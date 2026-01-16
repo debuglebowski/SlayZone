@@ -22,7 +22,12 @@ Phases derived from requirement categories and dependencies. Foundation establis
 3. Preload script exposes typed IPC API (contextBridge)
 4. Security baseline verified: nodeIntegration false, contextIsolation true, sandbox true
 
-**Plans:** (created by /gsd:plan-phase)
+**Plans:** 3 plans
+
+Plans:
+- [ ] 01-01-PLAN.md — Scaffold Electron-Vite + Tailwind/shadcn
+- [ ] 01-02-PLAN.md — Database layer with better-sqlite3
+- [ ] 01-03-PLAN.md — Typed IPC API + security verification
 
 ---
 
@@ -136,7 +141,7 @@ Phases derived from requirement categories and dependencies. Foundation establis
 
 | Phase | Status | Completed |
 |-------|--------|-----------|
-| 1 - Foundation | Not started | - |
+| 1 - Foundation | Planned | - |
 | 2 - Data Layer | Not started | - |
 | 3 - Navigation | Not started | - |
 | 4 - Task Management | Not started | - |
