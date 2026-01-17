@@ -7,9 +7,8 @@ function getFilterKey(projectId: string | null): string {
 
 export function useFilterState(
   projectId: string | null
-): [FilterState, (filter: FilterState) => void, boolean] {
+): [FilterState, (filter: FilterState) => void] {
   const [filterState, setFilterState] = useState<FilterState>(defaultFilterState)
-  const [isLoaded, setIsLoaded] = useState(false)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const prevProjectIdRef = useRef<string | null>(projectId)
 
@@ -19,8 +18,10 @@ export function useFilterState(
 
     // Only reset loaded state if projectId actually changed
     if (prevProjectIdRef.current !== projectId) {
-      setIsLoaded(false)
+      // Set default filter immediately to prevent flicker
+      setFilterState(defaultFilterState)
       prevProjectIdRef.current = projectId
+      // Don't set isLoaded to false - keep showing the filter bar with default state
     }
 
     window.api.settings.get(key).then((value) => {
@@ -34,7 +35,6 @@ export function useFilterState(
       } else {
         setFilterState(defaultFilterState)
       }
-      setIsLoaded(true)
     })
   }, [projectId])
 
@@ -64,5 +64,5 @@ export function useFilterState(
     }
   }, [])
 
-  return [filterState, setFilter, isLoaded]
+  return [filterState, setFilter]
 }

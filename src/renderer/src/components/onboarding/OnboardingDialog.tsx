@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
 import { Dialog, DialogContent } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
@@ -81,18 +82,34 @@ export function OnboardingDialog({
     <Dialog open={open} onOpenChange={() => {}}>
       <DialogContent className="sm:max-w-md" showCloseButton={false}>
         <div className="text-center py-6">
-          <h2 className="text-xl font-bold mb-3">{current.title}</h2>
-          <p className="text-muted-foreground mb-8 px-4">{current.description}</p>
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={step}
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
+              transition={{ type: 'spring', stiffness: 1500, damping: 80 }}
+            >
+              <h2 className="text-xl font-bold mb-3">{current.title}</h2>
+              <p className="text-muted-foreground mb-8 px-4">{current.description}</p>
+            </motion.div>
+          </AnimatePresence>
 
           {/* Step indicators */}
           <div className="flex justify-center gap-2 mb-6">
             {ONBOARDING_STEPS.map((_, i) => (
-              <div
+              <motion.div
                 key={i}
                 className={cn(
                   'w-2 h-2 rounded-full transition-colors',
                   i === step ? 'bg-primary' : 'bg-muted'
                 )}
+                initial={false}
+                animate={{
+                  scale: i === step ? 1.2 : 1,
+                  opacity: i === step ? 1 : 0.5
+                }}
+                transition={{ duration: 0.2 }}
               />
             ))}
           </div>

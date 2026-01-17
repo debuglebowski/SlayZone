@@ -1,3 +1,4 @@
+import { motion } from 'framer-motion'
 import { cn } from '@/lib/utils'
 import {
   ContextMenu,
@@ -28,19 +29,22 @@ export function ProjectItem({
   return (
     <ContextMenu>
       <ContextMenuTrigger asChild>
-        <button
+        <motion.button
           onClick={onClick}
           className={cn(
             'w-10 h-10 rounded-lg flex items-center justify-center',
             'text-xs font-semibold text-white transition-all',
-            'hover:scale-105',
             selected && 'ring-2 ring-primary ring-offset-2 ring-offset-background'
           )}
           style={{ backgroundColor: project.color }}
           title={project.name}
+          whileHover={{ scale: 1.1 }}
+          whileTap={{ scale: 0.95 }}
+          animate={selected ? { scale: 1.05 } : { scale: 1 }}
+          transition={{ type: 'spring', stiffness: 1800, damping: 50 }}
         >
           {abbrev}
-        </button>
+        </motion.button>
       </ContextMenuTrigger>
       <ContextMenuContent>
         <ContextMenuItem onSelect={onSettings}>Settings</ContextMenuItem>

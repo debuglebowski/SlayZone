@@ -1,3 +1,5 @@
+import { motion } from 'framer-motion'
+import { useEffect, useRef, useState } from 'react'
 import type { Task, Project } from '../../../../shared/types/database'
 import { Card, CardContent } from '@/components/ui/card'
 import { cn } from '@/lib/utils'
@@ -31,17 +33,43 @@ export function KanbanCard({
   const isOverdue = task.due_date && task.due_date < today && task.status !== 'done'
   const isBlocked = !!task.blocked_reason
   const priorityColor = PRIORITY_COLORS[task.priority] || PRIORITY_COLORS[3]
+  const prevStatusRef = useRef(task.status)
+  const [justCompleted, setJustCompleted] = useState(false)
+
+  useEffect(() => {
+    if (prevStatusRef.current !== 'done' && task.status === 'done') {
+      setJustCompleted(true)
+      setTimeout(() => setJustCompleted(false), 1000)
+    }
+    prevStatusRef.current = task.status
+  }, [task.status])
 
   return (
-    <Card
-      className={cn(
-        'cursor-grab transition-shadow select-none py-0 gap-0',
-        isDragging && 'opacity-50 shadow-lg',
-        isOverdue && 'border-destructive',
-        isBlocked && 'border-yellow-500 opacity-60'
-      )}
-      onClick={(e) => onClick?.(e)}
+    <motion.div
+      whileHover={!isDragging ? { y: -2, transition: { duration: 0.033 } } : undefined}
+      whileTap={!isDragging ? { scale: 0.98 } : undefined}
+      animate={
+        justCompleted
+          ? {
+              scale: [1, 1.1, 1],
+              rotate: [0, 5, -5, 0],
+              transition: {
+                duration: 0.1,
+                ease: 'easeOut'
+              }
+            }
+          : {}
+      }
     >
+      <Card
+        className={cn(
+          'cursor-grab transition-shadow select-none py-0 gap-0',
+          isDragging && 'opacity-50 shadow-lg',
+          isOverdue && 'border-destructive',
+          isBlocked && 'border-yellow-500 opacity-60'
+        )}
+        onClick={(e) => onClick?.(e)}
+      >
       <CardContent className="px-2.5 py-5">
         <div className="flex items-center gap-1">
           {/* Project color dot - shown in All view */}
@@ -93,5 +121,6 @@ export function KanbanCard({
         </div>
       </CardContent>
     </Card>
+    </motion.div>
   )
 }

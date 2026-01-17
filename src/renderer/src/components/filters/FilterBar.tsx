@@ -1,3 +1,4 @@
+import { motion, AnimatePresence } from 'framer-motion'
 import type { Tag } from '../../../../shared/types/database'
 import { GroupBySelect } from './GroupBySelect'
 import type { FilterState, GroupKey, DueDateRange } from './FilterState'
@@ -74,7 +75,12 @@ export function FilterBar({ filter, onChange, tags }: FilterBarProps): React.JSX
   const selectedTagCount = filter.tagIds.length
 
   return (
-    <div className="flex items-center gap-4 flex-wrap">
+    <motion.div
+      className="flex items-center gap-4 flex-wrap"
+      initial={false}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.033 }}
+    >
       {/* Group By */}
       <div className="flex items-center gap-2">
         <Label className="text-xs text-muted-foreground">Group</Label>
@@ -184,6 +190,6 @@ export function FilterBar({ filter, onChange, tags }: FilterBarProps): React.JSX
           </Label>
         </div>
       </div>
-    </div>
+    </motion.div>
   )
 }

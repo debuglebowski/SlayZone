@@ -112,7 +112,7 @@ export function KanbanColumn({
           strategy={verticalListSortingStrategy}
         >
           <div className="flex flex-col gap-2">
-            {column.tasks.map((task) => {
+            {column.tasks.map((task, index) => {
               const taskTagIds = taskTags?.get(task.id) ?? []
               const taskTagsList =
                 tags && taskTagIds.length > 0

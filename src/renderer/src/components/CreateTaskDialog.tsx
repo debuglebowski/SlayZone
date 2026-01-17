@@ -4,6 +4,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { format } from 'date-fns'
 import { CalendarIcon } from 'lucide-react'
 import type { Task, Tag } from '../../../shared/types/database'
+import { SuccessToast } from '@/components/animations/SuccessToast'
 import {
   createTaskSchema,
   type CreateTaskFormData,
@@ -59,6 +60,7 @@ export function CreateTaskDialog({
   onTagCreated
 }: CreateTaskDialogProps): React.JSX.Element {
   const [newTagName, setNewTagName] = useState('')
+  const [showSuccess, setShowSuccess] = useState(false)
   const form = useForm<CreateTaskFormData>({
     resolver: zodResolver(createTaskSchema),
     defaultValues: {
@@ -101,6 +103,8 @@ export function CreateTaskDialog({
     }
     onCreated(task)
     form.reset()
+    setShowSuccess(true)
+    setTimeout(() => setShowSuccess(false), 3000)
   }
 
   // Get selected tags for display
@@ -339,6 +343,11 @@ export function CreateTaskDialog({
             </div>
           </form>
         </Form>
+        <SuccessToast
+          message="Task created successfully!"
+          show={showSuccess}
+          onComplete={() => setShowSuccess(false)}
+        />
       </DialogContent>
     </Dialog>
   )

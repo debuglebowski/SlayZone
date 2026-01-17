@@ -18,10 +18,11 @@ import { TaskDetailPage } from '@/components/task-detail/TaskDetailPage'
 import { WorkModePage } from '@/components/work-mode/WorkModePage'
 import { ArchivedTasksView } from '@/components/ArchivedTasksView'
 import { Button } from '@/components/ui/button'
-import { Skeleton } from '@/components/ui/skeleton'
 import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar'
 import { AppSidebar } from '@/components/sidebar/AppSidebar'
 import { useWhatNext } from '@/hooks/useWhatNext'
+import { AnimatedPage } from '@/components/animations/AnimatedPage'
+import { LoadingScreen } from '@/components/LoadingScreen'
 
 // View state for navigation
 type ViewState =
@@ -44,10 +45,11 @@ function App(): React.JSX.Element {
   const [taskTags, setTaskTags] = useState<Map<string, string[]>>(new Map())
 
   // Filter state (persisted per project)
-  const [filter, setFilter, filterLoaded] = useFilterState(selectedProjectId)
+  const [filter, setFilter] = useFilterState(selectedProjectId)
 
   // View state (replaces editingTask for task detail navigation)
   const [view, setView] = useState<ViewState>({ type: 'kanban' })
+  const [navDirection, setNavDirection] = useState<'forward' | 'backward'>('forward')
 
   // Dialog state
   const [createOpen, setCreateOpen] = useState(false)
@@ -143,26 +145,31 @@ function App(): React.JSX.Element {
 
   // Navigation handlers
   const openTaskDetail = (taskId: string): void => {
+    setNavDirection('forward')
     setView({ type: 'task-detail', taskId })
   }
 
   const closeTaskDetail = (): void => {
+    setNavDirection('backward')
     setView({ type: 'kanban' })
   }
 
   const openWorkMode = (taskId: string): void => {
+    setNavDirection('forward')
     setView({ type: 'work-mode', taskId })
   }
 
   const closeWorkMode = (): void => {
     // Return to task detail, not kanban
     if (view.type === 'work-mode') {
+      setNavDirection('backward')
       setView({ type: 'task-detail', taskId: view.taskId })
     }
   }
 
   const openArchive = (): void => {
     setSelectedProjectId(null)
+    setNavDirection('forward')
     setView({ type: 'archived' })
   }
 
@@ -375,40 +382,55 @@ function App(): React.JSX.Element {
   }
 
   if (loading) {
-    return <div className="flex h-screen items-center justify-center">Loading...</div>
+    return <LoadingScreen />
   }
 
   // Work Mode view
   if (view.type === 'work-mode') {
-    return <WorkModePage taskId={view.taskId} onBack={closeWorkMode} />
+    return (
+      <AnimatedPage viewKey={`work-mode-${view.taskId}`} direction={navDirection}>
+        <WorkModePage taskId={view.taskId} onBack={closeWorkMode} />
+      </AnimatedPage>
+    )
   }
 
   // Archived view (full screen, no sidebar)
   if (view.type === 'archived') {
     return (
-      <ArchivedTasksView
-        onBack={() => setView({ type: 'kanban' })}
-        onTaskClick={(id) => setView({ type: 'task-detail', taskId: id })}
-      />
+      <AnimatedPage viewKey="archived" direction={navDirection}>
+        <ArchivedTasksView
+          onBack={() => {
+            setNavDirection('backward')
+            setView({ type: 'kanban' })
+          }}
+          onTaskClick={(id) => {
+            setNavDirection('forward')
+            setView({ type: 'task-detail', taskId: id })
+          }}
+        />
+      </AnimatedPage>
     )
   }
 
   // Task detail view (full screen, no sidebar)
   if (view.type === 'task-detail') {
     return (
-      <TaskDetailPage
-        taskId={view.taskId}
-        onBack={closeTaskDetail}
-        onTaskUpdated={handleTaskDetailUpdated}
-        onWorkMode={() => openWorkMode(view.taskId)}
-        onNavigateToTask={openTaskDetail}
-      />
+      <AnimatedPage viewKey={`task-detail-${view.taskId}`} direction={navDirection}>
+        <TaskDetailPage
+          taskId={view.taskId}
+          onBack={closeTaskDetail}
+          onTaskUpdated={handleTaskDetailUpdated}
+          onWorkMode={() => openWorkMode(view.taskId)}
+          onNavigateToTask={openTaskDetail}
+        />
+      </AnimatedPage>
     )
   }
 
   // Kanban view (with sidebar)
   return (
-    <SidebarProvider defaultOpen={true}>
+    <AnimatedPage viewKey="kanban" direction={navDirection}>
+      <SidebarProvider defaultOpen={true}>
       <AppSidebar
         projects={projects}
         selectedProjectId={selectedProjectId}
@@ -460,13 +482,9 @@ function App(): React.JSX.Element {
             </div>
           ) : (
             <>
-              {!filterLoaded ? (
-                <Skeleton className="h-10 w-full mb-4" />
-              ) : (
-                <div className="mb-4">
-                  <FilterBar filter={filter} onChange={setFilter} tags={tags} />
-                </div>
-              )}
+              <div className="mb-4">
+                <FilterBar filter={filter} onChange={setFilter} tags={tags} />
+              </div>
               <div className="flex-1 min-h-0">
                 <KanbanBoard
                   tasks={displayTasks}
@@ -550,6 +568,7 @@ function App(): React.JSX.Element {
         </div>
       </SidebarInset>
     </SidebarProvider>
+    </AnimatedPage>
   )
 }
 

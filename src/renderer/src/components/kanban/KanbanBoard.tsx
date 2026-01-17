@@ -10,6 +10,7 @@ import {
   type DragStartEvent,
   type DragEndEvent
 } from '@dnd-kit/core'
+import { motion } from 'framer-motion'
 import type { Task, Project, Tag } from '../../../../shared/types/database'
 import { groupTasksBy, type GroupKey, type Column } from '@/lib/kanban'
 import { KanbanColumn } from './KanbanColumn'
@@ -109,14 +110,25 @@ export function KanbanBoard({
           />
         ))}
       </div>
-      <DragOverlay dropAnimation={{ duration: 150, easing: 'ease-out' }}>
+      <DragOverlay
+        dropAnimation={{
+          duration: 33,
+          easing: 'ease-out'
+        }}
+      >
         {activeTask ? (
-          <KanbanCard
-            task={activeTask}
-            isDragging
-            project={showProjectDot ? projectsMap?.get(activeTask.project_id) : undefined}
-            showProject={showProjectDot}
-          />
+          <motion.div
+            initial={{ scale: 0.95, opacity: 0.8 }}
+            animate={{ scale: 1.05, opacity: 1 }}
+            transition={{ type: 'spring', stiffness: 1800, damping: 60 }}
+          >
+            <KanbanCard
+              task={activeTask}
+              isDragging
+              project={showProjectDot ? projectsMap?.get(activeTask.project_id) : undefined}
+              showProject={showProjectDot}
+            />
+          </motion.div>
         ) : null}
       </DragOverlay>
     </DndContext>
