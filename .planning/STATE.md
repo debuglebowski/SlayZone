@@ -10,16 +10,16 @@ See: .planning/PROJECT.md
 ## Current Position
 
 Phase: 7 of 7 (Polish + UX)
-Plan: 3 of 5 complete (07-01, 07-03, 07-04)
+Plan: 4 of 5 complete (07-01, 07-02, 07-03, 07-04)
 Status: In progress
-Last activity: 2026-01-17 - Completed 07-01-PLAN.md (Tags in CreateTaskDialog)
+Last activity: 2026-01-17 - Completed 07-02-PLAN.md (Global keyboard shortcuts)
 
-Progress: █████████████████████████████████░░░ 94% (29/31 plans)
+Progress: ██████████████████████████████████░░ 97% (30/31 plans)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 29
+- Total plans completed: 30
 - Average duration: 2.7min
 
 **By Phase:**
@@ -32,7 +32,7 @@ Progress: ███████████████████████�
 | 04-task-management | 7 | 14min | 2.0min |
 | 05-ai-integration | 4 | 7min | 1.8min |
 | 06-work-mode | 5 | 12min | 2.4min |
-| 07-polish | 3 | 21min | 7.0min |
+| 07-polish | 4 | 24min | 6.0min |
 
 ## Accumulated Context
 
@@ -99,6 +99,7 @@ Progress: ███████████████████████�
 | Priority score formula: (6-priority)*200 + dueDateScore + statusScore | 07-03 | Clear weighted scoring |
 | Overdue tasks capped at +1000 bonus | 07-03 | Prevent runaway scores |
 | Remove .default([]) from tagIds schema | 07-01 | react-hook-form type compatibility |
+| useHotkeys with enableOnFormTags: false | 07-02 | Prevents shortcuts triggering while typing |
 
 ### Pending Todos
 
@@ -110,6 +111,6 @@ Progress: ███████████████████████�
 
 ## Session Continuity
 
-Last session: 2026-01-17T14:00Z
-Stopped at: Completed 07-01-PLAN.md (Tags in CreateTaskDialog)
+Last session: 2026-01-17T14:50Z
+Stopped at: Completed 07-02-PLAN.md (Global keyboard shortcuts)
 Resume file: None
