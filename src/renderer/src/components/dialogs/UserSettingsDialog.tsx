@@ -9,7 +9,16 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Separator } from "@/components/ui/separator"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import { useTheme } from "@/contexts/ThemeContext"
 import type { Tag } from "../../../../shared/types/database"
+import type { ThemePreference } from "../../../../shared/types/api"
 
 interface UserSettingsDialogProps {
   open: boolean
@@ -17,6 +26,7 @@ interface UserSettingsDialogProps {
 }
 
 export function UserSettingsDialog({ open, onOpenChange }: UserSettingsDialogProps) {
+  const { preference, setPreference } = useTheme()
   const [tags, setTags] = useState<Tag[]>([])
   const [newTagName, setNewTagName] = useState("")
   const [newTagColor, setNewTagColor] = useState("#6b7280")
@@ -73,6 +83,26 @@ export function UserSettingsDialog({ open, onOpenChange }: UserSettingsDialogPro
         </DialogHeader>
 
         <div className="space-y-6">
+          {/* Appearance Section */}
+          <div className="space-y-2">
+            <Label className="text-base font-semibold">Appearance</Label>
+            <div className="flex items-center justify-between">
+              <span className="text-sm">Theme</span>
+              <Select value={preference} onValueChange={(v) => setPreference(v as ThemePreference)}>
+                <SelectTrigger className="w-32">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="light">Light</SelectItem>
+                  <SelectItem value="dark">Dark</SelectItem>
+                  <SelectItem value="system">System</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <Separator />
+
           {/* Tags Section */}
           <div className="space-y-4">
             <Label className="text-base font-semibold">Tags</Label>
