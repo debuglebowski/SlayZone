@@ -5,29 +5,29 @@
 See: .planning/PROJECT.md
 
 **Core value:** One place for all tasks with focused Work Mode that prevents rabbit-holing
-**Current focus:** Phase 2 - Data Layer + Task CRUD
+**Current focus:** Phase 2 Complete - Ready for Phase 3
 
 ## Current Position
 
 Phase: 2 of 7 (Data Layer + Task CRUD)
-Plan: 2 of 3 complete
-Status: In progress
-Last activity: 2026-01-17 - Completed 02-02-PLAN.md
+Plan: 3 of 3 complete
+Status: Phase complete
+Last activity: 2026-01-17 - Completed 02-03-PLAN.md
 
-Progress: ██░░░░░░░░ 24%
+Progress: ██████░░░░ 29%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 5
-- Average duration: 5.6min
+- Total plans completed: 6
+- Average duration: 5.2min
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
 | 01-foundation | 3 | 19min | 6.3min |
-| 02-data-layer | 2 | 9min | 4.5min |
+| 02-data-layer | 3 | 13min | 4.3min |
 
 ## Accumulated Context
 
@@ -47,6 +47,9 @@ Progress: ██░░░░░░░░ 24%
 | Zod enum mirrors database.ts TaskStatus | 02-02 | Validation matches DB schema |
 | Priority as number 1-5, not string | 02-02 | Enables sorting |
 | dueDate as nullable ISO string | 02-02 | Consistent date format |
+| Explicit form data types vs Zod inferred | 02-03 | Form compatibility with react-hook-form |
+| Collapsible blockedReason field | 02-03 | Cleaner edit dialog UX |
+| Null-to-undefined coercion for API calls | 02-03 | Form uses null, API expects undefined |
 
 ### Pending Todos
 
@@ -59,5 +62,5 @@ Progress: ██░░░░░░░░ 24%
 ## Session Continuity
 
 Last session: 2026-01-17
-Stopped at: Completed 02-02-PLAN.md
-Resume file: .planning/phases/02-data-layer/02-03-PLAN.md
+Stopped at: Completed 02-03-PLAN.md (Phase 2 complete)
+Resume file: .planning/phases/03-ui-components/03-PHASE.md
