@@ -1,4 +1,4 @@
-import { Archive } from 'lucide-react'
+import { Archive, Settings, HelpCircle } from 'lucide-react'
 import {
   Sidebar,
   SidebarContent,
@@ -8,12 +8,8 @@ import {
   SidebarMenu,
   SidebarMenuItem
 } from '@/components/ui/sidebar'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger
-} from '@/components/ui/dropdown-menu'
+import { Button } from '@/components/ui/button'
+import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip'
 import { ProjectItem } from './ProjectItem'
 import { cn } from '@/lib/utils'
 import type { Project } from '../../../../shared/types/database'
@@ -117,40 +113,33 @@ export function AppSidebar({
       </SidebarContent>
       <SidebarFooter className="py-4">
         <SidebarMenu>
-          <SidebarMenuItem className="flex justify-center">
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button
-                  className={cn(
-                    'w-10 h-10 rounded-lg flex items-center justify-center',
-                    'text-muted-foreground hover:bg-muted transition-colors'
-                  )}
-                  title="Menu"
+          <SidebarMenuItem className="flex justify-center gap-2">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon-lg"
+                  onClick={onSettings}
+                  className="rounded-lg text-muted-foreground"
                 >
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    width="20"
-                    height="20"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  >
-                    <circle cx="12" cy="12" r="10" />
-                    <circle cx="12" cy="12" r="4" />
-                    <line x1="21.17" y1="8" x2="12" y2="8" />
-                    <line x1="3.95" y1="6.06" x2="8.54" y2="14" />
-                    <line x1="10.88" y1="21.94" x2="15.46" y2="14" />
-                  </svg>
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent side="right" align="end">
-                <DropdownMenuItem onClick={onSettings}>Settings</DropdownMenuItem>
-                <DropdownMenuItem onClick={onTutorial}>Tutorial</DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+                  <Settings className="size-5" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="right">Settings</TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon-lg"
+                  onClick={onTutorial}
+                  className="rounded-lg text-muted-foreground"
+                >
+                  <HelpCircle className="size-5" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="right">Tutorial</TooltipContent>
+            </Tooltip>
           </SidebarMenuItem>
         </SidebarMenu>
       </SidebarFooter>
