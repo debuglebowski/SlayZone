@@ -5,22 +5,22 @@
 See: .planning/PROJECT.md
 
 **Core value:** One place for all tasks with focused Work Mode that prevents rabbit-holing
-**Current focus:** Phase 4 - Kanban board implemented
+**Current focus:** Phase 4 - Task detail page with inline editing
 
 ## Current Position
 
 Phase: 4 of 7 (Task Management)
-Plan: 3 of 5 complete
+Plan: 4 of 7 complete
 Status: In progress
-Last activity: 2026-01-17 - Completed 04-03-PLAN.md
+Last activity: 2026-01-17 - Completed 04-05-PLAN.md
 
-Progress: █████████████░ 54%
+Progress: ███████████████░ 83%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 14
-- Average duration: 3.5min
+- Total plans completed: 15
+- Average duration: 3.4min
 
 **By Phase:**
 
@@ -29,7 +29,7 @@ Progress: █████████████░ 54%
 | 01-foundation | 3 | 19min | 6.3min |
 | 02-data-layer | 3 | 13min | 4.3min |
 | 03-navigation | 5 | 11min | 2.2min |
-| 04-task-management | 3 | 8min | 2.7min |
+| 04-task-management | 4 | 10min | 2.5min |
 
 ## Accumulated Context
 
@@ -70,6 +70,9 @@ Progress: █████████████░ 54%
 | Filter key per project: filter:${projectId} | 04-03 | Per-project filter persistence |
 | 500ms debounce on filter save | 04-03 | Avoid excessive SQLite writes |
 | isLoaded flag from useFilterState | 04-03 | Prevent flash of default state |
+| ViewState discriminated union for nav | 04-05 | State-based routing without router |
+| Wrap ReactMarkdown in div for prose | 04-05 | v10 API doesn't accept className |
+| Click-to-edit with blur-to-save | 04-05 | Inline editing pattern |
 
 ### Pending Todos
 
@@ -82,5 +85,5 @@ Progress: █████████████░ 54%
 ## Session Continuity
 
 Last session: 2026-01-17
-Stopped at: Completed 04-03-PLAN.md
-Resume file: .planning/phases/04-task-management/04-04-PLAN.md
+Stopped at: Completed 04-05-PLAN.md
+Resume file: .planning/phases/04-task-management/04-06-PLAN.md
