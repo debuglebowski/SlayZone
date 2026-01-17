@@ -68,12 +68,9 @@ export function MarkdownEditor({
       )}
     >
       {value ? (
-        <ReactMarkdown
-          remarkPlugins={[remarkGfm]}
-          className="prose prose-sm dark:prose-invert max-w-none"
-        >
-          {value}
-        </ReactMarkdown>
+        <div className="prose prose-sm dark:prose-invert max-w-none">
+          <ReactMarkdown remarkPlugins={[remarkGfm]}>{value}</ReactMarkdown>
+        </div>
       ) : (
         placeholder
       )}
