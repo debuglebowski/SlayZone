@@ -125,7 +125,7 @@ export interface ElectronAPI {
     create: (data: CreateChatMessageInput) => Promise<ChatMessage>
     delete: (id: string) => Promise<boolean>
   }
-  workspaceItems?: {
+  workspaceItems: {
     getByTask: (taskId: string) => Promise<WorkspaceItem[]>
     create: (data: CreateWorkspaceItemInput) => Promise<WorkspaceItem>
     update: (data: UpdateWorkspaceItemInput) => Promise<WorkspaceItem>
