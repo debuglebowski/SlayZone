@@ -287,6 +287,7 @@ function App(): React.JSX.Element {
         onBack={closeTaskDetail}
         onTaskUpdated={handleTaskDetailUpdated}
         onWorkMode={() => openWorkMode(view.taskId)}
+        onNavigateToTask={openTaskDetail}
       />
     )
   }
