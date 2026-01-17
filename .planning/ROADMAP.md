@@ -58,7 +58,9 @@ Plans:
   2. Search finds tasks and projects by title
   3. Results display project and task icons to distinguish types
   4. Selecting a result navigates to it
-**Plans**: TBD
+**Plans**: 1 plan
+Plans:
+- [ ] 09-01-PLAN.md - Install shadcn command, create SearchDialog, wire into App.tsx
 
 #### Phase 10: Task Lifecycle
 **Goal**: Archive and delete tasks
@@ -122,7 +124,7 @@ Plans:
 |-------|-----------|----------------|--------|-----------|
 | 1-7 | v1.0 | - | Complete | 2026-01-16 |
 | 8. Theme System | v1.1 | 2/2 | Complete | 2026-01-17 |
-| 9. Search | v1.1 | 0/TBD | Not started | - |
+| 9. Search | v1.1 | 0/1 | Not started | - |
 | 10. Task Lifecycle | v1.1 | 0/TBD | Not started | - |
 | 11. Kanban Polish | v1.1 | 0/TBD | Not started | - |
 | 12. Settings Redesign | v1.1 | 0/TBD | Not started | - |
