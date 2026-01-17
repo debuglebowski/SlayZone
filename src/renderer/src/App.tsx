@@ -11,6 +11,7 @@ import { CreateProjectDialog } from '@/components/dialogs/CreateProjectDialog'
 import { ProjectSettingsDialog } from '@/components/dialogs/ProjectSettingsDialog'
 import { DeleteProjectDialog } from '@/components/dialogs/DeleteProjectDialog'
 import { UserSettingsDialog } from '@/components/dialogs/UserSettingsDialog'
+import { OnboardingDialog } from '@/components/onboarding/OnboardingDialog'
 import { TaskDetailPage } from '@/components/task-detail/TaskDetailPage'
 import { WorkModePage } from '@/components/work-mode/WorkModePage'
 import { Button } from '@/components/ui/button'
@@ -316,6 +317,9 @@ function App(): React.JSX.Element {
             open={settingsOpen}
             onOpenChange={setSettingsOpen}
           />
+
+          {/* Onboarding (first launch) */}
+          <OnboardingDialog />
         </div>
       </SidebarInset>
     </SidebarProvider>
