@@ -27,6 +27,8 @@ function streamReducer(state: StreamState, action: StreamAction): StreamState {
     case 'CHUNK':
       return { ...state, content: state.content + action.text }
     case 'DONE':
+      // Don't overwrite error state
+      if (state.status === 'error') return state
       return { ...state, status: 'done' }
     case 'ERROR':
       return { ...state, status: 'error', error: action.error }
@@ -62,11 +64,22 @@ export function useClaude(workspaceItemId?: string) {
   // Subscribe to stream events
   useEffect(() => {
     const unsubChunk = window.api.claude.onChunk((data: ClaudeStreamEvent) => {
+      console.log('[useClaude] Chunk:', data.type, data.subtype || data.event?.type || '')
+
+      // Handle assistant message (final or without --include-partial-messages)
       if (data.type === 'assistant' && data.message?.content) {
         for (const block of data.message.content) {
           if (block.type === 'text' && block.text) {
             dispatch({ type: 'CHUNK', text: block.text })
           }
+        }
+      }
+
+      // Handle stream_event (incremental streaming with --include-partial-messages)
+      if (data.type === 'stream_event' && data.event?.type === 'content_block_delta') {
+        const text = data.event.delta?.text
+        if (text) {
+          dispatch({ type: 'CHUNK', text })
         }
       }
     })
@@ -75,8 +88,13 @@ export function useClaude(workspaceItemId?: string) {
       dispatch({ type: 'ERROR', error })
     })
 
-    const unsubDone = window.api.claude.onDone(() => {
-      dispatch({ type: 'DONE' })
+    const unsubDone = window.api.claude.onDone((result) => {
+      // If exit code is non-zero, treat as error
+      if (result.code !== 0) {
+        dispatch({ type: 'ERROR', error: `Claude CLI exited with code ${result.code}` })
+      } else {
+        dispatch({ type: 'DONE' })
+      }
     })
 
     return () => {

@@ -13,11 +13,19 @@ export interface ClaudeAvailability {
 
 // Claude streaming types
 export interface ClaudeStreamEvent {
-  type: 'system' | 'assistant' | 'result'
+  type: 'system' | 'assistant' | 'result' | 'stream_event'
   subtype?: 'init' | 'success' | 'error'
   message?: {
     role: string
     content: Array<{ type: string; text?: string }>
+  }
+  // stream_event fields (for --include-partial-messages)
+  event?: {
+    type: string // 'content_block_delta', 'message_start', etc.
+    delta?: {
+      type: string // 'text_delta'
+      text?: string
+    }
   }
   session_id?: string
   cost?: number

@@ -86,7 +86,7 @@ export function DumperPanel({ item, onUpdate }: Props) {
     const newThoughts = [...thoughts, input.trim()]
     setThoughts(newThoughts)
     setInput('')
-    
+
     // Save updated thoughts list
     const currentData = parseDumperData(item.content)
     const updatedData: DumperData = {
@@ -103,7 +103,7 @@ export function DumperPanel({ item, onUpdate }: Props) {
   const handleDeleteThought = async (index: number) => {
     const newThoughts = thoughts.filter((_, i) => i !== index)
     setThoughts(newThoughts)
-    
+
     // Save updated thoughts list
     const currentData = parseDumperData(item.content)
     const updatedData: DumperData = {
@@ -185,7 +185,7 @@ export function DumperPanel({ item, onUpdate }: Props) {
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 placeholder="Dump your unorganized thoughts here..."
-                className="min-h-[120px] resize-none pr-12"
+                className="min-h-[120px] resize-none pr-12 pb-12"
                 disabled={isStreaming}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
@@ -198,7 +198,7 @@ export function DumperPanel({ item, onUpdate }: Props) {
                 onClick={handleSend}
                 disabled={isStreaming || !input.trim()}
                 size="icon"
-                className="absolute bottom-2 right-2 h-8 w-8"
+                className="absolute bottom-2 right-2 z-10 h-8 w-8"
               >
                 <Send className="h-4 w-4" />
               </Button>

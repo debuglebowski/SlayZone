@@ -177,6 +177,9 @@ export function TaskDetailPage({
                 {onWorkMode && (
                   <Button variant="outline" size="sm" onClick={onWorkMode}>
                     Work Mode
+                    <span className="ml-2 text-xs text-muted-foreground tracking-widest">
+                      ⌘↵
+                    </span>
                   </Button>
                 )}
                 <DropdownMenu>

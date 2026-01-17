@@ -13,9 +13,147 @@ import { registerClaudeHandlers } from './ipc/claude'
 import { registerThemeHandlers } from './ipc/theme'
 import { getActiveProcess } from './services/claude-spawner'
 
-function createWindow(): void {
-  // Create the browser window.
-  const mainWindow = new BrowserWindow({
+// Minimum splash screen display time (ms)
+const SPLASH_MIN_DURATION = 3000
+
+// Self-contained splash HTML with inline SVG and CSS animations
+const splashHTML = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body {
+      height: 100%;
+      overflow: hidden;
+      background: transparent;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+    .container {
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: #0a0a0a;
+      border-radius: 16px;
+    }
+    .logo-wrapper {
+      animation: fadeInScale 0.6s ease-out forwards;
+    }
+    .logo {
+      width: 80px;
+      height: 80px;
+      color: #e5e5e5;
+      animation: pulse 2s ease-in-out infinite;
+    }
+    .title {
+      margin-top: 24px;
+      font-size: 28px;
+      font-weight: 600;
+      color: #fafafa;
+      opacity: 0;
+      animation: fadeInUp 0.5s ease-out 0.3s forwards;
+    }
+    .dots {
+      display: flex;
+      gap: 8px;
+      margin-top: 32px;
+      opacity: 0;
+      animation: fadeIn 0.4s ease-out 0.6s forwards;
+    }
+    .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #a3a3a3;
+      animation: dotPulse 1.4s ease-in-out infinite;
+    }
+    .dot:nth-child(2) { animation-delay: 0.2s; }
+    .dot:nth-child(3) { animation-delay: 0.4s; }
+
+    @keyframes fadeInScale {
+      from { opacity: 0; transform: scale(0.8); }
+      to { opacity: 1; transform: scale(1); }
+    }
+    @keyframes fadeInUp {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+    @keyframes pulse {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.05); }
+    }
+    @keyframes dotPulse {
+      0%, 80%, 100% { opacity: 0.3; transform: scale(0.8); }
+      40% { opacity: 1; transform: scale(1); }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="logo-wrapper">
+      <svg class="logo" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="32" cy="32" r="20" stroke="currentColor" stroke-width="2" fill="none" opacity="0.3"/>
+        <circle cx="32" cy="32" r="12" stroke="currentColor" stroke-width="2" fill="none" opacity="0.5"/>
+        <circle cx="32" cy="32" r="4" fill="currentColor"/>
+        <path d="M 32 12 L 28 20 M 32 12 L 36 20" stroke="currentColor" stroke-width="2" stroke-linecap="round" opacity="0.6"/>
+        <path d="M 52 32 L 44 28 M 52 32 L 44 36" stroke="currentColor" stroke-width="2" stroke-linecap="round" opacity="0.6"/>
+        <path d="M 32 52 L 28 44 M 32 52 L 36 44" stroke="currentColor" stroke-width="2" stroke-linecap="round" opacity="0.6"/>
+        <path d="M 12 32 L 20 28 M 12 32 L 20 36" stroke="currentColor" stroke-width="2" stroke-linecap="round" opacity="0.6"/>
+      </svg>
+    </div>
+    <div class="title">Focus</div>
+    <div class="dots">
+      <div class="dot"></div>
+      <div class="dot"></div>
+      <div class="dot"></div>
+    </div>
+  </div>
+</body>
+</html>
+`
+
+let splashWindow: BrowserWindow | null = null
+let mainWindow: BrowserWindow | null = null
+let splashShownAt: number = 0
+
+function createSplashWindow(): void {
+  splashWindow = new BrowserWindow({
+    width: 300,
+    height: 350,
+    frame: false,
+    transparent: true,
+    resizable: false,
+    center: true,
+    skipTaskbar: true,
+    alwaysOnTop: true,
+    show: false,
+    webPreferences: {
+      nodeIntegration: false,
+      contextIsolation: true
+    }
+  })
+
+  splashWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(splashHTML)}`)
+
+  splashWindow.once('ready-to-show', () => {
+    splashShownAt = Date.now()
+    splashWindow?.show()
+  })
+
+  splashWindow.on('closed', () => {
+    splashWindow = null
+  })
+}
+
+function createMainWindow(): void {
+  mainWindow = new BrowserWindow({
     width: 1911,
     height: 1421,
     show: false,
@@ -31,12 +169,25 @@ function createWindow(): void {
   })
 
   mainWindow.on('ready-to-show', () => {
-    mainWindow.show()
+    // Calculate remaining time to keep splash visible
+    const elapsed = Date.now() - splashShownAt
+    const remaining = Math.max(0, SPLASH_MIN_DURATION - elapsed)
+
+    setTimeout(() => {
+      if (splashWindow && !splashWindow.isDestroyed()) {
+        splashWindow.close()
+      }
+      mainWindow?.show()
+    }, remaining)
   })
 
   mainWindow.webContents.setWindowOpenHandler((details) => {
     shell.openExternal(details.url)
     return { action: 'deny' }
+  })
+
+  mainWindow.on('closed', () => {
+    mainWindow = null
   })
 
   // HMR for renderer base on electron-vite cli.
@@ -46,6 +197,11 @@ function createWindow(): void {
   } else {
     mainWindow.loadFile(join(__dirname, '../renderer/index.html'))
   }
+}
+
+function createWindow(): void {
+  createSplashWindow()
+  createMainWindow()
 }
 
 // This method will be called when Electron has finished

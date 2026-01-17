@@ -12,13 +12,14 @@ export function streamClaude(win: BrowserWindow, prompt: string, context?: strin
   }
 
   // Build args
-  const args = ['-p', '--verbose', '--output-format', 'stream-json']
+  const args = ['-p', '--verbose', '--output-format', 'stream-json', '--include-partial-messages']
   if (context) {
     args.push('--append-system-prompt', context)
   }
   args.push(prompt)
 
   // Spawn process
+  console.log('[Claude] Spawning with args:', args.slice(0, -1).join(' '), '+ prompt')
   activeProcess = spawn('claude', args, {
     stdio: ['ignore', 'pipe', 'pipe']
   })
@@ -60,9 +61,10 @@ export function streamClaude(win: BrowserWindow, prompt: string, context?: strin
     try {
       const data = JSON.parse(line)
       chunksReceived = true
+      console.log('[Claude] Chunk:', data.type, data.subtype || data.event?.type || '')
       win.webContents.send('claude:chunk', data)
     } catch {
-      // Skip non-JSON lines
+      console.log('[Claude] Non-JSON line:', line.substring(0, 80))
     }
   })
 
@@ -76,6 +78,7 @@ export function streamClaude(win: BrowserWindow, prompt: string, context?: strin
   })
 
   activeProcess.on('close', (code) => {
+    console.log('[Claude] Process closed. code:', code, 'chunksReceived:', chunksReceived)
     // If process completed successfully but no chunks were received, provide feedback
     if (code === 0 && !chunksReceived) {
       win.webContents.send('claude:error', 'Claude CLI completed but produced no output. This may indicate an issue with the command or configuration.')
