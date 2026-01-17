@@ -4,14 +4,10 @@ import { TaskList } from '@/components/TaskList'
 import { CreateTaskDialog } from '@/components/CreateTaskDialog'
 import { EditTaskDialog } from '@/components/EditTaskDialog'
 import { DeleteTaskDialog } from '@/components/DeleteTaskDialog'
+import { CreateProjectDialog } from '@/components/dialogs/CreateProjectDialog'
+import { ProjectSettingsDialog } from '@/components/dialogs/ProjectSettingsDialog'
+import { DeleteProjectDialog } from '@/components/dialogs/DeleteProjectDialog'
 import { Button } from '@/components/ui/button'
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle
-} from '@/components/ui/dialog'
-import { Input } from '@/components/ui/input'
 import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar'
 import { AppSidebar } from '@/components/sidebar/AppSidebar'
 
@@ -29,9 +25,10 @@ function App(): React.JSX.Element {
   const [editingTask, setEditingTask] = useState<Task | null>(null)
   const [deletingTask, setDeletingTask] = useState<Task | null>(null)
 
-  // Quick project create
-  const [newProjectName, setNewProjectName] = useState('')
-  const [projectDialogOpen, setProjectDialogOpen] = useState(false)
+  // Project dialog state
+  const [createProjectOpen, setCreateProjectOpen] = useState(false)
+  const [editingProject, setEditingProject] = useState<Project | null>(null)
+  const [deletingProject, setDeletingProject] = useState<Project | null>(null)
 
   // Load data on mount
   useEffect(() => {
@@ -66,15 +63,29 @@ function App(): React.JSX.Element {
     }
   }
 
-  const handleCreateProject = async (): Promise<void> => {
-    if (!newProjectName.trim()) return
-    const colors = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6']
-    const color = colors[projects.length % colors.length]
-    const project = await window.api.db.createProject({ name: newProjectName, color })
+  // Project CRUD handlers
+  const handleProjectCreated = (project: Project): void => {
     setProjects([...projects, project])
     setSelectedProjectId(project.id)
-    setNewProjectName('')
-    setProjectDialogOpen(false)
+    setCreateProjectOpen(false)
+  }
+
+  const handleProjectUpdated = (project: Project): void => {
+    setProjects(projects.map((p) => (p.id === project.id ? project : p)))
+    setEditingProject(null)
+  }
+
+  const handleProjectDeleted = (): void => {
+    if (deletingProject) {
+      const remaining = projects.filter((p) => p.id !== deletingProject.id)
+      setProjects(remaining)
+      // Also remove tasks belonging to deleted project
+      setTasks(tasks.filter((t) => t.project_id !== deletingProject.id))
+      if (selectedProjectId === deletingProject.id) {
+        setSelectedProjectId(remaining.length > 0 ? remaining[0].id : null)
+      }
+      setDeletingProject(null)
+    }
   }
 
   if (loading) {
@@ -87,7 +98,9 @@ function App(): React.JSX.Element {
         projects={projects}
         selectedProjectId={selectedProjectId}
         onSelectProject={setSelectedProjectId}
-        onAddProject={() => setProjectDialogOpen(true)}
+        onAddProject={() => setCreateProjectOpen(true)}
+        onProjectSettings={setEditingProject}
+        onProjectDelete={setDeletingProject}
       />
       <SidebarInset className="min-h-screen">
         <div className="p-6">
@@ -114,23 +127,7 @@ function App(): React.JSX.Element {
             />
           )}
 
-          {/* Dialogs */}
-          <Dialog open={projectDialogOpen} onOpenChange={setProjectDialogOpen}>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Create Project</DialogTitle>
-              </DialogHeader>
-              <div className="flex gap-2">
-                <Input
-                  value={newProjectName}
-                  onChange={(e) => setNewProjectName(e.target.value)}
-                  placeholder="Project name"
-                  onKeyDown={(e) => e.key === 'Enter' && handleCreateProject()}
-                />
-                <Button onClick={handleCreateProject}>Create</Button>
-              </div>
-            </DialogContent>
-          </Dialog>
+          {/* Task Dialogs */}
           <CreateTaskDialog
             open={createOpen}
             onOpenChange={setCreateOpen}
@@ -148,6 +145,25 @@ function App(): React.JSX.Element {
             open={!!deletingTask}
             onOpenChange={(open) => !open && setDeletingTask(null)}
             onDeleted={handleTaskDeleted}
+          />
+
+          {/* Project Dialogs */}
+          <CreateProjectDialog
+            open={createProjectOpen}
+            onOpenChange={setCreateProjectOpen}
+            onCreated={handleProjectCreated}
+          />
+          <ProjectSettingsDialog
+            project={editingProject}
+            open={!!editingProject}
+            onOpenChange={(open) => !open && setEditingProject(null)}
+            onUpdated={handleProjectUpdated}
+          />
+          <DeleteProjectDialog
+            project={deletingProject}
+            open={!!deletingProject}
+            onOpenChange={(open) => !open && setDeletingProject(null)}
+            onDeleted={handleProjectDeleted}
           />
         </div>
       </SidebarInset>

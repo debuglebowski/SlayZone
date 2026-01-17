@@ -15,6 +15,8 @@ interface AppSidebarProps {
   selectedProjectId: string | null
   onSelectProject: (id: string | null) => void
   onAddProject: () => void
+  onProjectSettings: (project: Project) => void
+  onProjectDelete: (project: Project) => void
 }
 
 export function AppSidebar({
@@ -22,6 +24,8 @@ export function AppSidebar({
   selectedProjectId,
   onSelectProject,
   onAddProject,
+  onProjectSettings,
+  onProjectDelete,
 }: AppSidebarProps) {
   return (
     <Sidebar collapsible="none" className="w-16 border-r">
@@ -52,6 +56,8 @@ export function AppSidebar({
                     project={project}
                     selected={selectedProjectId === project.id}
                     onClick={() => onSelectProject(project.id)}
+                    onSettings={() => onProjectSettings(project)}
+                    onDelete={() => onProjectDelete(project)}
                   />
                 </SidebarMenuItem>
               ))}
