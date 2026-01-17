@@ -1,11 +1,7 @@
 import { useState, useEffect } from 'react'
 import { ChevronRight, Plus } from 'lucide-react'
 import type { Task } from '../../../../shared/types/database'
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger
-} from '@/components/ui/collapsible'
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { SubtaskItem } from './SubtaskItem'
@@ -14,11 +10,13 @@ import { cn } from '@/lib/utils'
 interface SubtaskAccordionProps {
   parentTaskId: string
   projectId: string
+  onNavigate: (subtaskId: string) => void
 }
 
 export function SubtaskAccordion({
   parentTaskId,
-  projectId
+  projectId,
+  onNavigate
 }: SubtaskAccordionProps): React.JSX.Element {
   const [subtasks, setSubtasks] = useState<Task[]>([])
   const [expanded, setExpanded] = useState(false)
@@ -30,7 +28,6 @@ export function SubtaskAccordion({
     const loadSubtasks = async (): Promise<void> => {
       const loaded = await window.api.db.getSubtasks(parentTaskId)
       setSubtasks(loaded)
-      setExpanded(loaded.length > 0)
       setLoading(false)
     }
 
@@ -48,21 +45,16 @@ export function SubtaskAccordion({
 
     setSubtasks((prev) => [...prev, created])
     setNewTitle('')
-    setExpanded(true)
   }
 
-  const handleKeyDown = async (
-    e: React.KeyboardEvent<HTMLInputElement>
-  ): Promise<void> => {
+  const handleKeyDown = async (e: React.KeyboardEvent<HTMLInputElement>): Promise<void> => {
     if (e.key === 'Enter') {
       await handleAddSubtask()
     }
   }
 
   const handleSubtaskUpdate = (updated: Task): void => {
-    setSubtasks((prev) =>
-      prev.map((s) => (s.id === updated.id ? updated : s))
-    )
+    setSubtasks((prev) => prev.map((s) => (s.id === updated.id ? updated : s)))
   }
 
   const handleSubtaskDelete = (subtaskId: string): void => {
@@ -79,18 +71,11 @@ export function SubtaskAccordion({
     <Collapsible open={expanded} onOpenChange={setExpanded}>
       <CollapsibleTrigger asChild>
         <Button variant="ghost" className="w-full justify-start gap-2 px-0">
-          <ChevronRight
-            className={cn(
-              'size-4 transition-transform',
-              expanded && 'rotate-90'
-            )}
-          />
+          <ChevronRight className={cn('size-4 transition-transform', expanded && 'rotate-90')} />
           <span className="font-medium">
             Subtasks ({subtasks.length})
             {subtasks.length > 0 && (
-              <span className="ml-1 text-muted-foreground">
-                - {doneCount} done
-              </span>
+              <span className="ml-1 text-muted-foreground">- {doneCount} done</span>
             )}
           </span>
         </Button>
@@ -105,6 +90,7 @@ export function SubtaskAccordion({
               subtask={subtask}
               onUpdate={handleSubtaskUpdate}
               onDelete={handleSubtaskDelete}
+              onNavigate={onNavigate}
             />
           ))}
         </div>
