@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
-import type { Task, Project } from '../../shared/types/database'
-import { TaskList } from '@/components/TaskList'
+import type { Task, Project, TaskStatus } from '../../shared/types/database'
+import { KanbanBoard } from '@/components/kanban/KanbanBoard'
+import type { GroupKey } from '@/lib/kanban'
 import { CreateTaskDialog } from '@/components/CreateTaskDialog'
 import { EditTaskDialog } from '@/components/EditTaskDialog'
 import { DeleteTaskDialog } from '@/components/DeleteTaskDialog'
@@ -34,6 +35,9 @@ function App(): React.JSX.Element {
   // Settings dialog state
   const [settingsOpen, setSettingsOpen] = useState(false)
 
+  // Kanban state
+  const [groupBy] = useState<GroupKey>('status')
+
   // Load data on mount
   useEffect(() => {
     Promise.all([window.api.db.getTasks(), window.api.db.getProjects()]).then(([t, p]) => {
@@ -58,6 +62,20 @@ function App(): React.JSX.Element {
   const handleTaskUpdated = (task: Task): void => {
     setTasks(tasks.map((t) => (t.id === task.id ? task : t)))
     setEditingTask(null)
+  }
+
+  const handleTaskMove = async (taskId: string, newColumnId: string): Promise<void> => {
+    // For status grouping, newColumnId is the status value
+    if (groupBy === 'status') {
+      const updated = await window.api.db.updateTask({
+        id: taskId,
+        status: newColumnId as TaskStatus
+      })
+      if (updated) {
+        setTasks(tasks.map((t) => (t.id === taskId ? updated : t)))
+      }
+    }
+    // priority and due_date grouping don't update on drag (read-only columns)
   }
 
   const handleTaskDeleted = (): void => {
@@ -125,10 +143,11 @@ function App(): React.JSX.Element {
               Click + in sidebar to create a project
             </div>
           ) : (
-            <TaskList
+            <KanbanBoard
               tasks={filteredTasks}
-              onEdit={setEditingTask}
-              onDelete={setDeletingTask}
+              groupBy={groupBy}
+              onTaskMove={handleTaskMove}
+              onTaskClick={setEditingTask}
             />
           )}
 
