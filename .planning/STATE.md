@@ -5,22 +5,22 @@
 See: .planning/PROJECT.md
 
 **Core value:** One place for all tasks with focused Work Mode that prevents rabbit-holing
-**Current focus:** Phase 3 - Navigation (tags + settings data layer done)
+**Current focus:** Phase 3 - Navigation (sidebar UI done)
 
 ## Current Position
 
 Phase: 3 of 7 (Navigation)
-Plan: 2 of ? in phase
+Plan: 3 of ? in phase
 Status: In progress
-Last activity: 2026-01-17 - Completed 03-02-PLAN.md
+Last activity: 2026-01-17 - Completed 03-03-PLAN.md
 
-Progress: ███████░░░ 33%
+Progress: ████████░░ 38%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 7
-- Average duration: 5.0min
+- Total plans completed: 8
+- Average duration: 4.5min
 
 **By Phase:**
 
@@ -28,7 +28,7 @@ Progress: ███████░░░ 33%
 |-------|-------|-------|----------|
 | 01-foundation | 3 | 19min | 6.3min |
 | 02-data-layer | 3 | 13min | 4.3min |
-| 03-navigation | 1 | 4min | 4.0min |
+| 03-navigation | 2 | 5min | 2.5min |
 
 ## Accumulated Context
 
@@ -54,6 +54,9 @@ Progress: ███████░░░ 33%
 | Tags use UNIQUE name constraint | 03-02 | Prevent duplicate tag names |
 | Settings use INSERT OR REPLACE | 03-02 | Simple upsert behavior |
 | Tags and settings as separate API namespaces | 03-02 | Cleaner organization |
+| Start with All view (null selectedProjectId) | 03-03 | Better UX for cross-project tasks |
+| Fixed 64px sidebar, non-collapsible | 03-03 | Simple sidebar for nav phase |
+| 2-letter abbreviation from project name | 03-03 | Compact blob display |
 
 ### Pending Todos
 
@@ -66,5 +69,5 @@ Progress: ███████░░░ 33%
 ## Session Continuity
 
 Last session: 2026-01-17
-Stopped at: Completed 03-02-PLAN.md
-Resume file: .planning/phases/03-navigation/03-03-PLAN.md (if exists)
+Stopped at: Completed 03-03-PLAN.md
+Resume file: .planning/phases/03-navigation/03-04-PLAN.md (if exists)
