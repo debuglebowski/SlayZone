@@ -10,17 +10,17 @@ See: .planning/PROJECT.md
 ## Current Position
 
 Phase: 4 of 7 (Task Management)
-Plan: 4 of 7 complete
+Plan: 5 of 7 complete
 Status: In progress
-Last activity: 2026-01-17 - Completed 04-05-PLAN.md
+Last activity: 2026-01-17 - Completed 04-06-PLAN.md
 
-Progress: ███████████████░ 83%
+Progress: ████████████████░ 89%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 15
-- Average duration: 3.4min
+- Total plans completed: 16
+- Average duration: 3.3min
 
 **By Phase:**
 
@@ -29,7 +29,7 @@ Progress: ███████████████░ 83%
 | 01-foundation | 3 | 19min | 6.3min |
 | 02-data-layer | 3 | 13min | 4.3min |
 | 03-navigation | 5 | 11min | 2.2min |
-| 04-task-management | 4 | 10min | 2.5min |
+| 04-task-management | 5 | 12min | 2.4min |
 
 ## Accumulated Context
 
@@ -73,6 +73,8 @@ Progress: ███████████████░ 83%
 | ViewState discriminated union for nav | 04-05 | State-based routing without router |
 | Wrap ReactMarkdown in div for prose | 04-05 | v10 API doesn't accept className |
 | Click-to-edit with blur-to-save | 04-05 | Inline editing pattern |
+| Subtask status: checkbox toggles todo/done | 04-06 | Simplified from full status |
+| Local state for subtasks (no refetch) | 04-06 | Simpler mutation handling |
 
 ### Pending Todos
 
@@ -85,5 +87,5 @@ Progress: ███████████████░ 83%
 ## Session Continuity
 
 Last session: 2026-01-17
-Stopped at: Completed 04-05-PLAN.md
-Resume file: .planning/phases/04-task-management/04-06-PLAN.md
+Stopped at: Completed 04-06-PLAN.md
+Resume file: .planning/phases/04-task-management/04-07-PLAN.md
