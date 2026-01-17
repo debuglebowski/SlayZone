@@ -16,7 +16,7 @@ Polish all three screens (Kanban, Task Detail, Work Mode) and add cross-cutting 
 - Decimal phases (8.1, 8.2): Urgent insertions (marked with INSERTED)
 
 - [x] **Phase 8: Theme System** - Light/dark/system toggle with persistence
-- [ ] **Phase 9: Search** - Global search modal across all projects
+- [x] **Phase 9: Search** - Global search modal across all projects
 - [ ] **Phase 10: Task Lifecycle** - Archive and delete tasks
 - [ ] **Phase 11: Kanban Polish** - Split user menu into buttons
 - [ ] **Phase 12: Settings Redesign** - Professional UI with Claude status
@@ -60,7 +60,7 @@ Plans:
   4. Selecting a result navigates to it
 **Plans**: 1 plan
 Plans:
-- [ ] 09-01-PLAN.md - Install shadcn command, create SearchDialog, wire into App.tsx
+- [x] 09-01-PLAN.md - Install shadcn command, create SearchDialog, wire into App.tsx
 
 #### Phase 10: Task Lifecycle
 **Goal**: Archive and delete tasks
@@ -124,7 +124,7 @@ Plans:
 |-------|-----------|----------------|--------|-----------|
 | 1-7 | v1.0 | - | Complete | 2026-01-16 |
 | 8. Theme System | v1.1 | 2/2 | Complete | 2026-01-17 |
-| 9. Search | v1.1 | 0/1 | Not started | - |
+| 9. Search | v1.1 | 1/1 | Complete | 2026-01-17 |
 | 10. Task Lifecycle | v1.1 | 0/TBD | Not started | - |
 | 11. Kanban Polish | v1.1 | 0/TBD | Not started | - |
 | 12. Settings Redesign | v1.1 | 0/TBD | Not started | - |

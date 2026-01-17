@@ -14,10 +14,10 @@ Requirements for v1.1 release. Each maps to roadmap phases.
 
 ### Search
 
-- [ ] **SEARCH-01**: User can open search modal via keyboard shortcut
-- [ ] **SEARCH-02**: User can search across all projects and tasks
-- [ ] **SEARCH-03**: Search results display both projects and tasks with distinguishing icons
-- [ ] **SEARCH-04**: User can navigate to selected search result
+- [x] **SEARCH-01**: User can open search modal via keyboard shortcut
+- [x] **SEARCH-02**: User can search across all projects and tasks
+- [x] **SEARCH-03**: Search results display both projects and tasks with distinguishing icons
+- [x] **SEARCH-04**: User can navigate to selected search result
 
 ### Lifecycle
 
@@ -91,10 +91,10 @@ Which phases cover which requirements. Updated by create-roadmap.
 |-------------|-------|--------|
 | THEME-01 | Phase 8 | Complete |
 | THEME-02 | Phase 8 | Complete |
-| SEARCH-01 | Phase 9 | Pending |
-| SEARCH-02 | Phase 9 | Pending |
-| SEARCH-03 | Phase 9 | Pending |
-| SEARCH-04 | Phase 9 | Pending |
+| SEARCH-01 | Phase 9 | Complete |
+| SEARCH-02 | Phase 9 | Complete |
+| SEARCH-03 | Phase 9 | Complete |
+| SEARCH-04 | Phase 9 | Complete |
 | LIFE-01 | Phase 10 | Pending |
 | LIFE-02 | Phase 10 | Pending |
 | LIFE-03 | Phase 10 | Pending |
