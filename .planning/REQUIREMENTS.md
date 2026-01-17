@@ -51,7 +51,7 @@ Requirements for initial release. Each maps to roadmap phases.
 
 - [ ] **WORK-01**: Enter Work Mode from task detail
 - [ ] **WORK-02**: Workspace sidebar with item list
-- [ ] **WORK-03**: AI Chat (spawns Claude CLI, streams response)
+- [x] **WORK-03**: AI Chat (spawns Claude CLI, streams response)
 - [ ] **WORK-04**: Browser tabs (embedded web views)
 - [ ] **WORK-05**: Living documents (markdown editor)
 - [ ] **WORK-06**: Add/rename/delete workspace items
