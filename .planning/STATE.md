@@ -5,22 +5,22 @@
 See: .planning/PROJECT.md
 
 **Core value:** One place for all tasks with focused Work Mode that prevents rabbit-holing
-**Current focus:** Phase 3 - Navigation (sidebar UI done)
+**Current focus:** Phase 3 - Navigation (project dialogs done)
 
 ## Current Position
 
 Phase: 3 of 7 (Navigation)
-Plan: 3 of ? in phase
+Plan: 4 of ? in phase
 Status: In progress
-Last activity: 2026-01-17 - Completed 03-03-PLAN.md
+Last activity: 2026-01-17 - Completed 03-04-PLAN.md
 
-Progress: ████████░░ 38%
+Progress: ████████░░ 43%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 8
-- Average duration: 4.5min
+- Total plans completed: 9
+- Average duration: 4.2min
 
 **By Phase:**
 
@@ -28,7 +28,7 @@ Progress: ████████░░ 38%
 |-------|-------|-------|----------|
 | 01-foundation | 3 | 19min | 6.3min |
 | 02-data-layer | 3 | 13min | 4.3min |
-| 03-navigation | 2 | 5min | 2.5min |
+| 03-navigation | 3 | 7min | 2.3min |
 
 ## Accumulated Context
 
@@ -57,6 +57,7 @@ Progress: ████████░░ 38%
 | Start with All view (null selectedProjectId) | 03-03 | Better UX for cross-project tasks |
 | Fixed 64px sidebar, non-collapsible | 03-03 | Simple sidebar for nav phase |
 | 2-letter abbreviation from project name | 03-03 | Compact blob display |
+| Client-side cascade delete for project tasks | 03-04 | DB handles FK cascade, state updated locally |
 
 ### Pending Todos
 
@@ -69,5 +70,5 @@ Progress: ████████░░ 38%
 ## Session Continuity
 
 Last session: 2026-01-17
-Stopped at: Completed 03-03-PLAN.md
-Resume file: .planning/phases/03-navigation/03-04-PLAN.md (if exists)
+Stopped at: Completed 03-04-PLAN.md
+Resume file: .planning/phases/03-navigation/03-05-PLAN.md (if exists)
