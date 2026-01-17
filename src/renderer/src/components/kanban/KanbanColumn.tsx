@@ -1,7 +1,7 @@
 import { useDroppable } from '@dnd-kit/core'
 import { SortableContext, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import type { Task } from '../../../../shared/types/database'
+import type { Task, Project } from '../../../../shared/types/database'
 import type { Column } from '@/lib/kanban'
 import { KanbanCard } from './KanbanCard'
 import { cn } from '@/lib/utils'
@@ -9,11 +9,21 @@ import { cn } from '@/lib/utils'
 interface SortableKanbanCardProps {
   task: Task
   onTaskClick?: (task: Task) => void
+  project?: Project
+  showProject?: boolean
+  disableDrag?: boolean
 }
 
-function SortableKanbanCard({ task, onTaskClick }: SortableKanbanCardProps): React.JSX.Element {
+function SortableKanbanCard({
+  task,
+  onTaskClick,
+  project,
+  showProject,
+  disableDrag
+}: SortableKanbanCardProps): React.JSX.Element {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
-    id: task.id
+    id: task.id,
+    disabled: disableDrag
   })
 
   const style = {
@@ -21,9 +31,18 @@ function SortableKanbanCard({ task, onTaskClick }: SortableKanbanCardProps): Rea
     transition
   }
 
+  // When drag disabled, don't pass listeners/attributes
+  const dragProps = disableDrag ? {} : { ...attributes, ...listeners }
+
   return (
-    <div ref={setNodeRef} style={style} {...attributes} {...listeners}>
-      <KanbanCard task={task} isDragging={isDragging} onClick={() => onTaskClick?.(task)} />
+    <div ref={setNodeRef} style={style} {...dragProps}>
+      <KanbanCard
+        task={task}
+        isDragging={isDragging}
+        onClick={() => onTaskClick?.(task)}
+        project={project}
+        showProject={showProject}
+      />
     </div>
   )
 }
@@ -31,9 +50,18 @@ function SortableKanbanCard({ task, onTaskClick }: SortableKanbanCardProps): Rea
 interface KanbanColumnProps {
   column: Column
   onTaskClick?: (task: Task) => void
+  projectsMap?: Map<string, Project>
+  showProjectDot?: boolean
+  disableDrag?: boolean
 }
 
-export function KanbanColumn({ column, onTaskClick }: KanbanColumnProps): React.JSX.Element {
+export function KanbanColumn({
+  column,
+  onTaskClick,
+  projectsMap,
+  showProjectDot,
+  disableDrag
+}: KanbanColumnProps): React.JSX.Element {
   const { setNodeRef, isOver } = useDroppable({
     id: column.id
   })
@@ -54,7 +82,14 @@ export function KanbanColumn({ column, onTaskClick }: KanbanColumnProps): React.
         <SortableContext items={column.tasks.map((t) => t.id)} strategy={verticalListSortingStrategy}>
           <div className="flex flex-col gap-2">
             {column.tasks.map((task) => (
-              <SortableKanbanCard key={task.id} task={task} onTaskClick={onTaskClick} />
+              <SortableKanbanCard
+                key={task.id}
+                task={task}
+                onTaskClick={onTaskClick}
+                project={showProjectDot ? projectsMap?.get(task.project_id) : undefined}
+                showProject={showProjectDot}
+                disableDrag={disableDrag}
+              />
             ))}
           </div>
         </SortableContext>

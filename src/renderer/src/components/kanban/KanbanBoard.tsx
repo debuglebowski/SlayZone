@@ -10,7 +10,7 @@ import {
   type DragStartEvent,
   type DragEndEvent
 } from '@dnd-kit/core'
-import type { Task } from '../../../../shared/types/database'
+import type { Task, Project } from '../../../../shared/types/database'
 import { groupTasksBy, type GroupKey } from '@/lib/kanban'
 import { KanbanColumn } from './KanbanColumn'
 import { KanbanCard } from './KanbanCard'
@@ -20,13 +20,19 @@ interface KanbanBoardProps {
   groupBy: GroupKey
   onTaskMove: (taskId: string, newColumnId: string) => void
   onTaskClick?: (task: Task) => void
+  projectsMap?: Map<string, Project>
+  showProjectDot?: boolean
+  disableDrag?: boolean
 }
 
 export function KanbanBoard({
   tasks,
   groupBy,
   onTaskMove,
-  onTaskClick
+  onTaskClick,
+  projectsMap,
+  showProjectDot,
+  disableDrag
 }: KanbanBoardProps): React.JSX.Element {
   const [activeId, setActiveId] = useState<string | null>(null)
 
@@ -81,11 +87,25 @@ export function KanbanBoard({
     >
       <div className="flex gap-4 overflow-x-auto pb-4">
         {columns.map((column) => (
-          <KanbanColumn key={column.id} column={column} onTaskClick={onTaskClick} />
+          <KanbanColumn
+            key={column.id}
+            column={column}
+            onTaskClick={onTaskClick}
+            projectsMap={projectsMap}
+            showProjectDot={showProjectDot}
+            disableDrag={disableDrag}
+          />
         ))}
       </div>
       <DragOverlay>
-        {activeTask ? <KanbanCard task={activeTask} isDragging /> : null}
+        {activeTask ? (
+          <KanbanCard
+            task={activeTask}
+            isDragging
+            project={showProjectDot ? projectsMap?.get(activeTask.project_id) : undefined}
+            showProject={showProjectDot}
+          />
+        ) : null}
       </DragOverlay>
     </DndContext>
   )
