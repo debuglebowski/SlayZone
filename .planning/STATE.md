@@ -5,22 +5,22 @@
 See: .planning/PROJECT.md
 
 **Core value:** One place for all tasks with focused Work Mode that prevents rabbit-holing
-**Current focus:** Phase 3 Complete - Ready for Phase 4
+**Current focus:** Phase 4 - Kanban board implemented
 
 ## Current Position
 
 Phase: 4 of 7 (Task Management)
-Plan: 1 of 5 complete
+Plan: 2 of 5 complete
 Status: In progress
-Last activity: 2026-01-17 - Completed 04-01-PLAN.md
+Last activity: 2026-01-17 - Completed 04-02-PLAN.md
 
-Progress: ███████████░ 46%
+Progress: ████████████░ 50%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 12
-- Average duration: 3.8min
+- Total plans completed: 13
+- Average duration: 3.6min
 
 **By Phase:**
 
@@ -29,7 +29,7 @@ Progress: ███████████░ 46%
 | 01-foundation | 3 | 19min | 6.3min |
 | 02-data-layer | 3 | 13min | 4.3min |
 | 03-navigation | 5 | 11min | 2.2min |
-| 04-task-management | 1 | 3min | 3min |
+| 04-task-management | 2 | 5min | 2.5min |
 
 ## Accumulated Context
 
@@ -64,6 +64,9 @@ Progress: ███████████░ 46%
 | Database path read-only in UI | 03-05 | Change requires CLI restart |
 | taskTags as separate API namespace | 04-01 | Consistent with tags/settings pattern |
 | setTagsForTask delete-all + insert | 04-01 | Simple, atomic transaction |
+| Only status grouping enables drag-drop | 04-02 | Priority/due_date columns read-only |
+| Root tasks only in kanban | 04-02 | Subtasks filtered by parent_id |
+| DndContext with DragOverlay pattern | 04-02 | Smooth drag preview rendering |
 
 ### Pending Todos
 
@@ -76,5 +79,5 @@ Progress: ███████████░ 46%
 ## Session Continuity
 
 Last session: 2026-01-17
-Stopped at: Completed 04-01-PLAN.md
-Resume file: .planning/phases/04-task-management/04-02-PLAN.md
+Stopped at: Completed 04-02-PLAN.md
+Resume file: .planning/phases/04-task-management/04-03-PLAN.md
