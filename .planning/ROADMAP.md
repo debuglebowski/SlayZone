@@ -123,10 +123,10 @@ Plans:
 **Plans:** 4 plans
 
 Plans:
-- [ ] 05-01-PLAN.md — Foundation: types + migration + spawner service
-- [ ] 05-02-PLAN.md — IPC layer: handlers + preload + cleanup
-- [ ] 05-03-PLAN.md — UI: hook + components + persistence
-- [ ] 05-04-PLAN.md — Human verification checkpoint
+- [x] 05-01-PLAN.md — Foundation: types + migration + spawner service
+- [x] 05-02-PLAN.md — IPC layer: handlers + preload + cleanup
+- [x] 05-03-PLAN.md — UI: hook + components + persistence
+- [x] 05-04-PLAN.md — Human verification checkpoint
 
 ---
 
@@ -172,7 +172,7 @@ Plans:
 | 2 - Data Layer | Complete | 2026-01-17 |
 | 3 - Navigation | Complete | 2026-01-17 |
 | 4 - Task Management | Complete | 2026-01-17 |
-| 5 - AI Integration | Not started | - |
+| 5 - AI Integration | Complete | 2026-01-17 |
 | 6 - Work Mode | Not started | - |
 | 7 - Polish | Not started | - |
 
