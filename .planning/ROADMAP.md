@@ -110,7 +110,10 @@ Plans:
   3. Metadata (status, priority, due, tags, blocked) displayed in right sidebar
   4. Subtasks are clickable and navigate to subtask detail
   5. Subtasks minimized by default
-**Plans**: TBD
+**Plans**: 2 plans
+Plans:
+- [ ] 13-01-PLAN.md - Create TaskMetadataSidebar, update layout
+- [ ] 13-02-PLAN.md - Make subtasks navigable, collapse by default
 
 #### Phase 14: Work Mode Improvements
 **Goal**: Empty state improvements and sidebar polish
@@ -136,7 +139,7 @@ Plans:
 | 10. Task Lifecycle | v1.1 | 2/2 | Complete | 2026-01-17 |
 | 11. Kanban Polish | v1.1 | 1/1 | Complete | 2026-01-17 |
 | 12. Settings Redesign | v1.1 | 2/2 | Complete | 2026-01-17 |
-| 13. Task Screen Redesign | v1.1 | 0/TBD | Not started | - |
+| 13. Task Screen Redesign | v1.1 | 0/2 | Not started | - |
 | 14. Work Mode | v1.1 | 0/TBD | Not started | - |
 
 ---
