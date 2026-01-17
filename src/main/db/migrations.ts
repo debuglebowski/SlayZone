@@ -49,6 +49,33 @@ const migrations: Migration[] = [
         CREATE INDEX idx_workspace_task ON workspace_items(task_id);
       `)
     }
+  },
+  {
+    version: 2,
+    up: (db) => {
+      db.exec(`
+        CREATE TABLE tags (
+          id TEXT PRIMARY KEY,
+          name TEXT NOT NULL UNIQUE,
+          color TEXT NOT NULL DEFAULT '#6b7280',
+          created_at TEXT NOT NULL DEFAULT (datetime('now'))
+        );
+
+        CREATE TABLE task_tags (
+          task_id TEXT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+          tag_id TEXT NOT NULL REFERENCES tags(id) ON DELETE CASCADE,
+          PRIMARY KEY (task_id, tag_id)
+        );
+
+        CREATE TABLE settings (
+          key TEXT PRIMARY KEY,
+          value TEXT NOT NULL
+        );
+
+        CREATE INDEX idx_task_tags_task ON task_tags(task_id);
+        CREATE INDEX idx_task_tags_tag ON task_tags(tag_id);
+      `)
+    }
   }
 ]
 
