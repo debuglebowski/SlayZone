@@ -1,11 +1,11 @@
 import { useState, useEffect } from 'react'
-import { ArrowLeft } from 'lucide-react'
+import { ArrowLeft, MessageSquare, Globe, FileText } from 'lucide-react'
 import type { Task, WorkspaceItem, WorkspaceItemType } from '../../../../shared/types/database'
 import { Button } from '@/components/ui/button'
-import { WorkspaceSidebar } from './WorkspaceSidebar'
 import { BrowserView } from './BrowserView'
 import { DocumentEditor } from './DocumentEditor'
 import { ChatPanel } from '@/components/chat/ChatPanel'
+import { WorkspaceItemCard } from './WorkspaceItemCard'
 
 interface Props {
   taskId: string
@@ -38,15 +38,15 @@ export function WorkModePage({ taskId, onBack }: Props) {
     setActiveItemId(item.id)
   }
 
-  const handleRenameItem = async (id: string, name: string) => {
-    const updated = await window.api.workspaceItems.update({ id, name })
-    setItems(items.map((i) => (i.id === id ? updated : i)))
-  }
-
   const handleDeleteItem = async (id: string) => {
     await window.api.workspaceItems.delete(id)
     setItems(items.filter((i) => i.id !== id))
     if (activeItemId === id) setActiveItemId(null)
+  }
+
+  const handleRenameItem = async (id: string, name: string) => {
+    const updated = await window.api.workspaceItems.update({ id, name })
+    setItems(items.map((i) => (i.id === id ? updated : i)))
   }
 
   const handleUrlChange = async (id: string, url: string) => {
@@ -72,14 +72,41 @@ export function WorkModePage({ taskId, onBack }: Props) {
         <span className="text-sm text-muted-foreground">Work Mode</span>
       </header>
       <div className="flex flex-1 min-h-0">
-        <WorkspaceSidebar
-          items={items}
-          activeItemId={activeItemId}
-          onSelectItem={setActiveItemId}
-          onAddItem={handleAddItem}
-          onRenameItem={handleRenameItem}
-          onDeleteItem={handleDeleteItem}
-        />
+        {/* Sidebar */}
+        <aside className="w-64 border-r flex flex-col">
+          <div className="p-2 border-b flex items-center justify-between">
+            <span className="text-sm font-medium">Workspace</span>
+            <div className="flex gap-1">
+              <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleAddItem('chat')} title="Add Chat">
+                <MessageSquare className="h-3 w-3" />
+              </Button>
+              <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleAddItem('browser')} title="Add Browser">
+                <Globe className="h-3 w-3" />
+              </Button>
+              <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleAddItem('document')} title="Add Document">
+                <FileText className="h-3 w-3" />
+              </Button>
+            </div>
+          </div>
+          <div className="flex-1 overflow-y-auto p-2 space-y-1">
+            {items.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-4">No items yet</p>
+            ) : (
+              items.map((item) => (
+                <WorkspaceItemCard
+                  key={item.id}
+                  item={item}
+                  isActive={item.id === activeItemId}
+                  onClick={() => setActiveItemId(item.id)}
+                  onRename={(name) => handleRenameItem(item.id, name)}
+                  onDelete={() => handleDeleteItem(item.id)}
+                />
+              ))
+            )}
+          </div>
+        </aside>
+
+        {/* Content */}
         <main className="flex-1 min-h-0">
           {!activeItem ? (
             <div className="flex items-center justify-center h-full text-muted-foreground">
