@@ -3,6 +3,9 @@ import { ArrowLeft } from 'lucide-react'
 import type { Task, WorkspaceItem, WorkspaceItemType } from '../../../../shared/types/database'
 import { Button } from '@/components/ui/button'
 import { WorkspaceSidebar } from './WorkspaceSidebar'
+import { BrowserView } from './BrowserView'
+import { DocumentEditor } from './DocumentEditor'
+import { ChatPanel } from '@/components/chat/ChatPanel'
 
 interface Props {
   taskId: string
@@ -46,7 +49,18 @@ export function WorkModePage({ taskId, onBack }: Props) {
     if (activeItemId === id) setActiveItemId(null)
   }
 
+  const handleUrlChange = async (id: string, url: string) => {
+    const updated = await window.api.workspaceItems.update({ id, url })
+    setItems(items.map((i) => (i.id === id ? updated : i)))
+  }
+
+  const handleItemUpdate = (updated: WorkspaceItem) => {
+    setItems(items.map((i) => (i.id === updated.id ? updated : i)))
+  }
+
   if (!task) return <div className="p-6">Loading...</div>
+
+  const activeItem = items.find((i) => i.id === activeItemId) ?? null
 
   return (
     <div className="flex flex-col h-screen">
@@ -66,8 +80,21 @@ export function WorkModePage({ taskId, onBack }: Props) {
           onRenameItem={handleRenameItem}
           onDeleteItem={handleDeleteItem}
         />
-        <main className="flex-1 p-4">
-          <p className="text-muted-foreground">Select an item</p>
+        <main className="flex-1 min-h-0">
+          {!activeItem ? (
+            <div className="flex items-center justify-center h-full text-muted-foreground">
+              Select an item or add one to get started
+            </div>
+          ) : activeItem.type === 'chat' ? (
+            <ChatPanel task={task} workspaceItemId={activeItem.id} />
+          ) : activeItem.type === 'browser' ? (
+            <BrowserView
+              url={activeItem.url ?? 'https://google.com'}
+              onUrlChange={(url) => handleUrlChange(activeItem.id, url)}
+            />
+          ) : activeItem.type === 'document' ? (
+            <DocumentEditor item={activeItem} onUpdate={handleItemUpdate} />
+          ) : null}
         </main>
       </div>
     </div>
