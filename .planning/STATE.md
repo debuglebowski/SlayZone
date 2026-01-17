@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-01-17)
 ## Current Position
 
 Phase: 14 of 14 (Work Mode Improvements)
-Plan: Not started
-Status: Ready to plan
-Last activity: 2026-01-17 — Phase 13 complete (2 plans verified)
+Plan: 1 of ? complete
+Status: In progress
+Last activity: 2026-01-17 — Completed 14-01-PLAN.md
 
-Progress: v1.1 ██████████████████████████████░░░░░ 86%
+Progress: v1.1 ███████████████████████████████░░░░ 89%
 
 ## Performance Metrics
 
@@ -33,9 +33,10 @@ Progress: v1.1 █████████████████████�
 | 11-kanban-polish | 1 | 5m | 5m |
 | 12-settings-redesign | 2 | 5m | 2.5m |
 | 13-task-screen | 2 | 6m | 3m |
+| 14-work-mode-improvements | 1 | 3m | 3m |
 
 **Recent Trend:**
-- Last 5 plans: 5m, 3m, 2m, 3m, 3m
+- Last 5 plans: 3m, 2m, 3m, 3m, 3m
 - Trend: —
 
 ## Milestone History
@@ -69,6 +70,9 @@ Recent decisions affecting current work:
 | Green/red status dot pattern | 12-02 | Visual indicator for CLI availability |
 | Title click navigates, pencil edits | 13-02 | Primary action navigate, secondary edit |
 | Subtasks collapsed by default | 13-02 | Reduce visual clutter |
+| Empty state with action buttons | 14-01 | Better onboarding UX |
+| Sidebar-first layout (w-80) | 14-01 | More space for title+controls |
+| X icon for exit | 14-01 | Subtle, doesn't compete with primary actions |
 
 ### Pending Todos
 
@@ -81,5 +85,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-01-17
-Stopped at: Phase 13 complete, ready to plan Phase 14
+Stopped at: Completed 14-01-PLAN.md
 Resume file: None
