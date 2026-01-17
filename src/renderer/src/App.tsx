@@ -12,6 +12,7 @@ import { CreateProjectDialog } from '@/components/dialogs/CreateProjectDialog'
 import { ProjectSettingsDialog } from '@/components/dialogs/ProjectSettingsDialog'
 import { DeleteProjectDialog } from '@/components/dialogs/DeleteProjectDialog'
 import { UserSettingsDialog } from '@/components/dialogs/UserSettingsDialog'
+import { SearchDialog } from '@/components/dialogs/SearchDialog'
 import { OnboardingDialog } from '@/components/onboarding/OnboardingDialog'
 import { TaskDetailPage } from '@/components/task-detail/TaskDetailPage'
 import { WorkModePage } from '@/components/work-mode/WorkModePage'
@@ -61,6 +62,9 @@ function App(): React.JSX.Element {
 
   // Onboarding dialog state (for manual trigger via Tutorial)
   const [onboardingOpen, setOnboardingOpen] = useState(false)
+
+  // Search dialog state
+  const [searchOpen, setSearchOpen] = useState(false)
 
   // Load data on mount
   useEffect(() => {
@@ -134,12 +138,19 @@ function App(): React.JSX.Element {
     }
   }, { enableOnFormTags: false })
 
+  // "mod+k" opens search dialog from anywhere
+  useHotkeys('mod+k', (e) => {
+    e.preventDefault()
+    setSearchOpen(true)
+  }, { enableOnFormTags: true })
+
   // "esc" navigates back (Radix handles dialog closing)
   useHotkeys('escape', () => {
     // Skip if any dialog is open - Radix handles those
     if (createOpen || editingTask || deletingTask) return
     if (createProjectOpen || editingProject || deletingProject) return
     if (settingsOpen) return
+    if (searchOpen) return
 
     // Navigate back
     if (view.type === 'work-mode') closeWorkMode()
@@ -162,29 +173,31 @@ function App(): React.JSX.Element {
     setTasks(tasks.map((t) => (t.id === task.id ? task : t)))
   }
 
-  const handleTaskMove = async (taskId: string, newColumnId: string): Promise<void> => {
-    // Status grouping: update status field
-    if (filter.groupBy === 'status') {
-      const updated = await window.api.db.updateTask({
-        id: taskId,
-        status: newColumnId as TaskStatus
-      })
-      if (updated) {
-        setTasks(tasks.map((t) => (t.id === taskId ? updated : t)))
-      }
+  const handleTaskMove = (taskId: string, newColumnId: string): void => {
+    // due_date grouping: drag disabled
+    if (filter.groupBy === 'due_date') return
+
+    // Compute optimistic task
+    const optimisticTask = (t: Task): Task => {
+      if (t.id !== taskId) return t
+      if (filter.groupBy === 'status') return { ...t, status: newColumnId as TaskStatus }
+      if (filter.groupBy === 'priority') return { ...t, priority: parseInt(newColumnId.slice(1), 10) }
+      return t
     }
-    // Priority grouping: update priority field (column id is 'p1', 'p2', etc.)
-    else if (filter.groupBy === 'priority') {
-      const priority = parseInt(newColumnId.slice(1), 10) // 'p1' -> 1
-      const updated = await window.api.db.updateTask({
-        id: taskId,
-        priority
-      })
-      if (updated) {
-        setTasks(tasks.map((t) => (t.id === taskId ? updated : t)))
-      }
-    }
-    // due_date grouping: drag disabled (dates can't be set by column)
+
+    // Optimistic update
+    const previousTasks = tasks
+    setTasks(tasks.map(optimisticTask))
+
+    // Async DB call with rollback
+    const updatePayload =
+      filter.groupBy === 'status'
+        ? { id: taskId, status: newColumnId as TaskStatus }
+        : { id: taskId, priority: parseInt(newColumnId.slice(1), 10) }
+
+    window.api.db.updateTask(updatePayload).catch(() => {
+      setTasks(previousTasks)
+    })
   }
 
   const handleTaskDeleted = (): void => {
@@ -361,6 +374,16 @@ function App(): React.JSX.Element {
           <UserSettingsDialog
             open={settingsOpen}
             onOpenChange={setSettingsOpen}
+          />
+
+          {/* Search Dialog */}
+          <SearchDialog
+            open={searchOpen}
+            onOpenChange={setSearchOpen}
+            tasks={tasks}
+            projects={projects}
+            onSelectTask={openTaskDetail}
+            onSelectProject={setSelectedProjectId}
           />
 
           {/* Onboarding (first launch or manual trigger) */}
