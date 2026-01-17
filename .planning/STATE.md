@@ -10,18 +10,18 @@ See: .planning/PROJECT.md (updated 2026-01-17)
 ## Current Position
 
 Phase: 10 of 14 (Task Lifecycle)
-Plan: Not started
-Status: Ready to plan
-Last activity: 2026-01-17 — Phase 9 complete (1 plan verified)
+Plan: 1 of 4 complete
+Status: In progress
+Last activity: 2026-01-17 — Completed 10-01-PLAN.md
 
-Progress: v1.1 ██████████░░░░░░░░░░░░░░░░░░░░░░░░░░ 29%
+Progress: v1.1 ███████████░░░░░░░░░░░░░░░░░░░░░░░░░ 32%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 3 (v1.1)
-- Average duration: 2.7 min
-- Total execution time: 0.13 hours
+- Total plans completed: 4 (v1.1)
+- Average duration: 3 min
+- Total execution time: 0.2 hours
 
 **By Phase:**
 
@@ -29,9 +29,10 @@ Progress: v1.1 ██████████░░░░░░░░░░░�
 |-------|-------|-------|----------|
 | 08-theme-system | 2 | 5m | 2.5m |
 | 09-search | 1 | 3m | 3m |
+| 10-task-lifecycle | 1 | 4m | 4m |
 
 **Recent Trend:**
-- Last 5 plans: 2m, 3m, 3m
+- Last 5 plans: 2m, 3m, 3m, 4m
 - Trend: —
 
 ## Milestone History
@@ -54,6 +55,9 @@ Recent decisions affecting current work:
 | .dark class on documentElement | 08-02 | Matches Tailwind convention |
 | Filter top-level tasks only | 09-01 | Subtasks excluded from search |
 | Project name in task keywords | 09-01 | Cross-search capability |
+| Archive via timestamp (soft delete) | 10-01 | Enables recovery, simpler than hard delete |
+| Archive parent archives all subtasks | 10-01 | Atomic operation via transaction |
+| getArchived returns top-level only | 10-01 | Subtasks follow parent state |
 
 ### Pending Todos
 
@@ -66,5 +70,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-01-17
-Stopped at: Phase 9 complete, ready to plan Phase 10
+Stopped at: Completed 10-01-PLAN.md
 Resume file: None
