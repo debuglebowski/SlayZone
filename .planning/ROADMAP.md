@@ -120,7 +120,13 @@ Plans:
 4. User can cancel ongoing response
 5. Chat history persists in workspace
 
-**Plans:** (created by /gsd:plan-phase)
+**Plans:** 4 plans
+
+Plans:
+- [ ] 05-01-PLAN.md — Foundation: types + migration + spawner service
+- [ ] 05-02-PLAN.md — IPC layer: handlers + preload + cleanup
+- [ ] 05-03-PLAN.md — UI: hook + components + persistence
+- [ ] 05-04-PLAN.md — Human verification checkpoint
 
 ---
 
