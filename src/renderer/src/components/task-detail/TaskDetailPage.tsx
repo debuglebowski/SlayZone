@@ -169,7 +169,7 @@ export function TaskDetailPage({
                 readOnly={!editingTitle}
                 className={cn(
                   'text-2xl font-bold bg-transparent border-none outline-none w-full',
-                  !editingTitle && 'cursor-pointer hover:text-muted-foreground'
+                  !editingTitle && 'cursor-pointer'
                 )}
               />
 

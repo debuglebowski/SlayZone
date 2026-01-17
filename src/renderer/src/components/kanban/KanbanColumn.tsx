@@ -10,7 +10,7 @@ import { cn } from '@/lib/utils'
 
 interface SortableKanbanCardProps {
   task: Task
-  onTaskClick?: (task: Task) => void
+  onTaskClick?: (task: Task, e: React.MouseEvent) => void
   project?: Project
   showProject?: boolean
   disableDrag?: boolean
@@ -43,7 +43,7 @@ function SortableKanbanCard({
       <KanbanCard
         task={task}
         isDragging={isDragging}
-        onClick={() => onTaskClick?.(task)}
+        onClick={(e) => onTaskClick?.(task, e)}
         project={project}
         showProject={showProject}
         tags={tags}
@@ -54,7 +54,7 @@ function SortableKanbanCard({
 
 interface KanbanColumnProps {
   column: Column
-  onTaskClick?: (task: Task) => void
+  onTaskClick?: (task: Task, e: React.MouseEvent) => void
   onCreateTask?: (column: Column) => void
   projectsMap?: Map<string, Project>
   showProjectDot?: boolean

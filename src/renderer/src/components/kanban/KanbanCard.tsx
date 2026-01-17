@@ -7,7 +7,7 @@ import { AlertCircle, Ban, Repeat } from 'lucide-react'
 interface KanbanCardProps {
   task: Task
   isDragging?: boolean
-  onClick?: () => void
+  onClick?: (e: React.MouseEvent) => void
   project?: Project
   showProject?: boolean
 }
@@ -40,7 +40,7 @@ export function KanbanCard({
         isOverdue && 'border-destructive',
         isBlocked && 'border-yellow-500 opacity-60'
       )}
-      onClick={onClick}
+      onClick={(e) => onClick?.(e)}
     >
       <CardContent className="px-2.5 py-5">
         <div className="flex items-center gap-1">

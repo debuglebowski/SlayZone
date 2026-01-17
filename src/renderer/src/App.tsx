@@ -74,9 +74,8 @@ function App(): React.JSX.Element {
   const [searchOpen, setSearchOpen] = useState(false)
 
   // Inline project rename state
-  const [editingProjectName, setEditingProjectName] = useState(false)
   const [projectNameValue, setProjectNameValue] = useState('')
-  const projectNameInputRef = useRef<HTMLHeadingElement>(null)
+  const projectNameInputRef = useRef<HTMLTextAreaElement>(null)
 
   // Load data on mount
   useEffect(() => {
@@ -117,6 +116,24 @@ function App(): React.JSX.Element {
 
   // Get highest-priority task suggestion
   const whatNextTask = useWhatNext(projectTasks)
+
+  // Sync project name value when selected project changes
+  useEffect(() => {
+    if (selectedProjectId) {
+      const project = projects.find((p) => p.id === selectedProjectId)
+      if (project) {
+        setProjectNameValue(project.name)
+      }
+    }
+  }, [selectedProjectId, projects])
+
+  // Auto-resize textarea to fit content
+  useEffect(() => {
+    if (projectNameInputRef.current) {
+      projectNameInputRef.current.style.height = 'auto'
+      projectNameInputRef.current.style.height = `${projectNameInputRef.current.scrollHeight}px`
+    }
+  }, [projectNameValue])
 
   // Apply filter state
   const displayTasks = applyFilters(projectTasks, filter, taskTags)
@@ -279,9 +296,13 @@ function App(): React.JSX.Element {
     }
   }
 
-  // Handle task click - navigate to detail page
-  const handleTaskClick = (task: Task): void => {
-    openTaskDetail(task.id)
+  // Handle task click - navigate to detail page or work mode based on modifier key
+  const handleTaskClick = (task: Task, e: React.MouseEvent): void => {
+    if (e.metaKey || e.ctrlKey) {
+      openWorkMode(task.id)
+    } else {
+      openTaskDetail(task.id)
+    }
   }
 
   // Project CRUD handlers
@@ -296,15 +317,6 @@ function App(): React.JSX.Element {
     setEditingProject(null)
   }
 
-  const handleProjectNameStartEdit = (): void => {
-    if (!selectedProjectId) return
-    const project = projects.find((p) => p.id === selectedProjectId)
-    if (project) {
-      setProjectNameValue(project.name)
-      setEditingProjectName(true)
-    }
-  }
-
   const handleProjectNameSave = async (): Promise<void> => {
     if (!selectedProjectId) return
     const trimmed = projectNameValue.trim()
@@ -314,7 +326,6 @@ function App(): React.JSX.Element {
       if (project) {
         setProjectNameValue(project.name)
       }
-      setEditingProjectName(false)
       return
     }
 
@@ -334,34 +345,21 @@ function App(): React.JSX.Element {
         }
       }
     }
-    setEditingProjectName(false)
   }
 
-  const handleProjectNameKeyDown = (e: React.KeyboardEvent<HTMLHeadingElement>): void => {
-    if (e.key === 'Enter') {
+  const handleProjectNameKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>): void => {
+    if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()
       handleProjectNameSave()
+      projectNameInputRef.current?.blur()
     } else if (e.key === 'Escape') {
       const project = projects.find((p) => p.id === selectedProjectId)
       if (project) {
         setProjectNameValue(project.name)
       }
-      setEditingProjectName(false)
+      projectNameInputRef.current?.blur()
     }
   }
-
-  // Focus input when editing starts
-  useEffect(() => {
-    if (editingProjectName && projectNameInputRef.current) {
-      // Select all text
-      const range = document.createRange()
-      range.selectNodeContents(projectNameInputRef.current)
-      const selection = window.getSelection()
-      selection?.removeAllRanges()
-      selection?.addRange(range)
-      projectNameInputRef.current.focus()
-    }
-  }, [editingProjectName])
 
   const handleProjectDeleted = (): void => {
     if (deletingProject) {
@@ -420,34 +418,21 @@ function App(): React.JSX.Element {
         onProjectDelete={setDeletingProject}
         onSettings={() => setSettingsOpen(true)}
         onTutorial={() => setOnboardingOpen(true)}
-        onSelectArchive={openArchive}
-        showArchiveSelected={false}
       />
       <SidebarInset className="min-h-screen min-w-0">
         <div className="flex flex-col flex-1 p-6">
           <header className="mb-6 flex items-center justify-between">
             {selectedProjectId ? (
-              editingProjectName ? (
-                <h1
-                  ref={projectNameInputRef}
-                  contentEditable
-                  suppressContentEditableWarning
-                  onBlur={handleProjectNameSave}
-                  onKeyDown={handleProjectNameKeyDown}
-                  onInput={(e) => setProjectNameValue(e.currentTarget.textContent ?? '')}
-                  className="text-2xl font-bold outline-none cursor-text"
-                  style={{ caretColor: 'currentColor' }}
-                >
-                  {projectNameValue}
-                </h1>
-              ) : (
-                <h1
-                  onClick={handleProjectNameStartEdit}
-                  className="text-2xl font-bold cursor-pointer hover:text-muted-foreground"
-                >
-                  {projects.find((p) => p.id === selectedProjectId)?.name ?? 'Focus'}
-                </h1>
-              )
+              <textarea
+                ref={projectNameInputRef}
+                value={projectNameValue}
+                onChange={(e) => setProjectNameValue(e.target.value)}
+                onBlur={handleProjectNameSave}
+                onKeyDown={handleProjectNameKeyDown}
+                className="text-2xl font-bold bg-transparent border-none outline-none w-full resize-none cursor-text"
+                style={{ caretColor: 'currentColor' }}
+                rows={1}
+              />
             ) : (
               <h1 className="text-2xl font-bold">All Tasks</h1>
             )}

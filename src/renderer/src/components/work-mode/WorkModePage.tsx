@@ -43,6 +43,13 @@ export function WorkModePage({ taskId, onBack }: Props) {
     window.api.workspaceItems.getByTask(taskId).then(setItems)
   }, [taskId])
 
+  // Auto-select first item when items are loaded and no item is selected
+  useEffect(() => {
+    if (items.length > 0 && activeItemId === null) {
+      setActiveItemId(items[0].id)
+    }
+  }, [items, activeItemId])
+
   const handleAddItem = async (type: WorkspaceItemType) => {
     const names = { chat: 'Chat', browser: 'New Tab', document: 'Untitled', dumper: 'Thought Dump' }
     const item = await window.api.workspaceItems.create({
@@ -89,14 +96,14 @@ export function WorkModePage({ taskId, onBack }: Props) {
           sidebarOpen ? 'w-80' : 'w-0 overflow-hidden'
         )}
       >
-        {/* Title + Exit */}
+        {/* Title */}
         <div className="flex items-center justify-between p-4 border-b">
           <h1 className="text-lg font-semibold truncate pr-2">{task.title}</h1>
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-1 shrink-0">
             <Button
               variant="ghost"
               size="icon"
-              className="h-7 w-7 shrink-0 text-muted-foreground"
+              className="h-7 w-7 text-muted-foreground"
               onClick={() => setSidebarOpen(false)}
               title="Hide sidebar (⌘B)"
             >
@@ -105,7 +112,7 @@ export function WorkModePage({ taskId, onBack }: Props) {
             <Button
               variant="ghost"
               size="icon"
-              className="h-7 w-7 shrink-0 text-muted-foreground"
+              className="h-7 w-7 text-muted-foreground"
               onClick={onBack}
             >
               <X className="h-4 w-4" />
@@ -128,13 +135,12 @@ export function WorkModePage({ taskId, onBack }: Props) {
             ))
           )}
         </div>
-        <div className="border-t p-2 flex justify-center items-center gap-1">
+        <div className="border-t p-2 flex items-center gap-1">
           <Tooltip>
             <TooltipTrigger asChild>
               <Button
                 variant="ghost"
-                size="icon"
-                className="h-6 w-6"
+                className="h-6 flex-1"
                 onClick={() => handleAddItem('chat')}
               >
                 <MessageSquare className="h-3 w-3" />
@@ -147,8 +153,7 @@ export function WorkModePage({ taskId, onBack }: Props) {
             <TooltipTrigger asChild>
               <Button
                 variant="ghost"
-                size="icon"
-                className="h-6 w-6"
+                className="h-6 flex-1"
                 onClick={() => handleAddItem('browser')}
               >
                 <Globe className="h-3 w-3" />
@@ -161,8 +166,7 @@ export function WorkModePage({ taskId, onBack }: Props) {
             <TooltipTrigger asChild>
               <Button
                 variant="ghost"
-                size="icon"
-                className="h-6 w-6"
+                className="h-6 flex-1"
                 onClick={() => handleAddItem('document')}
               >
                 <FileText className="h-3 w-3" />
@@ -175,8 +179,7 @@ export function WorkModePage({ taskId, onBack }: Props) {
             <TooltipTrigger asChild>
               <Button
                 variant="ghost"
-                size="icon"
-                className="h-6 w-6"
+                className="h-6 flex-1"
                 onClick={() => handleAddItem('dumper')}
               >
                 <Lightbulb className="h-3 w-3" />

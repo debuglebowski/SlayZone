@@ -1,4 +1,4 @@
-import { Archive, Settings, HelpCircle } from 'lucide-react'
+import { Settings, HelpCircle } from 'lucide-react'
 import {
   Sidebar,
   SidebarContent,
@@ -23,8 +23,6 @@ interface AppSidebarProps {
   onProjectDelete: (project: Project) => void
   onSettings: () => void
   onTutorial: () => void
-  onSelectArchive: () => void
-  showArchiveSelected?: boolean
 }
 
 export function AppSidebar({
@@ -35,9 +33,7 @@ export function AppSidebar({
   onProjectSettings,
   onProjectDelete,
   onSettings,
-  onTutorial,
-  onSelectArchive,
-  showArchiveSelected
+  onTutorial
 }: AppSidebarProps) {
   return (
     <Sidebar collapsible="none" className="w-16 border-r min-h-svh">
@@ -54,29 +50,11 @@ export function AppSidebar({
                     'text-xs font-semibold bg-muted transition-all',
                     'hover:scale-105',
                     selectedProjectId === null &&
-                      !showArchiveSelected &&
                       'ring-2 ring-primary ring-offset-2 ring-offset-background'
                   )}
                   title="All projects"
                 >
                   All
-                </button>
-              </SidebarMenuItem>
-
-              {/* Archive button */}
-              <SidebarMenuItem>
-                <button
-                  onClick={onSelectArchive}
-                  className={cn(
-                    'w-10 h-10 rounded-lg flex items-center justify-center',
-                    'text-muted-foreground bg-muted transition-all',
-                    'hover:scale-105',
-                    showArchiveSelected &&
-                      'ring-2 ring-primary ring-offset-2 ring-offset-background'
-                  )}
-                  title="Archived tasks"
-                >
-                  <Archive className="size-4" />
                 </button>
               </SidebarMenuItem>
 

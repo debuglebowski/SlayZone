@@ -19,7 +19,7 @@ interface KanbanBoardProps {
   tasks: Task[]
   groupBy: GroupKey
   onTaskMove: (taskId: string, newColumnId: string) => void
-  onTaskClick?: (task: Task) => void
+  onTaskClick?: (task: Task, e: React.MouseEvent) => void
   onCreateTask?: (column: Column) => void
   projectsMap?: Map<string, Project>
   showProjectDot?: boolean
