@@ -7,6 +7,12 @@ import {
   SidebarMenu,
   SidebarMenuItem,
 } from "@/components/ui/sidebar"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import { ProjectItem } from "./ProjectItem"
 import { cn } from "@/lib/utils"
 import type { Project } from "../../../../shared/types/database"
@@ -19,6 +25,7 @@ interface AppSidebarProps {
   onProjectSettings: (project: Project) => void
   onProjectDelete: (project: Project) => void
   onSettings: () => void
+  onTutorial: () => void
 }
 
 export function AppSidebar({
@@ -29,9 +36,10 @@ export function AppSidebar({
   onProjectSettings,
   onProjectDelete,
   onSettings,
+  onTutorial,
 }: AppSidebarProps) {
   return (
-    <Sidebar collapsible="none" className="w-16 border-r">
+    <Sidebar collapsible="none" className="w-16 border-r min-h-svh">
       <SidebarContent className="py-4">
         <SidebarGroup>
           <SidebarGroupContent>
@@ -86,29 +94,43 @@ export function AppSidebar({
       <SidebarFooter className="py-4">
         <SidebarMenu>
           <SidebarMenuItem className="flex justify-center">
-            <button
-              onClick={onSettings}
-              className={cn(
-                "w-10 h-10 rounded-lg flex items-center justify-center",
-                "text-muted-foreground hover:bg-muted transition-colors"
-              )}
-              title="Settings"
-            >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="20"
-                height="20"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/>
-                <circle cx="12" cy="12" r="3"/>
-              </svg>
-            </button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  className={cn(
+                    "w-10 h-10 rounded-lg flex items-center justify-center",
+                    "text-muted-foreground hover:bg-muted transition-colors"
+                  )}
+                  title="Menu"
+                >
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="20"
+                    height="20"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <circle cx="12" cy="12" r="10"/>
+                    <circle cx="12" cy="12" r="4"/>
+                    <line x1="21.17" y1="8" x2="12" y2="8"/>
+                    <line x1="3.95" y1="6.06" x2="8.54" y2="14"/>
+                    <line x1="10.88" y1="21.94" x2="15.46" y2="14"/>
+                  </svg>
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent side="right" align="end">
+                <DropdownMenuItem onClick={onSettings}>
+                  Settings
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={onTutorial}>
+                  Tutorial
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </SidebarMenuItem>
         </SidebarMenu>
       </SidebarFooter>

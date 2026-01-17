@@ -30,15 +30,23 @@ const ONBOARDING_STEPS: OnboardingStep[] = [
   }
 ]
 
-export function OnboardingDialog(): React.JSX.Element | null {
-  const [open, setOpen] = useState(false)
+interface OnboardingDialogProps {
+  externalOpen?: boolean
+  onExternalClose?: () => void
+}
+
+export function OnboardingDialog({ externalOpen, onExternalClose }: OnboardingDialogProps): React.JSX.Element | null {
+  const [autoOpen, setAutoOpen] = useState(false)
   const [step, setStep] = useState(0)
 
+  // Combined open state: either auto-triggered or externally controlled
+  const open = autoOpen || (externalOpen ?? false)
+
   useEffect(() => {
-    // Check if onboarding already completed
+    // Check auto-open on first launch
     window.api.settings.get('onboarding_completed').then((value) => {
       if (value !== 'true') {
-        setOpen(true)
+        setAutoOpen(true)
       }
     })
   }, [])
@@ -57,7 +65,9 @@ export function OnboardingDialog(): React.JSX.Element | null {
 
   const completeOnboarding = (): void => {
     window.api.settings.set('onboarding_completed', 'true')
-    setOpen(false)
+    setStep(0)
+    setAutoOpen(false)
+    onExternalClose?.()
   }
 
   if (!open) return null

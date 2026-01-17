@@ -59,6 +59,9 @@ function App(): React.JSX.Element {
   // Settings dialog state
   const [settingsOpen, setSettingsOpen] = useState(false)
 
+  // Onboarding dialog state (for manual trigger via Tutorial)
+  const [onboardingOpen, setOnboardingOpen] = useState(false)
+
   // Load data on mount
   useEffect(() => {
     Promise.all([
@@ -124,8 +127,9 @@ function App(): React.JSX.Element {
 
   // Keyboard shortcuts
   // "n" opens new task dialog (only from kanban view, when no dialog open)
-  useHotkeys('n', () => {
+  useHotkeys('n', (e) => {
     if (projects.length > 0 && view.type === 'kanban') {
+      e.preventDefault()
       setCreateOpen(true)
     }
   }, { enableOnFormTags: false })
@@ -257,6 +261,7 @@ function App(): React.JSX.Element {
         onProjectSettings={setEditingProject}
         onProjectDelete={setDeletingProject}
         onSettings={() => setSettingsOpen(true)}
+        onTutorial={() => setOnboardingOpen(true)}
       />
       <SidebarInset className="min-h-screen min-w-0">
         <div className="flex flex-col flex-1 p-6">
@@ -318,6 +323,7 @@ function App(): React.JSX.Element {
             onCreated={handleTaskCreated}
             defaultProjectId={selectedProjectId ?? undefined}
             tags={tags}
+            onTagCreated={(tag) => setTags([...tags, tag])}
           />
           <EditTaskDialog
             task={editingTask}
@@ -357,8 +363,11 @@ function App(): React.JSX.Element {
             onOpenChange={setSettingsOpen}
           />
 
-          {/* Onboarding (first launch) */}
-          <OnboardingDialog />
+          {/* Onboarding (first launch or manual trigger) */}
+          <OnboardingDialog
+            externalOpen={onboardingOpen}
+            onExternalClose={() => setOnboardingOpen(false)}
+          />
         </div>
       </SidebarInset>
     </SidebarProvider>

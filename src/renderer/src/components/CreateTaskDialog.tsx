@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { format } from 'date-fns'
@@ -46,6 +46,7 @@ interface CreateTaskDialogProps {
   onCreated: (task: Task) => void
   defaultProjectId?: string
   tags: Tag[]
+  onTagCreated?: (tag: Tag) => void
 }
 
 export function CreateTaskDialog({
@@ -53,8 +54,10 @@ export function CreateTaskDialog({
   onOpenChange,
   onCreated,
   defaultProjectId,
-  tags
+  tags,
+  onTagCreated
 }: CreateTaskDialogProps): React.JSX.Element {
+  const [newTagName, setNewTagName] = useState('')
   const form = useForm<CreateTaskFormData>({
     resolver: zodResolver(createTaskSchema),
     defaultValues: {
@@ -264,34 +267,51 @@ export function CreateTaskDialog({
                       </FormControl>
                     </PopoverTrigger>
                     <PopoverContent className="w-[200px] p-2" align="start">
-                      {tags.length === 0 ? (
-                        <p className="text-sm text-muted-foreground">No tags created</p>
-                      ) : (
-                        <div className="space-y-2">
-                          {tags.map((tag) => (
-                            <label
-                              key={tag.id}
-                              className="flex cursor-pointer items-center gap-2"
+                      <div className="space-y-2">
+                        {tags.map((tag) => (
+                          <label
+                            key={tag.id}
+                            className="flex cursor-pointer items-center gap-2"
+                          >
+                            <Checkbox
+                              checked={field.value.includes(tag.id)}
+                              onCheckedChange={(checked) => {
+                                const newValue = checked
+                                  ? [...field.value, tag.id]
+                                  : field.value.filter((id: string) => id !== tag.id)
+                                field.onChange(newValue)
+                              }}
+                            />
+                            <span
+                              className="rounded px-1.5 py-0.5 text-sm"
+                              style={{ backgroundColor: tag.color + '30', color: tag.color }}
                             >
-                              <Checkbox
-                                checked={field.value.includes(tag.id)}
-                                onCheckedChange={(checked) => {
-                                  const newValue = checked
-                                    ? [...field.value, tag.id]
-                                    : field.value.filter((id: string) => id !== tag.id)
-                                  field.onChange(newValue)
-                                }}
-                              />
-                              <span
-                                className="rounded px-1.5 py-0.5 text-sm"
-                                style={{ backgroundColor: tag.color + '30', color: tag.color }}
-                              >
-                                {tag.name}
-                              </span>
-                            </label>
-                          ))}
+                              {tag.name}
+                            </span>
+                          </label>
+                        ))}
+                        {tags.length > 0 && <div className="border-t my-2" />}
+                        <div className="flex gap-1">
+                          <Input
+                            placeholder="New tag..."
+                            value={newTagName}
+                            onChange={(e) => setNewTagName(e.target.value)}
+                            onKeyDown={async (e) => {
+                              if (e.key === 'Enter' && newTagName.trim()) {
+                                e.preventDefault()
+                                const tag = await window.api.tags.createTag({
+                                  name: newTagName.trim(),
+                                  color: '#6366f1'
+                                })
+                                onTagCreated?.(tag)
+                                field.onChange([...field.value, tag.id])
+                                setNewTagName('')
+                              }
+                            }}
+                            className="h-7 text-sm"
+                          />
                         </div>
-                      )}
+                      </div>
                     </PopoverContent>
                   </Popover>
                   <FormMessage />
