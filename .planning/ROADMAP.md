@@ -94,7 +94,16 @@ Plans:
 7. User can add/edit markdown description (rendered view, click to edit)
 8. Task cards show title, project color (in All view), overdue indicator
 
-**Plans:** (created by /gsd:plan-phase)
+**Plans:** 7 plans
+
+Plans:
+- [ ] 04-01-PLAN.md — Install dnd-kit + extend API for subtasks/tags
+- [ ] 04-02-PLAN.md — Build kanban board with drag-drop
+- [ ] 04-03-PLAN.md — Build filter controls and persistence
+- [ ] 04-04-PLAN.md — Integrate filters with kanban + card indicators
+- [ ] 04-05-PLAN.md — Build task detail page with markdown
+- [ ] 04-06-PLAN.md — Add subtasks feature
+- [ ] 04-07-PLAN.md — Human verification checkpoint
 
 ---
 
