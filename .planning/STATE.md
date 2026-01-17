@@ -10,17 +10,17 @@ See: .planning/PROJECT.md
 ## Current Position
 
 Phase: 6 of 7 (Work Mode)
-Plan: 1 of ? in progress
+Plan: 2 of ? complete
 Status: In progress
-Last activity: 2026-01-17 - Completed 06-01-PLAN.md (workspace items API)
+Last activity: 2026-01-17 - Completed 06-02-PLAN.md (work mode container)
 
-Progress: █████████████████████████████░ 96%
+Progress: █████████████████████████████░ 97%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 21
-- Average duration: 2.8min
+- Total plans completed: 22
+- Average duration: 2.7min
 
 **By Phase:**
 
@@ -31,7 +31,7 @@ Progress: ███████████████████████�
 | 03-navigation | 5 | 11min | 2.2min |
 | 04-task-management | 7 | 14min | 2.0min |
 | 05-ai-integration | 4 | 7min | 1.8min |
-| 06-work-mode | 1 | 3min | 3.0min |
+| 06-work-mode | 2 | 5.5min | 2.8min |
 
 ## Accumulated Context
 
@@ -86,6 +86,8 @@ Progress: ███████████████████████�
 | useReducer for streaming state | 05-03 | Predictable state transitions |
 | Optimistic user message display | 05-03 | Immediate feedback before persistence |
 | workspaceItems API follows chatMessages pattern | 06-01 | Consistent namespace organization |
+| WorkModePage back returns to task-detail | 06-02 | Better UX flow, not always return to kanban |
+| onWorkMode prop optional | 06-02 | Support potential standalone usage |
 
 ### Pending Todos
 
@@ -97,6 +99,6 @@ Progress: ███████████████████████�
 
 ## Session Continuity
 
-Last session: 2026-01-17T12:23Z
-Stopped at: Completed 06-01-PLAN.md (workspace items API)
+Last session: 2026-01-17T12:38Z
+Stopped at: Completed 06-02-PLAN.md (work mode container)
 Resume file: None
