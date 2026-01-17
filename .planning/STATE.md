@@ -10,17 +10,17 @@ See: .planning/PROJECT.md
 ## Current Position
 
 Phase: 4 of 7 (Task Management)
-Plan: 2 of 5 complete
+Plan: 3 of 5 complete
 Status: In progress
-Last activity: 2026-01-17 - Completed 04-02-PLAN.md
+Last activity: 2026-01-17 - Completed 04-03-PLAN.md
 
-Progress: ████████████░ 50%
+Progress: █████████████░ 54%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 13
-- Average duration: 3.6min
+- Total plans completed: 14
+- Average duration: 3.5min
 
 **By Phase:**
 
@@ -29,7 +29,7 @@ Progress: ████████████░ 50%
 | 01-foundation | 3 | 19min | 6.3min |
 | 02-data-layer | 3 | 13min | 4.3min |
 | 03-navigation | 5 | 11min | 2.2min |
-| 04-task-management | 2 | 5min | 2.5min |
+| 04-task-management | 3 | 8min | 2.7min |
 
 ## Accumulated Context
 
@@ -67,6 +67,9 @@ Progress: ████████████░ 50%
 | Only status grouping enables drag-drop | 04-02 | Priority/due_date columns read-only |
 | Root tasks only in kanban | 04-02 | Subtasks filtered by parent_id |
 | DndContext with DragOverlay pattern | 04-02 | Smooth drag preview rendering |
+| Filter key per project: filter:${projectId} | 04-03 | Per-project filter persistence |
+| 500ms debounce on filter save | 04-03 | Avoid excessive SQLite writes |
+| isLoaded flag from useFilterState | 04-03 | Prevent flash of default state |
 
 ### Pending Todos
 
@@ -79,5 +82,5 @@ Progress: ████████████░ 50%
 ## Session Continuity
 
 Last session: 2026-01-17
-Stopped at: Completed 04-02-PLAN.md
-Resume file: .planning/phases/04-task-management/04-03-PLAN.md
+Stopped at: Completed 04-03-PLAN.md
+Resume file: .planning/phases/04-task-management/04-04-PLAN.md
