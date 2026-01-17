@@ -143,7 +143,14 @@ Plans:
 4. User can create living document and edit markdown content
 5. User can rename or delete any workspace item
 
-**Plans:** (created by /gsd:plan-phase)
+**Plans:** 5 plans
+
+Plans:
+- [ ] 06-01-PLAN.md — IPC layer for workspace items CRUD
+- [ ] 06-02-PLAN.md — Work Mode container + navigation + webview enablement
+- [ ] 06-03-PLAN.md — Workspace sidebar + item management
+- [ ] 06-04-PLAN.md — Browser view + document editor components
+- [ ] 06-05-PLAN.md — Human verification checkpoint
 
 ---
 
