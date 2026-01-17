@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import type { TaskStatus } from '../../../shared/types/database'
 
 // Task status enum matching database.ts
 export const taskStatusEnum = z.enum([
@@ -11,27 +12,27 @@ export const taskStatusEnum = z.enum([
 ])
 
 // Priority 1-5
-export const priorityEnum = z.number().int().min(1).max(5)
+export const prioritySchema = z.number().int().min(1).max(5)
 
-// Task creation schema
+// Task creation schema - explicit non-optional for form
 export const createTaskSchema = z.object({
-  projectId: z.string().uuid(),
+  projectId: z.string().min(1, 'Project required'),
   title: z.string().min(1, 'Title required').max(200, 'Title too long'),
-  description: z.string().max(5000).optional(),
-  status: taskStatusEnum.default('inbox'),
-  priority: priorityEnum.default(3),
-  dueDate: z.string().nullable().optional(), // ISO date string YYYY-MM-DD
+  description: z.string().max(5000),
+  status: taskStatusEnum,
+  priority: prioritySchema,
+  dueDate: z.string().nullable()
 })
 
-// Task update schema (all optional except id)
+// Task update schema
 export const updateTaskSchema = z.object({
   id: z.string().uuid(),
-  title: z.string().min(1).max(200).optional(),
-  description: z.string().max(5000).nullable().optional(),
-  status: taskStatusEnum.optional(),
-  priority: priorityEnum.optional(),
-  dueDate: z.string().nullable().optional(),
-  blockedReason: z.string().max(500).nullable().optional(),
+  title: z.string().min(1).max(200),
+  description: z.string().max(5000).nullable(),
+  status: taskStatusEnum,
+  priority: prioritySchema,
+  dueDate: z.string().nullable(),
+  blockedReason: z.string().max(500).nullable()
 })
 
 // Project creation schema
@@ -47,9 +48,26 @@ export const updateProjectSchema = z.object({
   color: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
 })
 
-// Inferred types for forms
-export type CreateTaskFormData = z.infer<typeof createTaskSchema>
-export type UpdateTaskFormData = z.infer<typeof updateTaskSchema>
+// Form data types - explicit for forms
+export interface CreateTaskFormData {
+  projectId: string
+  title: string
+  description: string
+  status: TaskStatus
+  priority: number
+  dueDate: string | null
+}
+
+export interface UpdateTaskFormData {
+  id: string
+  title: string
+  description: string | null
+  status: TaskStatus
+  priority: number
+  dueDate: string | null
+  blockedReason: string | null
+}
+
 export type CreateProjectFormData = z.infer<typeof createProjectSchema>
 export type UpdateProjectFormData = z.infer<typeof updateProjectSchema>
 

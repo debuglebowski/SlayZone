@@ -82,10 +82,10 @@ export function CreateTaskDialog({
     const task = await window.api.db.createTask({
       projectId: data.projectId,
       title: data.title,
-      description: data.description ?? null,
+      description: data.description || undefined,
       status: data.status,
       priority: data.priority,
-      dueDate: data.dueDate ?? null
+      dueDate: data.dueDate ?? undefined
     })
     onCreated(task)
     form.reset()
