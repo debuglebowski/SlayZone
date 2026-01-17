@@ -21,9 +21,9 @@ Requirements for v1.1 release. Each maps to roadmap phases.
 
 ### Lifecycle
 
-- [ ] **LIFE-01**: User can archive completed tasks
-- [ ] **LIFE-02**: User can permanently delete tasks
-- [ ] **LIFE-03**: Archived tasks are hidden from kanban but recoverable
+- [x] **LIFE-01**: User can archive completed tasks
+- [x] **LIFE-02**: User can permanently delete tasks
+- [x] **LIFE-03**: Archived tasks are hidden from kanban but recoverable
 
 ### Kanban
 
@@ -95,9 +95,9 @@ Which phases cover which requirements. Updated by create-roadmap.
 | SEARCH-02 | Phase 9 | Complete |
 | SEARCH-03 | Phase 9 | Complete |
 | SEARCH-04 | Phase 9 | Complete |
-| LIFE-01 | Phase 10 | Pending |
-| LIFE-02 | Phase 10 | Pending |
-| LIFE-03 | Phase 10 | Pending |
+| LIFE-01 | Phase 10 | Complete |
+| LIFE-02 | Phase 10 | Complete |
+| LIFE-03 | Phase 10 | Complete |
 | KAN-01 | Phase 11 | Pending |
 | KAN-02 | Phase 11 | Pending |
 | SET-01 | Phase 12 | Pending |

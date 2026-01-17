@@ -17,7 +17,7 @@ Polish all three screens (Kanban, Task Detail, Work Mode) and add cross-cutting 
 
 - [x] **Phase 8: Theme System** - Light/dark/system toggle with persistence
 - [x] **Phase 9: Search** - Global search modal across all projects
-- [ ] **Phase 10: Task Lifecycle** - Archive and delete tasks
+- [x] **Phase 10: Task Lifecycle** - Archive and delete tasks
 - [ ] **Phase 11: Kanban Polish** - Split user menu into buttons
 - [ ] **Phase 12: Settings Redesign** - Professional UI with Claude status
 - [ ] **Phase 13: Task Screen Redesign** - Narrow layout with metadata sidebar
@@ -72,8 +72,8 @@ Plans:
   3. Archived tasks hidden from kanban but recoverable
 **Plans**: 2 plans
 Plans:
-- [ ] 10-01-PLAN.md - Migration v4 + archive IPC handlers + types
-- [ ] 10-02-PLAN.md - Action dropdown in TaskDetailPage + ArchivedTasksView
+- [x] 10-01-PLAN.md - Migration v4 + archive IPC handlers + types
+- [x] 10-02-PLAN.md - Action dropdown in TaskDetailPage + ArchivedTasksView
 
 #### Phase 11: Kanban Polish
 **Goal**: Split user menu into dedicated Settings and Tutorial buttons
@@ -128,7 +128,7 @@ Plans:
 | 1-7 | v1.0 | - | Complete | 2026-01-16 |
 | 8. Theme System | v1.1 | 2/2 | Complete | 2026-01-17 |
 | 9. Search | v1.1 | 1/1 | Complete | 2026-01-17 |
-| 10. Task Lifecycle | v1.1 | 0/2 | Not started | - |
+| 10. Task Lifecycle | v1.1 | 2/2 | Complete | 2026-01-17 |
 | 11. Kanban Polish | v1.1 | 0/TBD | Not started | - |
 | 12. Settings Redesign | v1.1 | 0/TBD | Not started | - |
 | 13. Task Screen Redesign | v1.1 | 0/TBD | Not started | - |
