@@ -4,6 +4,13 @@ import type { Task, Project, Tag, TaskStatus, WorkspaceItem, WorkspaceItemType }
 export type Theme = 'light' | 'dark'
 export type ThemePreference = 'light' | 'dark' | 'system'
 
+// Claude CLI types
+export interface ClaudeAvailability {
+  available: boolean
+  path: string | null
+  version: string | null
+}
+
 // Claude streaming types
 export interface ClaudeStreamEvent {
   type: 'system' | 'assistant' | 'result'
@@ -144,6 +151,7 @@ export interface ElectronAPI {
     onChunk: (callback: (data: ClaudeStreamEvent) => void) => () => void
     onError: (callback: (error: string) => void) => () => void
     onDone: (callback: (result: { code: number }) => void) => () => void
+    checkAvailability: () => Promise<ClaudeAvailability>
   }
   theme: {
     getEffective: () => Promise<Theme>

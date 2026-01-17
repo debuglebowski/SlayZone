@@ -70,7 +70,8 @@ const api: ElectronAPI = {
       const handler = (_event: unknown, result: { code: number }) => callback(result)
       ipcRenderer.on('claude:done', handler)
       return () => ipcRenderer.removeListener('claude:done', handler)
-    }
+    },
+    checkAvailability: () => ipcRenderer.invoke('claude:check-availability')
   },
   theme: {
     getEffective: () => ipcRenderer.invoke('theme:get-effective'),
