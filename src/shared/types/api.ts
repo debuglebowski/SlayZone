@@ -108,6 +108,9 @@ export interface ElectronAPI {
     updateTask: (data: UpdateTaskInput) => Promise<Task>
     deleteTask: (id: string) => Promise<boolean>
     getSubtasks: (parentId: string) => Promise<Task[]>
+    archiveTask: (id: string) => Promise<Task>
+    unarchiveTask: (id: string) => Promise<Task>
+    getArchivedTasks: () => Promise<Task[]>
   }
   tags: {
     getTags: () => Promise<Tag[]>

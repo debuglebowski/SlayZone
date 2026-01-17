@@ -10,6 +10,7 @@ export interface Task {
   priority: number // 1-5, default 3
   due_date: string | null
   blocked_reason: string | null
+  archived_at: string | null
   created_at: string
   updated_at: string
 }

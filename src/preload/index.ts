@@ -17,7 +17,10 @@ const api: ElectronAPI = {
     createTask: (data) => ipcRenderer.invoke('db:tasks:create', data),
     updateTask: (data) => ipcRenderer.invoke('db:tasks:update', data),
     deleteTask: (id) => ipcRenderer.invoke('db:tasks:delete', id),
-    getSubtasks: (parentId) => ipcRenderer.invoke('db:tasks:getSubtasks', parentId)
+    getSubtasks: (parentId) => ipcRenderer.invoke('db:tasks:getSubtasks', parentId),
+    archiveTask: (id) => ipcRenderer.invoke('db:tasks:archive', id),
+    unarchiveTask: (id) => ipcRenderer.invoke('db:tasks:unarchive', id),
+    getArchivedTasks: () => ipcRenderer.invoke('db:tasks:getArchived')
   },
   tags: {
     getTags: () => ipcRenderer.invoke('db:tags:getAll'),
