@@ -9,9 +9,15 @@ import { CreateProjectDialog } from '@/components/dialogs/CreateProjectDialog'
 import { ProjectSettingsDialog } from '@/components/dialogs/ProjectSettingsDialog'
 import { DeleteProjectDialog } from '@/components/dialogs/DeleteProjectDialog'
 import { UserSettingsDialog } from '@/components/dialogs/UserSettingsDialog'
+import { TaskDetailPage } from '@/components/task-detail/TaskDetailPage'
 import { Button } from '@/components/ui/button'
 import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar'
 import { AppSidebar } from '@/components/sidebar/AppSidebar'
+
+// View state for navigation
+type ViewState =
+  | { type: 'kanban' }
+  | { type: 'task-detail'; taskId: string }
 
 function App(): React.JSX.Element {
   // Task state
@@ -21,6 +27,9 @@ function App(): React.JSX.Element {
   // Project state
   const [projects, setProjects] = useState<Project[]>([])
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null)
+
+  // View state (replaces editingTask for task detail navigation)
+  const [view, setView] = useState<ViewState>({ type: 'kanban' })
 
   // Dialog state
   const [createOpen, setCreateOpen] = useState(false)
@@ -53,6 +62,15 @@ function App(): React.JSX.Element {
     ? tasks.filter((t) => t.project_id === selectedProjectId)
     : tasks
 
+  // Navigation handlers
+  const openTaskDetail = (taskId: string): void => {
+    setView({ type: 'task-detail', taskId })
+  }
+
+  const closeTaskDetail = (): void => {
+    setView({ type: 'kanban' })
+  }
+
   // CRUD handlers
   const handleTaskCreated = (task: Task): void => {
     setTasks([task, ...tasks])
@@ -62,6 +80,11 @@ function App(): React.JSX.Element {
   const handleTaskUpdated = (task: Task): void => {
     setTasks(tasks.map((t) => (t.id === task.id ? task : t)))
     setEditingTask(null)
+  }
+
+  // Handler for task detail page updates (doesn't close dialog)
+  const handleTaskDetailUpdated = (task: Task): void => {
+    setTasks(tasks.map((t) => (t.id === task.id ? task : t)))
   }
 
   const handleTaskMove = async (taskId: string, newColumnId: string): Promise<void> => {
@@ -83,6 +106,11 @@ function App(): React.JSX.Element {
       setTasks(tasks.filter((t) => t.id !== deletingTask.id))
       setDeletingTask(null)
     }
+  }
+
+  // Handle task click - navigate to detail page
+  const handleTaskClick = (task: Task): void => {
+    openTaskDetail(task.id)
   }
 
   // Project CRUD handlers
@@ -114,6 +142,18 @@ function App(): React.JSX.Element {
     return <div className="flex h-screen items-center justify-center">Loading...</div>
   }
 
+  // Task detail view (full screen, no sidebar)
+  if (view.type === 'task-detail') {
+    return (
+      <TaskDetailPage
+        taskId={view.taskId}
+        onBack={closeTaskDetail}
+        onTaskUpdated={handleTaskDetailUpdated}
+      />
+    )
+  }
+
+  // Kanban view (with sidebar)
   return (
     <SidebarProvider defaultOpen={true}>
       <AppSidebar
@@ -147,7 +187,7 @@ function App(): React.JSX.Element {
               tasks={filteredTasks}
               groupBy={groupBy}
               onTaskMove={handleTaskMove}
-              onTaskClick={setEditingTask}
+              onTaskClick={handleTaskClick}
             />
           )}
 
