@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useHotkeys } from 'react-hotkeys-hook'
 import type { Task, Project, Tag, TaskStatus } from '../../shared/types/database'
 import { KanbanBoard } from '@/components/kanban/KanbanBoard'
 import { applyFilters } from '@/lib/kanban'
@@ -18,6 +19,7 @@ import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar'
 import { AppSidebar } from '@/components/sidebar/AppSidebar'
+import { useWhatNext } from '@/hooks/useWhatNext'
 
 // View state for navigation
 type ViewState =
@@ -91,6 +93,9 @@ function App(): React.JSX.Element {
     ? tasks.filter((t) => t.project_id === selectedProjectId)
     : tasks
 
+  // Get highest-priority task suggestion
+  const whatNextTask = useWhatNext(projectTasks)
+
   // Apply filter state
   const displayTasks = applyFilters(projectTasks, filter, taskTags)
 
@@ -116,6 +121,26 @@ function App(): React.JSX.Element {
       setView({ type: 'task-detail', taskId: view.taskId })
     }
   }
+
+  // Keyboard shortcuts
+  // "n" opens new task dialog (only from kanban view, when no dialog open)
+  useHotkeys('n', () => {
+    if (projects.length > 0 && view.type === 'kanban') {
+      setCreateOpen(true)
+    }
+  }, { enableOnFormTags: false })
+
+  // "esc" navigates back (Radix handles dialog closing)
+  useHotkeys('escape', () => {
+    // Skip if any dialog is open - Radix handles those
+    if (createOpen || editingTask || deletingTask) return
+    if (createProjectOpen || editingProject || deletingProject) return
+    if (settingsOpen) return
+
+    // Navigate back
+    if (view.type === 'work-mode') closeWorkMode()
+    else if (view.type === 'task-detail') closeTaskDetail()
+  }, { enableOnFormTags: false })
 
   // CRUD handlers
   const handleTaskCreated = (task: Task): void => {
@@ -241,9 +266,22 @@ function App(): React.JSX.Element {
                 ? projects.find(p => p.id === selectedProjectId)?.name ?? 'Focus'
                 : 'All Tasks'}
             </h1>
-            <Button onClick={() => setCreateOpen(true)} disabled={projects.length === 0}>
-              New Task
-            </Button>
+            <div className="flex items-center gap-3">
+              {whatNextTask && (
+                <div
+                  className="flex items-center gap-2 px-3 py-1.5 bg-muted rounded-md cursor-pointer hover:bg-muted/80"
+                  onClick={() => openTaskDetail(whatNextTask.id)}
+                >
+                  <span className="text-sm text-muted-foreground">Next:</span>
+                  <span className="text-sm font-medium truncate max-w-[200px]">
+                    {whatNextTask.title}
+                  </span>
+                </div>
+              )}
+              <Button onClick={() => setCreateOpen(true)} disabled={projects.length === 0}>
+                New Task
+              </Button>
+            </div>
           </header>
 
           {projects.length === 0 ? (
@@ -279,6 +317,7 @@ function App(): React.JSX.Element {
             onOpenChange={setCreateOpen}
             onCreated={handleTaskCreated}
             defaultProjectId={selectedProjectId ?? undefined}
+            tags={tags}
           />
           <EditTaskDialog
             task={editingTask}
