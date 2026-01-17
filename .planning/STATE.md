@@ -5,22 +5,22 @@
 See: .planning/PROJECT.md
 
 **Core value:** One place for all tasks with focused Work Mode that prevents rabbit-holing
-**Current focus:** Phase 2 Complete - Ready for Phase 3
+**Current focus:** Phase 3 - Navigation (tags + settings data layer done)
 
 ## Current Position
 
-Phase: 2 of 7 (Data Layer + Task CRUD)
-Plan: 3 of 3 complete
-Status: Phase complete
-Last activity: 2026-01-17 - Completed 02-03-PLAN.md
+Phase: 3 of 7 (Navigation)
+Plan: 2 of ? in phase
+Status: In progress
+Last activity: 2026-01-17 - Completed 03-02-PLAN.md
 
-Progress: ██████░░░░ 29%
+Progress: ███████░░░ 33%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 6
-- Average duration: 5.2min
+- Total plans completed: 7
+- Average duration: 5.0min
 
 **By Phase:**
 
@@ -28,6 +28,7 @@ Progress: ██████░░░░ 29%
 |-------|-------|-------|----------|
 | 01-foundation | 3 | 19min | 6.3min |
 | 02-data-layer | 3 | 13min | 4.3min |
+| 03-navigation | 1 | 4min | 4.0min |
 
 ## Accumulated Context
 
@@ -50,6 +51,9 @@ Progress: ██████░░░░ 29%
 | Explicit form data types vs Zod inferred | 02-03 | Form compatibility with react-hook-form |
 | Collapsible blockedReason field | 02-03 | Cleaner edit dialog UX |
 | Null-to-undefined coercion for API calls | 02-03 | Form uses null, API expects undefined |
+| Tags use UNIQUE name constraint | 03-02 | Prevent duplicate tag names |
+| Settings use INSERT OR REPLACE | 03-02 | Simple upsert behavior |
+| Tags and settings as separate API namespaces | 03-02 | Cleaner organization |
 
 ### Pending Todos
 
@@ -62,5 +66,5 @@ Progress: ██████░░░░ 29%
 ## Session Continuity
 
 Last session: 2026-01-17
-Stopped at: Completed 02-03-PLAN.md (Phase 2 complete)
-Resume file: .planning/phases/03-ui-components/03-PHASE.md
+Stopped at: Completed 03-02-PLAN.md
+Resume file: .planning/phases/03-navigation/03-03-PLAN.md (if exists)
