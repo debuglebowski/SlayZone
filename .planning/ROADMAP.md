@@ -20,7 +20,7 @@ Polish all three screens (Kanban, Task Detail, Work Mode) and add cross-cutting 
 - [x] **Phase 10: Task Lifecycle** - Archive and delete tasks
 - [x] **Phase 11: Kanban Polish** - Split user menu into buttons
 - [x] **Phase 12: Settings Redesign** - Professional UI with Claude status
-- [ ] **Phase 13: Task Screen Redesign** - Narrow layout with metadata sidebar
+- [x] **Phase 13: Task Screen Redesign** - Narrow layout with metadata sidebar
 - [ ] **Phase 14: Work Mode Improvements** - Empty state and sidebar polish
 
 ## Phase Details
@@ -112,8 +112,8 @@ Plans:
   5. Subtasks minimized by default
 **Plans**: 2 plans
 Plans:
-- [ ] 13-01-PLAN.md - Create TaskMetadataSidebar, update layout
-- [ ] 13-02-PLAN.md - Make subtasks navigable, collapse by default
+- [x] 13-01-PLAN.md - Create TaskMetadataSidebar, update layout
+- [x] 13-02-PLAN.md - Make subtasks navigable, collapse by default
 
 #### Phase 14: Work Mode Improvements
 **Goal**: Empty state improvements and sidebar polish
@@ -139,7 +139,7 @@ Plans:
 | 10. Task Lifecycle | v1.1 | 2/2 | Complete | 2026-01-17 |
 | 11. Kanban Polish | v1.1 | 1/1 | Complete | 2026-01-17 |
 | 12. Settings Redesign | v1.1 | 2/2 | Complete | 2026-01-17 |
-| 13. Task Screen Redesign | v1.1 | 0/2 | Not started | - |
+| 13. Task Screen Redesign | v1.1 | 2/2 | Complete | 2026-01-17 |
 | 14. Work Mode | v1.1 | 0/TBD | Not started | - |
 
 ---

@@ -37,11 +37,11 @@ Requirements for v1.1 release. Each maps to roadmap phases.
 
 ### Task Screen
 
-- [ ] **TASK-01**: Task screen uses narrow consistent width
-- [ ] **TASK-02**: Task screen header has no border
-- [ ] **TASK-03**: Metadata sidebar (status, priority, due, tags, blocked) on right side
-- [ ] **TASK-04**: Subtasks clickable and navigate to subtask detail
-- [ ] **TASK-05**: Subtasks minimized by default
+- [x] **TASK-01**: Task screen uses narrow consistent width
+- [x] **TASK-02**: Task screen header has no border
+- [x] **TASK-03**: Metadata sidebar (status, priority, due, tags, blocked) on right side
+- [x] **TASK-04**: Subtasks clickable and navigate to subtask detail
+- [x] **TASK-05**: Subtasks minimized by default
 
 ### Work Mode
 
@@ -102,11 +102,11 @@ Which phases cover which requirements. Updated by create-roadmap.
 | KAN-02 | Phase 11 | Complete |
 | SET-01 | Phase 12 | Complete |
 | SET-02 | Phase 12 | Complete |
-| TASK-01 | Phase 13 | Pending |
-| TASK-02 | Phase 13 | Pending |
-| TASK-03 | Phase 13 | Pending |
-| TASK-04 | Phase 13 | Pending |
-| TASK-05 | Phase 13 | Pending |
+| TASK-01 | Phase 13 | Complete |
+| TASK-02 | Phase 13 | Complete |
+| TASK-03 | Phase 13 | Complete |
+| TASK-04 | Phase 13 | Complete |
+| TASK-05 | Phase 13 | Complete |
 | WORK-01 | Phase 14 | Pending |
 | WORK-02 | Phase 14 | Pending |
 | WORK-03 | Phase 14 | Pending |
