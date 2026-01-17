@@ -95,7 +95,10 @@ Plans:
   1. Settings UI has professional, polished layout
   2. Claude Code CLI availability status displayed
   3. All existing settings functionality preserved
-**Plans**: TBD
+**Plans**: 2 plans
+Plans:
+- [ ] 12-01-PLAN.md - Install Tabs component + Claude availability IPC
+- [ ] 12-02-PLAN.md - Refactor dialog to tabbed layout with Claude status
 
 #### Phase 13: Task Screen Redesign
 **Goal**: Narrow consistent layout with metadata sidebar
@@ -132,7 +135,7 @@ Plans:
 | 9. Search | v1.1 | 1/1 | Complete | 2026-01-17 |
 | 10. Task Lifecycle | v1.1 | 2/2 | Complete | 2026-01-17 |
 | 11. Kanban Polish | v1.1 | 1/1 | Complete | 2026-01-17 |
-| 12. Settings Redesign | v1.1 | 0/TBD | Not started | - |
+| 12. Settings Redesign | v1.1 | 0/2 | Not started | - |
 | 13. Task Screen Redesign | v1.1 | 0/TBD | Not started | - |
 | 14. Work Mode | v1.1 | 0/TBD | Not started | - |
 
