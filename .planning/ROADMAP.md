@@ -167,7 +167,14 @@ Plans:
 4. Add task modal allows setting all fields (title, project, priority, due, tags, description)
 5. First launch shows onboarding flow explaining key features
 
-**Plans:** (created by /gsd:plan-phase)
+**Plans:** 5 plans
+
+Plans:
+- [ ] 07-01-PLAN.md — Add tags to CreateTaskDialog
+- [ ] 07-02-PLAN.md — Keyboard shortcuts (n, esc)
+- [ ] 07-03-PLAN.md — What Next prioritization
+- [ ] 07-04-PLAN.md — First-launch onboarding
+- [ ] 07-05-PLAN.md — Human verification checkpoint
 
 ---
 
@@ -181,7 +188,7 @@ Plans:
 | 4 - Task Management | Complete | 2026-01-17 |
 | 5 - AI Integration | Complete | 2026-01-17 |
 | 6 - Work Mode | Complete | 2026-01-17 |
-| 7 - Polish | Not started | - |
+| 7 - Polish | Planned | - |
 
 ---
 
