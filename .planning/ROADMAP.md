@@ -25,9 +25,9 @@ Phases derived from requirement categories and dependencies. Foundation establis
 **Plans:** 3 plans
 
 Plans:
-- [ ] 01-01-PLAN.md — Scaffold Electron-Vite + Tailwind/shadcn
-- [ ] 01-02-PLAN.md — Database layer with better-sqlite3
-- [ ] 01-03-PLAN.md — Typed IPC API + security verification
+- [x] 01-01-PLAN.md — Scaffold Electron-Vite + Tailwind/shadcn
+- [x] 01-02-PLAN.md — Database layer with better-sqlite3
+- [x] 01-03-PLAN.md — Typed IPC API + security verification
 
 ---
 
@@ -141,7 +141,7 @@ Plans:
 
 | Phase | Status | Completed |
 |-------|--------|-----------|
-| 1 - Foundation | Planned | - |
+| 1 - Foundation | ✓ Complete | 2026-01-17 |
 | 2 - Data Layer | Not started | - |
 | 3 - Navigation | Not started | - |
 | 4 - Task Management | Not started | - |
