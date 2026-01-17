@@ -76,6 +76,22 @@ const migrations: Migration[] = [
         CREATE INDEX idx_task_tags_tag ON task_tags(tag_id);
       `)
     }
+  },
+  {
+    version: 3,
+    up: (db) => {
+      db.exec(`
+        CREATE TABLE chat_messages (
+          id TEXT PRIMARY KEY,
+          workspace_item_id TEXT NOT NULL REFERENCES workspace_items(id) ON DELETE CASCADE,
+          role TEXT NOT NULL CHECK (role IN ('user', 'assistant')),
+          content TEXT NOT NULL,
+          created_at TEXT NOT NULL DEFAULT (datetime('now'))
+        );
+
+        CREATE INDEX idx_chat_messages_workspace ON chat_messages(workspace_item_id);
+      `)
+    }
   }
 ]
 
