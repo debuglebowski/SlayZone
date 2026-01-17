@@ -5,21 +5,21 @@
 See: .planning/PROJECT.md
 
 **Core value:** One place for all tasks with focused Work Mode that prevents rabbit-holing
-**Current focus:** Phase 7 - Polish + UX (not started)
+**Current focus:** Phase 7 - Polish + UX (in progress)
 
 ## Current Position
 
 Phase: 7 of 7 (Polish + UX)
-Plan: 0 of ? complete
-Status: Not started
-Last activity: 2026-01-17 - Completed Phase 6 (Work Mode)
+Plan: 1 of 5 complete (07-04)
+Status: In progress
+Last activity: 2026-01-17 - Completed 07-04-PLAN.md (Onboarding)
 
-Progress: ██████████████████████████████ 100% (6/7 phases)
+Progress: ██████████████████████████████░░░░░░ 87% (27/31 plans)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 26
+- Total plans completed: 27
 - Average duration: 2.6min
 
 **By Phase:**
@@ -32,6 +32,7 @@ Progress: ███████████████████████�
 | 04-task-management | 7 | 14min | 2.0min |
 | 05-ai-integration | 4 | 7min | 1.8min |
 | 06-work-mode | 5 | 12min | 2.4min |
+| 07-polish | 1 | <1min | <1min |
 
 ## Accumulated Context
 
@@ -93,6 +94,8 @@ Progress: ███████████████████████�
 | persist:browser-tabs partition for webview | 06-04 | Session sharing across browser tabs |
 | Conditional rendering by activeItem.type | 06-04 | Clean content switching in WorkModePage |
 | WorkspaceItemCard for sidebar items | 06-05 | Provides rename/delete via dropdown menu |
+| onboarding_completed setting as boolean flag | 07-04 | Simple first-run detection |
+| showCloseButton={false} on onboarding dialog | 07-04 | Force completion or explicit skip |
 
 ### Pending Todos
 
@@ -104,6 +107,6 @@ Progress: ███████████████████████�
 
 ## Session Continuity
 
-Last session: 2026-01-17T14:30Z
-Stopped at: Completed Phase 6 (Work Mode) - all 5 plans verified
+Last session: 2026-01-17T14:37Z
+Stopped at: Completed 07-04-PLAN.md (Onboarding)
 Resume file: None
