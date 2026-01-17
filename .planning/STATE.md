@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-01-17)
 
 **Core value:** One place for all tasks with focused Work Mode that prevents rabbit-holing
-**Current focus:** Planning next milestone
+**Current focus:** v1.1 UX & Features
 
 ## Current Position
 
-Phase: v1.0 complete
-Plan: N/A
-Status: Ready for next milestone
-Last activity: 2026-01-17 — v1.0 milestone complete
+Phase: Not started (run /gsd:create-roadmap)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-01-17 — Milestone v1.1 started
 
-Progress: v1.0 ████████████████████████████████████ SHIPPED
+Progress: v1.1 ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░ 0%
 
 ## Milestone History
 
@@ -22,13 +22,13 @@ Progress: v1.0 █████████████████████�
 
 ## Next Steps
 
-1. `/gsd:discuss-milestone` — thinking partner, creates context file
-2. `/gsd:new-milestone` — update PROJECT.md with new goals
-3. `/gsd:define-requirements` — scope what to build
-4. `/gsd:create-roadmap` — plan how to build it
+1. `/gsd:define-requirements` — scope what to build
+2. `/gsd:create-roadmap` — plan how to build it
+3. `/gsd:plan-phase` — plan first phase
+4. `/gsd:execute-phase` — build it
 
 ## Session Continuity
 
 Last session: 2026-01-17
-Stopped at: v1.0 milestone complete
+Stopped at: Milestone v1.1 started
 Resume file: None

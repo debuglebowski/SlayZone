@@ -31,14 +31,22 @@ One place for all tasks with focused Work Mode that prevents rabbit-holing on lo
 
 ### Active
 
-(None — fresh requirements defined for next milestone)
+- [ ] Theme toggle (light/dark/system, system default)
+- [ ] Search across all projects
+- [ ] Archive/delete tasks
+- [ ] Kanban: split user menu into separate Settings + Tutorial buttons
+- [ ] Settings: professional redesign, show Claude Code setup status
+- [ ] Task screen: narrow consistent width, no header border
+- [ ] Task screen: metadata sidebar (status, priority, due, tags, blocked) on right
+- [ ] Subtasks: behave like full tasks (clickable → navigate), minimized by default
+- [ ] Work Mode: empty state shows 3 options, hides workspace panel
+- [ ] Work Mode: task title in sidebar instead of header
+- [ ] Work Mode: wider sidebar, subtle exit button top-right
 
 ### Out of Scope
 
 - Claude Code commands / MCP server — app owns data, passes context to Claude
 - Tauri — switched to Electron for Node backend
-- Search — v2
-- Archive — v2
 - Recurring tasks — v2
 - Time tracking — v2
 - Mobile app — v2
@@ -76,5 +84,17 @@ Detailed UI spec in `SPEC.md`. Covers 3 pages (Kanban, Task Detail, Work Mode), 
 | Single active Claude process | Prevents resource exhaustion | ✓ Good |
 | useReducer for streaming state | Predictable state transitions | ✓ Good |
 
+## Current Milestone: v1.1 UX & Features
+
+**Goal:** Polish all three screens and add search + archive functionality.
+
+**Target features:**
+- Theme system (light/dark/system toggle)
+- Search across projects
+- Archive/delete tasks
+- Kanban screen polish (menu split, settings redesign)
+- Task screen redesign (narrow layout, sidebar metadata, subtasks as full tasks)
+- Work Mode improvements (empty state, no header, wider sidebar, exit button)
+
 ---
-*Last updated: 2026-01-17 after v1.0 milestone*
+*Last updated: 2026-01-17 after v1.1 milestone start*
