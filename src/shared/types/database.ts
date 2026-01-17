@@ -22,6 +22,13 @@ export interface Project {
   updated_at: string
 }
 
+export interface Tag {
+  id: string
+  name: string
+  color: string
+  created_at: string
+}
+
 export type WorkspaceItemType = 'chat' | 'browser' | 'document'
 
 export interface WorkspaceItem {

@@ -4,7 +4,9 @@ import type {
   CreateTaskInput,
   CreateProjectInput,
   UpdateTaskInput,
-  UpdateProjectInput
+  UpdateProjectInput,
+  CreateTagInput,
+  UpdateTagInput
 } from '../../shared/types/api'
 
 export function registerDatabaseHandlers(): void {
@@ -130,5 +132,66 @@ export function registerDatabaseHandlers(): void {
   ipcMain.handle('db:tasks:delete', (_, id: string) => {
     const result = db.prepare('DELETE FROM tasks WHERE id = ?').run(id)
     return result.changes > 0
+  })
+
+  // Tags
+  ipcMain.handle('db:tags:getAll', () => {
+    return db.prepare('SELECT * FROM tags ORDER BY name').all()
+  })
+
+  ipcMain.handle('db:tags:create', (_, data: CreateTagInput) => {
+    const id = crypto.randomUUID()
+    db.prepare('INSERT INTO tags (id, name, color) VALUES (?, ?, ?)').run(
+      id,
+      data.name,
+      data.color ?? '#6b7280'
+    )
+    return db.prepare('SELECT * FROM tags WHERE id = ?').get(id)
+  })
+
+  ipcMain.handle('db:tags:update', (_, data: UpdateTagInput) => {
+    const fields: string[] = []
+    const values: unknown[] = []
+
+    if (data.name !== undefined) {
+      fields.push('name = ?')
+      values.push(data.name)
+    }
+    if (data.color !== undefined) {
+      fields.push('color = ?')
+      values.push(data.color)
+    }
+
+    if (fields.length > 0) {
+      values.push(data.id)
+      db.prepare(`UPDATE tags SET ${fields.join(', ')} WHERE id = ?`).run(...values)
+    }
+
+    return db.prepare('SELECT * FROM tags WHERE id = ?').get(data.id)
+  })
+
+  ipcMain.handle('db:tags:delete', (_, id: string) => {
+    const result = db.prepare('DELETE FROM tags WHERE id = ?').run(id)
+    return result.changes > 0
+  })
+
+  // Settings
+  ipcMain.handle('db:settings:get', (_, key: string) => {
+    const row = db.prepare('SELECT value FROM settings WHERE key = ?').get(key) as
+      | { value: string }
+      | undefined
+    return row?.value ?? null
+  })
+
+  ipcMain.handle('db:settings:set', (_, key: string, value: string) => {
+    db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)').run(key, value)
+  })
+
+  ipcMain.handle('db:settings:getAll', () => {
+    const rows = db.prepare('SELECT key, value FROM settings').all() as {
+      key: string
+      value: string
+    }[]
+    return Object.fromEntries(rows.map((r) => [r.key, r.value]))
   })
 }

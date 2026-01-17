@@ -1,4 +1,4 @@
-import type { Task, Project, TaskStatus } from './database'
+import type { Task, Project, Tag, TaskStatus } from './database'
 
 export interface CreateTaskInput {
   projectId: string
@@ -30,6 +30,17 @@ export interface UpdateProjectInput {
   color?: string
 }
 
+export interface CreateTagInput {
+  name: string
+  color?: string
+}
+
+export interface UpdateTagInput {
+  id: string
+  name?: string
+  color?: string
+}
+
 export interface ElectronAPI {
   db: {
     // Projects
@@ -45,5 +56,16 @@ export interface ElectronAPI {
     createTask: (data: CreateTaskInput) => Promise<Task>
     updateTask: (data: UpdateTaskInput) => Promise<Task>
     deleteTask: (id: string) => Promise<boolean>
+  }
+  tags: {
+    getTags: () => Promise<Tag[]>
+    createTag: (data: CreateTagInput) => Promise<Tag>
+    updateTag: (data: UpdateTagInput) => Promise<Tag>
+    deleteTag: (id: string) => Promise<boolean>
+  }
+  settings: {
+    get: (key: string) => Promise<string | null>
+    set: (key: string, value: string) => Promise<void>
+    getAll: () => Promise<Record<string, string>>
   }
 }
