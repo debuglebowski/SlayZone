@@ -40,6 +40,12 @@ const api: ElectronAPI = {
     create: (data) => ipcRenderer.invoke('db:chatMessages:create', data),
     delete: (id) => ipcRenderer.invoke('db:chatMessages:delete', id)
   },
+  workspaceItems: {
+    getByTask: (taskId) => ipcRenderer.invoke('db:workspaceItems:getByTask', taskId),
+    create: (data) => ipcRenderer.invoke('db:workspaceItems:create', data),
+    update: (data) => ipcRenderer.invoke('db:workspaceItems:update', data),
+    delete: (id) => ipcRenderer.invoke('db:workspaceItems:delete', id)
+  },
   claude: {
     stream: (prompt: string, context?: string) => {
       return ipcRenderer.invoke('claude:stream:start', prompt, context)
