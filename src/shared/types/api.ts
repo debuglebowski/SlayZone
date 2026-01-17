@@ -1,4 +1,4 @@
-import type { Task, Project, Tag, TaskStatus } from './database'
+import type { Task, Project, Tag, TaskStatus, WorkspaceItem, WorkspaceItemType } from './database'
 
 // Claude streaming types
 export interface ClaudeStreamEvent {
@@ -73,6 +73,21 @@ export interface UpdateTagInput {
   color?: string
 }
 
+export interface CreateWorkspaceItemInput {
+  taskId: string
+  type: WorkspaceItemType
+  name: string
+  content?: string  // For documents
+  url?: string      // For browser tabs
+}
+
+export interface UpdateWorkspaceItemInput {
+  id: string
+  name?: string
+  content?: string
+  url?: string
+}
+
 export interface ElectronAPI {
   db: {
     // Projects
@@ -108,6 +123,12 @@ export interface ElectronAPI {
   chatMessages: {
     getByWorkspace: (workspaceItemId: string) => Promise<ChatMessage[]>
     create: (data: CreateChatMessageInput) => Promise<ChatMessage>
+    delete: (id: string) => Promise<boolean>
+  }
+  workspaceItems: {
+    getByTask: (taskId: string) => Promise<WorkspaceItem[]>
+    create: (data: CreateWorkspaceItemInput) => Promise<WorkspaceItem>
+    update: (data: UpdateWorkspaceItemInput) => Promise<WorkspaceItem>
     delete: (id: string) => Promise<boolean>
   }
   claude: {
