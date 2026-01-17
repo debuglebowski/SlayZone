@@ -41,3 +41,13 @@ export interface WorkspaceItem {
   created_at: string
   updated_at: string
 }
+
+export type ChatMessageRole = 'user' | 'assistant'
+
+export interface ChatMessage {
+  id: string
+  workspace_item_id: string
+  role: ChatMessageRole
+  content: string
+  created_at: string
+}

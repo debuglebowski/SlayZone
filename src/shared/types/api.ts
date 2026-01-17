@@ -1,5 +1,31 @@
 import type { Task, Project, Tag, TaskStatus } from './database'
 
+// Claude streaming types
+export interface ClaudeStreamEvent {
+  type: 'system' | 'assistant' | 'result'
+  subtype?: 'init' | 'success' | 'error'
+  message?: {
+    role: string
+    content: Array<{ type: string; text?: string }>
+  }
+  session_id?: string
+  cost?: number
+}
+
+export interface ChatMessage {
+  id: string
+  workspace_item_id: string
+  role: 'user' | 'assistant'
+  content: string
+  created_at: string
+}
+
+export interface CreateChatMessageInput {
+  workspaceItemId: string
+  role: 'user' | 'assistant'
+  content: string
+}
+
 export interface CreateTaskInput {
   projectId: string
   title: string
