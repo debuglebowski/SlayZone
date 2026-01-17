@@ -2,7 +2,7 @@
 
 ## What This Is
 
-A desktop task management app solving attention allocation and list proliferation. Single SQLite database as source of truth. Kanban-centric with Work Mode for focused deep work including AI chat powered by Claude.
+A desktop task management app with kanban board, AI-powered Work Mode, and focused UX. Single SQLite database as source of truth. Prevents rabbit-holing through prioritized task flow and focused workspace.
 
 ## Core Value
 
@@ -12,49 +12,48 @@ One place for all tasks with focused Work Mode that prevents rabbit-holing on lo
 
 ### Validated
 
-(None yet — ship to validate)
+- ✓ SQLite database for tasks, projects, workspace items — v1.0
+- ✓ Project-based organization with colors — v1.0
+- ✓ Kanban board with drag-drop between columns — v1.0
+- ✓ Grouping by status, priority, or due date — v1.0
+- ✓ Filtering by priority, due, tags, blocked, done — v1.0
+- ✓ Task detail view with inline editing — v1.0
+- ✓ Subtasks with independent status — v1.0
+- ✓ Blocked tasks with reason — v1.0
+- ✓ "What Next" prioritization logic — v1.0
+- ✓ Work Mode focused workspace — v1.0
+- ✓ Work Mode AI Chat (spawns Claude CLI with task context) — v1.0
+- ✓ Work Mode Browser tabs (embedded web views) — v1.0
+- ✓ Work Mode Living documents (editable markdown) — v1.0
+- ✓ First launch onboarding — v1.0
+- ✓ User settings (tags, database location) — v1.0
+- ✓ Keyboard shortcuts (n for new task, esc to close) — v1.0
 
 ### Active
 
-- [ ] SQLite database for tasks, projects, workspace items
-- [ ] Project-based organization with colors
-- [ ] Kanban board with drag-drop between columns
-- [ ] Grouping by status, priority, or due date
-- [ ] Filtering by priority, due, tags, blocked, done
-- [ ] Task detail view with inline editing
-- [ ] Subtasks with independent status
-- [ ] Blocked tasks with reason
-- [ ] "What Next" prioritization logic
-- [ ] Work Mode focused workspace
-- [ ] Work Mode AI Chat (spawns Claude CLI with task context)
-- [ ] Work Mode Browser tabs (embedded web views)
-- [ ] Work Mode Living documents (editable markdown)
-- [ ] First launch onboarding
-- [ ] User settings (tags, database location)
-- [ ] Keyboard shortcuts (n for new task, esc to close)
+(None — fresh requirements defined for next milestone)
 
 ### Out of Scope
 
 - Claude Code commands / MCP server — app owns data, passes context to Claude
-- Tauri — switched to Electron
+- Tauri — switched to Electron for Node backend
 - Search — v2
 - Archive — v2
 - Recurring tasks — v2
 - Time tracking — v2
 - Mobile app — v2
 - Export/Import — v2
-- Customizable statuses — v2
+- Customizable statuses — fixed workflow is opinionated
 
 ## Context
 
-Detailed UI spec exists in `SPEC.md`. Covers:
-- 3 pages: Kanban Board, Task Detail, Work Mode
-- Sidebar with project blobs
-- Task card design and interactions
-- All modals and popovers
-- Right-click menus
+Shipped v1.0 with ~39,000 LOC TypeScript across 186 files.
 
-Statuses are fixed: inbox, backlog, todo, in_progress, review, done
+**Tech stack:** Electron-Vite, React, SQLite (better-sqlite3), shadcn/ui, Tailwind v4, dnd-kit, react-markdown
+
+**Architecture:** Main process handles SQLite + IPC + Claude spawning. Preload exposes typed API. Renderer is pure React.
+
+Detailed UI spec in `SPEC.md`. Covers 3 pages (Kanban, Task Detail, Work Mode), all modals, and interactions.
 
 ## Constraints
 
@@ -66,9 +65,16 @@ Statuses are fixed: inbox, backlog, todo, in_progress, review, done
 
 | Decision | Rationale | Outcome |
 |----------|-----------|---------|
-| Electron over Tauri | Node backend can spawn Claude CLI directly | — Pending |
-| App provides context to Claude | Simpler than giving Claude DB access, more control | — Pending |
-| shadcn/ui + Tailwind | Accessible components, flexible styling, good DX | — Pending |
+| Electron over Tauri | Node backend can spawn Claude CLI directly | ✓ Good |
+| App provides context to Claude | Simpler than giving Claude DB access, more control | ✓ Good |
+| shadcn/ui + Tailwind | Accessible components, flexible styling, good DX | ✓ Good |
+| WAL mode for SQLite | Better concurrent performance | ✓ Good |
+| IPC channel naming: db:entity:action | Consistent, discoverable | ✓ Good |
+| ViewState discriminated union | State-based routing without router library | ✓ Good |
+| dnd-kit for drag-drop | Best React DnD library, accessible | ✓ Good |
+| Only status grouping enables drag-drop | Priority/due columns read-only makes sense | ✓ Good |
+| Single active Claude process | Prevents resource exhaustion | ✓ Good |
+| useReducer for streaming state | Predictable state transitions | ✓ Good |
 
 ---
-*Last updated: 2026-01-17 after initialization*
+*Last updated: 2026-01-17 after v1.0 milestone*
