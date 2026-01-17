@@ -28,20 +28,18 @@ One place for all tasks with focused Work Mode that prevents rabbit-holing on lo
 - ✓ First launch onboarding — v1.0
 - ✓ User settings (tags, database location) — v1.0
 - ✓ Keyboard shortcuts (n for new task, esc to close) — v1.0
+- ✓ Theme toggle (light/dark/system) — v1.1
+- ✓ Global search across projects — v1.1
+- ✓ Archive/delete tasks — v1.1
+- ✓ Settings redesign with Claude status — v1.1
+- ✓ Task screen narrow layout with metadata sidebar — v1.1
+- ✓ Subtasks navigable and collapsed by default — v1.1
+- ✓ Work Mode empty state with action buttons — v1.1
+- ✓ Work Mode sidebar improvements — v1.1
 
 ### Active
 
-- [ ] Theme toggle (light/dark/system, system default)
-- [ ] Search across all projects
-- [ ] Archive/delete tasks
-- [ ] Kanban: split user menu into separate Settings + Tutorial buttons
-- [ ] Settings: professional redesign, show Claude Code setup status
-- [ ] Task screen: narrow consistent width, no header border
-- [ ] Task screen: metadata sidebar (status, priority, due, tags, blocked) on right
-- [ ] Subtasks: behave like full tasks (clickable → navigate), minimized by default
-- [ ] Work Mode: empty state shows 3 options, hides workspace panel
-- [ ] Work Mode: task title in sidebar instead of header
-- [ ] Work Mode: wider sidebar, subtle exit button top-right
+(Next milestone requirements defined via `/gsd:define-requirements`)
 
 ### Out of Scope
 
@@ -55,7 +53,7 @@ One place for all tasks with focused Work Mode that prevents rabbit-holing on lo
 
 ## Context
 
-Shipped v1.0 with ~39,000 LOC TypeScript across 186 files.
+Shipped v1.1 with ~119,000 LOC TypeScript.
 
 **Tech stack:** Electron-Vite, React, SQLite (better-sqlite3), shadcn/ui, Tailwind v4, dnd-kit, react-markdown
 
@@ -84,17 +82,20 @@ Detailed UI spec in `SPEC.md`. Covers 3 pages (Kanban, Task Detail, Work Mode), 
 | Single active Claude process | Prevents resource exhaustion | ✓ Good |
 | useReducer for streaming state | Predictable state transitions | ✓ Good |
 
-## Current Milestone: v1.1 UX & Features
+## Current State
 
-**Goal:** Polish all three screens and add search + archive functionality.
+**Shipped:** v1.1 UX & Features (2026-01-17)
 
-**Target features:**
+Key features delivered in v1.1:
 - Theme system (light/dark/system toggle)
-- Search across projects
-- Archive/delete tasks
-- Kanban screen polish (menu split, settings redesign)
-- Task screen redesign (narrow layout, sidebar metadata, subtasks as full tasks)
-- Work Mode improvements (empty state, no header, wider sidebar, exit button)
+- Global search (Cmd+K)
+- Task archive/delete lifecycle
+- Settings redesign with Claude status
+- Task screen narrow layout with metadata sidebar
+- Subtasks navigable and collapsed
+- Work Mode empty state and sidebar improvements
+
+**Next milestone:** TBD — use `/gsd:discuss-milestone` to explore
 
 ---
-*Last updated: 2026-01-17 after v1.1 milestone start*
+*Last updated: 2026-01-17 after v1.1 milestone completion*
