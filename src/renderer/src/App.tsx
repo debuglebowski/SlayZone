@@ -19,7 +19,8 @@ import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar'
 import { AppSidebar } from '@/components/sidebar/AppSidebar'
-import { useWhatNext } from '@/hooks/useWhatNext'
+// TODO: Use whatNextTask for task suggestions
+// import { useWhatNext } from '@/hooks/useWhatNext'
 
 // View state for navigation
 type ViewState =
@@ -93,8 +94,8 @@ function App(): React.JSX.Element {
     ? tasks.filter((t) => t.project_id === selectedProjectId)
     : tasks
 
-  // Get highest-priority task suggestion
-  const whatNextTask = useWhatNext(projectTasks)
+  // TODO: Use whatNextTask for task suggestions
+  // const whatNextTask = useWhatNext(projectTasks)
 
   // Apply filter state
   const displayTasks = applyFilters(projectTasks, filter, taskTags)
