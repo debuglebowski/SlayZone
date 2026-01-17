@@ -16,6 +16,7 @@ import { SearchDialog } from '@/components/dialogs/SearchDialog'
 import { OnboardingDialog } from '@/components/onboarding/OnboardingDialog'
 import { TaskDetailPage } from '@/components/task-detail/TaskDetailPage'
 import { WorkModePage } from '@/components/work-mode/WorkModePage'
+import { ArchivedTasksView } from '@/components/ArchivedTasksView'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar'
@@ -27,6 +28,7 @@ type ViewState =
   | { type: 'kanban' }
   | { type: 'task-detail'; taskId: string }
   | { type: 'work-mode'; taskId: string }
+  | { type: 'archived' }
 
 function App(): React.JSX.Element {
   // Task state
@@ -89,7 +91,10 @@ function App(): React.JSX.Element {
     await Promise.all(
       taskList.map(async (task) => {
         const tags = await window.api.taskTags.getTagsForTask(task.id)
-        mapping.set(task.id, tags.map((t) => t.id))
+        mapping.set(
+          task.id,
+          tags.map((t) => t.id)
+        )
       })
     )
     setTaskTags(mapping)
@@ -129,33 +134,50 @@ function App(): React.JSX.Element {
     }
   }
 
+  const openArchive = (): void => {
+    setSelectedProjectId(null)
+    setView({ type: 'archived' })
+  }
+
   // Keyboard shortcuts
   // "n" opens new task dialog (only from kanban view, when no dialog open)
-  useHotkeys('n', (e) => {
-    if (projects.length > 0 && view.type === 'kanban') {
-      e.preventDefault()
-      setCreateOpen(true)
-    }
-  }, { enableOnFormTags: false })
+  useHotkeys(
+    'n',
+    (e) => {
+      if (projects.length > 0 && view.type === 'kanban') {
+        e.preventDefault()
+        setCreateOpen(true)
+      }
+    },
+    { enableOnFormTags: false }
+  )
 
   // "mod+k" opens search dialog from anywhere
-  useHotkeys('mod+k', (e) => {
-    e.preventDefault()
-    setSearchOpen(true)
-  }, { enableOnFormTags: true })
+  useHotkeys(
+    'mod+k',
+    (e) => {
+      e.preventDefault()
+      setSearchOpen(true)
+    },
+    { enableOnFormTags: true }
+  )
 
   // "esc" navigates back (Radix handles dialog closing)
-  useHotkeys('escape', () => {
-    // Skip if any dialog is open - Radix handles those
-    if (createOpen || editingTask || deletingTask) return
-    if (createProjectOpen || editingProject || deletingProject) return
-    if (settingsOpen) return
-    if (searchOpen) return
+  useHotkeys(
+    'escape',
+    () => {
+      // Skip if any dialog is open - Radix handles those
+      if (createOpen || editingTask || deletingTask) return
+      if (createProjectOpen || editingProject || deletingProject) return
+      if (settingsOpen) return
+      if (searchOpen) return
 
-    // Navigate back
-    if (view.type === 'work-mode') closeWorkMode()
-    else if (view.type === 'task-detail') closeTaskDetail()
-  }, { enableOnFormTags: false })
+      // Navigate back
+      if (view.type === 'work-mode') closeWorkMode()
+      else if (view.type === 'task-detail') closeTaskDetail()
+    },
+    { enableOnFormTags: false }
+  )
 
   // CRUD handlers
   const handleTaskCreated = (task: Task): void => {
@@ -181,7 +203,8 @@ function App(): React.JSX.Element {
     const optimisticTask = (t: Task): Task => {
       if (t.id !== taskId) return t
       if (filter.groupBy === 'status') return { ...t, status: newColumnId as TaskStatus }
-      if (filter.groupBy === 'priority') return { ...t, priority: parseInt(newColumnId.slice(1), 10) }
+      if (filter.groupBy === 'priority')
+        return { ...t, priority: parseInt(newColumnId.slice(1), 10) }
       return t
     }
 
@@ -243,10 +266,15 @@ function App(): React.JSX.Element {
 
   // Work Mode view
   if (view.type === 'work-mode') {
+    return <WorkModePage taskId={view.taskId} onBack={closeWorkMode} />
+  }
+
+  // Archived view (full screen, no sidebar)
+  if (view.type === 'archived') {
     return (
-      <WorkModePage
-        taskId={view.taskId}
-        onBack={closeWorkMode}
+      <ArchivedTasksView
+        onBack={() => setView({ type: 'kanban' })}
+        onTaskClick={(id) => setView({ type: 'task-detail', taskId: id })}
       />
     )
   }
@@ -275,13 +303,15 @@ function App(): React.JSX.Element {
         onProjectDelete={setDeletingProject}
         onSettings={() => setSettingsOpen(true)}
         onTutorial={() => setOnboardingOpen(true)}
+        onSelectArchive={openArchive}
+        showArchiveSelected={false}
       />
       <SidebarInset className="min-h-screen min-w-0">
         <div className="flex flex-col flex-1 p-6">
           <header className="mb-6 flex items-center justify-between">
             <h1 className="text-2xl font-bold">
               {selectedProjectId
-                ? projects.find(p => p.id === selectedProjectId)?.name ?? 'Focus'
+                ? (projects.find((p) => p.id === selectedProjectId)?.name ?? 'Focus')
                 : 'All Tasks'}
             </h1>
             <div className="flex items-center gap-3">
@@ -371,10 +401,7 @@ function App(): React.JSX.Element {
           />
 
           {/* User Settings Dialog */}
-          <UserSettingsDialog
-            open={settingsOpen}
-            onOpenChange={setSettingsOpen}
-          />
+          <UserSettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} />
 
           {/* Search Dialog */}
           <SearchDialog
