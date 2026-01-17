@@ -32,8 +32,8 @@ Requirements for v1.1 release. Each maps to roadmap phases.
 
 ### Settings
 
-- [ ] **SET-01**: Settings UI professionally redesigned
-- [ ] **SET-02**: Settings shows Claude Code CLI availability status
+- [x] **SET-01**: Settings UI professionally redesigned
+- [x] **SET-02**: Settings shows Claude Code CLI availability status
 
 ### Task Screen
 
@@ -100,8 +100,8 @@ Which phases cover which requirements. Updated by create-roadmap.
 | LIFE-03 | Phase 10 | Complete |
 | KAN-01 | Phase 11 | Complete |
 | KAN-02 | Phase 11 | Complete |
-| SET-01 | Phase 12 | Pending |
-| SET-02 | Phase 12 | Pending |
+| SET-01 | Phase 12 | Complete |
+| SET-02 | Phase 12 | Complete |
 | TASK-01 | Phase 13 | Pending |
 | TASK-02 | Phase 13 | Pending |
 | TASK-03 | Phase 13 | Pending |
