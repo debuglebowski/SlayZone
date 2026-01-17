@@ -92,6 +92,15 @@ const migrations: Migration[] = [
         CREATE INDEX idx_chat_messages_workspace ON chat_messages(workspace_item_id);
       `)
     }
+  },
+  {
+    version: 4,
+    up: (db) => {
+      db.exec(`
+        ALTER TABLE tasks ADD COLUMN archived_at TEXT DEFAULT NULL;
+        CREATE INDEX idx_tasks_archived ON tasks(archived_at);
+      `)
+    }
   }
 ]
 
