@@ -10,18 +10,18 @@ See: .planning/PROJECT.md (updated 2026-01-17)
 ## Current Position
 
 Phase: 10 of 14 (Task Lifecycle)
-Plan: 1 of 4 complete
+Plan: 2 of 4 complete
 Status: In progress
-Last activity: 2026-01-17 — Completed 10-01-PLAN.md
+Last activity: 2026-01-17 — Completed 10-02-PLAN.md
 
-Progress: v1.1 ███████████░░░░░░░░░░░░░░░░░░░░░░░░░ 32%
+Progress: v1.1 █████████████░░░░░░░░░░░░░░░░░░░░░░░ 38%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 4 (v1.1)
-- Average duration: 3 min
-- Total execution time: 0.2 hours
+- Total plans completed: 5 (v1.1)
+- Average duration: 3.4 min
+- Total execution time: 0.3 hours
 
 **By Phase:**
 
@@ -29,10 +29,10 @@ Progress: v1.1 ███████████░░░░░░░░░░�
 |-------|-------|-------|----------|
 | 08-theme-system | 2 | 5m | 2.5m |
 | 09-search | 1 | 3m | 3m |
-| 10-task-lifecycle | 1 | 4m | 4m |
+| 10-task-lifecycle | 2 | 8m | 4m |
 
 **Recent Trend:**
-- Last 5 plans: 2m, 3m, 3m, 4m
+- Last 5 plans: 2m, 3m, 3m, 4m, 4m
 - Trend: —
 
 ## Milestone History
@@ -58,6 +58,8 @@ Recent decisions affecting current work:
 | Archive via timestamp (soft delete) | 10-01 | Enables recovery, simpler than hard delete |
 | Archive parent archives all subtasks | 10-01 | Atomic operation via transaction |
 | getArchived returns top-level only | 10-01 | Subtasks follow parent state |
+| Action dropdown for Archive/Delete | 10-02 | Common UI pattern for destructive ops |
+| Archived view is full-screen | 10-02 | Consistent with task detail view |
 
 ### Pending Todos
 
@@ -70,5 +72,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-01-17
-Stopped at: Completed 10-01-PLAN.md
+Stopped at: Completed 10-02-PLAN.md
 Resume file: None
