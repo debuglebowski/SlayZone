@@ -5,22 +5,22 @@
 See: .planning/PROJECT.md (updated 2026-01-17)
 
 **Core value:** One place for all tasks with focused Work Mode that prevents rabbit-holing
-**Current focus:** Phase 12 — Settings Redesign
+**Current focus:** Phase 13 — Polish
 
 ## Current Position
 
 Phase: 12 of 14 (Settings Redesign)
-Plan: 1 of 2
-Status: In progress
-Last activity: 2026-01-17 — Completed 12-01-PLAN.md
+Plan: 2 of 2
+Status: Phase complete
+Last activity: 2026-01-17 — Completed 12-02-PLAN.md
 
-Progress: v1.1 █████████████████████░░░░░░░░░░░░░░ 60%
+Progress: v1.1 ██████████████████████░░░░░░░░░░░░░ 63%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 7 (v1.1)
-- Average duration: 3.4 min
+- Total plans completed: 8 (v1.1)
+- Average duration: 3.3 min
 - Total execution time: 0.4 hours
 
 **By Phase:**
@@ -31,10 +31,10 @@ Progress: v1.1 █████████████████████�
 | 09-search | 1 | 3m | 3m |
 | 10-task-lifecycle | 2 | 8m | 4m |
 | 11-kanban-polish | 1 | 5m | 5m |
-| 12-settings-redesign | 1 | 3m | 3m |
+| 12-settings-redesign | 2 | 5m | 2.5m |
 
 **Recent Trend:**
-- Last 5 plans: 3m, 4m, 4m, 5m, 3m
+- Last 5 plans: 4m, 4m, 5m, 3m, 2m
 - Trend: —
 
 ## Milestone History
@@ -64,6 +64,8 @@ Recent decisions affecting current work:
 | Archived view is full-screen | 10-02 | Consistent with task detail view |
 | Icon buttons replace dropdown | 11-01 | Single-click access faster than dropdown |
 | which/where via spawn for CLI detect | 12-01 | Cross-platform, non-blocking |
+| 3 tabs for settings | 12-02 | General/Tags/About logical grouping |
+| Green/red status dot pattern | 12-02 | Visual indicator for CLI availability |
 
 ### Pending Todos
 
@@ -76,5 +78,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-01-17
-Stopped at: Completed 12-01-PLAN.md
+Stopped at: Completed 12-02-PLAN.md
 Resume file: None
