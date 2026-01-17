@@ -73,6 +73,8 @@ Progress: ████████████████░ 89%
 | ViewState discriminated union for nav | 04-05 | State-based routing without router |
 | Wrap ReactMarkdown in div for prose | 04-05 | v10 API doesn't accept className |
 | Click-to-edit with blur-to-save | 04-05 | Inline editing pattern |
+| Drag disable via useSortable disabled option | 04-04 | Native dnd-kit support |
+| Project lookup via Map prop | 04-04 | O(1) lookup, single source of truth |
 | Subtask status: checkbox toggles todo/done | 04-06 | Simplified from full status |
 | Local state for subtasks (no refetch) | 04-06 | Simpler mutation handling |
 
