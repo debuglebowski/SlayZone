@@ -125,7 +125,9 @@ Plans:
   3. Task title displayed in sidebar instead of header
   4. Sidebar wider than current design
   5. Exit button subtle and positioned top-right
-**Plans**: TBD
+**Plans**: 1 plan
+Plans:
+- [ ] 14-01-PLAN.md - Restructure layout, create EmptyWorkspaceState
 
 ## Progress
 
@@ -140,7 +142,7 @@ Plans:
 | 11. Kanban Polish | v1.1 | 1/1 | Complete | 2026-01-17 |
 | 12. Settings Redesign | v1.1 | 2/2 | Complete | 2026-01-17 |
 | 13. Task Screen Redesign | v1.1 | 2/2 | Complete | 2026-01-17 |
-| 14. Work Mode | v1.1 | 0/TBD | Not started | - |
+| 14. Work Mode | v1.1 | 0/1 | Not started | - |
 
 ---
 *Created: 2026-01-17*
