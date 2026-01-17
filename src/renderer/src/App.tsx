@@ -321,7 +321,7 @@ function App(): React.JSX.Element {
             open={createOpen}
             onOpenChange={setCreateOpen}
             onCreated={handleTaskCreated}
-            defaultProjectId={selectedProjectId ?? undefined}
+            defaultProjectId={selectedProjectId ?? projects[0]?.id}
             tags={tags}
             onTagCreated={(tag) => setTags([...tags, tag])}
           />
