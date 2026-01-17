@@ -1,5 +1,9 @@
 import type { Task, Project, Tag, TaskStatus, WorkspaceItem, WorkspaceItemType } from './database'
 
+// Theme types
+export type Theme = 'light' | 'dark'
+export type ThemePreference = 'light' | 'dark' | 'system'
+
 // Claude streaming types
 export interface ClaudeStreamEvent {
   type: 'system' | 'assistant' | 'result'
@@ -137,5 +141,11 @@ export interface ElectronAPI {
     onChunk: (callback: (data: ClaudeStreamEvent) => void) => () => void
     onError: (callback: (error: string) => void) => () => void
     onDone: (callback: (result: { code: number }) => void) => () => void
+  }
+  theme: {
+    getEffective: () => Promise<Theme>
+    getSource: () => Promise<ThemePreference>
+    set: (theme: ThemePreference) => Promise<Theme>
+    onChange: (callback: (theme: Theme) => void) => () => void
   }
 }

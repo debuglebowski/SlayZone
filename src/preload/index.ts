@@ -68,6 +68,16 @@ const api: ElectronAPI = {
       ipcRenderer.on('claude:done', handler)
       return () => ipcRenderer.removeListener('claude:done', handler)
     }
+  },
+  theme: {
+    getEffective: () => ipcRenderer.invoke('theme:get-effective'),
+    getSource: () => ipcRenderer.invoke('theme:get-source'),
+    set: (theme: 'light' | 'dark' | 'system') => ipcRenderer.invoke('theme:set', theme),
+    onChange: (callback: (theme: 'light' | 'dark') => void) => {
+      const handler = (_event: unknown, theme: 'light' | 'dark') => callback(theme)
+      ipcRenderer.on('theme:changed', handler)
+      return () => ipcRenderer.removeListener('theme:changed', handler)
+    }
   }
 }
 
