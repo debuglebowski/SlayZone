@@ -128,10 +128,10 @@ Which phases cover which requirements. Updated by create-roadmap.
 | Requirement | Phase | Status |
 |-------------|-------|--------|
 | CORE-01 | Phase 1 | Complete |
-| CORE-02 | Phase 2 | Pending |
-| CORE-03 | Phase 2 | Pending |
-| CORE-04 | Phase 2 | Pending |
-| CORE-05 | Phase 2 | Pending |
+| CORE-02 | Phase 2 | Complete |
+| CORE-03 | Phase 2 | Complete |
+| CORE-04 | Phase 2 | Complete |
+| CORE-05 | Phase 2 | Complete |
 | NAV-01 | Phase 3 | Pending |
 | NAV-02 | Phase 3 | Pending |
 | NAV-03 | Phase 3 | Pending |

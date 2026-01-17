@@ -47,9 +47,9 @@ Plans:
 **Plans:** 3 plans
 
 Plans:
-- [ ] 02-01-PLAN.md — Extend IPC layer (update/delete handlers)
-- [ ] 02-02-PLAN.md — Install shadcn form components + Zod schemas
-- [ ] 02-03-PLAN.md — Build CRUD UI (task list, dialogs)
+- [x] 02-01-PLAN.md — Extend IPC layer (update/delete handlers)
+- [x] 02-02-PLAN.md — Install shadcn form components + Zod schemas
+- [x] 02-03-PLAN.md — Build CRUD UI (task list, dialogs)
 
 ---
 
@@ -147,7 +147,7 @@ Plans:
 | Phase | Status | Completed |
 |-------|--------|-----------|
 | 1 - Foundation | Complete | 2026-01-17 |
-| 2 - Data Layer | Planned | - |
+| 2 - Data Layer | Complete | 2026-01-17 |
 | 3 - Navigation | Not started | - |
 | 4 - Task Management | Not started | - |
 | 5 - AI Integration | Not started | - |
