@@ -7,6 +7,7 @@ import { DeleteTaskDialog } from '@/components/DeleteTaskDialog'
 import { CreateProjectDialog } from '@/components/dialogs/CreateProjectDialog'
 import { ProjectSettingsDialog } from '@/components/dialogs/ProjectSettingsDialog'
 import { DeleteProjectDialog } from '@/components/dialogs/DeleteProjectDialog'
+import { UserSettingsDialog } from '@/components/dialogs/UserSettingsDialog'
 import { Button } from '@/components/ui/button'
 import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar'
 import { AppSidebar } from '@/components/sidebar/AppSidebar'
@@ -29,6 +30,9 @@ function App(): React.JSX.Element {
   const [createProjectOpen, setCreateProjectOpen] = useState(false)
   const [editingProject, setEditingProject] = useState<Project | null>(null)
   const [deletingProject, setDeletingProject] = useState<Project | null>(null)
+
+  // Settings dialog state
+  const [settingsOpen, setSettingsOpen] = useState(false)
 
   // Load data on mount
   useEffect(() => {
@@ -101,6 +105,7 @@ function App(): React.JSX.Element {
         onAddProject={() => setCreateProjectOpen(true)}
         onProjectSettings={setEditingProject}
         onProjectDelete={setDeletingProject}
+        onSettings={() => setSettingsOpen(true)}
       />
       <SidebarInset className="min-h-screen">
         <div className="p-6">
@@ -164,6 +169,12 @@ function App(): React.JSX.Element {
             open={!!deletingProject}
             onOpenChange={(open) => !open && setDeletingProject(null)}
             onDeleted={handleProjectDeleted}
+          />
+
+          {/* User Settings Dialog */}
+          <UserSettingsDialog
+            open={settingsOpen}
+            onOpenChange={setSettingsOpen}
           />
         </div>
       </SidebarInset>
