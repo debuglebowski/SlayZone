@@ -48,7 +48,7 @@ export function TaskMetadataRow({
   }
 
   const handleBlockedChange = async (blocked: boolean): Promise<void> => {
-    const blockedReason = blocked ? 'Blocked' : undefined
+    const blockedReason = blocked ? 'Blocked' : null
     const updated = await window.api.db.updateTask({ id: task.id, blockedReason })
     onUpdate(updated)
   }
@@ -56,15 +56,13 @@ export function TaskMetadataRow({
   const handleBlockedReasonChange = async (reason: string): Promise<void> => {
     const updated = await window.api.db.updateTask({
       id: task.id,
-      blockedReason: reason || undefined
+      blockedReason: reason || null
     })
     onUpdate(updated)
   }
 
   const handleTagToggle = async (tagId: string, checked: boolean): Promise<void> => {
-    const newTagIds = checked
-      ? [...taskTagIds, tagId]
-      : taskTagIds.filter((id) => id !== tagId)
+    const newTagIds = checked ? [...taskTagIds, tagId] : taskTagIds.filter((id) => id !== tagId)
     await window.api.taskTags.setTagsForTask(task.id, newTagIds)
     onTagsChange(newTagIds)
   }
@@ -170,15 +168,10 @@ export function TaskMetadataRow({
             ) : (
               <div className="space-y-2">
                 {tags.map((tag) => (
-                  <label
-                    key={tag.id}
-                    className="flex cursor-pointer items-center gap-2"
-                  >
+                  <label key={tag.id} className="flex cursor-pointer items-center gap-2">
                     <Checkbox
                       checked={taskTagIds.includes(tag.id)}
-                      onCheckedChange={(checked) =>
-                        handleTagToggle(tag.id, checked === true)
-                      }
+                      onCheckedChange={(checked) => handleTagToggle(tag.id, checked === true)}
                     />
                     <span
                       className="rounded px-1.5 py-0.5 text-sm"

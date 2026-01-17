@@ -10,12 +10,7 @@ import {
   statusOptions,
   priorityOptions
 } from '@/lib/schemas'
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle
-} from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import {
   Form,
   FormControl,
@@ -269,10 +264,7 @@ export function CreateTaskDialog({
                     <PopoverContent className="w-[200px] p-2" align="start">
                       <div className="space-y-2">
                         {tags.map((tag) => (
-                          <label
-                            key={tag.id}
-                            className="flex cursor-pointer items-center gap-2"
-                          >
+                          <label key={tag.id} className="flex cursor-pointer items-center gap-2">
                             <Checkbox
                               checked={field.value.includes(tag.id)}
                               onCheckedChange={(checked) => {

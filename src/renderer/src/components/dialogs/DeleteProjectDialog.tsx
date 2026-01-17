@@ -6,9 +6,9 @@ import {
   AlertDialogDescription,
   AlertDialogFooter,
   AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog"
-import type { Project } from "../../../../shared/types/database"
+  AlertDialogTitle
+} from '@/components/ui/alert-dialog'
+import type { Project } from '../../../../shared/types/database'
 
 interface DeleteProjectDialogProps {
   project: Project | null
@@ -17,7 +17,12 @@ interface DeleteProjectDialogProps {
   onDeleted: () => void
 }
 
-export function DeleteProjectDialog({ project, open, onOpenChange, onDeleted }: DeleteProjectDialogProps) {
+export function DeleteProjectDialog({
+  project,
+  open,
+  onOpenChange,
+  onDeleted
+}: DeleteProjectDialogProps) {
   const handleDelete = async () => {
     if (!project) return
     await window.api.db.deleteProject(project.id)
@@ -30,13 +35,16 @@ export function DeleteProjectDialog({ project, open, onOpenChange, onDeleted }: 
         <AlertDialogHeader>
           <AlertDialogTitle>Delete Project</AlertDialogTitle>
           <AlertDialogDescription>
-            This will permanently delete "{project?.name}" and all its tasks.
-            This action cannot be undone.
+            This will permanently delete "{project?.name}" and all its tasks. This action cannot be
+            undone.
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel>Cancel</AlertDialogCancel>
-          <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+          <AlertDialogAction
+            onClick={handleDelete}
+            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+          >
             Delete
           </AlertDialogAction>
         </AlertDialogFooter>

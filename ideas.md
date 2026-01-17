@@ -1,0 +1,3 @@
+- Plugins to the web? 1Password.
+- Summarize a website
+- Be able to branch out a chat.

@@ -113,20 +113,7 @@ export function AppSidebar({
       </SidebarContent>
       <SidebarFooter className="py-4">
         <SidebarMenu>
-          <SidebarMenuItem className="flex justify-center gap-2">
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon-lg"
-                  onClick={onSettings}
-                  className="rounded-lg text-muted-foreground"
-                >
-                  <Settings className="size-5" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent side="right">Settings</TooltipContent>
-            </Tooltip>
+          <SidebarMenuItem className="flex flex-col items-center gap-2">
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button
@@ -139,6 +126,19 @@ export function AppSidebar({
                 </Button>
               </TooltipTrigger>
               <TooltipContent side="right">Tutorial</TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon-lg"
+                  onClick={onSettings}
+                  className="rounded-lg text-muted-foreground"
+                >
+                  <Settings className="size-5" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="right">Settings</TooltipContent>
             </Tooltip>
           </SidebarMenuItem>
         </SidebarMenu>

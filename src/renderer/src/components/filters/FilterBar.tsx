@@ -142,10 +142,7 @@ export function FilterBar({ filter, onChange, tags }: FilterBarProps): React.JSX
                     checked={filter.tagIds.includes(tag.id)}
                     onCheckedChange={() => handleTagToggle(tag.id)}
                   />
-                  <span
-                    className="size-3 rounded-full"
-                    style={{ backgroundColor: tag.color }}
-                  />
+                  <span className="size-3 rounded-full" style={{ backgroundColor: tag.color }} />
                   <span className="text-sm">{tag.name}</span>
                 </label>
               ))}
@@ -167,11 +164,7 @@ export function FilterBar({ filter, onChange, tags }: FilterBarProps): React.JSX
           </Label>
         </div>
         <div className="flex items-center gap-2">
-          <Switch
-            id="show-done"
-            checked={filter.showDone}
-            onCheckedChange={handleShowDoneChange}
-          />
+          <Switch id="show-done" checked={filter.showDone} onCheckedChange={handleShowDoneChange} />
           <Label htmlFor="show-done" className="text-xs cursor-pointer">
             Done
           </Label>

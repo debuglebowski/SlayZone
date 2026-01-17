@@ -16,7 +16,9 @@ export function registerClaudeHandlers(): void {
   })
 
   ipcMain.handle('claude:check-availability', async (): Promise<ClaudeAvailability> => {
-    return new Promise((resolve) => {
+    const TIMEOUT_MS = 5000
+
+    const checkPromise = new Promise<ClaudeAvailability>((resolve) => {
       const cmd = process.platform === 'win32' ? 'where' : 'which'
       const proc = spawn(cmd, ['claude'], { shell: true })
 
@@ -56,5 +58,13 @@ export function registerClaudeHandlers(): void {
         resolve({ available: false, path: null, version: null })
       })
     })
+
+    const timeoutPromise = new Promise<ClaudeAvailability>((resolve) => {
+      setTimeout(() => {
+        resolve({ available: false, path: null, version: null })
+      }, TIMEOUT_MS)
+    })
+
+    return Promise.race([checkPromise, timeoutPromise])
   })
 }

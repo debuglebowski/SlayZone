@@ -35,7 +35,10 @@ interface OnboardingDialogProps {
   onExternalClose?: () => void
 }
 
-export function OnboardingDialog({ externalOpen, onExternalClose }: OnboardingDialogProps): React.JSX.Element | null {
+export function OnboardingDialog({
+  externalOpen,
+  onExternalClose
+}: OnboardingDialogProps): React.JSX.Element | null {
   const [autoOpen, setAutoOpen] = useState(false)
   const [step, setStep] = useState(0)
 

@@ -34,12 +34,12 @@ export function TaskItem({ task, onEdit, onDelete }: TaskItemProps): React.JSX.E
   return (
     <div className="flex items-center gap-3 rounded-md border px-3 py-2 hover:bg-muted/50">
       {/* Priority */}
-      <span className="w-6 text-xs font-medium text-muted-foreground">
-        P{task.priority}
-      </span>
+      <span className="w-6 text-xs font-medium text-muted-foreground">P{task.priority}</span>
 
       {/* Title */}
-      <span className={`flex-1 truncate ${task.status === 'done' ? 'line-through text-muted-foreground' : ''}`}>
+      <span
+        className={`flex-1 truncate ${task.status === 'done' ? 'line-through text-muted-foreground' : ''}`}
+      >
         {task.title}
       </span>
 
@@ -60,7 +60,9 @@ export function TaskItem({ task, onEdit, onDelete }: TaskItemProps): React.JSX.E
 
       {/* Due date */}
       {task.due_date && (
-        <span className={`text-xs ${isOverdue ? 'font-medium text-red-600' : 'text-muted-foreground'}`}>
+        <span
+          className={`text-xs ${isOverdue ? 'font-medium text-red-600' : 'text-muted-foreground'}`}
+        >
           {format(parseISO(task.due_date), 'MMM d')}
         </span>
       )}

@@ -1,0 +1,29 @@
+{
+  "name": "Kanban Screen Improvements",
+  "status": "queued",
+  "description": "Enhance the Kanban board with better task management, visual feedback, and inline editing.",
+  "size": "Medium",
+  "dependencies": [],
+  "subtasks": [
+    {
+      "name": "Add task directly on column",
+      "description": "Add button on right side of column to create task inline"
+    },
+    {
+      "name": "Display task count per column",
+      "description": "Show number of tasks next to each column name"
+    },
+    {
+      "name": "Inline project rename",
+      "description": "Click project title to rename, no textarea visuals - just cursor"
+    },
+    {
+      "name": "Improve archived tasks UX",
+      "description": "Replace current archive solution with a switch (like blocked/done)"
+    },
+    {
+      "name": "Enhance task card data",
+      "description": "Show more tasteful and relevant data on task cards"
+    }
+  ]
+}

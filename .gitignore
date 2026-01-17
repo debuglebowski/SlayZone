@@ -4,3 +4,6 @@ out
 .DS_Store
 .eslintcache
 *.log*
+
+# Auto Claude data directory
+.auto-claude/

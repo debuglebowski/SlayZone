@@ -15,13 +15,12 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
   // Initialize from main process
   useEffect(() => {
-    Promise.all([
-      window.api.theme.getEffective(),
-      window.api.theme.getSource()
-    ]).then(([effective, source]) => {
-      setTheme(effective)
-      setPreferenceState(source)
-    })
+    Promise.all([window.api.theme.getEffective(), window.api.theme.getSource()]).then(
+      ([effective, source]) => {
+        setTheme(effective)
+        setPreferenceState(source)
+      }
+    )
 
     // Listen for system theme changes
     const unsubscribe = window.api.theme.onChange((newTheme) => {

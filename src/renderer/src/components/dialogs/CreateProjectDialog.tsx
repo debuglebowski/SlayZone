@@ -1,15 +1,10 @@
-import { useState } from "react"
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { ColorPicker } from "@/components/ui/color-picker"
-import type { Project } from "../../../../shared/types/database"
+import { useState } from 'react'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { ColorPicker } from '@/components/ui/color-picker'
+import type { Project } from '../../../../shared/types/database'
 
 interface CreateProjectDialogProps {
   open: boolean
@@ -20,7 +15,7 @@ interface CreateProjectDialogProps {
 const DEFAULT_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899']
 
 export function CreateProjectDialog({ open, onOpenChange, onCreated }: CreateProjectDialogProps) {
-  const [name, setName] = useState("")
+  const [name, setName] = useState('')
   const [color, setColor] = useState(DEFAULT_COLORS[0])
   const [loading, setLoading] = useState(false)
 
@@ -32,7 +27,7 @@ export function CreateProjectDialog({ open, onOpenChange, onCreated }: CreatePro
     try {
       const project = await window.api.db.createProject({ name: name.trim(), color })
       onCreated(project)
-      setName("")
+      setName('')
       setColor(DEFAULT_COLORS[Math.floor(Math.random() * DEFAULT_COLORS.length)])
     } finally {
       setLoading(false)

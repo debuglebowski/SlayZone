@@ -4,11 +4,7 @@ import { BrowserWindow } from 'electron'
 
 let activeProcess: ChildProcess | null = null
 
-export function streamClaude(
-  win: BrowserWindow,
-  prompt: string,
-  context?: string
-): void {
+export function streamClaude(win: BrowserWindow, prompt: string, context?: string): void {
   // Kill existing if any
   if (activeProcess) {
     activeProcess.kill('SIGTERM')
@@ -16,7 +12,7 @@ export function streamClaude(
   }
 
   // Build args
-  const args = ['-p', '--output-format', 'stream-json']
+  const args = ['-p', '--verbose', '--output-format', 'stream-json']
   if (context) {
     args.push('--append-system-prompt', context)
   }

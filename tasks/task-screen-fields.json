@@ -1,0 +1,21 @@
+{
+  "name": "Task Screen Fields",
+  "status": "queued",
+  "description": "Improve task screen input fields with cleaner styling and add recurring task functionality.",
+  "size": "Medium",
+  "dependencies": ["Task Screen Layout"],
+  "subtasks": [
+    {
+      "name": "Unstyled title input",
+      "description": "Title should be plain text input - no border, outline, or decoration. Only text style."
+    },
+    {
+      "name": "Standard description textarea",
+      "description": "Use normal shadcn textarea for description, no active mode changes"
+    },
+    {
+      "name": "Add recurring tasks",
+      "description": "Tasks that reset every x time. Configure in settings sidebar."
+    }
+  ]
+}

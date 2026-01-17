@@ -25,20 +25,37 @@ export function WorkspaceSidebar({
   onRenameItem: _onRenameItem,
   onDeleteItem
 }: Props) {
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   void _onRenameItem // Reserved for inline rename feature
   return (
     <aside className="w-64 border-r flex flex-col">
       <div className="p-2 border-b flex items-center justify-between">
         <span className="text-sm font-medium">Workspace</span>
         <div className="flex gap-1">
-          <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => onAddItem('chat')} title="Add Chat">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-6 w-6"
+            onClick={() => onAddItem('chat')}
+            title="Add Chat"
+          >
             <MessageSquare className="h-3 w-3" />
           </Button>
-          <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => onAddItem('browser')} title="Add Browser">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-6 w-6"
+            onClick={() => onAddItem('browser')}
+            title="Add Browser"
+          >
             <Globe className="h-3 w-3" />
           </Button>
-          <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => onAddItem('document')} title="Add Document">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-6 w-6"
+            onClick={() => onAddItem('document')}
+            title="Add Document"
+          >
             <FileText className="h-3 w-3" />
           </Button>
         </div>

@@ -1,4 +1,4 @@
-import { HexColorPicker, HexColorInput } from "react-colorful"
+import { HexColorPicker, HexColorInput } from 'react-colorful'
 
 interface ColorPickerProps {
   value: string

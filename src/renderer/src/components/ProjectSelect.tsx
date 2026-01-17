@@ -14,7 +14,11 @@ interface ProjectSelectProps {
   disabled?: boolean
 }
 
-export function ProjectSelect({ value, onChange, disabled }: ProjectSelectProps): React.JSX.Element {
+export function ProjectSelect({
+  value,
+  onChange,
+  disabled
+}: ProjectSelectProps): React.JSX.Element {
   const [projects, setProjects] = useState<Project[]>([])
 
   useEffect(() => {
@@ -30,10 +34,7 @@ export function ProjectSelect({ value, onChange, disabled }: ProjectSelectProps)
         {projects.map((project) => (
           <SelectItem key={project.id} value={project.id}>
             <span className="flex items-center gap-2">
-              <span
-                className="h-2 w-2 rounded-full"
-                style={{ backgroundColor: project.color }}
-              />
+              <span className="h-2 w-2 rounded-full" style={{ backgroundColor: project.color }} />
               {project.name}
             </span>
           </SelectItem>

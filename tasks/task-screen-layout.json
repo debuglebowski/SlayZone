@@ -1,0 +1,17 @@
+{
+  "name": "Task Screen Layout",
+  "status": "queued",
+  "description": "Restructure the task screen layout with centered content and separated settings sidebar.",
+  "size": "Medium",
+  "dependencies": [],
+  "subtasks": [
+    {
+      "name": "Center header with content",
+      "description": "Make header (title, arrow, work mode button) same width as content, centered"
+    },
+    {
+      "name": "Align settings sidebar to window edge",
+      "description": "Position settings sidebar against right window edge, visually separated from main content"
+    }
+  ]
+}

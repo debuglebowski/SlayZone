@@ -4,10 +4,10 @@ import {
   CommandGroup,
   CommandInput,
   CommandItem,
-  CommandList,
-} from "@/components/ui/command"
-import { Folder, CheckSquare } from "lucide-react"
-import type { Task, Project } from "../../../../shared/types/database"
+  CommandList
+} from '@/components/ui/command'
+import { Folder, CheckSquare } from 'lucide-react'
+import type { Task, Project } from '../../../../shared/types/database'
 
 interface SearchDialogProps {
   open: boolean
@@ -24,7 +24,7 @@ export function SearchDialog({
   tasks,
   projects,
   onSelectTask,
-  onSelectProject,
+  onSelectProject
 }: SearchDialogProps) {
   // Filter to top-level tasks only (no subtasks)
   const searchableTasks = tasks.filter((t) => !t.parent_id)
@@ -61,7 +61,7 @@ export function SearchDialog({
                 value={task.title}
                 keywords={[
                   // Include project name in search
-                  projects.find((p) => p.id === task.project_id)?.name ?? "",
+                  projects.find((p) => p.id === task.project_id)?.name ?? ''
                 ].filter(Boolean)}
                 onSelect={() => {
                   onSelectTask(task.id)

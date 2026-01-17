@@ -10,12 +10,7 @@ import {
   statusOptions,
   priorityOptions
 } from '@/lib/schemas'
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle
-} from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import {
   Form,
   FormControl,
@@ -90,7 +85,7 @@ export function EditTaskDialog({
       status: data.status,
       priority: data.priority,
       dueDate: data.dueDate,
-      blockedReason: data.blockedReason
+      blockedReason: data.blockedReason || null
     })
     onUpdated(updated)
   }
@@ -231,7 +226,11 @@ export function EditTaskDialog({
                 onClick={() => setShowBlocked(!showBlocked)}
                 className="mb-2 -ml-2"
               >
-                {showBlocked ? <ChevronUp className="mr-1 size-4" /> : <ChevronDown className="mr-1 size-4" />}
+                {showBlocked ? (
+                  <ChevronUp className="mr-1 size-4" />
+                ) : (
+                  <ChevronDown className="mr-1 size-4" />
+                )}
                 Blocked Reason
               </Button>
               {showBlocked && (

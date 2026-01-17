@@ -60,9 +60,7 @@ export function KanbanCard({
                   Blocked
                 </span>
               )}
-              {task.due_date && !isOverdue && (
-                <span>{task.due_date}</span>
-              )}
+              {task.due_date && !isOverdue && <span>{task.due_date}</span>}
             </div>
           </div>
         </div>

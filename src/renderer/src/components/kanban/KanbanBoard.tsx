@@ -6,7 +6,7 @@ import {
   KeyboardSensor,
   useSensors,
   useSensor,
-  closestCorners,
+  pointerWithin,
   type DragStartEvent,
   type DragEndEvent
 } from '@dnd-kit/core'
@@ -81,11 +81,11 @@ export function KanbanBoard({
   return (
     <DndContext
       sensors={sensors}
-      collisionDetection={closestCorners}
+      collisionDetection={pointerWithin}
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
     >
-      <div className="flex gap-4 overflow-x-auto pb-4">
+      <div className="flex gap-4 overflow-x-auto pb-4 h-full">
         {columns.map((column) => (
           <KanbanColumn
             key={column.id}
@@ -97,7 +97,7 @@ export function KanbanBoard({
           />
         ))}
       </div>
-      <DragOverlay>
+      <DragOverlay dropAnimation={{ duration: 150, easing: 'ease-out' }}>
         {activeTask ? (
           <KanbanCard
             task={activeTask}

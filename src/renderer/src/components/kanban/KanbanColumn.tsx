@@ -67,7 +67,7 @@ export function KanbanColumn({
   })
 
   return (
-    <div className="flex w-72 shrink-0 flex-col">
+    <div className="flex w-72 shrink-0 flex-col h-full">
       <div className="mb-2 flex items-center justify-between px-2">
         <h3 className="text-sm font-semibold text-muted-foreground">{column.title}</h3>
         <span className="text-xs text-muted-foreground">{column.tasks.length}</span>
@@ -75,11 +75,14 @@ export function KanbanColumn({
       <div
         ref={setNodeRef}
         className={cn(
-          'flex-1 rounded-lg bg-muted/30 p-2 min-h-[200px]',
+          'flex-1 h-full rounded-lg bg-muted/30 p-2 min-h-[200px]',
           isOver && 'bg-muted/50 ring-2 ring-primary/20'
         )}
       >
-        <SortableContext items={column.tasks.map((t) => t.id)} strategy={verticalListSortingStrategy}>
+        <SortableContext
+          items={column.tasks.map((t) => t.id)}
+          strategy={verticalListSortingStrategy}
+        >
           <div className="flex flex-col gap-2">
             {column.tasks.map((task) => (
               <SortableKanbanCard

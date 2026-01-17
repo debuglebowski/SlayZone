@@ -1,15 +1,10 @@
-import { useState, useEffect } from "react"
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { ColorPicker } from "@/components/ui/color-picker"
-import type { Project } from "../../../../shared/types/database"
+import { useState, useEffect } from 'react'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { ColorPicker } from '@/components/ui/color-picker'
+import type { Project } from '../../../../shared/types/database'
 
 interface ProjectSettingsDialogProps {
   project: Project | null
@@ -18,9 +13,14 @@ interface ProjectSettingsDialogProps {
   onUpdated: (project: Project) => void
 }
 
-export function ProjectSettingsDialog({ project, open, onOpenChange, onUpdated }: ProjectSettingsDialogProps) {
-  const [name, setName] = useState("")
-  const [color, setColor] = useState("")
+export function ProjectSettingsDialog({
+  project,
+  open,
+  onOpenChange,
+  onUpdated
+}: ProjectSettingsDialogProps) {
+  const [name, setName] = useState('')
+  const [color, setColor] = useState('')
   const [loading, setLoading] = useState(false)
 
   useEffect(() => {
@@ -39,7 +39,7 @@ export function ProjectSettingsDialog({ project, open, onOpenChange, onUpdated }
       const updated = await window.api.db.updateProject({
         id: project.id,
         name: name.trim(),
-        color,
+        color
       })
       onUpdated(updated)
     } finally {
@@ -56,11 +56,7 @@ export function ProjectSettingsDialog({ project, open, onOpenChange, onUpdated }
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="edit-name">Name</Label>
-            <Input
-              id="edit-name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-            />
+            <Input id="edit-name" value={name} onChange={(e) => setName(e.target.value)} />
           </div>
           <div className="space-y-2">
             <Label>Color</Label>

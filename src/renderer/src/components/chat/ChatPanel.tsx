@@ -93,11 +93,7 @@ export function ChatPanel({ task, workspaceItemId }: Props) {
           </div>
         )}
       </div>
-      <ChatInput
-        onSend={handleSend}
-        onCancel={cancel}
-        isStreaming={isStreaming}
-      />
+      <ChatInput onSend={handleSend} onCancel={cancel} isStreaming={isStreaming} />
     </div>
   )
 }
