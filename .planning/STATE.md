@@ -10,27 +10,28 @@ See: .planning/PROJECT.md (updated 2026-01-17)
 ## Current Position
 
 Phase: 9 of 14 (Search)
-Plan: Not started
-Status: Ready to plan
-Last activity: 2026-01-17 — Phase 8 complete (2 plans verified)
+Plan: 1 of 1 complete
+Status: Phase complete
+Last activity: 2026-01-17 — Completed 09-01-PLAN.md
 
-Progress: v1.1 █████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░ 14%
+Progress: v1.1 ██████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░ 17%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 2 (v1.1)
-- Average duration: 2.5 min
-- Total execution time: 0.08 hours
+- Total plans completed: 3 (v1.1)
+- Average duration: 2.7 min
+- Total execution time: 0.13 hours
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
 | 08-theme-system | 2 | 5m | 2.5m |
+| 09-search | 1 | 3m | 3m |
 
 **Recent Trend:**
-- Last 5 plans: 2m, 3m
+- Last 5 plans: 2m, 3m, 3m
 - Trend: —
 
 ## Milestone History
@@ -51,6 +52,8 @@ Recent decisions affecting current work:
 | Load theme before window creation | 08-01 | Prevent theme flash on startup |
 | ThemeProvider at app root | 08-02 | Wraps all components for theme access |
 | .dark class on documentElement | 08-02 | Matches Tailwind convention |
+| Filter top-level tasks only | 09-01 | Subtasks excluded from search |
+| Project name in task keywords | 09-01 | Cross-search capability |
 
 ### Pending Todos
 
@@ -63,5 +66,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-01-17
-Stopped at: Phase 8 complete, ready to plan Phase 9
+Stopped at: Phase 9 complete (09-01-PLAN.md)
 Resume file: None
