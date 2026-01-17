@@ -10,17 +10,17 @@ See: .planning/PROJECT.md
 ## Current Position
 
 Phase: 6 of 7 (Work Mode)
-Plan: 3 of ? complete
+Plan: 4 of ? complete
 Status: In progress
-Last activity: 2026-01-17 - Completed 06-03-PLAN.md (workspace sidebar)
+Last activity: 2026-01-17 - Completed 06-04-PLAN.md (content viewers)
 
-Progress: █████████████████████████████░ 97%
+Progress: █████████████████████████████░ 98%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 23
-- Average duration: 2.7min
+- Total plans completed: 24
+- Average duration: 2.6min
 
 **By Phase:**
 
@@ -31,7 +31,7 @@ Progress: ███████████████████████�
 | 03-navigation | 5 | 11min | 2.2min |
 | 04-task-management | 7 | 14min | 2.0min |
 | 05-ai-integration | 4 | 7min | 1.8min |
-| 06-work-mode | 3 | 8.5min | 2.8min |
+| 06-work-mode | 4 | 10.5min | 2.6min |
 
 ## Accumulated Context
 
@@ -90,6 +90,8 @@ Progress: ███████████████████████�
 | onWorkMode prop optional | 06-02 | Support potential standalone usage |
 | Inline rename via input on context menu | 06-03 | Blur-to-save pattern from click-to-edit |
 | Add item via dropdown (chat/browser/document) | 06-03 | Single + button with type options |
+| persist:browser-tabs partition for webview | 06-04 | Session sharing across browser tabs |
+| Conditional rendering by activeItem.type | 06-04 | Clean content switching in WorkModePage |
 
 ### Pending Todos
 
@@ -101,6 +103,6 @@ Progress: ███████████████████████�
 
 ## Session Continuity
 
-Last session: 2026-01-17T12:48Z
-Stopped at: Completed 06-03-PLAN.md (workspace sidebar)
+Last session: 2026-01-17T12:42Z
+Stopped at: Completed 06-04-PLAN.md (content viewers)
 Resume file: None
