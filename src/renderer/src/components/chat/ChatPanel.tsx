@@ -2,7 +2,8 @@ import { useRef, useEffect } from 'react'
 import { useClaude } from '@/hooks/useClaude'
 import { ChatMessage } from './ChatMessage'
 import { ChatInput } from './ChatInput'
-import type { Task, ChatMessage as ChatMessageType } from '../../../../shared/types/api'
+import type { Task } from '../../../../shared/types/database'
+import type { ChatMessage as ChatMessageType } from '../../../../shared/types/api'
 
 interface Props {
   task: Task
