@@ -11,7 +11,7 @@ import {
   DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu'
 import { DeleteTaskDialog } from '@/components/DeleteTaskDialog'
-import { TaskMetadataRow } from './TaskMetadataRow'
+import { TaskMetadataSidebar } from './TaskMetadataSidebar'
 import { MarkdownEditor } from './MarkdownEditor'
 import { SubtaskAccordion } from './SubtaskAccordion'
 
@@ -20,13 +20,15 @@ interface TaskDetailPageProps {
   onBack: () => void
   onTaskUpdated: (task: Task) => void
   onWorkMode?: () => void
+  onNavigateToTask?: (taskId: string) => void
 }
 
 export function TaskDetailPage({
   taskId,
   onBack,
   onTaskUpdated,
-  onWorkMode
+  onWorkMode,
+  onNavigateToTask
 }: TaskDetailPageProps): React.JSX.Element {
   const [task, setTask] = useState<Task | null>(null)
   const [tags, setTags] = useState<Tag[]>([])
@@ -149,7 +151,7 @@ export function TaskDetailPage({
   return (
     <div className="min-h-screen">
       {/* Header */}
-      <header className="sticky top-0 z-10 border-b bg-background p-4">
+      <header className="sticky top-0 z-10 bg-background p-4">
         <div className="flex items-center gap-4">
           <Button variant="ghost" size="icon" onClick={onBack}>
             <ArrowLeft className="size-5" />
@@ -205,32 +207,43 @@ export function TaskDetailPage({
       </header>
 
       {/* Content */}
-      <main className="mx-auto max-w-4xl p-6">
-        {/* Metadata row */}
-        <TaskMetadataRow
-          task={task}
-          tags={tags}
-          taskTagIds={taskTagIds}
-          onUpdate={handleTaskUpdate}
-          onTagsChange={handleTagsChange}
-        />
+      <div className="mx-auto max-w-5xl p-6">
+        <div className="flex gap-8">
+          {/* Main content */}
+          <main className="min-w-0 max-w-2xl flex-1">
+            {/* Description */}
+            <section>
+              <h2 className="mb-2 text-sm font-medium text-muted-foreground">Description</h2>
+              <MarkdownEditor
+                value={descriptionValue}
+                onChange={setDescriptionValue}
+                onSave={handleDescriptionSave}
+                placeholder="Click to add description..."
+              />
+            </section>
 
-        {/* Description */}
-        <section className="mt-6">
-          <h2 className="mb-2 text-sm font-medium text-muted-foreground">Description</h2>
-          <MarkdownEditor
-            value={descriptionValue}
-            onChange={setDescriptionValue}
-            onSave={handleDescriptionSave}
-            placeholder="Click to add description..."
-          />
-        </section>
+            {/* Subtasks */}
+            <section className="mt-8">
+              <SubtaskAccordion
+                parentTaskId={task.id}
+                projectId={task.project_id}
+                onNavigate={onNavigateToTask || (() => {})}
+              />
+            </section>
+          </main>
 
-        {/* Subtasks */}
-        <section className="mt-8 border-t pt-6">
-          <SubtaskAccordion parentTaskId={task.id} projectId={task.project_id} />
-        </section>
-      </main>
+          {/* Metadata sidebar */}
+          <aside className="w-64 shrink-0">
+            <TaskMetadataSidebar
+              task={task}
+              tags={tags}
+              taskTagIds={taskTagIds}
+              onUpdate={handleTaskUpdate}
+              onTagsChange={handleTagsChange}
+            />
+          </aside>
+        </div>
+      </div>
 
       <DeleteTaskDialog
         task={task}
