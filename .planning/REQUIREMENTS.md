@@ -45,11 +45,11 @@ Requirements for v1.1 release. Each maps to roadmap phases.
 
 ### Work Mode
 
-- [ ] **WORK-01**: Empty state shows 3 workspace options
-- [ ] **WORK-02**: Empty state hides workspace panel
-- [ ] **WORK-03**: Task title displayed in sidebar (not header)
-- [ ] **WORK-04**: Sidebar wider than current
-- [ ] **WORK-05**: Exit button subtle, positioned top-right
+- [x] **WORK-01**: Empty state shows 3 workspace options
+- [x] **WORK-02**: Empty state hides workspace panel
+- [x] **WORK-03**: Task title displayed in sidebar (not header)
+- [x] **WORK-04**: Sidebar wider than current
+- [x] **WORK-05**: Exit button subtle, positioned top-right
 
 ## v2 Requirements
 
@@ -107,11 +107,11 @@ Which phases cover which requirements. Updated by create-roadmap.
 | TASK-03 | Phase 13 | Complete |
 | TASK-04 | Phase 13 | Complete |
 | TASK-05 | Phase 13 | Complete |
-| WORK-01 | Phase 14 | Pending |
-| WORK-02 | Phase 14 | Pending |
-| WORK-03 | Phase 14 | Pending |
-| WORK-04 | Phase 14 | Pending |
-| WORK-05 | Phase 14 | Pending |
+| WORK-01 | Phase 14 | Complete |
+| WORK-02 | Phase 14 | Complete |
+| WORK-03 | Phase 14 | Complete |
+| WORK-04 | Phase 14 | Complete |
+| WORK-05 | Phase 14 | Complete |
 
 **Coverage:**
 - v1.1 requirements: 23 total

@@ -21,7 +21,7 @@ Polish all three screens (Kanban, Task Detail, Work Mode) and add cross-cutting 
 - [x] **Phase 11: Kanban Polish** - Split user menu into buttons
 - [x] **Phase 12: Settings Redesign** - Professional UI with Claude status
 - [x] **Phase 13: Task Screen Redesign** - Narrow layout with metadata sidebar
-- [ ] **Phase 14: Work Mode Improvements** - Empty state and sidebar polish
+- [x] **Phase 14: Work Mode Improvements** - Empty state and sidebar polish
 
 ## Phase Details
 
@@ -127,7 +127,7 @@ Plans:
   5. Exit button subtle and positioned top-right
 **Plans**: 1 plan
 Plans:
-- [ ] 14-01-PLAN.md - Restructure layout, create EmptyWorkspaceState
+- [x] 14-01-PLAN.md - Restructure layout, create EmptyWorkspaceState
 
 ## Progress
 
@@ -142,7 +142,7 @@ Plans:
 | 11. Kanban Polish | v1.1 | 1/1 | Complete | 2026-01-17 |
 | 12. Settings Redesign | v1.1 | 2/2 | Complete | 2026-01-17 |
 | 13. Task Screen Redesign | v1.1 | 2/2 | Complete | 2026-01-17 |
-| 14. Work Mode | v1.1 | 0/1 | Not started | - |
+| 14. Work Mode | v1.1 | 1/1 | Complete | 2026-01-17 |
 
 ---
 *Created: 2026-01-17*
