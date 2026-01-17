@@ -9,10 +9,11 @@ import {
   Dialog,
   DialogContent,
   DialogHeader,
-  DialogTitle,
-  DialogTrigger
+  DialogTitle
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
+import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar'
+import { AppSidebar } from '@/components/sidebar/AppSidebar'
 
 function App(): React.JSX.Element {
   // Task state
@@ -37,12 +38,15 @@ function App(): React.JSX.Element {
     Promise.all([window.api.db.getTasks(), window.api.db.getProjects()]).then(([t, p]) => {
       setTasks(t)
       setProjects(p)
-      if (p.length > 0 && !selectedProjectId) {
-        setSelectedProjectId(p[0].id)
-      }
+      // Don't auto-select first project - start with "All" view
       setLoading(false)
     })
   }, [])
+
+  // Filter tasks based on selected project
+  const filteredTasks = selectedProjectId
+    ? tasks.filter((t) => t.project_id === selectedProjectId)
+    : tasks
 
   // CRUD handlers
   const handleTaskCreated = (task: Task): void => {
@@ -78,14 +82,40 @@ function App(): React.JSX.Element {
   }
 
   return (
-    <div className="min-h-screen bg-background p-6">
-      <header className="mb-6 flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Focus</h1>
-        <div className="flex gap-2">
+    <SidebarProvider defaultOpen={true}>
+      <AppSidebar
+        projects={projects}
+        selectedProjectId={selectedProjectId}
+        onSelectProject={setSelectedProjectId}
+        onAddProject={() => setProjectDialogOpen(true)}
+      />
+      <SidebarInset className="min-h-screen">
+        <div className="p-6">
+          <header className="mb-6 flex items-center justify-between">
+            <h1 className="text-2xl font-bold">
+              {selectedProjectId
+                ? projects.find(p => p.id === selectedProjectId)?.name ?? 'Focus'
+                : 'All Tasks'}
+            </h1>
+            <Button onClick={() => setCreateOpen(true)} disabled={projects.length === 0}>
+              New Task
+            </Button>
+          </header>
+
+          {projects.length === 0 ? (
+            <div className="text-center text-muted-foreground">
+              Click + in sidebar to create a project
+            </div>
+          ) : (
+            <TaskList
+              tasks={filteredTasks}
+              onEdit={setEditingTask}
+              onDelete={setDeletingTask}
+            />
+          )}
+
+          {/* Dialogs */}
           <Dialog open={projectDialogOpen} onOpenChange={setProjectDialogOpen}>
-            <DialogTrigger asChild>
-              <Button variant="outline">New Project</Button>
-            </DialogTrigger>
             <DialogContent>
               <DialogHeader>
                 <DialogTitle>Create Project</DialogTitle>
@@ -101,61 +131,27 @@ function App(): React.JSX.Element {
               </div>
             </DialogContent>
           </Dialog>
-          <Button onClick={() => setCreateOpen(true)} disabled={projects.length === 0}>
-            New Task
-          </Button>
-        </div>
-      </header>
-
-      {projects.length === 0 ? (
-        <div className="text-center text-muted-foreground">Create a project to get started</div>
-      ) : (
-        <>
-          {/* Project tabs */}
-          <div className="mb-4 flex gap-2 border-b pb-2">
-            {projects.map((p) => (
-              <button
-                key={p.id}
-                onClick={() => setSelectedProjectId(p.id)}
-                className={`flex items-center gap-2 rounded px-3 py-1 ${
-                  selectedProjectId === p.id ? 'bg-muted' : 'hover:bg-muted/50'
-                }`}
-              >
-                <span className="h-2 w-2 rounded-full" style={{ backgroundColor: p.color }} />
-                {p.name}
-              </button>
-            ))}
-          </div>
-
-          {/* Task list */}
-          <TaskList
-            tasks={tasks.filter((t) => t.project_id === selectedProjectId)}
-            onEdit={setEditingTask}
-            onDelete={setDeletingTask}
+          <CreateTaskDialog
+            open={createOpen}
+            onOpenChange={setCreateOpen}
+            onCreated={handleTaskCreated}
+            defaultProjectId={selectedProjectId ?? undefined}
           />
-        </>
-      )}
-
-      {/* Dialogs */}
-      <CreateTaskDialog
-        open={createOpen}
-        onOpenChange={setCreateOpen}
-        onCreated={handleTaskCreated}
-        defaultProjectId={selectedProjectId ?? undefined}
-      />
-      <EditTaskDialog
-        task={editingTask}
-        open={!!editingTask}
-        onOpenChange={(open) => !open && setEditingTask(null)}
-        onUpdated={handleTaskUpdated}
-      />
-      <DeleteTaskDialog
-        task={deletingTask}
-        open={!!deletingTask}
-        onOpenChange={(open) => !open && setDeletingTask(null)}
-        onDeleted={handleTaskDeleted}
-      />
-    </div>
+          <EditTaskDialog
+            task={editingTask}
+            open={!!editingTask}
+            onOpenChange={(open) => !open && setEditingTask(null)}
+            onUpdated={handleTaskUpdated}
+          />
+          <DeleteTaskDialog
+            task={deletingTask}
+            open={!!deletingTask}
+            onOpenChange={(open) => !open && setDeletingTask(null)}
+            onDeleted={handleTaskDeleted}
+          />
+        </div>
+      </SidebarInset>
+    </SidebarProvider>
   )
 }
 
