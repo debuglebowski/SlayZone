@@ -10,24 +10,24 @@ See: .planning/PROJECT.md
 ## Current Position
 
 Phase: 2 of 7 (Data Layer + Task CRUD)
-Plan: 1 of 3 complete
+Plan: 2 of 3 complete
 Status: In progress
-Last activity: 2026-01-17 - Completed 02-01-PLAN.md
+Last activity: 2026-01-17 - Completed 02-02-PLAN.md
 
-Progress: ██░░░░░░░░ 19%
+Progress: ██░░░░░░░░ 24%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 4
-- Average duration: 6.5min
+- Total plans completed: 5
+- Average duration: 5.6min
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
 | 01-foundation | 3 | 19min | 6.3min |
-| 02-data-layer | 1 | 7min | 7min |
+| 02-data-layer | 2 | 9min | 4.5min |
 
 ## Accumulated Context
 
@@ -44,6 +44,9 @@ Progress: ██░░░░░░░░ 19%
 | Explicit security settings | 01-03 | Don't rely on defaults for security |
 | Dynamic SET clause for partial updates | 02-01 | Only modify provided fields |
 | Update returns entity, delete returns boolean | 02-01 | Consistent return patterns |
+| Zod enum mirrors database.ts TaskStatus | 02-02 | Validation matches DB schema |
+| Priority as number 1-5, not string | 02-02 | Enables sorting |
+| dueDate as nullable ISO string | 02-02 | Consistent date format |
 
 ### Pending Todos
 
@@ -56,5 +59,5 @@ Progress: ██░░░░░░░░ 19%
 ## Session Continuity
 
 Last session: 2026-01-17
-Stopped at: Completed 02-01-PLAN.md
-Resume file: .planning/phases/02-data-layer/02-02-PLAN.md
+Stopped at: Completed 02-02-PLAN.md
+Resume file: .planning/phases/02-data-layer/02-03-PLAN.md
