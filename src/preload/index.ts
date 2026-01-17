@@ -5,11 +5,19 @@ import type { ElectronAPI } from '../shared/types/api'
 // Custom APIs for renderer
 const api: ElectronAPI = {
   db: {
+    // Projects
     getProjects: () => ipcRenderer.invoke('db:projects:getAll'),
     createProject: (data) => ipcRenderer.invoke('db:projects:create', data),
+    updateProject: (data) => ipcRenderer.invoke('db:projects:update', data),
+    deleteProject: (id) => ipcRenderer.invoke('db:projects:delete', id),
+
+    // Tasks
     getTasks: () => ipcRenderer.invoke('db:tasks:getAll'),
     getTasksByProject: (projectId) => ipcRenderer.invoke('db:tasks:getByProject', projectId),
-    createTask: (data) => ipcRenderer.invoke('db:tasks:create', data)
+    getTask: (id) => ipcRenderer.invoke('db:tasks:get', id),
+    createTask: (data) => ipcRenderer.invoke('db:tasks:create', data),
+    updateTask: (data) => ipcRenderer.invoke('db:tasks:update', data),
+    deleteTask: (id) => ipcRenderer.invoke('db:tasks:delete', id)
   }
 }
 

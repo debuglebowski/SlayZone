@@ -1,6 +1,11 @@
 import { ipcMain } from 'electron'
 import { getDatabase } from '../db'
-import type { CreateTaskInput, CreateProjectInput } from '../../shared/types/api'
+import type {
+  CreateTaskInput,
+  CreateProjectInput,
+  UpdateTaskInput,
+  UpdateProjectInput
+} from '../../shared/types/api'
 
 export function registerDatabaseHandlers(): void {
   const db = getDatabase()
@@ -20,6 +25,35 @@ export function registerDatabaseHandlers(): void {
     return db.prepare('SELECT * FROM projects WHERE id = ?').get(id)
   })
 
+  ipcMain.handle('db:projects:update', (_, data: UpdateProjectInput) => {
+    const fields: string[] = []
+    const values: unknown[] = []
+
+    if (data.name !== undefined) {
+      fields.push('name = ?')
+      values.push(data.name)
+    }
+    if (data.color !== undefined) {
+      fields.push('color = ?')
+      values.push(data.color)
+    }
+
+    if (fields.length === 0) {
+      return db.prepare('SELECT * FROM projects WHERE id = ?').get(data.id)
+    }
+
+    fields.push("updated_at = datetime('now')")
+    values.push(data.id)
+
+    db.prepare(`UPDATE projects SET ${fields.join(', ')} WHERE id = ?`).run(...values)
+    return db.prepare('SELECT * FROM projects WHERE id = ?').get(data.id)
+  })
+
+  ipcMain.handle('db:projects:delete', (_, id: string) => {
+    const result = db.prepare('DELETE FROM projects WHERE id = ?').run(id)
+    return result.changes > 0
+  })
+
   // Tasks
   ipcMain.handle('db:tasks:getAll', () => {
     return db.prepare('SELECT * FROM tasks ORDER BY created_at DESC').all()
@@ -29,6 +63,10 @@ export function registerDatabaseHandlers(): void {
     return db
       .prepare('SELECT * FROM tasks WHERE project_id = ? ORDER BY created_at DESC')
       .all(projectId)
+  })
+
+  ipcMain.handle('db:tasks:get', (_, id: string) => {
+    return db.prepare('SELECT * FROM tasks WHERE id = ?').get(id) ?? null
   })
 
   ipcMain.handle('db:tasks:create', (_, data: CreateTaskInput) => {
@@ -47,5 +85,50 @@ export function registerDatabaseHandlers(): void {
       data.dueDate ?? null
     )
     return db.prepare('SELECT * FROM tasks WHERE id = ?').get(id)
+  })
+
+  ipcMain.handle('db:tasks:update', (_, data: UpdateTaskInput) => {
+    const fields: string[] = []
+    const values: unknown[] = []
+
+    if (data.title !== undefined) {
+      fields.push('title = ?')
+      values.push(data.title)
+    }
+    if (data.description !== undefined) {
+      fields.push('description = ?')
+      values.push(data.description)
+    }
+    if (data.status !== undefined) {
+      fields.push('status = ?')
+      values.push(data.status)
+    }
+    if (data.priority !== undefined) {
+      fields.push('priority = ?')
+      values.push(data.priority)
+    }
+    if (data.dueDate !== undefined) {
+      fields.push('due_date = ?')
+      values.push(data.dueDate)
+    }
+    if (data.blockedReason !== undefined) {
+      fields.push('blocked_reason = ?')
+      values.push(data.blockedReason)
+    }
+
+    if (fields.length === 0) {
+      return db.prepare('SELECT * FROM tasks WHERE id = ?').get(data.id)
+    }
+
+    fields.push("updated_at = datetime('now')")
+    values.push(data.id)
+
+    db.prepare(`UPDATE tasks SET ${fields.join(', ')} WHERE id = ?`).run(...values)
+    return db.prepare('SELECT * FROM tasks WHERE id = ?').get(data.id)
+  })
+
+  ipcMain.handle('db:tasks:delete', (_, id: string) => {
+    const result = db.prepare('DELETE FROM tasks WHERE id = ?').run(id)
+    return result.changes > 0
   })
 }
