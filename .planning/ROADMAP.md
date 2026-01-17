@@ -80,10 +80,12 @@ Plans:
 **Depends on**: Phase 8
 **Requirements**: KAN-01, KAN-02
 **Success Criteria** (what must be TRUE):
-  1. Settings button visible in kanban header
-  2. Tutorial button visible in kanban header
+  1. Settings button visible in sidebar footer
+  2. Tutorial button visible in sidebar footer
   3. Dropdown menu replaced with direct button access
-**Plans**: TBD
+**Plans**: 1 plan
+Plans:
+- [ ] 11-01-PLAN.md - Replace dropdown with Settings and Tutorial icon buttons
 
 #### Phase 12: Settings Redesign
 **Goal**: Professional settings UI with Claude Code status
@@ -129,7 +131,7 @@ Plans:
 | 8. Theme System | v1.1 | 2/2 | Complete | 2026-01-17 |
 | 9. Search | v1.1 | 1/1 | Complete | 2026-01-17 |
 | 10. Task Lifecycle | v1.1 | 2/2 | Complete | 2026-01-17 |
-| 11. Kanban Polish | v1.1 | 0/TBD | Not started | - |
+| 11. Kanban Polish | v1.1 | 0/1 | Not started | - |
 | 12. Settings Redesign | v1.1 | 0/TBD | Not started | - |
 | 13. Task Screen Redesign | v1.1 | 0/TBD | Not started | - |
 | 14. Work Mode | v1.1 | 0/TBD | Not started | - |
