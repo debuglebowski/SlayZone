@@ -3,7 +3,7 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { format } from 'date-fns'
 import { CalendarIcon } from 'lucide-react'
-import type { Task } from '../../../shared/types/database'
+import type { Task, Tag } from '../../../shared/types/database'
 import {
   createTaskSchema,
   type CreateTaskFormData,
@@ -36,6 +36,7 @@ import {
 } from '@/components/ui/select'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Calendar } from '@/components/ui/calendar'
+import { Checkbox } from '@/components/ui/checkbox'
 import { ProjectSelect } from './ProjectSelect'
 import { cn } from '@/lib/utils'
 
@@ -44,13 +45,15 @@ interface CreateTaskDialogProps {
   onOpenChange: (open: boolean) => void
   onCreated: (task: Task) => void
   defaultProjectId?: string
+  tags: Tag[]
 }
 
 export function CreateTaskDialog({
   open,
   onOpenChange,
   onCreated,
-  defaultProjectId
+  defaultProjectId,
+  tags
 }: CreateTaskDialogProps): React.JSX.Element {
   const form = useForm<CreateTaskFormData>({
     resolver: zodResolver(createTaskSchema),
@@ -60,7 +63,8 @@ export function CreateTaskDialog({
       description: '',
       status: 'inbox',
       priority: 3,
-      dueDate: null
+      dueDate: null,
+      tagIds: []
     }
   })
 
@@ -73,7 +77,8 @@ export function CreateTaskDialog({
         description: '',
         status: 'inbox',
         priority: 3,
-        dueDate: null
+        dueDate: null,
+        tagIds: []
       })
     }
   }, [open, defaultProjectId, form])
@@ -87,9 +92,16 @@ export function CreateTaskDialog({
       priority: data.priority,
       dueDate: data.dueDate ?? undefined
     })
+    if (data.tagIds.length > 0) {
+      await window.api.taskTags.setTagsForTask(task.id, data.tagIds)
+    }
     onCreated(task)
     form.reset()
   }
+
+  // Get selected tags for display
+  const selectedTagIds = form.watch('tagIds')
+  const selectedTags = tags.filter((t) => selectedTagIds.includes(t.id))
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -211,6 +223,75 @@ export function CreateTaskDialog({
                           field.onChange(date ? format(date, 'yyyy-MM-dd') : null)
                         }
                       />
+                    </PopoverContent>
+                  </Popover>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="tagIds"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Tags</FormLabel>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <FormControl>
+                        <Button variant="outline" className="w-full justify-start">
+                          {selectedTags.length === 0 ? (
+                            <span className="text-muted-foreground">Select tags...</span>
+                          ) : (
+                            <div className="flex gap-1">
+                              {selectedTags.slice(0, 3).map((tag) => (
+                                <span
+                                  key={tag.id}
+                                  className="rounded px-1.5 py-0.5 text-xs"
+                                  style={{ backgroundColor: tag.color + '30', color: tag.color }}
+                                >
+                                  {tag.name}
+                                </span>
+                              ))}
+                              {selectedTags.length > 3 && (
+                                <span className="text-xs text-muted-foreground">
+                                  +{selectedTags.length - 3}
+                                </span>
+                              )}
+                            </div>
+                          )}
+                        </Button>
+                      </FormControl>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-[200px] p-2" align="start">
+                      {tags.length === 0 ? (
+                        <p className="text-sm text-muted-foreground">No tags created</p>
+                      ) : (
+                        <div className="space-y-2">
+                          {tags.map((tag) => (
+                            <label
+                              key={tag.id}
+                              className="flex cursor-pointer items-center gap-2"
+                            >
+                              <Checkbox
+                                checked={field.value.includes(tag.id)}
+                                onCheckedChange={(checked) => {
+                                  const newValue = checked
+                                    ? [...field.value, tag.id]
+                                    : field.value.filter((id: string) => id !== tag.id)
+                                  field.onChange(newValue)
+                                }}
+                              />
+                              <span
+                                className="rounded px-1.5 py-0.5 text-sm"
+                                style={{ backgroundColor: tag.color + '30', color: tag.color }}
+                              >
+                                {tag.name}
+                              </span>
+                            </label>
+                          ))}
+                        </div>
+                      )}
                     </PopoverContent>
                   </Popover>
                   <FormMessage />

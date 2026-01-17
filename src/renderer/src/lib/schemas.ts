@@ -22,7 +22,7 @@ export const createTaskSchema = z.object({
   status: taskStatusEnum,
   priority: prioritySchema,
   dueDate: z.string().nullable(),
-  tagIds: z.array(z.string()).default([])
+  tagIds: z.array(z.string())
 })
 
 // Task update schema
