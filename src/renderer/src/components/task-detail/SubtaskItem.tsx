@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-import { X } from 'lucide-react'
+import { X, Pencil } from 'lucide-react'
 import type { Task } from '../../../../shared/types/database'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
@@ -10,13 +10,10 @@ interface SubtaskItemProps {
   subtask: Task
   onUpdate: (subtask: Task) => void
   onDelete: (subtaskId: string) => void
+  onNavigate: (subtaskId: string) => void
 }
 
-export function SubtaskItem({
-  subtask,
-  onUpdate,
-  onDelete
-}: SubtaskItemProps): React.JSX.Element {
+export function SubtaskItem({ subtask, onUpdate, onDelete, onNavigate }: SubtaskItemProps): React.JSX.Element {
   const [editing, setEditing] = useState(false)
   const [titleValue, setTitleValue] = useState(subtask.title)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -84,15 +81,27 @@ export function SubtaskItem({
         />
       ) : (
         <span
-          onClick={() => setEditing(true)}
+          onClick={() => onNavigate(subtask.id)}
           className={cn(
-            'flex-1 cursor-pointer text-sm',
+            'flex-1 cursor-pointer rounded px-2 py-1 text-sm hover:bg-muted/50',
             isDone && 'text-muted-foreground line-through'
           )}
         >
           {subtask.title}
         </span>
       )}
+
+      <Button
+        variant="ghost"
+        size="icon"
+        className="size-6 opacity-0 group-hover:opacity-100"
+        onClick={(e) => {
+          e.stopPropagation()
+          setEditing(true)
+        }}
+      >
+        <Pencil className="size-3" />
+      </Button>
 
       <Button
         variant="ghost"
