@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react'
-import type { Task, Project, TaskStatus } from '../../shared/types/database'
+import type { Task, Project, Tag, TaskStatus } from '../../shared/types/database'
 import { KanbanBoard } from '@/components/kanban/KanbanBoard'
-import type { GroupKey } from '@/lib/kanban'
+import { applyFilters } from '@/lib/kanban'
+import { useFilterState } from '@/hooks/useFilterState'
+import { FilterBar } from '@/components/filters/FilterBar'
 import { CreateTaskDialog } from '@/components/CreateTaskDialog'
 import { EditTaskDialog } from '@/components/EditTaskDialog'
 import { DeleteTaskDialog } from '@/components/DeleteTaskDialog'
@@ -11,6 +13,7 @@ import { DeleteProjectDialog } from '@/components/dialogs/DeleteProjectDialog'
 import { UserSettingsDialog } from '@/components/dialogs/UserSettingsDialog'
 import { TaskDetailPage } from '@/components/task-detail/TaskDetailPage'
 import { Button } from '@/components/ui/button'
+import { Skeleton } from '@/components/ui/skeleton'
 import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar'
 import { AppSidebar } from '@/components/sidebar/AppSidebar'
 
@@ -28,6 +31,13 @@ function App(): React.JSX.Element {
   const [projects, setProjects] = useState<Project[]>([])
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null)
 
+  // Tag state
+  const [tags, setTags] = useState<Tag[]>([])
+  const [taskTags, setTaskTags] = useState<Map<string, string[]>>(new Map())
+
+  // Filter state (persisted per project)
+  const [filter, setFilter, filterLoaded] = useFilterState(selectedProjectId)
+
   // View state (replaces editingTask for task detail navigation)
   const [view, setView] = useState<ViewState>({ type: 'kanban' })
 
@@ -44,23 +54,45 @@ function App(): React.JSX.Element {
   // Settings dialog state
   const [settingsOpen, setSettingsOpen] = useState(false)
 
-  // Kanban state
-  const [groupBy] = useState<GroupKey>('status')
-
   // Load data on mount
   useEffect(() => {
-    Promise.all([window.api.db.getTasks(), window.api.db.getProjects()]).then(([t, p]) => {
+    Promise.all([
+      window.api.db.getTasks(),
+      window.api.db.getProjects(),
+      window.api.tags.getTags()
+    ]).then(([t, p, tg]) => {
       setTasks(t)
       setProjects(p)
+      setTags(tg)
+      // Load task tags mapping
+      loadTaskTags(t)
       // Don't auto-select first project - start with "All" view
       setLoading(false)
     })
   }, [])
 
+  // Load task tags mapping for all tasks
+  const loadTaskTags = async (taskList: Task[]): Promise<void> => {
+    const mapping = new Map<string, string[]>()
+    await Promise.all(
+      taskList.map(async (task) => {
+        const tags = await window.api.taskTags.getTagsForTask(task.id)
+        mapping.set(task.id, tags.map((t) => t.id))
+      })
+    )
+    setTaskTags(mapping)
+  }
+
   // Filter tasks based on selected project
-  const filteredTasks = selectedProjectId
+  const projectTasks = selectedProjectId
     ? tasks.filter((t) => t.project_id === selectedProjectId)
     : tasks
+
+  // Apply filter state
+  const displayTasks = applyFilters(projectTasks, filter, taskTags)
+
+  // Create projects map for card lookups
+  const projectsMap = new Map(projects.map((p) => [p.id, p]))
 
   // Navigation handlers
   const openTaskDetail = (taskId: string): void => {
@@ -88,8 +120,8 @@ function App(): React.JSX.Element {
   }
 
   const handleTaskMove = async (taskId: string, newColumnId: string): Promise<void> => {
-    // For status grouping, newColumnId is the status value
-    if (groupBy === 'status') {
+    // Status grouping: update status field
+    if (filter.groupBy === 'status') {
       const updated = await window.api.db.updateTask({
         id: taskId,
         status: newColumnId as TaskStatus
@@ -98,7 +130,18 @@ function App(): React.JSX.Element {
         setTasks(tasks.map((t) => (t.id === taskId ? updated : t)))
       }
     }
-    // priority and due_date grouping don't update on drag (read-only columns)
+    // Priority grouping: update priority field (column id is 'p1', 'p2', etc.)
+    else if (filter.groupBy === 'priority') {
+      const priority = parseInt(newColumnId.slice(1), 10) // 'p1' -> 1
+      const updated = await window.api.db.updateTask({
+        id: taskId,
+        priority
+      })
+      if (updated) {
+        setTasks(tasks.map((t) => (t.id === taskId ? updated : t)))
+      }
+    }
+    // due_date grouping: drag disabled (dates can't be set by column)
   }
 
   const handleTaskDeleted = (): void => {
@@ -183,12 +226,24 @@ function App(): React.JSX.Element {
               Click + in sidebar to create a project
             </div>
           ) : (
-            <KanbanBoard
-              tasks={filteredTasks}
-              groupBy={groupBy}
-              onTaskMove={handleTaskMove}
-              onTaskClick={handleTaskClick}
-            />
+            <>
+              {!filterLoaded ? (
+                <Skeleton className="h-10 w-full mb-4" />
+              ) : (
+                <div className="mb-4">
+                  <FilterBar filter={filter} onChange={setFilter} tags={tags} />
+                </div>
+              )}
+              <KanbanBoard
+                tasks={displayTasks}
+                groupBy={filter.groupBy}
+                onTaskMove={handleTaskMove}
+                onTaskClick={handleTaskClick}
+                projectsMap={projectsMap}
+                showProjectDot={selectedProjectId === null}
+                disableDrag={filter.groupBy === 'due_date'}
+              />
+            </>
           )}
 
           {/* Task Dialogs */}
