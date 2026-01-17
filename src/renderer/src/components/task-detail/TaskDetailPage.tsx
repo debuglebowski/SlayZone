@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { TaskMetadataRow } from './TaskMetadataRow'
 import { MarkdownEditor } from './MarkdownEditor'
+import { SubtaskAccordion } from './SubtaskAccordion'
 
 interface TaskDetailPageProps {
   taskId: string
@@ -178,14 +179,12 @@ export function TaskDetailPage({
           />
         </section>
 
-        {/* Subtasks placeholder */}
-        <section className="mt-8">
-          <h2 className="mb-2 text-sm font-medium text-muted-foreground">
-            Subtasks
-          </h2>
-          <p className="text-sm text-muted-foreground">
-            Subtasks will be added in a future update.
-          </p>
+        {/* Subtasks */}
+        <section className="mt-8 border-t pt-6">
+          <SubtaskAccordion
+            parentTaskId={task.id}
+            projectId={task.project_id}
+          />
         </section>
       </main>
     </div>
