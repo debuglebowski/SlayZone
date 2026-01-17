@@ -74,8 +74,8 @@ export function registerDatabaseHandlers(): void {
   ipcMain.handle('db:tasks:create', (_, data: CreateTaskInput) => {
     const id = crypto.randomUUID()
     const stmt = db.prepare(`
-      INSERT INTO tasks (id, project_id, title, description, status, priority, due_date)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO tasks (id, project_id, title, description, status, priority, due_date, parent_id)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     `)
     stmt.run(
       id,
@@ -84,9 +84,14 @@ export function registerDatabaseHandlers(): void {
       data.description ?? null,
       data.status ?? 'inbox',
       data.priority ?? 3,
-      data.dueDate ?? null
+      data.dueDate ?? null,
+      data.parentId ?? null
     )
     return db.prepare('SELECT * FROM tasks WHERE id = ?').get(id)
+  })
+
+  ipcMain.handle('db:tasks:getSubtasks', (_, parentId: string) => {
+    return db.prepare('SELECT * FROM tasks WHERE parent_id = ? ORDER BY created_at').all(parentId)
   })
 
   ipcMain.handle('db:tasks:update', (_, data: UpdateTaskInput) => {
@@ -193,5 +198,28 @@ export function registerDatabaseHandlers(): void {
       value: string
     }[]
     return Object.fromEntries(rows.map((r) => [r.key, r.value]))
+  })
+
+  // Task Tags
+  ipcMain.handle('db:taskTags:getForTask', (_, taskId: string) => {
+    return db
+      .prepare(
+        `SELECT tags.* FROM tags
+         JOIN task_tags ON tags.id = task_tags.tag_id
+         WHERE task_tags.task_id = ?`
+      )
+      .all(taskId)
+  })
+
+  ipcMain.handle('db:taskTags:setForTask', (_, taskId: string, tagIds: string[]) => {
+    const deleteStmt = db.prepare('DELETE FROM task_tags WHERE task_id = ?')
+    const insertStmt = db.prepare('INSERT INTO task_tags (task_id, tag_id) VALUES (?, ?)')
+
+    db.transaction(() => {
+      deleteStmt.run(taskId)
+      for (const tagId of tagIds) {
+        insertStmt.run(taskId, tagId)
+      }
+    })()
   })
 }
