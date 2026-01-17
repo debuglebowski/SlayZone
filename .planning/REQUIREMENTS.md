@@ -9,8 +9,8 @@ Requirements for v1.1 release. Each maps to roadmap phases.
 
 ### Theme
 
-- [ ] **THEME-01**: User can toggle between light, dark, and system theme
-- [ ] **THEME-02**: App respects system theme preference when set to "system"
+- [x] **THEME-01**: User can toggle between light, dark, and system theme
+- [x] **THEME-02**: App respects system theme preference when set to "system"
 
 ### Search
 
@@ -89,8 +89,8 @@ Which phases cover which requirements. Updated by create-roadmap.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| THEME-01 | Phase 8 | Pending |
-| THEME-02 | Phase 8 | Pending |
+| THEME-01 | Phase 8 | Complete |
+| THEME-02 | Phase 8 | Complete |
 | SEARCH-01 | Phase 9 | Pending |
 | SEARCH-02 | Phase 9 | Pending |
 | SEARCH-03 | Phase 9 | Pending |

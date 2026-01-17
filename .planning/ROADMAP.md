@@ -15,7 +15,7 @@ Polish all three screens (Kanban, Task Detail, Work Mode) and add cross-cutting 
 - Integer phases (1, 2, 3): Planned milestone work
 - Decimal phases (8.1, 8.2): Urgent insertions (marked with INSERTED)
 
-- [ ] **Phase 8: Theme System** - Light/dark/system toggle with persistence
+- [x] **Phase 8: Theme System** - Light/dark/system toggle with persistence
 - [ ] **Phase 9: Search** - Global search modal across all projects
 - [ ] **Phase 10: Task Lifecycle** - Archive and delete tasks
 - [ ] **Phase 11: Kanban Polish** - Split user menu into buttons
@@ -46,8 +46,8 @@ Phases 1-7 delivered complete task management app with kanban board, Work Mode A
   3. System theme changes apply automatically when set to "system"
 **Plans**: 2 plans
 Plans:
-- [ ] 08-01-PLAN.md - Wire Electron nativeTheme API through IPC
-- [ ] 08-02-PLAN.md - Create ThemeContext and settings UI toggle
+- [x] 08-01-PLAN.md - Wire Electron nativeTheme API through IPC
+- [x] 08-02-PLAN.md - Create ThemeContext and settings UI toggle
 
 #### Phase 9: Search
 **Goal**: Global search across all projects and tasks
@@ -121,7 +121,7 @@ Plans:
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
 | 1-7 | v1.0 | - | Complete | 2026-01-16 |
-| 8. Theme System | v1.1 | 0/2 | Planned | - |
+| 8. Theme System | v1.1 | 2/2 | Complete | 2026-01-17 |
 | 9. Search | v1.1 | 0/TBD | Not started | - |
 | 10. Task Lifecycle | v1.1 | 0/TBD | Not started | - |
 | 11. Kanban Polish | v1.1 | 0/TBD | Not started | - |
