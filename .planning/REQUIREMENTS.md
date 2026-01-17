@@ -27,8 +27,8 @@ Requirements for v1.1 release. Each maps to roadmap phases.
 
 ### Kanban
 
-- [ ] **KAN-01**: Settings accessible via dedicated button (not menu)
-- [ ] **KAN-02**: Tutorial accessible via dedicated button (not menu)
+- [x] **KAN-01**: Settings accessible via dedicated button (not menu)
+- [x] **KAN-02**: Tutorial accessible via dedicated button (not menu)
 
 ### Settings
 
@@ -98,8 +98,8 @@ Which phases cover which requirements. Updated by create-roadmap.
 | LIFE-01 | Phase 10 | Complete |
 | LIFE-02 | Phase 10 | Complete |
 | LIFE-03 | Phase 10 | Complete |
-| KAN-01 | Phase 11 | Pending |
-| KAN-02 | Phase 11 | Pending |
+| KAN-01 | Phase 11 | Complete |
+| KAN-02 | Phase 11 | Complete |
 | SET-01 | Phase 12 | Pending |
 | SET-02 | Phase 12 | Pending |
 | TASK-01 | Phase 13 | Pending |
