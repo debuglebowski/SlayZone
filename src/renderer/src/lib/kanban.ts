@@ -1,4 +1,5 @@
 import type { Task, TaskStatus } from '../../../shared/types/database'
+import type { FilterState, DueDateRange } from '@/components/filters/FilterState'
 
 export type GroupKey = 'status' | 'priority' | 'due_date'
 
@@ -105,4 +106,74 @@ export function groupTasksBy(tasks: Task[], groupBy: GroupKey): Column[] {
     case 'due_date':
       return groupByDueDate(rootTasks)
   }
+}
+
+function matchesDueDateRange(dueDate: string | null, range: DueDateRange): boolean {
+  if (range === 'all') return true
+
+  const today = todayISO()
+  const weekEnd = addDaysISO(today, 7)
+
+  if (!dueDate) {
+    // Tasks without due date don't match specific date ranges
+    return false
+  }
+
+  switch (range) {
+    case 'overdue':
+      return dueDate < today
+    case 'today':
+      return dueDate === today
+    case 'week':
+      return dueDate > today && dueDate <= weekEnd
+    case 'later':
+      return dueDate > weekEnd
+    default:
+      return true
+  }
+}
+
+/**
+ * Apply filters to task array
+ * @param tasks - Array of tasks to filter
+ * @param filter - Filter state with criteria
+ * @param taskTags - Map of taskId to array of tagIds
+ */
+export function applyFilters(
+  tasks: Task[],
+  filter: FilterState,
+  taskTags: Map<string, string[]>
+): Task[] {
+  return tasks.filter((task) => {
+    // Priority filter
+    if (filter.priority !== null && task.priority !== filter.priority) {
+      return false
+    }
+
+    // Due date range filter
+    if (!matchesDueDateRange(task.due_date, filter.dueDateRange)) {
+      return false
+    }
+
+    // Tag filter - task must have at least one matching tag
+    if (filter.tagIds.length > 0) {
+      const tags = taskTags.get(task.id) ?? []
+      const hasMatchingTag = filter.tagIds.some((tagId) => tags.includes(tagId))
+      if (!hasMatchingTag) {
+        return false
+      }
+    }
+
+    // Show blocked filter
+    if (!filter.showBlocked && task.blocked_reason) {
+      return false
+    }
+
+    // Show done filter
+    if (!filter.showDone && task.status === 'done') {
+      return false
+    }
+
+    return true
+  })
 }
