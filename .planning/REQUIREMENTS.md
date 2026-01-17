@@ -89,34 +89,34 @@ Which phases cover which requirements. Updated by create-roadmap.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| THEME-01 | TBD | Pending |
-| THEME-02 | TBD | Pending |
-| SEARCH-01 | TBD | Pending |
-| SEARCH-02 | TBD | Pending |
-| SEARCH-03 | TBD | Pending |
-| SEARCH-04 | TBD | Pending |
-| LIFE-01 | TBD | Pending |
-| LIFE-02 | TBD | Pending |
-| LIFE-03 | TBD | Pending |
-| KAN-01 | TBD | Pending |
-| KAN-02 | TBD | Pending |
-| SET-01 | TBD | Pending |
-| SET-02 | TBD | Pending |
-| TASK-01 | TBD | Pending |
-| TASK-02 | TBD | Pending |
-| TASK-03 | TBD | Pending |
-| TASK-04 | TBD | Pending |
-| TASK-05 | TBD | Pending |
-| WORK-01 | TBD | Pending |
-| WORK-02 | TBD | Pending |
-| WORK-03 | TBD | Pending |
-| WORK-04 | TBD | Pending |
-| WORK-05 | TBD | Pending |
+| THEME-01 | Phase 8 | Pending |
+| THEME-02 | Phase 8 | Pending |
+| SEARCH-01 | Phase 9 | Pending |
+| SEARCH-02 | Phase 9 | Pending |
+| SEARCH-03 | Phase 9 | Pending |
+| SEARCH-04 | Phase 9 | Pending |
+| LIFE-01 | Phase 10 | Pending |
+| LIFE-02 | Phase 10 | Pending |
+| LIFE-03 | Phase 10 | Pending |
+| KAN-01 | Phase 11 | Pending |
+| KAN-02 | Phase 11 | Pending |
+| SET-01 | Phase 12 | Pending |
+| SET-02 | Phase 12 | Pending |
+| TASK-01 | Phase 13 | Pending |
+| TASK-02 | Phase 13 | Pending |
+| TASK-03 | Phase 13 | Pending |
+| TASK-04 | Phase 13 | Pending |
+| TASK-05 | Phase 13 | Pending |
+| WORK-01 | Phase 14 | Pending |
+| WORK-02 | Phase 14 | Pending |
+| WORK-03 | Phase 14 | Pending |
+| WORK-04 | Phase 14 | Pending |
+| WORK-05 | Phase 14 | Pending |
 
 **Coverage:**
 - v1.1 requirements: 23 total
-- Mapped to phases: 0
-- Unmapped: 23 (awaiting roadmap)
+- Mapped to phases: 23 ✓
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-01-17*
