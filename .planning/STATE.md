@@ -10,11 +10,11 @@ See: .planning/PROJECT.md
 ## Current Position
 
 Phase: 5 of 7 (AI Integration)
-Plan: 1 of 4 complete
+Plan: 2 of 4 complete
 Status: In progress
-Last activity: 2026-01-17 - Completed 05-01-PLAN.md
+Last activity: 2026-01-17 - Completed 05-02-PLAN.md
 
-Progress: █████████████████████████░░░░░ 86%
+Progress: █████████████████████████░░░░ 88%
 
 ## Performance Metrics
 
@@ -30,7 +30,7 @@ Progress: ███████████████████████�
 | 02-data-layer | 3 | 13min | 4.3min |
 | 03-navigation | 5 | 11min | 2.2min |
 | 04-task-management | 7 | 14min | 2.0min |
-| 05-ai-integration | 1 | 2min | 2.0min |
+| 05-ai-integration | 2 | 5min | 2.5min |
 
 ## Accumulated Context
 
@@ -80,6 +80,8 @@ Progress: ███████████████████████�
 | Local state for subtasks (no refetch) | 04-06 | Simpler mutation handling |
 | readline for NDJSON parsing | 05-01 | Handles partial chunks correctly |
 | Single active Claude process | 05-01 | Simpler cancel logic, prevents resource exhaustion |
+| handle() for stream start, on() for cancel | 05-02 | Renderer awaits start, cancel is fire-and-forget |
+| Preload callbacks return cleanup functions | 05-02 | Proper listener removal pattern |
 
 ### Pending Todos
 
@@ -91,6 +93,6 @@ Progress: ███████████████████████�
 
 ## Session Continuity
 
-Last session: 2026-01-17T12:07Z
-Stopped at: Completed 05-01-PLAN.md
-Resume file: 05-02-PLAN.md ready to execute
+Last session: 2026-01-17T12:13Z
+Stopped at: Completed 05-02-PLAN.md
+Resume file: 05-03-PLAN.md ready to execute
