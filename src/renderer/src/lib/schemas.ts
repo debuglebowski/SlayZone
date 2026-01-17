@@ -21,7 +21,8 @@ export const createTaskSchema = z.object({
   description: z.string().max(5000),
   status: taskStatusEnum,
   priority: prioritySchema,
-  dueDate: z.string().nullable()
+  dueDate: z.string().nullable(),
+  tagIds: z.array(z.string()).default([])
 })
 
 // Task update schema
@@ -56,6 +57,7 @@ export interface CreateTaskFormData {
   status: TaskStatus
   priority: number
   dueDate: string | null
+  tagIds: string[]
 }
 
 export interface UpdateTaskFormData {
