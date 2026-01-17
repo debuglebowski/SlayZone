@@ -61,12 +61,12 @@ export function registerDatabaseHandlers(): void {
 
   // Tasks
   ipcMain.handle('db:tasks:getAll', () => {
-    return db.prepare('SELECT * FROM tasks ORDER BY created_at DESC').all()
+    return db.prepare('SELECT * FROM tasks WHERE archived_at IS NULL ORDER BY created_at DESC').all()
   })
 
   ipcMain.handle('db:tasks:getByProject', (_, projectId: string) => {
     return db
-      .prepare('SELECT * FROM tasks WHERE project_id = ? ORDER BY created_at DESC')
+      .prepare('SELECT * FROM tasks WHERE project_id = ? AND archived_at IS NULL ORDER BY created_at DESC')
       .all(projectId)
   })
 
@@ -94,7 +94,7 @@ export function registerDatabaseHandlers(): void {
   })
 
   ipcMain.handle('db:tasks:getSubtasks', (_, parentId: string) => {
-    return db.prepare('SELECT * FROM tasks WHERE parent_id = ? ORDER BY created_at').all(parentId)
+    return db.prepare('SELECT * FROM tasks WHERE parent_id = ? AND archived_at IS NULL ORDER BY created_at').all(parentId)
   })
 
   ipcMain.handle('db:tasks:update', (_, data: UpdateTaskInput) => {
@@ -140,6 +140,34 @@ export function registerDatabaseHandlers(): void {
   ipcMain.handle('db:tasks:delete', (_, id: string) => {
     const result = db.prepare('DELETE FROM tasks WHERE id = ?').run(id)
     return result.changes > 0
+  })
+
+  ipcMain.handle('db:tasks:archive', (_, id: string) => {
+    const archiveStmt = db.prepare(`
+      UPDATE tasks SET archived_at = datetime('now'), updated_at = datetime('now')
+      WHERE id = ? OR parent_id = ?
+    `)
+    db.transaction(() => {
+      archiveStmt.run(id, id)
+    })()
+    return db.prepare('SELECT * FROM tasks WHERE id = ?').get(id)
+  })
+
+  ipcMain.handle('db:tasks:unarchive', (_, id: string) => {
+    const unarchiveStmt = db.prepare(`
+      UPDATE tasks SET archived_at = NULL, updated_at = datetime('now')
+      WHERE id = ? OR parent_id = ?
+    `)
+    db.transaction(() => {
+      unarchiveStmt.run(id, id)
+    })()
+    return db.prepare('SELECT * FROM tasks WHERE id = ?').get(id)
+  })
+
+  ipcMain.handle('db:tasks:getArchived', () => {
+    return db
+      .prepare('SELECT * FROM tasks WHERE archived_at IS NOT NULL AND parent_id IS NULL ORDER BY archived_at DESC')
+      .all()
   })
 
   // Tags
