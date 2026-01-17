@@ -10,27 +10,27 @@ See: .planning/PROJECT.md (updated 2026-01-17)
 ## Current Position
 
 Phase: 8 of 14 (Theme System)
-Plan: 1 of 3 complete
+Plan: 2 of 3 complete
 Status: In progress
-Last activity: 2026-01-17 — Completed 08-01-PLAN.md (Theme IPC)
+Last activity: 2026-01-17 — Completed 08-02-PLAN.md (Theme Context & UI)
 
-Progress: v1.1 ███░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░ 8%
+Progress: v1.1 ██████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░ 17%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 1 (v1.1)
-- Average duration: 2 min
-- Total execution time: 0.03 hours
+- Total plans completed: 2 (v1.1)
+- Average duration: 2.5 min
+- Total execution time: 0.08 hours
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
-| 08-theme-system | 1 | 2m | 2m |
+| 08-theme-system | 2 | 5m | 2.5m |
 
 **Recent Trend:**
-- Last 5 plans: 2m
+- Last 5 plans: 2m, 3m
 - Trend: —
 
 ## Milestone History
@@ -49,6 +49,8 @@ Recent decisions affecting current work:
 | nativeTheme as source of truth | 08-01 | Controls CSS prefers-color-scheme + native UI |
 | Theme persisted to settings table | 08-01 | Reuse existing infrastructure |
 | Load theme before window creation | 08-01 | Prevent theme flash on startup |
+| ThemeProvider at app root | 08-02 | Wraps all components for theme access |
+| .dark class on documentElement | 08-02 | Matches Tailwind convention |
 
 ### Pending Todos
 
@@ -61,5 +63,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-01-17
-Stopped at: Completed 08-01-PLAN.md (Theme IPC)
+Stopped at: Completed 08-02-PLAN.md (Theme Context & UI)
 Resume file: None
