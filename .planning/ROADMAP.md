@@ -67,7 +67,14 @@ Plans:
 5. User can edit project name/color in settings modal
 6. User can open user settings and configure tags and database path
 
-**Plans:** (created by /gsd:plan-phase)
+**Plans:** 5 plans
+
+Plans:
+- [ ] 03-01-PLAN.md — Install shadcn components + react-colorful
+- [ ] 03-02-PLAN.md — Add tags/settings tables + IPC handlers
+- [ ] 03-03-PLAN.md — Build sidebar with project blobs + All view
+- [ ] 03-04-PLAN.md — Build project dialogs + context menu
+- [ ] 03-05-PLAN.md — Build user settings dialog
 
 ---
 
