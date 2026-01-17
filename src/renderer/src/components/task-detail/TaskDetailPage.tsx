@@ -1,8 +1,16 @@
 import { useState, useEffect, useRef } from 'react'
-import { ArrowLeft } from 'lucide-react'
+import { ArrowLeft, MoreHorizontal, Archive, Trash2 } from 'lucide-react'
 import type { Task, Tag } from '../../../../shared/types/database'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger
+} from '@/components/ui/dropdown-menu'
+import { DeleteTaskDialog } from '@/components/DeleteTaskDialog'
 import { TaskMetadataRow } from './TaskMetadataRow'
 import { MarkdownEditor } from './MarkdownEditor'
 import { SubtaskAccordion } from './SubtaskAccordion'
@@ -29,6 +37,9 @@ export function TaskDetailPage({
   const [editingTitle, setEditingTitle] = useState(false)
   const [titleValue, setTitleValue] = useState('')
   const titleInputRef = useRef<HTMLInputElement>(null)
+
+  // Delete dialog state
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
 
   // Description editing state
   const [descriptionValue, setDescriptionValue] = useState('')
@@ -107,12 +118,19 @@ export function TaskDetailPage({
     setTaskTagIds(newTagIds)
   }
 
+  const handleArchive = async (): Promise<void> => {
+    if (!task) return
+    await window.api.db.archiveTask(task.id)
+    onBack()
+  }
+
+  const handleDeleteConfirm = (): void => {
+    setDeleteDialogOpen(false)
+    onBack()
+  }
+
   if (loading) {
-    return (
-      <div className="flex h-screen items-center justify-center">
-        Loading...
-      </div>
-    )
+    return <div className="flex h-screen items-center justify-center">Loading...</div>
   }
 
   if (!task) {
@@ -155,11 +173,34 @@ export function TaskDetailPage({
             </h1>
           )}
 
-          {onWorkMode && (
-            <Button variant="outline" size="sm" onClick={onWorkMode} className="ml-auto">
-              Work Mode
-            </Button>
-          )}
+          <div className="ml-auto flex items-center gap-2">
+            {onWorkMode && (
+              <Button variant="outline" size="sm" onClick={onWorkMode}>
+                Work Mode
+              </Button>
+            )}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon">
+                  <MoreHorizontal className="size-5" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={handleArchive}>
+                  <Archive className="mr-2 size-4" />
+                  Archive
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  onClick={() => setDeleteDialogOpen(true)}
+                  className="text-destructive"
+                >
+                  <Trash2 className="mr-2 size-4" />
+                  Delete
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
         </div>
       </header>
 
@@ -176,9 +217,7 @@ export function TaskDetailPage({
 
         {/* Description */}
         <section className="mt-6">
-          <h2 className="mb-2 text-sm font-medium text-muted-foreground">
-            Description
-          </h2>
+          <h2 className="mb-2 text-sm font-medium text-muted-foreground">Description</h2>
           <MarkdownEditor
             value={descriptionValue}
             onChange={setDescriptionValue}
@@ -189,12 +228,16 @@ export function TaskDetailPage({
 
         {/* Subtasks */}
         <section className="mt-8 border-t pt-6">
-          <SubtaskAccordion
-            parentTaskId={task.id}
-            projectId={task.project_id}
-          />
+          <SubtaskAccordion parentTaskId={task.id} projectId={task.project_id} />
         </section>
       </main>
+
+      <DeleteTaskDialog
+        task={task}
+        open={deleteDialogOpen}
+        onOpenChange={setDeleteDialogOpen}
+        onDeleted={handleDeleteConfirm}
+      />
     </div>
   )
 }
