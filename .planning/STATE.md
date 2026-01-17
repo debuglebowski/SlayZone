@@ -10,27 +10,27 @@ See: .planning/PROJECT.md (updated 2026-01-17)
 ## Current Position
 
 Phase: 8 of 14 (Theme System)
-Plan: Not started
-Status: Ready to plan
-Last activity: 2026-01-17 — Roadmap created (7 phases, 23 requirements)
+Plan: 1 of 3 complete
+Status: In progress
+Last activity: 2026-01-17 — Completed 08-01-PLAN.md (Theme IPC)
 
-Progress: v1.1 ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░ 0%
+Progress: v1.1 ███░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░ 8%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 0 (v1.1)
-- Average duration: —
-- Total execution time: 0 hours
+- Total plans completed: 1 (v1.1)
+- Average duration: 2 min
+- Total execution time: 0.03 hours
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
-| — | — | — | — |
+| 08-theme-system | 1 | 2m | 2m |
 
 **Recent Trend:**
-- Last 5 plans: —
+- Last 5 plans: 2m
 - Trend: —
 
 ## Milestone History
@@ -44,7 +44,11 @@ Progress: v1.1 ░░░░░░░░░░░░░░░░░░░░░�
 Decisions are logged in PROJECT.md Key Decisions table.
 Recent decisions affecting current work:
 
-(None yet for v1.1)
+| Decision | Phase | Rationale |
+|----------|-------|-----------|
+| nativeTheme as source of truth | 08-01 | Controls CSS prefers-color-scheme + native UI |
+| Theme persisted to settings table | 08-01 | Reuse existing infrastructure |
+| Load theme before window creation | 08-01 | Prevent theme flash on startup |
 
 ### Pending Todos
 
@@ -57,5 +61,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-01-17
-Stopped at: Roadmap created, ready to plan Phase 8
+Stopped at: Completed 08-01-PLAN.md (Theme IPC)
 Resume file: None
