@@ -1,4 +1,4 @@
-import { app, shell, BrowserWindow, ipcMain } from 'electron'
+import { app, shell, BrowserWindow, ipcMain, nativeTheme } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 
@@ -10,6 +10,7 @@ import icon from '../../resources/icon.png?asset'
 import { getDatabase, closeDatabase } from './db'
 import { registerDatabaseHandlers } from './ipc/database'
 import { registerClaudeHandlers } from './ipc/claude'
+import { registerThemeHandlers } from './ipc/theme'
 import { getActiveProcess } from './services/claude-spawner'
 
 function createWindow(): void {
@@ -52,11 +53,21 @@ function createWindow(): void {
 // Some APIs can only be used after this event occurs.
 app.whenReady().then(() => {
   // Initialize database
-  getDatabase()
+  const db = getDatabase()
+
+  // Load and apply persisted theme BEFORE creating window to prevent flash
+  const row = db.prepare('SELECT value FROM settings WHERE key = ?').get('theme') as
+    | { value: string }
+    | undefined
+  const savedTheme = row?.value as 'light' | 'dark' | 'system' | undefined
+  if (savedTheme) {
+    nativeTheme.themeSource = savedTheme
+  }
 
   // Register IPC handlers
   registerDatabaseHandlers()
   registerClaudeHandlers()
+  registerThemeHandlers()
 
   // Set app user model id for windows
   electronApp.setAppUserModelId('com.electron')
