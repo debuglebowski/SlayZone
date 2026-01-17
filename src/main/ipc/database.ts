@@ -6,7 +6,8 @@ import type {
   UpdateTaskInput,
   UpdateProjectInput,
   CreateTagInput,
-  UpdateTagInput
+  UpdateTagInput,
+  CreateChatMessageInput
 } from '../../shared/types/api'
 
 export function registerDatabaseHandlers(): void {
@@ -221,5 +222,26 @@ export function registerDatabaseHandlers(): void {
         insertStmt.run(taskId, tagId)
       }
     })()
+  })
+
+  // Chat Messages
+  ipcMain.handle('db:chatMessages:getByWorkspace', (_, workspaceItemId: string) => {
+    return db
+      .prepare('SELECT * FROM chat_messages WHERE workspace_item_id = ? ORDER BY created_at')
+      .all(workspaceItemId)
+  })
+
+  ipcMain.handle('db:chatMessages:create', (_, data: CreateChatMessageInput) => {
+    const id = crypto.randomUUID()
+    db.prepare(`
+      INSERT INTO chat_messages (id, workspace_item_id, role, content)
+      VALUES (?, ?, ?, ?)
+    `).run(id, data.workspaceItemId, data.role, data.content)
+    return db.prepare('SELECT * FROM chat_messages WHERE id = ?').get(id)
+  })
+
+  ipcMain.handle('db:chatMessages:delete', (_, id: string) => {
+    const result = db.prepare('DELETE FROM chat_messages WHERE id = ?').run(id)
+    return result.changes > 0
   })
 }

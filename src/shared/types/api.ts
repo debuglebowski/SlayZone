@@ -105,4 +105,9 @@ export interface ElectronAPI {
     set: (key: string, value: string) => Promise<void>
     getAll: () => Promise<Record<string, string>>
   }
+  chatMessages: {
+    getByWorkspace: (workspaceItemId: string) => Promise<ChatMessage[]>
+    create: (data: CreateChatMessageInput) => Promise<ChatMessage>
+    delete: (id: string) => Promise<boolean>
+  }
 }
