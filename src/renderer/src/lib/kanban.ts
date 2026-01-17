@@ -21,7 +21,7 @@ export const STATUS_ORDER: TaskStatus[] = [
 export const STATUS_LABELS: Record<TaskStatus, string> = {
   inbox: 'Inbox',
   backlog: 'Backlog',
-  todo: 'To Do',
+  todo: 'Todo',
   in_progress: 'In Progress',
   review: 'Review',
   done: 'Done'
@@ -171,6 +171,11 @@ export function applyFilters(
 
     // Show done filter
     if (!filter.showDone && task.status === 'done') {
+      return false
+    }
+
+    // Show archived filter
+    if (!filter.showArchived && task.archived_at !== null) {
       return false
     }
 

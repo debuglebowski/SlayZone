@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <!-- Spotlight/beam representing focus -->
+  <circle cx="32" cy="32" r="20" stroke="currentColor" stroke-width="2" fill="none" opacity="0.3"/>
+  <circle cx="32" cy="32" r="12" stroke="currentColor" stroke-width="2" fill="none" opacity="0.5"/>
+  <circle cx="32" cy="32" r="4" fill="currentColor"/>
+  <!-- Converging rays/beams -->
+  <path d="M 32 12 L 28 20 M 32 12 L 36 20" stroke="currentColor" stroke-width="2" stroke-linecap="round" opacity="0.6"/>
+  <path d="M 52 32 L 44 28 M 52 32 L 44 36" stroke="currentColor" stroke-width="2" stroke-linecap="round" opacity="0.6"/>
+  <path d="M 32 52 L 28 44 M 32 52 L 36 44" stroke="currentColor" stroke-width="2" stroke-linecap="round" opacity="0.6"/>
+  <path d="M 12 32 L 20 28 M 12 32 L 20 36" stroke="currentColor" stroke-width="2" stroke-linecap="round" opacity="0.6"/>
+</svg>

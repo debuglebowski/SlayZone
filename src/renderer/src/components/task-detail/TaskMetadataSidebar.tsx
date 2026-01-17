@@ -1,6 +1,6 @@
 import { format } from 'date-fns'
-import { CalendarIcon, AlertCircle } from 'lucide-react'
-import type { Task, Tag, TaskStatus } from '../../../../shared/types/database'
+import { CalendarIcon, AlertCircle, Repeat } from 'lucide-react'
+import type { Task, Tag, TaskStatus, RecurrenceType } from '../../../../shared/types/database'
 import { statusOptions, priorityOptions } from '@/lib/schemas'
 import {
   Select,
@@ -65,6 +65,67 @@ export function TaskMetadataSidebar({
     const newTagIds = checked ? [...taskTagIds, tagId] : taskTagIds.filter((id) => id !== tagId)
     await window.api.taskTags.setTagsForTask(task.id, newTagIds)
     onTagsChange(newTagIds)
+  }
+
+  const calculateNextReset = (type: RecurrenceType, interval: number): string => {
+    const now = new Date()
+    const next = new Date(now)
+
+    if (type === 'daily') {
+      next.setDate(next.getDate() + interval)
+    } else if (type === 'weekly') {
+      next.setDate(next.getDate() + interval * 7)
+    } else if (type === 'monthly') {
+      next.setMonth(next.getMonth() + interval)
+    }
+
+    return next.toISOString()
+  }
+
+  const handleRecurringChange = async (enabled: boolean): Promise<void> => {
+    if (enabled) {
+      // Enable with default values: daily, interval 1
+      const nextReset = calculateNextReset('daily', 1)
+      const updated = await window.api.db.updateTask({
+        id: task.id,
+        recurrenceType: 'daily',
+        recurrenceInterval: 1,
+        nextResetAt: nextReset
+      })
+      onUpdate(updated)
+    } else {
+      // Disable recurring
+      const updated = await window.api.db.updateTask({
+        id: task.id,
+        recurrenceType: null,
+        recurrenceInterval: null,
+        nextResetAt: null
+      })
+      onUpdate(updated)
+    }
+  }
+
+  const handleRecurrenceTypeChange = async (type: RecurrenceType): Promise<void> => {
+    const interval = task.recurrence_interval ?? 1
+    const nextReset = calculateNextReset(type, interval)
+    const updated = await window.api.db.updateTask({
+      id: task.id,
+      recurrenceType: type,
+      nextResetAt: nextReset
+    })
+    onUpdate(updated)
+  }
+
+  const handleRecurrenceIntervalChange = async (interval: number): Promise<void> => {
+    if (interval < 1) return
+    const type = task.recurrence_type ?? 'daily'
+    const nextReset = calculateNextReset(type, interval)
+    const updated = await window.api.db.updateTask({
+      id: task.id,
+      recurrenceInterval: interval,
+      nextResetAt: nextReset
+    })
+    onUpdate(updated)
   }
 
   const selectedTags = tags.filter((t) => taskTagIds.includes(t.id))
@@ -214,6 +275,68 @@ export function TaskMetadataSidebar({
             className="mt-2 w-full"
             placeholder="Reason..."
           />
+        )}
+      </div>
+
+      {/* Recurring */}
+      <div>
+        <div className="flex items-center gap-2">
+          <Checkbox
+            id="recurring"
+            checked={!!task.recurrence_type}
+            onCheckedChange={handleRecurringChange}
+          />
+          <label
+            htmlFor="recurring"
+            className="flex cursor-pointer items-center gap-1 text-sm"
+          >
+            <Repeat className="size-4" />
+            Recurring
+          </label>
+        </div>
+        {task.recurrence_type && (
+          <div className="mt-2 space-y-2">
+            <Select
+              value={task.recurrence_type}
+              onValueChange={handleRecurrenceTypeChange}
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="daily">Daily</SelectItem>
+                <SelectItem value="weekly">Weekly</SelectItem>
+                <SelectItem value="monthly">Monthly</SelectItem>
+              </SelectContent>
+            </Select>
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-muted-foreground">Every</span>
+              <Input
+                type="number"
+                min="1"
+                value={task.recurrence_interval ?? 1}
+                onChange={(e) => {
+                  const value = parseInt(e.target.value, 10)
+                  if (!isNaN(value) && value > 0) {
+                    handleRecurrenceIntervalChange(value)
+                  }
+                }}
+                className="w-16"
+              />
+              <span className="text-sm text-muted-foreground">
+                {task.recurrence_type === 'daily'
+                  ? 'day(s)'
+                  : task.recurrence_type === 'weekly'
+                    ? 'week(s)'
+                    : 'month(s)'}
+              </span>
+            </div>
+            {task.next_reset_at && (
+              <p className="text-xs text-muted-foreground">
+                Next reset: {format(new Date(task.next_reset_at), 'MMM d, yyyy')}
+              </p>
+            )}
+          </div>
         )}
       </div>
     </div>

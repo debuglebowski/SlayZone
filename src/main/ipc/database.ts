@@ -125,6 +125,18 @@ export function registerDatabaseHandlers(): void {
       fields.push('blocked_reason = ?')
       values.push(data.blockedReason)
     }
+    if (data.recurrenceType !== undefined) {
+      fields.push('recurrence_type = ?')
+      values.push(data.recurrenceType)
+    }
+    if (data.recurrenceInterval !== undefined) {
+      fields.push('recurrence_interval = ?')
+      values.push(data.recurrenceInterval)
+    }
+    if (data.nextResetAt !== undefined) {
+      fields.push('next_reset_at = ?')
+      values.push(data.nextResetAt)
+    }
 
     if (fields.length === 0) {
       return db.prepare('SELECT * FROM tasks WHERE id = ?').get(data.id)
@@ -308,5 +320,57 @@ export function registerDatabaseHandlers(): void {
   ipcMain.handle('db:workspaceItems:delete', (_, id: string) => {
     const result = db.prepare('DELETE FROM workspace_items WHERE id = ?').run(id)
     return result.changes > 0
+  })
+
+  // Recurring Tasks
+  ipcMain.handle('db:tasks:checkAndResetRecurring', () => {
+    const now = new Date().toISOString()
+    const tasksToReset = db
+      .prepare(
+        `SELECT * FROM tasks 
+         WHERE next_reset_at IS NOT NULL 
+         AND next_reset_at <= ? 
+         AND recurrence_type IS NOT NULL
+         AND archived_at IS NULL`
+      )
+      .all(now) as Array<{
+      id: string
+      recurrence_type: string
+      recurrence_interval: number
+      next_reset_at: string
+    }>
+
+    const updateStmt = db.prepare(`
+      UPDATE tasks 
+      SET status = 'inbox',
+          last_reset_at = datetime('now'),
+          next_reset_at = ?,
+          updated_at = datetime('now')
+      WHERE id = ?
+    `)
+
+    db.transaction(() => {
+      for (const task of tasksToReset) {
+        const lastReset = new Date(task.next_reset_at)
+        let nextReset: Date
+
+        if (task.recurrence_type === 'daily') {
+          nextReset = new Date(lastReset)
+          nextReset.setDate(nextReset.getDate() + task.recurrence_interval)
+        } else if (task.recurrence_type === 'weekly') {
+          nextReset = new Date(lastReset)
+          nextReset.setDate(nextReset.getDate() + task.recurrence_interval * 7)
+        } else if (task.recurrence_type === 'monthly') {
+          nextReset = new Date(lastReset)
+          nextReset.setMonth(nextReset.getMonth() + task.recurrence_interval)
+        } else {
+          continue
+        }
+
+        updateStmt.run(nextReset.toISOString(), task.id)
+      }
+    })()
+
+    return tasksToReset.length
   })
 }

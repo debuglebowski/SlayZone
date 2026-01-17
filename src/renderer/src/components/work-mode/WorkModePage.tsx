@@ -1,12 +1,16 @@
 import { useState, useEffect } from 'react'
-import { X, MessageSquare, Globe, FileText } from 'lucide-react'
+import { X, MessageSquare, Globe, FileText, PanelLeft, Lightbulb } from 'lucide-react'
+import { cn } from '@/lib/utils'
 import type { Task, WorkspaceItem, WorkspaceItemType } from '../../../../shared/types/database'
 import { Button } from '@/components/ui/button'
+import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip'
+import { Separator } from '@/components/ui/separator'
 import { BrowserView } from './BrowserView'
 import { DocumentEditor } from './DocumentEditor'
 import { ChatPanel } from '@/components/chat/ChatPanel'
 import { WorkspaceItemCard } from './WorkspaceItemCard'
 import { EmptyWorkspaceState } from './EmptyWorkspaceState'
+import { DumperPanel } from './DumperPanel'
 
 interface Props {
   taskId: string
@@ -17,6 +21,19 @@ export function WorkModePage({ taskId, onBack }: Props) {
   const [task, setTask] = useState<Task | null>(null)
   const [items, setItems] = useState<WorkspaceItem[]>([])
   const [activeItemId, setActiveItemId] = useState<string | null>(null)
+  const [sidebarOpen, setSidebarOpen] = useState(true)
+
+  // Keyboard shortcut Cmd/Ctrl+B to toggle sidebar
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'b' && (e.metaKey || e.ctrlKey)) {
+        e.preventDefault()
+        setSidebarOpen((prev) => !prev)
+      }
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [])
 
   useEffect(() => {
     window.api.db.getTask(taskId).then(setTask)
@@ -27,7 +44,7 @@ export function WorkModePage({ taskId, onBack }: Props) {
   }, [taskId])
 
   const handleAddItem = async (type: WorkspaceItemType) => {
-    const names = { chat: 'Chat', browser: 'New Tab', document: 'Untitled' }
+    const names = { chat: 'Chat', browser: 'New Tab', document: 'Untitled', dumper: 'Thought Dump' }
     const item = await window.api.workspaceItems.create({
       taskId,
       type,
@@ -64,50 +81,34 @@ export function WorkModePage({ taskId, onBack }: Props) {
   const activeItem = items.find((i) => i.id === activeItemId) ?? null
 
   return (
-    <div className="flex h-screen">
+    <div className="flex h-screen relative">
       {/* Sidebar */}
-      <aside className="w-80 border-r flex flex-col">
+      <aside
+        className={cn(
+          'border-r flex flex-col transition-all duration-200',
+          sidebarOpen ? 'w-80' : 'w-0 overflow-hidden'
+        )}
+      >
         {/* Title + Exit */}
         <div className="flex items-center justify-between p-4 border-b">
           <h1 className="text-lg font-semibold truncate pr-2">{task.title}</h1>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-7 w-7 shrink-0 text-muted-foreground"
-            onClick={onBack}
-          >
-            <X className="h-4 w-4" />
-          </Button>
-        </div>
-        <div className="p-2 border-b flex items-center justify-between">
-          <span className="text-sm font-medium">Workspace</span>
-          <div className="flex gap-1">
+          <div className="flex items-center gap-1">
             <Button
               variant="ghost"
               size="icon"
-              className="h-6 w-6"
-              onClick={() => handleAddItem('chat')}
-              title="Add Chat"
+              className="h-7 w-7 shrink-0 text-muted-foreground"
+              onClick={() => setSidebarOpen(false)}
+              title="Hide sidebar (⌘B)"
             >
-              <MessageSquare className="h-3 w-3" />
+              <PanelLeft className="h-4 w-4" />
             </Button>
             <Button
               variant="ghost"
               size="icon"
-              className="h-6 w-6"
-              onClick={() => handleAddItem('browser')}
-              title="Add Browser"
+              className="h-7 w-7 shrink-0 text-muted-foreground"
+              onClick={onBack}
             >
-              <Globe className="h-3 w-3" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-6 w-6"
-              onClick={() => handleAddItem('document')}
-              title="Add Document"
-            >
-              <FileText className="h-3 w-3" />
+              <X className="h-4 w-4" />
             </Button>
           </div>
         </div>
@@ -127,7 +128,77 @@ export function WorkModePage({ taskId, onBack }: Props) {
             ))
           )}
         </div>
+        <div className="border-t p-2 flex justify-center items-center gap-1">
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-6 w-6"
+                onClick={() => handleAddItem('chat')}
+              >
+                <MessageSquare className="h-3 w-3" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Add Chat</TooltipContent>
+          </Tooltip>
+          <Separator orientation="vertical" className="h-4" />
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-6 w-6"
+                onClick={() => handleAddItem('browser')}
+              >
+                <Globe className="h-3 w-3" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Add Browser</TooltipContent>
+          </Tooltip>
+          <Separator orientation="vertical" className="h-4" />
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-6 w-6"
+                onClick={() => handleAddItem('document')}
+              >
+                <FileText className="h-3 w-3" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Add Document</TooltipContent>
+          </Tooltip>
+          <Separator orientation="vertical" className="h-4" />
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-6 w-6"
+                onClick={() => handleAddItem('dumper')}
+              >
+                <Lightbulb className="h-3 w-3" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Add Thought Dumper</TooltipContent>
+          </Tooltip>
+        </div>
       </aside>
+
+      {/* Sidebar toggle when collapsed */}
+      {!sidebarOpen && (
+        <Button
+          variant="ghost"
+          size="icon"
+          className="absolute left-2 top-4 h-7 w-7 text-muted-foreground z-10"
+          onClick={() => setSidebarOpen(true)}
+          title="Show sidebar (⌘B)"
+        >
+          <PanelLeft className="h-4 w-4" />
+        </Button>
+      )}
 
       {/* Content */}
       {items.length === 0 ? (
@@ -147,6 +218,8 @@ export function WorkModePage({ taskId, onBack }: Props) {
             />
           ) : activeItem.type === 'document' ? (
             <DocumentEditor item={activeItem} onUpdate={handleItemUpdate} />
+          ) : activeItem.type === 'dumper' ? (
+            <DumperPanel item={activeItem} onUpdate={handleItemUpdate} />
           ) : null}
         </main>
       )}

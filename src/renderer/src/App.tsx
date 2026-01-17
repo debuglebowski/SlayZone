@@ -1,8 +1,8 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useHotkeys } from 'react-hotkeys-hook'
 import type { Task, Project, Tag, TaskStatus } from '../../shared/types/database'
 import { KanbanBoard } from '@/components/kanban/KanbanBoard'
-import { applyFilters } from '@/lib/kanban'
+import { applyFilters, type Column } from '@/lib/kanban'
 import { useFilterState } from '@/hooks/useFilterState'
 import { FilterBar } from '@/components/filters/FilterBar'
 import { CreateTaskDialog } from '@/components/CreateTaskDialog'
@@ -51,6 +51,11 @@ function App(): React.JSX.Element {
 
   // Dialog state
   const [createOpen, setCreateOpen] = useState(false)
+  const [createTaskDefaults, setCreateTaskDefaults] = useState<{
+    status?: Task['status']
+    priority?: number
+    dueDate?: string | null
+  }>({})
   const [editingTask, setEditingTask] = useState<Task | null>(null)
   const [deletingTask, setDeletingTask] = useState<Task | null>(null)
 
@@ -67,6 +72,11 @@ function App(): React.JSX.Element {
 
   // Search dialog state
   const [searchOpen, setSearchOpen] = useState(false)
+
+  // Inline project rename state
+  const [editingProjectName, setEditingProjectName] = useState(false)
+  const [projectNameValue, setProjectNameValue] = useState('')
+  const projectNameInputRef = useRef<HTMLHeadingElement>(null)
 
   // Load data on mount
   useEffect(() => {
@@ -183,6 +193,45 @@ function App(): React.JSX.Element {
   const handleTaskCreated = (task: Task): void => {
     setTasks([task, ...tasks])
     setCreateOpen(false)
+    setCreateTaskDefaults({})
+  }
+
+  const handleCreateTaskFromColumn = (column: Column): void => {
+    const defaults: {
+      status?: Task['status']
+      priority?: number
+      dueDate?: string | null
+    } = {}
+
+    if (filter.groupBy === 'status') {
+      // Column id is the status
+      defaults.status = column.id as Task['status']
+    } else if (filter.groupBy === 'priority') {
+      // Column id is like "p1", "p2", etc.
+      const priority = parseInt(column.id.slice(1), 10)
+      if (!isNaN(priority)) {
+        defaults.priority = priority
+      }
+    } else if (filter.groupBy === 'due_date') {
+      // Column id is like "today", "this_week", etc.
+      const today = new Date().toISOString().split('T')[0]
+      if (column.id === 'today') {
+        defaults.dueDate = today
+      } else if (column.id === 'this_week') {
+        const weekEnd = new Date(today)
+        weekEnd.setDate(weekEnd.getDate() + 7)
+        defaults.dueDate = weekEnd.toISOString().split('T')[0]
+      } else if (column.id === 'overdue') {
+        // For overdue, set to yesterday
+        const yesterday = new Date(today)
+        yesterday.setDate(yesterday.getDate() - 1)
+        defaults.dueDate = yesterday.toISOString().split('T')[0]
+      }
+      // "later" and "no_date" don't set a default due date
+    }
+
+    setCreateTaskDefaults(defaults)
+    setCreateOpen(true)
   }
 
   const handleTaskUpdated = (task: Task): void => {
@@ -247,6 +296,73 @@ function App(): React.JSX.Element {
     setEditingProject(null)
   }
 
+  const handleProjectNameStartEdit = (): void => {
+    if (!selectedProjectId) return
+    const project = projects.find((p) => p.id === selectedProjectId)
+    if (project) {
+      setProjectNameValue(project.name)
+      setEditingProjectName(true)
+    }
+  }
+
+  const handleProjectNameSave = async (): Promise<void> => {
+    if (!selectedProjectId) return
+    const trimmed = projectNameValue.trim()
+    if (!trimmed) {
+      // Restore original name if empty
+      const project = projects.find((p) => p.id === selectedProjectId)
+      if (project) {
+        setProjectNameValue(project.name)
+      }
+      setEditingProjectName(false)
+      return
+    }
+
+    const project = projects.find((p) => p.id === selectedProjectId)
+    if (project && trimmed !== project.name) {
+      try {
+        const updated = await window.api.db.updateProject({
+          id: selectedProjectId,
+          name: trimmed,
+          color: project.color
+        })
+        setProjects(projects.map((p) => (p.id === selectedProjectId ? updated : p)))
+      } catch (error) {
+        // Restore original name on error
+        if (project) {
+          setProjectNameValue(project.name)
+        }
+      }
+    }
+    setEditingProjectName(false)
+  }
+
+  const handleProjectNameKeyDown = (e: React.KeyboardEvent<HTMLHeadingElement>): void => {
+    if (e.key === 'Enter') {
+      e.preventDefault()
+      handleProjectNameSave()
+    } else if (e.key === 'Escape') {
+      const project = projects.find((p) => p.id === selectedProjectId)
+      if (project) {
+        setProjectNameValue(project.name)
+      }
+      setEditingProjectName(false)
+    }
+  }
+
+  // Focus input when editing starts
+  useEffect(() => {
+    if (editingProjectName && projectNameInputRef.current) {
+      // Select all text
+      const range = document.createRange()
+      range.selectNodeContents(projectNameInputRef.current)
+      const selection = window.getSelection()
+      selection?.removeAllRanges()
+      selection?.addRange(range)
+      projectNameInputRef.current.focus()
+    }
+  }, [editingProjectName])
+
   const handleProjectDeleted = (): void => {
     if (deletingProject) {
       const remaining = projects.filter((p) => p.id !== deletingProject.id)
@@ -310,11 +426,31 @@ function App(): React.JSX.Element {
       <SidebarInset className="min-h-screen min-w-0">
         <div className="flex flex-col flex-1 p-6">
           <header className="mb-6 flex items-center justify-between">
-            <h1 className="text-2xl font-bold">
-              {selectedProjectId
-                ? (projects.find((p) => p.id === selectedProjectId)?.name ?? 'Focus')
-                : 'All Tasks'}
-            </h1>
+            {selectedProjectId ? (
+              editingProjectName ? (
+                <h1
+                  ref={projectNameInputRef}
+                  contentEditable
+                  suppressContentEditableWarning
+                  onBlur={handleProjectNameSave}
+                  onKeyDown={handleProjectNameKeyDown}
+                  onInput={(e) => setProjectNameValue(e.currentTarget.textContent ?? '')}
+                  className="text-2xl font-bold outline-none cursor-text"
+                  style={{ caretColor: 'currentColor' }}
+                >
+                  {projectNameValue}
+                </h1>
+              ) : (
+                <h1
+                  onClick={handleProjectNameStartEdit}
+                  className="text-2xl font-bold cursor-pointer hover:text-muted-foreground"
+                >
+                  {projects.find((p) => p.id === selectedProjectId)?.name ?? 'Focus'}
+                </h1>
+              )
+            ) : (
+              <h1 className="text-2xl font-bold">All Tasks</h1>
+            )}
             <div className="flex items-center gap-3">
               {whatNextTask && (
                 <div
@@ -352,9 +488,13 @@ function App(): React.JSX.Element {
                   groupBy={filter.groupBy}
                   onTaskMove={handleTaskMove}
                   onTaskClick={handleTaskClick}
+                  onCreateTask={handleCreateTaskFromColumn}
                   projectsMap={projectsMap}
                   showProjectDot={selectedProjectId === null}
                   disableDrag={filter.groupBy === 'due_date'}
+                  taskTags={taskTags}
+                  allTasks={projectTasks}
+                  tags={tags}
                 />
               </div>
             </>
@@ -366,6 +506,9 @@ function App(): React.JSX.Element {
             onOpenChange={setCreateOpen}
             onCreated={handleTaskCreated}
             defaultProjectId={selectedProjectId ?? projects[0]?.id}
+            defaultStatus={createTaskDefaults.status}
+            defaultPriority={createTaskDefaults.priority}
+            defaultDueDate={createTaskDefaults.dueDate}
             tags={tags}
             onTagCreated={(tag) => setTags([...tags, tag])}
           />

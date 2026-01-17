@@ -67,6 +67,10 @@ export function FilterBar({ filter, onChange, tags }: FilterBarProps): React.JSX
     onChange({ ...filter, showDone })
   }
 
+  const handleShowArchivedChange = (showArchived: boolean): void => {
+    onChange({ ...filter, showArchived })
+  }
+
   const selectedTagCount = filter.tagIds.length
 
   return (
@@ -167,6 +171,16 @@ export function FilterBar({ filter, onChange, tags }: FilterBarProps): React.JSX
           <Switch id="show-done" checked={filter.showDone} onCheckedChange={handleShowDoneChange} />
           <Label htmlFor="show-done" className="text-xs cursor-pointer">
             Done
+          </Label>
+        </div>
+        <div className="flex items-center gap-2">
+          <Switch
+            id="show-archived"
+            checked={filter.showArchived}
+            onCheckedChange={handleShowArchivedChange}
+          />
+          <Label htmlFor="show-archived" className="text-xs cursor-pointer">
+            Archived
           </Label>
         </div>
       </div>

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { MessageSquare, Globe, FileText, MoreVertical } from 'lucide-react'
+import { MessageSquare, Globe, FileText, MoreVertical, Lightbulb } from 'lucide-react'
 import type { WorkspaceItem } from '../../../../shared/types/database'
 import {
   DropdownMenu,
@@ -22,7 +22,8 @@ interface Props {
 const typeIcons = {
   chat: MessageSquare,
   browser: Globe,
-  document: FileText
+  document: FileText,
+  dumper: Lightbulb
 }
 
 export function WorkspaceItemCard({ item, isActive, onClick, onRename, onDelete }: Props) {

@@ -10,8 +10,8 @@ import {
   type DragStartEvent,
   type DragEndEvent
 } from '@dnd-kit/core'
-import type { Task, Project } from '../../../../shared/types/database'
-import { groupTasksBy, type GroupKey } from '@/lib/kanban'
+import type { Task, Project, Tag } from '../../../../shared/types/database'
+import { groupTasksBy, type GroupKey, type Column } from '@/lib/kanban'
 import { KanbanColumn } from './KanbanColumn'
 import { KanbanCard } from './KanbanCard'
 
@@ -20,9 +20,13 @@ interface KanbanBoardProps {
   groupBy: GroupKey
   onTaskMove: (taskId: string, newColumnId: string) => void
   onTaskClick?: (task: Task) => void
+  onCreateTask?: (column: Column) => void
   projectsMap?: Map<string, Project>
   showProjectDot?: boolean
   disableDrag?: boolean
+  taskTags?: Map<string, string[]>
+  allTasks?: Task[]
+  tags?: Tag[]
 }
 
 export function KanbanBoard({
@@ -30,9 +34,13 @@ export function KanbanBoard({
   groupBy,
   onTaskMove,
   onTaskClick,
+  onCreateTask,
   projectsMap,
   showProjectDot,
-  disableDrag
+  disableDrag,
+  taskTags,
+  allTasks,
+  tags
 }: KanbanBoardProps): React.JSX.Element {
   const [activeId, setActiveId] = useState<string | null>(null)
 
@@ -91,9 +99,13 @@ export function KanbanBoard({
             key={column.id}
             column={column}
             onTaskClick={onTaskClick}
+            onCreateTask={onCreateTask}
             projectsMap={projectsMap}
             showProjectDot={showProjectDot}
             disableDrag={disableDrag}
+            taskTags={taskTags}
+            allTasks={allTasks}
+            tags={tags}
           />
         ))}
       </div>

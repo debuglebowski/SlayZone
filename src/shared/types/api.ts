@@ -1,4 +1,4 @@
-import type { Task, Project, Tag, TaskStatus, WorkspaceItem, WorkspaceItemType } from './database'
+import type { Task, Project, Tag, TaskStatus, WorkspaceItem, WorkspaceItemType, RecurrenceType } from './database'
 
 // Theme types
 export type Theme = 'light' | 'dark'
@@ -65,6 +65,9 @@ export interface UpdateTaskInput {
   priority?: number
   dueDate?: string | null
   blockedReason?: string | null
+  recurrenceType?: RecurrenceType | null
+  recurrenceInterval?: number | null
+  nextResetAt?: string | null
 }
 
 export interface UpdateProjectInput {
@@ -118,6 +121,7 @@ export interface ElectronAPI {
     archiveTask: (id: string) => Promise<Task>
     unarchiveTask: (id: string) => Promise<Task>
     getArchivedTasks: () => Promise<Task[]>
+    checkAndResetRecurring: () => Promise<number>
   }
   tags: {
     getTags: () => Promise<Tag[]>

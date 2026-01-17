@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__ide__getDiagnostics",
+      "mcp__electron__take_screenshot",
+      "mcp__electron__get_electron_window_info",
+      "mcp__electron__send_command_to_electron",
+      "mcp__electron__read_electron_logs"
+    ]
+  }
+}

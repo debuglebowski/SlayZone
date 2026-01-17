@@ -101,6 +101,18 @@ const migrations: Migration[] = [
         CREATE INDEX idx_tasks_archived ON tasks(archived_at);
       `)
     }
+  },
+  {
+    version: 5,
+    up: (db) => {
+      db.exec(`
+        ALTER TABLE tasks ADD COLUMN recurrence_type TEXT DEFAULT NULL;
+        ALTER TABLE tasks ADD COLUMN recurrence_interval INTEGER DEFAULT NULL;
+        ALTER TABLE tasks ADD COLUMN last_reset_at TEXT DEFAULT NULL;
+        ALTER TABLE tasks ADD COLUMN next_reset_at TEXT DEFAULT NULL;
+        CREATE INDEX idx_tasks_recurring ON tasks(next_reset_at) WHERE recurrence_type IS NOT NULL;
+      `)
+    }
   }
 ]
 

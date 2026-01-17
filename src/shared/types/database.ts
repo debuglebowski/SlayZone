@@ -1,5 +1,7 @@
 export type TaskStatus = 'inbox' | 'backlog' | 'todo' | 'in_progress' | 'review' | 'done'
 
+export type RecurrenceType = 'daily' | 'weekly' | 'monthly'
+
 export interface Task {
   id: string
   project_id: string
@@ -11,6 +13,10 @@ export interface Task {
   due_date: string | null
   blocked_reason: string | null
   archived_at: string | null
+  recurrence_type: RecurrenceType | null
+  recurrence_interval: number | null
+  last_reset_at: string | null
+  next_reset_at: string | null
   created_at: string
   updated_at: string
 }
@@ -30,7 +36,7 @@ export interface Tag {
   created_at: string
 }
 
-export type WorkspaceItemType = 'chat' | 'browser' | 'document'
+export type WorkspaceItemType = 'chat' | 'browser' | 'document' | 'dumper'
 
 export interface WorkspaceItem {
   id: string

@@ -20,7 +20,8 @@ const api: ElectronAPI = {
     getSubtasks: (parentId) => ipcRenderer.invoke('db:tasks:getSubtasks', parentId),
     archiveTask: (id) => ipcRenderer.invoke('db:tasks:archive', id),
     unarchiveTask: (id) => ipcRenderer.invoke('db:tasks:unarchive', id),
-    getArchivedTasks: () => ipcRenderer.invoke('db:tasks:getArchived')
+    getArchivedTasks: () => ipcRenderer.invoke('db:tasks:getArchived'),
+    checkAndResetRecurring: () => ipcRenderer.invoke('db:tasks:checkAndResetRecurring')
   },
   tags: {
     getTags: () => ipcRenderer.invoke('db:tags:getAll'),

@@ -40,6 +40,9 @@ interface CreateTaskDialogProps {
   onOpenChange: (open: boolean) => void
   onCreated: (task: Task) => void
   defaultProjectId?: string
+  defaultStatus?: Task['status']
+  defaultPriority?: number
+  defaultDueDate?: string | null
   tags: Tag[]
   onTagCreated?: (tag: Tag) => void
 }
@@ -49,6 +52,9 @@ export function CreateTaskDialog({
   onOpenChange,
   onCreated,
   defaultProjectId,
+  defaultStatus,
+  defaultPriority,
+  defaultDueDate,
   tags,
   onTagCreated
 }: CreateTaskDialogProps): React.JSX.Element {
@@ -59,27 +65,27 @@ export function CreateTaskDialog({
       projectId: defaultProjectId ?? '',
       title: '',
       description: '',
-      status: 'inbox',
-      priority: 3,
-      dueDate: null,
+      status: defaultStatus ?? 'inbox',
+      priority: defaultPriority ?? 3,
+      dueDate: defaultDueDate ?? null,
       tagIds: []
     }
   })
 
-  // Reset form when dialog opens with new defaultProjectId
+  // Reset form when dialog opens with new defaults
   useEffect(() => {
     if (open) {
       form.reset({
         projectId: defaultProjectId ?? '',
         title: '',
         description: '',
-        status: 'inbox',
-        priority: 3,
-        dueDate: null,
+        status: defaultStatus ?? 'inbox',
+        priority: defaultPriority ?? 3,
+        dueDate: defaultDueDate ?? null,
         tagIds: []
       })
     }
-  }, [open, defaultProjectId, form])
+  }, [open, defaultProjectId, defaultStatus, defaultPriority, defaultDueDate, form])
 
   const onSubmit = async (data: CreateTaskFormData): Promise<void> => {
     const task = await window.api.db.createTask({

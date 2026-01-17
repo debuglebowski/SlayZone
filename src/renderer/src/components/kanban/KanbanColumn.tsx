@@ -1,9 +1,11 @@
 import { useDroppable } from '@dnd-kit/core'
 import { SortableContext, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import type { Task, Project } from '../../../../shared/types/database'
+import { Plus } from 'lucide-react'
+import type { Task, Project, Tag } from '../../../../shared/types/database'
 import type { Column } from '@/lib/kanban'
 import { KanbanCard } from './KanbanCard'
+import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 
 interface SortableKanbanCardProps {
@@ -12,6 +14,7 @@ interface SortableKanbanCardProps {
   project?: Project
   showProject?: boolean
   disableDrag?: boolean
+  tags?: Tag[]
 }
 
 function SortableKanbanCard({
@@ -19,7 +22,8 @@ function SortableKanbanCard({
   onTaskClick,
   project,
   showProject,
-  disableDrag
+  disableDrag,
+  tags
 }: SortableKanbanCardProps): React.JSX.Element {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: task.id,
@@ -42,6 +46,7 @@ function SortableKanbanCard({
         onClick={() => onTaskClick?.(task)}
         project={project}
         showProject={showProject}
+        tags={tags}
       />
     </div>
   )
@@ -50,17 +55,25 @@ function SortableKanbanCard({
 interface KanbanColumnProps {
   column: Column
   onTaskClick?: (task: Task) => void
+  onCreateTask?: (column: Column) => void
   projectsMap?: Map<string, Project>
   showProjectDot?: boolean
   disableDrag?: boolean
+  taskTags?: Map<string, string[]>
+  allTasks?: Task[]
+  tags?: Tag[]
 }
 
 export function KanbanColumn({
   column,
   onTaskClick,
+  onCreateTask,
   projectsMap,
   showProjectDot,
-  disableDrag
+  disableDrag,
+  taskTags,
+  allTasks,
+  tags
 }: KanbanColumnProps): React.JSX.Element {
   const { setNodeRef, isOver } = useDroppable({
     id: column.id
@@ -69,8 +82,23 @@ export function KanbanColumn({
   return (
     <div className="flex w-72 shrink-0 flex-col h-full">
       <div className="mb-2 flex items-center justify-between px-2">
-        <h3 className="text-sm font-semibold text-muted-foreground">{column.title}</h3>
-        <span className="text-xs text-muted-foreground">{column.tasks.length}</span>
+        <div className="flex items-center gap-2">
+          <h3 className="text-sm font-semibold text-muted-foreground">{column.title}</h3>
+          <span className="text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
+            {column.tasks.length}
+          </span>
+        </div>
+        {onCreateTask && (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-6 w-6"
+            onClick={() => onCreateTask(column)}
+            title="Add task"
+          >
+            <Plus className="h-4 w-4" />
+          </Button>
+        )}
       </div>
       <div
         ref={setNodeRef}
@@ -84,16 +112,25 @@ export function KanbanColumn({
           strategy={verticalListSortingStrategy}
         >
           <div className="flex flex-col gap-2">
-            {column.tasks.map((task) => (
-              <SortableKanbanCard
-                key={task.id}
-                task={task}
-                onTaskClick={onTaskClick}
-                project={showProjectDot ? projectsMap?.get(task.project_id) : undefined}
-                showProject={showProjectDot}
-                disableDrag={disableDrag}
-              />
-            ))}
+            {column.tasks.map((task) => {
+              const taskTagIds = taskTags?.get(task.id) ?? []
+              const taskTagsList =
+                tags && taskTagIds.length > 0
+                  ? tags.filter((t) => taskTagIds.includes(t.id))
+                  : []
+
+              return (
+                <SortableKanbanCard
+                  key={task.id}
+                  task={task}
+                  onTaskClick={onTaskClick}
+                  project={showProjectDot ? projectsMap?.get(task.project_id) : undefined}
+                  showProject={showProjectDot}
+                  disableDrag={disableDrag}
+                  tags={taskTagsList}
+                />
+              )
+            })}
           </div>
         </SortableContext>
       </div>

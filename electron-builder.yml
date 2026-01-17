@@ -1,5 +1,5 @@
-appId: com.electron.app
-productName: focus-temp
+appId: com.focus.app
+productName: focus
 directories:
   buildResources: build
 files:
@@ -11,8 +11,9 @@ files:
   - '!{tsconfig.json,tsconfig.node.json,tsconfig.web.json}'
 asarUnpack:
   - resources/**
+  - '**/node_modules/better-sqlite3/**'
 win:
-  executableName: focus-temp
+  executableName: focus
 nsis:
   artifactName: ${name}-${version}-setup.${ext}
   shortcutName: ${productName}
@@ -37,7 +38,8 @@ linux:
   category: Utility
 appImage:
   artifactName: ${name}-${version}.${ext}
-npmRebuild: false
+npmRebuild: true
+nativeRebuilder: sequential
 publish:
   provider: generic
   url: https://example.com/auto-updates

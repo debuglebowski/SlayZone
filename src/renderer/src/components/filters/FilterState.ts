@@ -8,6 +8,7 @@ export interface FilterState {
   tagIds: string[] // selected tag IDs
   showBlocked: boolean
   showDone: boolean
+  showArchived: boolean
 }
 
 export const defaultFilterState: FilterState = {
@@ -16,5 +17,6 @@ export const defaultFilterState: FilterState = {
   dueDateRange: 'all',
   tagIds: [],
   showBlocked: true,
-  showDone: true
+  showDone: true,
+  showArchived: false
 }
