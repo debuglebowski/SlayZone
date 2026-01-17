@@ -10,17 +10,17 @@ See: .planning/PROJECT.md
 ## Current Position
 
 Phase: 7 of 7 (Polish + UX)
-Plan: 1 of 5 complete (07-04)
+Plan: 3 of 5 complete (07-01, 07-03, 07-04)
 Status: In progress
-Last activity: 2026-01-17 - Completed 07-04-PLAN.md (Onboarding)
+Last activity: 2026-01-17 - Completed 07-01-PLAN.md (Tags in CreateTaskDialog)
 
-Progress: ██████████████████████████████░░░░░░ 87% (27/31 plans)
+Progress: █████████████████████████████████░░░ 94% (29/31 plans)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 27
-- Average duration: 2.6min
+- Total plans completed: 29
+- Average duration: 2.7min
 
 **By Phase:**
 
@@ -32,7 +32,7 @@ Progress: ███████████████████████�
 | 04-task-management | 7 | 14min | 2.0min |
 | 05-ai-integration | 4 | 7min | 1.8min |
 | 06-work-mode | 5 | 12min | 2.4min |
-| 07-polish | 1 | <1min | <1min |
+| 07-polish | 3 | 21min | 7.0min |
 
 ## Accumulated Context
 
@@ -96,6 +96,9 @@ Progress: ███████████████████████�
 | WorkspaceItemCard for sidebar items | 06-05 | Provides rename/delete via dropdown menu |
 | onboarding_completed setting as boolean flag | 07-04 | Simple first-run detection |
 | showCloseButton={false} on onboarding dialog | 07-04 | Force completion or explicit skip |
+| Priority score formula: (6-priority)*200 + dueDateScore + statusScore | 07-03 | Clear weighted scoring |
+| Overdue tasks capped at +1000 bonus | 07-03 | Prevent runaway scores |
+| Remove .default([]) from tagIds schema | 07-01 | react-hook-form type compatibility |
 
 ### Pending Todos
 
@@ -107,6 +110,6 @@ Progress: ███████████████████████�
 
 ## Session Continuity
 
-Last session: 2026-01-17T14:37Z
-Stopped at: Completed 07-04-PLAN.md (Onboarding)
+Last session: 2026-01-17T14:00Z
+Stopped at: Completed 07-01-PLAN.md (Tags in CreateTaskDialog)
 Resume file: None
