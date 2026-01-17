@@ -5,21 +5,21 @@
 See: .planning/PROJECT.md
 
 **Core value:** One place for all tasks with focused Work Mode that prevents rabbit-holing
-**Current focus:** Phase 6 - Work Mode (in progress)
+**Current focus:** Phase 7 - Polish + UX (not started)
 
 ## Current Position
 
-Phase: 6 of 7 (Work Mode)
-Plan: 4 of ? complete
-Status: In progress
-Last activity: 2026-01-17 - Completed 06-04-PLAN.md (content viewers)
+Phase: 7 of 7 (Polish + UX)
+Plan: 0 of ? complete
+Status: Not started
+Last activity: 2026-01-17 - Completed Phase 6 (Work Mode)
 
-Progress: █████████████████████████████░ 98%
+Progress: ██████████████████████████████ 100% (6/7 phases)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 24
+- Total plans completed: 26
 - Average duration: 2.6min
 
 **By Phase:**
@@ -31,7 +31,7 @@ Progress: ███████████████████████�
 | 03-navigation | 5 | 11min | 2.2min |
 | 04-task-management | 7 | 14min | 2.0min |
 | 05-ai-integration | 4 | 7min | 1.8min |
-| 06-work-mode | 4 | 10.5min | 2.6min |
+| 06-work-mode | 5 | 12min | 2.4min |
 
 ## Accumulated Context
 
@@ -92,6 +92,7 @@ Progress: ███████████████████████�
 | Add item via dropdown (chat/browser/document) | 06-03 | Single + button with type options |
 | persist:browser-tabs partition for webview | 06-04 | Session sharing across browser tabs |
 | Conditional rendering by activeItem.type | 06-04 | Clean content switching in WorkModePage |
+| WorkspaceItemCard for sidebar items | 06-05 | Provides rename/delete via dropdown menu |
 
 ### Pending Todos
 
@@ -103,6 +104,6 @@ Progress: ███████████████████████�
 
 ## Session Continuity
 
-Last session: 2026-01-17T12:42Z
-Stopped at: Completed 06-04-PLAN.md (content viewers)
+Last session: 2026-01-17T14:30Z
+Stopped at: Completed Phase 6 (Work Mode) - all 5 plans verified
 Resume file: None

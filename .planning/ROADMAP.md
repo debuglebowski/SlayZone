@@ -146,11 +146,11 @@ Plans:
 **Plans:** 5 plans
 
 Plans:
-- [ ] 06-01-PLAN.md — IPC layer for workspace items CRUD
-- [ ] 06-02-PLAN.md — Work Mode container + navigation + webview enablement
-- [ ] 06-03-PLAN.md — Workspace sidebar + item management
-- [ ] 06-04-PLAN.md — Browser view + document editor components
-- [ ] 06-05-PLAN.md — Human verification checkpoint
+- [x] 06-01-PLAN.md — IPC layer for workspace items CRUD
+- [x] 06-02-PLAN.md — Work Mode container + navigation + webview enablement
+- [x] 06-03-PLAN.md — Workspace sidebar + item management
+- [x] 06-04-PLAN.md — Browser view + document editor components
+- [x] 06-05-PLAN.md — Human verification checkpoint
 
 ---
 
@@ -180,7 +180,7 @@ Plans:
 | 3 - Navigation | Complete | 2026-01-17 |
 | 4 - Task Management | Complete | 2026-01-17 |
 | 5 - AI Integration | Complete | 2026-01-17 |
-| 6 - Work Mode | Not started | - |
+| 6 - Work Mode | Complete | 2026-01-17 |
 | 7 - Polish | Not started | - |
 
 ---
