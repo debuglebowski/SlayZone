@@ -110,4 +110,11 @@ export interface ElectronAPI {
     create: (data: CreateChatMessageInput) => Promise<ChatMessage>
     delete: (id: string) => Promise<boolean>
   }
+  claude: {
+    stream: (prompt: string, context?: string) => Promise<void>
+    cancel: () => void
+    onChunk: (callback: (data: ClaudeStreamEvent) => void) => () => void
+    onError: (callback: (error: string) => void) => () => void
+    onDone: (callback: (result: { code: number }) => void) => () => void
+  }
 }

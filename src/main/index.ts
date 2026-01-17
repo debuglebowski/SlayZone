@@ -1,9 +1,16 @@
 import { app, shell, BrowserWindow, ipcMain } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
+
+// Enable remote debugging for MCP server (dev only)
+if (is.dev) {
+  app.commandLine.appendSwitch('remote-debugging-port', '9222')
+}
 import icon from '../../resources/icon.png?asset'
 import { getDatabase, closeDatabase } from './db'
 import { registerDatabaseHandlers } from './ipc/database'
+import { registerClaudeHandlers } from './ipc/claude'
+import { getActiveProcess } from './services/claude-spawner'
 
 function createWindow(): void {
   // Create the browser window.
@@ -48,6 +55,7 @@ app.whenReady().then(() => {
 
   // Register IPC handlers
   registerDatabaseHandlers()
+  registerClaudeHandlers()
 
   // Set app user model id for windows
   electronApp.setAppUserModelId('com.electron')
@@ -80,8 +88,10 @@ app.on('window-all-closed', () => {
   }
 })
 
-// Clean up database connection before quitting
+// Clean up database connection and active processes before quitting
 app.on('will-quit', () => {
+  const proc = getActiveProcess()
+  if (proc) proc.kill('SIGTERM')
   closeDatabase()
 })
 

@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron'
-import type { ElectronAPI } from '../shared/types/api'
+import type { ElectronAPI, ClaudeStreamEvent } from '../shared/types/api'
 
 // Custom APIs for renderer
 const api: ElectronAPI = {
@@ -33,6 +33,35 @@ const api: ElectronAPI = {
     get: (key) => ipcRenderer.invoke('db:settings:get', key),
     set: (key, value) => ipcRenderer.invoke('db:settings:set', key, value),
     getAll: () => ipcRenderer.invoke('db:settings:getAll')
+  },
+  chatMessages: {
+    getByWorkspace: (workspaceItemId) =>
+      ipcRenderer.invoke('db:chatMessages:getByWorkspace', workspaceItemId),
+    create: (data) => ipcRenderer.invoke('db:chatMessages:create', data),
+    delete: (id) => ipcRenderer.invoke('db:chatMessages:delete', id)
+  },
+  claude: {
+    stream: (prompt: string, context?: string) => {
+      return ipcRenderer.invoke('claude:stream:start', prompt, context)
+    },
+    cancel: () => {
+      ipcRenderer.send('claude:stream:cancel')
+    },
+    onChunk: (callback: (data: ClaudeStreamEvent) => void) => {
+      const handler = (_event: unknown, data: ClaudeStreamEvent) => callback(data)
+      ipcRenderer.on('claude:chunk', handler)
+      return () => ipcRenderer.removeListener('claude:chunk', handler)
+    },
+    onError: (callback: (error: string) => void) => {
+      const handler = (_event: unknown, error: string) => callback(error)
+      ipcRenderer.on('claude:error', handler)
+      return () => ipcRenderer.removeListener('claude:error', handler)
+    },
+    onDone: (callback: (result: { code: number }) => void) => {
+      const handler = (_event: unknown, result: { code: number }) => callback(result)
+      ipcRenderer.on('claude:done', handler)
+      return () => ipcRenderer.removeListener('claude:done', handler)
+    }
   }
 }
 
