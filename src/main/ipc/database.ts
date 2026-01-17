@@ -7,7 +7,9 @@ import type {
   UpdateProjectInput,
   CreateTagInput,
   UpdateTagInput,
-  CreateChatMessageInput
+  CreateChatMessageInput,
+  CreateWorkspaceItemInput,
+  UpdateWorkspaceItemInput
 } from '../../shared/types/api'
 
 export function registerDatabaseHandlers(): void {
@@ -242,6 +244,41 @@ export function registerDatabaseHandlers(): void {
 
   ipcMain.handle('db:chatMessages:delete', (_, id: string) => {
     const result = db.prepare('DELETE FROM chat_messages WHERE id = ?').run(id)
+    return result.changes > 0
+  })
+
+  // Workspace Items
+  ipcMain.handle('db:workspaceItems:getByTask', (_, taskId: string) => {
+    return db.prepare('SELECT * FROM workspace_items WHERE task_id = ? ORDER BY created_at').all(taskId)
+  })
+
+  ipcMain.handle('db:workspaceItems:create', (_, data: CreateWorkspaceItemInput) => {
+    const id = crypto.randomUUID()
+    db.prepare(`
+      INSERT INTO workspace_items (id, task_id, type, name, content, url)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `).run(id, data.taskId, data.type, data.name, data.content ?? null, data.url ?? null)
+    return db.prepare('SELECT * FROM workspace_items WHERE id = ?').get(id)
+  })
+
+  ipcMain.handle('db:workspaceItems:update', (_, data: UpdateWorkspaceItemInput) => {
+    const fields: string[] = []
+    const values: unknown[] = []
+
+    if (data.name !== undefined) { fields.push('name = ?'); values.push(data.name) }
+    if (data.content !== undefined) { fields.push('content = ?'); values.push(data.content) }
+    if (data.url !== undefined) { fields.push('url = ?'); values.push(data.url) }
+
+    if (fields.length > 0) {
+      fields.push("updated_at = datetime('now')")
+      values.push(data.id)
+      db.prepare(`UPDATE workspace_items SET ${fields.join(', ')} WHERE id = ?`).run(...values)
+    }
+    return db.prepare('SELECT * FROM workspace_items WHERE id = ?').get(data.id)
+  })
+
+  ipcMain.handle('db:workspaceItems:delete', (_, id: string) => {
+    const result = db.prepare('DELETE FROM workspace_items WHERE id = ?').run(id)
     return result.changes > 0
   })
 }
