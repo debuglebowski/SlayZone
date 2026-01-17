@@ -6,8 +6,8 @@ Polish all three screens (Kanban, Task Detail, Work Mode) and add cross-cutting 
 
 ## Milestones
 
-- ✅ **v1.0 MVP** - Phases 1-7 (shipped 2026-01-16)
-- 🚧 **v1.1 UX & Features** - Phases 8-14 (in progress)
+- **v1.0 MVP** - Phases 1-7 (shipped 2026-01-16)
+- **v1.1 UX & Features** - Phases 8-14 (in progress)
 
 ## Phases
 
@@ -26,13 +26,13 @@ Polish all three screens (Kanban, Task Detail, Work Mode) and add cross-cutting 
 ## Phase Details
 
 <details>
-<summary>✅ v1.0 MVP (Phases 1-7) - SHIPPED 2026-01-16</summary>
+<summary>v1.0 MVP (Phases 1-7) - SHIPPED 2026-01-16</summary>
 
 Phases 1-7 delivered complete task management app with kanban board, Work Mode AI chat, browser tabs, and living documents. See archived planning docs for details.
 
 </details>
 
-### 🚧 v1.1 UX & Features (In Progress)
+### v1.1 UX & Features (In Progress)
 
 **Milestone Goal:** Polish all screens and add search + archive functionality.
 
@@ -44,7 +44,10 @@ Phases 1-7 delivered complete task management app with kanban board, Work Mode A
   1. User can toggle between light, dark, and system theme
   2. Theme persists across app restarts
   3. System theme changes apply automatically when set to "system"
-**Plans**: TBD
+**Plans**: 2 plans
+Plans:
+- [ ] 08-01-PLAN.md - Wire Electron nativeTheme API through IPC
+- [ ] 08-02-PLAN.md - Create ThemeContext and settings UI toggle
 
 #### Phase 9: Search
 **Goal**: Global search across all projects and tasks
@@ -113,12 +116,12 @@ Phases 1-7 delivered complete task management app with kanban board, Work Mode A
 
 ## Progress
 
-**Execution Order:** 8 → 9 → 10 → 11 → 12 → 13 → 14
+**Execution Order:** 8 -> 9 -> 10 -> 11 -> 12 -> 13 -> 14
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
-| 1-7 | v1.0 | — | Complete | 2026-01-16 |
-| 8. Theme System | v1.1 | 0/TBD | Not started | - |
+| 1-7 | v1.0 | - | Complete | 2026-01-16 |
+| 8. Theme System | v1.1 | 0/2 | Planned | - |
 | 9. Search | v1.1 | 0/TBD | Not started | - |
 | 10. Task Lifecycle | v1.1 | 0/TBD | Not started | - |
 | 11. Kanban Polish | v1.1 | 0/TBD | Not started | - |
