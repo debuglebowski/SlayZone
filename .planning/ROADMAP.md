@@ -44,7 +44,12 @@ Plans:
 4. User can mark a task as blocked with a reason
 5. User can create a project with name and color
 
-**Plans:** (created by /gsd:plan-phase)
+**Plans:** 3 plans
+
+Plans:
+- [ ] 02-01-PLAN.md — Extend IPC layer (update/delete handlers)
+- [ ] 02-02-PLAN.md — Install shadcn form components + Zod schemas
+- [ ] 02-03-PLAN.md — Build CRUD UI (task list, dialogs)
 
 ---
 
@@ -141,8 +146,8 @@ Plans:
 
 | Phase | Status | Completed |
 |-------|--------|-----------|
-| 1 - Foundation | ✓ Complete | 2026-01-17 |
-| 2 - Data Layer | Not started | - |
+| 1 - Foundation | Complete | 2026-01-17 |
+| 2 - Data Layer | Planned | - |
 | 3 - Navigation | Not started | - |
 | 4 - Task Management | Not started | - |
 | 5 - AI Integration | Not started | - |
