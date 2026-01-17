@@ -12,6 +12,7 @@ import { ProjectSettingsDialog } from '@/components/dialogs/ProjectSettingsDialo
 import { DeleteProjectDialog } from '@/components/dialogs/DeleteProjectDialog'
 import { UserSettingsDialog } from '@/components/dialogs/UserSettingsDialog'
 import { TaskDetailPage } from '@/components/task-detail/TaskDetailPage'
+import { WorkModePage } from '@/components/work-mode/WorkModePage'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar'
@@ -21,6 +22,7 @@ import { AppSidebar } from '@/components/sidebar/AppSidebar'
 type ViewState =
   | { type: 'kanban' }
   | { type: 'task-detail'; taskId: string }
+  | { type: 'work-mode'; taskId: string }
 
 function App(): React.JSX.Element {
   // Task state
@@ -101,6 +103,17 @@ function App(): React.JSX.Element {
 
   const closeTaskDetail = (): void => {
     setView({ type: 'kanban' })
+  }
+
+  const openWorkMode = (taskId: string): void => {
+    setView({ type: 'work-mode', taskId })
+  }
+
+  const closeWorkMode = (): void => {
+    // Return to task detail, not kanban
+    if (view.type === 'work-mode') {
+      setView({ type: 'task-detail', taskId: view.taskId })
+    }
   }
 
   // CRUD handlers
@@ -185,6 +198,16 @@ function App(): React.JSX.Element {
     return <div className="flex h-screen items-center justify-center">Loading...</div>
   }
 
+  // Work Mode view
+  if (view.type === 'work-mode') {
+    return (
+      <WorkModePage
+        taskId={view.taskId}
+        onBack={closeWorkMode}
+      />
+    )
+  }
+
   // Task detail view (full screen, no sidebar)
   if (view.type === 'task-detail') {
     return (
@@ -192,6 +215,7 @@ function App(): React.JSX.Element {
         taskId={view.taskId}
         onBack={closeTaskDetail}
         onTaskUpdated={handleTaskDetailUpdated}
+        onWorkMode={() => openWorkMode(view.taskId)}
       />
     )
   }
@@ -208,8 +232,8 @@ function App(): React.JSX.Element {
         onProjectDelete={setDeletingProject}
         onSettings={() => setSettingsOpen(true)}
       />
-      <SidebarInset className="min-h-screen">
-        <div className="p-6">
+      <SidebarInset className="min-h-screen min-w-0">
+        <div className="flex flex-col flex-1 p-6">
           <header className="mb-6 flex items-center justify-between">
             <h1 className="text-2xl font-bold">
               {selectedProjectId
@@ -234,15 +258,17 @@ function App(): React.JSX.Element {
                   <FilterBar filter={filter} onChange={setFilter} tags={tags} />
                 </div>
               )}
-              <KanbanBoard
-                tasks={displayTasks}
-                groupBy={filter.groupBy}
-                onTaskMove={handleTaskMove}
-                onTaskClick={handleTaskClick}
-                projectsMap={projectsMap}
-                showProjectDot={selectedProjectId === null}
-                disableDrag={filter.groupBy === 'due_date'}
-              />
+              <div className="flex-1 min-h-0">
+                <KanbanBoard
+                  tasks={displayTasks}
+                  groupBy={filter.groupBy}
+                  onTaskMove={handleTaskMove}
+                  onTaskClick={handleTaskClick}
+                  projectsMap={projectsMap}
+                  showProjectDot={selectedProjectId === null}
+                  disableDrag={filter.groupBy === 'due_date'}
+                />
+              </div>
             </>
           )}
 

@@ -11,12 +11,14 @@ interface TaskDetailPageProps {
   taskId: string
   onBack: () => void
   onTaskUpdated: (task: Task) => void
+  onWorkMode?: () => void
 }
 
 export function TaskDetailPage({
   taskId,
   onBack,
-  onTaskUpdated
+  onTaskUpdated,
+  onWorkMode
 }: TaskDetailPageProps): React.JSX.Element {
   const [task, setTask] = useState<Task | null>(null)
   const [tags, setTags] = useState<Tag[]>([])
@@ -151,6 +153,12 @@ export function TaskDetailPage({
             >
               {task.title}
             </h1>
+          )}
+
+          {onWorkMode && (
+            <Button variant="outline" size="sm" onClick={onWorkMode} className="ml-auto">
+              Work Mode
+            </Button>
           )}
         </div>
       </header>
