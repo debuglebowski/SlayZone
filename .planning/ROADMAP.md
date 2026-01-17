@@ -70,11 +70,11 @@ Plans:
 **Plans:** 5 plans
 
 Plans:
-- [ ] 03-01-PLAN.md — Install shadcn components + react-colorful
-- [ ] 03-02-PLAN.md — Add tags/settings tables + IPC handlers
-- [ ] 03-03-PLAN.md — Build sidebar with project blobs + All view
-- [ ] 03-04-PLAN.md — Build project dialogs + context menu
-- [ ] 03-05-PLAN.md — Build user settings dialog
+- [x] 03-01-PLAN.md — Install shadcn components + react-colorful
+- [x] 03-02-PLAN.md — Add tags/settings tables + IPC handlers
+- [x] 03-03-PLAN.md — Build sidebar with project blobs + All view
+- [x] 03-04-PLAN.md — Build project dialogs + context menu
+- [x] 03-05-PLAN.md — Build user settings dialog
 
 ---
 
@@ -155,7 +155,7 @@ Plans:
 |-------|--------|-----------|
 | 1 - Foundation | Complete | 2026-01-17 |
 | 2 - Data Layer | Complete | 2026-01-17 |
-| 3 - Navigation | Not started | - |
+| 3 - Navigation | Complete | 2026-01-17 |
 | 4 - Task Management | Not started | - |
 | 5 - AI Integration | Not started | - |
 | 6 - Work Mode | Not started | - |
