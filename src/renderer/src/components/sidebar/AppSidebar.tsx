@@ -37,7 +37,9 @@ export function AppSidebar({
 }: AppSidebarProps) {
   return (
     <Sidebar collapsible="none" className="w-16 border-r min-h-svh">
-      <SidebarContent className="py-4">
+      {/* Draggable region for window movement - clears traffic lights */}
+      <div className="h-10 window-drag-region" />
+      <SidebarContent className="py-4 pt-0">
         <SidebarGroup>
           <SidebarGroupContent>
             <SidebarMenu className="flex flex-col items-center gap-2">

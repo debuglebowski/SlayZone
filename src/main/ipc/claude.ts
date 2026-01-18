@@ -4,10 +4,10 @@ import { streamClaude, cancelClaude } from '../services/claude-spawner'
 import type { ClaudeAvailability } from '../../shared/types/api'
 
 export function registerClaudeHandlers(): void {
-  ipcMain.handle('claude:stream:start', (event, prompt: string, context?: string) => {
+  ipcMain.handle('claude:stream:start', async (event, prompt: string, context?: string) => {
     const win = BrowserWindow.fromWebContents(event.sender)
     if (win) {
-      streamClaude(win, prompt, context)
+      await streamClaude(win, prompt, context)
     }
   })
 

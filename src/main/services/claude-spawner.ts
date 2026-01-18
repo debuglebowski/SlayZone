@@ -1,14 +1,34 @@
 import { spawn, ChildProcess } from 'child_process'
 import { createInterface } from 'readline'
 import { BrowserWindow } from 'electron'
+import { userInfo, homedir } from 'os'
 
 let activeProcess: ChildProcess | null = null
 
-export function streamClaude(win: BrowserWindow, prompt: string, context?: string): void {
+async function getClaudePath(): Promise<string | null> {
+  return new Promise((resolve) => {
+    const cmd = process.platform === 'win32' ? 'where' : 'which'
+    const proc = spawn(cmd, ['claude'], { shell: true })
+    let path = ''
+    proc.stdout?.on('data', (data) => { path += data.toString().trim() })
+    proc.on('close', (code) => resolve(code === 0 && path ? path.split('\n')[0] : null))
+    proc.on('error', () => resolve(null))
+  })
+}
+
+export async function streamClaude(win: BrowserWindow, prompt: string, context?: string): Promise<void> {
   // Kill existing if any
   if (activeProcess) {
     activeProcess.kill('SIGTERM')
     activeProcess = null
+  }
+
+  // Get claude path
+  const claudePath = await getClaudePath()
+  if (!claudePath) {
+    win.webContents.send('claude:error', 'Claude CLI not found in PATH')
+    win.webContents.send('claude:done', { code: 1 })
+    return
   }
 
   // Build args
@@ -16,12 +36,20 @@ export function streamClaude(win: BrowserWindow, prompt: string, context?: strin
   if (context) {
     args.push('--append-system-prompt', context)
   }
-  args.push(prompt)
+  args.push('--', prompt)  // -- signals end of options, so prompt can start with -
 
   // Spawn process
-  console.log('[Claude] Spawning with args:', args.slice(0, -1).join(' '), '+ prompt')
-  activeProcess = spawn('claude', args, {
-    stdio: ['ignore', 'pipe', 'pipe']
+  console.log('[Claude] Spawning:', claudePath)
+  console.log('[Claude] Args:', JSON.stringify(args))
+  console.log('[Claude] Prompt length:', prompt.length, 'Context length:', context?.length ?? 0)
+  activeProcess = spawn(claudePath, args, {
+    stdio: ['ignore', 'pipe', 'pipe'],
+    env: {
+      ...process.env,
+      USER: process.env.USER || userInfo().username,
+      HOME: process.env.HOME || homedir(),
+      SECURITYSESSIONID: process.env.SECURITYSESSIONID,
+    }
   })
 
   // Track whether chunks were received
@@ -74,6 +102,7 @@ export function streamClaude(win: BrowserWindow, prompt: string, context?: strin
   })
 
   activeProcess.stderr?.on('data', (data) => {
+    console.log('[Claude] stderr:', data.toString())
     win.webContents.send('claude:error', data.toString())
   })
 

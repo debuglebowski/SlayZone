@@ -8,7 +8,25 @@
       "mcp__electron__read_electron_logs",
       "Bash(claude -p --output-format stream-json)",
       "Bash(claude -p --verbose --output-format stream-json)",
-      "Bash(claude:*)"
+      "Bash(claude:*)",
+      "Bash(env)",
+      "Bash(tty:*)",
+      "Bash(# Check for hidden auth files ls -la ~/.claude/.*)",
+      "Bash(# Check if credentials might be in keychain security find-generic-password -s \"\"Claude\"\" -a \"\"claude\"\")",
+      "Bash(env -i HOME=\"$HOME\" USER=\"$USER\" PATH=\"/usr/bin:/bin\" /Users/Kalle/.local/bin/claude:*)",
+      "Bash(# Run tests separately with shorter timeout\n\\(env -i HOME=\"\"$HOME\"\" PATH=\"\"/usr/bin:/bin\"\" /Users/Kalle/.local/bin/claude -p --output-format json \"\"hi\"\" 2>&1)",
+      "Bash(security find-generic-password -s \"claude\")",
+      "Bash(security find-generic-password:*)",
+      "Bash(ls:*)",
+      "Bash(security dump-keychain:*)",
+      "Bash(plutil:*)",
+      "Bash(defaults read:*)",
+      "Bash(ELECTRON_RUN_AS_NODE=1 /Applications/Focus.app/Contents/MacOS/Focus:*)",
+      "Bash(npm root:*)",
+      "Bash(echo:*)",
+      "Bash(npm install:*)",
+      "Bash(npm run typecheck:*)",
+      "Bash(npx tsc:*)"
     ]
   }
 }

@@ -175,16 +175,16 @@ function App(): React.JSX.Element {
   }
 
   // Keyboard shortcuts
-  // "n" opens new task dialog (only from kanban view, when no dialog open)
+  // "mod+n" opens new task dialog (only from kanban view, when no dialog open)
   useHotkeys(
-    'n',
+    'mod+n',
     (e) => {
       if (projects.length > 0 && view.type === 'kanban') {
         e.preventDefault()
         setCreateOpen(true)
       }
     },
-    { enableOnFormTags: false }
+    { enableOnFormTags: true }
   )
 
   // "mod+k" opens search dialog from anywhere
@@ -470,8 +470,10 @@ function App(): React.JSX.Element {
         onTutorial={() => setOnboardingOpen(true)}
       />
       <SidebarInset className="min-h-screen min-w-0">
-        <div className="flex flex-col flex-1 p-6">
-          <header className="mb-6 flex items-center justify-between">
+        {/* Draggable region for window movement - continues from sidebar */}
+        <div className="h-10 window-drag-region" />
+        <div className="flex flex-col flex-1 p-6 pt-0">
+          <header className="mb-6 flex items-center justify-between window-no-drag">
             {selectedProjectId ? (
               <textarea
                 ref={projectNameInputRef}

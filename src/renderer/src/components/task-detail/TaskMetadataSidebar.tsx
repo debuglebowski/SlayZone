@@ -15,6 +15,7 @@ import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
+import { ProjectSelect } from '../ProjectSelect'
 
 interface TaskMetadataSidebarProps {
   task: Task
@@ -33,6 +34,11 @@ export function TaskMetadataSidebar({
 }: TaskMetadataSidebarProps): React.JSX.Element {
   const handleStatusChange = async (status: TaskStatus): Promise<void> => {
     const updated = await window.api.db.updateTask({ id: task.id, status })
+    onUpdate(updated)
+  }
+
+  const handleProjectChange = async (projectId: string): Promise<void> => {
+    const updated = await window.api.db.updateTask({ id: task.id, projectId })
     onUpdate(updated)
   }
 
@@ -132,6 +138,12 @@ export function TaskMetadataSidebar({
 
   return (
     <div className="space-y-4">
+      {/* Project */}
+      <div>
+        <label className="mb-1 block text-sm text-muted-foreground">Project</label>
+        <ProjectSelect value={task.project_id} onChange={handleProjectChange} />
+      </div>
+
       {/* Status */}
       <div>
         <label className="mb-1 block text-sm text-muted-foreground">Status</label>

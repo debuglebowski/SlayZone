@@ -96,8 +96,10 @@ export function WorkModePage({ taskId, onBack }: Props) {
           sidebarOpen ? 'w-80' : 'w-0 overflow-hidden'
         )}
       >
+        {/* Draggable region for window movement - clears traffic lights */}
+        <div className="h-10 window-drag-region shrink-0" />
         {/* Title */}
-        <div className="flex items-center justify-between p-4 border-b">
+        <div className="flex items-center justify-between p-4 pt-0 border-b">
           <h1 className="text-lg font-semibold truncate pr-2">{task.title}</h1>
           <div className="flex items-center gap-1 shrink-0">
             <Button
@@ -140,49 +142,49 @@ export function WorkModePage({ taskId, onBack }: Props) {
             <TooltipTrigger asChild>
               <Button
                 variant="ghost"
-                className="h-6 flex-1"
+                className="h-10 flex-1"
                 onClick={() => handleAddItem('chat')}
               >
-                <MessageSquare className="h-3 w-3" />
+                <MessageSquare className="h-3.5 w-3.5" />
               </Button>
             </TooltipTrigger>
             <TooltipContent>Add Chat</TooltipContent>
           </Tooltip>
-          <Separator orientation="vertical" className="h-4" />
+          <Separator orientation="vertical" className="h-5" />
           <Tooltip>
             <TooltipTrigger asChild>
               <Button
                 variant="ghost"
-                className="h-6 flex-1"
+                className="h-10 flex-1"
                 onClick={() => handleAddItem('browser')}
               >
-                <Globe className="h-3 w-3" />
+                <Globe className="h-3.5 w-3.5" />
               </Button>
             </TooltipTrigger>
             <TooltipContent>Add Browser</TooltipContent>
           </Tooltip>
-          <Separator orientation="vertical" className="h-4" />
+          <Separator orientation="vertical" className="h-5" />
           <Tooltip>
             <TooltipTrigger asChild>
               <Button
                 variant="ghost"
-                className="h-6 flex-1"
+                className="h-10 flex-1"
                 onClick={() => handleAddItem('document')}
               >
-                <FileText className="h-3 w-3" />
+                <FileText className="h-3.5 w-3.5" />
               </Button>
             </TooltipTrigger>
             <TooltipContent>Add Document</TooltipContent>
           </Tooltip>
-          <Separator orientation="vertical" className="h-4" />
+          <Separator orientation="vertical" className="h-5" />
           <Tooltip>
             <TooltipTrigger asChild>
               <Button
                 variant="ghost"
-                className="h-6 flex-1"
+                className="h-10 flex-1"
                 onClick={() => handleAddItem('dumper')}
               >
-                <Lightbulb className="h-3 w-3" />
+                <Lightbulb className="h-3.5 w-3.5" />
               </Button>
             </TooltipTrigger>
             <TooltipContent>Add Thought Dumper</TooltipContent>
@@ -192,15 +194,19 @@ export function WorkModePage({ taskId, onBack }: Props) {
 
       {/* Sidebar toggle when collapsed */}
       {!sidebarOpen && (
-        <Button
-          variant="ghost"
-          size="icon"
-          className="absolute left-2 top-4 h-7 w-7 text-muted-foreground z-10"
-          onClick={() => setSidebarOpen(true)}
-          title="Show sidebar (⌘B)"
-        >
-          <PanelLeft className="h-4 w-4" />
-        </Button>
+        <>
+          {/* Draggable region when sidebar is hidden */}
+          <div className="absolute top-0 left-0 right-0 h-10 window-drag-region z-5" />
+          <Button
+            variant="ghost"
+            size="icon"
+            className="absolute left-2 top-12 h-7 w-7 text-muted-foreground z-10 window-no-drag"
+            onClick={() => setSidebarOpen(true)}
+            title="Show sidebar (⌘B)"
+          >
+            <PanelLeft className="h-4 w-4" />
+          </Button>
+        </>
       )}
 
       {/* Content */}

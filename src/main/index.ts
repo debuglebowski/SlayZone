@@ -14,7 +14,7 @@ import { registerThemeHandlers } from './ipc/theme'
 import { getActiveProcess } from './services/claude-spawner'
 
 // Minimum splash screen display time (ms)
-const SPLASH_MIN_DURATION = 3000
+const SPLASH_MIN_DURATION = 800
 
 // Self-contained splash HTML with inline SVG and CSS animations
 const splashHTML = `
@@ -93,6 +93,13 @@ const splashHTML = `
       0%, 80%, 100% { opacity: 0.3; transform: scale(0.8); }
       40% { opacity: 1; transform: scale(1); }
     }
+    @keyframes fadeOut {
+      from { opacity: 1; }
+      to { opacity: 0; }
+    }
+    .fade-out {
+      animation: fadeOut 0.3s ease-out forwards;
+    }
   </style>
 </head>
 <body>
@@ -125,15 +132,16 @@ let splashShownAt: number = 0
 
 function createSplashWindow(): void {
   splashWindow = new BrowserWindow({
-    width: 300,
-    height: 350,
-    frame: false,
-    transparent: true,
+    width: 1911,
+    height: 1421,
+    titleBarStyle: 'hiddenInset',
+    trafficLightPosition: { x: 16, y: 16 },
     resizable: false,
     center: true,
     skipTaskbar: true,
     alwaysOnTop: true,
     show: false,
+    backgroundColor: '#0a0a0a',
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true
@@ -157,7 +165,10 @@ function createMainWindow(): void {
     width: 1911,
     height: 1421,
     show: false,
-    autoHideMenuBar: true,
+    center: true,
+    titleBarStyle: 'hiddenInset',
+    trafficLightPosition: { x: 16, y: 16 },
+    backgroundColor: '#0a0a0a',
     ...(process.platform === 'linux' ? { icon } : {}),
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
@@ -174,10 +185,30 @@ function createMainWindow(): void {
     const remaining = Math.max(0, SPLASH_MIN_DURATION - elapsed)
 
     setTimeout(() => {
+      // Position main window exactly where splash is
       if (splashWindow && !splashWindow.isDestroyed()) {
-        splashWindow.close()
+        const bounds = splashWindow.getBounds()
+        mainWindow?.setBounds(bounds)
       }
+      // Show main window first (splash stays on top due to alwaysOnTop)
       mainWindow?.show()
+      // Fade out splash, then close it
+      if (splashWindow && !splashWindow.isDestroyed()) {
+        splashWindow.webContents
+          .executeJavaScript(`document.querySelector('.container').classList.add('fade-out')`)
+          .then(() => {
+            // Wait for fade animation to complete (300ms), then close
+            setTimeout(() => {
+              if (splashWindow && !splashWindow.isDestroyed()) {
+                splashWindow.close()
+              }
+            }, 300)
+          })
+          .catch(() => {
+            // Fallback: just close if JS execution fails
+            splashWindow?.close()
+          })
+      }
     }, remaining)
   })
 

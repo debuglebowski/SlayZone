@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import type { WorkspaceItem } from '../../../../shared/types/database'
-import { MarkdownEditor } from '@/components/task-detail/MarkdownEditor'
+import { RichTextEditor } from '@/components/ui/rich-text-editor'
 
 interface Props {
   item: WorkspaceItem
@@ -27,11 +27,12 @@ export function DocumentEditor({ item, onUpdate }: Props) {
 
   return (
     <div className="h-full overflow-y-auto p-4">
-      <MarkdownEditor
+      <RichTextEditor
         value={content}
         onChange={setContent}
-        onSave={handleSave}
+        onBlur={handleSave}
         placeholder="Start writing..."
+        minHeight="100%"
       />
     </div>
   )

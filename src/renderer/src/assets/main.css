@@ -122,6 +122,15 @@
   }
 }
 
+/* Window drag region for frameless window */
+.window-drag-region {
+  -webkit-app-region: drag;
+}
+
+.window-no-drag {
+  -webkit-app-region: no-drag;
+}
+
 @keyframes shimmer {
   0% {
     background-position: -1000px 0;
@@ -142,4 +151,44 @@
   );
   background-size: 1000px 100%;
   animation: shimmer 2s infinite linear;
+}
+
+/* TipTap/ProseMirror styles */
+.ProseMirror {
+  min-height: inherit;
+  outline: none;
+}
+
+.ProseMirror p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  float: left;
+  color: var(--color-muted-foreground);
+  pointer-events: none;
+  height: 0;
+}
+
+/* Task list checkbox styling */
+.ProseMirror ul[data-type="taskList"] {
+  list-style: none;
+  padding-left: 0;
+}
+
+.ProseMirror ul[data-type="taskList"] li {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+}
+
+.ProseMirror ul[data-type="taskList"] li > label {
+  flex-shrink: 0;
+  user-select: none;
+}
+
+.ProseMirror ul[data-type="taskList"] li > label input[type="checkbox"] {
+  cursor: pointer;
+  accent-color: var(--color-primary);
+}
+
+.ProseMirror ul[data-type="taskList"] li > div {
+  flex: 1;
 }

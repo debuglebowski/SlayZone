@@ -1,15 +1,6 @@
 # General
 
-- We need more emotional design.
-  - More animations (WHICH MUST BE GRACEFUL)
-  - Nail the first impression.
-  - Add moments of delight
-  - Make interactions feel dynamic.
-- Remove the top window bar (containing the red, yellow, green buttons on mac). Embed the tree dots inside the window.
-
-  # Kanban screen
-
-- Each renaming in the header should not display the text area visuals, it should just display a cursor.
+# Kanban screen
 
 # Task screen
 

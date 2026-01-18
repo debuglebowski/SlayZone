@@ -12,7 +12,7 @@ import {
 import { DeleteTaskDialog } from '@/components/DeleteTaskDialog'
 import { TaskMetadataSidebar } from './TaskMetadataSidebar'
 import { SubtaskAccordion } from './SubtaskAccordion'
-import { Textarea } from '@/components/ui/textarea'
+import { RichTextEditor } from '@/components/ui/rich-text-editor'
 import { cn } from '@/lib/utils'
 
 interface TaskDetailPageProps {
@@ -96,6 +96,7 @@ export function TaskDetailPage({
     } else if (e.key === 'Escape') {
       setTitleValue(task?.title ?? '')
       setEditingTitle(false)
+      titleInputRef.current?.blur()
     }
   }
 
@@ -151,10 +152,12 @@ export function TaskDetailPage({
     <div className="min-h-screen flex">
       {/* Left: centered content column */}
       <div className="flex-1 flex flex-col min-w-0">
+        {/* Draggable region for window movement - clears traffic lights */}
+        <div className="h-10 window-drag-region shrink-0" />
         {/* Header */}
-        <header className="sticky top-0 z-10 bg-background">
+        <header className="sticky top-10 z-10 bg-background">
           <div className="mx-auto max-w-3xl p-4">
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-4 window-no-drag">
               <Button variant="ghost" size="icon" onClick={onBack}>
                 <ArrowLeft className="size-5" />
               </Button>
@@ -213,17 +216,12 @@ export function TaskDetailPage({
           {/* Description */}
           <section>
             <h2 className="mb-2 text-sm font-medium text-muted-foreground">Description</h2>
-            <Textarea
+            <RichTextEditor
               value={descriptionValue}
-              onChange={(e) => setDescriptionValue(e.target.value)}
+              onChange={setDescriptionValue}
               onBlur={handleDescriptionSave}
-              onKeyDown={async (e) => {
-                if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
-                  await handleDescriptionSave()
-                }
-              }}
               placeholder="Add description..."
-              className="min-h-[200px]"
+              minHeight="200px"
             />
           </section>
 
@@ -240,7 +238,9 @@ export function TaskDetailPage({
 
       {/* Right: sidebar at window edge */}
       <aside className="w-64 shrink-0 border-l bg-muted/30 sticky top-0 h-screen overflow-y-auto">
-        <div className="p-6">
+        {/* Spacer for traffic lights */}
+        <div className="h-10 window-drag-region shrink-0" />
+        <div className="p-6 pt-0">
           <TaskMetadataSidebar
             task={task}
             tags={tags}

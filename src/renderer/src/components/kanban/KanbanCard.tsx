@@ -84,7 +84,7 @@ export function KanbanCard({
           ) : null}
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-1">
-              <p className="text-xs font-medium line-clamp-1 flex-1 leading-none">{task.title}</p>
+              <p className="text-xs font-medium line-clamp-3 flex-1 leading-tight whitespace-pre-wrap break-words">{task.title}</p>
               {task.priority <= 2 && (
                 <span
                   className={cn(

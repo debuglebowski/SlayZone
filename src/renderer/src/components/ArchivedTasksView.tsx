@@ -40,9 +40,11 @@ export function ArchivedTasksView({
 
   return (
     <div className="min-h-screen">
+      {/* Draggable region for window movement - clears traffic lights */}
+      <div className="h-10 window-drag-region" />
       {/* Header */}
-      <header className="sticky top-0 z-10 border-b bg-background p-4">
-        <div className="flex items-center gap-4">
+      <header className="sticky top-10 z-10 border-b bg-background p-4">
+        <div className="flex items-center gap-4 window-no-drag">
           <Button variant="ghost" size="icon" onClick={onBack}>
             <ArrowLeft className="size-5" />
           </Button>
