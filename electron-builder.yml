@@ -1,5 +1,5 @@
-appId: com.focus.app
-productName: focus
+appId: com.omgslayzone.app
+productName: omgslayzone
 directories:
   buildResources: build
 files:
@@ -13,7 +13,7 @@ asarUnpack:
   - resources/**
   - '**/node_modules/better-sqlite3/**'
 win:
-  executableName: focus
+  executableName: omgslayzone
 nsis:
   artifactName: ${name}-${version}-setup.${ext}
   shortcutName: ${productName}

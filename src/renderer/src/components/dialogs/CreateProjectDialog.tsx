@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { FolderOpen } from 'lucide-react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -17,7 +18,23 @@ const DEFAULT_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '
 export function CreateProjectDialog({ open, onOpenChange, onCreated }: CreateProjectDialogProps) {
   const [name, setName] = useState('')
   const [color, setColor] = useState(DEFAULT_COLORS[0])
+  const [path, setPath] = useState('')
   const [loading, setLoading] = useState(false)
+
+  const handleBrowse = async () => {
+    const result = await window.api.dialog.showOpenDialog({
+      title: 'Select Project Directory',
+      properties: ['openDirectory']
+    })
+    if (!result.canceled && result.filePaths[0]) {
+      setPath(result.filePaths[0])
+      // Auto-fill name from folder name if empty
+      if (!name.trim()) {
+        const folderName = result.filePaths[0].split('/').pop() || ''
+        setName(folderName)
+      }
+    }
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -25,9 +42,14 @@ export function CreateProjectDialog({ open, onOpenChange, onCreated }: CreatePro
 
     setLoading(true)
     try {
-      const project = await window.api.db.createProject({ name: name.trim(), color })
+      const project = await window.api.db.createProject({
+        name: name.trim(),
+        color,
+        path: path || undefined
+      })
       onCreated(project)
       setName('')
+      setPath('')
       setColor(DEFAULT_COLORS[Math.floor(Math.random() * DEFAULT_COLORS.length)])
     } finally {
       setLoading(false)
@@ -50,6 +72,24 @@ export function CreateProjectDialog({ open, onOpenChange, onCreated }: CreatePro
               placeholder="Project name"
               autoFocus
             />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="path">Repository Path</Label>
+            <div className="flex gap-2">
+              <Input
+                id="path"
+                value={path}
+                onChange={(e) => setPath(e.target.value)}
+                placeholder="/path/to/repo"
+                className="flex-1"
+              />
+              <Button type="button" variant="outline" size="icon" onClick={handleBrowse}>
+                <FolderOpen className="h-4 w-4" />
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Claude Code terminal will open in this directory
+            </p>
           </div>
           <div className="space-y-2">
             <Label>Color</Label>

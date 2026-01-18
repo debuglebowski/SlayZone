@@ -62,14 +62,6 @@ export function TaskContextMenu({
     onUpdateTask(task.id, { priority: parseInt(priority, 10) })
   }
 
-  const handleBlockToggle = (): void => {
-    if (task.blocked_reason) {
-      onUpdateTask(task.id, { blocked_reason: null })
-    } else {
-      onUpdateTask(task.id, { blocked_reason: 'Blocked' })
-    }
-  }
-
   const handleProjectChange = (projectId: string): void => {
     onUpdateTask(task.id, { project_id: projectId })
   }
@@ -79,7 +71,7 @@ export function TaskContextMenu({
   }
 
   const handleCopyLink = async (): Promise<void> => {
-    await navigator.clipboard.writeText(`focus://task/${task.id}`)
+    await navigator.clipboard.writeText(`omgslayzone://task/${task.id}`)
   }
 
   const handleArchiveConfirm = (): void => {
@@ -127,13 +119,6 @@ export function TaskContextMenu({
               </ContextMenuRadioGroup>
             </ContextMenuSubContent>
           </ContextMenuSub>
-
-          <ContextMenuSeparator />
-
-          {/* Block/Unblock */}
-          <ContextMenuItem onSelect={handleBlockToggle}>
-            {task.blocked_reason ? 'Unblock' : 'Block'}
-          </ContextMenuItem>
 
           <ContextMenuSeparator />
 

@@ -58,8 +58,10 @@ function Button({
     )
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const MotionButton = motion.button as any
   return (
-    <motion.button
+    <MotionButton
       whileHover={{ scale: 1.02 }}
       whileTap={{ scale: 0.98 }}
       transition={{ type: 'spring', stiffness: 1800, damping: 50 }}

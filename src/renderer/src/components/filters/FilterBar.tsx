@@ -1,4 +1,4 @@
-import { motion, AnimatePresence } from 'framer-motion'
+import { motion } from 'framer-motion'
 import type { Tag } from '../../../../shared/types/database'
 import { GroupBySelect } from './GroupBySelect'
 import type { FilterState, GroupKey, DueDateRange } from './FilterState'
@@ -58,10 +58,6 @@ export function FilterBar({ filter, onChange, tags }: FilterBarProps): React.JSX
       ? filter.tagIds.filter((id) => id !== tagId)
       : [...filter.tagIds, tagId]
     onChange({ ...filter, tagIds })
-  }
-
-  const handleShowBlockedChange = (showBlocked: boolean): void => {
-    onChange({ ...filter, showBlocked })
   }
 
   const handleShowDoneChange = (showDone: boolean): void => {
@@ -163,16 +159,6 @@ export function FilterBar({ filter, onChange, tags }: FilterBarProps): React.JSX
 
       {/* Toggle Switches */}
       <div className="flex items-center gap-4 ml-auto">
-        <div className="flex items-center gap-2">
-          <Switch
-            id="show-blocked"
-            checked={filter.showBlocked}
-            onCheckedChange={handleShowBlockedChange}
-          />
-          <Label htmlFor="show-blocked" className="text-xs cursor-pointer">
-            Blocked
-          </Label>
-        </div>
         <div className="flex items-center gap-2">
           <Switch id="show-done" checked={filter.showDone} onCheckedChange={handleShowDoneChange} />
           <Label htmlFor="show-done" className="text-xs cursor-pointer">

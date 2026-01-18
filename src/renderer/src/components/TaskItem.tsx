@@ -30,7 +30,6 @@ const statusLabels: Record<string, string> = {
 
 export function TaskItem({ task, onEdit, onDelete }: TaskItemProps): React.JSX.Element {
   const isOverdue = task.due_date && task.status !== 'done' && isPast(parseISO(task.due_date))
-  const isBlocked = !!task.blocked_reason
 
   return (
     <motion.div
@@ -45,16 +44,6 @@ export function TaskItem({ task, onEdit, onDelete }: TaskItemProps): React.JSX.E
       >
         {task.title}
       </span>
-
-      {/* Blocked badge */}
-      {isBlocked && (
-        <span
-          className="rounded bg-red-200 px-1.5 py-0.5 text-xs font-medium text-red-700"
-          title={task.blocked_reason ?? undefined}
-        >
-          Blocked
-        </span>
-      )}
 
       {/* Status badge */}
       <span className={`rounded px-1.5 py-0.5 text-xs font-medium ${statusColors[task.status]}`}>

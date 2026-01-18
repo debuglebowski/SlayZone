@@ -129,6 +129,43 @@ const migrations: Migration[] = [
         ALTER TABLE tasks ADD COLUMN last_active_workspace_item_id TEXT DEFAULT NULL;
       `)
     }
+  },
+  {
+    version: 8,
+    up: (db) => {
+      // Cleanup: remove unused tables and columns
+      db.exec(`
+        DROP TABLE IF EXISTS chat_messages;
+        DROP TABLE IF EXISTS workspace_items;
+        DROP INDEX IF EXISTS idx_tasks_parent;
+        DROP INDEX IF EXISTS idx_tasks_recurring;
+        ALTER TABLE tasks DROP COLUMN parent_id;
+        ALTER TABLE tasks DROP COLUMN blocked_reason;
+        ALTER TABLE tasks DROP COLUMN recurrence_type;
+        ALTER TABLE tasks DROP COLUMN recurrence_interval;
+        ALTER TABLE tasks DROP COLUMN last_reset_at;
+        ALTER TABLE tasks DROP COLUMN next_reset_at;
+        ALTER TABLE tasks DROP COLUMN last_active_workspace_item_id;
+      `)
+    }
+  },
+  {
+    version: 9,
+    up: (db) => {
+      db.exec(`
+        ALTER TABLE projects ADD COLUMN path TEXT DEFAULT NULL;
+        ALTER TABLE tasks ADD COLUMN claude_session_id TEXT DEFAULT NULL;
+
+        CREATE TABLE task_dependencies (
+          task_id TEXT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+          blocks_task_id TEXT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+          PRIMARY KEY (task_id, blocks_task_id)
+        );
+
+        CREATE INDEX idx_task_deps_task ON task_dependencies(task_id);
+        CREATE INDEX idx_task_deps_blocks ON task_dependencies(blocks_task_id);
+      `)
+    }
   }
 ]
 

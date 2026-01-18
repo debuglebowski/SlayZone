@@ -1,4 +1,4 @@
-# focus-temp
+# omgslayzone
 
 An Electron application with React and TypeScript
 

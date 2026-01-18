@@ -5,9 +5,13 @@ import logo from '@/assets/logo.svg'
 export function LoadingScreen(): React.JSX.Element {
   const shouldReduceMotion = useReducedMotion()
   const [version, setVersion] = useState('')
+  const [showSecondText, setShowSecondText] = useState(false)
 
   useEffect(() => {
     window.api.app.getVersion().then(setVersion)
+    // Show second text after first animation + pause
+    const timer = setTimeout(() => setShowSecondText(true), 2000)
+    return () => clearTimeout(timer)
   }, [])
 
   const containerVariants = {
@@ -23,7 +27,7 @@ export function LoadingScreen(): React.JSX.Element {
       scale: 1,
       transition: {
         duration: 0.4,
-        ease: 'easeOut'
+        ease: 'easeOut' as const
       }
     }
   }
@@ -58,6 +62,16 @@ export function LoadingScreen(): React.JSX.Element {
               {letter}
             </motion.span>
           ))}
+          {showSecondText && (
+            <motion.span
+              initial={{ clipPath: 'inset(0 100% 0 0)' }}
+              animate={{ clipPath: 'inset(0 0% 0 0)' }}
+              transition={{ duration: 0.8, ease: 'easeOut' }}
+              className="inline-flex"
+            >
+              &nbsp;&nbsp;&nbsp;then slay
+            </motion.span>
+          )}
         </div>
         {version && (
           <motion.div

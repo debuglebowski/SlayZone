@@ -1,20 +1,8 @@
-import { ipcMain, BrowserWindow } from 'electron'
+import { ipcMain } from 'electron'
 import { spawn } from 'child_process'
-import { streamClaude, cancelClaude } from '../services/claude-spawner'
 import type { ClaudeAvailability } from '../../shared/types/api'
 
 export function registerClaudeHandlers(): void {
-  ipcMain.handle('claude:stream:start', async (event, prompt: string, context?: string) => {
-    const win = BrowserWindow.fromWebContents(event.sender)
-    if (win) {
-      await streamClaude(win, prompt, context)
-    }
-  })
-
-  ipcMain.on('claude:stream:cancel', () => {
-    cancelClaude()
-  })
-
   ipcMain.handle('claude:check-availability', async (): Promise<ClaudeAvailability> => {
     const TIMEOUT_MS = 5000
 

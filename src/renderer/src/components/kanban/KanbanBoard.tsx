@@ -26,8 +26,8 @@ interface KanbanBoardProps {
   showProjectDot?: boolean
   disableDrag?: boolean
   taskTags?: Map<string, string[]>
-  allTasks?: Task[]
   tags?: Tag[]
+  blockedTaskIds?: Set<string>
   // Context menu props
   allProjects?: Project[]
   onUpdateTask?: (taskId: string, updates: Partial<Task>) => void
@@ -45,8 +45,8 @@ export function KanbanBoard({
   showProjectDot,
   disableDrag,
   taskTags,
-  allTasks,
   tags,
+  blockedTaskIds,
   allProjects,
   onUpdateTask,
   onArchiveTask,
@@ -114,8 +114,8 @@ export function KanbanBoard({
             showProjectDot={showProjectDot}
             disableDrag={disableDrag}
             taskTags={taskTags}
-            allTasks={allTasks}
             tags={tags}
+            blockedTaskIds={blockedTaskIds}
             allProjects={allProjects}
             onUpdateTask={onUpdateTask}
             onArchiveTask={onArchiveTask}

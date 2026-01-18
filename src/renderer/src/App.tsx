@@ -16,7 +16,6 @@ import { UserSettingsDialog } from '@/components/dialogs/UserSettingsDialog'
 import { SearchDialog } from '@/components/dialogs/SearchDialog'
 import { OnboardingDialog } from '@/components/onboarding/OnboardingDialog'
 import { TaskDetailPage } from '@/components/task-detail/TaskDetailPage'
-import { WorkModePage } from '@/components/work-mode/WorkModePage'
 import { ArchivedTasksView } from '@/components/ArchivedTasksView'
 import { Button } from '@/components/ui/button'
 import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar'
@@ -29,7 +28,6 @@ import { LoadingScreen } from '@/components/LoadingScreen'
 type ViewState =
   | { type: 'kanban' }
   | { type: 'task-detail'; taskId: string }
-  | { type: 'work-mode'; taskId: string }
   | { type: 'archived' }
 
 function App(): React.JSX.Element {
@@ -44,6 +42,9 @@ function App(): React.JSX.Element {
   // Tag state
   const [tags, setTags] = useState<Tag[]>([])
   const [taskTags, setTaskTags] = useState<Map<string, string[]>>(new Map())
+
+  // Blocked tasks state
+  const [blockedTaskIds, setBlockedTaskIds] = useState<Set<string>>(new Set())
 
   // Filter state (persisted per project)
   const [filter, setFilter] = useFilterState(selectedProjectId)
@@ -97,16 +98,20 @@ function App(): React.JSX.Element {
 
   // Load data on mount
   useEffect(() => {
+    const minLoadTime = new Promise((r) => setTimeout(r, 3000))
     Promise.all([
       window.api.db.getTasks(),
       window.api.db.getProjects(),
-      window.api.tags.getTags()
+      window.api.tags.getTags(),
+      minLoadTime
     ]).then(([t, p, tg]) => {
-      setTasks(t)
-      setProjects(p)
-      setTags(tg)
+      setTasks(t as Task[])
+      setProjects(p as Project[])
+      setTags(tg as Tag[])
       // Load task tags mapping
-      loadTaskTags(t)
+      loadTaskTags(t as Task[])
+      // Load blocked task IDs
+      loadBlockedTaskIds(t as Task[])
       // Don't auto-select first project - start with "All" view
       setLoading(false)
     })
@@ -125,6 +130,20 @@ function App(): React.JSX.Element {
       })
     )
     setTaskTags(mapping)
+  }
+
+  // Load blocked task IDs for all tasks
+  const loadBlockedTaskIds = async (taskList: Task[]): Promise<void> => {
+    const blocked = new Set<string>()
+    await Promise.all(
+      taskList.map(async (task) => {
+        const blockers = await window.api.taskDependencies.getBlockers(task.id)
+        if (blockers.length > 0) {
+          blocked.add(task.id)
+        }
+      })
+    )
+    setBlockedTaskIds(blocked)
   }
 
   // Filter tasks based on selected project
@@ -164,10 +183,6 @@ function App(): React.JSX.Element {
     navigateTo({ type: 'task-detail', taskId })
   }
 
-  const openWorkMode = (taskId: string): void => {
-    navigateTo({ type: 'work-mode', taskId })
-  }
-
   // Keyboard shortcuts
   // "mod+n" opens new task dialog (only from kanban view, when no dialog open)
   useHotkeys(
@@ -202,18 +217,6 @@ function App(): React.JSX.Element {
       if (searchOpen) return
 
       goBack()
-    },
-    { enableOnFormTags: false }
-  )
-
-  // "mod+enter" opens work mode from task detail page
-  useHotkeys(
-    'mod+enter',
-    (e) => {
-      if (view.type === 'task-detail') {
-        e.preventDefault()
-        openWorkMode(view.taskId)
-      }
     },
     { enableOnFormTags: false }
   )
@@ -308,13 +311,9 @@ function App(): React.JSX.Element {
     }
   }
 
-  // Handle task click - navigate to detail page or work mode based on modifier key
-  const handleTaskClick = (task: Task, e: React.MouseEvent): void => {
-    if (e.metaKey || e.ctrlKey) {
-      openWorkMode(task.id)
-    } else {
-      openTaskDetail(task.id)
-    }
+  // Handle task click - navigate to detail page
+  const handleTaskClick = (task: Task): void => {
+    openTaskDetail(task.id)
   }
 
   // Context menu handlers
@@ -331,7 +330,6 @@ function App(): React.JSX.Element {
         id: taskId,
         status: updates.status,
         priority: updates.priority,
-        blockedReason: updates.blocked_reason,
         projectId: updates.project_id
       })
     } catch {
@@ -437,15 +435,6 @@ function App(): React.JSX.Element {
   )
 
   function renderAppContent(): React.JSX.Element {
-    // Work Mode view
-    if (view.type === 'work-mode') {
-      return (
-        <AnimatedPage viewKey={`work-mode-${view.taskId}`} direction={navDirection}>
-          <WorkModePage taskId={view.taskId} onBack={goBack} />
-        </AnimatedPage>
-      )
-    }
-
     // Archived view (full screen, no sidebar)
     if (view.type === 'archived') {
       return (
@@ -463,7 +452,6 @@ function App(): React.JSX.Element {
             taskId={view.taskId}
             onBack={goBack}
             onTaskUpdated={handleTaskDetailUpdated}
-            onWorkMode={() => openWorkMode(view.taskId)}
             onNavigateToTask={openTaskDetail}
           />
         </AnimatedPage>
@@ -541,8 +529,8 @@ function App(): React.JSX.Element {
                   showProjectDot={selectedProjectId === null}
                   disableDrag={filter.groupBy === 'due_date'}
                   taskTags={taskTags}
-                  allTasks={projectTasks}
                   tags={tags}
+                  blockedTaskIds={blockedTaskIds}
                   allProjects={projects}
                   onUpdateTask={handleContextMenuUpdate}
                   onArchiveTask={handleContextMenuArchive}

@@ -4,7 +4,7 @@ import type { Task, Project } from '../../../../shared/types/database'
 import { Card, CardContent } from '@/components/ui/card'
 import { cn } from '@/lib/utils'
 import { todayISO } from '@/lib/kanban'
-import { AlertCircle, Ban, Repeat } from 'lucide-react'
+import { AlertCircle, Link2 } from 'lucide-react'
 
 interface KanbanCardProps {
   task: Task
@@ -12,6 +12,7 @@ interface KanbanCardProps {
   onClick?: (e: React.MouseEvent) => void
   project?: Project
   showProject?: boolean
+  isBlocked?: boolean
 }
 
 const PRIORITY_COLORS: Record<number, string> = {
@@ -27,11 +28,11 @@ export function KanbanCard({
   isDragging,
   onClick,
   project,
-  showProject
+  showProject,
+  isBlocked
 }: KanbanCardProps): React.JSX.Element {
   const today = todayISO()
   const isOverdue = task.due_date && task.due_date < today && task.status !== 'done'
-  const isBlocked = !!task.blocked_reason
   const priorityColor = PRIORITY_COLORS[task.priority] || PRIORITY_COLORS[3]
   const prevStatusRef = useRef(task.status)
   const [justCompleted, setJustCompleted] = useState(false)
@@ -64,8 +65,7 @@ export function KanbanCard({
         className={cn(
           'cursor-grab transition-colors duration-[400ms] hover:duration-[100ms] select-none py-0 gap-0 hover:bg-muted/50',
           isDragging && 'opacity-50 shadow-lg',
-          isOverdue && 'border-destructive',
-          isBlocked && 'border-yellow-500 opacity-60'
+          isOverdue && 'border-destructive'
         )}
         onClick={(e) => onClick?.(e)}
       >
@@ -95,20 +95,14 @@ export function KanbanCard({
                 </span>
               )}
               {/* Status indicators */}
+              {isBlocked && (
+                <span className="flex items-center text-amber-500 shrink-0" title="Blocked">
+                  <Link2 className="h-2.5 w-2.5" />
+                </span>
+              )}
               {isOverdue && (
                 <span className="flex items-center text-destructive shrink-0">
                   <AlertCircle className="h-2 w-2" />
-                </span>
-              )}
-              {isBlocked && (
-                <span className="flex items-center text-yellow-500 shrink-0">
-                  <Ban className="h-2 w-2" />
-                </span>
-              )}
-              {/* Recurrence indicator */}
-              {task.recurrence_type && (
-                <span className="flex items-center text-muted-foreground shrink-0">
-                  <Repeat className="h-2 w-2" />
                 </span>
               )}
               {/* Due date */}

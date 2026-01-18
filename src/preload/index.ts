@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron'
-import type { ElectronAPI, ClaudeStreamEvent } from '../shared/types/api'
+import type { ElectronAPI } from '../shared/types/api'
 
 // Custom APIs for renderer
 const api: ElectronAPI = {
@@ -17,11 +17,9 @@ const api: ElectronAPI = {
     createTask: (data) => ipcRenderer.invoke('db:tasks:create', data),
     updateTask: (data) => ipcRenderer.invoke('db:tasks:update', data),
     deleteTask: (id) => ipcRenderer.invoke('db:tasks:delete', id),
-    getSubtasks: (parentId) => ipcRenderer.invoke('db:tasks:getSubtasks', parentId),
     archiveTask: (id) => ipcRenderer.invoke('db:tasks:archive', id),
     unarchiveTask: (id) => ipcRenderer.invoke('db:tasks:unarchive', id),
-    getArchivedTasks: () => ipcRenderer.invoke('db:tasks:getArchived'),
-    checkAndResetRecurring: () => ipcRenderer.invoke('db:tasks:checkAndResetRecurring')
+    getArchivedTasks: () => ipcRenderer.invoke('db:tasks:getArchived')
   },
   tags: {
     getTags: () => ipcRenderer.invoke('db:tags:getAll'),
@@ -33,45 +31,22 @@ const api: ElectronAPI = {
     getTagsForTask: (taskId) => ipcRenderer.invoke('db:taskTags:getForTask', taskId),
     setTagsForTask: (taskId, tagIds) => ipcRenderer.invoke('db:taskTags:setForTask', taskId, tagIds)
   },
+  taskDependencies: {
+    getBlockers: (taskId) => ipcRenderer.invoke('db:taskDependencies:getBlockers', taskId),
+    getBlocking: (taskId) => ipcRenderer.invoke('db:taskDependencies:getBlocking', taskId),
+    addBlocker: (taskId, blockerTaskId) =>
+      ipcRenderer.invoke('db:taskDependencies:addBlocker', taskId, blockerTaskId),
+    removeBlocker: (taskId, blockerTaskId) =>
+      ipcRenderer.invoke('db:taskDependencies:removeBlocker', taskId, blockerTaskId),
+    setBlockers: (taskId, blockerTaskIds) =>
+      ipcRenderer.invoke('db:taskDependencies:setBlockers', taskId, blockerTaskIds)
+  },
   settings: {
     get: (key) => ipcRenderer.invoke('db:settings:get', key),
     set: (key, value) => ipcRenderer.invoke('db:settings:set', key, value),
     getAll: () => ipcRenderer.invoke('db:settings:getAll')
   },
-  chatMessages: {
-    getByWorkspace: (workspaceItemId) =>
-      ipcRenderer.invoke('db:chatMessages:getByWorkspace', workspaceItemId),
-    create: (data) => ipcRenderer.invoke('db:chatMessages:create', data),
-    delete: (id) => ipcRenderer.invoke('db:chatMessages:delete', id)
-  },
-  workspaceItems: {
-    getByTask: (taskId) => ipcRenderer.invoke('db:workspaceItems:getByTask', taskId),
-    create: (data) => ipcRenderer.invoke('db:workspaceItems:create', data),
-    update: (data) => ipcRenderer.invoke('db:workspaceItems:update', data),
-    delete: (id) => ipcRenderer.invoke('db:workspaceItems:delete', id)
-  },
   claude: {
-    stream: (prompt: string, context?: string) => {
-      return ipcRenderer.invoke('claude:stream:start', prompt, context)
-    },
-    cancel: () => {
-      ipcRenderer.send('claude:stream:cancel')
-    },
-    onChunk: (callback: (data: ClaudeStreamEvent) => void) => {
-      const handler = (_event: unknown, data: ClaudeStreamEvent) => callback(data)
-      ipcRenderer.on('claude:chunk', handler)
-      return () => ipcRenderer.removeListener('claude:chunk', handler)
-    },
-    onError: (callback: (error: string) => void) => {
-      const handler = (_event: unknown, error: string) => callback(error)
-      ipcRenderer.on('claude:error', handler)
-      return () => ipcRenderer.removeListener('claude:error', handler)
-    },
-    onDone: (callback: (result: { code: number }) => void) => {
-      const handler = (_event: unknown, result: { code: number }) => callback(result)
-      ipcRenderer.on('claude:done', handler)
-      return () => ipcRenderer.removeListener('claude:done', handler)
-    },
     checkAvailability: () => ipcRenderer.invoke('claude:check-availability')
   },
   theme: {
@@ -87,17 +62,35 @@ const api: ElectronAPI = {
   shell: {
     openExternal: (url: string) => ipcRenderer.invoke('shell:open-external', url)
   },
-  webview: {
-    registerShortcuts: (webviewId: number) =>
-      ipcRenderer.invoke('webview:register-shortcuts', webviewId),
-    onShortcut: (callback: (data: { key: string }) => void) => {
-      const handler = (_event: unknown, data: { key: string }) => callback(data)
-      ipcRenderer.on('webview:shortcut', handler)
-      return () => ipcRenderer.removeListener('webview:shortcut', handler)
-    }
+  dialog: {
+    showOpenDialog: (options) => ipcRenderer.invoke('dialog:showOpenDialog', options)
   },
   app: {
     getVersion: () => ipcRenderer.invoke('app:getVersion')
+  },
+  pty: {
+    create: (taskId, cwd, sessionId, existingSessionId) =>
+      ipcRenderer.invoke('pty:create', taskId, cwd, sessionId, existingSessionId),
+    write: (taskId, data) => ipcRenderer.invoke('pty:write', taskId, data),
+    resize: (taskId, cols, rows) => ipcRenderer.invoke('pty:resize', taskId, cols, rows),
+    kill: (taskId) => ipcRenderer.invoke('pty:kill', taskId),
+    exists: (taskId) => ipcRenderer.invoke('pty:exists', taskId),
+    onData: (callback: (taskId: string, data: string) => void) => {
+      const handler = (_event: unknown, taskId: string, data: string) => callback(taskId, data)
+      ipcRenderer.on('pty:data', handler)
+      return () => ipcRenderer.removeListener('pty:data', handler)
+    },
+    onExit: (callback: (taskId: string, exitCode: number) => void) => {
+      const handler = (_event: unknown, taskId: string, exitCode: number) =>
+        callback(taskId, exitCode)
+      ipcRenderer.on('pty:exit', handler)
+      return () => ipcRenderer.removeListener('pty:exit', handler)
+    },
+    onSessionNotFound: (callback: (taskId: string) => void) => {
+      const handler = (_event: unknown, taskId: string) => callback(taskId)
+      ipcRenderer.on('pty:session-not-found', handler)
+      return () => ipcRenderer.removeListener('pty:session-not-found', handler)
+    }
   }
 }
 

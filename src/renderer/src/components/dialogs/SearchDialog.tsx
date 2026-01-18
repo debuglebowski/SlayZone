@@ -26,9 +26,6 @@ export function SearchDialog({
   onSelectTask,
   onSelectProject
 }: SearchDialogProps) {
-  // Filter to top-level tasks only (no subtasks)
-  const searchableTasks = tasks.filter((t) => !t.parent_id)
-
   return (
     <CommandDialog open={open} onOpenChange={onOpenChange}>
       <CommandInput placeholder="Search tasks and projects..." />
@@ -53,9 +50,9 @@ export function SearchDialog({
           </CommandGroup>
         )}
 
-        {searchableTasks.length > 0 && (
+        {tasks.length > 0 && (
           <CommandGroup heading="Tasks">
-            {searchableTasks.map((task) => (
+            {tasks.map((task) => (
               <CommandItem
                 key={task.id}
                 value={task.title}

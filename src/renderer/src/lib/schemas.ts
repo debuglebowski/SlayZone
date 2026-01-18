@@ -25,8 +25,7 @@ export const updateTaskSchema = z.object({
   description: z.string().max(5000).nullable(),
   status: taskStatusEnum,
   priority: prioritySchema,
-  dueDate: z.string().nullable(),
-  blockedReason: z.string().max(500).nullable()
+  dueDate: z.string().nullable()
 })
 
 // Project creation schema
@@ -63,7 +62,6 @@ export interface UpdateTaskFormData {
   status: TaskStatus
   priority: number
   dueDate: string | null
-  blockedReason: string | null
 }
 
 export type CreateProjectFormData = z.infer<typeof createProjectSchema>

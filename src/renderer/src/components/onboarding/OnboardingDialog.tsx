@@ -11,23 +11,23 @@ interface OnboardingStep {
 
 const ONBOARDING_STEPS: OnboardingStep[] = [
   {
-    title: 'Welcome to Focus',
+    title: 'Welcome',
     description:
-      'A simple task manager with a focused Work Mode to help you get things done without rabbit-holing.'
+      'A task manager with built-in Claude Code terminal for AI-assisted development.'
   },
   {
-    title: 'Organize with Projects',
+    title: 'Projects',
     description:
-      'Create projects in the sidebar to group related tasks. Click "All" to see tasks across all projects.'
+      'Create projects and set their repository path. Each project maps to a codebase.'
   },
   {
-    title: 'Work Mode',
+    title: 'Terminal',
     description:
-      'Open a task and click "Work Mode" for a dedicated workspace with AI chat, browser tabs, and documents.'
+      'Open a task to see a split view with notes on the left and a Claude Code terminal on the right.'
   },
   {
-    title: 'Keyboard Shortcuts',
-    description: 'Press "n" to create a new task from anywhere. Press "esc" to go back.'
+    title: 'Shortcuts',
+    description: 'Cmd+N creates a task. Cmd+K searches. Esc goes back.'
   }
 ]
 

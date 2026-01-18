@@ -1,4 +1,1 @@
-- Plugins to the web? 1Password.
-- Summarize a website
-- Be able to branch out a chat.
-- Split work area in work mode.
+- Worktree functionality

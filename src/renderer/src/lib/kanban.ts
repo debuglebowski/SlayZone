@@ -95,16 +95,13 @@ function groupByDueDate(tasks: Task[]): Column[] {
 }
 
 export function groupTasksBy(tasks: Task[], groupBy: GroupKey): Column[] {
-  // Filter out subtasks - only show root tasks
-  const rootTasks = tasks.filter((t) => t.parent_id === null)
-
   switch (groupBy) {
     case 'status':
-      return groupByStatus(rootTasks)
+      return groupByStatus(tasks)
     case 'priority':
-      return groupByPriority(rootTasks)
+      return groupByPriority(tasks)
     case 'due_date':
-      return groupByDueDate(rootTasks)
+      return groupByDueDate(tasks)
   }
 }
 
@@ -162,11 +159,6 @@ export function applyFilters(
       if (!hasMatchingTag) {
         return false
       }
-    }
-
-    // Show blocked filter
-    if (!filter.showBlocked && task.blocked_reason) {
-      return false
     }
 
     // Show done filter

@@ -1,8 +1,8 @@
-import { useEffect, useState } from 'react'
+import { useEffect } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { format } from 'date-fns'
-import { CalendarIcon, ChevronDown, ChevronUp } from 'lucide-react'
+import { CalendarIcon } from 'lucide-react'
 import type { Task } from '../../../shared/types/database'
 import {
   updateTaskSchema,
@@ -46,8 +46,6 @@ export function EditTaskDialog({
   onOpenChange,
   onUpdated
 }: EditTaskDialogProps): React.JSX.Element {
-  const [showBlocked, setShowBlocked] = useState(false)
-
   const form = useForm<UpdateTaskFormData>({
     resolver: zodResolver(updateTaskSchema),
     defaultValues: {
@@ -56,12 +54,11 @@ export function EditTaskDialog({
       description: null,
       status: 'inbox',
       priority: 3,
-      dueDate: null,
-      blockedReason: null
+      dueDate: null
     }
   })
 
-  // Reset form when task changes (pitfall #3 from research)
+  // Reset form when task changes
   useEffect(() => {
     if (task) {
       form.reset({
@@ -70,10 +67,8 @@ export function EditTaskDialog({
         description: task.description,
         status: task.status,
         priority: task.priority,
-        dueDate: task.due_date,
-        blockedReason: task.blocked_reason
+        dueDate: task.due_date
       })
-      setShowBlocked(!!task.blocked_reason)
     }
   }, [task, form])
 
@@ -84,8 +79,7 @@ export function EditTaskDialog({
       description: data.description,
       status: data.status,
       priority: data.priority,
-      dueDate: data.dueDate,
-      blockedReason: data.blockedReason || null
+      dueDate: data.dueDate
     })
     onUpdated(updated)
   }
@@ -216,42 +210,6 @@ export function EditTaskDialog({
                 </FormItem>
               )}
             />
-
-            {/* Collapsible blocked reason */}
-            <div>
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={() => setShowBlocked(!showBlocked)}
-                className="mb-2 -ml-2"
-              >
-                {showBlocked ? (
-                  <ChevronUp className="mr-1 size-4" />
-                ) : (
-                  <ChevronDown className="mr-1 size-4" />
-                )}
-                Blocked Reason
-              </Button>
-              {showBlocked && (
-                <FormField
-                  control={form.control}
-                  name="blockedReason"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormControl>
-                        <Textarea
-                          {...field}
-                          value={field.value ?? ''}
-                          placeholder="Why is this task blocked?"
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              )}
-            </div>
 
             <div className="flex justify-end gap-2">
               <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>

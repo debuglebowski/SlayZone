@@ -15,7 +15,7 @@ interface SortableKanbanCardProps {
   project?: Project
   showProject?: boolean
   disableDrag?: boolean
-  tags?: Tag[]
+  isBlocked?: boolean
   // Context menu props
   allProjects?: Project[]
   onUpdateTask?: (taskId: string, updates: Partial<Task>) => void
@@ -29,7 +29,7 @@ function SortableKanbanCard({
   project,
   showProject,
   disableDrag,
-  tags,
+  isBlocked,
   allProjects,
   onUpdateTask,
   onArchiveTask,
@@ -56,7 +56,7 @@ function SortableKanbanCard({
         onClick={(e) => onTaskClick?.(task, e)}
         project={project}
         showProject={showProject}
-        tags={tags}
+        isBlocked={isBlocked}
       />
     </div>
   )
@@ -87,8 +87,8 @@ interface KanbanColumnProps {
   showProjectDot?: boolean
   disableDrag?: boolean
   taskTags?: Map<string, string[]>
-  allTasks?: Task[]
   tags?: Tag[]
+  blockedTaskIds?: Set<string>
   // Context menu props
   allProjects?: Project[]
   onUpdateTask?: (taskId: string, updates: Partial<Task>) => void
@@ -103,9 +103,7 @@ export function KanbanColumn({
   projectsMap,
   showProjectDot,
   disableDrag,
-  taskTags,
-  allTasks,
-  tags,
+  blockedTaskIds,
   allProjects,
   onUpdateTask,
   onArchiveTask,
@@ -114,10 +112,6 @@ export function KanbanColumn({
   const { setNodeRef, isOver } = useDroppable({
     id: column.id
   })
-
-  // Split tasks into regular and blocked
-  const regularTasks = column.tasks.filter((t) => !t.blocked_reason)
-  const blockedTasks = column.tasks.filter((t) => !!t.blocked_reason)
 
   return (
     <div className="flex w-72 shrink-0 flex-col h-full">
@@ -148,70 +142,26 @@ export function KanbanColumn({
         )}
       >
         <SortableContext
-          items={[...regularTasks, ...blockedTasks].map((t) => t.id)}
+          items={column.tasks.map((t) => t.id)}
           strategy={verticalListSortingStrategy}
         >
           <div className="flex flex-col gap-2">
-            {regularTasks.map((task) => {
-              const taskTagIds = taskTags?.get(task.id) ?? []
-              const taskTagsList =
-                tags && taskTagIds.length > 0
-                  ? tags.filter((t) => taskTagIds.includes(t.id))
-                  : []
-
-              return (
-                <SortableKanbanCard
-                  key={task.id}
-                  task={task}
-                  onTaskClick={onTaskClick}
-                  project={showProjectDot ? projectsMap?.get(task.project_id) : undefined}
-                  showProject={showProjectDot}
-                  disableDrag={disableDrag}
-                  tags={taskTagsList}
-                  allProjects={allProjects}
-                  onUpdateTask={onUpdateTask}
-                  onArchiveTask={onArchiveTask}
-                  onDeleteTask={onDeleteTask}
-                />
-              )
-            })}
+            {column.tasks.map((task) => (
+              <SortableKanbanCard
+                key={task.id}
+                task={task}
+                onTaskClick={onTaskClick}
+                project={showProjectDot ? projectsMap?.get(task.project_id) : undefined}
+                showProject={showProjectDot}
+                disableDrag={disableDrag}
+                isBlocked={blockedTaskIds?.has(task.id)}
+                allProjects={allProjects}
+                onUpdateTask={onUpdateTask}
+                onArchiveTask={onArchiveTask}
+                onDeleteTask={onDeleteTask}
+              />
+            ))}
           </div>
-          {blockedTasks.length > 0 && (
-            <>
-              <div className="flex items-center gap-2 my-3 px-1">
-                <div className="flex-1 h-px bg-yellow-500/30" />
-                <span className="text-[10px] font-medium text-yellow-600/70 uppercase tracking-wide">
-                  Blocked
-                </span>
-                <div className="flex-1 h-px bg-yellow-500/30" />
-              </div>
-              <div className="flex flex-col gap-2">
-                {blockedTasks.map((task) => {
-                  const taskTagIds = taskTags?.get(task.id) ?? []
-                  const taskTagsList =
-                    tags && taskTagIds.length > 0
-                      ? tags.filter((t) => taskTagIds.includes(t.id))
-                      : []
-
-                  return (
-                    <SortableKanbanCard
-                      key={task.id}
-                      task={task}
-                      onTaskClick={onTaskClick}
-                      project={showProjectDot ? projectsMap?.get(task.project_id) : undefined}
-                      showProject={showProjectDot}
-                      disableDrag={disableDrag}
-                      tags={taskTagsList}
-                      allProjects={allProjects}
-                      onUpdateTask={onUpdateTask}
-                      onArchiveTask={onArchiveTask}
-                      onDeleteTask={onDeleteTask}
-                    />
-                  )
-                })}
-              </div>
-            </>
-          )}
         </SortableContext>
       </div>
     </div>

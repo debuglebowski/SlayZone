@@ -5,7 +5,7 @@ import { runMigrations } from './migrations'
 
 const getDatabasePath = (): string => {
   const userDataPath = app.getPath('userData')
-  const dbName = app.isPackaged ? 'focus.sqlite' : 'focus.dev.sqlite'
+  const dbName = app.isPackaged ? 'omgslayzone.sqlite' : 'omgslayzone.dev.sqlite'
   return path.join(userDataPath, dbName)
 }
 

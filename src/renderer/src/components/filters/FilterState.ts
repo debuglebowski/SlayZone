@@ -6,7 +6,6 @@ export interface FilterState {
   priority: number | null // null = all priorities
   dueDateRange: DueDateRange
   tagIds: string[] // selected tag IDs
-  showBlocked: boolean
   showDone: boolean
   showArchived: boolean
 }
@@ -16,7 +15,6 @@ export const defaultFilterState: FilterState = {
   priority: null,
   dueDateRange: 'all',
   tagIds: [],
-  showBlocked: true,
   showDone: true,
   showArchived: false
 }

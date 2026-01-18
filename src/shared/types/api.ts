@@ -1,4 +1,4 @@
-import type { Task, Project, Tag, TaskStatus, WorkspaceItem, WorkspaceItemType, RecurrenceType } from './database'
+import type { Task, Project, Tag, TaskStatus } from './database'
 
 // Theme types
 export type Theme = 'light' | 'dark'
@@ -11,40 +11,6 @@ export interface ClaudeAvailability {
   version: string | null
 }
 
-// Claude streaming types
-export interface ClaudeStreamEvent {
-  type: 'system' | 'assistant' | 'result' | 'stream_event'
-  subtype?: 'init' | 'success' | 'error'
-  message?: {
-    role: string
-    content: Array<{ type: string; text?: string }>
-  }
-  // stream_event fields (for --include-partial-messages)
-  event?: {
-    type: string // 'content_block_delta', 'message_start', etc.
-    delta?: {
-      type: string // 'text_delta'
-      text?: string
-    }
-  }
-  session_id?: string
-  cost?: number
-}
-
-export interface ChatMessage {
-  id: string
-  workspace_item_id: string
-  role: 'user' | 'assistant'
-  content: string
-  created_at: string
-}
-
-export interface CreateChatMessageInput {
-  workspaceItemId: string
-  role: 'user' | 'assistant'
-  content: string
-}
-
 export interface CreateTaskInput {
   projectId: string
   title: string
@@ -52,7 +18,6 @@ export interface CreateTaskInput {
   status?: string
   priority?: number
   dueDate?: string
-  parentId?: string
 }
 
 export interface TaskTagInput {
@@ -63,6 +28,7 @@ export interface TaskTagInput {
 export interface CreateProjectInput {
   name: string
   color: string
+  path?: string
 }
 
 export interface UpdateTaskInput {
@@ -72,18 +38,15 @@ export interface UpdateTaskInput {
   status?: TaskStatus
   priority?: number
   dueDate?: string | null
-  blockedReason?: string | null
-  recurrenceType?: RecurrenceType | null
-  recurrenceInterval?: number | null
-  nextResetAt?: string | null
   projectId?: string
-  lastActiveWorkspaceItemId?: string | null
+  claudeSessionId?: string | null
 }
 
 export interface UpdateProjectInput {
   id: string
   name?: string
   color?: string
+  path?: string | null
 }
 
 export interface CreateTagInput {
@@ -95,22 +58,6 @@ export interface UpdateTagInput {
   id: string
   name?: string
   color?: string
-}
-
-export interface CreateWorkspaceItemInput {
-  taskId: string
-  type: WorkspaceItemType
-  name: string
-  content?: string  // For documents
-  url?: string      // For browser tabs
-}
-
-export interface UpdateWorkspaceItemInput {
-  id: string
-  name?: string
-  content?: string
-  url?: string
-  favicon?: string
 }
 
 export interface ElectronAPI {
@@ -128,11 +75,9 @@ export interface ElectronAPI {
     createTask: (data: CreateTaskInput) => Promise<Task>
     updateTask: (data: UpdateTaskInput) => Promise<Task>
     deleteTask: (id: string) => Promise<boolean>
-    getSubtasks: (parentId: string) => Promise<Task[]>
     archiveTask: (id: string) => Promise<Task>
     unarchiveTask: (id: string) => Promise<Task>
     getArchivedTasks: () => Promise<Task[]>
-    checkAndResetRecurring: () => Promise<number>
   }
   tags: {
     getTags: () => Promise<Tag[]>
@@ -144,28 +89,19 @@ export interface ElectronAPI {
     getTagsForTask: (taskId: string) => Promise<Tag[]>
     setTagsForTask: (taskId: string, tagIds: string[]) => Promise<void>
   }
+  taskDependencies: {
+    getBlockers: (taskId: string) => Promise<Task[]>
+    getBlocking: (taskId: string) => Promise<Task[]>
+    addBlocker: (taskId: string, blockerTaskId: string) => Promise<void>
+    removeBlocker: (taskId: string, blockerTaskId: string) => Promise<void>
+    setBlockers: (taskId: string, blockerTaskIds: string[]) => Promise<void>
+  }
   settings: {
     get: (key: string) => Promise<string | null>
     set: (key: string, value: string) => Promise<void>
     getAll: () => Promise<Record<string, string>>
   }
-  chatMessages: {
-    getByWorkspace: (workspaceItemId: string) => Promise<ChatMessage[]>
-    create: (data: CreateChatMessageInput) => Promise<ChatMessage>
-    delete: (id: string) => Promise<boolean>
-  }
-  workspaceItems: {
-    getByTask: (taskId: string) => Promise<WorkspaceItem[]>
-    create: (data: CreateWorkspaceItemInput) => Promise<WorkspaceItem>
-    update: (data: UpdateWorkspaceItemInput) => Promise<WorkspaceItem>
-    delete: (id: string) => Promise<boolean>
-  }
   claude: {
-    stream: (prompt: string, context?: string) => Promise<void>
-    cancel: () => void
-    onChunk: (callback: (data: ClaudeStreamEvent) => void) => () => void
-    onError: (callback: (error: string) => void) => () => void
-    onDone: (callback: (result: { code: number }) => void) => () => void
     checkAvailability: () => Promise<ClaudeAvailability>
   }
   theme: {
@@ -177,11 +113,29 @@ export interface ElectronAPI {
   shell: {
     openExternal: (url: string) => Promise<void>
   }
-  webview: {
-    registerShortcuts: (webviewId: number) => Promise<void>
-    onShortcut: (callback: (data: { key: string }) => void) => () => void
+  dialog: {
+    showOpenDialog: (options: {
+      title?: string
+      defaultPath?: string
+      properties?: Array<'openFile' | 'openDirectory' | 'multiSelections'>
+    }) => Promise<{ canceled: boolean; filePaths: string[] }>
   }
   app: {
     getVersion: () => Promise<string>
+  }
+  pty: {
+    create: (
+      taskId: string,
+      cwd: string,
+      sessionId?: string | null,
+      existingSessionId?: string | null
+    ) => Promise<{ success: boolean; error?: string }>
+    write: (taskId: string, data: string) => Promise<boolean>
+    resize: (taskId: string, cols: number, rows: number) => Promise<boolean>
+    kill: (taskId: string) => Promise<boolean>
+    exists: (taskId: string) => Promise<boolean>
+    onData: (callback: (taskId: string, data: string) => void) => () => void
+    onExit: (callback: (taskId: string, exitCode: number) => void) => () => void
+    onSessionNotFound: (callback: (taskId: string) => void) => () => void
   }
 }

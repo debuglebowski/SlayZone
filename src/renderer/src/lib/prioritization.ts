@@ -2,8 +2,8 @@ import { differenceInDays, parseISO, startOfDay } from 'date-fns'
 import type { Task } from '../../../shared/types/database'
 
 export function calculatePriorityScore(task: Task): number {
-  // Skip blocked and done tasks
-  if (task.blocked_reason || task.status === 'done') return -Infinity
+  // Skip done tasks
+  if (task.status === 'done') return -Infinity
 
   // Base score from priority (P1=1000, P2=800, P3=600, P4=400, P5=200)
   const priorityScore = (6 - task.priority) * 200

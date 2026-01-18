@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { FolderOpen } from 'lucide-react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -21,14 +22,27 @@ export function ProjectSettingsDialog({
 }: ProjectSettingsDialogProps) {
   const [name, setName] = useState('')
   const [color, setColor] = useState('')
+  const [path, setPath] = useState('')
   const [loading, setLoading] = useState(false)
 
   useEffect(() => {
     if (project) {
       setName(project.name)
       setColor(project.color)
+      setPath(project.path || '')
     }
   }, [project])
+
+  const handleBrowse = async () => {
+    const result = await window.api.dialog.showOpenDialog({
+      title: 'Select Project Directory',
+      defaultPath: path || undefined,
+      properties: ['openDirectory']
+    })
+    if (!result.canceled && result.filePaths[0]) {
+      setPath(result.filePaths[0])
+    }
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -39,7 +53,8 @@ export function ProjectSettingsDialog({
       const updated = await window.api.db.updateProject({
         id: project.id,
         name: name.trim(),
-        color
+        color,
+        path: path || null
       })
       onUpdated(updated)
     } finally {
@@ -57,6 +72,24 @@ export function ProjectSettingsDialog({
           <div className="space-y-2">
             <Label htmlFor="edit-name">Name</Label>
             <Input id="edit-name" value={name} onChange={(e) => setName(e.target.value)} />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="edit-path">Repository Path</Label>
+            <div className="flex gap-2">
+              <Input
+                id="edit-path"
+                value={path}
+                onChange={(e) => setPath(e.target.value)}
+                placeholder="/path/to/repo"
+                className="flex-1"
+              />
+              <Button type="button" variant="outline" size="icon" onClick={handleBrowse}>
+                <FolderOpen className="h-4 w-4" />
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Claude Code terminal will open in this directory
+            </p>
           </div>
           <div className="space-y-2">
             <Label>Color</Label>

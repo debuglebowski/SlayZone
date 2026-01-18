@@ -1,4 +1,4 @@
-import { app, shell, BrowserWindow, ipcMain, nativeTheme, session, webContents } from 'electron'
+import { app, shell, BrowserWindow, ipcMain, nativeTheme, session, webContents, dialog } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 
@@ -11,10 +11,11 @@ import { getDatabase, closeDatabase } from './db'
 import { registerDatabaseHandlers } from './ipc/database'
 import { registerClaudeHandlers } from './ipc/claude'
 import { registerThemeHandlers } from './ipc/theme'
-import { getActiveProcess } from './services/claude-spawner'
+import { registerPtyHandlers } from './ipc/pty'
+import { killAllPtys } from './services/pty-manager'
 
 // Minimum splash screen display time (ms)
-const SPLASH_MIN_DURATION = 1500
+const SPLASH_MIN_DURATION = 3500
 
 // Self-contained splash HTML with inline SVG and CSS animations
 const splashHTML = (version: string) => `
@@ -59,15 +60,25 @@ const splashHTML = (version: string) => `
       opacity: 0;
       animation: fadeIn 0.15s ease-out forwards;
     }
-    .letter:nth-child(1) { animation-delay: 0.1s; }
-    .letter:nth-child(2) { animation-delay: 0.2s; }
-    .letter:nth-child(3) { animation-delay: 0.3s; }
-    .letter:nth-child(4) { animation-delay: 0.4s; }
-    .letter:nth-child(5) { animation-delay: 0.5s; }
-    .letter:nth-child(6) { animation-delay: 0.6s; }
-    .letter:nth-child(7) { animation-delay: 0.7s; }
-    .letter:nth-child(8) { animation-delay: 0.8s; }
-    .letter:nth-child(9) { animation-delay: 0.9s; }
+    .line2-container {
+      display: inline-flex;
+      clip-path: inset(0 100% 0 0);
+      animation: reveal 0.8s ease-out 2s forwards;
+    }
+    @keyframes reveal {
+      from { clip-path: inset(0 100% 0 0); }
+      to { clip-path: inset(0 0 0 0); }
+    }
+    .letter.line1:nth-child(1) { animation-delay: 0.1s; }
+    .letter.line1:nth-child(2) { animation-delay: 0.2s; }
+    .letter.line1:nth-child(3) { animation-delay: 0.3s; }
+    .letter.line1:nth-child(4) { animation-delay: 0.4s; }
+    .letter.line1:nth-child(5) { animation-delay: 0.5s; }
+    .letter.line1:nth-child(6) { animation-delay: 0.6s; }
+    .letter.line1:nth-child(7) { animation-delay: 0.7s; }
+    .letter.line1:nth-child(8) { animation-delay: 0.8s; }
+    .letter.line1:nth-child(9) { animation-delay: 0.9s; }
+    .line2-container .letter { opacity: 1; animation: none; }
     .version {
       position: absolute;
       bottom: 24px;
@@ -107,15 +118,27 @@ const splashHTML = (version: string) => `
       </svg>
     </div>
     <div class="title">
-      <span class="letter">B</span>
-      <span class="letter">r</span>
-      <span class="letter">e</span>
-      <span class="letter">a</span>
-      <span class="letter">t</span>
-      <span class="letter">h</span>
-      <span class="letter">.</span>
-      <span class="letter">.</span>
-      <span class="letter">.</span>
+      <span class="letter line1">B</span>
+      <span class="letter line1">r</span>
+      <span class="letter line1">e</span>
+      <span class="letter line1">a</span>
+      <span class="letter line1">t</span>
+      <span class="letter line1">h</span>
+      <span class="letter line1">.</span>
+      <span class="letter line1">.</span>
+      <span class="letter line1">.</span>
+      <span class="line2-container">
+        <span class="letter">&nbsp;&nbsp;&nbsp;</span>
+        <span class="letter">t</span>
+        <span class="letter">h</span>
+        <span class="letter">e</span>
+        <span class="letter">n</span>
+        <span class="letter">&nbsp;</span>
+        <span class="letter">s</span>
+        <span class="letter">l</span>
+        <span class="letter">a</span>
+        <span class="letter">y</span>
+      </span>
     </div>
     <div class="version">v${version}</div>
   </div>
@@ -252,6 +275,7 @@ app.whenReady().then(() => {
   registerDatabaseHandlers()
   registerClaudeHandlers()
   registerThemeHandlers()
+  registerPtyHandlers()
 
   // Configure webview session for WebAuthn/passkey support
   const browserSession = session.fromPartition('persist:browser-tabs')
@@ -288,6 +312,21 @@ app.whenReady().then(() => {
 
   // App version
   ipcMain.handle('app:getVersion', () => app.getVersion())
+
+  // Dialog
+  ipcMain.handle(
+    'dialog:showOpenDialog',
+    async (
+      _,
+      options: {
+        title?: string
+        defaultPath?: string
+        properties?: Array<'openFile' | 'openDirectory' | 'multiSelections'>
+      }
+    ) => {
+      return dialog.showOpenDialog(options)
+    }
+  )
 
   // Webview shortcut interception
   const registeredWebviews = new Set<number>()
@@ -334,8 +373,7 @@ app.on('window-all-closed', () => {
 
 // Clean up database connection and active processes before quitting
 app.on('will-quit', () => {
-  const proc = getActiveProcess()
-  if (proc) proc.kill('SIGTERM')
+  killAllPtys()
   closeDatabase()
 })
 

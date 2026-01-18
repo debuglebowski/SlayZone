@@ -29,7 +29,12 @@
       "Bash(npx tsc:*)",
       "WebSearch",
       "WebFetch(domain:github.com)",
-      "WebFetch(domain:www.npmjs.com)"
+      "WebFetch(domain:www.npmjs.com)",
+      "Bash(xargs:*)"
     ]
-  }
+  },
+  "enableAllProjectMcpServers": true,
+  "enabledMcpjsonServers": [
+    "electron"
+  ]
 }
