@@ -71,13 +71,10 @@ export function RichTextEditor({
 
   return (
     <div
-      className={cn(
-        'border-input focus-within:border-ring focus-within:ring-ring/50 dark:bg-input/30 w-full rounded-md border bg-transparent px-3 py-2 text-base shadow-xs transition-[color,box-shadow] focus-within:ring-[3px] md:text-sm',
-        className
-      )}
+      className={cn('w-full', className)}
       style={{ minHeight }}
     >
-      <EditorContent editor={editor} />
+      <EditorContent editor={editor} className="h-full" />
     </div>
   )
 }

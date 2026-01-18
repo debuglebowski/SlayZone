@@ -46,7 +46,6 @@ export function KanbanCard({
 
   return (
     <motion.div
-      whileHover={!isDragging ? { y: -2, transition: { duration: 0.033 } } : undefined}
       whileTap={!isDragging ? { scale: 0.98 } : undefined}
       animate={
         justCompleted
@@ -63,7 +62,7 @@ export function KanbanCard({
     >
       <Card
         className={cn(
-          'cursor-grab transition-shadow select-none py-0 gap-0',
+          'cursor-grab transition-colors duration-[400ms] hover:duration-[100ms] select-none py-0 gap-0 hover:bg-muted/50',
           isDragging && 'opacity-50 shadow-lg',
           isOverdue && 'border-destructive',
           isBlocked && 'border-yellow-500 opacity-60'

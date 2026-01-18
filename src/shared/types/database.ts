@@ -17,6 +17,7 @@ export interface Task {
   recurrence_interval: number | null
   last_reset_at: string | null
   next_reset_at: string | null
+  last_active_workspace_item_id: string | null
   created_at: string
   updated_at: string
 }
@@ -45,6 +46,7 @@ export interface WorkspaceItem {
   name: string
   content: string | null
   url: string | null
+  favicon: string | null
   created_at: string
   updated_at: string
 }

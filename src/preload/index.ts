@@ -83,6 +83,21 @@ const api: ElectronAPI = {
       ipcRenderer.on('theme:changed', handler)
       return () => ipcRenderer.removeListener('theme:changed', handler)
     }
+  },
+  shell: {
+    openExternal: (url: string) => ipcRenderer.invoke('shell:open-external', url)
+  },
+  webview: {
+    registerShortcuts: (webviewId: number) =>
+      ipcRenderer.invoke('webview:register-shortcuts', webviewId),
+    onShortcut: (callback: (data: { key: string }) => void) => {
+      const handler = (_event: unknown, data: { key: string }) => callback(data)
+      ipcRenderer.on('webview:shortcut', handler)
+      return () => ipcRenderer.removeListener('webview:shortcut', handler)
+    }
+  },
+  app: {
+    getVersion: () => ipcRenderer.invoke('app:getVersion')
   }
 }
 

@@ -6,9 +6,11 @@ import { RotateCw, ArrowLeft, ArrowRight } from 'lucide-react'
 interface Props {
   url: string
   onUrlChange: (url: string) => void
+  onTitleChange?: (title: string) => void
+  onFaviconChange?: (favicon: string) => void
 }
 
-export function BrowserView({ url, onUrlChange }: Props) {
+export function BrowserView({ url, onUrlChange, onTitleChange, onFaviconChange }: Props) {
   const [inputUrl, setInputUrl] = useState(url)
   const webviewRef = useRef<Electron.WebviewTag>(null)
 
@@ -34,6 +36,52 @@ export function BrowserView({ url, onUrlChange }: Props) {
       webview.removeEventListener('did-navigate-in-page', handleNavigate as any)
     }
   }, [url, onUrlChange])
+
+  // Handle page title updates
+  useEffect(() => {
+    const webview = webviewRef.current
+    if (!webview || !onTitleChange) return
+
+    const handleTitleUpdate = (e: Electron.PageTitleUpdatedEvent) => {
+      onTitleChange(e.title)
+    }
+
+    webview.addEventListener('page-title-updated', handleTitleUpdate)
+    return () => {
+      webview.removeEventListener('page-title-updated', handleTitleUpdate)
+    }
+  }, [onTitleChange])
+
+  // Handle page favicon updates
+  useEffect(() => {
+    const webview = webviewRef.current
+    if (!webview || !onFaviconChange) return
+
+    const handleFaviconUpdate = (e: Electron.PageFaviconUpdatedEvent) => {
+      if (e.favicons.length > 0) {
+        onFaviconChange(e.favicons[0])
+      }
+    }
+
+    webview.addEventListener('page-favicon-updated', handleFaviconUpdate)
+    return () => {
+      webview.removeEventListener('page-favicon-updated', handleFaviconUpdate)
+    }
+  }, [onFaviconChange])
+
+  // Register webview for shortcut interception
+  useEffect(() => {
+    const webview = webviewRef.current
+    if (!webview) return
+
+    const onReady = () => {
+      const id = (webview as any).getWebContentsId?.()
+      if (id) window.api.webview.registerShortcuts(id)
+    }
+
+    webview.addEventListener('dom-ready', onReady)
+    return () => webview.removeEventListener('dom-ready', onReady)
+  }, [])
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
@@ -87,6 +135,7 @@ export function BrowserView({ url, onUrlChange }: Props) {
           ref={webviewRef}
           src={url}
           partition="persist:browser-tabs"
+          allowpopups="true"
           className="w-full h-full"
           style={{ display: 'inline-flex' }}
         />

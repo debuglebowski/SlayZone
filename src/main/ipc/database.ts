@@ -137,6 +137,14 @@ export function registerDatabaseHandlers(): void {
       fields.push('next_reset_at = ?')
       values.push(data.nextResetAt)
     }
+    if (data.projectId !== undefined) {
+      fields.push('project_id = ?')
+      values.push(data.projectId)
+    }
+    if (data.lastActiveWorkspaceItemId !== undefined) {
+      fields.push('last_active_workspace_item_id = ?')
+      values.push(data.lastActiveWorkspaceItemId)
+    }
 
     if (fields.length === 0) {
       return db.prepare('SELECT * FROM tasks WHERE id = ?').get(data.id)
@@ -308,6 +316,7 @@ export function registerDatabaseHandlers(): void {
     if (data.name !== undefined) { fields.push('name = ?'); values.push(data.name) }
     if (data.content !== undefined) { fields.push('content = ?'); values.push(data.content) }
     if (data.url !== undefined) { fields.push('url = ?'); values.push(data.url) }
+    if (data.favicon !== undefined) { fields.push('favicon = ?'); values.push(data.favicon) }
 
     if (fields.length > 0) {
       fields.push("updated_at = datetime('now')")

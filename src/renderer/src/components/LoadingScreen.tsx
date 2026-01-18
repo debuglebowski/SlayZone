@@ -1,8 +1,14 @@
 import { motion, useReducedMotion } from 'framer-motion'
+import { useEffect, useState } from 'react'
 import logo from '@/assets/logo.svg'
 
 export function LoadingScreen(): React.JSX.Element {
   const shouldReduceMotion = useReducedMotion()
+  const [version, setVersion] = useState('')
+
+  useEffect(() => {
+    window.api.app.getVersion().then(setVersion)
+  }, [])
 
   const containerVariants = {
     initial: { opacity: 0 },
@@ -16,61 +22,14 @@ export function LoadingScreen(): React.JSX.Element {
       opacity: 1,
       scale: 1,
       transition: {
-        duration: 0.5,
-        ease: 'easeOut'
-      }
-    }
-  }
-
-  const logoPulseVariants = shouldReduceMotion
-    ? {}
-    : {
-        animate: {
-          scale: [1, 1.05, 1],
-          transition: {
-            duration: 2,
-            repeat: Infinity,
-            ease: 'easeInOut'
-          }
-        }
-      }
-
-  const textVariants = {
-    initial: { opacity: 0, y: 10 },
-    animate: {
-      opacity: 1,
-      y: 0,
-      transition: {
         duration: 0.4,
-        delay: 0.3,
         ease: 'easeOut'
       }
     }
   }
 
-  const dotsVariants = {
-    hidden: { opacity: 0 },
-    visible: {
-      opacity: 1,
-      transition: {
-        staggerChildren: 0.2,
-        delayChildren: 0.6
-      }
-    }
-  }
-
-  const dotVariants = {
-    hidden: { opacity: 0, scale: 0.5 },
-    visible: {
-      opacity: [0, 1, 0],
-      scale: [0.5, 1, 0.5],
-      transition: {
-        duration: 1.5,
-        repeat: Infinity,
-        ease: 'easeInOut'
-      }
-    }
-  }
+  const letters = 'Breath...'.split('')
+  const letterDelay = shouldReduceMotion ? 0 : 0.1
 
   return (
     <motion.div
@@ -80,42 +39,36 @@ export function LoadingScreen(): React.JSX.Element {
       animate="animate"
       exit="exit"
     >
-      <div className="flex flex-col items-center gap-6">
-        <motion.div
-          variants={logoVariants}
-          initial="initial"
-          animate="animate"
-        >
-          <motion.img
-            src={logo}
-            alt="Focus"
-            className="h-16 w-16"
-            variants={logoPulseVariants}
-            animate="animate"
-          />
+      <div className="relative flex h-full w-full flex-col items-center justify-center gap-6">
+        <motion.div variants={logoVariants} initial="initial" animate="animate">
+          <img src={logo} alt="Focus" className="h-16 w-16" />
         </motion.div>
-        <motion.div
-          variants={textVariants}
-          initial="initial"
-          animate="animate"
-          className="text-2xl font-semibold text-foreground"
-        >
-          Focus
-        </motion.div>
-        <motion.div
-          className="flex gap-2"
-          variants={dotsVariants}
-          initial="hidden"
-          animate="visible"
-        >
-          {[0, 1, 2].map((i) => (
-            <motion.div
+        <div className="flex text-2xl font-semibold text-foreground">
+          {letters.map((letter, i) => (
+            <motion.span
               key={i}
-              variants={dotVariants}
-              className="h-2 w-2 rounded-full bg-primary"
-            />
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{
+                duration: 0.15,
+                delay: 0.1 + i * letterDelay,
+                ease: 'easeOut'
+              }}
+            >
+              {letter}
+            </motion.span>
           ))}
-        </motion.div>
+        </div>
+        {version && (
+          <motion.div
+            className="absolute bottom-6 text-xs text-muted-foreground/50"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.3, delay: 1 }}
+          >
+            v{version}
+          </motion.div>
+        )}
       </div>
     </motion.div>
   )

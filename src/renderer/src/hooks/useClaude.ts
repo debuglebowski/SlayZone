@@ -66,15 +66,6 @@ export function useClaude(workspaceItemId?: string) {
     const unsubChunk = window.api.claude.onChunk((data: ClaudeStreamEvent) => {
       console.log('[useClaude] Chunk:', data.type, data.subtype || data.event?.type || '')
 
-      // Handle assistant message (final or without --include-partial-messages)
-      if (data.type === 'assistant' && data.message?.content) {
-        for (const block of data.message.content) {
-          if (block.type === 'text' && block.text) {
-            dispatch({ type: 'CHUNK', text: block.text })
-          }
-        }
-      }
-
       // Handle stream_event (incremental streaming with --include-partial-messages)
       if (data.type === 'stream_event' && data.event?.type === 'content_block_delta') {
         const text = data.event.delta?.text

@@ -34,9 +34,7 @@ export function TaskItem({ task, onEdit, onDelete }: TaskItemProps): React.JSX.E
 
   return (
     <motion.div
-      className="flex items-center gap-3 rounded-md border px-3 py-2 hover:bg-muted/50"
-      whileHover={{ x: 2 }}
-      transition={{ duration: 0.033 }}
+      className="flex items-center gap-3 rounded-md border px-3 py-2 hover:bg-muted/50 transition-colors duration-[400ms] hover:duration-[100ms]"
     >
       {/* Priority */}
       <span className="w-6 text-xs font-medium text-muted-foreground">P{task.priority}</span>

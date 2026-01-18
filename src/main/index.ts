@@ -1,4 +1,4 @@
-import { app, shell, BrowserWindow, ipcMain, nativeTheme } from 'electron'
+import { app, shell, BrowserWindow, ipcMain, nativeTheme, session, webContents } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 
@@ -14,10 +14,10 @@ import { registerThemeHandlers } from './ipc/theme'
 import { getActiveProcess } from './services/claude-spawner'
 
 // Minimum splash screen display time (ms)
-const SPLASH_MIN_DURATION = 800
+const SPLASH_MIN_DURATION = 1500
 
 // Self-contained splash HTML with inline SVG and CSS animations
-const splashHTML = `
+const splashHTML = (version: string) => `
 <!DOCTYPE html>
 <html>
 <head>
@@ -38,60 +38,51 @@ const splashHTML = `
       justify-content: center;
       background: #0a0a0a;
       border-radius: 16px;
+      position: relative;
     }
     .logo-wrapper {
-      animation: fadeInScale 0.6s ease-out forwards;
+      animation: fadeInScale 0.4s ease-out forwards;
     }
     .logo {
       width: 80px;
       height: 80px;
       color: #e5e5e5;
-      animation: pulse 2s ease-in-out infinite;
     }
     .title {
       margin-top: 24px;
       font-size: 28px;
       font-weight: 600;
       color: #fafafa;
-      opacity: 0;
-      animation: fadeInUp 0.5s ease-out 0.3s forwards;
-    }
-    .dots {
       display: flex;
-      gap: 8px;
-      margin-top: 32px;
+    }
+    .letter {
       opacity: 0;
-      animation: fadeIn 0.4s ease-out 0.6s forwards;
+      animation: fadeIn 0.15s ease-out forwards;
     }
-    .dot {
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
-      background: #a3a3a3;
-      animation: dotPulse 1.4s ease-in-out infinite;
+    .letter:nth-child(1) { animation-delay: 0.1s; }
+    .letter:nth-child(2) { animation-delay: 0.2s; }
+    .letter:nth-child(3) { animation-delay: 0.3s; }
+    .letter:nth-child(4) { animation-delay: 0.4s; }
+    .letter:nth-child(5) { animation-delay: 0.5s; }
+    .letter:nth-child(6) { animation-delay: 0.6s; }
+    .letter:nth-child(7) { animation-delay: 0.7s; }
+    .letter:nth-child(8) { animation-delay: 0.8s; }
+    .letter:nth-child(9) { animation-delay: 0.9s; }
+    .version {
+      position: absolute;
+      bottom: 24px;
+      font-size: 12px;
+      color: #525252;
+      opacity: 0;
+      animation: fadeIn 0.3s ease-out 1s forwards;
     }
-    .dot:nth-child(2) { animation-delay: 0.2s; }
-    .dot:nth-child(3) { animation-delay: 0.4s; }
-
     @keyframes fadeInScale {
       from { opacity: 0; transform: scale(0.8); }
       to { opacity: 1; transform: scale(1); }
     }
-    @keyframes fadeInUp {
-      from { opacity: 0; transform: translateY(10px); }
-      to { opacity: 1; transform: translateY(0); }
-    }
     @keyframes fadeIn {
       from { opacity: 0; }
       to { opacity: 1; }
-    }
-    @keyframes pulse {
-      0%, 100% { transform: scale(1); }
-      50% { transform: scale(1.05); }
-    }
-    @keyframes dotPulse {
-      0%, 80%, 100% { opacity: 0.3; transform: scale(0.8); }
-      40% { opacity: 1; transform: scale(1); }
     }
     @keyframes fadeOut {
       from { opacity: 1; }
@@ -115,12 +106,18 @@ const splashHTML = `
         <path d="M 12 32 L 20 28 M 12 32 L 20 36" stroke="currentColor" stroke-width="2" stroke-linecap="round" opacity="0.6"/>
       </svg>
     </div>
-    <div class="title">Focus</div>
-    <div class="dots">
-      <div class="dot"></div>
-      <div class="dot"></div>
-      <div class="dot"></div>
+    <div class="title">
+      <span class="letter">B</span>
+      <span class="letter">r</span>
+      <span class="letter">e</span>
+      <span class="letter">a</span>
+      <span class="letter">t</span>
+      <span class="letter">h</span>
+      <span class="letter">.</span>
+      <span class="letter">.</span>
+      <span class="letter">.</span>
     </div>
+    <div class="version">v${version}</div>
   </div>
 </body>
 </html>
@@ -148,7 +145,7 @@ function createSplashWindow(): void {
     }
   })
 
-  splashWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(splashHTML)}`)
+  splashWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(splashHTML(app.getVersion()))}`)
 
   splashWindow.once('ready-to-show', () => {
     splashShownAt = Date.now()
@@ -256,6 +253,21 @@ app.whenReady().then(() => {
   registerClaudeHandlers()
   registerThemeHandlers()
 
+  // Configure webview session for WebAuthn/passkey support
+  const browserSession = session.fromPartition('persist:browser-tabs')
+
+  browserSession.setPermissionRequestHandler((_webContents, permission, callback) => {
+    const allowedPermissions = ['hid', 'usb', 'clipboard-read', 'clipboard-write']
+    callback(allowedPermissions.includes(permission) || permission === 'unknown')
+  })
+
+  browserSession.setDevicePermissionHandler((details) => {
+    if (details.deviceType === 'hid' || details.deviceType === 'usb') {
+      return true
+    }
+    return false
+  })
+
   // Set app user model id for windows
   electronApp.setAppUserModelId('com.electron')
 
@@ -268,6 +280,39 @@ app.whenReady().then(() => {
 
   // IPC test
   ipcMain.on('ping', () => console.log('pong'))
+
+  // Shell: open external URLs
+  ipcMain.handle('shell:open-external', (_event, url: string) => {
+    shell.openExternal(url)
+  })
+
+  // App version
+  ipcMain.handle('app:getVersion', () => app.getVersion())
+
+  // Webview shortcut interception
+  const registeredWebviews = new Set<number>()
+
+  ipcMain.handle('webview:register-shortcuts', (event, webviewId: number) => {
+    if (registeredWebviews.has(webviewId)) return
+
+    const wc = webContents.fromId(webviewId)
+    if (!wc) return
+
+    registeredWebviews.add(webviewId)
+
+    wc.on('before-input-event', (e, input) => {
+      if (input.type !== 'keyDown') return
+      if (!(input.control || input.meta)) return
+
+      // Cmd/Ctrl+1-9 for tab switching
+      if (/^[1-9]$/.test(input.key)) {
+        e.preventDefault()
+        event.sender.send('webview:shortcut', { key: input.key })
+      }
+    })
+
+    wc.on('destroyed', () => registeredWebviews.delete(webviewId))
+  })
 
   createWindow()
 

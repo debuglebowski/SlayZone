@@ -23,17 +23,33 @@ export function WorkModePage({ taskId, onBack }: Props) {
   const [activeItemId, setActiveItemId] = useState<string | null>(null)
   const [sidebarOpen, setSidebarOpen] = useState(true)
 
-  // Keyboard shortcut Cmd/Ctrl+B to toggle sidebar
+  // Keyboard shortcuts
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if (e.key === 'b' && (e.metaKey || e.ctrlKey)) {
+      if (!(e.metaKey || e.ctrlKey)) return
+      if (e.key === 'b') {
         e.preventDefault()
         setSidebarOpen((prev) => !prev)
+      }
+      const num = parseInt(e.key)
+      if (num >= 1 && num <= 9 && items[num - 1]) {
+        e.preventDefault()
+        setActiveItemId(items[num - 1].id)
       }
     }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
-  }, [])
+  }, [items])
+
+  // Handle shortcuts forwarded from webview
+  useEffect(() => {
+    return window.api.webview.onShortcut(({ key }) => {
+      const num = parseInt(key)
+      if (num >= 1 && num <= 9 && items[num - 1]) {
+        setActiveItemId(items[num - 1].id)
+      }
+    })
+  }, [items])
 
   useEffect(() => {
     window.api.db.getTask(taskId).then(setTask)
@@ -43,12 +59,21 @@ export function WorkModePage({ taskId, onBack }: Props) {
     window.api.workspaceItems.getByTask(taskId).then(setItems)
   }, [taskId])
 
-  // Auto-select first item when items are loaded and no item is selected
+  // Restore last active item or auto-select first item
   useEffect(() => {
     if (items.length > 0 && activeItemId === null) {
-      setActiveItemId(items[0].id)
+      const lastId = task?.last_active_workspace_item_id
+      const valid = lastId && items.some((i) => i.id === lastId)
+      setActiveItemId(valid ? lastId : items[0].id)
     }
-  }, [items, activeItemId])
+  }, [items, activeItemId, task?.last_active_workspace_item_id])
+
+  // Persist active item selection
+  useEffect(() => {
+    if (activeItemId && task && activeItemId !== task.last_active_workspace_item_id) {
+      window.api.db.updateTask({ id: taskId, lastActiveWorkspaceItemId: activeItemId })
+    }
+  }, [activeItemId, taskId, task?.last_active_workspace_item_id])
 
   const handleAddItem = async (type: WorkspaceItemType) => {
     const names = { chat: 'Chat', browser: 'New Tab', document: 'Untitled', dumper: 'Thought Dump' }
@@ -76,6 +101,11 @@ export function WorkModePage({ taskId, onBack }: Props) {
 
   const handleUrlChange = async (id: string, url: string) => {
     const updated = await window.api.workspaceItems.update({ id, url })
+    setItems(items.map((i) => (i.id === id ? updated : i)))
+  }
+
+  const handleFaviconChange = async (id: string, favicon: string) => {
+    const updated = await window.api.workspaceItems.update({ id, favicon })
     setItems(items.map((i) => (i.id === id ? updated : i)))
   }
 
@@ -125,10 +155,11 @@ export function WorkModePage({ taskId, onBack }: Props) {
           {items.length === 0 ? (
             <p className="text-sm text-muted-foreground text-center py-4">No items yet</p>
           ) : (
-            items.map((item) => (
+            items.map((item, index) => (
               <WorkspaceItemCard
                 key={item.id}
                 item={item}
+                index={index}
                 isActive={item.id === activeItemId}
                 onClick={() => setActiveItemId(item.id)}
                 onRename={(name) => handleRenameItem(item.id, name)}
@@ -219,11 +250,18 @@ export function WorkModePage({ taskId, onBack }: Props) {
       ) : (
         <main className="flex-1 min-h-0">
           {activeItem.type === 'chat' ? (
-            <ChatPanel task={task} workspaceItemId={activeItem.id} />
+            <ChatPanel
+              task={task}
+              workspaceItemId={activeItem.id}
+              item={activeItem}
+              onRename={(name) => handleRenameItem(activeItem.id, name)}
+            />
           ) : activeItem.type === 'browser' ? (
             <BrowserView
               url={activeItem.url ?? 'https://google.com'}
               onUrlChange={(url) => handleUrlChange(activeItem.id, url)}
+              onTitleChange={(title) => handleRenameItem(activeItem.id, title)}
+              onFaviconChange={(favicon) => handleFaviconChange(activeItem.id, favicon)}
             />
           ) : activeItem.type === 'document' ? (
             <DocumentEditor item={activeItem} onUpdate={handleItemUpdate} />

@@ -1,5 +1,6 @@
 @import "tailwindcss";
 @import "tw-animate-css";
+@plugin "@tailwindcss/typography";
 
 @custom-variant dark (&:is(.dark *));
 
@@ -154,8 +155,13 @@
 }
 
 /* TipTap/ProseMirror styles */
+.tiptap {
+  height: 100%;
+}
+
 .ProseMirror {
   min-height: inherit;
+  height: 100%;
   outline: none;
 }
 
@@ -165,6 +171,32 @@
   color: var(--color-muted-foreground);
   pointer-events: none;
   height: 0;
+}
+
+/* Tighter prose spacing */
+.ProseMirror.prose > * + * {
+  margin-top: 0.5em;
+}
+
+.ProseMirror.prose ul,
+.ProseMirror.prose ol {
+  padding-left: 1.25em;
+}
+
+.ProseMirror.prose li {
+  margin-top: 0.125em;
+  margin-bottom: 0.125em;
+}
+
+.ProseMirror.prose li > p {
+  margin: 0;
+}
+
+.ProseMirror.prose h1,
+.ProseMirror.prose h2,
+.ProseMirror.prose h3 {
+  margin-top: 0.75em;
+  margin-bottom: 0.25em;
 }
 
 /* Task list checkbox styling */

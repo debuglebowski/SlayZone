@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { Loader2, Save, Sparkles, Send, X, AlertCircle } from 'lucide-react'
 import type { WorkspaceItem } from '../../../../shared/types/database'
+import { EditableTitle } from './EditableTitle'
 
 interface Props {
   item: WorkspaceItem
@@ -144,8 +145,19 @@ export function DumperPanel({ item, onUpdate }: Props) {
   const displayContent = isStreaming ? content : output
   const hasChanges = displayContent && displayContent !== parseDumperData(item.content).organized
 
+  const handleRename = async (name: string) => {
+    const updated = await window.api.workspaceItems.update({
+      id: item.id,
+      name
+    })
+    onUpdate(updated)
+  }
+
   return (
     <div className="flex flex-col h-full">
+      <div className="px-4 pt-4 pb-2">
+        <EditableTitle value={item.name} onChange={handleRename} />
+      </div>
       {/* Side-by-side layout */}
       <div className="flex-1 flex min-h-0">
         {/* Left panel: Thoughts list with input at bottom */}

@@ -113,6 +113,22 @@ const migrations: Migration[] = [
         CREATE INDEX idx_tasks_recurring ON tasks(next_reset_at) WHERE recurrence_type IS NOT NULL;
       `)
     }
+  },
+  {
+    version: 6,
+    up: (db) => {
+      db.exec(`
+        ALTER TABLE workspace_items ADD COLUMN favicon TEXT DEFAULT NULL;
+      `)
+    }
+  },
+  {
+    version: 7,
+    up: (db) => {
+      db.exec(`
+        ALTER TABLE tasks ADD COLUMN last_active_workspace_item_id TEXT DEFAULT NULL;
+      `)
+    }
   }
 ]
 

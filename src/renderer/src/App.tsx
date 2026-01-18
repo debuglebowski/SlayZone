@@ -48,9 +48,24 @@ function App(): React.JSX.Element {
   // Filter state (persisted per project)
   const [filter, setFilter] = useFilterState(selectedProjectId)
 
-  // View state (replaces editingTask for task detail navigation)
-  const [view, setView] = useState<ViewState>({ type: 'kanban' })
+  // View state with history for back navigation
+  const [viewHistory, setViewHistory] = useState<ViewState[]>([{ type: 'kanban' }])
+  const view = viewHistory[viewHistory.length - 1]
   const [navDirection, setNavDirection] = useState<'forward' | 'backward'>('forward')
+
+  // Navigation functions
+  const navigateTo = (newView: ViewState): void => {
+    // Skip if navigating to same view
+    if (JSON.stringify(view) === JSON.stringify(newView)) return
+    setNavDirection('forward')
+    setViewHistory((prev) => [...prev, newView])
+  }
+
+  const goBack = (): void => {
+    if (viewHistory.length <= 1) return
+    setNavDirection('backward')
+    setViewHistory((prev) => prev.slice(0, -1))
+  }
 
   // Dialog state
   const [createOpen, setCreateOpen] = useState(false)
@@ -146,32 +161,11 @@ function App(): React.JSX.Element {
 
   // Navigation handlers
   const openTaskDetail = (taskId: string): void => {
-    setNavDirection('forward')
-    setView({ type: 'task-detail', taskId })
-  }
-
-  const closeTaskDetail = (): void => {
-    setNavDirection('backward')
-    setView({ type: 'kanban' })
+    navigateTo({ type: 'task-detail', taskId })
   }
 
   const openWorkMode = (taskId: string): void => {
-    setNavDirection('forward')
-    setView({ type: 'work-mode', taskId })
-  }
-
-  const closeWorkMode = (): void => {
-    // Return to task detail, not kanban
-    if (view.type === 'work-mode') {
-      setNavDirection('backward')
-      setView({ type: 'task-detail', taskId: view.taskId })
-    }
-  }
-
-  const openArchive = (): void => {
-    setSelectedProjectId(null)
-    setNavDirection('forward')
-    setView({ type: 'archived' })
+    navigateTo({ type: 'work-mode', taskId })
   }
 
   // Keyboard shortcuts
@@ -207,9 +201,7 @@ function App(): React.JSX.Element {
       if (settingsOpen) return
       if (searchOpen) return
 
-      // Navigate back
-      if (view.type === 'work-mode') closeWorkMode()
-      else if (view.type === 'task-detail') closeTaskDetail()
+      goBack()
     },
     { enableOnFormTags: false }
   )
@@ -325,6 +317,38 @@ function App(): React.JSX.Element {
     }
   }
 
+  // Context menu handlers
+  const handleContextMenuUpdate = async (
+    taskId: string,
+    updates: Partial<Task>
+  ): Promise<void> => {
+    // Optimistic update
+    const previousTasks = tasks
+    setTasks(tasks.map((t) => (t.id === taskId ? { ...t, ...updates } : t)))
+
+    try {
+      await window.api.db.updateTask({
+        id: taskId,
+        status: updates.status,
+        priority: updates.priority,
+        blockedReason: updates.blocked_reason,
+        projectId: updates.project_id
+      })
+    } catch {
+      setTasks(previousTasks)
+    }
+  }
+
+  const handleContextMenuArchive = async (taskId: string): Promise<void> => {
+    setTasks(tasks.filter((t) => t.id !== taskId))
+    await window.api.db.archiveTask(taskId)
+  }
+
+  const handleContextMenuDelete = async (taskId: string): Promise<void> => {
+    setTasks(tasks.filter((t) => t.id !== taskId))
+    await window.api.db.deleteTask(taskId)
+  }
+
   // Project CRUD handlers
   const handleProjectCreated = (project: Project): void => {
     setProjects([...projects, project])
@@ -417,7 +441,7 @@ function App(): React.JSX.Element {
     if (view.type === 'work-mode') {
       return (
         <AnimatedPage viewKey={`work-mode-${view.taskId}`} direction={navDirection}>
-          <WorkModePage taskId={view.taskId} onBack={closeWorkMode} />
+          <WorkModePage taskId={view.taskId} onBack={goBack} />
         </AnimatedPage>
       )
     }
@@ -426,16 +450,7 @@ function App(): React.JSX.Element {
     if (view.type === 'archived') {
       return (
         <AnimatedPage viewKey="archived" direction={navDirection}>
-          <ArchivedTasksView
-            onBack={() => {
-              setNavDirection('backward')
-              setView({ type: 'kanban' })
-            }}
-            onTaskClick={(id) => {
-              setNavDirection('forward')
-              setView({ type: 'task-detail', taskId: id })
-            }}
-          />
+          <ArchivedTasksView onBack={goBack} onTaskClick={openTaskDetail} />
         </AnimatedPage>
       )
     }
@@ -446,7 +461,7 @@ function App(): React.JSX.Element {
         <AnimatedPage viewKey={`task-detail-${view.taskId}`} direction={navDirection}>
           <TaskDetailPage
             taskId={view.taskId}
-            onBack={closeTaskDetail}
+            onBack={goBack}
             onTaskUpdated={handleTaskDetailUpdated}
             onWorkMode={() => openWorkMode(view.taskId)}
             onNavigateToTask={openTaskDetail}
@@ -528,6 +543,10 @@ function App(): React.JSX.Element {
                   taskTags={taskTags}
                   allTasks={projectTasks}
                   tags={tags}
+                  allProjects={projects}
+                  onUpdateTask={handleContextMenuUpdate}
+                  onArchiveTask={handleContextMenuArchive}
+                  onDeleteTask={handleContextMenuDelete}
                 />
               </div>
             </>

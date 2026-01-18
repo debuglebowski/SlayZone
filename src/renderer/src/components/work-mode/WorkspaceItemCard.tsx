@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { MessageSquare, Globe, FileText, MoreVertical, Lightbulb } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { Sparkles, Globe, FileText, MoreVertical, Lightbulb } from 'lucide-react'
 import type { WorkspaceItem } from '../../../../shared/types/database'
 import {
   DropdownMenu,
@@ -13,6 +13,7 @@ import { cn } from '@/lib/utils'
 
 interface Props {
   item: WorkspaceItem
+  index?: number
   isActive: boolean
   onClick: () => void
   onRename: (name: string) => void
@@ -20,16 +21,35 @@ interface Props {
 }
 
 const typeIcons = {
-  chat: MessageSquare,
+  chat: Sparkles,
   browser: Globe,
   document: FileText,
   dumper: Lightbulb
 }
 
-export function WorkspaceItemCard({ item, isActive, onClick, onRename, onDelete }: Props) {
+function getHostname(url: string): string | null {
+  try {
+    return new URL(url).hostname
+  } catch {
+    return null
+  }
+}
+
+export function WorkspaceItemCard({ item, index, isActive, onClick, onRename, onDelete }: Props) {
   const [editing, setEditing] = useState(false)
   const [name, setName] = useState(item.name)
+  const [faviconError, setFaviconError] = useState(false)
   const Icon = typeIcons[item.type]
+
+  // Reset favicon error state when URL changes
+  useEffect(() => {
+    setFaviconError(false)
+  }, [item.url])
+
+  // Use DuckDuckGo's favicon service (no redirects, CSP-friendly)
+  const hostname = item.type === 'browser' && item.url ? getHostname(item.url) : null
+  const faviconUrl = hostname ? `https://icons.duckduckgo.com/ip3/${hostname}.ico` : null
+  const showFavicon = faviconUrl && !faviconError
 
   const handleRename = () => {
     if (name.trim() && name !== item.name) {
@@ -54,7 +74,21 @@ export function WorkspaceItemCard({ item, isActive, onClick, onRename, onDelete 
       )}
       onClick={editing ? undefined : onClick}
     >
-      <Icon className="h-4 w-4 shrink-0 text-muted-foreground" />
+      {index !== undefined && index < 9 && (
+        <span className="text-xs text-muted-foreground/50 w-3 shrink-0 text-center tabular-nums">
+          {index + 1}
+        </span>
+      )}
+      {showFavicon ? (
+        <img
+          src={faviconUrl}
+          alt=""
+          className="h-4 w-4 shrink-0"
+          onError={() => setFaviconError(true)}
+        />
+      ) : (
+        <Icon className="h-4 w-4 shrink-0 text-muted-foreground" />
+      )}
       {editing ? (
         <Input
           value={name}

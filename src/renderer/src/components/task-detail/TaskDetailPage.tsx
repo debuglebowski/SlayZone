@@ -215,13 +215,13 @@ export function TaskDetailPage({
         <main className="mx-auto max-w-3xl w-full p-6">
           {/* Description */}
           <section>
-            <h2 className="mb-2 text-sm font-medium text-muted-foreground">Description</h2>
             <RichTextEditor
               value={descriptionValue}
               onChange={setDescriptionValue}
               onBlur={handleDescriptionSave}
               placeholder="Add description..."
               minHeight="200px"
+              className="bg-muted/30 rounded-lg p-4"
             />
           </section>
 

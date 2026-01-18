@@ -28,6 +28,11 @@ interface KanbanBoardProps {
   taskTags?: Map<string, string[]>
   allTasks?: Task[]
   tags?: Tag[]
+  // Context menu props
+  allProjects?: Project[]
+  onUpdateTask?: (taskId: string, updates: Partial<Task>) => void
+  onArchiveTask?: (taskId: string) => void
+  onDeleteTask?: (taskId: string) => void
 }
 
 export function KanbanBoard({
@@ -41,7 +46,11 @@ export function KanbanBoard({
   disableDrag,
   taskTags,
   allTasks,
-  tags
+  tags,
+  allProjects,
+  onUpdateTask,
+  onArchiveTask,
+  onDeleteTask
 }: KanbanBoardProps): React.JSX.Element {
   const [activeId, setActiveId] = useState<string | null>(null)
 
@@ -107,6 +116,10 @@ export function KanbanBoard({
             taskTags={taskTags}
             allTasks={allTasks}
             tags={tags}
+            allProjects={allProjects}
+            onUpdateTask={onUpdateTask}
+            onArchiveTask={onArchiveTask}
+            onDeleteTask={onDeleteTask}
           />
         ))}
       </div>

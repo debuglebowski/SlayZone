@@ -2,15 +2,18 @@ import { useRef, useEffect } from 'react'
 import { useClaude } from '@/hooks/useClaude'
 import { ChatMessage } from './ChatMessage'
 import { ChatInput } from './ChatInput'
-import type { Task } from '../../../../shared/types/database'
+import { EditableTitle } from '@/components/work-mode/EditableTitle'
+import type { Task, WorkspaceItem } from '../../../../shared/types/database'
 import type { ChatMessage as ChatMessageType } from '../../../../shared/types/api'
 
 interface Props {
   task: Task
   workspaceItemId?: string
+  item?: WorkspaceItem
+  onRename?: (name: string) => void
 }
 
-export function ChatPanel({ task, workspaceItemId }: Props) {
+export function ChatPanel({ task, workspaceItemId, item, onRename }: Props) {
   const { messages, content, status, stream, cancel, addMessage } = useClaude(workspaceItemId)
   const scrollRef = useRef<HTMLDivElement>(null)
 
@@ -93,6 +96,11 @@ export function ChatPanel({ task, workspaceItemId }: Props) {
 
   return (
     <div className="flex flex-col h-full bg-background">
+      {item && onRename && (
+        <div className="px-6 pt-6 pb-2">
+          <EditableTitle value={item.name} onChange={onRename} />
+        </div>
+      )}
       <div
         ref={scrollRef}
         className="flex-1 overflow-y-auto py-6 scroll-smooth"

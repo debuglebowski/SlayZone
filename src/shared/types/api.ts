@@ -76,6 +76,8 @@ export interface UpdateTaskInput {
   recurrenceType?: RecurrenceType | null
   recurrenceInterval?: number | null
   nextResetAt?: string | null
+  projectId?: string
+  lastActiveWorkspaceItemId?: string | null
 }
 
 export interface UpdateProjectInput {
@@ -108,6 +110,7 @@ export interface UpdateWorkspaceItemInput {
   name?: string
   content?: string
   url?: string
+  favicon?: string
 }
 
 export interface ElectronAPI {
@@ -170,5 +173,15 @@ export interface ElectronAPI {
     getSource: () => Promise<ThemePreference>
     set: (theme: ThemePreference) => Promise<Theme>
     onChange: (callback: (theme: Theme) => void) => () => void
+  }
+  shell: {
+    openExternal: (url: string) => Promise<void>
+  }
+  webview: {
+    registerShortcuts: (webviewId: number) => Promise<void>
+    onShortcut: (callback: (data: { key: string }) => void) => () => void
+  }
+  app: {
+    getVersion: () => Promise<string>
   }
 }
