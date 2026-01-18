@@ -39,9 +39,7 @@ export async function streamClaude(win: BrowserWindow, prompt: string, context?:
   args.push('--', prompt)  // -- signals end of options, so prompt can start with -
 
   // Spawn process
-  console.log('[Claude] Spawning:', claudePath)
-  console.log('[Claude] Args:', JSON.stringify(args))
-  console.log('[Claude] Prompt length:', prompt.length, 'Context length:', context?.length ?? 0)
+  console.log('[Claude] Spawning:', claudePath, 'with args:', args.slice(0, -1).join(' '), '+ prompt')
   activeProcess = spawn(claudePath, args, {
     stdio: ['ignore', 'pipe', 'pipe'],
     env: {
@@ -102,7 +100,6 @@ export async function streamClaude(win: BrowserWindow, prompt: string, context?:
   })
 
   activeProcess.stderr?.on('data', (data) => {
-    console.log('[Claude] stderr:', data.toString())
     win.webContents.send('claude:error', data.toString())
   })
 
