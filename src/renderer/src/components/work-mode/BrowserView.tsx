@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, forwardRef, useImperativeHandle } from 'react'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { RotateCw, ArrowLeft, ArrowRight } from 'lucide-react'
@@ -10,9 +10,22 @@ interface Props {
   onFaviconChange?: (favicon: string) => void
 }
 
-export function BrowserView({ url, onUrlChange, onTitleChange, onFaviconChange }: Props) {
+export interface BrowserViewHandle {
+  focusUrlBar: () => void
+}
+
+export const BrowserView = forwardRef<BrowserViewHandle, Props>(
+  function BrowserView({ url, onUrlChange, onTitleChange, onFaviconChange }, ref) {
   const [inputUrl, setInputUrl] = useState(url)
   const webviewRef = useRef<Electron.WebviewTag>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  useImperativeHandle(ref, () => ({
+    focusUrlBar: () => {
+      inputRef.current?.focus()
+      inputRef.current?.select()
+    }
+  }))
 
   // Sync input when url prop changes
   useEffect(() => {
@@ -122,6 +135,7 @@ export function BrowserView({ url, onUrlChange, onTitleChange, onFaviconChange }
           <RotateCw className="h-4 w-4" />
         </Button>
         <Input
+          ref={inputRef}
           value={inputUrl}
           onChange={(e) => setInputUrl(e.target.value)}
           onKeyDown={handleKeyDown}
@@ -142,4 +156,4 @@ export function BrowserView({ url, onUrlChange, onTitleChange, onFaviconChange }
       </div>
     </div>
   )
-}
+})

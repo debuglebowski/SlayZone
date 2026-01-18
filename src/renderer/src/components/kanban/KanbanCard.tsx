@@ -70,16 +70,16 @@ export function KanbanCard({
         onClick={(e) => onClick?.(e)}
       >
       <CardContent className="px-2.5 py-5">
-        <div className="flex items-center gap-1">
+        <div className="flex items-start gap-3">
           {/* Project color dot - shown in All view */}
           {showProject && project ? (
             <div
-              className="h-1.5 w-1.5 rounded-full shrink-0"
+              className="h-1.5 w-1.5 rounded-full shrink-0 mt-1"
               style={{ backgroundColor: project.color }}
               title={project.name}
             />
           ) : showProject ? (
-            <div className="h-1.5 w-1.5 rounded-full bg-muted-foreground/30 shrink-0" />
+            <div className="h-1.5 w-1.5 rounded-full bg-muted-foreground/30 shrink-0 mt-1" />
           ) : null}
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-1">

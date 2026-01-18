@@ -1,11 +1,11 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { X, MessageSquare, Globe, FileText, PanelLeft, Lightbulb } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { Task, WorkspaceItem, WorkspaceItemType } from '../../../../shared/types/database'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip'
 import { Separator } from '@/components/ui/separator'
-import { BrowserView } from './BrowserView'
+import { BrowserView, type BrowserViewHandle } from './BrowserView'
 import { DocumentEditor } from './DocumentEditor'
 import { ChatPanel } from '@/components/chat/ChatPanel'
 import { WorkspaceItemCard } from './WorkspaceItemCard'
@@ -22,6 +22,7 @@ export function WorkModePage({ taskId, onBack }: Props) {
   const [items, setItems] = useState<WorkspaceItem[]>([])
   const [activeItemId, setActiveItemId] = useState<string | null>(null)
   const [sidebarOpen, setSidebarOpen] = useState(true)
+  const browserRef = useRef<BrowserViewHandle>(null)
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -30,6 +31,30 @@ export function WorkModePage({ taskId, onBack }: Props) {
       if (e.key === 'b') {
         e.preventDefault()
         setSidebarOpen((prev) => !prev)
+        return
+      }
+      if (e.key === 't') {
+        e.preventDefault()
+        handleAddItem('browser')
+        return
+      }
+      if (e.key === 'a') {
+        e.preventDefault()
+        handleAddItem('chat')
+        return
+      }
+      if (e.key === 'd') {
+        e.preventDefault()
+        handleAddItem('document')
+        return
+      }
+      if (e.key === 'l') {
+        const active = items.find((i) => i.id === activeItemId)
+        if (active?.type === 'browser') {
+          e.preventDefault()
+          browserRef.current?.focusUrlBar()
+          return
+        }
       }
       const num = parseInt(e.key)
       if (num >= 1 && num <= 9 && items[num - 1]) {
@@ -39,7 +64,7 @@ export function WorkModePage({ taskId, onBack }: Props) {
     }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
-  }, [items])
+  }, [items, activeItemId])
 
   // Handle shortcuts forwarded from webview
   useEffect(() => {
@@ -48,6 +73,10 @@ export function WorkModePage({ taskId, onBack }: Props) {
       if (num >= 1 && num <= 9 && items[num - 1]) {
         setActiveItemId(items[num - 1].id)
       }
+      if (key === 't') handleAddItem('browser')
+      if (key === 'a') handleAddItem('chat')
+      if (key === 'd') handleAddItem('document')
+      if (key === 'l') browserRef.current?.focusUrlBar()
     })
   }, [items])
 
@@ -179,7 +208,7 @@ export function WorkModePage({ taskId, onBack }: Props) {
                 <MessageSquare className="h-3.5 w-3.5" />
               </Button>
             </TooltipTrigger>
-            <TooltipContent>Add Chat</TooltipContent>
+            <TooltipContent>Add Chat (⌘A)</TooltipContent>
           </Tooltip>
           <Separator orientation="vertical" className="h-5" />
           <Tooltip>
@@ -192,7 +221,7 @@ export function WorkModePage({ taskId, onBack }: Props) {
                 <Globe className="h-3.5 w-3.5" />
               </Button>
             </TooltipTrigger>
-            <TooltipContent>Add Browser</TooltipContent>
+            <TooltipContent>Add Browser (⌘T)</TooltipContent>
           </Tooltip>
           <Separator orientation="vertical" className="h-5" />
           <Tooltip>
@@ -205,7 +234,7 @@ export function WorkModePage({ taskId, onBack }: Props) {
                 <FileText className="h-3.5 w-3.5" />
               </Button>
             </TooltipTrigger>
-            <TooltipContent>Add Document</TooltipContent>
+            <TooltipContent>Add Document (⌘D)</TooltipContent>
           </Tooltip>
           <Separator orientation="vertical" className="h-5" />
           <Tooltip>
@@ -258,6 +287,7 @@ export function WorkModePage({ taskId, onBack }: Props) {
             />
           ) : activeItem.type === 'browser' ? (
             <BrowserView
+              ref={browserRef}
               url={activeItem.url ?? 'https://google.com'}
               onUrlChange={(url) => handleUrlChange(activeItem.id, url)}
               onTitleChange={(title) => handleRenameItem(activeItem.id, title)}

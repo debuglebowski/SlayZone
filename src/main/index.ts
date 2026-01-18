@@ -304,10 +304,10 @@ app.whenReady().then(() => {
       if (input.type !== 'keyDown') return
       if (!(input.control || input.meta)) return
 
-      // Cmd/Ctrl+1-9 for tab switching
-      if (/^[1-9]$/.test(input.key)) {
+      // Cmd/Ctrl+1-9 for tab switching, T/A/D for adding items, L for URL bar
+      if (/^[1-9tadl]$/i.test(input.key)) {
         e.preventDefault()
-        event.sender.send('webview:shortcut', { key: input.key })
+        event.sender.send('webview:shortcut', { key: input.key.toLowerCase() })
       }
     })
 
