@@ -11,6 +11,13 @@ export interface ClaudeAvailability {
   version: string | null
 }
 
+// PTY types
+export interface PtyInfo {
+  taskId: string
+  lastOutputTime: number
+  isIdle: boolean
+}
+
 export interface CreateTaskInput {
   projectId: string
   title: string
@@ -134,8 +141,11 @@ export interface ElectronAPI {
     resize: (taskId: string, cols: number, rows: number) => Promise<boolean>
     kill: (taskId: string) => Promise<boolean>
     exists: (taskId: string) => Promise<boolean>
+    getBuffer: (taskId: string) => Promise<string | null>
+    list: () => Promise<PtyInfo[]>
     onData: (callback: (taskId: string, data: string) => void) => () => void
     onExit: (callback: (taskId: string, exitCode: number) => void) => () => void
     onSessionNotFound: (callback: (taskId: string) => void) => () => void
+    onIdle: (callback: (taskId: string) => void) => () => void
   }
 }

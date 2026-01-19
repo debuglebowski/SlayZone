@@ -3,6 +3,7 @@ import { Terminal as XTerm } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
 import { WebLinksAddon } from '@xterm/addon-web-links'
 import '@xterm/xterm/css/xterm.css'
+import { getTerminal, setTerminal, disposeTerminal } from './terminal-cache'
 
 interface TerminalProps {
   taskId: string
@@ -30,6 +31,25 @@ export function Terminal({
     if (!containerRef.current || initializedRef.current) return
     initializedRef.current = true
 
+    // Check if we have a cached terminal for this task
+    const cached = getTerminal(taskId)
+    if (cached) {
+      // Reattach existing terminal
+      containerRef.current.appendChild(cached.element)
+      terminalRef.current = cached.terminal
+      fitAddonRef.current = cached.fitAddon
+
+      // Fit to potentially new container size and focus
+      cached.fitAddon.fit()
+      cached.terminal.focus()
+
+      // Sync terminal size with PTY
+      const { cols, rows } = cached.terminal
+      window.api.pty.resize(taskId, cols, rows)
+      return
+    }
+
+    // Create new terminal
     const terminal = new XTerm({
       cursorBlink: true,
       fontSize: 13,
@@ -72,9 +92,15 @@ export function Terminal({
     fitAddon.fit()
     terminal.focus()
 
-    // Check if PTY already exists
+    // Check if PTY already exists (e.g., from a previous app session)
     const exists = await window.api.pty.exists(taskId)
-    if (!exists) {
+    if (exists) {
+      // PTY exists - restore terminal history from buffer (fallback)
+      const buffer = await window.api.pty.getBuffer(taskId)
+      if (buffer) {
+        terminal.write(buffer)
+      }
+    } else {
       // Generate session ID if not provided
       let newSessionId = sessionId
       if (!newSessionId && !existingSessionId) {
@@ -110,12 +136,23 @@ export function Terminal({
     initTerminal()
 
     return () => {
-      terminalRef.current?.dispose()
+      // Detach terminal from DOM and cache it (don't dispose)
+      if (terminalRef.current && fitAddonRef.current) {
+        const element = terminalRef.current.element
+        if (element && element.parentNode) {
+          element.parentNode.removeChild(element)
+          setTerminal(taskId, {
+            terminal: terminalRef.current,
+            fitAddon: fitAddonRef.current,
+            element
+          })
+        }
+      }
       terminalRef.current = null
       fitAddonRef.current = null
       initializedRef.current = false
     }
-  }, [initTerminal])
+  }, [initTerminal, taskId])
 
   // Listen for PTY data
   useEffect(() => {
@@ -137,10 +174,23 @@ export function Terminal({
       }
     })
 
+    // Listen for idle events to hibernate the terminal (dispose xterm, keep PTY)
+    const unsubIdle = window.api.pty.onIdle((id) => {
+      if (id === taskId) {
+        // Dispose the cached terminal for this task to free memory
+        // The PTY is still running, so we can restore from buffer later
+        disposeTerminal(taskId)
+        // Clear local refs if they point to the disposed terminal
+        terminalRef.current = null
+        fitAddonRef.current = null
+      }
+    })
+
     return () => {
       unsubData()
       unsubExit()
       unsubSessionNotFound()
+      unsubIdle()
     }
   }, [taskId, onSessionInvalid])
 
@@ -166,7 +216,7 @@ export function Terminal({
     <div
       ref={containerRef}
       tabIndex={0}
-      className="h-full w-full bg-[#0a0a0a] outline-none"
+      className="h-[calc(100%-32px)] w-[calc(100%-32px)] m-4 bg-[#0a0a0a] border border-neutral-800 rounded-lg outline-none overflow-hidden"
       style={{ padding: '8px' }}
       onClick={() => terminalRef.current?.focus()}
     />

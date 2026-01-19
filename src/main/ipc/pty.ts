@@ -1,5 +1,5 @@
 import { ipcMain, BrowserWindow } from 'electron'
-import { createPty, writePty, resizePty, killPty, hasPty } from '../services/pty-manager'
+import { createPty, writePty, resizePty, killPty, hasPty, getBuffer, listPtys } from '../services/pty-manager'
 
 export function registerPtyHandlers(): void {
   ipcMain.handle(
@@ -31,5 +31,13 @@ export function registerPtyHandlers(): void {
 
   ipcMain.handle('pty:exists', (_, taskId: string) => {
     return hasPty(taskId)
+  })
+
+  ipcMain.handle('pty:getBuffer', (_, taskId: string) => {
+    return getBuffer(taskId)
+  })
+
+  ipcMain.handle('pty:list', () => {
+    return listPtys()
   })
 }

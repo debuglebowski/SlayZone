@@ -28,6 +28,7 @@ interface KanbanBoardProps {
   taskTags?: Map<string, string[]>
   tags?: Tag[]
   blockedTaskIds?: Set<string>
+  activePtyTaskIds?: Set<string>
   // Context menu props
   allProjects?: Project[]
   onUpdateTask?: (taskId: string, updates: Partial<Task>) => void
@@ -47,6 +48,7 @@ export function KanbanBoard({
   taskTags,
   tags,
   blockedTaskIds,
+  activePtyTaskIds,
   allProjects,
   onUpdateTask,
   onArchiveTask,
@@ -116,6 +118,7 @@ export function KanbanBoard({
             taskTags={taskTags}
             tags={tags}
             blockedTaskIds={blockedTaskIds}
+            activePtyTaskIds={activePtyTaskIds}
             allProjects={allProjects}
             onUpdateTask={onUpdateTask}
             onArchiveTask={onArchiveTask}

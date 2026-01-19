@@ -1,0 +1,85 @@
+#!/usr/bin/env node
+/**
+ * Patches the Electron.app bundle to show "OmgSlayZone" in macOS (menu bar and Cmd+Tab) during development.
+ * This is a workaround for the known limitation where macOS shows "Electron" in dev mode.
+ *
+ * What this script does:
+ * 1. Renames Electron.app to OmgSlayZone.app
+ * 2. Updates path.txt so electron-vite finds the renamed app
+ * 3. Patches Info.plist to set CFBundleName and CFBundleDisplayName
+ */
+
+const fs = require('fs')
+const path = require('path')
+
+const APP_NAME = 'OmgSlayZone'
+
+// Only run on macOS
+if (process.platform !== 'darwin') {
+  console.log('Skipping Electron name patch (not macOS)')
+  process.exit(0)
+}
+
+const electronDir = path.join(__dirname, '..', 'node_modules', 'electron')
+const distDir = path.join(electronDir, 'dist')
+const oldAppPath = path.join(distDir, 'Electron.app')
+const newAppPath = path.join(distDir, `${APP_NAME}.app`)
+const pathTxtFile = path.join(electronDir, 'path.txt')
+
+// Step 1: Rename Electron.app to OmgSlayZone.app (if not already renamed)
+if (fs.existsSync(oldAppPath)) {
+  try {
+    fs.renameSync(oldAppPath, newAppPath)
+    console.log(`✓ Renamed Electron.app to ${APP_NAME}.app`)
+  } catch (err) {
+    console.error(`Failed to rename Electron.app: ${err.message}`)
+    process.exit(1)
+  }
+} else if (fs.existsSync(newAppPath)) {
+  console.log(`✓ ${APP_NAME}.app already exists`)
+} else {
+  console.log('Electron.app not found, skipping patch')
+  process.exit(0)
+}
+
+// Step 2: Update path.txt to point to renamed app
+try {
+  const newPath = `${APP_NAME}.app/Contents/MacOS/Electron`
+  fs.writeFileSync(pathTxtFile, newPath)
+  console.log(`✓ Updated path.txt to: ${newPath}`)
+} catch (err) {
+  console.error(`Failed to update path.txt: ${err.message}`)
+  process.exit(1)
+}
+
+// Step 3: Patch Info.plist
+const plistPath = path.join(newAppPath, 'Contents', 'Info.plist')
+
+if (!fs.existsSync(plistPath)) {
+  console.log('Info.plist not found, skipping plist patch')
+  process.exit(0)
+}
+
+try {
+  let plist = fs.readFileSync(plistPath, 'utf-8')
+
+  // Replace CFBundleDisplayName
+  plist = plist.replace(
+    /<key>CFBundleDisplayName<\/key>\s*<string>[^<]*<\/string>/,
+    `<key>CFBundleDisplayName</key>\n\t<string>${APP_NAME}</string>`
+  )
+
+  // Replace CFBundleName
+  plist = plist.replace(
+    /<key>CFBundleName<\/key>\s*<string>[^<]*<\/string>/,
+    `<key>CFBundleName</key>\n\t<string>${APP_NAME}</string>`
+  )
+
+  fs.writeFileSync(plistPath, plist)
+  console.log(`✓ Patched Info.plist with app name "${APP_NAME}"`)
+} catch (err) {
+  console.error(`Failed to patch Info.plist: ${err.message}`)
+  process.exit(1)
+}
+
+console.log(`\n✅ Electron patched successfully! "${APP_NAME}" will appear in macOS menu bar and Cmd+Tab.`)

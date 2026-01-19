@@ -1,10 +1,10 @@
 import { useState, useEffect, useRef } from 'react'
 import { useHotkeys } from 'react-hotkeys-hook'
-import { AnimatePresence, motion } from 'framer-motion'
 import type { Task, Project, Tag, TaskStatus } from '../../shared/types/database'
 import { KanbanBoard } from '@/components/kanban/KanbanBoard'
 import { applyFilters, type Column } from '@/lib/kanban'
 import { useFilterState } from '@/hooks/useFilterState'
+import { usePtyStatus } from '@/hooks/usePtyStatus'
 import { FilterBar } from '@/components/filters/FilterBar'
 import { CreateTaskDialog } from '@/components/CreateTaskDialog'
 import { EditTaskDialog } from '@/components/EditTaskDialog'
@@ -20,9 +20,7 @@ import { ArchivedTasksView } from '@/components/ArchivedTasksView'
 import { Button } from '@/components/ui/button'
 import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar'
 import { AppSidebar } from '@/components/sidebar/AppSidebar'
-import { useWhatNext } from '@/hooks/useWhatNext'
 import { AnimatedPage } from '@/components/animations/AnimatedPage'
-import { LoadingScreen } from '@/components/LoadingScreen'
 
 // View state for navigation
 type ViewState =
@@ -33,7 +31,6 @@ type ViewState =
 function App(): React.JSX.Element {
   // Task state
   const [tasks, setTasks] = useState<Task[]>([])
-  const [loading, setLoading] = useState(true)
 
   // Project state
   const [projects, setProjects] = useState<Project[]>([])
@@ -45,6 +42,9 @@ function App(): React.JSX.Element {
 
   // Blocked tasks state
   const [blockedTaskIds, setBlockedTaskIds] = useState<Set<string>>(new Set())
+
+  // Active PTY tasks (AI running)
+  const activePtyTaskIds = usePtyStatus()
 
   // Filter state (persisted per project)
   const [filter, setFilter] = useFilterState(selectedProjectId)
@@ -98,12 +98,10 @@ function App(): React.JSX.Element {
 
   // Load data on mount
   useEffect(() => {
-    const minLoadTime = new Promise((r) => setTimeout(r, 3000))
     Promise.all([
       window.api.db.getTasks(),
       window.api.db.getProjects(),
-      window.api.tags.getTags(),
-      minLoadTime
+      window.api.tags.getTags()
     ]).then(([t, p, tg]) => {
       setTasks(t as Task[])
       setProjects(p as Project[])
@@ -112,8 +110,6 @@ function App(): React.JSX.Element {
       loadTaskTags(t as Task[])
       // Load blocked task IDs
       loadBlockedTaskIds(t as Task[])
-      // Don't auto-select first project - start with "All" view
-      setLoading(false)
     })
   }, [])
 
@@ -151,8 +147,6 @@ function App(): React.JSX.Element {
     ? tasks.filter((t) => t.project_id === selectedProjectId)
     : tasks
 
-  // Get highest-priority task suggestion
-  const whatNextTask = useWhatNext(projectTasks)
 
   // Sync project name value when selected project changes
   useEffect(() => {
@@ -206,9 +200,9 @@ function App(): React.JSX.Element {
     { enableOnFormTags: true }
   )
 
-  // "esc" navigates back (Radix handles dialog closing)
+  // "shift+esc" navigates back (plain esc reserved for terminal)
   useHotkeys(
-    'escape',
+    'shift+escape',
     () => {
       // Skip if any dialog is open - Radix handles those
       if (createOpen || editingTask || deletingTask) return
@@ -417,21 +411,9 @@ function App(): React.JSX.Element {
   }
 
   return (
-    <AnimatePresence mode="wait">
-      {loading ? (
-        <LoadingScreen key="loading" />
-      ) : (
-        <motion.div
-          key="app"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 0.3 }}
-          className="h-full w-full"
-        >
-          {renderAppContent()}
-        </motion.div>
-      )}
-    </AnimatePresence>
+    <div className="h-full w-full">
+      {renderAppContent()}
+    </div>
   )
 
   function renderAppContent(): React.JSX.Element {
@@ -464,6 +446,7 @@ function App(): React.JSX.Element {
       <SidebarProvider defaultOpen={true}>
       <AppSidebar
         projects={projects}
+        tasks={tasks}
         selectedProjectId={selectedProjectId}
         onSelectProject={setSelectedProjectId}
         onAddProject={() => setCreateProjectOpen(true)}
@@ -491,22 +474,9 @@ function App(): React.JSX.Element {
             ) : (
               <h1 className="text-2xl font-bold">All Tasks</h1>
             )}
-            <div className="flex items-center gap-3">
-              {whatNextTask && (
-                <div
-                  className="flex items-center gap-2 px-3 py-1.5 bg-muted rounded-md cursor-pointer hover:bg-muted/80"
-                  onClick={() => openTaskDetail(whatNextTask.id)}
-                >
-                  <span className="text-sm text-muted-foreground">Next:</span>
-                  <span className="text-sm font-medium truncate max-w-[200px]">
-                    {whatNextTask.title}
-                  </span>
-                </div>
-              )}
-              <Button onClick={() => setCreateOpen(true)} disabled={projects.length === 0}>
-                New Task
-              </Button>
-            </div>
+            <Button onClick={() => setCreateOpen(true)} disabled={projects.length === 0}>
+              New Task
+            </Button>
           </header>
 
           {projects.length === 0 ? (
@@ -531,6 +501,7 @@ function App(): React.JSX.Element {
                   taskTags={taskTags}
                   tags={tags}
                   blockedTaskIds={blockedTaskIds}
+                  activePtyTaskIds={activePtyTaskIds}
                   allProjects={projects}
                   onUpdateTask={handleContextMenuUpdate}
                   onArchiveTask={handleContextMenuArchive}

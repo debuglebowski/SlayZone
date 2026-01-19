@@ -1,6 +1,10 @@
-import { app, shell, BrowserWindow, ipcMain, nativeTheme, session, webContents, dialog } from 'electron'
+import { app, shell, BrowserWindow, ipcMain, nativeTheme, session, webContents, dialog, Menu } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
+
+// #region agent log
+fetch('http://127.0.0.1:7246/ingest/99fa6442-9a16-4bdf-bbc1-4c693694c593',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'index.ts:TOP',message:'App info at startup',data:{appName:app.name,appPath:app.getAppPath(),execPath:process.execPath},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'A,B'})}).catch(()=>{});
+// #endregion
 
 // Enable remote debugging for MCP server (dev only)
 if (is.dev) {
@@ -12,10 +16,10 @@ import { registerDatabaseHandlers } from './ipc/database'
 import { registerClaudeHandlers } from './ipc/claude'
 import { registerThemeHandlers } from './ipc/theme'
 import { registerPtyHandlers } from './ipc/pty'
-import { killAllPtys } from './services/pty-manager'
+import { killAllPtys, startIdleChecker, stopIdleChecker } from './services/pty-manager'
 
 // Minimum splash screen display time (ms)
-const SPLASH_MIN_DURATION = 3500
+const SPLASH_MIN_DURATION = 2800
 
 // Self-contained splash HTML with inline SVG and CSS animations
 const splashHTML = (version: string) => `
@@ -63,21 +67,21 @@ const splashHTML = (version: string) => `
     .line2-container {
       display: inline-flex;
       clip-path: inset(0 100% 0 0);
-      animation: reveal 0.8s ease-out 2s forwards;
+      animation: reveal 0.5s ease-out 1.75s forwards;
     }
     @keyframes reveal {
       from { clip-path: inset(0 100% 0 0); }
       to { clip-path: inset(0 0 0 0); }
     }
-    .letter.line1:nth-child(1) { animation-delay: 0.1s; }
-    .letter.line1:nth-child(2) { animation-delay: 0.2s; }
-    .letter.line1:nth-child(3) { animation-delay: 0.3s; }
-    .letter.line1:nth-child(4) { animation-delay: 0.4s; }
-    .letter.line1:nth-child(5) { animation-delay: 0.5s; }
-    .letter.line1:nth-child(6) { animation-delay: 0.6s; }
-    .letter.line1:nth-child(7) { animation-delay: 0.7s; }
-    .letter.line1:nth-child(8) { animation-delay: 0.8s; }
-    .letter.line1:nth-child(9) { animation-delay: 0.9s; }
+    .letter.line1:nth-child(1) { animation-delay: 0.6s; }
+    .letter.line1:nth-child(2) { animation-delay: 0.65s; }
+    .letter.line1:nth-child(3) { animation-delay: 0.7s; }
+    .letter.line1:nth-child(4) { animation-delay: 0.75s; }
+    .letter.line1:nth-child(5) { animation-delay: 0.8s; }
+    .letter.line1:nth-child(6) { animation-delay: 0.85s; }
+    .letter.line1:nth-child(7) { animation-delay: 0.9s; }
+    .letter.line1:nth-child(8) { animation-delay: 0.95s; }
+    .letter.line1:nth-child(9) { animation-delay: 1s; }
     .line2-container .letter { opacity: 1; animation: none; }
     .version {
       position: absolute;
@@ -85,7 +89,7 @@ const splashHTML = (version: string) => `
       font-size: 12px;
       color: #525252;
       opacity: 0;
-      animation: fadeIn 0.3s ease-out 1s forwards;
+      animation: fadeIn 0.15s ease-out 0.3s forwards;
     }
     @keyframes fadeInScale {
       from { opacity: 0; transform: scale(0.8); }
@@ -108,13 +112,8 @@ const splashHTML = (version: string) => `
   <div class="container">
     <div class="logo-wrapper">
       <svg class="logo" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <circle cx="32" cy="32" r="20" stroke="currentColor" stroke-width="2" fill="none" opacity="0.3"/>
-        <circle cx="32" cy="32" r="12" stroke="currentColor" stroke-width="2" fill="none" opacity="0.5"/>
-        <circle cx="32" cy="32" r="4" fill="currentColor"/>
-        <path d="M 32 12 L 28 20 M 32 12 L 36 20" stroke="currentColor" stroke-width="2" stroke-linecap="round" opacity="0.6"/>
-        <path d="M 52 32 L 44 28 M 52 32 L 44 36" stroke="currentColor" stroke-width="2" stroke-linecap="round" opacity="0.6"/>
-        <path d="M 32 52 L 28 44 M 32 52 L 36 44" stroke="currentColor" stroke-width="2" stroke-linecap="round" opacity="0.6"/>
-        <path d="M 12 32 L 20 28 M 12 32 L 20 36" stroke="currentColor" stroke-width="2" stroke-linecap="round" opacity="0.6"/>
+        <path d="M32 8 C32 8 22 22 22 36 C22 46 26 54 32 56 C38 54 42 46 42 36 C42 22 32 8 32 8Z" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+        <path d="M32 24 C32 24 28 32 28 40 C28 44 30 48 32 48 C34 48 36 44 36 40 C36 32 32 24 32 24Z" fill="currentColor" opacity="0.4"/>
       </svg>
     </div>
     <div class="title">
@@ -186,6 +185,7 @@ function createMainWindow(): void {
     height: 1421,
     show: false,
     center: true,
+    title: 'OmgSlayZone',
     titleBarStyle: 'hiddenInset',
     trafficLightPosition: { x: 16, y: 16 },
     backgroundColor: '#0a0a0a',
@@ -203,6 +203,11 @@ function createMainWindow(): void {
     // Calculate remaining time to keep splash visible
     const elapsed = Date.now() - splashShownAt
     const remaining = Math.max(0, SPLASH_MIN_DURATION - elapsed)
+
+    // Start the idle checker for terminal hibernation
+    if (mainWindow) {
+      startIdleChecker(mainWindow)
+    }
 
     setTimeout(() => {
       // Position main window exactly where splash is
@@ -269,6 +274,70 @@ app.whenReady().then(() => {
   const savedTheme = row?.value as 'light' | 'dark' | 'system' | undefined
   if (savedTheme) {
     nativeTheme.themeSource = savedTheme
+  }
+
+  // Set dock icon on macOS (needed for dev mode)
+  if (process.platform === 'darwin') {
+    app.dock?.setIcon(icon)
+
+    // Set custom application menu to show correct app name in menu items
+    const appName = 'OmgSlayZone'
+    const template: Electron.MenuItemConstructorOptions[] = [
+      {
+        label: appName,
+        submenu: [
+          { role: 'about', label: `About ${appName}` },
+          { type: 'separator' },
+          { role: 'services' },
+          { type: 'separator' },
+          { role: 'hide', label: `Hide ${appName}` },
+          { role: 'hideOthers' },
+          { role: 'unhide' },
+          { type: 'separator' },
+          { role: 'quit', label: `Quit ${appName}` }
+        ]
+      },
+      {
+        label: 'Edit',
+        submenu: [
+          { role: 'undo' },
+          { role: 'redo' },
+          { type: 'separator' },
+          { role: 'cut' },
+          { role: 'copy' },
+          { role: 'paste' },
+          { role: 'pasteAndMatchStyle' },
+          { role: 'delete' },
+          { role: 'selectAll' }
+        ]
+      },
+      {
+        label: 'View',
+        submenu: [
+          { role: 'reload' },
+          { role: 'forceReload' },
+          { role: 'toggleDevTools' },
+          { type: 'separator' },
+          { role: 'resetZoom' },
+          { role: 'zoomIn' },
+          { role: 'zoomOut' },
+          { type: 'separator' },
+          { role: 'togglefullscreen' }
+        ]
+      },
+      {
+        label: 'Window',
+        submenu: [
+          { role: 'minimize' },
+          { role: 'zoom' },
+          { type: 'separator' },
+          { role: 'front' },
+          { type: 'separator' },
+          { role: 'window' }
+        ]
+      }
+    ]
+    Menu.setApplicationMenu(Menu.buildFromTemplate(template))
   }
 
   // Register IPC handlers
@@ -373,6 +442,7 @@ app.on('window-all-closed', () => {
 
 // Clean up database connection and active processes before quitting
 app.on('will-quit', () => {
+  stopIdleChecker()
   killAllPtys()
   closeDatabase()
 })

@@ -11,11 +11,13 @@ import {
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip'
 import { ProjectItem } from './ProjectItem'
+import { TerminalStatusPopover } from '@/components/terminal/TerminalStatusPopover'
 import { cn } from '@/lib/utils'
-import type { Project } from '../../../../shared/types/database'
+import type { Project, Task } from '../../../../shared/types/database'
 
 interface AppSidebarProps {
   projects: Project[]
+  tasks: Task[]
   selectedProjectId: string | null
   onSelectProject: (id: string | null) => void
   onAddProject: () => void
@@ -27,6 +29,7 @@ interface AppSidebarProps {
 
 export function AppSidebar({
   projects,
+  tasks,
   selectedProjectId,
   onSelectProject,
   onAddProject,
@@ -94,6 +97,7 @@ export function AppSidebar({
       <SidebarFooter className="py-4">
         <SidebarMenu>
           <SidebarMenuItem className="flex flex-col items-center gap-2">
+            <TerminalStatusPopover tasks={tasks} />
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button

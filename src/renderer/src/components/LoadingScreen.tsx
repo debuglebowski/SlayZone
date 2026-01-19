@@ -10,7 +10,7 @@ export function LoadingScreen(): React.JSX.Element {
   useEffect(() => {
     window.api.app.getVersion().then(setVersion)
     // Show second text after first animation + pause
-    const timer = setTimeout(() => setShowSecondText(true), 2000)
+    const timer = setTimeout(() => setShowSecondText(true), 450)
     return () => clearTimeout(timer)
   }, [])
 
@@ -26,14 +26,14 @@ export function LoadingScreen(): React.JSX.Element {
       opacity: 1,
       scale: 1,
       transition: {
-        duration: 0.4,
+        duration: 0.15,
         ease: 'easeOut' as const
       }
     }
   }
 
   const letters = 'Breath...'.split('')
-  const letterDelay = shouldReduceMotion ? 0 : 0.1
+  const letterDelay = shouldReduceMotion ? 0 : 0.05
 
   return (
     <motion.div
@@ -54,8 +54,8 @@ export function LoadingScreen(): React.JSX.Element {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={{
-                duration: 0.15,
-                delay: 0.1 + i * letterDelay,
+                duration: 0.1,
+                delay: 0.05 + i * letterDelay,
                 ease: 'easeOut'
               }}
             >
@@ -66,7 +66,7 @@ export function LoadingScreen(): React.JSX.Element {
             <motion.span
               initial={{ clipPath: 'inset(0 100% 0 0)' }}
               animate={{ clipPath: 'inset(0 0% 0 0)' }}
-              transition={{ duration: 0.8, ease: 'easeOut' }}
+              transition={{ duration: 0.25, ease: 'easeOut' }}
               className="inline-flex"
             >
               &nbsp;&nbsp;&nbsp;then slay
@@ -78,7 +78,7 @@ export function LoadingScreen(): React.JSX.Element {
             className="absolute bottom-6 text-xs text-muted-foreground/50"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            transition={{ duration: 0.3, delay: 1 }}
+            transition={{ duration: 0.15, delay: 0.3 }}
           >
             v{version}
           </motion.div>

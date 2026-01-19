@@ -75,6 +75,8 @@ const api: ElectronAPI = {
     resize: (taskId, cols, rows) => ipcRenderer.invoke('pty:resize', taskId, cols, rows),
     kill: (taskId) => ipcRenderer.invoke('pty:kill', taskId),
     exists: (taskId) => ipcRenderer.invoke('pty:exists', taskId),
+    getBuffer: (taskId) => ipcRenderer.invoke('pty:getBuffer', taskId),
+    list: () => ipcRenderer.invoke('pty:list'),
     onData: (callback: (taskId: string, data: string) => void) => {
       const handler = (_event: unknown, taskId: string, data: string) => callback(taskId, data)
       ipcRenderer.on('pty:data', handler)
@@ -90,6 +92,11 @@ const api: ElectronAPI = {
       const handler = (_event: unknown, taskId: string) => callback(taskId)
       ipcRenderer.on('pty:session-not-found', handler)
       return () => ipcRenderer.removeListener('pty:session-not-found', handler)
+    },
+    onIdle: (callback: (taskId: string) => void) => {
+      const handler = (_event: unknown, taskId: string) => callback(taskId)
+      ipcRenderer.on('pty:idle', handler)
+      return () => ipcRenderer.removeListener('pty:idle', handler)
     }
   }
 }

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { ArrowLeft, MoreHorizontal, Archive, Trash2, AlertTriangle } from 'lucide-react'
+import { ArrowLeft, MoreHorizontal, Archive, Trash2, AlertTriangle, RotateCw } from 'lucide-react'
 import type { Task, Tag, Project } from '../../../../shared/types/database'
 import type { ClaudeAvailability } from '../../../../shared/types/api'
 import { Button } from '@/components/ui/button'
@@ -14,6 +14,7 @@ import { DeleteTaskDialog } from '@/components/DeleteTaskDialog'
 import { TaskMetadataSidebar } from './TaskMetadataSidebar'
 import { RichTextEditor } from '@/components/ui/rich-text-editor'
 import { Terminal } from '@/components/terminal/Terminal'
+import { disposeTerminal } from '@/components/terminal/terminal-cache'
 import { cn } from '@/lib/utils'
 
 interface TaskDetailPageProps {
@@ -45,6 +46,9 @@ export function TaskDetailPage({
 
   // Description editing state
   const [descriptionValue, setDescriptionValue] = useState('')
+
+  // Terminal restart key (changing this forces remount)
+  const [terminalKey, setTerminalKey] = useState(0)
 
   // Load task data on mount
   useEffect(() => {
@@ -103,6 +107,14 @@ export function TaskDetailPage({
     // Kill the current PTY so we can restart fresh
     await window.api.pty.kill(task.id)
   }, [task, onTaskUpdated])
+
+  // Restart terminal (kill PTY, clear cache, remount)
+  const handleRestartTerminal = useCallback(async () => {
+    if (!task) return
+    await window.api.pty.kill(task.id)
+    disposeTerminal(task.id)
+    setTerminalKey((k) => k + 1)
+  }, [task])
 
   // Focus title input when editing
   useEffect(() => {
@@ -212,6 +224,16 @@ export function TaskDetailPage({
             />
 
             <div className="flex items-center gap-2">
+              {project?.path && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={handleRestartTerminal}
+                  title="Restart terminal"
+                >
+                  <RotateCw className="size-4" />
+                </Button>
+              )}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" size="icon">
@@ -279,6 +301,7 @@ export function TaskDetailPage({
           <div className="flex-1 min-h-0">
             {project?.path ? (
               <Terminal
+                key={terminalKey}
                 taskId={task.id}
                 cwd={project.path}
                 sessionId={task.claude_session_id || undefined}

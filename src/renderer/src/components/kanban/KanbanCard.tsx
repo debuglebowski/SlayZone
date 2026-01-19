@@ -13,6 +13,7 @@ interface KanbanCardProps {
   project?: Project
   showProject?: boolean
   isBlocked?: boolean
+  isActive?: boolean
 }
 
 const PRIORITY_COLORS: Record<number, string> = {
@@ -29,7 +30,8 @@ export function KanbanCard({
   onClick,
   project,
   showProject,
-  isBlocked
+  isBlocked,
+  isActive
 }: KanbanCardProps): React.JSX.Element {
   const today = todayISO()
   const isOverdue = task.due_date && task.due_date < today && task.status !== 'done'
@@ -95,6 +97,12 @@ export function KanbanCard({
                 </span>
               )}
               {/* Status indicators */}
+              {isActive && (
+                <span className="relative flex h-2 w-2 shrink-0" title="AI running">
+                  <span className="animate-ping absolute h-full w-full rounded-full bg-green-400 opacity-75" />
+                  <span className="relative rounded-full h-2 w-2 bg-green-500" />
+                </span>
+              )}
               {isBlocked && (
                 <span className="flex items-center text-amber-500 shrink-0" title="Blocked">
                   <Link2 className="h-2.5 w-2.5" />

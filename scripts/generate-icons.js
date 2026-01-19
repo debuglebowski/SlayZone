@@ -6,30 +6,76 @@ const { join } = require('path');
 const { mkdirSync, existsSync, rmSync, writeFileSync } = require('fs');
 const pngToIco = require('png-to-ico');
 
-const SVG_PATH = join(__dirname, '../src/renderer/src/assets/logo-solid.svg');
 const BUILD_DIR = join(__dirname, '../build');
 const RESOURCES_DIR = join(__dirname, '../resources');
 
-// Icon sizes for different platforms
-const PNG_SIZES = [16, 32, 48, 64, 128, 256, 512, 1024];
-const ICNS_SIZES = [16, 32, 64, 128, 256, 512, 1024]; // macOS ICNS sizes
-const ICO_SIZES = [16, 32, 48, 64, 128, 256]; // Windows ICO sizes
+// Background color matching app theme
+const BG_COLOR = '#0a0a0a';
+// Flame color (light gray/white for contrast)
+const FLAME_COLOR = '#e5e5e5';
+
+// Correct iconset pairs: [display_size, actual_pixel_size, filename]
+const ICONSET_FILES = [
+  [16, 16, 'icon_16x16.png'],
+  [16, 32, 'icon_16x16@2x.png'],
+  [32, 32, 'icon_32x32.png'],
+  [32, 64, 'icon_32x32@2x.png'],
+  [128, 128, 'icon_128x128.png'],
+  [128, 256, 'icon_128x128@2x.png'],
+  [256, 256, 'icon_256x256.png'],
+  [256, 512, 'icon_256x256@2x.png'],
+  [512, 512, 'icon_512x512.png'],
+  [512, 1024, 'icon_512x512@2x.png'],
+];
+
+const ICO_SIZES = [16, 32, 48, 64, 128, 256];
+
+/**
+ * Create icon with transparent background and squircle shape
+ * Following Apple's macOS icon grid specifications
+ */
+async function createIconWithBackground(size) {
+  // Apple's icon grid:
+  // - Squircle occupies ~80% of canvas (10% padding on each side)
+  // - Corner radius ~22.37% of squircle size
+  const squirclePadding = Math.round(size * 0.1);
+  const squircleSize = size - (squirclePadding * 2);
+  const cornerRadius = Math.round(squircleSize * 0.223);
+  
+  // Content safe zone: ~17.5% padding inside squircle
+  const contentPadding = Math.round(squircleSize * 0.175);
+  const flameSize = squircleSize - (contentPadding * 2);
+
+  // Transparent canvas with only the squircle shape filled
+  const backgroundSvg = `<svg width="${size}" height="${size}" xmlns="http://www.w3.org/2000/svg">
+    <rect x="${squirclePadding}" y="${squirclePadding}" width="${squircleSize}" height="${squircleSize}" rx="${cornerRadius}" ry="${cornerRadius}" fill="${BG_COLOR}"/>
+  </svg>`;
+
+  const flameSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="${flameSize}" height="${flameSize}">
+    <path d="M32 8 C32 8 22 22 22 36 C22 46 26 54 32 56 C38 54 42 46 42 36 C42 22 32 8 32 8Z" fill="${FLAME_COLOR}"/>
+  </svg>`;
+
+  const flameBuffer = await sharp(Buffer.from(flameSvg)).png().toBuffer();
+
+  return sharp(Buffer.from(backgroundSvg))
+    .composite([{
+      input: flameBuffer,
+      top: squirclePadding + contentPadding,
+      left: squirclePadding + contentPadding
+    }])
+    .png()
+    .toBuffer();
+}
 
 async function generatePNGs() {
   console.log('Generating PNG files...');
-  
-  // Generate PNG for resources (Linux window icon)
-  await sharp(SVG_PATH)
-    .resize(512, 512)
-    .png()
-    .toFile(join(RESOURCES_DIR, 'icon.png'));
+
+  const icon512 = await createIconWithBackground(512);
+  writeFileSync(join(RESOURCES_DIR, 'icon.png'), icon512);
   console.log('✓ Created resources/icon.png (512x512)');
 
-  // Generate PNG for build directory (electron-builder)
-  await sharp(SVG_PATH)
-    .resize(1024, 1024)
-    .png()
-    .toFile(join(BUILD_DIR, 'icon.png'));
+  const icon1024 = await createIconWithBackground(1024);
+  writeFileSync(join(BUILD_DIR, 'icon.png'), icon1024);
   console.log('✓ Created build/icon.png (1024x1024)');
 }
 
@@ -41,28 +87,21 @@ async function generateICNS() {
     return;
   }
 
-  // Create temporary iconset directory
   const iconsetDir = join(BUILD_DIR, 'icon.iconset');
   if (existsSync(iconsetDir)) {
     rmSync(iconsetDir, { recursive: true });
   }
   mkdirSync(iconsetDir, { recursive: true });
 
-  // Generate PNG files for iconset
-  for (const size of ICNS_SIZES) {
-    const filename = size === 1024 ? 'icon_512x512@2x.png' : `icon_${size}x${size}.png`;
-    await sharp(SVG_PATH)
-      .resize(size, size)
-      .png()
-      .toFile(join(iconsetDir, filename));
+  // Generate correctly named iconset files
+  for (const [, pixelSize, filename] of ICONSET_FILES) {
+    const iconBuffer = await createIconWithBackground(pixelSize);
+    writeFileSync(join(iconsetDir, filename), iconBuffer);
   }
 
-  // Use iconutil to create ICNS file
   try {
     execSync(`iconutil -c icns "${iconsetDir}" -o "${join(BUILD_DIR, 'icon.icns')}"`);
     console.log('✓ Created build/icon.icns');
-    
-    // Clean up iconset directory
     rmSync(iconsetDir, { recursive: true });
   } catch (error) {
     console.error('✗ Failed to create ICNS file:', error.message);
@@ -73,47 +112,30 @@ async function generateICO() {
   console.log('Generating ICO file for Windows...');
   
   try {
-    // Generate PNG files at multiple sizes for ICO
     const pngBuffers = [];
     for (const size of ICO_SIZES) {
-      const buffer = await sharp(SVG_PATH)
-        .resize(size, size)
-        .png()
-        .toBuffer();
+      const buffer = await createIconWithBackground(size);
       pngBuffers.push(buffer);
     }
     
-    // Convert PNG buffers to ICO
     const icoBuffer = await pngToIco(pngBuffers);
     writeFileSync(join(BUILD_DIR, 'icon.ico'), icoBuffer);
     console.log('✓ Created build/icon.ico (multi-size)');
   } catch (error) {
     console.error('✗ Failed to create ICO file:', error.message);
-    // Fallback: create PNG and let electron-builder handle conversion
-    console.log('  Creating PNG fallback...');
-    await sharp(SVG_PATH)
-      .resize(256, 256)
-      .png()
-      .toFile(join(BUILD_DIR, 'icon-256.png'));
   }
 }
 
 async function main() {
   console.log('Starting icon generation...\n');
   
-  // Ensure directories exist
-  if (!existsSync(BUILD_DIR)) {
-    mkdirSync(BUILD_DIR, { recursive: true });
-  }
-  if (!existsSync(RESOURCES_DIR)) {
-    mkdirSync(RESOURCES_DIR, { recursive: true });
-  }
+  if (!existsSync(BUILD_DIR)) mkdirSync(BUILD_DIR, { recursive: true });
+  if (!existsSync(RESOURCES_DIR)) mkdirSync(RESOURCES_DIR, { recursive: true });
 
   try {
     await generatePNGs();
     await generateICNS();
     await generateICO();
-    
     console.log('\n✓ Icon generation complete!');
   } catch (error) {
     console.error('\n✗ Error generating icons:', error);
