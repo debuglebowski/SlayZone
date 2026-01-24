@@ -102,10 +102,14 @@ export function TerminalStatusPopover({ tasks }: TerminalStatusPopoverProps) {
                 <div className="flex-1 min-w-0 mr-2">
                   <p className="text-sm font-medium truncate">{getTaskName(pty.taskId)}</p>
                   <p className="text-xs text-muted-foreground">
-                    {pty.isIdle ? (
+                    {pty.state === 'idle' ? (
                       <span className="text-amber-500">Idle</span>
+                    ) : pty.state === 'error' ? (
+                      <span className="text-red-500">Error</span>
+                    ) : pty.state === 'awaiting_input' ? (
+                      <span className="text-blue-500">Awaiting Input</span>
                     ) : (
-                      <span className="text-green-500">Active</span>
+                      <span className="text-green-500">{pty.state === 'starting' ? 'Starting' : 'Active'}</span>
                     )}
                     {' · '}
                     {formatIdleTime(pty.lastOutputTime)}

@@ -16,7 +16,6 @@ interface SortableKanbanCardProps {
   showProject?: boolean
   disableDrag?: boolean
   isBlocked?: boolean
-  isActive?: boolean
   // Context menu props
   allProjects?: Project[]
   onUpdateTask?: (taskId: string, updates: Partial<Task>) => void
@@ -31,7 +30,6 @@ function SortableKanbanCard({
   showProject,
   disableDrag,
   isBlocked,
-  isActive,
   allProjects,
   onUpdateTask,
   onArchiveTask,
@@ -59,7 +57,6 @@ function SortableKanbanCard({
         project={project}
         showProject={showProject}
         isBlocked={isBlocked}
-        isActive={isActive}
       />
     </div>
   )
@@ -92,7 +89,6 @@ interface KanbanColumnProps {
   taskTags?: Map<string, string[]>
   tags?: Tag[]
   blockedTaskIds?: Set<string>
-  activePtyTaskIds?: Set<string>
   // Context menu props
   allProjects?: Project[]
   onUpdateTask?: (taskId: string, updates: Partial<Task>) => void
@@ -108,7 +104,6 @@ export function KanbanColumn({
   showProjectDot,
   disableDrag,
   blockedTaskIds,
-  activePtyTaskIds,
   allProjects,
   onUpdateTask,
   onArchiveTask,
@@ -160,7 +155,6 @@ export function KanbanColumn({
                 showProject={showProjectDot}
                 disableDrag={disableDrag}
                 isBlocked={blockedTaskIds?.has(task.id)}
-                isActive={activePtyTaskIds?.has(task.id)}
                 allProjects={allProjects}
                 onUpdateTask={onUpdateTask}
                 onArchiveTask={onArchiveTask}

@@ -29,6 +29,8 @@ export function UserSettingsDialog({ open, onOpenChange }: UserSettingsDialogPro
   const [editingTag, setEditingTag] = useState<Tag | null>(null)
   const [dbPath, setDbPath] = useState<string>('')
   const [claudeStatus, setClaudeStatus] = useState<ClaudeAvailability | null>(null)
+  const [shellSetting, setShellSetting] = useState('')
+  const [defaultShell, setDefaultShell] = useState('')
 
   useEffect(() => {
     if (open) {
@@ -37,12 +39,15 @@ export function UserSettingsDialog({ open, onOpenChange }: UserSettingsDialogPro
   }, [open])
 
   const loadData = async () => {
-    const [loadedTags, path] = await Promise.all([
+    const [loadedTags, path, shell] = await Promise.all([
       window.api.tags.getTags(),
-      window.api.settings.get('database_path')
+      window.api.settings.get('database_path'),
+      window.api.settings.get('shell')
     ])
     setTags(loadedTags)
     setDbPath(path ?? 'Default location (userData)')
+    setShellSetting(shell ?? '')
+    setDefaultShell(process.env.SHELL || '/bin/bash')
     window.api.claude.checkAvailability().then(setClaudeStatus)
   }
 
@@ -81,8 +86,9 @@ export function UserSettingsDialog({ open, onOpenChange }: UserSettingsDialogPro
         </DialogHeader>
 
         <Tabs defaultValue="general" className="w-full">
-          <TabsList className="grid w-full grid-cols-3">
+          <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="general">General</TabsTrigger>
+            <TabsTrigger value="terminal">Terminal</TabsTrigger>
             <TabsTrigger value="tags">Tags</TabsTrigger>
             <TabsTrigger value="about">About</TabsTrigger>
           </TabsList>
@@ -103,6 +109,31 @@ export function UserSettingsDialog({ open, onOpenChange }: UserSettingsDialogPro
                   </SelectContent>
                 </Select>
               </div>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="terminal" className="space-y-4 pt-4">
+            <div className="space-y-2">
+              <Label className="text-base font-semibold">Shell</Label>
+              <div className="flex items-center justify-between gap-4">
+                <span className="text-sm">Default shell</span>
+                <Input
+                  className="w-48"
+                  placeholder={defaultShell}
+                  value={shellSetting}
+                  onChange={(e) => setShellSetting(e.target.value)}
+                  onBlur={() => {
+                    if (shellSetting.trim()) {
+                      window.api.settings.set('shell', shellSetting.trim())
+                    } else {
+                      window.api.settings.set('shell', '')
+                    }
+                  }}
+                />
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Leave empty to use system default
+              </p>
             </div>
           </TabsContent>
 

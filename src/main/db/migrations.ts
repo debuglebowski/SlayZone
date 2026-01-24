@@ -166,6 +166,44 @@ const migrations: Migration[] = [
         CREATE INDEX idx_task_deps_blocks ON task_dependencies(blocks_task_id);
       `)
     }
+  },
+  {
+    version: 10,
+    up: (db) => {
+      db.exec(`
+        CREATE TABLE terminal_sessions (
+          task_id TEXT PRIMARY KEY REFERENCES tasks(id) ON DELETE CASCADE,
+          buffer TEXT NOT NULL,
+          serialized_state TEXT,
+          updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+        );
+      `)
+    }
+  },
+  {
+    version: 11,
+    up: (db) => {
+      // Add terminal mode columns
+      // Rename claude_session_id to claude_conversation_id (SQLite doesn't support direct rename, so add new + migrate)
+      db.exec(`
+        ALTER TABLE tasks ADD COLUMN terminal_mode TEXT DEFAULT 'claude-code';
+        ALTER TABLE tasks ADD COLUMN claude_conversation_id TEXT DEFAULT NULL;
+        ALTER TABLE tasks ADD COLUMN codex_conversation_id TEXT DEFAULT NULL;
+        ALTER TABLE tasks ADD COLUMN terminal_shell TEXT DEFAULT NULL;
+      `)
+      // Migrate data from old column to new
+      db.exec(`
+        UPDATE tasks SET claude_conversation_id = claude_session_id WHERE claude_session_id IS NOT NULL;
+      `)
+      // Note: SQLite doesn't support DROP COLUMN in older versions, keep claude_session_id for backwards compat
+    }
+  },
+  {
+    version: 12,
+    up: (db) => {
+      // Remove unused terminal_sessions table - sessions are now handled entirely in-memory
+      db.exec(`DROP TABLE IF EXISTS terminal_sessions;`)
+    }
   }
 ]
 

@@ -1,20 +1,34 @@
 import type { Terminal as XTerm } from '@xterm/xterm'
 import type { FitAddon } from '@xterm/addon-fit'
+import type { SerializeAddon } from '@xterm/addon-serialize'
+import type { TerminalMode } from '../../../../shared/types/api'
 
 export interface CachedTerminal {
   terminal: XTerm
   fitAddon: FitAddon
+  serializeAddon: SerializeAddon
   element: HTMLElement
+  serializedState?: string
+  mode?: TerminalMode
 }
 
 // Module-level cache for terminal instances
 const cache = new Map<string, CachedTerminal>()
+
+// Track taskIds that shouldn't be re-cached (e.g., during restart/mode-change)
+const skipCacheSet = new Set<string>()
 
 export function getTerminal(taskId: string): CachedTerminal | undefined {
   return cache.get(taskId)
 }
 
 export function setTerminal(taskId: string, instance: CachedTerminal): void {
+  // Don't cache if marked for skip (e.g., during restart/mode-change)
+  if (skipCacheSet.has(taskId)) {
+    skipCacheSet.delete(taskId)
+    instance.terminal.dispose()
+    return
+  }
   cache.set(taskId, instance)
 }
 
@@ -41,6 +55,11 @@ export function disposeTerminal(taskId: string): boolean {
 
 export function hasTerminal(taskId: string): boolean {
   return cache.has(taskId)
+}
+
+// Mark taskId to skip caching on next setTerminal call (for restart/mode-change)
+export function markSkipCache(taskId: string): void {
+  skipCacheSet.add(taskId)
 }
 
 export function getCacheSize(): number {

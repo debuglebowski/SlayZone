@@ -125,6 +125,22 @@ export function registerDatabaseHandlers(): void {
       fields.push('claude_session_id = ?')
       values.push(data.claudeSessionId)
     }
+    if (data.terminalMode !== undefined) {
+      fields.push('terminal_mode = ?')
+      values.push(data.terminalMode)
+    }
+    if (data.claudeConversationId !== undefined) {
+      fields.push('claude_conversation_id = ?')
+      values.push(data.claudeConversationId)
+    }
+    if (data.codexConversationId !== undefined) {
+      fields.push('codex_conversation_id = ?')
+      values.push(data.codexConversationId)
+    }
+    if (data.terminalShell !== undefined) {
+      fields.push('terminal_shell = ?')
+      values.push(data.terminalShell)
+    }
 
     if (fields.length === 0) {
       return db.prepare('SELECT * FROM tasks WHERE id = ?').get(data.id)

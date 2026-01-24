@@ -1,4 +1,5 @@
 export type TaskStatus = 'inbox' | 'backlog' | 'todo' | 'in_progress' | 'review' | 'done'
+export type TerminalMode = 'claude-code' | 'codex' | 'terminal'
 
 export interface Task {
   id: string
@@ -9,6 +10,12 @@ export interface Task {
   priority: number // 1-5, default 3
   due_date: string | null
   archived_at: string | null
+  // Terminal configuration
+  terminal_mode: TerminalMode
+  claude_conversation_id: string | null
+  codex_conversation_id: string | null
+  terminal_shell: string | null
+  // Legacy (kept for backwards compat, use claude_conversation_id instead)
   claude_session_id: string | null
   created_at: string
   updated_at: string

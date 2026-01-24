@@ -4,7 +4,6 @@ import type { Task, Project, Tag, TaskStatus } from '../../shared/types/database
 import { KanbanBoard } from '@/components/kanban/KanbanBoard'
 import { applyFilters, type Column } from '@/lib/kanban'
 import { useFilterState } from '@/hooks/useFilterState'
-import { usePtyStatus } from '@/hooks/usePtyStatus'
 import { FilterBar } from '@/components/filters/FilterBar'
 import { CreateTaskDialog } from '@/components/CreateTaskDialog'
 import { EditTaskDialog } from '@/components/EditTaskDialog'
@@ -42,9 +41,6 @@ function App(): React.JSX.Element {
 
   // Blocked tasks state
   const [blockedTaskIds, setBlockedTaskIds] = useState<Set<string>>(new Set())
-
-  // Active PTY tasks (AI running)
-  const activePtyTaskIds = usePtyStatus()
 
   // Filter state (persisted per project)
   const [filter, setFilter] = useFilterState(selectedProjectId)
@@ -200,9 +196,9 @@ function App(): React.JSX.Element {
     { enableOnFormTags: true }
   )
 
-  // "shift+esc" navigates back (plain esc reserved for terminal)
+  // "cmd+esc" navigates back (plain esc reserved for terminal)
   useHotkeys(
-    'shift+escape',
+    'mod+escape',
     () => {
       // Skip if any dialog is open - Radix handles those
       if (createOpen || editingTask || deletingTask) return
@@ -501,7 +497,6 @@ function App(): React.JSX.Element {
                   taskTags={taskTags}
                   tags={tags}
                   blockedTaskIds={blockedTaskIds}
-                  activePtyTaskIds={activePtyTaskIds}
                   allProjects={projects}
                   onUpdateTask={handleContextMenuUpdate}
                   onArchiveTask={handleContextMenuArchive}

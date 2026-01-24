@@ -32,7 +32,8 @@
       "WebFetch(domain:www.npmjs.com)",
       "Bash(xargs:*)",
       "Bash(npm run generate-icons:*)",
-      "Bash(identify -verbose:*)"
+      "Bash(identify -verbose:*)",
+      "Bash(npm run dev:*)"
     ]
   },
   "enableAllProjectMcpServers": true,

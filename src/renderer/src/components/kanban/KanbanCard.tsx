@@ -1,10 +1,13 @@
 import { motion } from 'framer-motion'
 import { useEffect, useRef, useState } from 'react'
 import type { Task, Project } from '../../../../shared/types/database'
+import type { TerminalState } from '../../../../shared/types/api'
 import { Card, CardContent } from '@/components/ui/card'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
 import { todayISO } from '@/lib/kanban'
 import { AlertCircle, Link2 } from 'lucide-react'
+import { usePty } from '@/contexts/PtyContext'
 
 interface KanbanCardProps {
   task: Task
@@ -13,7 +16,24 @@ interface KanbanCardProps {
   project?: Project
   showProject?: boolean
   isBlocked?: boolean
-  isActive?: boolean
+}
+
+const TERMINAL_STATE_COLORS: Record<TerminalState, string> = {
+  idle: 'bg-blue-400',
+  dead: 'bg-gray-400',
+  starting: 'bg-gray-400',
+  running: 'bg-yellow-400',
+  awaiting_input: 'bg-blue-400',
+  error: 'bg-red-400'
+}
+
+const TERMINAL_STATE_LABELS: Record<TerminalState, string> = {
+  idle: 'Awaiting input',
+  dead: 'Stopped',
+  starting: 'Starting',
+  running: 'Running',
+  awaiting_input: 'Awaiting input',
+  error: 'Error'
 }
 
 const PRIORITY_COLORS: Record<number, string> = {
@@ -30,14 +50,22 @@ export function KanbanCard({
   onClick,
   project,
   showProject,
-  isBlocked,
-  isActive
+  isBlocked
 }: KanbanCardProps): React.JSX.Element {
   const today = todayISO()
   const isOverdue = task.due_date && task.due_date < today && task.status !== 'done'
   const priorityColor = PRIORITY_COLORS[task.priority] || PRIORITY_COLORS[3]
   const prevStatusRef = useRef(task.status)
   const [justCompleted, setJustCompleted] = useState(false)
+
+  // Terminal state tracking
+  const { getState, subscribeState } = usePty()
+  const [terminalState, setTerminalState] = useState<TerminalState>(() => getState(task.id))
+
+  useEffect(() => {
+    setTerminalState(getState(task.id))
+    return subscribeState(task.id, (newState) => setTerminalState(newState))
+  }, [task.id, getState, subscribeState])
 
   useEffect(() => {
     if (prevStatusRef.current !== 'done' && task.status === 'done') {
@@ -96,13 +124,15 @@ export function KanbanCard({
                   P{task.priority}
                 </span>
               )}
-              {/* Status indicators */}
-              {isActive && (
-                <span className="relative flex h-2 w-2 shrink-0" title="AI running">
-                  <span className="animate-ping absolute h-full w-full rounded-full bg-green-400 opacity-75" />
-                  <span className="relative rounded-full h-2 w-2 bg-green-500" />
-                </span>
-              )}
+              {/* Terminal state indicator */}
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span
+                    className={cn('h-2 w-2 rounded-full shrink-0', TERMINAL_STATE_COLORS[terminalState])}
+                  />
+                </TooltipTrigger>
+                <TooltipContent>{TERMINAL_STATE_LABELS[terminalState]}</TooltipContent>
+              </Tooltip>
               {isBlocked && (
                 <span className="flex items-center text-amber-500 shrink-0" title="Blocked">
                   <Link2 className="h-2.5 w-2.5" />

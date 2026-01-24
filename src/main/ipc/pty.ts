@@ -1,5 +1,7 @@
 import { ipcMain, BrowserWindow } from 'electron'
-import { createPty, writePty, resizePty, killPty, hasPty, getBuffer, listPtys } from '../services/pty-manager'
+import { createPty, writePty, resizePty, killPty, hasPty, getBuffer, listPtys, getState } from '../services/pty-manager'
+import { getDatabase } from '../db'
+import type { TerminalMode } from '../services/adapters'
 
 export function registerPtyHandlers(): void {
   ipcMain.handle(
@@ -9,11 +11,18 @@ export function registerPtyHandlers(): void {
       taskId: string,
       cwd: string,
       sessionId?: string | null,
-      existingSessionId?: string | null
+      existingSessionId?: string | null,
+      mode?: TerminalMode
     ) => {
       const win = BrowserWindow.fromWebContents(event.sender)
       if (!win) return { success: false, error: 'No window found' }
-      return createPty(win, taskId, cwd, sessionId, existingSessionId)
+
+      // Read global shell setting from DB
+      const db = getDatabase()
+      const row = db.prepare('SELECT value FROM settings WHERE key = ?').get('shell') as { value: string } | undefined
+      const globalShell = row?.value || null
+
+      return createPty(win, taskId, cwd, sessionId, existingSessionId, mode, globalShell)
     }
   )
 
@@ -39,5 +48,9 @@ export function registerPtyHandlers(): void {
 
   ipcMain.handle('pty:list', () => {
     return listPtys()
+  })
+
+  ipcMain.handle('pty:getState', (_, taskId: string) => {
+    return getState(taskId)
   })
 }

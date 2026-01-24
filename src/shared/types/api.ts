@@ -12,10 +12,19 @@ export interface ClaudeAvailability {
 }
 
 // PTY types
+export type TerminalState = 'starting' | 'running' | 'idle' | 'awaiting_input' | 'error' | 'dead'
+export type TerminalMode = 'claude-code' | 'codex' | 'terminal'
+
 export interface PtyInfo {
   taskId: string
   lastOutputTime: number
-  isIdle: boolean
+  state: TerminalState
+}
+
+export interface PromptInfo {
+  type: 'permission' | 'question' | 'input'
+  text: string
+  position: number
 }
 
 export interface CreateTaskInput {
@@ -46,6 +55,12 @@ export interface UpdateTaskInput {
   priority?: number
   dueDate?: string | null
   projectId?: string
+  // Terminal config
+  terminalMode?: TerminalMode
+  claudeConversationId?: string | null
+  codexConversationId?: string | null
+  terminalShell?: string | null
+  // Legacy
   claudeSessionId?: string | null
 }
 
@@ -135,7 +150,8 @@ export interface ElectronAPI {
       taskId: string,
       cwd: string,
       sessionId?: string | null,
-      existingSessionId?: string | null
+      existingSessionId?: string | null,
+      mode?: TerminalMode
     ) => Promise<{ success: boolean; error?: string }>
     write: (taskId: string, data: string) => Promise<boolean>
     resize: (taskId: string, cols: number, rows: number) => Promise<boolean>
@@ -147,5 +163,10 @@ export interface ElectronAPI {
     onExit: (callback: (taskId: string, exitCode: number) => void) => () => void
     onSessionNotFound: (callback: (taskId: string) => void) => () => void
     onIdle: (callback: (taskId: string) => void) => () => void
+    onStateChange: (
+      callback: (taskId: string, newState: TerminalState, oldState: TerminalState) => void
+    ) => () => void
+    onPrompt: (callback: (taskId: string, prompt: PromptInfo) => void) => () => void
+    getState: (taskId: string) => Promise<TerminalState | null>
   }
 }

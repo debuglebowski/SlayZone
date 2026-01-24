@@ -17,7 +17,7 @@ const DEFAULT_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '
 
 export function CreateProjectDialog({ open, onOpenChange, onCreated }: CreateProjectDialogProps) {
   const [name, setName] = useState('')
-  const [color, setColor] = useState(DEFAULT_COLORS[0])
+  const [color, setColor] = useState(() => DEFAULT_COLORS[Math.floor(Math.random() * DEFAULT_COLORS.length)])
   const [path, setPath] = useState('')
   const [loading, setLoading] = useState(false)
 

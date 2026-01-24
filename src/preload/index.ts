@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron'
-import type { ElectronAPI } from '../shared/types/api'
+import type { ElectronAPI, TerminalState, PromptInfo } from '../shared/types/api'
 
 // Custom APIs for renderer
 const api: ElectronAPI = {
@@ -69,8 +69,8 @@ const api: ElectronAPI = {
     getVersion: () => ipcRenderer.invoke('app:getVersion')
   },
   pty: {
-    create: (taskId, cwd, sessionId, existingSessionId) =>
-      ipcRenderer.invoke('pty:create', taskId, cwd, sessionId, existingSessionId),
+    create: (taskId, cwd, sessionId, existingSessionId, mode) =>
+      ipcRenderer.invoke('pty:create', taskId, cwd, sessionId, existingSessionId, mode),
     write: (taskId, data) => ipcRenderer.invoke('pty:write', taskId, data),
     resize: (taskId, cols, rows) => ipcRenderer.invoke('pty:resize', taskId, cols, rows),
     kill: (taskId) => ipcRenderer.invoke('pty:kill', taskId),
@@ -97,7 +97,26 @@ const api: ElectronAPI = {
       const handler = (_event: unknown, taskId: string) => callback(taskId)
       ipcRenderer.on('pty:idle', handler)
       return () => ipcRenderer.removeListener('pty:idle', handler)
-    }
+    },
+    onStateChange: (
+      callback: (taskId: string, newState: TerminalState, oldState: TerminalState) => void
+    ) => {
+      const handler = (
+        _event: unknown,
+        taskId: string,
+        newState: TerminalState,
+        oldState: TerminalState
+      ) => callback(taskId, newState, oldState)
+      ipcRenderer.on('pty:state-change', handler)
+      return () => ipcRenderer.removeListener('pty:state-change', handler)
+    },
+    onPrompt: (callback: (taskId: string, prompt: PromptInfo) => void) => {
+      const handler = (_event: unknown, taskId: string, prompt: PromptInfo) =>
+        callback(taskId, prompt)
+      ipcRenderer.on('pty:prompt', handler)
+      return () => ipcRenderer.removeListener('pty:prompt', handler)
+    },
+    getState: (taskId: string) => ipcRenderer.invoke('pty:getState', taskId)
   }
 }
 

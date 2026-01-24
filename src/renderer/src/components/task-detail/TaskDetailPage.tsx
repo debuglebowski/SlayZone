@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { ArrowLeft, MoreHorizontal, Archive, Trash2, AlertTriangle, RotateCw } from 'lucide-react'
-import type { Task, Tag, Project } from '../../../../shared/types/database'
+import { ArrowLeft, MoreHorizontal, Archive, Trash2, AlertTriangle, RotateCw, Link2 } from 'lucide-react'
+import type { Task, Tag, Project, TerminalMode } from '../../../../shared/types/database'
 import type { ClaudeAvailability } from '../../../../shared/types/api'
 import { Button } from '@/components/ui/button'
 import {
@@ -10,11 +10,20 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
+} from '@/components/ui/select'
 import { DeleteTaskDialog } from '@/components/DeleteTaskDialog'
+import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip'
 import { TaskMetadataSidebar } from './TaskMetadataSidebar'
 import { RichTextEditor } from '@/components/ui/rich-text-editor'
 import { Terminal } from '@/components/terminal/Terminal'
-import { disposeTerminal } from '@/components/terminal/terminal-cache'
+import { disposeTerminal, markSkipCache } from '@/components/terminal/terminal-cache'
+import { usePty } from '@/contexts/PtyContext'
 import { cn } from '@/lib/utils'
 
 interface TaskDetailPageProps {
@@ -35,6 +44,9 @@ export function TaskDetailPage({
   const [taskTagIds, setTaskTagIds] = useState<string[]>([])
   const [loading, setLoading] = useState(true)
   const [claudeAvailability, setClaudeAvailability] = useState<ClaudeAvailability | null>(null)
+
+  // PTY context for buffer management
+  const { resetTaskState } = usePty()
 
   // Title editing state
   const [editingTitle, setEditingTitle] = useState(false)
@@ -84,7 +96,7 @@ export function TaskDetailPage({
       if (!task) return
       const updated = await window.api.db.updateTask({
         id: task.id,
-        claudeSessionId: sessionId
+        claudeConversationId: sessionId
       })
       setTask(updated)
       onTaskUpdated(updated)
@@ -95,15 +107,15 @@ export function TaskDetailPage({
   // Handle invalid session (e.g., "No conversation found" error)
   const handleSessionInvalid = useCallback(async () => {
     if (!task) return
-    
+
     // Clear the stale session ID from the database
     const updated = await window.api.db.updateTask({
       id: task.id,
-      claudeSessionId: null
+      claudeConversationId: null
     })
     setTask(updated)
     onTaskUpdated(updated)
-    
+
     // Kill the current PTY so we can restart fresh
     await window.api.pty.kill(task.id)
   }, [task, onTaskUpdated])
@@ -111,10 +123,50 @@ export function TaskDetailPage({
   // Restart terminal (kill PTY, clear cache, remount)
   const handleRestartTerminal = useCallback(async () => {
     if (!task) return
-    await window.api.pty.kill(task.id)
+    // Reset state FIRST to ignore any in-flight data
+    resetTaskState(task.id)
     disposeTerminal(task.id)
+    // Now kill the PTY (any data it sends will be ignored)
+    await window.api.pty.kill(task.id)
+    // Small delay to let any remaining PTY data be processed and ignored
+    await new Promise((r) => setTimeout(r, 100))
+    markSkipCache(task.id)
+    setTerminalKey((k) => k + 1)
+  }, [task, resetTaskState])
+
+  // Re-attach terminal (remount without killing PTY - reuses cached terminal)
+  const handleReattachTerminal = useCallback(() => {
+    if (!task) return
     setTerminalKey((k) => k + 1)
   }, [task])
+
+  // Handle terminal mode change
+  const handleModeChange = useCallback(
+    async (mode: TerminalMode) => {
+      if (!task) return
+      // Reset state FIRST to ignore any in-flight data
+      resetTaskState(task.id)
+      disposeTerminal(task.id)
+      // Now kill the PTY (any data it sends will be ignored)
+      await window.api.pty.kill(task.id)
+      // Small delay to let any remaining PTY data be processed and ignored
+      await new Promise((r) => setTimeout(r, 100))
+      // Update mode and clear all conversation IDs (fresh start)
+      const updated = await window.api.db.updateTask({
+        id: task.id,
+        terminalMode: mode,
+        claudeConversationId: null,
+        codexConversationId: null,
+        claudeSessionId: null
+      })
+      setTask(updated)
+      onTaskUpdated(updated)
+      // Remount terminal (mark skip to prevent cleanup from re-caching old content)
+      markSkipCache(task.id)
+      setTerminalKey((k) => k + 1)
+    },
+    [task, onTaskUpdated, resetTaskState]
+  )
 
   // Focus title input when editing
   useEffect(() => {
@@ -225,14 +277,32 @@ export function TaskDetailPage({
 
             <div className="flex items-center gap-2">
               {project?.path && (
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={handleRestartTerminal}
-                  title="Restart terminal"
-                >
-                  <RotateCw className="size-4" />
-                </Button>
+                <>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={handleReattachTerminal}
+                      >
+                        <Link2 className="size-4" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>Re-attach terminal</TooltipContent>
+                  </Tooltip>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={handleRestartTerminal}
+                      >
+                        <RotateCw className="size-4" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>Restart terminal</TooltipContent>
+                  </Tooltip>
+                </>
               )}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -304,8 +374,9 @@ export function TaskDetailPage({
                 key={terminalKey}
                 taskId={task.id}
                 cwd={project.path}
-                sessionId={task.claude_session_id || undefined}
-                existingSessionId={task.claude_session_id || undefined}
+                mode={task.terminal_mode || 'claude-code'}
+                sessionId={task.claude_conversation_id || task.claude_session_id || undefined}
+                existingSessionId={task.claude_conversation_id || task.claude_session_id || undefined}
                 onSessionCreated={handleSessionCreated}
                 onSessionInvalid={handleSessionInvalid}
               />
@@ -319,6 +390,24 @@ export function TaskDetailPage({
                 </div>
               </div>
             )}
+          </div>
+
+          {/* Terminal mode bar */}
+          <div className="shrink-0 border-t border-neutral-800 bg-neutral-900 px-3 py-2 flex items-center gap-3">
+            <span className="text-xs text-muted-foreground">Mode:</span>
+            <Select
+              value={task.terminal_mode || 'claude-code'}
+              onValueChange={(value) => handleModeChange(value as TerminalMode)}
+            >
+              <SelectTrigger size="sm" className="w-36 h-7 text-xs bg-neutral-800 border-neutral-700">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="claude-code">Claude Code</SelectItem>
+                <SelectItem value="codex">Codex</SelectItem>
+                <SelectItem value="terminal">Terminal</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
         </div>
       </div>

@@ -8,7 +8,7 @@ export function usePtyStatus(): Set<string> {
 
   const refresh = useCallback(async () => {
     const list = await window.api.pty.list()
-    const active = new Set(list.filter((p) => !p.isIdle).map((p) => p.taskId))
+    const active = new Set(list.filter((p) => p.state !== 'idle' && p.state !== 'dead').map((p) => p.taskId))
     setActiveTaskIds(active)
   }, [])
 

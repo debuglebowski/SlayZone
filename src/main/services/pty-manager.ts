@@ -1,26 +1,27 @@
 import * as pty from 'node-pty'
 import { BrowserWindow } from 'electron'
-import { homedir, userInfo, platform } from 'os'
+import { homedir, userInfo } from 'os'
+import type { TerminalState, PtyInfo } from '../../shared/types/api'
+import { RingBuffer } from './ring-buffer'
+import { getAdapter, type TerminalMode, type TerminalAdapter } from './adapters'
 
 interface PtySession {
   pty: pty.IPty
   taskId: string
+  mode: TerminalMode
+  adapter: TerminalAdapter
   checkingForSessionError?: boolean
-  buffer: string
+  buffer: RingBuffer
   lastOutputTime: number
-  isIdle: boolean
+  state: TerminalState
 }
 
-export interface PtyInfo {
-  taskId: string
-  lastOutputTime: number
-  isIdle: boolean
-}
+export type { PtyInfo }
 
 const sessions = new Map<string, PtySession>()
 
-// Maximum buffer size (~1MB) to prevent memory issues
-const MAX_BUFFER_SIZE = 1024 * 1024
+// Maximum buffer size (5MB) per session
+const MAX_BUFFER_SIZE = 5 * 1024 * 1024
 
 // Idle timeout in milliseconds (60 seconds)
 const IDLE_TIMEOUT_MS = 60 * 1000
@@ -46,23 +47,32 @@ function filterBufferData(data: string): string {
     .replace(/\x1b\[\?[0-9;]*c/g, '')
 }
 
-function getShell(): string {
-  if (platform() === 'win32') {
-    return process.env.COMSPEC || 'cmd.exe'
+// Transition session state and emit event
+function transitionState(taskId: string, newState: TerminalState): void {
+  const session = sessions.get(taskId)
+  if (!session || session.state === newState) return
+
+  const oldState = session.state
+  session.state = newState
+
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send('pty:state-change', taskId, newState, oldState)
+    // Also emit legacy idle event for backward compatibility
+    if (newState === 'idle') {
+      mainWindow.webContents.send('pty:idle', taskId)
+    }
   }
-  return process.env.SHELL || '/bin/bash'
 }
 
-// Check for idle sessions and emit events
+// Check for idle sessions and transition state
 function checkIdleSessions(): void {
   if (!mainWindow || mainWindow.isDestroyed()) return
 
   const now = Date.now()
   for (const [taskId, session] of sessions) {
     const idleTime = now - session.lastOutputTime
-    if (idleTime >= IDLE_TIMEOUT_MS && !session.isIdle) {
-      session.isIdle = true
-      mainWindow.webContents.send('pty:idle', taskId)
+    if (idleTime >= IDLE_TIMEOUT_MS && session.state === 'running') {
+      transitionState(taskId, 'idle')
     }
   }
 }
@@ -85,97 +95,129 @@ export function stopIdleChecker(): void {
   mainWindow = null
 }
 
+export interface CreatePtyOptions {
+  win: BrowserWindow
+  taskId: string
+  cwd: string
+  mode?: TerminalMode
+  conversationId?: string | null
+  resuming?: boolean
+}
+
 export function createPty(
   win: BrowserWindow,
   taskId: string,
   cwd: string,
   sessionId?: string | null,
-  existingSessionId?: string | null
+  existingSessionId?: string | null,
+  mode?: TerminalMode,
+  globalShell?: string | null
 ): { success: boolean; error?: string } {
+  console.log(`[pty-manager] createPty(${taskId}) mode=${mode} shell=${globalShell}`)
   // Kill existing if any
   if (sessions.has(taskId)) {
+    console.log(`[pty-manager] createPty(${taskId}) - killing existing PTY first`)
     killPty(taskId)
   }
 
   try {
-    // Build claude command args
-    const claudeArgs: string[] = []
-    if (existingSessionId) {
-      claudeArgs.push('--resume', existingSessionId)
-    } else if (sessionId) {
-      claudeArgs.push('--session-id', sessionId)
-    }
+    const terminalMode = mode || 'claude-code'
+    const adapter = getAdapter(terminalMode)
+    const resuming = !!existingSessionId
+    const conversationId = existingSessionId || sessionId
 
-    const shell = getShell()
-    const ptyProcess = pty.spawn(shell, [], {
+    // Get spawn config from adapter
+    const spawnConfig = adapter.buildSpawnConfig(cwd || homedir(), conversationId || undefined, resuming, globalShell || undefined)
+
+    const ptyProcess = pty.spawn(spawnConfig.shell, spawnConfig.args, {
       name: 'xterm-256color',
       cols: 80,
       rows: 24,
       cwd: cwd || homedir(),
       env: {
         ...process.env,
+        ...spawnConfig.env,
         USER: process.env.USER || userInfo().username,
         HOME: process.env.HOME || homedir(),
-        TERM: 'xterm-256color'
+        TERM: 'xterm-256color',
+        COLORTERM: 'truecolor'
       } as Record<string, string>
     })
 
-    sessions.set(taskId, { 
-      pty: ptyProcess, 
+    sessions.set(taskId, {
+      pty: ptyProcess,
       taskId,
+      mode: terminalMode,
+      adapter,
       // Only check for session errors if we're trying to resume
-      checkingForSessionError: !!existingSessionId,
-      buffer: '',
+      checkingForSessionError: resuming,
+      buffer: new RingBuffer(MAX_BUFFER_SIZE),
       lastOutputTime: Date.now(),
-      isIdle: false
+      state: 'starting'
     })
 
     // Forward data to renderer
     ptyProcess.onData((data) => {
-      // Append to buffer for history restoration (filter problematic sequences)
+      // Only process if session still exists (prevents data leaking after kill)
       const session = sessions.get(taskId)
-      if (session) {
-        session.buffer += filterBufferData(data)
-        // Trim buffer if it exceeds max size (keep the most recent data)
-        if (session.buffer.length > MAX_BUFFER_SIZE) {
-          session.buffer = session.buffer.slice(-MAX_BUFFER_SIZE)
-        }
-        // Update idle tracking
-        session.lastOutputTime = Date.now()
-        session.isIdle = false
+      if (!session) {
+        console.log(`[pty-manager] onData(${taskId}) - NO SESSION, ignoring ${data.length} chars`)
+        return
+      }
+
+      // Append to buffer for history restoration (filter problematic sequences)
+      session.buffer.append(filterBufferData(data))
+      // Update idle tracking
+      session.lastOutputTime = Date.now()
+
+      // Use adapter for state detection
+      const detectedState = session.adapter.detectState(data, session.state)
+      if (detectedState) {
+        transitionState(taskId, detectedState)
+      } else if (session.state === 'starting' || session.state === 'idle') {
+        // Default: transition to running on any output
+        transitionState(taskId, 'running')
+      }
+
+      // Check for prompts
+      const prompt = session.adapter.detectPrompt(data)
+      if (prompt && !win.isDestroyed()) {
+        win.webContents.send('pty:prompt', taskId, prompt)
       }
 
       if (!win.isDestroyed()) {
         win.webContents.send('pty:data', taskId, data)
-        
+
         // Check for session not found error (only in the first few seconds)
-        if (session?.checkingForSessionError && SESSION_NOT_FOUND_PATTERN.test(data)) {
+        if (session.checkingForSessionError && SESSION_NOT_FOUND_PATTERN.test(data)) {
           // Stop checking after we find the error
           session.checkingForSessionError = false
+          transitionState(taskId, 'error')
           win.webContents.send('pty:session-not-found', taskId)
         }
       }
     })
 
     ptyProcess.onExit(({ exitCode }) => {
+      transitionState(taskId, 'dead')
       sessions.delete(taskId)
       if (!win.isDestroyed()) {
         win.webContents.send('pty:exit', taskId, exitCode)
       }
     })
 
-    // If we have claude args, start claude after shell is ready
-    if (claudeArgs.length > 0) {
+    // If adapter has post-spawn command, execute it after shell is ready
+    if (spawnConfig.postSpawnCommand) {
       // Small delay to let shell initialize
       setTimeout(() => {
         if (sessions.has(taskId)) {
-          ptyProcess.write(`claude ${claudeArgs.join(' ')}\r`)
+          ptyProcess.write(`${spawnConfig.postSpawnCommand}\r`)
         }
       }, 100)
     }
 
     // Stop checking for session errors after 5 seconds
-    if (existingSessionId) {
+    if (resuming) {
       setTimeout(() => {
         const session = sessions.get(taskId)
         if (session) {
@@ -207,9 +249,16 @@ export function resizePty(taskId: string, cols: number, rows: number): boolean {
 
 export function killPty(taskId: string): boolean {
   const session = sessions.get(taskId)
-  if (!session) return false
-  session.pty.kill()
+  if (!session) {
+    console.log(`[pty-manager] killPty(${taskId}) - no session found`)
+    return false
+  }
+  console.log(`[pty-manager] killPty(${taskId}) - deleting session and killing PTY`)
+  // Delete from map FIRST so onData handlers exit early during kill
   sessions.delete(taskId)
+  // Use SIGKILL (9) to forcefully terminate - SIGTERM may not kill child processes
+  session.pty.kill('SIGKILL')
+  console.log(`[pty-manager] killPty(${taskId}) - done`)
   return true
 }
 
@@ -219,7 +268,7 @@ export function hasPty(taskId: string): boolean {
 
 export function getBuffer(taskId: string): string | null {
   const session = sessions.get(taskId)
-  return session?.buffer ?? null
+  return session?.buffer.toString() ?? null
 }
 
 export function listPtys(): PtyInfo[] {
@@ -228,10 +277,15 @@ export function listPtys(): PtyInfo[] {
     result.push({
       taskId,
       lastOutputTime: session.lastOutputTime,
-      isIdle: session.isIdle
+      state: session.state
     })
   }
   return result
+}
+
+export function getState(taskId: string): TerminalState | null {
+  const session = sessions.get(taskId)
+  return session?.state ?? null
 }
 
 export function killAllPtys(): void {
