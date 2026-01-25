@@ -62,12 +62,16 @@ export function registerDatabaseHandlers(): void {
 
   // Tasks
   ipcMain.handle('db:tasks:getAll', () => {
-    return db.prepare('SELECT * FROM tasks WHERE archived_at IS NULL ORDER BY created_at DESC').all()
+    return db
+      .prepare('SELECT * FROM tasks WHERE archived_at IS NULL ORDER BY "order" ASC, created_at DESC')
+      .all()
   })
 
   ipcMain.handle('db:tasks:getByProject', (_, projectId: string) => {
     return db
-      .prepare('SELECT * FROM tasks WHERE project_id = ? AND archived_at IS NULL ORDER BY created_at DESC')
+      .prepare(
+        'SELECT * FROM tasks WHERE project_id = ? AND archived_at IS NULL ORDER BY "order" ASC, created_at DESC'
+      )
       .all(projectId)
   })
 
@@ -178,6 +182,15 @@ export function registerDatabaseHandlers(): void {
     return db
       .prepare('SELECT * FROM tasks WHERE archived_at IS NOT NULL ORDER BY archived_at DESC')
       .all()
+  })
+
+  ipcMain.handle('db:tasks:reorder', (_, taskIds: string[]) => {
+    const stmt = db.prepare('UPDATE tasks SET "order" = ? WHERE id = ?')
+    db.transaction(() => {
+      taskIds.forEach((id, index) => {
+        stmt.run(index, id)
+      })
+    })()
   })
 
   // Tags

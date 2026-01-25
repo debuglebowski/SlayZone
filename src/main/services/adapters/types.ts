@@ -27,7 +27,7 @@ export interface TerminalAdapter {
   /**
    * Build spawn configuration for this terminal mode.
    */
-  buildSpawnConfig(cwd: string, conversationId?: string, resuming?: boolean, shellOverride?: string): SpawnConfig
+  buildSpawnConfig(cwd: string, conversationId?: string, resuming?: boolean, shellOverride?: string, initialPrompt?: string): SpawnConfig
 
   /**
    * Detect if output indicates a prompt that needs user input.

@@ -9,14 +9,54 @@ import { getTerminal, setTerminal, disposeTerminal } from './terminal-cache'
 import { usePty } from '../../contexts/PtyContext'
 import type { TerminalMode } from '../../../../shared/types/api'
 
+// Wait for container to have non-zero dimensions before opening terminal
+function waitForDimensions(
+  container: HTMLElement,
+  signal: AbortSignal
+): Promise<void> {
+  return new Promise((resolve, reject) => {
+    // Already has dimensions? Resolve immediately
+    const rect = container.getBoundingClientRect()
+    if (rect.width > 0 && rect.height > 0) {
+      resolve()
+      return
+    }
+
+    // Otherwise wait for ResizeObserver
+    const observer = new ResizeObserver((entries) => {
+      const entry = entries[0]
+      if (entry.contentRect.width > 0 && entry.contentRect.height > 0) {
+        observer.disconnect()
+        resolve()
+      }
+    })
+
+    // Handle abort (component unmount)
+    const onAbort = (): void => {
+      observer.disconnect()
+      reject(new DOMException('Aborted', 'AbortError'))
+    }
+    signal.addEventListener('abort', onAbort)
+
+    observer.observe(container)
+  })
+}
+
+// Check if a dialog is open (don't steal focus from dialogs)
+function isDialogOpen(): boolean {
+  return document.querySelector('[role="dialog"]') !== null
+}
+
 interface TerminalProps {
   taskId: string
   cwd: string
   mode?: TerminalMode
   sessionId?: string | null
   existingSessionId?: string | null
+  initialPrompt?: string | null
   onSessionCreated?: (sessionId: string) => void
   onSessionInvalid?: () => void
+  onReady?: (sendInput: (text: string) => Promise<void>) => void
 }
 
 export function Terminal({
@@ -25,8 +65,10 @@ export function Terminal({
   mode = 'claude-code',
   sessionId,
   existingSessionId,
+  initialPrompt,
   onSessionCreated,
-  onSessionInvalid
+  onSessionInvalid,
+  onReady
 }: TerminalProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const terminalRef = useRef<XTerm | null>(null)
@@ -36,8 +78,19 @@ export function Terminal({
 
   const { subscribe, subscribeExit, subscribeSessionInvalid, subscribeIdle, getBuffer, clearBuffer, resetTaskState, clearIgnore } = usePty()
 
-  const initTerminal = useCallback(async () => {
+  const initTerminal = useCallback(async (signal: AbortSignal) => {
     if (!containerRef.current || initializedRef.current) return
+
+    // Wait for container to have dimensions BEFORE initializing terminal
+    try {
+      await waitForDimensions(containerRef.current, signal)
+    } catch (e) {
+      if (e instanceof DOMException && e.name === 'AbortError') return
+      throw e
+    }
+
+    // Re-check after await (component state might have changed)
+    if (!containerRef.current || initializedRef.current || signal.aborted) return
     initializedRef.current = true
 
     // Check if we have a cached terminal for this task
@@ -51,19 +104,24 @@ export function Terminal({
         // Kill old PTY (any data it sends will be ignored)
         await window.api.pty.kill(taskId)
       } else {
-        // Reattach existing terminal
+        // Reattach existing terminal (container already has dimensions)
         containerRef.current.appendChild(cached.element)
         terminalRef.current = cached.terminal
         fitAddonRef.current = cached.fitAddon
         serializeAddonRef.current = cached.serializeAddon
 
-        // Fit to potentially new container size and focus
+        // Simple fit - container is guaranteed to have dimensions
         cached.fitAddon.fit()
-        cached.terminal.focus()
+        if (!isDialogOpen()) cached.terminal.focus()
+        window.api.pty.resize(taskId, cached.terminal.cols, cached.terminal.rows)
 
-        // Sync terminal size with PTY
-        const { cols, rows } = cached.terminal
-        window.api.pty.resize(taskId, cols, rows)
+        // Expose sendInput for programmatic input (char-by-char for Ink compatibility)
+        onReady?.(async (text) => {
+          for (const char of text) {
+            cached.terminal.input(char)
+            await new Promise(r => setTimeout(r, 1))
+          }
+        })
         return
       }
     }
@@ -123,12 +181,13 @@ export function Terminal({
 
     terminal.open(containerRef.current)
     terminal.clear() // Ensure terminal starts completely fresh
+    // Simple fit - container is guaranteed to have dimensions from waitForDimensions
     fitAddon.fit()
-    terminal.focus()
+    if (!isDialogOpen()) terminal.focus()
 
-    // Let Cmd+Escape bubble up to app for navigation
+    // Let Ctrl+Tab and Ctrl+Shift+Tab bubble up for tab switching
     terminal.attachCustomKeyEventHandler((e) => {
-      if (e.key === 'Escape' && e.metaKey) return false
+      if (e.ctrlKey && e.key === 'Tab') return false
       return true
     })
 
@@ -150,6 +209,9 @@ export function Terminal({
       // Clear any stale buffer data before creating new PTY
       // (handles race condition where old PTY sends data while dying)
       clearBuffer(taskId)
+      // Clear ignore flag BEFORE creating PTY so we receive its initial output
+      // (old PTY was killed 100ms+ ago, stale data has been delivered and ignored)
+      clearIgnore(taskId)
 
       // Generate session ID only for claude-code mode
       let newSessionId = sessionId
@@ -161,13 +223,11 @@ export function Terminal({
       // Create PTY with selected mode (only pass session IDs for claude-code)
       const effectiveSessionId = mode === 'claude-code' ? newSessionId : undefined
       const effectiveExistingSessionId = mode === 'claude-code' ? existingSessionId : undefined
-      const result = await window.api.pty.create(taskId, cwd, effectiveSessionId, effectiveExistingSessionId, mode)
+      const result = await window.api.pty.create(taskId, cwd, effectiveSessionId, effectiveExistingSessionId, mode, initialPrompt)
       if (!result.success) {
         terminal.writeln(`\x1b[31mError: ${result.error}\x1b[0m`)
         return
       }
-      // Clear ignore flag now that new PTY is confirmed - allows new data through
-      clearIgnore(taskId)
     }
 
     // Handle terminal input
@@ -183,13 +243,23 @@ export function Terminal({
     // Initial resize
     const { cols, rows } = terminal
     window.api.pty.resize(taskId, cols, rows)
-  }, [taskId, cwd, mode, sessionId, existingSessionId, onSessionCreated, getBuffer, clearBuffer, resetTaskState, clearIgnore])
+
+    // Expose sendInput for programmatic input (char-by-char for Ink compatibility)
+    onReady?.(async (text) => {
+      for (const char of text) {
+        terminal.input(char)
+        await new Promise(r => setTimeout(r, 1))
+      }
+    })
+  }, [taskId, cwd, mode, sessionId, existingSessionId, initialPrompt, onSessionCreated, onReady, getBuffer, clearBuffer, resetTaskState, clearIgnore])
 
   // Initialize terminal
   useEffect(() => {
-    initTerminal()
+    const controller = new AbortController()
+    initTerminal(controller.signal)
 
     return () => {
+      controller.abort()
       // Serialize state before caching
       let serializedState: string | undefined
       if (serializeAddonRef.current && terminalRef.current) {

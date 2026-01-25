@@ -8,8 +8,10 @@ import {
   useSensor,
   pointerWithin,
   type DragStartEvent,
-  type DragEndEvent
+  type DragEndEvent,
+  type DragOverEvent
 } from '@dnd-kit/core'
+import { arrayMove } from '@dnd-kit/sortable'
 import { motion } from 'framer-motion'
 import type { Task, Project, Tag } from '../../../../shared/types/database'
 import { groupTasksBy, type GroupKey, type Column } from '@/lib/kanban'
@@ -19,7 +21,8 @@ import { KanbanCard } from './KanbanCard'
 interface KanbanBoardProps {
   tasks: Task[]
   groupBy: GroupKey
-  onTaskMove: (taskId: string, newColumnId: string) => void
+  onTaskMove: (taskId: string, newColumnId: string, targetIndex: number) => void
+  onTaskReorder: (taskIds: string[]) => void
   onTaskClick?: (task: Task, e: React.MouseEvent) => void
   onCreateTask?: (column: Column) => void
   projectsMap?: Map<string, Project>
@@ -39,6 +42,7 @@ export function KanbanBoard({
   tasks,
   groupBy,
   onTaskMove,
+  onTaskReorder,
   onTaskClick,
   onCreateTask,
   projectsMap,
@@ -53,6 +57,8 @@ export function KanbanBoard({
   onDeleteTask
 }: KanbanBoardProps): React.JSX.Element {
   const [activeId, setActiveId] = useState<string | null>(null)
+  const [activeColumnId, setActiveColumnId] = useState<string | null>(null)
+  const [overColumnId, setOverColumnId] = useState<string | null>(null)
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -67,33 +73,72 @@ export function KanbanBoard({
   const activeTask = activeId ? tasks.find((t) => t.id === activeId) : null
 
   function handleDragStart(event: DragStartEvent): void {
-    setActiveId(event.active.id as string)
+    const taskId = event.active.id as string
+    setActiveId(taskId)
+    // Find which column the dragged task belongs to
+    const sourceColumn = columns.find((c) => c.tasks.some((t) => t.id === taskId))
+    setActiveColumnId(sourceColumn?.id ?? null)
+  }
+
+  function handleDragOver(event: DragOverEvent): void {
+    const { over } = event
+    if (!over) {
+      setOverColumnId(null)
+      return
+    }
+
+    const overId = over.id as string
+    // Check if over a column directly
+    let targetColumn = columns.find((c) => c.id === overId)
+    if (!targetColumn) {
+      // Over a task - find which column contains it
+      targetColumn = columns.find((c) => c.tasks.some((t) => t.id === overId))
+    }
+    setOverColumnId(targetColumn?.id ?? null)
   }
 
   function handleDragEnd(event: DragEndEvent): void {
     const { active, over } = event
     setActiveId(null)
+    setActiveColumnId(null)
+    setOverColumnId(null)
 
     if (!over) return
 
     const taskId = active.id as string
-    let targetColumnId = over.id as string
+    const overId = over.id as string
 
-    // If dropped on a task, find its column
-    const task = tasks.find((t) => t.id === targetColumnId)
-    if (task) {
-      // Find which column contains this task
-      const column = columns.find((c) => c.tasks.some((t) => t.id === targetColumnId))
-      if (column) {
-        targetColumnId = column.id
-      }
+    // Find current column containing the dragged task
+    const currentColumn = columns.find((c) => c.tasks.some((t) => t.id === taskId))
+    if (!currentColumn) return
+
+    // Determine target column and drop index
+    let targetColumn = columns.find((c) => c.id === overId)
+    let targetIndex: number
+
+    if (targetColumn) {
+      // Dropped on column itself - add to end
+      targetIndex = targetColumn.tasks.length
+    } else {
+      // Dropped on a task - find that task's column and index
+      targetColumn = columns.find((c) => c.tasks.some((t) => t.id === overId))
+      if (!targetColumn) return
+      targetIndex = targetColumn.tasks.findIndex((t) => t.id === overId)
     }
 
-    // Don't call onTaskMove if same column
-    const currentColumn = columns.find((c) => c.tasks.some((t) => t.id === taskId))
-    if (currentColumn?.id === targetColumnId) return
+    const isSameColumn = currentColumn.id === targetColumn.id
 
-    onTaskMove(taskId, targetColumnId)
+    if (isSameColumn) {
+      // Reorder within same column
+      const oldIndex = currentColumn.tasks.findIndex((t) => t.id === taskId)
+      if (oldIndex === targetIndex) return
+
+      const reordered = arrayMove(currentColumn.tasks, oldIndex, targetIndex)
+      onTaskReorder(reordered.map((t) => t.id))
+    } else {
+      // Move to different column at specific position
+      onTaskMove(taskId, targetColumn.id, targetIndex)
+    }
   }
 
   return (
@@ -101,6 +146,7 @@ export function KanbanBoard({
       sensors={sensors}
       collisionDetection={pointerWithin}
       onDragStart={handleDragStart}
+      onDragOver={handleDragOver}
       onDragEnd={handleDragEnd}
     >
       <div className="flex gap-4 overflow-x-auto pb-4 h-full">
@@ -108,6 +154,8 @@ export function KanbanBoard({
           <KanbanColumn
             key={column.id}
             column={column}
+            activeColumnId={activeColumnId}
+            overColumnId={overColumnId}
             onTaskClick={onTaskClick}
             onCreateTask={onCreateTask}
             projectsMap={projectsMap}

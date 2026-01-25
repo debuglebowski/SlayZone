@@ -4,8 +4,10 @@ import type { Task, Project, Tag, TaskStatus } from '../../shared/types/database
 import { KanbanBoard } from '@/components/kanban/KanbanBoard'
 import { applyFilters, type Column } from '@/lib/kanban'
 import { useFilterState } from '@/hooks/useFilterState'
+import { useViewState } from '@/hooks/useViewState'
 import { FilterBar } from '@/components/filters/FilterBar'
 import { CreateTaskDialog } from '@/components/CreateTaskDialog'
+import { QuickRunDialog } from '@/components/QuickRunDialog'
 import { EditTaskDialog } from '@/components/EditTaskDialog'
 import { DeleteTaskDialog } from '@/components/DeleteTaskDialog'
 import { CreateProjectDialog } from '@/components/dialogs/CreateProjectDialog'
@@ -15,17 +17,10 @@ import { UserSettingsDialog } from '@/components/dialogs/UserSettingsDialog'
 import { SearchDialog } from '@/components/dialogs/SearchDialog'
 import { OnboardingDialog } from '@/components/onboarding/OnboardingDialog'
 import { TaskDetailPage } from '@/components/task-detail/TaskDetailPage'
-import { ArchivedTasksView } from '@/components/ArchivedTasksView'
 import { Button } from '@/components/ui/button'
-import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar'
+import { SidebarProvider } from '@/components/ui/sidebar'
 import { AppSidebar } from '@/components/sidebar/AppSidebar'
-import { AnimatedPage } from '@/components/animations/AnimatedPage'
-
-// View state for navigation
-type ViewState =
-  | { type: 'kanban' }
-  | { type: 'task-detail'; taskId: string }
-  | { type: 'archived' }
+import { TabBar } from '@/components/tabs/TabBar'
 
 function App(): React.JSX.Element {
   // Task state
@@ -33,7 +28,6 @@ function App(): React.JSX.Element {
 
   // Project state
   const [projects, setProjects] = useState<Project[]>([])
-  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null)
 
   // Tag state
   const [tags, setTags] = useState<Tag[]>([])
@@ -42,27 +36,74 @@ function App(): React.JSX.Element {
   // Blocked tasks state
   const [blockedTaskIds, setBlockedTaskIds] = useState<Set<string>>(new Set())
 
+  // View state (tabs + selected project, persisted)
+  const [tabs, activeTabIndex, selectedProjectId, setTabs, setActiveTabIndex, setSelectedProjectId] =
+    useViewState()
+
   // Filter state (persisted per project)
   const [filter, setFilter] = useFilterState(selectedProjectId)
 
-  // View state with history for back navigation
-  const [viewHistory, setViewHistory] = useState<ViewState[]>([{ type: 'kanban' }])
-  const view = viewHistory[viewHistory.length - 1]
-  const [navDirection, setNavDirection] = useState<'forward' | 'backward'>('forward')
-
-  // Navigation functions
-  const navigateTo = (newView: ViewState): void => {
-    // Skip if navigating to same view
-    if (JSON.stringify(view) === JSON.stringify(newView)) return
-    setNavDirection('forward')
-    setViewHistory((prev) => [...prev, newView])
+  // Open task = add or switch to existing tab
+  const openTask = (taskId: string): void => {
+    const existing = tabs.findIndex((t) => t.type === 'task' && t.taskId === taskId)
+    if (existing >= 0) {
+      setActiveTabIndex(existing)
+    } else {
+      const task = tasks.find((t) => t.id === taskId)
+      const title = task?.title || 'Task'
+      const status = task?.status
+      setTabs([...tabs, { type: 'task', taskId, title, status }])
+      setActiveTabIndex(tabs.length)
+    }
   }
 
+  // Open task in background (add tab without switching)
+  const openTaskInBackground = (taskId: string): void => {
+    const existing = tabs.findIndex((t) => t.type === 'task' && t.taskId === taskId)
+    if (existing < 0) {
+      const task = tasks.find((t) => t.id === taskId)
+      const title = task?.title || 'Task'
+      const status = task?.status
+      setTabs([...tabs, { type: 'task', taskId, title, status }])
+    }
+  }
+
+  // Close tab
+  const closeTab = (index: number): void => {
+    if (index === 0) return // Home can't be closed via UI
+    const newTabs = tabs.filter((_, i) => i !== index)
+    setTabs(newTabs)
+    if (activeTabIndex >= index) {
+      setActiveTabIndex(Math.max(0, activeTabIndex - 1))
+    }
+  }
+
+  // Go back from task detail (close tab)
   const goBack = (): void => {
-    if (viewHistory.length <= 1) return
-    setNavDirection('backward')
-    setViewHistory((prev) => prev.slice(0, -1))
+    if (activeTabIndex > 0) {
+      closeTab(activeTabIndex)
+    }
   }
+
+  // Sync tab titles/status and remove tabs for deleted tasks
+  useEffect(() => {
+    const taskIds = new Set(tasks.map((t) => t.id))
+    setTabs((prev) => {
+      const filtered = prev.filter((tab) => tab.type === 'home' || taskIds.has(tab.taskId))
+      // Adjust activeTabIndex if needed
+      if (filtered.length < prev.length) {
+        setActiveTabIndex((idx) => Math.min(idx, filtered.length - 1))
+      }
+      return filtered.map((tab) => {
+        if (tab.type !== 'task') return tab
+        const task = tasks.find((t) => t.id === tab.taskId)
+        if (task && (task.title !== tab.title || task.status !== tab.status)) {
+          return { ...tab, title: task.title, status: task.status }
+        }
+        return tab
+      })
+    })
+  }, [tasks, setTabs, setActiveTabIndex])
 
   // Dialog state
   const [createOpen, setCreateOpen] = useState(false)
@@ -87,6 +128,9 @@ function App(): React.JSX.Element {
 
   // Search dialog state
   const [searchOpen, setSearchOpen] = useState(false)
+
+  // Quick run dialog state
+  const [quickRunOpen, setQuickRunOpen] = useState(false)
 
   // Inline project rename state
   const [projectNameValue, setProjectNameValue] = useState('')
@@ -170,17 +214,29 @@ function App(): React.JSX.Element {
 
   // Navigation handlers
   const openTaskDetail = (taskId: string): void => {
-    navigateTo({ type: 'task-detail', taskId })
+    openTask(taskId)
   }
 
   // Keyboard shortcuts
-  // "mod+n" opens new task dialog (only from kanban view, when no dialog open)
+  // "mod+n" opens new task dialog from anywhere
   useHotkeys(
     'mod+n',
     (e) => {
-      if (projects.length > 0 && view.type === 'kanban') {
+      if (projects.length > 0) {
         e.preventDefault()
         setCreateOpen(true)
+      }
+    },
+    { enableOnFormTags: true }
+  )
+
+  // "mod+shift+n" opens quick run dialog
+  useHotkeys(
+    'mod+shift+n',
+    (e) => {
+      if (projects.length > 0) {
+        e.preventDefault()
+        setQuickRunOpen(true)
       }
     },
     { enableOnFormTags: true }
@@ -196,19 +252,56 @@ function App(): React.JSX.Element {
     { enableOnFormTags: true }
   )
 
-  // "cmd+esc" navigates back (plain esc reserved for terminal)
+  // "mod+w" closes current tab or window
   useHotkeys(
-    'mod+escape',
-    () => {
-      // Skip if any dialog is open - Radix handles those
-      if (createOpen || editingTask || deletingTask) return
-      if (createProjectOpen || editingProject || deletingProject) return
-      if (settingsOpen) return
-      if (searchOpen) return
-
-      goBack()
+    'mod+w',
+    (e) => {
+      e.preventDefault()
+      if (activeTabIndex === 0) {
+        window.api.window.close()
+      } else {
+        closeTab(activeTabIndex)
+      }
     },
-    { enableOnFormTags: false }
+    { enableOnFormTags: true }
+  )
+
+  // "mod+§" switches to home/kanban tab (intercepted at Electron level)
+  useEffect(() => {
+    return window.api.app.onGoHome(() => setActiveTabIndex(0))
+  }, [])
+
+  // "mod+1-9" switches to task tabs (1 = first task tab, not home)
+  useHotkeys(
+    'mod+1,mod+2,mod+3,mod+4,mod+5,mod+6,mod+7,mod+8,mod+9',
+    (e) => {
+      e.preventDefault()
+      const key = e.key
+      const num = parseInt(key, 10)
+      // num maps to task tab index (1 = index 1, etc.)
+      if (num < tabs.length) setActiveTabIndex(num)
+    },
+    { enableOnFormTags: true }
+  )
+
+  // "ctrl+tab" cycles to next tab (wraps around)
+  useHotkeys(
+    'ctrl+tab',
+    (e) => {
+      e.preventDefault()
+      setActiveTabIndex((prev) => (prev + 1) % tabs.length)
+    },
+    { enableOnFormTags: true }
+  )
+
+  // "ctrl+shift+tab" cycles to previous tab (wraps around)
+  useHotkeys(
+    'ctrl+shift+tab',
+    (e) => {
+      e.preventDefault()
+      setActiveTabIndex((prev) => (prev - 1 + tabs.length) % tabs.length)
+    },
+    { enableOnFormTags: true }
   )
 
   // CRUD handlers
@@ -216,6 +309,12 @@ function App(): React.JSX.Element {
     setTasks([task, ...tasks])
     setCreateOpen(false)
     setCreateTaskDefaults({})
+  }
+
+  const handleQuickRunCreated = (task: Task): void => {
+    setTasks([task, ...tasks])
+    setQuickRunOpen(false)
+    openTask(task.id)
   }
 
   const handleCreateTaskFromColumn = (column: Column): void => {
@@ -266,30 +365,74 @@ function App(): React.JSX.Element {
     setTasks(tasks.map((t) => (t.id === task.id ? task : t)))
   }
 
-  const handleTaskMove = (taskId: string, newColumnId: string): void => {
+  const handleTaskMove = (taskId: string, newColumnId: string, targetIndex: number): void => {
     // due_date grouping: drag disabled
     if (filter.groupBy === 'due_date') return
 
-    // Compute optimistic task
-    const optimisticTask = (t: Task): Task => {
-      if (t.id !== taskId) return t
-      if (filter.groupBy === 'status') return { ...t, status: newColumnId as TaskStatus }
-      if (filter.groupBy === 'priority')
-        return { ...t, priority: parseInt(newColumnId.slice(1), 10) }
-      return t
-    }
+    // Compute field update based on groupBy
+    const fieldUpdate =
+      filter.groupBy === 'status'
+        ? { status: newColumnId as TaskStatus }
+        : { priority: parseInt(newColumnId.slice(1), 10) }
 
-    // Optimistic update
+    // Get tasks in target column (after applying the field update)
+    const targetColumnTasks = tasks.filter((t) => {
+      if (t.id === taskId) return false // Exclude the moving task
+      if (filter.groupBy === 'status') return t.status === newColumnId
+      return t.priority === parseInt(newColumnId.slice(1), 10)
+    })
+
+    // Insert the moved task at target position
+    const movedTask = tasks.find((t) => t.id === taskId)
+    if (!movedTask) return
+
+    const newColumnTaskIds = [...targetColumnTasks.map((t) => t.id)]
+    newColumnTaskIds.splice(targetIndex, 0, taskId)
+
+    // Optimistic update: update field + reorder
     const previousTasks = tasks
-    setTasks(tasks.map(optimisticTask))
+    setTasks(
+      tasks.map((t) => {
+        if (t.id === taskId) {
+          return { ...t, ...fieldUpdate, order: targetIndex }
+        }
+        const newOrder = newColumnTaskIds.indexOf(t.id)
+        if (newOrder >= 0) {
+          return { ...t, order: newOrder }
+        }
+        return t
+      })
+    )
 
-    // Async DB call with rollback
+    // Async DB calls with rollback
     const updatePayload =
       filter.groupBy === 'status'
         ? { id: taskId, status: newColumnId as TaskStatus }
         : { id: taskId, priority: parseInt(newColumnId.slice(1), 10) }
 
-    window.api.db.updateTask(updatePayload).catch(() => {
+    Promise.all([
+      window.api.db.updateTask(updatePayload),
+      window.api.db.reorderTasks(newColumnTaskIds)
+    ]).catch(() => {
+      setTasks(previousTasks)
+    })
+  }
+
+  const handleTaskReorder = (taskIds: string[]): void => {
+    // Optimistic update
+    const previousTasks = tasks
+    setTasks(
+      tasks.map((t) => {
+        const newOrder = taskIds.indexOf(t.id)
+        if (newOrder >= 0) {
+          return { ...t, order: newOrder }
+        }
+        return t
+      })
+    )
+
+    // Async DB call with rollback
+    window.api.db.reorderTasks(taskIds).catch(() => {
       setTasks(previousTasks)
     })
   }
@@ -301,9 +444,13 @@ function App(): React.JSX.Element {
     }
   }
 
-  // Handle task click - navigate to detail page
-  const handleTaskClick = (task: Task): void => {
-    openTaskDetail(task.id)
+  // Handle task click - navigate to detail page (or open in background with Cmd)
+  const handleTaskClick = (task: Task, e: React.MouseEvent): void => {
+    if (e.metaKey) {
+      openTaskInBackground(task.id)
+    } else {
+      openTaskDetail(task.id)
+    }
   }
 
   // Context menu handlers
@@ -407,171 +554,176 @@ function App(): React.JSX.Element {
   }
 
   return (
-    <div className="h-full w-full">
-      {renderAppContent()}
-    </div>
+    <SidebarProvider defaultOpen={true}>
+      <div className="h-full w-full flex">
+        {/* Sidebar - full height */}
+        <AppSidebar
+          projects={projects}
+          tasks={tasks}
+          selectedProjectId={selectedProjectId}
+          onSelectProject={setSelectedProjectId}
+          onAddProject={() => setCreateProjectOpen(true)}
+          onProjectSettings={setEditingProject}
+          onProjectDelete={setDeletingProject}
+          onSettings={() => setSettingsOpen(true)}
+          onTutorial={() => setOnboardingOpen(true)}
+        />
+
+        {/* Right side - TabBar + content */}
+        <div className="flex-1 flex flex-col min-w-0">
+          {/* Top drag region + Tab Bar */}
+          <div className="window-drag-region pt-2">
+            <div className="window-no-drag">
+              <TabBar
+                tabs={tabs}
+                activeIndex={activeTabIndex}
+                onTabClick={setActiveTabIndex}
+                onTabClose={closeTab}
+              />
+            </div>
+          </div>
+
+          {/* Tab Content - all tabs rendered, inactive hidden */}
+          <div className="flex-1 min-h-0 relative">
+            {tabs.map((tab, i) => (
+              <div
+                key={tab.type === 'home' ? 'home' : tab.taskId}
+                className={`absolute inset-0 ${i !== activeTabIndex ? 'hidden' : ''}`}
+              >
+                {tab.type === 'home' ? (
+                  renderHomeTab()
+                ) : (
+                  <TaskDetailPage
+                    taskId={tab.taskId}
+                    onBack={goBack}
+                    onTaskUpdated={handleTaskDetailUpdated}
+                    onNavigateToTask={openTaskDetail}
+                  />
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* All Dialogs */}
+        <CreateTaskDialog
+          open={createOpen}
+          onOpenChange={setCreateOpen}
+          onCreated={handleTaskCreated}
+          defaultProjectId={selectedProjectId ?? projects[0]?.id}
+          defaultStatus={createTaskDefaults.status}
+          defaultPriority={createTaskDefaults.priority}
+          defaultDueDate={createTaskDefaults.dueDate}
+          tags={tags}
+          onTagCreated={(tag) => setTags([...tags, tag])}
+        />
+        <EditTaskDialog
+          task={editingTask}
+          open={!!editingTask}
+          onOpenChange={(open) => !open && setEditingTask(null)}
+          onUpdated={handleTaskUpdated}
+        />
+        <DeleteTaskDialog
+          task={deletingTask}
+          open={!!deletingTask}
+          onOpenChange={(open) => !open && setDeletingTask(null)}
+          onDeleted={handleTaskDeleted}
+        />
+        <CreateProjectDialog
+          open={createProjectOpen}
+          onOpenChange={setCreateProjectOpen}
+          onCreated={handleProjectCreated}
+        />
+        <ProjectSettingsDialog
+          project={editingProject}
+          open={!!editingProject}
+          onOpenChange={(open) => !open && setEditingProject(null)}
+          onUpdated={handleProjectUpdated}
+        />
+        <DeleteProjectDialog
+          project={deletingProject}
+          open={!!deletingProject}
+          onOpenChange={(open) => !open && setDeletingProject(null)}
+          onDeleted={handleProjectDeleted}
+        />
+        <UserSettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} />
+        <SearchDialog
+          open={searchOpen}
+          onOpenChange={setSearchOpen}
+          tasks={tasks}
+          projects={projects}
+          onSelectTask={openTaskDetail}
+          onSelectProject={setSelectedProjectId}
+        />
+        <OnboardingDialog
+          externalOpen={onboardingOpen}
+          onExternalClose={() => setOnboardingOpen(false)}
+        />
+        <QuickRunDialog
+          open={quickRunOpen}
+          onOpenChange={setQuickRunOpen}
+          onCreated={handleQuickRunCreated}
+          defaultProjectId={selectedProjectId ?? projects[0]?.id}
+        />
+      </div>
+    </SidebarProvider>
   )
 
-  function renderAppContent(): React.JSX.Element {
-    // Archived view (full screen, no sidebar)
-    if (view.type === 'archived') {
-      return (
-        <AnimatedPage viewKey="archived" direction={navDirection}>
-          <ArchivedTasksView onBack={goBack} onTaskClick={openTaskDetail} />
-        </AnimatedPage>
-      )
-    }
-
-    // Task detail view (full screen, no sidebar)
-    if (view.type === 'task-detail') {
-      return (
-        <AnimatedPage viewKey={`task-detail-${view.taskId}`} direction={navDirection}>
-          <TaskDetailPage
-            taskId={view.taskId}
-            onBack={goBack}
-            onTaskUpdated={handleTaskDetailUpdated}
-            onNavigateToTask={openTaskDetail}
-          />
-        </AnimatedPage>
-      )
-    }
-
-    // Kanban view (with sidebar)
+  function renderHomeTab(): React.JSX.Element {
     return (
-    <AnimatedPage viewKey="kanban" direction={navDirection}>
-      <SidebarProvider defaultOpen={true}>
-      <AppSidebar
-        projects={projects}
-        tasks={tasks}
-        selectedProjectId={selectedProjectId}
-        onSelectProject={setSelectedProjectId}
-        onAddProject={() => setCreateProjectOpen(true)}
-        onProjectSettings={setEditingProject}
-        onProjectDelete={setDeletingProject}
-        onSettings={() => setSettingsOpen(true)}
-        onTutorial={() => setOnboardingOpen(true)}
-      />
-      <SidebarInset className="min-h-screen min-w-0">
-        {/* Draggable region for window movement - continues from sidebar */}
-        <div className="h-10 window-drag-region" />
-        <div className="flex flex-col flex-1 p-6 pt-0">
-          <header className="mb-6 flex items-center justify-between window-no-drag">
-            {selectedProjectId ? (
-              <textarea
-                ref={projectNameInputRef}
-                value={projectNameValue}
-                onChange={(e) => setProjectNameValue(e.target.value)}
-                onBlur={handleProjectNameSave}
-                onKeyDown={handleProjectNameKeyDown}
-                className="text-2xl font-bold bg-transparent border-none outline-none w-full resize-none cursor-text"
-                style={{ caretColor: 'currentColor' }}
-                rows={1}
-              />
-            ) : (
-              <h1 className="text-2xl font-bold">All Tasks</h1>
-            )}
-            <Button onClick={() => setCreateOpen(true)} disabled={projects.length === 0}>
-              New Task
-            </Button>
-          </header>
-
-          {projects.length === 0 ? (
-            <div className="text-center text-muted-foreground">
-              Click + in sidebar to create a project
-            </div>
+      <div className="flex flex-col flex-1 p-6 pt-4 h-full">
+        <header className="mb-6 flex items-center justify-between window-no-drag">
+          {selectedProjectId ? (
+            <textarea
+              ref={projectNameInputRef}
+              value={projectNameValue}
+              onChange={(e) => setProjectNameValue(e.target.value)}
+              onBlur={handleProjectNameSave}
+              onKeyDown={handleProjectNameKeyDown}
+              className="text-2xl font-bold bg-transparent border-none outline-none w-full resize-none cursor-text"
+              style={{ caretColor: 'currentColor' }}
+              rows={1}
+            />
           ) : (
-            <>
-              <div className="mb-4">
-                <FilterBar filter={filter} onChange={setFilter} tags={tags} />
-              </div>
-              <div className="flex-1 min-h-0">
-                <KanbanBoard
-                  tasks={displayTasks}
-                  groupBy={filter.groupBy}
-                  onTaskMove={handleTaskMove}
-                  onTaskClick={handleTaskClick}
-                  onCreateTask={handleCreateTaskFromColumn}
-                  projectsMap={projectsMap}
-                  showProjectDot={selectedProjectId === null}
-                  disableDrag={filter.groupBy === 'due_date'}
-                  taskTags={taskTags}
-                  tags={tags}
-                  blockedTaskIds={blockedTaskIds}
-                  allProjects={projects}
-                  onUpdateTask={handleContextMenuUpdate}
-                  onArchiveTask={handleContextMenuArchive}
-                  onDeleteTask={handleContextMenuDelete}
-                />
-              </div>
-            </>
+            <h1 className="text-2xl font-bold">All Tasks</h1>
           )}
+          <Button onClick={() => setCreateOpen(true)} disabled={projects.length === 0}>
+            New Task
+          </Button>
+        </header>
 
-          {/* Task Dialogs */}
-          <CreateTaskDialog
-            open={createOpen}
-            onOpenChange={setCreateOpen}
-            onCreated={handleTaskCreated}
-            defaultProjectId={selectedProjectId ?? projects[0]?.id}
-            defaultStatus={createTaskDefaults.status}
-            defaultPriority={createTaskDefaults.priority}
-            defaultDueDate={createTaskDefaults.dueDate}
-            tags={tags}
-            onTagCreated={(tag) => setTags([...tags, tag])}
-          />
-          <EditTaskDialog
-            task={editingTask}
-            open={!!editingTask}
-            onOpenChange={(open) => !open && setEditingTask(null)}
-            onUpdated={handleTaskUpdated}
-          />
-          <DeleteTaskDialog
-            task={deletingTask}
-            open={!!deletingTask}
-            onOpenChange={(open) => !open && setDeletingTask(null)}
-            onDeleted={handleTaskDeleted}
-          />
-
-          {/* Project Dialogs */}
-          <CreateProjectDialog
-            open={createProjectOpen}
-            onOpenChange={setCreateProjectOpen}
-            onCreated={handleProjectCreated}
-          />
-          <ProjectSettingsDialog
-            project={editingProject}
-            open={!!editingProject}
-            onOpenChange={(open) => !open && setEditingProject(null)}
-            onUpdated={handleProjectUpdated}
-          />
-          <DeleteProjectDialog
-            project={deletingProject}
-            open={!!deletingProject}
-            onOpenChange={(open) => !open && setDeletingProject(null)}
-            onDeleted={handleProjectDeleted}
-          />
-
-          {/* User Settings Dialog */}
-          <UserSettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} />
-
-          {/* Search Dialog */}
-          <SearchDialog
-            open={searchOpen}
-            onOpenChange={setSearchOpen}
-            tasks={tasks}
-            projects={projects}
-            onSelectTask={openTaskDetail}
-            onSelectProject={setSelectedProjectId}
-          />
-
-          {/* Onboarding (first launch or manual trigger) */}
-          <OnboardingDialog
-            externalOpen={onboardingOpen}
-            onExternalClose={() => setOnboardingOpen(false)}
-          />
-        </div>
-      </SidebarInset>
-    </SidebarProvider>
-    </AnimatedPage>
+        {projects.length === 0 ? (
+          <div className="text-center text-muted-foreground">
+            Click + in sidebar to create a project
+          </div>
+        ) : (
+          <>
+            <div className="mb-4">
+              <FilterBar filter={filter} onChange={setFilter} tags={tags} />
+            </div>
+            <div className="flex-1 min-h-0">
+              <KanbanBoard
+                tasks={displayTasks}
+                groupBy={filter.groupBy}
+                onTaskMove={handleTaskMove}
+                onTaskReorder={handleTaskReorder}
+                onTaskClick={handleTaskClick}
+                onCreateTask={handleCreateTaskFromColumn}
+                projectsMap={projectsMap}
+                showProjectDot={selectedProjectId === null}
+                disableDrag={filter.groupBy === 'due_date'}
+                taskTags={taskTags}
+                tags={tags}
+                blockedTaskIds={blockedTaskIds}
+                allProjects={projects}
+                onUpdateTask={handleContextMenuUpdate}
+                onArchiveTask={handleContextMenuArchive}
+                onDeleteTask={handleContextMenuDelete}
+              />
+            </div>
+          </>
+        )}
+      </div>
     )
   }
 }

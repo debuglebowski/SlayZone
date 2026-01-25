@@ -3,6 +3,9 @@ import type { ElectronAPI, TerminalState, PromptInfo } from '../shared/types/api
 
 // Custom APIs for renderer
 const api: ElectronAPI = {
+  ai: {
+    generateDescription: (title, mode) => ipcRenderer.invoke('ai:generate-description', title, mode)
+  },
   db: {
     // Projects
     getProjects: () => ipcRenderer.invoke('db:projects:getAll'),
@@ -19,7 +22,8 @@ const api: ElectronAPI = {
     deleteTask: (id) => ipcRenderer.invoke('db:tasks:delete', id),
     archiveTask: (id) => ipcRenderer.invoke('db:tasks:archive', id),
     unarchiveTask: (id) => ipcRenderer.invoke('db:tasks:unarchive', id),
-    getArchivedTasks: () => ipcRenderer.invoke('db:tasks:getArchived')
+    getArchivedTasks: () => ipcRenderer.invoke('db:tasks:getArchived'),
+    reorderTasks: (taskIds) => ipcRenderer.invoke('db:tasks:reorder', taskIds)
   },
   tags: {
     getTags: () => ipcRenderer.invoke('db:tags:getAll'),
@@ -66,11 +70,19 @@ const api: ElectronAPI = {
     showOpenDialog: (options) => ipcRenderer.invoke('dialog:showOpenDialog', options)
   },
   app: {
-    getVersion: () => ipcRenderer.invoke('app:getVersion')
+    getVersion: () => ipcRenderer.invoke('app:getVersion'),
+    onGoHome: (callback: () => void) => {
+      const handler = () => callback()
+      ipcRenderer.on('app:go-home', handler)
+      return () => ipcRenderer.removeListener('app:go-home', handler)
+    }
+  },
+  window: {
+    close: () => ipcRenderer.invoke('window:close')
   },
   pty: {
-    create: (taskId, cwd, sessionId, existingSessionId, mode) =>
-      ipcRenderer.invoke('pty:create', taskId, cwd, sessionId, existingSessionId, mode),
+    create: (taskId, cwd, sessionId, existingSessionId, mode, initialPrompt) =>
+      ipcRenderer.invoke('pty:create', taskId, cwd, sessionId, existingSessionId, mode, initialPrompt),
     write: (taskId, data) => ipcRenderer.invoke('pty:write', taskId, data),
     resize: (taskId, cols, rows) => ipcRenderer.invoke('pty:resize', taskId, cols, rows),
     kill: (taskId) => ipcRenderer.invoke('pty:kill', taskId),
@@ -115,6 +127,12 @@ const api: ElectronAPI = {
         callback(taskId, prompt)
       ipcRenderer.on('pty:prompt', handler)
       return () => ipcRenderer.removeListener('pty:prompt', handler)
+    },
+    onSessionDetected: (callback: (taskId: string, sessionId: string) => void) => {
+      const handler = (_event: unknown, taskId: string, sessionId: string) =>
+        callback(taskId, sessionId)
+      ipcRenderer.on('pty:session-detected', handler)
+      return () => ipcRenderer.removeListener('pty:session-detected', handler)
     },
     getState: (taskId: string) => ipcRenderer.invoke('pty:getState', taskId)
   }

@@ -82,7 +82,16 @@ export interface UpdateTagInput {
   color?: string
 }
 
+export interface GenerateDescriptionResult {
+  success: boolean
+  description?: string
+  error?: string
+}
+
 export interface ElectronAPI {
+  ai: {
+    generateDescription: (title: string, mode: TerminalMode) => Promise<GenerateDescriptionResult>
+  }
   db: {
     // Projects
     getProjects: () => Promise<Project[]>
@@ -100,6 +109,7 @@ export interface ElectronAPI {
     archiveTask: (id: string) => Promise<Task>
     unarchiveTask: (id: string) => Promise<Task>
     getArchivedTasks: () => Promise<Task[]>
+    reorderTasks: (taskIds: string[]) => Promise<void>
   }
   tags: {
     getTags: () => Promise<Tag[]>
@@ -144,6 +154,10 @@ export interface ElectronAPI {
   }
   app: {
     getVersion: () => Promise<string>
+    onGoHome: (callback: () => void) => () => void
+  }
+  window: {
+    close: () => Promise<void>
   }
   pty: {
     create: (
@@ -151,7 +165,8 @@ export interface ElectronAPI {
       cwd: string,
       sessionId?: string | null,
       existingSessionId?: string | null,
-      mode?: TerminalMode
+      mode?: TerminalMode,
+      initialPrompt?: string | null
     ) => Promise<{ success: boolean; error?: string }>
     write: (taskId: string, data: string) => Promise<boolean>
     resize: (taskId: string, cols: number, rows: number) => Promise<boolean>

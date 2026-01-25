@@ -113,7 +113,11 @@ export function CreateTaskDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DialogContent onOpenAutoFocus={(e) => {
+          e.preventDefault()
+          const input = document.querySelector<HTMLInputElement>('[name="title"]')
+          input?.focus()
+        }}>
         <DialogHeader>
           <DialogTitle>Create Task</DialogTitle>
         </DialogHeader>

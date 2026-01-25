@@ -81,6 +81,8 @@ function SortableKanbanCard({
 
 interface KanbanColumnProps {
   column: Column
+  activeColumnId?: string | null
+  overColumnId?: string | null
   onTaskClick?: (task: Task, e: React.MouseEvent) => void
   onCreateTask?: (column: Column) => void
   projectsMap?: Map<string, Project>
@@ -98,6 +100,8 @@ interface KanbanColumnProps {
 
 export function KanbanColumn({
   column,
+  activeColumnId,
+  overColumnId,
   onTaskClick,
   onCreateTask,
   projectsMap,
@@ -109,9 +113,13 @@ export function KanbanColumn({
   onArchiveTask,
   onDeleteTask
 }: KanbanColumnProps): React.JSX.Element {
-  const { setNodeRef, isOver } = useDroppable({
+  const { setNodeRef } = useDroppable({
     id: column.id
   })
+
+  // Highlight when dragging over this column from a different column
+  const showDropHighlight =
+    overColumnId === column.id && activeColumnId !== null && activeColumnId !== column.id
 
   return (
     <div className="flex w-72 shrink-0 flex-col h-full">
@@ -138,7 +146,7 @@ export function KanbanColumn({
         ref={setNodeRef}
         className={cn(
           'flex-1 h-full rounded-lg bg-muted/30 p-2 min-h-[200px]',
-          isOver && 'bg-muted/50 ring-2 ring-primary/20'
+          showDropHighlight && 'bg-muted/50 ring-2 ring-primary/20'
         )}
       >
         <SortableContext

@@ -9,13 +9,20 @@ import type { TerminalAdapter, SpawnConfig, PromptInfo, StructuredEvent } from '
 export class ClaudeAdapter implements TerminalAdapter {
   readonly mode = 'claude-code' as const
 
-  buildSpawnConfig(_cwd: string, conversationId?: string, resuming?: boolean, _shellOverride?: string): SpawnConfig {
+  buildSpawnConfig(_cwd: string, conversationId?: string, resuming?: boolean, _shellOverride?: string, initialPrompt?: string): SpawnConfig {
     const claudeArgs: string[] = []
 
-    // Only pass --resume for existing sessions, not --session-id for new ones
-    // Claude generates its own session IDs
+    // Pass --resume for existing sessions, --session-id for new ones
     if (resuming && conversationId) {
       claudeArgs.push('--resume', conversationId)
+    } else if (conversationId) {
+      claudeArgs.push('--session-id', conversationId)
+    }
+
+    // Add initial prompt as positional argument (claude "prompt")
+    // Note: Do NOT use -p flag, that's for non-interactive "print and exit" mode
+    if (initialPrompt) {
+      claudeArgs.push(initialPrompt)
     }
 
     // Spawn claude directly

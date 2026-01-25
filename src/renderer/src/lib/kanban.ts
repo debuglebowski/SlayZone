@@ -46,22 +46,25 @@ export function addDaysISO(date: string, days: number): string {
 }
 
 function groupByStatus(tasks: Task[]): Column[] {
+  const sorted = [...tasks].sort((a, b) => a.order - b.order)
   return STATUS_ORDER.map((status) => ({
     id: status,
     title: STATUS_LABELS[status],
-    tasks: tasks.filter((t) => t.status === status)
+    tasks: sorted.filter((t) => t.status === status)
   }))
 }
 
 function groupByPriority(tasks: Task[]): Column[] {
+  const sorted = [...tasks].sort((a, b) => a.order - b.order)
   return [1, 2, 3, 4, 5].map((priority) => ({
     id: `p${priority}`,
     title: PRIORITY_LABELS[priority],
-    tasks: tasks.filter((t) => t.priority === priority)
+    tasks: sorted.filter((t) => t.priority === priority)
   }))
 }
 
 function groupByDueDate(tasks: Task[]): Column[] {
+  const sorted = [...tasks].sort((a, b) => a.order - b.order)
   const today = todayISO()
   const weekEnd = addDaysISO(today, 7)
 
@@ -71,7 +74,7 @@ function groupByDueDate(tasks: Task[]): Column[] {
   const later: Task[] = []
   const noDate: Task[] = []
 
-  for (const task of tasks) {
+  for (const task of sorted) {
     if (!task.due_date) {
       noDate.push(task)
     } else if (task.due_date < today) {

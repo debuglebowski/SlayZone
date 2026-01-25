@@ -204,6 +204,13 @@ const migrations: Migration[] = [
       // Remove unused terminal_sessions table - sessions are now handled entirely in-memory
       db.exec(`DROP TABLE IF EXISTS terminal_sessions;`)
     }
+  },
+  {
+    version: 13,
+    up: (db) => {
+      db.exec(`ALTER TABLE tasks ADD COLUMN "order" INTEGER NOT NULL DEFAULT 0;`)
+      db.exec(`UPDATE tasks SET "order" = rowid;`)
+    }
   }
 ]
 

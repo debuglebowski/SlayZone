@@ -17,7 +17,7 @@ export class ShellAdapter implements TerminalAdapter {
     return process.env.SHELL || '/bin/bash'
   }
 
-  buildSpawnConfig(_cwd: string, _conversationId?: string, _resuming?: boolean, shellOverride?: string): SpawnConfig {
+  buildSpawnConfig(_cwd: string, _conversationId?: string, _resuming?: boolean, shellOverride?: string, _initialPrompt?: string): SpawnConfig {
     return {
       shell: this.getShell(shellOverride),
       args: []

@@ -14,6 +14,11 @@ interface PtySession {
   buffer: RingBuffer
   lastOutputTime: number
   state: TerminalState
+  // /status monitoring
+  inputBuffer: string
+  watchingForSessionId: boolean
+  statusOutputBuffer: string
+  statusWatchTimeout?: NodeJS.Timeout
 }
 
 export type { PtyInfo }
@@ -111,7 +116,8 @@ export function createPty(
   sessionId?: string | null,
   existingSessionId?: string | null,
   mode?: TerminalMode,
-  globalShell?: string | null
+  globalShell?: string | null,
+  initialPrompt?: string | null
 ): { success: boolean; error?: string } {
   console.log(`[pty-manager] createPty(${taskId}) mode=${mode} shell=${globalShell}`)
   // Kill existing if any
@@ -127,7 +133,7 @@ export function createPty(
     const conversationId = existingSessionId || sessionId
 
     // Get spawn config from adapter
-    const spawnConfig = adapter.buildSpawnConfig(cwd || homedir(), conversationId || undefined, resuming, globalShell || undefined)
+    const spawnConfig = adapter.buildSpawnConfig(cwd || homedir(), conversationId || undefined, resuming, globalShell || undefined, initialPrompt || undefined)
 
     const ptyProcess = pty.spawn(spawnConfig.shell, spawnConfig.args, {
       name: 'xterm-256color',
@@ -153,7 +159,11 @@ export function createPty(
       checkingForSessionError: resuming,
       buffer: new RingBuffer(MAX_BUFFER_SIZE),
       lastOutputTime: Date.now(),
-      state: 'starting'
+      state: 'starting',
+      // /status monitoring
+      inputBuffer: '',
+      watchingForSessionId: false,
+      statusOutputBuffer: ''
     })
 
     // Forward data to renderer
@@ -196,6 +206,28 @@ export function createPty(
           win.webContents.send('pty:session-not-found', taskId)
         }
       }
+
+      // Parse session ID from /status output
+      if (session.watchingForSessionId) {
+        session.statusOutputBuffer += data
+
+        const uuidMatch = session.statusOutputBuffer.match(
+          /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i
+        )
+        if (uuidMatch) {
+          const detectedSessionId = uuidMatch[0]
+          console.log(`[pty-manager] Session ID detected: ${detectedSessionId}`)
+          if (!win.isDestroyed()) {
+            win.webContents.send('pty:session-detected', taskId, detectedSessionId)
+          }
+          session.watchingForSessionId = false
+          session.statusOutputBuffer = ''
+          if (session.statusWatchTimeout) {
+            clearTimeout(session.statusWatchTimeout)
+            session.statusWatchTimeout = undefined
+          }
+        }
+      }
     })
 
     ptyProcess.onExit(({ exitCode }) => {
@@ -236,6 +268,33 @@ export function createPty(
 export function writePty(taskId: string, data: string): boolean {
   const session = sessions.get(taskId)
   if (!session) return false
+
+  // Debug: log all input
+  console.log(`[pty-manager] writePty(${taskId}) data=${JSON.stringify(data)}`)
+
+  // Buffer input to detect commands
+  session.inputBuffer += data
+
+  // Check for /status command (on Enter)
+  if (data === '\r' || data === '\n') {
+    console.log(`[pty-manager] Enter detected, inputBuffer=${JSON.stringify(session.inputBuffer)}`)
+    if (session.inputBuffer.includes('/status')) {
+      console.log(`[pty-manager] /status command detected for task ${taskId}`)
+      session.watchingForSessionId = true
+      session.statusOutputBuffer = ''
+
+      // Stop watching after 5s timeout
+      session.statusWatchTimeout = setTimeout(() => {
+        if (session.watchingForSessionId) {
+          console.log(`[pty-manager] /status watch timeout, no session ID found`)
+          session.watchingForSessionId = false
+          session.statusOutputBuffer = ''
+        }
+      }, 5000)
+    }
+    session.inputBuffer = '' // reset on enter
+  }
+
   session.pty.write(data)
   return true
 }

@@ -12,7 +12,8 @@ export function registerPtyHandlers(): void {
       cwd: string,
       sessionId?: string | null,
       existingSessionId?: string | null,
-      mode?: TerminalMode
+      mode?: TerminalMode,
+      initialPrompt?: string | null
     ) => {
       const win = BrowserWindow.fromWebContents(event.sender)
       if (!win) return { success: false, error: 'No window found' }
@@ -22,7 +23,7 @@ export function registerPtyHandlers(): void {
       const row = db.prepare('SELECT value FROM settings WHERE key = ?').get('shell') as { value: string } | undefined
       const globalShell = row?.value || null
 
-      return createPty(win, taskId, cwd, sessionId, existingSessionId, mode, globalShell)
+      return createPty(win, taskId, cwd, sessionId, existingSessionId, mode, globalShell, initialPrompt)
     }
   )
 

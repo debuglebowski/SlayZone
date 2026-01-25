@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { ArrowLeft, MoreHorizontal, Archive, Trash2, AlertTriangle, RotateCw, Link2 } from 'lucide-react'
+import { MoreHorizontal, Archive, Trash2, AlertTriangle, RotateCw, RefreshCcw, Link2, Sparkles, Loader2 } from 'lucide-react'
 import type { Task, Tag, Project, TerminalMode } from '../../../../shared/types/database'
 import type { ClaudeAvailability } from '../../../../shared/types/api'
 import { Button } from '@/components/ui/button'
@@ -22,7 +22,7 @@ import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip
 import { TaskMetadataSidebar } from './TaskMetadataSidebar'
 import { RichTextEditor } from '@/components/ui/rich-text-editor'
 import { Terminal } from '@/components/terminal/Terminal'
-import { disposeTerminal, markSkipCache } from '@/components/terminal/terminal-cache'
+import { markSkipCache } from '@/components/terminal/terminal-cache'
 import { usePty } from '@/contexts/PtyContext'
 import { cn } from '@/lib/utils'
 
@@ -46,7 +46,10 @@ export function TaskDetailPage({
   const [claudeAvailability, setClaudeAvailability] = useState<ClaudeAvailability | null>(null)
 
   // PTY context for buffer management
-  const { resetTaskState } = usePty()
+  const { resetTaskState, subscribeSessionDetected, getQuickRunPrompt, clearQuickRunPrompt } = usePty()
+
+  // Detected session ID from /status command
+  const [detectedSessionId, setDetectedSessionId] = useState<string | null>(null)
 
   // Title editing state
   const [editingTitle, setEditingTitle] = useState(false)
@@ -58,9 +61,19 @@ export function TaskDetailPage({
 
   // Description editing state
   const [descriptionValue, setDescriptionValue] = useState('')
+  const [generatingDescription, setGeneratingDescription] = useState(false)
 
   // Terminal restart key (changing this forces remount)
   const [terminalKey, setTerminalKey] = useState(0)
+
+  // Terminal input function (exposed via onReady callback)
+  const sendInputRef = useRef<((text: string) => Promise<void>) | null>(null)
+
+  // Subscribe to session detected events
+  useEffect(() => {
+    if (!task) return
+    return subscribeSessionDetected(task.id, setDetectedSessionId)
+  }, [task?.id, subscribeSessionDetected])
 
   // Load task data on mount
   useEffect(() => {
@@ -104,6 +117,18 @@ export function TaskDetailPage({
     [task, onTaskUpdated]
   )
 
+  // Update DB with detected session ID
+  const handleUpdateSessionId = useCallback(async () => {
+    if (!task || !detectedSessionId) return
+    const updated = await window.api.db.updateTask({
+      id: task.id,
+      claudeConversationId: detectedSessionId
+    })
+    setTask(updated)
+    onTaskUpdated(updated)
+    setDetectedSessionId(null)
+  }, [task, detectedSessionId, onTaskUpdated])
+
   // Handle invalid session (e.g., "No conversation found" error)
   const handleSessionInvalid = useCallback(async () => {
     if (!task) return
@@ -120,19 +145,32 @@ export function TaskDetailPage({
     await window.api.pty.kill(task.id)
   }, [task, onTaskUpdated])
 
-  // Restart terminal (kill PTY, clear cache, remount)
+  // Restart terminal (kill PTY, remount, keep session for --resume)
   const handleRestartTerminal = useCallback(async () => {
     if (!task) return
-    // Reset state FIRST to ignore any in-flight data
     resetTaskState(task.id)
-    disposeTerminal(task.id)
-    // Now kill the PTY (any data it sends will be ignored)
     await window.api.pty.kill(task.id)
-    // Small delay to let any remaining PTY data be processed and ignored
     await new Promise((r) => setTimeout(r, 100))
     markSkipCache(task.id)
     setTerminalKey((k) => k + 1)
   }, [task, resetTaskState])
+
+  // Reset terminal (kill PTY, clear session ID, remount fresh)
+  const handleResetTerminal = useCallback(async () => {
+    if (!task) return
+    resetTaskState(task.id)
+    await window.api.pty.kill(task.id)
+    // Clear session ID so new session starts fresh
+    const updated = await window.api.db.updateTask({
+      id: task.id,
+      claudeConversationId: null
+    })
+    setTask(updated)
+    onTaskUpdated(updated)
+    await new Promise((r) => setTimeout(r, 100))
+    markSkipCache(task.id)
+    setTerminalKey((k) => k + 1)
+  }, [task, resetTaskState, onTaskUpdated])
 
   // Re-attach terminal (remount without killing PTY - reuses cached terminal)
   const handleReattachTerminal = useCallback(() => {
@@ -140,13 +178,47 @@ export function TaskDetailPage({
     setTerminalKey((k) => k + 1)
   }, [task])
 
+  // Sync Claude session name with task title
+  const handleSyncSessionName = useCallback(async () => {
+    if (!task || !sendInputRef.current) return
+    await sendInputRef.current(`/rename ${task.title}\r`)
+  }, [task])
+
+  // Inject task title into terminal (no execute)
+  const handleInjectTitle = useCallback(async () => {
+    if (!task || !sendInputRef.current) return
+    await sendInputRef.current(task.title)
+  }, [task])
+
+  // Cmd+I shortcut for inject title
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent): void => {
+      if (e.metaKey && e.key === 'i') {
+        e.preventDefault()
+        handleInjectTitle()
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [handleInjectTitle])
+
+  // Clear quick run prompt after it's been passed to Terminal
+  useEffect(() => {
+    if (!task) return
+    // Small delay to ensure Terminal has read the prompt
+    const timer = setTimeout(() => {
+      clearQuickRunPrompt(task.id)
+    }, 500)
+    return () => clearTimeout(timer)
+  }, [task?.id, clearQuickRunPrompt])
+
+
   // Handle terminal mode change
   const handleModeChange = useCallback(
     async (mode: TerminalMode) => {
       if (!task) return
       // Reset state FIRST to ignore any in-flight data
       resetTaskState(task.id)
-      disposeTerminal(task.id)
       // Now kill the PTY (any data it sends will be ignored)
       await window.api.pty.kill(task.id)
       // Small delay to let any remaining PTY data be processed and ignored
@@ -211,6 +283,34 @@ export function TaskDetailPage({
     onTaskUpdated(updated)
   }
 
+  const handleGenerateDescription = async (): Promise<void> => {
+    if (!task || generatingDescription) return
+    console.log('[generate] Starting for title:', task.title)
+    setGeneratingDescription(true)
+    try {
+      const result = await window.api.ai.generateDescription(
+        task.title,
+        task.terminal_mode || 'claude-code'
+      )
+      console.log('[generate] Result:', result)
+      if (result.success && result.description) {
+        setDescriptionValue(result.description)
+        const updated = await window.api.db.updateTask({
+          id: task.id,
+          description: result.description
+        })
+        setTask(updated)
+        onTaskUpdated(updated)
+      } else if (result.error) {
+        console.error('[generate] Error:', result.error)
+      }
+    } catch (err) {
+      console.error('[generate] Exception:', err)
+    } finally {
+      setGeneratingDescription(false)
+    }
+  }
+
   const handleTaskUpdate = (updated: Task): void => {
     setTask(updated)
     onTaskUpdated(updated)
@@ -249,18 +349,11 @@ export function TaskDetailPage({
   }
 
   return (
-    <div className="h-screen flex flex-col">
-      {/* Draggable region for window movement - clears traffic lights */}
-      <div className="h-10 window-drag-region shrink-0" />
-
+    <div className="h-full flex flex-col">
       {/* Header */}
       <header className="shrink-0 border-b bg-background">
         <div className="px-4 py-2">
           <div className="flex items-center gap-4 window-no-drag">
-            <Button variant="ghost" size="icon" onClick={onBack}>
-              <ArrowLeft className="size-5" />
-            </Button>
-
             <input
               ref={titleInputRef}
               value={titleValue}
@@ -301,6 +394,18 @@ export function TaskDetailPage({
                       </Button>
                     </TooltipTrigger>
                     <TooltipContent>Restart terminal</TooltipContent>
+                  </Tooltip>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={handleResetTerminal}
+                      >
+                        <RefreshCcw className="size-4" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>Reset terminal</TooltipContent>
                   </Tooltip>
                 </>
               )}
@@ -344,6 +449,23 @@ export function TaskDetailPage({
               minHeight="150px"
               className="bg-muted/30 rounded-lg p-3"
             />
+            {task.terminal_mode !== 'terminal' && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="mt-2 text-xs text-muted-foreground hover:text-foreground"
+                onClick={() => handleGenerateDescription()}
+                disabled={generatingDescription || !task.title}
+              >
+                {generatingDescription ? (
+                  <Loader2 className="size-3 mr-1 animate-spin" />
+                ) : (
+                  <Sparkles className="size-3 mr-1" />
+                )}
+                Generate description
+              </Button>
+            )}
           </div>
 
           {/* Metadata */}
@@ -368,6 +490,22 @@ export function TaskDetailPage({
               </span>
             </div>
           )}
+          {detectedSessionId && task.claude_conversation_id && detectedSessionId !== task.claude_conversation_id && (
+            <div className="shrink-0 bg-amber-500/10 border-b border-amber-500/20 px-4 py-2 flex items-center gap-2">
+              <AlertTriangle className="h-4 w-4 text-amber-500" />
+              <span className="text-sm text-amber-500">
+                Session mismatch: terminal using {detectedSessionId}
+              </span>
+              <Button
+                size="sm"
+                variant="outline"
+                className="ml-auto h-6 text-xs"
+                onClick={handleUpdateSessionId}
+              >
+                Update DB
+              </Button>
+            </div>
+          )}
           <div className="flex-1 min-h-0">
             {project?.path ? (
               <Terminal
@@ -377,8 +515,10 @@ export function TaskDetailPage({
                 mode={task.terminal_mode || 'claude-code'}
                 sessionId={task.claude_conversation_id || task.claude_session_id || undefined}
                 existingSessionId={task.claude_conversation_id || task.claude_session_id || undefined}
+                initialPrompt={getQuickRunPrompt(task.id)}
                 onSessionCreated={handleSessionCreated}
                 onSessionInvalid={handleSessionInvalid}
+                onReady={(sendInput) => { sendInputRef.current = sendInput }}
               />
             ) : (
               <div className="h-full flex items-center justify-center text-muted-foreground">
@@ -408,6 +548,39 @@ export function TaskDetailPage({
                 <SelectItem value="terminal">Terminal</SelectItem>
               </SelectContent>
             </Select>
+
+            {(task.terminal_mode === 'claude-code' || !task.terminal_mode) && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="ml-auto h-7 text-xs"
+                    onClick={handleSyncSessionName}
+                  >
+                    Sync name
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Rename Claude session to match task title</TooltipContent>
+              </Tooltip>
+            )}
+
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className={cn(
+                    'h-7 text-xs',
+                    task.terminal_mode !== 'claude-code' && task.terminal_mode && 'ml-auto'
+                  )}
+                  onClick={handleInjectTitle}
+                >
+                  Inject task title
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Insert task title into terminal (⌘I)</TooltipContent>
+            </Tooltip>
           </div>
         </div>
       </div>

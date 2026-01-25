@@ -16,6 +16,7 @@ import { registerDatabaseHandlers } from './ipc/database'
 import { registerClaudeHandlers } from './ipc/claude'
 import { registerThemeHandlers } from './ipc/theme'
 import { registerPtyHandlers } from './ipc/pty'
+import { registerAiHandlers } from './ipc/ai'
 import { killAllPtys, startIdleChecker, stopIdleChecker } from './services/pty-manager'
 
 // Minimum splash screen display time (ms)
@@ -246,6 +247,14 @@ function createMainWindow(): void {
     mainWindow = null
   })
 
+  // Intercept Cmd+§ at Electron level (react-hotkeys-hook doesn't recognize §)
+  mainWindow.webContents.on('before-input-event', (event, input) => {
+    if (input.type === 'keyDown' && input.key === '§' && input.meta) {
+      event.preventDefault()
+      mainWindow?.webContents.send('app:go-home')
+    }
+  })
+
   // HMR for renderer base on electron-vite cli.
   // Load the remote URL for development or the local html file for production.
   if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
@@ -345,6 +354,7 @@ app.whenReady().then(() => {
   registerClaudeHandlers()
   registerThemeHandlers()
   registerPtyHandlers()
+  registerAiHandlers()
 
   // Configure webview session for WebAuthn/passkey support
   const browserSession = session.fromPartition('persist:browser-tabs')
@@ -381,6 +391,12 @@ app.whenReady().then(() => {
 
   // App version
   ipcMain.handle('app:getVersion', () => app.getVersion())
+
+  // Window close
+  ipcMain.handle('window:close', (event) => {
+    const win = BrowserWindow.fromWebContents(event.sender)
+    if (win) win.close()
+  })
 
   // Dialog
   ipcMain.handle(

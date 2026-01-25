@@ -17,7 +17,7 @@ export class CodexAdapter implements TerminalAdapter {
     return process.env.SHELL || '/bin/bash'
   }
 
-  buildSpawnConfig(_cwd: string, _conversationId?: string, _resuming?: boolean, shellOverride?: string): SpawnConfig {
+  buildSpawnConfig(_cwd: string, _conversationId?: string, _resuming?: boolean, shellOverride?: string, _initialPrompt?: string): SpawnConfig {
     // Codex CLI doesn't support session resume - always start fresh
     return {
       shell: this.getShell(shellOverride),

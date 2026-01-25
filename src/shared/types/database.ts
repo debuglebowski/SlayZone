@@ -8,6 +8,7 @@ export interface Task {
   description: string | null
   status: TaskStatus
   priority: number // 1-5, default 3
+  order: number
   due_date: string | null
   archived_at: string | null
   // Terminal configuration

@@ -18,6 +18,7 @@ interface PtyState {
   sessionInvalid: boolean
   state: TerminalState
   pendingPrompt?: PromptInfo
+  quickRunPrompt?: string
 }
 
 type DataCallback = (data: string) => void
@@ -26,6 +27,7 @@ type SessionInvalidCallback = () => void
 type IdleCallback = () => void
 type StateChangeCallback = (newState: TerminalState, oldState: TerminalState) => void
 type PromptCallback = (prompt: PromptInfo) => void
+type SessionDetectedCallback = (sessionId: string) => void
 
 interface PtyContextValue {
   subscribe: (taskId: string, cb: DataCallback) => () => void
@@ -34,6 +36,7 @@ interface PtyContextValue {
   subscribeIdle: (taskId: string, cb: IdleCallback) => () => void
   subscribeState: (taskId: string, cb: StateChangeCallback) => () => void
   subscribePrompt: (taskId: string, cb: PromptCallback) => () => void
+  subscribeSessionDetected: (taskId: string, cb: SessionDetectedCallback) => () => void
   getBuffer: (taskId: string) => string
   getExitCode: (taskId: string) => number | undefined
   isSessionInvalid: (taskId: string) => boolean
@@ -45,6 +48,10 @@ interface PtyContextValue {
   clearIgnore: (taskId: string) => void
   // Global prompt tracking for badge
   getPendingPromptTaskIds: () => string[]
+  // Quick run prompt
+  setQuickRunPrompt: (taskId: string, prompt: string) => void
+  getQuickRunPrompt: (taskId: string) => string | undefined
+  clearQuickRunPrompt: (taskId: string) => void
 }
 
 const PtyContext = createContext<PtyContextValue | null>(null)
@@ -63,6 +70,7 @@ export function PtyProvider({ children }: { children: ReactNode }) {
   const idleSubsRef = useRef<Map<string, Set<IdleCallback>>>(new Map())
   const stateSubsRef = useRef<Map<string, Set<StateChangeCallback>>>(new Map())
   const promptSubsRef = useRef<Map<string, Set<PromptCallback>>>(new Map())
+  const sessionDetectedSubsRef = useRef<Map<string, Set<SessionDetectedCallback>>>(new Map())
 
   // Track task IDs with pending prompts for global badge
   const [pendingPromptTaskIds, setPendingPromptTaskIds] = useState<Set<string>>(new Set())
@@ -81,17 +89,10 @@ export function PtyProvider({ children }: { children: ReactNode }) {
     const unsubData = window.api.pty.onData((taskId, data) => {
       // Ignore data for tasks being reset (prevents stale data from recreating state)
       if (ignoredTasksRef.current.has(taskId)) {
-        console.log(`[PtyContext] IGNORED data for ${taskId} (${data.length} chars) - task is being reset`)
         return
       }
 
-      const existedBefore = statesRef.current.has(taskId)
       const state = getOrCreateState(taskId)
-      if (!existedBefore) {
-        console.log(`[PtyContext] CREATED new state for ${taskId} on data receive (${data.length} chars)`)
-      }
-      const preview = data.slice(0, 50).replace(/[\x00-\x1f]/g, '.')
-      console.log(`[PtyContext] DATA for ${taskId}: ${data.length} chars, preview: "${preview}"`)
       state.buffer += data
       if (state.buffer.length > MAX_BUFFER_SIZE) {
         state.buffer = state.buffer.slice(-MAX_BUFFER_SIZE)
@@ -164,6 +165,13 @@ export function PtyProvider({ children }: { children: ReactNode }) {
       }
     })
 
+    const unsubSessionDetected = window.api.pty.onSessionDetected((taskId, sessionId) => {
+      const subs = sessionDetectedSubsRef.current.get(taskId)
+      if (subs) {
+        subs.forEach((cb) => cb(sessionId))
+      }
+    })
+
     return () => {
       unsubData()
       unsubExit()
@@ -171,6 +179,7 @@ export function PtyProvider({ children }: { children: ReactNode }) {
       unsubIdle()
       unsubStateChange()
       unsubPrompt()
+      unsubSessionDetected()
     }
   }, [getOrCreateState])
 
@@ -249,6 +258,21 @@ export function PtyProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
+  const subscribeSessionDetected = useCallback(
+    (taskId: string, cb: SessionDetectedCallback): (() => void) => {
+      let subs = sessionDetectedSubsRef.current.get(taskId)
+      if (!subs) {
+        subs = new Set()
+        sessionDetectedSubsRef.current.set(taskId, subs)
+      }
+      subs.add(cb)
+      return () => {
+        subs!.delete(cb)
+      }
+    },
+    []
+  )
+
   const getBuffer = useCallback((taskId: string): string => {
     return statesRef.current.get(taskId)?.buffer ?? ''
   }, [])
@@ -294,21 +318,14 @@ export function PtyProvider({ children }: { children: ReactNode }) {
 
   // Clear ignore flag early - call after new PTY is confirmed created
   const clearIgnore = useCallback((taskId: string): void => {
-    if (ignoredTasksRef.current.has(taskId)) {
-      ignoredTasksRef.current.delete(taskId)
-      console.log(`[PtyContext] clearIgnore(${taskId}) - manually cleared ignore flag`)
-    }
+    ignoredTasksRef.current.delete(taskId)
   }, [])
 
   // Full reset for mode switches - removes all state so fresh state is created
   const resetTaskState = useCallback((taskId: string): void => {
-    console.log(`[PtyContext] resetTaskState(${taskId}) - adding to ignore list`)
     // Mark as ignored to prevent in-flight IPC data from recreating state
     ignoredTasksRef.current.add(taskId)
-    const hadState = statesRef.current.has(taskId)
-    const oldBuffer = statesRef.current.get(taskId)?.buffer || ''
     statesRef.current.delete(taskId)
-    console.log(`[PtyContext] resetTaskState(${taskId}) - deleted state (had=${hadState}, oldBufferLen=${oldBuffer.length})`)
     setPendingPromptTaskIds((prev) => {
       const next = new Set(prev)
       next.delete(taskId)
@@ -317,8 +334,24 @@ export function PtyProvider({ children }: { children: ReactNode }) {
     // Clear ignore flag after delay (allows new PTY to start fresh)
     setTimeout(() => {
       ignoredTasksRef.current.delete(taskId)
-      console.log(`[PtyContext] resetTaskState(${taskId}) - removed from ignore list`)
     }, 500)
+  }, [])
+
+  // Quick run prompt - for auto-sending prompt when task opens
+  const setQuickRunPrompt = useCallback((taskId: string, prompt: string): void => {
+    const state = getOrCreateState(taskId)
+    state.quickRunPrompt = prompt
+  }, [getOrCreateState])
+
+  const getQuickRunPrompt = useCallback((taskId: string): string | undefined => {
+    return statesRef.current.get(taskId)?.quickRunPrompt
+  }, [])
+
+  const clearQuickRunPrompt = useCallback((taskId: string): void => {
+    const state = statesRef.current.get(taskId)
+    if (state) {
+      state.quickRunPrompt = undefined
+    }
   }, [])
 
   const value: PtyContextValue = {
@@ -328,6 +361,7 @@ export function PtyProvider({ children }: { children: ReactNode }) {
     subscribeIdle,
     subscribeState,
     subscribePrompt,
+    subscribeSessionDetected,
     getBuffer,
     getExitCode,
     isSessionInvalid,
@@ -337,7 +371,10 @@ export function PtyProvider({ children }: { children: ReactNode }) {
     clearBuffer,
     resetTaskState,
     clearIgnore,
-    getPendingPromptTaskIds
+    getPendingPromptTaskIds,
+    setQuickRunPrompt,
+    getQuickRunPrompt,
+    clearQuickRunPrompt
   }
 
   return <PtyContext.Provider value={value}>{children}</PtyContext.Provider>
