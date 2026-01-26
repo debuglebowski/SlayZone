@@ -1,4 +1,4 @@
-import { useEffect, useRef, useCallback } from 'react'
+import { useEffect, useRef, useCallback, useState } from 'react'
 import { Terminal as XTerm } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
 import { WebLinksAddon } from '@xterm/addon-web-links'
@@ -7,12 +7,13 @@ import { WebglAddon } from '@xterm/addon-webgl'
 import '@xterm/xterm/css/xterm.css'
 import { getTerminal, setTerminal, disposeTerminal } from './terminal-cache'
 import { usePty } from '../../contexts/PtyContext'
-import type { TerminalMode } from '../../../../shared/types/api'
+import type { TerminalMode, TerminalState, CodeMode } from '../../../../shared/types/api'
 
 // Wait for container to have non-zero dimensions before opening terminal
 function waitForDimensions(
   container: HTMLElement,
-  signal: AbortSignal
+  signal: AbortSignal,
+  timeoutMs = 3000
 ): Promise<void> {
   return new Promise((resolve, reject) => {
     // Already has dimensions? Resolve immediately
@@ -22,10 +23,17 @@ function waitForDimensions(
       return
     }
 
+    // Timeout to prevent hanging forever
+    const timeoutId = setTimeout(() => {
+      observer.disconnect()
+      resolve()
+    }, timeoutMs)
+
     // Otherwise wait for ResizeObserver
     const observer = new ResizeObserver((entries) => {
       const entry = entries[0]
       if (entry.contentRect.width > 0 && entry.contentRect.height > 0) {
+        clearTimeout(timeoutId)
         observer.disconnect()
         resolve()
       }
@@ -33,6 +41,7 @@ function waitForDimensions(
 
     // Handle abort (component unmount)
     const onAbort = (): void => {
+      clearTimeout(timeoutId)
       observer.disconnect()
       reject(new DOMException('Aborted', 'AbortError'))
     }
@@ -54,6 +63,7 @@ interface TerminalProps {
   sessionId?: string | null
   existingSessionId?: string | null
   initialPrompt?: string | null
+  codeMode?: CodeMode | null
   onSessionCreated?: (sessionId: string) => void
   onSessionInvalid?: () => void
   onReady?: (sendInput: (text: string) => Promise<void>) => void
@@ -66,6 +76,7 @@ export function Terminal({
   sessionId,
   existingSessionId,
   initialPrompt,
+  codeMode,
   onSessionCreated,
   onSessionInvalid,
   onReady
@@ -75,8 +86,13 @@ export function Terminal({
   const fitAddonRef = useRef<FitAddon | null>(null)
   const serializeAddonRef = useRef<SerializeAddon | null>(null)
   const initializedRef = useRef(false)
+  const hasInitialFocusedRef = useRef(false)
+  const [isDragOver, setIsDragOver] = useState(false)
+  const [isInitializing, setIsInitializing] = useState(true)
 
-  const { subscribe, subscribeExit, subscribeSessionInvalid, subscribeIdle, getBuffer, clearBuffer, resetTaskState, clearIgnore } = usePty()
+  const { subscribe, subscribeExit, subscribeSessionInvalid, subscribeIdle, subscribeState, getState, getBuffer, clearBuffer, resetTaskState, clearIgnore } = usePty()
+
+  const [ptyState, setPtyState] = useState<TerminalState>(() => getState(taskId))
 
   const initTerminal = useCallback(async (signal: AbortSignal) => {
     if (!containerRef.current || initializedRef.current) return
@@ -89,8 +105,16 @@ export function Terminal({
       throw e
     }
 
+    const rect = containerRef.current.getBoundingClientRect()
+
     // Re-check after await (component state might have changed)
     if (!containerRef.current || initializedRef.current || signal.aborted) return
+
+    // Don't initialize if container still has 0 dimensions (not visible)
+    if (rect.width === 0 || rect.height === 0) {
+      return
+    }
+
     initializedRef.current = true
 
     // Check if we have a cached terminal for this task
@@ -112,7 +136,10 @@ export function Terminal({
 
         // Simple fit - container is guaranteed to have dimensions
         cached.fitAddon.fit()
-        if (!isDialogOpen()) cached.terminal.focus()
+        if (!hasInitialFocusedRef.current && !isDialogOpen()) {
+          cached.terminal.focus()
+          hasInitialFocusedRef.current = true
+        }
         window.api.pty.resize(taskId, cached.terminal.cols, cached.terminal.rows)
 
         // Expose sendInput for programmatic input (char-by-char for Ink compatibility)
@@ -122,6 +149,7 @@ export function Terminal({
             await new Promise(r => setTimeout(r, 1))
           }
         })
+        setIsInitializing(false)
         return
       }
     }
@@ -183,7 +211,10 @@ export function Terminal({
     terminal.clear() // Ensure terminal starts completely fresh
     // Simple fit - container is guaranteed to have dimensions from waitForDimensions
     fitAddon.fit()
-    if (!isDialogOpen()) terminal.focus()
+    if (!hasInitialFocusedRef.current && !isDialogOpen()) {
+      terminal.focus()
+      hasInitialFocusedRef.current = true
+    }
 
     // Let Ctrl+Tab and Ctrl+Shift+Tab bubble up for tab switching
     terminal.attachCustomKeyEventHandler((e) => {
@@ -194,15 +225,23 @@ export function Terminal({
     // Check if PTY already exists (e.g., from idle hibernation)
     const exists = await window.api.pty.exists(taskId)
     if (exists) {
+      // Sync state from main process (fixes stuck loading spinner)
+      const actualState = await window.api.pty.getState(taskId)
+      if (actualState) setPtyState(actualState)
+
       // PTY exists - check if we have buffered data from context
       const contextBuffer = getBuffer(taskId)
       if (contextBuffer) {
+        terminal.write('\x1b[0m') // Reset ANSI state before buffer replay
         terminal.write(contextBuffer)
+        terminal.write('\x1b[0m') // Reset ANSI state after buffer replay
       } else {
         // Fall back to PTY buffer
         const buffer = await window.api.pty.getBuffer(taskId)
         if (buffer) {
+          terminal.write('\x1b[0m') // Reset ANSI state before buffer replay
           terminal.write(buffer)
+          terminal.write('\x1b[0m') // Reset ANSI state after buffer replay
         }
       }
     } else {
@@ -221,9 +260,10 @@ export function Terminal({
       }
 
       // Create PTY with selected mode (only pass session IDs for claude-code)
+      // Note: Don't pass initialPrompt - we'll inject it after terminal is ready
       const effectiveSessionId = mode === 'claude-code' ? newSessionId : undefined
       const effectiveExistingSessionId = mode === 'claude-code' ? existingSessionId : undefined
-      const result = await window.api.pty.create(taskId, cwd, effectiveSessionId, effectiveExistingSessionId, mode, initialPrompt)
+      const result = await window.api.pty.create(taskId, cwd, effectiveSessionId, effectiveExistingSessionId, mode, null, codeMode)
       if (!result.success) {
         terminal.writeln(`\x1b[31mError: ${result.error}\x1b[0m`)
         return
@@ -244,14 +284,33 @@ export function Terminal({
     const { cols, rows } = terminal
     window.api.pty.resize(taskId, cols, rows)
 
-    // Expose sendInput for programmatic input (char-by-char for Ink compatibility)
-    onReady?.(async (text) => {
+    // Helper to inject text char-by-char
+    const injectText = async (text: string): Promise<void> => {
       for (const char of text) {
         terminal.input(char)
         await new Promise(r => setTimeout(r, 1))
       }
-    })
-  }, [taskId, cwd, mode, sessionId, existingSessionId, initialPrompt, onSessionCreated, onReady, getBuffer, clearBuffer, resetTaskState, clearIgnore])
+    }
+
+    // Expose sendInput for programmatic input
+    onReady?.(injectText)
+
+    // Inject initial prompt if provided (after a delay for terminal to be ready)
+    if (initialPrompt) {
+      setTimeout(async () => {
+        // For plan mode, prefix with /plan
+        const textToInject = codeMode === 'plan' ? `/plan ${initialPrompt}` : initialPrompt
+        await injectText(textToInject)
+      }, 500)
+    }
+
+    setIsInitializing(false)
+  }, [taskId, cwd, mode, sessionId, existingSessionId, initialPrompt, codeMode, onSessionCreated, onReady, getBuffer, clearBuffer, resetTaskState, clearIgnore])
+
+  // Reset initial focus flag when taskId changes
+  useEffect(() => {
+    hasInitialFocusedRef.current = false
+  }, [taskId])
 
   // Initialize terminal
   useEffect(() => {
@@ -307,6 +366,12 @@ export function Terminal({
     })
 
     const unsubIdle = subscribeIdle(taskId, () => {
+      // Only hibernate if terminal is not currently visible (0 dimensions = hidden tab)
+      const rect = containerRef.current?.getBoundingClientRect()
+      if (rect && rect.width > 0 && rect.height > 0) {
+        return
+      }
+
       // Dispose the cached terminal for this task to free memory
       // The PTY is still running, so we can restore from buffer later
       disposeTerminal(taskId)
@@ -314,6 +379,8 @@ export function Terminal({
       terminalRef.current = null
       fitAddonRef.current = null
       serializeAddonRef.current = null
+      // Allow reinitialization when terminal becomes visible again
+      initializedRef.current = false
     })
 
     return () => {
@@ -323,6 +390,12 @@ export function Terminal({
       unsubIdle()
     }
   }, [taskId, onSessionInvalid, subscribe, subscribeExit, subscribeSessionInvalid, subscribeIdle])
+
+  // Subscribe to PTY state changes for loading indicator
+  useEffect(() => {
+    setPtyState(getState(taskId))
+    return subscribeState(taskId, (newState) => setPtyState(newState))
+  }, [taskId, getState, subscribeState])
 
   // Handle resize
   useEffect(() => {
@@ -342,13 +415,135 @@ export function Terminal({
     }
   }, [])
 
+  // Handle paste and drag-drop for files/images
+  useEffect(() => {
+    const container = containerRef.current
+    if (!container) return
+
+    // Convert File to base64
+    const fileToBase64 = (file: File): Promise<string> => {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader()
+        reader.onload = () => {
+          const result = reader.result as string
+          resolve(result.split(',')[1]) // Remove data:...;base64, prefix
+        }
+        reader.onerror = reject
+        reader.readAsDataURL(file)
+      })
+    }
+
+    // Insert path into terminal (escape if has spaces)
+    const insertPath = (path: string) => {
+      const escaped = path.includes(' ') ? `"${path}"` : path
+      window.api.pty.write(taskId, escaped)
+    }
+
+    // Process a single file
+    const processFile = async (file: File, mimeType?: string): Promise<string | null> => {
+      const filePath = (file as File & { path?: string }).path
+      if (filePath) {
+        return filePath
+      } else if (mimeType?.startsWith('image/') || file.type.startsWith('image/')) {
+        // Image from clipboard (screenshot, browser copy) - save to temp
+        const base64 = await fileToBase64(file)
+        const result = await window.api.files.saveTempImage(base64, mimeType || file.type)
+        if (result.success && result.path) {
+          return result.path
+        }
+      }
+      return null
+    }
+
+    const handlePaste = async (e: ClipboardEvent) => {
+      const items = e.clipboardData?.items
+      if (!items) return
+
+      const paths: string[] = []
+
+      for (const item of items) {
+        if (item.kind === 'file') {
+          const file = item.getAsFile()
+          if (!file) continue
+
+          e.preventDefault()
+          const path = await processFile(file, item.type)
+          if (path) paths.push(path)
+        }
+      }
+
+      if (paths.length > 0) {
+        insertPath(paths.join(' '))
+      }
+    }
+
+    const handleDrop = async (e: DragEvent) => {
+      e.preventDefault()
+      e.stopPropagation()
+      setIsDragOver(false)
+
+      const files = e.dataTransfer?.files
+      if (!files?.length) return
+
+      const paths: string[] = []
+      for (const file of files) {
+        const path = await processFile(file)
+        if (path) paths.push(path)
+      }
+
+      if (paths.length > 0) {
+        insertPath(paths.join(' '))
+      }
+    }
+
+    const handleDragOver = (e: DragEvent) => {
+      e.preventDefault()
+      e.stopPropagation()
+      setIsDragOver(true)
+    }
+
+    const handleDragLeave = (e: DragEvent) => {
+      e.preventDefault()
+      e.stopPropagation()
+      setIsDragOver(false)
+    }
+
+    container.addEventListener('paste', handlePaste)
+    container.addEventListener('drop', handleDrop)
+    container.addEventListener('dragover', handleDragOver)
+    container.addEventListener('dragleave', handleDragLeave)
+
+    return () => {
+      container.removeEventListener('paste', handlePaste)
+      container.removeEventListener('drop', handleDrop)
+      container.removeEventListener('dragover', handleDragOver)
+      container.removeEventListener('dragleave', handleDragLeave)
+    }
+  }, [taskId])
+
+  const isLoading = isInitializing || ptyState === 'starting'
+
   return (
     <div
       ref={containerRef}
       tabIndex={0}
-      className="h-[calc(100%-32px)] w-[calc(100%-32px)] m-4 bg-[#0a0a0a] border border-neutral-800 rounded-lg outline-none overflow-hidden"
+      className={`relative h-[calc(100%-32px)] w-[calc(100%-32px)] m-4 bg-[#0a0a0a] border rounded-lg outline-none overflow-hidden transition-colors ${
+        isDragOver ? 'border-blue-500 ring-2 ring-blue-500/50' : 'border-neutral-800'
+      }`}
       style={{ padding: '8px' }}
       onClick={() => terminalRef.current?.focus()}
-    />
+    >
+      {isLoading && (
+        <div className="absolute inset-0 flex items-center justify-center bg-[#0a0a0a] z-10">
+          <div className="flex items-center gap-2 text-neutral-500">
+            <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+            </svg>
+            <span className="text-sm">Starting terminal...</span>
+          </div>
+        </div>
+      )}
+    </div>
   )
 }

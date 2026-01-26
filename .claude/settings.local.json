@@ -36,7 +36,9 @@
       "Bash(npm run dev:*)",
       "Bash(gh issue view:*)",
       "Bash(timeout 10 ~/.local/bin/claude:*)",
-      "Bash(~/.local/bin/claude:*)"
+      "Bash(~/.local/bin/claude:*)",
+      "Bash(grep:*)",
+      "Bash(find:*)"
     ]
   },
   "enableAllProjectMcpServers": true,

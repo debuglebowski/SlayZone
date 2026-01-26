@@ -1,12 +1,18 @@
 import { useDroppable } from '@dnd-kit/core'
 import { SortableContext, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { Plus } from 'lucide-react'
+import { MoreHorizontal, Plus } from 'lucide-react'
 import type { Task, Project, Tag } from '../../../../shared/types/database'
 import type { Column } from '@/lib/kanban'
 import { KanbanCard } from './KanbanCard'
 import { TaskContextMenu } from './TaskContextMenu'
 import { Button } from '@/components/ui/button'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger
+} from '@/components/ui/dropdown-menu'
 import { cn } from '@/lib/utils'
 
 interface SortableKanbanCardProps {
@@ -96,6 +102,7 @@ interface KanbanColumnProps {
   onUpdateTask?: (taskId: string, updates: Partial<Task>) => void
   onArchiveTask?: (taskId: string) => void
   onDeleteTask?: (taskId: string) => void
+  onArchiveAllTasks?: (taskIds: string[]) => void
 }
 
 export function KanbanColumn({
@@ -111,7 +118,8 @@ export function KanbanColumn({
   allProjects,
   onUpdateTask,
   onArchiveTask,
-  onDeleteTask
+  onDeleteTask,
+  onArchiveAllTasks
 }: KanbanColumnProps): React.JSX.Element {
   const { setNodeRef } = useDroppable({
     id: column.id
@@ -130,22 +138,38 @@ export function KanbanColumn({
             {column.tasks.length}
           </span>
         </div>
-        {onCreateTask && (
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-6 w-6"
-            onClick={() => onCreateTask(column)}
-            title="Add task"
-          >
-            <Plus className="h-4 w-4" />
-          </Button>
-        )}
+        <div className="flex items-center gap-1">
+          {column.id === 'done' && onArchiveAllTasks && column.tasks.length > 0 && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-6 w-6">
+                  <MoreHorizontal className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => onArchiveAllTasks(column.tasks.map((t) => t.id))}>
+                  Archive all tasks
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
+          {onCreateTask && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-6 w-6"
+              onClick={() => onCreateTask(column)}
+              title="Add task"
+            >
+              <Plus className="h-4 w-4" />
+            </Button>
+          )}
+        </div>
       </div>
       <div
         ref={setNodeRef}
         className={cn(
-          'flex-1 h-full rounded-lg bg-muted/30 p-2 min-h-[200px]',
+          'flex-1 h-full rounded-lg bg-muted/30 p-2 min-h-[200px] overflow-y-auto scrollbar-hide',
           showDropHighlight && 'bg-muted/50 ring-2 ring-primary/20'
         )}
       >

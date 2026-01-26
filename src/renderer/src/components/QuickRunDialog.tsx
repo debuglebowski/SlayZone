@@ -34,7 +34,7 @@ export function QuickRunDialog({
     const task = await window.api.db.createTask({
       projectId: defaultProjectId,
       title: prompt.trim(),
-      description: prompt.trim(),
+      description: '',
       status: 'in_progress'
     })
 

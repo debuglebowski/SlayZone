@@ -17,6 +17,7 @@ import { registerClaudeHandlers } from './ipc/claude'
 import { registerThemeHandlers } from './ipc/theme'
 import { registerPtyHandlers } from './ipc/pty'
 import { registerAiHandlers } from './ipc/ai'
+import { registerFilesHandlers } from './ipc/files'
 import { killAllPtys, startIdleChecker, stopIdleChecker } from './services/pty-manager'
 
 // Minimum splash screen display time (ms)
@@ -355,6 +356,7 @@ app.whenReady().then(() => {
   registerThemeHandlers()
   registerPtyHandlers()
   registerAiHandlers()
+  registerFilesHandlers()
 
   // Configure webview session for WebAuthn/passkey support
   const browserSession = session.fromPartition('persist:browser-tabs')

@@ -1,7 +1,7 @@
 import * as pty from 'node-pty'
 import { BrowserWindow } from 'electron'
 import { homedir, userInfo } from 'os'
-import type { TerminalState, PtyInfo } from '../../shared/types/api'
+import type { TerminalState, PtyInfo, CodeMode } from '../../shared/types/api'
 import { RingBuffer } from './ring-buffer'
 import { getAdapter, type TerminalMode, type TerminalAdapter } from './adapters'
 
@@ -117,9 +117,11 @@ export function createPty(
   existingSessionId?: string | null,
   mode?: TerminalMode,
   globalShell?: string | null,
-  initialPrompt?: string | null
+  initialPrompt?: string | null,
+  dangerouslySkipPermissions?: boolean,
+  codeMode?: CodeMode | null
 ): { success: boolean; error?: string } {
-  console.log(`[pty-manager] createPty(${taskId}) mode=${mode} shell=${globalShell}`)
+  console.log(`[pty-manager] createPty(${taskId}) mode=${mode} shell=${globalShell} skipPerms=${dangerouslySkipPermissions} codeMode=${codeMode}`)
   // Kill existing if any
   if (sessions.has(taskId)) {
     console.log(`[pty-manager] createPty(${taskId}) - killing existing PTY first`)
@@ -133,7 +135,7 @@ export function createPty(
     const conversationId = existingSessionId || sessionId
 
     // Get spawn config from adapter
-    const spawnConfig = adapter.buildSpawnConfig(cwd || homedir(), conversationId || undefined, resuming, globalShell || undefined, initialPrompt || undefined)
+    const spawnConfig = adapter.buildSpawnConfig(cwd || homedir(), conversationId || undefined, resuming, globalShell || undefined, initialPrompt || undefined, dangerouslySkipPermissions, codeMode || undefined)
 
     const ptyProcess = pty.spawn(spawnConfig.shell, spawnConfig.args, {
       name: 'xterm-256color',

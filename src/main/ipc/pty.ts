@@ -2,6 +2,8 @@ import { ipcMain, BrowserWindow } from 'electron'
 import { createPty, writePty, resizePty, killPty, hasPty, getBuffer, listPtys, getState } from '../services/pty-manager'
 import { getDatabase } from '../db'
 import type { TerminalMode } from '../services/adapters'
+import type { Task } from '../../shared/types/database'
+import type { CodeMode } from '../../shared/types/api'
 
 export function registerPtyHandlers(): void {
   ipcMain.handle(
@@ -13,17 +15,23 @@ export function registerPtyHandlers(): void {
       sessionId?: string | null,
       existingSessionId?: string | null,
       mode?: TerminalMode,
-      initialPrompt?: string | null
+      initialPrompt?: string | null,
+      codeMode?: CodeMode | null
     ) => {
       const win = BrowserWindow.fromWebContents(event.sender)
       if (!win) return { success: false, error: 'No window found' }
 
-      // Read global shell setting from DB
       const db = getDatabase()
-      const row = db.prepare('SELECT value FROM settings WHERE key = ?').get('shell') as { value: string } | undefined
-      const globalShell = row?.value || null
 
-      return createPty(win, taskId, cwd, sessionId, existingSessionId, mode, globalShell, initialPrompt)
+      // Read global shell setting from DB
+      const shellRow = db.prepare('SELECT value FROM settings WHERE key = ?').get('shell') as { value: string } | undefined
+      const globalShell = shellRow?.value || null
+
+      // Read task-specific dangerously_skip_permissions flag (override by codeMode if provided)
+      const taskRow = db.prepare('SELECT dangerously_skip_permissions FROM tasks WHERE id = ?').get(taskId) as Pick<Task, 'dangerously_skip_permissions'> | undefined
+      const dangerouslySkipPermissions = codeMode === 'bypass' || (taskRow?.dangerously_skip_permissions ?? false)
+
+      return createPty(win, taskId, cwd, sessionId, existingSessionId, mode, globalShell, initialPrompt, dangerouslySkipPermissions, codeMode)
     }
   )
 

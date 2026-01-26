@@ -26,6 +26,8 @@ export function setTerminal(taskId: string, instance: CachedTerminal): void {
   // Don't cache if marked for skip (e.g., during restart/mode-change)
   if (skipCacheSet.has(taskId)) {
     skipCacheSet.delete(taskId)
+    // Also clear any existing cache entry (from before restart was triggered)
+    cache.delete(taskId)
     instance.terminal.dispose()
     return
   }
@@ -44,6 +46,9 @@ export function removeTerminal(taskId: string): boolean {
 
 // Dispose terminal without needing the instance (for idle hibernation)
 export function disposeTerminal(taskId: string): boolean {
+  // Clear skip flag if set (handles idle-before-restart race condition)
+  skipCacheSet.delete(taskId)
+
   const instance = cache.get(taskId)
   if (instance) {
     instance.terminal.dispose()
@@ -60,6 +65,10 @@ export function hasTerminal(taskId: string): boolean {
 // Mark taskId to skip caching on next setTerminal call (for restart/mode-change)
 export function markSkipCache(taskId: string): void {
   skipCacheSet.add(taskId)
+  // Auto-clear after 2 seconds as safety net against stale entries
+  setTimeout(() => {
+    skipCacheSet.delete(taskId)
+  }, 2000)
 }
 
 export function getCacheSize(): number {

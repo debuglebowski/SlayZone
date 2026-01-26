@@ -1,6 +1,6 @@
 import { platform, homedir } from 'os'
 import type { TerminalState } from '../../../shared/types/api'
-import type { TerminalAdapter, SpawnConfig, PromptInfo, StructuredEvent } from './types'
+import type { TerminalAdapter, SpawnConfig, PromptInfo, StructuredEvent, CodeMode } from './types'
 
 /**
  * Adapter for Claude Code CLI.
@@ -9,7 +9,7 @@ import type { TerminalAdapter, SpawnConfig, PromptInfo, StructuredEvent } from '
 export class ClaudeAdapter implements TerminalAdapter {
   readonly mode = 'claude-code' as const
 
-  buildSpawnConfig(_cwd: string, conversationId?: string, resuming?: boolean, _shellOverride?: string, initialPrompt?: string): SpawnConfig {
+  buildSpawnConfig(_cwd: string, conversationId?: string, resuming?: boolean, _shellOverride?: string, initialPrompt?: string, dangerouslySkipPermissions?: boolean, codeMode?: CodeMode): SpawnConfig {
     const claudeArgs: string[] = []
 
     // Pass --resume for existing sessions, --session-id for new ones
@@ -19,8 +19,19 @@ export class ClaudeAdapter implements TerminalAdapter {
       claudeArgs.push('--session-id', conversationId)
     }
 
+    // Add dangerously skip permissions flag if enabled (or bypass mode)
+    if (dangerouslySkipPermissions || codeMode === 'bypass') {
+      claudeArgs.push('--dangerously-skip-permissions')
+    }
+
+    // Handle accept-edits mode: allow edit tools without prompting
+    if (codeMode === 'accept-edits') {
+      claudeArgs.push('--allowedTools', 'Edit,Write,MultiEdit,NotebookEdit')
+    }
+
     // Add initial prompt as positional argument (claude "prompt")
     // Note: Do NOT use -p flag, that's for non-interactive "print and exit" mode
+    // Note: Plan mode prefix (/plan) is handled by injecting into terminal, not here
     if (initialPrompt) {
       claudeArgs.push(initialPrompt)
     }

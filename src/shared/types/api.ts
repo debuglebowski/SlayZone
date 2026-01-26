@@ -14,6 +14,7 @@ export interface ClaudeAvailability {
 // PTY types
 export type TerminalState = 'starting' | 'running' | 'idle' | 'awaiting_input' | 'error' | 'dead'
 export type TerminalMode = 'claude-code' | 'codex' | 'terminal'
+export type CodeMode = 'normal' | 'plan' | 'accept-edits' | 'bypass'
 
 export interface PtyInfo {
   taskId: string
@@ -60,6 +61,7 @@ export interface UpdateTaskInput {
   claudeConversationId?: string | null
   codexConversationId?: string | null
   terminalShell?: string | null
+  dangerouslySkipPermissions?: boolean
   // Legacy
   claudeSessionId?: string | null
 }
@@ -107,6 +109,7 @@ export interface ElectronAPI {
     updateTask: (data: UpdateTaskInput) => Promise<Task>
     deleteTask: (id: string) => Promise<boolean>
     archiveTask: (id: string) => Promise<Task>
+    archiveTasks: (ids: string[]) => Promise<void>
     unarchiveTask: (id: string) => Promise<Task>
     getArchivedTasks: () => Promise<Task[]>
     reorderTasks: (taskIds: string[]) => Promise<void>
@@ -159,6 +162,12 @@ export interface ElectronAPI {
   window: {
     close: () => Promise<void>
   }
+  files: {
+    saveTempImage: (
+      base64: string,
+      mimeType: string
+    ) => Promise<{ success: boolean; path?: string; error?: string }>
+  }
   pty: {
     create: (
       taskId: string,
@@ -166,7 +175,8 @@ export interface ElectronAPI {
       sessionId?: string | null,
       existingSessionId?: string | null,
       mode?: TerminalMode,
-      initialPrompt?: string | null
+      initialPrompt?: string | null,
+      codeMode?: CodeMode | null
     ) => Promise<{ success: boolean; error?: string }>
     write: (taskId: string, data: string) => Promise<boolean>
     resize: (taskId: string, cols: number, rows: number) => Promise<boolean>
@@ -182,6 +192,7 @@ export interface ElectronAPI {
       callback: (taskId: string, newState: TerminalState, oldState: TerminalState) => void
     ) => () => void
     onPrompt: (callback: (taskId: string, prompt: PromptInfo) => void) => () => void
+    onSessionDetected: (callback: (taskId: string, sessionId: string) => void) => () => void
     getState: (taskId: string) => Promise<TerminalState | null>
   }
 }

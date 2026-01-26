@@ -31,12 +31,18 @@ export function TabBar({ tabs, activeIndex, onTabClick, onTabClose }: TabBarProp
           <div
             key={isHome ? 'home' : tab.taskId}
             className={cn(
-              'flex items-center gap-1.5 h-8 px-3 rounded-t-md cursor-pointer transition-colors',
+              'flex items-center gap-1.5 h-8 px-3 rounded-t-md cursor-pointer transition-colors select-none',
               'hover:bg-muted/50',
               isActive ? 'bg-muted border-b-2 border-b-primary' : 'text-muted-foreground',
               !isHome && 'min-w-[150px] max-w-[300px]'
             )}
             onClick={() => onTabClick(i)}
+            onAuxClick={(e) => {
+              if (e.button === 1 && !isHome) {
+                e.preventDefault()
+                onTabClose(i)
+              }
+            }}
           >
             {isHome ? (
               <Home className="h-4 w-4" />

@@ -21,6 +21,7 @@ const api: ElectronAPI = {
     updateTask: (data) => ipcRenderer.invoke('db:tasks:update', data),
     deleteTask: (id) => ipcRenderer.invoke('db:tasks:delete', id),
     archiveTask: (id) => ipcRenderer.invoke('db:tasks:archive', id),
+    archiveTasks: (ids) => ipcRenderer.invoke('db:tasks:archiveMany', ids),
     unarchiveTask: (id) => ipcRenderer.invoke('db:tasks:unarchive', id),
     getArchivedTasks: () => ipcRenderer.invoke('db:tasks:getArchived'),
     reorderTasks: (taskIds) => ipcRenderer.invoke('db:tasks:reorder', taskIds)
@@ -80,9 +81,12 @@ const api: ElectronAPI = {
   window: {
     close: () => ipcRenderer.invoke('window:close')
   },
+  files: {
+    saveTempImage: (base64, mimeType) => ipcRenderer.invoke('files:saveTempImage', base64, mimeType)
+  },
   pty: {
-    create: (taskId, cwd, sessionId, existingSessionId, mode, initialPrompt) =>
-      ipcRenderer.invoke('pty:create', taskId, cwd, sessionId, existingSessionId, mode, initialPrompt),
+    create: (taskId, cwd, sessionId, existingSessionId, mode, initialPrompt, codeMode) =>
+      ipcRenderer.invoke('pty:create', taskId, cwd, sessionId, existingSessionId, mode, initialPrompt, codeMode),
     write: (taskId, data) => ipcRenderer.invoke('pty:write', taskId, data),
     resize: (taskId, cols, rows) => ipcRenderer.invoke('pty:resize', taskId, cols, rows),
     kill: (taskId) => ipcRenderer.invoke('pty:kill', taskId),

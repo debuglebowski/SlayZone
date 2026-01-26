@@ -479,6 +479,11 @@ function App(): React.JSX.Element {
     await window.api.db.archiveTask(taskId)
   }
 
+  const handleArchiveAllTasks = async (taskIds: string[]): Promise<void> => {
+    setTasks(tasks.filter((t) => !taskIds.includes(t.id)))
+    await window.api.db.archiveTasks(taskIds)
+  }
+
   const handleContextMenuDelete = async (taskId: string): Promise<void> => {
     setTasks(tasks.filter((t) => t.id !== taskId))
     await window.api.db.deleteTask(taskId)
@@ -719,6 +724,7 @@ function App(): React.JSX.Element {
                 onUpdateTask={handleContextMenuUpdate}
                 onArchiveTask={handleContextMenuArchive}
                 onDeleteTask={handleContextMenuDelete}
+                onArchiveAllTasks={handleArchiveAllTasks}
               />
             </div>
           </>

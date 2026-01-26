@@ -19,14 +19,23 @@ export class RingBuffer {
     this.totalSize += data.length
 
     // Drop oldest chunks until under max size
+    let droppedAny = false
     while (this.totalSize > this.maxSize && this.chunks.length > 1) {
       const dropped = this.chunks.shift()!
       this.totalSize -= dropped.length
+      droppedAny = true
+    }
+
+    // Prepend ANSI reset if chunks were dropped (reset codes may have been lost)
+    if (droppedAny && this.chunks.length > 0) {
+      this.chunks[0] = '\x1b[0m' + this.chunks[0]
+      this.totalSize += 4
     }
 
     // If single chunk still exceeds max, truncate it
     if (this.totalSize > this.maxSize && this.chunks.length === 1) {
-      this.chunks[0] = this.chunks[0].slice(-this.maxSize)
+      // Prepend ANSI reset in case truncation cuts mid-sequence
+      this.chunks[0] = '\x1b[0m' + this.chunks[0].slice(-this.maxSize)
       this.totalSize = this.chunks[0].length
     }
   }

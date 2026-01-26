@@ -18,6 +18,8 @@ export interface Task {
   terminal_shell: string | null
   // Legacy (kept for backwards compat, use claude_conversation_id instead)
   claude_session_id: string | null
+  // Permissions
+  dangerously_skip_permissions: boolean
   created_at: string
   updated_at: string
 }

@@ -211,6 +211,12 @@ const migrations: Migration[] = [
       db.exec(`ALTER TABLE tasks ADD COLUMN "order" INTEGER NOT NULL DEFAULT 0;`)
       db.exec(`UPDATE tasks SET "order" = rowid;`)
     }
+  },
+  {
+    version: 14,
+    up: (db) => {
+      db.exec(`ALTER TABLE tasks ADD COLUMN dangerously_skip_permissions INTEGER NOT NULL DEFAULT 0;`)
+    }
   }
 ]
 

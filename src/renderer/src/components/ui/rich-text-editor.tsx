@@ -14,6 +14,7 @@ interface RichTextEditorProps {
   placeholder?: string
   className?: string
   minHeight?: string
+  maxHeight?: string
 }
 
 export function RichTextEditor({
@@ -22,7 +23,8 @@ export function RichTextEditor({
   onBlur,
   placeholder = '',
   className,
-  minHeight
+  minHeight,
+  maxHeight
 }: RichTextEditorProps) {
   const editor = useEditor({
     extensions: [
@@ -71,10 +73,10 @@ export function RichTextEditor({
 
   return (
     <div
-      className={cn('w-full', className)}
-      style={{ minHeight }}
+      className={cn('w-full h-full flex flex-col', className)}
+      style={{ minHeight, maxHeight }}
     >
-      <EditorContent editor={editor} className="h-full" />
+      <EditorContent editor={editor} className="flex-1 overflow-y-auto" />
     </div>
   )
 }

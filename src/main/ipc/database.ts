@@ -145,6 +145,10 @@ export function registerDatabaseHandlers(): void {
       fields.push('terminal_shell = ?')
       values.push(data.terminalShell)
     }
+    if (data.dangerouslySkipPermissions !== undefined) {
+      fields.push('dangerously_skip_permissions = ?')
+      values.push(data.dangerouslySkipPermissions ? 1 : 0)
+    }
 
     if (fields.length === 0) {
       return db.prepare('SELECT * FROM tasks WHERE id = ?').get(data.id)
@@ -168,6 +172,15 @@ export function registerDatabaseHandlers(): void {
       WHERE id = ?
     `).run(id)
     return db.prepare('SELECT * FROM tasks WHERE id = ?').get(id)
+  })
+
+  ipcMain.handle('db:tasks:archiveMany', (_, ids: string[]) => {
+    if (ids.length === 0) return
+    const placeholders = ids.map(() => '?').join(',')
+    db.prepare(`
+      UPDATE tasks SET archived_at = datetime('now'), updated_at = datetime('now')
+      WHERE id IN (${placeholders})
+    `).run(...ids)
   })
 
   ipcMain.handle('db:tasks:unarchive', (_, id: string) => {

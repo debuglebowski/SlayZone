@@ -12,6 +12,8 @@ import type { TerminalState, PromptInfo } from '../../../shared/types/api'
 // 300KB buffer limit per task
 const MAX_BUFFER_SIZE = 300 * 1024
 
+export type CodeMode = 'normal' | 'plan' | 'accept-edits' | 'bypass'
+
 interface PtyState {
   buffer: string
   exitCode?: number
@@ -19,6 +21,7 @@ interface PtyState {
   state: TerminalState
   pendingPrompt?: PromptInfo
   quickRunPrompt?: string
+  quickRunCodeMode?: CodeMode
 }
 
 type DataCallback = (data: string) => void
@@ -49,8 +52,9 @@ interface PtyContextValue {
   // Global prompt tracking for badge
   getPendingPromptTaskIds: () => string[]
   // Quick run prompt
-  setQuickRunPrompt: (taskId: string, prompt: string) => void
+  setQuickRunPrompt: (taskId: string, prompt: string, codeMode?: CodeMode) => void
   getQuickRunPrompt: (taskId: string) => string | undefined
+  getQuickRunCodeMode: (taskId: string) => CodeMode | undefined
   clearQuickRunPrompt: (taskId: string) => void
 }
 
@@ -95,7 +99,8 @@ export function PtyProvider({ children }: { children: ReactNode }) {
       const state = getOrCreateState(taskId)
       state.buffer += data
       if (state.buffer.length > MAX_BUFFER_SIZE) {
-        state.buffer = state.buffer.slice(-MAX_BUFFER_SIZE)
+        // Prepend ANSI reset in case truncation cuts mid-sequence
+        state.buffer = '\x1b[0m' + state.buffer.slice(-MAX_BUFFER_SIZE)
       }
 
       // Notify subscribers
@@ -338,19 +343,25 @@ export function PtyProvider({ children }: { children: ReactNode }) {
   }, [])
 
   // Quick run prompt - for auto-sending prompt when task opens
-  const setQuickRunPrompt = useCallback((taskId: string, prompt: string): void => {
+  const setQuickRunPrompt = useCallback((taskId: string, prompt: string, codeMode?: CodeMode): void => {
     const state = getOrCreateState(taskId)
     state.quickRunPrompt = prompt
+    state.quickRunCodeMode = codeMode
   }, [getOrCreateState])
 
   const getQuickRunPrompt = useCallback((taskId: string): string | undefined => {
     return statesRef.current.get(taskId)?.quickRunPrompt
   }, [])
 
+  const getQuickRunCodeMode = useCallback((taskId: string): CodeMode | undefined => {
+    return statesRef.current.get(taskId)?.quickRunCodeMode
+  }, [])
+
   const clearQuickRunPrompt = useCallback((taskId: string): void => {
     const state = statesRef.current.get(taskId)
     if (state) {
       state.quickRunPrompt = undefined
+      state.quickRunCodeMode = undefined
     }
   }, [])
 
@@ -374,6 +385,7 @@ export function PtyProvider({ children }: { children: ReactNode }) {
     getPendingPromptTaskIds,
     setQuickRunPrompt,
     getQuickRunPrompt,
+    getQuickRunCodeMode,
     clearQuickRunPrompt
   }
 

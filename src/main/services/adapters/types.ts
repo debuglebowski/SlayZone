@@ -1,6 +1,7 @@
-import type { TerminalState } from '../../../shared/types/api'
+import type { TerminalState, CodeMode } from '../../../shared/types/api'
 
 export type TerminalMode = 'claude-code' | 'codex' | 'terminal'
+export type { CodeMode }
 
 export interface SpawnConfig {
   shell: string
@@ -27,7 +28,7 @@ export interface TerminalAdapter {
   /**
    * Build spawn configuration for this terminal mode.
    */
-  buildSpawnConfig(cwd: string, conversationId?: string, resuming?: boolean, shellOverride?: string, initialPrompt?: string): SpawnConfig
+  buildSpawnConfig(cwd: string, conversationId?: string, resuming?: boolean, shellOverride?: string, initialPrompt?: string, dangerouslySkipPermissions?: boolean, codeMode?: CodeMode): SpawnConfig
 
   /**
    * Detect if output indicates a prompt that needs user input.

@@ -36,6 +36,7 @@ interface KanbanBoardProps {
   onUpdateTask?: (taskId: string, updates: Partial<Task>) => void
   onArchiveTask?: (taskId: string) => void
   onDeleteTask?: (taskId: string) => void
+  onArchiveAllTasks?: (taskIds: string[]) => void
 }
 
 export function KanbanBoard({
@@ -54,7 +55,8 @@ export function KanbanBoard({
   allProjects,
   onUpdateTask,
   onArchiveTask,
-  onDeleteTask
+  onDeleteTask,
+  onArchiveAllTasks
 }: KanbanBoardProps): React.JSX.Element {
   const [activeId, setActiveId] = useState<string | null>(null)
   const [activeColumnId, setActiveColumnId] = useState<string | null>(null)
@@ -168,6 +170,7 @@ export function KanbanBoard({
             onUpdateTask={onUpdateTask}
             onArchiveTask={onArchiveTask}
             onDeleteTask={onDeleteTask}
+            onArchiveAllTasks={onArchiveAllTasks}
           />
         ))}
       </div>

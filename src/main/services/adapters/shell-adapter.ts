@@ -1,6 +1,6 @@
 import { platform } from 'os'
 import type { TerminalState } from '../../../shared/types/api'
-import type { TerminalAdapter, SpawnConfig, PromptInfo, StructuredEvent } from './types'
+import type { TerminalAdapter, SpawnConfig, PromptInfo, StructuredEvent, CodeMode } from './types'
 
 /**
  * Adapter for raw terminal/shell.
@@ -17,7 +17,7 @@ export class ShellAdapter implements TerminalAdapter {
     return process.env.SHELL || '/bin/bash'
   }
 
-  buildSpawnConfig(_cwd: string, _conversationId?: string, _resuming?: boolean, shellOverride?: string, _initialPrompt?: string): SpawnConfig {
+  buildSpawnConfig(_cwd: string, _conversationId?: string, _resuming?: boolean, shellOverride?: string, _initialPrompt?: string, _dangerouslySkipPermissions?: boolean, _codeMode?: CodeMode): SpawnConfig {
     return {
       shell: this.getShell(shellOverride),
       args: []

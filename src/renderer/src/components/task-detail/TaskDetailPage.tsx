@@ -17,6 +17,8 @@ import {
   SelectTrigger,
   SelectValue
 } from '@/components/ui/select'
+import { Switch } from '@/components/ui/switch'
+import { Label } from '@/components/ui/label'
 import { DeleteTaskDialog } from '@/components/DeleteTaskDialog'
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip'
 import { TaskMetadataSidebar } from './TaskMetadataSidebar'
@@ -46,7 +48,7 @@ export function TaskDetailPage({
   const [claudeAvailability, setClaudeAvailability] = useState<ClaudeAvailability | null>(null)
 
   // PTY context for buffer management
-  const { resetTaskState, subscribeSessionDetected, getQuickRunPrompt, clearQuickRunPrompt } = usePty()
+  const { resetTaskState, subscribeSessionDetected, getQuickRunPrompt, getQuickRunCodeMode, clearQuickRunPrompt } = usePty()
 
   // Detected session ID from /status command
   const [detectedSessionId, setDetectedSessionId] = useState<string | null>(null)
@@ -190,17 +192,33 @@ export function TaskDetailPage({
     await sendInputRef.current(task.title)
   }, [task])
 
-  // Cmd+I shortcut for inject title
+  // Inject task description into terminal (no execute)
+  const handleInjectDescription = useCallback(async () => {
+    if (!sendInputRef.current || !descriptionValue) return
+    // Strip HTML tags to get plain text
+    const tmp = document.createElement('div')
+    tmp.innerHTML = descriptionValue
+    const plainText = tmp.textContent || tmp.innerText || ''
+    if (plainText.trim()) {
+      await sendInputRef.current(plainText.trim())
+    }
+  }, [descriptionValue])
+
+  // Cmd+I (title) and Cmd+Shift+I (description) shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent): void => {
       if (e.metaKey && e.key === 'i') {
         e.preventDefault()
-        handleInjectTitle()
+        if (e.shiftKey) {
+          handleInjectDescription()
+        } else {
+          handleInjectTitle()
+        }
       }
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [handleInjectTitle])
+  }, [handleInjectTitle, handleInjectDescription])
 
   // Clear quick run prompt after it's been passed to Terminal
   useEffect(() => {
@@ -234,6 +252,27 @@ export function TaskDetailPage({
       setTask(updated)
       onTaskUpdated(updated)
       // Remount terminal (mark skip to prevent cleanup from re-caching old content)
+      markSkipCache(task.id)
+      setTerminalKey((k) => k + 1)
+    },
+    [task, onTaskUpdated, resetTaskState]
+  )
+
+  // Handle dangerously skip permissions toggle
+  const handleSkipPermissionsChange = useCallback(
+    async (checked: boolean) => {
+      if (!task) return
+      // Update DB
+      const updated = await window.api.db.updateTask({
+        id: task.id,
+        dangerouslySkipPermissions: checked
+      })
+      setTask(updated)
+      onTaskUpdated(updated)
+      // Restart terminal to apply new setting
+      resetTaskState(task.id)
+      await window.api.pty.kill(task.id)
+      await new Promise((r) => setTimeout(r, 100))
       markSkipCache(task.id)
       setTerminalKey((k) => k + 1)
     },
@@ -435,52 +474,9 @@ export function TaskDetailPage({
         </div>
       </header>
 
-      {/* Split view: info left | terminal right */}
+      {/* Split view: terminal left | info right */}
       <div className="flex-1 flex min-h-0">
-        {/* Left: Task info */}
-        <div className="w-80 shrink-0 border-r flex flex-col overflow-y-auto">
-          {/* Description */}
-          <div className="p-4 flex-1">
-            <RichTextEditor
-              value={descriptionValue}
-              onChange={setDescriptionValue}
-              onBlur={handleDescriptionSave}
-              placeholder="Add description..."
-              minHeight="150px"
-              className="bg-muted/30 rounded-lg p-3"
-            />
-            {task.terminal_mode !== 'terminal' && (
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                className="mt-2 text-xs text-muted-foreground hover:text-foreground"
-                onClick={() => handleGenerateDescription()}
-                disabled={generatingDescription || !task.title}
-              >
-                {generatingDescription ? (
-                  <Loader2 className="size-3 mr-1 animate-spin" />
-                ) : (
-                  <Sparkles className="size-3 mr-1" />
-                )}
-                Generate description
-              </Button>
-            )}
-          </div>
-
-          {/* Metadata */}
-          <div className="p-4 border-t bg-muted/30">
-            <TaskMetadataSidebar
-              task={task}
-              tags={tags}
-              taskTagIds={taskTagIds}
-              onUpdate={handleTaskUpdate}
-              onTagsChange={handleTagsChange}
-            />
-          </div>
-        </div>
-
-        {/* Right: Terminal */}
+        {/* Left: Terminal */}
         <div className="flex-1 min-w-0 bg-[#0a0a0a] flex flex-col">
           {claudeAvailability && !claudeAvailability.available && (
             <div className="shrink-0 bg-amber-500/10 border-b border-amber-500/20 px-4 py-2 flex items-center gap-2 text-amber-500">
@@ -516,6 +512,7 @@ export function TaskDetailPage({
                 sessionId={task.claude_conversation_id || task.claude_session_id || undefined}
                 existingSessionId={task.claude_conversation_id || task.claude_session_id || undefined}
                 initialPrompt={getQuickRunPrompt(task.id)}
+                codeMode={getQuickRunCodeMode(task.id)}
                 onSessionCreated={handleSessionCreated}
                 onSessionInvalid={handleSessionInvalid}
                 onReady={(sendInput) => { sendInputRef.current = sendInput }}
@@ -552,6 +549,24 @@ export function TaskDetailPage({
             {(task.terminal_mode === 'claude-code' || !task.terminal_mode) && (
               <Tooltip>
                 <TooltipTrigger asChild>
+                  <div className="flex items-center gap-2">
+                    <Switch
+                      id="skip-permissions"
+                      checked={task.dangerously_skip_permissions ?? false}
+                      onCheckedChange={handleSkipPermissionsChange}
+                    />
+                    <Label htmlFor="skip-permissions" className="text-xs text-muted-foreground cursor-pointer">
+                      Skip permissions
+                    </Label>
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent>Auto-approve all tool calls (dangerous)</TooltipContent>
+              </Tooltip>
+            )}
+
+            {(task.terminal_mode === 'claude-code' || !task.terminal_mode) && (
+              <Tooltip>
+                <TooltipTrigger asChild>
                   <Button
                     variant="outline"
                     size="sm"
@@ -581,6 +596,50 @@ export function TaskDetailPage({
               </TooltipTrigger>
               <TooltipContent>Insert task title into terminal (⌘I)</TooltipContent>
             </Tooltip>
+          </div>
+        </div>
+
+        {/* Right: Task info */}
+        <div className="w-80 shrink-0 border-l flex flex-col overflow-y-auto">
+          {/* Description */}
+          <div className="p-4 flex-1 flex flex-col min-h-0">
+            <RichTextEditor
+              value={descriptionValue}
+              onChange={setDescriptionValue}
+              onBlur={handleDescriptionSave}
+              placeholder="Add description..."
+              minHeight="150px"
+              maxHeight="300px"
+              className="bg-muted/30 rounded-lg p-3"
+            />
+            {task.terminal_mode !== 'terminal' && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="mt-2 text-xs text-muted-foreground hover:text-foreground"
+                onClick={() => handleGenerateDescription()}
+                disabled={generatingDescription || !task.title}
+              >
+                {generatingDescription ? (
+                  <Loader2 className="size-3 mr-1 animate-spin" />
+                ) : (
+                  <Sparkles className="size-3 mr-1" />
+                )}
+                Generate description
+              </Button>
+            )}
+          </div>
+
+          {/* Metadata */}
+          <div className="p-4 border-t bg-muted/30">
+            <TaskMetadataSidebar
+              task={task}
+              tags={tags}
+              taskTagIds={taskTagIds}
+              onUpdate={handleTaskUpdate}
+              onTagsChange={handleTagsChange}
+            />
           </div>
         </div>
       </div>
