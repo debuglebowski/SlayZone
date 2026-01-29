@@ -1,6 +1,5 @@
 import { platform } from 'os'
-import type { TerminalState } from '../../../shared/types/api'
-import type { TerminalAdapter, SpawnConfig, PromptInfo, StructuredEvent, CodeMode } from './types'
+import type { TerminalAdapter, SpawnConfig, PromptInfo, CodeMode, ActivityState, ErrorInfo } from './types'
 
 /**
  * Adapter for OpenAI Codex CLI.
@@ -8,6 +7,7 @@ import type { TerminalAdapter, SpawnConfig, PromptInfo, StructuredEvent, CodeMod
  */
 export class CodexAdapter implements TerminalAdapter {
   readonly mode = 'codex' as const
+  readonly idleTimeoutMs = null // use default 60s
 
   private getShell(override?: string): string {
     if (override) return override
@@ -26,17 +26,17 @@ export class CodexAdapter implements TerminalAdapter {
     }
   }
 
+  detectActivity(_data: string, _current: ActivityState): ActivityState | null {
+    // TODO: Implement when Codex output format is known
+    return null
+  }
+
+  detectError(_data: string): ErrorInfo | null {
+    // TODO: Implement when Codex output format is known
+    return null
+  }
+
   detectPrompt(_data: string): PromptInfo | null {
-    // TODO: Implement when Codex output format is known
-    return null
-  }
-
-  parseEvent(_data: string): StructuredEvent | null {
-    // TODO: Implement when Codex output format is known
-    return null
-  }
-
-  detectState(_data: string, _currentState: TerminalState): TerminalState | null {
     // TODO: Implement when Codex output format is known
     return null
   }

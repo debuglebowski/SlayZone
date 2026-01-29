@@ -1,13 +1,13 @@
 import { platform, homedir } from 'os'
-import type { TerminalState } from '../../../shared/types/api'
-import type { TerminalAdapter, SpawnConfig, PromptInfo, StructuredEvent, CodeMode } from './types'
+import type { TerminalAdapter, SpawnConfig, PromptInfo, CodeMode, ActivityState, ErrorInfo } from './types'
 
 /**
  * Adapter for Claude Code CLI.
- * Handles JSON structured output parsing and conversation resume.
+ * Uses pattern-based heuristics for activity detection in interactive mode.
  */
 export class ClaudeAdapter implements TerminalAdapter {
   readonly mode = 'claude-code' as const
+  readonly idleTimeoutMs = null // use default 60s
 
   buildSpawnConfig(_cwd: string, conversationId?: string, resuming?: boolean, _shellOverride?: string, initialPrompt?: string, dangerouslySkipPermissions?: boolean, codeMode?: CodeMode): SpawnConfig {
     const claudeArgs: string[] = []
@@ -45,86 +45,67 @@ export class ClaudeAdapter implements TerminalAdapter {
     }
   }
 
+  detectActivity(data: string, _current: ActivityState): ActivityState | null {
+    // Thinking: spinner chars (braille patterns used by Claude CLI)
+    if (/[⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏]/.test(data)) return 'thinking'
+
+    // Tool use: tool name patterns in output
+    if (/\b(Read|Write|Edit|Bash|Glob|Grep|Task|WebFetch|WebSearch)\s*[:\(]/.test(data)) return 'tool_use'
+
+    // Awaiting input: Y/n permission prompts
+    if (/\[Y\/n\]|\[y\/N\]/i.test(data)) return 'awaiting_input'
+
+    // Idle: Claude's input prompt (> at start of line)
+    // Strip ANSI escape codes first, then check for > at line start
+    const stripped = data.replace(/\x1b\[[0-9;]*m/g, '')
+    if (/(?:^|\n)>\s/m.test(stripped)) return 'idle'
+
+    return null
+  }
+
+  detectError(data: string): ErrorInfo | null {
+    // Session not found error
+    if (/No conversation found with session ID:/.test(data)) {
+      return {
+        code: 'SESSION_NOT_FOUND',
+        message: 'Session not found',
+        recoverable: false
+      }
+    }
+
+    // Generic CLI error
+    const errorMatch = data.match(/Error:\s*(.+)/i)
+    if (errorMatch) {
+      return {
+        code: 'CLI_ERROR',
+        message: errorMatch[1].trim(),
+        recoverable: true
+      }
+    }
+
+    return null
+  }
+
   detectPrompt(data: string): PromptInfo | null {
-    // Look for JSON events indicating permission/input needed
-    const lines = data.split('\n')
-    for (const line of lines) {
-      if (!line.trim().startsWith('{')) continue
-
-      try {
-        const event = JSON.parse(line)
-        // Claude Code emits specific event types for prompts
-        if (event.type === 'assistant' && event.message?.content) {
-          const content = event.message.content
-          // Check if this looks like a question
-          if (typeof content === 'string' && content.includes('?')) {
-            return {
-              type: 'question',
-              text: content,
-              position: data.indexOf(line)
-            }
-          }
-        }
-        // Permission prompts have specific structure
-        if (event.type === 'tool_use' || event.type === 'permission_request') {
-          return {
-            type: 'permission',
-            text: event.tool_name || 'Permission required',
-            position: data.indexOf(line)
-          }
-        }
-      } catch {
-        // Not valid JSON, skip
+    // Y/n permission prompts
+    if (/\[Y\/n\]|\[y\/N\]/i.test(data)) {
+      return {
+        type: 'permission',
+        text: data,
+        position: 0
       }
     }
-    return null
-  }
 
-  parseEvent(data: string): StructuredEvent | null {
-    const lines = data.split('\n')
-    for (const line of lines) {
-      if (!line.trim().startsWith('{')) continue
-
-      try {
-        const event = JSON.parse(line)
-        if (event.type) {
-          return {
-            type: event.type,
-            data: event
-          }
-        }
-      } catch {
-        // Not valid JSON
+    // Question detection (lines ending with ?)
+    const questionMatch = data.match(/[^\n]*\?\s*$/m)
+    if (questionMatch) {
+      return {
+        type: 'question',
+        text: questionMatch[0].trim(),
+        position: data.indexOf(questionMatch[0])
       }
     }
+
     return null
-  }
-
-  detectState(data: string, _currentState: TerminalState): TerminalState | null {
-    // Parse JSON events to detect state
-    const event = this.parseEvent(data)
-    if (event) {
-      console.log(`[ClaudeAdapter] Event type: "${event.type}"`, JSON.stringify(event.data).slice(0, 200))
-    }
-    if (!event) return null
-
-    // Map event types to states
-    switch (event.type) {
-      case 'thinking':
-      case 'tool_use':
-      case 'assistant':
-        return 'running'
-      case 'input_request':
-      case 'permission_request':
-        return 'awaiting_input'
-      case 'error':
-        return 'error'
-      case 'result':
-      case 'done':
-        return 'idle'
-      default:
-        console.log(`[ClaudeAdapter] Unknown event type: "${event.type}"`)
-        return null
-    }
   }
 }

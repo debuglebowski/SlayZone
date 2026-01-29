@@ -68,8 +68,14 @@ export function TaskDetailPage({
   // Terminal restart key (changing this forces remount)
   const [terminalKey, setTerminalKey] = useState(0)
 
-  // Terminal input function (exposed via onReady callback)
-  const sendInputRef = useRef<((text: string) => Promise<void>) | null>(null)
+  // Terminal API (exposed via onReady callback)
+  const terminalApiRef = useRef<{ sendInput: (text: string) => Promise<void>; focus: () => void } | null>(null)
+
+  // Track first mount for auto-focus
+  const isFirstMountRef = useRef(true)
+  useEffect(() => {
+    isFirstMountRef.current = false
+  }, [])
 
   // Subscribe to session detected events
   useEffect(() => {
@@ -182,25 +188,25 @@ export function TaskDetailPage({
 
   // Sync Claude session name with task title
   const handleSyncSessionName = useCallback(async () => {
-    if (!task || !sendInputRef.current) return
-    await sendInputRef.current(`/rename ${task.title}\r`)
+    if (!task || !terminalApiRef.current) return
+    await terminalApiRef.current.sendInput(`/rename ${task.title}\r`)
   }, [task])
 
   // Inject task title into terminal (no execute)
   const handleInjectTitle = useCallback(async () => {
-    if (!task || !sendInputRef.current) return
-    await sendInputRef.current(task.title)
+    if (!task || !terminalApiRef.current) return
+    await terminalApiRef.current.sendInput(task.title)
   }, [task])
 
   // Inject task description into terminal (no execute)
   const handleInjectDescription = useCallback(async () => {
-    if (!sendInputRef.current || !descriptionValue) return
+    if (!terminalApiRef.current || !descriptionValue) return
     // Strip HTML tags to get plain text
     const tmp = document.createElement('div')
     tmp.innerHTML = descriptionValue
     const plainText = tmp.textContent || tmp.innerText || ''
     if (plainText.trim()) {
-      await sendInputRef.current(plainText.trim())
+      await terminalApiRef.current.sendInput(plainText.trim())
     }
   }, [descriptionValue])
 
@@ -229,6 +235,7 @@ export function TaskDetailPage({
     }, 500)
     return () => clearTimeout(timer)
   }, [task?.id, clearQuickRunPrompt])
+
 
 
   // Handle terminal mode change
@@ -502,36 +509,38 @@ export function TaskDetailPage({
               </Button>
             </div>
           )}
-          <div className="flex-1 min-h-0">
-            {project?.path ? (
-              <Terminal
-                key={terminalKey}
-                taskId={task.id}
-                cwd={project.path}
-                mode={task.terminal_mode || 'claude-code'}
-                sessionId={task.claude_conversation_id || task.claude_session_id || undefined}
-                existingSessionId={task.claude_conversation_id || task.claude_session_id || undefined}
-                initialPrompt={getQuickRunPrompt(task.id)}
-                codeMode={getQuickRunCodeMode(task.id)}
-                onSessionCreated={handleSessionCreated}
-                onSessionInvalid={handleSessionInvalid}
-                onReady={(sendInput) => { sendInputRef.current = sendInput }}
-              />
-            ) : (
-              <div className="h-full flex items-center justify-center text-muted-foreground">
-                <div className="text-center p-8">
-                  <p className="mb-2">No repository path configured</p>
-                  <p className="text-sm">
-                    Set a repository path in project settings to use the terminal
-                  </p>
+          {/* Terminal + mode bar wrapper */}
+          <div className="flex-1 min-h-0 m-4 flex flex-col">
+            <div className="flex-1 min-h-0 border border-neutral-800 rounded-lg overflow-hidden">
+              {project?.path ? (
+                <Terminal
+                  key={terminalKey}
+                  taskId={task.id}
+                  cwd={project.path}
+                  mode={task.terminal_mode || 'claude-code'}
+                  sessionId={task.claude_conversation_id || task.claude_session_id || undefined}
+                  existingSessionId={task.claude_conversation_id || task.claude_session_id || undefined}
+                  initialPrompt={getQuickRunPrompt(task.id)}
+                  codeMode={getQuickRunCodeMode(task.id)}
+                  autoFocus={isFirstMountRef.current}
+                  onSessionCreated={handleSessionCreated}
+                  onSessionInvalid={handleSessionInvalid}
+                  onReady={(api) => { terminalApiRef.current = api }}
+                />
+              ) : (
+                <div className="h-full flex items-center justify-center text-muted-foreground">
+                  <div className="text-center p-8">
+                    <p className="mb-2">No repository path configured</p>
+                    <p className="text-sm">
+                      Set a repository path in project settings to use the terminal
+                    </p>
+                  </div>
                 </div>
-              </div>
-            )}
-          </div>
+              )}
+            </div>
 
-          {/* Terminal mode bar */}
-          <div className="shrink-0 border-t border-neutral-800 bg-neutral-900 px-3 py-2 flex items-center gap-3">
-            <span className="text-xs text-muted-foreground">Mode:</span>
+            {/* Terminal mode bar */}
+            <div className="shrink-0 px-1 py-2 flex items-center gap-3">
             <Select
               value={task.terminal_mode || 'claude-code'}
               onValueChange={(value) => handleModeChange(value as TerminalMode)}
@@ -591,11 +600,26 @@ export function TaskDetailPage({
                   )}
                   onClick={handleInjectTitle}
                 >
-                  Inject task title
+                  Inject title
                 </Button>
               </TooltipTrigger>
               <TooltipContent>Insert task title into terminal (⌘I)</TooltipContent>
             </Tooltip>
+
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-7 text-xs"
+                  onClick={handleInjectDescription}
+                >
+                  Inject description
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Insert task description into terminal (⌘⇧I)</TooltipContent>
+            </Tooltip>
+            </div>
           </div>
         </div>
 

@@ -1,7 +1,24 @@
-import type { TerminalState, CodeMode } from '../../../shared/types/api'
+import type { CodeMode } from '../../../shared/types/api'
 
 export type TerminalMode = 'claude-code' | 'codex' | 'terminal'
 export type { CodeMode }
+
+// Activity states for CLI tools
+export type ActivityState = 'idle' | 'thinking' | 'tool_use' | 'awaiting_input' | 'unknown'
+
+// Error info from CLI
+export interface ErrorInfo {
+  code: string
+  message: string
+  recoverable: boolean
+}
+
+// Full CLI state (alive tracked by pty-manager via process exit)
+export interface CLIState {
+  alive: boolean
+  activity: ActivityState
+  error: ErrorInfo | null
+}
 
 export interface SpawnConfig {
   shell: string
@@ -17,13 +34,11 @@ export interface PromptInfo {
   position: number
 }
 
-export interface StructuredEvent {
-  type: string
-  data: unknown
-}
-
 export interface TerminalAdapter {
   readonly mode: TerminalMode
+
+  /** Idle timeout in ms (null = use default 60s) */
+  readonly idleTimeoutMs: number | null
 
   /**
    * Build spawn configuration for this terminal mode.
@@ -31,20 +46,20 @@ export interface TerminalAdapter {
   buildSpawnConfig(cwd: string, conversationId?: string, resuming?: boolean, shellOverride?: string, initialPrompt?: string, dangerouslySkipPermissions?: boolean, codeMode?: CodeMode): SpawnConfig
 
   /**
+   * Detect activity state from terminal output.
+   * Returns null if no change detected.
+   */
+  detectActivity(data: string, current: ActivityState): ActivityState | null
+
+  /**
+   * Detect errors from terminal output.
+   * Returns null if no error detected.
+   */
+  detectError(data: string): ErrorInfo | null
+
+  /**
    * Detect if output indicates a prompt that needs user input.
    * Returns null if no prompt detected.
    */
   detectPrompt(data: string): PromptInfo | null
-
-  /**
-   * Parse structured events from output (e.g., JSON events from CLI).
-   * Returns null if no structured event found.
-   */
-  parseEvent(data: string): StructuredEvent | null
-
-  /**
-   * Detect state changes from output.
-   * Returns null if no state change indicated.
-   */
-  detectState(data: string, currentState: TerminalState): TerminalState | null
 }

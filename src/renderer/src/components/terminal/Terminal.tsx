@@ -64,9 +64,10 @@ interface TerminalProps {
   existingSessionId?: string | null
   initialPrompt?: string | null
   codeMode?: CodeMode | null
+  autoFocus?: boolean
   onSessionCreated?: (sessionId: string) => void
   onSessionInvalid?: () => void
-  onReady?: (sendInput: (text: string) => Promise<void>) => void
+  onReady?: (api: { sendInput: (text: string) => Promise<void>; focus: () => void }) => void
 }
 
 export function Terminal({
@@ -77,6 +78,7 @@ export function Terminal({
   existingSessionId,
   initialPrompt,
   codeMode,
+  autoFocus = false,
   onSessionCreated,
   onSessionInvalid,
   onReady
@@ -86,7 +88,6 @@ export function Terminal({
   const fitAddonRef = useRef<FitAddon | null>(null)
   const serializeAddonRef = useRef<SerializeAddon | null>(null)
   const initializedRef = useRef(false)
-  const hasInitialFocusedRef = useRef(false)
   const [isDragOver, setIsDragOver] = useState(false)
   const [isInitializing, setIsInitializing] = useState(true)
 
@@ -136,18 +137,20 @@ export function Terminal({
 
         // Simple fit - container is guaranteed to have dimensions
         cached.fitAddon.fit()
-        if (!hasInitialFocusedRef.current && !isDialogOpen()) {
+        if (autoFocus && !isDialogOpen()) {
           cached.terminal.focus()
-          hasInitialFocusedRef.current = true
         }
         window.api.pty.resize(taskId, cached.terminal.cols, cached.terminal.rows)
 
-        // Expose sendInput for programmatic input (char-by-char for Ink compatibility)
-        onReady?.(async (text) => {
-          for (const char of text) {
-            cached.terminal.input(char)
-            await new Promise(r => setTimeout(r, 1))
-          }
+        // Expose API for programmatic input and focus
+        onReady?.({
+          sendInput: async (text) => {
+            for (const char of text) {
+              cached.terminal.input(char)
+              await new Promise(r => setTimeout(r, 1))
+            }
+          },
+          focus: () => cached.terminal.focus()
         })
         setIsInitializing(false)
         return
@@ -211,9 +214,8 @@ export function Terminal({
     terminal.clear() // Ensure terminal starts completely fresh
     // Simple fit - container is guaranteed to have dimensions from waitForDimensions
     fitAddon.fit()
-    if (!hasInitialFocusedRef.current && !isDialogOpen()) {
+    if (autoFocus && !isDialogOpen()) {
       terminal.focus()
-      hasInitialFocusedRef.current = true
     }
 
     // Let Ctrl+Tab and Ctrl+Shift+Tab bubble up for tab switching
@@ -270,7 +272,7 @@ export function Terminal({
       }
     }
 
-    // Handle terminal input
+    // Handle terminal input - pass through to PTY
     terminal.onData((data) => {
       window.api.pty.write(taskId, data)
     })
@@ -292,8 +294,8 @@ export function Terminal({
       }
     }
 
-    // Expose sendInput for programmatic input
-    onReady?.(injectText)
+    // Expose API for programmatic input and focus
+    onReady?.({ sendInput: injectText, focus: () => terminal.focus() })
 
     // Inject initial prompt if provided (after a delay for terminal to be ready)
     if (initialPrompt) {
@@ -305,12 +307,7 @@ export function Terminal({
     }
 
     setIsInitializing(false)
-  }, [taskId, cwd, mode, sessionId, existingSessionId, initialPrompt, codeMode, onSessionCreated, onReady, getBuffer, clearBuffer, resetTaskState, clearIgnore])
-
-  // Reset initial focus flag when taskId changes
-  useEffect(() => {
-    hasInitialFocusedRef.current = false
-  }, [taskId])
+  }, [taskId, cwd, mode, sessionId, existingSessionId, initialPrompt, codeMode, autoFocus, onSessionCreated, onReady, getBuffer, clearBuffer, resetTaskState, clearIgnore])
 
   // Initialize terminal
   useEffect(() => {
@@ -527,8 +524,8 @@ export function Terminal({
     <div
       ref={containerRef}
       tabIndex={0}
-      className={`relative h-[calc(100%-32px)] w-[calc(100%-32px)] m-4 bg-[#0a0a0a] border rounded-lg outline-none overflow-hidden transition-colors ${
-        isDragOver ? 'border-blue-500 ring-2 ring-blue-500/50' : 'border-neutral-800'
+      className={`relative h-full w-full bg-[#0a0a0a] rounded-lg outline-none overflow-hidden transition-colors ${
+        isDragOver ? 'ring-2 ring-blue-500/50 ring-inset' : ''
       }`}
       style={{ padding: '8px' }}
       onClick={() => terminalRef.current?.focus()}

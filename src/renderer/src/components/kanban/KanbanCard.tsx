@@ -28,10 +28,10 @@ const TERMINAL_STATE_COLORS: Record<TerminalState, string> = {
 }
 
 const TERMINAL_STATE_LABELS: Record<TerminalState, string> = {
-  idle: 'Awaiting input',
+  idle: 'Idle',
   dead: 'Stopped',
   starting: 'Starting',
-  running: 'Running',
+  running: 'Working',
   awaiting_input: 'Awaiting input',
   error: 'Error'
 }

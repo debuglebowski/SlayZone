@@ -38,7 +38,9 @@
       "Bash(timeout 10 ~/.local/bin/claude:*)",
       "Bash(~/.local/bin/claude:*)",
       "Bash(grep:*)",
-      "Bash(find:*)"
+      "Bash(find:*)",
+      "WebFetch(domain:docs.claude.com)",
+      "WebFetch(domain:www.ytyng.com)"
     ]
   },
   "enableAllProjectMcpServers": true,

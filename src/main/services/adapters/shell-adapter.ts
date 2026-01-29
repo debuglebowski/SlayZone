@@ -1,6 +1,5 @@
 import { platform } from 'os'
-import type { TerminalState } from '../../../shared/types/api'
-import type { TerminalAdapter, SpawnConfig, PromptInfo, StructuredEvent, CodeMode } from './types'
+import type { TerminalAdapter, SpawnConfig, PromptInfo, CodeMode, ActivityState, ErrorInfo } from './types'
 
 /**
  * Adapter for raw terminal/shell.
@@ -8,6 +7,7 @@ import type { TerminalAdapter, SpawnConfig, PromptInfo, StructuredEvent, CodeMod
  */
 export class ShellAdapter implements TerminalAdapter {
   readonly mode = 'terminal' as const
+  readonly idleTimeoutMs = null // use default 60s
 
   private getShell(override?: string): string {
     if (override) return override
@@ -24,18 +24,18 @@ export class ShellAdapter implements TerminalAdapter {
     }
   }
 
+  detectActivity(_data: string, _current: ActivityState): ActivityState | null {
+    // Raw terminal has no activity detection
+    return null
+  }
+
+  detectError(_data: string): ErrorInfo | null {
+    // Raw terminal has no error detection
+    return null
+  }
+
   detectPrompt(_data: string): PromptInfo | null {
-    // Raw terminal has no special prompt detection
-    return null
-  }
-
-  parseEvent(_data: string): StructuredEvent | null {
-    // Raw terminal has no structured events
-    return null
-  }
-
-  detectState(_data: string, _currentState: TerminalState): TerminalState | null {
-    // Raw terminal uses basic heuristics only (handled in pty-manager)
+    // Raw terminal has no prompt detection
     return null
   }
 }

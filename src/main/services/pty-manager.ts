@@ -3,7 +3,7 @@ import { BrowserWindow } from 'electron'
 import { homedir, userInfo } from 'os'
 import type { TerminalState, PtyInfo, CodeMode } from '../../shared/types/api'
 import { RingBuffer } from './ring-buffer'
-import { getAdapter, type TerminalMode, type TerminalAdapter } from './adapters'
+import { getAdapter, type TerminalMode, type TerminalAdapter, type ActivityState, type ErrorInfo } from './adapters'
 
 interface PtySession {
   pty: pty.IPty
@@ -14,6 +14,9 @@ interface PtySession {
   buffer: RingBuffer
   lastOutputTime: number
   state: TerminalState
+  // CLI state tracking
+  activity: ActivityState
+  error: ErrorInfo | null
   // /status monitoring
   inputBuffer: string
   watchingForSessionId: boolean
@@ -40,9 +43,6 @@ let mainWindow: BrowserWindow | null = null
 // Interval reference for idle checker
 let idleCheckerInterval: NodeJS.Timeout | null = null
 
-// Pattern to detect Claude session not found error
-const SESSION_NOT_FOUND_PATTERN = /No conversation found with session ID:/
-
 // Filter out terminal escape sequences that shouldn't be replayed
 function filterBufferData(data: string): string {
   return data
@@ -50,6 +50,21 @@ function filterBufferData(data: string): string {
     .replace(/\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)/g, '')
     // Filter DA responses (ESC [ ? ... c)
     .replace(/\x1b\[\?[0-9;]*c/g, '')
+}
+
+// Map ActivityState to TerminalState for backward compatibility
+function activityToTerminalState(activity: ActivityState): TerminalState | null {
+  switch (activity) {
+    case 'idle':
+      return 'idle'
+    case 'thinking':
+    case 'tool_use':
+      return 'running'
+    case 'awaiting_input':
+      return 'awaiting_input'
+    default:
+      return null
+  }
 }
 
 // Transition session state and emit event
@@ -69,14 +84,16 @@ function transitionState(taskId: string, newState: TerminalState): void {
   }
 }
 
-// Check for idle sessions and transition state
+// Check for idle sessions and transition state (fallback timeout)
 function checkIdleSessions(): void {
   if (!mainWindow || mainWindow.isDestroyed()) return
 
   const now = Date.now()
   for (const [taskId, session] of sessions) {
+    const timeout = session.adapter.idleTimeoutMs ?? IDLE_TIMEOUT_MS
     const idleTime = now - session.lastOutputTime
-    if (idleTime >= IDLE_TIMEOUT_MS && session.state === 'running') {
+    if (idleTime >= timeout && session.state === 'running') {
+      session.activity = 'idle'
       transitionState(taskId, 'idle')
     }
   }
@@ -162,10 +179,23 @@ export function createPty(
       buffer: new RingBuffer(MAX_BUFFER_SIZE),
       lastOutputTime: Date.now(),
       state: 'starting',
+      // CLI state tracking
+      activity: 'unknown',
+      error: null,
       // /status monitoring
       inputBuffer: '',
       watchingForSessionId: false,
       statusOutputBuffer: ''
+    })
+
+    // Transition out of 'starting' once setup completes
+    // (pty.spawn is synchronous, so process is already running)
+    setImmediate(() => {
+      const session = sessions.get(taskId)
+      if (session?.state === 'starting') {
+        session.activity = 'idle'
+        transitionState(taskId, 'idle')
+      }
     })
 
     // Forward data to renderer
@@ -182,13 +212,31 @@ export function createPty(
       // Update idle tracking
       session.lastOutputTime = Date.now()
 
-      // Use adapter for state detection
-      const detectedState = session.adapter.detectState(data, session.state)
-      if (detectedState) {
-        transitionState(taskId, detectedState)
-      } else if (session.state === 'starting' || session.state === 'idle') {
-        // Default: transition to running on any output
-        transitionState(taskId, 'running')
+      // Use adapter for activity detection
+      const detectedActivity = session.adapter.detectActivity(data, session.activity)
+      if (detectedActivity) {
+        session.activity = detectedActivity
+        // Map activity to TerminalState for backward compatibility
+        const newState = activityToTerminalState(detectedActivity)
+        if (newState) transitionState(taskId, newState)
+      } else if (session.state === 'starting') {
+        // No spinner detected from 'starting' - assume idle (Claude showing prompt)
+        session.activity = 'idle'
+        transitionState(taskId, 'idle')
+      }
+      // Note: Don't auto-transition from 'idle' to 'running' on any output.
+      // Claude CLI outputs cursor/ANSI codes while waiting. Let detectActivity
+      // handle the transition when it sees actual work (spinner chars).
+
+      // Use adapter for error detection
+      const detectedError = session.adapter.detectError(data)
+      if (detectedError) {
+        session.error = detectedError
+        session.checkingForSessionError = false
+        transitionState(taskId, 'error')
+        if (!win.isDestroyed() && detectedError.code === 'SESSION_NOT_FOUND') {
+          win.webContents.send('pty:session-not-found', taskId)
+        }
       }
 
       // Check for prompts
@@ -199,14 +247,6 @@ export function createPty(
 
       if (!win.isDestroyed()) {
         win.webContents.send('pty:data', taskId, data)
-
-        // Check for session not found error (only in the first few seconds)
-        if (session.checkingForSessionError && SESSION_NOT_FOUND_PATTERN.test(data)) {
-          // Stop checking after we find the error
-          session.checkingForSessionError = false
-          transitionState(taskId, 'error')
-          win.webContents.send('pty:session-not-found', taskId)
-        }
       }
 
       // Parse session ID from /status output
@@ -271,24 +311,18 @@ export function writePty(taskId: string, data: string): boolean {
   const session = sessions.get(taskId)
   if (!session) return false
 
-  // Debug: log all input
-  console.log(`[pty-manager] writePty(${taskId}) data=${JSON.stringify(data)}`)
-
   // Buffer input to detect commands
   session.inputBuffer += data
 
   // Check for /status command (on Enter)
   if (data === '\r' || data === '\n') {
-    console.log(`[pty-manager] Enter detected, inputBuffer=${JSON.stringify(session.inputBuffer)}`)
     if (session.inputBuffer.includes('/status')) {
-      console.log(`[pty-manager] /status command detected for task ${taskId}`)
       session.watchingForSessionId = true
       session.statusOutputBuffer = ''
 
       // Stop watching after 5s timeout
       session.statusWatchTimeout = setTimeout(() => {
         if (session.watchingForSessionId) {
-          console.log(`[pty-manager] /status watch timeout, no session ID found`)
           session.watchingForSessionId = false
           session.statusOutputBuffer = ''
         }
