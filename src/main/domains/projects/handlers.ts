@@ -1,0 +1,54 @@
+import { ipcMain } from 'electron'
+import { getDatabase } from '../../db'
+import type { CreateProjectInput, UpdateProjectInput } from '../../../shared/types/api'
+
+export function registerProjectHandlers(): void {
+  const db = getDatabase()
+
+  ipcMain.handle('db:projects:getAll', () => {
+    return db.prepare('SELECT * FROM projects ORDER BY name').all()
+  })
+
+  ipcMain.handle('db:projects:create', (_, data: CreateProjectInput) => {
+    const id = crypto.randomUUID()
+    const stmt = db.prepare(`
+      INSERT INTO projects (id, name, color, path)
+      VALUES (?, ?, ?, ?)
+    `)
+    stmt.run(id, data.name, data.color, data.path ?? null)
+    return db.prepare('SELECT * FROM projects WHERE id = ?').get(id)
+  })
+
+  ipcMain.handle('db:projects:update', (_, data: UpdateProjectInput) => {
+    const fields: string[] = []
+    const values: unknown[] = []
+
+    if (data.name !== undefined) {
+      fields.push('name = ?')
+      values.push(data.name)
+    }
+    if (data.color !== undefined) {
+      fields.push('color = ?')
+      values.push(data.color)
+    }
+    if (data.path !== undefined) {
+      fields.push('path = ?')
+      values.push(data.path)
+    }
+
+    if (fields.length === 0) {
+      return db.prepare('SELECT * FROM projects WHERE id = ?').get(data.id)
+    }
+
+    fields.push("updated_at = datetime('now')")
+    values.push(data.id)
+
+    db.prepare(`UPDATE projects SET ${fields.join(', ')} WHERE id = ?`).run(...values)
+    return db.prepare('SELECT * FROM projects WHERE id = ?').get(data.id)
+  })
+
+  ipcMain.handle('db:projects:delete', (_, id: string) => {
+    const result = db.prepare('DELETE FROM projects WHERE id = ?').run(id)
+    return result.changes > 0
+  })
+}

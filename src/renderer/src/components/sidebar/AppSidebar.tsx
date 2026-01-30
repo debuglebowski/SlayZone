@@ -11,7 +11,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip'
 import { ProjectItem } from './ProjectItem'
-import { TerminalStatusPopover } from '@/components/terminal/TerminalStatusPopover'
+import { TerminalStatusPopover } from '@/domains/terminal/components/TerminalStatusPopover'
 import { cn } from '@/lib/utils'
 import type { Project, Task } from '../../../../shared/types/database'
 

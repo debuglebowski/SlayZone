@@ -1,149 +1,65 @@
-import type { Task, Project, Tag, TaskStatus } from './database'
+// Re-export domain types for backwards compatibility
+export type { Task, TaskStatus, TaskDependency, CreateTaskInput, UpdateTaskInput } from '../domains/task'
+export type { Project, CreateProjectInput, UpdateProjectInput } from '../domains/project'
+export type { Tag, CreateTagInput, UpdateTagInput, TaskTagInput } from '../domains/tag'
+export type {
+  TerminalMode,
+  TerminalState,
+  CodeMode,
+  ActivityState,
+  ErrorInfo,
+  CLIState,
+  PtyInfo,
+  PromptInfo
+} from '../domains/terminal'
+export type { Theme, ThemePreference } from '../domains/settings'
+export type { ClaudeAvailability, GenerateDescriptionResult } from '../domains/ai'
 
-// Theme types
-export type Theme = 'light' | 'dark'
-export type ThemePreference = 'light' | 'dark' | 'system'
-
-// Claude CLI types
-export interface ClaudeAvailability {
-  available: boolean
-  path: string | null
-  version: string | null
-}
-
-// PTY types
-export type TerminalState = 'starting' | 'running' | 'idle' | 'awaiting_input' | 'error' | 'dead'
-export type TerminalMode = 'claude-code' | 'codex' | 'terminal'
-export type CodeMode = 'normal' | 'plan' | 'accept-edits' | 'bypass'
-
-// CLI activity states (more granular than TerminalState)
-export type ActivityState = 'idle' | 'thinking' | 'tool_use' | 'awaiting_input' | 'unknown'
-
-// CLI error info
-export interface ErrorInfo {
-  code: string
-  message: string
-  recoverable: boolean
-}
-
-// Full CLI state
-export interface CLIState {
-  alive: boolean
-  activity: ActivityState
-  error: ErrorInfo | null
-}
-
-export interface PtyInfo {
-  taskId: string
-  lastOutputTime: number
-  state: TerminalState
-}
-
-export interface PromptInfo {
-  type: 'permission' | 'question' | 'input'
-  text: string
-  position: number
-}
-
-export interface CreateTaskInput {
-  projectId: string
-  title: string
-  description?: string
-  status?: string
-  priority?: number
-  dueDate?: string
-}
-
-export interface TaskTagInput {
-  taskId: string
-  tagId: string
-}
-
-export interface CreateProjectInput {
-  name: string
-  color: string
-  path?: string
-}
-
-export interface UpdateTaskInput {
-  id: string
-  title?: string
-  description?: string | null
-  status?: TaskStatus
-  priority?: number
-  dueDate?: string | null
-  projectId?: string
-  // Terminal config
-  terminalMode?: TerminalMode
-  claudeConversationId?: string | null
-  codexConversationId?: string | null
-  terminalShell?: string | null
-  dangerouslySkipPermissions?: boolean
-  // Legacy
-  claudeSessionId?: string | null
-}
-
-export interface UpdateProjectInput {
-  id: string
-  name?: string
-  color?: string
-  path?: string | null
-}
-
-export interface CreateTagInput {
-  name: string
-  color?: string
-}
-
-export interface UpdateTagInput {
-  id: string
-  name?: string
-  color?: string
-}
-
-export interface GenerateDescriptionResult {
-  success: boolean
-  description?: string
-  error?: string
-}
-
+// ElectronAPI interface - stays here as it's the IPC contract
 export interface ElectronAPI {
   ai: {
-    generateDescription: (title: string, mode: TerminalMode) => Promise<GenerateDescriptionResult>
+    generateDescription: (
+      title: string,
+      mode: import('../domains/terminal').TerminalMode
+    ) => Promise<import('../domains/ai').GenerateDescriptionResult>
   }
   db: {
     // Projects
-    getProjects: () => Promise<Project[]>
-    createProject: (data: CreateProjectInput) => Promise<Project>
-    updateProject: (data: UpdateProjectInput) => Promise<Project>
+    getProjects: () => Promise<import('../domains/project').Project[]>
+    createProject: (
+      data: import('../domains/project').CreateProjectInput
+    ) => Promise<import('../domains/project').Project>
+    updateProject: (
+      data: import('../domains/project').UpdateProjectInput
+    ) => Promise<import('../domains/project').Project>
     deleteProject: (id: string) => Promise<boolean>
 
     // Tasks
-    getTasks: () => Promise<Task[]>
-    getTasksByProject: (projectId: string) => Promise<Task[]>
-    getTask: (id: string) => Promise<Task | null>
-    createTask: (data: CreateTaskInput) => Promise<Task>
-    updateTask: (data: UpdateTaskInput) => Promise<Task>
+    getTasks: () => Promise<import('../domains/task').Task[]>
+    getTasksByProject: (projectId: string) => Promise<import('../domains/task').Task[]>
+    getTask: (id: string) => Promise<import('../domains/task').Task | null>
+    createTask: (data: import('../domains/task').CreateTaskInput) => Promise<import('../domains/task').Task>
+    updateTask: (data: import('../domains/task').UpdateTaskInput) => Promise<import('../domains/task').Task>
     deleteTask: (id: string) => Promise<boolean>
-    archiveTask: (id: string) => Promise<Task>
+    archiveTask: (id: string) => Promise<import('../domains/task').Task>
     archiveTasks: (ids: string[]) => Promise<void>
-    unarchiveTask: (id: string) => Promise<Task>
-    getArchivedTasks: () => Promise<Task[]>
+    unarchiveTask: (id: string) => Promise<import('../domains/task').Task>
+    getArchivedTasks: () => Promise<import('../domains/task').Task[]>
     reorderTasks: (taskIds: string[]) => Promise<void>
   }
   tags: {
-    getTags: () => Promise<Tag[]>
-    createTag: (data: CreateTagInput) => Promise<Tag>
-    updateTag: (data: UpdateTagInput) => Promise<Tag>
+    getTags: () => Promise<import('../domains/tag').Tag[]>
+    createTag: (data: import('../domains/tag').CreateTagInput) => Promise<import('../domains/tag').Tag>
+    updateTag: (data: import('../domains/tag').UpdateTagInput) => Promise<import('../domains/tag').Tag>
     deleteTag: (id: string) => Promise<boolean>
   }
   taskTags: {
-    getTagsForTask: (taskId: string) => Promise<Tag[]>
+    getTagsForTask: (taskId: string) => Promise<import('../domains/tag').Tag[]>
     setTagsForTask: (taskId: string, tagIds: string[]) => Promise<void>
   }
   taskDependencies: {
-    getBlockers: (taskId: string) => Promise<Task[]>
-    getBlocking: (taskId: string) => Promise<Task[]>
+    getBlockers: (taskId: string) => Promise<import('../domains/task').Task[]>
+    getBlocking: (taskId: string) => Promise<import('../domains/task').Task[]>
     addBlocker: (taskId: string, blockerTaskId: string) => Promise<void>
     removeBlocker: (taskId: string, blockerTaskId: string) => Promise<void>
     setBlockers: (taskId: string, blockerTaskIds: string[]) => Promise<void>
@@ -154,13 +70,13 @@ export interface ElectronAPI {
     getAll: () => Promise<Record<string, string>>
   }
   claude: {
-    checkAvailability: () => Promise<ClaudeAvailability>
+    checkAvailability: () => Promise<import('../domains/ai').ClaudeAvailability>
   }
   theme: {
-    getEffective: () => Promise<Theme>
-    getSource: () => Promise<ThemePreference>
-    set: (theme: ThemePreference) => Promise<Theme>
-    onChange: (callback: (theme: Theme) => void) => () => void
+    getEffective: () => Promise<import('../domains/settings').Theme>
+    getSource: () => Promise<import('../domains/settings').ThemePreference>
+    set: (theme: import('../domains/settings').ThemePreference) => Promise<import('../domains/settings').Theme>
+    onChange: (callback: (theme: import('../domains/settings').Theme) => void) => () => void
   }
   shell: {
     openExternal: (url: string) => Promise<void>
@@ -191,25 +107,31 @@ export interface ElectronAPI {
       cwd: string,
       sessionId?: string | null,
       existingSessionId?: string | null,
-      mode?: TerminalMode,
+      mode?: import('../domains/terminal').TerminalMode,
       initialPrompt?: string | null,
-      codeMode?: CodeMode | null
+      codeMode?: import('../domains/terminal').CodeMode | null
     ) => Promise<{ success: boolean; error?: string }>
     write: (taskId: string, data: string) => Promise<boolean>
     resize: (taskId: string, cols: number, rows: number) => Promise<boolean>
     kill: (taskId: string) => Promise<boolean>
     exists: (taskId: string) => Promise<boolean>
     getBuffer: (taskId: string) => Promise<string | null>
-    list: () => Promise<PtyInfo[]>
+    list: () => Promise<import('../domains/terminal').PtyInfo[]>
     onData: (callback: (taskId: string, data: string) => void) => () => void
     onExit: (callback: (taskId: string, exitCode: number) => void) => () => void
     onSessionNotFound: (callback: (taskId: string) => void) => () => void
     onIdle: (callback: (taskId: string) => void) => () => void
     onStateChange: (
-      callback: (taskId: string, newState: TerminalState, oldState: TerminalState) => void
+      callback: (
+        taskId: string,
+        newState: import('../domains/terminal').TerminalState,
+        oldState: import('../domains/terminal').TerminalState
+      ) => void
     ) => () => void
-    onPrompt: (callback: (taskId: string, prompt: PromptInfo) => void) => () => void
+    onPrompt: (
+      callback: (taskId: string, prompt: import('../domains/terminal').PromptInfo) => void
+    ) => () => void
     onSessionDetected: (callback: (taskId: string, sessionId: string) => void) => () => void
-    getState: (taskId: string) => Promise<TerminalState | null>
+    getState: (taskId: string) => Promise<import('../domains/terminal').TerminalState | null>
   }
 }

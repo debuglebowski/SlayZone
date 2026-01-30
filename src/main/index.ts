@@ -2,9 +2,6 @@ import { app, shell, BrowserWindow, ipcMain, nativeTheme, session, webContents, 
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 
-// #region agent log
-fetch('http://127.0.0.1:7246/ingest/99fa6442-9a16-4bdf-bbc1-4c693694c593',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'index.ts:TOP',message:'App info at startup',data:{appName:app.name,appPath:app.getAppPath(),execPath:process.execPath},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'A,B'})}).catch(()=>{});
-// #endregion
 
 // Enable remote debugging for MCP server (dev only)
 if (is.dev) {
@@ -12,13 +9,12 @@ if (is.dev) {
 }
 import icon from '../../resources/icon.png?asset'
 import { getDatabase, closeDatabase } from './db'
-import { registerDatabaseHandlers } from './ipc/database'
-import { registerClaudeHandlers } from './ipc/claude'
-import { registerThemeHandlers } from './ipc/theme'
-import { registerPtyHandlers } from './ipc/pty'
-import { registerAiHandlers } from './ipc/ai'
-import { registerFilesHandlers } from './ipc/files'
-import { killAllPtys, startIdleChecker, stopIdleChecker } from './services/pty-manager'
+// Domain handlers
+import { registerProjectHandlers } from './domains/projects'
+import { registerTaskHandlers, registerAiHandlers, registerFilesHandlers } from './domains/task'
+import { registerTagHandlers } from './domains/tags'
+import { registerSettingsHandlers, registerThemeHandlers } from './domains/settings'
+import { registerPtyHandlers, registerClaudeHandlers, killAllPtys, startIdleChecker, stopIdleChecker } from './domains/terminal'
 
 // Minimum splash screen display time (ms)
 const SPLASH_MIN_DURATION = 2800
@@ -350,12 +346,15 @@ app.whenReady().then(() => {
     Menu.setApplicationMenu(Menu.buildFromTemplate(template))
   }
 
-  // Register IPC handlers
-  registerDatabaseHandlers()
-  registerClaudeHandlers()
-  registerThemeHandlers()
-  registerPtyHandlers()
+  // Register domain handlers
+  registerProjectHandlers()
+  registerTaskHandlers()
   registerAiHandlers()
+  registerTagHandlers()
+  registerSettingsHandlers()
+  registerThemeHandlers()
+  registerClaudeHandlers()
+  registerPtyHandlers()
   registerFilesHandlers()
 
   // Configure webview session for WebAuthn/passkey support
