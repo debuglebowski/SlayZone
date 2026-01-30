@@ -1,0 +1,36 @@
+{
+  "name": "@omgslayzone/task",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./shared": "./src/shared/index.ts",
+    "./main": "./src/main/index.ts",
+    "./client": "./src/client/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@omgslayzone/types": "workspace:*",
+    "@omgslayzone/ui": "workspace:*",
+    "@omgslayzone/editor": "workspace:*",
+    "@omgslayzone/terminal": "workspace:*",
+    "@omgslayzone/projects": "workspace:*",
+    "@omgslayzone/tags": "workspace:*",
+    "@hookform/resolvers": "^5.2.2",
+    "react-hook-form": "^7.71.1",
+    "date-fns": "^4.1.0",
+    "zod": "^4.3.5"
+  },
+  "peerDependencies": {
+    "react": "^19.0.0"
+  },
+  "devDependencies": {
+    "@types/react": "^19.2.7",
+    "typescript": "^5.9.3"
+  }
+}

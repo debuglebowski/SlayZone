@@ -1,0 +1,133 @@
+import { Settings, HelpCircle } from 'lucide-react'
+import {
+  Sidebar,
+  SidebarContent,
+  SidebarFooter,
+  SidebarGroup,
+  SidebarGroupContent,
+  SidebarMenu,
+  SidebarMenuItem
+} from '@omgslayzone/ui'
+import { Button } from '@omgslayzone/ui'
+import { Tooltip, TooltipTrigger, TooltipContent } from '@omgslayzone/ui'
+import { ProjectItem } from './ProjectItem'
+import { TerminalStatusPopover } from '@omgslayzone/terminal'
+import { cn } from '@omgslayzone/ui'
+import type { Task } from '@omgslayzone/task/shared'
+import type { Project } from '@omgslayzone/projects/shared'
+
+interface AppSidebarProps {
+  projects: Project[]
+  tasks: Task[]
+  selectedProjectId: string | null
+  onSelectProject: (id: string | null) => void
+  onAddProject: () => void
+  onProjectSettings: (project: Project) => void
+  onProjectDelete: (project: Project) => void
+  onSettings: () => void
+  onTutorial: () => void
+}
+
+export function AppSidebar({
+  projects,
+  tasks,
+  selectedProjectId,
+  onSelectProject,
+  onAddProject,
+  onProjectSettings,
+  onProjectDelete,
+  onSettings,
+  onTutorial
+}: AppSidebarProps) {
+  return (
+    <Sidebar collapsible="none" className="w-[72px] border-r min-h-svh">
+      {/* Draggable region for window movement - clears traffic lights */}
+      <div className="h-10 window-drag-region" />
+      <SidebarContent className="py-4 pt-0">
+        <SidebarGroup>
+          <SidebarGroupContent>
+            <SidebarMenu className="flex flex-col items-center gap-2">
+              {/* All projects button */}
+              <SidebarMenuItem>
+                <button
+                  onClick={() => onSelectProject(null)}
+                  className={cn(
+                    'w-10 h-10 rounded-lg flex items-center justify-center',
+                    'text-xs font-semibold bg-muted transition-all',
+                    'hover:scale-105',
+                    selectedProjectId === null &&
+                      'ring-2 ring-primary ring-offset-2 ring-offset-background'
+                  )}
+                  title="All projects"
+                >
+                  All
+                </button>
+              </SidebarMenuItem>
+
+              {/* Project blobs */}
+              {projects.map((project) => (
+                <SidebarMenuItem key={project.id}>
+                  <ProjectItem
+                    project={project}
+                    selected={selectedProjectId === project.id}
+                    onClick={() => onSelectProject(project.id)}
+                    onSettings={() => onProjectSettings(project)}
+                    onDelete={() => onProjectDelete(project)}
+                  />
+                </SidebarMenuItem>
+              ))}
+
+              {/* Add project button */}
+              <SidebarMenuItem>
+                <button
+                  onClick={onAddProject}
+                  className={cn(
+                    'w-10 h-10 rounded-lg flex items-center justify-center',
+                    'text-lg text-muted-foreground border-2 border-dashed',
+                    'hover:border-primary hover:text-primary transition-colors'
+                  )}
+                  title="Add project"
+                >
+                  +
+                </button>
+              </SidebarMenuItem>
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+      </SidebarContent>
+      <SidebarFooter className="py-4">
+        <SidebarMenu>
+          <SidebarMenuItem className="flex flex-col items-center gap-2">
+            <TerminalStatusPopover tasks={tasks} />
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon-lg"
+                  onClick={onTutorial}
+                  className="rounded-lg text-muted-foreground"
+                >
+                  <HelpCircle className="size-5" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="right">Tutorial</TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon-lg"
+                  onClick={onSettings}
+                  className="rounded-lg text-muted-foreground"
+                >
+                  <Settings className="size-5" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="right">Settings</TooltipContent>
+            </Tooltip>
+          </SidebarMenuItem>
+        </SidebarMenu>
+      </SidebarFooter>
+    </Sidebar>
+  )
+}

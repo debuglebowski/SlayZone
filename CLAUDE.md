@@ -5,8 +5,8 @@ Desktop task management app with integrated AI coding assistants (Claude Code, C
 ## Quick Start
 
 ```bash
-npm install
-npm run dev
+pnpm install
+pnpm dev
 ```
 
 ## Stack
@@ -19,80 +19,76 @@ npm run dev
 
 ## Architecture
 
-See [ARCHITECTURE.md](./ARCHITECTURE.md) for full details.
+See [ARCHITECTURE.md](./ARCHITECTURE.md) for system architecture and [PHILOSOPHY.md](./PHILOSOPHY.md) for structural principles.
+
+## Monorepo Structure
 
 ```
-src/
-├── main/           # Electron main process (Node.js)
-│   └── domains/    # Domain handlers (task, projects, tags, terminal, settings)
-├── renderer/       # React frontend
-│   └── src/domains/# Domain components, hooks, lib
-├── preload/        # IPC bridge (contextBridge)
-└── shared/         # Cross-process types
+packages/
+├── apps/
+│   └── desktop/         # @omgslayzone/app - Electron shell
+└── domains/
+│   ├── terminal/        # @omgslayzone/terminal
+│   ├── task/            # @omgslayzone/task
+│   ├── tasks/           # @omgslayzone/tasks
+│   ├── projects/        # @omgslayzone/projects
+│   ├── tags/            # @omgslayzone/tags
+│   ├── settings/        # @omgslayzone/settings
+│   └── onboarding/      # @omgslayzone/onboarding
+└── shared/
+    ├── types/           # @omgslayzone/types - ElectronAPI
+    ├── ui/              # @omgslayzone/ui - Components
+    └── editor/          # @omgslayzone/editor - TipTap
 ```
 
-## Domains
+## Domain Structure
 
-| Domain | Main | Renderer |
-|--------|------|----------|
-| tasks | - | `domains/tasks/` (kanban, filters, hooks) |
-| task | `domains/task/` | `domains/task/` (detail, CRUD dialogs, AI) |
-| projects | `domains/projects/` | `domains/projects/` (CRUD, settings) |
-| tags | `domains/tags/` | `domains/tags/` (CRUD) |
-| terminal | `domains/terminal/` | `domains/terminal/` (PTY, xterm) |
-| settings | `domains/settings/` | `domains/settings/` (theme, prefs) |
-| onboarding | - | `domains/onboarding/` (tutorial) |
+Each domain:
+```
+domain/
+├── DOMAIN.md           # Documentation
+└── src/
+    ├── shared/         # Types, contracts → ./shared
+    ├── main/           # IPC handlers → ./main
+    └── client/         # React UI → ./client
+```
 
-## Key Files
+## Domain Packages
 
-| File | Purpose |
-|------|---------|
-| `src/main/index.ts` | App entry, window creation, IPC registration |
-| `src/renderer/src/App.tsx` | Main React component, coordinates domains |
-| `src/renderer/src/domains/tasks/hooks/useTasksData.ts` | Core data state (tasks, projects, tags) |
-| `src/main/domains/terminal/pty-manager.ts` | Terminal session lifecycle |
-| `src/preload/index.ts` | IPC bridge exposing `window.api` |
+| Package | /shared | /main | /client |
+|---------|---------|-------|---------|
+| @omgslayzone/terminal | TerminalMode, PtyInfo | PTY handlers | Terminal, PtyProvider |
+| @omgslayzone/task | Task, schemas | Task CRUD, AI | TaskDetailPage, dialogs |
+| @omgslayzone/tasks | - | - | KanbanBoard, useTasksData |
+| @omgslayzone/projects | Project | Project CRUD | ProjectSelect, dialogs |
+| @omgslayzone/tags | Tag | Tag CRUD | - |
+| @omgslayzone/settings | Theme | Settings, theme | ThemeProvider |
+| @omgslayzone/onboarding | - | - | OnboardingDialog |
 
 ## Commands
 
 | Command | Purpose |
 |---------|---------|
-| `npm run dev` | Start dev server with HMR |
-| `npm run build` | Typecheck + build for production |
-| `npm run build:mac` | Build macOS .app |
-| `npm run typecheck` | Run TypeScript checks |
-| `npm run lint` | Run ESLint |
+| `pnpm dev` | Start dev server |
+| `pnpm build` | Build for production |
+| `pnpm build:mac` | Build macOS .app |
+| `pnpm typecheck` | Typecheck all packages |
 
-## IPC Pattern
+## Key Files
 
-Renderer calls main via `window.api`:
-
-```typescript
-// Renderer
-const tasks = await window.api.db.getTasks()
-
-// Main (domains/task/handlers.ts)
-ipcMain.handle('db:tasks:getAll', () => {
-  return db.prepare('SELECT * FROM tasks...').all()
-})
-
-// Preload bridges them
-db: {
-  getTasks: () => ipcRenderer.invoke('db:tasks:getAll')
-}
-```
+| File | Purpose |
+|------|---------|
+| `packages/apps/desktop/src/main/index.ts` | App entry, DI |
+| `packages/apps/desktop/src/renderer/src/App.tsx` | Main React |
+| `packages/domains/tasks/src/client/useTasksData.ts` | Core state |
+| `packages/domains/terminal/src/main/pty-manager.ts` | PTY lifecycle |
 
 ## Terminal Modes
 
-Tasks can use different terminal modes:
-- `claude-code` - Claude Code CLI with --resume support
+- `claude-code` - Claude Code CLI
 - `codex` - OpenAI Codex CLI
 - `terminal` - Plain shell
 
-Adapters in `src/main/domains/terminal/adapters/` handle mode-specific behavior.
-
 ## Database
 
-SQLite stored in user data directory. Schema in `src/main/db/migrations.ts`.
-
-Core tables: `projects`, `tasks`, `tags`, `task_tags`, `task_dependencies`, `settings`
+SQLite in user data. Schema: `packages/apps/desktop/src/main/db/migrations.ts`

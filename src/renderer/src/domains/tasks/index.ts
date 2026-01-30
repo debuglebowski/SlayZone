@@ -1,5 +1,0 @@
-export { KanbanBoard } from './components/KanbanBoard'
-export { FilterBar } from './components/FilterBar'
-export { useTasksData } from './hooks/useTasksData'
-export { useFilterState } from './hooks/useFilterState'
-export { applyFilters, type Column, type GroupKey } from './lib/kanban'
