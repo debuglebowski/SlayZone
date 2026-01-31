@@ -27,7 +27,7 @@ See [ARCHITECTURE.md](./ARCHITECTURE.md) for system architecture and [PHILOSOPHY
 ```
 packages/
 ├── apps/
-│   └── desktop/         # @omgslayzone/app - Electron shell
+│   └── app/             # @omgslayzone/app - Electron shell
 └── domains/
 │   ├── terminal/        # @omgslayzone/terminal
 │   ├── task/            # @omgslayzone/task
@@ -81,8 +81,8 @@ domain/
 
 | File | Purpose |
 |------|---------|
-| `packages/apps/desktop/src/main/index.ts` | App entry, DI |
-| `packages/apps/desktop/src/renderer/src/App.tsx` | Main React |
+| `packages/apps/app/src/main/index.ts` | App entry, DI |
+| `packages/apps/app/src/renderer/src/App.tsx` | Main React |
 | `packages/domains/tasks/src/client/useTasksData.ts` | Core state |
 | `packages/domains/terminal/src/main/pty-manager.ts` | PTY lifecycle |
 
@@ -94,4 +94,4 @@ domain/
 
 ## Database
 
-SQLite in user data. Schema: `packages/apps/desktop/src/main/db/migrations.ts`
+SQLite in user data. Schema: `packages/apps/app/src/main/db/migrations.ts`

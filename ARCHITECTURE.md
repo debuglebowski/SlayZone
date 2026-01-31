@@ -29,7 +29,7 @@ OmgSlayZone is an Electron desktop app organized as a **pnpm monorepo** followin
 ```
 packages/
 ├── apps/
-│   └── desktop/           # @omgslayzone/app - Electron shell
+│   └── app/               # @omgslayzone/app - Electron shell
 │       └── APP.md
 ├── domains/
 │   ├── terminal/          # @omgslayzone/terminal - PTY, xterm
