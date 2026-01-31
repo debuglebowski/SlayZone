@@ -6,8 +6,9 @@ Desktop task management app with integrated AI coding assistants (Claude Code, C
 
 ```bash
 pnpm install
-pnpm dev
 ```
+
+**Never start the dev server** - user runs it separately.
 
 ## Stack
 
@@ -34,7 +35,8 @@ packages/
 │   ├── projects/        # @omgslayzone/projects
 │   ├── tags/            # @omgslayzone/tags
 │   ├── settings/        # @omgslayzone/settings
-│   └── onboarding/      # @omgslayzone/onboarding
+│   ├── onboarding/      # @omgslayzone/onboarding
+│   └── worktrees/       # @omgslayzone/worktrees
 └── shared/
     ├── types/           # @omgslayzone/types - ElectronAPI
     ├── ui/              # @omgslayzone/ui - Components
@@ -64,6 +66,7 @@ domain/
 | @omgslayzone/tags | Tag | Tag CRUD | - |
 | @omgslayzone/settings | Theme | Settings, theme | ThemeProvider |
 | @omgslayzone/onboarding | - | - | OnboardingDialog |
+| @omgslayzone/worktrees | Worktree, DetectedWorktree | Git ops, worktree CRUD | GitPanel |
 
 ## Commands
 

@@ -21,6 +21,8 @@
     "@omgslayzone/terminal": "workspace:*",
     "@omgslayzone/projects": "workspace:*",
     "@omgslayzone/tags": "workspace:*",
+    "@omgslayzone/worktrees": "workspace:*",
+    "@omgslayzone/task-browser": "workspace:*",
     "@hookform/resolvers": "^5.2.2",
     "react-hook-form": "^7.71.1",
     "date-fns": "^4.1.0",

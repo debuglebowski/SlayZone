@@ -1,11 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
-  <!-- Zen flame - solid variant for icon generation -->
+  <!-- Crown logo - 3 point minimalist solid -->
   <path
-    d="M32 8
-       C32 8 22 22 22 36
-       C22 46 26 54 32 56
-       C38 54 42 46 42 36
-       C42 22 32 8 32 8Z"
-    fill="#000000"
+    d="M8,48 L14,24 L24,36 L32,16 L40,36 L50,24 L56,48 Z"
+    fill="#e5e5e5"
   />
 </svg>

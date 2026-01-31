@@ -17,6 +17,7 @@ import { registerTaskHandlers, registerAiHandlers, registerFilesHandlers } from 
 import { registerTagHandlers } from '@omgslayzone/tags/main'
 import { registerSettingsHandlers, registerThemeHandlers } from '@omgslayzone/settings/main'
 import { registerPtyHandlers, registerClaudeHandlers, killAllPtys, startIdleChecker, stopIdleChecker } from '@omgslayzone/terminal/main'
+import { registerWorktreeHandlers } from '@omgslayzone/worktrees/main'
 
 // Minimum splash screen display time (ms)
 const SPLASH_MIN_DURATION = 2800
@@ -112,8 +113,7 @@ const splashHTML = (version: string) => `
   <div class="container">
     <div class="logo-wrapper">
       <svg class="logo" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <path d="M32 8 C32 8 22 22 22 36 C22 46 26 54 32 56 C38 54 42 46 42 36 C42 22 32 8 32 8Z" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
-        <path d="M32 24 C32 24 28 32 28 40 C28 44 30 48 32 48 C34 48 36 44 36 40 C36 32 32 24 32 24Z" fill="currentColor" opacity="0.4"/>
+        <path d="M8,48 L14,24 L24,36 L32,16 L40,36 L50,24 L56,48 Z" stroke="currentColor" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
       </svg>
     </div>
     <div class="title">
@@ -358,6 +358,7 @@ app.whenReady().then(() => {
   registerClaudeHandlers(ipcMain)
   registerPtyHandlers(ipcMain, db)
   registerFilesHandlers(ipcMain)
+  registerWorktreeHandlers(ipcMain)
 
   // Configure webview session for WebAuthn/passkey support
   const browserSession = session.fromPartition('persist:browser-tabs')

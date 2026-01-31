@@ -1,10 +1,22 @@
 import { useEffect, useRef, useCallback, useState } from 'react'
 import { Terminal as XTerm } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
-import { WebLinksAddon } from '@xterm/addon-web-links'
+// import { WebLinksAddon } from '@xterm/addon-web-links' // Disabled - causes persistent underlines
 import { SerializeAddon } from '@xterm/addon-serialize'
-import { WebglAddon } from '@xterm/addon-webgl'
+// import { WebglAddon } from '@xterm/addon-webgl' // Disabled - bypasses CSS underline fix
 import '@xterm/xterm/css/xterm.css'
+
+// Override xterm underline styles - Claude Code outputs these and they persist incorrectly
+// This is a definitive fix that works regardless of ANSI code filtering
+const underlineOverride = document.createElement('style')
+underlineOverride.textContent = `
+  .xterm-underline-1, .xterm-underline-2, .xterm-underline-3,
+  .xterm-underline-4, .xterm-underline-5 {
+    text-decoration: none !important;
+  }
+`
+document.head.appendChild(underlineOverride)
+
 import { getTerminal, setTerminal, disposeTerminal } from './terminal-cache'
 import { usePty } from './PtyContext'
 import type { TerminalMode, TerminalState, CodeMode } from '@omgslayzone/terminal/shared'
@@ -23,9 +35,18 @@ function waitForDimensions(
       return
     }
 
+    let settled = false
+    const cleanup = () => {
+      if (settled) return
+      settled = true
+      clearTimeout(timeoutId)
+      observer.disconnect()
+      signal.removeEventListener('abort', onAbort)
+    }
+
     // Timeout to prevent hanging forever
     const timeoutId = setTimeout(() => {
-      observer.disconnect()
+      cleanup()
       resolve()
     }, timeoutMs)
 
@@ -33,16 +54,14 @@ function waitForDimensions(
     const observer = new ResizeObserver((entries) => {
       const entry = entries[0]
       if (entry.contentRect.width > 0 && entry.contentRect.height > 0) {
-        clearTimeout(timeoutId)
-        observer.disconnect()
+        cleanup()
         resolve()
       }
     })
 
     // Handle abort (component unmount)
     const onAbort = (): void => {
-      clearTimeout(timeoutId)
-      observer.disconnect()
+      cleanup()
       reject(new DOMException('Aborted', 'AbortError'))
     }
     signal.addEventListener('abort', onAbort)
@@ -91,7 +110,7 @@ export function Terminal({
   const [isDragOver, setIsDragOver] = useState(false)
   const [isInitializing, setIsInitializing] = useState(true)
 
-  const { subscribe, subscribeExit, subscribeSessionInvalid, subscribeIdle, subscribeState, getState, getBuffer, clearBuffer, resetTaskState, clearIgnore } = usePty()
+  const { subscribe, subscribeExit, subscribeSessionInvalid, subscribeIdle, subscribeState, getState, resetTaskState, cleanupTask } = usePty()
 
   const [ptyState, setPtyState] = useState<TerminalState>(() => getState(taskId))
 
@@ -141,6 +160,12 @@ export function Terminal({
           cached.terminal.focus()
         }
         window.api.pty.resize(taskId, cached.terminal.cols, cached.terminal.rows)
+        cached.terminal.write('\x1b[0m') // Reset ANSI state on reattach
+
+        // Sync state from backend (fixes stuck loading spinner on reattach)
+        const actualState = await window.api.pty.getState(taskId)
+        if (signal.aborted) return // Don't setState if unmounted
+        if (actualState) setPtyState(actualState)
 
         // Expose API for programmatic input and focus
         onReady?.({
@@ -188,23 +213,24 @@ export function Terminal({
     })
 
     const fitAddon = new FitAddon()
-    const webLinksAddon = new WebLinksAddon()
+    // const webLinksAddon = new WebLinksAddon() // Disabled - causes persistent underlines
     const serializeAddon = new SerializeAddon()
 
     terminal.loadAddon(fitAddon)
-    terminal.loadAddon(webLinksAddon)
+    // terminal.loadAddon(webLinksAddon) // Disabled - causes persistent underlines
     terminal.loadAddon(serializeAddon)
 
-    // Try to load WebGL addon for GPU acceleration
-    try {
-      const webglAddon = new WebglAddon()
-      webglAddon.onContextLoss(() => {
-        webglAddon.dispose()
-      })
-      terminal.loadAddon(webglAddon)
-    } catch {
-      // WebGL not available, continue with canvas renderer
-    }
+    // WebGL addon DISABLED - renders underlines directly to canvas, bypassing CSS override
+    // Canvas 2D renderer uses DOM elements that respect our .xterm-underline-* CSS fix
+    // try {
+    //   const webglAddon = new WebglAddon()
+    //   webglAddon.onContextLoss(() => {
+    //     webglAddon.dispose()
+    //   })
+    //   terminal.loadAddon(webglAddon)
+    // } catch {
+    //   // WebGL not available, continue with canvas renderer
+    // }
 
     terminalRef.current = terminal
     fitAddonRef.current = fitAddon
@@ -226,33 +252,24 @@ export function Terminal({
 
     // Check if PTY already exists (e.g., from idle hibernation)
     const exists = await window.api.pty.exists(taskId)
+    if (signal.aborted) return // Don't continue if unmounted
     if (exists) {
       // Sync state from main process (fixes stuck loading spinner)
       const actualState = await window.api.pty.getState(taskId)
+      if (signal.aborted) return // Don't setState if unmounted
       if (actualState) setPtyState(actualState)
 
-      // PTY exists - check if we have buffered data from context
-      const contextBuffer = getBuffer(taskId)
-      if (contextBuffer) {
+      // Restore from backend buffer (single source of truth)
+      // Use getBufferSince with -1 to get all chunks
+      const result = await window.api.pty.getBufferSince(taskId, -1)
+      if (result && result.chunks.length > 0) {
         terminal.write('\x1b[0m') // Reset ANSI state before buffer replay
-        terminal.write(contextBuffer)
-        terminal.write('\x1b[0m') // Reset ANSI state after buffer replay
-      } else {
-        // Fall back to PTY buffer
-        const buffer = await window.api.pty.getBuffer(taskId)
-        if (buffer) {
-          terminal.write('\x1b[0m') // Reset ANSI state before buffer replay
-          terminal.write(buffer)
-          terminal.write('\x1b[0m') // Reset ANSI state after buffer replay
+        for (const chunk of result.chunks) {
+          terminal.write(chunk.data)
         }
+        terminal.write('\x1b[0m') // Reset ANSI state after buffer replay
       }
     } else {
-      // Clear any stale buffer data before creating new PTY
-      // (handles race condition where old PTY sends data while dying)
-      clearBuffer(taskId)
-      // Clear ignore flag BEFORE creating PTY so we receive its initial output
-      // (old PTY was killed 100ms+ ago, stale data has been delivered and ignored)
-      clearIgnore(taskId)
 
       // Generate session ID only for claude-code mode
       let newSessionId = sessionId
@@ -300,14 +317,20 @@ export function Terminal({
     // Inject initial prompt if provided (after a delay for terminal to be ready)
     if (initialPrompt) {
       setTimeout(async () => {
-        // For plan mode, prefix with /plan
-        const textToInject = codeMode === 'plan' ? `/plan ${initialPrompt}` : initialPrompt
-        await injectText(textToInject)
+        if (signal.aborted) return // Don't inject if unmounted
+        try {
+          // For plan mode, prefix with /plan
+          const textToInject = codeMode === 'plan' ? `/plan ${initialPrompt}` : initialPrompt
+          await injectText(textToInject)
+        } catch {
+          // Terminal may have been disposed, ignore
+        }
       }, 500)
     }
 
+    if (signal.aborted) return // Don't setState if unmounted
     setIsInitializing(false)
-  }, [taskId, cwd, mode, sessionId, existingSessionId, initialPrompt, codeMode, autoFocus, onSessionCreated, onReady, getBuffer, clearBuffer, resetTaskState, clearIgnore])
+  }, [taskId, cwd, mode, sessionId, existingSessionId, initialPrompt, codeMode, autoFocus, onSessionCreated, onReady, resetTaskState])
 
   // Initialize terminal
   useEffect(() => {
@@ -350,12 +373,16 @@ export function Terminal({
 
   // Subscribe to PTY events via context (survives view switches)
   useEffect(() => {
-    const unsubData = subscribe(taskId, (data) => {
+    const unsubData = subscribe(taskId, (data, _seq) => {
+      // Seq is tracked by PtyContext - just write the data
       terminalRef.current?.write(data)
     })
 
     const unsubExit = subscribeExit(taskId, (exitCode) => {
       terminalRef.current?.writeln(`\r\n\x1b[90mProcess exited with code ${exitCode}\x1b[0m`)
+      // Clean up cached terminal and context state on exit
+      disposeTerminal(taskId)
+      cleanupTask(taskId)
     })
 
     const unsubSessionInvalid = subscribeSessionInvalid(taskId, () => {
@@ -363,21 +390,9 @@ export function Terminal({
     })
 
     const unsubIdle = subscribeIdle(taskId, () => {
-      // Only hibernate if terminal is not currently visible (0 dimensions = hidden tab)
-      const rect = containerRef.current?.getBoundingClientRect()
-      if (rect && rect.width > 0 && rect.height > 0) {
-        return
-      }
-
-      // Dispose the cached terminal for this task to free memory
-      // The PTY is still running, so we can restore from buffer later
-      disposeTerminal(taskId)
-      // Clear local refs if they point to the disposed terminal
-      terminalRef.current = null
-      fitAddonRef.current = null
-      serializeAddonRef.current = null
-      // Allow reinitialization when terminal becomes visible again
-      initializedRef.current = false
+      // Hibernation disabled - caused sync loss when returning to tab
+      // (terminalRef became null but nothing triggered reinit)
+      // Memory tradeoff: ~5-20MB per idle terminal, worth it for reliability
     })
 
     return () => {
@@ -397,6 +412,21 @@ export function Terminal({
   // Handle resize
   useEffect(() => {
     const handleResize = () => {
+      // Don't fit when container is hidden (0 dimensions from CSS display:none)
+      const rect = containerRef.current?.getBoundingClientRect()
+      if (!rect || rect.width === 0 || rect.height === 0) {
+        return
+      }
+
+      // If terminal is missing and not currently initializing, reinit
+      // DO NOT set initializedRef here - initTerminal manages its own flag
+      // (setting it here caused initTerminal to return early at line 118)
+      if (!terminalRef.current && !initializedRef.current) {
+        const controller = new AbortController()
+        initTerminal(controller.signal)
+        return
+      }
+
       fitAddonRef.current?.fit()
     }
 
@@ -410,7 +440,7 @@ export function Terminal({
       window.removeEventListener('resize', handleResize)
       observer.disconnect()
     }
-  }, [])
+  }, [initTerminal])
 
   // Handle paste and drag-drop for files/images
   useEffect(() => {

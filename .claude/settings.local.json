@@ -40,7 +40,17 @@
       "Bash(grep:*)",
       "Bash(find:*)",
       "WebFetch(domain:docs.claude.com)",
-      "WebFetch(domain:www.ytyng.com)"
+      "WebFetch(domain:www.ytyng.com)",
+      "Bash(pnpm dev:*)",
+      "Bash(node scripts/generate-icons.js:*)",
+      "Bash(pnpm add:*)",
+      "Bash(pnpm approve-builds:*)",
+      "Bash(node:*)",
+      "Bash(pnpm typecheck:*)",
+      "Bash(pnpm exec vitest:*)",
+      "Bash(pnpm:*)",
+      "WebFetch(domain:medium.com)",
+      "Bash(npx tsx:*)"
     ]
   },
   "enableAllProjectMcpServers": true,

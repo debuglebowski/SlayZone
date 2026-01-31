@@ -1,10 +1,10 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { MoreHorizontal, Archive, Trash2, AlertTriangle, RotateCw, RefreshCcw, Link2, Sparkles, Loader2 } from 'lucide-react'
-import type { Task } from '@omgslayzone/task/shared'
+import { MoreHorizontal, Archive, Trash2, AlertTriangle, RotateCw, RefreshCcw, Link2, Sparkles, Loader2, Terminal as TerminalIcon, Globe, Settings2 } from 'lucide-react'
+import type { Task, PanelVisibility } from '@omgslayzone/task/shared'
 import type { Tag } from '@omgslayzone/tags/shared'
 import type { Project } from '@omgslayzone/projects/shared'
 import type { TerminalMode, ClaudeAvailability } from '@omgslayzone/terminal/shared'
-import { Button } from '@omgslayzone/ui'
+import { Button, PanelToggle } from '@omgslayzone/ui'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -28,11 +28,14 @@ import { RichTextEditor } from '@omgslayzone/editor'
 import { Terminal } from '@omgslayzone/terminal'
 import { markSkipCache } from '@omgslayzone/terminal'
 import { usePty } from '@omgslayzone/terminal'
+import { GitPanel } from '@omgslayzone/worktrees'
 import { cn } from '@omgslayzone/ui'
+import { BrowserPanel } from '@omgslayzone/task-browser'
 // ErrorBoundary should be provided by the app when rendering this component
 
 interface TaskDetailPageProps {
   taskId: string
+  isActive?: boolean
   onBack: () => void
   onTaskUpdated: (task: Task) => void
   onNavigateToTask?: (taskId: string) => void
@@ -40,6 +43,7 @@ interface TaskDetailPageProps {
 
 export function TaskDetailPage({
   taskId,
+  isActive,
   onBack,
   onTaskUpdated
 }: TaskDetailPageProps): React.JSX.Element {
@@ -71,6 +75,10 @@ export function TaskDetailPage({
   // Terminal restart key (changing this forces remount)
   const [terminalKey, setTerminalKey] = useState(0)
 
+  // Panel visibility state
+  const defaultPanelVisibility: PanelVisibility = { terminal: true, browser: false, settings: true }
+  const [panelVisibility, setPanelVisibility] = useState<PanelVisibility>(defaultPanelVisibility)
+
   // Terminal API (exposed via onReady callback)
   const terminalApiRef = useRef<{ sendInput: (text: string) => Promise<void>; focus: () => void } | null>(null)
 
@@ -79,6 +87,15 @@ export function TaskDetailPage({
   useEffect(() => {
     isFirstMountRef.current = false
   }, [])
+
+  // Focus terminal when tab becomes active
+  useEffect(() => {
+    if (isActive && !document.querySelector('[role="dialog"]')) {
+      requestAnimationFrame(() => {
+        terminalApiRef.current?.focus()
+      })
+    }
+  }, [isActive])
 
   // Subscribe to session detected events
   useEffect(() => {
@@ -101,6 +118,10 @@ export function TaskDetailPage({
         setTask(loadedTask)
         setTitleValue(loadedTask.title)
         setDescriptionValue(loadedTask.description ?? '')
+        // Initialize panel visibility from task or use defaults
+        if (loadedTask.panel_visibility) {
+          setPanelVisibility(loadedTask.panel_visibility)
+        }
         // Find project for this task
         const taskProject = projects.find((p) => p.id === loadedTask.project_id)
         setProject(taskProject || null)
@@ -127,6 +148,11 @@ export function TaskDetailPage({
     },
     [task, onTaskUpdated]
   )
+
+  // Handle terminal ready - memoized to prevent effect cascade
+  const handleTerminalReady = useCallback((api: { sendInput: (text: string) => Promise<void>; focus: () => void }) => {
+    terminalApiRef.current = api
+  }, [])
 
   // Update DB with detected session ID
   const handleUpdateSessionId = useCallback(async () => {
@@ -289,6 +315,43 @@ export function TaskDetailPage({
     [task, onTaskUpdated, resetTaskState]
   )
 
+  // Handle panel visibility toggle
+  const handlePanelToggle = useCallback(
+    async (panelId: string, active: boolean) => {
+      if (!task) return
+      const newVisibility = { ...panelVisibility, [panelId]: active }
+      setPanelVisibility(newVisibility)
+      // Persist to DB
+      const updated = await window.api.db.updateTask({
+        id: task.id,
+        panelVisibility: newVisibility
+      })
+      setTask(updated)
+      onTaskUpdated(updated)
+    },
+    [task, panelVisibility, onTaskUpdated]
+  )
+
+  // Cmd+T/B/S for panel toggles
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent): void => {
+      if (e.metaKey && !e.shiftKey) {
+        if (e.key === 't') {
+          e.preventDefault()
+          handlePanelToggle('terminal', !panelVisibility.terminal)
+        } else if (e.key === 'b') {
+          e.preventDefault()
+          handlePanelToggle('browser', !panelVisibility.browser)
+        } else if (e.key === 's') {
+          e.preventDefault()
+          handlePanelToggle('settings', !panelVisibility.settings)
+        }
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [panelVisibility, handlePanelToggle])
+
   // Focus title input when editing
   useEffect(() => {
     if (editingTitle && titleInputRef.current) {
@@ -365,6 +428,13 @@ export function TaskDetailPage({
     onTaskUpdated(updated)
   }
 
+  // Wrapper for GitPanel that calls API and notifies parent
+  const updateTaskAndNotify = async (data: { id: string; worktreePath?: string | null; browserUrl?: string | null }): Promise<Task> => {
+    const updated = await window.api.db.updateTask(data)
+    handleTaskUpdate(updated)
+    return updated
+  }
+
   const handleTagsChange = (newTagIds: string[]): void => {
     setTaskTagIds(newTagIds)
   }
@@ -418,6 +488,17 @@ export function TaskDetailPage({
             />
 
             <div className="flex items-center gap-2">
+              <PanelToggle
+                panels={[
+                  { id: 'terminal', icon: TerminalIcon, label: 'Terminal', active: panelVisibility.terminal, shortcut: '⌘T' },
+                  { id: 'browser', icon: Globe, label: 'Browser', active: panelVisibility.browser, shortcut: '⌘B' },
+                  { id: 'settings', icon: Settings2, label: 'Settings', active: panelVisibility.settings, shortcut: '⌘S' },
+                ]}
+                onChange={handlePanelToggle}
+              />
+
+              <div className="h-6 w-px bg-border" />
+
               {project?.path && (
                 <>
                   <Tooltip>
@@ -484,10 +565,14 @@ export function TaskDetailPage({
         </div>
       </header>
 
-      {/* Split view: terminal left | info right */}
+      {/* Split view: terminal | browser | settings */}
       <div className="flex-1 flex min-h-0">
-        {/* Left: Terminal */}
-        <div className="flex-1 min-w-0 bg-[#0a0a0a] flex flex-col">
+        {/* Terminal Panel */}
+        {panelVisibility.terminal && (
+        <div className={cn(
+          "min-w-0 bg-[#0a0a0a] flex flex-col",
+          panelVisibility.browser ? "flex-1 min-w-[300px]" : "flex-1"
+        )}>
           {claudeAvailability && !claudeAvailability.available && (
             <div className="shrink-0 bg-amber-500/10 border-b border-amber-500/20 px-4 py-2 flex items-center gap-2 text-amber-500">
               <AlertTriangle className="h-4 w-4" />
@@ -514,7 +599,7 @@ export function TaskDetailPage({
           )}
           {/* Terminal + mode bar wrapper */}
           <div className="flex-1 min-h-0 m-4 flex flex-col">
-            <div className="flex-1 min-h-0 border border-neutral-800 rounded-lg overflow-hidden">
+            <div className="flex-1 min-h-0 rounded-lg overflow-hidden border border-neutral-800">
               {project?.path ? (
                 <Terminal
                   key={terminalKey}
@@ -528,7 +613,7 @@ export function TaskDetailPage({
                   autoFocus={isFirstMountRef.current}
                   onSessionCreated={handleSessionCreated}
                   onSessionInvalid={handleSessionInvalid}
-                  onReady={(api) => { terminalApiRef.current = api }}
+                  onReady={handleTerminalReady}
                 />
               ) : (
                 <div className="h-full flex items-center justify-center text-muted-foreground">
@@ -625,8 +710,15 @@ export function TaskDetailPage({
             </div>
           </div>
         </div>
+        )}
 
-        {/* Right: Task info */}
+        {/* Browser Panel */}
+        {panelVisibility.browser && (
+          <BrowserPanel className="flex-1 min-w-[300px] border-l" />
+        )}
+
+        {/* Settings Panel */}
+        {panelVisibility.settings && (
         <div className="w-80 shrink-0 border-l flex flex-col overflow-y-auto">
           {/* Description */}
           <div className="p-4 flex-1 flex flex-col min-h-0">
@@ -658,6 +750,15 @@ export function TaskDetailPage({
             )}
           </div>
 
+          {/* Git */}
+          <div className="px-4 py-3 border-t">
+            <GitPanel
+              task={task}
+              projectPath={project?.path ?? null}
+              onUpdateTask={updateTaskAndNotify}
+            />
+          </div>
+
           {/* Metadata */}
           <div className="p-4 border-t bg-muted/30">
             <TaskMetadataSidebar
@@ -669,6 +770,7 @@ export function TaskDetailPage({
             />
           </div>
         </div>
+        )}
       </div>
 
       <DeleteTaskDialog

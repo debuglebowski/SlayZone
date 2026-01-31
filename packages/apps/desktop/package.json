@@ -25,6 +25,7 @@
     "@omgslayzone/tasks": "workspace:*",
     "@omgslayzone/terminal": "workspace:*",
     "@omgslayzone/ui": "workspace:*",
+    "@omgslayzone/worktrees": "workspace:*",
     "@tailwindcss/typography": "^0.5.19",
     "better-sqlite3": "^12.6.2",
     "node-pty": "^1.1.0",

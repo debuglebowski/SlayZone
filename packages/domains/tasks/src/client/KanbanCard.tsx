@@ -3,9 +3,7 @@ import { useEffect, useRef, useState } from 'react'
 import type { Task } from '@omgslayzone/task/shared'
 import type { Project } from '@omgslayzone/projects/shared'
 import type { TerminalState } from '@omgslayzone/terminal/shared'
-import { Card, CardContent } from '@omgslayzone/ui'
-import { Tooltip, TooltipContent, TooltipTrigger } from '@omgslayzone/ui'
-import { cn } from '@omgslayzone/ui'
+import { Card, CardContent, Tooltip, TooltipContent, TooltipTrigger, cn, getTerminalStateStyle } from '@omgslayzone/ui'
 import { todayISO } from './kanban'
 import { AlertCircle, Link2 } from 'lucide-react'
 import { usePty } from '@omgslayzone/terminal'
@@ -17,24 +15,6 @@ interface KanbanCardProps {
   project?: Project
   showProject?: boolean
   isBlocked?: boolean
-}
-
-const TERMINAL_STATE_COLORS: Record<TerminalState, string> = {
-  idle: 'bg-blue-400',
-  dead: 'bg-gray-400',
-  starting: 'bg-gray-400',
-  running: 'bg-yellow-400',
-  awaiting_input: 'bg-blue-400',
-  error: 'bg-red-400'
-}
-
-const TERMINAL_STATE_LABELS: Record<TerminalState, string> = {
-  idle: 'Idle',
-  dead: 'Stopped',
-  starting: 'Starting',
-  running: 'Working',
-  awaiting_input: 'Awaiting input',
-  error: 'Error'
 }
 
 const PRIORITY_COLORS: Record<number, string> = {
@@ -126,14 +106,17 @@ export function KanbanCard({
                 </span>
               )}
               {/* Terminal state indicator */}
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <span
-                    className={cn('h-2 w-2 rounded-full shrink-0', TERMINAL_STATE_COLORS[terminalState])}
-                  />
-                </TooltipTrigger>
-                <TooltipContent>{TERMINAL_STATE_LABELS[terminalState]}</TooltipContent>
-              </Tooltip>
+              {(() => {
+                const stateStyle = getTerminalStateStyle(terminalState)
+                return stateStyle ? (
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span className={cn('h-2 w-2 rounded-full shrink-0', stateStyle.color)} />
+                    </TooltipTrigger>
+                    <TooltipContent>{stateStyle.label}</TooltipContent>
+                  </Tooltip>
+                ) : null
+              })()}
               {isBlocked && (
                 <span className="flex items-center text-amber-500 shrink-0" title="Blocked">
                   <Link2 className="h-2.5 w-2.5" />

@@ -3,7 +3,7 @@ export type TerminalState = 'starting' | 'running' | 'idle' | 'awaiting_input' |
 export type CodeMode = 'normal' | 'plan' | 'accept-edits' | 'bypass'
 
 // CLI activity states (more granular than TerminalState)
-export type ActivityState = 'idle' | 'thinking' | 'tool_use' | 'awaiting_input' | 'unknown'
+export type ActivityState = 'idle' | 'working' | 'awaiting_input' | 'unknown'
 
 // CLI error info
 export interface ErrorInfo {
@@ -23,6 +23,18 @@ export interface PtyInfo {
   taskId: string
   lastOutputTime: number
   state: TerminalState
+}
+
+// Buffer chunk with sequence number for ordering
+export interface BufferChunk {
+  seq: number
+  data: string
+}
+
+// Result from getBufferSince
+export interface BufferSinceResult {
+  chunks: BufferChunk[]
+  currentSeq: number
 }
 
 export interface PromptInfo {

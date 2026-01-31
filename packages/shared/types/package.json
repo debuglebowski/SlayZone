@@ -17,7 +17,8 @@
     "@omgslayzone/settings": "workspace:*",
     "@omgslayzone/tags": "workspace:*",
     "@omgslayzone/task": "workspace:*",
-    "@omgslayzone/terminal": "workspace:*"
+    "@omgslayzone/terminal": "workspace:*",
+    "@omgslayzone/worktrees": "workspace:*"
   },
   "devDependencies": {
     "typescript": "^5.9.3"

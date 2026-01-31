@@ -17,6 +17,8 @@ const cache = new Map<string, CachedTerminal>()
 
 // Track taskIds that shouldn't be re-cached (e.g., during restart/mode-change)
 const skipCacheSet = new Set<string>()
+// Track pending timeouts for skipCache cleanup
+const skipCacheTimeouts = new Map<string, NodeJS.Timeout>()
 
 export function getTerminal(taskId: string): CachedTerminal | undefined {
   return cache.get(taskId)
@@ -64,11 +66,19 @@ export function hasTerminal(taskId: string): boolean {
 
 // Mark taskId to skip caching on next setTerminal call (for restart/mode-change)
 export function markSkipCache(taskId: string): void {
+  // Clear any existing timeout for this taskId
+  const existingTimeout = skipCacheTimeouts.get(taskId)
+  if (existingTimeout) {
+    clearTimeout(existingTimeout)
+  }
+
   skipCacheSet.add(taskId)
   // Auto-clear after 2 seconds as safety net against stale entries
-  setTimeout(() => {
+  const timeout = setTimeout(() => {
     skipCacheSet.delete(taskId)
+    skipCacheTimeouts.delete(taskId)
   }, 2000)
+  skipCacheTimeouts.set(taskId, timeout)
 }
 
 export function getCacheSize(): number {

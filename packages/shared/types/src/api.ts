@@ -1,8 +1,9 @@
 import type { Project, CreateProjectInput, UpdateProjectInput } from '@omgslayzone/projects/shared'
 import type { Task, CreateTaskInput, UpdateTaskInput, GenerateDescriptionResult } from '@omgslayzone/task/shared'
 import type { Tag, CreateTagInput, UpdateTagInput } from '@omgslayzone/tags/shared'
-import type { TerminalMode, TerminalState, CodeMode, PtyInfo, PromptInfo, ClaudeAvailability } from '@omgslayzone/terminal/shared'
+import type { TerminalMode, TerminalState, CodeMode, PtyInfo, PromptInfo, ClaudeAvailability, BufferSinceResult } from '@omgslayzone/terminal/shared'
 import type { Theme, ThemePreference } from '@omgslayzone/settings/shared'
+import type { DetectedWorktree } from '@omgslayzone/worktrees/shared'
 
 // ElectronAPI interface - the IPC contract between renderer and main
 export interface ElectronAPI {
@@ -98,8 +99,9 @@ export interface ElectronAPI {
     kill: (taskId: string) => Promise<boolean>
     exists: (taskId: string) => Promise<boolean>
     getBuffer: (taskId: string) => Promise<string | null>
+    getBufferSince: (taskId: string, afterSeq: number) => Promise<BufferSinceResult | null>
     list: () => Promise<PtyInfo[]>
-    onData: (callback: (taskId: string, data: string) => void) => () => void
+    onData: (callback: (taskId: string, data: string, seq: number) => void) => () => void
     onExit: (callback: (taskId: string, exitCode: number) => void) => () => void
     onSessionNotFound: (callback: (taskId: string) => void) => () => void
     onIdle: (callback: (taskId: string) => void) => () => void
@@ -109,5 +111,13 @@ export interface ElectronAPI {
     onPrompt: (callback: (taskId: string, prompt: PromptInfo) => void) => () => void
     onSessionDetected: (callback: (taskId: string, sessionId: string) => void) => () => void
     getState: (taskId: string) => Promise<TerminalState | null>
+  }
+  git: {
+    isGitRepo: (path: string) => Promise<boolean>
+    detectWorktrees: (repoPath: string) => Promise<DetectedWorktree[]>
+    createWorktree: (repoPath: string, targetPath: string, branch?: string) => Promise<void>
+    removeWorktree: (repoPath: string, worktreePath: string) => Promise<void>
+    init: (path: string) => Promise<void>
+    getCurrentBranch: (path: string) => Promise<string | null>
   }
 }

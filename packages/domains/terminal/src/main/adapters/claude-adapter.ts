@@ -46,19 +46,26 @@ export class ClaudeAdapter implements TerminalAdapter {
   }
 
   detectActivity(data: string, _current: ActivityState): ActivityState | null {
-    // Thinking: spinner chars (braille patterns used by Claude CLI)
-    if (/[⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏]/.test(data)) return 'thinking'
+    // Strip ANSI escape codes for pattern matching
+    const stripped = data
+      .replace(/\x1b\][^\x07]*\x07/g, '')  // OSC sequences
+      .replace(/\x1b\[[?0-9;]*[A-Za-z]/g, '')  // CSI (including ?)
+      .replace(/\x1b[()][AB012]/g, '')  // Character set
+      .trimStart()  // Remove leading whitespace including \r (keep trailing for prompt detection)
 
-    // Tool use: tool name patterns in output
-    if (/\b(Read|Write|Edit|Bash|Glob|Grep|Task|WebFetch|WebSearch)\s*[:\(]/.test(data)) return 'tool_use'
+    // 1. Awaiting input (highest priority - user needs to respond)
+    // - Numbered menu: ❯ 1. or ❯1.
+    // - Menu selection: ❯Option (no space after)
+    // - Y/n prompts
+    if (/(?:^|\n|\r)[>❯]\s*\d+\./.test(stripped)) return 'awaiting_input'
+    if (/(?:^|\n|\r)[>❯][A-Za-z]/.test(stripped)) return 'awaiting_input'
+    if (/\[Y\/n\]|\[y\/N\]/i.test(stripped)) return 'awaiting_input'
 
-    // Awaiting input: Y/n permission prompts
-    if (/\[Y\/n\]|\[y\/N\]/i.test(data)) return 'awaiting_input'
+    // 2. Idle: prompt with space (ready for user input, no menu)
+    if (/(?:^|\n|\r)[>❯]\s/.test(stripped)) return 'idle'
 
-    // Idle: Claude's input prompt (> at start of line)
-    // Strip ANSI escape codes first, then check for > at line start
-    const stripped = data.replace(/\x1b\[[0-9;]*m/g, '')
-    if (/(?:^|\n)>\s/m.test(stripped)) return 'idle'
+    // 3. Working: spinner at start
+    if (/^[·✻✽✶✳✢]/m.test(stripped)) return 'working'
 
     return null
   }
@@ -73,8 +80,10 @@ export class ClaudeAdapter implements TerminalAdapter {
       }
     }
 
-    // Generic CLI error
-    const errorMatch = data.match(/Error:\s*(.+)/i)
+    // Generic CLI error - only match actual error lines, not code/docs
+    // Must start with "Error:" at line start (after ANSI codes)
+    const stripped = data.replace(/\x1b\[[0-9;]*[A-Za-z]/g, '')
+    const errorMatch = stripped.match(/^Error:\s*(.+)/im)
     if (errorMatch) {
       return {
         code: 'CLI_ERROR',
@@ -87,8 +96,10 @@ export class ClaudeAdapter implements TerminalAdapter {
   }
 
   detectPrompt(data: string): PromptInfo | null {
+    const stripped = data.replace(/\x1b\[[0-9;]*[A-Za-z]/g, '')
+
     // Y/n permission prompts
-    if (/\[Y\/n\]|\[y\/N\]/i.test(data)) {
+    if (/\[Y\/n\]|\[y\/N\]/i.test(stripped)) {
       return {
         type: 'permission',
         text: data,
@@ -96,8 +107,17 @@ export class ClaudeAdapter implements TerminalAdapter {
       }
     }
 
+    // Numbered menu with selection indicator (Claude's AskUserQuestion)
+    if (/(?:^|\n|\r)[>❯]\s*\d+\./m.test(stripped)) {
+      return {
+        type: 'input',
+        text: data,
+        position: 0
+      }
+    }
+
     // Question detection (lines ending with ?)
-    const questionMatch = data.match(/[^\n]*\?\s*$/m)
+    const questionMatch = stripped.match(/[^\n]*\?\s*$/m)
     if (questionMatch) {
       return {
         type: 'question',

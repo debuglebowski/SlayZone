@@ -1,5 +1,6 @@
 // Utilities
 export { cn } from './utils'
+export { getTerminalStateStyle, type TerminalStateStyle } from './terminal-state'
 
 // Components
 export * from './alert-dialog'
@@ -24,6 +25,7 @@ export * from './sidebar'
 export * from './skeleton'
 export * from './switch'
 export * from './tabs'
+export * from './panel-toggle'
 export * from './textarea'
 export * from './tooltip'
 

@@ -4,7 +4,7 @@ export type TerminalMode = 'claude-code' | 'codex' | 'terminal'
 export type { CodeMode }
 
 // Activity states for CLI tools
-export type ActivityState = 'idle' | 'thinking' | 'tool_use' | 'awaiting_input' | 'unknown'
+export type ActivityState = 'idle' | 'working' | 'awaiting_input' | 'unknown'
 
 // Error info from CLI
 export interface ErrorInfo {

@@ -1,9 +1,11 @@
 import * as pty from 'node-pty'
 import { BrowserWindow } from 'electron'
 import { homedir, userInfo } from 'os'
-import type { TerminalState, PtyInfo, CodeMode } from '@omgslayzone/terminal/shared'
-import { RingBuffer } from './ring-buffer'
+import type { TerminalState, PtyInfo, CodeMode, BufferSinceResult } from '@omgslayzone/terminal/shared'
+import { RingBuffer, type BufferChunk } from './ring-buffer'
 import { getAdapter, type TerminalMode, type TerminalAdapter, type ActivityState, type ErrorInfo } from './adapters'
+
+export type { BufferChunk }
 
 interface PtySession {
   pty: pty.IPty
@@ -43,13 +45,23 @@ let mainWindow: BrowserWindow | null = null
 // Interval reference for idle checker
 let idleCheckerInterval: NodeJS.Timeout | null = null
 
-// Filter out terminal escape sequences that shouldn't be replayed
+// Filter out terminal escape sequences that cause issues
 function filterBufferData(data: string): string {
   return data
     // Filter OSC sequences (ESC ] ... BEL or ESC ] ... ST)
     .replace(/\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)/g, '')
     // Filter DA responses (ESC [ ? ... c)
     .replace(/\x1b\[\?[0-9;]*c/g, '')
+    // Filter underline from ANY SGR sequence (handles combined codes like ESC[1;4m)
+    // Claude Code outputs these and they persist incorrectly in xterm.js
+    .replace(/\x1b\[([0-9;:]*)m/g, (_match, params) => {
+      if (!params) return '\x1b[m'
+      // Split only by semicolon - colon is subparameter separator (4:3 = curly underline)
+      const filtered = params.split(';')
+        .filter((p: string) => p !== '4' && !p.startsWith('4:'))
+        .join(';')
+      return filtered ? `\x1b[${filtered}m` : ''
+    })
 }
 
 // Map ActivityState to TerminalState for backward compatibility
@@ -57,8 +69,7 @@ function activityToTerminalState(activity: ActivityState): TerminalState | null 
   switch (activity) {
     case 'idle':
       return 'idle'
-    case 'thinking':
-    case 'tool_use':
+    case 'working':
       return 'running'
     case 'awaiting_input':
       return 'awaiting_input'
@@ -76,10 +87,14 @@ function transitionState(taskId: string, newState: TerminalState): void {
   session.state = newState
 
   if (mainWindow && !mainWindow.isDestroyed()) {
-    mainWindow.webContents.send('pty:state-change', taskId, newState, oldState)
-    // Also emit legacy idle event for backward compatibility
-    if (newState === 'idle') {
-      mainWindow.webContents.send('pty:idle', taskId)
+    try {
+      mainWindow.webContents.send('pty:state-change', taskId, newState, oldState)
+      // Also emit legacy idle event for backward compatibility
+      if (newState === 'idle') {
+        mainWindow.webContents.send('pty:idle', taskId)
+      }
+    } catch {
+      // Window destroyed between check and send, ignore
     }
   }
 }
@@ -208,14 +223,20 @@ export function createPty(
       }
 
       // Append to buffer for history restoration (filter problematic sequences)
-      session.buffer.append(filterBufferData(data))
+      const seq = session.buffer.append(filterBufferData(data))
       // Update idle tracking
       session.lastOutputTime = Date.now()
+      // Track current seq for IPC emission
+      const currentSeq = seq
 
       // Use adapter for activity detection
       const detectedActivity = session.adapter.detectActivity(data, session.activity)
       if (detectedActivity) {
         session.activity = detectedActivity
+        // Clear error state on valid activity (recovery from error)
+        if (session.error && detectedActivity !== 'unknown') {
+          session.error = null
+        }
         // Map activity to TerminalState for backward compatibility
         const newState = activityToTerminalState(detectedActivity)
         if (newState) transitionState(taskId, newState)
@@ -235,18 +256,32 @@ export function createPty(
         session.checkingForSessionError = false
         transitionState(taskId, 'error')
         if (!win.isDestroyed() && detectedError.code === 'SESSION_NOT_FOUND') {
-          win.webContents.send('pty:session-not-found', taskId)
+          try {
+            win.webContents.send('pty:session-not-found', taskId)
+          } catch {
+            // Window destroyed, ignore
+          }
         }
       }
 
       // Check for prompts
       const prompt = session.adapter.detectPrompt(data)
       if (prompt && !win.isDestroyed()) {
-        win.webContents.send('pty:prompt', taskId, prompt)
+        try {
+          win.webContents.send('pty:prompt', taskId, prompt)
+        } catch {
+          // Window destroyed, ignore
+        }
       }
 
       if (!win.isDestroyed()) {
-        win.webContents.send('pty:data', taskId, data)
+        try {
+          // Filter problematic sequences before sending to renderer
+          const cleanData = filterBufferData(data)
+          win.webContents.send('pty:data', taskId, cleanData, currentSeq)
+        } catch {
+          // Window destroyed between check and send, ignore
+        }
       }
 
       // Parse session ID from /status output
@@ -260,7 +295,11 @@ export function createPty(
           const detectedSessionId = uuidMatch[0]
           console.log(`[pty-manager] Session ID detected: ${detectedSessionId}`)
           if (!win.isDestroyed()) {
-            win.webContents.send('pty:session-detected', taskId, detectedSessionId)
+            try {
+              win.webContents.send('pty:session-detected', taskId, detectedSessionId)
+            } catch {
+              // Window destroyed, ignore
+            }
           }
           session.watchingForSessionId = false
           session.statusOutputBuffer = ''
@@ -276,18 +315,23 @@ export function createPty(
       transitionState(taskId, 'dead')
       sessions.delete(taskId)
       if (!win.isDestroyed()) {
-        win.webContents.send('pty:exit', taskId, exitCode)
+        try {
+          win.webContents.send('pty:exit', taskId, exitCode)
+        } catch {
+          // Window destroyed, ignore
+        }
       }
     })
 
     // If adapter has post-spawn command, execute it after shell is ready
     if (spawnConfig.postSpawnCommand) {
-      // Small delay to let shell initialize
+      // Delay to let shell initialize - 250ms is conservative but reliable
+      // TODO: Could improve with shell-specific ready detection
       setTimeout(() => {
         if (sessions.has(taskId)) {
           ptyProcess.write(`${spawnConfig.postSpawnCommand}\r`)
         }
-      }, 100)
+      }, 250)
     }
 
     // Stop checking for session errors after 5 seconds
@@ -338,7 +382,10 @@ export function writePty(taskId: string, data: string): boolean {
 export function resizePty(taskId: string, cols: number, rows: number): boolean {
   const session = sessions.get(taskId)
   if (!session) return false
-  session.pty.resize(cols, rows)
+  // Validate bounds to prevent crashes
+  const safeCols = Math.max(1, Math.min(cols, 500))
+  const safeRows = Math.max(1, Math.min(rows, 500))
+  session.pty.resize(safeCols, safeRows)
   return true
 }
 
@@ -349,6 +396,10 @@ export function killPty(taskId: string): boolean {
     return false
   }
   console.log(`[pty-manager] killPty(${taskId}) - deleting session and killing PTY`)
+  // Clear any pending timeout to prevent orphaned callbacks
+  if (session.statusWatchTimeout) {
+    clearTimeout(session.statusWatchTimeout)
+  }
   // Delete from map FIRST so onData handlers exit early during kill
   sessions.delete(taskId)
   // Use SIGKILL (9) to forcefully terminate - SIGTERM may not kill child processes
@@ -364,6 +415,15 @@ export function hasPty(taskId: string): boolean {
 export function getBuffer(taskId: string): string | null {
   const session = sessions.get(taskId)
   return session?.buffer.toString() ?? null
+}
+
+export function getBufferSince(taskId: string, afterSeq: number): BufferSinceResult | null {
+  const session = sessions.get(taskId)
+  if (!session) return null
+  return {
+    chunks: session.buffer.getChunksSince(afterSeq),
+    currentSeq: session.buffer.getCurrentSeq()
+  }
 }
 
 export function listPtys(): PtyInfo[] {

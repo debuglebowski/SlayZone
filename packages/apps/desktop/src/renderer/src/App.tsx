@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import { useHotkeys } from 'react-hotkeys-hook'
 import type { Task } from '@omgslayzone/task/shared'
 import type { Project } from '@omgslayzone/projects/shared'
@@ -9,9 +9,21 @@ import { CreateTaskDialog, QuickRunDialog, EditTaskDialog, DeleteTaskDialog, Tas
 import { CreateProjectDialog, ProjectSettingsDialog, DeleteProjectDialog } from '@omgslayzone/projects'
 import { UserSettingsDialog, useViewState } from '@omgslayzone/settings'
 import { OnboardingDialog } from '@omgslayzone/onboarding'
+import { usePty } from '@omgslayzone/terminal/client'
+import type { TerminalState } from '@omgslayzone/terminal/shared'
 // Shared
 import { SearchDialog } from '@/components/dialogs/SearchDialog'
-import { Button } from '@omgslayzone/ui'
+import {
+  Button,
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle
+} from '@omgslayzone/ui'
 import { SidebarProvider } from '@omgslayzone/ui'
 import { AppSidebar } from '@/components/sidebar/AppSidebar'
 import { TabBar } from '@/components/tabs/TabBar'
@@ -61,10 +73,58 @@ function App(): React.JSX.Element {
   const [onboardingOpen, setOnboardingOpen] = useState(false)
   const [searchOpen, setSearchOpen] = useState(false)
   const [quickRunOpen, setQuickRunOpen] = useState(false)
+  const [completeTaskDialogOpen, setCompleteTaskDialogOpen] = useState(false)
 
   // Inline project rename state
   const [projectNameValue, setProjectNameValue] = useState('')
   const projectNameInputRef = useRef<HTMLTextAreaElement>(null)
+
+  // Terminal state tracking for tab indicators
+  const ptyContext = usePty()
+  const [terminalStates, setTerminalStates] = useState<Map<string, TerminalState>>(new Map())
+
+  // Get task IDs from open tabs
+  const openTaskIds = useMemo(
+    () => tabs.filter((t): t is { type: 'task'; taskId: string; title: string } => t.type === 'task').map((t) => t.taskId),
+    [tabs]
+  )
+
+  // Subscribe to terminal state changes for open tabs
+  useEffect(() => {
+    const unsubscribes: (() => void)[] = []
+
+    for (const taskId of openTaskIds) {
+      // Initialize with current state
+      const currentState = ptyContext.getState(taskId)
+      setTerminalStates((prev) => {
+        const next = new Map(prev)
+        next.set(taskId, currentState)
+        return next
+      })
+
+      // Subscribe to changes
+      const unsub = ptyContext.subscribeState(taskId, (newState) => {
+        setTerminalStates((prev) => {
+          const next = new Map(prev)
+          next.set(taskId, newState)
+          return next
+        })
+      })
+      unsubscribes.push(unsub)
+    }
+
+    // Cleanup closed tabs from state
+    setTerminalStates((prev) => {
+      const openSet = new Set(openTaskIds)
+      const next = new Map(prev)
+      for (const key of next.keys()) {
+        if (!openSet.has(key)) next.delete(key)
+      }
+      return next
+    })
+
+    return () => unsubscribes.forEach((fn) => fn())
+  }, [openTaskIds, ptyContext])
 
   // Tab management
   const openTask = (taskId: string): void => {
@@ -96,6 +156,21 @@ function App(): React.JSX.Element {
     setTabs(newTabs)
     if (activeTabIndex >= index) {
       setActiveTabIndex(Math.max(0, activeTabIndex - 1))
+    }
+  }
+
+  const reorderTabs = (fromIndex: number, toIndex: number): void => {
+    const newTabs = [...tabs]
+    const [moved] = newTabs.splice(fromIndex, 1)
+    newTabs.splice(toIndex, 0, moved)
+    setTabs(newTabs)
+    // Update active index if needed
+    if (activeTabIndex === fromIndex) {
+      setActiveTabIndex(toIndex)
+    } else if (fromIndex < activeTabIndex && toIndex >= activeTabIndex) {
+      setActiveTabIndex(activeTabIndex - 1)
+    } else if (fromIndex > activeTabIndex && toIndex <= activeTabIndex) {
+      setActiveTabIndex(activeTabIndex + 1)
     }
   }
 
@@ -193,6 +268,24 @@ function App(): React.JSX.Element {
     e.preventDefault()
     setActiveTabIndex((prev) => (prev - 1 + tabs.length) % tabs.length)
   }, { enableOnFormTags: true })
+
+  useHotkeys('mod+shift+d', (e) => {
+    e.preventDefault()
+    const activeTab = tabs[activeTabIndex]
+    if (activeTab.type === 'task') {
+      setCompleteTaskDialogOpen(true)
+    }
+  }, { enableOnFormTags: true })
+
+  const handleCompleteTaskConfirm = async (): Promise<void> => {
+    const activeTab = tabs[activeTabIndex]
+    if (activeTab.type !== 'task') return
+
+    await window.api.db.updateTask({ id: activeTab.taskId, status: 'done' })
+    updateTask({ ...tasks.find((t) => t.id === activeTab.taskId)!, status: 'done' })
+    closeTab(activeTabIndex)
+    setCompleteTaskDialogOpen(false)
+  }
 
   // Task handlers
   const handleTaskCreated = (task: Task): void => {
@@ -331,8 +424,10 @@ function App(): React.JSX.Element {
               <TabBar
                 tabs={tabs}
                 activeIndex={activeTabIndex}
+                terminalStates={terminalStates}
                 onTabClick={setActiveTabIndex}
                 onTabClose={closeTab}
+                onTabReorder={reorderTabs}
               />
             </div>
           </div>
@@ -401,6 +496,7 @@ function App(): React.JSX.Element {
                 ) : (
                   <TaskDetailPage
                     taskId={tab.taskId}
+                    isActive={i === activeTabIndex}
                     onBack={goBack}
                     onTaskUpdated={updateTask}
                     onNavigateToTask={openTask}
@@ -471,6 +567,18 @@ function App(): React.JSX.Element {
           onCreated={handleQuickRunCreated}
           defaultProjectId={selectedProjectId ?? projects[0]?.id}
         />
+        <AlertDialog open={completeTaskDialogOpen} onOpenChange={setCompleteTaskDialogOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Complete Task</AlertDialogTitle>
+              <AlertDialogDescription>Mark as done and close tab?</AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction autoFocus onClick={handleCompleteTaskConfirm}>Complete</AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </SidebarProvider>
   )

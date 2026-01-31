@@ -2,6 +2,12 @@ import type { TerminalMode } from '@omgslayzone/terminal/shared'
 
 export type TaskStatus = 'inbox' | 'backlog' | 'todo' | 'in_progress' | 'review' | 'done'
 
+export interface PanelVisibility {
+  terminal: boolean
+  browser: boolean
+  settings: boolean
+}
+
 export interface Task {
   id: string
   project_id: string
@@ -21,6 +27,11 @@ export interface Task {
   claude_session_id: string | null
   // Permissions
   dangerously_skip_permissions: boolean
+  // Panel visibility (JSON)
+  panel_visibility: PanelVisibility | null
+  // Worktree
+  worktree_path: string | null
+  browser_url: string | null
   created_at: string
   updated_at: string
 }
@@ -53,6 +64,11 @@ export interface UpdateTaskInput {
   codexConversationId?: string | null
   terminalShell?: string | null
   dangerouslySkipPermissions?: boolean
+  // Panel visibility
+  panelVisibility?: PanelVisibility | null
+  // Worktree
+  worktreePath?: string | null
+  browserUrl?: string | null
   // Legacy
   claudeSessionId?: string | null
 }

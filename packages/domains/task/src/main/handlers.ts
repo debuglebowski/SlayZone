@@ -1,26 +1,44 @@
 import type { IpcMain } from 'electron'
 import type { Database } from 'better-sqlite3'
-import type { CreateTaskInput, UpdateTaskInput } from '@omgslayzone/task/shared'
+import type { CreateTaskInput, UpdateTaskInput, Task } from '@omgslayzone/task/shared'
+
+// Parse panel_visibility JSON from DB row
+function parseTask(row: Record<string, unknown> | undefined): Task | null {
+  if (!row) return null
+  return {
+    ...row,
+    panel_visibility: row.panel_visibility
+      ? JSON.parse(row.panel_visibility as string)
+      : null
+  } as Task
+}
+
+function parseTasks(rows: Record<string, unknown>[]): Task[] {
+  return rows.map((row) => parseTask(row)!)
+}
 
 export function registerTaskHandlers(ipcMain: IpcMain, db: Database): void {
 
   // Task CRUD
   ipcMain.handle('db:tasks:getAll', () => {
-    return db
+    const rows = db
       .prepare('SELECT * FROM tasks WHERE archived_at IS NULL ORDER BY "order" ASC, created_at DESC')
-      .all()
+      .all() as Record<string, unknown>[]
+    return parseTasks(rows)
   })
 
   ipcMain.handle('db:tasks:getByProject', (_, projectId: string) => {
-    return db
+    const rows = db
       .prepare(
         'SELECT * FROM tasks WHERE project_id = ? AND archived_at IS NULL ORDER BY "order" ASC, created_at DESC'
       )
-      .all(projectId)
+      .all(projectId) as Record<string, unknown>[]
+    return parseTasks(rows)
   })
 
   ipcMain.handle('db:tasks:get', (_, id: string) => {
-    return db.prepare('SELECT * FROM tasks WHERE id = ?').get(id) ?? null
+    const row = db.prepare('SELECT * FROM tasks WHERE id = ?').get(id) as Record<string, unknown> | undefined
+    return parseTask(row)
   })
 
   ipcMain.handle('db:tasks:create', (_, data: CreateTaskInput) => {
@@ -38,7 +56,8 @@ export function registerTaskHandlers(ipcMain: IpcMain, db: Database): void {
       data.priority ?? 3,
       data.dueDate ?? null
     )
-    return db.prepare('SELECT * FROM tasks WHERE id = ?').get(id)
+    const row = db.prepare('SELECT * FROM tasks WHERE id = ?').get(id) as Record<string, unknown> | undefined
+    return parseTask(row)
   })
 
   ipcMain.handle('db:tasks:update', (_, data: UpdateTaskInput) => {
@@ -93,16 +112,30 @@ export function registerTaskHandlers(ipcMain: IpcMain, db: Database): void {
       fields.push('dangerously_skip_permissions = ?')
       values.push(data.dangerouslySkipPermissions ? 1 : 0)
     }
+    if (data.panelVisibility !== undefined) {
+      fields.push('panel_visibility = ?')
+      values.push(data.panelVisibility ? JSON.stringify(data.panelVisibility) : null)
+    }
+    if (data.worktreePath !== undefined) {
+      fields.push('worktree_path = ?')
+      values.push(data.worktreePath)
+    }
+    if (data.browserUrl !== undefined) {
+      fields.push('browser_url = ?')
+      values.push(data.browserUrl)
+    }
 
     if (fields.length === 0) {
-      return db.prepare('SELECT * FROM tasks WHERE id = ?').get(data.id)
+      const row = db.prepare('SELECT * FROM tasks WHERE id = ?').get(data.id) as Record<string, unknown> | undefined
+      return parseTask(row)
     }
 
     fields.push("updated_at = datetime('now')")
     values.push(data.id)
 
     db.prepare(`UPDATE tasks SET ${fields.join(', ')} WHERE id = ?`).run(...values)
-    return db.prepare('SELECT * FROM tasks WHERE id = ?').get(data.id)
+    const row = db.prepare('SELECT * FROM tasks WHERE id = ?').get(data.id) as Record<string, unknown> | undefined
+    return parseTask(row)
   })
 
   ipcMain.handle('db:tasks:delete', (_, id: string) => {
@@ -116,7 +149,8 @@ export function registerTaskHandlers(ipcMain: IpcMain, db: Database): void {
       UPDATE tasks SET archived_at = datetime('now'), updated_at = datetime('now')
       WHERE id = ?
     `).run(id)
-    return db.prepare('SELECT * FROM tasks WHERE id = ?').get(id)
+    const row = db.prepare('SELECT * FROM tasks WHERE id = ?').get(id) as Record<string, unknown> | undefined
+    return parseTask(row)
   })
 
   ipcMain.handle('db:tasks:archiveMany', (_, ids: string[]) => {
@@ -133,13 +167,15 @@ export function registerTaskHandlers(ipcMain: IpcMain, db: Database): void {
       UPDATE tasks SET archived_at = NULL, updated_at = datetime('now')
       WHERE id = ?
     `).run(id)
-    return db.prepare('SELECT * FROM tasks WHERE id = ?').get(id)
+    const row = db.prepare('SELECT * FROM tasks WHERE id = ?').get(id) as Record<string, unknown> | undefined
+    return parseTask(row)
   })
 
   ipcMain.handle('db:tasks:getArchived', () => {
-    return db
+    const rows = db
       .prepare('SELECT * FROM tasks WHERE archived_at IS NOT NULL ORDER BY archived_at DESC')
-      .all()
+      .all() as Record<string, unknown>[]
+    return parseTasks(rows)
   })
 
   // Reorder
@@ -154,23 +190,25 @@ export function registerTaskHandlers(ipcMain: IpcMain, db: Database): void {
 
   // Task Dependencies
   ipcMain.handle('db:taskDependencies:getBlockers', (_, taskId: string) => {
-    return db
+    const rows = db
       .prepare(
         `SELECT tasks.* FROM tasks
          JOIN task_dependencies ON tasks.id = task_dependencies.task_id
          WHERE task_dependencies.blocks_task_id = ?`
       )
-      .all(taskId)
+      .all(taskId) as Record<string, unknown>[]
+    return parseTasks(rows)
   })
 
   ipcMain.handle('db:taskDependencies:getBlocking', (_, taskId: string) => {
-    return db
+    const rows = db
       .prepare(
         `SELECT tasks.* FROM tasks
          JOIN task_dependencies ON tasks.id = task_dependencies.blocks_task_id
          WHERE task_dependencies.task_id = ?`
       )
-      .all(taskId)
+      .all(taskId) as Record<string, unknown>[]
+    return parseTasks(rows)
   })
 
   ipcMain.handle(

@@ -38,7 +38,8 @@ packages/
 │   ├── projects/          # @omgslayzone/projects - Project CRUD
 │   ├── tags/              # @omgslayzone/tags - Tag system
 │   ├── settings/          # @omgslayzone/settings - Preferences
-│   └── onboarding/        # @omgslayzone/onboarding - Tutorial
+│   ├── onboarding/        # @omgslayzone/onboarding - Tutorial
+│   └── worktrees/         # @omgslayzone/worktrees - Git worktrees
 │       └── DOMAIN.md      # Each domain has DOMAIN.md
 └── shared/
     ├── types/             # @omgslayzone/types - ElectronAPI contract
@@ -70,6 +71,7 @@ domain/
 | tags | Task tagging | ✓ |
 | settings | Theme, preferences | ✓ |
 | onboarding | Tutorial flow | - |
+| worktrees | Git status, branch, worktrees | ✓ |
 
 ## Data Flow
 
@@ -107,10 +109,21 @@ PTY data streams → xterm.js renders
 
 Allowed domain dependencies:
 ```
-task → terminal (TerminalMode type)
+task → terminal, worktrees (TerminalMode, GitPanel)
 tasks → task, terminal (types, usePty)
 types → all domains (ElectronAPI contract)
 ```
+
+## Logo & Icons
+
+Z-slash logo in 3 places:
+- `src/main/index.ts` - native splash screen (inline SVG)
+- `src/renderer/src/assets/logo.svg` - React UI (`#e5e5e5` stroke)
+- `scripts/generate-icons.js` - app icons (regenerate with `node scripts/generate-icons.js`)
+
+Generated icons:
+- `build/icon.{png,icns,ico}` - app icons
+- `resources/icon.png` - dock icon
 
 ## Decision Log
 

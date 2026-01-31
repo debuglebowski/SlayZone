@@ -93,9 +93,10 @@ const api: ElectronAPI = {
     kill: (taskId) => ipcRenderer.invoke('pty:kill', taskId),
     exists: (taskId) => ipcRenderer.invoke('pty:exists', taskId),
     getBuffer: (taskId) => ipcRenderer.invoke('pty:getBuffer', taskId),
+    getBufferSince: (taskId, afterSeq) => ipcRenderer.invoke('pty:getBufferSince', taskId, afterSeq),
     list: () => ipcRenderer.invoke('pty:list'),
-    onData: (callback: (taskId: string, data: string) => void) => {
-      const handler = (_event: unknown, taskId: string, data: string) => callback(taskId, data)
+    onData: (callback: (taskId: string, data: string, seq: number) => void) => {
+      const handler = (_event: unknown, taskId: string, data: string, seq: number) => callback(taskId, data, seq)
       ipcRenderer.on('pty:data', handler)
       return () => ipcRenderer.removeListener('pty:data', handler)
     },
@@ -140,6 +141,16 @@ const api: ElectronAPI = {
       return () => ipcRenderer.removeListener('pty:session-detected', handler)
     },
     getState: (taskId: string) => ipcRenderer.invoke('pty:getState', taskId)
+  },
+  git: {
+    isGitRepo: (path) => ipcRenderer.invoke('git:isGitRepo', path),
+    detectWorktrees: (repoPath) => ipcRenderer.invoke('git:detectWorktrees', repoPath),
+    createWorktree: (repoPath, targetPath, branch) =>
+      ipcRenderer.invoke('git:createWorktree', repoPath, targetPath, branch),
+    removeWorktree: (repoPath, worktreePath) =>
+      ipcRenderer.invoke('git:removeWorktree', repoPath, worktreePath),
+    init: (path) => ipcRenderer.invoke('git:init', path),
+    getCurrentBranch: (path) => ipcRenderer.invoke('git:getCurrentBranch', path)
   }
 }
 

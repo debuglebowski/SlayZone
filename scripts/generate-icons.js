@@ -4,15 +4,15 @@ const sharp = require('sharp');
 const { execSync } = require('child_process');
 const { join } = require('path');
 const { mkdirSync, existsSync, rmSync, writeFileSync } = require('fs');
-const pngToIco = require('png-to-ico');
+const pngToIco = require('png-to-ico').default;
 
 const BUILD_DIR = join(__dirname, '../build');
 const RESOURCES_DIR = join(__dirname, '../resources');
 
 // Background color matching app theme
 const BG_COLOR = '#0a0a0a';
-// Flame color (light gray/white for contrast)
-const FLAME_COLOR = '#e5e5e5';
+// Logo color (light gray/white for contrast)
+const LOGO_COLOR = '#e5e5e5';
 
 // Correct iconset pairs: [display_size, actual_pixel_size, filename]
 const ICONSET_FILES = [
@@ -44,22 +44,22 @@ async function createIconWithBackground(size) {
   
   // Content safe zone: ~17.5% padding inside squircle
   const contentPadding = Math.round(squircleSize * 0.175);
-  const flameSize = squircleSize - (contentPadding * 2);
+  const logoSize = squircleSize - (contentPadding * 2);
 
   // Transparent canvas with only the squircle shape filled
   const backgroundSvg = `<svg width="${size}" height="${size}" xmlns="http://www.w3.org/2000/svg">
     <rect x="${squirclePadding}" y="${squirclePadding}" width="${squircleSize}" height="${squircleSize}" rx="${cornerRadius}" ry="${cornerRadius}" fill="${BG_COLOR}"/>
   </svg>`;
 
-  const flameSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="${flameSize}" height="${flameSize}">
-    <path d="M32 8 C32 8 22 22 22 36 C22 46 26 54 32 56 C38 54 42 46 42 36 C42 22 32 8 32 8Z" fill="${FLAME_COLOR}"/>
+  const logoSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="${logoSize}" height="${logoSize}">
+    <path d="M8,48 L14,24 L24,36 L32,16 L40,36 L50,24 L56,48 Z" stroke="${LOGO_COLOR}" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
   </svg>`;
 
-  const flameBuffer = await sharp(Buffer.from(flameSvg)).png().toBuffer();
+  const logoBuffer = await sharp(Buffer.from(logoSvg)).png().toBuffer();
 
   return sharp(Buffer.from(backgroundSvg))
     .composite([{
-      input: flameBuffer,
+      input: logoBuffer,
       top: squirclePadding + contentPadding,
       left: squirclePadding + contentPadding
     }])

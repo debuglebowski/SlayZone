@@ -5,7 +5,7 @@ import tailwindcss from '@tailwindcss/vite'
 
 export default defineConfig({
   main: {
-    plugins: [externalizeDepsPlugin({ exclude: ['@omgslayzone/types', '@omgslayzone/task', '@omgslayzone/projects', '@omgslayzone/tags', '@omgslayzone/settings', '@omgslayzone/terminal'] })],
+    plugins: [externalizeDepsPlugin({ exclude: ['@omgslayzone/types', '@omgslayzone/task', '@omgslayzone/projects', '@omgslayzone/tags', '@omgslayzone/settings', '@omgslayzone/terminal', '@omgslayzone/worktrees'] })],
     build: {
       rollupOptions: {
         external: ['better-sqlite3', 'node-pty']
@@ -24,7 +24,7 @@ export default defineConfig({
     },
     plugins: [react(), tailwindcss()],
     optimizeDeps: {
-      exclude: ['@omgslayzone/types', '@omgslayzone/ui', '@omgslayzone/editor', '@omgslayzone/task', '@omgslayzone/tasks', '@omgslayzone/projects', '@omgslayzone/tags', '@omgslayzone/settings', '@omgslayzone/terminal', '@omgslayzone/onboarding']
+      exclude: ['@omgslayzone/types', '@omgslayzone/ui', '@omgslayzone/editor', '@omgslayzone/task', '@omgslayzone/tasks', '@omgslayzone/projects', '@omgslayzone/tags', '@omgslayzone/settings', '@omgslayzone/terminal', '@omgslayzone/onboarding', '@omgslayzone/worktrees']
     }
   }
 })

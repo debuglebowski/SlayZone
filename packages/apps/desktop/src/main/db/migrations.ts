@@ -217,6 +217,52 @@ const migrations: Migration[] = [
     up: (db) => {
       db.exec(`ALTER TABLE tasks ADD COLUMN dangerously_skip_permissions INTEGER NOT NULL DEFAULT 0;`)
     }
+  },
+  {
+    version: 15,
+    up: (db) => {
+      db.exec(`
+        CREATE TABLE worktrees (
+          id TEXT PRIMARY KEY,
+          task_id TEXT NOT NULL UNIQUE REFERENCES tasks(id) ON DELETE CASCADE,
+          name TEXT NOT NULL,
+          path TEXT NOT NULL,
+          branch TEXT,
+          created_at TEXT NOT NULL DEFAULT (datetime('now')),
+          updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+        );
+        CREATE UNIQUE INDEX idx_worktrees_task ON worktrees(task_id);
+      `)
+    }
+  },
+  {
+    version: 16,
+    up: (db) => {
+      db.exec(`ALTER TABLE tasks ADD COLUMN panel_visibility TEXT DEFAULT NULL;`)
+    }
+  },
+  {
+    version: 17,
+    up: (db) => {
+      // Add worktree_path and browser_url to tasks
+      db.exec(`
+        ALTER TABLE tasks ADD COLUMN worktree_path TEXT DEFAULT NULL;
+        ALTER TABLE tasks ADD COLUMN browser_url TEXT DEFAULT NULL;
+      `)
+      // Migrate existing worktree paths to tasks
+      db.exec(`
+        UPDATE tasks
+        SET worktree_path = (
+          SELECT path FROM worktrees WHERE worktrees.task_id = tasks.id
+        )
+        WHERE id IN (SELECT task_id FROM worktrees)
+      `)
+      // Drop worktrees table
+      db.exec(`
+        DROP INDEX IF EXISTS idx_worktrees_task;
+        DROP TABLE IF EXISTS worktrees;
+      `)
+    }
   }
 ]
 
