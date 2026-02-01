@@ -2,8 +2,9 @@ import type { Project, CreateProjectInput, UpdateProjectInput } from '@omgslayzo
 import type { Task, CreateTaskInput, UpdateTaskInput, GenerateDescriptionResult } from '@omgslayzone/task/shared'
 import type { Tag, CreateTagInput, UpdateTagInput } from '@omgslayzone/tags/shared'
 import type { TerminalMode, TerminalState, CodeMode, PtyInfo, PromptInfo, ClaudeAvailability, BufferSinceResult } from '@omgslayzone/terminal/shared'
+import type { TerminalTab, CreateTerminalTabInput, UpdateTerminalTabInput } from '@omgslayzone/task-terminals/shared'
 import type { Theme, ThemePreference } from '@omgslayzone/settings/shared'
-import type { DetectedWorktree } from '@omgslayzone/worktrees/shared'
+import type { DetectedWorktree, MergeResult } from '@omgslayzone/worktrees/shared'
 
 // ElectronAPI interface - the IPC contract between renderer and main
 export interface ElectronAPI {
@@ -86,31 +87,32 @@ export interface ElectronAPI {
   }
   pty: {
     create: (
-      taskId: string,
+      sessionId: string,
       cwd: string,
-      sessionId?: string | null,
-      existingSessionId?: string | null,
+      conversationId?: string | null,
+      existingConversationId?: string | null,
       mode?: TerminalMode,
       initialPrompt?: string | null,
-      codeMode?: CodeMode | null
+      codeMode?: CodeMode | null,
+      dangerouslySkipPermissions?: boolean
     ) => Promise<{ success: boolean; error?: string }>
-    write: (taskId: string, data: string) => Promise<boolean>
-    resize: (taskId: string, cols: number, rows: number) => Promise<boolean>
-    kill: (taskId: string) => Promise<boolean>
-    exists: (taskId: string) => Promise<boolean>
-    getBuffer: (taskId: string) => Promise<string | null>
-    getBufferSince: (taskId: string, afterSeq: number) => Promise<BufferSinceResult | null>
+    write: (sessionId: string, data: string) => Promise<boolean>
+    resize: (sessionId: string, cols: number, rows: number) => Promise<boolean>
+    kill: (sessionId: string) => Promise<boolean>
+    exists: (sessionId: string) => Promise<boolean>
+    getBuffer: (sessionId: string) => Promise<string | null>
+    getBufferSince: (sessionId: string, afterSeq: number) => Promise<BufferSinceResult | null>
     list: () => Promise<PtyInfo[]>
-    onData: (callback: (taskId: string, data: string, seq: number) => void) => () => void
-    onExit: (callback: (taskId: string, exitCode: number) => void) => () => void
-    onSessionNotFound: (callback: (taskId: string) => void) => () => void
-    onIdle: (callback: (taskId: string) => void) => () => void
+    onData: (callback: (sessionId: string, data: string, seq: number) => void) => () => void
+    onExit: (callback: (sessionId: string, exitCode: number) => void) => () => void
+    onSessionNotFound: (callback: (sessionId: string) => void) => () => void
+    onAttention: (callback: (sessionId: string) => void) => () => void
     onStateChange: (
-      callback: (taskId: string, newState: TerminalState, oldState: TerminalState) => void
+      callback: (sessionId: string, newState: TerminalState, oldState: TerminalState) => void
     ) => () => void
-    onPrompt: (callback: (taskId: string, prompt: PromptInfo) => void) => () => void
-    onSessionDetected: (callback: (taskId: string, sessionId: string) => void) => () => void
-    getState: (taskId: string) => Promise<TerminalState | null>
+    onPrompt: (callback: (sessionId: string, prompt: PromptInfo) => void) => () => void
+    onSessionDetected: (callback: (sessionId: string, conversationId: string) => void) => () => void
+    getState: (sessionId: string) => Promise<TerminalState | null>
   }
   git: {
     isGitRepo: (path: string) => Promise<boolean>
@@ -119,5 +121,15 @@ export interface ElectronAPI {
     removeWorktree: (repoPath: string, worktreePath: string) => Promise<void>
     init: (path: string) => Promise<void>
     getCurrentBranch: (path: string) => Promise<string | null>
+    hasUncommittedChanges: (path: string) => Promise<boolean>
+    mergeIntoParent: (projectPath: string, parentBranch: string, sourceBranch: string) => Promise<MergeResult>
+    abortMerge: (path: string) => Promise<void>
+  }
+  tabs: {
+    list: (taskId: string) => Promise<TerminalTab[]>
+    create: (input: CreateTerminalTabInput) => Promise<TerminalTab>
+    update: (input: UpdateTerminalTabInput) => Promise<TerminalTab | null>
+    delete: (tabId: string) => Promise<boolean>
+    ensureMain: (taskId: string, mode: TerminalMode) => Promise<TerminalTab>
   }
 }

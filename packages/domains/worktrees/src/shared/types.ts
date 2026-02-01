@@ -3,3 +3,10 @@ export interface DetectedWorktree {
   branch: string | null
   isMain: boolean
 }
+
+export interface MergeResult {
+  success: boolean
+  merged: boolean
+  conflicted: boolean
+  error?: string
+}

@@ -28,6 +28,7 @@ interface TabBarProps {
   onTabClick: (index: number) => void
   onTabClose: (index: number) => void
   onTabReorder: (fromIndex: number, toIndex: number) => void
+  rightContent?: React.ReactNode
 }
 
 interface TabContentProps {
@@ -139,7 +140,8 @@ export function TabBar({
   terminalStates,
   onTabClick,
   onTabClose,
-  onTabReorder
+  onTabReorder,
+  rightContent
 }: TabBarProps): React.JSX.Element {
   const [activeId, setActiveId] = useState<string | null>(null)
 
@@ -173,53 +175,61 @@ export function TabBar({
   }
 
   return (
-    <div className="flex items-end h-9 pl-2 pr-2 gap-1 bg-background border-b overflow-x-auto">
-      {/* Home tab - not draggable */}
-      <div
-        className={cn(
-          'flex items-center gap-1.5 h-8 px-3 rounded-t-md cursor-pointer transition-colors select-none',
-          'hover:bg-muted/50',
-          activeIndex === 0 ? 'bg-muted border-b-2 border-b-primary' : 'text-muted-foreground'
-        )}
-        onClick={() => onTabClick(0)}
-      >
-        <Home className="h-4 w-4" />
+    <div className="flex items-end h-9 pl-2 pr-2 gap-1 bg-background border-b">
+      {/* Scrollable tabs area */}
+      <div className="flex items-end gap-1 overflow-x-auto flex-1 min-w-0">
+        {/* Home tab - not draggable */}
+        <div
+          className={cn(
+            'flex items-center gap-1.5 h-8 px-3 rounded-t-md cursor-pointer transition-colors select-none flex-shrink-0',
+            'hover:bg-muted/50',
+            activeIndex === 0 ? 'bg-muted border-b-2 border-b-primary' : 'text-muted-foreground'
+          )}
+          onClick={() => onTabClick(0)}
+        >
+          <Home className="h-4 w-4" />
+        </div>
+
+        {/* Task tabs - sortable */}
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          onDragStart={handleDragStart}
+          onDragEnd={handleDragEnd}
+        >
+          <SortableContext items={taskIds} strategy={horizontalListSortingStrategy}>
+            {taskTabs.map((tab) => {
+              const index = tabs.findIndex((t) => t.type === 'task' && t.taskId === tab.taskId)
+              return (
+                <SortableTab
+                  key={tab.taskId}
+                  tab={tab}
+                  index={index}
+                  isActive={index === activeIndex}
+                  onTabClick={onTabClick}
+                  onTabClose={onTabClose}
+                  terminalState={terminalStates?.get(tab.taskId)}
+                />
+              )
+            })}
+          </SortableContext>
+          <DragOverlay>
+            {activeTab && (
+              <TabContent
+                title={activeTab.title}
+                isActive={tabs.findIndex((t) => t.type === 'task' && t.taskId === activeTab.taskId) === activeIndex}
+                isDragging
+                terminalState={terminalStates?.get(activeTab.taskId)}
+              />
+            )}
+          </DragOverlay>
+        </DndContext>
       </div>
 
-      {/* Task tabs - sortable */}
-      <DndContext
-        sensors={sensors}
-        collisionDetection={closestCenter}
-        onDragStart={handleDragStart}
-        onDragEnd={handleDragEnd}
-      >
-        <SortableContext items={taskIds} strategy={horizontalListSortingStrategy}>
-          {taskTabs.map((tab) => {
-            const index = tabs.findIndex((t) => t.type === 'task' && t.taskId === tab.taskId)
-            return (
-              <SortableTab
-                key={tab.taskId}
-                tab={tab}
-                index={index}
-                isActive={index === activeIndex}
-                onTabClick={onTabClick}
-                onTabClose={onTabClose}
-                terminalState={terminalStates?.get(tab.taskId)}
-              />
-            )
-          })}
-        </SortableContext>
-        <DragOverlay>
-          {activeTab && (
-            <TabContent
-              title={activeTab.title}
-              isActive={tabs.findIndex((t) => t.type === 'task' && t.taskId === activeTab.taskId) === activeIndex}
-              isDragging
-              terminalState={terminalStates?.get(activeTab.taskId)}
-            />
-          )}
-        </DragOverlay>
-      </DndContext>
+      {/* Fixed right content */}
+      {rightContent && (
+        <div className="flex items-center flex-shrink-0 self-center">{rightContent}</div>
+      )}
     </div>
   )
 }

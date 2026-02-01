@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { Monitor, X } from 'lucide-react'
-import { Button } from '@omgslayzone/ui'
+import { Button, getTerminalStateStyle } from '@omgslayzone/ui'
 import { Popover, PopoverContent, PopoverTrigger } from '@omgslayzone/ui'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@omgslayzone/ui'
 import type { PtyInfo } from '@omgslayzone/terminal/shared'
@@ -34,9 +34,9 @@ export function TerminalStatusPopover({ tasks }: TerminalStatusPopoverProps) {
     return undefined
   }, [open, refreshPtys])
 
-  // Also refresh on idle events
+  // Also refresh on attention events
   useEffect(() => {
-    const unsub = window.api.pty.onIdle(() => {
+    const unsub = window.api.pty.onAttention(() => {
       refreshPtys()
     })
     return unsub
@@ -47,12 +47,18 @@ export function TerminalStatusPopover({ tasks }: TerminalStatusPopoverProps) {
     refreshPtys()
   }, [refreshPtys])
 
-  const handleTerminate = async (taskId: string) => {
-    await window.api.pty.kill(taskId)
+  const handleTerminate = async (sessionId: string) => {
+    await window.api.pty.kill(sessionId)
     refreshPtys()
   }
 
-  const getTaskName = (taskId: string): string => {
+  // Extract taskId from sessionId (format: taskId or taskId:tabId)
+  const getTaskIdFromSession = (sessionId: string): string => {
+    return sessionId.split(':')[0]
+  }
+
+  const getTaskName = (sessionId: string): string => {
+    const taskId = getTaskIdFromSession(sessionId)
     const task = tasks.find((t) => t.id === taskId)
     return task?.title || 'Unknown Task'
   }
@@ -100,21 +106,16 @@ export function TerminalStatusPopover({ tasks }: TerminalStatusPopoverProps) {
           <div className="space-y-2 max-h-64 overflow-y-auto">
             {ptys.map((pty) => (
               <div
-                key={pty.taskId}
+                key={pty.sessionId}
                 className="flex items-center justify-between p-2 rounded-md bg-muted/50 hover:bg-muted transition-colors"
               >
                 <div className="flex-1 min-w-0 mr-2">
-                  <p className="text-sm font-medium truncate">{getTaskName(pty.taskId)}</p>
+                  <p className="text-sm font-medium truncate">{getTaskName(pty.sessionId)}</p>
                   <p className="text-xs text-muted-foreground">
-                    {pty.state === 'idle' ? (
-                      <span className="text-amber-500">Idle</span>
-                    ) : pty.state === 'error' ? (
-                      <span className="text-red-500">Error</span>
-                    ) : pty.state === 'awaiting_input' ? (
-                      <span className="text-blue-500">Awaiting Input</span>
-                    ) : (
-                      <span className="text-green-500">{pty.state === 'starting' ? 'Starting' : 'Active'}</span>
-                    )}
+                    {(() => {
+                      const style = getTerminalStateStyle(pty.state)
+                      return style && <span className={style.textColor}>{style.label}</span>
+                    })()}
                     {' · '}
                     {formatIdleTime(pty.lastOutputTime)}
                   </p>
@@ -123,7 +124,7 @@ export function TerminalStatusPopover({ tasks }: TerminalStatusPopoverProps) {
                   variant="ghost"
                   size="icon"
                   className="h-7 w-7 text-muted-foreground hover:text-destructive"
-                  onClick={() => handleTerminate(pty.taskId)}
+                  onClick={() => handleTerminate(pty.sessionId)}
                 >
                   <X className="size-4" />
                 </Button>

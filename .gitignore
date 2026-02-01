@@ -4,6 +4,7 @@ out
 .DS_Store
 .eslintcache
 *.log*
+*.tsbuildinfo
 
 # Auto Claude data directory
 .auto-claude/

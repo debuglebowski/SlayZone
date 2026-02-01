@@ -6,28 +6,24 @@ Git integration for tasks. Shows git status, branch, and optional worktree per t
 
 ```
 src/
-├── shared/types.ts       # Worktree, CreateWorktreeInput, DetectedWorktree
+├── shared/types.ts       # DetectedWorktree, MergeResult
 ├── main/
-│   ├── handlers.ts       # IPC handlers for CRUD + git operations
+│   ├── handlers.ts       # IPC handlers for git operations
 │   └── git-worktree.ts   # Git CLI wrappers
 └── client/
     ├── GitPanel.tsx              # Git section in task detail
-    ├── WorktreePanel.tsx         # Legacy, use GitPanel
-    └── CreateWorktreeDialog.tsx
+    ├── CreateWorktreeDialog.tsx  # Dialog for creating worktrees
+    └── utils.ts                  # slugify helper
 ```
 
 ## Database
 
+Worktree data stored on tasks table:
+
 ```sql
-CREATE TABLE worktrees (
-  id TEXT PRIMARY KEY,
-  task_id TEXT NOT NULL UNIQUE REFERENCES tasks(id) ON DELETE CASCADE,
-  name TEXT NOT NULL,
-  path TEXT NOT NULL,
-  branch TEXT,
-  created_at TEXT,
-  updated_at TEXT
-);
+-- Columns on tasks table
+worktree_path TEXT DEFAULT NULL,
+worktree_parent_branch TEXT DEFAULT NULL
 ```
 
 ## IPC Handlers
@@ -39,12 +35,9 @@ CREATE TABLE worktrees (
 - `git:detectWorktrees(repoPath)` - List worktrees
 - `git:createWorktree(repoPath, targetPath, branch?)` - Create worktree
 - `git:removeWorktree(repoPath, worktreePath)` - Remove worktree
-
-### Worktree CRUD
-- `db:worktrees:getByTask(taskId)` - Get worktree for task
-- `db:worktrees:create(input)` - Create worktree record
-- `db:worktrees:update(input)` - Update worktree
-- `db:worktrees:delete(id)` - Delete worktree
+- `git:hasUncommittedChanges(path)` - Check for uncommitted changes
+- `git:mergeIntoParent(projectPath, parentBranch, sourceBranch)` - Merge branch into parent
+- `git:abortMerge(path)` - Abort in-progress merge
 
 ## GitPanel Features
 
@@ -52,7 +45,7 @@ CREATE TABLE worktrees (
 - Initialize git if not a repo
 - Current branch display
 - Worktree management (add/remove)
-- AI Merge placeholder (coming soon)
+- Merge to parent branch (completes task + kills terminal)
 
 ## Dependencies
 

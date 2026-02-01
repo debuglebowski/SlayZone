@@ -76,29 +76,31 @@ function isDialogOpen(): boolean {
 }
 
 interface TerminalProps {
-  taskId: string
+  sessionId: string
   cwd: string
   mode?: TerminalMode
-  sessionId?: string | null
-  existingSessionId?: string | null
+  conversationId?: string | null
+  existingConversationId?: string | null
   initialPrompt?: string | null
   codeMode?: CodeMode | null
+  dangerouslySkipPermissions?: boolean
   autoFocus?: boolean
-  onSessionCreated?: (sessionId: string) => void
+  onConversationCreated?: (conversationId: string) => void
   onSessionInvalid?: () => void
   onReady?: (api: { sendInput: (text: string) => Promise<void>; focus: () => void }) => void
 }
 
 export function Terminal({
-  taskId,
+  sessionId,
   cwd,
   mode = 'claude-code',
-  sessionId,
-  existingSessionId,
+  conversationId,
+  existingConversationId,
   initialPrompt,
   codeMode,
+  dangerouslySkipPermissions = false,
   autoFocus = false,
-  onSessionCreated,
+  onConversationCreated,
   onSessionInvalid,
   onReady
 }: TerminalProps) {
@@ -110,9 +112,9 @@ export function Terminal({
   const [isDragOver, setIsDragOver] = useState(false)
   const [isInitializing, setIsInitializing] = useState(true)
 
-  const { subscribe, subscribeExit, subscribeSessionInvalid, subscribeIdle, subscribeState, getState, resetTaskState, cleanupTask } = usePty()
+  const { subscribe, subscribeExit, subscribeSessionInvalid, subscribeAttention, subscribeState, getState, resetTaskState, cleanupTask } = usePty()
 
-  const [ptyState, setPtyState] = useState<TerminalState>(() => getState(taskId))
+  const [ptyState, setPtyState] = useState<TerminalState>(() => getState(sessionId))
 
   const initTerminal = useCallback(async (signal: AbortSignal) => {
     if (!containerRef.current || initializedRef.current) return
@@ -138,15 +140,15 @@ export function Terminal({
     initializedRef.current = true
 
     // Check if we have a cached terminal for this task
-    const cached = getTerminal(taskId)
+    const cached = getTerminal(sessionId)
     if (cached) {
       // If mode changed, dispose cached terminal and kill old PTY to start fresh
       if (cached.mode !== mode) {
         // Reset state FIRST to ignore any in-flight data
-        resetTaskState(taskId)
-        disposeTerminal(taskId)
+        resetTaskState(sessionId)
+        disposeTerminal(sessionId)
         // Kill old PTY (any data it sends will be ignored)
-        await window.api.pty.kill(taskId)
+        await window.api.pty.kill(sessionId)
       } else {
         // Reattach existing terminal (container already has dimensions)
         containerRef.current.appendChild(cached.element)
@@ -159,11 +161,11 @@ export function Terminal({
         if (autoFocus && !isDialogOpen()) {
           cached.terminal.focus()
         }
-        window.api.pty.resize(taskId, cached.terminal.cols, cached.terminal.rows)
+        window.api.pty.resize(sessionId, cached.terminal.cols, cached.terminal.rows)
         cached.terminal.write('\x1b[0m') // Reset ANSI state on reattach
 
         // Sync state from backend (fixes stuck loading spinner on reattach)
-        const actualState = await window.api.pty.getState(taskId)
+        const actualState = await window.api.pty.getState(sessionId)
         if (signal.aborted) return // Don't setState if unmounted
         if (actualState) setPtyState(actualState)
 
@@ -251,17 +253,17 @@ export function Terminal({
     })
 
     // Check if PTY already exists (e.g., from idle hibernation)
-    const exists = await window.api.pty.exists(taskId)
+    const exists = await window.api.pty.exists(sessionId)
     if (signal.aborted) return // Don't continue if unmounted
     if (exists) {
       // Sync state from main process (fixes stuck loading spinner)
-      const actualState = await window.api.pty.getState(taskId)
+      const actualState = await window.api.pty.getState(sessionId)
       if (signal.aborted) return // Don't setState if unmounted
       if (actualState) setPtyState(actualState)
 
       // Restore from backend buffer (single source of truth)
       // Use getBufferSince with -1 to get all chunks
-      const result = await window.api.pty.getBufferSince(taskId, -1)
+      const result = await window.api.pty.getBufferSince(sessionId, -1)
       if (result && result.chunks.length > 0) {
         terminal.write('\x1b[0m') // Reset ANSI state before buffer replay
         for (const chunk of result.chunks) {
@@ -271,18 +273,18 @@ export function Terminal({
       }
     } else {
 
-      // Generate session ID only for claude-code mode
-      let newSessionId = sessionId
-      if (mode === 'claude-code' && !newSessionId && !existingSessionId) {
-        newSessionId = crypto.randomUUID()
-        onSessionCreated?.(newSessionId)
+      // Generate conversation ID only for claude-code mode
+      let newConversationId = conversationId
+      if (mode === 'claude-code' && !newConversationId && !existingConversationId) {
+        newConversationId = crypto.randomUUID()
+        onConversationCreated?.(newConversationId)
       }
 
-      // Create PTY with selected mode (only pass session IDs for claude-code)
+      // Create PTY with selected mode (only pass conversation IDs for claude-code)
       // Note: Don't pass initialPrompt - we'll inject it after terminal is ready
-      const effectiveSessionId = mode === 'claude-code' ? newSessionId : undefined
-      const effectiveExistingSessionId = mode === 'claude-code' ? existingSessionId : undefined
-      const result = await window.api.pty.create(taskId, cwd, effectiveSessionId, effectiveExistingSessionId, mode, null, codeMode)
+      const effectiveConversationId = mode === 'claude-code' ? newConversationId : undefined
+      const effectiveExistingConversationId = mode === 'claude-code' ? existingConversationId : undefined
+      const result = await window.api.pty.create(sessionId, cwd, effectiveConversationId, effectiveExistingConversationId, mode, null, codeMode, dangerouslySkipPermissions)
       if (!result.success) {
         terminal.writeln(`\x1b[31mError: ${result.error}\x1b[0m`)
         return
@@ -291,17 +293,17 @@ export function Terminal({
 
     // Handle terminal input - pass through to PTY
     terminal.onData((data) => {
-      window.api.pty.write(taskId, data)
+      window.api.pty.write(sessionId, data)
     })
 
     // Handle resize
     terminal.onResize(({ cols, rows }) => {
-      window.api.pty.resize(taskId, cols, rows)
+      window.api.pty.resize(sessionId, cols, rows)
     })
 
     // Initial resize
     const { cols, rows } = terminal
-    window.api.pty.resize(taskId, cols, rows)
+    window.api.pty.resize(sessionId, cols, rows)
 
     // Helper to inject text char-by-char
     const injectText = async (text: string): Promise<void> => {
@@ -330,7 +332,7 @@ export function Terminal({
 
     if (signal.aborted) return // Don't setState if unmounted
     setIsInitializing(false)
-  }, [taskId, cwd, mode, sessionId, existingSessionId, initialPrompt, codeMode, autoFocus, onSessionCreated, onReady, resetTaskState])
+  }, [sessionId, cwd, mode, conversationId, existingConversationId, initialPrompt, codeMode, dangerouslySkipPermissions, autoFocus, onConversationCreated, onReady, resetTaskState])
 
   // Initialize terminal
   useEffect(() => {
@@ -354,7 +356,7 @@ export function Terminal({
         const element = terminalRef.current.element
         if (element && element.parentNode) {
           element.parentNode.removeChild(element)
-          setTerminal(taskId, {
+          setTerminal(sessionId, {
             terminal: terminalRef.current,
             fitAddon: fitAddonRef.current,
             serializeAddon: serializeAddonRef.current,
@@ -369,45 +371,45 @@ export function Terminal({
       serializeAddonRef.current = null
       initializedRef.current = false
     }
-  }, [initTerminal, taskId])
+  }, [initTerminal, sessionId])
 
   // Subscribe to PTY events via context (survives view switches)
   useEffect(() => {
-    const unsubData = subscribe(taskId, (data, _seq) => {
+    const unsubData = subscribe(sessionId, (data, _seq) => {
       // Seq is tracked by PtyContext - just write the data
       terminalRef.current?.write(data)
     })
 
-    const unsubExit = subscribeExit(taskId, (exitCode) => {
+    const unsubExit = subscribeExit(sessionId, (exitCode) => {
       terminalRef.current?.writeln(`\r\n\x1b[90mProcess exited with code ${exitCode}\x1b[0m`)
       // Clean up cached terminal and context state on exit
-      disposeTerminal(taskId)
-      cleanupTask(taskId)
+      disposeTerminal(sessionId)
+      cleanupTask(sessionId)
     })
 
-    const unsubSessionInvalid = subscribeSessionInvalid(taskId, () => {
+    const unsubSessionInvalid = subscribeSessionInvalid(sessionId, () => {
       onSessionInvalid?.()
     })
 
-    const unsubIdle = subscribeIdle(taskId, () => {
+    const unsubAttention = subscribeAttention(sessionId, () => {
       // Hibernation disabled - caused sync loss when returning to tab
       // (terminalRef became null but nothing triggered reinit)
-      // Memory tradeoff: ~5-20MB per idle terminal, worth it for reliability
+      // Memory tradeoff: ~5-20MB per inactive terminal, worth it for reliability
     })
 
     return () => {
       unsubData()
       unsubExit()
       unsubSessionInvalid()
-      unsubIdle()
+      unsubAttention()
     }
-  }, [taskId, onSessionInvalid, subscribe, subscribeExit, subscribeSessionInvalid, subscribeIdle])
+  }, [sessionId, onSessionInvalid, subscribe, subscribeExit, subscribeSessionInvalid, subscribeAttention])
 
   // Subscribe to PTY state changes for loading indicator
   useEffect(() => {
-    setPtyState(getState(taskId))
-    return subscribeState(taskId, (newState) => setPtyState(newState))
-  }, [taskId, getState, subscribeState])
+    setPtyState(getState(sessionId))
+    return subscribeState(sessionId, (newState) => setPtyState(newState))
+  }, [sessionId, getState, subscribeState])
 
   // Handle resize
   useEffect(() => {
@@ -463,7 +465,7 @@ export function Terminal({
     // Insert path into terminal (escape if has spaces)
     const insertPath = (path: string) => {
       const escaped = path.includes(' ') ? `"${path}"` : path
-      window.api.pty.write(taskId, escaped)
+      window.api.pty.write(sessionId, escaped)
     }
 
     // Process a single file
@@ -546,7 +548,7 @@ export function Terminal({
       container.removeEventListener('dragover', handleDragOver)
       container.removeEventListener('dragleave', handleDragLeave)
     }
-  }, [taskId])
+  }, [sessionId])
 
   const isLoading = isInitializing || ptyState === 'starting'
 

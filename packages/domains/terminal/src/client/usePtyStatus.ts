@@ -1,15 +1,15 @@
 import { useState, useEffect, useCallback } from 'react'
 
 /**
- * Returns Set of taskIds with active (non-idle) PTY sessions
+ * Returns Set of sessionIds with active (non-attention) PTY sessions
  */
 export function usePtyStatus(): Set<string> {
-  const [activeTaskIds, setActiveTaskIds] = useState<Set<string>>(new Set())
+  const [activeSessionIds, setActiveSessionIds] = useState<Set<string>>(new Set())
 
   const refresh = useCallback(async () => {
     const list = await window.api.pty.list()
-    const active = new Set(list.filter((p) => p.state !== 'idle' && p.state !== 'dead').map((p) => p.taskId))
-    setActiveTaskIds(active)
+    const active = new Set(list.filter((p) => p.state !== 'attention' && p.state !== 'dead').map((p) => p.sessionId))
+    setActiveSessionIds(active)
   }, [])
 
   // Initial load
@@ -17,9 +17,9 @@ export function usePtyStatus(): Set<string> {
     refresh()
   }, [refresh])
 
-  // Refresh on idle events
+  // Refresh on attention events
   useEffect(() => {
-    const unsub = window.api.pty.onIdle(() => {
+    const unsub = window.api.pty.onAttention(() => {
       refresh()
     })
     return unsub
@@ -31,5 +31,5 @@ export function usePtyStatus(): Set<string> {
     return () => clearInterval(interval)
   }, [refresh])
 
-  return activeTaskIds
+  return activeSessionIds
 }

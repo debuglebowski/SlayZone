@@ -26,47 +26,47 @@ interface PtyState {
 type DataCallback = (data: string, seq: number) => void
 type ExitCallback = (exitCode: number) => void
 type SessionInvalidCallback = () => void
-type IdleCallback = () => void
+type AttentionCallback = () => void
 type StateChangeCallback = (newState: TerminalState, oldState: TerminalState) => void
 type PromptCallback = (prompt: PromptInfo) => void
 type SessionDetectedCallback = (sessionId: string) => void
 
 interface PtyContextValue {
-  subscribe: (taskId: string, cb: DataCallback) => () => void
-  subscribeExit: (taskId: string, cb: ExitCallback) => () => void
-  subscribeSessionInvalid: (taskId: string, cb: SessionInvalidCallback) => () => void
-  subscribeIdle: (taskId: string, cb: IdleCallback) => () => void
-  subscribeState: (taskId: string, cb: StateChangeCallback) => () => void
-  subscribePrompt: (taskId: string, cb: PromptCallback) => () => void
-  subscribeSessionDetected: (taskId: string, cb: SessionDetectedCallback) => () => void
-  getLastSeq: (taskId: string) => number
-  getExitCode: (taskId: string) => number | undefined
-  isSessionInvalid: (taskId: string) => boolean
-  getState: (taskId: string) => TerminalState
-  getPendingPrompt: (taskId: string) => PromptInfo | undefined
-  clearPendingPrompt: (taskId: string) => void
-  resetTaskState: (taskId: string) => void
-  cleanupTask: (taskId: string) => void // Free all memory for a task
+  subscribe: (sessionId: string, cb: DataCallback) => () => void
+  subscribeExit: (sessionId: string, cb: ExitCallback) => () => void
+  subscribeSessionInvalid: (sessionId: string, cb: SessionInvalidCallback) => () => void
+  subscribeAttention: (sessionId: string, cb: AttentionCallback) => () => void
+  subscribeState: (sessionId: string, cb: StateChangeCallback) => () => void
+  subscribePrompt: (sessionId: string, cb: PromptCallback) => () => void
+  subscribeSessionDetected: (sessionId: string, cb: SessionDetectedCallback) => () => void
+  getLastSeq: (sessionId: string) => number
+  getExitCode: (sessionId: string) => number | undefined
+  isSessionInvalid: (sessionId: string) => boolean
+  getState: (sessionId: string) => TerminalState
+  getPendingPrompt: (sessionId: string) => PromptInfo | undefined
+  clearPendingPrompt: (sessionId: string) => void
+  resetTaskState: (sessionId: string) => void
+  cleanupTask: (sessionId: string) => void // Free all memory for a task
   // Global prompt tracking for badge
   getPendingPromptTaskIds: () => string[]
   // Quick run prompt
-  setQuickRunPrompt: (taskId: string, prompt: string, codeMode?: CodeMode) => void
-  getQuickRunPrompt: (taskId: string) => string | undefined
-  getQuickRunCodeMode: (taskId: string) => CodeMode | undefined
-  clearQuickRunPrompt: (taskId: string) => void
+  setQuickRunPrompt: (sessionId: string, prompt: string, codeMode?: CodeMode) => void
+  getQuickRunPrompt: (sessionId: string) => string | undefined
+  getQuickRunCodeMode: (sessionId: string) => CodeMode | undefined
+  clearQuickRunPrompt: (sessionId: string) => void
 }
 
 const PtyContext = createContext<PtyContextValue | null>(null)
 
 export function PtyProvider({ children }: { children: ReactNode }) {
-  // Per-taskId state (metadata only - backend is source of truth for buffer)
+  // Per-sessionId state (metadata only - backend is source of truth for buffer)
   const statesRef = useRef<Map<string, PtyState>>(new Map())
 
-  // Per-taskId subscriber sets
+  // Per-sessionId subscriber sets
   const dataSubsRef = useRef<Map<string, Set<DataCallback>>>(new Map())
   const exitSubsRef = useRef<Map<string, Set<ExitCallback>>>(new Map())
   const sessionInvalidSubsRef = useRef<Map<string, Set<SessionInvalidCallback>>>(new Map())
-  const idleSubsRef = useRef<Map<string, Set<IdleCallback>>>(new Map())
+  const attentionSubsRef = useRef<Map<string, Set<AttentionCallback>>>(new Map())
   const stateSubsRef = useRef<Map<string, Set<StateChangeCallback>>>(new Map())
   const promptSubsRef = useRef<Map<string, Set<PromptCallback>>>(new Map())
   const sessionDetectedSubsRef = useRef<Map<string, Set<SessionDetectedCallback>>>(new Map())
@@ -77,11 +77,11 @@ export function PtyProvider({ children }: { children: ReactNode }) {
   const pendingPromptTaskIdsRef = useRef(pendingPromptTaskIds)
   pendingPromptTaskIdsRef.current = pendingPromptTaskIds
 
-  const getOrCreateState = useCallback((taskId: string): PtyState => {
-    let state = statesRef.current.get(taskId)
+  const getOrCreateState = useCallback((sessionId: string): PtyState => {
+    let state = statesRef.current.get(sessionId)
     if (!state) {
       state = { lastSeq: -1, sessionInvalid: false, state: 'starting' }
-      statesRef.current.set(taskId, state)
+      statesRef.current.set(sessionId, state)
     }
     return state
   }, [])
@@ -90,8 +90,8 @@ export function PtyProvider({ children }: { children: ReactNode }) {
   // Note: Only update existing state, don't create state for unknown tasks
   // State is created when Terminal component subscribes
   useEffect(() => {
-    const unsubData = window.api.pty.onData((taskId, data, seq) => {
-      const state = statesRef.current.get(taskId)
+    const unsubData = window.api.pty.onData((sessionId, data, seq) => {
+      const state = statesRef.current.get(sessionId)
       if (!state) return
 
       // Drop out-of-order data (seq should be monotonically increasing)
@@ -99,84 +99,84 @@ export function PtyProvider({ children }: { children: ReactNode }) {
       state.lastSeq = seq
 
       // Notify subscribers
-      const subs = dataSubsRef.current.get(taskId)
+      const subs = dataSubsRef.current.get(sessionId)
       if (subs) {
         subs.forEach((cb) => cb(data, seq))
       }
     })
 
-    const unsubExit = window.api.pty.onExit((taskId, exitCode) => {
-      const state = statesRef.current.get(taskId)
+    const unsubExit = window.api.pty.onExit((sessionId, exitCode) => {
+      const state = statesRef.current.get(sessionId)
       if (!state) return // Ignore exit for unknown tasks
 
       state.exitCode = exitCode
 
-      const subs = exitSubsRef.current.get(taskId)
+      const subs = exitSubsRef.current.get(sessionId)
       if (subs) {
         subs.forEach((cb) => cb(exitCode))
       }
     })
 
-    const unsubSessionNotFound = window.api.pty.onSessionNotFound((taskId) => {
-      const state = statesRef.current.get(taskId)
+    const unsubSessionNotFound = window.api.pty.onSessionNotFound((sessionId) => {
+      const state = statesRef.current.get(sessionId)
       if (!state) return // Ignore for unknown tasks
 
       state.sessionInvalid = true
 
-      const subs = sessionInvalidSubsRef.current.get(taskId)
+      const subs = sessionInvalidSubsRef.current.get(sessionId)
       if (subs) {
         subs.forEach((cb) => cb())
       }
     })
 
-    const unsubIdle = window.api.pty.onIdle((taskId) => {
-      const subs = idleSubsRef.current.get(taskId)
+    const unsubAttention = window.api.pty.onAttention((sessionId) => {
+      const subs = attentionSubsRef.current.get(sessionId)
       if (subs) {
         subs.forEach((cb) => cb())
       }
     })
 
-    const unsubStateChange = window.api.pty.onStateChange((taskId, newState, oldState) => {
-      const state = statesRef.current.get(taskId)
+    const unsubStateChange = window.api.pty.onStateChange((sessionId, newState, oldState) => {
+      const state = statesRef.current.get(sessionId)
       if (!state) return // Ignore state changes for unknown tasks
 
       state.state = newState as TerminalState
 
-      const subs = stateSubsRef.current.get(taskId)
+      const subs = stateSubsRef.current.get(sessionId)
       if (subs) {
         subs.forEach((cb) => cb(newState as TerminalState, oldState as TerminalState))
       }
 
-      // Clear pending prompt when state changes from awaiting_input
-      if (oldState === 'awaiting_input' && newState !== 'awaiting_input') {
+      // Clear pending prompt when state changes from attention
+      if (oldState === 'attention' && newState !== 'attention') {
         state.pendingPrompt = undefined
         setPendingPromptTaskIds((prev) => {
           const next = new Set(prev)
-          next.delete(taskId)
+          next.delete(sessionId)
           return next
         })
       }
     })
 
-    const unsubPrompt = window.api.pty.onPrompt((taskId, prompt) => {
-      const state = statesRef.current.get(taskId)
+    const unsubPrompt = window.api.pty.onPrompt((sessionId, prompt) => {
+      const state = statesRef.current.get(sessionId)
       if (!state) return // Ignore prompts for unknown tasks
 
       state.pendingPrompt = prompt
 
       // Update global tracking
-      setPendingPromptTaskIds((prev) => new Set(prev).add(taskId))
+      setPendingPromptTaskIds((prev) => new Set(prev).add(sessionId))
 
-      const subs = promptSubsRef.current.get(taskId)
+      const subs = promptSubsRef.current.get(sessionId)
       if (subs) {
         subs.forEach((cb) => cb(prompt))
       }
     })
 
-    const unsubSessionDetected = window.api.pty.onSessionDetected((taskId, sessionId) => {
-      const subs = sessionDetectedSubsRef.current.get(taskId)
+    const unsubSessionDetected = window.api.pty.onSessionDetected((sessionId, conversationId) => {
+      const subs = sessionDetectedSubsRef.current.get(sessionId)
       if (subs) {
-        subs.forEach((cb) => cb(sessionId))
+        subs.forEach((cb) => cb(conversationId))
       }
     })
 
@@ -184,21 +184,21 @@ export function PtyProvider({ children }: { children: ReactNode }) {
       unsubData()
       unsubExit()
       unsubSessionNotFound()
-      unsubIdle()
+      unsubAttention()
       unsubStateChange()
       unsubPrompt()
       unsubSessionDetected()
     }
   }, [getOrCreateState])
 
-  const subscribe = useCallback((taskId: string, cb: DataCallback): (() => void) => {
+  const subscribe = useCallback((sessionId: string, cb: DataCallback): (() => void) => {
     // Ensure state exists so onData doesn't drop data
-    getOrCreateState(taskId)
+    getOrCreateState(sessionId)
 
-    let subs = dataSubsRef.current.get(taskId)
+    let subs = dataSubsRef.current.get(sessionId)
     if (!subs) {
       subs = new Set()
-      dataSubsRef.current.set(taskId, subs)
+      dataSubsRef.current.set(sessionId, subs)
     }
     subs.add(cb)
     return () => {
@@ -206,11 +206,11 @@ export function PtyProvider({ children }: { children: ReactNode }) {
     }
   }, [getOrCreateState])
 
-  const subscribeExit = useCallback((taskId: string, cb: ExitCallback): (() => void) => {
-    let subs = exitSubsRef.current.get(taskId)
+  const subscribeExit = useCallback((sessionId: string, cb: ExitCallback): (() => void) => {
+    let subs = exitSubsRef.current.get(sessionId)
     if (!subs) {
       subs = new Set()
-      exitSubsRef.current.set(taskId, subs)
+      exitSubsRef.current.set(sessionId, subs)
     }
     subs.add(cb)
     return () => {
@@ -219,11 +219,11 @@ export function PtyProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const subscribeSessionInvalid = useCallback(
-    (taskId: string, cb: SessionInvalidCallback): (() => void) => {
-      let subs = sessionInvalidSubsRef.current.get(taskId)
+    (sessionId: string, cb: SessionInvalidCallback): (() => void) => {
+      let subs = sessionInvalidSubsRef.current.get(sessionId)
       if (!subs) {
         subs = new Set()
-        sessionInvalidSubsRef.current.set(taskId, subs)
+        sessionInvalidSubsRef.current.set(sessionId, subs)
       }
       subs.add(cb)
       return () => {
@@ -233,11 +233,11 @@ export function PtyProvider({ children }: { children: ReactNode }) {
     []
   )
 
-  const subscribeIdle = useCallback((taskId: string, cb: IdleCallback): (() => void) => {
-    let subs = idleSubsRef.current.get(taskId)
+  const subscribeAttention = useCallback((sessionId: string, cb: AttentionCallback): (() => void) => {
+    let subs = attentionSubsRef.current.get(sessionId)
     if (!subs) {
       subs = new Set()
-      idleSubsRef.current.set(taskId, subs)
+      attentionSubsRef.current.set(sessionId, subs)
     }
     subs.add(cb)
     return () => {
@@ -245,25 +245,28 @@ export function PtyProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
-  const subscribeState = useCallback((taskId: string, cb: StateChangeCallback): (() => void) => {
-    let subs = stateSubsRef.current.get(taskId)
+  const subscribeState = useCallback((sessionId: string, cb: StateChangeCallback): (() => void) => {
+    // Ensure state exists so onStateChange doesn't drop events
+    getOrCreateState(sessionId)
+
+    let subs = stateSubsRef.current.get(sessionId)
     if (!subs) {
       subs = new Set()
-      stateSubsRef.current.set(taskId, subs)
+      stateSubsRef.current.set(sessionId, subs)
     }
     subs.add(cb)
 
     // Fetch initial state from backend if we don't have it yet
-    const state = statesRef.current.get(taskId)
+    const state = statesRef.current.get(sessionId)
     if (!state || state.state === 'starting') {
-      window.api.pty.getState(taskId).then((backendState) => {
+      window.api.pty.getState(sessionId).then((backendState) => {
         if (backendState) {
-          const localState = getOrCreateState(taskId)
+          const localState = getOrCreateState(sessionId)
           if (localState.state !== backendState) {
             const oldState = localState.state
             localState.state = backendState
             // Notify all subscribers of the initial state
-            const currentSubs = stateSubsRef.current.get(taskId)
+            const currentSubs = stateSubsRef.current.get(sessionId)
             if (currentSubs) {
               currentSubs.forEach((sub) => sub(backendState, oldState))
             }
@@ -277,11 +280,11 @@ export function PtyProvider({ children }: { children: ReactNode }) {
     }
   }, [getOrCreateState])
 
-  const subscribePrompt = useCallback((taskId: string, cb: PromptCallback): (() => void) => {
-    let subs = promptSubsRef.current.get(taskId)
+  const subscribePrompt = useCallback((sessionId: string, cb: PromptCallback): (() => void) => {
+    let subs = promptSubsRef.current.get(sessionId)
     if (!subs) {
       subs = new Set()
-      promptSubsRef.current.set(taskId, subs)
+      promptSubsRef.current.set(sessionId, subs)
     }
     subs.add(cb)
     return () => {
@@ -290,11 +293,11 @@ export function PtyProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const subscribeSessionDetected = useCallback(
-    (taskId: string, cb: SessionDetectedCallback): (() => void) => {
-      let subs = sessionDetectedSubsRef.current.get(taskId)
+    (sessionId: string, cb: SessionDetectedCallback): (() => void) => {
+      let subs = sessionDetectedSubsRef.current.get(sessionId)
       if (!subs) {
         subs = new Set()
-        sessionDetectedSubsRef.current.set(taskId, subs)
+        sessionDetectedSubsRef.current.set(sessionId, subs)
       }
       subs.add(cb)
       return () => {
@@ -304,33 +307,33 @@ export function PtyProvider({ children }: { children: ReactNode }) {
     []
   )
 
-  const getLastSeq = useCallback((taskId: string): number => {
-    return statesRef.current.get(taskId)?.lastSeq ?? -1
+  const getLastSeq = useCallback((sessionId: string): number => {
+    return statesRef.current.get(sessionId)?.lastSeq ?? -1
   }, [])
 
-  const getExitCode = useCallback((taskId: string): number | undefined => {
-    return statesRef.current.get(taskId)?.exitCode
+  const getExitCode = useCallback((sessionId: string): number | undefined => {
+    return statesRef.current.get(sessionId)?.exitCode
   }, [])
 
-  const isSessionInvalid = useCallback((taskId: string): boolean => {
-    return statesRef.current.get(taskId)?.sessionInvalid ?? false
+  const isSessionInvalid = useCallback((sessionId: string): boolean => {
+    return statesRef.current.get(sessionId)?.sessionInvalid ?? false
   }, [])
 
-  const getState = useCallback((taskId: string): TerminalState => {
-    return statesRef.current.get(taskId)?.state ?? 'starting'
+  const getState = useCallback((sessionId: string): TerminalState => {
+    return statesRef.current.get(sessionId)?.state ?? 'starting'
   }, [])
 
-  const getPendingPrompt = useCallback((taskId: string): PromptInfo | undefined => {
-    return statesRef.current.get(taskId)?.pendingPrompt
+  const getPendingPrompt = useCallback((sessionId: string): PromptInfo | undefined => {
+    return statesRef.current.get(sessionId)?.pendingPrompt
   }, [])
 
-  const clearPendingPrompt = useCallback((taskId: string): void => {
-    const state = statesRef.current.get(taskId)
+  const clearPendingPrompt = useCallback((sessionId: string): void => {
+    const state = statesRef.current.get(sessionId)
     if (state) {
       state.pendingPrompt = undefined
       setPendingPromptTaskIds((prev) => {
         const next = new Set(prev)
-        next.delete(taskId)
+        next.delete(sessionId)
         return next
       })
     }
@@ -342,49 +345,49 @@ export function PtyProvider({ children }: { children: ReactNode }) {
 
   // Full reset for mode switches - removes all state so fresh state is created
   // Sequence numbers handle ordering - no need for ignore mechanism
-  const resetTaskState = useCallback((taskId: string): void => {
-    statesRef.current.delete(taskId)
+  const resetTaskState = useCallback((sessionId: string): void => {
+    statesRef.current.delete(sessionId)
     setPendingPromptTaskIds((prev) => {
       const next = new Set(prev)
-      next.delete(taskId)
+      next.delete(sessionId)
       return next
     })
   }, [])
 
   // Clean up all memory for a task (call when PTY exits or task is deleted)
-  const cleanupTask = useCallback((taskId: string): void => {
-    statesRef.current.delete(taskId)
-    dataSubsRef.current.delete(taskId)
-    exitSubsRef.current.delete(taskId)
-    sessionInvalidSubsRef.current.delete(taskId)
-    idleSubsRef.current.delete(taskId)
-    stateSubsRef.current.delete(taskId)
-    promptSubsRef.current.delete(taskId)
-    sessionDetectedSubsRef.current.delete(taskId)
+  const cleanupTask = useCallback((sessionId: string): void => {
+    statesRef.current.delete(sessionId)
+    dataSubsRef.current.delete(sessionId)
+    exitSubsRef.current.delete(sessionId)
+    sessionInvalidSubsRef.current.delete(sessionId)
+    attentionSubsRef.current.delete(sessionId)
+    stateSubsRef.current.delete(sessionId)
+    promptSubsRef.current.delete(sessionId)
+    sessionDetectedSubsRef.current.delete(sessionId)
     setPendingPromptTaskIds((prev) => {
       const next = new Set(prev)
-      next.delete(taskId)
+      next.delete(sessionId)
       return next
     })
   }, [])
 
   // Quick run prompt - for auto-sending prompt when task opens
-  const setQuickRunPrompt = useCallback((taskId: string, prompt: string, codeMode?: CodeMode): void => {
-    const state = getOrCreateState(taskId)
+  const setQuickRunPrompt = useCallback((sessionId: string, prompt: string, codeMode?: CodeMode): void => {
+    const state = getOrCreateState(sessionId)
     state.quickRunPrompt = prompt
     state.quickRunCodeMode = codeMode
   }, [getOrCreateState])
 
-  const getQuickRunPrompt = useCallback((taskId: string): string | undefined => {
-    return statesRef.current.get(taskId)?.quickRunPrompt
+  const getQuickRunPrompt = useCallback((sessionId: string): string | undefined => {
+    return statesRef.current.get(sessionId)?.quickRunPrompt
   }, [])
 
-  const getQuickRunCodeMode = useCallback((taskId: string): CodeMode | undefined => {
-    return statesRef.current.get(taskId)?.quickRunCodeMode
+  const getQuickRunCodeMode = useCallback((sessionId: string): CodeMode | undefined => {
+    return statesRef.current.get(sessionId)?.quickRunCodeMode
   }, [])
 
-  const clearQuickRunPrompt = useCallback((taskId: string): void => {
-    const state = statesRef.current.get(taskId)
+  const clearQuickRunPrompt = useCallback((sessionId: string): void => {
+    const state = statesRef.current.get(sessionId)
     if (state) {
       state.quickRunPrompt = undefined
       state.quickRunCodeMode = undefined
@@ -395,7 +398,7 @@ export function PtyProvider({ children }: { children: ReactNode }) {
     subscribe,
     subscribeExit,
     subscribeSessionInvalid,
-    subscribeIdle,
+    subscribeAttention,
     subscribeState,
     subscribePrompt,
     subscribeSessionDetected,
@@ -416,7 +419,7 @@ export function PtyProvider({ children }: { children: ReactNode }) {
     subscribe,
     subscribeExit,
     subscribeSessionInvalid,
-    subscribeIdle,
+    subscribeAttention,
     subscribeState,
     subscribePrompt,
     subscribeSessionDetected,

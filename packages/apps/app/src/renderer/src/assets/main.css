@@ -12,6 +12,9 @@
 @source "../../../../../../../packages/domains/tags/src";
 @source "../../../../../../../packages/domains/settings/src";
 @source "../../../../../../../packages/domains/onboarding/src";
+@source "../../../../../../../packages/domains/task-terminals/src";
+@source "../../../../../../../packages/domains/task-browser/src";
+@source "../../../../../../../packages/domains/worktrees/src";
 
 @custom-variant dark (&:is(.dark *));
 

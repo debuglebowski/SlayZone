@@ -4,16 +4,16 @@
 
 export type TerminalStateStyle = {
   color: string
+  textColor: string
   label: string
 }
 
 const TERMINAL_STATE_STYLES: Record<string, TerminalStateStyle> = {
-  idle: { color: 'bg-blue-400', label: 'Idle' },
-  dead: { color: 'bg-gray-400', label: 'Stopped' },
-  starting: { color: 'bg-gray-400', label: 'Starting' },
-  running: { color: 'bg-yellow-400', label: 'Working' },
-  awaiting_input: { color: 'bg-yellow-400 animate-pulse', label: 'Awaiting input' },
-  error: { color: 'bg-red-400', label: 'Error' }
+  dead: { color: 'bg-gray-400', textColor: 'text-gray-500', label: 'Stopped' },
+  starting: { color: 'bg-gray-400', textColor: 'text-green-500', label: 'Starting' },
+  running: { color: 'bg-yellow-400 animate-pulse', textColor: 'text-green-500', label: 'Active' },
+  attention: { color: 'bg-cyan-400', textColor: 'text-cyan-500', label: 'Attention' },
+  error: { color: 'bg-red-400', textColor: 'text-red-500', label: 'Error' }
 }
 
 export function getTerminalStateStyle(state: string | undefined): TerminalStateStyle | null {

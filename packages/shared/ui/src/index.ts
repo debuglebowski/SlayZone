@@ -1,6 +1,12 @@
 // Utilities
 export { cn } from './utils'
 export { getTerminalStateStyle, type TerminalStateStyle } from './terminal-state'
+export {
+  getTaskStatusStyle,
+  TASK_STATUS_ORDER,
+  taskStatusOptions,
+  type TaskStatusStyle
+} from './task-status'
 
 // Components
 export * from './alert-dialog'

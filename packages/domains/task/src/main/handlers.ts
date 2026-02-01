@@ -2,13 +2,16 @@ import type { IpcMain } from 'electron'
 import type { Database } from 'better-sqlite3'
 import type { CreateTaskInput, UpdateTaskInput, Task } from '@omgslayzone/task/shared'
 
-// Parse panel_visibility JSON from DB row
+// Parse JSON columns from DB row
 function parseTask(row: Record<string, unknown> | undefined): Task | null {
   if (!row) return null
   return {
     ...row,
     panel_visibility: row.panel_visibility
       ? JSON.parse(row.panel_visibility as string)
+      : null,
+    browser_tabs: row.browser_tabs
+      ? JSON.parse(row.browser_tabs as string)
       : null
   } as Task
 }
@@ -120,9 +123,17 @@ export function registerTaskHandlers(ipcMain: IpcMain, db: Database): void {
       fields.push('worktree_path = ?')
       values.push(data.worktreePath)
     }
+    if (data.worktreeParentBranch !== undefined) {
+      fields.push('worktree_parent_branch = ?')
+      values.push(data.worktreeParentBranch)
+    }
     if (data.browserUrl !== undefined) {
       fields.push('browser_url = ?')
       values.push(data.browserUrl)
+    }
+    if (data.browserTabs !== undefined) {
+      fields.push('browser_tabs = ?')
+      values.push(data.browserTabs ? JSON.stringify(data.browserTabs) : null)
     }
 
     if (fields.length === 0) {

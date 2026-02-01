@@ -1,6 +1,6 @@
 import { motion } from 'framer-motion'
 import type { Task } from '@omgslayzone/task/shared'
-import { Button } from '@omgslayzone/ui'
+import { Button, getTaskStatusStyle } from '@omgslayzone/ui'
 import { Pencil, Trash2 } from 'lucide-react'
 import { format, isPast, parseISO } from 'date-fns'
 
@@ -8,24 +8,6 @@ interface TaskItemProps {
   task: Task
   onEdit: (task: Task) => void
   onDelete: (task: Task) => void
-}
-
-const statusColors: Record<string, string> = {
-  inbox: 'bg-gray-200 text-gray-700',
-  backlog: 'bg-slate-200 text-slate-700',
-  todo: 'bg-blue-200 text-blue-700',
-  in_progress: 'bg-yellow-200 text-yellow-700',
-  review: 'bg-purple-200 text-purple-700',
-  done: 'bg-green-200 text-green-700'
-}
-
-const statusLabels: Record<string, string> = {
-  inbox: 'Inbox',
-  backlog: 'Backlog',
-  todo: 'Todo',
-  in_progress: 'In Progress',
-  review: 'Review',
-  done: 'Done'
 }
 
 export function TaskItem({ task, onEdit, onDelete }: TaskItemProps): React.JSX.Element {
@@ -46,9 +28,14 @@ export function TaskItem({ task, onEdit, onDelete }: TaskItemProps): React.JSX.E
       </span>
 
       {/* Status badge */}
-      <span className={`rounded px-1.5 py-0.5 text-xs font-medium ${statusColors[task.status]}`}>
-        {statusLabels[task.status]}
-      </span>
+      {(() => {
+        const style = getTaskStatusStyle(task.status)
+        return style && (
+          <span className={`rounded px-1.5 py-0.5 text-xs font-medium ${style.bg} ${style.text}`}>
+            {style.label}
+          </span>
+        )
+      })()}
 
       {/* Due date */}
       {task.due_date && (

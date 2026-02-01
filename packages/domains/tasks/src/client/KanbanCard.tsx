@@ -39,14 +39,15 @@ export function KanbanCard({
   const prevStatusRef = useRef(task.status)
   const [justCompleted, setJustCompleted] = useState(false)
 
-  // Terminal state tracking
+  // Terminal state tracking - use main terminal sessionId format (taskId:taskId)
   const { getState, subscribeState } = usePty()
-  const [terminalState, setTerminalState] = useState<TerminalState>(() => getState(task.id))
+  const mainSessionId = `${task.id}:${task.id}`
+  const [terminalState, setTerminalState] = useState<TerminalState>(() => getState(mainSessionId))
 
   useEffect(() => {
-    setTerminalState(getState(task.id))
-    return subscribeState(task.id, (newState) => setTerminalState(newState))
-  }, [task.id, getState, subscribeState])
+    setTerminalState(getState(mainSessionId))
+    return subscribeState(mainSessionId, (newState) => setTerminalState(newState))
+  }, [mainSessionId, getState, subscribeState])
 
   useEffect(() => {
     if (prevStatusRef.current !== 'done' && task.status === 'done') {
@@ -105,9 +106,9 @@ export function KanbanCard({
                   P{task.priority}
                 </span>
               )}
-              {/* Terminal state indicator */}
+              {/* Terminal state indicator - hide when starting */}
               {(() => {
-                const stateStyle = getTerminalStateStyle(terminalState)
+                const stateStyle = terminalState !== 'starting' ? getTerminalStateStyle(terminalState) : null
                 return stateStyle ? (
                   <Tooltip>
                     <TooltipTrigger asChild>

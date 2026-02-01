@@ -1,5 +1,5 @@
 import { execSync } from 'child_process'
-import type { DetectedWorktree } from '../shared/types'
+import type { DetectedWorktree, MergeResult } from '../shared/types'
 
 export function isGitRepo(path: string): boolean {
   try {
@@ -93,4 +93,64 @@ export function getCurrentBranch(path: string): string | null {
   } catch {
     return null
   }
+}
+
+export function hasUncommittedChanges(path: string): boolean {
+  try {
+    const output = execSync('git status --porcelain', {
+      cwd: path,
+      encoding: 'utf-8',
+      stdio: ['pipe', 'pipe', 'pipe']
+    })
+    return output.trim().length > 0
+  } catch {
+    return false
+  }
+}
+
+export function mergeIntoParent(
+  projectPath: string,
+  parentBranch: string,
+  sourceBranch: string
+): MergeResult {
+  try {
+    // Check if we're on parent branch, if not checkout
+    const currentBranch = getCurrentBranch(projectPath)
+    if (currentBranch !== parentBranch) {
+      execSync(`git checkout "${parentBranch}"`, {
+        cwd: projectPath,
+        stdio: 'pipe'
+      })
+    }
+
+    // Attempt merge
+    try {
+      execSync(`git merge "${sourceBranch}" --no-edit`, {
+        cwd: projectPath,
+        stdio: 'pipe'
+      })
+      return { success: true, merged: true, conflicted: false }
+    } catch {
+      // Check for merge conflicts
+      const status = execSync('git status --porcelain', {
+        cwd: projectPath,
+        encoding: 'utf-8'
+      })
+      if (status.includes('UU') || status.includes('AA') || status.includes('DD')) {
+        return { success: false, merged: false, conflicted: true, error: 'Merge conflicts detected' }
+      }
+      throw new Error('Merge failed')
+    }
+  } catch (err) {
+    return {
+      success: false,
+      merged: false,
+      conflicted: false,
+      error: err instanceof Error ? err.message : String(err)
+    }
+  }
+}
+
+export function abortMerge(path: string): void {
+  execSync('git merge --abort', { cwd: path, stdio: 'pipe' })
 }

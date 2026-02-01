@@ -263,6 +263,63 @@ const migrations: Migration[] = [
         DROP TABLE IF EXISTS worktrees;
       `)
     }
+  },
+  {
+    version: 18,
+    up: (db) => {
+      // Add browser_tabs JSON column for multi-tab browser support
+      db.exec(`ALTER TABLE tasks ADD COLUMN browser_tabs TEXT DEFAULT NULL;`)
+
+      // Migrate existing browser_url values to browser_tabs JSON
+      // Using task_id as tab id since we need deterministic IDs in migration
+      const tasks = db.prepare(`SELECT id, browser_url FROM tasks WHERE browser_url IS NOT NULL AND browser_url != ''`).all() as Array<{ id: string; browser_url: string }>
+      const updateStmt = db.prepare(`UPDATE tasks SET browser_tabs = ? WHERE id = ?`)
+      for (const task of tasks) {
+        const tabId = `tab-${task.id.slice(0, 8)}`
+        const browserTabs = JSON.stringify({
+          tabs: [{ id: tabId, url: task.browser_url, title: task.browser_url }],
+          activeTabId: tabId
+        })
+        updateStmt.run(browserTabs, task.id)
+      }
+    }
+  },
+  {
+    version: 19,
+    up: (db) => {
+      // Create terminal_tabs table for multi-tab terminal support
+      // Use IF NOT EXISTS to handle partial migration state
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS terminal_tabs (
+          id TEXT PRIMARY KEY,
+          task_id TEXT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+          label TEXT,
+          mode TEXT NOT NULL DEFAULT 'terminal',
+          is_main INTEGER NOT NULL DEFAULT 0,
+          position INTEGER NOT NULL DEFAULT 0,
+          created_at TEXT NOT NULL DEFAULT (datetime('now'))
+        );
+        CREATE INDEX IF NOT EXISTS idx_terminal_tabs_task ON terminal_tabs(task_id);
+      `)
+
+      // Create main tab for each existing task using its terminal_mode
+      // Use taskId as tab id (unique since each task has one main tab)
+      // Use INSERT OR IGNORE to skip tasks that already have a main tab
+      const tasks = db.prepare(`SELECT id, terminal_mode FROM tasks`).all() as Array<{ id: string; terminal_mode: string | null }>
+      const insertStmt = db.prepare(`
+        INSERT OR IGNORE INTO terminal_tabs (id, task_id, label, mode, is_main, position, created_at)
+        VALUES (?, ?, NULL, ?, 1, 0, datetime('now'))
+      `)
+      for (const task of tasks) {
+        insertStmt.run(task.id, task.id, task.terminal_mode || 'claude-code')
+      }
+    }
+  },
+  {
+    version: 20,
+    up: (db) => {
+      db.exec(`ALTER TABLE tasks ADD COLUMN worktree_parent_branch TEXT DEFAULT NULL;`)
+    }
   }
 ]
 

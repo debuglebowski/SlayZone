@@ -1,4 +1,5 @@
 import type { TerminalMode } from '@omgslayzone/terminal/shared'
+import type { BrowserTabsState } from '@omgslayzone/task-browser/shared'
 
 export type TaskStatus = 'inbox' | 'backlog' | 'todo' | 'in_progress' | 'review' | 'done'
 
@@ -31,7 +32,10 @@ export interface Task {
   panel_visibility: PanelVisibility | null
   // Worktree
   worktree_path: string | null
+  worktree_parent_branch: string | null
   browser_url: string | null
+  // Browser tabs (JSON)
+  browser_tabs: BrowserTabsState | null
   created_at: string
   updated_at: string
 }
@@ -68,7 +72,10 @@ export interface UpdateTaskInput {
   panelVisibility?: PanelVisibility | null
   // Worktree
   worktreePath?: string | null
+  worktreeParentBranch?: string | null
   browserUrl?: string | null
+  // Browser tabs
+  browserTabs?: BrowserTabsState | null
   // Legacy
   claudeSessionId?: string | null
 }

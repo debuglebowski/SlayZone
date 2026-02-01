@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { MoreHorizontal, Archive, Trash2, AlertTriangle, RotateCw, RefreshCcw, Link2, Sparkles, Loader2, Terminal as TerminalIcon, Globe, Settings2 } from 'lucide-react'
 import type { Task, PanelVisibility } from '@omgslayzone/task/shared'
+import type { BrowserTabsState } from '@omgslayzone/task-browser/shared'
 import type { Tag } from '@omgslayzone/tags/shared'
 import type { Project } from '@omgslayzone/projects/shared'
 import type { TerminalMode, ClaudeAvailability } from '@omgslayzone/terminal/shared'
@@ -25,12 +26,13 @@ import { DeleteTaskDialog } from './DeleteTaskDialog'
 import { Tooltip, TooltipTrigger, TooltipContent } from '@omgslayzone/ui'
 import { TaskMetadataSidebar } from './TaskMetadataSidebar'
 import { RichTextEditor } from '@omgslayzone/editor'
-import { Terminal } from '@omgslayzone/terminal'
-import { markSkipCache } from '@omgslayzone/terminal'
-import { usePty } from '@omgslayzone/terminal'
+import { markSkipCache, usePty } from '@omgslayzone/terminal'
+import { TerminalContainer } from '@omgslayzone/task-terminals'
 import { GitPanel } from '@omgslayzone/worktrees'
 import { cn } from '@omgslayzone/ui'
 import { BrowserPanel } from '@omgslayzone/task-browser'
+import { usePanelSizes } from './usePanelSizes'
+import { ResizeHandle } from './ResizeHandle'
 // ErrorBoundary should be provided by the app when rendering this component
 
 interface TaskDetailPageProps {
@@ -75,9 +77,23 @@ export function TaskDetailPage({
   // Terminal restart key (changing this forces remount)
   const [terminalKey, setTerminalKey] = useState(0)
 
+  // Track if the main terminal tab is active (for bottom bar visibility)
+  const [isMainTabActive, setIsMainTabActive] = useState(true)
+
   // Panel visibility state
   const defaultPanelVisibility: PanelVisibility = { terminal: true, browser: false, settings: true }
   const [panelVisibility, setPanelVisibility] = useState<PanelVisibility>(defaultPanelVisibility)
+
+  // Browser tabs state
+  const defaultBrowserTabs: BrowserTabsState = {
+    tabs: [{ id: 'default', url: 'about:blank', title: 'New Tab' }],
+    activeTabId: 'default'
+  }
+  const [browserTabs, setBrowserTabs] = useState<BrowserTabsState>(defaultBrowserTabs)
+
+  // Panel sizes for resizable panels
+  const [panelSizes, updatePanelSizes] = usePanelSizes()
+  const [isResizing, setIsResizing] = useState(false)
 
   // Terminal API (exposed via onReady callback)
   const terminalApiRef = useRef<{ sendInput: (text: string) => Promise<void>; focus: () => void } | null>(null)
@@ -103,8 +119,14 @@ export function TaskDetailPage({
     return subscribeSessionDetected(task.id, setDetectedSessionId)
   }, [task?.id, subscribeSessionDetected])
 
-  // Load task data on mount
+  // Load task data on mount or when taskId changes
   useEffect(() => {
+    // Reset transient state when switching tasks
+    setLoading(true)
+    setDetectedSessionId(null)
+    setEditingTitle(false)
+    setGeneratingDescription(false)
+
     const loadData = async (): Promise<void> => {
       const [loadedTask, loadedTags, loadedTaskTags, projects, claudeCheck] = await Promise.all([
         window.api.db.getTask(taskId),
@@ -118,10 +140,9 @@ export function TaskDetailPage({
         setTask(loadedTask)
         setTitleValue(loadedTask.title)
         setDescriptionValue(loadedTask.description ?? '')
-        // Initialize panel visibility from task or use defaults
-        if (loadedTask.panel_visibility) {
-          setPanelVisibility(loadedTask.panel_visibility)
-        }
+        // Restore panel visibility and browser tabs (always reset to defaults if not saved)
+        setPanelVisibility(loadedTask.panel_visibility ?? defaultPanelVisibility)
+        setBrowserTabs(loadedTask.browser_tabs ?? defaultBrowserTabs)
         // Find project for this task
         const taskProject = projects.find((p) => p.id === loadedTask.project_id)
         setProject(taskProject || null)
@@ -271,10 +292,12 @@ export function TaskDetailPage({
   const handleModeChange = useCallback(
     async (mode: TerminalMode) => {
       if (!task) return
+      // Main tab session ID format: ${taskId}:${taskId}
+      const mainSessionId = `${task.id}:${task.id}`
       // Reset state FIRST to ignore any in-flight data
-      resetTaskState(task.id)
+      resetTaskState(mainSessionId)
       // Now kill the PTY (any data it sends will be ignored)
-      await window.api.pty.kill(task.id)
+      await window.api.pty.kill(mainSessionId)
       // Small delay to let any remaining PTY data be processed and ignored
       await new Promise((r) => setTimeout(r, 100))
       // Update mode and clear all conversation IDs (fresh start)
@@ -305,11 +328,13 @@ export function TaskDetailPage({
       })
       setTask(updated)
       onTaskUpdated(updated)
+      // Main tab session ID format: ${taskId}:${taskId}
+      const mainSessionId = `${task.id}:${task.id}`
       // Restart terminal to apply new setting
-      resetTaskState(task.id)
-      await window.api.pty.kill(task.id)
+      resetTaskState(mainSessionId)
+      await window.api.pty.kill(mainSessionId)
       await new Promise((r) => setTimeout(r, 100))
-      markSkipCache(task.id)
+      markSkipCache(mainSessionId)
       setTerminalKey((k) => k + 1)
     },
     [task, onTaskUpdated, resetTaskState]
@@ -429,11 +454,22 @@ export function TaskDetailPage({
   }
 
   // Wrapper for GitPanel that calls API and notifies parent
-  const updateTaskAndNotify = async (data: { id: string; worktreePath?: string | null; browserUrl?: string | null }): Promise<Task> => {
+  const updateTaskAndNotify = async (data: { id: string; worktreePath?: string | null; worktreeParentBranch?: string | null; browserUrl?: string | null; status?: Task['status'] }): Promise<Task> => {
     const updated = await window.api.db.updateTask(data)
     handleTaskUpdate(updated)
     return updated
   }
+
+  // Handler for browser tabs changes
+  const handleBrowserTabsChange = useCallback(async (tabs: BrowserTabsState) => {
+    setBrowserTabs(tabs)
+    if (!task) return
+    // Persist to DB (debounced via the tab state itself)
+    await window.api.db.updateTask({
+      id: task.id,
+      browserTabs: tabs
+    })
+  }, [task])
 
   const handleTagsChange = (newTagIds: string[]): void => {
     setTaskTagIds(newTagIds)
@@ -598,22 +634,26 @@ export function TaskDetailPage({
             </div>
           )}
           {/* Terminal + mode bar wrapper */}
-          <div className="flex-1 min-h-0 m-4 flex flex-col">
-            <div className="flex-1 min-h-0 rounded-lg overflow-hidden border border-neutral-800">
-              {project?.path ? (
-                <Terminal
+          <div className="flex-1 min-h-0 flex flex-col">
+            <div className="flex-1 min-h-0">
+              {isResizing ? (
+                <div className="h-full bg-[#0a0a0a]" />
+              ) : project?.path ? (
+                <TerminalContainer
                   key={terminalKey}
                   taskId={task.id}
-                  cwd={project.path}
-                  mode={task.terminal_mode || 'claude-code'}
-                  sessionId={task.claude_conversation_id || task.claude_session_id || undefined}
-                  existingSessionId={task.claude_conversation_id || task.claude_session_id || undefined}
+                  cwd={task.worktree_path || project.path}
+                  defaultMode={task.terminal_mode || 'claude-code'}
+                  conversationId={task.claude_conversation_id || task.claude_session_id || undefined}
+                  existingConversationId={task.claude_conversation_id || task.claude_session_id || undefined}
                   initialPrompt={getQuickRunPrompt(task.id)}
                   codeMode={getQuickRunCodeMode(task.id)}
+                  dangerouslySkipPermissions={task.dangerously_skip_permissions ?? false}
                   autoFocus={isFirstMountRef.current}
-                  onSessionCreated={handleSessionCreated}
+                  onConversationCreated={handleSessionCreated}
                   onSessionInvalid={handleSessionInvalid}
                   onReady={handleTerminalReady}
+                  onMainTabActiveChange={setIsMainTabActive}
                 />
               ) : (
                 <div className="h-full flex items-center justify-center text-muted-foreground">
@@ -627,8 +667,14 @@ export function TaskDetailPage({
               )}
             </div>
 
-            {/* Terminal mode bar */}
-            <div className="shrink-0 px-1 py-2 flex items-center gap-3">
+            {/* Terminal mode bar - only active on main tab */}
+            <Tooltip open={isMainTabActive ? false : undefined}>
+              <TooltipTrigger asChild>
+                <div className="shrink-0 px-2 py-2 border-t border-neutral-800">
+                  <div className={cn(
+                    "flex items-center gap-3 transition-opacity",
+                    !isMainTabActive && "opacity-40 pointer-events-none"
+                  )}>
             <Select
               value={task.terminal_mode || 'claude-code'}
               onValueChange={(value) => handleModeChange(value as TerminalMode)}
@@ -707,19 +753,55 @@ export function TaskDetailPage({
               </TooltipTrigger>
               <TooltipContent>Insert task description into terminal (⌘⇧I)</TooltipContent>
             </Tooltip>
-            </div>
+                  </div>
+                </div>
+              </TooltipTrigger>
+              <TooltipContent>Switch to Main tab to use these controls</TooltipContent>
+            </Tooltip>
           </div>
         </div>
         )}
 
+        {/* Resize handle: Terminal | Browser */}
+        {panelVisibility.terminal && panelVisibility.browser && (
+          <ResizeHandle
+            width={panelSizes.browser}
+            minWidth={200}
+            onWidthChange={(w) => updatePanelSizes({ browser: w })}
+            onDragStart={() => setIsResizing(true)}
+            onDragEnd={() => setIsResizing(false)}
+          />
+        )}
+
         {/* Browser Panel */}
         {panelVisibility.browser && (
-          <BrowserPanel className="flex-1 min-w-[300px] border-l" />
+          <div className="shrink-0 border-l" style={{ width: panelSizes.browser }}>
+            {isResizing ? (
+              <div className="h-full bg-background" />
+            ) : (
+              <BrowserPanel
+                className="h-full"
+                tabs={browserTabs}
+                onTabsChange={handleBrowserTabsChange}
+              />
+            )}
+          </div>
+        )}
+
+        {/* Resize handle: Browser | Settings or Terminal | Settings */}
+        {panelVisibility.settings && (panelVisibility.browser || panelVisibility.terminal) && (
+          <ResizeHandle
+            width={panelSizes.settings}
+            minWidth={200}
+            onWidthChange={(w) => updatePanelSizes({ settings: w })}
+            onDragStart={() => setIsResizing(true)}
+            onDragEnd={() => setIsResizing(false)}
+          />
         )}
 
         {/* Settings Panel */}
         {panelVisibility.settings && (
-        <div className="w-80 shrink-0 border-l flex flex-col overflow-y-auto">
+        <div className="shrink-0 border-l flex flex-col overflow-y-auto" style={{ width: panelSizes.settings }}>
           {/* Description */}
           <div className="p-4 flex-1 flex flex-col min-h-0">
             <RichTextEditor

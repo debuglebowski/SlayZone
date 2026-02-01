@@ -17,6 +17,7 @@ import { registerTaskHandlers, registerAiHandlers, registerFilesHandlers } from 
 import { registerTagHandlers } from '@omgslayzone/tags/main'
 import { registerSettingsHandlers, registerThemeHandlers } from '@omgslayzone/settings/main'
 import { registerPtyHandlers, registerClaudeHandlers, killAllPtys, startIdleChecker, stopIdleChecker } from '@omgslayzone/terminal/main'
+import { registerTerminalTabsHandlers } from '@omgslayzone/task-terminals/main'
 import { registerWorktreeHandlers } from '@omgslayzone/worktrees/main'
 
 // Minimum splash screen display time (ms)
@@ -357,6 +358,7 @@ app.whenReady().then(() => {
   registerThemeHandlers(ipcMain, db)
   registerClaudeHandlers(ipcMain)
   registerPtyHandlers(ipcMain, db)
+  registerTerminalTabsHandlers(ipcMain, db)
   registerFilesHandlers(ipcMain)
   registerWorktreeHandlers(ipcMain)
 

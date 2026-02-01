@@ -27,6 +27,13 @@ import {
 import { SidebarProvider } from '@omgslayzone/ui'
 import { AppSidebar } from '@/components/sidebar/AppSidebar'
 import { TabBar } from '@/components/tabs/TabBar'
+import {
+  DesktopNotificationToggle,
+  NotificationButton,
+  NotificationSidePanel,
+  useAttentionTasks,
+  useNotificationState
+} from '@/components/notifications'
 
 function App(): React.JSX.Element {
   // Core data from domain hook
@@ -83,6 +90,13 @@ function App(): React.JSX.Element {
   const ptyContext = usePty()
   const [terminalStates, setTerminalStates] = useState<Map<string, TerminalState>>(new Map())
 
+  // Notification state
+  const [notificationState, setNotificationState] = useNotificationState()
+  const { attentionTasks, refresh: refreshAttentionTasks } = useAttentionTasks(
+    tasks,
+    notificationState.filterCurrentProject ? selectedProjectId : null
+  )
+
   // Get task IDs from open tabs
   const openTaskIds = useMemo(
     () => tabs.filter((t): t is { type: 'task'; taskId: string; title: string } => t.type === 'task').map((t) => t.taskId),
@@ -94,8 +108,11 @@ function App(): React.JSX.Element {
     const unsubscribes: (() => void)[] = []
 
     for (const taskId of openTaskIds) {
+      // Main terminal sessionId format: taskId:taskId (matches useTaskTerminals.getSessionId)
+      const mainSessionId = `${taskId}:${taskId}`
+
       // Initialize with current state
-      const currentState = ptyContext.getState(taskId)
+      const currentState = ptyContext.getState(mainSessionId)
       setTerminalStates((prev) => {
         const next = new Map(prev)
         next.set(taskId, currentState)
@@ -103,7 +120,7 @@ function App(): React.JSX.Element {
       })
 
       // Subscribe to changes
-      const unsub = ptyContext.subscribeState(taskId, (newState) => {
+      const unsub = ptyContext.subscribeState(mainSessionId, (newState) => {
         setTerminalStates((prev) => {
           const next = new Map(prev)
           next.set(taskId, newState)
@@ -428,82 +445,121 @@ function App(): React.JSX.Element {
                 onTabClick={setActiveTabIndex}
                 onTabClose={closeTab}
                 onTabReorder={reorderTabs}
+                rightContent={
+                  <div className="flex items-center gap-1">
+                    <DesktopNotificationToggle
+                      enabled={notificationState.desktopEnabled}
+                      onToggle={() =>
+                        setNotificationState({ desktopEnabled: !notificationState.desktopEnabled })
+                      }
+                    />
+                    <NotificationButton
+                      active={notificationState.isLocked}
+                      onClick={() => setNotificationState({ isLocked: !notificationState.isLocked })}
+                    />
+                  </div>
+                }
               />
             </div>
           </div>
 
-          <div className="flex-1 min-h-0 relative">
-            {tabs.map((tab, i) => (
-              <div
-                key={tab.type === 'home' ? 'home' : tab.taskId}
-                className={`absolute inset-0 ${i !== activeTabIndex ? 'hidden' : ''}`}
-              >
-                {tab.type === 'home' ? (
-                  <div className="flex flex-col flex-1 p-6 pt-4 h-full">
-                    <header className="mb-6 flex items-center justify-between window-no-drag">
-                      {selectedProjectId ? (
-                        <textarea
-                          ref={projectNameInputRef}
-                          value={projectNameValue}
-                          onChange={(e) => setProjectNameValue(e.target.value)}
-                          onBlur={handleProjectNameSave}
-                          onKeyDown={handleProjectNameKeyDown}
-                          className="text-2xl font-bold bg-transparent border-none outline-none w-full resize-none cursor-text"
-                          style={{ caretColor: 'currentColor' }}
-                          rows={1}
-                        />
-                      ) : (
-                        <h1 className="text-2xl font-bold">All Tasks</h1>
-                      )}
-                      <Button onClick={() => setCreateOpen(true)} disabled={projects.length === 0}>
-                        New Task
-                      </Button>
-                    </header>
-
-                    {projects.length === 0 ? (
-                      <div className="text-center text-muted-foreground">
-                        Click + in sidebar to create a project
-                      </div>
-                    ) : (
-                      <>
-                        <div className="mb-4">
-                          <FilterBar filter={filter} onChange={setFilter} tags={tags} />
-                        </div>
-                        <div className="flex-1 min-h-0">
-                          <KanbanBoard
-                            tasks={displayTasks}
-                            groupBy={filter.groupBy}
-                            onTaskMove={handleTaskMove}
-                            onTaskReorder={reorderTasks}
-                            onTaskClick={handleTaskClick}
-                            onCreateTask={handleCreateTaskFromColumn}
-                            projectsMap={projectsMap}
-                            showProjectDot={selectedProjectId === null}
-                            disableDrag={filter.groupBy === 'due_date'}
-                            taskTags={taskTags}
-                            tags={tags}
-                            blockedTaskIds={blockedTaskIds}
-                            allProjects={projects}
-                            onUpdateTask={contextMenuUpdate}
-                            onArchiveTask={archiveTask}
-                            onDeleteTask={deleteTask}
-                            onArchiveAllTasks={archiveTasks}
+          <div className="flex-1 min-h-0 flex">
+            <div className="flex-1 min-w-0 relative">
+              {tabs.map((tab, i) => (
+                <div
+                  key={tab.type === 'home' ? 'home' : tab.taskId}
+                  className={`absolute inset-0 ${i !== activeTabIndex ? 'hidden' : ''}`}
+                >
+                  {tab.type === 'home' ? (
+                    <div className="flex flex-col flex-1 p-6 pt-4 h-full">
+                      <header className="mb-6 flex items-center justify-between window-no-drag">
+                        {selectedProjectId ? (
+                          <textarea
+                            ref={projectNameInputRef}
+                            value={projectNameValue}
+                            onChange={(e) => setProjectNameValue(e.target.value)}
+                            onBlur={handleProjectNameSave}
+                            onKeyDown={handleProjectNameKeyDown}
+                            className="text-2xl font-bold bg-transparent border-none outline-none w-full resize-none cursor-text"
+                            style={{ caretColor: 'currentColor' }}
+                            rows={1}
                           />
+                        ) : (
+                          <h1 className="text-2xl font-bold">All Tasks</h1>
+                        )}
+                        <Button onClick={() => setCreateOpen(true)} disabled={projects.length === 0}>
+                          New Task
+                        </Button>
+                      </header>
+
+                      {projects.length === 0 ? (
+                        <div className="text-center text-muted-foreground">
+                          Click + in sidebar to create a project
                         </div>
-                      </>
-                    )}
-                  </div>
-                ) : (
-                  <TaskDetailPage
-                    taskId={tab.taskId}
-                    isActive={i === activeTabIndex}
-                    onBack={goBack}
-                    onTaskUpdated={updateTask}
-                    onNavigateToTask={openTask}
-                  />
-                )}
-              </div>
-            ))}
+                      ) : (
+                        <>
+                          <div className="mb-4">
+                            <FilterBar filter={filter} onChange={setFilter} tags={tags} />
+                          </div>
+                          <div className="flex-1 min-h-0">
+                            <KanbanBoard
+                              tasks={displayTasks}
+                              groupBy={filter.groupBy}
+                              onTaskMove={handleTaskMove}
+                              onTaskReorder={reorderTasks}
+                              onTaskClick={handleTaskClick}
+                              onCreateTask={handleCreateTaskFromColumn}
+                              projectsMap={projectsMap}
+                              showProjectDot={selectedProjectId === null}
+                              disableDrag={filter.groupBy === 'due_date'}
+                              taskTags={taskTags}
+                              tags={tags}
+                              blockedTaskIds={blockedTaskIds}
+                              allProjects={projects}
+                              onUpdateTask={contextMenuUpdate}
+                              onArchiveTask={archiveTask}
+                              onDeleteTask={deleteTask}
+                              onArchiveAllTasks={archiveTasks}
+                            />
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  ) : (
+                    <TaskDetailPage
+                      taskId={tab.taskId}
+                      isActive={i === activeTabIndex}
+                      onBack={goBack}
+                      onTaskUpdated={updateTask}
+                      onNavigateToTask={openTask}
+                    />
+                  )}
+                </div>
+              ))}
+            </div>
+
+            {notificationState.isLocked && (
+              <NotificationSidePanel
+                width={notificationState.panelWidth}
+                onWidthChange={(width) => setNotificationState({ panelWidth: width })}
+                attentionTasks={attentionTasks}
+                projects={projects}
+                filterCurrentProject={notificationState.filterCurrentProject}
+                onFilterToggle={() =>
+                  setNotificationState({
+                    filterCurrentProject: !notificationState.filterCurrentProject
+                  })
+                }
+                onNavigate={openTask}
+                onCloseTerminal={async (sessionId) => {
+                  await window.api.pty.kill(sessionId)
+                  refreshAttentionTasks()
+                }}
+                onLockToggle={() => setNotificationState({ isLocked: false })}
+                selectedProjectId={selectedProjectId}
+                currentProjectName={projects.find((p) => p.id === selectedProjectId)?.name}
+              />
+            )}
           </div>
         </div>
 

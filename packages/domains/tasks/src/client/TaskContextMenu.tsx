@@ -9,7 +9,8 @@ import {
   ContextMenuSubTrigger,
   ContextMenuTrigger,
   ContextMenuRadioGroup,
-  ContextMenuRadioItem
+  ContextMenuRadioItem,
+  taskStatusOptions
 } from '@omgslayzone/ui'
 import {
   AlertDialog,
@@ -32,15 +33,6 @@ interface TaskContextMenuProps {
   onDeleteTask: (taskId: string) => void
   children: React.ReactNode
 }
-
-const STATUSES: { value: TaskStatus; label: string }[] = [
-  { value: 'inbox', label: 'Inbox' },
-  { value: 'backlog', label: 'Backlog' },
-  { value: 'todo', label: 'Todo' },
-  { value: 'in_progress', label: 'In Progress' },
-  { value: 'review', label: 'Review' },
-  { value: 'done', label: 'Done' }
-]
 
 const PRIORITIES = [1, 2, 3, 4, 5]
 
@@ -95,7 +87,7 @@ export function TaskContextMenu({
             <ContextMenuSubTrigger>Status</ContextMenuSubTrigger>
             <ContextMenuSubContent>
               <ContextMenuRadioGroup value={task.status} onValueChange={handleStatusChange}>
-                {STATUSES.map((s) => (
+                {taskStatusOptions.map((s) => (
                   <ContextMenuRadioItem key={s.value} value={s.value}>
                     {s.label}
                   </ContextMenuRadioItem>

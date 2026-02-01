@@ -32,6 +32,7 @@ export function UserSettingsDialog({ open, onOpenChange }: UserSettingsDialogPro
   const [claudeStatus, setClaudeStatus] = useState<ClaudeAvailability | null>(null)
   const [shellSetting, setShellSetting] = useState('')
   const [defaultShell, setDefaultShell] = useState('')
+  const [worktreeBasePath, setWorktreeBasePath] = useState('')
 
   useEffect(() => {
     if (open) {
@@ -40,15 +41,17 @@ export function UserSettingsDialog({ open, onOpenChange }: UserSettingsDialogPro
   }, [open])
 
   const loadData = async () => {
-    const [loadedTags, path, shell] = await Promise.all([
+    const [loadedTags, path, shell, wtBasePath] = await Promise.all([
       window.api.tags.getTags(),
       window.api.settings.get('database_path'),
-      window.api.settings.get('shell')
+      window.api.settings.get('shell'),
+      window.api.settings.get('worktree_base_path')
     ])
     setTags(loadedTags)
     setDbPath(path ?? 'Default location (userData)')
     setShellSetting(shell ?? '')
     setDefaultShell(process.env.SHELL || '/bin/bash')
+    setWorktreeBasePath(wtBasePath ?? '')
     window.api.claude.checkAvailability().then(setClaudeStatus)
   }
 
@@ -110,6 +113,25 @@ export function UserSettingsDialog({ open, onOpenChange }: UserSettingsDialogPro
                   </SelectContent>
                 </Select>
               </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label className="text-base font-semibold">Git</Label>
+              <div className="flex items-center justify-between gap-4">
+                <span className="text-sm">Worktree base path</span>
+                <Input
+                  className="w-48"
+                  placeholder="{project}/worktrees"
+                  value={worktreeBasePath}
+                  onChange={(e) => setWorktreeBasePath(e.target.value)}
+                  onBlur={() => {
+                    window.api.settings.set('worktree_base_path', worktreeBasePath.trim())
+                  }}
+                />
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Leave empty to create worktrees inside each project
+              </p>
             </div>
           </TabsContent>
 

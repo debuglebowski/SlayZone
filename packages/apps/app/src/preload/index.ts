@@ -86,61 +86,61 @@ const api: ElectronAPI = {
     saveTempImage: (base64, mimeType) => ipcRenderer.invoke('files:saveTempImage', base64, mimeType)
   },
   pty: {
-    create: (taskId, cwd, sessionId, existingSessionId, mode, initialPrompt, codeMode) =>
-      ipcRenderer.invoke('pty:create', taskId, cwd, sessionId, existingSessionId, mode, initialPrompt, codeMode),
-    write: (taskId, data) => ipcRenderer.invoke('pty:write', taskId, data),
-    resize: (taskId, cols, rows) => ipcRenderer.invoke('pty:resize', taskId, cols, rows),
-    kill: (taskId) => ipcRenderer.invoke('pty:kill', taskId),
-    exists: (taskId) => ipcRenderer.invoke('pty:exists', taskId),
-    getBuffer: (taskId) => ipcRenderer.invoke('pty:getBuffer', taskId),
-    getBufferSince: (taskId, afterSeq) => ipcRenderer.invoke('pty:getBufferSince', taskId, afterSeq),
+    create: (sessionId, cwd, conversationId, existingConversationId, mode, initialPrompt, codeMode, dangerouslySkipPermissions) =>
+      ipcRenderer.invoke('pty:create', sessionId, cwd, conversationId, existingConversationId, mode, initialPrompt, codeMode, dangerouslySkipPermissions),
+    write: (sessionId, data) => ipcRenderer.invoke('pty:write', sessionId, data),
+    resize: (sessionId, cols, rows) => ipcRenderer.invoke('pty:resize', sessionId, cols, rows),
+    kill: (sessionId) => ipcRenderer.invoke('pty:kill', sessionId),
+    exists: (sessionId) => ipcRenderer.invoke('pty:exists', sessionId),
+    getBuffer: (sessionId) => ipcRenderer.invoke('pty:getBuffer', sessionId),
+    getBufferSince: (sessionId, afterSeq) => ipcRenderer.invoke('pty:getBufferSince', sessionId, afterSeq),
     list: () => ipcRenderer.invoke('pty:list'),
-    onData: (callback: (taskId: string, data: string, seq: number) => void) => {
-      const handler = (_event: unknown, taskId: string, data: string, seq: number) => callback(taskId, data, seq)
+    onData: (callback: (sessionId: string, data: string, seq: number) => void) => {
+      const handler = (_event: unknown, sessionId: string, data: string, seq: number) => callback(sessionId, data, seq)
       ipcRenderer.on('pty:data', handler)
       return () => ipcRenderer.removeListener('pty:data', handler)
     },
-    onExit: (callback: (taskId: string, exitCode: number) => void) => {
-      const handler = (_event: unknown, taskId: string, exitCode: number) =>
-        callback(taskId, exitCode)
+    onExit: (callback: (sessionId: string, exitCode: number) => void) => {
+      const handler = (_event: unknown, sessionId: string, exitCode: number) =>
+        callback(sessionId, exitCode)
       ipcRenderer.on('pty:exit', handler)
       return () => ipcRenderer.removeListener('pty:exit', handler)
     },
-    onSessionNotFound: (callback: (taskId: string) => void) => {
-      const handler = (_event: unknown, taskId: string) => callback(taskId)
+    onSessionNotFound: (callback: (sessionId: string) => void) => {
+      const handler = (_event: unknown, sessionId: string) => callback(sessionId)
       ipcRenderer.on('pty:session-not-found', handler)
       return () => ipcRenderer.removeListener('pty:session-not-found', handler)
     },
-    onIdle: (callback: (taskId: string) => void) => {
-      const handler = (_event: unknown, taskId: string) => callback(taskId)
-      ipcRenderer.on('pty:idle', handler)
-      return () => ipcRenderer.removeListener('pty:idle', handler)
+    onAttention: (callback: (sessionId: string) => void) => {
+      const handler = (_event: unknown, sessionId: string) => callback(sessionId)
+      ipcRenderer.on('pty:attention', handler)
+      return () => ipcRenderer.removeListener('pty:attention', handler)
     },
     onStateChange: (
-      callback: (taskId: string, newState: TerminalState, oldState: TerminalState) => void
+      callback: (sessionId: string, newState: TerminalState, oldState: TerminalState) => void
     ) => {
       const handler = (
         _event: unknown,
-        taskId: string,
+        sessionId: string,
         newState: TerminalState,
         oldState: TerminalState
-      ) => callback(taskId, newState, oldState)
+      ) => callback(sessionId, newState, oldState)
       ipcRenderer.on('pty:state-change', handler)
       return () => ipcRenderer.removeListener('pty:state-change', handler)
     },
-    onPrompt: (callback: (taskId: string, prompt: PromptInfo) => void) => {
-      const handler = (_event: unknown, taskId: string, prompt: PromptInfo) =>
-        callback(taskId, prompt)
+    onPrompt: (callback: (sessionId: string, prompt: PromptInfo) => void) => {
+      const handler = (_event: unknown, sessionId: string, prompt: PromptInfo) =>
+        callback(sessionId, prompt)
       ipcRenderer.on('pty:prompt', handler)
       return () => ipcRenderer.removeListener('pty:prompt', handler)
     },
-    onSessionDetected: (callback: (taskId: string, sessionId: string) => void) => {
-      const handler = (_event: unknown, taskId: string, sessionId: string) =>
-        callback(taskId, sessionId)
+    onSessionDetected: (callback: (sessionId: string, conversationId: string) => void) => {
+      const handler = (_event: unknown, sessionId: string, conversationId: string) =>
+        callback(sessionId, conversationId)
       ipcRenderer.on('pty:session-detected', handler)
       return () => ipcRenderer.removeListener('pty:session-detected', handler)
     },
-    getState: (taskId: string) => ipcRenderer.invoke('pty:getState', taskId)
+    getState: (sessionId: string) => ipcRenderer.invoke('pty:getState', sessionId)
   },
   git: {
     isGitRepo: (path) => ipcRenderer.invoke('git:isGitRepo', path),
@@ -150,7 +150,18 @@ const api: ElectronAPI = {
     removeWorktree: (repoPath, worktreePath) =>
       ipcRenderer.invoke('git:removeWorktree', repoPath, worktreePath),
     init: (path) => ipcRenderer.invoke('git:init', path),
-    getCurrentBranch: (path) => ipcRenderer.invoke('git:getCurrentBranch', path)
+    getCurrentBranch: (path) => ipcRenderer.invoke('git:getCurrentBranch', path),
+    hasUncommittedChanges: (path) => ipcRenderer.invoke('git:hasUncommittedChanges', path),
+    mergeIntoParent: (projectPath, parentBranch, sourceBranch) =>
+      ipcRenderer.invoke('git:mergeIntoParent', projectPath, parentBranch, sourceBranch),
+    abortMerge: (path) => ipcRenderer.invoke('git:abortMerge', path)
+  },
+  tabs: {
+    list: (taskId) => ipcRenderer.invoke('tabs:list', taskId),
+    create: (input) => ipcRenderer.invoke('tabs:create', input),
+    update: (input) => ipcRenderer.invoke('tabs:update', input),
+    delete: (tabId) => ipcRenderer.invoke('tabs:delete', tabId),
+    ensureMain: (taskId, mode) => ipcRenderer.invoke('tabs:ensureMain', taskId, mode)
   }
 }
 

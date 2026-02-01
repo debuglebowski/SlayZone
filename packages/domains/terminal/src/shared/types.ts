@@ -1,9 +1,9 @@
 export type TerminalMode = 'claude-code' | 'codex' | 'terminal'
-export type TerminalState = 'starting' | 'running' | 'idle' | 'awaiting_input' | 'error' | 'dead'
+export type TerminalState = 'starting' | 'running' | 'attention' | 'error' | 'dead'
 export type CodeMode = 'normal' | 'plan' | 'accept-edits' | 'bypass'
 
 // CLI activity states (more granular than TerminalState)
-export type ActivityState = 'idle' | 'working' | 'awaiting_input' | 'unknown'
+export type ActivityState = 'attention' | 'working' | 'unknown'
 
 // CLI error info
 export interface ErrorInfo {
@@ -20,7 +20,7 @@ export interface CLIState {
 }
 
 export interface PtyInfo {
-  taskId: string
+  sessionId: string
   lastOutputTime: number
   state: TerminalState
 }

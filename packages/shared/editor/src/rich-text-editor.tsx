@@ -29,7 +29,9 @@ export function RichTextEditor({
   const editor = useEditor({
     extensions: [
       StarterKit.configure({
-        heading: { levels: [1, 2, 3] }
+        heading: { levels: [1, 2, 3] },
+        // Disable built-in link - we use our own configured Link extension
+        link: false
       }),
       Placeholder.configure({
         placeholder

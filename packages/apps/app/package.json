@@ -23,6 +23,7 @@
     "@omgslayzone/tags": "workspace:*",
     "@omgslayzone/task": "workspace:*",
     "@omgslayzone/tasks": "workspace:*",
+    "@omgslayzone/task-terminals": "workspace:*",
     "@omgslayzone/terminal": "workspace:*",
     "@omgslayzone/ui": "workspace:*",
     "@omgslayzone/worktrees": "workspace:*",

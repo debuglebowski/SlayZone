@@ -9,7 +9,7 @@ interface CreateWorktreeDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   projectPath: string
-  onCreated: (worktreePath: string) => void
+  onCreated: (worktreePath: string, parentBranch: string | null) => void
 }
 
 export function CreateWorktreeDialog({
@@ -41,9 +41,12 @@ export function CreateWorktreeDialog({
     setError(null)
 
     try {
-      // Create git worktree only - no DB record needed
+      // Capture parent branch before creating worktree
+      const parentBranch = await window.api.git.getCurrentBranch(projectPath)
+
+      // Create git worktree
       await window.api.git.createWorktree(projectPath, path, branch || undefined)
-      onCreated(path.trim())
+      onCreated(path.trim(), parentBranch)
       resetForm()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create worktree')

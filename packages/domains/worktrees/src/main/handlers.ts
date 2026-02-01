@@ -1,5 +1,15 @@
 import type { IpcMain } from 'electron'
-import { isGitRepo, detectWorktrees, createWorktree, removeWorktree, initRepo, getCurrentBranch } from './git-worktree'
+import {
+  isGitRepo,
+  detectWorktrees,
+  createWorktree,
+  removeWorktree,
+  initRepo,
+  getCurrentBranch,
+  hasUncommittedChanges,
+  mergeIntoParent,
+  abortMerge
+} from './git-worktree'
 
 export function registerWorktreeHandlers(ipcMain: IpcMain): void {
   // Git operations
@@ -25,5 +35,17 @@ export function registerWorktreeHandlers(ipcMain: IpcMain): void {
 
   ipcMain.handle('git:getCurrentBranch', (_, path: string) => {
     return getCurrentBranch(path)
+  })
+
+  ipcMain.handle('git:hasUncommittedChanges', (_, path: string) => {
+    return hasUncommittedChanges(path)
+  })
+
+  ipcMain.handle('git:mergeIntoParent', (_, projectPath: string, parentBranch: string, sourceBranch: string) => {
+    return mergeIntoParent(projectPath, parentBranch, sourceBranch)
+  })
+
+  ipcMain.handle('git:abortMerge', (_, path: string) => {
+    abortMerge(path)
   })
 }

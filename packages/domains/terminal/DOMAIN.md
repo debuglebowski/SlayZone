@@ -55,7 +55,7 @@ PTY Process (node-pty)
 
 ```typescript
 type TerminalMode = 'claude-code' | 'codex' | 'terminal'
-type TerminalState = 'starting' | 'running' | 'idle' | 'awaiting_input' | 'error' | 'dead'
+type TerminalState = 'starting' | 'running' | 'attention' | 'error' | 'dead'
 type CodeMode = 'normal' | 'plan' | 'accept-edits' | 'bypass'
 
 interface BufferChunk { seq: number; data: string }
@@ -75,16 +75,25 @@ The `ClaudeAdapter` detects terminal state from PTY output patterns:
 
 | Pattern | State | Description |
 |---------|-------|-------------|
-| `❯ 1.` or `❯1.` | awaiting_input | Numbered menu selection |
-| `❯Option` (no space) | awaiting_input | Menu item with cursor |
-| `[Y/n]` or `[y/N]` | awaiting_input | Permission prompt |
-| `❯ ` (with space) | idle | Input prompt ready |
-| `·✻✽✶✳✢` at line start | thinking | Spinner animation |
-| `Read(`, `Write:`, etc. | tool_use | Tool execution |
+| `❯ 1.` or `❯1.` | attention | Numbered menu selection |
+| `❯Option` (no space) | attention | Menu item with cursor |
+| `[Y/n]` or `[y/N]` | attention | Permission prompt |
+| `❯ ` (with space) | attention | Input prompt ready |
+| `·✻✽✶✳✢` + `for Xm Ys` | attention | Completion summary |
+| `·✻✽✶✳✢` at line start | running | Spinner animation (working) |
 
-**Priority order:** awaiting_input > idle > thinking > tool_use
+**Note:** Only `❯` (special prompt char) triggers attention, not `>` (markdown blockquote).
 
-This ensures menus take precedence even if spinner is also visible.
+**Priority order:** attention patterns checked before spinner patterns.
+
+### State Transition Debouncing
+
+State transitions use asymmetric debouncing to prevent UI flicker:
+
+- **`running`**: Immediate transition (work resumed, show it right away)
+- **`attention`/`error`/`dead`**: 100ms debounce (prevents flicker during output gaps)
+
+This handles the case where PTY output briefly doesn't match spinner pattern mid-output.
 
 ## Client (client/)
 
@@ -215,3 +224,17 @@ const handleTerminalReady = useCallback((api) => {
 ```
 
 **Lesson:** Always memoize callbacks passed to components with effect-based initialization.
+
+### 2025-02 Terminal State Flicker Fix
+
+**Context:** UI flickered between 'running' and 'attention' states during Claude output.
+
+**Root Cause:** Two issues:
+1. Pattern `[>❯]` matched both `❯` (Claude's prompt) and `>` (markdown blockquotes in output)
+2. No debounce on state transitions - brief output gaps triggered instant state change
+
+**Fix:**
+1. Changed pattern to only match `❯` character (not `>`)
+2. Added asymmetric debounce: immediate for 'running', 100ms delay for 'attention'
+
+**Why asymmetric:** When work resumes (spinner detected), show it immediately. When work might be done (no spinner), wait 100ms to confirm it's not just an output gap.

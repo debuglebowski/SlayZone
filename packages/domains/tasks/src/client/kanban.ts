@@ -1,4 +1,5 @@
 import type { Task, TaskStatus } from '@omgslayzone/task/shared'
+import { TASK_STATUS_ORDER, getTaskStatusStyle } from '@omgslayzone/ui'
 import type { FilterState, DueDateRange } from './FilterState'
 
 export type GroupKey = 'status' | 'priority' | 'due_date'
@@ -9,23 +10,11 @@ export interface Column {
   tasks: Task[]
 }
 
-export const STATUS_ORDER: TaskStatus[] = [
-  'inbox',
-  'backlog',
-  'todo',
-  'in_progress',
-  'review',
-  'done'
-]
+export const STATUS_ORDER = TASK_STATUS_ORDER as unknown as TaskStatus[]
 
-export const STATUS_LABELS: Record<TaskStatus, string> = {
-  inbox: 'Inbox',
-  backlog: 'Backlog',
-  todo: 'Todo',
-  in_progress: 'In Progress',
-  review: 'Review',
-  done: 'Done'
-}
+export const STATUS_LABELS: Record<TaskStatus, string> = Object.fromEntries(
+  TASK_STATUS_ORDER.map((status) => [status, getTaskStatusStyle(status)!.label])
+) as Record<TaskStatus, string>
 
 const PRIORITY_LABELS: Record<number, string> = {
   1: 'P1 - Critical',

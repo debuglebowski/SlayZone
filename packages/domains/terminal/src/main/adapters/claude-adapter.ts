@@ -53,18 +53,18 @@ export class ClaudeAdapter implements TerminalAdapter {
       .replace(/\x1b[()][AB012]/g, '')  // Character set
       .trimStart()  // Remove leading whitespace including \r (keep trailing for prompt detection)
 
-    // 1. Awaiting input (highest priority - user needs to respond)
+    // 1. Attention: user needs to respond (menus, prompts, ready for input)
     // - Numbered menu: ❯ 1. or ❯1.
     // - Menu selection: ❯Option (no space after)
     // - Y/n prompts
-    if (/(?:^|\n|\r)[>❯]\s*\d+\./.test(stripped)) return 'awaiting_input'
-    if (/(?:^|\n|\r)[>❯][A-Za-z]/.test(stripped)) return 'awaiting_input'
-    if (/\[Y\/n\]|\[y\/N\]/i.test(stripped)) return 'awaiting_input'
+    // - Prompt with space (ready for user input)
+    if (/(?:^|\n|\r)❯\s*\d+\./.test(stripped)) return 'attention'
+    if (/(?:^|\n|\r)❯[A-Za-z]/.test(stripped)) return 'attention'
+    if (/\[Y\/n\]|\[y\/N\]/i.test(stripped)) return 'attention'
+    if (/(?:^|\n|\r)❯\s/.test(stripped)) return 'attention'
 
-    // 2. Idle: prompt with space (ready for user input, no menu)
-    if (/(?:^|\n|\r)[>❯]\s/.test(stripped)) return 'idle'
-
-    // 3. Working: spinner at start
+    // 2. Working: spinner at start (but not "X for Ym Zs" completion summary)
+    if (/^[·✻✽✶✳✢].*\bfor \d+[smh]/m.test(stripped)) return 'attention'
     if (/^[·✻✽✶✳✢]/m.test(stripped)) return 'working'
 
     return null
@@ -108,7 +108,7 @@ export class ClaudeAdapter implements TerminalAdapter {
     }
 
     // Numbered menu with selection indicator (Claude's AskUserQuestion)
-    if (/(?:^|\n|\r)[>❯]\s*\d+\./m.test(stripped)) {
+    if (/(?:^|\n|\r)❯\s*\d+\./m.test(stripped)) {
       return {
         type: 'input',
         text: data,

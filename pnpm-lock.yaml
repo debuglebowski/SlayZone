@@ -47,6 +47,9 @@ importers:
       '@omgslayzone/task':
         specifier: workspace:*
         version: link:../../domains/task
+      '@omgslayzone/task-terminals':
+        specifier: workspace:*
+        version: link:../../domains/task-terminals
       '@omgslayzone/tasks':
         specifier: workspace:*
         version: link:../../domains/tasks
@@ -241,6 +244,9 @@ importers:
       '@omgslayzone/task-browser':
         specifier: workspace:*
         version: link:../task-browser
+      '@omgslayzone/task-terminals':
+        specifier: workspace:*
+        version: link:../task-terminals
       '@omgslayzone/terminal':
         specifier: workspace:*
         version: link:../terminal
@@ -275,6 +281,28 @@ importers:
 
   packages/domains/task-browser:
     dependencies:
+      '@omgslayzone/ui':
+        specifier: workspace:*
+        version: link:../../shared/ui
+      react:
+        specifier: ^19.0.0
+        version: 19.2.3
+    devDependencies:
+      '@types/react':
+        specifier: ^19.2.7
+        version: 19.2.8
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+
+  packages/domains/task-terminals:
+    dependencies:
+      '@omgslayzone/terminal':
+        specifier: workspace:*
+        version: link:../terminal
+      '@omgslayzone/types':
+        specifier: workspace:*
+        version: link:../../shared/types
       '@omgslayzone/ui':
         specifier: workspace:*
         version: link:../../shared/ui
@@ -439,6 +467,9 @@ importers:
       '@omgslayzone/task':
         specifier: workspace:*
         version: link:../../domains/task
+      '@omgslayzone/task-terminals':
+        specifier: workspace:*
+        version: link:../../domains/task-terminals
       '@omgslayzone/terminal':
         specifier: workspace:*
         version: link:../../domains/terminal

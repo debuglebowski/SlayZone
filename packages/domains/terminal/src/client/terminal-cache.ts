@@ -15,70 +15,70 @@ export interface CachedTerminal {
 // Module-level cache for terminal instances
 const cache = new Map<string, CachedTerminal>()
 
-// Track taskIds that shouldn't be re-cached (e.g., during restart/mode-change)
+// Track sessionIds that shouldn't be re-cached (e.g., during restart/mode-change)
 const skipCacheSet = new Set<string>()
 // Track pending timeouts for skipCache cleanup
 const skipCacheTimeouts = new Map<string, NodeJS.Timeout>()
 
-export function getTerminal(taskId: string): CachedTerminal | undefined {
-  return cache.get(taskId)
+export function getTerminal(sessionId: string): CachedTerminal | undefined {
+  return cache.get(sessionId)
 }
 
-export function setTerminal(taskId: string, instance: CachedTerminal): void {
+export function setTerminal(sessionId: string, instance: CachedTerminal): void {
   // Don't cache if marked for skip (e.g., during restart/mode-change)
-  if (skipCacheSet.has(taskId)) {
-    skipCacheSet.delete(taskId)
+  if (skipCacheSet.has(sessionId)) {
+    skipCacheSet.delete(sessionId)
     // Also clear any existing cache entry (from before restart was triggered)
-    cache.delete(taskId)
+    cache.delete(sessionId)
     instance.terminal.dispose()
     return
   }
-  cache.set(taskId, instance)
+  cache.set(sessionId, instance)
 }
 
-export function removeTerminal(taskId: string): boolean {
-  const instance = cache.get(taskId)
+export function removeTerminal(sessionId: string): boolean {
+  const instance = cache.get(sessionId)
   if (instance) {
     instance.terminal.dispose()
-    cache.delete(taskId)
+    cache.delete(sessionId)
     return true
   }
   return false
 }
 
 // Dispose terminal without needing the instance (for idle hibernation)
-export function disposeTerminal(taskId: string): boolean {
+export function disposeTerminal(sessionId: string): boolean {
   // Clear skip flag if set (handles idle-before-restart race condition)
-  skipCacheSet.delete(taskId)
+  skipCacheSet.delete(sessionId)
 
-  const instance = cache.get(taskId)
+  const instance = cache.get(sessionId)
   if (instance) {
     instance.terminal.dispose()
-    cache.delete(taskId)
+    cache.delete(sessionId)
     return true
   }
   return false
 }
 
-export function hasTerminal(taskId: string): boolean {
-  return cache.has(taskId)
+export function hasTerminal(sessionId: string): boolean {
+  return cache.has(sessionId)
 }
 
-// Mark taskId to skip caching on next setTerminal call (for restart/mode-change)
-export function markSkipCache(taskId: string): void {
-  // Clear any existing timeout for this taskId
-  const existingTimeout = skipCacheTimeouts.get(taskId)
+// Mark sessionId to skip caching on next setTerminal call (for restart/mode-change)
+export function markSkipCache(sessionId: string): void {
+  // Clear any existing timeout for this sessionId
+  const existingTimeout = skipCacheTimeouts.get(sessionId)
   if (existingTimeout) {
     clearTimeout(existingTimeout)
   }
 
-  skipCacheSet.add(taskId)
+  skipCacheSet.add(sessionId)
   // Auto-clear after 2 seconds as safety net against stale entries
   const timeout = setTimeout(() => {
-    skipCacheSet.delete(taskId)
-    skipCacheTimeouts.delete(taskId)
+    skipCacheSet.delete(sessionId)
+    skipCacheTimeouts.delete(sessionId)
   }, 2000)
-  skipCacheTimeouts.set(taskId, timeout)
+  skipCacheTimeouts.set(sessionId, timeout)
 }
 
 export function getCacheSize(): number {

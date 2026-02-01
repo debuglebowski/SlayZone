@@ -1,8 +1,9 @@
 import { z } from 'zod'
+import { taskStatusOptions as sharedStatusOptions, TASK_STATUS_ORDER } from '@omgslayzone/ui'
 import type { TaskStatus } from './types'
 
 // Task status enum matching database
-export const taskStatusEnum = z.enum(['inbox', 'backlog', 'todo', 'in_progress', 'review', 'done'])
+export const taskStatusEnum = z.enum(TASK_STATUS_ORDER)
 
 // Priority 1-5
 export const prioritySchema = z.number().int().min(1).max(5)
@@ -67,15 +68,8 @@ export interface UpdateTaskFormData {
 export type CreateProjectFormData = z.infer<typeof createProjectSchema>
 export type UpdateProjectFormData = z.infer<typeof updateProjectSchema>
 
-// Status options for Select
-export const statusOptions = [
-  { value: 'inbox', label: 'Inbox' },
-  { value: 'backlog', label: 'Backlog' },
-  { value: 'todo', label: 'Todo' },
-  { value: 'in_progress', label: 'In Progress' },
-  { value: 'review', label: 'Review' },
-  { value: 'done', label: 'Done' }
-] as const
+// Status options for Select - re-exported from shared ui
+export const statusOptions = sharedStatusOptions
 
 // Priority options for Select
 export const priorityOptions = [

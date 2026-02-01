@@ -30,6 +30,13 @@ Also exports validation schemas (`createTaskSchema`, `updateTaskSchema`) and for
 ## Client (client/)
 
 - `TaskDetailPage` - Full task view with terminal
+
+### Keyboard Shortcuts (TaskDetailPage)
+
+| Shortcut | Action |
+|----------|--------|
+| Cmd+I | Inject task title into active terminal |
+| Cmd+Shift+I | Inject task description into active terminal |
 - `CreateTaskDialog` / `EditTaskDialog` / `DeleteTaskDialog`
 - `QuickRunDialog` - Quick task execution
 - `TaskMetadataSidebar` - Priority, status, project, tags, blockers
