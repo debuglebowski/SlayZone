@@ -37,7 +37,7 @@ Documentation nested so each level contains only what's relevant at that altitud
 AI working on a feature loads docs from root to leaf:
 
 ```
-ARCHITECTURE.md → DOMAIN.md → CLIENT.md or SERVER.md → FEATURE.md (if present)
+ARCHITECTURE.md → DOMAIN.md
 ```
 
 For app-level work (routing, layouts, composition):
@@ -51,8 +51,6 @@ ARCHITECTURE.md → APP.md
 - **ARCHITECTURE.md**: ~1 page. Whole system overview.
 - **APP.md**: ~1 page. Composition and routing.
 - **DOMAIN.md**: 1-2 pages max. Business rules, contracts.
-- **CLIENT.md / SERVER.md**: ~1 page. Platform-specific patterns.
-- **FEATURE.md**: As short as possible. Only non-obvious things.
 
 Principle: if it's obvious from reading the code, don't document it.
 
@@ -78,13 +76,13 @@ Codebase organized into three categories:
 
 | Folder | Contains |
 |--------|----------|
-| shared/ | Types, validation schemas, contracts, constants — imported by both client and server |
-| client/ | React components, hooks, state management — frontend implementation |
-| server/ | Handlers, services, database access — backend implementation |
+| shared/ | Types, validation schemas, contracts, constants — imported by both client and main |
+| client/ | React components, hooks, state management — renderer process |
+| main/ | Handlers, services, database access — main process (Electron) |
 
 ### Asymmetric Domains
 
-Not every domain needs both client and server:
+Not every domain needs both client and main:
 
 ```
 domains/
@@ -93,16 +91,11 @@ domains/
 │   ├── shared/
 │   └── client/
 │
-├── billing/        # Server-only
-│   ├── DOMAIN.md
-│   ├── shared/
-│   └── server/
-│
-├── checkout/       # Full-stack
+├── terminal/       # Full-stack
 │   ├── DOMAIN.md
 │   ├── shared/
 │   ├── client/
-│   └── server/
+│   └── main/
 ```
 
 ### Cross-Domain Features
@@ -122,7 +115,7 @@ Test: would you explain this feature as part of an existing domain, or as its ow
 | What user sees | What developer reasons about |
 | Entry points | Implementation |
 
-Routes live in `packages/apps/web`. Domains live in `packages/domains/`.
+Routes live in `packages/apps/app`. Domains live in `packages/domains/`.
 
 ## README.md vs ARCHITECTURE.md
 
@@ -171,35 +164,6 @@ checkout/ ◄──────────────► catalog/  (circular)
 ```
 
 Dependencies enforced via package.json and documented in DOMAIN.md.
-
-## When to Create FEATURE.md
-
-Create when:
-- Feature has non-obvious edge cases or gotchas
-- Decisions made that would surprise new developer
-- Pending work or known limitations
-- Feature deviates from domain patterns
-- Multiple approaches considered, one chosen for specific reasons
-
-Skip when feature is straightforward and follows domain patterns.
-
-### FEATURE.md Location
-
-Features live in `features/` subfolder within their implementation:
-
-```
-packages/domains/checkout/client/features/guest-checkout/
-├── FEATURE.md
-├── GuestCheckoutForm.tsx
-└── useGuestCheckout.ts
-```
-
-Apps can also have features/ for complex app-level concerns:
-
-```
-packages/apps/web/features/auth-flow/
-└── FEATURE.md
-```
 
 ## Decision Logs
 

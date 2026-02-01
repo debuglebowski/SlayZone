@@ -116,12 +116,11 @@ types → all domains (ElectronAPI contract)
 
 ## Logo & Icons
 
-Z-slash logo in 3 places:
-- `src/main/index.ts` - native splash screen (inline SVG)
-- `src/renderer/src/assets/logo.svg` - React UI (`#e5e5e5` stroke)
-- `scripts/generate-icons.js` - app icons (regenerate with `node scripts/generate-icons.js`)
+Z-slash logo in 2 places:
+- `packages/apps/app/src/main/index.ts` - native splash screen (inline SVG)
+- `packages/apps/app/src/renderer/src/assets/logo.svg` - React UI (`#e5e5e5` stroke)
 
-Generated icons:
+Generated icons (in `packages/apps/app/`):
 - `build/icon.{png,icns,ico}` - app icons
 - `resources/icon.png` - dock icon
 

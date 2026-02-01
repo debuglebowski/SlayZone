@@ -36,6 +36,11 @@ Also exports validation schemas (`createTaskSchema`, `updateTaskSchema`) and for
 
 ## Dependencies
 
+- `@omgslayzone/types` - ElectronAPI contract
+- `@omgslayzone/ui` - UI components
+- `@omgslayzone/editor` - Rich text description
 - `@omgslayzone/terminal` - TerminalMode type, Terminal component
 - `@omgslayzone/projects` - Project selector
-- `@omgslayzone/editor` - Rich text description
+- `@omgslayzone/tags` - Tag selector
+- `@omgslayzone/worktrees` - GitPanel
+- `@omgslayzone/task-browser` - URL webview

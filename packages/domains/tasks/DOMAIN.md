@@ -1,6 +1,6 @@
 # Tasks Domain (Kanban)
 
-Kanban board view for task management. Client-only domain.
+Kanban board view for task management. Client-only domain (shared/ and main/ are placeholders).
 
 ## Client (client/)
 

@@ -50,7 +50,8 @@
       "Bash(pnpm exec vitest:*)",
       "Bash(pnpm:*)",
       "WebFetch(domain:medium.com)",
-      "Bash(npx tsx:*)"
+      "Bash(npx tsx:*)",
+      "Bash(done)"
     ]
   },
   "enableAllProjectMcpServers": true,

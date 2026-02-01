@@ -1,6 +1,6 @@
 # Onboarding Domain
 
-First-run tutorial flow. Client-only domain.
+First-run tutorial flow. Client-only domain (shared/ and main/ are placeholders).
 
 ## Client (client/)
 

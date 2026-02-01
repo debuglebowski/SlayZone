@@ -61,11 +61,11 @@ domain/
 |---------|---------|-------|---------|
 | @omgslayzone/terminal | TerminalMode, PtyInfo | PTY handlers | Terminal, PtyProvider |
 | @omgslayzone/task | Task, schemas | Task CRUD, AI | TaskDetailPage, dialogs |
-| @omgslayzone/tasks | - | - | KanbanBoard, useTasksData |
+| @omgslayzone/tasks | (empty) | (empty) | KanbanBoard, useTasksData |
 | @omgslayzone/projects | Project | Project CRUD | ProjectSelect, dialogs |
 | @omgslayzone/tags | Tag | Tag CRUD | - |
 | @omgslayzone/settings | Theme | Settings, theme | ThemeProvider |
-| @omgslayzone/onboarding | - | - | OnboardingDialog |
+| @omgslayzone/onboarding | (empty) | (empty) | OnboardingDialog |
 | @omgslayzone/worktrees | Worktree, DetectedWorktree | Git ops, worktree CRUD | GitPanel |
 
 ## Commands

@@ -1,30 +1,15 @@
-# omgslayzone
+# OmgSlayZone
 
-An Electron application with React and TypeScript
+Desktop task management app with integrated AI coding assistants.
 
-## Project Setup
-
-### Install
+## Setup
 
 ```bash
-$ npm install
+pnpm install
 ```
 
-### Development
+## Architecture
 
-```bash
-$ npm run dev
-```
+See [ARCHITECTURE.md](ARCHITECTURE.md) for system architecture and [PHILOSOPHY.md](PHILOSOPHY.md) for structural principles.
 
-### Build
-
-```bash
-# For windows
-$ npm run build:win
-
-# For macOS
-$ npm run build:mac
-
-# For Linux
-$ npm run build:linux
-```
+For AI tools, see [CLAUDE.md](CLAUDE.md).
