@@ -1,6 +1,8 @@
 import type { IpcMain } from 'electron'
 import type { Database } from 'better-sqlite3'
 import type { CreateTaskInput, UpdateTaskInput, Task } from '@omgslayzone/task/shared'
+import { removeWorktree } from '@omgslayzone/worktrees/main'
+import { killPty } from '@omgslayzone/terminal/main'
 
 // Parse JSON columns from DB row
 function parseTask(row: Record<string, unknown> | undefined): Task | null {
@@ -18,6 +20,33 @@ function parseTask(row: Record<string, unknown> | undefined): Task | null {
 
 function parseTasks(rows: Record<string, unknown>[]): Task[] {
   return rows.map((row) => parseTask(row)!)
+}
+
+function cleanupTask(db: Database, taskId: string): void {
+  const task = db.prepare(
+    'SELECT worktree_path, project_id, terminal_mode FROM tasks WHERE id = ?'
+  ).get(taskId) as { worktree_path: string | null; project_id: string; terminal_mode: string | null } | undefined
+
+  if (!task) return
+
+  // Kill PTY (sessionId format: taskId:mode)
+  const mode = task.terminal_mode || 'claude-code'
+  killPty(`${taskId}:${mode}`)
+
+  // Remove worktree if exists
+  if (task.worktree_path) {
+    const project = db.prepare(
+      'SELECT path FROM projects WHERE id = ?'
+    ).get(task.project_id) as { path: string } | undefined
+
+    if (project?.path) {
+      try {
+        removeWorktree(project.path, task.worktree_path)
+      } catch (err) {
+        console.error('Failed to remove worktree:', err)
+      }
+    }
+  }
 }
 
 export function registerTaskHandlers(ipcMain: IpcMain, db: Database): void {
@@ -150,14 +179,16 @@ export function registerTaskHandlers(ipcMain: IpcMain, db: Database): void {
   })
 
   ipcMain.handle('db:tasks:delete', (_, id: string) => {
+    cleanupTask(db, id)
     const result = db.prepare('DELETE FROM tasks WHERE id = ?').run(id)
     return result.changes > 0
   })
 
   // Archive operations
   ipcMain.handle('db:tasks:archive', (_, id: string) => {
+    cleanupTask(db, id)
     db.prepare(`
-      UPDATE tasks SET archived_at = datetime('now'), updated_at = datetime('now')
+      UPDATE tasks SET archived_at = datetime('now'), worktree_path = NULL, updated_at = datetime('now')
       WHERE id = ?
     `).run(id)
     const row = db.prepare('SELECT * FROM tasks WHERE id = ?').get(id) as Record<string, unknown> | undefined
@@ -166,9 +197,12 @@ export function registerTaskHandlers(ipcMain: IpcMain, db: Database): void {
 
   ipcMain.handle('db:tasks:archiveMany', (_, ids: string[]) => {
     if (ids.length === 0) return
+    for (const id of ids) {
+      cleanupTask(db, id)
+    }
     const placeholders = ids.map(() => '?').join(',')
     db.prepare(`
-      UPDATE tasks SET archived_at = datetime('now'), updated_at = datetime('now')
+      UPDATE tasks SET archived_at = datetime('now'), worktree_path = NULL, updated_at = datetime('now')
       WHERE id IN (${placeholders})
     `).run(...ids)
   })

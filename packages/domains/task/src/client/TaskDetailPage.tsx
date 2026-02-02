@@ -286,8 +286,6 @@ export function TaskDetailPage({
     return () => clearTimeout(timer)
   }, [task?.id, clearQuickRunPrompt])
 
-
-
   // Handle terminal mode change
   const handleModeChange = useCallback(
     async (mode: TerminalMode) => {
@@ -455,8 +453,22 @@ export function TaskDetailPage({
 
   // Wrapper for GitPanel that calls API and notifies parent
   const updateTaskAndNotify = async (data: { id: string; worktreePath?: string | null; worktreeParentBranch?: string | null; browserUrl?: string | null; status?: Task['status'] }): Promise<Task> => {
+    // If worktreePath is changing, kill old PTY first so terminal restarts with new cwd
+    if (data.worktreePath !== undefined) {
+      const mainSessionId = `${data.id}:${data.id}`
+      resetTaskState(mainSessionId)
+      await window.api.pty.kill(mainSessionId)
+      markSkipCache(mainSessionId)
+    }
+
     const updated = await window.api.db.updateTask(data)
     handleTaskUpdate(updated)
+
+    // Force terminal remount if worktreePath changed
+    if (data.worktreePath !== undefined) {
+      setTerminalKey(k => k + 1)
+    }
+
     return updated
   }
 
@@ -640,7 +652,7 @@ export function TaskDetailPage({
                 <div className="h-full bg-[#0a0a0a]" />
               ) : project?.path ? (
                 <TerminalContainer
-                  key={terminalKey}
+                  key={`${terminalKey}-${task.worktree_path || ''}`}
                   taskId={task.id}
                   cwd={task.worktree_path || project.path}
                   defaultMode={task.terminal_mode || 'claude-code'}

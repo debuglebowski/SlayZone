@@ -125,7 +125,7 @@ export function mergeIntoParent(
 
     // Attempt merge
     try {
-      execSync(`git merge "${sourceBranch}" --no-edit`, {
+      execSync(`git merge "${sourceBranch}" --no-ff --no-edit`, {
         cwd: projectPath,
         stdio: 'pipe'
       })

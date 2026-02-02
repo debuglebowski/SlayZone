@@ -303,10 +303,10 @@ export function GitPanel({ task, projectPath, onUpdateTask, disabled = false }: 
         Git
       </div>
 
-      {/* Branch info - show worktree branch when exists, else root branch */}
+      {/* Branch info - always show root branch */}
       <div className="flex items-center gap-2 text-sm">
         <GitBranch className="h-4 w-4 text-muted-foreground" />
-        <span>{hasWorktree ? (worktreeBranch || 'loading...') : (currentBranch || 'detached HEAD')}</span>
+        <span>{currentBranch || 'detached HEAD'}</span>
       </div>
 
       {/* Worktree section */}

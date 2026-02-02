@@ -51,7 +51,8 @@
       "Bash(pnpm:*)",
       "WebFetch(domain:medium.com)",
       "Bash(npx tsx:*)",
-      "Bash(done)"
+      "Bash(done)",
+      "Bash(git -C /Users/Kalle/dev/projects/omgslayzone diff packages/domains/worktrees/src/main/git-worktree.ts)"
     ]
   },
   "enableAllProjectMcpServers": true,
