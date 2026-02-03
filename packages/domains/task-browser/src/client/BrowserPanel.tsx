@@ -1,7 +1,22 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { ArrowLeft, ArrowRight, RotateCw, X, Plus } from 'lucide-react'
-import { Button, Input, cn } from '@omgslayzone/ui'
+import { ArrowLeft, ArrowRight, RotateCw, X, Plus, Import } from 'lucide-react'
+import {
+  Button,
+  Input,
+  cn,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger
+} from '@omgslayzone/ui'
 import type { BrowserTab, BrowserTabsState } from '../shared'
+
+interface TaskUrlEntry {
+  taskId: string
+  taskTitle: string
+  url: string
+  tabTitle: string
+}
 
 // Minimal webview interface for type safety
 interface WebviewElement extends HTMLElement {
@@ -19,21 +34,50 @@ interface BrowserPanelProps {
   className?: string
   tabs: BrowserTabsState
   onTabsChange: (tabs: BrowserTabsState) => void
+  taskId?: string
+  isResizing?: boolean
 }
 
 function generateTabId(): string {
   return `tab-${crypto.randomUUID().slice(0, 8)}`
 }
 
-export function BrowserPanel({ className, tabs, onTabsChange }: BrowserPanelProps) {
+export function BrowserPanel({ className, tabs, onTabsChange, taskId, isResizing }: BrowserPanelProps) {
   const [inputUrl, setInputUrl] = useState('')
   const [canGoBack, setCanGoBack] = useState(false)
   const [canGoForward, setCanGoForward] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [isFocused, setIsFocused] = useState(false)
   const [webviewReady, setWebviewReady] = useState(false)
+  const [otherTaskUrls, setOtherTaskUrls] = useState<TaskUrlEntry[]>([])
+  const [importDropdownOpen, setImportDropdownOpen] = useState(false)
   const webviewRef = useRef<WebviewElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
+
+  // Fetch URLs from other tasks when dropdown opens
+  useEffect(() => {
+    if (!importDropdownOpen || !taskId) return
+
+    window.api.db.getTasks().then(tasks => {
+      const entries: TaskUrlEntry[] = []
+      for (const t of tasks) {
+        if (t.id === taskId) continue
+        if (!t.browser_tabs?.tabs) continue
+        for (const tab of t.browser_tabs.tabs) {
+          if (tab.url && tab.url !== 'about:blank') {
+            entries.push({
+              taskId: t.id,
+              taskTitle: t.title,
+              url: tab.url,
+              tabTitle: tab.title
+            })
+          }
+        }
+      }
+      // Sort by task updated_at (most recent first) - tasks are already sorted
+      setOtherTaskUrls(entries)
+    })
+  }, [importDropdownOpen, taskId])
 
   const activeTab = tabs.tabs.find(t => t.id === tabs.activeTabId) || null
 
@@ -358,17 +402,50 @@ export function BrowserPanel({ className, tabs, onTabsChange }: BrowserPanelProp
           placeholder="Enter URL..."
           className="flex-1 h-7 text-sm"
         />
+
+        {taskId && (
+          <DropdownMenu open={importDropdownOpen} onOpenChange={setImportDropdownOpen}>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon-sm">
+                <Import className="size-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="max-h-64 overflow-y-auto w-80">
+              {otherTaskUrls.length === 0 ? (
+                <div className="px-2 py-1.5 text-sm text-muted-foreground">
+                  No URLs from other tasks
+                </div>
+              ) : (
+                otherTaskUrls.map((entry, idx) => (
+                  <DropdownMenuItem
+                    key={`${entry.taskId}-${idx}`}
+                    onClick={() => webviewRef.current?.loadURL(entry.url)}
+                    className="flex flex-col items-start gap-0.5"
+                  >
+                    <span className="text-xs text-muted-foreground truncate w-full">
+                      {entry.taskTitle}
+                    </span>
+                    <span className="text-sm truncate w-full">{entry.url}</span>
+                  </DropdownMenuItem>
+                ))
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
       </div>
 
       {/* Webview */}
-      <webview
-        ref={webviewRef}
-        src={activeTab?.url || 'about:blank'}
-        partition="persist:browser-tabs"
-        className="flex-1"
-        // @ts-expect-error - webview attributes not in React types
-        allowpopups="true"
-      />
+      <div className="relative flex-1">
+        <webview
+          ref={webviewRef}
+          src={activeTab?.url || 'about:blank'}
+          partition="persist:browser-tabs"
+          className="absolute inset-0"
+          // @ts-expect-error - webview attributes not in React types
+          allowpopups="true"
+        />
+        {isResizing && <div className="absolute inset-0 z-10" />}
+      </div>
     </div>
   )
 }

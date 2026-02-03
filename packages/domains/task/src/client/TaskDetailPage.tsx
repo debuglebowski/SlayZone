@@ -57,7 +57,10 @@ export function TaskDetailPage({
   const [claudeAvailability, setClaudeAvailability] = useState<ClaudeAvailability | null>(null)
 
   // PTY context for buffer management
-  const { resetTaskState, subscribeSessionDetected, getQuickRunPrompt, getQuickRunCodeMode, clearQuickRunPrompt } = usePty()
+  const { resetTaskState, subscribeSessionDetected, getQuickRunPrompt, getQuickRunCodeMode, clearQuickRunPrompt, setQuickRunPrompt } = usePty()
+
+  // AI merge state - when set, terminal uses these instead of normal task settings
+  const [aiMergeState, setAiMergeState] = useState<{ cwd: string; prompt: string } | null>(null)
 
   // Detected session ID from /status command
   const [detectedSessionId, setDetectedSessionId] = useState<string | null>(null)
@@ -118,6 +121,32 @@ export function TaskDetailPage({
     if (!task) return
     return subscribeSessionDetected(task.id, setDetectedSessionId)
   }, [task?.id, subscribeSessionDetected])
+
+  // Listen for PTY exit when in AI merge mode
+  useEffect(() => {
+    if (!aiMergeState || !task) return
+
+    const unsub = window.api.pty.onExit(async (sessionId, _exitCode) => {
+      // Check if this is our merge session
+      if (!sessionId.startsWith(task.id)) return
+
+      // Check if merge completed successfully (no more conflicts)
+      const hasConflicts = await window.api.git.isMergeInProgress(aiMergeState.cwd)
+
+      if (!hasConflicts) {
+        // Merge complete - mark task done
+        const updated = await window.api.db.updateTask({ id: task.id, status: 'done' })
+        setTask(updated)
+        onTaskUpdated(updated)
+      }
+
+      // Clear merge state regardless (user can retry if needed)
+      setAiMergeState(null)
+      clearQuickRunPrompt(task.id)
+    })
+
+    return unsub
+  }, [aiMergeState, task, onTaskUpdated, clearQuickRunPrompt])
 
   // Load task data on mount or when taskId changes
   useEffect(() => {
@@ -263,6 +292,7 @@ export function TaskDetailPage({
   // Cmd+I (title) and Cmd+Shift+I (description) shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent): void => {
+      if (!isActive) return
       if (e.metaKey && e.key === 'i') {
         e.preventDefault()
         if (e.shiftKey) {
@@ -274,7 +304,7 @@ export function TaskDetailPage({
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [handleInjectTitle, handleInjectDescription])
+  }, [isActive, handleInjectTitle, handleInjectDescription])
 
   // Clear quick run prompt after it's been passed to Terminal
   useEffect(() => {
@@ -472,6 +502,26 @@ export function TaskDetailPage({
     return updated
   }
 
+  // Handler for AI merge - creates Claude session with merge prompt
+  const handleMergeWithAI = useCallback(async (prompt: string, cwd: string) => {
+    if (!task) return
+
+    // Kill existing PTY
+    const mainSessionId = `${task.id}:${task.id}`
+    resetTaskState(mainSessionId)
+    await window.api.pty.kill(mainSessionId)
+    markSkipCache(mainSessionId)
+
+    // Set up quick run prompt with bypass mode for automated merge
+    setQuickRunPrompt(task.id, prompt, 'bypass')
+
+    // Store merge state for terminal cwd override
+    setAiMergeState({ cwd, prompt })
+
+    // Force terminal remount
+    setTerminalKey(k => k + 1)
+  }, [task, resetTaskState, setQuickRunPrompt])
+
   // Handler for browser tabs changes
   const handleBrowserTabsChange = useCallback(async (tabs: BrowserTabsState) => {
     setBrowserTabs(tabs)
@@ -652,15 +702,15 @@ export function TaskDetailPage({
                 <div className="h-full bg-[#0a0a0a]" />
               ) : project?.path ? (
                 <TerminalContainer
-                  key={`${terminalKey}-${task.worktree_path || ''}`}
+                  key={`${terminalKey}-${task.worktree_path || ''}-${aiMergeState?.cwd || ''}`}
                   taskId={task.id}
-                  cwd={task.worktree_path || project.path}
+                  cwd={aiMergeState?.cwd || task.worktree_path || project.path}
                   defaultMode={task.terminal_mode || 'claude-code'}
-                  conversationId={task.claude_conversation_id || task.claude_session_id || undefined}
-                  existingConversationId={task.claude_conversation_id || task.claude_session_id || undefined}
+                  conversationId={aiMergeState ? undefined : (task.claude_conversation_id || task.claude_session_id || undefined)}
+                  existingConversationId={aiMergeState ? undefined : (task.claude_conversation_id || task.claude_session_id || undefined)}
                   initialPrompt={getQuickRunPrompt(task.id)}
                   codeMode={getQuickRunCodeMode(task.id)}
-                  dangerouslySkipPermissions={task.dangerously_skip_permissions ?? false}
+                  dangerouslySkipPermissions={aiMergeState ? true : (task.dangerously_skip_permissions ?? false)}
                   autoFocus={isFirstMountRef.current}
                   onConversationCreated={handleSessionCreated}
                   onSessionInvalid={handleSessionInvalid}
@@ -788,15 +838,13 @@ export function TaskDetailPage({
         {/* Browser Panel */}
         {panelVisibility.browser && (
           <div className="shrink-0 border-l" style={{ width: panelSizes.browser }}>
-            {isResizing ? (
-              <div className="h-full bg-background" />
-            ) : (
-              <BrowserPanel
-                className="h-full"
-                tabs={browserTabs}
-                onTabsChange={handleBrowserTabsChange}
-              />
-            )}
+            <BrowserPanel
+              className="h-full"
+              tabs={browserTabs}
+              onTabsChange={handleBrowserTabsChange}
+              taskId={task.id}
+              isResizing={isResizing}
+            />
           </div>
         )}
 
@@ -850,6 +898,7 @@ export function TaskDetailPage({
               task={task}
               projectPath={project?.path ?? null}
               onUpdateTask={updateTaskAndNotify}
+              onMergeWithAI={handleMergeWithAI}
             />
           </div>
 
