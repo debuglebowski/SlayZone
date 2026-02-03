@@ -2,7 +2,7 @@ import type { IpcMain } from 'electron'
 import type { Database } from 'better-sqlite3'
 import type { CreateTaskInput, UpdateTaskInput, Task } from '@omgslayzone/task/shared'
 import { removeWorktree } from '@omgslayzone/worktrees/main'
-import { killPty } from '@omgslayzone/terminal/main'
+import { killPtysByTaskId } from '@omgslayzone/terminal/main'
 
 // Parse JSON columns from DB row
 function parseTask(row: Record<string, unknown> | undefined): Task | null {
@@ -29,9 +29,7 @@ function cleanupTask(db: Database, taskId: string): void {
 
   if (!task) return
 
-  // Kill PTY (sessionId format: taskId:mode)
-  const mode = task.terminal_mode || 'claude-code'
-  killPty(`${taskId}:${mode}`)
+  killPtysByTaskId(taskId)
 
   // Remove worktree if exists
   if (task.worktree_path) {
@@ -174,6 +172,11 @@ export function registerTaskHandlers(ipcMain: IpcMain, db: Database): void {
     values.push(data.id)
 
     db.prepare(`UPDATE tasks SET ${fields.join(', ')} WHERE id = ?`).run(...values)
+
+    if (data.status === 'done') {
+      killPtysByTaskId(data.id)
+    }
+
     const row = db.prepare('SELECT * FROM tasks WHERE id = ?').get(data.id) as Record<string, unknown> | undefined
     return parseTask(row)
   })

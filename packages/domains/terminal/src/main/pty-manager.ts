@@ -517,3 +517,10 @@ export function killAllPtys(): void {
     killPty(taskId)
   }
 }
+
+export function killPtysByTaskId(taskId: string): void {
+  const toKill = [...sessions.keys()].filter(id => id.startsWith(`${taskId}:`))
+  for (const sessionId of toKill) {
+    killPty(sessionId)
+  }
+}

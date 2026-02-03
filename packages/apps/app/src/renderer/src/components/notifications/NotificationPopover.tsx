@@ -34,7 +34,7 @@ export function NotificationPopover({
   return (
     <Popover open={open} onOpenChange={onOpenChange}>
       <PopoverTrigger asChild>
-        <NotificationButton count={attentionTasks.length} onClick={() => onOpenChange(!open)} />
+        <NotificationButton active={attentionTasks.length > 0} onClick={() => onOpenChange(!open)} />
       </PopoverTrigger>
       <PopoverContent side="bottom" align="end" className="w-80 p-0 max-h-96">
         <NotificationPanel
