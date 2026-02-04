@@ -388,6 +388,7 @@ export function TaskDetailPage({
   // Cmd+T/B/S for panel toggles
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent): void => {
+      if (!isActive) return
       if (e.metaKey && !e.shiftKey) {
         if (e.key === 't') {
           e.preventDefault()
@@ -403,7 +404,7 @@ export function TaskDetailPage({
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [panelVisibility, handlePanelToggle])
+  }, [isActive, panelVisibility, handlePanelToggle])
 
   // Focus title input when editing
   useEffect(() => {
