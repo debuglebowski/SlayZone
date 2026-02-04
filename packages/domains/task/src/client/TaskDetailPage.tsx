@@ -171,7 +171,25 @@ export function TaskDetailPage({
         setDescriptionValue(loadedTask.description ?? '')
         // Restore panel visibility and browser tabs (always reset to defaults if not saved)
         setPanelVisibility(loadedTask.panel_visibility ?? defaultPanelVisibility)
-        setBrowserTabs(loadedTask.browser_tabs ?? defaultBrowserTabs)
+        if (loadedTask.browser_tabs) {
+          setBrowserTabs(loadedTask.browser_tabs)
+        } else {
+          // Default to first URL from other tasks
+          const allTasks = await window.api.db.getTasks()
+          let firstUrl = 'about:blank'
+          for (const t of allTasks) {
+            if (t.id === loadedTask.id) continue
+            const url = t.browser_tabs?.tabs?.find(tab => tab.url && tab.url !== 'about:blank')?.url
+            if (url) {
+              firstUrl = url
+              break
+            }
+          }
+          setBrowserTabs({
+            tabs: [{ id: 'default', url: firstUrl, title: firstUrl === 'about:blank' ? 'New Tab' : firstUrl }],
+            activeTabId: 'default'
+          })
+        }
         // Find project for this task
         const taskProject = projects.find((p) => p.id === loadedTask.project_id)
         setProject(taskProject || null)
