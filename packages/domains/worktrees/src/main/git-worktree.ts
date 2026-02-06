@@ -154,3 +154,71 @@ export function mergeIntoParent(
 export function abortMerge(path: string): void {
   execSync('git merge --abort', { cwd: path, stdio: 'pipe' })
 }
+
+export function getConflictedFiles(path: string): string[] {
+  try {
+    const output = execSync('git diff --name-only --diff-filter=U', {
+      cwd: path,
+      encoding: 'utf-8',
+      stdio: ['pipe', 'pipe', 'pipe']
+    })
+    return output.trim().split('\n').filter(Boolean)
+  } catch {
+    return []
+  }
+}
+
+export function startMergeNoCommit(
+  projectPath: string,
+  parentBranch: string,
+  sourceBranch: string
+): { clean: boolean; conflictedFiles: string[] } {
+  // Checkout parent branch
+  const currentBranch = getCurrentBranch(projectPath)
+  if (currentBranch !== parentBranch) {
+    try {
+      execSync(`git checkout "${parentBranch}"`, {
+        cwd: projectPath,
+        stdio: 'pipe'
+      })
+    } catch (err) {
+      const msg = err instanceof Error && 'stderr' in err ? String((err as { stderr: unknown }).stderr) : String(err)
+      throw new Error(`Cannot checkout ${parentBranch}: ${msg.trim()}`)
+    }
+  }
+
+  // Attempt merge with --no-commit
+  try {
+    execSync(`git merge "${sourceBranch}" --no-commit --no-ff`, {
+      cwd: projectPath,
+      stdio: 'pipe'
+    })
+    // Clean merge - commit it
+    execSync(`git commit --no-edit`, {
+      cwd: projectPath,
+      stdio: 'pipe'
+    })
+    return { clean: true, conflictedFiles: [] }
+  } catch (err) {
+    // Check for conflicts
+    const conflictedFiles = getConflictedFiles(projectPath)
+    if (conflictedFiles.length > 0) {
+      return { clean: false, conflictedFiles }
+    }
+    // Some other error - include the actual message
+    const msg = err instanceof Error && 'stderr' in err ? String((err as { stderr: unknown }).stderr) : String(err)
+    throw new Error(`Merge failed: ${msg.trim()}`)
+  }
+}
+
+export function isMergeInProgress(path: string): boolean {
+  try {
+    execSync('git rev-parse --verify MERGE_HEAD', {
+      cwd: path,
+      stdio: 'pipe'
+    })
+    return true
+  } catch {
+    return false
+  }
+}

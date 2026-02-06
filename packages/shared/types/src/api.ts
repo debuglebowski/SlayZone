@@ -4,7 +4,7 @@ import type { Tag, CreateTagInput, UpdateTagInput } from '@omgslayzone/tags/shar
 import type { TerminalMode, TerminalState, CodeMode, PtyInfo, PromptInfo, ClaudeAvailability, BufferSinceResult } from '@omgslayzone/terminal/shared'
 import type { TerminalTab, CreateTerminalTabInput, UpdateTerminalTabInput } from '@omgslayzone/task-terminals/shared'
 import type { Theme, ThemePreference } from '@omgslayzone/settings/shared'
-import type { DetectedWorktree, MergeResult } from '@omgslayzone/worktrees/shared'
+import type { DetectedWorktree, MergeResult, MergeWithAIResult } from '@omgslayzone/worktrees/shared'
 
 // ElectronAPI interface - the IPC contract between renderer and main
 export interface ElectronAPI {
@@ -124,6 +124,9 @@ export interface ElectronAPI {
     hasUncommittedChanges: (path: string) => Promise<boolean>
     mergeIntoParent: (projectPath: string, parentBranch: string, sourceBranch: string) => Promise<MergeResult>
     abortMerge: (path: string) => Promise<void>
+    mergeWithAI: (projectPath: string, worktreePath: string, parentBranch: string, sourceBranch: string) => Promise<MergeWithAIResult>
+    isMergeInProgress: (path: string) => Promise<boolean>
+    getConflictedFiles: (path: string) => Promise<string[]>
   }
   tabs: {
     list: (taskId: string) => Promise<TerminalTab[]>

@@ -154,7 +154,11 @@ const api: ElectronAPI = {
     hasUncommittedChanges: (path) => ipcRenderer.invoke('git:hasUncommittedChanges', path),
     mergeIntoParent: (projectPath, parentBranch, sourceBranch) =>
       ipcRenderer.invoke('git:mergeIntoParent', projectPath, parentBranch, sourceBranch),
-    abortMerge: (path) => ipcRenderer.invoke('git:abortMerge', path)
+    abortMerge: (path) => ipcRenderer.invoke('git:abortMerge', path),
+    mergeWithAI: (projectPath, worktreePath, parentBranch, sourceBranch) =>
+      ipcRenderer.invoke('git:mergeWithAI', projectPath, worktreePath, parentBranch, sourceBranch),
+    isMergeInProgress: (path) => ipcRenderer.invoke('git:isMergeInProgress', path),
+    getConflictedFiles: (path) => ipcRenderer.invoke('git:getConflictedFiles', path)
   },
   tabs: {
     list: (taskId) => ipcRenderer.invoke('tabs:list', taskId),

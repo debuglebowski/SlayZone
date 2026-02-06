@@ -22,11 +22,13 @@ interface GitPanelProps {
   task: Task
   projectPath: string | null
   onUpdateTask: (data: UpdateTaskInput) => Promise<Task>
+  /** Called when AI merge needs to resolve conflicts. Parent should start Claude in terminal. */
+  onMergeWithAI?: (prompt: string, cwd: string) => Promise<void>
   /** When true, UI is shown but backend calls are disabled */
   disabled?: boolean
 }
 
-export function GitPanel({ task, projectPath, onUpdateTask, disabled = false }: GitPanelProps) {
+export function GitPanel({ task, projectPath, onUpdateTask, onMergeWithAI, disabled = false }: GitPanelProps) {
   const [isGitRepo, setIsGitRepo] = useState<boolean | null>(null)
   const [currentBranch, setCurrentBranch] = useState<string | null>(null)
   const [worktreeBranch, setWorktreeBranch] = useState<string | null>(null)
@@ -37,6 +39,7 @@ export function GitPanel({ task, projectPath, onUpdateTask, disabled = false }: 
   const [mergeConfirmOpen, setMergeConfirmOpen] = useState(false)
   const [merging, setMerging] = useState(false)
   const [mergeResult, setMergeResult] = useState<MergeResult | null>(null)
+  const [resolvingConflicts, setResolvingConflicts] = useState(false)
   const hasWorktree = !!task.worktree_path
 
   // Check git status when projectPath changes
@@ -171,18 +174,6 @@ export function GitPanel({ task, projectPath, onUpdateTask, disabled = false }: 
     setMergeResult(null)
 
     try {
-      // Check for uncommitted changes in worktree
-      const hasChanges = await window.api.git.hasUncommittedChanges(task.worktree_path)
-      if (hasChanges) {
-        setMergeResult({
-          success: false,
-          merged: false,
-          conflicted: false,
-          error: 'Uncommitted changes in worktree - commit or stash first'
-        })
-        return
-      }
-
       // Get worktree's current branch
       const sourceBranch = await window.api.git.getCurrentBranch(task.worktree_path)
       if (!sourceBranch) {
@@ -195,18 +186,31 @@ export function GitPanel({ task, projectPath, onUpdateTask, disabled = false }: 
         return
       }
 
-      // Perform merge
-      const result = await window.api.git.mergeIntoParent(
+      // Attempt merge with AI resolution (handles uncommitted changes too)
+      const result = await window.api.git.mergeWithAI(
         projectPath,
+        task.worktree_path,
         task.worktree_parent_branch,
         sourceBranch
       )
-      setMergeResult(result)
 
-      // On success: mark task done and kill process
       if (result.success) {
+        // Clean merge - mark done
         await onUpdateTask({ id: task.id, status: 'done' })
         await window.api.pty.kill(task.id)
+        setMergeResult({ success: true, merged: true, conflicted: false })
+      } else if (result.resolving && result.prompt && onMergeWithAI) {
+        // Conflicts or uncommitted changes - start AI resolution
+        setResolvingConflicts(true)
+        // Run Claude in the WORKTREE directory (may need to commit there first)
+        await onMergeWithAI(result.prompt, task.worktree_path)
+      } else if (result.error) {
+        setMergeResult({
+          success: false,
+          merged: false,
+          conflicted: false,
+          error: result.error
+        })
       }
     } catch (err) {
       setMergeResult({
@@ -343,7 +347,14 @@ export function GitPanel({ task, projectPath, onUpdateTask, disabled = false }: 
             </div>
             {task.worktree_parent_branch && (
               <>
-                {mergeResult?.conflicted ? (
+                {resolvingConflicts ? (
+                  <div className="space-y-2">
+                    <p className="text-xs text-yellow-500">AI resolving conflicts...</p>
+                    <Button variant="outline" size="sm" onClick={handleAbortMerge}>
+                      Abort Merge
+                    </Button>
+                  </div>
+                ) : mergeResult?.conflicted ? (
                   <div className="space-y-2">
                     <p className="text-xs text-destructive">Merge conflicts - resolve manually</p>
                     <Button variant="outline" size="sm" onClick={handleAbortMerge}>
