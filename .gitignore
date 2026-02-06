@@ -8,3 +8,6 @@ out
 
 # Auto Claude data directory
 .auto-claude/
+
+# Local Claude settings
+.claude/settings.local.json
