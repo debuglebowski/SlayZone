@@ -74,7 +74,6 @@ export function BrowserPanel({ className, tabs, onTabsChange, taskId, isResizing
           }
         }
       }
-      // Sort by task updated_at (most recent first) - tasks are already sorted
       setOtherTaskUrls(entries)
     })
   }, [importDropdownOpen, taskId])
