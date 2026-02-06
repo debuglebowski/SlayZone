@@ -101,7 +101,8 @@ export function NotificationPanel({
         </Button>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-2">
+      <div className="flex-1 min-h-0 relative">
+        <div className="absolute inset-0 overflow-y-auto p-2">
         {attentionTasks.length === 0 ? (
           <p className="text-sm text-muted-foreground text-center py-4">No tasks need attention</p>
         ) : (
@@ -153,6 +154,7 @@ export function NotificationPanel({
             </div>
           ))
         )}
+        </div>
       </div>
     </div>
   )
