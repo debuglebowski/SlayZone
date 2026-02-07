@@ -11,3 +11,6 @@ out
 
 # Local Claude settings
 .claude/settings.local.json
+
+# Generated icon intermediates
+packages/apps/app/build/icon.iconset/
