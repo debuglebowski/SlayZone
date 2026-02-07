@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { MoreHorizontal, Archive, Trash2, AlertTriangle, RotateCw, RefreshCcw, Link2, Sparkles, Loader2, Terminal as TerminalIcon, Globe, Settings2 } from 'lucide-react'
+import { MoreHorizontal, Archive, Trash2, AlertTriangle, RotateCw, RefreshCcw, Link2, Sparkles, Loader2, Terminal as TerminalIcon, Globe, Settings2, GitBranch, Pencil } from 'lucide-react'
 import type { Task, PanelVisibility } from '@slayzone/task/shared'
 import type { BrowserTabsState } from '@slayzone/task-browser/shared'
 import type { Tag } from '@slayzone/tags/shared'
@@ -20,15 +20,14 @@ import {
   SelectTrigger,
   SelectValue
 } from '@slayzone/ui'
-import { Switch } from '@slayzone/ui'
-import { Label } from '@slayzone/ui'
+import { Input } from '@slayzone/ui'
 import { DeleteTaskDialog } from './DeleteTaskDialog'
 import { Tooltip, TooltipTrigger, TooltipContent } from '@slayzone/ui'
 import { TaskMetadataSidebar } from './TaskMetadataSidebar'
 import { RichTextEditor } from '@slayzone/editor'
 import { markSkipCache, usePty } from '@slayzone/terminal'
 import { TerminalContainer } from '@slayzone/task-terminals'
-import { GitPanel } from '@slayzone/worktrees'
+import { GitPanel, GitDiffPanel } from '@slayzone/worktrees'
 import { cn } from '@slayzone/ui'
 import { BrowserPanel } from '@slayzone/task-browser'
 import { usePanelSizes } from './usePanelSizes'
@@ -40,6 +39,8 @@ interface TaskDetailPageProps {
   isActive?: boolean
   onBack: () => void
   onTaskUpdated: (task: Task) => void
+  onArchiveTask?: (taskId: string) => Promise<void>
+  onDeleteTask?: (taskId: string) => Promise<void>
   onNavigateToTask?: (taskId: string) => void
 }
 
@@ -47,14 +48,22 @@ export function TaskDetailPage({
   taskId,
   isActive,
   onBack,
-  onTaskUpdated
+  onTaskUpdated,
+  onArchiveTask,
+  onDeleteTask
 }: TaskDetailPageProps): React.JSX.Element {
+  // Main tab session ID format used by TerminalContainer/useTaskTerminals.
+  const getMainSessionId = useCallback((id: string) => `${id}:${id}`, [])
+
   const [task, setTask] = useState<Task | null>(null)
   const [project, setProject] = useState<Project | null>(null)
   const [tags, setTags] = useState<Tag[]>([])
   const [taskTagIds, setTaskTagIds] = useState<string[]>([])
   const [loading, setLoading] = useState(true)
   const [claudeAvailability, setClaudeAvailability] = useState<ClaudeAvailability | null>(null)
+
+  // Project path validation
+  const [projectPathMissing, setProjectPathMissing] = useState(false)
 
   // PTY context for buffer management
   const { resetTaskState, subscribeSessionDetected, getQuickRunPrompt, getQuickRunCodeMode, clearQuickRunPrompt, setQuickRunPrompt } = usePty()
@@ -82,9 +91,12 @@ export function TaskDetailPage({
 
   // Track if the main terminal tab is active (for bottom bar visibility)
   const [isMainTabActive, setIsMainTabActive] = useState(true)
+  const [flagsInputValue, setFlagsInputValue] = useState('')
+  const [isEditingFlags, setIsEditingFlags] = useState(false)
+  const flagsInputRef = useRef<HTMLInputElement>(null)
 
   // Panel visibility state
-  const defaultPanelVisibility: PanelVisibility = { terminal: true, browser: false, settings: true }
+  const defaultPanelVisibility: PanelVisibility = { terminal: true, browser: false, gitDiff: false, settings: true }
   const [panelVisibility, setPanelVisibility] = useState<PanelVisibility>(defaultPanelVisibility)
 
   // Browser tabs state
@@ -157,6 +169,13 @@ export function TaskDetailPage({
     setGeneratingDescription(false)
 
     const loadData = async (): Promise<void> => {
+      const checkProjectPathExists = async (path: string): Promise<boolean> => {
+        const pathExists = window.api.files?.pathExists
+        if (typeof pathExists === 'function') return pathExists(path)
+        console.warn('window.api.files.pathExists is unavailable; skipping path validation')
+        return true
+      }
+
       const [loadedTask, loadedTags, loadedTaskTags, projects, claudeCheck] = await Promise.all([
         window.api.db.getTask(taskId),
         window.api.tags.getTags(),
@@ -170,7 +189,10 @@ export function TaskDetailPage({
         setTitleValue(loadedTask.title)
         setDescriptionValue(loadedTask.description ?? '')
         // Restore panel visibility and browser tabs (always reset to defaults if not saved)
-        setPanelVisibility(loadedTask.panel_visibility ?? defaultPanelVisibility)
+        setPanelVisibility({
+          ...defaultPanelVisibility,
+          ...(loadedTask.panel_visibility ?? {})
+        })
         if (loadedTask.browser_tabs) {
           setBrowserTabs(loadedTask.browser_tabs)
         } else {
@@ -193,6 +215,12 @@ export function TaskDetailPage({
         // Find project for this task
         const taskProject = projects.find((p) => p.id === loadedTask.project_id)
         setProject(taskProject || null)
+        if (taskProject?.path) {
+          const exists = await checkProjectPathExists(taskProject.path)
+          setProjectPathMissing(!exists)
+        } else {
+          setProjectPathMissing(false)
+        }
       }
       setTags(loadedTags)
       setTaskTagIds(loadedTaskTags.map((t) => t.id))
@@ -202,6 +230,24 @@ export function TaskDetailPage({
 
     loadData()
   }, [taskId])
+
+  // Re-check project path on window focus
+  useEffect(() => {
+    if (!project?.path) return
+
+    const checkProjectPathExists = async (path: string): Promise<boolean> => {
+      const pathExists = window.api.files?.pathExists
+      if (typeof pathExists === 'function') return pathExists(path)
+      console.warn('window.api.files.pathExists is unavailable; skipping path validation')
+      return true
+    }
+
+    const handleFocus = (): void => {
+      checkProjectPathExists(project.path!).then((exists) => setProjectPathMissing(!exists))
+    }
+    window.addEventListener('focus', handleFocus)
+    return () => window.removeEventListener('focus', handleFocus)
+  }, [project?.path])
 
   // Handle session ID creation from terminal
   const handleSessionCreated = useCallback(
@@ -237,6 +283,7 @@ export function TaskDetailPage({
   // Handle invalid session (e.g., "No conversation found" error)
   const handleSessionInvalid = useCallback(async () => {
     if (!task) return
+    const mainSessionId = getMainSessionId(task.id)
 
     // Clear the stale session ID from the database
     const updated = await window.api.db.updateTask({
@@ -247,24 +294,26 @@ export function TaskDetailPage({
     onTaskUpdated(updated)
 
     // Kill the current PTY so we can restart fresh
-    await window.api.pty.kill(task.id)
-  }, [task, onTaskUpdated])
+    await window.api.pty.kill(mainSessionId)
+  }, [task, onTaskUpdated, getMainSessionId])
 
   // Restart terminal (kill PTY, remount, keep session for --resume)
   const handleRestartTerminal = useCallback(async () => {
     if (!task) return
-    resetTaskState(task.id)
-    await window.api.pty.kill(task.id)
+    const mainSessionId = getMainSessionId(task.id)
+    resetTaskState(mainSessionId)
+    await window.api.pty.kill(mainSessionId)
     await new Promise((r) => setTimeout(r, 100))
-    markSkipCache(task.id)
+    markSkipCache(mainSessionId)
     setTerminalKey((k) => k + 1)
-  }, [task, resetTaskState])
+  }, [task, resetTaskState, getMainSessionId])
 
   // Reset terminal (kill PTY, clear session ID, remount fresh)
   const handleResetTerminal = useCallback(async () => {
     if (!task) return
-    resetTaskState(task.id)
-    await window.api.pty.kill(task.id)
+    const mainSessionId = getMainSessionId(task.id)
+    resetTaskState(mainSessionId)
+    await window.api.pty.kill(mainSessionId)
     // Clear session ID so new session starts fresh
     const updated = await window.api.db.updateTask({
       id: task.id,
@@ -273,9 +322,9 @@ export function TaskDetailPage({
     setTask(updated)
     onTaskUpdated(updated)
     await new Promise((r) => setTimeout(r, 100))
-    markSkipCache(task.id)
+    markSkipCache(mainSessionId)
     setTerminalKey((k) => k + 1)
-  }, [task, resetTaskState, onTaskUpdated])
+  }, [task, resetTaskState, onTaskUpdated, getMainSessionId])
 
   // Re-attach terminal (remount without killing PTY - reuses cached terminal)
   const handleReattachTerminal = useCallback(() => {
@@ -357,34 +406,70 @@ export function TaskDetailPage({
       setTask(updated)
       onTaskUpdated(updated)
       // Remount terminal (mark skip to prevent cleanup from re-caching old content)
-      markSkipCache(task.id)
+      markSkipCache(mainSessionId)
       setTerminalKey((k) => k + 1)
     },
     [task, onTaskUpdated, resetTaskState]
   )
 
   // Handle dangerously skip permissions toggle
-  const handleSkipPermissionsChange = useCallback(
-    async (checked: boolean) => {
-      if (!task) return
-      // Update DB
-      const updated = await window.api.db.updateTask({
-        id: task.id,
-        dangerouslySkipPermissions: checked
-      })
+  const getProviderFlagsForMode = useCallback((currentTask: Task): string => {
+    if (currentTask.terminal_mode === 'claude-code') return currentTask.claude_flags ?? ''
+    if (currentTask.terminal_mode === 'codex') return currentTask.codex_flags ?? ''
+    return ''
+  }, [])
+
+  const handleFlagsSave = useCallback(
+    async (nextValue: string) => {
+      if (!task || task.terminal_mode === 'terminal') return
+      const currentValue = getProviderFlagsForMode(task)
+      if (currentValue === nextValue) return
+
+      const update =
+        task.terminal_mode === 'claude-code'
+          ? { id: task.id, claudeFlags: nextValue }
+          : { id: task.id, codexFlags: nextValue }
+
+      const updated = await window.api.db.updateTask(update)
       setTask(updated)
       onTaskUpdated(updated)
-      // Main tab session ID format: ${taskId}:${taskId}
+
       const mainSessionId = `${task.id}:${task.id}`
-      // Restart terminal to apply new setting
       resetTaskState(mainSessionId)
       await window.api.pty.kill(mainSessionId)
       await new Promise((r) => setTimeout(r, 100))
       markSkipCache(mainSessionId)
       setTerminalKey((k) => k + 1)
     },
-    [task, onTaskUpdated, resetTaskState]
+    [task, getProviderFlagsForMode, onTaskUpdated, resetTaskState]
   )
+
+  const handleSetDefaultFlags = useCallback(async () => {
+    if (!task || task.terminal_mode === 'terminal') return
+    const settingsKey =
+      task.terminal_mode === 'claude-code' ? 'default_claude_flags' : 'default_codex_flags'
+    const fallback =
+      task.terminal_mode === 'claude-code'
+        ? '--dangerously-skip-permissions'
+        : '--full-auto --search'
+    const defaultFlags = (await window.api.settings.get(settingsKey)) ?? fallback
+    setFlagsInputValue(defaultFlags)
+    await handleFlagsSave(defaultFlags)
+  }, [task, handleFlagsSave])
+
+  useEffect(() => {
+    if (!task) return
+    setFlagsInputValue(getProviderFlagsForMode(task))
+    setIsEditingFlags(false)
+  }, [task, getProviderFlagsForMode])
+
+  useEffect(() => {
+    if (!isEditingFlags) return
+    requestAnimationFrame(() => {
+      flagsInputRef.current?.focus()
+      flagsInputRef.current?.select()
+    })
+  }, [isEditingFlags])
 
   // Handle panel visibility toggle
   const handlePanelToggle = useCallback(
@@ -403,7 +488,7 @@ export function TaskDetailPage({
     [task, panelVisibility, onTaskUpdated]
   )
 
-  // Cmd+T/B/S for panel toggles
+  // Cmd+T/B/G/S for panel toggles
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent): void => {
       if (!isActive) return
@@ -414,6 +499,9 @@ export function TaskDetailPage({
         } else if (e.key === 'b') {
           e.preventDefault()
           handlePanelToggle('browser', !panelVisibility.browser)
+        } else if (e.key === 'g') {
+          e.preventDefault()
+          handlePanelToggle('gitDiff', !panelVisibility.gitDiff)
         } else if (e.key === 's') {
           e.preventDefault()
           handlePanelToggle('settings', !panelVisibility.settings)
@@ -474,7 +562,7 @@ export function TaskDetailPage({
     try {
       const result = await window.api.ai.generateDescription(
         task.title,
-        task.terminal_mode || 'claude-code'
+        task.terminal_mode
       )
       console.log('[generate] Result:', result)
       if (result.success && result.description) {
@@ -558,7 +646,11 @@ export function TaskDetailPage({
 
   const handleArchive = async (): Promise<void> => {
     if (!task) return
-    await window.api.db.archiveTask(task.id)
+    if (onArchiveTask) {
+      await onArchiveTask(task.id)
+    } else {
+      await window.api.db.archiveTask(task.id)
+    }
     onBack()
   }
 
@@ -610,6 +702,7 @@ export function TaskDetailPage({
                   { id: 'terminal', icon: TerminalIcon, label: 'Terminal', active: panelVisibility.terminal, shortcut: '⌘T' },
                   { id: 'browser', icon: Globe, label: 'Browser', active: panelVisibility.browser, shortcut: '⌘B' },
                   { id: 'settings', icon: Settings2, label: 'Settings', active: panelVisibility.settings, shortcut: '⌘S' },
+                  { id: 'gitDiff', icon: GitBranch, label: 'Git diff', active: panelVisibility.gitDiff, shortcut: '⌘G' },
                 ]}
                 onChange={handlePanelToggle}
               />
@@ -682,7 +775,7 @@ export function TaskDetailPage({
         </div>
       </header>
 
-      {/* Split view: terminal | browser | settings */}
+      {/* Split view: terminal | browser | settings | git diff */}
       <div className="flex-1 flex min-h-0">
         {/* Terminal Panel */}
         {panelVisibility.terminal && (
@@ -690,6 +783,14 @@ export function TaskDetailPage({
           "min-w-0 bg-[#0a0a0a] flex flex-col",
           panelVisibility.browser ? "flex-1 min-w-[300px]" : "flex-1"
         )}>
+          {projectPathMissing && project?.path && (
+            <div className="shrink-0 bg-amber-500/10 border-b border-amber-500/20 px-4 py-2 flex items-center gap-2">
+              <AlertTriangle className="h-4 w-4 text-amber-500" />
+              <span className="text-sm text-amber-500">
+                Project path not found: <code className="bg-amber-500/10 px-1 rounded">{project.path}</code>
+              </span>
+            </div>
+          )}
           {claudeAvailability && !claudeAvailability.available && (
             <div className="shrink-0 bg-amber-500/10 border-b border-amber-500/20 px-4 py-2 flex items-center gap-2 text-amber-500">
               <AlertTriangle className="h-4 w-4" />
@@ -719,17 +820,29 @@ export function TaskDetailPage({
             <div className="flex-1 min-h-0">
               {isResizing ? (
                 <div className="h-full bg-[#0a0a0a]" />
-              ) : project?.path ? (
+              ) : project?.path && !projectPathMissing ? (
                 <TerminalContainer
                   key={`${terminalKey}-${task.worktree_path || ''}-${aiMergeState?.cwd || ''}`}
                   taskId={task.id}
                   cwd={aiMergeState?.cwd || task.worktree_path || project.path}
-                  defaultMode={task.terminal_mode || 'claude-code'}
-                  conversationId={aiMergeState ? undefined : (task.claude_conversation_id || task.claude_session_id || undefined)}
-                  existingConversationId={aiMergeState ? undefined : (task.claude_conversation_id || task.claude_session_id || undefined)}
+                  defaultMode={task.terminal_mode}
+                  conversationId={aiMergeState
+                    ? undefined
+                    : task.terminal_mode === 'claude-code'
+                      ? (task.claude_conversation_id || task.claude_session_id || undefined)
+                      : task.terminal_mode === 'codex'
+                        ? (task.codex_conversation_id || undefined)
+                        : undefined}
+                  existingConversationId={aiMergeState
+                    ? undefined
+                    : task.terminal_mode === 'claude-code'
+                      ? (task.claude_conversation_id || task.claude_session_id || undefined)
+                      : task.terminal_mode === 'codex'
+                        ? (task.codex_conversation_id || undefined)
+                        : undefined}
                   initialPrompt={getQuickRunPrompt(task.id)}
                   codeMode={getQuickRunCodeMode(task.id)}
-                  dangerouslySkipPermissions={aiMergeState ? true : (task.dangerously_skip_permissions ?? false)}
+                  providerFlags={getProviderFlagsForMode(task)}
                   autoFocus={isFirstMountRef.current}
                   onConversationCreated={handleSessionCreated}
                   onSessionInvalid={handleSessionInvalid}
@@ -757,7 +870,7 @@ export function TaskDetailPage({
                     !isMainTabActive && "opacity-40 pointer-events-none"
                   )}>
             <Select
-              value={task.terminal_mode || 'claude-code'}
+              value={task.terminal_mode}
               onValueChange={(value) => handleModeChange(value as TerminalMode)}
             >
               <SelectTrigger size="sm" className="w-36 h-7 text-xs bg-neutral-800 border-neutral-700">
@@ -770,70 +883,115 @@ export function TaskDetailPage({
               </SelectContent>
             </Select>
 
-            {(task.terminal_mode === 'claude-code' || !task.terminal_mode) && (
-              <Tooltip>
-                <TooltipTrigger asChild>
+            {task.terminal_mode !== 'terminal' && (
+              isEditingFlags ? (
+                <Input
+                  ref={flagsInputRef}
+                  value={flagsInputValue}
+                  onChange={(e) => setFlagsInputValue(e.target.value)}
+                  onBlur={() => {
+                    setIsEditingFlags(false)
+                    void handleFlagsSave(flagsInputValue)
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault()
+                      setIsEditingFlags(false)
+                      void handleFlagsSave(flagsInputValue)
+                    } else if (e.key === 'Escape') {
+                      e.preventDefault()
+                      setFlagsInputValue(getProviderFlagsForMode(task))
+                      setIsEditingFlags(false)
+                    }
+                  }}
+                  placeholder="Flags"
+                  className="h-7 text-xs bg-neutral-800 border-neutral-700 w-72"
+                />
+              ) : (
+                flagsInputValue.trim().length === 0 ? (
                   <div className="flex items-center gap-2">
-                    <Switch
-                      id="skip-permissions"
-                      checked={task.dangerously_skip_permissions ?? false}
-                      onCheckedChange={handleSkipPermissionsChange}
-                    />
-                    <Label htmlFor="skip-permissions" className="text-xs text-muted-foreground cursor-pointer">
-                      Skip permissions
-                    </Label>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="!h-8 !min-h-8 text-xs"
+                      onClick={() => setIsEditingFlags(true)}
+                    >
+                      Set flags
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="!h-8 !min-h-8 text-xs"
+                      onClick={() => { void handleSetDefaultFlags() }}
+                    >
+                      Set default flags
+                    </Button>
                   </div>
-                </TooltipTrigger>
-                <TooltipContent>Auto-approve all tool calls (dangerous)</TooltipContent>
-              </Tooltip>
+                ) : (
+                  <div className="relative h-7 w-fit max-w-72 px-1 pr-7">
+                    <div className="min-w-0 h-full flex items-center">
+                      <div className="text-xs text-neutral-200 truncate">
+                        {flagsInputValue}
+                      </div>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="absolute right-0 top-1/2 -translate-y-1/2 h-6 w-6"
+                      onClick={() => setIsEditingFlags(true)}
+                    >
+                      <Pencil className="size-3.5" />
+                    </Button>
+                  </div>
+                )
+              )
             )}
 
-            {(task.terminal_mode === 'claude-code' || !task.terminal_mode) && (
+            <div className="ml-auto flex items-center gap-3">
+              {task.terminal_mode === 'claude-code' && (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="!h-8 !min-h-8 text-xs"
+                      onClick={handleSyncSessionName}
+                    >
+                      Sync name
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Rename Claude session to match task title</TooltipContent>
+                </Tooltip>
+              )}
+
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button
                     variant="outline"
                     size="sm"
-                    className="ml-auto h-7 text-xs"
-                    onClick={handleSyncSessionName}
+                    className="!h-8 !min-h-8 text-xs"
+                    onClick={handleInjectTitle}
                   >
-                    Sync name
+                    Inject title
                   </Button>
                 </TooltipTrigger>
-                <TooltipContent>Rename Claude session to match task title</TooltipContent>
+                <TooltipContent>Insert task title into terminal (⌘I)</TooltipContent>
               </Tooltip>
-            )}
 
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className={cn(
-                    'h-7 text-xs',
-                    task.terminal_mode !== 'claude-code' && task.terminal_mode && 'ml-auto'
-                  )}
-                  onClick={handleInjectTitle}
-                >
-                  Inject title
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Insert task title into terminal (⌘I)</TooltipContent>
-            </Tooltip>
-
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="h-7 text-xs"
-                  onClick={handleInjectDescription}
-                >
-                  Inject description
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Insert task description into terminal (⌘⇧I)</TooltipContent>
-            </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="!h-8 !min-h-8 text-xs"
+                    onClick={handleInjectDescription}
+                  >
+                    Inject description
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Insert task description into terminal (⌘⇧I)</TooltipContent>
+              </Tooltip>
+            </div>
                   </div>
                 </div>
               </TooltipTrigger>
@@ -933,6 +1091,29 @@ export function TaskDetailPage({
           </div>
         </div>
         )}
+
+        {/* Resize handle: Settings | Git Diff or Browser | Git Diff or Terminal | Git Diff */}
+        {panelVisibility.gitDiff && (panelVisibility.settings || panelVisibility.browser || panelVisibility.terminal) && (
+          <ResizeHandle
+            width={panelSizes.gitDiff}
+            minWidth={50}
+            onWidthChange={(w) => updatePanelSizes({ gitDiff: w })}
+            onDragStart={() => setIsResizing(true)}
+            onDragEnd={() => setIsResizing(false)}
+          />
+        )}
+
+        {/* Git Diff Panel */}
+        {panelVisibility.gitDiff && (
+          <div className="shrink-0 border-l" style={{ width: panelSizes.gitDiff }}>
+            <GitDiffPanel
+              task={task}
+              projectPath={project?.path ?? null}
+              visible={panelVisibility.gitDiff}
+              pollIntervalMs={5000}
+            />
+          </div>
+        )}
       </div>
 
       <DeleteTaskDialog
@@ -940,6 +1121,7 @@ export function TaskDetailPage({
         open={deleteDialogOpen}
         onOpenChange={setDeleteDialogOpen}
         onDeleted={handleDeleteConfirm}
+        onDeleteTask={onDeleteTask}
       />
     </div>
   )

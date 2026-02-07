@@ -83,7 +83,7 @@ interface TerminalProps {
   existingConversationId?: string | null
   initialPrompt?: string | null
   codeMode?: CodeMode | null
-  dangerouslySkipPermissions?: boolean
+  providerFlags?: string | null
   autoFocus?: boolean
   onConversationCreated?: (conversationId: string) => void
   onSessionInvalid?: () => void
@@ -98,7 +98,7 @@ export function Terminal({
   existingConversationId,
   initialPrompt,
   codeMode,
-  dangerouslySkipPermissions = false,
+  providerFlags,
   autoFocus = false,
   onConversationCreated,
   onSessionInvalid,
@@ -111,6 +111,7 @@ export function Terminal({
   const initializedRef = useRef(false)
   const [isDragOver, setIsDragOver] = useState(false)
   const [isInitializing, setIsInitializing] = useState(true)
+  const [initError, setInitError] = useState<string | null>(null)
 
   const { subscribe, subscribeExit, subscribeSessionInvalid, subscribeAttention, subscribeState, getState, resetTaskState, cleanupTask } = usePty()
 
@@ -118,221 +119,234 @@ export function Terminal({
 
   const initTerminal = useCallback(async (signal: AbortSignal) => {
     if (!containerRef.current || initializedRef.current) return
+    setIsInitializing(true)
+    setInitError(null)
 
-    // Wait for container to have dimensions BEFORE initializing terminal
     try {
-      await waitForDimensions(containerRef.current, signal)
-    } catch (e) {
-      if (e instanceof DOMException && e.name === 'AbortError') return
-      throw e
-    }
+      // Wait for container to have dimensions BEFORE initializing terminal
+      try {
+        await waitForDimensions(containerRef.current, signal)
+      } catch (e) {
+        if (e instanceof DOMException && e.name === 'AbortError') return
+        throw e
+      }
 
-    const rect = containerRef.current.getBoundingClientRect()
+      const rect = containerRef.current.getBoundingClientRect()
 
-    // Re-check after await (component state might have changed)
-    if (!containerRef.current || initializedRef.current || signal.aborted) return
+      // Re-check after await (component state might have changed)
+      if (!containerRef.current || initializedRef.current || signal.aborted) return
 
-    // Don't initialize if container still has 0 dimensions (not visible)
-    if (rect.width === 0 || rect.height === 0) {
-      return
-    }
+      // Don't initialize if container still has 0 dimensions (not visible)
+      if (rect.width === 0 || rect.height === 0) {
+        return
+      }
 
-    initializedRef.current = true
+      initializedRef.current = true
 
-    // Check if we have a cached terminal for this task
-    const cached = getTerminal(sessionId)
-    if (cached) {
-      // If mode changed, dispose cached terminal and kill old PTY to start fresh
-      if (cached.mode !== mode) {
-        // Reset state FIRST to ignore any in-flight data
-        resetTaskState(sessionId)
-        disposeTerminal(sessionId)
-        // Kill old PTY (any data it sends will be ignored)
-        await window.api.pty.kill(sessionId)
-      } else {
-        // Reattach existing terminal (container already has dimensions)
-        containerRef.current.appendChild(cached.element)
-        terminalRef.current = cached.terminal
-        fitAddonRef.current = cached.fitAddon
-        serializeAddonRef.current = cached.serializeAddon
+      // Check if we have a cached terminal for this task
+      const cached = getTerminal(sessionId)
+      if (cached) {
+        // If mode changed, dispose cached terminal and kill old PTY to start fresh
+        if (cached.mode !== mode) {
+          // Reset state FIRST to ignore any in-flight data
+          resetTaskState(sessionId)
+          disposeTerminal(sessionId)
+          // Kill old PTY (any data it sends will be ignored)
+          await window.api.pty.kill(sessionId)
+        } else {
+          // Reattach existing terminal (container already has dimensions)
+          containerRef.current.appendChild(cached.element)
+          terminalRef.current = cached.terminal
+          fitAddonRef.current = cached.fitAddon
+          serializeAddonRef.current = cached.serializeAddon
 
-        // Simple fit - container is guaranteed to have dimensions
-        cached.fitAddon.fit()
-        if (autoFocus && !isDialogOpen()) {
-          cached.terminal.focus()
+          // Simple fit - container is guaranteed to have dimensions
+          cached.fitAddon.fit()
+          if (autoFocus && !isDialogOpen()) {
+            cached.terminal.focus()
+          }
+          window.api.pty.resize(sessionId, cached.terminal.cols, cached.terminal.rows)
+          cached.terminal.write('\x1b[0m') // Reset ANSI state on reattach
+
+          // Sync state from backend (fixes stuck loading spinner on reattach)
+          const actualState = await window.api.pty.getState(sessionId)
+          if (signal.aborted) return // Don't setState if unmounted
+          if (actualState) setPtyState(actualState)
+
+          // Expose API for programmatic input and focus
+          onReady?.({
+            sendInput: async (text) => {
+              for (const char of text) {
+                cached.terminal.input(char)
+                await new Promise(r => setTimeout(r, 1))
+              }
+            },
+            focus: () => cached.terminal.focus()
+          })
+          return
         }
-        window.api.pty.resize(sessionId, cached.terminal.cols, cached.terminal.rows)
-        cached.terminal.write('\x1b[0m') // Reset ANSI state on reattach
+      }
 
-        // Sync state from backend (fixes stuck loading spinner on reattach)
+      // Create new terminal
+      const terminal = new XTerm({
+        cursorBlink: true,
+        fontSize: 13,
+        fontFamily: 'Menlo, Monaco, "Courier New", monospace',
+        theme: {
+          background: '#0a0a0a',
+          foreground: '#e5e5e5',
+          cursor: '#e5e5e5',
+          cursorAccent: '#0a0a0a',
+          selectionBackground: '#525252',
+          black: '#171717',
+          red: '#f87171',
+          green: '#4ade80',
+          yellow: '#facc15',
+          blue: '#60a5fa',
+          magenta: '#c084fc',
+          cyan: '#22d3ee',
+          white: '#e5e5e5',
+          brightBlack: '#404040',
+          brightRed: '#fca5a5',
+          brightGreen: '#86efac',
+          brightYellow: '#fde047',
+          brightBlue: '#93c5fd',
+          brightMagenta: '#d8b4fe',
+          brightCyan: '#67e8f9',
+          brightWhite: '#fafafa'
+        }
+      })
+
+      const fitAddon = new FitAddon()
+      // const webLinksAddon = new WebLinksAddon() // Disabled - causes persistent underlines
+      const serializeAddon = new SerializeAddon()
+
+      terminal.loadAddon(fitAddon)
+      // terminal.loadAddon(webLinksAddon) // Disabled - causes persistent underlines
+      terminal.loadAddon(serializeAddon)
+
+      // WebGL addon DISABLED - renders underlines directly to canvas, bypassing CSS override
+      // Canvas 2D renderer uses DOM elements that respect our .xterm-underline-* CSS fix
+      // try {
+      //   const webglAddon = new WebglAddon()
+      //   webglAddon.onContextLoss(() => {
+      //     webglAddon.dispose()
+      //   })
+      //   terminal.loadAddon(webglAddon)
+      // } catch {
+      //   // WebGL not available, continue with canvas renderer
+      // }
+
+      terminalRef.current = terminal
+      fitAddonRef.current = fitAddon
+      serializeAddonRef.current = serializeAddon
+
+      terminal.open(containerRef.current)
+      terminal.clear() // Ensure terminal starts completely fresh
+      // Simple fit - container is guaranteed to have dimensions from waitForDimensions
+      fitAddon.fit()
+      if (autoFocus && !isDialogOpen()) {
+        terminal.focus()
+      }
+
+      // Let Ctrl+Tab and Ctrl+Shift+Tab bubble up for tab switching
+      terminal.attachCustomKeyEventHandler((e) => {
+        if (e.ctrlKey && e.key === 'Tab') return false
+        return true
+      })
+
+      // Check if PTY already exists (e.g., from idle hibernation)
+      const exists = await window.api.pty.exists(sessionId)
+      if (signal.aborted) return // Don't continue if unmounted
+      if (exists) {
+        // Sync state from main process (fixes stuck loading spinner)
         const actualState = await window.api.pty.getState(sessionId)
         if (signal.aborted) return // Don't setState if unmounted
         if (actualState) setPtyState(actualState)
 
-        // Expose API for programmatic input and focus
-        onReady?.({
-          sendInput: async (text) => {
-            for (const char of text) {
-              cached.terminal.input(char)
-              await new Promise(r => setTimeout(r, 1))
-            }
-          },
-          focus: () => cached.terminal.focus()
-        })
-        setIsInitializing(false)
-        return
-      }
-    }
-
-    // Create new terminal
-    const terminal = new XTerm({
-      cursorBlink: true,
-      fontSize: 13,
-      fontFamily: 'Menlo, Monaco, "Courier New", monospace',
-      theme: {
-        background: '#0a0a0a',
-        foreground: '#e5e5e5',
-        cursor: '#e5e5e5',
-        cursorAccent: '#0a0a0a',
-        selectionBackground: '#525252',
-        black: '#171717',
-        red: '#f87171',
-        green: '#4ade80',
-        yellow: '#facc15',
-        blue: '#60a5fa',
-        magenta: '#c084fc',
-        cyan: '#22d3ee',
-        white: '#e5e5e5',
-        brightBlack: '#404040',
-        brightRed: '#fca5a5',
-        brightGreen: '#86efac',
-        brightYellow: '#fde047',
-        brightBlue: '#93c5fd',
-        brightMagenta: '#d8b4fe',
-        brightCyan: '#67e8f9',
-        brightWhite: '#fafafa'
-      }
-    })
-
-    const fitAddon = new FitAddon()
-    // const webLinksAddon = new WebLinksAddon() // Disabled - causes persistent underlines
-    const serializeAddon = new SerializeAddon()
-
-    terminal.loadAddon(fitAddon)
-    // terminal.loadAddon(webLinksAddon) // Disabled - causes persistent underlines
-    terminal.loadAddon(serializeAddon)
-
-    // WebGL addon DISABLED - renders underlines directly to canvas, bypassing CSS override
-    // Canvas 2D renderer uses DOM elements that respect our .xterm-underline-* CSS fix
-    // try {
-    //   const webglAddon = new WebglAddon()
-    //   webglAddon.onContextLoss(() => {
-    //     webglAddon.dispose()
-    //   })
-    //   terminal.loadAddon(webglAddon)
-    // } catch {
-    //   // WebGL not available, continue with canvas renderer
-    // }
-
-    terminalRef.current = terminal
-    fitAddonRef.current = fitAddon
-    serializeAddonRef.current = serializeAddon
-
-    terminal.open(containerRef.current)
-    terminal.clear() // Ensure terminal starts completely fresh
-    // Simple fit - container is guaranteed to have dimensions from waitForDimensions
-    fitAddon.fit()
-    if (autoFocus && !isDialogOpen()) {
-      terminal.focus()
-    }
-
-    // Let Ctrl+Tab and Ctrl+Shift+Tab bubble up for tab switching
-    terminal.attachCustomKeyEventHandler((e) => {
-      if (e.ctrlKey && e.key === 'Tab') return false
-      return true
-    })
-
-    // Check if PTY already exists (e.g., from idle hibernation)
-    const exists = await window.api.pty.exists(sessionId)
-    if (signal.aborted) return // Don't continue if unmounted
-    if (exists) {
-      // Sync state from main process (fixes stuck loading spinner)
-      const actualState = await window.api.pty.getState(sessionId)
-      if (signal.aborted) return // Don't setState if unmounted
-      if (actualState) setPtyState(actualState)
-
-      // Restore from backend buffer (single source of truth)
-      // Use getBufferSince with -1 to get all chunks
-      const result = await window.api.pty.getBufferSince(sessionId, -1)
-      if (result && result.chunks.length > 0) {
-        terminal.write('\x1b[0m') // Reset ANSI state before buffer replay
-        for (const chunk of result.chunks) {
-          terminal.write(chunk.data)
+        // Restore from backend buffer (single source of truth)
+        // Use getBufferSince with -1 to get all chunks
+        const result = await window.api.pty.getBufferSince(sessionId, -1)
+        if (result && result.chunks.length > 0) {
+          terminal.write('\x1b[0m') // Reset ANSI state before buffer replay
+          for (const chunk of result.chunks) {
+            terminal.write(chunk.data)
+          }
+          terminal.write('\x1b[0m') // Reset ANSI state after buffer replay
         }
-        terminal.write('\x1b[0m') // Reset ANSI state after buffer replay
+      } else {
+
+        // Generate conversation ID only for claude-code mode
+        let newConversationId = conversationId
+        if (mode === 'claude-code' && !newConversationId && !existingConversationId) {
+          newConversationId = crypto.randomUUID()
+          onConversationCreated?.(newConversationId)
+        }
+
+        // Create PTY with selected mode (conversation IDs apply to AI modes only)
+        // Note: Don't pass initialPrompt - we'll inject it after terminal is ready
+        const isAiMode = mode === 'claude-code' || mode === 'codex'
+        const effectiveConversationId = isAiMode ? newConversationId : undefined
+        const effectiveExistingConversationId = isAiMode ? existingConversationId : undefined
+        const result = await window.api.pty.create(sessionId, cwd, effectiveConversationId, effectiveExistingConversationId, mode, null, codeMode, providerFlags)
+        if (!result.success) {
+          const message = result.error || 'Failed to create terminal process'
+          terminal.writeln(`\x1b[31mError: ${message}\x1b[0m`)
+          setInitError(message)
+          setPtyState('error')
+          return
+        }
       }
-    } else {
 
-      // Generate conversation ID only for claude-code mode
-      let newConversationId = conversationId
-      if (mode === 'claude-code' && !newConversationId && !existingConversationId) {
-        newConversationId = crypto.randomUUID()
-        onConversationCreated?.(newConversationId)
-      }
+      // Handle terminal input - pass through to PTY
+      terminal.onData((data) => {
+        window.api.pty.write(sessionId, data)
+      })
 
-      // Create PTY with selected mode (only pass conversation IDs for claude-code)
-      // Note: Don't pass initialPrompt - we'll inject it after terminal is ready
-      const effectiveConversationId = mode === 'claude-code' ? newConversationId : undefined
-      const effectiveExistingConversationId = mode === 'claude-code' ? existingConversationId : undefined
-      const result = await window.api.pty.create(sessionId, cwd, effectiveConversationId, effectiveExistingConversationId, mode, null, codeMode, dangerouslySkipPermissions)
-      if (!result.success) {
-        terminal.writeln(`\x1b[31mError: ${result.error}\x1b[0m`)
-        return
-      }
-    }
+      // Handle resize
+      terminal.onResize(({ cols, rows }) => {
+        window.api.pty.resize(sessionId, cols, rows)
+      })
 
-    // Handle terminal input - pass through to PTY
-    terminal.onData((data) => {
-      window.api.pty.write(sessionId, data)
-    })
-
-    // Handle resize
-    terminal.onResize(({ cols, rows }) => {
+      // Initial resize
+      const { cols, rows } = terminal
       window.api.pty.resize(sessionId, cols, rows)
-    })
 
-    // Initial resize
-    const { cols, rows } = terminal
-    window.api.pty.resize(sessionId, cols, rows)
+      // Helper to inject text char-by-char
+      const injectText = async (text: string): Promise<void> => {
+        for (const char of text) {
+          terminal.input(char)
+          await new Promise(r => setTimeout(r, 1))
+        }
+      }
 
-    // Helper to inject text char-by-char
-    const injectText = async (text: string): Promise<void> => {
-      for (const char of text) {
-        terminal.input(char)
-        await new Promise(r => setTimeout(r, 1))
+      // Expose API for programmatic input and focus
+      onReady?.({ sendInput: injectText, focus: () => terminal.focus() })
+
+      // Inject initial prompt if provided (after a delay for terminal to be ready)
+      if (initialPrompt) {
+        setTimeout(async () => {
+          if (signal.aborted) return // Don't inject if unmounted
+          try {
+            // For plan mode, prefix with /plan
+            const textToInject = codeMode === 'plan' ? `/plan ${initialPrompt}` : initialPrompt
+            await injectText(textToInject)
+          } catch {
+            // Terminal may have been disposed, ignore
+          }
+        }, 500)
+      }
+    } catch (error) {
+      if (signal.aborted) return
+      const message = error instanceof Error ? error.message : 'Failed to initialize terminal'
+      setInitError(message)
+      setPtyState('error')
+    } finally {
+      if (!signal.aborted) {
+        setIsInitializing(false)
       }
     }
-
-    // Expose API for programmatic input and focus
-    onReady?.({ sendInput: injectText, focus: () => terminal.focus() })
-
-    // Inject initial prompt if provided (after a delay for terminal to be ready)
-    if (initialPrompt) {
-      setTimeout(async () => {
-        if (signal.aborted) return // Don't inject if unmounted
-        try {
-          // For plan mode, prefix with /plan
-          const textToInject = codeMode === 'plan' ? `/plan ${initialPrompt}` : initialPrompt
-          await injectText(textToInject)
-        } catch {
-          // Terminal may have been disposed, ignore
-        }
-      }, 500)
-    }
-
-    if (signal.aborted) return // Don't setState if unmounted
-    setIsInitializing(false)
-  }, [sessionId, cwd, mode, conversationId, existingConversationId, initialPrompt, codeMode, dangerouslySkipPermissions, autoFocus, onConversationCreated, onReady, resetTaskState])
+  }, [sessionId, cwd, mode, conversationId, existingConversationId, initialPrompt, codeMode, providerFlags, autoFocus, onConversationCreated, onReady, resetTaskState])
 
   // Initialize terminal
   useEffect(() => {
@@ -550,7 +564,7 @@ export function Terminal({
     }
   }, [sessionId])
 
-  const isLoading = isInitializing || ptyState === 'starting'
+  const isLoading = !initError && (isInitializing || ptyState === 'starting')
 
   return (
     <div
@@ -571,6 +585,11 @@ export function Terminal({
             </svg>
             <span className="text-sm">Starting terminal...</span>
           </div>
+        </div>
+      )}
+      {initError && (
+        <div className="absolute inset-0 flex items-center justify-center bg-[#0a0a0a] z-10 p-4">
+          <div className="text-red-400 text-sm text-center">Failed to start terminal: {initError}</div>
         </div>
       )}
     </div>

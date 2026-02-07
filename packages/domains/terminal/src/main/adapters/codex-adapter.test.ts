@@ -42,8 +42,8 @@ test('detects "esc to interrupt" case-insensitively', () => {
   expect(adapter.detectActivity('ESC TO INTERRUPT', 'unknown')).toBe('working')
 })
 
-test('transitions from working to attention when output lacks indicator', () => {
-  expect(adapter.detectActivity('Some output without the indicator', 'working')).toBe('attention')
+test('keeps working latched when chunk lacks indicator', () => {
+  expect(adapter.detectActivity('Some output without the indicator', 'working')).toBe(null)
 })
 
 test('returns null for text when not currently working', () => {
@@ -58,6 +58,28 @@ test('returns null for whitespace-only output when working', () => {
 test('"esc to interrupt" takes priority even when currently working', () => {
   const data = '• Editing files (5s • esc to interrupt)'
   expect(adapter.detectActivity(data, 'working')).toBe('working')
+})
+
+test('detects alternative working indicator phrases', () => {
+  expect(adapter.detectActivity('Escape to cancel', 'unknown')).toBe('working')
+  expect(adapter.detectActivity('Ctrl+C to stop', 'unknown')).toBe('working')
+})
+
+console.log('\nCodexAdapter.buildSpawnConfig\n')
+
+test('starts fresh codex session by default', () => {
+  const result = adapter.buildSpawnConfig('/tmp')
+  expect(result.postSpawnCommand).toBe('codex')
+})
+
+test('resumes codex session when existing conversation ID is provided', () => {
+  const result = adapter.buildSpawnConfig('/tmp', '11111111-2222-4333-8444-555555555555', true)
+  expect(result.postSpawnCommand).toBe("codex resume '11111111-2222-4333-8444-555555555555'")
+})
+
+test('includes provider flags while resuming', () => {
+  const result = adapter.buildSpawnConfig('/tmp', 'thread-123', true, undefined, undefined, ['--search'])
+  expect(result.postSpawnCommand).toBe("codex resume 'thread-123' '--search'")
 })
 
 console.log('\nDone\n')
