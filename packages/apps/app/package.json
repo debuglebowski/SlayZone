@@ -10,6 +10,8 @@
     "build:win": "npm run build && electron-builder --win",
     "build:linux": "npm run build && electron-builder --linux",
     "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json",
+    "test:e2e": "npx playwright test --config playwright.config.ts",
+    "test:e2e:headed": "npx playwright test --config playwright.config.ts --headed",
     "postinstall": "cd ../../../node_modules/better-sqlite3 && npx node-gyp rebuild --target=39.2.7 --arch=arm64 --dist-url=https://electronjs.org/headers --release"
   },
   "dependencies": {
@@ -51,6 +53,8 @@
     "electron-builder": "^26.0.12",
     "electron-vite": "^5.0.0",
     "typescript": "^5.9.3",
-    "vite": "^7.2.6"
+    "vite": "^7.2.6",
+    "@playwright/test": "^1.52.0",
+    "playwright": "^1.52.0"
   }
 }

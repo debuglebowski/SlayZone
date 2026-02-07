@@ -19,7 +19,8 @@
     "build:linux": "pnpm --filter @slayzone/app build:linux",
     "typecheck": "pnpm -r typecheck",
     "lint": "pnpm -r lint",
-    "format": "prettier --write ."
+    "format": "prettier --write .",
+    "test:e2e": "pnpm --filter @slayzone/app test:e2e"
   },
   "devDependencies": {
     "@fiahfy/icns": "^0.0.7",
