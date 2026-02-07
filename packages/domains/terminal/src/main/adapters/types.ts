@@ -1,4 +1,4 @@
-import type { CodeMode } from '@omgslayzone/terminal/shared'
+import type { CodeMode } from '@slayzone/terminal/shared'
 
 export type TerminalMode = 'claude-code' | 'codex' | 'terminal'
 export type { CodeMode }

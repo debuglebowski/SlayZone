@@ -37,11 +37,11 @@ renderer/main.tsx
 ## Domain Dependencies
 
 All domains injected via IPC:
-- `@omgslayzone/terminal/main` - PTY handlers
-- `@omgslayzone/task/main` - Task CRUD, AI handlers
-- `@omgslayzone/projects/main` - Project handlers
-- `@omgslayzone/tags/main` - Tag handlers
-- `@omgslayzone/settings/main` - Settings, theme handlers
+- `@slayzone/terminal/main` - PTY handlers
+- `@slayzone/task/main` - Task CRUD, AI handlers
+- `@slayzone/projects/main` - Project handlers
+- `@slayzone/tags/main` - Tag handlers
+- `@slayzone/settings/main` - Settings, theme handlers
 
 ## Decision Log
 

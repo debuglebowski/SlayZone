@@ -2,7 +2,7 @@
 
 ## Overview
 
-OmgSlayZone is an Electron desktop app organized as a **pnpm monorepo** following the Clara philosophy (see PHILOSOPHY.md).
+SlayZone is an Electron desktop app organized as a **pnpm monorepo** following the Clara philosophy (see PHILOSOPHY.md).
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -29,22 +29,22 @@ OmgSlayZone is an Electron desktop app organized as a **pnpm monorepo** followin
 ```
 packages/
 ├── apps/
-│   └── app/               # @omgslayzone/app - Electron shell
+│   └── app/               # @slayzone/app - Electron shell
 │       └── APP.md
 ├── domains/
-│   ├── terminal/          # @omgslayzone/terminal - PTY, xterm
-│   ├── task/              # @omgslayzone/task - Task CRUD, AI
-│   ├── tasks/             # @omgslayzone/tasks - Kanban view
-│   ├── projects/          # @omgslayzone/projects - Project CRUD
-│   ├── tags/              # @omgslayzone/tags - Tag system
-│   ├── settings/          # @omgslayzone/settings - Preferences
-│   ├── onboarding/        # @omgslayzone/onboarding - Tutorial
-│   └── worktrees/         # @omgslayzone/worktrees - Git worktrees
+│   ├── terminal/          # @slayzone/terminal - PTY, xterm
+│   ├── task/              # @slayzone/task - Task CRUD, AI
+│   ├── tasks/             # @slayzone/tasks - Kanban view
+│   ├── projects/          # @slayzone/projects - Project CRUD
+│   ├── tags/              # @slayzone/tags - Tag system
+│   ├── settings/          # @slayzone/settings - Preferences
+│   ├── onboarding/        # @slayzone/onboarding - Tutorial
+│   └── worktrees/         # @slayzone/worktrees - Git worktrees
 │       └── DOMAIN.md      # Each domain has DOMAIN.md
 └── shared/
-    ├── types/             # @omgslayzone/types - ElectronAPI contract
-    ├── ui/                # @omgslayzone/ui - Radix/shadcn components
-    └── editor/            # @omgslayzone/editor - TipTap rich text
+    ├── types/             # @slayzone/types - ElectronAPI contract
+    ├── ui/                # @slayzone/ui - Radix/shadcn components
+    └── editor/            # @slayzone/editor - TipTap rich text
 ```
 
 ## Domain Structure
@@ -121,8 +121,19 @@ Z-slash logo in 2 places:
 - `packages/apps/app/src/renderer/src/assets/logo.svg` - React UI (`#e5e5e5` stroke)
 
 Generated icons (in `packages/apps/app/`):
-- `build/icon.{png,icns,ico}` - app icons
-- `resources/icon.png` - dock icon
+- `build/icon.{png,icns,ico}` - packaged app icons (macOS uses `build/icon.icns`)
+- `resources/icon.png` - dev-mode Dock icon (`app.dock.setIcon(...)`)
+
+To change the app icon:
+1. Update the source logo/color in `scripts/generate-icons.js` (or replace `packages/apps/app/resources/icon.png` if you already have a final 512x512 PNG).
+2. Run `node scripts/generate-icons.js` (writes to `packages/apps/app/build` + `packages/apps/app/resources`).
+3. For dev mode, fully restart the app (`pnpm dev`) so the Dock icon refreshes.
+4. For packaged builds, re-run the platform build (`pnpm build:mac`, `pnpm build:win`, etc.).
+5. If macOS still shows the old icon, clear the icon cache:
+   - `sudo rm -rf /Library/Caches/com.apple.iconservices.store`
+   - `rm -rf ~/Library/Caches/com.apple.iconservices.store`
+   - `killall Dock`
+   - `killall Finder`
 
 ## Decision Log
 

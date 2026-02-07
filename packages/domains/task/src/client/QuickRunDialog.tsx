@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react'
-import type { Task } from '@omgslayzone/task/shared'
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@omgslayzone/ui'
-import { Textarea } from '@omgslayzone/ui'
-import { Button } from '@omgslayzone/ui'
-import { usePty } from '@omgslayzone/terminal'
+import type { Task } from '@slayzone/task/shared'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@slayzone/ui'
+import { Textarea } from '@slayzone/ui'
+import { Button } from '@slayzone/ui'
+import { usePty } from '@slayzone/terminal'
 
 interface QuickRunDialogProps {
   open: boolean

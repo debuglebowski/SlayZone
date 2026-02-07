@@ -1,9 +1,9 @@
 import { useState } from 'react'
 import { FolderOpen } from 'lucide-react'
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@omgslayzone/ui'
-import { Button } from '@omgslayzone/ui'
-import { Input } from '@omgslayzone/ui'
-import { Label } from '@omgslayzone/ui'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@slayzone/ui'
+import { Button } from '@slayzone/ui'
+import { Input } from '@slayzone/ui'
+import { Label } from '@slayzone/ui'
 
 interface CreateWorktreeDialogProps {
   open: boolean

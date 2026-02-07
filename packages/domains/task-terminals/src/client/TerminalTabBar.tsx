@@ -1,8 +1,8 @@
 import { useState, useRef, useEffect } from 'react'
 import { Plus, X, Terminal as TerminalIcon, Bot, Command } from 'lucide-react'
-import { cn } from '@omgslayzone/ui'
+import { cn } from '@slayzone/ui'
 import type { TerminalTab } from '../shared/types'
-import type { TerminalMode } from '@omgslayzone/terminal/shared'
+import type { TerminalMode } from '@slayzone/terminal/shared'
 
 interface TerminalTabBarProps {
   tabs: TerminalTab[]

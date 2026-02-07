@@ -1,36 +1,36 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { MoreHorizontal, Archive, Trash2, AlertTriangle, RotateCw, RefreshCcw, Link2, Sparkles, Loader2, Terminal as TerminalIcon, Globe, Settings2 } from 'lucide-react'
-import type { Task, PanelVisibility } from '@omgslayzone/task/shared'
-import type { BrowserTabsState } from '@omgslayzone/task-browser/shared'
-import type { Tag } from '@omgslayzone/tags/shared'
-import type { Project } from '@omgslayzone/projects/shared'
-import type { TerminalMode, ClaudeAvailability } from '@omgslayzone/terminal/shared'
-import { Button, PanelToggle } from '@omgslayzone/ui'
+import type { Task, PanelVisibility } from '@slayzone/task/shared'
+import type { BrowserTabsState } from '@slayzone/task-browser/shared'
+import type { Tag } from '@slayzone/tags/shared'
+import type { Project } from '@slayzone/projects/shared'
+import type { TerminalMode, ClaudeAvailability } from '@slayzone/terminal/shared'
+import { Button, PanelToggle } from '@slayzone/ui'
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger
-} from '@omgslayzone/ui'
+} from '@slayzone/ui'
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue
-} from '@omgslayzone/ui'
-import { Switch } from '@omgslayzone/ui'
-import { Label } from '@omgslayzone/ui'
+} from '@slayzone/ui'
+import { Switch } from '@slayzone/ui'
+import { Label } from '@slayzone/ui'
 import { DeleteTaskDialog } from './DeleteTaskDialog'
-import { Tooltip, TooltipTrigger, TooltipContent } from '@omgslayzone/ui'
+import { Tooltip, TooltipTrigger, TooltipContent } from '@slayzone/ui'
 import { TaskMetadataSidebar } from './TaskMetadataSidebar'
-import { RichTextEditor } from '@omgslayzone/editor'
-import { markSkipCache, usePty } from '@omgslayzone/terminal'
-import { TerminalContainer } from '@omgslayzone/task-terminals'
-import { GitPanel } from '@omgslayzone/worktrees'
-import { cn } from '@omgslayzone/ui'
-import { BrowserPanel } from '@omgslayzone/task-browser'
+import { RichTextEditor } from '@slayzone/editor'
+import { markSkipCache, usePty } from '@slayzone/terminal'
+import { TerminalContainer } from '@slayzone/task-terminals'
+import { GitPanel } from '@slayzone/worktrees'
+import { cn } from '@slayzone/ui'
+import { BrowserPanel } from '@slayzone/task-browser'
 import { usePanelSizes } from './usePanelSizes'
 import { ResizeHandle } from './ResizeHandle'
 // ErrorBoundary should be provided by the app when rendering this component

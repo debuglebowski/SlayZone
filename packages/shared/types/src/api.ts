@@ -1,10 +1,10 @@
-import type { Project, CreateProjectInput, UpdateProjectInput } from '@omgslayzone/projects/shared'
-import type { Task, CreateTaskInput, UpdateTaskInput, GenerateDescriptionResult } from '@omgslayzone/task/shared'
-import type { Tag, CreateTagInput, UpdateTagInput } from '@omgslayzone/tags/shared'
-import type { TerminalMode, TerminalState, CodeMode, PtyInfo, PromptInfo, ClaudeAvailability, BufferSinceResult } from '@omgslayzone/terminal/shared'
-import type { TerminalTab, CreateTerminalTabInput, UpdateTerminalTabInput } from '@omgslayzone/task-terminals/shared'
-import type { Theme, ThemePreference } from '@omgslayzone/settings/shared'
-import type { DetectedWorktree, MergeResult, MergeWithAIResult } from '@omgslayzone/worktrees/shared'
+import type { Project, CreateProjectInput, UpdateProjectInput } from '@slayzone/projects/shared'
+import type { Task, CreateTaskInput, UpdateTaskInput, GenerateDescriptionResult } from '@slayzone/task/shared'
+import type { Tag, CreateTagInput, UpdateTagInput } from '@slayzone/tags/shared'
+import type { TerminalMode, TerminalState, CodeMode, PtyInfo, PromptInfo, ClaudeAvailability, BufferSinceResult } from '@slayzone/terminal/shared'
+import type { TerminalTab, CreateTerminalTabInput, UpdateTerminalTabInput } from '@slayzone/task-terminals/shared'
+import type { Theme, ThemePreference } from '@slayzone/settings/shared'
+import type { DetectedWorktree, MergeResult, MergeWithAIResult } from '@slayzone/worktrees/shared'
 
 // ElectronAPI interface - the IPC contract between renderer and main
 export interface ElectronAPI {

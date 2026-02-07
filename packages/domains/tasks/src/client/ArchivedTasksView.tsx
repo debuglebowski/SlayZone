@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react'
 import { ArrowLeft, Undo2 } from 'lucide-react'
-import type { Task } from '@omgslayzone/task/shared'
-import type { Project } from '@omgslayzone/projects/shared'
-import { Button } from '@omgslayzone/ui'
+import type { Task } from '@slayzone/task/shared'
+import type { Project } from '@slayzone/projects/shared'
+import { Button } from '@slayzone/ui'
 
 interface ArchivedTasksViewProps {
   onBack: () => void

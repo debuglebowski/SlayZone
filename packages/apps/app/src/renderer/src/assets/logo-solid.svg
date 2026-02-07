@@ -1,7 +1,35 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
-  <!-- Crown logo - 3 point minimalist solid -->
+  <defs>
+    <linearGradient id="bg-electric" x1="0" y1="0" x2="64" y2="64" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#03020A"/>
+      <stop offset="0.4" stop-color="#2E0F6B"/>
+      <stop offset="1" stop-color="#00B3FF"/>
+    </linearGradient>
+    <linearGradient id="crown-graffiti" x1="6" y1="10" x2="58" y2="54" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#00E5FF"/>
+      <stop offset="0.35" stop-color="#FF3CAC"/>
+      <stop offset="0.7" stop-color="#FFD500"/>
+      <stop offset="1" stop-color="#39FF14"/>
+    </linearGradient>
+    <filter id="soft-glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="1.2" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <rect width="64" height="64" rx="12" fill="url(#bg-electric)"/>
+
   <path
     d="M8,48 L14,24 L24,36 L32,16 L40,36 L50,24 L56,48 Z"
-    fill="#e5e5e5"
+    stroke="url(#crown-graffiti)"
+    stroke-width="5.2"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+    fill="none"
+    filter="url(#soft-glow)"
+    transform="translate(32 32) scale(0.6) translate(-32 -32)"
   />
 </svg>

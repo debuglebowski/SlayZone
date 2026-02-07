@@ -1,5 +1,5 @@
 import { Bell } from 'lucide-react'
-import { cn, Tooltip, TooltipTrigger, TooltipContent } from '@omgslayzone/ui'
+import { cn, Tooltip, TooltipTrigger, TooltipContent } from '@slayzone/ui'
 
 interface NotificationButtonProps {
   active: boolean

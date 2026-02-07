@@ -1,5 +1,5 @@
-appId: com.omgslayzone.app
-productName: OmgSlayZone
+appId: com.slayzone.app
+productName: SlayZone
 directories:
   buildResources: build
 files:
@@ -13,7 +13,7 @@ asarUnpack:
   - resources/**
   - '**/node_modules/better-sqlite3/**'
 win:
-  executableName: omgslayzone
+  executableName: slayzone
 nsis:
   artifactName: ${name}-${version}-setup.${ext}
   shortcutName: ${productName}

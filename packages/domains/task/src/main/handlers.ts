@@ -1,8 +1,8 @@
 import type { IpcMain } from 'electron'
 import type { Database } from 'better-sqlite3'
-import type { CreateTaskInput, UpdateTaskInput, Task } from '@omgslayzone/task/shared'
-import { removeWorktree } from '@omgslayzone/worktrees/main'
-import { killPtysByTaskId } from '@omgslayzone/terminal/main'
+import type { CreateTaskInput, UpdateTaskInput, Task } from '@slayzone/task/shared'
+import { removeWorktree } from '@slayzone/worktrees/main'
+import { killPtysByTaskId } from '@slayzone/terminal/main'
 
 // Parse JSON columns from DB row
 function parseTask(row: Record<string, unknown> | undefined): Task | null {

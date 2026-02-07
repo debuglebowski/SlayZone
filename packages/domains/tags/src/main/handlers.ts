@@ -1,6 +1,6 @@
 import type { IpcMain } from 'electron'
 import type { Database } from 'better-sqlite3'
-import type { CreateTagInput, UpdateTagInput } from '@omgslayzone/tags/shared'
+import type { CreateTagInput, UpdateTagInput } from '@slayzone/tags/shared'
 
 export function registerTagHandlers(ipcMain: IpcMain, db: Database): void {
 

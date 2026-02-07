@@ -1,4 +1,4 @@
-# @omgslayzone/editor
+# @slayzone/editor
 
 TipTap rich text editor for task descriptions.
 
@@ -8,5 +8,5 @@ TipTap rich text editor for task descriptions.
 
 ## Dependencies
 
-- `@omgslayzone/ui` - Button, styling utilities
+- `@slayzone/ui` - Button, styling utilities
 - `@tiptap/*` - TipTap core and extensions

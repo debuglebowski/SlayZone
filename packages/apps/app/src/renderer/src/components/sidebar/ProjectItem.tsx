@@ -1,14 +1,14 @@
 import { motion } from 'framer-motion'
-import { cn } from '@omgslayzone/ui'
+import { cn } from '@slayzone/ui'
 import {
   ContextMenu,
   ContextMenuContent,
   ContextMenuItem,
   ContextMenuSeparator,
   ContextMenuTrigger
-} from '@omgslayzone/ui'
-import { Tooltip, TooltipTrigger, TooltipContent } from '@omgslayzone/ui'
-import type { Project } from '@omgslayzone/projects/shared'
+} from '@slayzone/ui'
+import { Tooltip, TooltipTrigger, TooltipContent } from '@slayzone/ui'
+import type { Project } from '@slayzone/projects/shared'
 
 interface ProjectItemProps {
   project: Project

@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
-import type { Task, TaskStatus } from '@omgslayzone/task/shared'
-import type { Project } from '@omgslayzone/projects/shared'
-import type { Tag } from '@omgslayzone/tags/shared'
+import type { Task, TaskStatus } from '@slayzone/task/shared'
+import type { Project } from '@slayzone/projects/shared'
+import type { Tag } from '@slayzone/tags/shared'
 import type { GroupKey } from './kanban'
 
 interface UseTasksDataReturn {

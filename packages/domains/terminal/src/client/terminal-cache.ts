@@ -1,7 +1,7 @@
 import type { Terminal as XTerm } from '@xterm/xterm'
 import type { FitAddon } from '@xterm/addon-fit'
 import type { SerializeAddon } from '@xterm/addon-serialize'
-import type { TerminalMode } from '@omgslayzone/terminal/shared'
+import type { TerminalMode } from '@slayzone/terminal/shared'
 
 export interface CachedTerminal {
   terminal: XTerm

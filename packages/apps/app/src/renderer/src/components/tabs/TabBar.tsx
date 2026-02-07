@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Home, X } from 'lucide-react'
-import { cn, Tooltip, TooltipTrigger, TooltipContent, getTerminalStateStyle } from '@omgslayzone/ui'
-import type { TerminalState } from '@omgslayzone/terminal/shared'
+import { cn, Tooltip, TooltipTrigger, TooltipContent, getTerminalStateStyle } from '@slayzone/ui'
+import type { TerminalState } from '@slayzone/terminal/shared'
 import {
   DndContext,
   DragOverlay,

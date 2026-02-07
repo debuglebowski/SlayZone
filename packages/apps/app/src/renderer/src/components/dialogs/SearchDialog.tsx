@@ -5,10 +5,10 @@ import {
   CommandInput,
   CommandItem,
   CommandList
-} from '@omgslayzone/ui'
+} from '@slayzone/ui'
 import { Folder, CheckSquare } from 'lucide-react'
-import type { Task } from '@omgslayzone/task/shared'
-import type { Project } from '@omgslayzone/projects/shared'
+import type { Task } from '@slayzone/task/shared'
+import type { Project } from '@slayzone/projects/shared'
 
 interface SearchDialogProps {
   open: boolean

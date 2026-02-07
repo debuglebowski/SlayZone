@@ -1,5 +1,5 @@
 {
-  "name": "@omgslayzone/editor",
+  "name": "@slayzone/editor",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -12,7 +12,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@omgslayzone/ui": "workspace:*",
+    "@slayzone/ui": "workspace:*",
     "@tiptap/extension-link": "^3.15.3",
     "@tiptap/extension-placeholder": "^3.15.3",
     "@tiptap/extension-task-item": "^3.15.3",

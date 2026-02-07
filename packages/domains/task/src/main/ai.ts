@@ -1,7 +1,7 @@
 import type { IpcMain } from 'electron'
 import { spawn } from 'child_process'
 import { homedir, platform } from 'os'
-import type { TerminalMode } from '@omgslayzone/terminal/shared'
+import type { TerminalMode } from '@slayzone/terminal/shared'
 
 export function registerAiHandlers(ipcMain: IpcMain): void {
   ipcMain.handle(

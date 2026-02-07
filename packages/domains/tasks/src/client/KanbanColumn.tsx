@@ -2,20 +2,20 @@ import { useDroppable } from '@dnd-kit/core'
 import { SortableContext, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { MoreHorizontal, Plus } from 'lucide-react'
-import type { Task } from '@omgslayzone/task/shared'
-import type { Project } from '@omgslayzone/projects/shared'
-import type { Tag } from '@omgslayzone/tags/shared'
+import type { Task } from '@slayzone/task/shared'
+import type { Project } from '@slayzone/projects/shared'
+import type { Tag } from '@slayzone/tags/shared'
 import type { Column } from './kanban'
 import { KanbanCard } from './KanbanCard'
 import { TaskContextMenu } from './TaskContextMenu'
-import { Button } from '@omgslayzone/ui'
+import { Button } from '@slayzone/ui'
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger
-} from '@omgslayzone/ui'
-import { cn } from '@omgslayzone/ui'
+} from '@slayzone/ui'
+import { cn } from '@slayzone/ui'
 
 interface SortableKanbanCardProps {
   task: Task

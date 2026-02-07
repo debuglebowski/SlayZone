@@ -8,7 +8,7 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger
-} from '@omgslayzone/ui'
+} from '@slayzone/ui'
 import type { BrowserTab, BrowserTabsState } from '../shared'
 
 interface TaskUrlEntry {

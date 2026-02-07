@@ -1,4 +1,4 @@
-import type { Task } from '@omgslayzone/task/shared'
+import type { Task } from '@slayzone/task/shared'
 import { TaskItem } from './TaskItem'
 
 interface TaskListProps {

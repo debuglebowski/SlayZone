@@ -1,8 +1,8 @@
-import { Popover, PopoverContent, PopoverTrigger } from '@omgslayzone/ui'
+import { Popover, PopoverContent, PopoverTrigger } from '@slayzone/ui'
 import { NotificationButton } from './NotificationButton'
 import { NotificationPanel } from './NotificationPanel'
 import type { AttentionTask } from './useAttentionTasks'
-import type { Project } from '@omgslayzone/projects/shared'
+import type { Project } from '@slayzone/projects/shared'
 
 interface NotificationPopoverProps {
   open: boolean

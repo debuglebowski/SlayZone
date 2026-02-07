@@ -11,7 +11,7 @@ import {
   ContextMenuRadioGroup,
   ContextMenuRadioItem,
   taskStatusOptions
-} from '@omgslayzone/ui'
+} from '@slayzone/ui'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -21,9 +21,9 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle
-} from '@omgslayzone/ui'
-import type { Task, TaskStatus } from '@omgslayzone/task/shared'
-import type { Project } from '@omgslayzone/projects/shared'
+} from '@slayzone/ui'
+import type { Task, TaskStatus } from '@slayzone/task/shared'
+import type { Project } from '@slayzone/projects/shared'
 
 interface TaskContextMenuProps {
   task: Task
@@ -64,7 +64,7 @@ export function TaskContextMenu({
   }
 
   const handleCopyLink = async (): Promise<void> => {
-    await navigator.clipboard.writeText(`omgslayzone://task/${task.id}`)
+    await navigator.clipboard.writeText(`slayzone://task/${task.id}`)
   }
 
   const handleArchiveConfirm = (): void => {

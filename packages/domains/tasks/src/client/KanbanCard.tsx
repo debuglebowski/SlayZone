@@ -1,12 +1,12 @@
 import { motion } from 'framer-motion'
 import { useEffect, useRef, useState } from 'react'
-import type { Task } from '@omgslayzone/task/shared'
-import type { Project } from '@omgslayzone/projects/shared'
-import type { TerminalState } from '@omgslayzone/terminal/shared'
-import { Card, CardContent, Tooltip, TooltipContent, TooltipTrigger, cn, getTerminalStateStyle } from '@omgslayzone/ui'
+import type { Task } from '@slayzone/task/shared'
+import type { Project } from '@slayzone/projects/shared'
+import type { TerminalState } from '@slayzone/terminal/shared'
+import { Card, CardContent, Tooltip, TooltipContent, TooltipTrigger, cn, getTerminalStateStyle } from '@slayzone/ui'
 import { todayISO } from './kanban'
 import { AlertCircle, Link2 } from 'lucide-react'
-import { usePty } from '@omgslayzone/terminal'
+import { usePty } from '@slayzone/terminal'
 
 interface KanbanCardProps {
   task: Task

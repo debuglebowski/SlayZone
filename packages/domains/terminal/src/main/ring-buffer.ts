@@ -1,4 +1,4 @@
-import type { BufferChunk } from '@omgslayzone/terminal/shared'
+import type { BufferChunk } from '@slayzone/terminal/shared'
 
 export type { BufferChunk }
 

@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { taskStatusOptions as sharedStatusOptions, TASK_STATUS_ORDER } from '@omgslayzone/ui'
+import { taskStatusOptions as sharedStatusOptions, TASK_STATUS_ORDER } from '@slayzone/ui'
 import type { TaskStatus } from './types'
 
 // Task status enum matching database

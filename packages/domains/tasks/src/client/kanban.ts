@@ -1,5 +1,5 @@
-import type { Task, TaskStatus } from '@omgslayzone/task/shared'
-import { TASK_STATUS_ORDER, getTaskStatusStyle } from '@omgslayzone/ui'
+import type { Task, TaskStatus } from '@slayzone/task/shared'
+import { TASK_STATUS_ORDER, getTaskStatusStyle } from '@slayzone/ui'
 import type { FilterState, DueDateRange } from './FilterState'
 
 export type GroupKey = 'status' | 'priority' | 'due_date'

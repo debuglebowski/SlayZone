@@ -1,5 +1,5 @@
 {
-  "name": "@omgslayzone/tasks",
+  "name": "@slayzone/tasks",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -14,12 +14,12 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@omgslayzone/types": "workspace:*",
-    "@omgslayzone/ui": "workspace:*",
-    "@omgslayzone/terminal": "workspace:*",
-    "@omgslayzone/task": "workspace:*",
-    "@omgslayzone/projects": "workspace:*",
-    "@omgslayzone/tags": "workspace:*",
+    "@slayzone/types": "workspace:*",
+    "@slayzone/ui": "workspace:*",
+    "@slayzone/terminal": "workspace:*",
+    "@slayzone/task": "workspace:*",
+    "@slayzone/projects": "workspace:*",
+    "@slayzone/tags": "workspace:*",
     "@dnd-kit/core": "^6.3.1",
     "@dnd-kit/sortable": "^10.0.0",
     "@dnd-kit/utilities": "^3.2.2",

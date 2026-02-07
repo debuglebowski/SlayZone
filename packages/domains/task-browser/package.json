@@ -1,5 +1,5 @@
 {
-  "name": "@omgslayzone/task-browser",
+  "name": "@slayzone/task-browser",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -14,7 +14,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@omgslayzone/ui": "workspace:*"
+    "@slayzone/ui": "workspace:*"
   },
   "peerDependencies": {
     "react": "^19.0.0"

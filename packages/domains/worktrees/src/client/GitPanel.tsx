@@ -13,8 +13,8 @@ import {
   Tooltip,
   TooltipContent,
   TooltipTrigger
-} from '@omgslayzone/ui'
-import type { Task, UpdateTaskInput } from '@omgslayzone/task/shared'
+} from '@slayzone/ui'
+import type { Task, UpdateTaskInput } from '@slayzone/task/shared'
 import type { MergeResult } from '../shared/types'
 import { slugify } from './utils'
 

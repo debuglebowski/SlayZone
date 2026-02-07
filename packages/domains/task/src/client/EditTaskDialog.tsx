@@ -3,14 +3,14 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { format } from 'date-fns'
 import { CalendarIcon } from 'lucide-react'
-import type { Task } from '@omgslayzone/task/shared'
+import type { Task } from '@slayzone/task/shared'
 import {
   updateTaskSchema,
   type UpdateTaskFormData,
   statusOptions,
   priorityOptions
-} from '@omgslayzone/task/shared'
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@omgslayzone/ui'
+} from '@slayzone/task/shared'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@slayzone/ui'
 import {
   Form,
   FormControl,
@@ -18,20 +18,20 @@ import {
   FormItem,
   FormLabel,
   FormMessage
-} from '@omgslayzone/ui'
-import { Input } from '@omgslayzone/ui'
-import { Textarea } from '@omgslayzone/ui'
-import { Button } from '@omgslayzone/ui'
+} from '@slayzone/ui'
+import { Input } from '@slayzone/ui'
+import { Textarea } from '@slayzone/ui'
+import { Button } from '@slayzone/ui'
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue
-} from '@omgslayzone/ui'
-import { Popover, PopoverContent, PopoverTrigger } from '@omgslayzone/ui'
-import { Calendar } from '@omgslayzone/ui'
-import { cn } from '@omgslayzone/ui'
+} from '@slayzone/ui'
+import { Popover, PopoverContent, PopoverTrigger } from '@slayzone/ui'
+import { Calendar } from '@slayzone/ui'
+import { cn } from '@slayzone/ui'
 
 interface EditTaskDialogProps {
   task: Task | null

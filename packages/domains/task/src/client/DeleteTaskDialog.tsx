@@ -1,4 +1,4 @@
-import type { Task } from '@omgslayzone/task/shared'
+import type { Task } from '@slayzone/task/shared'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -8,7 +8,7 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle
-} from '@omgslayzone/ui'
+} from '@slayzone/ui'
 
 interface DeleteTaskDialogProps {
   task: Task | null

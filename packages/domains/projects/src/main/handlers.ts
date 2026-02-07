@@ -1,6 +1,6 @@
 import type { IpcMain } from 'electron'
 import type { Database } from 'better-sqlite3'
-import type { CreateProjectInput, UpdateProjectInput } from '@omgslayzone/projects/shared'
+import type { CreateProjectInput, UpdateProjectInput } from '@slayzone/projects/shared'
 
 export function registerProjectHandlers(ipcMain: IpcMain, db: Database): void {
 

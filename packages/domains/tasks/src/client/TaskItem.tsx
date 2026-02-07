@@ -1,6 +1,6 @@
 import { motion } from 'framer-motion'
-import type { Task } from '@omgslayzone/task/shared'
-import { Button, getTaskStatusStyle } from '@omgslayzone/ui'
+import type { Task } from '@slayzone/task/shared'
+import { Button, getTaskStatusStyle } from '@slayzone/ui'
 import { Pencil, Trash2 } from 'lucide-react'
 import { format, isPast, parseISO } from 'date-fns'
 

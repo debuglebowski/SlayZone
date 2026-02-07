@@ -5,7 +5,7 @@ import Link from '@tiptap/extension-link'
 import TaskList from '@tiptap/extension-task-list'
 import TaskItem from '@tiptap/extension-task-item'
 import { useEffect } from 'react'
-import { cn } from '@omgslayzone/ui'
+import { cn } from '@slayzone/ui'
 
 interface RichTextEditorProps {
   value: string

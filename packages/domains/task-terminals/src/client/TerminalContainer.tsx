@@ -1,6 +1,6 @@
 import { useEffect, useCallback, useRef } from 'react'
-import { Terminal, usePty } from '@omgslayzone/terminal'
-import type { TerminalMode, CodeMode } from '@omgslayzone/terminal/shared'
+import { Terminal, usePty } from '@slayzone/terminal'
+import type { TerminalMode, CodeMode } from '@slayzone/terminal/shared'
 import { useTaskTerminals } from './useTaskTerminals'
 import { TerminalTabBar } from './TerminalTabBar'
 

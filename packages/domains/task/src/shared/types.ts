@@ -1,5 +1,5 @@
-import type { TerminalMode } from '@omgslayzone/terminal/shared'
-import type { BrowserTabsState } from '@omgslayzone/task-browser/shared'
+import type { TerminalMode } from '@slayzone/terminal/shared'
+import type { BrowserTabsState } from '@slayzone/task-browser/shared'
 
 export type TaskStatus = 'inbox' | 'backlog' | 'todo' | 'in_progress' | 'review' | 'done'
 

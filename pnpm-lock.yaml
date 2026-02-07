@@ -8,6 +8,9 @@ importers:
 
   .:
     devDependencies:
+      '@fiahfy/icns':
+        specifier: ^0.0.7
+        version: 0.0.7
       png-to-ico:
         specifier: ^3.0.1
         version: 3.0.1
@@ -29,40 +32,40 @@ importers:
       '@electron-toolkit/utils':
         specifier: ^4.0.0
         version: 4.0.0(electron@39.4.0)
-      '@omgslayzone/editor':
+      '@slayzone/editor':
         specifier: workspace:*
         version: link:../../shared/editor
-      '@omgslayzone/onboarding':
+      '@slayzone/onboarding':
         specifier: workspace:*
         version: link:../../domains/onboarding
-      '@omgslayzone/projects':
+      '@slayzone/projects':
         specifier: workspace:*
         version: link:../../domains/projects
-      '@omgslayzone/settings':
+      '@slayzone/settings':
         specifier: workspace:*
         version: link:../../domains/settings
-      '@omgslayzone/tags':
+      '@slayzone/tags':
         specifier: workspace:*
         version: link:../../domains/tags
-      '@omgslayzone/task':
+      '@slayzone/task':
         specifier: workspace:*
         version: link:../../domains/task
-      '@omgslayzone/task-terminals':
+      '@slayzone/task-terminals':
         specifier: workspace:*
         version: link:../../domains/task-terminals
-      '@omgslayzone/tasks':
+      '@slayzone/tasks':
         specifier: workspace:*
         version: link:../../domains/tasks
-      '@omgslayzone/terminal':
+      '@slayzone/terminal':
         specifier: workspace:*
         version: link:../../domains/terminal
-      '@omgslayzone/types':
+      '@slayzone/types':
         specifier: workspace:*
         version: link:../../shared/types
-      '@omgslayzone/ui':
+      '@slayzone/ui':
         specifier: workspace:*
         version: link:../../shared/ui
-      '@omgslayzone/worktrees':
+      '@slayzone/worktrees':
         specifier: workspace:*
         version: link:../../domains/worktrees
       '@tailwindcss/typography':
@@ -138,10 +141,10 @@ importers:
 
   packages/domains/onboarding:
     dependencies:
-      '@omgslayzone/types':
+      '@slayzone/types':
         specifier: workspace:*
         version: link:../../shared/types
-      '@omgslayzone/ui':
+      '@slayzone/ui':
         specifier: workspace:*
         version: link:../../shared/ui
       react:
@@ -157,10 +160,10 @@ importers:
 
   packages/domains/projects:
     dependencies:
-      '@omgslayzone/types':
+      '@slayzone/types':
         specifier: workspace:*
         version: link:../../shared/types
-      '@omgslayzone/ui':
+      '@slayzone/ui':
         specifier: workspace:*
         version: link:../../shared/ui
       react:
@@ -179,19 +182,19 @@ importers:
 
   packages/domains/settings:
     dependencies:
-      '@omgslayzone/tags':
+      '@slayzone/tags':
         specifier: workspace:*
         version: link:../tags
-      '@omgslayzone/task':
+      '@slayzone/task':
         specifier: workspace:*
         version: link:../task
-      '@omgslayzone/terminal':
+      '@slayzone/terminal':
         specifier: workspace:*
         version: link:../terminal
-      '@omgslayzone/types':
+      '@slayzone/types':
         specifier: workspace:*
         version: link:../../shared/types
-      '@omgslayzone/ui':
+      '@slayzone/ui':
         specifier: workspace:*
         version: link:../../shared/ui
       date-fns:
@@ -210,10 +213,10 @@ importers:
 
   packages/domains/tags:
     dependencies:
-      '@omgslayzone/types':
+      '@slayzone/types':
         specifier: workspace:*
         version: link:../../shared/types
-      '@omgslayzone/ui':
+      '@slayzone/ui':
         specifier: workspace:*
         version: link:../../shared/ui
       react:
@@ -232,31 +235,31 @@ importers:
       '@hookform/resolvers':
         specifier: ^5.2.2
         version: 5.2.2(react-hook-form@7.71.1(react@19.2.3))
-      '@omgslayzone/editor':
+      '@slayzone/editor':
         specifier: workspace:*
         version: link:../../shared/editor
-      '@omgslayzone/projects':
+      '@slayzone/projects':
         specifier: workspace:*
         version: link:../projects
-      '@omgslayzone/tags':
+      '@slayzone/tags':
         specifier: workspace:*
         version: link:../tags
-      '@omgslayzone/task-browser':
+      '@slayzone/task-browser':
         specifier: workspace:*
         version: link:../task-browser
-      '@omgslayzone/task-terminals':
+      '@slayzone/task-terminals':
         specifier: workspace:*
         version: link:../task-terminals
-      '@omgslayzone/terminal':
+      '@slayzone/terminal':
         specifier: workspace:*
         version: link:../terminal
-      '@omgslayzone/types':
+      '@slayzone/types':
         specifier: workspace:*
         version: link:../../shared/types
-      '@omgslayzone/ui':
+      '@slayzone/ui':
         specifier: workspace:*
         version: link:../../shared/ui
-      '@omgslayzone/worktrees':
+      '@slayzone/worktrees':
         specifier: workspace:*
         version: link:../worktrees
       date-fns:
@@ -281,7 +284,7 @@ importers:
 
   packages/domains/task-browser:
     dependencies:
-      '@omgslayzone/ui':
+      '@slayzone/ui':
         specifier: workspace:*
         version: link:../../shared/ui
       react:
@@ -297,13 +300,13 @@ importers:
 
   packages/domains/task-terminals:
     dependencies:
-      '@omgslayzone/terminal':
+      '@slayzone/terminal':
         specifier: workspace:*
         version: link:../terminal
-      '@omgslayzone/types':
+      '@slayzone/types':
         specifier: workspace:*
         version: link:../../shared/types
-      '@omgslayzone/ui':
+      '@slayzone/ui':
         specifier: workspace:*
         version: link:../../shared/ui
       react:
@@ -328,22 +331,22 @@ importers:
       '@dnd-kit/utilities':
         specifier: ^3.2.2
         version: 3.2.2(react@19.2.3)
-      '@omgslayzone/projects':
+      '@slayzone/projects':
         specifier: workspace:*
         version: link:../projects
-      '@omgslayzone/tags':
+      '@slayzone/tags':
         specifier: workspace:*
         version: link:../tags
-      '@omgslayzone/task':
+      '@slayzone/task':
         specifier: workspace:*
         version: link:../task
-      '@omgslayzone/terminal':
+      '@slayzone/terminal':
         specifier: workspace:*
         version: link:../terminal
-      '@omgslayzone/types':
+      '@slayzone/types':
         specifier: workspace:*
         version: link:../../shared/types
-      '@omgslayzone/ui':
+      '@slayzone/ui':
         specifier: workspace:*
         version: link:../../shared/ui
       date-fns:
@@ -362,10 +365,10 @@ importers:
 
   packages/domains/terminal:
     dependencies:
-      '@omgslayzone/types':
+      '@slayzone/types':
         specifier: workspace:*
         version: link:../../shared/types
-      '@omgslayzone/ui':
+      '@slayzone/ui':
         specifier: workspace:*
         version: link:../../shared/ui
       '@xterm/addon-fit':
@@ -396,13 +399,13 @@ importers:
 
   packages/domains/worktrees:
     dependencies:
-      '@omgslayzone/task':
+      '@slayzone/task':
         specifier: workspace:*
         version: link:../task
-      '@omgslayzone/types':
+      '@slayzone/types':
         specifier: workspace:*
         version: link:../../shared/types
-      '@omgslayzone/ui':
+      '@slayzone/ui':
         specifier: workspace:*
         version: link:../../shared/ui
       react:
@@ -418,7 +421,7 @@ importers:
 
   packages/shared/editor:
     dependencies:
-      '@omgslayzone/ui':
+      '@slayzone/ui':
         specifier: workspace:*
         version: link:../ui
       '@tiptap/extension-link':
@@ -455,25 +458,25 @@ importers:
 
   packages/shared/types:
     dependencies:
-      '@omgslayzone/projects':
+      '@slayzone/projects':
         specifier: workspace:*
         version: link:../../domains/projects
-      '@omgslayzone/settings':
+      '@slayzone/settings':
         specifier: workspace:*
         version: link:../../domains/settings
-      '@omgslayzone/tags':
+      '@slayzone/tags':
         specifier: workspace:*
         version: link:../../domains/tags
-      '@omgslayzone/task':
+      '@slayzone/task':
         specifier: workspace:*
         version: link:../../domains/task
-      '@omgslayzone/task-terminals':
+      '@slayzone/task-terminals':
         specifier: workspace:*
         version: link:../../domains/task-terminals
-      '@omgslayzone/terminal':
+      '@slayzone/terminal':
         specifier: workspace:*
         version: link:../../domains/terminal
-      '@omgslayzone/worktrees':
+      '@slayzone/worktrees':
         specifier: workspace:*
         version: link:../../domains/worktrees
     devDependencies:
@@ -1112,6 +1115,14 @@ packages:
   '@eslint/plugin-kit@0.4.1':
     resolution: {integrity: sha512-43/qtrDUokr7LJqoF2c3+RInu/t4zfrpYdoSDfYyhg52rwLV6TnOvdG4fXm7IkSB3wErkcmJS9iEhjVtOSEjjA==}
     engines: {node: ^18.18.0 || ^20.9.0 || >=21.1.0}
+
+  '@fiahfy/icns@0.0.7':
+    resolution: {integrity: sha512-0apAtbUXTU3Opy/Z4h69o53voBa+am8FmdZauyagUMskAVYN1a5yIRk48Sf+tEdBLlefbvqLWPJ4pxr/Y/QtTg==}
+    engines: {node: '>=8'}
+
+  '@fiahfy/packbits@0.0.6':
+    resolution: {integrity: sha512-XuhF/edg+iIvXjkCWgfj6fWtRi/KrEPg2ILXj1l86EN4EssuOiPcLKgkMDr9cL8jTGtVd/MKUWW6Y0/ZVf1PGA==}
+    engines: {node: '>=8'}
 
   '@floating-ui/core@1.7.3':
     resolution: {integrity: sha512-sGnvb5dmrJaKEZ+LDIpguvdX3bDlEllmv4/ClQ9awcmCZrlx5jQyyMWFM5kBI+EyNOCDDiKk8il0zeuX3Zlg/w==}
@@ -3625,6 +3636,10 @@ packages:
     engines: {node: '>=20'}
     hasBin: true
 
+  pngjs@6.0.0:
+    resolution: {integrity: sha512-TRzzuFRRmEoSW/p1KVAmiOgPco2Irlah+bGFCeNfJXxxYGwSw7YwAOAcd7X28K/m5bjBWKsC29KyoMfHbypayg==}
+    engines: {node: '>=12.13.0'}
+
   pngjs@7.0.0:
     resolution: {integrity: sha512-LKWqWJRhstyYo9pGvgor/ivk2w94eSjE3RGVuzLGlr3NmD8bf7RcYGze1mNdEHRP6TRP6rMuDHk5t44hnTRyow==}
     engines: {node: '>=14.19.0'}
@@ -4764,6 +4779,13 @@ snapshots:
     dependencies:
       '@eslint/core': 0.17.0
       levn: 0.4.1
+
+  '@fiahfy/icns@0.0.7':
+    dependencies:
+      '@fiahfy/packbits': 0.0.6
+      pngjs: 6.0.0
+
+  '@fiahfy/packbits@0.0.6': {}
 
   '@floating-ui/core@1.7.3':
     dependencies:
@@ -7370,6 +7392,8 @@ snapshots:
       '@types/node': 22.19.7
       minimist: 1.2.8
       pngjs: 7.0.0
+
+  pngjs@6.0.0: {}
 
   pngjs@7.0.0: {}
 

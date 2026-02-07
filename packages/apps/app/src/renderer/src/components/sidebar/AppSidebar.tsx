@@ -7,14 +7,14 @@ import {
   SidebarGroupContent,
   SidebarMenu,
   SidebarMenuItem
-} from '@omgslayzone/ui'
-import { Button } from '@omgslayzone/ui'
-import { Tooltip, TooltipTrigger, TooltipContent } from '@omgslayzone/ui'
+} from '@slayzone/ui'
+import { Button } from '@slayzone/ui'
+import { Tooltip, TooltipTrigger, TooltipContent } from '@slayzone/ui'
 import { ProjectItem } from './ProjectItem'
-import { TerminalStatusPopover } from '@omgslayzone/terminal'
-import { cn } from '@omgslayzone/ui'
-import type { Task } from '@omgslayzone/task/shared'
-import type { Project } from '@omgslayzone/projects/shared'
+import { TerminalStatusPopover } from '@slayzone/terminal'
+import { cn } from '@slayzone/ui'
+import type { Task } from '@slayzone/task/shared'
+import type { Project } from '@slayzone/projects/shared'
 
 interface AppSidebarProps {
   projects: Project[]

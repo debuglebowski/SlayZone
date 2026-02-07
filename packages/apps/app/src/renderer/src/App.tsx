@@ -1,16 +1,16 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
 import { useHotkeys } from 'react-hotkeys-hook'
-import type { Task } from '@omgslayzone/task/shared'
-import type { Project } from '@omgslayzone/projects/shared'
-import type { Tag } from '@omgslayzone/tags/shared'
+import type { Task } from '@slayzone/task/shared'
+import type { Project } from '@slayzone/projects/shared'
+import type { Tag } from '@slayzone/tags/shared'
 // Domains
-import { KanbanBoard, FilterBar, useTasksData, useFilterState, applyFilters, type Column } from '@omgslayzone/tasks'
-import { CreateTaskDialog, QuickRunDialog, EditTaskDialog, DeleteTaskDialog, TaskDetailPage } from '@omgslayzone/task'
-import { CreateProjectDialog, ProjectSettingsDialog, DeleteProjectDialog } from '@omgslayzone/projects'
-import { UserSettingsDialog, useViewState } from '@omgslayzone/settings'
-import { OnboardingDialog } from '@omgslayzone/onboarding'
-import { usePty } from '@omgslayzone/terminal/client'
-import type { TerminalState } from '@omgslayzone/terminal/shared'
+import { KanbanBoard, FilterBar, useTasksData, useFilterState, applyFilters, type Column } from '@slayzone/tasks'
+import { CreateTaskDialog, QuickRunDialog, EditTaskDialog, DeleteTaskDialog, TaskDetailPage } from '@slayzone/task'
+import { CreateProjectDialog, ProjectSettingsDialog, DeleteProjectDialog } from '@slayzone/projects'
+import { UserSettingsDialog, useViewState } from '@slayzone/settings'
+import { OnboardingDialog } from '@slayzone/onboarding'
+import { usePty } from '@slayzone/terminal/client'
+import type { TerminalState } from '@slayzone/terminal/shared'
 // Shared
 import { SearchDialog } from '@/components/dialogs/SearchDialog'
 import {
@@ -23,8 +23,8 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle
-} from '@omgslayzone/ui'
-import { SidebarProvider } from '@omgslayzone/ui'
+} from '@slayzone/ui'
+import { SidebarProvider } from '@slayzone/ui'
 import { AppSidebar } from '@/components/sidebar/AppSidebar'
 import { TabBar } from '@/components/tabs/TabBar'
 import {

@@ -1,4 +1,4 @@
-# OmgSlayZone
+# SlayZone
 
 Desktop task management app with integrated AI coding assistants.
 

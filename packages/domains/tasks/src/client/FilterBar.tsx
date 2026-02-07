@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion'
-import type { Tag } from '@omgslayzone/tags/shared'
+import type { Tag } from '@slayzone/tags/shared'
 import { GroupBySelect } from './GroupBySelect'
 import type { FilterState, GroupKey, DueDateRange } from './FilterState'
 import {
@@ -8,12 +8,12 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue
-} from '@omgslayzone/ui'
-import { Popover, PopoverContent, PopoverTrigger } from '@omgslayzone/ui'
-import { Button } from '@omgslayzone/ui'
-import { Checkbox } from '@omgslayzone/ui'
-import { Switch } from '@omgslayzone/ui'
-import { Label } from '@omgslayzone/ui'
+} from '@slayzone/ui'
+import { Popover, PopoverContent, PopoverTrigger } from '@slayzone/ui'
+import { Button } from '@slayzone/ui'
+import { Checkbox } from '@slayzone/ui'
+import { Switch } from '@slayzone/ui'
+import { Label } from '@slayzone/ui'
 import { TagIcon } from 'lucide-react'
 
 interface FilterBarProps {

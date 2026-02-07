@@ -1,5 +1,5 @@
 {
-  "name": "@omgslayzone/terminal",
+  "name": "@slayzone/terminal",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -15,8 +15,8 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@omgslayzone/types": "workspace:*",
-    "@omgslayzone/ui": "workspace:*",
+    "@slayzone/types": "workspace:*",
+    "@slayzone/ui": "workspace:*",
     "@xterm/addon-fit": "^0.11.0",
     "@xterm/addon-serialize": "^0.14.0",
     "@xterm/addon-web-links": "^0.12.0",

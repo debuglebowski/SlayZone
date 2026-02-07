@@ -1,4 +1,4 @@
-import type { TerminalMode } from '@omgslayzone/terminal/shared'
+import type { TerminalMode } from '@slayzone/terminal/shared'
 
 export interface TerminalTab {
   id: string           // UUID or "main"

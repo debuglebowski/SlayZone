@@ -1,22 +1,22 @@
 import { useState, useEffect } from 'react'
 import { format } from 'date-fns'
 import { CalendarIcon, X } from 'lucide-react'
-import type { Task, TaskStatus } from '@omgslayzone/task/shared'
-import { statusOptions, priorityOptions } from '@omgslayzone/task/shared'
-import type { Tag } from '@omgslayzone/tags/shared'
+import type { Task, TaskStatus } from '@slayzone/task/shared'
+import { statusOptions, priorityOptions } from '@slayzone/task/shared'
+import type { Tag } from '@slayzone/tags/shared'
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue
-} from '@omgslayzone/ui'
-import { Popover, PopoverContent, PopoverTrigger } from '@omgslayzone/ui'
-import { Calendar } from '@omgslayzone/ui'
-import { Button } from '@omgslayzone/ui'
-import { Checkbox } from '@omgslayzone/ui'
-import { cn } from '@omgslayzone/ui'
-import { ProjectSelect } from '@omgslayzone/projects'
+} from '@slayzone/ui'
+import { Popover, PopoverContent, PopoverTrigger } from '@slayzone/ui'
+import { Calendar } from '@slayzone/ui'
+import { Button } from '@slayzone/ui'
+import { Checkbox } from '@slayzone/ui'
+import { cn } from '@slayzone/ui'
+import { ProjectSelect } from '@slayzone/projects'
 
 interface TaskMetadataSidebarProps {
   task: Task

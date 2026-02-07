@@ -1,6 +1,6 @@
 import { contextBridge, ipcRenderer } from 'electron'
-import type { ElectronAPI } from '@omgslayzone/types'
-import type { TerminalState, PromptInfo } from '@omgslayzone/terminal/shared'
+import type { ElectronAPI } from '@slayzone/types'
+import type { TerminalState, PromptInfo } from '@slayzone/terminal/shared'
 
 // Custom APIs for renderer
 const api: ElectronAPI = {

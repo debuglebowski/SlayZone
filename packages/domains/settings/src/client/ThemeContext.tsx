@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
-import type { Theme, ThemePreference } from '@omgslayzone/settings/shared'
+import type { Theme, ThemePreference } from '@slayzone/settings/shared'
 
 interface ThemeContextValue {
   theme: Theme

@@ -3,16 +3,16 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { format } from 'date-fns'
 import { CalendarIcon } from 'lucide-react'
-import type { Task } from '@omgslayzone/task/shared'
-import type { Tag } from '@omgslayzone/tags/shared'
-import { SuccessToast } from '@omgslayzone/ui'
+import type { Task } from '@slayzone/task/shared'
+import type { Tag } from '@slayzone/tags/shared'
+import { SuccessToast } from '@slayzone/ui'
 import {
   createTaskSchema,
   type CreateTaskFormData,
   statusOptions,
   priorityOptions
-} from '@omgslayzone/task/shared'
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@omgslayzone/ui'
+} from '@slayzone/task/shared'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@slayzone/ui'
 import {
   Form,
   FormControl,
@@ -20,22 +20,22 @@ import {
   FormItem,
   FormLabel,
   FormMessage
-} from '@omgslayzone/ui'
-import { Input } from '@omgslayzone/ui'
-import { Textarea } from '@omgslayzone/ui'
-import { Button } from '@omgslayzone/ui'
+} from '@slayzone/ui'
+import { Input } from '@slayzone/ui'
+import { Textarea } from '@slayzone/ui'
+import { Button } from '@slayzone/ui'
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue
-} from '@omgslayzone/ui'
-import { Popover, PopoverContent, PopoverTrigger } from '@omgslayzone/ui'
-import { Calendar } from '@omgslayzone/ui'
-import { Checkbox } from '@omgslayzone/ui'
-import { ProjectSelect } from '@omgslayzone/projects'
-import { cn } from '@omgslayzone/ui'
+} from '@slayzone/ui'
+import { Popover, PopoverContent, PopoverTrigger } from '@slayzone/ui'
+import { Calendar } from '@slayzone/ui'
+import { Checkbox } from '@slayzone/ui'
+import { ProjectSelect } from '@slayzone/projects'
+import { cn } from '@slayzone/ui'
 
 interface CreateTaskDialogProps {
   open: boolean

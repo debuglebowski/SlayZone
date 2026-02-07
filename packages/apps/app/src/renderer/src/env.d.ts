@@ -1,6 +1,6 @@
 /// <reference types="vite/client" />
 
-import type { ElectronAPI } from '@omgslayzone/types'
+import type { ElectronAPI } from '@slayzone/types'
 
 declare global {
   interface Window {

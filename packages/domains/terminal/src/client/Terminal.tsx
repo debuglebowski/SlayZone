@@ -19,7 +19,7 @@ document.head.appendChild(underlineOverride)
 
 import { getTerminal, setTerminal, disposeTerminal } from './terminal-cache'
 import { usePty } from './PtyContext'
-import type { TerminalMode, TerminalState, CodeMode } from '@omgslayzone/terminal/shared'
+import type { TerminalMode, TerminalState, CodeMode } from '@slayzone/terminal/shared'
 
 // Wait for container to have non-zero dimensions before opening terminal
 function waitForDimensions(

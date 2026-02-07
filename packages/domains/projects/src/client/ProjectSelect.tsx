@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react'
-import type { Project } from '@omgslayzone/projects/shared'
+import type { Project } from '@slayzone/projects/shared'
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue
-} from '@omgslayzone/ui'
+} from '@slayzone/ui'
 
 interface ProjectSelectProps {
   value: string | undefined

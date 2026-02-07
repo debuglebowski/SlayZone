@@ -1,11 +1,11 @@
 import { useState } from 'react'
 import { FolderOpen } from 'lucide-react'
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@omgslayzone/ui'
-import { Button } from '@omgslayzone/ui'
-import { Input } from '@omgslayzone/ui'
-import { Label } from '@omgslayzone/ui'
-import { ColorPicker } from '@omgslayzone/ui'
-import type { Project } from '@omgslayzone/projects/shared'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@slayzone/ui'
+import { Button } from '@slayzone/ui'
+import { Input } from '@slayzone/ui'
+import { Label } from '@slayzone/ui'
+import { ColorPicker } from '@slayzone/ui'
+import type { Project } from '@slayzone/projects/shared'
 
 interface CreateProjectDialogProps {
   open: boolean

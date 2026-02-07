@@ -1,5 +1,5 @@
 {
-  "name": "@omgslayzone/onboarding",
+  "name": "@slayzone/onboarding",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -14,8 +14,8 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@omgslayzone/types": "workspace:*",
-    "@omgslayzone/ui": "workspace:*"
+    "@slayzone/types": "workspace:*",
+    "@slayzone/ui": "workspace:*"
   },
   "peerDependencies": {
     "react": "^19.0.0"

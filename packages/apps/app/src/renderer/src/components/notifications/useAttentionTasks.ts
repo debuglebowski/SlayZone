@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
-import type { PtyInfo } from '@omgslayzone/terminal/shared'
-import type { Task } from '@omgslayzone/task/shared'
+import type { PtyInfo } from '@slayzone/terminal/shared'
+import type { Task } from '@slayzone/task/shared'
 
 export interface AttentionTask {
   task: Task

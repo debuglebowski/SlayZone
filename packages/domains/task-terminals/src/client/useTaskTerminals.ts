@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import type { TerminalTab } from '../shared/types'
-import type { TerminalMode } from '@omgslayzone/terminal/shared'
+import type { TerminalMode } from '@slayzone/terminal/shared'
 
 interface UseTaskTerminalsResult {
   tabs: TerminalTab[]

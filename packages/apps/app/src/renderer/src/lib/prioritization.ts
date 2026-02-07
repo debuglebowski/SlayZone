@@ -1,5 +1,5 @@
 import { differenceInDays, parseISO, startOfDay } from 'date-fns'
-import type { Task } from '@omgslayzone/task/shared'
+import type { Task } from '@slayzone/task/shared'
 
 export function calculatePriorityScore(task: Task): number {
   // Skip done tasks

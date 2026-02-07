@@ -1,4 +1,4 @@
-# @omgslayzone/ui
+# @slayzone/ui
 
 Radix UI / shadcn-style components with TailwindCSS 4.
 

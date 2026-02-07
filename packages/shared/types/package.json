@@ -1,5 +1,5 @@
 {
-  "name": "@omgslayzone/types",
+  "name": "@slayzone/types",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -13,13 +13,13 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@omgslayzone/projects": "workspace:*",
-    "@omgslayzone/settings": "workspace:*",
-    "@omgslayzone/tags": "workspace:*",
-    "@omgslayzone/task": "workspace:*",
-    "@omgslayzone/task-terminals": "workspace:*",
-    "@omgslayzone/terminal": "workspace:*",
-    "@omgslayzone/worktrees": "workspace:*"
+    "@slayzone/projects": "workspace:*",
+    "@slayzone/settings": "workspace:*",
+    "@slayzone/tags": "workspace:*",
+    "@slayzone/task": "workspace:*",
+    "@slayzone/task-terminals": "workspace:*",
+    "@slayzone/terminal": "workspace:*",
+    "@slayzone/worktrees": "workspace:*"
   },
   "devDependencies": {
     "typescript": "^5.9.3"

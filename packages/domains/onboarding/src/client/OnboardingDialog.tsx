@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Dialog, DialogContent } from '@omgslayzone/ui'
-import { Button } from '@omgslayzone/ui'
-import { cn } from '@omgslayzone/ui'
+import { Dialog, DialogContent } from '@slayzone/ui'
+import { Button } from '@slayzone/ui'
+import { cn } from '@slayzone/ui'
 
 interface OnboardingStep {
   title: string

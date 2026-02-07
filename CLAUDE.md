@@ -1,4 +1,4 @@
-# OmgSlayZone
+# SlayZone
 
 Desktop task management app with integrated AI coding assistants (Claude Code, Codex).
 
@@ -27,20 +27,20 @@ See [ARCHITECTURE.md](./ARCHITECTURE.md) for system architecture and [PHILOSOPHY
 ```
 packages/
 ├── apps/
-│   └── app/             # @omgslayzone/app - Electron shell
+│   └── app/             # @slayzone/app - Electron shell
 └── domains/
-│   ├── terminal/        # @omgslayzone/terminal
-│   ├── task/            # @omgslayzone/task
-│   ├── tasks/           # @omgslayzone/tasks
-│   ├── projects/        # @omgslayzone/projects
-│   ├── tags/            # @omgslayzone/tags
-│   ├── settings/        # @omgslayzone/settings
-│   ├── onboarding/      # @omgslayzone/onboarding
-│   └── worktrees/       # @omgslayzone/worktrees
+│   ├── terminal/        # @slayzone/terminal
+│   ├── task/            # @slayzone/task
+│   ├── tasks/           # @slayzone/tasks
+│   ├── projects/        # @slayzone/projects
+│   ├── tags/            # @slayzone/tags
+│   ├── settings/        # @slayzone/settings
+│   ├── onboarding/      # @slayzone/onboarding
+│   └── worktrees/       # @slayzone/worktrees
 └── shared/
-    ├── types/           # @omgslayzone/types - ElectronAPI
-    ├── ui/              # @omgslayzone/ui - Components
-    └── editor/          # @omgslayzone/editor - TipTap
+    ├── types/           # @slayzone/types - ElectronAPI
+    ├── ui/              # @slayzone/ui - Components
+    └── editor/          # @slayzone/editor - TipTap
 ```
 
 ## Domain Structure
@@ -59,14 +59,14 @@ domain/
 
 | Package | /shared | /main | /client |
 |---------|---------|-------|---------|
-| @omgslayzone/terminal | TerminalMode, PtyInfo | PTY handlers | Terminal, PtyProvider |
-| @omgslayzone/task | Task, schemas | Task CRUD, AI | TaskDetailPage, dialogs |
-| @omgslayzone/tasks | (empty) | (empty) | KanbanBoard, useTasksData |
-| @omgslayzone/projects | Project | Project CRUD | ProjectSelect, dialogs |
-| @omgslayzone/tags | Tag | Tag CRUD | - |
-| @omgslayzone/settings | Theme | Settings, theme | ThemeProvider |
-| @omgslayzone/onboarding | (empty) | (empty) | OnboardingDialog |
-| @omgslayzone/worktrees | Worktree, DetectedWorktree | Git ops, worktree CRUD | GitPanel |
+| @slayzone/terminal | TerminalMode, PtyInfo | PTY handlers | Terminal, PtyProvider |
+| @slayzone/task | Task, schemas | Task CRUD, AI | TaskDetailPage, dialogs |
+| @slayzone/tasks | (empty) | (empty) | KanbanBoard, useTasksData |
+| @slayzone/projects | Project | Project CRUD | ProjectSelect, dialogs |
+| @slayzone/tags | Tag | Tag CRUD | - |
+| @slayzone/settings | Theme | Settings, theme | ThemeProvider |
+| @slayzone/onboarding | (empty) | (empty) | OnboardingDialog |
+| @slayzone/worktrees | Worktree, DetectedWorktree | Git ops, worktree CRUD | GitPanel |
 
 ## Commands
 

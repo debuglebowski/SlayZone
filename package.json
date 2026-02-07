@@ -1,5 +1,5 @@
 {
-  "name": "omgslayzone-monorepo",
+  "name": "slayzone-monorepo",
   "private": true,
   "pnpm": {
     "onlyBuiltDependencies": [
@@ -10,16 +10,19 @@
     ]
   },
   "scripts": {
-    "dev": "pnpm --filter @omgslayzone/app dev",
-    "build": "pnpm --filter @omgslayzone/app build",
-    "build:mac": "pnpm --filter @omgslayzone/app build:mac",
-    "build:win": "pnpm --filter @omgslayzone/app build:win",
-    "build:linux": "pnpm --filter @omgslayzone/app build:linux",
+    "dev": "pnpm --filter @slayzone/app dev",
+    "icons": "node scripts/generate-icons.js",
+    "reset:mac-icon-cache": "bash scripts/reset-mac-icon-cache.sh",
+    "build": "pnpm --filter @slayzone/app build",
+    "build:mac": "pnpm --filter @slayzone/app build:mac",
+    "build:win": "pnpm --filter @slayzone/app build:win",
+    "build:linux": "pnpm --filter @slayzone/app build:linux",
     "typecheck": "pnpm -r typecheck",
     "lint": "pnpm -r lint",
     "format": "prettier --write ."
   },
   "devDependencies": {
+    "@fiahfy/icns": "^0.0.7",
     "png-to-ico": "^3.0.1",
     "prettier": "^3.7.4",
     "sharp": "^0.34.5",

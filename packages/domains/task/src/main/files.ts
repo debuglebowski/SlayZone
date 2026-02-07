@@ -9,7 +9,7 @@ export function registerFilesHandlers(ipcMain: IpcMain): void {
     try {
       const ext = mimeType === 'image/png' ? 'png' : mimeType === 'image/gif' ? 'gif' : 'jpg'
       const filename = `paste-${randomUUID()}.${ext}`
-      const tempDir = join(app.getPath('temp'), 'omgslayzone')
+      const tempDir = join(app.getPath('temp'), 'slayzone')
 
       await mkdir(tempDir, { recursive: true })
       const filepath = join(tempDir, filename)

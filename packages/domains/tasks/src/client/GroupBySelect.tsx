@@ -4,7 +4,7 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue
-} from '@omgslayzone/ui'
+} from '@slayzone/ui'
 import type { GroupKey } from './FilterState'
 
 interface GroupBySelectProps {

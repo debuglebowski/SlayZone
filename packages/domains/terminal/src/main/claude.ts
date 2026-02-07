@@ -1,6 +1,6 @@
 import type { IpcMain } from 'electron'
 import { spawn } from 'child_process'
-import type { ClaudeAvailability } from '@omgslayzone/terminal/shared'
+import type { ClaudeAvailability } from '@slayzone/terminal/shared'
 
 export function registerClaudeHandlers(ipcMain: IpcMain): void {
   ipcMain.handle('claude:check-availability', async (): Promise<ClaudeAvailability> => {

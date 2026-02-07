@@ -1,18 +1,15 @@
 #!/usr/bin/env node
 
 const sharp = require('sharp');
-const { execSync } = require('child_process');
 const { join } = require('path');
 const { mkdirSync, existsSync, rmSync, writeFileSync } = require('fs');
 const pngToIco = require('png-to-ico').default;
+const { Icns, IcnsImage } = require('@fiahfy/icns');
 
-const BUILD_DIR = join(__dirname, '../build');
-const RESOURCES_DIR = join(__dirname, '../resources');
-
-// Background color matching app theme
-const BG_COLOR = '#0a0a0a';
-// Logo color (light gray/white for contrast)
-const LOGO_COLOR = '#e5e5e5';
+const APP_DIR = join(__dirname, '../packages/apps/app');
+const BUILD_DIR = join(APP_DIR, 'build');
+const RESOURCES_DIR = join(APP_DIR, 'resources');
+const SOURCE_SVG = join(APP_DIR, 'src/renderer/src/assets/logo-solid.svg');
 
 // Correct iconset pairs: [display_size, actual_pixel_size, filename]
 const ICONSET_FILES = [
@@ -31,7 +28,7 @@ const ICONSET_FILES = [
 const ICO_SIZES = [16, 32, 48, 64, 128, 256];
 
 /**
- * Create icon with transparent background and squircle shape
+ * Create icon by rendering the source SVG and applying a squircle mask.
  * Following Apple's macOS icon grid specifications
  */
 async function createIconWithBackground(size) {
@@ -41,28 +38,18 @@ async function createIconWithBackground(size) {
   const squirclePadding = Math.round(size * 0.1);
   const squircleSize = size - (squirclePadding * 2);
   const cornerRadius = Math.round(squircleSize * 0.223);
-  
-  // Content safe zone: ~17.5% padding inside squircle
-  const contentPadding = Math.round(squircleSize * 0.175);
-  const logoSize = squircleSize - (contentPadding * 2);
 
-  // Transparent canvas with only the squircle shape filled
-  const backgroundSvg = `<svg width="${size}" height="${size}" xmlns="http://www.w3.org/2000/svg">
-    <rect x="${squirclePadding}" y="${squirclePadding}" width="${squircleSize}" height="${squircleSize}" rx="${cornerRadius}" ry="${cornerRadius}" fill="${BG_COLOR}"/>
+  const maskSvg = `<svg width="${size}" height="${size}" xmlns="http://www.w3.org/2000/svg">
+    <rect x="${squirclePadding}" y="${squirclePadding}" width="${squircleSize}" height="${squircleSize}" rx="${cornerRadius}" ry="${cornerRadius}" fill="#ffffff"/>
   </svg>`;
 
-  const logoSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="${logoSize}" height="${logoSize}">
-    <path d="M8,48 L14,24 L24,36 L32,16 L40,36 L50,24 L56,48 Z" stroke="${LOGO_COLOR}" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
-  </svg>`;
+  const rendered = await sharp(SOURCE_SVG)
+    .resize(size, size, { fit: 'cover' })
+    .png()
+    .toBuffer();
 
-  const logoBuffer = await sharp(Buffer.from(logoSvg)).png().toBuffer();
-
-  return sharp(Buffer.from(backgroundSvg))
-    .composite([{
-      input: logoBuffer,
-      top: squirclePadding + contentPadding,
-      left: squirclePadding + contentPadding
-    }])
+  return sharp(rendered)
+    .composite([{ input: Buffer.from(maskSvg), blend: 'dest-in' }])
     .png()
     .toBuffer();
 }
@@ -81,11 +68,6 @@ async function generatePNGs() {
 
 async function generateICNS() {
   console.log('Generating ICNS file for macOS...');
-  
-  if (process.platform !== 'darwin') {
-    console.log('⚠ Skipping ICNS generation (requires macOS)');
-    return;
-  }
 
   const iconsetDir = join(BUILD_DIR, 'icon.iconset');
   if (existsSync(iconsetDir)) {
@@ -93,19 +75,34 @@ async function generateICNS() {
   }
   mkdirSync(iconsetDir, { recursive: true });
 
-  // Generate correctly named iconset files
+  const icns = new Icns();
+
+  const osTypeByFilename = new Map([
+    ['icon_16x16.png', 'icp4'],
+    ['icon_32x32.png', 'icp5'],
+    ['icon_128x128.png', 'ic07'],
+    ['icon_256x256.png', 'ic08'],
+    ['icon_512x512.png', 'ic09'],
+    ['icon_16x16@2x.png', 'ic11'],
+    ['icon_32x32@2x.png', 'ic12'],
+    ['icon_128x128@2x.png', 'ic13'],
+    ['icon_256x256@2x.png', 'ic14'],
+    ['icon_512x512@2x.png', 'ic10'],
+  ]);
+
+  // Generate correctly named iconset files and build ICNS in pure JS
   for (const [, pixelSize, filename] of ICONSET_FILES) {
     const iconBuffer = await createIconWithBackground(pixelSize);
     writeFileSync(join(iconsetDir, filename), iconBuffer);
+    const osType = osTypeByFilename.get(filename);
+    if (!osType) {
+      throw new Error(`Unsupported icon filename for ICNS mapping: ${filename}`);
+    }
+    icns.append(IcnsImage.fromPNG(iconBuffer, osType));
   }
 
-  try {
-    execSync(`iconutil -c icns "${iconsetDir}" -o "${join(BUILD_DIR, 'icon.icns')}"`);
-    console.log('✓ Created build/icon.icns');
-    rmSync(iconsetDir, { recursive: true });
-  } catch (error) {
-    console.error('✗ Failed to create ICNS file:', error.message);
-  }
+  writeFileSync(join(BUILD_DIR, 'icon.icns'), icns.data);
+  console.log('✓ Created build/icon.icns');
 }
 
 async function generateICO() {

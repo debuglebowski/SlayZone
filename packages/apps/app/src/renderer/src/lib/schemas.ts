@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import type { TaskStatus } from '@omgslayzone/task/shared'
+import type { TaskStatus } from '@slayzone/task/shared'
 
 // Task status enum matching database.ts
 export const taskStatusEnum = z.enum(['inbox', 'backlog', 'todo', 'in_progress', 'review', 'done'])

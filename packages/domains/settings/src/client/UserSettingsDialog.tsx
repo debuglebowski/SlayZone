@@ -1,21 +1,21 @@
 import { useState, useEffect } from 'react'
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@omgslayzone/ui'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@omgslayzone/ui'
-import { Button } from '@omgslayzone/ui'
-import { Input } from '@omgslayzone/ui'
-import { Label } from '@omgslayzone/ui'
-import { Skeleton } from '@omgslayzone/ui'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@slayzone/ui'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@slayzone/ui'
+import { Button } from '@slayzone/ui'
+import { Input } from '@slayzone/ui'
+import { Label } from '@slayzone/ui'
+import { Skeleton } from '@slayzone/ui'
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue
-} from '@omgslayzone/ui'
-import { useTheme } from '@omgslayzone/settings'
-import type { Tag } from '@omgslayzone/tags/shared'
-import type { ThemePreference } from '@omgslayzone/settings/shared'
-import type { ClaudeAvailability } from '@omgslayzone/terminal/shared'
+} from '@slayzone/ui'
+import { useTheme } from '@slayzone/settings'
+import type { Tag } from '@slayzone/tags/shared'
+import type { ThemePreference } from '@slayzone/settings/shared'
+import type { ClaudeAvailability } from '@slayzone/terminal/shared'
 
 interface UserSettingsDialogProps {
   open: boolean

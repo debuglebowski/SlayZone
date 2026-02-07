@@ -1,9 +1,9 @@
 import { useState, useEffect, useCallback } from 'react'
 import { Monitor, X } from 'lucide-react'
-import { Button, getTerminalStateStyle } from '@omgslayzone/ui'
-import { Popover, PopoverContent, PopoverTrigger } from '@omgslayzone/ui'
-import { Tooltip, TooltipContent, TooltipTrigger } from '@omgslayzone/ui'
-import type { PtyInfo } from '@omgslayzone/terminal/shared'
+import { Button, getTerminalStateStyle } from '@slayzone/ui'
+import { Popover, PopoverContent, PopoverTrigger } from '@slayzone/ui'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@slayzone/ui'
+import type { PtyInfo } from '@slayzone/terminal/shared'
 
 interface TaskRef {
   id: string

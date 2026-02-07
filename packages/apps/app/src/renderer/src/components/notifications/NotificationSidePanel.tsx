@@ -1,7 +1,7 @@
 import { useRef, useCallback } from 'react'
 import { NotificationPanel } from './NotificationPanel'
 import type { AttentionTask } from './useAttentionTasks'
-import type { Project } from '@omgslayzone/projects/shared'
+import type { Project } from '@slayzone/projects/shared'
 
 interface NotificationSidePanelProps {
   width: number

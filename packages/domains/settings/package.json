@@ -1,5 +1,5 @@
 {
-  "name": "@omgslayzone/settings",
+  "name": "@slayzone/settings",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -15,11 +15,11 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@omgslayzone/types": "workspace:*",
-    "@omgslayzone/ui": "workspace:*",
-    "@omgslayzone/task": "workspace:*",
-    "@omgslayzone/tags": "workspace:*",
-    "@omgslayzone/terminal": "workspace:*",
+    "@slayzone/types": "workspace:*",
+    "@slayzone/ui": "workspace:*",
+    "@slayzone/task": "workspace:*",
+    "@slayzone/tags": "workspace:*",
+    "@slayzone/terminal": "workspace:*",
     "date-fns": "^4.1.0"
   },
   "peerDependencies": {

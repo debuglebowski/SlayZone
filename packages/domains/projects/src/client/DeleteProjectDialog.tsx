@@ -7,8 +7,8 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle
-} from '@omgslayzone/ui'
-import type { Project } from '@omgslayzone/projects/shared'
+} from '@slayzone/ui'
+import type { Project } from '@slayzone/projects/shared'
 
 interface DeleteProjectDialogProps {
   project: Project | null

@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 /**
- * Patches the Electron.app bundle to show "OmgSlayZone" in macOS (menu bar and Cmd+Tab) during development.
+ * Patches the Electron.app bundle to show "SlayZone" in macOS (menu bar and Cmd+Tab) during development.
  * This is a workaround for the known limitation where macOS shows "Electron" in dev mode.
  *
  * What this script does:
- * 1. Renames Electron.app to OmgSlayZone.app
+ * 1. Renames Electron.app to SlayZone.app
  * 2. Updates path.txt so electron-vite finds the renamed app
  * 3. Patches Info.plist to set CFBundleName and CFBundleDisplayName
  */
@@ -12,7 +12,7 @@
 const fs = require('fs')
 const path = require('path')
 
-const APP_NAME = 'OmgSlayZone'
+const APP_NAME = 'SlayZone'
 
 // Only run on macOS
 if (process.platform !== 'darwin') {
@@ -26,7 +26,7 @@ const oldAppPath = path.join(distDir, 'Electron.app')
 const newAppPath = path.join(distDir, `${APP_NAME}.app`)
 const pathTxtFile = path.join(electronDir, 'path.txt')
 
-// Step 1: Rename Electron.app to OmgSlayZone.app (if not already renamed)
+// Step 1: Rename Electron.app to SlayZone.app (if not already renamed)
 if (fs.existsSync(oldAppPath)) {
   try {
     fs.renameSync(oldAppPath, newAppPath)

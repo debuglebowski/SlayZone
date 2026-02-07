@@ -1,5 +1,5 @@
 import { Component, type ReactNode } from 'react'
-import { Button } from '@omgslayzone/ui'
+import { Button } from '@slayzone/ui'
 
 interface Props {
   children: ReactNode

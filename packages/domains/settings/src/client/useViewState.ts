@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback, type SetStateAction, type Dispatch } from 'react'
-import type { TaskStatus } from '@omgslayzone/task/shared'
+import type { TaskStatus } from '@slayzone/task/shared'
 
 // Tab type (matches TabBar.tsx in app)
 export type Tab = { type: 'home' } | { type: 'task'; taskId: string; title: string; status?: TaskStatus }

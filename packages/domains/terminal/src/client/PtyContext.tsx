@@ -8,7 +8,7 @@ import {
   useMemo,
   type ReactNode
 } from 'react'
-import type { TerminalState, PromptInfo } from '@omgslayzone/terminal/shared'
+import type { TerminalState, PromptInfo } from '@slayzone/terminal/shared'
 
 export type CodeMode = 'normal' | 'plan' | 'accept-edits' | 'bypass'
 

@@ -1,8 +1,8 @@
 import { useMemo } from 'react'
 import { PanelRightClose, PanelRightOpen, X } from 'lucide-react'
-import { Button, cn, Tooltip, TooltipTrigger, TooltipContent } from '@omgslayzone/ui'
+import { Button, cn, Tooltip, TooltipTrigger, TooltipContent } from '@slayzone/ui'
 import type { AttentionTask } from './useAttentionTasks'
-import type { Project } from '@omgslayzone/projects/shared'
+import type { Project } from '@slayzone/projects/shared'
 
 interface NotificationPanelProps {
   attentionTasks: AttentionTask[]

@@ -1,5 +1,5 @@
 import { Podcast } from 'lucide-react'
-import { cn, Tooltip, TooltipTrigger, TooltipContent } from '@omgslayzone/ui'
+import { cn, Tooltip, TooltipTrigger, TooltipContent } from '@slayzone/ui'
 
 interface DesktopNotificationToggleProps {
   enabled: boolean

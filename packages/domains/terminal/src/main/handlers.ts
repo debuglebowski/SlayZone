@@ -3,7 +3,7 @@ import type { IpcMain } from 'electron'
 import type { Database } from 'better-sqlite3'
 import { createPty, writePty, resizePty, killPty, hasPty, getBuffer, getBufferSince, listPtys, getState, setDatabase } from './pty-manager'
 import type { TerminalMode } from './adapters'
-import type { CodeMode } from '@omgslayzone/terminal/shared'
+import type { CodeMode } from '@slayzone/terminal/shared'
 
 export function registerPtyHandlers(ipcMain: IpcMain, db: Database): void {
   // Set database reference for notifications

@@ -1,4 +1,4 @@
-# @omgslayzone/types
+# @slayzone/types
 
 ElectronAPI contract shared between main and renderer processes.
 

@@ -2,7 +2,7 @@ import * as pty from 'node-pty'
 import { BrowserWindow, Notification } from 'electron'
 import { homedir, userInfo } from 'os'
 import type { Database } from 'better-sqlite3'
-import type { TerminalState, PtyInfo, CodeMode, BufferSinceResult } from '@omgslayzone/terminal/shared'
+import type { TerminalState, PtyInfo, CodeMode, BufferSinceResult } from '@slayzone/terminal/shared'
 import { RingBuffer, type BufferChunk } from './ring-buffer'
 import { getAdapter, type TerminalMode, type TerminalAdapter, type ActivityState, type ErrorInfo } from './adapters'
 
