@@ -1,10 +1,28 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Plus, Minus } from 'lucide-react'
 import { Button, cn } from '@slayzone/ui'
 import type { Task } from '@slayzone/task/shared'
 import type { GitDiffSnapshot } from '../shared/types'
 import { parseUnifiedDiff, type FileDiff } from './parse-diff'
 import { DiffView } from './DiffView'
+
+function arraysEqual(a: string[], b: string[]): boolean {
+  if (a.length !== b.length) return false
+  for (let i = 0; i < a.length; i++) {
+    if (a[i] !== b[i]) return false
+  }
+  return true
+}
+
+function snapshotsEqual(a: GitDiffSnapshot, b: GitDiffSnapshot): boolean {
+  return (
+    a.unstagedPatch === b.unstagedPatch &&
+    a.stagedPatch === b.stagedPatch &&
+    arraysEqual(a.unstagedFiles, b.unstagedFiles) &&
+    arraysEqual(a.stagedFiles, b.stagedFiles) &&
+    arraysEqual(a.untrackedFiles, b.untrackedFiles)
+  )
+}
 
 interface GitDiffPanelProps {
   task: Task
@@ -70,7 +88,7 @@ function HorizontalResizeHandle({ onDrag }: { onDrag: (deltaX: number) => void }
   )
 }
 
-function FileListItem({
+const FileListItem = memo(function FileListItem({
   entry,
   selected,
   additions,
@@ -124,7 +142,7 @@ function FileListItem({
       </button>
     </div>
   )
-}
+})
 
 export function GitDiffPanel({
   task,
@@ -141,15 +159,20 @@ export function GitDiffPanel({
   const [untrackedDiffs, setUntrackedDiffs] = useState<Map<string, FileDiff>>(new Map())
   const fileListRef = useRef<HTMLDivElement>(null)
   const selectedItemRef = useRef<HTMLDivElement>(null)
+  const prevSnapshotRef = useRef<GitDiffSnapshot | null>(null)
 
   const fetchDiff = async (): Promise<void> => {
     if (!targetPath) return
     setLoading(true)
     try {
       const next = await window.api.git.getWorkingDiff(targetPath)
-      setSnapshot(next)
+      if (!prevSnapshotRef.current || !snapshotsEqual(prevSnapshotRef.current, next)) {
+        prevSnapshotRef.current = next
+        setSnapshot(next)
+      }
       setError(null)
     } catch (err) {
+      prevSnapshotRef.current = null
       setSnapshot(null)
       setError(err instanceof Error ? err.message : String(err))
     } finally {
@@ -210,23 +233,41 @@ export function GitDiffPanel({
     return getDiffForEntry(entry) ?? null
   }, [selectedFile, flatEntries, getDiffForEntry])
 
-  // Eagerly fetch diffs for all untracked files (for counts + preview)
-  // Also clears cache when snapshot changes so stale entries don't persist
+  // Eagerly fetch diffs for untracked files (for counts + preview)
+  // Only fetch newly-added files and remove stale entries
+  const prevUntrackedRef = useRef<string[]>([])
   useEffect(() => {
     if (!snapshot || !targetPath) return
-    setUntrackedDiffs(new Map())
-    for (const filePath of snapshot.untrackedFiles) {
-      // Inline fetch to avoid stale closure on untrackedDiffs
+    const curr = snapshot.untrackedFiles
+    const prev = prevUntrackedRef.current
+    prevUntrackedRef.current = curr
+
+    const currSet = new Set(curr)
+    const prevSet = new Set(prev)
+
+    // Remove stale entries
+    const removed = prev.filter((f) => !currSet.has(f))
+    if (removed.length > 0) {
+      setUntrackedDiffs((old) => {
+        const next = new Map(old)
+        for (const f of removed) next.delete(f)
+        return next
+      })
+    }
+
+    // Fetch only new files
+    const added = curr.filter((f) => !prevSet.has(f))
+    for (const filePath of added) {
       window.api.git.getUntrackedFileDiff(targetPath, filePath).then((patch) => {
         const parsed = parseUnifiedDiff(patch)
         if (parsed.length > 0) {
-          setUntrackedDiffs((prev) => new Map(prev).set(filePath, parsed[0]))
+          setUntrackedDiffs((old) => new Map(old).set(filePath, parsed[0]))
         }
       }).catch(() => {
         // ignore — file may be binary or inaccessible
       })
     }
-  }, [snapshot?.generatedAt, targetPath])
+  }, [snapshot, targetPath])
 
   // Clear selection when file no longer exists
   useEffect(() => {
@@ -268,8 +309,12 @@ export function GitDiffPanel({
     }
   }, [targetPath])
 
+  const handleSelectFile = useCallback((path: string, source: 'unstaged' | 'staged') => {
+    setSelectedFile({ path, source })
+  }, [])
+
   const handleResize = useCallback((delta: number) => {
-    setFileListWidth((w) => Math.max(120, Math.min(400, w + delta)))
+    setFileListWidth((w) => Math.max(50, w + delta))
   }, [])
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
@@ -379,7 +424,7 @@ export function GitDiffPanel({
                       selected={isSelected(entry)}
                       additions={diff?.additions}
                       deletions={diff?.deletions}
-                      onClick={() => setSelectedFile({ path: entry.path, source: 'staged' })}
+                      onClick={() => handleSelectFile(entry.path, 'staged')}
                       onAction={() => handleStageAction(entry.path, 'staged')}
                       itemRef={isSelected(entry) ? selectedItemRef : undefined}
                     />
@@ -410,7 +455,7 @@ export function GitDiffPanel({
                       selected={isSelected(entry)}
                       additions={diff?.additions}
                       deletions={diff?.deletions}
-                      onClick={() => setSelectedFile({ path: entry.path, source: 'unstaged' })}
+                      onClick={() => handleSelectFile(entry.path, 'unstaged')}
                       onAction={() => handleStageAction(entry.path, 'unstaged')}
                       itemRef={isSelected(entry) ? selectedItemRef : undefined}
                     />

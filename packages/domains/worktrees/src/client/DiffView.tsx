@@ -1,3 +1,4 @@
+import { memo } from 'react'
 import { cn } from '@slayzone/ui'
 import type { FileDiff, DiffLine as DiffLineType, InlineHighlight } from './parse-diff'
 
@@ -34,7 +35,7 @@ function renderContent(content: string, type: DiffLineType['type'], highlights?:
   return <>{parts}</>
 }
 
-function DiffLineCmp({ line }: { line: DiffLineType }) {
+const DiffLineCmp = memo(function DiffLineCmp({ line }: { line: DiffLineType }) {
   const prefix = line.type === 'add' ? '+' : line.type === 'delete' ? '-' : ' '
 
   return (
@@ -62,9 +63,9 @@ function DiffLineCmp({ line }: { line: DiffLineType }) {
       </span>
     </div>
   )
-}
+})
 
-export function DiffView({ diff }: DiffViewProps) {
+export const DiffView = memo(function DiffView({ diff }: DiffViewProps) {
   if (diff.isBinary) {
     return (
       <div className="px-3 py-6 text-xs text-muted-foreground text-center">
@@ -95,4 +96,4 @@ export function DiffView({ diff }: DiffViewProps) {
       ))}
     </div>
   )
-}
+})

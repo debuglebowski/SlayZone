@@ -2,11 +2,13 @@ import { useState, useEffect, useCallback } from 'react'
 
 export interface PanelSizes {
   browser: number
+  gitDiff: number
   settings: number
 }
 
 const DEFAULT_SIZES: PanelSizes = {
   browser: 400,
+  gitDiff: 520,
   settings: 320
 }
 
