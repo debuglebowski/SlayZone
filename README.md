@@ -5,9 +5,9 @@
 <h1 align="center">SlayZone</h1>
 
 <p align="center">
-  <strong>Task management for developers who ship with AI.</strong>
+  <strong>Mission control for your AI coding agents.</strong>
   <br />
-  Kanban boards, integrated terminals, Claude Code & Codex — in one desktop app.
+  Manage all your agents from one place — scoped to tasks, tracked automatically.
 </p>
 
 <br />
@@ -29,31 +29,42 @@
 
 <br />
 
-## Every task gets its own AI terminal
+## Run any number of agents per task
 
-Open a task, pick Claude Code or Codex, and start working. SlayZone runs real PTY sessions — not sandboxed previews — so your AI tools behave exactly like they do in your regular terminal.
+Each task contains one or more integrated terminals. Spin up Claude Code, Codex, or a plain shell — run as many as you need. One agent researching, one coding, one testing, all inside the same task. Real PTY sessions, not sandboxed previews.
 
 <!-- SCREENSHOT: Task detail view with terminal -->
 <p align="center">
-  <img src="docs/screenshots/terminal.png" width="720" alt="Task with integrated Claude Code terminal" />
+  <img src="docs/screenshots/terminal.png" width="720" alt="Task with multiple AI agent terminals" />
 </p>
 
 <br />
 
-## Know when Claude needs you
+## Automatic status tracking
 
-SlayZone detects when Claude Code is waiting for input — permission prompts, menu selections, confirmations — and surfaces it instantly. No more switching back to check.
+SlayZone watches your agents and tracks each task's status automatically — idle, working, or waiting for your input. No more switching between terminals to check what's happening.
 
 <!-- SCREENSHOT: Attention indicator / notification panel -->
 <p align="center">
-  <img src="docs/screenshots/attention.png" width="720" alt="Activity detection showing Claude needs input" />
+  <img src="docs/screenshots/attention.png" width="720" alt="Automatic agent status tracking" />
+</p>
+
+<br />
+
+## Built-in browser
+
+Each task has an inline browser with multiple tabs. Preview what your agents are building without leaving the app.
+
+<!-- SCREENSHOT: Inline browser -->
+<p align="center">
+  <img src="docs/screenshots/browser.png" width="720" alt="Inline browser preview per task" />
 </p>
 
 <br />
 
 ## Git worktrees, per task
 
-Link a git worktree to any task. One branch per task, automatic isolation, merge when done. No more stashing half-finished work.
+Link a git worktree to any task. One branch per task, automatic isolation, view diffs, stage changes, merge when done. No more stashing half-finished work.
 
 <!-- SCREENSHOT: Git panel / worktree view -->
 <p align="center">

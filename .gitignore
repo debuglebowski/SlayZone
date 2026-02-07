@@ -14,3 +14,8 @@ out
 
 # Generated icon intermediates
 packages/apps/app/build/icon.iconset/
+
+# Playwright
+test-results/
+playwright-report/
+.e2e-userdata/
