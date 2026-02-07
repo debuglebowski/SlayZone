@@ -1,8 +1,37 @@
 import { cn } from '@slayzone/ui'
-import type { FileDiff, DiffLine as DiffLineType } from './parse-diff'
+import type { FileDiff, DiffLine as DiffLineType, InlineHighlight } from './parse-diff'
 
 interface DiffViewProps {
   diff: FileDiff
+}
+
+function renderContent(content: string, type: DiffLineType['type'], highlights?: InlineHighlight[]) {
+  if (!highlights || highlights.length === 0) {
+    return <span className="whitespace-pre">{content}</span>
+  }
+
+  const highlightClass = type === 'add'
+    ? 'bg-green-500/40 rounded-sm'
+    : 'bg-red-500/40 rounded-sm'
+
+  const parts: React.JSX.Element[] = []
+  let lastEnd = 0
+  for (let i = 0; i < highlights.length; i++) {
+    const h = highlights[i]
+    if (h.start > lastEnd) {
+      parts.push(<span key={`t${i}`} className="whitespace-pre">{content.slice(lastEnd, h.start)}</span>)
+    }
+    parts.push(
+      <span key={`h${i}`} className={cn('whitespace-pre', highlightClass)}>
+        {content.slice(h.start, h.end)}
+      </span>
+    )
+    lastEnd = h.end
+  }
+  if (lastEnd < content.length) {
+    parts.push(<span key="tail" className="whitespace-pre">{content.slice(lastEnd)}</span>)
+  }
+  return <>{parts}</>
 }
 
 function DiffLineCmp({ line }: { line: DiffLineType }) {
@@ -25,12 +54,11 @@ function DiffLineCmp({ line }: { line: DiffLineType }) {
       <span className="w-5 shrink-0 text-center select-none text-muted-foreground/60">{prefix}</span>
       <span
         className={cn(
-          'whitespace-pre',
           line.type === 'add' && 'text-green-700 dark:text-green-400',
           line.type === 'delete' && 'text-red-700 dark:text-red-400'
         )}
       >
-        {line.content}
+        {renderContent(line.content, line.type, line.highlights)}
       </span>
     </div>
   )

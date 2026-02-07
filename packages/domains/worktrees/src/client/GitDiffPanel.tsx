@@ -73,16 +73,25 @@ function HorizontalResizeHandle({ onDrag }: { onDrag: (deltaX: number) => void }
 function FileListItem({
   entry,
   selected,
+  additions,
+  deletions,
   onClick,
-  onAction
+  onAction,
+  itemRef
 }: {
   entry: FileEntry
   selected: boolean
+  additions?: number
+  deletions?: number
   onClick: () => void
   onAction: () => void
+  itemRef?: React.Ref<HTMLDivElement>
 }) {
+  const hasCounts = additions != null || deletions != null
+
   return (
     <div
+      ref={itemRef}
       className={cn(
         'group w-full text-left px-3 py-1 flex items-center gap-2 text-xs font-mono hover:bg-accent/50 transition-colors cursor-pointer',
         selected && 'bg-accent'
@@ -93,6 +102,16 @@ function FileListItem({
         {entry.status}
       </span>
       <span className="truncate min-w-0 flex-1">{entry.path}</span>
+      {hasCounts && (
+        <span className="shrink-0 text-[10px] tabular-nums space-x-1">
+          {additions != null && additions > 0 && (
+            <span className="text-green-600 dark:text-green-400">+{additions}</span>
+          )}
+          {deletions != null && deletions > 0 && (
+            <span className="text-red-600 dark:text-red-400">-{deletions}</span>
+          )}
+        </span>
+      )}
       <button
         className="shrink-0 opacity-0 group-hover:opacity-100 hover:text-foreground text-muted-foreground transition-opacity p-0.5 rounded hover:bg-accent"
         onClick={(e) => {
@@ -119,6 +138,9 @@ export function GitDiffPanel({
   const [error, setError] = useState<string | null>(null)
   const [selectedFile, setSelectedFile] = useState<{ path: string; source: 'unstaged' | 'staged' } | null>(null)
   const [fileListWidth, setFileListWidth] = useState(320)
+  const [untrackedDiffs, setUntrackedDiffs] = useState<Map<string, FileDiff>>(new Map())
+  const fileListRef = useRef<HTMLDivElement>(null)
+  const selectedItemRef = useRef<HTMLDivElement>(null)
 
   const fetchDiff = async (): Promise<void> => {
     if (!targetPath) return
@@ -166,20 +188,71 @@ export function GitDiffPanel({
     return snapshot.stagedFiles.map((f) => ({ path: f, status: deriveStatus(f, stagedFileDiffs) as FileEntry['status'], source: 'staged' as const }))
   }, [snapshot, stagedFileDiffs])
 
-  const allEntries = useMemo(() => [...unstagedEntries, ...stagedEntries], [unstagedEntries, stagedEntries])
+  // Flat list in render order: staged first, then unstaged
+  const flatEntries = useMemo(() => [...stagedEntries, ...unstagedEntries], [stagedEntries, unstagedEntries])
+
+  const allDiffsMap = useMemo(() => {
+    const map = new Map<string, FileDiff>()
+    for (const d of unstagedFileDiffs) map.set(`u:${d.path}`, d)
+    for (const d of stagedFileDiffs) map.set(`s:${d.path}`, d)
+    return map
+  }, [unstagedFileDiffs, stagedFileDiffs])
+
+  const getDiffForEntry = useCallback((entry: FileEntry): FileDiff | undefined => {
+    const key = entry.source === 'staged' ? `s:${entry.path}` : `u:${entry.path}`
+    return allDiffsMap.get(key) ?? (entry.status === '?' ? untrackedDiffs.get(entry.path) : undefined)
+  }, [allDiffsMap, untrackedDiffs])
 
   const selectedDiff = useMemo(() => {
     if (!selectedFile) return null
-    const diffs = selectedFile.source === 'unstaged' ? unstagedFileDiffs : stagedFileDiffs
-    return diffs.find((d) => d.path === selectedFile.path) ?? null
-  }, [selectedFile, unstagedFileDiffs, stagedFileDiffs])
+    const entry = flatEntries.find((f) => f.path === selectedFile.path && f.source === selectedFile.source)
+    if (!entry) return null
+    return getDiffForEntry(entry) ?? null
+  }, [selectedFile, flatEntries, getDiffForEntry])
+
+  // Eagerly fetch diffs for all untracked files (for counts + preview)
+  // Also clears cache when snapshot changes so stale entries don't persist
+  useEffect(() => {
+    if (!snapshot || !targetPath) return
+    setUntrackedDiffs(new Map())
+    for (const filePath of snapshot.untrackedFiles) {
+      // Inline fetch to avoid stale closure on untrackedDiffs
+      window.api.git.getUntrackedFileDiff(targetPath, filePath).then((patch) => {
+        const parsed = parseUnifiedDiff(patch)
+        if (parsed.length > 0) {
+          setUntrackedDiffs((prev) => new Map(prev).set(filePath, parsed[0]))
+        }
+      }).catch(() => {
+        // ignore — file may be binary or inaccessible
+      })
+    }
+  }, [snapshot?.generatedAt, targetPath])
 
   // Clear selection when file no longer exists
   useEffect(() => {
-    if (selectedFile && !allEntries.some((f) => f.path === selectedFile.path && f.source === selectedFile.source)) {
+    if (selectedFile && !flatEntries.some((f) => f.path === selectedFile.path && f.source === selectedFile.source)) {
       setSelectedFile(null)
     }
-  }, [allEntries, selectedFile])
+  }, [flatEntries, selectedFile])
+
+  // Scroll selected item into view
+  useEffect(() => {
+    selectedItemRef.current?.scrollIntoView({ block: 'nearest' })
+  }, [selectedFile])
+
+  const handleBulkAction = useCallback(async (action: 'stageAll' | 'unstageAll') => {
+    if (!targetPath) return
+    try {
+      if (action === 'stageAll') {
+        await window.api.git.stageAll(targetPath)
+      } else {
+        await window.api.git.unstageAll(targetPath)
+      }
+      await fetchDiff()
+    } catch {
+      // silently fail — next poll will correct state
+    }
+  }, [targetPath])
 
   const handleStageAction = useCallback(async (filePath: string, source: 'unstaged' | 'staged') => {
     if (!targetPath) return
@@ -198,6 +271,27 @@ export function GitDiffPanel({
   const handleResize = useCallback((delta: number) => {
     setFileListWidth((w) => Math.max(120, Math.min(400, w + delta)))
   }, [])
+
+  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return
+    e.preventDefault()
+
+    const currentIdx = selectedFile
+      ? flatEntries.findIndex((f) => f.path === selectedFile.path && f.source === selectedFile.source)
+      : -1
+
+    let nextIdx: number
+    if (e.key === 'ArrowDown') {
+      nextIdx = currentIdx < flatEntries.length - 1 ? currentIdx + 1 : 0
+    } else {
+      nextIdx = currentIdx > 0 ? currentIdx - 1 : flatEntries.length - 1
+    }
+
+    const next = flatEntries[nextIdx]
+    if (next) {
+      setSelectedFile({ path: next.path, source: next.source })
+    }
+  }, [selectedFile, flatEntries])
 
   const hasAnyChanges = !!snapshot && (
     snapshot.files.length > 0 ||
@@ -256,40 +350,72 @@ export function GitDiffPanel({
       {targetPath && !error && snapshot && hasAnyChanges && (
         <div className="flex-1 min-h-0 flex">
           {/* Left: stacked file lists */}
-          <div className="shrink-0 flex flex-col min-h-0 overflow-y-auto border-r" style={{ width: fileListWidth }}>
+          <div
+            ref={fileListRef}
+            className="shrink-0 flex flex-col min-h-0 overflow-y-auto border-r outline-none"
+            style={{ width: fileListWidth }}
+            tabIndex={0}
+            onKeyDown={handleKeyDown}
+          >
             {/* Staged section */}
             {stagedEntries.length > 0 && (
               <div>
-                <div className="px-3 py-1.5 text-[11px] font-medium text-muted-foreground uppercase tracking-wide bg-muted/30 border-b sticky top-0 z-10">
-                  Staged ({stagedEntries.length})
+                <div className="px-3 py-1.5 text-[11px] font-medium text-muted-foreground uppercase tracking-wide bg-muted/30 border-b sticky top-0 z-10 flex items-center justify-between">
+                  <span>Staged ({stagedEntries.length})</span>
+                  <button
+                    className="text-muted-foreground hover:text-foreground transition-colors p-0.5 rounded hover:bg-accent"
+                    onClick={() => handleBulkAction('unstageAll')}
+                    title="Unstage all"
+                  >
+                    <Minus className="size-3.5" />
+                  </button>
                 </div>
-                {stagedEntries.map((entry) => (
-                  <FileListItem
-                    key={`s:${entry.path}`}
-                    entry={entry}
-                    selected={isSelected(entry)}
-                    onClick={() => setSelectedFile({ path: entry.path, source: 'staged' })}
-                    onAction={() => handleStageAction(entry.path, 'staged')}
-                  />
-                ))}
+                {stagedEntries.map((entry) => {
+                  const diff = getDiffForEntry(entry)
+                  return (
+                    <FileListItem
+                      key={`s:${entry.path}`}
+                      entry={entry}
+                      selected={isSelected(entry)}
+                      additions={diff?.additions}
+                      deletions={diff?.deletions}
+                      onClick={() => setSelectedFile({ path: entry.path, source: 'staged' })}
+                      onAction={() => handleStageAction(entry.path, 'staged')}
+                      itemRef={isSelected(entry) ? selectedItemRef : undefined}
+                    />
+                  )
+                })}
               </div>
             )}
 
             {/* Unstaged section */}
             {unstagedEntries.length > 0 && (
               <div>
-                <div className="px-3 py-1.5 text-[11px] font-medium text-muted-foreground uppercase tracking-wide bg-muted/30 border-b sticky top-0 z-10">
-                  Unstaged ({unstagedEntries.length})
+                <div className="px-3 py-1.5 text-[11px] font-medium text-muted-foreground uppercase tracking-wide bg-muted/30 border-b sticky top-0 z-10 flex items-center justify-between">
+                  <span>Unstaged ({unstagedEntries.length})</span>
+                  <button
+                    className="text-muted-foreground hover:text-foreground transition-colors p-0.5 rounded hover:bg-accent"
+                    onClick={() => handleBulkAction('stageAll')}
+                    title="Stage all"
+                  >
+                    <Plus className="size-3.5" />
+                  </button>
                 </div>
-                {unstagedEntries.map((entry) => (
-                  <FileListItem
-                    key={`u:${entry.path}`}
-                    entry={entry}
-                    selected={isSelected(entry)}
-                    onClick={() => setSelectedFile({ path: entry.path, source: 'unstaged' })}
-                    onAction={() => handleStageAction(entry.path, 'unstaged')}
-                  />
-                ))}
+                {unstagedEntries.map((entry) => {
+                  const diff = getDiffForEntry(entry)
+                  return (
+                    <FileListItem
+                      key={`u:${entry.path}`}
+                      entry={entry}
+                      selected={isSelected(entry)}
+                      additions={diff?.additions}
+                      deletions={diff?.deletions}
+                      onClick={() => setSelectedFile({ path: entry.path, source: 'unstaged' })}
+                      onAction={() => handleStageAction(entry.path, 'unstaged')}
+                      itemRef={isSelected(entry) ? selectedItemRef : undefined}
+                    />
+                  )
+                })}
               </div>
             )}
           </div>
@@ -307,8 +433,8 @@ export function GitDiffPanel({
             {selectedFile && !selectedDiff && (
               <div className="h-full flex items-center justify-center p-6">
                 <p className="text-xs text-muted-foreground">
-                  {allEntries.find((f) => f.path === selectedFile.path && f.source === selectedFile.source)?.status === '?'
-                    ? 'Untracked file — no diff available'
+                  {flatEntries.find((f) => f.path === selectedFile.path && f.source === selectedFile.source)?.status === '?'
+                    ? 'Loading...'
                     : 'No diff content'}
                 </p>
               </div>

@@ -231,6 +231,29 @@ export function unstageFile(path: string, filePath: string): void {
   execSync(`git reset HEAD -- "${filePath}"`, { cwd: path, stdio: 'pipe' })
 }
 
+export function stageAll(path: string): void {
+  execSync('git add -A', { cwd: path, stdio: 'pipe' })
+}
+
+export function unstageAll(path: string): void {
+  execSync('git reset HEAD', { cwd: path, stdio: 'pipe' })
+}
+
+export function getUntrackedFileDiff(repoPath: string, filePath: string): string {
+  try {
+    return execSync(`git diff --no-index --no-ext-diff -- /dev/null "${filePath}"`, {
+      cwd: repoPath,
+      encoding: 'utf-8',
+      stdio: ['pipe', 'pipe', 'pipe']
+    })
+  } catch (err: unknown) {
+    // git diff --no-index exits with code 1 when files differ — expected
+    const e = err as { stdout?: string }
+    if (e.stdout) return e.stdout
+    throw err
+  }
+}
+
 export function getWorkingDiff(path: string): GitDiffSnapshot {
   try {
     execSync('git rev-parse --git-dir', { cwd: path, stdio: 'pipe' })

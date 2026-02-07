@@ -14,7 +14,10 @@ import {
   getConflictedFiles,
   getWorkingDiff,
   stageFile,
-  unstageFile
+  unstageFile,
+  stageAll,
+  unstageAll,
+  getUntrackedFileDiff
 } from './git-worktree'
 import type { MergeWithAIResult } from '../shared/types'
 
@@ -132,5 +135,17 @@ ${steps.join('\n\n')}`
 
   ipcMain.handle('git:unstageFile', (_, path: string, filePath: string) => {
     unstageFile(path, filePath)
+  })
+
+  ipcMain.handle('git:stageAll', (_, path: string) => {
+    stageAll(path)
+  })
+
+  ipcMain.handle('git:unstageAll', (_, path: string) => {
+    unstageAll(path)
+  })
+
+  ipcMain.handle('git:getUntrackedFileDiff', (_, repoPath: string, filePath: string) => {
+    return getUntrackedFileDiff(repoPath, filePath)
   })
 }

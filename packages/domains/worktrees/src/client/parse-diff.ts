@@ -1,8 +1,14 @@
+export interface InlineHighlight {
+  start: number
+  end: number
+}
+
 export interface DiffLine {
   type: 'add' | 'delete' | 'context'
   content: string
   oldLineNo: number | null
   newLineNo: number | null
+  highlights?: InlineHighlight[]
 }
 
 export interface DiffHunk {
@@ -19,9 +25,89 @@ export interface FileDiff {
   isBinary: boolean
   isNew: boolean
   isDeleted: boolean
+  additions: number
+  deletions: number
 }
 
 const HUNK_HEADER = /^@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@(.*)$/
+
+export function computeInlineHighlights(
+  oldContent: string,
+  newContent: string
+): { oldHighlights: InlineHighlight[]; newHighlights: InlineHighlight[] } {
+  const empty = { oldHighlights: [], newHighlights: [] }
+
+  // Skip if lines are too different (less than 30% common)
+  const maxLen = Math.max(oldContent.length, newContent.length)
+  if (maxLen === 0) return empty
+
+  // Find common prefix
+  let prefixLen = 0
+  const minLen = Math.min(oldContent.length, newContent.length)
+  while (prefixLen < minLen && oldContent[prefixLen] === newContent[prefixLen]) {
+    prefixLen++
+  }
+
+  // Find common suffix (not overlapping prefix)
+  let suffixLen = 0
+  while (
+    suffixLen < minLen - prefixLen &&
+    oldContent[oldContent.length - 1 - suffixLen] === newContent[newContent.length - 1 - suffixLen]
+  ) {
+    suffixLen++
+  }
+
+  const commonLen = prefixLen + suffixLen
+  // If less than 30% is common, don't highlight — lines are too different
+  if (commonLen < maxLen * 0.3) return empty
+  // If everything is common (identical lines), nothing to highlight
+  if (commonLen >= maxLen) return empty
+
+  const oldStart = prefixLen
+  const oldEnd = oldContent.length - suffixLen
+  const newStart = prefixLen
+  const newEnd = newContent.length - suffixLen
+
+  return {
+    oldHighlights: oldEnd > oldStart ? [{ start: oldStart, end: oldEnd }] : [],
+    newHighlights: newEnd > newStart ? [{ start: newStart, end: newEnd }] : []
+  }
+}
+
+function applyInlineHighlights(hunks: DiffHunk[]): void {
+  for (const hunk of hunks) {
+    const lines = hunk.lines
+    let i = 0
+    while (i < lines.length) {
+      // Find a block of consecutive deletes followed by consecutive adds
+      const delStart = i
+      while (i < lines.length && lines[i].type === 'delete') i++
+      const delEnd = i
+      const addStart = i
+      while (i < lines.length && lines[i].type === 'add') i++
+      const addEnd = i
+
+      const delCount = delEnd - delStart
+      const addCount = addEnd - addStart
+
+      // Pair up to min(del, add) lines for highlighting
+      if (delCount > 0 && addCount > 0) {
+        const pairCount = Math.min(delCount, addCount)
+        for (let j = 0; j < pairCount; j++) {
+          const { oldHighlights, newHighlights } = computeInlineHighlights(
+            lines[delStart + j].content,
+            lines[addStart + j].content
+          )
+          lines[delStart + j].highlights = oldHighlights.length > 0 ? oldHighlights : undefined
+          lines[addStart + j].highlights = newHighlights.length > 0 ? newHighlights : undefined
+        }
+      }
+
+      // Skip context lines
+      if (i === delStart) i++
+    }
+  }
+}
 
 export function parseUnifiedDiff(patch: string): FileDiff[] {
   if (!patch.trim()) return []
@@ -46,7 +132,9 @@ export function parseUnifiedDiff(patch: string): FileDiff[] {
       hunks: [],
       isBinary: false,
       isNew: false,
-      isDeleted: false
+      isDeleted: false,
+      additions: 0,
+      deletions: 0
     }
 
     let i = 1
@@ -90,8 +178,10 @@ export function parseUnifiedDiff(patch: string): FileDiff[] {
         const raw = lines[i]
         if (raw.startsWith('+')) {
           hunk.lines.push({ type: 'add', content: raw.slice(1), oldLineNo: null, newLineNo: newLine++ })
+          fileDiff.additions++
         } else if (raw.startsWith('-')) {
           hunk.lines.push({ type: 'delete', content: raw.slice(1), oldLineNo: oldLine++, newLineNo: null })
+          fileDiff.deletions++
         } else if (raw.startsWith(' ')) {
           hunk.lines.push({ type: 'context', content: raw.slice(1), oldLineNo: oldLine++, newLineNo: newLine++ })
         } else if (raw.startsWith('\\')) {
@@ -103,6 +193,7 @@ export function parseUnifiedDiff(patch: string): FileDiff[] {
       fileDiff.hunks.push(hunk)
     }
 
+    applyInlineHighlights(fileDiff.hunks)
     files.push(fileDiff)
   }
 

@@ -162,7 +162,10 @@ const api: ElectronAPI = {
     getConflictedFiles: (path) => ipcRenderer.invoke('git:getConflictedFiles', path),
     getWorkingDiff: (path) => ipcRenderer.invoke('git:getWorkingDiff', path),
     stageFile: (path, filePath) => ipcRenderer.invoke('git:stageFile', path, filePath),
-    unstageFile: (path, filePath) => ipcRenderer.invoke('git:unstageFile', path, filePath)
+    unstageFile: (path, filePath) => ipcRenderer.invoke('git:unstageFile', path, filePath),
+    stageAll: (path) => ipcRenderer.invoke('git:stageAll', path),
+    unstageAll: (path) => ipcRenderer.invoke('git:unstageAll', path),
+    getUntrackedFileDiff: (repoPath, filePath) => ipcRenderer.invoke('git:getUntrackedFileDiff', repoPath, filePath)
   },
   tabs: {
     list: (taskId) => ipcRenderer.invoke('tabs:list', taskId),
