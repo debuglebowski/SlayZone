@@ -1,5 +1,6 @@
 import { test, expect, seed, goHome, clickProject } from './fixtures/electron'
 import { TEST_PROJECT_PATH } from './fixtures/electron'
+import { openTaskTerminal } from './fixtures/terminal'
 
 test.describe('Terminal mode switching', () => {
   let projectAbbrev: string
@@ -13,13 +14,7 @@ test.describe('Terminal mode switching', () => {
     taskId = t.id
     await s.refreshData()
 
-    await goHome(mainWindow)
-    await clickProject(mainWindow, projectAbbrev)
-    await mainWindow.waitForTimeout(500)
-
-    // Open task detail
-    await mainWindow.getByText('Mode switch task').first().click()
-    await mainWindow.waitForTimeout(500)
+    await openTaskTerminal(mainWindow, { projectAbbrev, taskTitle: 'Mode switch task' })
   })
 
   /** Find the terminal mode select trigger in the bottom bar */
@@ -38,7 +33,6 @@ test.describe('Terminal mode switching', () => {
   test('switch to Terminal mode', async ({ mainWindow }) => {
     await modeTrigger(mainWindow).click()
     await mainWindow.getByRole('option', { name: 'Terminal' }).click()
-    await mainWindow.waitForTimeout(500)
 
     // Select now shows Terminal
     await expect(modeTrigger(mainWindow)).toHaveText(/Terminal/)
@@ -57,7 +51,6 @@ test.describe('Terminal mode switching', () => {
   test('switch to Codex mode', async ({ mainWindow }) => {
     await modeTrigger(mainWindow).click()
     await mainWindow.getByRole('option', { name: 'Codex' }).click()
-    await mainWindow.waitForTimeout(500)
 
     await expect(modeTrigger(mainWindow)).toHaveText(/Codex/)
   })
@@ -70,13 +63,11 @@ test.describe('Terminal mode switching', () => {
   test('mode persists across navigation', async ({ mainWindow }) => {
     // Navigate away
     await goHome(mainWindow)
-    await mainWindow.waitForTimeout(300)
 
     // Navigate back
     await clickProject(mainWindow, projectAbbrev)
-    await mainWindow.waitForTimeout(300)
     await mainWindow.getByText('Mode switch task').first().click()
-    await mainWindow.waitForTimeout(500)
+    await expect(modeTrigger(mainWindow)).toBeVisible()
 
     // Still Codex
     await expect(modeTrigger(mainWindow)).toHaveText(/Codex/)
@@ -85,7 +76,6 @@ test.describe('Terminal mode switching', () => {
   test('switch back to Claude Code', async ({ mainWindow }) => {
     await modeTrigger(mainWindow).click()
     await mainWindow.getByRole('option', { name: 'Claude Code' }).click()
-    await mainWindow.waitForTimeout(500)
 
     await expect(modeTrigger(mainWindow)).toHaveText(/Claude Code/)
     await expect(mainWindow.getByRole('button', { name: 'Sync name' })).toBeVisible()
@@ -100,7 +90,7 @@ test.describe('Terminal mode switching', () => {
     // Switch to terminal and back
     await modeTrigger(mainWindow).click()
     await mainWindow.getByRole('option', { name: 'Terminal' }).click()
-    await mainWindow.waitForTimeout(500)
+    await expect(modeTrigger(mainWindow)).toHaveText(/Terminal/)
 
     // Verify cleared
     const task = await mainWindow.evaluate((id) => window.api.db.getTask(id), taskId)
@@ -110,6 +100,6 @@ test.describe('Terminal mode switching', () => {
     // Switch back to claude-code for clean state
     await modeTrigger(mainWindow).click()
     await mainWindow.getByRole('option', { name: 'Claude Code' }).click()
-    await mainWindow.waitForTimeout(500)
+    await expect(modeTrigger(mainWindow)).toHaveText(/Claude Code/)
   })
 })
