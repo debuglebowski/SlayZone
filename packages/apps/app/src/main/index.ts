@@ -2,8 +2,8 @@ import { app, shell, BrowserWindow, ipcMain, nativeTheme, session, webContents, 
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 
-// Use consistent app name for userData path (preserves existing database)
-app.name = 'omgslayzone'
+// Use consistent app name for userData path (paired with legacy DB migration)
+app.name = 'slayzone'
 
 // Enable remote debugging for MCP server (dev only)
 if (is.dev) {
@@ -12,16 +12,16 @@ if (is.dev) {
 import icon from '../../resources/icon.png?asset'
 import { getDatabase, closeDatabase } from './db'
 // Domain handlers
-import { registerProjectHandlers } from '@omgslayzone/projects/main'
-import { registerTaskHandlers, registerAiHandlers, registerFilesHandlers } from '@omgslayzone/task/main'
-import { registerTagHandlers } from '@omgslayzone/tags/main'
-import { registerSettingsHandlers, registerThemeHandlers } from '@omgslayzone/settings/main'
-import { registerPtyHandlers, registerClaudeHandlers, killAllPtys, startIdleChecker, stopIdleChecker } from '@omgslayzone/terminal/main'
-import { registerTerminalTabsHandlers } from '@omgslayzone/task-terminals/main'
-import { registerWorktreeHandlers } from '@omgslayzone/worktrees/main'
+import { registerProjectHandlers } from '@slayzone/projects/main'
+import { registerTaskHandlers, registerAiHandlers, registerFilesHandlers } from '@slayzone/task/main'
+import { registerTagHandlers } from '@slayzone/tags/main'
+import { registerSettingsHandlers, registerThemeHandlers } from '@slayzone/settings/main'
+import { registerPtyHandlers, registerClaudeHandlers, killAllPtys, startIdleChecker, stopIdleChecker } from '@slayzone/terminal/main'
+import { registerTerminalTabsHandlers } from '@slayzone/task-terminals/main'
+import { registerWorktreeHandlers } from '@slayzone/worktrees/main'
 
 // Minimum splash screen display time (ms)
-const SPLASH_MIN_DURATION = 2800
+const SPLASH_MIN_DURATION = 4000
 
 // Self-contained splash HTML with inline SVG and CSS animations
 const splashHTML = (version: string) => `
@@ -53,38 +53,26 @@ const splashHTML = (version: string) => `
     .logo {
       width: 80px;
       height: 80px;
-      color: #e5e5e5;
     }
     .title {
       margin-top: 24px;
       font-size: 28px;
       font-weight: 600;
       color: #fafafa;
-      display: flex;
-    }
-    .letter {
-      opacity: 0;
-      animation: fadeIn 0.15s ease-out forwards;
-    }
-    .line2-container {
       display: inline-flex;
-      clip-path: inset(0 100% 0 0);
-      animation: reveal 0.5s ease-out 1.75s forwards;
+      align-items: center;
     }
-    @keyframes reveal {
-      from { clip-path: inset(0 100% 0 0); }
-      to { clip-path: inset(0 0 0 0); }
+    .typed-text {
+      white-space: pre;
     }
-    .letter.line1:nth-child(1) { animation-delay: 0.6s; }
-    .letter.line1:nth-child(2) { animation-delay: 0.65s; }
-    .letter.line1:nth-child(3) { animation-delay: 0.7s; }
-    .letter.line1:nth-child(4) { animation-delay: 0.75s; }
-    .letter.line1:nth-child(5) { animation-delay: 0.8s; }
-    .letter.line1:nth-child(6) { animation-delay: 0.85s; }
-    .letter.line1:nth-child(7) { animation-delay: 0.9s; }
-    .letter.line1:nth-child(8) { animation-delay: 0.95s; }
-    .letter.line1:nth-child(9) { animation-delay: 1s; }
-    .line2-container .letter { opacity: 1; animation: none; }
+    .caret {
+      display: inline-block;
+      width: 2px;
+      height: 1.1em;
+      margin-left: 6px;
+      background: #fafafa;
+      animation: blink 0.9s step-end infinite;
+    }
     .version {
       position: absolute;
       bottom: 24px;
@@ -105,6 +93,10 @@ const splashHTML = (version: string) => `
       from { opacity: 1; }
       to { opacity: 0; }
     }
+    @keyframes blink {
+      0%, 49% { opacity: 1; }
+      50%, 100% { opacity: 0; }
+    }
     .fade-out {
       animation: fadeOut 0.3s ease-out forwards;
     }
@@ -114,34 +106,77 @@ const splashHTML = (version: string) => `
   <div class="container">
     <div class="logo-wrapper">
       <svg class="logo" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <path d="M8,48 L14,24 L24,36 L32,16 L40,36 L50,24 L56,48 Z" stroke="currentColor" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+        <defs>
+          <linearGradient id="crown-graffiti" x1="6" y1="10" x2="58" y2="54" gradientUnits="userSpaceOnUse">
+            <stop offset="0" stop-color="#00E5FF"/>
+            <stop offset="0.35" stop-color="#FF3CAC"/>
+            <stop offset="0.7" stop-color="#FFD500"/>
+            <stop offset="1" stop-color="#39FF14"/>
+          </linearGradient>
+          <filter id="soft-glow" x="-40%" y="-40%" width="180%" height="180%">
+            <feGaussianBlur stdDeviation="1.2" result="blur"/>
+            <feMerge>
+              <feMergeNode in="blur"/>
+              <feMergeNode in="SourceGraphic"/>
+            </feMerge>
+          </filter>
+        </defs>
+        <path
+          d="M8,48 L14,24 L24,36 L32,16 L40,36 L50,24 L56,48 Z"
+          stroke="url(#crown-graffiti)"
+          stroke-width="5.2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          fill="none"
+          filter="url(#soft-glow)"
+        />
       </svg>
     </div>
     <div class="title">
-      <span class="letter line1">B</span>
-      <span class="letter line1">r</span>
-      <span class="letter line1">e</span>
-      <span class="letter line1">a</span>
-      <span class="letter line1">t</span>
-      <span class="letter line1">h</span>
-      <span class="letter line1">.</span>
-      <span class="letter line1">.</span>
-      <span class="letter line1">.</span>
-      <span class="line2-container">
-        <span class="letter">&nbsp;&nbsp;&nbsp;</span>
-        <span class="letter">t</span>
-        <span class="letter">h</span>
-        <span class="letter">e</span>
-        <span class="letter">n</span>
-        <span class="letter">&nbsp;</span>
-        <span class="letter">s</span>
-        <span class="letter">l</span>
-        <span class="letter">a</span>
-        <span class="letter">y</span>
-      </span>
+      <span class="typed-text" aria-hidden="true"></span>
+      <span class="caret" aria-hidden="true"></span>
     </div>
     <div class="version">v${version}</div>
   </div>
+  <script>
+    const typedText = document.querySelector('.typed-text')
+    const first = 'Breath...'
+    const second = 'then slay'
+    const TYPE_MS = 90
+    const ERASE_MS = 60
+    const PAUSE_BEFORE_START = 500
+    const PAUSE_AFTER_FIRST = 600
+    const PAUSE_AFTER_ERASE = 250
+
+    const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
+
+    const typeText = async (text) => {
+      for (let i = 0; i < text.length; i += 1) {
+        typedText.textContent += text[i]
+        await sleep(TYPE_MS)
+      }
+    }
+
+    const eraseText = async () => {
+      while (typedText.textContent.length > 0) {
+        typedText.textContent = typedText.textContent.slice(0, -1)
+        await sleep(ERASE_MS)
+      }
+    }
+
+    const runSequence = async () => {
+      await sleep(PAUSE_BEFORE_START)
+      await typeText(first)
+      await sleep(PAUSE_AFTER_FIRST)
+      await eraseText()
+      await sleep(PAUSE_AFTER_ERASE)
+      await typeText(second)
+    }
+
+    window.addEventListener('DOMContentLoaded', () => {
+      runSequence()
+    })
+  </script>
 </body>
 </html>
 `
@@ -186,7 +221,7 @@ function createMainWindow(): void {
     height: 1421,
     show: false,
     center: true,
-    title: 'OmgSlayZone',
+    title: 'SlayZone',
     titleBarStyle: 'hiddenInset',
     trafficLightPosition: { x: 16, y: 16 },
     backgroundColor: '#0a0a0a',
@@ -290,7 +325,7 @@ app.whenReady().then(() => {
     app.dock?.setIcon(icon)
 
     // Set custom application menu to show correct app name in menu items
-    const appName = 'OmgSlayZone'
+    const appName = 'SlayZone'
     const template: Electron.MenuItemConstructorOptions[] = [
       {
         label: appName,
@@ -378,7 +413,7 @@ app.whenReady().then(() => {
   })
 
   // Set app user model id for windows
-  electronApp.setAppUserModelId('com.electron')
+  electronApp.setAppUserModelId('com.slayzone.app')
 
   // Default open or close DevTools by F12 in development
   // and ignore CommandOrControl + R in production.
