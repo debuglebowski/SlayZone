@@ -1,10 +1,19 @@
 import type { IpcMain } from 'electron'
 import { app } from 'electron'
-import { writeFile, mkdir } from 'fs/promises'
+import { writeFile, mkdir, access } from 'fs/promises'
 import { join } from 'path'
 import { randomUUID } from 'crypto'
 
 export function registerFilesHandlers(ipcMain: IpcMain): void {
+  ipcMain.handle('files:pathExists', async (_, filePath: string) => {
+    try {
+      await access(filePath)
+      return true
+    } catch {
+      return false
+    }
+  })
+
   ipcMain.handle('files:saveTempImage', async (_, base64: string, mimeType: string) => {
     try {
       const ext = mimeType === 'image/png' ? 'png' : mimeType === 'image/gif' ? 'gif' : 'jpg'

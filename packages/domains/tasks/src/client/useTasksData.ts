@@ -38,19 +38,23 @@ export function useTasksData(): UseTasksDataReturn {
   const [taskTags, setTaskTags] = useState<Map<string, string[]>>(new Map())
   const [blockedTaskIds, setBlockedTaskIds] = useState<Set<string>>(new Set())
 
-  // Load data on mount
+  // Load data on mount + allow external refresh (E2E tests)
   useEffect(() => {
-    Promise.all([
-      window.api.db.getTasks(),
-      window.api.db.getProjects(),
-      window.api.tags.getTags()
-    ]).then(([t, p, tg]) => {
-      setTasks(t as Task[])
-      setProjects(p as Project[])
-      setTags(tg as Tag[])
-      loadTaskTags(t as Task[])
-      loadBlockedTaskIds(t as Task[])
-    })
+    const loadData = () =>
+      Promise.all([
+        window.api.db.getTasks(),
+        window.api.db.getProjects(),
+        window.api.tags.getTags()
+      ]).then(([t, p, tg]) => {
+        setTasks(t as Task[])
+        setProjects(p as Project[])
+        setTags(tg as Tag[])
+        loadTaskTags(t as Task[])
+        loadBlockedTaskIds(t as Task[])
+      })
+    loadData()
+    ;(window as any).__slayzone_refreshData = loadData
+    return () => { delete (window as any).__slayzone_refreshData }
   }, [])
 
   // Load task tags mapping
@@ -159,13 +163,15 @@ export function useTasksData(): UseTasksDataReturn {
 
   // Archive single task
   const archiveTask = useCallback(async (taskId: string) => {
-    setTasks((prev) => prev.filter((t) => t.id !== taskId))
+    const now = new Date().toISOString()
+    setTasks((prev) => prev.map((t) => t.id === taskId ? { ...t, archived_at: now } : t))
     await window.api.db.archiveTask(taskId)
   }, [])
 
   // Archive multiple tasks
   const archiveTasks = useCallback(async (taskIds: string[]) => {
-    setTasks((prev) => prev.filter((t) => !taskIds.includes(t.id)))
+    const now = new Date().toISOString()
+    setTasks((prev) => prev.map((t) => taskIds.includes(t.id) ? { ...t, archived_at: now } : t))
     await window.api.db.archiveTasks(taskIds)
   }, [])
 

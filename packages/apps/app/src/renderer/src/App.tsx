@@ -1,5 +1,6 @@
-import { useState, useEffect, useRef, useMemo } from 'react'
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { useHotkeys } from 'react-hotkeys-hook'
+import { AlertTriangle } from 'lucide-react'
 import type { Task } from '@slayzone/task/shared'
 import type { Project } from '@slayzone/projects/shared'
 import type { Tag } from '@slayzone/tags/shared'
@@ -82,6 +83,19 @@ function App(): React.JSX.Element {
   const [quickRunOpen, setQuickRunOpen] = useState(false)
   const [completeTaskDialogOpen, setCompleteTaskDialogOpen] = useState(false)
 
+  // Project path validation
+  const [projectPathMissing, setProjectPathMissing] = useState(false)
+  const validateProjectPath = useCallback(async (project: Project | undefined) => {
+    if (!project?.path) {
+      setProjectPathMissing(false)
+      return
+    }
+    const fn = window.api.files?.pathExists
+    if (typeof fn !== 'function') return
+    const exists = await fn(project.path)
+    setProjectPathMissing(!exists)
+  }, [])
+
   // Inline project rename state
   const [projectNameValue, setProjectNameValue] = useState('')
   const projectNameInputRef = useRef<HTMLTextAreaElement>(null)
@@ -89,6 +103,9 @@ function App(): React.JSX.Element {
   // Terminal state tracking for tab indicators
   const ptyContext = usePty()
   const [terminalStates, setTerminalStates] = useState<Map<string, TerminalState>>(new Map())
+
+  // Closed tabs stack for Cmd+Shift+T reopen
+  const closedTabsRef = useRef<Extract<typeof tabs[number], { type: 'task' }>[]>([])
 
   // Notification state
   const [notificationState, setNotificationState] = useNotificationState()
@@ -169,10 +186,26 @@ function App(): React.JSX.Element {
 
   const closeTab = (index: number): void => {
     if (index === 0) return
+    const tab = tabs[index]
+    if (tab?.type === 'task') {
+      closedTabsRef.current.push(tab)
+      if (closedTabsRef.current.length > 20) closedTabsRef.current.shift()
+    }
     const newTabs = tabs.filter((_, i) => i !== index)
     setTabs(newTabs)
     if (activeTabIndex >= index) {
       setActiveTabIndex(Math.max(0, activeTabIndex - 1))
+    }
+  }
+
+  const reopenClosedTab = (): void => {
+    const taskIds = new Set(tasks.map((t) => t.id))
+    while (closedTabsRef.current.length > 0) {
+      const tab = closedTabsRef.current.pop()!
+      if (!taskIds.has(tab.taskId)) continue
+      if (tabs.some((t) => t.type === 'task' && t.taskId === tab.taskId)) continue
+      openTask(tab.taskId)
+      return
     }
   }
 
@@ -199,6 +232,12 @@ function App(): React.JSX.Element {
   useEffect(() => {
     const taskIds = new Set(tasks.map((t) => t.id))
     setTabs((prev) => {
+      for (const tab of prev) {
+        if (tab.type === 'task' && !taskIds.has(tab.taskId)) {
+          closedTabsRef.current.push(tab)
+          if (closedTabsRef.current.length > 20) closedTabsRef.current.shift()
+        }
+      }
       const filtered = prev.filter((tab) => tab.type === 'home' || taskIds.has(tab.taskId))
       if (filtered.length < prev.length) {
         setActiveTabIndex((idx) => Math.min(idx, filtered.length - 1))
@@ -221,6 +260,20 @@ function App(): React.JSX.Element {
       if (project) setProjectNameValue(project.name)
     }
   }, [selectedProjectId, projects])
+
+  // Validate selected project's path exists on disk
+  useEffect(() => {
+    validateProjectPath(projects.find((p) => p.id === selectedProjectId))
+  }, [selectedProjectId, projects, validateProjectPath])
+
+  // Re-check project path on window focus
+  useEffect(() => {
+    const project = projects.find((p) => p.id === selectedProjectId)
+    if (!project?.path) return
+    const handleFocus = (): void => { validateProjectPath(project) }
+    window.addEventListener('focus', handleFocus)
+    return () => window.removeEventListener('focus', handleFocus)
+  }, [selectedProjectId, projects, validateProjectPath])
 
   // Auto-resize textarea
   useEffect(() => {
@@ -284,6 +337,11 @@ function App(): React.JSX.Element {
   useHotkeys('ctrl+shift+tab', (e) => {
     e.preventDefault()
     setActiveTabIndex((prev) => (prev - 1 + tabs.length) % tabs.length)
+  }, { enableOnFormTags: true })
+
+  useHotkeys('mod+shift+t', (e) => {
+    e.preventDefault()
+    reopenClosedTab()
   }, { enableOnFormTags: true })
 
   useHotkeys('mod+shift+d', (e) => {
@@ -376,6 +434,7 @@ function App(): React.JSX.Element {
   const handleProjectUpdated = (project: Project): void => {
     updateProject(project)
     setEditingProject(null)
+    validateProjectPath(project)
   }
 
   const handleProjectNameSave = async (): Promise<void> => {
@@ -412,6 +471,23 @@ function App(): React.JSX.Element {
       projectNameInputRef.current?.blur()
     }
   }
+
+  const handleFixProjectPath = useCallback(async (): Promise<void> => {
+    const project = projects.find((p) => p.id === selectedProjectId)
+    if (!project) return
+    const result = await window.api.dialog.showOpenDialog({
+      title: 'Select Project Directory',
+      defaultPath: project.path || undefined,
+      properties: ['openDirectory']
+    })
+    if (result.canceled || !result.filePaths[0]) return
+    const updated = await window.api.db.updateProject({
+      id: project.id,
+      path: result.filePaths[0]
+    })
+    updateProject(updated)
+    validateProjectPath(updated)
+  }, [selectedProjectId, projects, updateProject, validateProjectPath])
 
   const handleProjectDeleted = (): void => {
     if (deletingProject) {
@@ -496,6 +572,17 @@ function App(): React.JSX.Element {
                         <div className="text-center text-muted-foreground">
                           Click + in sidebar to create a project
                         </div>
+                      ) : projectPathMissing && selectedProjectId ? (
+                        <div className="flex-1 flex items-center justify-center">
+                          <div className="text-center space-y-4">
+                            <AlertTriangle className="h-8 w-8 text-amber-500 mx-auto" />
+                            <p className="text-lg font-medium">Project path not found</p>
+                            <p className="text-sm text-muted-foreground">
+                              <code className="bg-muted px-2 py-1 rounded">{projects.find((p) => p.id === selectedProjectId)?.path}</code>
+                            </p>
+                            <Button onClick={handleFixProjectPath}>Update path</Button>
+                          </div>
+                        </div>
                       ) : (
                         <>
                           <div className="mb-4">
@@ -531,6 +618,8 @@ function App(): React.JSX.Element {
                       isActive={i === activeTabIndex}
                       onBack={goBack}
                       onTaskUpdated={updateTask}
+                      onArchiveTask={archiveTask}
+                      onDeleteTask={deleteTask}
                       onNavigateToTask={openTask}
                     />
                   )}

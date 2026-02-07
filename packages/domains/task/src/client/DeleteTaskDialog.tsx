@@ -15,17 +15,23 @@ interface DeleteTaskDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   onDeleted: () => void
+  onDeleteTask?: (taskId: string) => Promise<void>
 }
 
 export function DeleteTaskDialog({
   task,
   open,
   onOpenChange,
-  onDeleted
+  onDeleted,
+  onDeleteTask
 }: DeleteTaskDialogProps): React.JSX.Element {
   const handleDelete = async (): Promise<void> => {
     if (!task) return
-    await window.api.db.deleteTask(task.id)
+    if (onDeleteTask) {
+      await onDeleteTask(task.id)
+    } else {
+      await window.api.db.deleteTask(task.id)
+    }
     onDeleted()
   }
 
