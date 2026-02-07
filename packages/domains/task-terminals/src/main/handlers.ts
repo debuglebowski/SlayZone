@@ -82,8 +82,7 @@ export function registerTerminalTabsHandlers(ipcMain: IpcMain, db: Database): vo
 
     if (!existing) return null
 
-    // Don't allow mode change on main tab
-    const mode = existing.is_main === 1 ? existing.mode : (input.mode ?? existing.mode)
+    const mode = input.mode ?? existing.mode
 
     db.prepare(`
       UPDATE terminal_tabs
@@ -144,6 +143,11 @@ export function registerTerminalTabsHandlers(ipcMain: IpcMain, db: Database): vo
     } | undefined
 
     if (existing) {
+      // Update mode if it changed (e.g. user switched terminal mode on task)
+      if (existing.mode !== mode) {
+        db.prepare('UPDATE terminal_tabs SET mode = ? WHERE id = ?').run(mode, existing.id)
+        existing.mode = mode
+      }
       return {
         id: existing.id,
         taskId: existing.task_id,
