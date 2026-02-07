@@ -10,6 +10,8 @@ const APP_DIR = join(__dirname, '../packages/apps/app');
 const BUILD_DIR = join(APP_DIR, 'build');
 const RESOURCES_DIR = join(APP_DIR, 'resources');
 const SOURCE_SVG = join(APP_DIR, 'src/renderer/src/assets/logo-solid.svg');
+const LEGACY_ROOT_BUILD_DIR = join(__dirname, '../build');
+const LEGACY_ROOT_RESOURCES_DIR = join(__dirname, '../resources');
 
 // Correct iconset pairs: [display_size, actual_pixel_size, filename]
 const ICONSET_FILES = [
@@ -125,6 +127,16 @@ async function generateICO() {
 
 async function main() {
   console.log('Starting icon generation...\n');
+
+  // Clean up legacy root-level icon output directories from earlier scripts.
+  if (existsSync(LEGACY_ROOT_BUILD_DIR)) {
+    rmSync(LEGACY_ROOT_BUILD_DIR, { recursive: true, force: true });
+    console.log('✓ Removed legacy root build/ directory');
+  }
+  if (existsSync(LEGACY_ROOT_RESOURCES_DIR)) {
+    rmSync(LEGACY_ROOT_RESOURCES_DIR, { recursive: true, force: true });
+    console.log('✓ Removed legacy root resources/ directory');
+  }
   
   if (!existsSync(BUILD_DIR)) mkdirSync(BUILD_DIR, { recursive: true });
   if (!existsSync(RESOURCES_DIR)) mkdirSync(RESOURCES_DIR, { recursive: true });
