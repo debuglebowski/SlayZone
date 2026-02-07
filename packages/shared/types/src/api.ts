@@ -95,7 +95,7 @@ export interface ElectronAPI {
       mode?: TerminalMode,
       initialPrompt?: string | null,
       codeMode?: CodeMode | null,
-      dangerouslySkipPermissions?: boolean
+      providerFlags?: string | null
     ) => Promise<{ success: boolean; error?: string }>
     write: (sessionId: string, data: string) => Promise<boolean>
     resize: (sessionId: string, cols: number, rows: number) => Promise<boolean>

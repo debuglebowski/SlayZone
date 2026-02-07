@@ -15,7 +15,7 @@ import {
 import { useTheme } from '@slayzone/settings'
 import type { Tag } from '@slayzone/tags/shared'
 import type { ThemePreference } from '@slayzone/settings/shared'
-import type { ClaudeAvailability } from '@slayzone/terminal/shared'
+import type { ClaudeAvailability, TerminalMode } from '@slayzone/terminal/shared'
 
 interface UserSettingsDialogProps {
   open: boolean
@@ -33,6 +33,9 @@ export function UserSettingsDialog({ open, onOpenChange }: UserSettingsDialogPro
   const [shellSetting, setShellSetting] = useState('')
   const [defaultShell, setDefaultShell] = useState('')
   const [worktreeBasePath, setWorktreeBasePath] = useState('')
+  const [defaultTerminalMode, setDefaultTerminalMode] = useState<TerminalMode>('claude-code')
+  const [defaultClaudeFlags, setDefaultClaudeFlags] = useState('--dangerously-skip-permissions')
+  const [defaultCodexFlags, setDefaultCodexFlags] = useState('--full-auto --search')
 
   useEffect(() => {
     if (open) {
@@ -41,17 +44,23 @@ export function UserSettingsDialog({ open, onOpenChange }: UserSettingsDialogPro
   }, [open])
 
   const loadData = async () => {
-    const [loadedTags, path, shell, wtBasePath] = await Promise.all([
+    const [loadedTags, path, shell, wtBasePath, termMode, claudeFlags, codexFlags] = await Promise.all([
       window.api.tags.getTags(),
       window.api.settings.get('database_path'),
       window.api.settings.get('shell'),
-      window.api.settings.get('worktree_base_path')
+      window.api.settings.get('worktree_base_path'),
+      window.api.settings.get('default_terminal_mode'),
+      window.api.settings.get('default_claude_flags'),
+      window.api.settings.get('default_codex_flags')
     ])
     setTags(loadedTags)
     setDbPath(path ?? 'Default location (userData)')
     setShellSetting(shell ?? '')
     setDefaultShell(process.env.SHELL || '/bin/bash')
     setWorktreeBasePath(wtBasePath ?? '')
+    setDefaultTerminalMode((termMode as TerminalMode) || 'claude-code')
+    setDefaultClaudeFlags(claudeFlags ?? '--dangerously-skip-permissions')
+    setDefaultCodexFlags(codexFlags ?? '--full-auto --search')
     window.api.claude.checkAvailability().then(setClaudeStatus)
   }
 
@@ -137,6 +146,33 @@ export function UserSettingsDialog({ open, onOpenChange }: UserSettingsDialogPro
 
           <TabsContent value="terminal" className="space-y-4 pt-4">
             <div className="space-y-2">
+              <Label className="text-base font-semibold">Mode</Label>
+              <div className="flex items-center justify-between gap-4">
+                <span className="text-sm">Default mode</span>
+                <Select
+                  value={defaultTerminalMode}
+                  onValueChange={(v) => {
+                    const mode = v as TerminalMode
+                    setDefaultTerminalMode(mode)
+                    window.api.settings.set('default_terminal_mode', mode)
+                  }}
+                >
+                  <SelectTrigger className="w-48">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="claude-code">Claude Code</SelectItem>
+                    <SelectItem value="codex">Codex</SelectItem>
+                    <SelectItem value="terminal">Terminal</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Mode used when creating new tasks
+              </p>
+            </div>
+
+            <div className="space-y-2">
               <Label className="text-base font-semibold">Shell</Label>
               <div className="flex items-center justify-between gap-4">
                 <span className="text-sm">Default shell</span>
@@ -156,6 +192,31 @@ export function UserSettingsDialog({ open, onOpenChange }: UserSettingsDialogPro
               </div>
               <p className="text-xs text-muted-foreground">
                 Leave empty to use system default
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label className="text-base font-semibold">Flags</Label>
+              <div className="flex items-center justify-between gap-4">
+                <span className="text-sm">Default Claude flags</span>
+                <Input
+                  className="w-72"
+                  value={defaultClaudeFlags}
+                  onChange={(e) => setDefaultClaudeFlags(e.target.value)}
+                  onBlur={() => window.api.settings.set('default_claude_flags', defaultClaudeFlags.trim())}
+                />
+              </div>
+              <div className="flex items-center justify-between gap-4">
+                <span className="text-sm">Default Codex flags</span>
+                <Input
+                  className="w-72"
+                  value={defaultCodexFlags}
+                  onChange={(e) => setDefaultCodexFlags(e.target.value)}
+                  onBlur={() => window.api.settings.set('default_codex_flags', defaultCodexFlags.trim())}
+                />
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Applied to new tasks only.
               </p>
             </div>
           </TabsContent>

@@ -6,6 +6,7 @@ export type TaskStatus = 'inbox' | 'backlog' | 'todo' | 'in_progress' | 'review'
 export interface PanelVisibility {
   terminal: boolean
   browser: boolean
+  gitDiff: boolean
   settings: boolean
 }
 
@@ -24,6 +25,8 @@ export interface Task {
   claude_conversation_id: string | null
   codex_conversation_id: string | null
   terminal_shell: string | null
+  claude_flags: string
+  codex_flags: string
   // Legacy (kept for backwards compat, use claude_conversation_id instead)
   claude_session_id: string | null
   // Permissions
@@ -52,6 +55,9 @@ export interface CreateTaskInput {
   status?: string
   priority?: number
   dueDate?: string
+  terminalMode?: TerminalMode
+  claudeFlags?: string
+  codexFlags?: string
 }
 
 export interface UpdateTaskInput {
@@ -67,7 +73,8 @@ export interface UpdateTaskInput {
   claudeConversationId?: string | null
   codexConversationId?: string | null
   terminalShell?: string | null
-  dangerouslySkipPermissions?: boolean
+  claudeFlags?: string
+  codexFlags?: string
   // Panel visibility
   panelVisibility?: PanelVisibility | null
   // Worktree

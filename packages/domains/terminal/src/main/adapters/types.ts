@@ -43,7 +43,7 @@ export interface TerminalAdapter {
   /**
    * Build spawn configuration for this terminal mode.
    */
-  buildSpawnConfig(cwd: string, conversationId?: string, resuming?: boolean, shellOverride?: string, initialPrompt?: string, dangerouslySkipPermissions?: boolean, codeMode?: CodeMode): SpawnConfig
+  buildSpawnConfig(cwd: string, conversationId?: string, resuming?: boolean, shellOverride?: string, initialPrompt?: string, providerArgs?: string[], codeMode?: CodeMode): SpawnConfig
 
   /**
    * Detect activity state from terminal output.

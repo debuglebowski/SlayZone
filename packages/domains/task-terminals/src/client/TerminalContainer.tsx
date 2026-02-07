@@ -12,7 +12,7 @@ interface TerminalContainerProps {
   existingConversationId?: string | null
   initialPrompt?: string | null
   codeMode?: CodeMode | null
-  dangerouslySkipPermissions?: boolean
+  providerFlags?: string
   autoFocus?: boolean
   onConversationCreated?: (conversationId: string) => void
   onSessionInvalid?: () => void
@@ -28,7 +28,7 @@ export function TerminalContainer({
   existingConversationId,
   initialPrompt,
   codeMode,
-  dangerouslySkipPermissions = false,
+  providerFlags,
   autoFocus = false,
   onConversationCreated,
   onSessionInvalid,
@@ -145,7 +145,7 @@ export function TerminalContainer({
           existingConversationId={activeTab.isMain ? existingConversationId : undefined}
           initialPrompt={activeTab.isMain ? initialPrompt : undefined}
           codeMode={activeTab.isMain ? codeMode : undefined}
-          dangerouslySkipPermissions={activeTab.isMain ? dangerouslySkipPermissions : false}
+          providerFlags={activeTab.isMain ? providerFlags : undefined}
           autoFocus={autoFocus}
           onConversationCreated={handleConversationCreated}
           onSessionInvalid={activeTab.isMain ? onSessionInvalid : undefined}

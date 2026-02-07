@@ -320,6 +320,19 @@ const migrations: Migration[] = [
     up: (db) => {
       db.exec(`ALTER TABLE tasks ADD COLUMN worktree_parent_branch TEXT DEFAULT NULL;`)
     }
+  },
+  {
+    version: 21,
+    up: (db) => {
+      db.exec(`
+        ALTER TABLE tasks ADD COLUMN claude_flags TEXT NOT NULL DEFAULT '';
+        ALTER TABLE tasks ADD COLUMN codex_flags TEXT NOT NULL DEFAULT '';
+      `)
+      db.prepare(`INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)`)
+        .run('default_claude_flags', '--dangerously-skip-permissions')
+      db.prepare(`INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)`)
+        .run('default_codex_flags', '--full-auto --search')
+    }
   }
 ]
 

@@ -9,7 +9,7 @@ export class ClaudeAdapter implements TerminalAdapter {
   readonly mode = 'claude-code' as const
   readonly idleTimeoutMs = null // use default 60s
 
-  buildSpawnConfig(_cwd: string, conversationId?: string, resuming?: boolean, _shellOverride?: string, initialPrompt?: string, dangerouslySkipPermissions?: boolean, codeMode?: CodeMode): SpawnConfig {
+  buildSpawnConfig(_cwd: string, conversationId?: string, resuming?: boolean, _shellOverride?: string, initialPrompt?: string, providerArgs: string[] = [], codeMode?: CodeMode): SpawnConfig {
     const claudeArgs: string[] = []
 
     // Pass --resume for existing sessions, --session-id for new ones
@@ -19,10 +19,12 @@ export class ClaudeAdapter implements TerminalAdapter {
       claudeArgs.push('--session-id', conversationId)
     }
 
-    // Add dangerously skip permissions flag if enabled (or bypass mode)
-    if (dangerouslySkipPermissions || codeMode === 'bypass') {
+    // Add bypass flag if code mode requests full automation.
+    if (codeMode === 'bypass') {
       claudeArgs.push('--dangerously-skip-permissions')
     }
+
+    claudeArgs.push(...providerArgs)
 
     // Handle accept-edits mode: allow edit tools without prompting
     if (codeMode === 'accept-edits') {

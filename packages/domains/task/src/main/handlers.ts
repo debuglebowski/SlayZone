@@ -9,6 +9,9 @@ function parseTask(row: Record<string, unknown> | undefined): Task | null {
   if (!row) return null
   return {
     ...row,
+    dangerously_skip_permissions: Boolean(row.dangerously_skip_permissions),
+    claude_flags: typeof row.claude_flags === 'string' ? row.claude_flags : '',
+    codex_flags: typeof row.codex_flags === 'string' ? row.codex_flags : '',
     panel_visibility: row.panel_visibility
       ? JSON.parse(row.panel_visibility as string)
       : null,
@@ -52,7 +55,7 @@ export function registerTaskHandlers(ipcMain: IpcMain, db: Database): void {
   // Task CRUD
   ipcMain.handle('db:tasks:getAll', () => {
     const rows = db
-      .prepare('SELECT * FROM tasks WHERE archived_at IS NULL ORDER BY "order" ASC, created_at DESC')
+      .prepare('SELECT * FROM tasks ORDER BY "order" ASC, created_at DESC')
       .all() as Record<string, unknown>[]
     return parseTasks(rows)
   })
@@ -73,9 +76,31 @@ export function registerTaskHandlers(ipcMain: IpcMain, db: Database): void {
 
   ipcMain.handle('db:tasks:create', (_, data: CreateTaskInput) => {
     const id = crypto.randomUUID()
+    const terminalMode = data.terminalMode
+      ?? (db.prepare("SELECT value FROM settings WHERE key = 'default_terminal_mode'")
+          .get() as { value: string } | undefined)?.value
+      ?? 'claude-code'
+    const defaultClaudeFlags =
+      (db.prepare("SELECT value FROM settings WHERE key = 'default_claude_flags'")
+        .get() as { value: string } | undefined)?.value ?? '--dangerously-skip-permissions'
+    const defaultCodexFlags =
+      (db.prepare("SELECT value FROM settings WHERE key = 'default_codex_flags'")
+        .get() as { value: string } | undefined)?.value ?? '--full-auto --search'
+    const claudeFlags = data.claudeFlags ?? defaultClaudeFlags
+    const codexFlags = data.codexFlags ?? defaultCodexFlags
     const stmt = db.prepare(`
-      INSERT INTO tasks (id, project_id, title, description, status, priority, due_date)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO tasks (
+        id,
+        project_id,
+        title,
+        description,
+        status,
+        priority,
+        due_date,
+        terminal_mode,
+        claude_flags,
+        codex_flags
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `)
     stmt.run(
       id,
@@ -84,7 +109,10 @@ export function registerTaskHandlers(ipcMain: IpcMain, db: Database): void {
       data.description ?? null,
       data.status ?? 'inbox',
       data.priority ?? 3,
-      data.dueDate ?? null
+      data.dueDate ?? null,
+      terminalMode,
+      claudeFlags,
+      codexFlags
     )
     const row = db.prepare('SELECT * FROM tasks WHERE id = ?').get(id) as Record<string, unknown> | undefined
     return parseTask(row)
@@ -138,9 +166,13 @@ export function registerTaskHandlers(ipcMain: IpcMain, db: Database): void {
       fields.push('terminal_shell = ?')
       values.push(data.terminalShell)
     }
-    if (data.dangerouslySkipPermissions !== undefined) {
-      fields.push('dangerously_skip_permissions = ?')
-      values.push(data.dangerouslySkipPermissions ? 1 : 0)
+    if (data.claudeFlags !== undefined) {
+      fields.push('claude_flags = ?')
+      values.push(data.claudeFlags)
+    }
+    if (data.codexFlags !== undefined) {
+      fields.push('codex_flags = ?')
+      values.push(data.codexFlags)
     }
     if (data.panelVisibility !== undefined) {
       fields.push('panel_visibility = ?')

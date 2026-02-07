@@ -87,8 +87,8 @@ const api: ElectronAPI = {
     pathExists: (path) => ipcRenderer.invoke('files:pathExists', path)
   },
   pty: {
-    create: (sessionId, cwd, conversationId, existingConversationId, mode, initialPrompt, codeMode, dangerouslySkipPermissions) =>
-      ipcRenderer.invoke('pty:create', sessionId, cwd, conversationId, existingConversationId, mode, initialPrompt, codeMode, dangerouslySkipPermissions),
+    create: (sessionId, cwd, conversationId, existingConversationId, mode, initialPrompt, codeMode, providerFlags) =>
+      ipcRenderer.invoke('pty:create', sessionId, cwd, conversationId, existingConversationId, mode, initialPrompt, codeMode, providerFlags),
     write: (sessionId, data) => ipcRenderer.invoke('pty:write', sessionId, data),
     resize: (sessionId, cols, rows) => ipcRenderer.invoke('pty:resize', sessionId, cols, rows),
     kill: (sessionId) => ipcRenderer.invoke('pty:kill', sessionId),

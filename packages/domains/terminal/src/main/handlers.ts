@@ -4,6 +4,7 @@ import type { Database } from 'better-sqlite3'
 import { createPty, writePty, resizePty, killPty, hasPty, getBuffer, getBufferSince, listPtys, getState, setDatabase } from './pty-manager'
 import type { TerminalMode } from './adapters'
 import type { CodeMode } from '@slayzone/terminal/shared'
+import { parseShellArgs } from './adapters/flag-parser'
 
 export function registerPtyHandlers(ipcMain: IpcMain, db: Database): void {
   // Set database reference for notifications
@@ -20,7 +21,7 @@ export function registerPtyHandlers(ipcMain: IpcMain, db: Database): void {
       mode?: TerminalMode,
       initialPrompt?: string | null,
       codeMode?: CodeMode | null,
-      dangerouslySkipPermissionsOverride?: boolean
+      providerFlags?: string | null
     ) => {
       const win = BrowserWindow.fromWebContents(event.sender)
       if (!win) return { success: false, error: 'No window found' }
@@ -29,10 +30,14 @@ export function registerPtyHandlers(ipcMain: IpcMain, db: Database): void {
       const shellRow = db.prepare('SELECT value FROM settings WHERE key = ?').get('shell') as { value: string } | undefined
       const globalShell = shellRow?.value || null
 
-      // Use override if provided, otherwise default to false
-      const dangerouslySkipPermissions = codeMode === 'bypass' || (dangerouslySkipPermissionsOverride ?? false)
+      let providerArgs: string[] = []
+      try {
+        providerArgs = parseShellArgs(providerFlags)
+      } catch (err) {
+        console.warn('[pty:create] Invalid provider flags, ignoring:', (err as Error).message)
+      }
 
-      return createPty(win, sessionId, cwd, conversationId, existingConversationId, mode, globalShell, initialPrompt, dangerouslySkipPermissions, codeMode)
+      return createPty(win, sessionId, cwd, conversationId, existingConversationId, mode, globalShell, initialPrompt, providerArgs, codeMode)
     }
   )
 
