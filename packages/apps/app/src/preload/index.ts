@@ -83,7 +83,8 @@ const api: ElectronAPI = {
     close: () => ipcRenderer.invoke('window:close')
   },
   files: {
-    saveTempImage: (base64, mimeType) => ipcRenderer.invoke('files:saveTempImage', base64, mimeType)
+    saveTempImage: (base64, mimeType) => ipcRenderer.invoke('files:saveTempImage', base64, mimeType),
+    pathExists: (path) => ipcRenderer.invoke('files:pathExists', path)
   },
   pty: {
     create: (sessionId, cwd, conversationId, existingConversationId, mode, initialPrompt, codeMode, dangerouslySkipPermissions) =>
@@ -158,7 +159,10 @@ const api: ElectronAPI = {
     mergeWithAI: (projectPath, worktreePath, parentBranch, sourceBranch) =>
       ipcRenderer.invoke('git:mergeWithAI', projectPath, worktreePath, parentBranch, sourceBranch),
     isMergeInProgress: (path) => ipcRenderer.invoke('git:isMergeInProgress', path),
-    getConflictedFiles: (path) => ipcRenderer.invoke('git:getConflictedFiles', path)
+    getConflictedFiles: (path) => ipcRenderer.invoke('git:getConflictedFiles', path),
+    getWorkingDiff: (path) => ipcRenderer.invoke('git:getWorkingDiff', path),
+    stageFile: (path, filePath) => ipcRenderer.invoke('git:stageFile', path, filePath),
+    unstageFile: (path, filePath) => ipcRenderer.invoke('git:unstageFile', path, filePath)
   },
   tabs: {
     list: (taskId) => ipcRenderer.invoke('tabs:list', taskId),

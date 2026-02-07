@@ -1,5 +1,5 @@
 import { execSync } from 'child_process'
-import type { DetectedWorktree, MergeResult } from '../shared/types'
+import type { DetectedWorktree, GitDiffSnapshot, MergeResult } from '../shared/types'
 
 export function isGitRepo(path: string): boolean {
   try {
@@ -220,5 +220,63 @@ export function isMergeInProgress(path: string): boolean {
     return true
   } catch {
     return false
+  }
+}
+
+export function stageFile(path: string, filePath: string): void {
+  execSync(`git add -- "${filePath}"`, { cwd: path, stdio: 'pipe' })
+}
+
+export function unstageFile(path: string, filePath: string): void {
+  execSync(`git reset HEAD -- "${filePath}"`, { cwd: path, stdio: 'pipe' })
+}
+
+export function getWorkingDiff(path: string): GitDiffSnapshot {
+  try {
+    execSync('git rev-parse --git-dir', { cwd: path, stdio: 'pipe' })
+  } catch {
+    throw new Error(`Not a git repository: ${path}`)
+  }
+
+  const unstagedFilesRaw = execSync('git diff --name-only', {
+    cwd: path,
+    encoding: 'utf-8',
+    stdio: ['pipe', 'pipe', 'pipe']
+  })
+  const stagedFilesRaw = execSync('git diff --cached --name-only', {
+    cwd: path,
+    encoding: 'utf-8',
+    stdio: ['pipe', 'pipe', 'pipe']
+  })
+  const untrackedFilesRaw = execSync('git ls-files --others --exclude-standard', {
+    cwd: path,
+    encoding: 'utf-8',
+    stdio: ['pipe', 'pipe', 'pipe']
+  })
+  const unstagedPatch = execSync('git diff --no-ext-diff', {
+    cwd: path,
+    encoding: 'utf-8',
+    stdio: ['pipe', 'pipe', 'pipe']
+  })
+  const stagedPatch = execSync('git diff --cached --no-ext-diff', {
+    cwd: path,
+    encoding: 'utf-8',
+    stdio: ['pipe', 'pipe', 'pipe']
+  })
+
+  const unstagedFiles = unstagedFilesRaw.trim().split('\n').filter(Boolean)
+  const stagedFiles = stagedFilesRaw.trim().split('\n').filter(Boolean)
+  const untrackedFiles = untrackedFilesRaw.trim().split('\n').filter(Boolean)
+
+  return {
+    targetPath: path,
+    files: [...new Set([...unstagedFiles, ...stagedFiles, ...untrackedFiles])].sort(),
+    stagedFiles: stagedFiles.sort(),
+    unstagedFiles: unstagedFiles.sort(),
+    untrackedFiles: untrackedFiles.sort(),
+    unstagedPatch,
+    stagedPatch,
+    generatedAt: new Date().toISOString(),
+    isGitRepo: true
   }
 }

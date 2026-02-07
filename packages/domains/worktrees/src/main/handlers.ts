@@ -11,7 +11,10 @@ import {
   abortMerge,
   startMergeNoCommit,
   isMergeInProgress,
-  getConflictedFiles
+  getConflictedFiles,
+  getWorkingDiff,
+  stageFile,
+  unstageFile
 } from './git-worktree'
 import type { MergeWithAIResult } from '../shared/types'
 
@@ -117,5 +120,17 @@ ${steps.join('\n\n')}`
 
   ipcMain.handle('git:getConflictedFiles', (_, path: string) => {
     return getConflictedFiles(path)
+  })
+
+  ipcMain.handle('git:getWorkingDiff', (_, path: string) => {
+    return getWorkingDiff(path)
+  })
+
+  ipcMain.handle('git:stageFile', (_, path: string, filePath: string) => {
+    stageFile(path, filePath)
+  })
+
+  ipcMain.handle('git:unstageFile', (_, path: string, filePath: string) => {
+    unstageFile(path, filePath)
   })
 }

@@ -4,7 +4,7 @@ import type { Tag, CreateTagInput, UpdateTagInput } from '@slayzone/tags/shared'
 import type { TerminalMode, TerminalState, CodeMode, PtyInfo, PromptInfo, ClaudeAvailability, BufferSinceResult } from '@slayzone/terminal/shared'
 import type { TerminalTab, CreateTerminalTabInput, UpdateTerminalTabInput } from '@slayzone/task-terminals/shared'
 import type { Theme, ThemePreference } from '@slayzone/settings/shared'
-import type { DetectedWorktree, MergeResult, MergeWithAIResult } from '@slayzone/worktrees/shared'
+import type { DetectedWorktree, MergeResult, MergeWithAIResult, GitDiffSnapshot } from '@slayzone/worktrees/shared'
 
 // ElectronAPI interface - the IPC contract between renderer and main
 export interface ElectronAPI {
@@ -84,6 +84,7 @@ export interface ElectronAPI {
       base64: string,
       mimeType: string
     ) => Promise<{ success: boolean; path?: string; error?: string }>
+    pathExists: (path: string) => Promise<boolean>
   }
   pty: {
     create: (
@@ -127,6 +128,9 @@ export interface ElectronAPI {
     mergeWithAI: (projectPath: string, worktreePath: string, parentBranch: string, sourceBranch: string) => Promise<MergeWithAIResult>
     isMergeInProgress: (path: string) => Promise<boolean>
     getConflictedFiles: (path: string) => Promise<string[]>
+    getWorkingDiff: (path: string) => Promise<GitDiffSnapshot>
+    stageFile: (path: string, filePath: string) => Promise<void>
+    unstageFile: (path: string, filePath: string) => Promise<void>
   }
   tabs: {
     list: (taskId: string) => Promise<TerminalTab[]>

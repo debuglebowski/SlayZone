@@ -19,3 +19,15 @@ export interface MergeWithAIResult {
   prompt?: string
   error?: string
 }
+
+export interface GitDiffSnapshot {
+  targetPath: string
+  files: string[]
+  stagedFiles: string[]
+  unstagedFiles: string[]
+  untrackedFiles: string[]
+  unstagedPatch: string
+  stagedPatch: string
+  generatedAt: string
+  isGitRepo: boolean
+}
