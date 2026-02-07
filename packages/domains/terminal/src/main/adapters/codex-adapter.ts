@@ -3,7 +3,8 @@ import type { TerminalAdapter, SpawnConfig, PromptInfo, CodeMode, ActivityState,
 
 /**
  * Adapter for OpenAI Codex CLI.
- * Stub implementation - to be fleshed out when Codex CLI details are known.
+ * Codex uses a full-screen Ratatui TUI. State detection is binary:
+ * working (shows "esc to interrupt") vs attention (everything else).
  */
 export class CodexAdapter implements TerminalAdapter {
   readonly mode = 'codex' as const
@@ -26,8 +27,22 @@ export class CodexAdapter implements TerminalAdapter {
     }
   }
 
-  detectActivity(_data: string, _current: ActivityState): ActivityState | null {
-    // TODO: Implement when Codex output format is known
+  private static stripAnsi(data: string): string {
+    return data
+      .replace(/\x1b\][^\x07]*\x07/g, '')       // OSC sequences
+      .replace(/\x1b\[[?0-9;]*[A-Za-z]/g, '')    // CSI (including ?)
+      .replace(/\x1b[()][AB012]/g, '')            // Character set
+  }
+
+  detectActivity(data: string, current: ActivityState): ActivityState | null {
+    const stripped = CodexAdapter.stripAnsi(data)
+
+    // "esc to interrupt" appears in Codex's TUI while working
+    if (/esc to interrupt/i.test(stripped)) return 'working'
+
+    // If currently working and we get output without the indicator, work finished
+    if (current === 'working' && stripped.replace(/\s/g, '').length > 0) return 'attention'
+
     return null
   }
 
