@@ -873,7 +873,11 @@ export function TaskDetailPage({
               value={task.terminal_mode}
               onValueChange={(value) => handleModeChange(value as TerminalMode)}
             >
-              <SelectTrigger size="sm" className="w-36 h-7 text-xs bg-neutral-800 border-neutral-700">
+              <SelectTrigger
+                data-testid="terminal-mode-trigger"
+                size="sm"
+                className="w-36 h-7 text-xs bg-neutral-800 border-neutral-700"
+              >
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>

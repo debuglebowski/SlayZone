@@ -24,7 +24,7 @@ test.describe('Terminal mode switching', () => {
 
   /** Find the terminal mode select trigger in the bottom bar */
   const modeTrigger = (page: import('@playwright/test').Page) =>
-    page.getByRole('combobox').filter({ hasText: /Claude Code|Codex|Terminal/ })
+    page.getByTestId('terminal-mode-trigger')
 
   test('default mode is Claude Code', async ({ mainWindow }) => {
     await expect(modeTrigger(mainWindow)).toHaveText(/Claude Code/)

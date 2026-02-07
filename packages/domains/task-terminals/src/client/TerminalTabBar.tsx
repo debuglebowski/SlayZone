@@ -62,7 +62,10 @@ export function TerminalTabBar({
   }
 
   return (
-    <div className="flex items-end h-11 pt-2 px-2 gap-1 bg-neutral-950 border-b border-neutral-800 overflow-x-auto">
+    <div
+      data-testid="terminal-tabbar"
+      className="flex items-end h-11 pt-2 px-2 gap-1 bg-neutral-950 border-b border-neutral-800 overflow-x-auto"
+    >
       {tabs.map(tab => {
         const Icon = MODE_ICONS[tab.mode]
         const isActive = tab.id === activeTabId
@@ -71,6 +74,11 @@ export function TerminalTabBar({
         return (
           <div
             key={tab.id}
+            data-testid={`terminal-tab-${tab.id}`}
+            data-tab-id={tab.id}
+            data-tab-mode={tab.mode}
+            data-tab-main={tab.isMain ? 'true' : 'false'}
+            data-tab-active={isActive ? 'true' : 'false'}
             className={cn(
               'group flex items-center gap-1.5 h-8 px-3 rounded-t-md cursor-pointer transition-colors select-none shrink-0',
               'hover:bg-neutral-800/50',
@@ -102,6 +110,7 @@ export function TerminalTabBar({
               <span className="ml-auto text-[10px] text-orange-300/80 bg-orange-400/10 px-1.5 rounded-full">main</span>
             ) : (
               <button
+                data-testid={`terminal-tab-close-${tab.id}`}
                 className="h-4 w-4 rounded hover:bg-neutral-600/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
                 onClick={e => {
                   e.stopPropagation()
@@ -115,6 +124,7 @@ export function TerminalTabBar({
         )
       })}
       <button
+        data-testid="terminal-tab-add"
         className="flex items-center justify-center h-8 w-8 rounded-t-md text-neutral-400 hover:text-neutral-200 hover:bg-neutral-800/50 shrink-0"
         onClick={onTabCreate}
       >
