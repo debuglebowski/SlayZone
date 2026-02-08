@@ -24,6 +24,8 @@ import { registerWorktreeHandlers } from '@slayzone/worktrees/main'
 // Minimum splash screen display time (ms)
 const SPLASH_MIN_DURATION = 4000
 
+const DEFAULT_WINDOW_WIDTH = 2200
+const DEFAULT_WINDOW_HEIGHT = 1600
 // Self-contained splash HTML with inline SVG and CSS animations
 const splashHTML = (version: string) => `
 <!DOCTYPE html>
@@ -188,8 +190,8 @@ let splashShownAt: number = 0
 
 function createSplashWindow(): void {
   splashWindow = new BrowserWindow({
-    width: 1911,
-    height: 1421,
+    width: DEFAULT_WINDOW_WIDTH,
+    height: DEFAULT_WINDOW_HEIGHT,
     titleBarStyle: 'hiddenInset',
     trafficLightPosition: { x: 16, y: 16 },
     resizable: false,
@@ -218,8 +220,8 @@ function createSplashWindow(): void {
 
 function createMainWindow(): void {
   mainWindow = new BrowserWindow({
-    width: 1911,
-    height: 1421,
+    width: DEFAULT_WINDOW_WIDTH,
+    height: DEFAULT_WINDOW_HEIGHT,
     show: false,
     center: true,
     title: 'SlayZone',
