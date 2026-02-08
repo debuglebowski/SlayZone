@@ -1,0 +1,1 @@
+export { registerAiConfigHandlers } from './handlers'

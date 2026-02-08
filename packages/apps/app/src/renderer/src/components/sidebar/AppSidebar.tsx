@@ -1,4 +1,4 @@
-import { Settings, HelpCircle } from 'lucide-react'
+import { Settings, HelpCircle, BrainCircuit } from 'lucide-react'
 import {
   Sidebar,
   SidebarContent,
@@ -26,6 +26,8 @@ interface AppSidebarProps {
   onProjectDelete: (project: Project) => void
   onSettings: () => void
   onTutorial: () => void
+  onAiCenter: () => void
+  aiCenterActive: boolean
 }
 
 export function AppSidebar({
@@ -37,7 +39,9 @@ export function AppSidebar({
   onProjectSettings,
   onProjectDelete,
   onSettings,
-  onTutorial
+  onTutorial,
+  onAiCenter,
+  aiCenterActive
 }: AppSidebarProps) {
   return (
     <Sidebar collapsible="none" className="w-[72px] border-r min-h-svh">
@@ -111,6 +115,22 @@ export function AppSidebar({
                 </Button>
               </TooltipTrigger>
               <TooltipContent side="right">Tutorial</TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon-lg"
+                  onClick={onAiCenter}
+                  className={cn(
+                    'rounded-lg text-muted-foreground',
+                    aiCenterActive && 'text-primary bg-primary/10'
+                  )}
+                >
+                  <BrainCircuit className="size-5" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="right">AI Config Center</TooltipContent>
             </Tooltip>
             <Tooltip>
               <TooltipTrigger asChild>

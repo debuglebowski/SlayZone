@@ -22,6 +22,15 @@ export class ErrorBoundary extends Component<Props, State> {
     return { hasError: true, error }
   }
 
+  componentDidCatch(error: Error, info: { componentStack?: string }): void {
+    window.api.diagnostics.recordClientError({
+      type: 'error-boundary',
+      message: error.message,
+      stack: error.stack ?? null,
+      componentStack: info.componentStack ?? null
+    })
+  }
+
   handleReset = (): void => {
     this.setState({ hasError: false, error: null })
     this.props.onReset?.()

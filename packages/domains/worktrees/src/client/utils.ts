@@ -11,3 +11,13 @@ export function slugify(text: string): string {
     .replace(/-+/g, '-') // collapse multiple hyphens
     .replace(/^-|-$/g, '') // trim leading/trailing hyphens
 }
+
+export const DEFAULT_WORKTREE_BASE_PATH_TEMPLATE = '{project}/..'
+
+/**
+ * Expands user template tokens in worktree base path.
+ * "{project}/.." with "/repo/slayzone" -> "/repo/slayzone/.."
+ */
+export function resolveWorktreeBasePathTemplate(template: string, projectPath: string): string {
+  return template.replaceAll('{project}', projectPath.replace(/[\\/]+$/, ''))
+}

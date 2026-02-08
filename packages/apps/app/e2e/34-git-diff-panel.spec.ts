@@ -64,7 +64,7 @@ test.describe('Git diff panel', () => {
 
   test('no changes shows empty state', async ({ mainWindow }) => {
     await refresh(mainWindow)
-    await expect(mainWindow.getByText('No local changes.')).toBeVisible()
+    await expect(mainWindow.getByText('No local changes.').first()).toBeVisible()
   })
 
   test('modified file appears in unstaged with M status', async ({ mainWindow }) => {

@@ -3,6 +3,7 @@ import { BrowserWindow, Notification } from 'electron'
 import { homedir, userInfo } from 'os'
 import type { Database } from 'better-sqlite3'
 import type { TerminalState, PtyInfo, CodeMode, BufferSinceResult } from '@slayzone/terminal/shared'
+import { getDiagnosticsConfig, recordDiagnosticEvent } from '@slayzone/diagnostics/main'
 import { RingBuffer, type BufferChunk } from './ring-buffer'
 import { getAdapter, type TerminalMode, type TerminalAdapter, type ActivityState, type ErrorInfo } from './adapters'
 
@@ -82,6 +83,10 @@ let mainWindow: BrowserWindow | null = null
 // Interval reference for idle checker
 let idleCheckerInterval: NodeJS.Timeout | null = null
 
+function taskIdFromSessionId(sessionId: string): string {
+  return sessionId.split(':')[0] || sessionId
+}
+
 // Filter out terminal escape sequences that cause issues
 function filterBufferData(data: string): string {
   return data
@@ -115,6 +120,19 @@ function activityToTerminalState(activity: ActivityState): TerminalState | null 
 
 // Emit state change via IPC
 function emitStateChange(session: PtySession, sessionId: string, newState: TerminalState, oldState: TerminalState): void {
+  recordDiagnosticEvent({
+    level: 'info',
+    source: 'pty',
+    event: 'pty.state_change',
+    sessionId,
+    taskId: taskIdFromSessionId(sessionId),
+    message: `${oldState} -> ${newState}`,
+    payload: {
+      oldState,
+      newState
+    }
+  })
+
   if (oldState === 'running' && newState === 'attention') {
     showTaskAttentionNotification(sessionId)
   }
@@ -215,10 +233,31 @@ export function createPty(
   providerArgs?: string[],
   codeMode?: CodeMode | null
 ): { success: boolean; error?: string } {
-  console.log(`[pty-manager] createPty(${sessionId}) mode=${mode} shell=${globalShell} providerArgs=${JSON.stringify(providerArgs ?? [])} codeMode=${codeMode}`)
+  recordDiagnosticEvent({
+    level: 'info',
+    source: 'pty',
+    event: 'pty.create',
+    sessionId,
+    taskId: taskIdFromSessionId(sessionId),
+    payload: {
+      mode: mode ?? null,
+      shell: globalShell ?? null,
+      providerArgs: providerArgs ?? [],
+      codeMode: codeMode ?? null,
+      hasConversationId: Boolean(conversationId),
+      hasExistingConversationId: Boolean(existingConversationId)
+    }
+  })
+
   // Kill existing if any
   if (sessions.has(sessionId)) {
-    console.log(`[pty-manager] createPty(${sessionId}) - killing existing PTY first`)
+    recordDiagnosticEvent({
+      level: 'warn',
+      source: 'pty',
+      event: 'pty.replace_existing',
+      sessionId,
+      taskId: taskIdFromSessionId(sessionId)
+    })
     killPty(sessionId)
   }
 
@@ -281,7 +320,16 @@ export function createPty(
       // Only process if session still exists (prevents data leaking after kill)
       const session = sessions.get(sessionId)
       if (!session) {
-        console.log(`[pty-manager] onData(${sessionId}) - NO SESSION, ignoring ${data.length} chars`)
+        recordDiagnosticEvent({
+          level: 'warn',
+          source: 'pty',
+          event: 'pty.data_without_session',
+          sessionId,
+          taskId: taskIdFromSessionId(sessionId),
+          payload: {
+            length: data.length
+          }
+        })
         return
       }
 
@@ -318,6 +366,18 @@ export function createPty(
         session.error = detectedError
         session.checkingForSessionError = false
         transitionState(sessionId, 'error')
+        recordDiagnosticEvent({
+          level: 'error',
+          source: 'pty',
+          event: 'pty.adapter_error',
+          sessionId,
+          taskId: taskIdFromSessionId(sessionId),
+          message: detectedError.message,
+          payload: {
+            code: detectedError.code,
+            rawLength: data.length
+          }
+        })
         if (!win.isDestroyed() && detectedError.code === 'SESSION_NOT_FOUND') {
           try {
             win.webContents.send('pty:session-not-found', sessionId)
@@ -356,7 +416,16 @@ export function createPty(
         )
         if (uuidMatch) {
           const detectedConversationId = uuidMatch[0]
-          console.log(`[pty-manager] Conversation ID detected: ${detectedConversationId}`)
+          recordDiagnosticEvent({
+            level: 'info',
+            source: 'pty',
+            event: 'pty.conversation_detected',
+            sessionId,
+            taskId: taskIdFromSessionId(sessionId),
+            payload: {
+              conversationId: detectedConversationId
+            }
+          })
           if (!win.isDestroyed()) {
             try {
               win.webContents.send('pty:session-detected', sessionId, detectedConversationId)
@@ -372,11 +441,33 @@ export function createPty(
           }
         }
       }
+
+      const config = getDiagnosticsConfig()
+      recordDiagnosticEvent({
+        level: 'debug',
+        source: 'pty',
+        event: 'pty.data',
+        sessionId,
+        taskId: taskIdFromSessionId(sessionId),
+        payload: config.includePtyOutput
+          ? { length: data.length, data }
+          : { length: data.length, included: false }
+      })
     })
 
     ptyProcess.onExit(({ exitCode }) => {
       transitionState(sessionId, 'dead')
       sessions.delete(sessionId)
+      recordDiagnosticEvent({
+        level: 'info',
+        source: 'pty',
+        event: 'pty.exit',
+        sessionId,
+        taskId: taskIdFromSessionId(sessionId),
+        payload: {
+          exitCode
+        }
+      })
       if (!win.isDestroyed()) {
         try {
           win.webContents.send('pty:exit', sessionId, exitCode)
@@ -410,6 +501,17 @@ export function createPty(
     return { success: true }
   } catch (error) {
     const err = error as Error
+    recordDiagnosticEvent({
+      level: 'error',
+      source: 'pty',
+      event: 'pty.create_failed',
+      sessionId,
+      taskId: taskIdFromSessionId(sessionId),
+      message: err.message,
+      payload: {
+        stack: err.stack ?? null
+      }
+    })
     return { success: false, error: err.message }
   }
 }
@@ -455,10 +557,22 @@ export function resizePty(sessionId: string, cols: number, rows: number): boolea
 export function killPty(sessionId: string): boolean {
   const session = sessions.get(sessionId)
   if (!session) {
-    console.log(`[pty-manager] killPty(${sessionId}) - no session found`)
+    recordDiagnosticEvent({
+      level: 'warn',
+      source: 'pty',
+      event: 'pty.kill_missing',
+      sessionId,
+      taskId: taskIdFromSessionId(sessionId)
+    })
     return false
   }
-  console.log(`[pty-manager] killPty(${sessionId}) - deleting session and killing PTY`)
+  recordDiagnosticEvent({
+    level: 'info',
+    source: 'pty',
+    event: 'pty.kill',
+    sessionId,
+    taskId: taskIdFromSessionId(sessionId)
+  })
   // Clear any pending timeout to prevent orphaned callbacks
   if (session.statusWatchTimeout) {
     clearTimeout(session.statusWatchTimeout)
@@ -473,7 +587,6 @@ export function killPty(sessionId: string): boolean {
   sessions.delete(sessionId)
   // Use SIGKILL (9) to forcefully terminate - SIGTERM may not kill child processes
   session.pty.kill('SIGKILL')
-  console.log(`[pty-manager] killPty(${sessionId}) - done`)
   return true
 }
 

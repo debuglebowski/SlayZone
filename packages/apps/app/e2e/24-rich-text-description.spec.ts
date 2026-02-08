@@ -24,7 +24,7 @@ test.describe('Rich text description', () => {
 
   /** The TipTap contenteditable editor in the settings panel */
   const editor = (page: import('@playwright/test').Page) =>
-    page.locator('[contenteditable="true"]').first()
+    page.getByTestId('task-settings-panel').last().locator('[contenteditable="true"]').first()
 
   test('editor shows placeholder', async ({ mainWindow }) => {
     // TipTap placeholder rendered as CSS ::before or data attribute

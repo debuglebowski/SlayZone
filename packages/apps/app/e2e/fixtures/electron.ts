@@ -47,7 +47,7 @@ export const test = base.extend<ElectronFixtures>({
         await electronApp.evaluate(({ BrowserWindow }) => {
           const win = BrowserWindow.getAllWindows().find(w => !w.isDestroyed() && w.webContents.getURL() !== 'about:blank' && !w.webContents.getURL().startsWith('data:'))
           if (win) {
-            win.setSize(1400, 900)
+            win.setSize(1920, 1200)
             win.center()
           }
         })

@@ -157,9 +157,11 @@ export function GitDiffPanel({
   const [selectedFile, setSelectedFile] = useState<{ path: string; source: 'unstaged' | 'staged' } | null>(null)
   const [fileListWidth, setFileListWidth] = useState(320)
   const [untrackedDiffs, setUntrackedDiffs] = useState<Map<string, FileDiff>>(new Map())
+  const splitContainerRef = useRef<HTMLDivElement>(null)
   const fileListRef = useRef<HTMLDivElement>(null)
   const selectedItemRef = useRef<HTMLDivElement>(null)
   const prevSnapshotRef = useRef<GitDiffSnapshot | null>(null)
+  const didInitSplitRef = useRef(false)
 
   const fetchDiff = async (): Promise<void> => {
     if (!targetPath) return
@@ -344,6 +346,14 @@ export function GitDiffPanel({
     snapshot.stagedPatch.trim().length > 0
   )
 
+  useEffect(() => {
+    if (!hasAnyChanges || didInitSplitRef.current) return
+    const containerWidth = splitContainerRef.current?.clientWidth ?? 0
+    if (containerWidth <= 0) return
+    didInitSplitRef.current = true
+    setFileListWidth(Math.max(50, containerWidth / 2))
+  }, [hasAnyChanges])
+
   const isSelected = (entry: FileEntry) =>
     selectedFile?.path === entry.path && selectedFile?.source === entry.source
 
@@ -393,7 +403,7 @@ export function GitDiffPanel({
 
       {/* Main content: horizontal split */}
       {targetPath && !error && snapshot && hasAnyChanges && (
-        <div className="flex-1 min-h-0 flex">
+        <div ref={splitContainerRef} className="flex-1 min-h-0 flex">
           {/* Left: stacked file lists */}
           <div
             ref={fileListRef}

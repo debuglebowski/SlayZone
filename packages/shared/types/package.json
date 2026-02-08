@@ -13,6 +13,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@slayzone/ai-config": "workspace:*",
     "@slayzone/projects": "workspace:*",
     "@slayzone/settings": "workspace:*",
     "@slayzone/tags": "workspace:*",

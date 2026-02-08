@@ -15,6 +15,7 @@ interface RichTextEditorProps {
   className?: string
   minHeight?: string
   maxHeight?: string
+  testId?: string
 }
 
 export function RichTextEditor({
@@ -24,7 +25,8 @@ export function RichTextEditor({
   placeholder = '',
   className,
   minHeight,
-  maxHeight
+  maxHeight,
+  testId
 }: RichTextEditorProps) {
   const editor = useEditor({
     extensions: [
@@ -75,6 +77,7 @@ export function RichTextEditor({
 
   return (
     <div
+      data-testid={testId}
       className={cn('w-full h-full flex flex-col', className)}
       style={{ minHeight, maxHeight }}
     >

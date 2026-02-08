@@ -4,6 +4,18 @@ import { TEST_PROJECT_PATH } from './fixtures/electron'
 test.describe('Panel resize', () => {
   let projectAbbrev: string
 
+  const openTaskViaSearch = async (
+    page: import('@playwright/test').Page,
+    title: string
+  ) => {
+    await page.keyboard.press('Meta+k')
+    const input = page.getByPlaceholder('Search tasks and projects...')
+    await expect(input).toBeVisible()
+    await input.fill(title)
+    await page.keyboard.press('Enter')
+    await page.waitForTimeout(500)
+  }
+
   test.beforeAll(async ({ mainWindow }) => {
     const s = seed(mainWindow)
     const p = await s.createProject({ name: 'Resize Test', color: '#f97316', path: TEST_PROJECT_PATH })
@@ -18,18 +30,16 @@ test.describe('Panel resize', () => {
     await clickProject(mainWindow, projectAbbrev)
     await mainWindow.waitForTimeout(500)
 
-    // Open task detail
-    await mainWindow.getByText('Resize task').first().click()
-    await mainWindow.waitForTimeout(500)
+    await openTaskViaSearch(mainWindow, 'Resize task')
   })
 
   /** All resize handles (1px dividers with cursor-col-resize) */
   const resizeHandles = (page: import('@playwright/test').Page) =>
-    page.locator('.cursor-col-resize')
+    page.locator('[data-testid="panel-resize-handle"]:visible')
 
   /** The settings panel (visible by default, uses inline width style) */
   const settingsPanel = (page: import('@playwright/test').Page) =>
-    page.locator('div.shrink-0.border-l.overflow-y-auto')
+    page.getByTestId('task-settings-panel').last()
 
   test('settings panel has default width of 320px', async ({ mainWindow }) => {
     const panel = settingsPanel(mainWindow)
@@ -95,8 +105,7 @@ test.describe('Panel resize', () => {
     // Come back
     await clickProject(mainWindow, projectAbbrev)
     await mainWindow.waitForTimeout(300)
-    await mainWindow.getByText('Resize task').first().click()
-    await mainWindow.waitForTimeout(500)
+    await openTaskViaSearch(mainWindow, 'Resize task')
 
     // Settings panel should still be 200px (the min we dragged to)
     const width = await settingsPanel(mainWindow).evaluate(el => parseInt(el.style.width))
@@ -116,7 +125,7 @@ test.describe('Panel resize', () => {
 
     // Toggle browser off to restore state
     // Focus URL input first to avoid webview stealing keystroke
-    await mainWindow.locator('input[placeholder="Enter URL..."]').focus()
+    await mainWindow.locator('input[placeholder="Enter URL..."]:visible').first().focus()
     await mainWindow.waitForTimeout(100)
     await mainWindow.keyboard.press('Meta+b')
     await mainWindow.waitForTimeout(300)

@@ -17,6 +17,8 @@
   "dependencies": {
     "@electron-toolkit/preload": "^3.0.2",
     "@electron-toolkit/utils": "^4.0.0",
+    "@slayzone/ai-config": "workspace:*",
+    "@slayzone/diagnostics": "workspace:*",
     "@slayzone/editor": "workspace:*",
     "@slayzone/onboarding": "workspace:*",
     "@slayzone/projects": "workspace:*",

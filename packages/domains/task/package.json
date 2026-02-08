@@ -15,6 +15,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@slayzone/diagnostics": "workspace:*",
     "@slayzone/types": "workspace:*",
     "@slayzone/ui": "workspace:*",
     "@slayzone/editor": "workspace:*",

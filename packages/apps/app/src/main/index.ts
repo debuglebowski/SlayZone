@@ -20,12 +20,14 @@ import { registerSettingsHandlers, registerThemeHandlers } from '@slayzone/setti
 import { registerPtyHandlers, registerClaudeHandlers, killAllPtys, startIdleChecker, stopIdleChecker } from '@slayzone/terminal/main'
 import { registerTerminalTabsHandlers } from '@slayzone/task-terminals/main'
 import { registerWorktreeHandlers } from '@slayzone/worktrees/main'
+import { registerDiagnosticsHandlers, registerProcessDiagnostics, stopDiagnostics } from '@slayzone/diagnostics/main'
+import { registerAiConfigHandlers } from '@slayzone/ai-config/main'
 
 // Minimum splash screen display time (ms)
 const SPLASH_MIN_DURATION = 4000
-
 const DEFAULT_WINDOW_WIDTH = 2200
 const DEFAULT_WINDOW_HEIGHT = 1600
+
 // Self-contained splash HTML with inline SVG and CSS animations
 const splashHTML = (version: string) => `
 <!DOCTYPE html>
@@ -317,6 +319,7 @@ function createWindow(): void {
 app.whenReady().then(() => {
   // Initialize database
   const db = getDatabase()
+  registerProcessDiagnostics(app)
 
   // Load and apply persisted theme BEFORE creating window to prevent flash
   const row = db.prepare('SELECT value FROM settings WHERE key = ?').get('theme') as
@@ -391,6 +394,9 @@ app.whenReady().then(() => {
     Menu.setApplicationMenu(Menu.buildFromTemplate(template))
   }
 
+  // Register diagnostics first so IPC handlers below are instrumented.
+  registerDiagnosticsHandlers(ipcMain, db)
+
   // Register domain handlers (inject ipcMain and db)
   registerProjectHandlers(ipcMain, db)
   registerTaskHandlers(ipcMain, db)
@@ -403,6 +409,7 @@ app.whenReady().then(() => {
   registerTerminalTabsHandlers(ipcMain, db)
   registerFilesHandlers(ipcMain)
   registerWorktreeHandlers(ipcMain)
+  registerAiConfigHandlers(ipcMain, db)
 
   // Configure webview session for WebAuthn/passkey support
   const browserSession = session.fromPartition('persist:browser-tabs')
@@ -506,6 +513,7 @@ app.on('window-all-closed', () => {
 
 // Clean up database connection and active processes before quitting
 app.on('will-quit', () => {
+  stopDiagnostics()
   stopIdleChecker()
   killAllPtys()
   closeDatabase()

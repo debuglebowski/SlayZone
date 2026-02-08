@@ -8,6 +8,26 @@ test.describe('Git worktree operations', () => {
   let taskId: string
   const branchName = 'worktree-task' // slugify('Worktree task')
 
+  const getTask = async (page: import('@playwright/test').Page, id: string) =>
+    page.evaluate((taskId) => window.api.db.getTask(taskId), id)
+
+  const openTaskViaSearch = async (
+    page: import('@playwright/test').Page,
+    title: string
+  ) => {
+    await page.keyboard.press('Meta+k')
+    const input = page.getByPlaceholder('Search tasks and projects...')
+    await expect(input).toBeVisible()
+    await input.fill(title)
+    await page.keyboard.press('Enter')
+    await page.waitForTimeout(500)
+  }
+
+  const removeWorktreeButton = (page: import('@playwright/test').Page) => {
+    const gitPanel = page.getByTestId('task-git-panel').last()
+    return gitPanel.locator('button:has(svg.lucide-trash-2)').first()
+  }
+
   test.beforeAll(async ({ mainWindow }) => {
     // Ensure test project dir has a git repo with an initial commit
     try { execSync('git rev-parse --is-inside-work-tree', { cwd: TEST_PROJECT_PATH }) }
@@ -20,8 +40,20 @@ test.describe('Git worktree operations', () => {
       execSync('git commit -m "Initial commit"', { cwd: TEST_PROJECT_PATH })
     }
 
-    // Clean up any leftover worktrees from previous runs
+    // Clean up any leftover worktrees from previous runs.
     try {
+      const mainWorktree = execSync('git rev-parse --show-toplevel', { cwd: TEST_PROJECT_PATH }).toString().trim()
+      const worktreeList = execSync('git worktree list --porcelain', { cwd: TEST_PROJECT_PATH }).toString()
+      const worktreePaths = worktreeList
+        .split('\n')
+        .filter(line => line.startsWith('worktree '))
+        .map(line => line.replace('worktree ', '').trim())
+
+      for (const wt of worktreePaths) {
+        if (wt !== mainWorktree) {
+          try { execSync(`git worktree remove --force "${wt}"`, { cwd: TEST_PROJECT_PATH }) } catch { /* ignore */ }
+        }
+      }
       execSync('git worktree prune', { cwd: TEST_PROJECT_PATH })
       const worktreeDir = path.join(TEST_PROJECT_PATH, 'worktrees')
       execSync(`rm -rf "${worktreeDir}"`, { cwd: TEST_PROJECT_PATH })
@@ -32,6 +64,8 @@ test.describe('Git worktree operations', () => {
 
     const s = seed(mainWindow)
     const p = await s.createProject({ name: 'Worktree Test', color: '#10b981', path: TEST_PROJECT_PATH })
+    // Ensure default worktree base path behavior is used for this suite.
+    await s.setSetting('worktree_base_path', '')
     projectAbbrev = p.name.slice(0, 2).toUpperCase()
     const t = await s.createTask({ projectId: p.id, title: 'Worktree task', status: 'todo' })
     taskId = t.id
@@ -40,17 +74,16 @@ test.describe('Git worktree operations', () => {
     await goHome(mainWindow)
     await clickProject(mainWindow, projectAbbrev)
     await mainWindow.waitForTimeout(500)
-
-    // Open task detail
-    await mainWindow.getByText('Worktree task').first().click()
-    await mainWindow.waitForTimeout(500)
+    await openTaskViaSearch(mainWindow, 'Worktree task')
   })
 
   test('git panel shows current branch', async ({ mainWindow }) => {
     // Settings panel is visible by default — GitPanel should show branch
-    await expect(mainWindow.getByText('Git').first()).toBeVisible()
+    const gitPanel = mainWindow.getByTestId('task-git-panel').last()
+    await expect(gitPanel).toBeVisible()
+    await expect(gitPanel.getByText('Git').first()).toBeVisible()
     // Should show main or master
-    const branchText = mainWindow.locator('text=/main|master/')
+    const branchText = gitPanel.locator('text=/main|master/')
     await expect(branchText.first()).toBeVisible()
   })
 
@@ -60,8 +93,13 @@ test.describe('Git worktree operations', () => {
 
   test('create worktree', async ({ mainWindow }) => {
     await mainWindow.getByRole('button', { name: /Add Worktree/ }).click()
-    // Wait for creation (git worktree add)
-    await mainWindow.waitForTimeout(2000)
+    // Wait for creation (git worktree add + DB update)
+    await expect
+      .poll(async () => {
+        const task = await getTask(mainWindow, taskId)
+        return task?.worktree_path ?? null
+      })
+      .toContain(branchName)
 
     // Worktree name should appear (derived from slugified task title)
     await expect(mainWindow.getByText(branchName)).toBeVisible()
@@ -69,38 +107,51 @@ test.describe('Git worktree operations', () => {
 
   test('worktree shows parent branch', async ({ mainWindow }) => {
     // "from main" or "from master"
-    const fromBranch = mainWindow.locator('text=/from (main|master)/')
-    await expect(fromBranch.first()).toBeVisible()
+    const gitPanel = mainWindow.getByTestId('task-git-panel').last()
+    const fromBranch = gitPanel.locator('text=/from\\s+(main|master)/i')
+    await expect(fromBranch.first()).toBeVisible({ timeout: 10_000 })
   })
 
   test('worktree path persisted in DB', async ({ mainWindow }) => {
-    const task = await mainWindow.evaluate((id) => window.api.db.getTask(id), taskId)
-    expect(task?.worktree_path).toContain(branchName)
-    expect(task?.worktree_parent_branch).toMatch(/main|master/)
+    await expect
+      .poll(async () => {
+        const task = await getTask(mainWindow, taskId)
+        return {
+          worktreePath: task?.worktree_path ?? null,
+          parent: task?.worktree_parent_branch ?? null,
+        }
+      })
+      .toMatchObject({
+        worktreePath: expect.stringContaining(branchName),
+        parent: expect.stringMatching(/main|master/),
+      })
   })
 
   test('merge button visible', async ({ mainWindow }) => {
-    const mergeBtn = mainWindow.getByRole('button', { name: /Merge into/ })
-    await expect(mergeBtn).toBeVisible()
+    const gitPanel = mainWindow.getByTestId('task-git-panel').last()
+    const mergeBtn = gitPanel.getByRole('button', { name: /Merge into/ })
+    await expect(mergeBtn).toBeVisible({ timeout: 10_000 })
   })
 
   test('remove worktree button visible', async ({ mainWindow }) => {
-    // Trash icon button with tooltip "Remove worktree"
-    const deleteBtn = mainWindow.locator('button').filter({ has: mainWindow.locator('.lucide-trash-2') })
-    await expect(deleteBtn.first()).toBeVisible()
+    await expect(removeWorktreeButton(mainWindow)).toBeVisible()
   })
 
   test('delete worktree', async ({ mainWindow }) => {
-    const deleteBtn = mainWindow.locator('button').filter({ has: mainWindow.locator('.lucide-trash-2') })
-    await deleteBtn.first().click()
-    await mainWindow.waitForTimeout(1000)
+    await removeWorktreeButton(mainWindow).click()
+    await expect
+      .poll(async () => {
+        const task = await getTask(mainWindow, taskId)
+        return task?.worktree_path ?? null
+      })
+      .toBeNull()
 
     // Add Worktree button should reappear
-    await expect(mainWindow.getByRole('button', { name: /Add Worktree/ })).toBeVisible()
+    await expect(mainWindow.getByRole('button', { name: /Add Worktree/ })).toBeVisible({ timeout: 10_000 })
   })
 
   test('worktree path cleared in DB after delete', async ({ mainWindow }) => {
-    const task = await mainWindow.evaluate((id) => window.api.db.getTask(id), taskId)
+    const task = await getTask(mainWindow, taskId)
     expect(task?.worktree_path).toBeNull()
   })
 
@@ -110,16 +161,43 @@ test.describe('Git worktree operations', () => {
     try { execSync('git worktree prune', { cwd: TEST_PROJECT_PATH }) } catch { /* ignore */ }
     try { execSync(`rm -rf "${path.join(TEST_PROJECT_PATH, 'worktrees')}"`, { cwd: TEST_PROJECT_PATH }) } catch { /* ignore */ }
 
+    // Ensure task is in "no worktree" state before re-creating.
+    if (!(await mainWindow.getByRole('button', { name: /Add Worktree/ }).isVisible().catch(() => false))) {
+      if (await removeWorktreeButton(mainWindow).isVisible().catch(() => false)) {
+        await removeWorktreeButton(mainWindow).click()
+      }
+      await expect
+        .poll(async () => {
+          const task = await getTask(mainWindow, taskId)
+          return task?.worktree_path ?? null
+        })
+        .toBeNull()
+      await expect(mainWindow.getByRole('button', { name: /Add Worktree/ })).toBeVisible({ timeout: 10_000 })
+    }
+
     // Create worktree again
     await mainWindow.getByRole('button', { name: /Add Worktree/ }).click()
-    await mainWindow.waitForTimeout(2000)
+    await expect
+      .poll(async () => {
+        const task = await getTask(mainWindow, taskId)
+        return task?.worktree_path ?? null
+      })
+      .toContain(branchName)
 
     // Verify branch was actually created in git
-    const branches = execSync('git branch', { cwd: TEST_PROJECT_PATH }).toString()
-    expect(branches).toContain(branchName)
+    await expect
+      .poll(() => execSync('git branch', { cwd: TEST_PROJECT_PATH }).toString())
+      .toContain(branchName)
 
-    // Verify worktree dir exists on disk
-    const worktreePath = path.join(TEST_PROJECT_PATH, 'worktrees', branchName)
+    // Verify default template behavior: {project}/.. + /{branch}
+    const task = await getTask(mainWindow, taskId)
+    const worktreePathFromDb = task?.worktree_path ?? ''
+    const escapedBranch = branchName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    const expectedPattern = new RegExp(`[\\\\/]\\.\\.[\\\\/]${escapedBranch}$`)
+    expect(worktreePathFromDb).toMatch(expectedPattern)
+
+    // Verify worktree dir exists on disk (read effective path from DB)
+    const worktreePath = task?.worktree_path ?? path.join(TEST_PROJECT_PATH, 'worktrees', branchName)
     const exists = require('fs').existsSync(worktreePath)
     expect(exists).toBe(true)
   })
