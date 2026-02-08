@@ -16,7 +16,11 @@ interface TerminalContainerProps {
   autoFocus?: boolean
   onConversationCreated?: (conversationId: string) => void
   onSessionInvalid?: () => void
-  onReady?: (api: { sendInput: (text: string) => Promise<void>; focus: () => void }) => void
+  onReady?: (api: {
+    sendInput: (text: string) => Promise<void>
+    focus: () => void
+    clearBuffer: () => Promise<void>
+  }) => void
   onMainTabActiveChange?: (isMainActive: boolean) => void
 }
 
@@ -47,7 +51,11 @@ export function TerminalContainer({
   } = useTaskTerminals(taskId, defaultMode)
 
   const { subscribePrompt } = usePty()
-  const terminalApiRef = useRef<{ sendInput: (text: string) => Promise<void>; focus: () => void } | null>(null)
+  const terminalApiRef = useRef<{
+    sendInput: (text: string) => Promise<void>
+    focus: () => void
+    clearBuffer: () => Promise<void>
+  } | null>(null)
 
   // Get active tab
   const activeTab = tabs.find(t => t.id === activeTabId)
@@ -105,7 +113,11 @@ export function TerminalContainer({
   }, [tabs, activeTabId, activeTab, createTab, closeTab, setActiveTabId])
 
   // Handle terminal ready - pass up to parent (active tab's API)
-  const handleTerminalReady = useCallback((api: { sendInput: (text: string) => Promise<void>; focus: () => void }) => {
+  const handleTerminalReady = useCallback((api: {
+    sendInput: (text: string) => Promise<void>
+    focus: () => void
+    clearBuffer: () => Promise<void>
+  }) => {
     terminalApiRef.current = api
     onReady?.(api)
   }, [onReady])

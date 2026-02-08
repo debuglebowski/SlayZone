@@ -599,6 +599,15 @@ export function getBuffer(sessionId: string): string | null {
   return session?.buffer.toString() ?? null
 }
 
+export function clearBuffer(sessionId: string): { success: boolean; clearedSeq: number | null } {
+  const session = sessions.get(sessionId)
+  if (!session) return { success: false, clearedSeq: null }
+
+  const clearedSeq = session.buffer.getCurrentSeq()
+  session.buffer.clear()
+  return { success: true, clearedSeq }
+}
+
 export function getBufferSince(sessionId: string, afterSeq: number): BufferSinceResult | null {
   const session = sessions.get(sessionId)
   if (!session) return null

@@ -109,7 +109,11 @@ export function TaskDetailPage({
   const [isResizing, setIsResizing] = useState(false)
 
   // Terminal API (exposed via onReady callback)
-  const terminalApiRef = useRef<{ sendInput: (text: string) => Promise<void>; focus: () => void } | null>(null)
+  const terminalApiRef = useRef<{
+    sendInput: (text: string) => Promise<void>
+    focus: () => void
+    clearBuffer: () => Promise<void>
+  } | null>(null)
 
   // Track first mount for auto-focus
   const isFirstMountRef = useRef(true)
@@ -236,7 +240,11 @@ export function TaskDetailPage({
   )
 
   // Handle terminal ready - memoized to prevent effect cascade
-  const handleTerminalReady = useCallback((api: { sendInput: (text: string) => Promise<void>; focus: () => void }) => {
+  const handleTerminalReady = useCallback((api: {
+    sendInput: (text: string) => Promise<void>
+    focus: () => void
+    clearBuffer: () => Promise<void>
+  }) => {
     terminalApiRef.current = api
     // Codex has no "create with session id" command; ask it for current session id on first start.
     if (
@@ -368,10 +376,15 @@ export function TaskDetailPage({
     }
   }, [descriptionValue])
 
-  // Cmd+I (title) and Cmd+Shift+I (description) shortcuts
+  // Cmd+I (title), Cmd+Shift+I (description), Cmd+Shift+K (clear terminal buffer)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent): void => {
       if (!isActive) return
+      if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === 'k') {
+        e.preventDefault()
+        void terminalApiRef.current?.clearBuffer()
+        return
+      }
       if (e.metaKey && e.key === 'i') {
         e.preventDefault()
         if (e.shiftKey) {
@@ -381,8 +394,8 @@ export function TaskDetailPage({
         }
       }
     }
-    window.addEventListener('keydown', handleKeyDown)
-    return () => window.removeEventListener('keydown', handleKeyDown)
+    window.addEventListener('keydown', handleKeyDown, { capture: true })
+    return () => window.removeEventListener('keydown', handleKeyDown, { capture: true })
   }, [isActive, handleInjectTitle, handleInjectDescription])
 
   // Clear quick run prompt after it's been passed to Terminal

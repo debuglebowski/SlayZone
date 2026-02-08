@@ -3,6 +3,7 @@ import { Terminal as XTerm } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
 // import { WebLinksAddon } from '@xterm/addon-web-links' // Disabled - causes persistent underlines
 import { SerializeAddon } from '@xterm/addon-serialize'
+import { SearchAddon } from '@xterm/addon-search'
 // import { WebglAddon } from '@xterm/addon-webgl' // Disabled - bypasses CSS underline fix
 import '@xterm/xterm/css/xterm.css'
 
@@ -19,6 +20,7 @@ document.head.appendChild(underlineOverride)
 
 import { getTerminal, setTerminal, disposeTerminal } from './terminal-cache'
 import { usePty } from './PtyContext'
+import { TerminalSearchBar } from './TerminalSearchBar'
 import type { TerminalMode, TerminalState, CodeMode } from '@slayzone/terminal/shared'
 
 // Wait for container to have non-zero dimensions before opening terminal
@@ -87,7 +89,11 @@ interface TerminalProps {
   autoFocus?: boolean
   onConversationCreated?: (conversationId: string) => void
   onSessionInvalid?: () => void
-  onReady?: (api: { sendInput: (text: string) => Promise<void>; focus: () => void }) => void
+  onReady?: (api: {
+    sendInput: (text: string) => Promise<void>
+    focus: () => void
+    clearBuffer: () => Promise<void>
+  }) => void
 }
 
 export function Terminal({
@@ -108,14 +114,39 @@ export function Terminal({
   const terminalRef = useRef<XTerm | null>(null)
   const fitAddonRef = useRef<FitAddon | null>(null)
   const serializeAddonRef = useRef<SerializeAddon | null>(null)
+  const searchAddonRef = useRef<SearchAddon | null>(null)
+  const clearedSeqRef = useRef<number | null>(null)
   const initializedRef = useRef(false)
   const [isDragOver, setIsDragOver] = useState(false)
+  const [searchOpen, setSearchOpen] = useState(false)
   const [isInitializing, setIsInitializing] = useState(true)
   const [initError, setInitError] = useState<string | null>(null)
 
   const { subscribe, subscribeExit, subscribeSessionInvalid, subscribeAttention, subscribeState, getState, resetTaskState, cleanupTask } = usePty()
 
   const [ptyState, setPtyState] = useState<TerminalState>(() => getState(sessionId))
+
+  const clearBufferWithoutRestart = useCallback(async (): Promise<void> => {
+    const result = await window.api.pty.clearBuffer(sessionId)
+    if (!result.success) return
+
+    clearedSeqRef.current = result.clearedSeq
+    terminalRef.current?.clear()
+    terminalRef.current?.write('\x1b[0m')
+  }, [sessionId])
+
+  const handleTerminalKeyEvent = useCallback((e: KeyboardEvent): boolean => {
+    if (e.ctrlKey && e.key === 'Tab') return false
+    if ((e.metaKey || e.ctrlKey) && e.key === 'f' && e.type === 'keydown') {
+      setSearchOpen(true)
+      return false
+    }
+    if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === 'k' && e.type === 'keydown') {
+      void clearBufferWithoutRestart()
+      return false
+    }
+    return true
+  }, [clearBufferWithoutRestart])
 
   const initTerminal = useCallback(async (signal: AbortSignal) => {
     if (!containerRef.current || initializedRef.current) return
@@ -159,6 +190,10 @@ export function Terminal({
           terminalRef.current = cached.terminal
           fitAddonRef.current = cached.fitAddon
           serializeAddonRef.current = cached.serializeAddon
+          searchAddonRef.current = cached.searchAddon
+
+          // Re-attach key handler (old closure captured stale setSearchOpen)
+          cached.terminal.attachCustomKeyEventHandler(handleTerminalKeyEvent)
 
           // Simple fit - container is guaranteed to have dimensions
           cached.fitAddon.fit()
@@ -181,7 +216,8 @@ export function Terminal({
                 await new Promise(r => setTimeout(r, 1))
               }
             },
-            focus: () => cached.terminal.focus()
+            focus: () => cached.terminal.focus(),
+            clearBuffer: clearBufferWithoutRestart
           })
           return
         }
@@ -220,10 +256,12 @@ export function Terminal({
       const fitAddon = new FitAddon()
       // const webLinksAddon = new WebLinksAddon() // Disabled - causes persistent underlines
       const serializeAddon = new SerializeAddon()
+      const searchAddon = new SearchAddon()
 
       terminal.loadAddon(fitAddon)
       // terminal.loadAddon(webLinksAddon) // Disabled - causes persistent underlines
       terminal.loadAddon(serializeAddon)
+      terminal.loadAddon(searchAddon)
 
       // WebGL addon DISABLED - renders underlines directly to canvas, bypassing CSS override
       // Canvas 2D renderer uses DOM elements that respect our .xterm-underline-* CSS fix
@@ -240,6 +278,7 @@ export function Terminal({
       terminalRef.current = terminal
       fitAddonRef.current = fitAddon
       serializeAddonRef.current = serializeAddon
+      searchAddonRef.current = searchAddon
 
       terminal.open(containerRef.current)
       terminal.clear() // Ensure terminal starts completely fresh
@@ -250,10 +289,8 @@ export function Terminal({
       }
 
       // Let Ctrl+Tab and Ctrl+Shift+Tab bubble up for tab switching
-      terminal.attachCustomKeyEventHandler((e) => {
-        if (e.ctrlKey && e.key === 'Tab') return false
-        return true
-      })
+      // Intercept Cmd+F / Ctrl+F for terminal search
+      terminal.attachCustomKeyEventHandler(handleTerminalKeyEvent)
 
       // Check if PTY already exists (e.g., from idle hibernation)
       const exists = await window.api.pty.exists(sessionId)
@@ -321,7 +358,11 @@ export function Terminal({
       }
 
       // Expose API for programmatic input and focus
-      onReady?.({ sendInput: injectText, focus: () => terminal.focus() })
+      onReady?.({
+        sendInput: injectText,
+        focus: () => terminal.focus(),
+        clearBuffer: clearBufferWithoutRestart
+      })
 
       // Inject initial prompt if provided (after a delay for terminal to be ready)
       if (initialPrompt) {
@@ -346,7 +387,7 @@ export function Terminal({
         setIsInitializing(false)
       }
     }
-  }, [sessionId, cwd, mode, conversationId, existingConversationId, initialPrompt, codeMode, providerFlags, autoFocus, onConversationCreated, onReady, resetTaskState])
+  }, [sessionId, cwd, mode, conversationId, existingConversationId, initialPrompt, codeMode, providerFlags, autoFocus, onConversationCreated, onReady, resetTaskState, handleTerminalKeyEvent, clearBufferWithoutRestart])
 
   // Initialize terminal
   useEffect(() => {
@@ -366,7 +407,7 @@ export function Terminal({
       }
 
       // Detach terminal from DOM and cache it (don't dispose)
-      if (terminalRef.current && fitAddonRef.current && serializeAddonRef.current) {
+      if (terminalRef.current && fitAddonRef.current && serializeAddonRef.current && searchAddonRef.current) {
         const element = terminalRef.current.element
         if (element && element.parentNode) {
           element.parentNode.removeChild(element)
@@ -374,6 +415,7 @@ export function Terminal({
             terminal: terminalRef.current,
             fitAddon: fitAddonRef.current,
             serializeAddon: serializeAddonRef.current,
+            searchAddon: searchAddonRef.current,
             element,
             serializedState,
             mode
@@ -383,14 +425,16 @@ export function Terminal({
       terminalRef.current = null
       fitAddonRef.current = null
       serializeAddonRef.current = null
+      searchAddonRef.current = null
       initializedRef.current = false
     }
   }, [initTerminal, sessionId])
 
   // Subscribe to PTY events via context (survives view switches)
   useEffect(() => {
-    const unsubData = subscribe(sessionId, (data, _seq) => {
-      // Seq is tracked by PtyContext - just write the data
+    const unsubData = subscribe(sessionId, (data, seq) => {
+      const cutoff = clearedSeqRef.current
+      if (cutoff !== null && seq <= cutoff) return
       terminalRef.current?.write(data)
     })
 
@@ -566,32 +610,46 @@ export function Terminal({
 
   const isLoading = !initError && (isInitializing || ptyState === 'starting')
 
+  const handleSearchClose = useCallback(() => {
+    setSearchOpen(false)
+    try { searchAddonRef.current?.clearDecorations() } catch { /* */ }
+    terminalRef.current?.focus()
+  }, [])
+
   return (
-    <div
-      ref={containerRef}
-      tabIndex={0}
-      className={`relative h-full w-full bg-[#0a0a0a] rounded-lg outline-none overflow-hidden transition-colors ${
-        isDragOver ? 'ring-2 ring-blue-500/50 ring-inset' : ''
-      }`}
-      style={{ padding: '8px' }}
-      onClick={() => terminalRef.current?.focus()}
-    >
-      {isLoading && (
-        <div className="absolute inset-0 flex items-center justify-center bg-[#0a0a0a] z-10">
-          <div className="flex items-center gap-2 text-neutral-500">
-            <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-            </svg>
-            <span className="text-sm">Starting terminal...</span>
+    <div className="relative h-full w-full">
+      {searchOpen && searchAddonRef.current && (
+        <TerminalSearchBar
+          searchAddon={searchAddonRef.current}
+          onClose={handleSearchClose}
+        />
+      )}
+      <div
+        ref={containerRef}
+        tabIndex={0}
+        className={`h-full w-full bg-[#0a0a0a] rounded-lg outline-none overflow-hidden transition-colors ${
+          isDragOver ? 'ring-2 ring-blue-500/50 ring-inset' : ''
+        }`}
+        style={{ padding: '8px' }}
+        onClick={() => terminalRef.current?.focus()}
+      >
+        {isLoading && (
+          <div className="absolute inset-0 flex items-center justify-center bg-[#0a0a0a] z-10">
+            <div className="flex items-center gap-2 text-neutral-500">
+              <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+              </svg>
+              <span className="text-sm">Starting terminal...</span>
+            </div>
           </div>
-        </div>
-      )}
-      {initError && (
-        <div className="absolute inset-0 flex items-center justify-center bg-[#0a0a0a] z-10 p-4">
-          <div className="text-red-400 text-sm text-center">Failed to start terminal: {initError}</div>
-        </div>
-      )}
+        )}
+        {initError && (
+          <div className="absolute inset-0 flex items-center justify-center bg-[#0a0a0a] z-10 p-4">
+            <div className="text-red-400 text-sm text-center">Failed to start terminal: {initError}</div>
+          </div>
+        )}
+      </div>
     </div>
   )
 }
