@@ -286,7 +286,7 @@ export function AiConfigCenter({ projects, selectedProjectId }: AiConfigCenterPr
             <div className="min-w-0">
               <div className="flex items-center gap-2">
                 <Bot className="text-primary size-4.5" />
-                <h1 className="truncate text-lg font-semibold tracking-tight md:text-xl">AI Config Center</h1>
+                <h1 className="truncate text-lg font-semibold tracking-tight md:text-xl">AI Config Center V2</h1>
               </div>
               <p className="mt-1 text-xs text-muted-foreground md:text-sm">
                 Build and govern reusable AI building blocks across projects.
@@ -331,8 +331,8 @@ export function AiConfigCenter({ projects, selectedProjectId }: AiConfigCenterPr
           </div>
         </header>
 
-        <div className="flex-1 min-h-0 grid grid-cols-1 gap-3 xl:grid-cols-[230px_360px_minmax(0,1fr)]">
-          <aside className="min-h-0 rounded-xl border bg-card/95 p-3 shadow-sm">
+        <div className="flex-1 min-h-0 grid grid-cols-1 gap-3 lg:grid-cols-12">
+          <aside className="min-h-0 rounded-xl border bg-card/95 p-3 shadow-sm lg:col-span-2">
             <p className="px-2 text-xs font-semibold tracking-wide text-muted-foreground uppercase">Libraries</p>
             <div className="mt-2 space-y-1.5">
               {(['skill', 'command', 'doc', 'sources'] as Section[]).map((key) => {
@@ -382,7 +382,7 @@ export function AiConfigCenter({ projects, selectedProjectId }: AiConfigCenterPr
             </div>
           </aside>
 
-          <section className="min-h-0 rounded-xl border bg-card/95 p-3 shadow-sm">
+          <section className="min-h-0 rounded-xl border bg-card/95 p-3 shadow-sm lg:col-span-3">
             <div className="mb-2 flex items-center justify-between gap-2">
               <div className="flex items-center gap-2">
                 <SectionIcon className="text-primary size-4" />
@@ -463,7 +463,7 @@ export function AiConfigCenter({ projects, selectedProjectId }: AiConfigCenterPr
             )}
           </section>
 
-          <section className="min-h-0 overflow-auto rounded-xl border bg-card/95 p-4 shadow-sm">
+          <section className="min-h-0 overflow-auto rounded-xl border bg-card/95 p-4 shadow-sm lg:col-span-7">
             {section === 'sources' ? (
               <div className="space-y-4">
                 <h2 className="text-lg font-semibold">Source Inspector</h2>

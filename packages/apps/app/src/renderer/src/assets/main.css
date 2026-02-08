@@ -15,6 +15,7 @@
 @source "../../../../../../../packages/domains/task-terminals/src";
 @source "../../../../../../../packages/domains/task-browser/src";
 @source "../../../../../../../packages/domains/worktrees/src";
+@source "../../../../../../../packages/domains/ai-config/src";
 
 @custom-variant dark (&:is(.dark *));
 

@@ -1,11 +1,17 @@
 import { resolve } from 'path'
+import { readFileSync } from 'fs'
 import { defineConfig, externalizeDepsPlugin } from 'electron-vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 
+const pkg = JSON.parse(readFileSync(resolve(__dirname, 'package.json'), 'utf-8'))
+const slayzoneDeps = Object.keys({ ...pkg.dependencies, ...pkg.devDependencies }).filter((d) =>
+  d.startsWith('@slayzone/')
+)
+
 export default defineConfig({
   main: {
-    plugins: [externalizeDepsPlugin({ exclude: ['@slayzone/types', '@slayzone/task', '@slayzone/projects', '@slayzone/tags', '@slayzone/settings', '@slayzone/terminal', '@slayzone/task-terminals', '@slayzone/worktrees', '@slayzone/diagnostics', '@slayzone/ai-config'] })],
+    plugins: [externalizeDepsPlugin({ exclude: slayzoneDeps })],
     build: {
       rollupOptions: {
         external: ['better-sqlite3', 'node-pty']
@@ -13,7 +19,7 @@ export default defineConfig({
     }
   },
   preload: {
-    plugins: [externalizeDepsPlugin({ exclude: ['@slayzone/types', '@slayzone/task-terminals'] })]
+    plugins: [externalizeDepsPlugin({ exclude: slayzoneDeps })]
   },
   renderer: {
     resolve: {
@@ -24,7 +30,7 @@ export default defineConfig({
     },
     plugins: [react(), tailwindcss()],
     optimizeDeps: {
-      exclude: ['@slayzone/types', '@slayzone/ui', '@slayzone/editor', '@slayzone/task', '@slayzone/tasks', '@slayzone/projects', '@slayzone/tags', '@slayzone/settings', '@slayzone/terminal', '@slayzone/task-terminals', '@slayzone/onboarding', '@slayzone/worktrees', '@slayzone/ai-config']
+      exclude: slayzoneDeps
     }
   }
 })
