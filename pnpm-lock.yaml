@@ -41,6 +41,9 @@ importers:
       '@slayzone/editor':
         specifier: workspace:*
         version: link:../../shared/editor
+      '@slayzone/integrations':
+        specifier: workspace:*
+        version: link:../../domains/integrations
       '@slayzone/onboarding':
         specifier: workspace:*
         version: link:../../domains/onboarding
@@ -179,6 +182,8 @@ importers:
         specifier: ^5.9.3
         version: 5.9.3
 
+  packages/domains/integrations: {}
+
   packages/domains/onboarding:
     dependencies:
       '@slayzone/types':
@@ -200,6 +205,9 @@ importers:
 
   packages/domains/projects:
     dependencies:
+      '@slayzone/integrations':
+        specifier: workspace:*
+        version: link:../integrations
       '@slayzone/types':
         specifier: workspace:*
         version: link:../../shared/types
@@ -222,6 +230,9 @@ importers:
 
   packages/domains/settings:
     dependencies:
+      '@slayzone/integrations':
+        specifier: workspace:*
+        version: link:../integrations
       '@slayzone/tags':
         specifier: workspace:*
         version: link:../tags
@@ -281,6 +292,9 @@ importers:
       '@slayzone/editor':
         specifier: workspace:*
         version: link:../../shared/editor
+      '@slayzone/integrations':
+        specifier: workspace:*
+        version: link:../integrations
       '@slayzone/projects':
         specifier: workspace:*
         version: link:../projects
@@ -420,6 +434,9 @@ importers:
       '@xterm/addon-fit':
         specifier: ^0.11.0
         version: 0.11.0
+      '@xterm/addon-search':
+        specifier: ^0.16.0
+        version: 0.16.0
       '@xterm/addon-serialize':
         specifier: ^0.14.0
         version: 0.14.0
@@ -525,6 +542,9 @@ importers:
       '@slayzone/ai-config':
         specifier: workspace:*
         version: link:../../domains/ai-config
+      '@slayzone/integrations':
+        specifier: workspace:*
+        version: link:../../domains/integrations
       '@slayzone/projects':
         specifier: workspace:*
         version: link:../../domains/projects
@@ -2482,6 +2502,9 @@ packages:
 
   '@xterm/addon-fit@0.11.0':
     resolution: {integrity: sha512-jYcgT6xtVYhnhgxh3QgYDnnNMYTcf8ElbxxFzX0IZo+vabQqSPAjC3c1wJrKB5E19VwQei89QCiZZP86DCPF7g==}
+
+  '@xterm/addon-search@0.16.0':
+    resolution: {integrity: sha512-9OeuBFu0/uZJPu+9AHKY6g/w0Czyb/Ut0A5t79I4ULoU4IfU5BEpPFVGQxP4zTTMdfZEYkVIRYbHBX1xWwjeSA==}
 
   '@xterm/addon-serialize@0.14.0':
     resolution: {integrity: sha512-uteyTU1EkrQa2Ux6P/uFl2fzmXI46jy5uoQMKEOM0fKTyiW7cSn0WrFenHm5vO5uEXX/GpwW/FgILvv3r0WbkA==}
@@ -6232,6 +6255,8 @@ snapshots:
   '@xmldom/xmldom@0.8.11': {}
 
   '@xterm/addon-fit@0.11.0': {}
+
+  '@xterm/addon-search@0.16.0': {}
 
   '@xterm/addon-serialize@0.14.0': {}
 

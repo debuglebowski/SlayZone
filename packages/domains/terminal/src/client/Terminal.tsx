@@ -225,6 +225,7 @@ export function Terminal({
 
       // Create new terminal
       const terminal = new XTerm({
+        allowProposedApi: true,
         cursorBlink: true,
         fontSize: 13,
         fontFamily: 'Menlo, Monaco, "Courier New", monospace',
