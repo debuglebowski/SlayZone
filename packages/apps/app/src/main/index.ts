@@ -4,9 +4,10 @@ import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 
 // Use consistent app name for userData path (paired with legacy DB migration)
 app.name = 'slayzone'
+const isPlaywright = process.env.PLAYWRIGHT === '1'
 
-// Enable remote debugging for MCP server (dev only)
-if (is.dev) {
+// Enable remote debugging for MCP server (dev only, skip when Playwright drives the app)
+if (is.dev && !isPlaywright) {
   app.commandLine.appendSwitch('remote-debugging-port', '9222')
 }
 import icon from '../../resources/icon.png?asset'
@@ -236,9 +237,11 @@ function createMainWindow(): void {
   })
 
   mainWindow.on('ready-to-show', () => {
-    // Calculate remaining time to keep splash visible
-    const elapsed = Date.now() - splashShownAt
-    const remaining = Math.max(0, SPLASH_MIN_DURATION - elapsed)
+    // In Playwright mode we skip splash entirely and show immediately.
+    const remaining =
+      splashWindow && !splashWindow.isDestroyed()
+        ? Math.max(0, SPLASH_MIN_DURATION - (Date.now() - splashShownAt))
+        : 0
 
     // Start the idle checker for terminal hibernation
     if (mainWindow) {
@@ -300,7 +303,9 @@ function createMainWindow(): void {
 }
 
 function createWindow(): void {
-  createSplashWindow()
+  if (!isPlaywright) {
+    createSplashWindow()
+  }
   createMainWindow()
 }
 
