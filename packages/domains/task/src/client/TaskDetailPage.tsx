@@ -27,7 +27,7 @@ import { TaskMetadataSidebar } from './TaskMetadataSidebar'
 import { RichTextEditor } from '@slayzone/editor'
 import { markSkipCache, usePty } from '@slayzone/terminal'
 import { TerminalContainer } from '@slayzone/task-terminals'
-import { GitPanel, GitDiffPanel } from '@slayzone/worktrees'
+import { GitPanel, GitDiffPanel, MergePanel } from '@slayzone/worktrees'
 import { cn } from '@slayzone/ui'
 import { BrowserPanel } from '@slayzone/task-browser'
 import { usePanelSizes } from './usePanelSizes'
@@ -66,13 +66,11 @@ export function TaskDetailPage({
   const [projectPathMissing, setProjectPathMissing] = useState(false)
 
   // PTY context for buffer management
-  const { resetTaskState, subscribeSessionDetected, getQuickRunPrompt, getQuickRunCodeMode, clearQuickRunPrompt, setQuickRunPrompt } = usePty()
-
-  // AI merge state - when set, terminal uses these instead of normal task settings
-  const [aiMergeState, setAiMergeState] = useState<{ cwd: string; prompt: string } | null>(null)
+  const { resetTaskState, subscribeSessionDetected, getQuickRunPrompt, getQuickRunCodeMode, clearQuickRunPrompt } = usePty()
 
   // Detected session ID from /status command
   const [detectedSessionId, setDetectedSessionId] = useState<string | null>(null)
+  const codexStatusRequestedTaskIdsRef = useRef<Set<string>>(new Set())
 
   // Title editing state
   const [editingTitle, setEditingTitle] = useState(false)
@@ -131,34 +129,8 @@ export function TaskDetailPage({
   // Subscribe to session detected events
   useEffect(() => {
     if (!task) return
-    return subscribeSessionDetected(task.id, setDetectedSessionId)
-  }, [task?.id, subscribeSessionDetected])
-
-  // Listen for PTY exit when in AI merge mode
-  useEffect(() => {
-    if (!aiMergeState || !task) return
-
-    const unsub = window.api.pty.onExit(async (sessionId, _exitCode) => {
-      // Check if this is our merge session
-      if (!sessionId.startsWith(task.id)) return
-
-      // Check if merge completed successfully (no more conflicts)
-      const hasConflicts = await window.api.git.isMergeInProgress(aiMergeState.cwd)
-
-      if (!hasConflicts) {
-        // Merge complete - mark task done
-        const updated = await window.api.db.updateTask({ id: task.id, status: 'done' })
-        setTask(updated)
-        onTaskUpdated(updated)
-      }
-
-      // Clear merge state regardless (user can retry if needed)
-      setAiMergeState(null)
-      clearQuickRunPrompt(task.id)
-    })
-
-    return unsub
-  }, [aiMergeState, task, onTaskUpdated, clearQuickRunPrompt])
+    return subscribeSessionDetected(getMainSessionId(task.id), setDetectedSessionId)
+  }, [task?.id, subscribeSessionDetected, getMainSessionId])
 
   // Load task data on mount or when taskId changes
   useEffect(() => {
@@ -266,18 +238,58 @@ export function TaskDetailPage({
   // Handle terminal ready - memoized to prevent effect cascade
   const handleTerminalReady = useCallback((api: { sendInput: (text: string) => Promise<void>; focus: () => void }) => {
     terminalApiRef.current = api
-  }, [])
+    // Codex has no "create with session id" command; ask it for current session id on first start.
+    if (
+      task &&
+      task.terminal_mode === 'codex' &&
+      !task.codex_conversation_id &&
+      !codexStatusRequestedTaskIdsRef.current.has(task.id)
+    ) {
+      codexStatusRequestedTaskIdsRef.current.add(task.id)
+      setTimeout(() => {
+        void api.sendInput('/status\r').catch(() => {
+          // Ignore: terminal may be closing/remounting
+        })
+      }, 400)
+    }
+  }, [task])
 
   // Update DB with detected session ID
   const handleUpdateSessionId = useCallback(async () => {
     if (!task || !detectedSessionId) return
-    const updated = await window.api.db.updateTask({
-      id: task.id,
-      claudeConversationId: detectedSessionId
-    })
+    const update =
+      task.terminal_mode === 'codex'
+        ? { id: task.id, codexConversationId: detectedSessionId }
+        : { id: task.id, claudeConversationId: detectedSessionId }
+    const updated = await window.api.db.updateTask(update)
     setTask(updated)
     onTaskUpdated(updated)
     setDetectedSessionId(null)
+  }, [task, detectedSessionId, onTaskUpdated])
+
+  // Persist detected Codex conversation IDs immediately.
+  useEffect(() => {
+    if (!task || !detectedSessionId || task.terminal_mode !== 'codex') return
+    if (task.codex_conversation_id === detectedSessionId) {
+      setDetectedSessionId(null)
+      return
+    }
+
+    let cancelled = false
+    void (async () => {
+      const updated = await window.api.db.updateTask({
+        id: task.id,
+        codexConversationId: detectedSessionId
+      })
+      if (cancelled) return
+      setTask(updated)
+      onTaskUpdated(updated)
+      setDetectedSessionId(null)
+    })()
+
+    return () => {
+      cancelled = true
+    }
   }, [task, detectedSessionId, onTaskUpdated])
 
   // Handle invalid session (e.g., "No conversation found" error)
@@ -609,26 +621,6 @@ export function TaskDetailPage({
     return updated
   }
 
-  // Handler for AI merge - creates Claude session with merge prompt
-  const handleMergeWithAI = useCallback(async (prompt: string, cwd: string) => {
-    if (!task) return
-
-    // Kill existing PTY
-    const mainSessionId = `${task.id}:${task.id}`
-    resetTaskState(mainSessionId)
-    await window.api.pty.kill(mainSessionId)
-    markSkipCache(mainSessionId)
-
-    // Set up quick run prompt with bypass mode for automated merge
-    setQuickRunPrompt(task.id, prompt, 'bypass')
-
-    // Store merge state for terminal cwd override
-    setAiMergeState({ cwd, prompt })
-
-    // Force terminal remount
-    setTerminalKey(k => k + 1)
-  }, [task, resetTaskState, setQuickRunPrompt])
-
   // Handler for browser tabs changes
   const handleBrowserTabsChange = useCallback(async (tabs: BrowserTabsState) => {
     setBrowserTabs(tabs)
@@ -799,7 +791,16 @@ export function TaskDetailPage({
               </span>
             </div>
           )}
-          {detectedSessionId && task.claude_conversation_id && detectedSessionId !== task.claude_conversation_id && (
+          {(() => {
+            const currentConversationId = task.terminal_mode === 'codex'
+              ? task.codex_conversation_id
+              : (task.claude_conversation_id || task.claude_session_id)
+            return (
+              detectedSessionId &&
+              currentConversationId &&
+              detectedSessionId !== currentConversationId
+            )
+          })() && (
             <div className="shrink-0 bg-amber-500/10 border-b border-amber-500/20 px-4 py-2 flex items-center gap-2">
               <AlertTriangle className="h-4 w-4 text-amber-500" />
               <span className="text-sm text-amber-500">
@@ -818,28 +819,31 @@ export function TaskDetailPage({
           {/* Terminal + mode bar wrapper */}
           <div className="flex-1 min-h-0 flex flex-col">
             <div className="flex-1 min-h-0">
-              {isResizing ? (
+              {task.merge_state ? (
+                <MergePanel
+                  task={task}
+                  projectPath={project?.path ?? ''}
+                  onUpdateTask={updateTaskAndNotify}
+                  onTaskUpdated={(t) => { setTask(t); onTaskUpdated(t) }}
+                />
+              ) : isResizing ? (
                 <div className="h-full bg-[#0a0a0a]" />
               ) : project?.path && !projectPathMissing ? (
                 <TerminalContainer
-                  key={`${terminalKey}-${task.worktree_path || ''}-${aiMergeState?.cwd || ''}`}
+                  key={`${terminalKey}-${task.worktree_path || ''}`}
                   taskId={task.id}
-                  cwd={aiMergeState?.cwd || task.worktree_path || project.path}
+                  cwd={task.worktree_path || project.path}
                   defaultMode={task.terminal_mode}
-                  conversationId={aiMergeState
-                    ? undefined
-                    : task.terminal_mode === 'claude-code'
-                      ? (task.claude_conversation_id || task.claude_session_id || undefined)
-                      : task.terminal_mode === 'codex'
-                        ? (task.codex_conversation_id || undefined)
-                        : undefined}
-                  existingConversationId={aiMergeState
-                    ? undefined
-                    : task.terminal_mode === 'claude-code'
-                      ? (task.claude_conversation_id || task.claude_session_id || undefined)
-                      : task.terminal_mode === 'codex'
-                        ? (task.codex_conversation_id || undefined)
-                        : undefined}
+                  conversationId={task.terminal_mode === 'claude-code'
+                    ? (task.claude_conversation_id || task.claude_session_id || undefined)
+                    : task.terminal_mode === 'codex'
+                      ? (task.codex_conversation_id || undefined)
+                      : undefined}
+                  existingConversationId={task.terminal_mode === 'claude-code'
+                    ? (task.claude_conversation_id || task.claude_session_id || undefined)
+                    : task.terminal_mode === 'codex'
+                      ? (task.codex_conversation_id || undefined)
+                      : undefined}
                   initialPrompt={getQuickRunPrompt(task.id)}
                   codeMode={getQuickRunCodeMode(task.id)}
                   providerFlags={getProviderFlagsForMode(task)}
@@ -1042,7 +1046,7 @@ export function TaskDetailPage({
 
         {/* Settings Panel */}
         {panelVisibility.settings && (
-        <div className="shrink-0 border-l flex flex-col overflow-y-auto" style={{ width: panelSizes.settings }}>
+        <div data-testid="task-settings-panel" className="shrink-0 border-l flex flex-col overflow-y-auto" style={{ width: panelSizes.settings }}>
           {/* Description */}
           <div className="p-4 flex-1 flex flex-col min-h-0">
             <RichTextEditor
@@ -1053,9 +1057,11 @@ export function TaskDetailPage({
               minHeight="150px"
               maxHeight="300px"
               className="bg-muted/30 rounded-lg p-3"
+              testId="task-description-editor"
             />
             {task.terminal_mode !== 'terminal' && (
               <Button
+                data-testid="generate-description-button"
                 type="button"
                 variant="ghost"
                 size="sm"
@@ -1074,12 +1080,12 @@ export function TaskDetailPage({
           </div>
 
           {/* Git */}
-          <div className="px-4 py-3 border-t">
+          <div data-testid="task-git-panel" className="px-4 py-3 border-t">
             <GitPanel
               task={task}
               projectPath={project?.path ?? null}
               onUpdateTask={updateTaskAndNotify}
-              onMergeWithAI={handleMergeWithAI}
+              onTaskUpdated={(t) => { setTask(t); onTaskUpdated(t) }}
             />
           </div>
 

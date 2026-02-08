@@ -2,6 +2,7 @@ import type { TerminalMode } from '@slayzone/terminal/shared'
 import type { BrowserTabsState } from '@slayzone/task-browser/shared'
 
 export type TaskStatus = 'inbox' | 'backlog' | 'todo' | 'in_progress' | 'review' | 'done'
+export type MergeState = 'uncommitted' | 'conflicts'
 
 export interface PanelVisibility {
   terminal: boolean
@@ -39,6 +40,8 @@ export interface Task {
   browser_url: string | null
   // Browser tabs (JSON)
   browser_tabs: BrowserTabsState | null
+  // Merge mode
+  merge_state: MergeState | null
   created_at: string
   updated_at: string
 }
@@ -83,6 +86,8 @@ export interface UpdateTaskInput {
   browserUrl?: string | null
   // Browser tabs
   browserTabs?: BrowserTabsState | null
+  // Merge mode
+  mergeState?: MergeState | null
   // Legacy
   claudeSessionId?: string | null
 }

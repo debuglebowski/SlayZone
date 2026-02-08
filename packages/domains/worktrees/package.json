@@ -15,9 +15,15 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@codemirror/lang-javascript": "^6.2.3",
+    "@codemirror/merge": "^6.7.4",
+    "@codemirror/state": "^6.5.2",
+    "@codemirror/view": "^6.36.5",
+    "@slayzone/diagnostics": "workspace:*",
     "@slayzone/task": "workspace:*",
     "@slayzone/types": "workspace:*",
-    "@slayzone/ui": "workspace:*"
+    "@slayzone/ui": "workspace:*",
+    "codemirror": "^6.0.1"
   },
   "peerDependencies": {
     "react": "^19.0.0"

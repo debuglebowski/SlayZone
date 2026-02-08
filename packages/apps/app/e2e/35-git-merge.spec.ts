@@ -169,7 +169,7 @@ test.describe('Clean merge UI', () => {
     await mainWindow.waitForTimeout(300)
 
     // Confirm in dialog
-    await mainWindow.getByRole('button', { name: 'Merge & Complete' }).click()
+    await mainWindow.getByRole('button', { name: 'Start Merge' }).click()
     await mainWindow.waitForTimeout(2000)
 
     // Success message
@@ -349,7 +349,7 @@ test.describe('Merge error - detached HEAD', () => {
     await mainWindow.getByRole('button', { name: new RegExp(`Merge into ${main}`) }).click()
     await mainWindow.waitForTimeout(300)
 
-    await mainWindow.getByRole('button', { name: 'Merge & Complete' }).click()
+    await mainWindow.getByRole('button', { name: 'Start Merge' }).click()
     await mainWindow.waitForTimeout(1000)
 
     await expect(mainWindow.getByText(/Cannot merge|detached HEAD/).first()).toBeVisible()

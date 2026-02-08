@@ -16,19 +16,22 @@ import {
 } from '@slayzone/ui'
 import type { Task, UpdateTaskInput } from '@slayzone/task/shared'
 import type { MergeResult } from '../shared/types'
-import { slugify } from './utils'
+import {
+  DEFAULT_WORKTREE_BASE_PATH_TEMPLATE,
+  resolveWorktreeBasePathTemplate,
+  slugify
+} from './utils'
 
 interface GitPanelProps {
   task: Task
   projectPath: string | null
   onUpdateTask: (data: UpdateTaskInput) => Promise<Task>
-  /** Called when AI merge needs to resolve conflicts. Parent should start Claude in terminal. */
-  onMergeWithAI?: (prompt: string, cwd: string) => Promise<void>
+  onTaskUpdated: (task: Task) => void
   /** When true, UI is shown but backend calls are disabled */
   disabled?: boolean
 }
 
-export function GitPanel({ task, projectPath, onUpdateTask, onMergeWithAI, disabled = false }: GitPanelProps) {
+export function GitPanel({ task, projectPath, onUpdateTask, onTaskUpdated, disabled = false }: GitPanelProps) {
   const [isGitRepo, setIsGitRepo] = useState<boolean | null>(null)
   const [currentBranch, setCurrentBranch] = useState<string | null>(null)
   const [worktreeBranch, setWorktreeBranch] = useState<string | null>(null)
@@ -39,7 +42,6 @@ export function GitPanel({ task, projectPath, onUpdateTask, onMergeWithAI, disab
   const [mergeConfirmOpen, setMergeConfirmOpen] = useState(false)
   const [merging, setMerging] = useState(false)
   const [mergeResult, setMergeResult] = useState<MergeResult | null>(null)
-  const [resolvingConflicts, setResolvingConflicts] = useState(false)
   const hasWorktree = !!task.worktree_path
 
   // Check git status when projectPath changes
@@ -138,10 +140,11 @@ export function GitPanel({ task, projectPath, onUpdateTask, onMergeWithAI, disab
     setCreating(true)
     setError(null)
     try {
-      // Get base path from settings or use default
-      const basePath =
+      // Get base path template from settings or use default, then resolve tokens.
+      const basePathTemplate =
         (await window.api.settings.get('worktree_base_path')) ||
-        `${projectPath}/worktrees`
+        DEFAULT_WORKTREE_BASE_PATH_TEMPLATE
+      const basePath = resolveWorktreeBasePathTemplate(basePathTemplate, projectPath)
 
       // Generate branch name from task title
       const branch = slugify(task.title) || `task-${task.id.slice(0, 8)}`
@@ -186,7 +189,16 @@ export function GitPanel({ task, projectPath, onUpdateTask, onMergeWithAI, disab
         return
       }
 
-      // Attempt merge with AI resolution (handles uncommitted changes too)
+      // Check for uncommitted changes in worktree
+      const hasChanges = await window.api.git.hasUncommittedChanges(task.worktree_path)
+      if (hasChanges) {
+        // Enter merge mode Phase 1 (uncommitted changes)
+        const updated = await onUpdateTask({ id: task.id, mergeState: 'uncommitted' })
+        onTaskUpdated(updated)
+        return
+      }
+
+      // No uncommitted changes — try the merge
       const result = await window.api.git.mergeWithAI(
         projectPath,
         task.worktree_path,
@@ -196,14 +208,14 @@ export function GitPanel({ task, projectPath, onUpdateTask, onMergeWithAI, disab
 
       if (result.success) {
         // Clean merge - mark done
-        await onUpdateTask({ id: task.id, status: 'done' })
+        const updated = await onUpdateTask({ id: task.id, status: 'done' })
+        onTaskUpdated(updated)
         await window.api.pty.kill(task.id)
         setMergeResult({ success: true, merged: true, conflicted: false })
-      } else if (result.resolving && result.prompt && onMergeWithAI) {
-        // Conflicts or uncommitted changes - start AI resolution
-        setResolvingConflicts(true)
-        // Run Claude in the WORKTREE directory (may need to commit there first)
-        await onMergeWithAI(result.prompt, task.worktree_path)
+      } else if (result.resolving) {
+        // Has conflicts — enter merge mode Phase 2
+        const updated = await onUpdateTask({ id: task.id, mergeState: 'conflicts' })
+        onTaskUpdated(updated)
       } else if (result.error) {
         setMergeResult({
           success: false,
@@ -221,16 +233,6 @@ export function GitPanel({ task, projectPath, onUpdateTask, onMergeWithAI, disab
       })
     } finally {
       setMerging(false)
-    }
-  }
-
-  const handleAbortMerge = async () => {
-    if (!projectPath) return
-    try {
-      await window.api.git.abortMerge(projectPath)
-      setMergeResult(null)
-    } catch (err) {
-      console.error('Failed to abort merge:', err)
     }
   }
 
@@ -300,6 +302,23 @@ export function GitPanel({ task, projectPath, onUpdateTask, onMergeWithAI, disab
   // Derive display name from path
   const worktreeName = task.worktree_path?.split('/').pop() || 'Worktree'
 
+  // In merge mode — show status instead of merge button
+  if (task.merge_state) {
+    return (
+      <div className="space-y-3">
+        <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+          Git
+        </div>
+        <div className="flex items-center gap-2 text-sm">
+          <GitMerge className="h-4 w-4 text-purple-400" />
+          <span className="text-xs">
+            {task.merge_state === 'uncommitted' ? 'Merge mode — reviewing changes' : 'Merge mode — resolving conflicts'}
+          </span>
+        </div>
+      </div>
+    )
+  }
+
   // Is a git repo - show branch + worktree
   return (
     <div className="space-y-3">
@@ -347,21 +366,7 @@ export function GitPanel({ task, projectPath, onUpdateTask, onMergeWithAI, disab
             </div>
             {task.worktree_parent_branch && (
               <>
-                {resolvingConflicts ? (
-                  <div className="space-y-2">
-                    <p className="text-xs text-yellow-500">AI resolving conflicts...</p>
-                    <Button variant="outline" size="sm" onClick={handleAbortMerge}>
-                      Abort Merge
-                    </Button>
-                  </div>
-                ) : mergeResult?.conflicted ? (
-                  <div className="space-y-2">
-                    <p className="text-xs text-destructive">Merge conflicts - resolve manually</p>
-                    <Button variant="outline" size="sm" onClick={handleAbortMerge}>
-                      Abort Merge
-                    </Button>
-                  </div>
-                ) : mergeResult?.success ? (
+                {mergeResult?.success ? (
                   <p className="text-xs text-green-500">Merged successfully - task marked done</p>
                 ) : (
                   <>
@@ -417,14 +422,14 @@ export function GitPanel({ task, projectPath, onUpdateTask, onMergeWithAI, disab
           <AlertDialogHeader>
             <AlertDialogTitle>Merge Worktree</AlertDialogTitle>
             <AlertDialogDescription>
-              This will merge {worktreeBranch || 'the worktree branch'} into {task.worktree_parent_branch},
-              mark this task as done, and kill the terminal process.
+              This will merge {worktreeBranch || 'the worktree branch'} into {task.worktree_parent_branch}.
+              If there are conflicts, you'll review and resolve them in merge mode.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={handleMergeConfirm}>
-              Merge & Complete
+              Start Merge
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

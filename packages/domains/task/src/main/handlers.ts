@@ -1,6 +1,7 @@
 import type { IpcMain } from 'electron'
 import type { Database } from 'better-sqlite3'
 import type { CreateTaskInput, UpdateTaskInput, Task } from '@slayzone/task/shared'
+import { recordDiagnosticEvent } from '@slayzone/diagnostics/main'
 import { removeWorktree } from '@slayzone/worktrees/main'
 import { killPtysByTaskId } from '@slayzone/terminal/main'
 
@@ -45,6 +46,14 @@ function cleanupTask(db: Database, taskId: string): void {
         removeWorktree(project.path, task.worktree_path)
       } catch (err) {
         console.error('Failed to remove worktree:', err)
+        recordDiagnosticEvent({
+          level: 'error',
+          source: 'task',
+          event: 'task.cleanup_worktree_failed',
+          taskId,
+          projectId: task.project_id,
+          message: err instanceof Error ? err.message : String(err)
+        })
       }
     }
   }
@@ -193,6 +202,10 @@ export function registerTaskHandlers(ipcMain: IpcMain, db: Database): void {
     if (data.browserTabs !== undefined) {
       fields.push('browser_tabs = ?')
       values.push(data.browserTabs ? JSON.stringify(data.browserTabs) : null)
+    }
+    if (data.mergeState !== undefined) {
+      fields.push('merge_state = ?')
+      values.push(data.mergeState)
     }
 
     if (fields.length === 0) {

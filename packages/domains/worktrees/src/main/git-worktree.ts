@@ -1,5 +1,7 @@
 import { execSync } from 'child_process'
-import type { DetectedWorktree, GitDiffSnapshot, MergeResult } from '../shared/types'
+import { readFileSync, writeFileSync } from 'fs'
+import path from 'path'
+import type { ConflictFileContent, DetectedWorktree, GitDiffSnapshot, MergeResult } from '../shared/types'
 
 export function isGitRepo(path: string): boolean {
   try {
@@ -302,4 +304,44 @@ export function getWorkingDiff(path: string): GitDiffSnapshot {
     generatedAt: new Date().toISOString(),
     isGitRepo: true
   }
+}
+
+export function getConflictContent(repoPath: string, filePath: string): ConflictFileContent {
+  const gitShow = (stage: string): string | null => {
+    try {
+      return execSync(`git show ${stage}:"${filePath}"`, {
+        cwd: repoPath,
+        encoding: 'utf-8',
+        stdio: ['pipe', 'pipe', 'pipe']
+      })
+    } catch {
+      return null
+    }
+  }
+
+  let merged: string | null = null
+  try {
+    merged = readFileSync(path.join(repoPath, filePath), 'utf-8')
+  } catch {
+    // File may have been deleted
+  }
+
+  return {
+    path: filePath,
+    base: gitShow(':1'),
+    ours: gitShow(':2'),
+    theirs: gitShow(':3'),
+    merged
+  }
+}
+
+export function writeResolvedFile(repoPath: string, filePath: string, content: string): void {
+  writeFileSync(path.join(repoPath, filePath), content, 'utf-8')
+}
+
+export function commitFiles(repoPath: string, message: string): void {
+  execSync(`git commit -m "${message.replace(/"/g, '\\"')}"`, {
+    cwd: repoPath,
+    stdio: 'pipe'
+  })
 }

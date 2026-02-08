@@ -5,7 +5,7 @@ import type { Project } from '@slayzone/projects/shared'
 import type { TerminalState } from '@slayzone/terminal/shared'
 import { Card, CardContent, Tooltip, TooltipContent, TooltipTrigger, cn, getTerminalStateStyle } from '@slayzone/ui'
 import { todayISO } from './kanban'
-import { AlertCircle, Link2 } from 'lucide-react'
+import { AlertCircle, GitMerge, Link2 } from 'lucide-react'
 import { usePty } from '@slayzone/terminal'
 
 interface KanbanCardProps {
@@ -118,6 +118,16 @@ export function KanbanCard({
                   </Tooltip>
                 ) : null
               })()}
+              {task.merge_state && (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span className="shrink-0">
+                      <GitMerge className="h-2.5 w-2.5 text-purple-400" />
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent>Merging</TooltipContent>
+                </Tooltip>
+              )}
               {isBlocked && (
                 <span className="flex items-center text-amber-500 shrink-0" title="Blocked">
                   <Link2 className="h-2.5 w-2.5" />

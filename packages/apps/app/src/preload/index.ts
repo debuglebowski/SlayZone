@@ -165,7 +165,12 @@ const api: ElectronAPI = {
     unstageFile: (path, filePath) => ipcRenderer.invoke('git:unstageFile', path, filePath),
     stageAll: (path) => ipcRenderer.invoke('git:stageAll', path),
     unstageAll: (path) => ipcRenderer.invoke('git:unstageAll', path),
-    getUntrackedFileDiff: (repoPath, filePath) => ipcRenderer.invoke('git:getUntrackedFileDiff', repoPath, filePath)
+    getUntrackedFileDiff: (repoPath, filePath) => ipcRenderer.invoke('git:getUntrackedFileDiff', repoPath, filePath),
+    getConflictContent: (repoPath, filePath) => ipcRenderer.invoke('git:getConflictContent', repoPath, filePath),
+    writeResolvedFile: (repoPath, filePath, content) => ipcRenderer.invoke('git:writeResolvedFile', repoPath, filePath, content),
+    commitFiles: (repoPath, message) => ipcRenderer.invoke('git:commitFiles', repoPath, message),
+    analyzeConflict: (mode, filePath, base, ours, theirs) =>
+      ipcRenderer.invoke('git:analyzeConflict', mode, filePath, base, ours, theirs)
   },
   tabs: {
     list: (taskId) => ipcRenderer.invoke('tabs:list', taskId),
@@ -173,6 +178,25 @@ const api: ElectronAPI = {
     update: (input) => ipcRenderer.invoke('tabs:update', input),
     delete: (tabId) => ipcRenderer.invoke('tabs:delete', tabId),
     ensureMain: (taskId, mode) => ipcRenderer.invoke('tabs:ensureMain', taskId, mode)
+  },
+  diagnostics: {
+    getConfig: () => ipcRenderer.invoke('diagnostics:getConfig'),
+    setConfig: (config) => ipcRenderer.invoke('diagnostics:setConfig', config),
+    export: (request) => ipcRenderer.invoke('diagnostics:export', request),
+    recordClientError: (input) => ipcRenderer.invoke('diagnostics:recordClientError', input)
+  },
+  aiConfig: {
+    listItems: (input) => ipcRenderer.invoke('ai-config:list-items', input),
+    getItem: (id) => ipcRenderer.invoke('ai-config:get-item', id),
+    createItem: (input) => ipcRenderer.invoke('ai-config:create-item', input),
+    updateItem: (input) => ipcRenderer.invoke('ai-config:update-item', input),
+    deleteItem: (id) => ipcRenderer.invoke('ai-config:delete-item', id),
+    listProjectSelections: (projectId) => ipcRenderer.invoke('ai-config:list-project-selections', projectId),
+    setProjectSelection: (input) => ipcRenderer.invoke('ai-config:set-project-selection', input),
+    removeProjectSelection: (projectId, itemId) =>
+      ipcRenderer.invoke('ai-config:remove-project-selection', projectId, itemId),
+    listSources: () => ipcRenderer.invoke('ai-config:list-sources'),
+    createSourcePlaceholder: (input) => ipcRenderer.invoke('ai-config:create-source-placeholder', input)
   }
 }
 

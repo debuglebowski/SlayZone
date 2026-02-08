@@ -4,7 +4,47 @@ import type { Tag, CreateTagInput, UpdateTagInput } from '@slayzone/tags/shared'
 import type { TerminalMode, TerminalState, CodeMode, PtyInfo, PromptInfo, ClaudeAvailability, BufferSinceResult } from '@slayzone/terminal/shared'
 import type { TerminalTab, CreateTerminalTabInput, UpdateTerminalTabInput } from '@slayzone/task-terminals/shared'
 import type { Theme, ThemePreference } from '@slayzone/settings/shared'
-import type { DetectedWorktree, MergeResult, MergeWithAIResult, GitDiffSnapshot } from '@slayzone/worktrees/shared'
+import type { DetectedWorktree, MergeResult, MergeWithAIResult, GitDiffSnapshot, ConflictFileContent, ConflictAnalysis } from '@slayzone/worktrees/shared'
+import type {
+  AiConfigItem,
+  AiConfigProjectSelection,
+  AiConfigSourcePlaceholder,
+  CreateAiConfigItemInput,
+  CreateAiConfigSourcePlaceholderInput,
+  ListAiConfigItemsInput,
+  SetAiConfigProjectSelectionInput,
+  UpdateAiConfigItemInput
+} from '@slayzone/ai-config/shared'
+
+export interface DiagnosticsConfig {
+  enabled: boolean
+  verbose: boolean
+  includePtyOutput: boolean
+  retentionDays: number
+}
+
+export interface DiagnosticsExportRequest {
+  fromTsMs: number
+  toTsMs: number
+}
+
+export interface DiagnosticsExportResult {
+  success: boolean
+  canceled?: boolean
+  path?: string
+  eventCount?: number
+  error?: string
+}
+
+export interface ClientErrorEventInput {
+  type: 'window.error' | 'window.unhandledrejection' | 'error-boundary'
+  message: string
+  stack?: string | null
+  componentStack?: string | null
+  url?: string | null
+  line?: number | null
+  column?: number | null
+}
 
 // ElectronAPI interface - the IPC contract between renderer and main
 export interface ElectronAPI {
@@ -134,6 +174,10 @@ export interface ElectronAPI {
     stageAll: (path: string) => Promise<void>
     unstageAll: (path: string) => Promise<void>
     getUntrackedFileDiff: (repoPath: string, filePath: string) => Promise<string>
+    getConflictContent: (repoPath: string, filePath: string) => Promise<ConflictFileContent>
+    writeResolvedFile: (repoPath: string, filePath: string, content: string) => Promise<void>
+    commitFiles: (repoPath: string, message: string) => Promise<void>
+    analyzeConflict: (mode: string, filePath: string, base: string | null, ours: string | null, theirs: string | null) => Promise<ConflictAnalysis>
   }
   tabs: {
     list: (taskId: string) => Promise<TerminalTab[]>
@@ -141,5 +185,23 @@ export interface ElectronAPI {
     update: (input: UpdateTerminalTabInput) => Promise<TerminalTab | null>
     delete: (tabId: string) => Promise<boolean>
     ensureMain: (taskId: string, mode: TerminalMode) => Promise<TerminalTab>
+  }
+  diagnostics: {
+    getConfig: () => Promise<DiagnosticsConfig>
+    setConfig: (config: Partial<DiagnosticsConfig>) => Promise<DiagnosticsConfig>
+    export: (request: DiagnosticsExportRequest) => Promise<DiagnosticsExportResult>
+    recordClientError: (input: ClientErrorEventInput) => Promise<void>
+  }
+  aiConfig: {
+    listItems: (input: ListAiConfigItemsInput) => Promise<AiConfigItem[]>
+    getItem: (id: string) => Promise<AiConfigItem | null>
+    createItem: (input: CreateAiConfigItemInput) => Promise<AiConfigItem>
+    updateItem: (input: UpdateAiConfigItemInput) => Promise<AiConfigItem | null>
+    deleteItem: (id: string) => Promise<boolean>
+    listProjectSelections: (projectId: string) => Promise<AiConfigProjectSelection[]>
+    setProjectSelection: (input: SetAiConfigProjectSelectionInput) => Promise<void>
+    removeProjectSelection: (projectId: string, itemId: string) => Promise<boolean>
+    listSources: () => Promise<AiConfigSourcePlaceholder[]>
+    createSourcePlaceholder: (input: CreateAiConfigSourcePlaceholderInput) => Promise<AiConfigSourcePlaceholder>
   }
 }

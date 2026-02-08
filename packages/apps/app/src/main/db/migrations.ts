@@ -333,6 +333,90 @@ const migrations: Migration[] = [
       db.prepare(`INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)`)
         .run('default_codex_flags', '--full-auto --search')
     }
+  },
+  {
+    version: 22,
+    up: (db) => {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS diagnostics_events (
+          id TEXT PRIMARY KEY,
+          ts_ms INTEGER NOT NULL,
+          level TEXT NOT NULL,
+          source TEXT NOT NULL,
+          event TEXT NOT NULL,
+          trace_id TEXT,
+          task_id TEXT,
+          project_id TEXT,
+          session_id TEXT,
+          channel TEXT,
+          message TEXT,
+          payload_json TEXT,
+          redaction_version INTEGER NOT NULL DEFAULT 1
+        );
+        CREATE INDEX IF NOT EXISTS idx_diag_ts ON diagnostics_events(ts_ms);
+        CREATE INDEX IF NOT EXISTS idx_diag_level_ts ON diagnostics_events(level, ts_ms);
+        CREATE INDEX IF NOT EXISTS idx_diag_trace ON diagnostics_events(trace_id);
+        CREATE INDEX IF NOT EXISTS idx_diag_source_event_ts ON diagnostics_events(source, event, ts_ms);
+      `)
+
+      db.prepare(`INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)`)
+        .run('diagnostics_enabled', '1')
+      db.prepare(`INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)`)
+        .run('diagnostics_verbose', '0')
+      db.prepare(`INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)`)
+        .run('diagnostics_include_pty_output', '0')
+      db.prepare(`INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)`)
+        .run('diagnostics_retention_days', '14')
+    }
+  },
+  {
+    version: 23,
+    up: (db) => {
+      db.exec(`ALTER TABLE tasks ADD COLUMN merge_state TEXT DEFAULT NULL;`)
+    }
+  },
+  {
+    version: 24,
+    up: (db) => {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS ai_config_items (
+          id TEXT PRIMARY KEY,
+          type TEXT NOT NULL,
+          scope TEXT NOT NULL,
+          project_id TEXT REFERENCES projects(id) ON DELETE CASCADE,
+          name TEXT NOT NULL,
+          slug TEXT NOT NULL,
+          content TEXT NOT NULL DEFAULT '',
+          metadata_json TEXT NOT NULL DEFAULT '{}',
+          created_at TEXT NOT NULL DEFAULT (datetime('now')),
+          updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+        );
+        CREATE INDEX IF NOT EXISTS idx_ai_config_items_scope_type ON ai_config_items(scope, type);
+        CREATE INDEX IF NOT EXISTS idx_ai_config_items_project ON ai_config_items(project_id);
+
+        CREATE TABLE IF NOT EXISTS ai_config_project_selections (
+          id TEXT PRIMARY KEY,
+          project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+          item_id TEXT NOT NULL REFERENCES ai_config_items(id) ON DELETE CASCADE,
+          target_path TEXT NOT NULL,
+          selected_at TEXT NOT NULL DEFAULT (datetime('now')),
+          UNIQUE(project_id, item_id)
+        );
+        CREATE INDEX IF NOT EXISTS idx_ai_config_sel_project ON ai_config_project_selections(project_id);
+        CREATE INDEX IF NOT EXISTS idx_ai_config_sel_item ON ai_config_project_selections(item_id);
+
+        CREATE TABLE IF NOT EXISTS ai_config_sources (
+          id TEXT PRIMARY KEY,
+          name TEXT NOT NULL,
+          kind TEXT NOT NULL,
+          enabled INTEGER NOT NULL DEFAULT 0,
+          status TEXT NOT NULL DEFAULT 'placeholder',
+          last_checked_at TEXT DEFAULT NULL,
+          created_at TEXT NOT NULL DEFAULT (datetime('now')),
+          updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+        );
+      `)
+    }
   }
 ]
 

@@ -20,6 +20,19 @@ export interface MergeWithAIResult {
   error?: string
 }
 
+export interface ConflictFileContent {
+  path: string
+  base: string | null
+  ours: string | null
+  theirs: string | null
+  merged: string | null
+}
+
+export interface ConflictAnalysis {
+  summary: string
+  suggestion: string
+}
+
 export interface GitDiffSnapshot {
   targetPath: string
   files: string[]
