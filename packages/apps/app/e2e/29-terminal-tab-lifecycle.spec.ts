@@ -14,7 +14,7 @@ test.describe('Terminal tab lifecycle', () => {
 
   test.beforeAll(async ({ mainWindow }) => {
     const s = seed(mainWindow)
-    const p = await s.createProject({ name: 'Terminal Tabs', color: '#06b6d4', path: TEST_PROJECT_PATH })
+    const p = await s.createProject({ name: 'Alpha Tabs', color: '#06b6d4', path: TEST_PROJECT_PATH })
     projectAbbrev = p.name.slice(0, 2).toUpperCase()
 
     const t = await s.createTask({ projectId: p.id, title: 'Terminal tab task', status: 'todo' })
@@ -30,7 +30,7 @@ test.describe('Terminal tab lifecycle', () => {
     const mainSessionId = getMainSessionId(taskId)
     await waitForPtySession(mainWindow, mainSessionId)
 
-    await mainWindow.getByTestId('terminal-tab-add').click()
+    await mainWindow.locator('[data-testid="terminal-tabbar"]:visible [data-testid="terminal-tab-add"]').first().click()
 
     await expect
       .poll(async () => {

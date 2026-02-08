@@ -17,7 +17,7 @@ test.describe('Terminal session isolation', () => {
 
   test.beforeAll(async ({ mainWindow }) => {
     const s = seed(mainWindow)
-    const p = await s.createProject({ name: 'Terminal Isolation', color: '#84cc16', path: TEST_PROJECT_PATH })
+    const p = await s.createProject({ name: 'Bravo Isolation', color: '#84cc16', path: TEST_PROJECT_PATH })
     projectAbbrev = p.name.slice(0, 2).toUpperCase()
 
     const taskA = await s.createTask({ projectId: p.id, title: 'Isolation task A', status: 'todo' })
@@ -47,7 +47,7 @@ test.describe('Terminal session isolation', () => {
     await runCommand(mainWindow, sessionA1, `echo ${markerA1}`)
     await waitForBufferContains(mainWindow, sessionA1, markerA1)
 
-    await mainWindow.getByTestId('terminal-tab-add').click()
+    await mainWindow.locator('[data-testid="terminal-tabbar"]:visible [data-testid="terminal-tab-add"]').first().click()
 
     await expect
       .poll(async () => {

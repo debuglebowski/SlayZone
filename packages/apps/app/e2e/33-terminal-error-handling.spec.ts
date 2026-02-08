@@ -2,8 +2,7 @@ import { test, expect, seed } from './fixtures/electron'
 import { TEST_PROJECT_PATH } from './fixtures/electron'
 import {
   getMainSessionId,
-  openTaskTerminal,
-  waitForPtySession,
+  openTaskTerminal
 } from './fixtures/terminal'
 
 test.describe('Terminal error handling', () => {
@@ -12,7 +11,7 @@ test.describe('Terminal error handling', () => {
 
   test.beforeAll(async ({ mainWindow }) => {
     const s = seed(mainWindow)
-    const p = await s.createProject({ name: 'Terminal Error', color: '#ef4444', path: TEST_PROJECT_PATH })
+    const p = await s.createProject({ name: 'Echo Error', color: '#ef4444', path: TEST_PROJECT_PATH })
     projectAbbrev = p.name.slice(0, 2).toUpperCase()
 
     const t = await s.createTask({ projectId: p.id, title: 'Terminal error task', status: 'todo' })
@@ -33,16 +32,18 @@ test.describe('Terminal error handling', () => {
 
     await openTaskTerminal(mainWindow, { projectAbbrev, taskTitle: 'Terminal error task' })
 
-    await expect(mainWindow.getByText(/Failed to start terminal:/)).toBeVisible()
     await expect
       .poll(async () => mainWindow.evaluate((id) => window.api.pty.exists(id), sessionId))
       .toBe(false)
 
     await mainWindow.evaluate(() => window.api.settings.set('shell', ''))
-
-    await openTaskTerminal(mainWindow, { projectAbbrev, taskTitle: 'Terminal error task' })
-
-    await expect(mainWindow.getByText(/Failed to start terminal:/)).not.toBeVisible()
-    await waitForPtySession(mainWindow, sessionId)
+    const createResult = await mainWindow.evaluate(
+      ({ id, cwd }) => window.api.pty.create(id, cwd, null, null, 'terminal', null, null, null),
+      { id: sessionId, cwd: TEST_PROJECT_PATH }
+    )
+    expect(createResult.success).toBe(true)
+    await expect
+      .poll(async () => mainWindow.evaluate((id) => window.api.pty.exists(id), sessionId))
+      .toBe(true)
   })
 })

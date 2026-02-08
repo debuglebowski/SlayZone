@@ -15,7 +15,7 @@ test.describe('Terminal buffer restore', () => {
 
   test.beforeAll(async ({ mainWindow }) => {
     const s = seed(mainWindow)
-    const p = await s.createProject({ name: 'Terminal Restore', color: '#f97316', path: TEST_PROJECT_PATH })
+    const p = await s.createProject({ name: 'Charlie Restore', color: '#f97316', path: TEST_PROJECT_PATH })
     projectAbbrev = p.name.slice(0, 2).toUpperCase()
 
     const t = await s.createTask({ projectId: p.id, title: 'Buffer restore task', status: 'todo' })
@@ -38,7 +38,7 @@ test.describe('Terminal buffer restore', () => {
     await goHome(mainWindow)
     await clickProject(mainWindow, projectAbbrev)
     await mainWindow.getByText('Buffer restore task').first().click()
-    await expect(mainWindow.getByTestId('terminal-mode-trigger')).toBeVisible()
+    await expect(mainWindow.locator('[data-testid="terminal-mode-trigger"]:visible').first()).toBeVisible()
 
     await waitForPtySession(mainWindow, sessionId)
     const restoredBuffer = await readFullBuffer(mainWindow, sessionId)

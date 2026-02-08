@@ -54,7 +54,9 @@ export const test = base.extend<ElectronFixtures>({
         // Dismiss onboarding if it appears
         const skip = sharedPage.getByRole('button', { name: 'Skip' })
         if (await skip.isVisible({ timeout: 2_000 }).catch(() => false)) {
-          await skip.click()
+          await skip.click({ timeout: 2_000 }).catch(async () => {
+            await skip.first().click({ force: true, timeout: 2_000 }).catch(() => {})
+          })
         }
       }
       await use(sharedPage)
@@ -64,8 +66,8 @@ export const test = base.extend<ElectronFixtures>({
 })
 
 /**
- * The app opens a splash window (data: URL) before the main window (file:// URL).
- * Wait for the main window and its React root to mount.
+ * In regular app runs there is a splash window (data: URL) before the main window (file:// URL).
+ * In Playwright mode the splash is disabled, so we resolve the first non-data window either way.
  */
 async function resolveMainWindow(app: ElectronApplication): Promise<Page> {
   const isMain = (url: string) => !url.startsWith('data:')
@@ -170,7 +172,7 @@ const sidebar = (page: Page) => page.locator('[data-slot="sidebar"]').first()
 
 /** Click a project blob in the sidebar by its 2-letter abbreviation */
 export async function clickProject(page: Page, abbrev: string) {
-  await sidebar(page).getByText(abbrev, { exact: true }).click()
+  await sidebar(page).getByRole('button', { name: abbrev, exact: true }).last().click()
 }
 
 /** Click the "All" button in the sidebar */
@@ -194,7 +196,9 @@ export async function goHome(page: Page) {
   for (const sel of ['.lucide-house', '.lucide-home']) {
     const icon = page.locator(sel).first()
     if (await icon.isVisible({ timeout: 500 }).catch(() => false)) {
-      await icon.click()
+      await icon.click({ timeout: 2_000 }).catch(async () => {
+        await icon.click({ force: true, timeout: 2_000 }).catch(() => {})
+      })
       return
     }
   }

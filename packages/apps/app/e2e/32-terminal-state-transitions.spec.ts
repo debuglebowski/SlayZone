@@ -15,7 +15,7 @@ test.describe('Terminal state behavior', () => {
 
   test.beforeAll(async ({ mainWindow }) => {
     const s = seed(mainWindow)
-    const p = await s.createProject({ name: 'Terminal State', color: '#eab308', path: TEST_PROJECT_PATH })
+    const p = await s.createProject({ name: 'Delta State', color: '#eab308', path: TEST_PROJECT_PATH })
     projectAbbrev = p.name.slice(0, 2).toUpperCase()
 
     const t = await s.createTask({ projectId: p.id, title: 'State transition task', status: 'todo' })

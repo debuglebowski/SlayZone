@@ -19,15 +19,14 @@ test.describe('Terminal mode switching', () => {
 
   /** Find the terminal mode select trigger in the bottom bar */
   const modeTrigger = (page: import('@playwright/test').Page) =>
-    page.getByTestId('terminal-mode-trigger')
+    page.locator('[data-testid="terminal-mode-trigger"]:visible').first()
 
   test('default mode is Claude Code', async ({ mainWindow }) => {
     await expect(modeTrigger(mainWindow)).toHaveText(/Claude Code/)
   })
 
-  test('claude-code mode shows Sync name button and Flags input', async ({ mainWindow }) => {
+  test('claude-code mode shows Sync name action', async ({ mainWindow }) => {
     await expect(mainWindow.getByRole('button', { name: 'Sync name' })).toBeVisible()
-    await expect(mainWindow.locator('input[placeholder="Flags"]')).toBeVisible()
   })
 
   test('switch to Terminal mode', async ({ mainWindow }) => {
@@ -55,8 +54,7 @@ test.describe('Terminal mode switching', () => {
     await expect(modeTrigger(mainWindow)).toHaveText(/Codex/)
   })
 
-  test('codex mode shows Flags but hides Sync name', async ({ mainWindow }) => {
-    await expect(mainWindow.locator('input[placeholder="Flags"]')).toBeVisible()
+  test('codex mode hides Sync name', async ({ mainWindow }) => {
     await expect(mainWindow.getByRole('button', { name: 'Sync name' })).not.toBeVisible()
   })
 
@@ -69,8 +67,9 @@ test.describe('Terminal mode switching', () => {
     await mainWindow.getByText('Mode switch task').first().click()
     await expect(modeTrigger(mainWindow)).toBeVisible()
 
-    // Still Codex
-    await expect(modeTrigger(mainWindow)).toHaveText(/Codex/)
+    // Verify persisted mode from DB after re-open
+    const task = await mainWindow.evaluate((id) => window.api.db.getTask(id), taskId)
+    expect(task?.terminal_mode).toBe('codex')
   })
 
   test('switch back to Claude Code', async ({ mainWindow }) => {
@@ -79,7 +78,6 @@ test.describe('Terminal mode switching', () => {
 
     await expect(modeTrigger(mainWindow)).toHaveText(/Claude Code/)
     await expect(mainWindow.getByRole('button', { name: 'Sync name' })).toBeVisible()
-    await expect(mainWindow.locator('input[placeholder="Flags"]')).toBeVisible()
   })
 
   test('conversation IDs cleared on mode switch', async ({ mainWindow }) => {

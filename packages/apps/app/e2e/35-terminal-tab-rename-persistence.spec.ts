@@ -22,7 +22,7 @@ test.describe('Terminal tab rename persistence', () => {
     const label = `Renamed ${Date.now()}`
 
     await openTaskTerminal(mainWindow, { projectAbbrev, taskTitle: 'Tab rename task' })
-    await mainWindow.getByTestId('terminal-tab-add').click()
+    await mainWindow.locator('[data-testid="terminal-tabbar"]:visible [data-testid="terminal-tab-add"]').first().click()
 
     await expect
       .poll(async () => {
@@ -57,7 +57,7 @@ test.describe('Terminal tab rename persistence', () => {
     await goHome(mainWindow)
     await clickProject(mainWindow, projectAbbrev)
     await mainWindow.getByText('Tab rename task').first().click()
-    await expect(mainWindow.getByTestId('terminal-tabbar')).toBeVisible()
+    await expect(mainWindow.locator('[data-testid="terminal-tabbar"]:visible').first()).toBeVisible()
 
     await expect(mainWindow.getByTestId(`terminal-tab-${nonMainTabId}`).getByText(label)).toBeVisible()
   })

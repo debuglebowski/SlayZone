@@ -3,6 +3,10 @@ import { expect } from './electron'
 import { clickProject, goHome } from './electron'
 import type { TerminalMode, TerminalState } from '@slayzone/terminal/shared'
 
+function activeModeTrigger(page: Page) {
+  return page.locator('[data-testid="terminal-mode-trigger"]:visible').first()
+}
+
 export function getMainSessionId(taskId: string): string {
   return `${taskId}:${taskId}`
 }
@@ -17,8 +21,20 @@ export async function openTaskTerminal(
 ): Promise<void> {
   await goHome(page)
   await clickProject(page, opts.projectAbbrev)
-  await page.getByText(opts.taskTitle).first().click()
-  await expect(page.getByTestId('terminal-mode-trigger')).toBeVisible()
+
+  const taskCardTitle = page.locator('p.line-clamp-3:visible', { hasText: opts.taskTitle }).first()
+  if (await taskCardTitle.isVisible({ timeout: 2_000 }).catch(() => false)) {
+    await taskCardTitle.click()
+  } else {
+    await page.keyboard.press('Meta+k')
+    const searchInput = page.getByPlaceholder('Search tasks and projects...')
+    await expect(searchInput).toBeVisible()
+    await searchInput.fill(opts.taskTitle)
+    const dialog = page.locator('[role="dialog"]:visible').last()
+    await dialog.getByText(opts.taskTitle).first().click()
+  }
+
+  await expect(activeModeTrigger(page)).toBeVisible()
 }
 
 export async function switchTerminalMode(page: Page, mode: TerminalMode): Promise<void> {
@@ -28,9 +44,10 @@ export async function switchTerminalMode(page: Page, mode: TerminalMode): Promis
     terminal: 'Terminal',
   }
 
-  await page.getByTestId('terminal-mode-trigger').click()
+  const trigger = activeModeTrigger(page)
+  await trigger.click()
   await page.getByRole('option', { name: labels[mode] }).click()
-  await expect(page.getByTestId('terminal-mode-trigger')).toHaveText(labels[mode])
+  await expect(trigger).toHaveText(labels[mode])
 }
 
 export async function waitForPtySession(

@@ -212,10 +212,10 @@ export function createPty(
   mode?: TerminalMode,
   globalShell?: string | null,
   initialPrompt?: string | null,
-  dangerouslySkipPermissions?: boolean,
+  providerArgs?: string[],
   codeMode?: CodeMode | null
 ): { success: boolean; error?: string } {
-  console.log(`[pty-manager] createPty(${sessionId}) mode=${mode} shell=${globalShell} skipPerms=${dangerouslySkipPermissions} codeMode=${codeMode}`)
+  console.log(`[pty-manager] createPty(${sessionId}) mode=${mode} shell=${globalShell} providerArgs=${JSON.stringify(providerArgs ?? [])} codeMode=${codeMode}`)
   // Kill existing if any
   if (sessions.has(sessionId)) {
     console.log(`[pty-manager] createPty(${sessionId}) - killing existing PTY first`)
@@ -229,7 +229,7 @@ export function createPty(
     const effectiveConversationId = existingConversationId || conversationId
 
     // Get spawn config from adapter
-    const spawnConfig = adapter.buildSpawnConfig(cwd || homedir(), effectiveConversationId || undefined, resuming, globalShell || undefined, initialPrompt || undefined, dangerouslySkipPermissions, codeMode || undefined)
+    const spawnConfig = adapter.buildSpawnConfig(cwd || homedir(), effectiveConversationId || undefined, resuming, globalShell || undefined, initialPrompt || undefined, providerArgs ?? [], codeMode || undefined)
 
     const ptyProcess = pty.spawn(spawnConfig.shell, spawnConfig.args, {
       name: 'xterm-256color',
