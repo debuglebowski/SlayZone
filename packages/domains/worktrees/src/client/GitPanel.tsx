@@ -18,6 +18,7 @@ import type { Task, UpdateTaskInput } from '@slayzone/task/shared'
 import type { MergeResult } from '../shared/types'
 import {
   DEFAULT_WORKTREE_BASE_PATH_TEMPLATE,
+  joinWorktreePath,
   resolveWorktreeBasePathTemplate,
   slugify
 } from './utils'
@@ -148,7 +149,7 @@ export function GitPanel({ task, projectPath, onUpdateTask, onTaskUpdated, disab
 
       // Generate branch name from task title
       const branch = slugify(task.title) || `task-${task.id.slice(0, 8)}`
-      const worktreePath = `${basePath}/${branch}`
+      const worktreePath = joinWorktreePath(basePath, branch)
 
       await window.api.git.createWorktree(projectPath, worktreePath, branch)
       await onUpdateTask({

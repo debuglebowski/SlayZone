@@ -4,6 +4,7 @@
  */
 import {
   DEFAULT_WORKTREE_BASE_PATH_TEMPLATE,
+  joinWorktreePath,
   resolveWorktreeBasePathTemplate,
   slugify
 } from './utils'
@@ -93,19 +94,31 @@ test('default template constant', () => {
 })
 
 test('resolve {project} token (posix)', () => {
-  expect(resolveWorktreeBasePathTemplate('{project}/..', '/Users/kalle/dev/slayzone')).toBe('/Users/kalle/dev/slayzone/..')
+  expect(resolveWorktreeBasePathTemplate('{project}/..', '/Users/kalle/dev/slayzone')).toBe('/Users/kalle/dev')
 })
 
 test('resolve {project} token trims trailing slash', () => {
-  expect(resolveWorktreeBasePathTemplate('{project}/..', '/Users/kalle/dev/slayzone/')).toBe('/Users/kalle/dev/slayzone/..')
+  expect(resolveWorktreeBasePathTemplate('{project}/..', '/Users/kalle/dev/slayzone/')).toBe('/Users/kalle/dev')
 })
 
 test('resolve {project} token (windows)', () => {
-  expect(resolveWorktreeBasePathTemplate('{project}\\..', 'C:\\Users\\kalle\\dev\\slayzone')).toBe('C:\\Users\\kalle\\dev\\slayzone\\..')
+  expect(resolveWorktreeBasePathTemplate('{project}\\..', 'C:\\Users\\kalle\\dev\\slayzone')).toBe('C:\\Users\\kalle\\dev')
 })
 
 test('template without token is returned unchanged', () => {
   expect(resolveWorktreeBasePathTemplate('/tmp/worktrees', '/Users/kalle/dev/slayzone')).toBe('/tmp/worktrees')
+})
+
+test('normalizes explicit dot segments', () => {
+  expect(resolveWorktreeBasePathTemplate('/tmp/worktrees/../wt', '/ignored')).toBe('/tmp/wt')
+})
+
+test('joins worktree path with posix separator', () => {
+  expect(joinWorktreePath('/tmp/wt', 'feature-1')).toBe('/tmp/wt/feature-1')
+})
+
+test('joins worktree path with windows separator', () => {
+  expect(joinWorktreePath('C:\\tmp\\wt', 'feature-1')).toBe('C:\\tmp\\wt\\feature-1')
 })
 
 console.log(`\n${passed} passed, ${failed} failed`)

@@ -189,12 +189,11 @@ test.describe('Git worktree operations', () => {
       .poll(() => execSync('git branch', { cwd: TEST_PROJECT_PATH }).toString())
       .toContain(branchName)
 
-    // Verify default template behavior: {project}/.. + /{branch}
+    // Verify default template behavior: {project}/.. resolves to project parent.
     const task = await getTask(mainWindow, taskId)
     const worktreePathFromDb = task?.worktree_path ?? ''
-    const escapedBranch = branchName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-    const expectedPattern = new RegExp(`[\\\\/]\\.\\.[\\\\/]${escapedBranch}$`)
-    expect(worktreePathFromDb).toMatch(expectedPattern)
+    const expectedWorktreePath = path.join(path.dirname(TEST_PROJECT_PATH), branchName)
+    expect(worktreePathFromDb).toBe(expectedWorktreePath)
 
     // Verify worktree dir exists on disk (read effective path from DB)
     const worktreePath = task?.worktree_path ?? path.join(TEST_PROJECT_PATH, 'worktrees', branchName)
