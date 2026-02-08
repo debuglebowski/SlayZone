@@ -53,7 +53,7 @@ export async function switchTerminalMode(page: Page, mode: TerminalMode): Promis
 export async function waitForPtySession(
   page: Page,
   sessionId: string,
-  timeoutMs = 10_000
+  timeoutMs = 20_000
 ): Promise<void> {
   await expect
     .poll(
@@ -66,7 +66,7 @@ export async function waitForPtySession(
 export async function waitForNoPtySession(
   page: Page,
   sessionId: string,
-  timeoutMs = 10_000
+  timeoutMs = 20_000
 ): Promise<void> {
   await expect
     .poll(

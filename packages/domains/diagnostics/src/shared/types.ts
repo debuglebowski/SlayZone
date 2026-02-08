@@ -93,4 +93,17 @@ export interface ClientErrorEventInput {
   url?: string | null
   line?: number | null
   column?: number | null
+  snapshot?: Record<string, unknown> | null
+}
+
+export interface ClientDiagnosticEventInput {
+  event: string
+  level?: DiagnosticLevel
+  message?: string | null
+  traceId?: string | null
+  taskId?: string | null
+  projectId?: string | null
+  sessionId?: string | null
+  channel?: string | null
+  payload?: unknown
 }

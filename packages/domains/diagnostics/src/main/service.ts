@@ -3,6 +3,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import type { Database } from 'better-sqlite3'
 import type {
+  ClientDiagnosticEventInput,
   ClientErrorEventInput,
   DiagnosticEvent,
   DiagnosticsConfig,
@@ -30,6 +31,17 @@ const DEFAULT_CONFIG: DiagnosticsConfig = {
 }
 
 const IPC_PAYLOAD_SKIP_CHANNELS = new Set(['pty:write', 'pty:getBufferSince', 'pty:getBuffer'])
+const CRITICAL_SETTINGS_KEYS = new Set([
+  'theme',
+  'shell',
+  'default_terminal_mode',
+  'default_claude_flags',
+  'default_codex_flags',
+  CONFIG_KEYS.enabled,
+  CONFIG_KEYS.verbose,
+  CONFIG_KEYS.includePtyOutput,
+  CONFIG_KEYS.retentionDays
+])
 
 let diagnosticsDb: Database | null = null
 let retentionTimer: NodeJS.Timeout | null = null
@@ -216,6 +228,83 @@ function summarizeArgs(args: unknown[]): unknown {
   })
 }
 
+function summarizeMutationArg(value: unknown): unknown {
+  if (value == null) return value
+  if (typeof value === 'string') {
+    if (value.length > 180) return `${value.slice(0, 180)}...[trimmed:${value.length - 180}]`
+    return value
+  }
+  if (typeof value === 'number' || typeof value === 'boolean') return value
+  if (Array.isArray(value)) return { type: 'array', count: value.length }
+  if (typeof value === 'object') {
+    const objectValue = value as Record<string, unknown>
+    return {
+      type: 'object',
+      keys: Object.keys(objectValue).slice(0, 20),
+      id: typeof objectValue.id === 'string' ? objectValue.id : null,
+      taskId: typeof objectValue.taskId === 'string' ? objectValue.taskId : null,
+      projectId: typeof objectValue.projectId === 'string' ? objectValue.projectId : null,
+      key: typeof objectValue.key === 'string' ? objectValue.key : null
+    }
+  }
+  return { type: typeof value }
+}
+
+function buildDbMutationEvent(
+  channel: string,
+  args: unknown[],
+  traceId: string
+): Omit<DiagnosticEvent, 'level' | 'source' | 'event'> | null {
+  if (channel === 'diagnostics:setConfig') {
+    return {
+      traceId,
+      channel,
+      message: 'diagnostics config updated',
+      payload: {
+        channel,
+        entity: 'diagnostics',
+        operation: 'setConfig',
+        args: args.map((arg) => summarizeMutationArg(arg))
+      }
+    }
+  }
+
+  if (!channel.startsWith('db:')) return null
+
+  const segments = channel.split(':')
+  if (segments.length < 3) return null
+
+  const entity = segments[1]
+  const operation = segments[2]
+
+  const isMutationOperation =
+    operation.includes('create') ||
+    operation.includes('update') ||
+    operation.includes('delete') ||
+    operation.includes('archive') ||
+    operation.includes('reorder') ||
+    operation.includes('set')
+
+  if (!isMutationOperation) return null
+
+  if (entity === 'settings' && operation === 'set') {
+    const key = typeof args[0] === 'string' ? args[0] : null
+    if (!key || !CRITICAL_SETTINGS_KEYS.has(key)) return null
+  }
+
+  return {
+    traceId,
+    channel,
+    message: `${entity}.${operation}`,
+    payload: {
+      channel,
+      entity,
+      operation,
+      args: args.map((arg) => summarizeMutationArg(arg))
+    }
+  }
+}
+
 function buildTraceId(channel: string, tsMs: number): string {
   return `${channel}:${tsMs}:${Math.random().toString(36).slice(2, 8)}`
 }
@@ -256,6 +345,17 @@ function instrumentIpcMain(ipcMain: IpcMain): void {
             resultType: result == null ? null : typeof result
           }
         })
+
+        const dbMutationEvent = buildDbMutationEvent(channel, args, traceId)
+        if (dbMutationEvent) {
+          recordDiagnosticEvent({
+            level: 'info',
+            source: channel === 'diagnostics:setConfig' ? 'settings' : 'db',
+            event: 'db.mutation',
+            ...dbMutationEvent
+          })
+        }
+
         return result
       } catch (error) {
         recordDiagnosticEvent({
@@ -310,8 +410,24 @@ function normalizeClientError(input: ClientErrorEventInput): DiagnosticEvent {
       componentStack: input.componentStack ?? null,
       url: input.url ?? null,
       line: input.line ?? null,
-      column: input.column ?? null
+      column: input.column ?? null,
+      snapshot: input.snapshot ?? null
     }
+  }
+}
+
+function normalizeClientEvent(input: ClientDiagnosticEventInput): DiagnosticEvent {
+  return {
+    level: input.level ?? 'info',
+    source: 'renderer',
+    event: input.event,
+    traceId: input.traceId ?? null,
+    taskId: input.taskId ?? null,
+    projectId: input.projectId ?? null,
+    sessionId: input.sessionId ?? null,
+    channel: input.channel ?? null,
+    message: input.message ?? null,
+    payload: input.payload ?? null
   }
 }
 
@@ -461,6 +577,10 @@ export function registerDiagnosticsHandlers(ipcMain: IpcMain, db: Database): voi
 
   ipcMain.handle('diagnostics:recordClientError', (_, input: ClientErrorEventInput) => {
     recordDiagnosticEvent(normalizeClientError(input))
+  })
+
+  ipcMain.handle('diagnostics:recordClientEvent', (_, input: ClientDiagnosticEventInput) => {
+    recordDiagnosticEvent(normalizeClientEvent(input))
   })
 
   ipcMain.handle('diagnostics:export', (_, request: DiagnosticsExportRequest) => {

@@ -1,5 +1,6 @@
 import { Component, type ReactNode } from 'react'
 import { Button } from '@slayzone/ui'
+import { getDiagnosticsContext } from '@/lib/diagnosticsClient'
 
 interface Props {
   children: ReactNode
@@ -27,7 +28,8 @@ export class ErrorBoundary extends Component<Props, State> {
       type: 'error-boundary',
       message: error.message,
       stack: error.stack ?? null,
-      componentStack: info.componentStack ?? null
+      componentStack: info.componentStack ?? null,
+      snapshot: getDiagnosticsContext()
     })
   }
 

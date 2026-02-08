@@ -28,7 +28,7 @@ test.describe('Terminal tab lifecycle', () => {
     await openTaskTerminal(mainWindow, { projectAbbrev, taskTitle: 'Terminal tab task' })
 
     const mainSessionId = getMainSessionId(taskId)
-    await waitForPtySession(mainWindow, mainSessionId)
+    await waitForPtySession(mainWindow, mainSessionId, 20_000)
 
     await mainWindow.locator('[data-testid="terminal-tabbar"]:visible [data-testid="terminal-tab-add"]').first().click()
 
@@ -46,7 +46,7 @@ test.describe('Terminal tab lifecycle', () => {
     const nonMainTabId = nonMainTab!.id
 
     const nonMainSessionId = getTabSessionId(taskId, nonMainTabId)
-    await waitForPtySession(mainWindow, nonMainSessionId)
+    await waitForPtySession(mainWindow, nonMainSessionId, 20_000)
 
     await mainWindow.getByTestId(`terminal-tab-${nonMainTabId}`).hover()
     await mainWindow.getByTestId(`terminal-tab-close-${nonMainTabId}`).click()

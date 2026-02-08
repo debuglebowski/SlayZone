@@ -94,6 +94,7 @@ const api: ElectronAPI = {
     kill: (sessionId) => ipcRenderer.invoke('pty:kill', sessionId),
     exists: (sessionId) => ipcRenderer.invoke('pty:exists', sessionId),
     getBuffer: (sessionId) => ipcRenderer.invoke('pty:getBuffer', sessionId),
+    clearBuffer: (sessionId) => ipcRenderer.invoke('pty:clearBuffer', sessionId),
     getBufferSince: (sessionId, afterSeq) => ipcRenderer.invoke('pty:getBufferSince', sessionId, afterSeq),
     list: () => ipcRenderer.invoke('pty:list'),
     onData: (callback: (sessionId: string, data: string, seq: number) => void) => {
@@ -183,7 +184,8 @@ const api: ElectronAPI = {
     getConfig: () => ipcRenderer.invoke('diagnostics:getConfig'),
     setConfig: (config) => ipcRenderer.invoke('diagnostics:setConfig', config),
     export: (request) => ipcRenderer.invoke('diagnostics:export', request),
-    recordClientError: (input) => ipcRenderer.invoke('diagnostics:recordClientError', input)
+    recordClientError: (input) => ipcRenderer.invoke('diagnostics:recordClientError', input),
+    recordClientEvent: (input) => ipcRenderer.invoke('diagnostics:recordClientEvent', input)
   },
   aiConfig: {
     listItems: (input) => ipcRenderer.invoke('ai-config:list-items', input),
@@ -197,6 +199,21 @@ const api: ElectronAPI = {
       ipcRenderer.invoke('ai-config:remove-project-selection', projectId, itemId),
     listSources: () => ipcRenderer.invoke('ai-config:list-sources'),
     createSourcePlaceholder: (input) => ipcRenderer.invoke('ai-config:create-source-placeholder', input)
+  },
+  integrations: {
+    connectLinear: (input) => ipcRenderer.invoke('integrations:connect-linear', input),
+    listConnections: (provider) => ipcRenderer.invoke('integrations:list-connections', provider),
+    disconnect: (connectionId) => ipcRenderer.invoke('integrations:disconnect', connectionId),
+    listLinearTeams: (connectionId) => ipcRenderer.invoke('integrations:list-linear-teams', connectionId),
+    listLinearProjects: (connectionId, teamId) =>
+      ipcRenderer.invoke('integrations:list-linear-projects', connectionId, teamId),
+    setProjectMapping: (input) => ipcRenderer.invoke('integrations:set-project-mapping', input),
+    getProjectMapping: (projectId, provider) =>
+      ipcRenderer.invoke('integrations:get-project-mapping', projectId, provider),
+    importLinearIssues: (input) => ipcRenderer.invoke('integrations:import-linear-issues', input),
+    syncNow: (input) => ipcRenderer.invoke('integrations:sync-now', input),
+    getLink: (taskId, provider) => ipcRenderer.invoke('integrations:get-link', taskId, provider),
+    unlinkTask: (taskId, provider) => ipcRenderer.invoke('integrations:unlink-task', taskId, provider)
   }
 }
 

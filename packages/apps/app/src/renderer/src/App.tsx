@@ -29,6 +29,7 @@ import {
 import { SidebarProvider } from '@slayzone/ui'
 import { AppSidebar } from '@/components/sidebar/AppSidebar'
 import { TabBar } from '@/components/tabs/TabBar'
+import { recordDiagnosticsTimeline, updateDiagnosticsContext } from '@/lib/diagnosticsClient'
 import {
   DesktopNotificationToggle,
   NotificationButton,
@@ -84,6 +85,7 @@ function App(): React.JSX.Element {
   const [quickRunOpen, setQuickRunOpen] = useState(false)
   const [completeTaskDialogOpen, setCompleteTaskDialogOpen] = useState(false)
   const [appView, setAppView] = useState<'tasks' | 'ai-center'>('tasks')
+  const [aiCenterInitialScope, setAiCenterInitialScope] = useState<'global' | 'project'>('global')
 
   // Project path validation
   const [projectPathMissing, setProjectPathMissing] = useState(false)
@@ -115,6 +117,12 @@ function App(): React.JSX.Element {
     tasks,
     notificationState.filterCurrentProject ? selectedProjectId : null
   )
+
+  const previousAppViewRef = useRef(appView)
+  const previousProjectRef = useRef<string | null>(selectedProjectId)
+  const previousActiveTabRef = useRef<string>('home')
+  const previousNotificationLockedRef = useRef(notificationState.isLocked)
+  const previousNotificationProjectFilterRef = useRef(notificationState.filterCurrentProject)
 
   // Get task IDs from open tabs
   const openTaskIds = useMemo(
@@ -292,6 +300,80 @@ function App(): React.JSX.Element {
     : tasks
   const displayTasks = applyFilters(projectTasks, filter, taskTags)
   const projectsMap = new Map(projects.map((p) => [p.id, p]))
+
+  useEffect(() => {
+    const activeTab = tabs[activeTabIndex]
+    updateDiagnosticsContext({
+      appView,
+      activeTabIndex,
+      activeTabType: activeTab?.type ?? 'unknown',
+      activeTaskId: activeTab?.type === 'task' ? activeTab.taskId : null,
+      openTaskTabs: tabs.filter((t) => t.type === 'task').length,
+      selectedProjectId,
+      selectedProjectName: projects.find((p) => p.id === selectedProjectId)?.name ?? null,
+      taskCount: tasks.length,
+      visibleTaskCount: displayTasks.length,
+      notificationPanelLocked: notificationState.isLocked,
+      notificationFilterCurrentProject: notificationState.filterCurrentProject,
+      projectPathMissing
+    })
+  }, [
+    appView,
+    activeTabIndex,
+    tabs,
+    selectedProjectId,
+    projects,
+    tasks.length,
+    displayTasks.length,
+    notificationState.isLocked,
+    notificationState.filterCurrentProject,
+    projectPathMissing
+  ])
+
+  useEffect(() => {
+    if (previousAppViewRef.current === appView) return
+    recordDiagnosticsTimeline('view_changed', { from: previousAppViewRef.current, to: appView })
+    previousAppViewRef.current = appView
+  }, [appView])
+
+  useEffect(() => {
+    if (previousProjectRef.current === selectedProjectId) return
+    recordDiagnosticsTimeline('project_changed', {
+      from: previousProjectRef.current,
+      to: selectedProjectId
+    })
+    previousProjectRef.current = selectedProjectId
+  }, [selectedProjectId])
+
+  useEffect(() => {
+    const activeTab = tabs[activeTabIndex]
+    const nextTabKey = activeTab?.type === 'task' ? `task:${activeTab.taskId}` : 'home'
+    if (previousActiveTabRef.current === nextTabKey) return
+    recordDiagnosticsTimeline('tab_changed', {
+      from: previousActiveTabRef.current,
+      to: nextTabKey,
+      activeTabIndex
+    })
+    previousActiveTabRef.current = nextTabKey
+  }, [tabs, activeTabIndex])
+
+  useEffect(() => {
+    if (previousNotificationLockedRef.current === notificationState.isLocked) return
+    recordDiagnosticsTimeline('notification_lock_changed', {
+      from: previousNotificationLockedRef.current,
+      to: notificationState.isLocked
+    })
+    previousNotificationLockedRef.current = notificationState.isLocked
+  }, [notificationState.isLocked])
+
+  useEffect(() => {
+    if (previousNotificationProjectFilterRef.current === notificationState.filterCurrentProject) return
+    recordDiagnosticsTimeline('notification_filter_project_changed', {
+      from: previousNotificationProjectFilterRef.current,
+      to: notificationState.filterCurrentProject
+    })
+    previousNotificationProjectFilterRef.current = notificationState.filterCurrentProject
+  }, [notificationState.filterCurrentProject])
 
   // Keyboard shortcuts
   useHotkeys('mod+n', (e) => {
@@ -502,6 +584,20 @@ function App(): React.JSX.Element {
     }
   }
 
+  const openGlobalAiCenter = (): void => {
+    setAiCenterInitialScope('global')
+    setAppView('ai-center')
+  }
+
+  const goToTasksView = (): void => {
+    setAppView('tasks')
+  }
+
+  const handleSidebarSelectProject = (projectId: string | null): void => {
+    setSelectedProjectId(projectId)
+    setAppView('tasks')
+  }
+
   return (
     <SidebarProvider defaultOpen={true}>
       <div className="h-full w-full flex">
@@ -515,14 +611,19 @@ function App(): React.JSX.Element {
           onProjectDelete={setDeletingProject}
           onSettings={() => setSettingsOpen(true)}
           onTutorial={() => setOnboardingOpen(true)}
-          onAiCenter={() => setAppView((prev) => (prev === 'ai-center' ? 'tasks' : 'ai-center'))}
+          onAiCenter={openGlobalAiCenter}
           aiCenterActive={appView === 'ai-center'}
         />
 
         <div className="flex-1 flex flex-col min-w-0">
           {appView === 'ai-center' ? (
             <div className="flex-1 min-h-0">
-              <AiConfigCenter projects={projects} selectedProjectId={selectedProjectId} />
+              <AiConfigCenter
+                projects={projects}
+                selectedProjectId={selectedProjectId}
+                initialScope={aiCenterInitialScope}
+                onBack={goToTasksView}
+              />
             </div>
           ) : (
             <>

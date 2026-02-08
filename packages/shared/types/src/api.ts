@@ -15,6 +15,20 @@ import type {
   SetAiConfigProjectSelectionInput,
   UpdateAiConfigItemInput
 } from '@slayzone/ai-config/shared'
+import type {
+  ConnectLinearInput,
+  ExternalLink,
+  ImportLinearIssuesInput,
+  ImportLinearIssuesResult,
+  IntegrationConnectionPublic,
+  IntegrationProjectMapping,
+  IntegrationProvider,
+  LinearProject,
+  LinearTeam,
+  SetProjectMappingInput,
+  SyncNowInput,
+  SyncNowResult
+} from '@slayzone/integrations/shared'
 
 export interface DiagnosticsConfig {
   enabled: boolean
@@ -44,6 +58,19 @@ export interface ClientErrorEventInput {
   url?: string | null
   line?: number | null
   column?: number | null
+  snapshot?: Record<string, unknown> | null
+}
+
+export interface ClientDiagnosticEventInput {
+  event: string
+  level?: 'debug' | 'info' | 'warn' | 'error'
+  message?: string | null
+  traceId?: string | null
+  taskId?: string | null
+  projectId?: string | null
+  sessionId?: string | null
+  channel?: string | null
+  payload?: unknown
 }
 
 // ElectronAPI interface - the IPC contract between renderer and main
@@ -142,6 +169,9 @@ export interface ElectronAPI {
     kill: (sessionId: string) => Promise<boolean>
     exists: (sessionId: string) => Promise<boolean>
     getBuffer: (sessionId: string) => Promise<string | null>
+    clearBuffer: (
+      sessionId: string
+    ) => Promise<{ success: boolean; clearedSeq: number | null }>
     getBufferSince: (sessionId: string, afterSeq: number) => Promise<BufferSinceResult | null>
     list: () => Promise<PtyInfo[]>
     onData: (callback: (sessionId: string, data: string, seq: number) => void) => () => void
@@ -191,6 +221,7 @@ export interface ElectronAPI {
     setConfig: (config: Partial<DiagnosticsConfig>) => Promise<DiagnosticsConfig>
     export: (request: DiagnosticsExportRequest) => Promise<DiagnosticsExportResult>
     recordClientError: (input: ClientErrorEventInput) => Promise<void>
+    recordClientEvent: (input: ClientDiagnosticEventInput) => Promise<void>
   }
   aiConfig: {
     listItems: (input: ListAiConfigItemsInput) => Promise<AiConfigItem[]>
@@ -203,5 +234,18 @@ export interface ElectronAPI {
     removeProjectSelection: (projectId: string, itemId: string) => Promise<boolean>
     listSources: () => Promise<AiConfigSourcePlaceholder[]>
     createSourcePlaceholder: (input: CreateAiConfigSourcePlaceholderInput) => Promise<AiConfigSourcePlaceholder>
+  }
+  integrations: {
+    connectLinear: (input: ConnectLinearInput) => Promise<IntegrationConnectionPublic>
+    listConnections: (provider?: IntegrationProvider) => Promise<IntegrationConnectionPublic[]>
+    disconnect: (connectionId: string) => Promise<boolean>
+    listLinearTeams: (connectionId: string) => Promise<LinearTeam[]>
+    listLinearProjects: (connectionId: string, teamId: string) => Promise<LinearProject[]>
+    setProjectMapping: (input: SetProjectMappingInput) => Promise<IntegrationProjectMapping>
+    getProjectMapping: (projectId: string, provider: IntegrationProvider) => Promise<IntegrationProjectMapping | null>
+    importLinearIssues: (input: ImportLinearIssuesInput) => Promise<ImportLinearIssuesResult>
+    syncNow: (input: SyncNowInput) => Promise<SyncNowResult>
+    getLink: (taskId: string, provider: IntegrationProvider) => Promise<ExternalLink | null>
+    unlinkTask: (taskId: string, provider: IntegrationProvider) => Promise<boolean>
   }
 }

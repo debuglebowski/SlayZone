@@ -4,6 +4,7 @@ import { createRoot } from 'react-dom/client'
 import { ThemeProvider } from '@slayzone/settings'
 import { PtyProvider } from '@slayzone/terminal'
 import App from './App'
+import { getDiagnosticsContext } from './lib/diagnosticsClient'
 
 window.addEventListener('error', (event) => {
   window.api.diagnostics.recordClientError({
@@ -12,7 +13,8 @@ window.addEventListener('error', (event) => {
     stack: event.error?.stack ?? null,
     url: event.filename ?? null,
     line: event.lineno ?? null,
-    column: event.colno ?? null
+    column: event.colno ?? null,
+    snapshot: getDiagnosticsContext()
   })
 })
 
@@ -23,7 +25,8 @@ window.addEventListener('unhandledrejection', (event) => {
   window.api.diagnostics.recordClientError({
     type: 'window.unhandledrejection',
     message,
-    stack
+    stack,
+    snapshot: getDiagnosticsContext()
   })
 })
 
