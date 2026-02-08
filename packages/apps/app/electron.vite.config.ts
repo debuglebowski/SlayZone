@@ -5,7 +5,7 @@ import tailwindcss from '@tailwindcss/vite'
 
 export default defineConfig({
   main: {
-    plugins: [externalizeDepsPlugin({ exclude: ['@slayzone/types', '@slayzone/task', '@slayzone/projects', '@slayzone/tags', '@slayzone/settings', '@slayzone/terminal', '@slayzone/task-terminals', '@slayzone/worktrees'] })],
+    plugins: [externalizeDepsPlugin({ exclude: ['@slayzone/types', '@slayzone/task', '@slayzone/projects', '@slayzone/tags', '@slayzone/settings', '@slayzone/terminal', '@slayzone/task-terminals', '@slayzone/worktrees', '@slayzone/diagnostics', '@slayzone/ai-config'] })],
     build: {
       rollupOptions: {
         external: ['better-sqlite3', 'node-pty']
@@ -24,7 +24,7 @@ export default defineConfig({
     },
     plugins: [react(), tailwindcss()],
     optimizeDeps: {
-      exclude: ['@slayzone/types', '@slayzone/ui', '@slayzone/editor', '@slayzone/task', '@slayzone/tasks', '@slayzone/projects', '@slayzone/tags', '@slayzone/settings', '@slayzone/terminal', '@slayzone/task-terminals', '@slayzone/onboarding', '@slayzone/worktrees']
+      exclude: ['@slayzone/types', '@slayzone/ui', '@slayzone/editor', '@slayzone/task', '@slayzone/tasks', '@slayzone/projects', '@slayzone/tags', '@slayzone/settings', '@slayzone/terminal', '@slayzone/task-terminals', '@slayzone/onboarding', '@slayzone/worktrees', '@slayzone/ai-config']
     }
   }
 })
