@@ -2,7 +2,8 @@ import type { IpcMain } from 'electron'
 import type { Database } from 'better-sqlite3'
 import type { CreateTaskInput, UpdateTaskInput, Task } from '@slayzone/task/shared'
 import { recordDiagnosticEvent } from '@slayzone/diagnostics/main'
-import { removeWorktree } from '@slayzone/worktrees/main'
+import path from 'path'
+import { removeWorktree, createWorktree, getCurrentBranch, isGitRepo } from '@slayzone/worktrees/main'
 import { killPtysByTaskId } from '@slayzone/terminal/main'
 
 // Parse JSON columns from DB row
@@ -59,6 +60,125 @@ function cleanupTask(db: Database, taskId: string): void {
   }
 }
 
+const DEFAULT_WORKTREE_BASE_PATH_TEMPLATE = '{project}/..'
+
+function slugify(text: string): string {
+  return text
+    .toLowerCase()
+    .trim()
+    .replace(/[^\w\s-]/g, '')
+    .replace(/[\s_]+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '')
+}
+
+function parseBooleanSetting(value: string | null | undefined): boolean {
+  if (!value) return false
+  return value === '1' || value.toLowerCase() === 'true'
+}
+
+function resolveWorktreeBasePathTemplate(template: string, projectPath: string): string {
+  const expanded = template.replaceAll('{project}', projectPath.replace(/[\\/]+$/, ''))
+  return path.normalize(expanded)
+}
+
+function isAutoCreateWorktreeEnabled(db: Database, projectId: string): boolean {
+  const projectRow = db.prepare(
+    'SELECT auto_create_worktree_on_task_create FROM projects WHERE id = ?'
+  ).get(projectId) as { auto_create_worktree_on_task_create: number | null } | undefined
+
+  if (projectRow?.auto_create_worktree_on_task_create === 1) return true
+  if (projectRow?.auto_create_worktree_on_task_create === 0) return false
+
+  const globalRow = db.prepare(
+    "SELECT value FROM settings WHERE key = 'auto_create_worktree_on_task_create'"
+  ).get() as { value: string } | undefined
+  return parseBooleanSetting(globalRow?.value)
+}
+
+function maybeAutoCreateWorktree(
+  db: Database,
+  taskId: string,
+  projectId: string,
+  taskTitle: string
+): void {
+  if (!isAutoCreateWorktreeEnabled(db, projectId)) return
+
+  const projectRow = db.prepare('SELECT path FROM projects WHERE id = ?').get(projectId) as
+    | { path: string | null }
+    | undefined
+  if (!projectRow?.path) {
+    recordDiagnosticEvent({
+      level: 'info',
+      source: 'task',
+      event: 'task.auto_worktree_skipped',
+      taskId,
+      projectId,
+      message: 'Project path is not set'
+    })
+    return
+  }
+
+  if (!isGitRepo(projectRow.path)) {
+    recordDiagnosticEvent({
+      level: 'info',
+      source: 'task',
+      event: 'task.auto_worktree_skipped',
+      taskId,
+      projectId,
+      message: 'Project path is not a git repository',
+      payload: { projectPath: projectRow.path }
+    })
+    return
+  }
+
+  const baseTemplate =
+    (db.prepare("SELECT value FROM settings WHERE key = 'worktree_base_path'")
+      .get() as { value: string } | undefined)?.value || DEFAULT_WORKTREE_BASE_PATH_TEMPLATE
+  const basePath = resolveWorktreeBasePathTemplate(baseTemplate, projectRow.path)
+  const branch = slugify(taskTitle) || `task-${taskId.slice(0, 8)}`
+  const worktreePath = path.join(basePath, branch)
+  const parentBranch = getCurrentBranch(projectRow.path)
+
+  try {
+    createWorktree(projectRow.path, worktreePath, branch)
+    db.prepare(`
+      UPDATE tasks
+      SET worktree_path = ?, worktree_parent_branch = ?, updated_at = datetime('now')
+      WHERE id = ?
+    `).run(worktreePath, parentBranch, taskId)
+    recordDiagnosticEvent({
+      level: 'info',
+      source: 'task',
+      event: 'task.auto_worktree_created',
+      taskId,
+      projectId,
+      payload: {
+        projectPath: projectRow.path,
+        worktreePath,
+        branch,
+        parentBranch
+      }
+    })
+  } catch (err) {
+    recordDiagnosticEvent({
+      level: 'error',
+      source: 'task',
+      event: 'task.auto_worktree_create_failed',
+      taskId,
+      projectId,
+      message: err instanceof Error ? err.message : String(err),
+      payload: {
+        projectPath: projectRow.path,
+        baseTemplate,
+        basePath,
+        branch,
+        worktreePath
+      }
+    })
+  }
+}
+
 export function registerTaskHandlers(ipcMain: IpcMain, db: Database): void {
 
   // Task CRUD
@@ -103,19 +223,21 @@ export function registerTaskHandlers(ipcMain: IpcMain, db: Database): void {
         project_id,
         title,
         description,
+        assignee,
         status,
         priority,
         due_date,
         terminal_mode,
         claude_flags,
         codex_flags
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `)
     stmt.run(
       id,
       data.projectId,
       data.title,
       data.description ?? null,
+      data.assignee ?? null,
       data.status ?? 'inbox',
       data.priority ?? 3,
       data.dueDate ?? null,
@@ -123,11 +245,17 @@ export function registerTaskHandlers(ipcMain: IpcMain, db: Database): void {
       claudeFlags,
       codexFlags
     )
+    maybeAutoCreateWorktree(db, id, data.projectId, data.title)
     const row = db.prepare('SELECT * FROM tasks WHERE id = ?').get(id) as Record<string, unknown> | undefined
     return parseTask(row)
   })
 
   ipcMain.handle('db:tasks:update', (_, data: UpdateTaskInput) => {
+    const existing = db.prepare('SELECT project_id FROM tasks WHERE id = ?').get(data.id) as
+      | { project_id: string }
+      | undefined
+    const projectChanged = data.projectId !== undefined && existing?.project_id !== data.projectId
+
     const fields: string[] = []
     const values: unknown[] = []
 
@@ -142,6 +270,10 @@ export function registerTaskHandlers(ipcMain: IpcMain, db: Database): void {
     if (data.status !== undefined) {
       fields.push('status = ?')
       values.push(data.status)
+    }
+    if (data.assignee !== undefined) {
+      fields.push('assignee = ?')
+      values.push(data.assignee)
     }
     if (data.priority !== undefined) {
       fields.push('priority = ?')
@@ -218,7 +350,7 @@ export function registerTaskHandlers(ipcMain: IpcMain, db: Database): void {
 
     db.prepare(`UPDATE tasks SET ${fields.join(', ')} WHERE id = ?`).run(...values)
 
-    if (data.status === 'done') {
+    if (data.status === 'done' || projectChanged) {
       killPtysByTaskId(data.id)
     }
 

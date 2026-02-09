@@ -18,13 +18,11 @@ import type { ThemePreference } from '@slayzone/settings/shared'
 import type { ClaudeAvailability, TerminalMode } from '@slayzone/terminal/shared'
 import type { DiagnosticsConfig } from '@slayzone/types'
 import type { IntegrationConnectionPublic } from '@slayzone/integrations/shared'
-import { AiConfigCenter } from '../../../ai-config/src/client/AiConfigCenter'
+import { ContextManagerSettings } from '../../../ai-config/src/client/ContextManagerSettings'
 
 interface UserSettingsDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  projects: Array<{ id: string; name: string }>
-  selectedProjectId: string | null
   initialTab?: 'general' | 'terminal' | 'integrations' | 'diagnostics' | 'ai-config' | 'tags' | 'about'
   onTabChange?: (tab: 'general' | 'terminal' | 'integrations' | 'diagnostics' | 'ai-config' | 'tags' | 'about') => void
 }
@@ -32,8 +30,6 @@ interface UserSettingsDialogProps {
 export function UserSettingsDialog({
   open,
   onOpenChange,
-  projects,
-  selectedProjectId,
   initialTab = 'general',
   onTabChange
 }: UserSettingsDialogProps) {
@@ -259,7 +255,7 @@ export function UserSettingsDialog({
     { key: 'terminal', label: 'Terminal' },
     { key: 'integrations', label: 'Integrations' },
     { key: 'diagnostics', label: 'Diagnostics' },
-    { key: 'ai-config', label: 'Global Context Manager' },
+    { key: 'ai-config', label: 'Context Manager' },
     { key: 'tags', label: 'Tags' },
     { key: 'about', label: 'About' }
   ]
@@ -568,14 +564,7 @@ export function UserSettingsDialog({
             )}
 
             {activeTab === 'ai-config' && (
-              <div className="h-[calc(88vh-210px)] min-h-[560px] overflow-hidden rounded-lg border">
-                <AiConfigCenter
-                  projects={projects}
-                  selectedProjectId={selectedProjectId}
-                  scopeMode="global"
-                  layoutMode="embedded"
-                />
-              </div>
+              <ContextManagerSettings scope="global" projectId={null} />
             )}
 
             {activeTab === 'tags' && (

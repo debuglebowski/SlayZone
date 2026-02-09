@@ -5,36 +5,280 @@ import fs from 'fs'
 
 const APP_DIR = path.resolve(__dirname, '..', '..')
 const MAIN_JS = path.join(APP_DIR, 'out', 'main', 'index.js')
-const USER_DATA_DIR = path.join(APP_DIR, '.e2e-userdata')
-export const TEST_PROJECT_PATH = path.join(APP_DIR, '.e2e-userdata', 'test-project')
+const RUNTIME_ROOT_DIR = path.join(APP_DIR, '.e2e-runtime')
+const LAUNCH_ATTEMPTS = 3
+const LAUNCH_BACKOFF_MS = [300, 1000]
+
+// Runtime path set in worker fixture before tests execute.
+export let TEST_PROJECT_PATH = path.join(RUNTIME_ROOT_DIR, 'default-test-project')
 
 // Shared state across all tests in the worker
-let sharedApp: ElectronApplication
-let sharedPage: Page
+let sharedApp: ElectronApplication | undefined
+let sharedPage: Page | undefined
+let sharedWorkerArtifactsDir: string | undefined
+let sessionStdoutStream: fs.WriteStream | null = null
+let sessionStderrStream: fs.WriteStream | null = null
 
 type ElectronFixtures = {
   electronApp: ElectronApplication
   mainWindow: Page
 }
 
+interface LaunchAttemptRecord {
+  attempt: number
+  startedAt: string
+  endedAt?: string
+  durationMs?: number
+  userDataDir: string
+  workerArtifactsDir: string
+  mainJsPath: string
+  executablePath: string
+  success: boolean
+  error?: string
+  observedWindowUrls?: string[]
+  rootReadyMs?: number
+}
+
+function ensureDir(dirPath: string): void {
+  fs.mkdirSync(dirPath, { recursive: true })
+}
+
+function wait(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
+function writeJson(filePath: string, payload: unknown): void {
+  fs.writeFileSync(filePath, JSON.stringify(payload, null, 2), 'utf8')
+}
+
+function startProcessLogCapture(
+  app: ElectronApplication,
+  stdoutPath: string,
+  stderrPath: string
+): () => void {
+  const proc = app.process()
+  if (!proc) return () => {}
+
+  const stdoutStream = fs.createWriteStream(stdoutPath, { flags: 'a' })
+  const stderrStream = fs.createWriteStream(stderrPath, { flags: 'a' })
+
+  const onStdout = (chunk: Buffer | string) => {
+    stdoutStream.write(chunk)
+  }
+  const onStderr = (chunk: Buffer | string) => {
+    stderrStream.write(chunk)
+  }
+
+  proc.stdout?.on('data', onStdout)
+  proc.stderr?.on('data', onStderr)
+
+  return () => {
+    proc.stdout?.off('data', onStdout)
+    proc.stderr?.off('data', onStderr)
+    stdoutStream.end()
+    stderrStream.end()
+  }
+}
+
+function attachSessionLogCapture(app: ElectronApplication, artifactsDir: string): void {
+  const proc = app.process()
+  if (!proc) return
+
+  const stdoutPath = path.join(artifactsDir, 'session.stdout.log')
+  const stderrPath = path.join(artifactsDir, 'session.stderr.log')
+
+  sessionStdoutStream = fs.createWriteStream(stdoutPath, { flags: 'a' })
+  sessionStderrStream = fs.createWriteStream(stderrPath, { flags: 'a' })
+
+  proc.stdout?.on('data', (chunk: Buffer | string) => {
+    sessionStdoutStream?.write(chunk)
+  })
+  proc.stderr?.on('data', (chunk: Buffer | string) => {
+    sessionStderrStream?.write(chunk)
+  })
+}
+
+function closeSessionLogCapture(): void {
+  sessionStdoutStream?.end()
+  sessionStderrStream?.end()
+  sessionStdoutStream = null
+  sessionStderrStream = null
+}
+
+/**
+ * In regular app runs there is a splash window (data: URL) before the main window (file:// URL).
+ * In Playwright mode the splash is disabled, so we resolve the first non-data window either way.
+ */
+async function resolveMainWindow(
+  app: ElectronApplication,
+  timeoutMs = 20_000
+): Promise<{ page: Page; observedWindowUrls: string[]; rootReadyMs: number }> {
+  const startedAt = Date.now()
+  const observedWindowUrls = new Set<string>()
+  const isMain = (url: string) => !url.startsWith('data:') && url !== 'about:blank'
+
+  while (Date.now() - startedAt < timeoutMs) {
+    const windows = app.windows()
+    for (const windowPage of windows) {
+      const url = windowPage.url()
+      observedWindowUrls.add(url)
+
+      if (!isMain(url)) continue
+
+      try {
+        await windowPage.waitForSelector('#root', {
+          timeout: Math.max(200, timeoutMs - (Date.now() - startedAt)),
+        })
+        return {
+          page: windowPage,
+          observedWindowUrls: Array.from(observedWindowUrls),
+          rootReadyMs: Date.now() - startedAt,
+        }
+      } catch {
+        // Keep polling until timeout so slow bootstrap can still recover.
+      }
+    }
+
+    await wait(200)
+  }
+
+  throw new Error(
+    `Main window not ready within ${timeoutMs}ms. Observed URLs: ${JSON.stringify(Array.from(observedWindowUrls))}`
+  )
+}
+
+async function launchElectronWithRetry(args: {
+  userDataDir: string
+  workerArtifactsDir: string
+  executablePath: string
+}): Promise<{ app: ElectronApplication; page: Page; attempts: LaunchAttemptRecord[] }> {
+  const attempts: LaunchAttemptRecord[] = []
+
+  for (let attempt = 1; attempt <= LAUNCH_ATTEMPTS; attempt++) {
+    const attemptStartedAt = Date.now()
+    const attemptArtifactsDir = path.join(args.workerArtifactsDir, `launch-attempt-${attempt}`)
+    ensureDir(attemptArtifactsDir)
+
+    const record: LaunchAttemptRecord = {
+      attempt,
+      startedAt: new Date(attemptStartedAt).toISOString(),
+      userDataDir: args.userDataDir,
+      workerArtifactsDir: args.workerArtifactsDir,
+      mainJsPath: MAIN_JS,
+      executablePath: args.executablePath,
+      success: false,
+    }
+
+    let app: ElectronApplication | undefined
+    let stopAttemptLogCapture: (() => void) | undefined
+
+    try {
+      app = await electron.launch({
+        args: [MAIN_JS],
+        executablePath: args.executablePath,
+        env: { ...process.env, PLAYWRIGHT: '1', SLAYZONE_DB_DIR: args.userDataDir },
+      })
+
+      stopAttemptLogCapture = startProcessLogCapture(
+        app,
+        path.join(attemptArtifactsDir, 'stdout.log'),
+        path.join(attemptArtifactsDir, 'stderr.log')
+      )
+
+      const resolved = await resolveMainWindow(app, 20_000)
+      record.success = true
+      record.observedWindowUrls = resolved.observedWindowUrls
+      record.rootReadyMs = resolved.rootReadyMs
+      record.endedAt = new Date().toISOString()
+      record.durationMs = Date.now() - attemptStartedAt
+
+      writeJson(path.join(attemptArtifactsDir, 'launch-meta.json'), record)
+      attempts.push(record)
+      stopAttemptLogCapture?.()
+
+      return { app, page: resolved.page, attempts }
+    } catch (error) {
+      record.success = false
+      record.error = error instanceof Error ? `${error.name}: ${error.message}` : String(error)
+      record.endedAt = new Date().toISOString()
+      record.durationMs = Date.now() - attemptStartedAt
+      writeJson(path.join(attemptArtifactsDir, 'launch-meta.json'), record)
+      attempts.push(record)
+
+      stopAttemptLogCapture?.()
+
+      if (app) {
+        await app.close().catch(() => {})
+      }
+
+      if (attempt < LAUNCH_ATTEMPTS) {
+        await wait(LAUNCH_BACKOFF_MS[attempt - 1] ?? 1000)
+      }
+    }
+  }
+
+  throw new Error(
+    `Electron failed to launch after ${LAUNCH_ATTEMPTS} attempts. See artifacts in ${args.workerArtifactsDir}`
+  )
+}
+
 export const test = base.extend<ElectronFixtures>({
   electronApp: [
-    async ({}, use) => {
+    async ({}, use, workerInfo) => {
       if (!sharedApp) {
-        // Fresh user data for entire suite
-        if (fs.existsSync(USER_DATA_DIR)) {
-          fs.rmSync(USER_DATA_DIR, { recursive: true })
-        }
-        fs.mkdirSync(USER_DATA_DIR, { recursive: true })
-        fs.mkdirSync(TEST_PROJECT_PATH, { recursive: true })
+        const workerRoot = path.join(
+          RUNTIME_ROOT_DIR,
+          `worker-${workerInfo.workerIndex}-${process.pid}-${Date.now()}`
+        )
+        const userDataDir = path.join(workerRoot, 'userdata')
+        const workerArtifactsDir = path.join(workerRoot, 'artifacts')
 
-        sharedApp = await electron.launch({
-          args: [MAIN_JS],
-          executablePath: require('electron') as unknown as string,
-          env: { ...process.env, PLAYWRIGHT: '1', SLAYZONE_DB_DIR: USER_DATA_DIR },
+        TEST_PROJECT_PATH = path.join(workerRoot, 'test-project')
+        ensureDir(userDataDir)
+        ensureDir(TEST_PROJECT_PATH)
+        ensureDir(workerArtifactsDir)
+
+        const executablePath = require('electron') as unknown as string
+
+        const launched = await launchElectronWithRetry({
+          userDataDir,
+          workerArtifactsDir,
+          executablePath,
+        })
+
+        sharedApp = launched.app
+        sharedPage = launched.page
+        sharedWorkerArtifactsDir = workerArtifactsDir
+
+        writeJson(path.join(workerArtifactsDir, 'launch-attempts-summary.json'), {
+          workerIndex: workerInfo.workerIndex,
+          createdAt: new Date().toISOString(),
+          userDataDir,
+          testProjectPath: TEST_PROJECT_PATH,
+          attempts: launched.attempts,
+        })
+
+        attachSessionLogCapture(sharedApp, workerArtifactsDir)
+      }
+
+      await use(sharedApp)
+
+      if (sharedApp) {
+        await sharedApp.close().catch(() => {})
+      }
+
+      closeSessionLogCapture()
+
+      if (sharedWorkerArtifactsDir) {
+        writeJson(path.join(sharedWorkerArtifactsDir, 'worker-finish.json'), {
+          finishedAt: new Date().toISOString(),
+          note: 'Worker teardown completed',
         })
       }
-      await use(sharedApp)
+
+      sharedApp = undefined
+      sharedPage = undefined
+      sharedWorkerArtifactsDir = undefined
     },
     { scope: 'worker' },
   ],
@@ -42,52 +286,37 @@ export const test = base.extend<ElectronFixtures>({
   mainWindow: [
     async ({ electronApp }, use) => {
       if (!sharedPage) {
-        sharedPage = await resolveMainWindow(electronApp)
-        // Resize the actual BrowserWindow so the app fills the viewport
-        await electronApp.evaluate(({ BrowserWindow }) => {
-          const win = BrowserWindow.getAllWindows().find(w => !w.isDestroyed() && w.webContents.getURL() !== 'about:blank' && !w.webContents.getURL().startsWith('data:'))
-          if (win) {
-            win.setSize(1920, 1200)
-            win.center()
-          }
-        })
-        // Dismiss onboarding if it appears
-        const skip = sharedPage.getByRole('button', { name: 'Skip' })
-        if (await skip.isVisible({ timeout: 2_000 }).catch(() => false)) {
-          await skip.click({ timeout: 2_000 }).catch(async () => {
-            await skip.first().click({ force: true, timeout: 2_000 }).catch(() => {})
-          })
-        }
+        const resolved = await resolveMainWindow(electronApp, 20_000)
+        sharedPage = resolved.page
       }
+
+      // Resize the actual BrowserWindow so the app fills the viewport
+      await electronApp.evaluate(({ BrowserWindow }) => {
+        const win = BrowserWindow.getAllWindows().find(
+          (w) =>
+            !w.isDestroyed() &&
+            w.webContents.getURL() !== 'about:blank' &&
+            !w.webContents.getURL().startsWith('data:')
+        )
+        if (win) {
+          win.setSize(1920, 1200)
+          win.center()
+        }
+      })
+
+      // Dismiss onboarding if it appears
+      const skip = sharedPage.getByRole('button', { name: 'Skip' })
+      if (await skip.isVisible({ timeout: 2_000 }).catch(() => false)) {
+        await skip.click({ timeout: 2_000 }).catch(async () => {
+          await skip.first().click({ force: true, timeout: 2_000 }).catch(() => {})
+        })
+      }
+
       await use(sharedPage)
     },
     { scope: 'worker' },
   ],
 })
-
-/**
- * In regular app runs there is a splash window (data: URL) before the main window (file:// URL).
- * In Playwright mode the splash is disabled, so we resolve the first non-data window either way.
- */
-async function resolveMainWindow(app: ElectronApplication): Promise<Page> {
-  const isMain = (url: string) => !url.startsWith('data:')
-
-  for (const page of app.windows()) {
-    if (isMain(page.url())) {
-      await page.waitForSelector('#root', { timeout: 15_000 })
-      return page
-    }
-  }
-
-  return new Promise<Page>((resolve) => {
-    app.on('window', async (page) => {
-      if (isMain(page.url())) {
-        await page.waitForSelector('#root', { timeout: 15_000 })
-        resolve(page)
-      }
-    })
-  })
-}
 
 /** Seed helpers — call window.api methods to create test data without UI interaction */
 export function seed(page: Page) {
@@ -129,16 +358,22 @@ export function seed(page: Page) {
       }),
 
     addBlocker: (taskId: string, blockerTaskId: string) =>
-      page.evaluate(
-        ({ t, b }) => window.api.taskDependencies.addBlocker(t, b),
-        { t: taskId, b: blockerTaskId }
-      ),
+      page.evaluate(({ t, b }) => window.api.taskDependencies.addBlocker(t, b), {
+        t: taskId,
+        b: blockerTaskId,
+      }),
 
     getProjects: () => page.evaluate(() => window.api.db.getProjects()),
 
     getTasks: () => page.evaluate(() => window.api.db.getTasks()),
 
-    updateProject: (data: { id: string; name?: string; color?: string; path?: string | null }) =>
+    updateProject: (data: {
+      id: string
+      name?: string
+      color?: string
+      path?: string | null
+      autoCreateWorktreeOnTaskCreate?: boolean | null
+    }) =>
       page.evaluate((d) => window.api.db.updateProject(d), data),
 
     deleteProject: (id: string) => page.evaluate((i) => window.api.db.deleteProject(i), id),

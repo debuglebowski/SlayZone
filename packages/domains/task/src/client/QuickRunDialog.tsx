@@ -31,12 +31,35 @@ export function QuickRunDialog({
   const handleSubmit = async (): Promise<void> => {
     if (!prompt.trim()) return
 
+    const isAutoCreateEnabledForProject = async (projectId: string): Promise<boolean> => {
+      const [globalSetting, projects] = await Promise.all([
+        window.api.settings.get('auto_create_worktree_on_task_create'),
+        window.api.db.getProjects()
+      ])
+      const project = projects.find((p) => p.id === projectId)
+      const override = project?.auto_create_worktree_on_task_create
+      if (override === 1) return true
+      if (override === 0) return false
+      return globalSetting === '1'
+    }
+
+    let shouldAutoCreateWorktree = false
+    try {
+      shouldAutoCreateWorktree = await isAutoCreateEnabledForProject(defaultProjectId)
+    } catch {
+      shouldAutoCreateWorktree = false
+    }
+
     const task = await window.api.db.createTask({
       projectId: defaultProjectId,
       title: prompt.trim(),
       description: '',
       status: 'in_progress'
     })
+
+    if (shouldAutoCreateWorktree && !task.worktree_path) {
+      window.alert('Task created, but worktree auto-create failed. You can add one from the Git panel.')
+    }
 
     setQuickRunPrompt(task.id, prompt.trim())
     onCreated(task)

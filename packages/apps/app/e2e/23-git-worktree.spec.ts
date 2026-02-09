@@ -200,4 +200,98 @@ test.describe('Git worktree operations', () => {
     const exists = require('fs').existsSync(worktreePath)
     expect(exists).toBe(true)
   })
+
+  test('archiving a task removes its worktree from git and disk', async ({ mainWindow }) => {
+    const s = seed(mainWindow)
+    const projects = await s.getProjects()
+    const project = projects.find((p: { name: string }) => p.name === 'Worktree Test')
+    expect(project).toBeTruthy()
+
+    const suffix = Date.now().toString()
+    const branch = `archive-cleanup-${suffix}`
+    const title = `Archive cleanup ${suffix}`
+    const created = await s.createTask({ projectId: project!.id, title, status: 'todo' })
+    const worktreePath = path.join(path.dirname(TEST_PROJECT_PATH), branch)
+    const parentBranch = execSync('git branch --show-current', { cwd: TEST_PROJECT_PATH }).toString().trim()
+
+    await mainWindow.evaluate(async ({ repoPath, targetPath, branch, taskId, parentBranch }) => {
+      await window.api.git.createWorktree(repoPath, targetPath, branch)
+      await window.api.db.updateTask({
+        id: taskId,
+        worktreePath: targetPath,
+        worktreeParentBranch: parentBranch
+      })
+    }, { repoPath: TEST_PROJECT_PATH, targetPath: worktreePath, branch, taskId: created.id, parentBranch })
+
+    await expect
+      .poll(() => execSync('git worktree list --porcelain', { cwd: TEST_PROJECT_PATH }).toString())
+      .toContain(worktreePath)
+    expect(require('fs').existsSync(worktreePath)).toBe(true)
+
+    await s.archiveTask(created.id)
+
+    await expect
+      .poll(async () => {
+        const archived = await getTask(mainWindow, created.id)
+        return {
+          archivedAt: archived?.archived_at ?? null,
+          worktreePath: archived?.worktree_path ?? null
+        }
+      })
+      .toMatchObject({
+        archivedAt: expect.any(String),
+        worktreePath: null
+      })
+
+    await expect
+      .poll(() => execSync('git worktree list --porcelain', { cwd: TEST_PROJECT_PATH }).toString())
+      .not.toContain(worktreePath)
+    await expect
+      .poll(() => require('fs').existsSync(worktreePath))
+      .toBe(false)
+  })
+
+  test('deleting a task removes its worktree from git and disk', async ({ mainWindow }) => {
+    const s = seed(mainWindow)
+    const projects = await s.getProjects()
+    const project = projects.find((p: { name: string }) => p.name === 'Worktree Test')
+    expect(project).toBeTruthy()
+
+    const suffix = Date.now().toString()
+    const branch = `delete-cleanup-${suffix}`
+    const title = `Delete cleanup ${suffix}`
+    const created = await s.createTask({ projectId: project!.id, title, status: 'todo' })
+    const worktreePath = path.join(path.dirname(TEST_PROJECT_PATH), branch)
+    const parentBranch = execSync('git branch --show-current', { cwd: TEST_PROJECT_PATH }).toString().trim()
+
+    await mainWindow.evaluate(async ({ repoPath, targetPath, branch, taskId, parentBranch }) => {
+      await window.api.git.createWorktree(repoPath, targetPath, branch)
+      await window.api.db.updateTask({
+        id: taskId,
+        worktreePath: targetPath,
+        worktreeParentBranch: parentBranch
+      })
+    }, { repoPath: TEST_PROJECT_PATH, targetPath: worktreePath, branch, taskId: created.id, parentBranch })
+
+    await expect
+      .poll(() => execSync('git worktree list --porcelain', { cwd: TEST_PROJECT_PATH }).toString())
+      .toContain(worktreePath)
+    expect(require('fs').existsSync(worktreePath)).toBe(true)
+
+    await s.deleteTask(created.id)
+
+    await expect
+      .poll(async () => {
+        const deleted = await getTask(mainWindow, created.id)
+        return deleted
+      })
+      .toBeNull()
+
+    await expect
+      .poll(() => execSync('git worktree list --porcelain', { cwd: TEST_PROJECT_PATH }).toString())
+      .not.toContain(worktreePath)
+    await expect
+      .poll(() => require('fs').existsSync(worktreePath))
+      .toBe(false)
+  })
 })

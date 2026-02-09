@@ -34,6 +34,14 @@ export function registerProjectHandlers(ipcMain: IpcMain, db: Database): void {
       fields.push('path = ?')
       values.push(data.path)
     }
+    if (data.autoCreateWorktreeOnTaskCreate !== undefined) {
+      fields.push('auto_create_worktree_on_task_create = ?')
+      if (data.autoCreateWorktreeOnTaskCreate === null) {
+        values.push(null)
+      } else {
+        values.push(data.autoCreateWorktreeOnTaskCreate ? 1 : 0)
+      }
+    }
 
     if (fields.length === 0) {
       return db.prepare('SELECT * FROM projects WHERE id = ?').get(data.id)

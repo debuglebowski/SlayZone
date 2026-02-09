@@ -91,6 +91,25 @@ export function CreateTaskDialog({
   }, [open, defaultProjectId, defaultStatus, defaultPriority, defaultDueDate, form])
 
   const onSubmit = async (data: CreateTaskFormData): Promise<void> => {
+    const isAutoCreateEnabledForProject = async (projectId: string): Promise<boolean> => {
+      const [globalSetting, projects] = await Promise.all([
+        window.api.settings.get('auto_create_worktree_on_task_create'),
+        window.api.db.getProjects()
+      ])
+      const project = projects.find((p) => p.id === projectId)
+      const override = project?.auto_create_worktree_on_task_create
+      if (override === 1) return true
+      if (override === 0) return false
+      return globalSetting === '1'
+    }
+
+    let shouldAutoCreateWorktree = false
+    try {
+      shouldAutoCreateWorktree = await isAutoCreateEnabledForProject(data.projectId)
+    } catch {
+      shouldAutoCreateWorktree = false
+    }
+
     const task = await window.api.db.createTask({
       projectId: data.projectId,
       title: data.title,
@@ -101,6 +120,9 @@ export function CreateTaskDialog({
     })
     if (data.tagIds.length > 0) {
       await window.api.taskTags.setTagsForTask(task.id, data.tagIds)
+    }
+    if (shouldAutoCreateWorktree && !task.worktree_path) {
+      window.alert('Task created, but worktree auto-create failed. You can add one from the Git panel.')
     }
     onCreated(task)
     form.reset()
