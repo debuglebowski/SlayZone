@@ -4,6 +4,7 @@ import { CalendarIcon, X } from 'lucide-react'
 import type { Task, TaskStatus } from '@slayzone/task/shared'
 import { statusOptions, priorityOptions } from '@slayzone/task/shared'
 import type { Tag } from '@slayzone/tags/shared'
+import type { ExternalLink } from '@slayzone/integrations/shared'
 import {
   Select,
   SelectContent,
@@ -35,6 +36,8 @@ export function TaskMetadataSidebar({
 }: TaskMetadataSidebarProps): React.JSX.Element {
   const [allTasks, setAllTasks] = useState<Task[]>([])
   const [blockers, setBlockers] = useState<Task[]>([])
+  const [linearLink, setLinearLink] = useState<ExternalLink | null>(null)
+  const [syncMessage, setSyncMessage] = useState('')
 
   // Load all tasks and current blockers
   useEffect(() => {
@@ -45,9 +48,27 @@ export function TaskMetadataSidebar({
       ])
       setAllTasks(tasks.filter((t) => t.id !== task.id))
       setBlockers(currentBlockers)
+      const link = await window.api.integrations.getLink(task.id, 'linear')
+      setLinearLink(link)
     }
     loadData()
   }, [task.id])
+
+  const handleSyncLinear = async (): Promise<void> => {
+    if (!linearLink) return
+    const result = await window.api.integrations.syncNow({ taskId: task.id })
+    const errSuffix = result.errors.length > 0 ? ` (${result.errors.length} errors)` : ''
+    setSyncMessage(`Synced: ${result.pulled} pulled, ${result.pushed} pushed${errSuffix}`)
+    const refreshedTask = await window.api.db.getTask(task.id)
+    if (refreshedTask) onUpdate(refreshedTask)
+  }
+
+  const handleUnlinkLinear = async (): Promise<void> => {
+    if (!linearLink) return
+    await window.api.integrations.unlinkTask(task.id, 'linear')
+    setLinearLink(null)
+    setSyncMessage('Unlinked from Linear')
+  }
 
   const handleAddBlocker = async (blockerTaskId: string): Promise<void> => {
     await window.api.taskDependencies.addBlocker(task.id, blockerTaskId)
@@ -263,6 +284,34 @@ export function TaskMetadataSidebar({
             )}
           </PopoverContent>
         </Popover>
+      </div>
+
+      {/* Linear */}
+      <div>
+        <label className="mb-1 block text-sm text-muted-foreground">Linear</label>
+        {linearLink ? (
+          <div className="space-y-2 rounded border p-2">
+            <div className="text-sm">{linearLink.external_key}</div>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => window.api.shell.openExternal(linearLink.external_url)}
+              >
+                Open
+              </Button>
+              <Button variant="outline" size="sm" onClick={handleSyncLinear}>
+                Sync
+              </Button>
+              <Button variant="ghost" size="sm" onClick={handleUnlinkLinear}>
+                Unlink
+              </Button>
+            </div>
+            {syncMessage ? <p className="text-xs text-muted-foreground">{syncMessage}</p> : null}
+          </div>
+        ) : (
+          <p className="text-xs text-muted-foreground">Not linked</p>
+        )}
       </div>
     </div>
   )

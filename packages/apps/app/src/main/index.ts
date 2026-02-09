@@ -22,6 +22,7 @@ import { registerTerminalTabsHandlers } from '@slayzone/task-terminals/main'
 import { registerWorktreeHandlers } from '@slayzone/worktrees/main'
 import { registerDiagnosticsHandlers, registerProcessDiagnostics, stopDiagnostics } from '@slayzone/diagnostics/main'
 import { registerAiConfigHandlers } from '@slayzone/ai-config/main'
+import { registerIntegrationHandlers, startLinearSyncPoller } from '@slayzone/integrations/main'
 
 // Minimum splash screen display time (ms)
 const SPLASH_MIN_DURATION = 4000
@@ -189,6 +190,7 @@ const splashHTML = (version: string) => `
 let splashWindow: BrowserWindow | null = null
 let mainWindow: BrowserWindow | null = null
 let splashShownAt: number = 0
+let linearSyncPoller: NodeJS.Timeout | null = null
 
 function emitOpenSettings(): void {
   mainWindow?.webContents.send('app:open-settings')
@@ -425,6 +427,8 @@ app.whenReady().then(() => {
   registerFilesHandlers(ipcMain)
   registerWorktreeHandlers(ipcMain)
   registerAiConfigHandlers(ipcMain, db)
+  registerIntegrationHandlers(ipcMain, db)
+  linearSyncPoller = startLinearSyncPoller(db)
 
   // Configure webview session for WebAuthn/passkey support
   const browserSession = session.fromPartition('persist:browser-tabs')
@@ -528,6 +532,10 @@ app.on('window-all-closed', () => {
 
 // Clean up database connection and active processes before quitting
 app.on('will-quit', () => {
+  if (linearSyncPoller) {
+    clearInterval(linearSyncPoller)
+    linearSyncPoller = null
+  }
   stopDiagnostics()
   stopIdleChecker()
   killAllPtys()

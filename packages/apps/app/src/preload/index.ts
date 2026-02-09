@@ -212,6 +212,7 @@ const api: ElectronAPI = {
     listLinearTeams: (connectionId) => ipcRenderer.invoke('integrations:list-linear-teams', connectionId),
     listLinearProjects: (connectionId, teamId) =>
       ipcRenderer.invoke('integrations:list-linear-projects', connectionId, teamId),
+    listLinearIssues: (input) => ipcRenderer.invoke('integrations:list-linear-issues', input),
     setProjectMapping: (input) => ipcRenderer.invoke('integrations:set-project-mapping', input),
     getProjectMapping: (projectId, provider) =>
       ipcRenderer.invoke('integrations:get-project-mapping', projectId, provider),

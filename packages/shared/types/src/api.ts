@@ -23,6 +23,8 @@ import type {
   IntegrationConnectionPublic,
   IntegrationProjectMapping,
   IntegrationProvider,
+  ListLinearIssuesInput,
+  LinearIssueSummary,
   LinearProject,
   LinearTeam,
   SetProjectMappingInput,
@@ -242,6 +244,9 @@ export interface ElectronAPI {
     disconnect: (connectionId: string) => Promise<boolean>
     listLinearTeams: (connectionId: string) => Promise<LinearTeam[]>
     listLinearProjects: (connectionId: string, teamId: string) => Promise<LinearProject[]>
+    listLinearIssues: (
+      input: ListLinearIssuesInput
+    ) => Promise<{ issues: LinearIssueSummary[]; nextCursor: string | null }>
     setProjectMapping: (input: SetProjectMappingInput) => Promise<IntegrationProjectMapping>
     getProjectMapping: (projectId: string, provider: IntegrationProvider) => Promise<IntegrationProjectMapping | null>
     importLinearIssues: (input: ImportLinearIssuesInput) => Promise<ImportLinearIssuesResult>

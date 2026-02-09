@@ -18,6 +18,7 @@
     "@slayzone/types": "workspace:*",
     "@slayzone/ui": "workspace:*",
     "@slayzone/task": "workspace:*",
+    "@slayzone/integrations": "workspace:*",
     "@slayzone/tags": "workspace:*",
     "@slayzone/terminal": "workspace:*",
     "date-fns": "^4.1.0"

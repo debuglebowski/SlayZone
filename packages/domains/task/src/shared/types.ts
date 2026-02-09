@@ -16,6 +16,7 @@ export interface Task {
   project_id: string
   title: string
   description: string | null
+  assignee: string | null
   status: TaskStatus
   priority: number // 1-5, default 3
   order: number
@@ -55,6 +56,7 @@ export interface CreateTaskInput {
   projectId: string
   title: string
   description?: string
+  assignee?: string | null
   status?: string
   priority?: number
   dueDate?: string
@@ -67,6 +69,7 @@ export interface UpdateTaskInput {
   id: string
   title?: string
   description?: string | null
+  assignee?: string | null
   status?: TaskStatus
   priority?: number
   dueDate?: string | null

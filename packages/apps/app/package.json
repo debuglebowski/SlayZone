@@ -20,6 +20,7 @@
     "@slayzone/ai-config": "workspace:*",
     "@slayzone/diagnostics": "workspace:*",
     "@slayzone/editor": "workspace:*",
+    "@slayzone/integrations": "workspace:*",
     "@slayzone/onboarding": "workspace:*",
     "@slayzone/projects": "workspace:*",
     "@slayzone/settings": "workspace:*",

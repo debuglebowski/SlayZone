@@ -19,6 +19,7 @@
     "@slayzone/types": "workspace:*",
     "@slayzone/ui": "workspace:*",
     "@slayzone/editor": "workspace:*",
+    "@slayzone/integrations": "workspace:*",
     "@slayzone/terminal": "workspace:*",
     "@slayzone/task-terminals": "workspace:*",
     "@slayzone/projects": "workspace:*",

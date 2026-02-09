@@ -514,7 +514,7 @@ const migrations: Migration[] = [
     up: (db) => {
       db.exec(`
         ALTER TABLE integration_project_mappings
-          ADD COLUMN sync_mode TEXT NOT NULL DEFAULT 'two_way';
+          ADD COLUMN sync_mode TEXT NOT NULL DEFAULT 'one_way';
       `)
     }
   },
