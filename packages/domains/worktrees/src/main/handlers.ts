@@ -19,6 +19,7 @@ import {
   getWorkingDiff,
   stageFile,
   unstageFile,
+  discardFile,
   stageAll,
   unstageAll,
   getUntrackedFileDiff
@@ -152,6 +153,10 @@ ${steps.join('\n\n')}`
 
   ipcMain.handle('git:unstageFile', (_, path: string, filePath: string) => {
     unstageFile(path, filePath)
+  })
+
+  ipcMain.handle('git:discardFile', (_, path: string, filePath: string) => {
+    discardFile(path, filePath)
   })
 
   ipcMain.handle('git:stageAll', (_, path: string) => {

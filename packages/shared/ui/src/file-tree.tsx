@@ -243,7 +243,7 @@ export function FileTree<T>({
   if (tree.length === 0) return null
 
   return (
-    <div className={cn('text-sm', className)}>
+    <div className={cn('select-none text-sm', className)}>
       <TreeBranch
         nodes={tree}
         depth={0}

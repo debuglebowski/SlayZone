@@ -284,6 +284,10 @@ export function unstageFile(path: string, filePath: string): void {
   execGit(`git reset HEAD -- "${filePath}"`, { cwd: path })
 }
 
+export function discardFile(path: string, filePath: string): void {
+  execGit(`git checkout -- "${filePath}"`, { cwd: path })
+}
+
 export function stageAll(path: string): void {
   execGit('git add -A', { cwd: path })
 }

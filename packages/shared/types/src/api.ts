@@ -209,6 +209,7 @@ export interface ElectronAPI {
     getWorkingDiff: (path: string) => Promise<GitDiffSnapshot>
     stageFile: (path: string, filePath: string) => Promise<void>
     unstageFile: (path: string, filePath: string) => Promise<void>
+    discardFile: (path: string, filePath: string) => Promise<void>
     stageAll: (path: string) => Promise<void>
     unstageAll: (path: string) => Promise<void>
     getUntrackedFileDiff: (repoPath: string, filePath: string) => Promise<string>

@@ -1,5 +1,5 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Plus, Minus } from 'lucide-react'
+import { Plus, Minus, Undo2 } from 'lucide-react'
 import { Button, FileTree, buildFileTree, flattenFileTree, fileTreeIndent, cn } from '@slayzone/ui'
 import type { Task } from '@slayzone/task/shared'
 import type { GitDiffSnapshot } from '../shared/types'
@@ -98,6 +98,7 @@ const FileListItem = memo(function FileListItem({
   deletions,
   onClick,
   onAction,
+  onDiscard,
   itemRef,
   depth = 0
 }: {
@@ -108,6 +109,7 @@ const FileListItem = memo(function FileListItem({
   deletions?: number
   onClick: () => void
   onAction: () => void
+  onDiscard?: () => void
   itemRef?: React.Ref<HTMLDivElement>
   depth?: number
 }) {
@@ -136,6 +138,18 @@ const FileListItem = memo(function FileListItem({
             <span className="text-red-600 dark:text-red-400">-{deletions}</span>
           )}
         </span>
+      )}
+      {onDiscard && (
+        <button
+          className="shrink-0 opacity-0 group-hover:opacity-100 hover:text-destructive text-muted-foreground transition-opacity p-0.5 rounded hover:bg-accent"
+          onClick={(e) => {
+            e.stopPropagation()
+            onDiscard()
+          }}
+          title="Discard changes"
+        >
+          <Undo2 className="size-3.5" />
+        </button>
       )}
       <button
         className="shrink-0 opacity-0 group-hover:opacity-100 hover:text-foreground text-muted-foreground transition-opacity p-0.5 rounded hover:bg-accent"
@@ -377,6 +391,16 @@ export function GitDiffPanel({
     }
   }, [targetPath])
 
+  const handleDiscardFile = useCallback(async (filePath: string) => {
+    if (!targetPath) return
+    try {
+      await window.api.git.discardFile(targetPath, filePath)
+      await fetchDiff()
+    } catch {
+      // silently fail — next poll will correct state
+    }
+  }, [targetPath])
+
   const handleSelectFile = useCallback((path: string, source: 'unstaged' | 'staged') => {
     setSelectedFile({ path, source })
   }, [])
@@ -426,6 +450,7 @@ export function GitDiffPanel({
   const renderFileItem = useCallback((entry: FileEntry, { name, depth }: { name: string; depth: number }) => {
     const diff = getDiffForEntry(entry)
     const selected = isSelected(entry)
+    const canDiscard = entry.source === 'unstaged' && entry.status !== '?'
     return (
       <FileListItem
         entry={entry}
@@ -435,11 +460,12 @@ export function GitDiffPanel({
         deletions={diff?.deletions}
         onClick={() => handleSelectFile(entry.path, entry.source)}
         onAction={() => handleStageAction(entry.path, entry.source)}
+        onDiscard={canDiscard ? () => handleDiscardFile(entry.path) : undefined}
         itemRef={selected ? selectedItemRef : undefined}
         depth={depth}
       />
     )
-  }, [getDiffForEntry, selectedFile, handleSelectFile, handleStageAction])
+  }, [getDiffForEntry, selectedFile, handleSelectFile, handleStageAction, handleDiscardFile])
 
   return (
     <div data-testid="git-diff-panel" className="h-full flex flex-col">
