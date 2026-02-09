@@ -51,7 +51,7 @@ export interface SetAiConfigProjectSelectionInput {
   targetPath: string
 }
 
-export type ContextFileCategory = 'claude' | 'agents' | 'cursorrules' | 'copilot' | 'mcp' | 'custom'
+export type ContextFileCategory = 'claude' | 'agents' | 'mcp' | 'custom'
 
 export interface ContextFileInfo {
   path: string

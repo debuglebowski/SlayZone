@@ -25,8 +25,6 @@ const KNOWN_CONTEXT_FILES: Array<{ relative: string; name: string; category: Con
   { relative: 'CLAUDE.md', name: 'CLAUDE.md', category: 'claude' },
   { relative: '.claude/CLAUDE.md', name: '.claude/CLAUDE.md', category: 'claude' },
   { relative: 'AGENTS.md', name: 'AGENTS.md', category: 'agents' },
-  { relative: '.cursorrules', name: '.cursorrules', category: 'cursorrules' },
-  { relative: '.github/copilot-instructions.md', name: '.github/copilot-instructions.md', category: 'copilot' },
   { relative: '.mcp.json', name: '.mcp.json', category: 'mcp' },
   { relative: '.cursor/mcp.json', name: '.cursor/mcp.json', category: 'mcp' },
   { relative: '.vscode/mcp.json', name: '.vscode/mcp.json', category: 'mcp' }
