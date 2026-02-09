@@ -190,6 +190,10 @@ let splashWindow: BrowserWindow | null = null
 let mainWindow: BrowserWindow | null = null
 let splashShownAt: number = 0
 
+function emitOpenSettings(): void {
+  mainWindow?.webContents.send('app:open-settings')
+}
+
 function createSplashWindow(): void {
   splashWindow = new BrowserWindow({
     width: DEFAULT_WINDOW_WIDTH,
@@ -294,6 +298,12 @@ function createMainWindow(): void {
     if (input.type === 'keyDown' && input.key === '§' && input.meta) {
       event.preventDefault()
       mainWindow?.webContents.send('app:go-home')
+      return
+    }
+
+    if (input.type === 'keyDown' && input.key === ',' && input.meta) {
+      event.preventDefault()
+      emitOpenSettings()
     }
   })
 
@@ -341,6 +351,11 @@ app.whenReady().then(() => {
         label: appName,
         submenu: [
           { role: 'about', label: `About ${appName}` },
+          {
+            label: 'Settings...',
+            accelerator: 'Cmd+,',
+            click: () => emitOpenSettings()
+          },
           { type: 'separator' },
           { role: 'services' },
           { type: 'separator' },

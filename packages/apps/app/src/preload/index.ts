@@ -77,6 +77,11 @@ const api: ElectronAPI = {
       const handler = () => callback()
       ipcRenderer.on('app:go-home', handler)
       return () => ipcRenderer.removeListener('app:go-home', handler)
+    },
+    onOpenSettings: (callback: () => void) => {
+      const handler = () => callback()
+      ipcRenderer.on('app:open-settings', handler)
+      return () => ipcRenderer.removeListener('app:open-settings', handler)
     }
   },
   window: {

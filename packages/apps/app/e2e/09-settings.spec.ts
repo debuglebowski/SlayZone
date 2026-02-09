@@ -6,6 +6,11 @@ test.describe('Settings', () => {
     await expect(mainWindow.getByText('Appearance')).toBeVisible({ timeout: 5_000 })
   })
 
+  test('Cmd+, opens settings dialog', async ({ mainWindow }) => {
+    await mainWindow.keyboard.press('Meta+,')
+    await expect(mainWindow.getByText('Appearance')).toBeVisible({ timeout: 5_000 })
+  })
+
   test('switch theme to dark', async ({ mainWindow }) => {
     const themeSelect = mainWindow.locator('select').filter({ hasText: /Light|Dark|System/ }).first()
     if (await themeSelect.isVisible().catch(() => false)) {
