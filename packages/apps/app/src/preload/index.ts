@@ -220,7 +220,13 @@ const api: ElectronAPI = {
     renameContextFile: (oldPath, newPath, projectPath) =>
       ipcRenderer.invoke('ai-config:rename-context-file', oldPath, newPath, projectPath),
     deleteContextFile: (filePath, projectPath, projectId) =>
-      ipcRenderer.invoke('ai-config:delete-context-file', filePath, projectPath, projectId)
+      ipcRenderer.invoke('ai-config:delete-context-file', filePath, projectPath, projectId),
+    discoverMcpConfigs: (projectPath) =>
+      ipcRenderer.invoke('ai-config:discover-mcp-configs', projectPath),
+    writeMcpServer: (input) =>
+      ipcRenderer.invoke('ai-config:write-mcp-server', input),
+    removeMcpServer: (input) =>
+      ipcRenderer.invoke('ai-config:remove-mcp-server', input)
   },
   integrations: {
     connectLinear: (input) => ipcRenderer.invoke('integrations:connect-linear', input),

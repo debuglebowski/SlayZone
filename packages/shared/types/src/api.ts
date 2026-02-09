@@ -13,8 +13,11 @@ import type {
   CreateAiConfigItemInput,
   ListAiConfigItemsInput,
   LoadGlobalItemInput,
+  McpConfigFileResult,
   SetAiConfigProjectSelectionInput,
-  UpdateAiConfigItemInput
+  UpdateAiConfigItemInput,
+  WriteMcpServerInput,
+  RemoveMcpServerInput
 } from '@slayzone/ai-config/shared'
 import type {
   ConnectLinearInput,
@@ -246,6 +249,9 @@ export interface ElectronAPI {
     unlinkFile: (projectId: string, itemId: string) => Promise<boolean>
     renameContextFile: (oldPath: string, newPath: string, projectPath: string) => Promise<void>
     deleteContextFile: (filePath: string, projectPath: string, projectId: string) => Promise<void>
+    discoverMcpConfigs: (projectPath: string) => Promise<McpConfigFileResult[]>
+    writeMcpServer: (input: WriteMcpServerInput) => Promise<void>
+    removeMcpServer: (input: RemoveMcpServerInput) => Promise<void>
   }
   integrations: {
     connectLinear: (input: ConnectLinearInput) => Promise<IntegrationConnectionPublic>

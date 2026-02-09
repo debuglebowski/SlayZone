@@ -51,7 +51,7 @@ export interface SetAiConfigProjectSelectionInput {
   targetPath: string
 }
 
-export type ContextFileCategory = 'claude' | 'agents' | 'cursorrules' | 'copilot' | 'custom'
+export type ContextFileCategory = 'claude' | 'agents' | 'cursorrules' | 'copilot' | 'mcp' | 'custom'
 
 export interface ContextFileInfo {
   path: string
@@ -79,4 +79,42 @@ export interface LoadGlobalItemInput {
   itemId: string
   provider: ContextFileProvider
   manualPath?: string
+}
+
+// MCP server management
+export type McpProvider = 'claude' | 'cursor' | 'vscode'
+
+export interface McpServerConfig {
+  command: string
+  args: string[]
+  env?: Record<string, string>
+  type?: string
+}
+
+export interface McpConfigFileResult {
+  provider: McpProvider
+  exists: boolean
+  servers: Record<string, McpServerConfig>
+}
+
+export interface ProjectMcpServer {
+  id: string
+  name: string
+  config: McpServerConfig
+  curated: boolean
+  providers: McpProvider[]
+  category?: string
+}
+
+export interface WriteMcpServerInput {
+  projectPath: string
+  provider: McpProvider
+  serverKey: string
+  config: McpServerConfig
+}
+
+export interface RemoveMcpServerInput {
+  projectPath: string
+  provider: McpProvider
+  serverKey: string
 }

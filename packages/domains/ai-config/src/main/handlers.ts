@@ -12,8 +12,13 @@ import type {
   CreateAiConfigItemInput,
   ListAiConfigItemsInput,
   LoadGlobalItemInput,
+  McpConfigFileResult,
+  McpProvider,
+  McpServerConfig,
   SetAiConfigProjectSelectionInput,
-  UpdateAiConfigItemInput
+  UpdateAiConfigItemInput,
+  WriteMcpServerInput,
+  RemoveMcpServerInput
 } from '../shared'
 
 const KNOWN_CONTEXT_FILES: Array<{ relative: string; name: string; category: ContextFileCategory }> = [
@@ -21,7 +26,10 @@ const KNOWN_CONTEXT_FILES: Array<{ relative: string; name: string; category: Con
   { relative: '.claude/CLAUDE.md', name: '.claude/CLAUDE.md', category: 'claude' },
   { relative: 'AGENTS.md', name: 'AGENTS.md', category: 'agents' },
   { relative: '.cursorrules', name: '.cursorrules', category: 'cursorrules' },
-  { relative: '.github/copilot-instructions.md', name: '.github/copilot-instructions.md', category: 'copilot' }
+  { relative: '.github/copilot-instructions.md', name: '.github/copilot-instructions.md', category: 'copilot' },
+  { relative: '.mcp.json', name: '.mcp.json', category: 'mcp' },
+  { relative: '.cursor/mcp.json', name: '.cursor/mcp.json', category: 'mcp' },
+  { relative: '.vscode/mcp.json', name: '.vscode/mcp.json', category: 'mcp' }
 ]
 
 function isPathAllowed(filePath: string, projectPath: string | null): boolean {
@@ -409,5 +417,71 @@ export function registerAiConfigHandlers(ipcMain: IpcMain, db: Database): void {
     db.prepare(`
       DELETE FROM ai_config_project_selections WHERE project_id = ? AND target_path = ?
     `).run(projectId, rel)
+  })
+
+  // MCP config discovery + management
+  const MCP_CONFIG_PATHS: Record<McpProvider, { relativePath: string; serversKey: string }> = {
+    claude: { relativePath: '.mcp.json', serversKey: 'mcpServers' },
+    cursor: { relativePath: '.cursor/mcp.json', serversKey: 'mcpServers' },
+    vscode: { relativePath: '.vscode/mcp.json', serversKey: 'servers' }
+  }
+
+  ipcMain.handle('ai-config:discover-mcp-configs', (_event, projectPath: string): McpConfigFileResult[] => {
+    const resolvedProject = path.resolve(projectPath)
+    const results: McpConfigFileResult[] = []
+    for (const [provider, spec] of Object.entries(MCP_CONFIG_PATHS)) {
+      const filePath = path.join(resolvedProject, spec.relativePath)
+      const exists = fs.existsSync(filePath)
+      let servers: Record<string, McpServerConfig> = {}
+      if (exists) {
+        try {
+          const data = JSON.parse(fs.readFileSync(filePath, 'utf-8'))
+          const raw = data[spec.serversKey]
+          if (raw && typeof raw === 'object') {
+            servers = raw as Record<string, McpServerConfig>
+          }
+        } catch { /* ignore parse errors */ }
+      }
+      results.push({ provider: provider as McpProvider, exists, servers })
+    }
+    return results
+  })
+
+  ipcMain.handle('ai-config:write-mcp-server', (_event, input: WriteMcpServerInput) => {
+    const spec = MCP_CONFIG_PATHS[input.provider]
+    const resolvedProject = path.resolve(input.projectPath)
+    const filePath = path.join(resolvedProject, spec.relativePath)
+
+    let data: Record<string, unknown> = {}
+    if (fs.existsSync(filePath)) {
+      try { data = JSON.parse(fs.readFileSync(filePath, 'utf-8')) } catch { /* start fresh */ }
+    }
+
+    const servers = (data[spec.serversKey] ?? {}) as Record<string, McpServerConfig>
+    const config = { ...input.config }
+    if (input.provider === 'vscode' && !config.type) config.type = 'stdio'
+    servers[input.serverKey] = config
+    data[spec.serversKey] = servers
+
+    const dir = path.dirname(filePath)
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true })
+    fs.writeFileSync(filePath, JSON.stringify(data, null, 2) + '\n', 'utf-8')
+  })
+
+  ipcMain.handle('ai-config:remove-mcp-server', (_event, input: RemoveMcpServerInput) => {
+    const spec = MCP_CONFIG_PATHS[input.provider]
+    const resolvedProject = path.resolve(input.projectPath)
+    const filePath = path.join(resolvedProject, spec.relativePath)
+
+    if (!fs.existsSync(filePath)) return
+
+    let data: Record<string, unknown> = {}
+    try { data = JSON.parse(fs.readFileSync(filePath, 'utf-8')) } catch { return }
+
+    const servers = (data[spec.serversKey] ?? {}) as Record<string, McpServerConfig>
+    delete servers[input.serverKey]
+    data[spec.serversKey] = servers
+
+    fs.writeFileSync(filePath, JSON.stringify(data, null, 2) + '\n', 'utf-8')
   })
 }

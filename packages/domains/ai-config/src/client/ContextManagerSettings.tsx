@@ -119,7 +119,11 @@ export function ContextManagerSettings({ scope, projectId, projectPath, projectN
       </div>
 
       {section === 'mcp' ? (
-        <McpServersPanel />
+        <McpServersPanel
+          mode={scope === 'project' ? 'project' : 'global'}
+          projectPath={projectPath ?? undefined}
+          projectId={projectId ?? undefined}
+        />
       ) : section === 'files' && scope === 'project' && projectPath && projectId ? (
         <ProjectContextTree
           projectPath={projectPath}
