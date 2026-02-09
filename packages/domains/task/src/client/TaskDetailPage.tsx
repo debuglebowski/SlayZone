@@ -549,7 +549,7 @@ export function TaskDetailPage({
       task.terminal_mode === 'claude-code' ? 'default_claude_flags' : 'default_codex_flags'
     const fallback =
       task.terminal_mode === 'claude-code'
-        ? '--dangerously-skip-permissions'
+        ? '--allow-dangerously-skip-permissions'
         : '--full-auto --search'
     const defaultFlags = (await window.api.settings.get(settingsKey)) ?? fallback
     setFlagsInputValue(defaultFlags)

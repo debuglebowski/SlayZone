@@ -329,7 +329,7 @@ const migrations: Migration[] = [
         ALTER TABLE tasks ADD COLUMN codex_flags TEXT NOT NULL DEFAULT '';
       `)
       db.prepare(`INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)`)
-        .run('default_claude_flags', '--dangerously-skip-permissions')
+        .run('default_claude_flags', '--allow-dangerously-skip-permissions')
       db.prepare(`INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)`)
         .run('default_codex_flags', '--full-auto --search')
     }
@@ -527,6 +527,13 @@ const migrations: Migration[] = [
       `)
       db.prepare(`INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)`)
         .run('auto_create_worktree_on_task_create', '0')
+    }
+  },
+  {
+    version: 29,
+    up: (db) => {
+      db.prepare(`UPDATE settings SET value = '--allow-dangerously-skip-permissions' WHERE key = 'default_claude_flags' AND value = '--dangerously-skip-permissions'`).run()
+      db.prepare(`UPDATE tasks SET claude_flags = '--allow-dangerously-skip-permissions' WHERE claude_flags = '--dangerously-skip-permissions'`).run()
     }
   }
 ]

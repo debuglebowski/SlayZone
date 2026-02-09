@@ -21,7 +21,7 @@ export class ClaudeAdapter implements TerminalAdapter {
 
     // Add bypass flag if code mode requests full automation.
     if (codeMode === 'bypass') {
-      claudeArgs.push('--dangerously-skip-permissions')
+      claudeArgs.push('--allow-dangerously-skip-permissions')
     }
 
     claudeArgs.push(...providerArgs)

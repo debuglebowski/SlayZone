@@ -216,7 +216,7 @@ function upsertTaskFromIssue(db: Database, localProjectId: string, issue: Linear
     INSERT INTO tasks (
       id, project_id, title, description, status, priority, assignee,
       terminal_mode, claude_flags, codex_flags, created_at, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, 'claude-code', '--dangerously-skip-permissions', '--full-auto --search', datetime('now'), ?)
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, 'claude-code', '--allow-dangerously-skip-permissions', '--full-auto --search', datetime('now'), ?)
   `).run(
     id,
     localProjectId,

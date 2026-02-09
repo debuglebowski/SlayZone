@@ -28,7 +28,7 @@ async function runAiCommand(mode: TerminalMode, prompt: string): Promise<string>
     const claudePath = platform() === 'win32' ? 'claude' : `${homedir()}/.local/bin/claude`
 
     const cmd = mode === 'claude-code' ? claudePath : 'codex'
-    const args = mode === 'claude-code' ? ['--print', '--dangerously-skip-permissions', prompt] : [prompt]
+    const args = mode === 'claude-code' ? ['--print', '--allow-dangerously-skip-permissions', prompt] : [prompt]
 
     console.log('[ai] Running:', cmd, args)
 

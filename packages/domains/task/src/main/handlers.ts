@@ -223,7 +223,7 @@ export function registerTaskHandlers(ipcMain: IpcMain, db: Database): void {
       ?? 'claude-code'
     const defaultClaudeFlags =
       (db.prepare("SELECT value FROM settings WHERE key = 'default_claude_flags'")
-        .get() as { value: string } | undefined)?.value ?? '--dangerously-skip-permissions'
+        .get() as { value: string } | undefined)?.value ?? '--allow-dangerously-skip-permissions'
     const defaultCodexFlags =
       (db.prepare("SELECT value FROM settings WHERE key = 'default_codex_flags'")
         .get() as { value: string } | undefined)?.value ?? '--full-auto --search'

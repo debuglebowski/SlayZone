@@ -46,7 +46,7 @@ export function UserSettingsDialog({
   const [worktreeBasePath, setWorktreeBasePath] = useState('')
   const [autoCreateWorktreeOnTaskCreate, setAutoCreateWorktreeOnTaskCreate] = useState(false)
   const [defaultTerminalMode, setDefaultTerminalMode] = useState<TerminalMode>('claude-code')
-  const [defaultClaudeFlags, setDefaultClaudeFlags] = useState('--dangerously-skip-permissions')
+  const [defaultClaudeFlags, setDefaultClaudeFlags] = useState('--allow-dangerously-skip-permissions')
   const [defaultCodexFlags, setDefaultCodexFlags] = useState('--full-auto --search')
   const [diagnosticsConfig, setDiagnosticsConfig] = useState<DiagnosticsConfig | null>(null)
   const [retentionDaysInput, setRetentionDaysInput] = useState('14')
@@ -117,8 +117,8 @@ export function UserSettingsDialog({
 
       setDefaultClaudeFlags(
         claudeFlags.status === 'fulfilled'
-          ? (claudeFlags.value ?? '--dangerously-skip-permissions')
-          : '--dangerously-skip-permissions'
+          ? (claudeFlags.value ?? '--allow-dangerously-skip-permissions')
+          : '--allow-dangerously-skip-permissions'
       )
       setDefaultCodexFlags(
         codexFlags.status === 'fulfilled'
