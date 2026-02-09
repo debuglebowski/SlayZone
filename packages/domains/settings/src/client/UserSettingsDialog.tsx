@@ -48,6 +48,7 @@ export function UserSettingsDialog({
   const [shellSetting, setShellSetting] = useState('')
   const [defaultShell, setDefaultShell] = useState('')
   const [worktreeBasePath, setWorktreeBasePath] = useState('')
+  const [autoCreateWorktreeOnTaskCreate, setAutoCreateWorktreeOnTaskCreate] = useState(false)
   const [defaultTerminalMode, setDefaultTerminalMode] = useState<TerminalMode>('claude-code')
   const [defaultClaudeFlags, setDefaultClaudeFlags] = useState('--dangerously-skip-permissions')
   const [defaultCodexFlags, setDefaultCodexFlags] = useState('--full-auto --search')
@@ -89,11 +90,12 @@ export function UserSettingsDialog({
     const isStale = () => requestId !== loadRequestIdRef.current
 
     try {
-      const [loadedTags, path, shell, wtBasePath, termMode, claudeFlags, codexFlags] = await Promise.allSettled([
+      const [loadedTags, path, shell, wtBasePath, autoCreateWorktree, termMode, claudeFlags, codexFlags] = await Promise.allSettled([
         window.api.tags.getTags(),
         window.api.settings.get('database_path'),
         window.api.settings.get('shell'),
         window.api.settings.get('worktree_base_path'),
+        window.api.settings.get('auto_create_worktree_on_task_create'),
         window.api.settings.get('default_terminal_mode'),
         window.api.settings.get('default_claude_flags'),
         window.api.settings.get('default_codex_flags')
@@ -106,6 +108,9 @@ export function UserSettingsDialog({
       const envShell = typeof process !== 'undefined' ? process.env?.SHELL : undefined
       setDefaultShell(envShell || '/bin/bash')
       setWorktreeBasePath(wtBasePath.status === 'fulfilled' ? (wtBasePath.value ?? '') : '')
+      setAutoCreateWorktreeOnTaskCreate(
+        autoCreateWorktree.status === 'fulfilled' ? autoCreateWorktree.value === '1' : false
+      )
 
       const safeMode =
         termMode.status === 'fulfilled' &&
@@ -322,8 +327,27 @@ export function UserSettingsDialog({
                       }}
                     />
                   </div>
+                  <div className="grid grid-cols-[220px_minmax(0,1fr)] items-center gap-4">
+                    <span className="text-sm">Auto-create worktree</span>
+                    <label className="inline-flex items-center gap-2 text-sm">
+                      <input
+                        type="checkbox"
+                        checked={autoCreateWorktreeOnTaskCreate}
+                        onChange={(e) => {
+                          const enabled = e.target.checked
+                          setAutoCreateWorktreeOnTaskCreate(enabled)
+                          window.api.settings.set(
+                            'auto_create_worktree_on_task_create',
+                            enabled ? '1' : '0'
+                          )
+                        }}
+                      />
+                      <span>Create worktree for every new task</span>
+                    </label>
+                  </div>
                   <p className="text-xs text-muted-foreground">
                     Use {'{project}'} as a token. Leave empty to use {'{project}/..'}.
+                    Project settings can override auto-create behavior.
                   </p>
                 </div>
               </>
