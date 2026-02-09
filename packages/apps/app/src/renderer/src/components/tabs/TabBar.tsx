@@ -177,7 +177,7 @@ export function TabBar({
   return (
     <div className="flex items-end h-9 pl-2 pr-2 gap-1 bg-background border-b">
       {/* Scrollable tabs area */}
-      <div className="flex items-end gap-1 overflow-x-auto flex-1 min-w-0">
+      <div className="flex items-end gap-1 overflow-x-auto scrollbar-hide flex-1 min-w-0">
         {/* Home tab - not draggable */}
         <div
           className={cn(

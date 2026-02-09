@@ -312,7 +312,7 @@ export function BrowserPanel({ className, tabs, onTabsChange, taskId, isResizing
       onBlur={handleBlur}
     >
       {/* Tab Bar */}
-      <div className="shrink-0 flex items-end h-10 px-2 pt-2 gap-1 bg-background border-b overflow-x-auto">
+      <div className="shrink-0 flex items-end h-10 px-2 pt-2 gap-1 bg-background border-b overflow-x-auto scrollbar-hide">
         {tabs.tabs.map(tab => {
           const isActive = tab.id === tabs.activeTabId
           const displayUrl = tab.url === 'about:blank' ? 'New Tab' : tab.url
