@@ -196,6 +196,10 @@ function emitOpenSettings(): void {
   mainWindow?.webContents.send('app:open-settings')
 }
 
+function emitOpenProjectSettings(): void {
+  mainWindow?.webContents.send('app:open-project-settings')
+}
+
 function createSplashWindow(): void {
   splashWindow = new BrowserWindow({
     width: DEFAULT_WINDOW_WIDTH,
@@ -303,6 +307,12 @@ function createMainWindow(): void {
       return
     }
 
+    if (input.type === 'keyDown' && input.key === ',' && input.meta && input.shift) {
+      event.preventDefault()
+      emitOpenProjectSettings()
+      return
+    }
+
     if (input.type === 'keyDown' && input.key === ',' && input.meta) {
       event.preventDefault()
       emitOpenSettings()
@@ -357,6 +367,11 @@ app.whenReady().then(() => {
             label: 'Settings...',
             accelerator: 'Cmd+,',
             click: () => emitOpenSettings()
+          },
+          {
+            label: 'Project Settings...',
+            accelerator: 'Cmd+Shift+,',
+            click: () => emitOpenProjectSettings()
           },
           { type: 'separator' },
           { role: 'services' },

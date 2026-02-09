@@ -145,6 +145,7 @@ export interface ElectronAPI {
     getVersion: () => Promise<string>
     onGoHome: (callback: () => void) => () => void
     onOpenSettings: (callback: () => void) => () => void
+    onOpenProjectSettings: (callback: () => void) => () => void
   }
   window: {
     close: () => Promise<void>

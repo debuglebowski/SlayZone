@@ -418,6 +418,14 @@ function App(): React.JSX.Element {
     })
   }, [])
 
+  useEffect(() => {
+    return window.api.app.onOpenProjectSettings(() => {
+      if (!selectedProjectId) return
+      const project = projects.find((p) => p.id === selectedProjectId)
+      if (project) setEditingProject(project)
+    })
+  }, [selectedProjectId, projects])
+
   useHotkeys('mod+1,mod+2,mod+3,mod+4,mod+5,mod+6,mod+7,mod+8,mod+9', (e) => {
     e.preventDefault()
     const num = parseInt(e.key, 10)
