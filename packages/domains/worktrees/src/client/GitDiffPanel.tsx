@@ -1,6 +1,6 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Plus, Minus } from 'lucide-react'
-import { Button, cn } from '@slayzone/ui'
+import { Button, FileTree, buildFileTree, flattenFileTree, fileTreeIndent, cn } from '@slayzone/ui'
 import type { Task } from '@slayzone/task/shared'
 import type { GitDiffSnapshot } from '../shared/types'
 import { parseUnifiedDiff, type FileDiff } from './parse-diff'
@@ -51,6 +51,8 @@ const STATUS_COLORS: Record<FileEntry['status'], string> = {
   '?': 'text-muted-foreground'
 }
 
+const getEntryPath = (entry: FileEntry) => entry.path
+
 function HorizontalResizeHandle({ onDrag }: { onDrag: (deltaX: number) => void }) {
   const isDragging = useRef(false)
   const startX = useRef(0)
@@ -90,20 +92,24 @@ function HorizontalResizeHandle({ onDrag }: { onDrag: (deltaX: number) => void }
 
 const FileListItem = memo(function FileListItem({
   entry,
+  displayName,
   selected,
   additions,
   deletions,
   onClick,
   onAction,
-  itemRef
+  itemRef,
+  depth = 0
 }: {
   entry: FileEntry
+  displayName?: string
   selected: boolean
   additions?: number
   deletions?: number
   onClick: () => void
   onAction: () => void
   itemRef?: React.Ref<HTMLDivElement>
+  depth?: number
 }) {
   const hasCounts = additions != null || deletions != null
 
@@ -111,15 +117,16 @@ const FileListItem = memo(function FileListItem({
     <div
       ref={itemRef}
       className={cn(
-        'group w-full text-left px-3 py-1 flex items-center gap-2 text-xs font-mono hover:bg-accent/50 transition-colors cursor-pointer',
-        selected && 'bg-accent'
+        'group w-full text-left py-1 pr-3 flex items-center gap-1.5 text-xs font-mono hover:bg-muted/50 transition-colors cursor-pointer rounded',
+        selected && 'bg-primary/10'
       )}
+      style={{ paddingLeft: fileTreeIndent(depth) }}
       onClick={onClick}
     >
       <span className={cn('font-bold shrink-0 w-3 text-center', STATUS_COLORS[entry.status])}>
         {entry.status}
       </span>
-      <span className="truncate min-w-0 flex-1">{entry.path}</span>
+      <span className="truncate min-w-0 flex-1">{displayName ?? entry.path}</span>
       {hasCounts && (
         <span className="shrink-0 text-[10px] tabular-nums space-x-1">
           {additions != null && additions > 0 && (
@@ -157,6 +164,7 @@ export function GitDiffPanel({
   const [selectedFile, setSelectedFile] = useState<{ path: string; source: 'unstaged' | 'staged' } | null>(null)
   const [fileListWidth, setFileListWidth] = useState(320)
   const [untrackedDiffs, setUntrackedDiffs] = useState<Map<string, FileDiff>>(new Map())
+  const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set())
   const splitContainerRef = useRef<HTMLDivElement>(null)
   const fileListRef = useRef<HTMLDivElement>(null)
   const selectedItemRef = useRef<HTMLDivElement>(null)
@@ -213,8 +221,69 @@ export function GitDiffPanel({
     return snapshot.stagedFiles.map((f) => ({ path: f, status: deriveStatus(f, stagedFileDiffs) as FileEntry['status'], source: 'staged' as const }))
   }, [snapshot, stagedFileDiffs])
 
-  // Flat list in render order: staged first, then unstaged
+  // Flat list for selection logic
   const flatEntries = useMemo(() => [...stagedEntries, ...unstagedEntries], [stagedEntries, unstagedEntries])
+
+  // Build trees for keyboard nav flattening (respecting collapsed folders)
+  const stagedTree = useMemo(() => buildFileTree(stagedEntries, getEntryPath, { compress: true }), [stagedEntries])
+  const unstagedTree = useMemo(() => buildFileTree(unstagedEntries, getEntryPath, { compress: true }), [unstagedEntries])
+
+  // Invert expanded → collapsed for flattenFileTree
+  const collapsedFolders = useMemo(() => {
+    const allPaths = new Set<string>()
+    function walk(nodes: typeof stagedTree) {
+      for (const n of nodes) {
+        if (n.type === 'folder') { allPaths.add(n.path); walk(n.children) }
+      }
+    }
+    walk(stagedTree)
+    walk(unstagedTree)
+    const collapsed = new Set<string>()
+    for (const p of allPaths) {
+      if (!expandedFolders.has(p)) collapsed.add(p)
+    }
+    return collapsed
+  }, [stagedTree, unstagedTree, expandedFolders])
+
+  const visibleFlatEntries = useMemo(
+    () => [
+      ...flattenFileTree(stagedTree, collapsedFolders),
+      ...flattenFileTree(unstagedTree, collapsedFolders)
+    ],
+    [stagedTree, unstagedTree, collapsedFolders]
+  )
+
+  const toggleFolder = useCallback((path: string) => {
+    setExpandedFolders((prev) => {
+      const next = new Set(prev)
+      if (next.has(path)) next.delete(path)
+      else next.add(path)
+      return next
+    })
+  }, [])
+
+  // Auto-expand all folders when new folders appear
+  const prevFolderPathsRef = useRef<Set<string>>(new Set())
+  useEffect(() => {
+    const allPaths = new Set<string>()
+    function walk(nodes: typeof stagedTree) {
+      for (const n of nodes) {
+        if (n.type === 'folder') { allPaths.add(n.path); walk(n.children) }
+      }
+    }
+    walk(stagedTree)
+    walk(unstagedTree)
+    const prev = prevFolderPathsRef.current
+    const newPaths = [...allPaths].filter((p) => !prev.has(p))
+    prevFolderPathsRef.current = allPaths
+    if (newPaths.length > 0) {
+      setExpandedFolders((old) => {
+        const next = new Set(old)
+        for (const p of newPaths) next.add(p)
+        return next
+      })
+    }
+  }, [stagedTree, unstagedTree])
 
   const allDiffsMap = useMemo(() => {
     const map = new Map<string, FileDiff>()
@@ -236,7 +305,6 @@ export function GitDiffPanel({
   }, [selectedFile, flatEntries, getDiffForEntry])
 
   // Eagerly fetch diffs for untracked files (for counts + preview)
-  // Only fetch newly-added files and remove stale entries
   const prevUntrackedRef = useRef<string[]>([])
   useEffect(() => {
     if (!snapshot || !targetPath) return
@@ -247,7 +315,6 @@ export function GitDiffPanel({
     const currSet = new Set(curr)
     const prevSet = new Set(prev)
 
-    // Remove stale entries
     const removed = prev.filter((f) => !currSet.has(f))
     if (removed.length > 0) {
       setUntrackedDiffs((old) => {
@@ -257,7 +324,6 @@ export function GitDiffPanel({
       })
     }
 
-    // Fetch only new files
     const added = curr.filter((f) => !prevSet.has(f))
     for (const filePath of added) {
       window.api.git.getUntrackedFileDiff(targetPath, filePath).then((patch) => {
@@ -324,21 +390,21 @@ export function GitDiffPanel({
     e.preventDefault()
 
     const currentIdx = selectedFile
-      ? flatEntries.findIndex((f) => f.path === selectedFile.path && f.source === selectedFile.source)
+      ? visibleFlatEntries.findIndex((f) => f.path === selectedFile.path && f.source === selectedFile.source)
       : -1
 
     let nextIdx: number
     if (e.key === 'ArrowDown') {
-      nextIdx = currentIdx < flatEntries.length - 1 ? currentIdx + 1 : 0
+      nextIdx = currentIdx < visibleFlatEntries.length - 1 ? currentIdx + 1 : 0
     } else {
-      nextIdx = currentIdx > 0 ? currentIdx - 1 : flatEntries.length - 1
+      nextIdx = currentIdx > 0 ? currentIdx - 1 : visibleFlatEntries.length - 1
     }
 
-    const next = flatEntries[nextIdx]
+    const next = visibleFlatEntries[nextIdx]
     if (next) {
       setSelectedFile({ path: next.path, source: next.source })
     }
-  }, [selectedFile, flatEntries])
+  }, [selectedFile, visibleFlatEntries])
 
   const hasAnyChanges = !!snapshot && (
     snapshot.files.length > 0 ||
@@ -356,6 +422,24 @@ export function GitDiffPanel({
 
   const isSelected = (entry: FileEntry) =>
     selectedFile?.path === entry.path && selectedFile?.source === entry.source
+
+  const renderFileItem = useCallback((entry: FileEntry, { name, depth }: { name: string; depth: number }) => {
+    const diff = getDiffForEntry(entry)
+    const selected = isSelected(entry)
+    return (
+      <FileListItem
+        entry={entry}
+        displayName={name}
+        selected={selected}
+        additions={diff?.additions}
+        deletions={diff?.deletions}
+        onClick={() => handleSelectFile(entry.path, entry.source)}
+        onAction={() => handleStageAction(entry.path, entry.source)}
+        itemRef={selected ? selectedItemRef : undefined}
+        depth={depth}
+      />
+    )
+  }, [getDiffForEntry, selectedFile, handleSelectFile, handleStageAction])
 
   return (
     <div data-testid="git-diff-panel" className="h-full flex flex-col">
@@ -425,21 +509,14 @@ export function GitDiffPanel({
                     <Minus className="size-3.5" />
                   </button>
                 </div>
-                {stagedEntries.map((entry) => {
-                  const diff = getDiffForEntry(entry)
-                  return (
-                    <FileListItem
-                      key={`s:${entry.path}`}
-                      entry={entry}
-                      selected={isSelected(entry)}
-                      additions={diff?.additions}
-                      deletions={diff?.deletions}
-                      onClick={() => handleSelectFile(entry.path, 'staged')}
-                      onAction={() => handleStageAction(entry.path, 'staged')}
-                      itemRef={isSelected(entry) ? selectedItemRef : undefined}
-                    />
-                  )
-                })}
+                <FileTree
+                  items={stagedEntries}
+                  getPath={getEntryPath}
+                  compress
+                  expandedFolders={expandedFolders}
+                  onToggleFolder={toggleFolder}
+                  renderFile={renderFileItem}
+                />
               </div>
             )}
 
@@ -456,21 +533,14 @@ export function GitDiffPanel({
                     <Plus className="size-3.5" />
                   </button>
                 </div>
-                {unstagedEntries.map((entry) => {
-                  const diff = getDiffForEntry(entry)
-                  return (
-                    <FileListItem
-                      key={`u:${entry.path}`}
-                      entry={entry}
-                      selected={isSelected(entry)}
-                      additions={diff?.additions}
-                      deletions={diff?.deletions}
-                      onClick={() => handleSelectFile(entry.path, 'unstaged')}
-                      onAction={() => handleStageAction(entry.path, 'unstaged')}
-                      itemRef={isSelected(entry) ? selectedItemRef : undefined}
-                    />
-                  )
-                })}
+                <FileTree
+                  items={unstagedEntries}
+                  getPath={getEntryPath}
+                  compress
+                  expandedFolders={expandedFolders}
+                  onToggleFolder={toggleFolder}
+                  renderFile={renderFileItem}
+                />
               </div>
             )}
           </div>

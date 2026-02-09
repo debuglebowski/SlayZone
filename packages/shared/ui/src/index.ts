@@ -33,6 +33,7 @@ export * from './switch'
 export * from './settings-layout'
 export * from './tabs'
 export * from './panel-toggle'
+export * from './file-tree'
 export * from './textarea'
 export * from './tooltip'
 

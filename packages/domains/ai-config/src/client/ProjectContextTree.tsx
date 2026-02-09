@@ -1,55 +1,8 @@
 import { useCallback, useEffect, useRef, useState, type ChangeEvent, type MouseEvent as ReactMouseEvent } from 'react'
-import { ChevronRight, ChevronDown, File, FilePlus, Folder, FolderOpen, Link, Unlink, RefreshCw, Save, Check, AlertCircle, Plus, Pencil, Trash2 } from 'lucide-react'
-import { Button, ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuSeparator, ContextMenuTrigger, Dialog, DialogContent, DialogHeader, DialogTitle, Input, Label, Textarea, cn } from '@slayzone/ui'
+import { File, FilePlus, Link, Unlink, RefreshCw, Save, Check, AlertCircle, Plus, Pencil, Trash2 } from 'lucide-react'
+import { Button, ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuSeparator, ContextMenuTrigger, Dialog, DialogContent, DialogHeader, DialogTitle, Input, Label, Textarea, FileTree, fileTreeIndent, cn } from '@slayzone/ui'
 import type { ContextTreeEntry } from '../shared'
 import { GlobalItemPicker } from './GlobalItemPicker'
-
-interface ProjectContextTreeProps {
-  projectPath: string
-  projectId: string
-  projectName?: string
-}
-
-// Tree node types
-interface TreeFolder {
-  type: 'folder'
-  name: string
-  children: TreeNode[]
-}
-interface TreeFile {
-  type: 'file'
-  name: string
-  entry: ContextTreeEntry
-}
-type TreeNode = TreeFolder | TreeFile
-
-function buildTree(entries: ContextTreeEntry[]): TreeNode[] {
-  const root: TreeFolder = { type: 'folder', name: '', children: [] }
-
-  for (const entry of [...entries].sort((a, b) => a.relativePath.localeCompare(b.relativePath))) {
-    const parts = entry.relativePath.split('/')
-    let current = root
-    for (let i = 0; i < parts.length - 1; i++) {
-      let folder = current.children.find((c): c is TreeFolder => c.type === 'folder' && c.name === parts[i])
-      if (!folder) {
-        folder = { type: 'folder', name: parts[i], children: [] }
-        current.children.push(folder)
-      }
-      current = folder
-    }
-    current.children.push({ type: 'file', name: parts[parts.length - 1], entry })
-  }
-
-  // Sort: folders first, then files, alphabetical within each
-  const sortNodes = (nodes: TreeNode[]): TreeNode[] => {
-    const folders = nodes.filter((n): n is TreeFolder => n.type === 'folder').sort((a, b) => a.name.localeCompare(b.name))
-    const files = nodes.filter((n): n is TreeFile => n.type === 'file').sort((a, b) => a.name.localeCompare(b.name))
-    for (const f of folders) f.children = sortNodes(f.children)
-    return [...folders, ...files]
-  }
-
-  return sortNodes(root.children)
-}
 
 function SyncBadge({ status }: { status: ContextTreeEntry['syncStatus'] }) {
   if (status === 'synced') {
@@ -69,128 +22,12 @@ function SyncBadge({ status }: { status: ContextTreeEntry['syncStatus'] }) {
   return null
 }
 
-function TreeNodeView({
-  node,
-  depth,
-  parentPath,
-  selectedPath,
-  expandedFolders,
-  onToggleFolder,
-  onOpen,
-  onSync,
-  onUnlink,
-  onRename,
-  onDelete
-}: {
-  node: TreeNode
-  depth: number
-  parentPath: string
-  selectedPath: string | null
-  expandedFolders: Set<string>
-  onToggleFolder: (path: string) => void
-  onOpen: (entry: ContextTreeEntry) => void
-  onSync: (entry: ContextTreeEntry) => void
-  onUnlink: (entry: ContextTreeEntry) => void
-  onRename: (entry: ContextTreeEntry) => void
-  onDelete: (entry: ContextTreeEntry) => void
-}) {
-  if (node.type === 'folder') {
-    const folderPath = parentPath ? `${parentPath}/${node.name}` : node.name
-    const expanded = expandedFolders.has(folderPath)
-    return (
-      <>
-        <button
-          className="group/folder flex w-full select-none items-center gap-1.5 rounded px-1 py-1 text-xs hover:bg-muted/50"
-          style={{ paddingLeft: depth * 20 + 4 }}
-          onClick={() => onToggleFolder(folderPath)}
-        >
-          <span className="relative size-4 shrink-0">
-            {expanded
-              ? <FolderOpen className="size-4 text-muted-foreground group-hover/folder:opacity-0" />
-              : <Folder className="size-4 text-muted-foreground group-hover/folder:opacity-0" />}
-            {expanded
-              ? <ChevronDown className="absolute inset-0 m-auto size-3 opacity-0 group-hover/folder:opacity-100" />
-              : <ChevronRight className="absolute inset-0 m-auto size-3 opacity-0 group-hover/folder:opacity-100" />}
-          </span>
-          <span className="font-mono">{node.name}</span>
-        </button>
-        {expanded && node.children.map((child, i) => (
-          <TreeNodeView
-            key={child.type === 'file' ? child.entry.path : `${folderPath}/${child.name}-${i}`}
-            node={child}
-            depth={depth + 1}
-            parentPath={folderPath}
-            selectedPath={selectedPath}
-            expandedFolders={expandedFolders}
-            onToggleFolder={onToggleFolder}
-            onOpen={onOpen}
-            onSync={onSync}
-            onUnlink={onUnlink}
-            onRename={onRename}
-            onDelete={onDelete}
-          />
-        ))}
-      </>
-    )
-  }
+const getRelativePath = (entry: ContextTreeEntry) => entry.relativePath
 
-  const { entry } = node
-  const selected = selectedPath === entry.path
-  return (
-    <ContextMenu>
-      <ContextMenuTrigger asChild>
-        <div
-          className={cn(
-            'group flex w-full select-none items-center gap-1.5 rounded px-1 py-1 text-xs',
-            selected ? 'bg-primary/10 text-foreground' : 'hover:bg-muted/50',
-            !entry.exists && 'text-muted-foreground'
-          )}
-          style={{ paddingLeft: depth * 20 + 4 }}
-        >
-          <button className="flex min-w-0 flex-1 items-center gap-1.5" onClick={() => onOpen(entry)}>
-            {entry.exists ? <File className="size-3.5 shrink-0" /> : <FilePlus className="size-3.5 shrink-0" />}
-            <span className="min-w-0 truncate font-mono">{node.name}</span>
-          </button>
-          <div className="flex shrink-0 items-center gap-1">
-            {entry.linkedItemId && (
-              <>
-                <Link className="size-3 text-muted-foreground" />
-                <SyncBadge status={entry.syncStatus} />
-                {entry.syncStatus === 'out_of_sync' && (
-                  <button
-                    className="rounded p-0.5 text-muted-foreground hover:text-foreground"
-                    onClick={(e) => { e.stopPropagation(); onSync(entry) }}
-                    title="Sync from global"
-                  >
-                    <RefreshCw className="size-3" />
-                  </button>
-                )}
-              </>
-            )}
-          </div>
-        </div>
-      </ContextMenuTrigger>
-      <ContextMenuContent>
-        <ContextMenuItem onSelect={() => onRename(entry)}>
-          <Pencil className="size-4" /> Rename
-        </ContextMenuItem>
-        {entry.linkedItemId && entry.syncStatus === 'out_of_sync' && (
-          <ContextMenuItem onSelect={() => onSync(entry)}>
-            <RefreshCw className="size-4" /> Sync from global
-          </ContextMenuItem>
-        )}
-        {entry.linkedItemId && (
-          <ContextMenuItem onSelect={() => onUnlink(entry)}>
-            <Unlink className="size-4" /> Unlink from global
-          </ContextMenuItem>
-        )}
-        <ContextMenuSeparator />
-        <ContextMenuItem variant="destructive" onSelect={() => onDelete(entry)}>
-          <Trash2 className="size-4" /> Delete
-        </ContextMenuItem>
-      </ContextMenuContent>
-    </ContextMenu>
-  )
+interface ProjectContextTreeProps {
+  projectPath: string
+  projectId: string
+  projectName?: string
 }
 
 export function ProjectContextTree({ projectPath, projectId }: ProjectContextTreeProps) {
@@ -233,14 +70,14 @@ export function ProjectContextTree({ projectPath, projectId }: ProjectContextTre
     void loadTree()
   }, [loadTree])
 
-  const toggleFolder = (folderPath: string) => {
+  const toggleFolder = useCallback((folderPath: string) => {
     setExpandedFolders((prev) => {
       const next = new Set(prev)
       if (next.has(folderPath)) next.delete(folderPath)
       else next.add(folderPath)
       return next
     })
-  }
+  }, [])
 
   const openFile = async (entry: ContextTreeEntry) => {
     if (!entry.exists) {
@@ -348,8 +185,65 @@ export function ProjectContextTree({ projectPath, projectId }: ProjectContextTre
   const selectedEntry = entries.find((e) => e.path === selectedPath)
   const projectFiles = entries.filter((e) => !e.relativePath.startsWith('~'))
   const computerFiles = entries.filter((e) => e.relativePath.startsWith('~'))
-  const projectTree = buildTree(projectFiles)
-  const computerTree = buildTree(computerFiles)
+
+  const renderContextFile = useCallback((entry: ContextTreeEntry, { name, depth }: { name: string; depth: number }) => {
+    const selected = selectedPath === entry.path
+    return (
+      <ContextMenu>
+        <ContextMenuTrigger asChild>
+          <div
+            className={cn(
+              'group flex w-full select-none items-center gap-1.5 rounded px-1 py-1 text-xs',
+              selected ? 'bg-primary/10 text-foreground' : 'hover:bg-muted/50',
+              !entry.exists && 'text-muted-foreground'
+            )}
+            style={{ paddingLeft: fileTreeIndent(depth) }}
+          >
+            <button className="flex min-w-0 flex-1 items-center gap-1.5" onClick={() => openFile(entry)}>
+              {entry.exists ? <File className="size-3.5 shrink-0" /> : <FilePlus className="size-3.5 shrink-0" />}
+              <span className="min-w-0 truncate font-mono">{name}</span>
+            </button>
+            <div className="flex shrink-0 items-center gap-1">
+              {entry.linkedItemId && (
+                <>
+                  <Link className="size-3 text-muted-foreground" />
+                  <SyncBadge status={entry.syncStatus} />
+                  {entry.syncStatus === 'out_of_sync' && (
+                    <button
+                      className="rounded p-0.5 text-muted-foreground hover:text-foreground"
+                      onClick={(e) => { e.stopPropagation(); handleSync(entry) }}
+                      title="Sync from global"
+                    >
+                      <RefreshCw className="size-3" />
+                    </button>
+                  )}
+                </>
+              )}
+            </div>
+          </div>
+        </ContextMenuTrigger>
+        <ContextMenuContent>
+          <ContextMenuItem onSelect={() => handleStartRename(entry)}>
+            <Pencil className="size-4" /> Rename
+          </ContextMenuItem>
+          {entry.linkedItemId && entry.syncStatus === 'out_of_sync' && (
+            <ContextMenuItem onSelect={() => handleSync(entry)}>
+              <RefreshCw className="size-4" /> Sync from global
+            </ContextMenuItem>
+          )}
+          {entry.linkedItemId && (
+            <ContextMenuItem onSelect={() => handleUnlink(entry)}>
+              <Unlink className="size-4" /> Unlink from global
+            </ContextMenuItem>
+          )}
+          <ContextMenuSeparator />
+          <ContextMenuItem variant="destructive" onSelect={() => handleDelete(entry)}>
+            <Trash2 className="size-4" /> Delete
+          </ContextMenuItem>
+        </ContextMenuContent>
+      </ContextMenu>
+    )
+  }, [selectedPath])
 
   // Resizable split (pixel-based)
   const [splitWidth, setSplitWidth] = useState(350)
@@ -385,47 +279,29 @@ export function ProjectContextTree({ projectPath, projectId }: ProjectContextTre
       {/* Left: file tree */}
       <div className="flex flex-col overflow-y-auto p-3" style={{ width: splitWidth }}>
         <div className="flex-1 space-y-8">
-          {projectTree.length > 0 && (
+          {projectFiles.length > 0 && (
             <div>
               <p className="mb-1 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Project</p>
-              {projectTree.map((node, i) => (
-                <TreeNodeView
-                  key={node.type === 'file' ? node.entry.path : `proj-${node.name}-${i}`}
-                  node={node}
-                  depth={0}
-                  parentPath=""
-                  selectedPath={selectedPath}
-                  expandedFolders={expandedFolders}
-                  onToggleFolder={toggleFolder}
-                  onOpen={openFile}
-                  onSync={handleSync}
-                  onUnlink={handleUnlink}
-                  onRename={handleStartRename}
-                  onDelete={handleDelete}
-                />
-              ))}
+              <FileTree
+                items={projectFiles}
+                getPath={getRelativePath}
+                expandedFolders={expandedFolders}
+                onToggleFolder={toggleFolder}
+                renderFile={renderContextFile}
+              />
             </div>
           )}
 
-          {computerTree.length > 0 && (
+          {computerFiles.length > 0 && (
             <div>
               <p className="mb-1 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Computer</p>
-              {computerTree.map((node, i) => (
-                <TreeNodeView
-                  key={node.type === 'file' ? node.entry.path : `comp-${node.name}-${i}`}
-                  node={node}
-                  depth={0}
-                  parentPath=""
-                  selectedPath={selectedPath}
-                  expandedFolders={expandedFolders}
-                  onToggleFolder={toggleFolder}
-                  onOpen={openFile}
-                  onSync={handleSync}
-                  onUnlink={handleUnlink}
-                  onRename={handleStartRename}
-                  onDelete={handleDelete}
-                />
-              ))}
+              <FileTree
+                items={computerFiles}
+                getPath={getRelativePath}
+                expandedFolders={expandedFolders}
+                onToggleFolder={toggleFolder}
+                renderFile={renderContextFile}
+              />
             </div>
           )}
         </div>
