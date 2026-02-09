@@ -77,7 +77,8 @@ export function KanbanCard({
         className={cn(
           'cursor-grab transition-colors duration-[400ms] hover:duration-[100ms] select-none py-0 gap-0 hover:bg-muted/50',
           isDragging && 'opacity-50 shadow-lg',
-          isOverdue && 'border-destructive'
+          isOverdue && 'border-destructive',
+          task.linear_url && 'border-l-2 border-l-indigo-500'
         )}
         onClick={(e) => onClick?.(e)}
       >
@@ -126,6 +127,14 @@ export function KanbanCard({
                     </span>
                   </TooltipTrigger>
                   <TooltipContent>Merging</TooltipContent>
+                </Tooltip>
+              )}
+              {task.linear_url && (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span className="shrink-0 h-2 w-2 rounded-full bg-indigo-500" />
+                  </TooltipTrigger>
+                  <TooltipContent>Linked to Linear</TooltipContent>
                 </Tooltip>
               )}
               {isBlocked && (

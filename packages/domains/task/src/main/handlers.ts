@@ -184,7 +184,10 @@ export function registerTaskHandlers(ipcMain: IpcMain, db: Database): void {
   // Task CRUD
   ipcMain.handle('db:tasks:getAll', () => {
     const rows = db
-      .prepare('SELECT * FROM tasks ORDER BY "order" ASC, created_at DESC')
+      .prepare(`SELECT t.*, el.external_url AS linear_url
+        FROM tasks t
+        LEFT JOIN external_links el ON el.task_id = t.id AND el.provider = 'linear'
+        ORDER BY t."order" ASC, t.created_at DESC`)
       .all() as Record<string, unknown>[]
     return parseTasks(rows)
   })
@@ -192,14 +195,23 @@ export function registerTaskHandlers(ipcMain: IpcMain, db: Database): void {
   ipcMain.handle('db:tasks:getByProject', (_, projectId: string) => {
     const rows = db
       .prepare(
-        'SELECT * FROM tasks WHERE project_id = ? AND archived_at IS NULL ORDER BY "order" ASC, created_at DESC'
+        `SELECT t.*, el.external_url AS linear_url
+        FROM tasks t
+        LEFT JOIN external_links el ON el.task_id = t.id AND el.provider = 'linear'
+        WHERE t.project_id = ? AND t.archived_at IS NULL
+        ORDER BY t."order" ASC, t.created_at DESC`
       )
       .all(projectId) as Record<string, unknown>[]
     return parseTasks(rows)
   })
 
   ipcMain.handle('db:tasks:get', (_, id: string) => {
-    const row = db.prepare('SELECT * FROM tasks WHERE id = ?').get(id) as Record<string, unknown> | undefined
+    const row = db.prepare(
+      `SELECT t.*, el.external_url AS linear_url
+      FROM tasks t
+      LEFT JOIN external_links el ON el.task_id = t.id AND el.provider = 'linear'
+      WHERE t.id = ?`
+    ).get(id) as Record<string, unknown> | undefined
     return parseTask(row)
   })
 

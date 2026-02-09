@@ -592,10 +592,12 @@ export function TaskDetailPage({
     const handleKeyDown = (e: KeyboardEvent): void => {
       if (!isActive) return
       if (e.metaKey && !e.shiftKey) {
+        // Skip Cmd+B when focus is in a contenteditable editor (conflicts with bold)
+        const inEditor = (e.target as HTMLElement)?.closest?.('[contenteditable="true"]')
         if (e.key === 't') {
           e.preventDefault()
           handlePanelToggle('terminal', !panelVisibility.terminal)
-        } else if (e.key === 'b') {
+        } else if (e.key === 'b' && !inEditor) {
           e.preventDefault()
           handlePanelToggle('browser', !panelVisibility.browser)
         } else if (e.key === 'g') {
@@ -774,6 +776,21 @@ export function TaskDetailPage({
                 !editingTitle && 'cursor-pointer'
               )}
             />
+
+            {task.linear_url && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <a
+                    href="#"
+                    onClick={(e) => { e.preventDefault(); window.api.shell.openExternal(task.linear_url!) }}
+                    className="shrink-0 rounded bg-indigo-500/10 px-1.5 py-0.5 text-xs font-semibold text-indigo-600 hover:bg-indigo-500/20 dark:text-indigo-400"
+                  >
+                    Linear
+                  </a>
+                </TooltipTrigger>
+                <TooltipContent>Open in Linear</TooltipContent>
+              </Tooltip>
+            )}
 
             <div className="flex items-center gap-2">
               <PanelToggle

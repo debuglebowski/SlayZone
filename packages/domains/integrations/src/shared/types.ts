@@ -150,4 +150,5 @@ export interface LinearIssueSummary {
     name: string
   } | null
   url: string
+  linkedTaskId?: string | null
 }

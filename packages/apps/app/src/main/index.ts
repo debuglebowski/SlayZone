@@ -26,8 +26,8 @@ import { registerIntegrationHandlers, startLinearSyncPoller } from '@slayzone/in
 
 // Minimum splash screen display time (ms)
 const SPLASH_MIN_DURATION = 4000
-const DEFAULT_WINDOW_WIDTH = 2200
-const DEFAULT_WINDOW_HEIGHT = 1600
+const DEFAULT_WINDOW_WIDTH = 1760
+const DEFAULT_WINDOW_HEIGHT = 1280
 
 // Self-contained splash HTML with inline SVG and CSS animations
 const splashHTML = (version: string) => `
@@ -269,7 +269,8 @@ function createMainWindow(): void {
         mainWindow?.setBounds(bounds)
       }
       // Show main window first (splash stays on top due to alwaysOnTop)
-      mainWindow?.show()
+      // In Playwright mode, keep window hidden to avoid focus stealing during tests
+      if (!isPlaywright) mainWindow?.show()
       // Fade out splash, then close it
       if (splashWindow && !splashWindow.isDestroyed()) {
         splashWindow.webContents
@@ -438,6 +439,21 @@ app.whenReady().then(() => {
   registerThemeHandlers(ipcMain, db)
   registerClaudeHandlers(ipcMain)
   registerPtyHandlers(ipcMain, db)
+
+  // Expose test helpers for e2e
+  if (isPlaywright) {
+    ;(globalThis as Record<string, unknown>).__db = db
+    ;(globalThis as Record<string, unknown>).__restorePtyHandlers = () => {
+      for (const ch of [
+        'pty:create', 'pty:write', 'pty:resize', 'pty:kill', 'pty:exists',
+        'pty:getBuffer', 'pty:clearBuffer', 'pty:getBufferSince', 'pty:list', 'pty:getState',
+      ]) {
+        ipcMain.removeHandler(ch)
+      }
+      registerPtyHandlers(ipcMain, db)
+    }
+  }
+
   registerTerminalTabsHandlers(ipcMain, db)
   registerFilesHandlers(ipcMain)
   registerWorktreeHandlers(ipcMain)

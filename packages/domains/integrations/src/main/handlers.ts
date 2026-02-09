@@ -413,6 +413,20 @@ export function registerIntegrationHandlers(ipcMain: IpcMain, db: Database): voi
       first: input.limit ?? 50,
       after: input.cursor ?? null
     })
+
+    const externalIds = data.issues.map((i) => i.id)
+    if (externalIds.length > 0) {
+      const placeholders = externalIds.map(() => '?').join(',')
+      const links = db.prepare(`
+        SELECT external_id, task_id FROM external_links
+        WHERE provider = 'linear' AND external_id IN (${placeholders})
+      `).all(...externalIds) as Array<{ external_id: string; task_id: string }>
+      const linkMap = new Map(links.map((l) => [l.external_id, l.task_id]))
+      for (const issue of data.issues) {
+        issue.linkedTaskId = linkMap.get(issue.id) ?? null
+      }
+    }
+
     return data
   })
 
@@ -423,14 +437,15 @@ export function registerIntegrationHandlers(ipcMain: IpcMain, db: Database): voi
       WHERE project_id = ? AND provider = 'linear'
     `).get(input.projectId) as IntegrationProjectMapping | undefined
 
-    if (!mapping) {
-      throw new Error('Project is not mapped to Linear')
+    const teamId = input.teamId ?? mapping?.external_team_id
+    if (!teamId) {
+      throw new Error('No team specified and project is not mapped to Linear')
     }
 
     const apiKey = readCredential(db, connection.credential_ref)
     const data = await listIssues(apiKey, {
-      teamId: input.teamId ?? mapping.external_team_id,
-      projectId: input.linearProjectId ?? mapping.external_project_id ?? undefined,
+      teamId,
+      projectId: input.linearProjectId ?? mapping?.external_project_id ?? undefined,
       first: input.limit ?? 25,
       after: input.cursor ?? null
     })

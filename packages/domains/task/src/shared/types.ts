@@ -43,6 +43,8 @@ export interface Task {
   browser_tabs: BrowserTabsState | null
   // Merge mode
   merge_state: MergeState | null
+  // External link (populated via JOIN)
+  linear_url: string | null
   created_at: string
   updated_at: string
 }
