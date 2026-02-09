@@ -18,8 +18,10 @@ underlineOverride.textContent = `
 `
 document.head.appendChild(underlineOverride)
 
-import { getTerminal, setTerminal, disposeTerminal } from './terminal-cache'
+import { getTerminal, setTerminal, disposeTerminal, updateAllThemes } from './terminal-cache'
 import { usePty } from './PtyContext'
+import { useTheme } from '@slayzone/settings/client'
+import { getTerminalTheme } from './terminal-themes'
 import { TerminalSearchBar } from './TerminalSearchBar'
 import type { TerminalMode, TerminalState, CodeMode } from '@slayzone/terminal/shared'
 
@@ -123,6 +125,7 @@ export function Terminal({
   const [initError, setInitError] = useState<string | null>(null)
 
   const { subscribe, subscribeExit, subscribeSessionInvalid, subscribeAttention, subscribeState, getState, resetTaskState, cleanupTask } = usePty()
+  const { theme } = useTheme()
 
   const [ptyState, setPtyState] = useState<TerminalState>(() => getState(sessionId))
 
@@ -187,6 +190,8 @@ export function Terminal({
         } else {
           // Reattach existing terminal (container already has dimensions)
           containerRef.current.appendChild(cached.element)
+          cached.terminal.options.theme = getTerminalTheme(theme)
+          cached.terminal.options.minimumContrastRatio = theme === 'light' ? 4.5 : 1
           terminalRef.current = cached.terminal
           fitAddonRef.current = cached.fitAddon
           serializeAddonRef.current = cached.serializeAddon
@@ -229,29 +234,8 @@ export function Terminal({
         cursorBlink: true,
         fontSize: 13,
         fontFamily: 'Menlo, Monaco, "Courier New", monospace',
-        theme: {
-          background: '#0a0a0a',
-          foreground: '#e5e5e5',
-          cursor: '#e5e5e5',
-          cursorAccent: '#0a0a0a',
-          selectionBackground: '#525252',
-          black: '#171717',
-          red: '#f87171',
-          green: '#4ade80',
-          yellow: '#facc15',
-          blue: '#60a5fa',
-          magenta: '#c084fc',
-          cyan: '#22d3ee',
-          white: '#e5e5e5',
-          brightBlack: '#404040',
-          brightRed: '#fca5a5',
-          brightGreen: '#86efac',
-          brightYellow: '#fde047',
-          brightBlue: '#93c5fd',
-          brightMagenta: '#d8b4fe',
-          brightCyan: '#67e8f9',
-          brightWhite: '#fafafa'
-        }
+        theme: getTerminalTheme(theme),
+        minimumContrastRatio: theme === 'light' ? 4.5 : 1
       })
 
       const fitAddon = new FitAddon()
@@ -470,6 +454,17 @@ export function Terminal({
     return subscribeState(sessionId, (newState) => setPtyState(newState))
   }, [sessionId, getState, subscribeState])
 
+  // Sync terminal theme with app theme
+  useEffect(() => {
+    const xtermTheme = getTerminalTheme(theme)
+    const contrastRatio = theme === 'light' ? 4.5 : 1
+    if (terminalRef.current) {
+      terminalRef.current.options.theme = xtermTheme
+      terminalRef.current.options.minimumContrastRatio = contrastRatio
+    }
+    updateAllThemes(xtermTheme, contrastRatio)
+  }, [theme])
+
   // Handle resize
   useEffect(() => {
     const handleResize = () => {
@@ -628,14 +623,14 @@ export function Terminal({
       <div
         ref={containerRef}
         tabIndex={0}
-        className={`h-full w-full bg-[#0a0a0a] rounded-lg outline-none overflow-hidden transition-colors ${
+        className={`h-full w-full bg-white dark:bg-[#0a0a0a] rounded-lg outline-none overflow-hidden transition-colors ${
           isDragOver ? 'ring-2 ring-blue-500/50 ring-inset' : ''
         }`}
         style={{ padding: '8px' }}
         onClick={() => terminalRef.current?.focus()}
       >
         {isLoading && (
-          <div className="absolute inset-0 flex items-center justify-center bg-[#0a0a0a] z-10">
+          <div className="absolute inset-0 flex items-center justify-center bg-white dark:bg-[#0a0a0a] z-10">
             <div className="flex items-center gap-2 text-neutral-500">
               <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
@@ -646,7 +641,7 @@ export function Terminal({
           </div>
         )}
         {initError && (
-          <div className="absolute inset-0 flex items-center justify-center bg-[#0a0a0a] z-10 p-4">
+          <div className="absolute inset-0 flex items-center justify-center bg-white dark:bg-[#0a0a0a] z-10 p-4">
             <div className="text-red-400 text-sm text-center">Failed to start terminal: {initError}</div>
           </div>
         )}

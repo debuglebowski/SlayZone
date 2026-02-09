@@ -225,6 +225,39 @@ export function TaskDetailPage({
     return () => window.removeEventListener('focus', handleFocus)
   }, [project?.path])
 
+  // Keep project in sync when task project assignment changes.
+  useEffect(() => {
+    if (!task) return
+    let cancelled = false
+
+    const checkProjectPathExists = async (path: string): Promise<boolean> => {
+      const pathExists = window.api.files?.pathExists
+      if (typeof pathExists === 'function') return pathExists(path)
+      console.warn('window.api.files.pathExists is unavailable; skipping path validation')
+      return true
+    }
+
+    const syncProject = async (): Promise<void> => {
+      const projects = await window.api.db.getProjects()
+      const taskProject = projects.find((p) => p.id === task.project_id) || null
+      if (cancelled) return
+
+      setProject(taskProject)
+
+      if (taskProject?.path) {
+        const exists = await checkProjectPathExists(taskProject.path)
+        if (!cancelled) setProjectPathMissing(!exists)
+      } else if (!cancelled) {
+        setProjectPathMissing(false)
+      }
+    }
+
+    void syncProject()
+    return () => {
+      cancelled = true
+    }
+  }, [task?.project_id, task?.id])
+
   // Handle session ID creation from terminal
   const handleSessionCreated = useCallback(
     async (sessionId: string) => {
@@ -246,21 +279,53 @@ export function TaskDetailPage({
     clearBuffer: () => Promise<void>
   }) => {
     terminalApiRef.current = api
-    // Codex has no "create with session id" command; ask it for current session id on first start.
-    if (
-      task &&
-      task.terminal_mode === 'codex' &&
-      !task.codex_conversation_id &&
-      !codexStatusRequestedTaskIdsRef.current.has(task.id)
-    ) {
-      codexStatusRequestedTaskIdsRef.current.add(task.id)
-      setTimeout(() => {
-        void api.sendInput('/status\r').catch(() => {
-          // Ignore: terminal may be closing/remounting
-        })
-      }, 400)
+  }, [])
+
+  // Codex has no "create with session id" command; ask it for current session id.
+  // Use direct PTY writes with retries to survive startup timing races.
+  useEffect(() => {
+    if (!task || task.terminal_mode !== 'codex' || task.codex_conversation_id) return
+    if (detectedSessionId) return
+    if (codexStatusRequestedTaskIdsRef.current.has(task.id)) return
+
+    codexStatusRequestedTaskIdsRef.current.add(task.id)
+    const sessionId = getMainSessionId(task.id)
+    let cancelled = false
+    let attempts = 0
+    let retryTimer: ReturnType<typeof setTimeout> | null = null
+
+    const runAttempt = async (): Promise<void> => {
+      if (cancelled) return
+      if (!task || task.codex_conversation_id || detectedSessionId) return
+
+      const exists = await window.api.pty.exists(sessionId)
+      if (!exists || cancelled) {
+        retryTimer = setTimeout(() => {
+          void runAttempt()
+        }, 800)
+        return
+      }
+
+      await window.api.pty.write(sessionId, '/status')
+      await window.api.pty.write(sessionId, '\r')
+      attempts += 1
+
+      if (attempts < 8) {
+        retryTimer = setTimeout(() => {
+          void runAttempt()
+        }, 1200)
+      }
     }
-  }, [task])
+
+    retryTimer = setTimeout(() => {
+      void runAttempt()
+    }, 500)
+
+    return () => {
+      cancelled = true
+      if (retryTimer) clearTimeout(retryTimer)
+    }
+  }, [task, detectedSessionId, getMainSessionId])
 
   // Update DB with detected session ID
   const handleUpdateSessionId = useCallback(async () => {
@@ -378,14 +443,23 @@ export function TaskDetailPage({
 
   // Cmd+I (title), Cmd+Shift+I (description), Cmd+Shift+K (clear terminal buffer)
   useEffect(() => {
+    const isTerminalFocused = (): boolean => {
+      const active = document.activeElement as HTMLElement | null
+      if (!active) return false
+      if (active.classList.contains('xterm-helper-textarea')) return true
+      return !!active.closest('.xterm')
+    }
+
     const handleKeyDown = (e: KeyboardEvent): void => {
       if (!isActive) return
       if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === 'k') {
+        if (!isTerminalFocused()) return
         e.preventDefault()
         void terminalApiRef.current?.clearBuffer()
         return
       }
       if (e.metaKey && e.key === 'i') {
+        if (!isTerminalFocused()) return
         e.preventDefault()
         if (e.shiftKey) {
           handleInjectDescription()
@@ -785,7 +859,7 @@ export function TaskDetailPage({
         {/* Terminal Panel */}
         {panelVisibility.terminal && (
         <div className={cn(
-          "min-w-0 bg-[#0a0a0a] flex flex-col",
+          "min-w-0 bg-white dark:bg-[#0a0a0a] flex flex-col",
           panelVisibility.browser ? "flex-1 min-w-[300px]" : "flex-1"
         )}>
           {projectPathMissing && project?.path && (
@@ -840,10 +914,10 @@ export function TaskDetailPage({
                   onTaskUpdated={(t) => { setTask(t); onTaskUpdated(t) }}
                 />
               ) : isResizing ? (
-                <div className="h-full bg-[#0a0a0a]" />
-              ) : project?.path && !projectPathMissing ? (
+                <div className="h-full bg-white dark:bg-[#0a0a0a]" />
+              ) : project?.id === task.project_id && project.path && !projectPathMissing ? (
                 <TerminalContainer
-                  key={`${terminalKey}-${task.worktree_path || ''}`}
+                  key={`${terminalKey}-${task.project_id}-${project?.path || ''}-${task.worktree_path || ''}`}
                   taskId={task.id}
                   cwd={task.worktree_path || project.path}
                   defaultMode={task.terminal_mode}
@@ -881,7 +955,7 @@ export function TaskDetailPage({
             {/* Terminal mode bar - only active on main tab */}
             <Tooltip open={isMainTabActive ? false : undefined}>
               <TooltipTrigger asChild>
-                <div className="shrink-0 px-2 py-2 border-t border-neutral-800">
+                <div className="shrink-0 px-2 py-2 border-t border-neutral-200 dark:border-neutral-800">
                   <div className={cn(
                     "flex items-center gap-3 transition-opacity",
                     !isMainTabActive && "opacity-40 pointer-events-none"
@@ -893,7 +967,7 @@ export function TaskDetailPage({
               <SelectTrigger
                 data-testid="terminal-mode-trigger"
                 size="sm"
-                className="w-36 h-7 text-xs bg-neutral-800 border-neutral-700"
+                className="w-36 h-7 text-xs bg-neutral-100 border-neutral-300 dark:bg-neutral-800 dark:border-neutral-700"
               >
                 <SelectValue />
               </SelectTrigger>
@@ -926,7 +1000,7 @@ export function TaskDetailPage({
                     }
                   }}
                   placeholder="Flags"
-                  className="h-7 text-xs bg-neutral-800 border-neutral-700 w-72"
+                  className="h-7 text-xs bg-neutral-100 border-neutral-300 dark:bg-neutral-800 dark:border-neutral-700 w-72"
                 />
               ) : (
                 flagsInputValue.trim().length === 0 ? (
@@ -951,7 +1025,7 @@ export function TaskDetailPage({
                 ) : (
                   <div className="relative h-7 w-fit max-w-72 px-1 pr-7">
                     <div className="min-w-0 h-full flex items-center">
-                      <div className="text-xs text-neutral-200 truncate">
+                      <div className="text-xs text-neutral-700 dark:text-neutral-200 truncate">
                         {flagsInputValue}
                       </div>
                     </div>

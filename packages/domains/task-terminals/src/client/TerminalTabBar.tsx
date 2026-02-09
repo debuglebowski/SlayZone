@@ -64,7 +64,7 @@ export function TerminalTabBar({
   return (
     <div
       data-testid="terminal-tabbar"
-      className="flex items-end h-11 pt-2 px-2 gap-1 bg-neutral-950 border-b border-neutral-800 overflow-x-auto"
+      className="flex items-end h-11 pt-2 px-2 gap-1 bg-neutral-100 border-b border-neutral-200 dark:bg-neutral-950 dark:border-neutral-800 overflow-x-auto scrollbar-hide"
     >
       {tabs.map(tab => {
         const Icon = MODE_ICONS[tab.mode]
@@ -81,10 +81,10 @@ export function TerminalTabBar({
             data-tab-active={isActive ? 'true' : 'false'}
             className={cn(
               'group flex items-center gap-1.5 h-8 px-3 rounded-t-md cursor-pointer transition-colors select-none shrink-0',
-              'hover:bg-neutral-800/50',
+              'hover:bg-neutral-200/50 dark:hover:bg-neutral-800/50',
               isActive
-                ? 'bg-neutral-800 border-b-2 border-b-white'
-                : 'text-neutral-400'
+                ? 'bg-neutral-200 border-b-2 border-b-neutral-900 dark:bg-neutral-800 dark:border-b-white'
+                : 'text-neutral-500 dark:text-neutral-400'
             )}
             onClick={() => onTabSelect(tab.id)}
             onDoubleClick={() => handleDoubleClick(tab)}
@@ -111,7 +111,7 @@ export function TerminalTabBar({
             ) : (
               <button
                 data-testid={`terminal-tab-close-${tab.id}`}
-                className="h-4 w-4 rounded hover:bg-neutral-600/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                className="h-4 w-4 rounded hover:bg-neutral-300/50 dark:hover:bg-neutral-600/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
                 onClick={e => {
                   e.stopPropagation()
                   onTabClose(tab.id)
@@ -125,7 +125,7 @@ export function TerminalTabBar({
       })}
       <button
         data-testid="terminal-tab-add"
-        className="flex items-center justify-center h-8 w-8 rounded-t-md text-neutral-400 hover:text-neutral-200 hover:bg-neutral-800/50 shrink-0"
+        className="flex items-center justify-center h-8 w-8 rounded-t-md text-neutral-500 hover:text-neutral-700 hover:bg-neutral-200/50 dark:text-neutral-400 dark:hover:text-neutral-200 dark:hover:bg-neutral-800/50 shrink-0"
         onClick={onTabCreate}
       >
         <Plus className="size-4" />

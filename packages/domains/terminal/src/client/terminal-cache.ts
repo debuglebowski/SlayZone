@@ -1,4 +1,4 @@
-import type { Terminal as XTerm } from '@xterm/xterm'
+import type { Terminal as XTerm, ITheme } from '@xterm/xterm'
 import type { FitAddon } from '@xterm/addon-fit'
 import type { SerializeAddon } from '@xterm/addon-serialize'
 import type { SearchAddon } from '@xterm/addon-search'
@@ -81,6 +81,15 @@ export function markSkipCache(sessionId: string): void {
     skipCacheTimeouts.delete(sessionId)
   }, 2000)
   skipCacheTimeouts.set(sessionId, timeout)
+}
+
+export function updateAllThemes(theme: ITheme, minimumContrastRatio?: number): void {
+  for (const entry of cache.values()) {
+    entry.terminal.options.theme = theme
+    if (minimumContrastRatio !== undefined) {
+      entry.terminal.options.minimumContrastRatio = minimumContrastRatio
+    }
+  }
 }
 
 export function getCacheSize(): number {

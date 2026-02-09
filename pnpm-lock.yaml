@@ -425,6 +425,9 @@ importers:
       '@slayzone/diagnostics':
         specifier: workspace:*
         version: link:../diagnostics
+      '@slayzone/settings':
+        specifier: workspace:*
+        version: link:../settings
       '@slayzone/types':
         specifier: workspace:*
         version: link:../../shared/types

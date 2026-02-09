@@ -97,37 +97,37 @@ export function TerminalSearchBar({ searchAddon, onClose }: TerminalSearchBarPro
   return (
     // Stop propagation so container onClick doesn't steal focus from search input
     <div
-      className="absolute top-2 right-4 z-50 flex items-center gap-1 bg-neutral-800 border border-neutral-700 rounded-md px-2 py-1 shadow-lg"
+      className="absolute top-2 right-4 z-50 flex items-center gap-1 bg-neutral-100 border border-neutral-300 dark:bg-neutral-800 dark:border-neutral-700 rounded-md px-2 py-1 shadow-lg"
       onClick={(e) => e.stopPropagation()}
       onMouseDown={(e) => e.stopPropagation()}
     >
-      <Search className="size-3.5 text-neutral-400 shrink-0" />
+      <Search className="size-3.5 text-neutral-500 dark:text-neutral-400 shrink-0" />
       <input
         ref={inputRef}
-        className="bg-transparent text-sm text-neutral-200 placeholder:text-neutral-500 outline-none w-40"
+        className="bg-transparent text-sm text-neutral-800 placeholder:text-neutral-400 dark:text-neutral-200 dark:placeholder:text-neutral-500 outline-none w-40"
         placeholder="Find..."
         value={query}
         onChange={(e) => setQuery(e.target.value)}
         onKeyDown={handleKeyDown}
       />
-      <span className="text-xs text-neutral-400 tabular-nums shrink-0 min-w-[3ch] text-right">
+      <span className="text-xs text-neutral-500 dark:text-neutral-400 tabular-nums shrink-0 min-w-[3ch] text-right">
         {countDisplay}
       </span>
-      <button onClick={findPrevious} title="Previous (Shift+Enter)" className="p-0.5 hover:bg-neutral-700 rounded">
-        <ChevronUp className="size-4 text-neutral-400 hover:text-neutral-200" />
+      <button onClick={findPrevious} title="Previous (Shift+Enter)" className="p-0.5 hover:bg-neutral-200 dark:hover:bg-neutral-700 rounded">
+        <ChevronUp className="size-4 text-neutral-500 hover:text-neutral-700 dark:text-neutral-400 dark:hover:text-neutral-200" />
       </button>
-      <button onClick={findNext} title="Next (Enter)" className="p-0.5 hover:bg-neutral-700 rounded">
-        <ChevronDown className="size-4 text-neutral-400 hover:text-neutral-200" />
+      <button onClick={findNext} title="Next (Enter)" className="p-0.5 hover:bg-neutral-200 dark:hover:bg-neutral-700 rounded">
+        <ChevronDown className="size-4 text-neutral-500 hover:text-neutral-700 dark:text-neutral-400 dark:hover:text-neutral-200" />
       </button>
       <button
         onClick={() => setCaseSensitive(!caseSensitive)}
         title="Case Sensitive"
-        className={`p-0.5 rounded ${caseSensitive ? 'bg-neutral-600 text-amber-400' : 'hover:bg-neutral-700 text-neutral-400'}`}
+        className={`p-0.5 rounded ${caseSensitive ? 'bg-neutral-300 text-amber-600 dark:bg-neutral-600 dark:text-amber-400' : 'hover:bg-neutral-200 text-neutral-500 dark:hover:bg-neutral-700 dark:text-neutral-400'}`}
       >
         <ALargeSmall className="size-4" />
       </button>
-      <button onClick={onClose} title="Close (Escape)" className="p-0.5 hover:bg-neutral-700 rounded">
-        <X className="size-3.5 text-neutral-400 hover:text-neutral-200" />
+      <button onClick={onClose} title="Close (Escape)" className="p-0.5 hover:bg-neutral-200 dark:hover:bg-neutral-700 rounded">
+        <X className="size-3.5 text-neutral-500 hover:text-neutral-700 dark:text-neutral-400 dark:hover:text-neutral-200" />
       </button>
     </div>
   )

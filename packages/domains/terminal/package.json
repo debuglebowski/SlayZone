@@ -16,6 +16,7 @@
   },
   "dependencies": {
     "@slayzone/diagnostics": "workspace:*",
+    "@slayzone/settings": "workspace:*",
     "@slayzone/types": "workspace:*",
     "@slayzone/ui": "workspace:*",
     "@xterm/addon-fit": "^0.11.0",

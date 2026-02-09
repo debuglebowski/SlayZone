@@ -1,5 +1,5 @@
 import * as pty from 'node-pty'
-import { BrowserWindow, Notification } from 'electron'
+import { BrowserWindow, Notification, nativeTheme } from 'electron'
 import { homedir, userInfo } from 'os'
 import type { Database } from 'better-sqlite3'
 import type { TerminalState, PtyInfo, CodeMode, BufferSinceResult } from '@slayzone/terminal/shared'
@@ -90,8 +90,9 @@ function taskIdFromSessionId(sessionId: string): string {
 // Filter out terminal escape sequences that cause issues
 function filterBufferData(data: string): string {
   return data
-    // Filter OSC sequences (ESC ] ... BEL or ESC ] ... ST)
-    .replace(/\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)/g, '')
+    // Strip only title-setting (0,1,2) and clipboard (52) OSC sequences
+    // Allow through: OSC 10/11 (color query), OSC 4 (palette), OSC 7 (CWD) etc.
+    .replace(/\x1b\](?:[012]|52)[;][^\x07\x1b]*(?:\x07|\x1b\\)/g, '')
     // Filter DA responses (ESC [ ? ... c)
     .replace(/\x1b\[\?[0-9;]*c/g, '')
     // Filter underline from ANY SGR sequence (handles combined codes like ESC[1;4m)
@@ -281,7 +282,9 @@ export function createPty(
         USER: process.env.USER || userInfo().username,
         HOME: process.env.HOME || homedir(),
         TERM: 'xterm-256color',
-        COLORTERM: 'truecolor'
+        COLORTERM: 'truecolor',
+        COLORFGBG: nativeTheme.shouldUseDarkColors ? '15;0' : '0;15',
+        TERM_BACKGROUND: nativeTheme.shouldUseDarkColors ? 'dark' : 'light'
       } as Record<string, string>
     })
 
