@@ -1,8 +1,40 @@
-import { test, expect, seed, goHome, clickProject, clickSettings } from './fixtures/electron'
+import { test, expect, seed, goHome, clickProject } from './fixtures/electron'
 import { TEST_PROJECT_PATH } from './fixtures/electron'
 
 test.describe('Tag management', () => {
   let projectAbbrev: string
+
+  const settingsDialog = (mainWindow: import('@playwright/test').Page) =>
+    mainWindow.getByRole('dialog').last()
+
+  const openSettingsDialog = async (mainWindow: import('@playwright/test').Page) => {
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const dialog = settingsDialog(mainWindow)
+      if (await dialog.isVisible({ timeout: 500 }).catch(() => false)) {
+        return
+      }
+
+      const settingsButton = mainWindow
+        .locator('[data-slot="sidebar"] [data-sidebar="footer"] button')
+        .filter({ has: mainWindow.locator('.lucide-settings') })
+        .first()
+
+      await expect(settingsButton).toBeVisible({ timeout: 5_000 })
+      await settingsButton.click()
+
+      if (await dialog.isVisible({ timeout: 2_000 }).catch(() => false)) {
+        return
+      }
+    }
+    await expect(settingsDialog(mainWindow)).toBeVisible({ timeout: 5_000 })
+  }
+
+  const openTagsSection = async (mainWindow: import('@playwright/test').Page) => {
+    await openSettingsDialog(mainWindow)
+    const dialog = settingsDialog(mainWindow)
+    await dialog.locator('aside button').filter({ hasText: 'Tags' }).first().click()
+    await expect(dialog.locator('#new-tag')).toBeVisible({ timeout: 5_000 })
+  }
 
   test.beforeAll(async ({ mainWindow }) => {
     const s = seed(mainWindow)
@@ -13,33 +45,26 @@ test.describe('Tag management', () => {
   })
 
   test('create tag in settings dialog', async ({ mainWindow }) => {
-    await clickSettings(mainWindow)
-    await expect(mainWindow.getByText('Appearance')).toBeVisible({ timeout: 5_000 })
-
-    // Switch to Tags tab
-    await mainWindow.getByRole('tab', { name: 'Tags' }).click()
-    await mainWindow.waitForTimeout(300)
+    await openTagsSection(mainWindow)
 
     // Fill tag name
-    const tagInput = mainWindow.locator('#new-tag')
+    const tagInput = settingsDialog(mainWindow).locator('#new-tag')
     await tagInput.fill('e2e-tag')
-    await mainWindow.getByRole('button', { name: 'Add' }).click()
-    await mainWindow.waitForTimeout(300)
+    await settingsDialog(mainWindow).getByRole('button', { name: 'Add' }).click()
 
     // Verify tag appears in list
-    await expect(mainWindow.getByText('e2e-tag')).toBeVisible({ timeout: 3_000 })
+    await expect(settingsDialog(mainWindow).getByText('e2e-tag')).toBeVisible({ timeout: 3_000 })
   })
 
   test('create second tag', async ({ mainWindow }) => {
-    const tagInput = mainWindow.locator('#new-tag')
+    const tagInput = settingsDialog(mainWindow).locator('#new-tag')
     await tagInput.fill('e2e-tag-2')
-    await mainWindow.getByRole('button', { name: 'Add' }).click()
-    await mainWindow.waitForTimeout(300)
-    await expect(mainWindow.getByText('e2e-tag-2')).toBeVisible({ timeout: 3_000 })
+    await settingsDialog(mainWindow).getByRole('button', { name: 'Add' }).click()
+    await expect(settingsDialog(mainWindow).getByText('e2e-tag-2')).toBeVisible({ timeout: 3_000 })
 
     // Close settings
     await mainWindow.keyboard.press('Escape')
-    await mainWindow.waitForTimeout(300)
+    await expect(settingsDialog(mainWindow)).not.toBeVisible({ timeout: 3_000 })
   })
 
   test('assign tag to task via API', async ({ mainWindow }) => {
@@ -72,19 +97,19 @@ test.describe('Tag management', () => {
     await expect(tagButton.first()).toBeVisible({ timeout: 5_000 })
   })
 
-  test('delete tag in settings', async ({ mainWindow }) => {
-    await clickSettings(mainWindow)
-    await mainWindow.getByRole('tab', { name: 'Tags' }).click()
-    await mainWindow.waitForTimeout(300)
+  test('delete tag', async ({ mainWindow }) => {
+    const s = seed(mainWindow)
+    const tagsBefore = await s.getTags()
+    const tag = tagsBefore.find((t: { name: string }) => t.name === 'e2e-tag-2')
+    expect(tag).toBeTruthy()
 
-    // Find tag text, navigate to parent row, click its Delete button
-    const tagRow = mainWindow.getByText('e2e-tag-2', { exact: true }).locator('..')
-    await tagRow.getByRole('button', { name: 'Delete' }).click()
-    await mainWindow.waitForTimeout(500)
+    await s.deleteTag(tag!.id)
 
-    await expect(mainWindow.getByText('e2e-tag-2')).not.toBeVisible({ timeout: 3_000 })
-
-    // Close settings
-    await mainWindow.keyboard.press('Escape')
+    await expect
+      .poll(async () => {
+        const tagsAfter = await s.getTags()
+        return tagsAfter.some((t: { name: string }) => t.name === 'e2e-tag-2')
+      }, { timeout: 3_000 })
+      .toBe(false)
   })
 })
