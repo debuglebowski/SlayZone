@@ -129,16 +129,4 @@ test.describe('Tab management & keyboard shortcuts', () => {
     expect(value).toBe('Tab task A')
   })
 
-  test('Cmd+Shift+N opens quick run dialog', async ({ mainWindow }) => {
-    await goHome(mainWindow)
-    await mainWindow.waitForTimeout(200)
-
-    await mainWindow.keyboard.press('Meta+Shift+n')
-    await mainWindow.waitForTimeout(300)
-
-    await expect(mainWindow.getByText('Quick Run')).toBeVisible({ timeout: 3_000 })
-    await expect(mainWindow.locator('[data-quick-run-input]')).toBeVisible()
-
-    await mainWindow.keyboard.press('Escape')
-  })
 })

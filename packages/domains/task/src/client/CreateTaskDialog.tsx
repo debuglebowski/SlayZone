@@ -41,6 +41,7 @@ interface CreateTaskDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   onCreated: (task: Task) => void
+  onCreatedAndOpen?: (task: Task) => void
   defaultProjectId?: string
   defaultStatus?: Task['status']
   defaultPriority?: number
@@ -53,6 +54,7 @@ export function CreateTaskDialog({
   open,
   onOpenChange,
   onCreated,
+  onCreatedAndOpen,
   defaultProjectId,
   defaultStatus,
   defaultPriority,
@@ -90,7 +92,10 @@ export function CreateTaskDialog({
     }
   }, [open, defaultProjectId, defaultStatus, defaultPriority, defaultDueDate, form])
 
-  const onSubmit = async (data: CreateTaskFormData): Promise<void> => {
+  const createTask = async (
+    data: CreateTaskFormData,
+    opts?: { statusOverride?: Task['status']; andOpen?: boolean }
+  ): Promise<void> => {
     const isAutoCreateEnabledForProject = async (projectId: string): Promise<boolean> => {
       const [globalSetting, projects] = await Promise.all([
         window.api.settings.get('auto_create_worktree_on_task_create'),
@@ -114,7 +119,7 @@ export function CreateTaskDialog({
       projectId: data.projectId,
       title: data.title,
       description: data.description || undefined,
-      status: data.status,
+      status: opts?.statusOverride ?? data.status,
       priority: data.priority,
       dueDate: data.dueDate ?? undefined
     })
@@ -124,10 +129,19 @@ export function CreateTaskDialog({
     if (shouldAutoCreateWorktree && !task.worktree_path) {
       window.alert('Task created, but worktree auto-create failed. You can add one from the Git panel.')
     }
-    onCreated(task)
+
+    if (opts?.andOpen && onCreatedAndOpen) {
+      onCreatedAndOpen(task)
+    } else {
+      onCreated(task)
+    }
     form.reset()
     setShowSuccess(true)
     setTimeout(() => setShowSuccess(false), 3000)
+  }
+
+  const onSubmit = async (data: CreateTaskFormData): Promise<void> => {
+    await createTask(data)
   }
 
   // Get selected tags for display
@@ -136,7 +150,7 @@ export function CreateTaskDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent onOpenAutoFocus={(e) => {
+      <DialogContent className="sm:max-w-[575px]" onOpenAutoFocus={(e) => {
           e.preventDefault()
           const input = document.querySelector<HTMLInputElement>('[name="title"]')
           input?.focus()
@@ -148,7 +162,10 @@ export function CreateTaskDialog({
           <form
             onSubmit={form.handleSubmit(onSubmit)}
             onKeyDown={(e) => {
-              if (e.key === 'Enter' && e.metaKey) {
+              if (e.key === 'Enter' && e.metaKey && e.shiftKey) {
+                e.preventDefault()
+                form.handleSubmit((data) => createTask(data, { statusOverride: 'in_progress', andOpen: true }))()
+              } else if (e.key === 'Enter' && e.metaKey) {
                 e.preventDefault()
                 form.handleSubmit(onSubmit)()
               }
@@ -371,11 +388,25 @@ export function CreateTaskDialog({
               )}
             />
 
-            <div className="flex justify-end gap-2">
+            <div className="flex gap-2">
               <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
                 Cancel
               </Button>
-              <Button type="submit">Create</Button>
+              <div className="flex-1" />
+              {onCreatedAndOpen && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => form.handleSubmit((data) => createTask(data, { andOpen: true }))()}
+                >
+                  Create and open
+                  <kbd className="ml-2 text-2xl text-muted-foreground">&#x21E7;&#x2318;&#x21A9;</kbd>
+                </Button>
+              )}
+              <Button type="submit">
+                Create
+                <kbd className="ml-2 text-2xl text-muted-foreground">&#x2318;&#x21A9;</kbd>
+              </Button>
             </div>
           </form>
         </Form>

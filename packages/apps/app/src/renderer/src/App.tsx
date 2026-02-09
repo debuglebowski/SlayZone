@@ -6,7 +6,7 @@ import type { Project } from '@slayzone/projects/shared'
 import type { Tag } from '@slayzone/tags/shared'
 // Domains
 import { KanbanBoard, FilterBar, useTasksData, useFilterState, applyFilters, type Column } from '@slayzone/tasks'
-import { CreateTaskDialog, QuickRunDialog, EditTaskDialog, DeleteTaskDialog, TaskDetailPage } from '@slayzone/task'
+import { CreateTaskDialog, EditTaskDialog, DeleteTaskDialog, TaskDetailPage } from '@slayzone/task'
 import { CreateProjectDialog, ProjectSettingsDialog, DeleteProjectDialog } from '@slayzone/projects'
 import { UserSettingsDialog, useViewState } from '@slayzone/settings'
 import { OnboardingDialog } from '@slayzone/onboarding'
@@ -82,7 +82,6 @@ function App(): React.JSX.Element {
   const [settingsInitialTab, setSettingsInitialTab] = useState<'general' | 'terminal' | 'integrations' | 'diagnostics' | 'ai-config' | 'tags' | 'about'>('general')
   const [onboardingOpen, setOnboardingOpen] = useState(false)
   const [searchOpen, setSearchOpen] = useState(false)
-  const [quickRunOpen, setQuickRunOpen] = useState(false)
   const [completeTaskDialogOpen, setCompleteTaskDialogOpen] = useState(false)
 
   // Project path validation
@@ -371,12 +370,6 @@ function App(): React.JSX.Element {
     }
   }, { enableOnFormTags: true })
 
-  useHotkeys('mod+shift+n', (e) => {
-    if (projects.length > 0) {
-      e.preventDefault()
-      setQuickRunOpen(true)
-    }
-  }, { enableOnFormTags: true })
 
   useHotkeys('mod+k', (e) => {
     e.preventDefault()
@@ -459,9 +452,10 @@ function App(): React.JSX.Element {
     setCreateTaskDefaults({})
   }
 
-  const handleQuickRunCreated = (task: Task): void => {
+  const handleTaskCreatedAndOpen = (task: Task): void => {
     setTasks((prev) => [task, ...prev])
-    setQuickRunOpen(false)
+    setCreateOpen(false)
+    setCreateTaskDefaults({})
     openTask(task.id)
   }
 
@@ -764,6 +758,7 @@ function App(): React.JSX.Element {
           open={createOpen}
           onOpenChange={setCreateOpen}
           onCreated={handleTaskCreated}
+          onCreatedAndOpen={handleTaskCreatedAndOpen}
           defaultProjectId={selectedProjectId ?? projects[0]?.id}
           defaultStatus={createTaskDefaults.status}
           defaultPriority={createTaskDefaults.priority}
@@ -817,12 +812,6 @@ function App(): React.JSX.Element {
         <OnboardingDialog
           externalOpen={onboardingOpen}
           onExternalClose={() => setOnboardingOpen(false)}
-        />
-        <QuickRunDialog
-          open={quickRunOpen}
-          onOpenChange={setQuickRunOpen}
-          onCreated={handleQuickRunCreated}
-          defaultProjectId={selectedProjectId ?? projects[0]?.id}
         />
         <AlertDialog open={completeTaskDialogOpen} onOpenChange={setCompleteTaskDialogOpen}>
           <AlertDialogContent>
