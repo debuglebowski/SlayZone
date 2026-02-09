@@ -16,6 +16,7 @@ import type {
   SyncNowInput
 } from '../shared'
 import { runSyncNow } from './sync'
+import { markdownToHtml } from './markdown'
 
 function columnExists(db: Database, table: string, column: string): boolean {
   const columns = db.prepare(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>
@@ -190,18 +191,21 @@ function upsertTaskFromIssue(db: Database, localProjectId: string, issue: Linear
     WHERE provider = 'linear' AND external_id = ?
   `).get(issue.id) as { task_id: string } | undefined
 
+  const descHtml = issue.description ? markdownToHtml(issue.description) : null
+
   if (byLink) {
     db.prepare(`
       UPDATE tasks
-      SET project_id = ?, title = ?, description = ?, status = ?, priority = ?, assignee = ?, updated_at = datetime('now')
+      SET project_id = ?, title = ?, description = ?, status = ?, priority = ?, assignee = ?, updated_at = ?
       WHERE id = ?
     `).run(
       localProjectId,
       issue.title,
-      issue.description,
+      descHtml,
       stateToLocal(issue.state.type),
       priorityToLocal(issue.priority),
       issue.assignee?.name ?? null,
+      issue.updatedAt,
       byLink.task_id
     )
     return byLink.task_id
@@ -212,15 +216,16 @@ function upsertTaskFromIssue(db: Database, localProjectId: string, issue: Linear
     INSERT INTO tasks (
       id, project_id, title, description, status, priority, assignee,
       terminal_mode, claude_flags, codex_flags, created_at, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, 'claude-code', '--dangerously-skip-permissions', '--full-auto --search', datetime('now'), datetime('now'))
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, 'claude-code', '--dangerously-skip-permissions', '--full-auto --search', datetime('now'), ?)
   `).run(
     id,
     localProjectId,
     issue.title,
-    issue.description,
+    descHtml,
     stateToLocal(issue.state.type),
     priorityToLocal(issue.priority),
-    issue.assignee?.name ?? null
+    issue.assignee?.name ?? null,
+    issue.updatedAt
   )
 
   return id

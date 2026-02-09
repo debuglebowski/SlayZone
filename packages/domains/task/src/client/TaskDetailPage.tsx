@@ -686,6 +686,8 @@ export function TaskDetailPage({
 
   const handleTaskUpdate = (updated: Task): void => {
     setTask(updated)
+    setTitleValue(updated.title)
+    setDescriptionValue(updated.description ?? '')
     onTaskUpdated(updated)
   }
 
@@ -928,7 +930,7 @@ export function TaskDetailPage({
                   task={task}
                   projectPath={project?.path ?? ''}
                   onUpdateTask={updateTaskAndNotify}
-                  onTaskUpdated={(t) => { setTask(t); onTaskUpdated(t) }}
+                  onTaskUpdated={handleTaskUpdate}
                 />
               ) : isResizing ? (
                 <div className="h-full bg-white dark:bg-[#0a0a0a]" />
@@ -1189,7 +1191,7 @@ export function TaskDetailPage({
               task={task}
               projectPath={project?.path ?? null}
               onUpdateTask={updateTaskAndNotify}
-              onTaskUpdated={(t) => { setTask(t); onTaskUpdated(t) }}
+              onTaskUpdated={handleTaskUpdate}
             />
           </div>
 

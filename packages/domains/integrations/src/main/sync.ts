@@ -8,6 +8,7 @@ import type {
 } from '../shared'
 import { getIssue, updateIssue } from './linear-client'
 import { readCredential } from './credentials'
+import { htmlToMarkdown, markdownToHtml } from './markdown'
 
 type TaskStatus = 'inbox' | 'backlog' | 'todo' | 'in_progress' | 'review' | 'done'
 type Task = {
@@ -27,7 +28,13 @@ interface LinkRow extends ExternalLink {
 
 function toMs(value: string | null | undefined): number {
   if (!value) return 0
-  const ts = Date.parse(value)
+  // SQLite datetime('now') returns UTC as 'YYYY-MM-DD HH:MM:SS' without timezone.
+  // Date.parse treats that as local time — normalize to UTC.
+  let s = value
+  if (s.includes(' ') && !s.includes('T')) {
+    s = s.replace(' ', 'T') + 'Z'
+  }
+  const ts = Date.parse(s)
   return Number.isNaN(ts) ? 0 : ts
 }
 
@@ -75,14 +82,15 @@ function applyRemoteTaskUpdate(db: Database, taskId: string, issue: LinearIssueS
         status = ?,
         priority = ?,
         assignee = ?,
-        updated_at = datetime('now')
+        updated_at = ?
     WHERE id = ?
   `).run(
     issue.title,
-    issue.description,
+    issue.description ? markdownToHtml(issue.description) : null,
     linearStateToTaskStatus(issue.state.type),
     linearPriorityToLocal(issue.priority),
     issue.assignee?.name ?? null,
+    issue.updatedAt,
     taskId
   )
 }
@@ -201,7 +209,7 @@ export async function runSyncNow(db: Database, input: SyncNowInput): Promise<Syn
 
         const updatedIssue = await updateIssue(apiKey, link.external_id, {
           title: task.title,
-          description: task.description,
+          description: task.description ? htmlToMarkdown(task.description) : null,
           priority: localPriorityToLinear(task.priority),
           stateId,
           assigneeId: null

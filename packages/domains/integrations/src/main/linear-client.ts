@@ -63,6 +63,18 @@ interface IssuesQuery {
   }
 }
 
+interface TeamIssuesQuery {
+  team: {
+    issues: IssuesQuery['issues']
+  } | null
+}
+
+interface ProjectIssuesQuery {
+  project: {
+    issues: IssuesQuery['issues']
+  } | null
+}
+
 interface IssueQuery {
   issue: {
     id: string
@@ -97,7 +109,8 @@ async function requestLinear<T>(apiKey: string, query: string, variables: Record
   })
 
   if (!res.ok) {
-    throw new Error(`Linear API request failed: HTTP ${res.status}`)
+    const bodyText = await res.text()
+    throw new Error(`Linear API request failed: HTTP ${res.status}${bodyText ? ` - ${bodyText}` : ''}`)
   }
 
   const body = await res.json() as GraphQLResponse<T>
@@ -195,50 +208,88 @@ export async function listIssues(
     after: input.after ?? null
   }
 
-  let query = `query Issues($first: Int!, $after: String) {
-    issues(first: $first, after: $after) {
-      pageInfo { hasNextPage endCursor }
-      nodes {
-        id identifier title description priority updatedAt url
-        state { id name type }
-        assignee { id name }
-        team { id key name }
-        project { id name }
-      }
-    }
-  }`
-
   if (input.projectId) {
-    query = `query Issues($projectId: String!, $first: Int!, $after: String) {
-      issues(first: $first, after: $after, filter: { project: { id: { eq: $projectId } } }) {
-        pageInfo { hasNextPage endCursor }
-        nodes {
-          id identifier title description priority updatedAt url
-          state { id name type }
-          assignee { id name }
-          team { id key name }
-          project { id name }
-        }
-      }
-    }`
     variables.projectId = input.projectId
-  } else if (input.teamId) {
-    query = `query Issues($teamId: String!, $first: Int!, $after: String) {
-      issues(first: $first, after: $after, filter: { team: { id: { eq: $teamId } } }) {
-        pageInfo { hasNextPage endCursor }
-        nodes {
-          id identifier title description priority updatedAt url
-          state { id name type }
-          assignee { id name }
-          team { id key name }
-          project { id name }
+
+    const data = await requestLinear<ProjectIssuesQuery>(
+      apiKey,
+      `query ProjectIssues($projectId: String!, $first: Int!, $after: String) {
+      project(id: $projectId) {
+        issues(first: $first, after: $after) {
+          pageInfo { hasNextPage endCursor }
+          nodes {
+            id identifier title description priority updatedAt url
+            state { id name type }
+            assignee { id name }
+            team { id key name }
+            project { id name }
+          }
         }
       }
-    }`
-    variables.teamId = input.teamId
+    }`,
+      variables
+    )
+
+    const issuesConnection = data.project?.issues
+    if (!issuesConnection) {
+      return { issues: [], nextCursor: null }
+    }
+
+    return {
+      issues: issuesConnection.nodes.map((issue) => mapIssue(issue)),
+      nextCursor: issuesConnection.pageInfo.hasNextPage ? issuesConnection.pageInfo.endCursor : null
+    }
   }
 
-  const data = await requestLinear<IssuesQuery>(apiKey, query, variables)
+  if (input.teamId) {
+    variables.teamId = input.teamId
+
+    const data = await requestLinear<TeamIssuesQuery>(
+      apiKey,
+      `query TeamIssues($teamId: String!, $first: Int!, $after: String) {
+      team(id: $teamId) {
+        issues(first: $first, after: $after) {
+          pageInfo { hasNextPage endCursor }
+          nodes {
+            id identifier title description priority updatedAt url
+            state { id name type }
+            assignee { id name }
+            team { id key name }
+            project { id name }
+          }
+        }
+      }
+    }`,
+      variables
+    )
+
+    const issuesConnection = data.team?.issues
+    if (!issuesConnection) {
+      return { issues: [], nextCursor: null }
+    }
+
+    return {
+      issues: issuesConnection.nodes.map((issue) => mapIssue(issue)),
+      nextCursor: issuesConnection.pageInfo.hasNextPage ? issuesConnection.pageInfo.endCursor : null
+    }
+  }
+
+  const data = await requestLinear<IssuesQuery>(
+    apiKey,
+    `query Issues($first: Int!, $after: String) {
+      issues(first: $first, after: $after) {
+        pageInfo { hasNextPage endCursor }
+        nodes {
+          id identifier title description priority updatedAt url
+          state { id name type }
+          assignee { id name }
+          team { id key name }
+          project { id name }
+        }
+      }
+    }`,
+    variables
+  )
 
   return {
     issues: data.issues.nodes.map((issue) => mapIssue(issue)),
