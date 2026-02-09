@@ -45,24 +45,16 @@ export function useTaskTerminals(taskId: string, defaultMode: TerminalMode): Use
   }, [taskId])
 
   const closeTab = useCallback(async (tabId: string): Promise<boolean> => {
-    const tab = tabs.find(t => t.id === tabId)
-    if (!tab || tab.isMain) return false
-
+    // Server-side tabs:delete already guards against deleting main tabs
     const success = await window.api.tabs.delete(tabId)
     if (success) {
-      // Kill PTY for this tab
       const sessionId = `${taskId}:${tabId}`
       await window.api.pty.kill(sessionId)
-
       setTabs(prev => prev.filter(t => t.id !== tabId))
-      // If closing active tab, switch to main tab
-      if (activeTabId === tabId) {
-        const mainTab = tabs.find(t => t.isMain)
-        if (mainTab) setActiveTabId(mainTab.id)
-      }
+      setActiveTabId(prev => prev === tabId ? taskId : prev)
     }
     return success
-  }, [taskId, tabs, activeTabId])
+  }, [taskId])
 
   const renameTab = useCallback(async (tabId: string, label: string | null): Promise<void> => {
     const updated = await window.api.tabs.update({ id: tabId, label })

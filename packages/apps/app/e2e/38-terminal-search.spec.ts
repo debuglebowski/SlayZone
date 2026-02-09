@@ -10,7 +10,18 @@ import {
 
 /** Focus the xterm instance so keyboard shortcuts reach attachCustomKeyEventHandler */
 async function focusTerminal(page: import('@playwright/test').Page) {
-  await page.locator('.xterm').first().click()
+  // xterm element may have zero dimensions in test layout; focus via its hidden textarea.
+  // Multiple terminals may exist from prior test tabs, so poll until one is focusable.
+  await expect.poll(async () => {
+    return page.evaluate(() => {
+      // Get all xterm textareas; the last one is the active/visible terminal
+      const textareas = document.querySelectorAll('.xterm-helper-textarea')
+      const target = textareas[textareas.length - 1] as HTMLTextAreaElement | null
+      if (!target) return false
+      target.focus()
+      return document.activeElement === target
+    })
+  }, { timeout: 10_000 }).toBe(true)
 }
 
 test.describe('Terminal search', () => {

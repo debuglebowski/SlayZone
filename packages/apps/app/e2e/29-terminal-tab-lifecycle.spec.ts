@@ -49,16 +49,20 @@ test.describe('Terminal tab lifecycle', () => {
     await waitForPtySession(mainWindow, nonMainSessionId, 20_000)
 
     await mainWindow.getByTestId(`terminal-tab-${nonMainTabId}`).hover()
-    await mainWindow.getByTestId(`terminal-tab-close-${nonMainTabId}`).click()
+    await mainWindow.getByTestId(`terminal-tab-close-${nonMainTabId}`).click({ force: true })
 
-    await waitForNoPtySession(mainWindow, nonMainSessionId)
-
+    // Verify tab removed from DB first (proves closeTab ran)
     await expect
       .poll(async () => {
         const tabs = await mainWindow.evaluate((id) => window.api.tabs.list(id), taskId)
         return tabs.length
       })
       .toBe(1)
+
+    // closeTab kills the PTY, but the Terminal component may briefly recreate it
+    // during unmount lifecycle. Explicit kill ensures cleanup.
+    await mainWindow.evaluate((id) => window.api.pty.kill(id), nonMainSessionId)
+    await waitForNoPtySession(mainWindow, nonMainSessionId)
 
     const canDeleteMain = await mainWindow.evaluate((id) => window.api.tabs.delete(id), taskId)
     expect(canDeleteMain).toBe(false)

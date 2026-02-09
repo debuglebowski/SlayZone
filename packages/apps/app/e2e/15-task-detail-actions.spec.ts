@@ -69,20 +69,22 @@ test.describe('Task detail actions', () => {
 
   test('Cmd+Shift+D opens complete task confirmation', async ({ mainWindow }) => {
     await mainWindow.getByText('Complete me task').first().click()
-    await mainWindow.waitForTimeout(500)
+    await expect(mainWindow.locator('[data-testid="terminal-mode-trigger"]:visible').first()).toBeVisible()
 
     await mainWindow.keyboard.press('Meta+Shift+d')
-    await mainWindow.waitForTimeout(300)
 
     await expect(mainWindow.getByText('Mark as done and close tab?')).toBeVisible({ timeout: 3_000 })
   })
 
   test('confirm complete task marks done and closes tab', async ({ mainWindow }) => {
     await mainWindow.getByRole('button', { name: 'Complete' }).click()
-    await mainWindow.waitForTimeout(500)
 
-    const tasks = await seed(mainWindow).getTasks()
-    const task = tasks.find((t: { title: string }) => t.title === 'Complete me task')
-    expect(task?.status).toBe('done')
+    await expect
+      .poll(async () => {
+        const tasks = await seed(mainWindow).getTasks()
+        const task = tasks.find((t: { title: string }) => t.title === 'Complete me task')
+        return task?.status ?? null
+      }, { timeout: 5_000 })
+      .toBe('done')
   })
 })
