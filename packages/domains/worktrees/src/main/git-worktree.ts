@@ -169,7 +169,8 @@ export function getCurrentBranch(path: string): string | null {
 
 export function hasUncommittedChanges(path: string): boolean {
   try {
-    const output = execGit('git status --porcelain', {
+    // -uno: ignore untracked files — they don't block git merge
+    const output = execGit('git status --porcelain -uno', {
       cwd: path,
       encoding: 'utf-8'
     }) as string

@@ -38,6 +38,9 @@ test.describe('Codex session detection', () => {
         globalState.__statusCommandCounts = counts
         return true
       })
+
+      ipcMain.removeHandler('pty:exists')
+      ipcMain.handle('pty:exists', async () => true)
     }, detectedId)
 
     const s = seed(mainWindow)
@@ -64,6 +67,13 @@ test.describe('Codex session detection', () => {
     await goHome(mainWindow)
     await clickProject(mainWindow, projectAbbrev)
     await mainWindow.waitForTimeout(500)
+  })
+
+  test.afterAll(async ({ electronApp }) => {
+    await electronApp.evaluate(() => {
+      const restore = (globalThis as unknown as { __restorePtyHandlers?: () => void }).__restorePtyHandlers
+      restore?.()
+    })
   })
 
   test('auto-requests /status for codex terminal without stored conversation id', async ({ mainWindow, electronApp }) => {

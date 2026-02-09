@@ -190,8 +190,8 @@ test.describe('Phase 1 — uncommitted changes', () => {
     resetRepo()
     setupCleanBranch()
 
-    // Add uncommitted file in worktree
-    writeFileSync(path.join(WORKTREE_PATH, 'dirty.txt'), 'uncommitted\n')
+    // Modify tracked file in worktree (unstaged change)
+    writeFileSync(path.join(WORKTREE_PATH, 'README.md'), '# test\nmodified\n')
 
     const s = seed(mainWindow)
     const p = await s.createProject({ name: 'DI merge', color: '#ef4444', path: TEST_PROJECT_PATH })

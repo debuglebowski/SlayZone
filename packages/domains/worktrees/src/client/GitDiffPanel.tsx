@@ -358,7 +358,7 @@ export function GitDiffPanel({
     selectedFile?.path === entry.path && selectedFile?.source === entry.source
 
   return (
-    <div className="h-full flex flex-col">
+    <div data-testid="git-diff-panel" className="h-full flex flex-col">
       {/* Header */}
       <div className="shrink-0 px-4 py-3 border-b flex items-center justify-between gap-2">
         <div>

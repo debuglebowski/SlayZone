@@ -192,8 +192,8 @@ test.describe('Merge with uncommitted changes', () => {
     resetRepo()
     setupCleanBranch()
 
-    // Add uncommitted file in worktree
-    writeFileSync(path.join(WORKTREE_PATH, 'dirty.txt'), 'uncommitted\n')
+    // Modify tracked file in worktree (unstaged change)
+    writeFileSync(path.join(WORKTREE_PATH, 'README.md'), '# test\nmodified\n')
 
     const s = seed(mainWindow)
     const p = await s.createProject({ name: 'Dirty Merge', color: '#ef4444', path: TEST_PROJECT_PATH })
@@ -286,8 +286,8 @@ test.describe('Merge with conflicts and uncommitted changes', () => {
     resetRepo()
     setupConflict()
 
-    // Also add uncommitted file in worktree
-    writeFileSync(path.join(WORKTREE_PATH, 'dirty.txt'), 'uncommitted\n')
+    // Modify tracked file in worktree (unstaged change)
+    writeFileSync(path.join(WORKTREE_PATH, 'README.md'), '# test\nmodified\n')
 
     const s = seed(mainWindow)
     const p = await s.createProject({ name: 'Both Issues', color: '#7c3aed', path: TEST_PROJECT_PATH })

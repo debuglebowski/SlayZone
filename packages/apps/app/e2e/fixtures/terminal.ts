@@ -35,6 +35,7 @@ export async function openTaskTerminal(
   }
 
   await expect(activeModeTrigger(page)).toBeVisible()
+  await expect(page.locator('[data-testid="terminal-tabbar"]:visible').first()).toBeVisible()
 }
 
 export async function switchTerminalMode(page: Page, mode: TerminalMode): Promise<void> {

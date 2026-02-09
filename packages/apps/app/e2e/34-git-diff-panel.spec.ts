@@ -57,24 +57,29 @@ test.describe('Git diff panel', () => {
     try { git('git clean -fd') } catch { /* ignore */ }
   })
 
+  /** Scope to the visible git diff panel (test 19 leaves a hidden tab with its own panel) */
+  const panel = (page: import('@playwright/test').Page) =>
+    page.locator('[data-testid="git-diff-panel"]:visible')
+
   const refresh = async (page: import('@playwright/test').Page) => {
-    await page.getByRole('button', { name: 'Refresh' }).click()
+    await panel(page).getByRole('button', { name: 'Refresh' }).click()
     await page.waitForTimeout(500)
   }
 
   test('no changes shows empty state', async ({ mainWindow }) => {
     await refresh(mainWindow)
-    await expect(mainWindow.getByText('No local changes.').first()).toBeVisible()
+    await expect(panel(mainWindow).getByText('No local changes.')).toBeVisible()
   })
 
   test('modified file appears in unstaged with M status', async ({ mainWindow }) => {
     writeFileSync(path.join(TEST_PROJECT_PATH, 'base.txt'), 'line1\nline2 modified\nline3\n')
     await refresh(mainWindow)
 
-    await expect(mainWindow.getByText('Unstaged').first()).toBeVisible()
-    await expect(mainWindow.getByText('base.txt').first()).toBeVisible()
+    const p = panel(mainWindow)
+    await expect(p.getByText('Unstaged')).toBeVisible()
+    await expect(p.getByText('base.txt')).toBeVisible()
     // Status badge M
-    const fileRow = mainWindow.locator('.font-mono.text-xs').filter({ hasText: 'base.txt' }).first()
+    const fileRow = p.locator('.font-mono.text-xs').filter({ hasText: 'base.txt' })
     await expect(fileRow.locator('.font-bold').first()).toHaveText('M')
   })
 
@@ -82,65 +87,71 @@ test.describe('Git diff panel', () => {
     writeFileSync(path.join(TEST_PROJECT_PATH, 'newfile.txt'), 'new content\n')
     await refresh(mainWindow)
 
-    const fileRow = mainWindow.locator('.font-mono.text-xs').filter({ hasText: 'newfile.txt' }).first()
+    const fileRow = panel(mainWindow).locator('.font-mono.text-xs').filter({ hasText: 'newfile.txt' })
     await expect(fileRow).toBeVisible()
     await expect(fileRow.locator('.font-bold').first()).toHaveText('?')
   })
 
   test('click file shows diff content', async ({ mainWindow }) => {
+    const p = panel(mainWindow)
     // Click base.txt to select it
-    await mainWindow.locator('.font-mono.text-xs').filter({ hasText: 'base.txt' }).first().click()
+    await p.locator('.font-mono.text-xs').filter({ hasText: 'base.txt' }).click()
     await mainWindow.waitForTimeout(300)
 
     // Diff viewer should show hunk header
-    await expect(mainWindow.locator('text=/@@/')).toBeVisible()
+    await expect(p.locator('text=/@@/')).toBeVisible()
   })
 
   test('stage individual file', async ({ mainWindow }) => {
+    const p = panel(mainWindow)
     // Click stage button on base.txt (opacity-0, needs force)
-    const baseRow = mainWindow.locator('.font-mono.text-xs').filter({ hasText: 'base.txt' }).first()
+    const baseRow = p.locator('.font-mono.text-xs').filter({ hasText: 'base.txt' })
     await baseRow.locator('button[title="Stage file"]').click({ force: true })
     await mainWindow.waitForTimeout(300)
 
     // Staged section should appear with base.txt
-    await expect(mainWindow.getByText(/^Staged/).first()).toBeVisible()
+    await expect(p.getByText(/^Staged/)).toBeVisible()
     // newfile.txt should still be in unstaged
-    await expect(mainWindow.getByText(/^Unstaged/).first()).toBeVisible()
+    await expect(p.getByText(/^Unstaged/)).toBeVisible()
   })
 
   test('unstage individual file', async ({ mainWindow }) => {
+    const p = panel(mainWindow)
     // Find base.txt in staged section and unstage it
-    const stagedBase = mainWindow.locator('.font-mono.text-xs').filter({ hasText: 'base.txt' }).first()
+    const stagedBase = p.locator('.font-mono.text-xs').filter({ hasText: 'base.txt' })
     await stagedBase.locator('button[title="Unstage file"]').click({ force: true })
     await mainWindow.waitForTimeout(300)
 
     // base.txt should be back in unstaged
-    await expect(mainWindow.getByText(/^Unstaged/).first()).toBeVisible()
+    await expect(p.getByText(/^Unstaged/)).toBeVisible()
   })
 
   test('stage all moves all files to staged', async ({ mainWindow }) => {
-    await mainWindow.locator('button[title="Stage all"]').click()
+    const p = panel(mainWindow)
+    await p.locator('button[title="Stage all"]').click()
     await mainWindow.waitForTimeout(300)
 
     // Staged section should exist with both files
-    await expect(mainWindow.getByText(/^Staged/).first()).toBeVisible()
+    await expect(p.getByText(/^Staged/)).toBeVisible()
     // Unstaged section should be gone
-    await expect(mainWindow.getByText(/^Unstaged/).first()).not.toBeVisible()
+    await expect(p.getByText(/^Unstaged/)).not.toBeVisible()
   })
 
   test('unstage all moves all files back to unstaged', async ({ mainWindow }) => {
-    await mainWindow.locator('button[title="Unstage all"]').click()
+    const p = panel(mainWindow)
+    await p.locator('button[title="Unstage all"]').click()
     await mainWindow.waitForTimeout(300)
 
     // Unstaged should exist
-    await expect(mainWindow.getByText(/^Unstaged/).first()).toBeVisible()
+    await expect(p.getByText(/^Unstaged/)).toBeVisible()
     // Staged should be gone
-    await expect(mainWindow.getByText(/^Staged/).first()).not.toBeVisible()
+    await expect(p.getByText(/^Staged/)).not.toBeVisible()
   })
 
   test('arrow key navigation selects files', async ({ mainWindow }) => {
+    const p = panel(mainWindow)
     // Focus the file list container
-    const fileList = mainWindow.locator('.overflow-y-auto.border-r').first()
+    const fileList = p.locator('.overflow-y-auto.border-r')
     await fileList.click()
     await mainWindow.waitForTimeout(100)
 
@@ -149,7 +160,7 @@ test.describe('Git diff panel', () => {
     await mainWindow.waitForTimeout(100)
 
     // First entry should have bg-accent (selected) — but not hover:bg-accent/50
-    const firstEntry = mainWindow.locator('.font-mono.text-xs').first()
+    const firstEntry = p.locator('.font-mono.text-xs').first()
     await expect(firstEntry).toHaveClass(/(?:^|\s)bg-accent(?:\s|$)/)
 
     // Press ArrowDown again to select second file
@@ -158,7 +169,7 @@ test.describe('Git diff panel', () => {
 
     // First should no longer be selected, second should be
     await expect(firstEntry).not.toHaveClass(/(?:^|\s)bg-accent(?:\s|$)/)
-    const secondEntry = mainWindow.locator('.font-mono.text-xs').nth(1)
+    const secondEntry = p.locator('.font-mono.text-xs').nth(1)
     await expect(secondEntry).toHaveClass(/(?:^|\s)bg-accent(?:\s|$)/)
 
     // ArrowUp goes back
@@ -175,6 +186,6 @@ test.describe('Git diff panel', () => {
     await mainWindow.waitForTimeout(7000)
 
     // Verify the diff panel updated — base.txt should still be visible with changes
-    await expect(mainWindow.locator('.font-mono.text-xs').filter({ hasText: 'base.txt' }).first()).toBeVisible()
+    await expect(panel(mainWindow).locator('.font-mono.text-xs').filter({ hasText: 'base.txt' })).toBeVisible()
   })
 })

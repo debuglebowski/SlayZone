@@ -34,9 +34,17 @@ test.describe('Project settings & context menu', () => {
     await mainWindow.waitForTimeout(300)
 
     await mainWindow.getByRole('menuitem', { name: 'Settings' }).click()
-    await mainWindow.waitForTimeout(300)
 
-    await expect(mainWindow.getByRole('heading', { name: 'Project Settings' })).toBeVisible({ timeout: 3_000 })
+    await expect(mainWindow.getByRole('heading', { name: 'Project Settings' })).toBeVisible({ timeout: 5_000 })
+    // General tab is default — verify name input exists
+    await expect(mainWindow.locator('#edit-name')).toBeVisible({ timeout: 3_000 })
+    // Switch to Integrations tab
+    await mainWindow.getByText('Integrations').click()
+    await expect(mainWindow.getByText('Mapping', { exact: true })).toBeVisible({ timeout: 3_000 })
+    await expect(mainWindow.getByText('Import Issues', { exact: true })).toBeVisible()
+    // Switch back to General for the next test (edit name)
+    await mainWindow.getByText('General').click()
+    await expect(mainWindow.locator('#edit-name')).toBeVisible({ timeout: 3_000 })
   })
 
   test('edit project name in settings dialog', async ({ mainWindow }) => {

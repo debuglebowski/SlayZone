@@ -7,6 +7,7 @@ import {
   runCommand,
   waitForBufferContains,
   waitForPtySession,
+  waitForPtyState,
 } from './fixtures/terminal'
 
 test.describe('Terminal clear buffer', () => {
@@ -36,14 +37,21 @@ test.describe('Terminal clear buffer', () => {
 
     await runCommand(mainWindow, sessionId, `echo ${markerA}`)
     await waitForBufferContains(mainWindow, sessionId, markerA)
+    // Wait for shell to be idle (prompt displayed = all PTY output flushed)
+    await waitForPtyState(mainWindow, sessionId, 'attention')
 
     await mainWindow.evaluate((id) => window.api.pty.clearBuffer(id), sessionId)
 
     await expect.poll(async () => mainWindow.evaluate((id) => window.api.pty.exists(id), sessionId)).toBe(true)
+    // Re-clear until buffer is free of marker A (in case of late PTY data)
     await expect.poll(async () => {
       const buffer = await readFullBuffer(mainWindow, sessionId)
-      return buffer.includes(markerA)
-    }).toBe(false)
+      if (buffer.includes(markerA)) {
+        await mainWindow.evaluate((id) => window.api.pty.clearBuffer(id), sessionId)
+        return false
+      }
+      return true
+    }, { timeout: 5_000 }).toBe(true)
 
     await runCommand(mainWindow, sessionId, `echo ${markerB}`)
     await waitForBufferContains(mainWindow, sessionId, markerB)

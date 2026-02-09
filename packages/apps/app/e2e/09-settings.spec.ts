@@ -63,6 +63,9 @@ test.describe('Settings', () => {
       .locator('[data-slot="select-trigger"]')
       .first()
     await expect(modeTrigger).toHaveText(/Codex/)
+
+    // Restore default to claude-code so subsequent tests get the real default
+    await s.setSetting('default_terminal_mode', 'claude-code')
   })
 
   test('close settings dialog', async ({ mainWindow }) => {
