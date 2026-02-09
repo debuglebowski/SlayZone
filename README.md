@@ -98,12 +98,12 @@ pnpm install
 pnpm dev
 ```
 
-Requires Node.js 20+ and pnpm 9+.
+Requires Node.js 20+ and pnpm 10+.
 
 <br />
 
 ---
 
 <p align="center">
-  <sub>Built with Electron, React, SQLite, and a mass of caffeine.</sub>
+  <sub>Built with Electron, React, SQLite, and mass amounts of caffeine.</sub>
 </p>

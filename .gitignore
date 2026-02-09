@@ -19,3 +19,4 @@ packages/apps/app/build/icon.iconset/
 test-results/
 playwright-report/
 .e2e-userdata/
+.e2e-runtime/
