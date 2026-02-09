@@ -1,1 +1,1 @@
-export { AiConfigCenter } from './AiConfigCenter'
+export { ContextManagerSettings } from './ContextManagerSettings'

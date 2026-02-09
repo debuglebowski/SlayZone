@@ -207,8 +207,20 @@ const api: ElectronAPI = {
     setProjectSelection: (input) => ipcRenderer.invoke('ai-config:set-project-selection', input),
     removeProjectSelection: (projectId, itemId) =>
       ipcRenderer.invoke('ai-config:remove-project-selection', projectId, itemId),
-    listSources: () => ipcRenderer.invoke('ai-config:list-sources'),
-    createSourcePlaceholder: (input) => ipcRenderer.invoke('ai-config:create-source-placeholder', input)
+    discoverContextFiles: (projectPath) => ipcRenderer.invoke('ai-config:discover-context-files', projectPath),
+    readContextFile: (filePath, projectPath) => ipcRenderer.invoke('ai-config:read-context-file', filePath, projectPath),
+    writeContextFile: (filePath, content, projectPath) =>
+      ipcRenderer.invoke('ai-config:write-context-file', filePath, content, projectPath),
+    getContextTree: (projectPath, projectId) =>
+      ipcRenderer.invoke('ai-config:get-context-tree', projectPath, projectId),
+    loadGlobalItem: (input) => ipcRenderer.invoke('ai-config:load-global-item', input),
+    syncLinkedFile: (projectId, projectPath, itemId) =>
+      ipcRenderer.invoke('ai-config:sync-linked-file', projectId, projectPath, itemId),
+    unlinkFile: (projectId, itemId) => ipcRenderer.invoke('ai-config:unlink-file', projectId, itemId),
+    renameContextFile: (oldPath, newPath, projectPath) =>
+      ipcRenderer.invoke('ai-config:rename-context-file', oldPath, newPath, projectPath),
+    deleteContextFile: (filePath, projectPath, projectId) =>
+      ipcRenderer.invoke('ai-config:delete-context-file', filePath, projectPath, projectId)
   },
   integrations: {
     connectLinear: (input) => ipcRenderer.invoke('integrations:connect-linear', input),

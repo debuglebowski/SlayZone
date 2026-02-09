@@ -1,4 +1,4 @@
-import { Settings, HelpCircle, BrainCircuit } from 'lucide-react'
+import { Settings, HelpCircle, SlidersHorizontal } from 'lucide-react'
 import {
   Sidebar,
   SidebarContent,
@@ -43,6 +43,8 @@ export function AppSidebar({
   onAiCenter,
   aiCenterActive
 }: AppSidebarProps) {
+  const showProjectSelection = !aiCenterActive
+
   return (
     <Sidebar collapsible="none" className="w-[72px] border-r min-h-svh">
       {/* Draggable region for window movement - clears traffic lights */}
@@ -59,7 +61,7 @@ export function AppSidebar({
                     'w-10 h-10 rounded-lg flex items-center justify-center',
                     'text-xs font-semibold bg-muted transition-all',
                     'hover:scale-105',
-                    selectedProjectId === null &&
+                    showProjectSelection && selectedProjectId === null &&
                       'ring-2 ring-primary ring-offset-2 ring-offset-background'
                   )}
                   title="All projects"
@@ -73,7 +75,7 @@ export function AppSidebar({
                 <SidebarMenuItem key={project.id}>
                   <ProjectItem
                     project={project}
-                    selected={selectedProjectId === project.id}
+                    selected={showProjectSelection && selectedProjectId === project.id}
                     onClick={() => onSelectProject(project.id)}
                     onSettings={() => onProjectSettings(project)}
                     onDelete={() => onProjectDelete(project)}
@@ -93,6 +95,25 @@ export function AppSidebar({
                   title="Add project"
                 >
                   +
+                </button>
+              </SidebarMenuItem>
+
+              <SidebarMenuItem className="my-3">
+                <div className="h-px w-10 bg-border/70" aria-hidden />
+              </SidebarMenuItem>
+
+              {/* Context Manager button */}
+              <SidebarMenuItem>
+                <button
+                  onClick={onAiCenter}
+                  className={cn(
+                    'w-10 h-10 rounded-lg flex items-center justify-center',
+                    'text-muted-foreground bg-muted transition-all hover:scale-105',
+                    aiCenterActive && 'ring-2 ring-primary ring-offset-2 ring-offset-background text-primary'
+                  )}
+                  title="Context Manager"
+                >
+                  <SlidersHorizontal className="size-5" />
                 </button>
               </SidebarMenuItem>
             </SidebarMenu>
@@ -115,22 +136,6 @@ export function AppSidebar({
                 </Button>
               </TooltipTrigger>
               <TooltipContent side="right">Tutorial</TooltipContent>
-            </Tooltip>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon-lg"
-                  onClick={onAiCenter}
-                  className={cn(
-                    'rounded-lg text-muted-foreground',
-                    aiCenterActive && 'text-primary bg-primary/10'
-                  )}
-                >
-                  <BrainCircuit className="size-5" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent side="right">AI Config Center</TooltipContent>
             </Tooltip>
             <Tooltip>
               <TooltipTrigger asChild>

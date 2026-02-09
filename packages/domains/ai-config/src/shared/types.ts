@@ -24,10 +24,8 @@ export interface CreateAiConfigItemInput {
   type: AiConfigItemType
   scope: AiConfigScope
   projectId?: string | null
-  name: string
   slug: string
   content?: string
-  metadataJson?: string
 }
 
 export interface UpdateAiConfigItemInput {
@@ -35,10 +33,8 @@ export interface UpdateAiConfigItemInput {
   type?: AiConfigItemType
   scope?: AiConfigScope
   projectId?: string | null
-  name?: string
   slug?: string
   content?: string
-  metadataJson?: string
 }
 
 export interface AiConfigProjectSelection {
@@ -55,20 +51,32 @@ export interface SetAiConfigProjectSelectionInput {
   targetPath: string
 }
 
-export interface AiConfigSourcePlaceholder {
-  id: string
+export type ContextFileCategory = 'claude' | 'agents' | 'cursorrules' | 'copilot' | 'custom'
+
+export interface ContextFileInfo {
+  path: string
   name: string
-  kind: string
-  enabled: boolean
-  status: string
-  last_checked_at: string | null
-  created_at: string
-  updated_at: string
+  exists: boolean
+  category: ContextFileCategory
 }
 
-export interface CreateAiConfigSourcePlaceholderInput {
-  name: string
-  kind: string
-  enabled?: boolean
-  status?: string
+export type ContextFileSyncStatus = 'synced' | 'out_of_sync' | 'local_only'
+
+export type ContextFileProvider = 'claude' | 'codex' | 'manual'
+
+export interface ContextTreeEntry {
+  path: string
+  relativePath: string
+  exists: boolean
+  category: ContextFileCategory | 'skill' | 'command'
+  linkedItemId: string | null
+  syncStatus: ContextFileSyncStatus
+}
+
+export interface LoadGlobalItemInput {
+  projectId: string
+  projectPath: string
+  itemId: string
+  provider: ContextFileProvider
+  manualPath?: string
 }

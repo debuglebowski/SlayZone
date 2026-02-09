@@ -12,7 +12,6 @@ import { UserSettingsDialog, useViewState } from '@slayzone/settings'
 import { OnboardingDialog } from '@slayzone/onboarding'
 import { usePty } from '@slayzone/terminal/client'
 import type { TerminalState } from '@slayzone/terminal/shared'
-import { AiConfigCenter } from '@slayzone/ai-config'
 // Shared
 import { SearchDialog } from '@/components/dialogs/SearchDialog'
 import {
@@ -80,12 +79,11 @@ function App(): React.JSX.Element {
   const [editingProject, setEditingProject] = useState<Project | null>(null)
   const [deletingProject, setDeletingProject] = useState<Project | null>(null)
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [settingsInitialTab, setSettingsInitialTab] = useState<'general' | 'terminal' | 'integrations' | 'diagnostics' | 'ai-config' | 'tags' | 'about'>('general')
   const [onboardingOpen, setOnboardingOpen] = useState(false)
   const [searchOpen, setSearchOpen] = useState(false)
   const [quickRunOpen, setQuickRunOpen] = useState(false)
   const [completeTaskDialogOpen, setCompleteTaskDialogOpen] = useState(false)
-  const [appView, setAppView] = useState<'tasks' | 'ai-center'>('tasks')
-  const [aiCenterInitialScope, setAiCenterInitialScope] = useState<'global' | 'project'>('global')
 
   // Project path validation
   const [projectPathMissing, setProjectPathMissing] = useState(false)
@@ -118,7 +116,6 @@ function App(): React.JSX.Element {
     notificationState.filterCurrentProject ? selectedProjectId : null
   )
 
-  const previousAppViewRef = useRef(appView)
   const previousProjectRef = useRef<string | null>(selectedProjectId)
   const previousActiveTabRef = useRef<string>('home')
   const previousNotificationLockedRef = useRef(notificationState.isLocked)
@@ -172,7 +169,6 @@ function App(): React.JSX.Element {
 
   // Tab management
   const openTask = (taskId: string): void => {
-    setAppView('tasks')
     const existing = tabs.findIndex((t) => t.type === 'task' && t.taskId === taskId)
     if (existing >= 0) {
       setActiveTabIndex(existing)
@@ -304,7 +300,6 @@ function App(): React.JSX.Element {
   useEffect(() => {
     const activeTab = tabs[activeTabIndex]
     updateDiagnosticsContext({
-      appView,
       activeTabIndex,
       activeTabType: activeTab?.type ?? 'unknown',
       activeTaskId: activeTab?.type === 'task' ? activeTab.taskId : null,
@@ -318,7 +313,6 @@ function App(): React.JSX.Element {
       projectPathMissing
     })
   }, [
-    appView,
     activeTabIndex,
     tabs,
     selectedProjectId,
@@ -329,12 +323,6 @@ function App(): React.JSX.Element {
     notificationState.filterCurrentProject,
     projectPathMissing
   ])
-
-  useEffect(() => {
-    if (previousAppViewRef.current === appView) return
-    recordDiagnosticsTimeline('view_changed', { from: previousAppViewRef.current, to: appView })
-    previousAppViewRef.current = appView
-  }, [appView])
 
   useEffect(() => {
     if (previousProjectRef.current === selectedProjectId) return
@@ -406,7 +394,6 @@ function App(): React.JSX.Element {
 
   useEffect(() => {
     return window.api.app.onGoHome(() => {
-      setAppView('tasks')
       setActiveTabIndex(0)
     })
   }, [])
@@ -600,17 +587,18 @@ function App(): React.JSX.Element {
   }
 
   const openGlobalAiCenter = (): void => {
-    setAiCenterInitialScope('global')
-    setAppView('ai-center')
-  }
-
-  const goToTasksView = (): void => {
-    setAppView('tasks')
+    setSettingsInitialTab('ai-config')
+    setSettingsOpen(true)
   }
 
   const handleSidebarSelectProject = (projectId: string | null): void => {
     setSelectedProjectId(projectId)
-    setAppView('tasks')
+    setActiveTabIndex(0)
+  }
+
+  const handleOpenSettings = (): void => {
+    setSettingsInitialTab('general')
+    setSettingsOpen(true)
   }
 
   return (
@@ -620,28 +608,17 @@ function App(): React.JSX.Element {
           projects={projects}
           tasks={tasks}
           selectedProjectId={selectedProjectId}
-          onSelectProject={setSelectedProjectId}
+          onSelectProject={handleSidebarSelectProject}
           onAddProject={() => setCreateProjectOpen(true)}
           onProjectSettings={setEditingProject}
           onProjectDelete={setDeletingProject}
-          onSettings={() => setSettingsOpen(true)}
+          onSettings={handleOpenSettings}
           onTutorial={() => setOnboardingOpen(true)}
           onAiCenter={openGlobalAiCenter}
-          aiCenterActive={appView === 'ai-center'}
+          aiCenterActive={settingsOpen && settingsInitialTab === 'ai-config'}
         />
 
         <div className="flex-1 flex flex-col min-w-0">
-          {appView === 'ai-center' ? (
-            <div className="flex-1 min-h-0">
-              <AiConfigCenter
-                projects={projects}
-                selectedProjectId={selectedProjectId}
-                initialScope={aiCenterInitialScope}
-                onBack={goToTasksView}
-              />
-            </div>
-          ) : (
-            <>
               <div className="window-drag-region pt-2">
                 <div className="window-no-drag">
                   <TabBar
@@ -780,8 +757,6 @@ function App(): React.JSX.Element {
                   />
                 )}
               </div>
-            </>
-          )}
         </div>
 
         {/* Dialogs */}
@@ -825,7 +800,12 @@ function App(): React.JSX.Element {
           onOpenChange={(open) => !open && setDeletingProject(null)}
           onDeleted={handleProjectDeleted}
         />
-        <UserSettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} />
+        <UserSettingsDialog
+          open={settingsOpen}
+          onOpenChange={setSettingsOpen}
+          initialTab={settingsInitialTab}
+          onTabChange={setSettingsInitialTab}
+        />
         <SearchDialog
           open={searchOpen}
           onOpenChange={setSearchOpen}

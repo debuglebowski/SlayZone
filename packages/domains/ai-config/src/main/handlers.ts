@@ -1,21 +1,38 @@
+import * as fs from 'node:fs'
+import * as path from 'node:path'
+import { app } from 'electron'
 import type { IpcMain } from 'electron'
 import type { Database } from 'better-sqlite3'
 import type {
   AiConfigItem,
   AiConfigProjectSelection,
-  AiConfigSourcePlaceholder,
+  ContextFileInfo,
+  ContextFileCategory,
+  ContextTreeEntry,
   CreateAiConfigItemInput,
-  CreateAiConfigSourcePlaceholderInput,
   ListAiConfigItemsInput,
+  LoadGlobalItemInput,
   SetAiConfigProjectSelectionInput,
   UpdateAiConfigItemInput
 } from '../shared'
 
-function parseSource(row: Record<string, unknown>): AiConfigSourcePlaceholder {
-  return {
-    ...row,
-    enabled: Boolean(row.enabled)
-  } as AiConfigSourcePlaceholder
+const KNOWN_CONTEXT_FILES: Array<{ relative: string; name: string; category: ContextFileCategory }> = [
+  { relative: 'CLAUDE.md', name: 'CLAUDE.md', category: 'claude' },
+  { relative: '.claude/CLAUDE.md', name: '.claude/CLAUDE.md', category: 'claude' },
+  { relative: 'AGENTS.md', name: 'AGENTS.md', category: 'agents' },
+  { relative: '.cursorrules', name: '.cursorrules', category: 'cursorrules' },
+  { relative: '.github/copilot-instructions.md', name: '.github/copilot-instructions.md', category: 'copilot' }
+]
+
+function isPathAllowed(filePath: string, projectPath: string | null): boolean {
+  const resolved = path.resolve(filePath)
+  const homeClaudeDir = path.join(app.getPath('home'), '.claude')
+  if (resolved.startsWith(homeClaudeDir + path.sep) || resolved === path.join(homeClaudeDir, 'CLAUDE.md')) return true
+  if (projectPath) {
+    const resolvedProject = path.resolve(projectPath)
+    if (resolved.startsWith(resolvedProject + path.sep) || resolved === resolvedProject) return true
+  }
+  return false
 }
 
 export function registerAiConfigHandlers(ipcMain: IpcMain, db: Database): void {
@@ -50,19 +67,19 @@ export function registerAiConfigHandlers(ipcMain: IpcMain, db: Database): void {
   ipcMain.handle('ai-config:create-item', (_event, input: CreateAiConfigItemInput) => {
     const id = crypto.randomUUID()
     const projectId = input.scope === 'project' ? (input.projectId ?? null) : null
+    const slug = input.slug.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'untitled'
     db.prepare(`
       INSERT INTO ai_config_items (
         id, type, scope, project_id, name, slug, content, metadata_json, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, '{}', datetime('now'), datetime('now'))
     `).run(
       id,
       input.type,
       input.scope,
       projectId,
-      input.name,
-      input.slug,
-      input.content ?? '',
-      input.metadataJson ?? '{}'
+      slug,
+      slug,
+      input.content ?? ''
     )
 
     const row = db.prepare('SELECT * FROM ai_config_items WHERE id = ?').get(id) as AiConfigItem
@@ -88,21 +105,16 @@ export function registerAiConfigHandlers(ipcMain: IpcMain, db: Database): void {
       fields.push('project_id = ?')
       values.push(input.projectId)
     }
-    if (input.name !== undefined) {
-      fields.push('name = ?')
-      values.push(input.name)
-    }
     if (input.slug !== undefined) {
+      const slug = input.slug.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'untitled'
       fields.push('slug = ?')
-      values.push(input.slug)
+      values.push(slug)
+      fields.push('name = ?')
+      values.push(slug)
     }
     if (input.content !== undefined) {
       fields.push('content = ?')
       values.push(input.content)
-    }
-    if (input.metadataJson !== undefined) {
-      fields.push('metadata_json = ?')
-      values.push(input.metadataJson)
     }
 
     if (fields.length > 0) {
@@ -149,28 +161,253 @@ export function registerAiConfigHandlers(ipcMain: IpcMain, db: Database): void {
     return result.changes > 0
   })
 
-  ipcMain.handle('ai-config:list-sources', () => {
-    const rows = db.prepare(`
-      SELECT * FROM ai_config_sources
-      ORDER BY updated_at DESC, created_at DESC
-    `).all() as Record<string, unknown>[]
-    return rows.map(parseSource)
+  ipcMain.handle('ai-config:discover-context-files', (_event, projectPath: string) => {
+    const results: ContextFileInfo[] = []
+
+    // Project-specific files (only if project path provided)
+    if (projectPath) {
+      const resolvedProject = path.resolve(projectPath)
+      for (const spec of KNOWN_CONTEXT_FILES) {
+        const filePath = path.join(resolvedProject, spec.relative)
+        results.push({
+          path: filePath,
+          name: spec.name,
+          exists: fs.existsSync(filePath),
+          category: spec.category
+        })
+      }
+    }
+
+    // ~/.claude/CLAUDE.md (always shown — global config)
+    const globalClaude = path.join(app.getPath('home'), '.claude', 'CLAUDE.md')
+    results.push({
+      path: globalClaude,
+      name: '~/.claude/CLAUDE.md',
+      exists: fs.existsSync(globalClaude),
+      category: 'claude'
+    })
+
+    return results
   })
 
-  ipcMain.handle('ai-config:create-source-placeholder', (_event, input: CreateAiConfigSourcePlaceholderInput) => {
+  ipcMain.handle('ai-config:read-context-file', (_event, filePath: string, projectPath: string) => {
+    if (!isPathAllowed(filePath, projectPath)) throw new Error('Path not allowed')
+    return fs.readFileSync(filePath, 'utf-8')
+  })
+
+  ipcMain.handle('ai-config:write-context-file', (_event, filePath: string, content: string, projectPath: string) => {
+    if (!isPathAllowed(filePath, projectPath)) throw new Error('Path not allowed')
+    const dir = path.dirname(filePath)
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true })
+    fs.writeFileSync(filePath, content, 'utf-8')
+  })
+
+  ipcMain.handle('ai-config:get-context-tree', (_event, projectPath: string, projectId: string) => {
+    const entries: ContextTreeEntry[] = []
+    const resolvedProject = path.resolve(projectPath)
+    const seenPaths = new Set<string>()
+
+    // 1. Discovered known files
+    for (const spec of KNOWN_CONTEXT_FILES) {
+      const filePath = path.join(resolvedProject, spec.relative)
+      seenPaths.add(filePath)
+      entries.push({
+        path: filePath,
+        relativePath: spec.relative,
+        exists: fs.existsSync(filePath),
+        category: spec.category,
+        linkedItemId: null,
+        syncStatus: 'local_only'
+      })
+    }
+
+    // ~/.claude/CLAUDE.md
+    const globalClaude = path.join(app.getPath('home'), '.claude', 'CLAUDE.md')
+    seenPaths.add(globalClaude)
+    entries.push({
+      path: globalClaude,
+      relativePath: '~/.claude/CLAUDE.md',
+      exists: fs.existsSync(globalClaude),
+      category: 'claude',
+      linkedItemId: null,
+      syncStatus: 'local_only'
+    })
+
+    // 2. Scan .claude/commands/, .claude/skills/, and agents/ for .md files
+    const scanDirs: Array<{ dir: string; relDir: string; category: 'skill' | 'command' }> = [
+      { dir: path.join(resolvedProject, '.claude', 'commands'), relDir: '.claude/commands', category: 'command' },
+      { dir: path.join(resolvedProject, '.claude', 'skills'), relDir: '.claude/skills', category: 'skill' },
+      { dir: path.join(resolvedProject, 'agents'), relDir: 'agents', category: 'skill' }
+    ]
+    for (const { dir, relDir, category } of scanDirs) {
+      if (fs.existsSync(dir) && fs.statSync(dir).isDirectory()) {
+        for (const file of fs.readdirSync(dir)) {
+          if (!file.endsWith('.md')) continue
+          const filePath = path.join(dir, file)
+          if (seenPaths.has(filePath)) continue
+          seenPaths.add(filePath)
+          entries.push({
+            path: filePath,
+            relativePath: `${relDir}/${file}`,
+            exists: true,
+            category,
+            linkedItemId: null,
+                syncStatus: 'local_only'
+          })
+        }
+      }
+    }
+
+    // 3. Check project selections for linked global items
+    const selections = db.prepare(`
+      SELECT ps.*, i.content as item_content
+      FROM ai_config_project_selections ps
+      JOIN ai_config_items i ON i.id = ps.item_id
+      WHERE ps.project_id = ?
+    `).all(projectId) as Array<AiConfigProjectSelection & { item_content: string }>
+
+    for (const sel of selections) {
+      const filePath = path.isAbsolute(sel.target_path)
+        ? sel.target_path
+        : path.join(resolvedProject, sel.target_path)
+
+      const existing = entries.find((e) => e.path === filePath)
+      if (existing) {
+        existing.linkedItemId = sel.item_id
+        if (fs.existsSync(filePath)) {
+          const fileContent = fs.readFileSync(filePath, 'utf-8')
+          existing.syncStatus = fileContent === sel.item_content ? 'synced' : 'out_of_sync'
+        } else {
+          existing.syncStatus = 'out_of_sync'
+        }
+      } else {
+        const exists = fs.existsSync(filePath)
+        let syncStatus: ContextTreeEntry['syncStatus'] = 'out_of_sync'
+        if (exists) {
+          const fileContent = fs.readFileSync(filePath, 'utf-8')
+          syncStatus = fileContent === sel.item_content ? 'synced' : 'out_of_sync'
+        }
+        seenPaths.add(filePath)
+        entries.push({
+          path: filePath,
+          relativePath: sel.target_path,
+          exists,
+          category: 'custom',
+          linkedItemId: sel.item_id,
+          syncStatus
+        })
+      }
+    }
+
+    return entries
+  })
+
+  ipcMain.handle('ai-config:load-global-item', (_event, input: LoadGlobalItemInput) => {
+    const item = db.prepare('SELECT * FROM ai_config_items WHERE id = ?').get(input.itemId) as AiConfigItem | undefined
+    if (!item) throw new Error('Item not found')
+
+    const resolvedProject = path.resolve(input.projectPath)
+    let relativePath: string
+    if (input.provider === 'claude') {
+      relativePath = item.type === 'skill'
+        ? `.claude/skills/${item.slug}.md`
+        : `.claude/commands/${item.slug}.md`
+    } else if (input.provider === 'codex') {
+      relativePath = `agents/${item.slug}.md`
+    } else {
+      if (!input.manualPath) throw new Error('Manual path required')
+      relativePath = input.manualPath
+    }
+
+    const filePath = path.join(resolvedProject, relativePath)
+    if (!isPathAllowed(filePath, input.projectPath)) throw new Error('Path not allowed')
+
+    const dir = path.dirname(filePath)
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true })
+    fs.writeFileSync(filePath, item.content, 'utf-8')
+
     const id = crypto.randomUUID()
     db.prepare(`
-      INSERT INTO ai_config_sources (
-        id, name, kind, enabled, status, last_checked_at, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, NULL, datetime('now'), datetime('now'))
-    `).run(
-      id,
-      input.name,
-      input.kind,
-      input.enabled ? 1 : 0,
-      input.status ?? 'placeholder'
-    )
-    const row = db.prepare('SELECT * FROM ai_config_sources WHERE id = ?').get(id) as Record<string, unknown>
-    return parseSource(row)
+      INSERT INTO ai_config_project_selections (id, project_id, item_id, target_path, selected_at)
+      VALUES (?, ?, ?, ?, datetime('now'))
+      ON CONFLICT(project_id, item_id) DO UPDATE SET
+        target_path = excluded.target_path,
+        selected_at = datetime('now')
+    `).run(id, input.projectId, input.itemId, relativePath)
+
+    const entry: ContextTreeEntry = {
+      path: filePath,
+      relativePath,
+      exists: true,
+      category: item.type === 'skill' ? 'skill' : 'command',
+      linkedItemId: item.id,
+      syncStatus: 'synced'
+    }
+    return entry
+  })
+
+  ipcMain.handle('ai-config:sync-linked-file', (_event, projectId: string, projectPath: string, itemId: string) => {
+    const sel = db.prepare(`
+      SELECT ps.*, i.content as item_content, i.type as item_type
+      FROM ai_config_project_selections ps
+      JOIN ai_config_items i ON i.id = ps.item_id
+      WHERE ps.project_id = ? AND ps.item_id = ?
+    `).get(projectId, itemId) as (AiConfigProjectSelection & { item_content: string; item_type: string }) | undefined
+    if (!sel) throw new Error('Selection not found')
+
+    const resolvedProject = path.resolve(projectPath)
+    const filePath = path.isAbsolute(sel.target_path)
+      ? sel.target_path
+      : path.join(resolvedProject, sel.target_path)
+
+    if (!isPathAllowed(filePath, projectPath)) throw new Error('Path not allowed')
+
+    const dir = path.dirname(filePath)
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true })
+    fs.writeFileSync(filePath, sel.item_content, 'utf-8')
+
+    const entry: ContextTreeEntry = {
+      path: filePath,
+      relativePath: sel.target_path,
+      exists: true,
+      category: sel.item_type === 'skill' ? 'skill' : 'command',
+      linkedItemId: sel.item_id,
+      syncStatus: 'synced'
+    }
+    return entry
+  })
+
+  ipcMain.handle('ai-config:unlink-file', (_event, projectId: string, itemId: string) => {
+    const result = db.prepare(`
+      DELETE FROM ai_config_project_selections WHERE project_id = ? AND item_id = ?
+    `).run(projectId, itemId)
+    return result.changes > 0
+  })
+
+  ipcMain.handle('ai-config:rename-context-file', (_event, oldPath: string, newPath: string, projectPath: string) => {
+    if (!isPathAllowed(oldPath, projectPath)) throw new Error('Path not allowed')
+    if (!isPathAllowed(newPath, projectPath)) throw new Error('Path not allowed')
+    if (!fs.existsSync(oldPath)) throw new Error('File not found')
+    const dir = path.dirname(newPath)
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true })
+    fs.renameSync(oldPath, newPath)
+    // Update any project selections pointing to old path
+    const resolvedProject = path.resolve(projectPath)
+    const oldRel = path.relative(resolvedProject, oldPath)
+    const newRel = path.relative(resolvedProject, newPath)
+    db.prepare(`
+      UPDATE ai_config_project_selections SET target_path = ? WHERE target_path = ?
+    `).run(newRel, oldRel)
+  })
+
+  ipcMain.handle('ai-config:delete-context-file', (_event, filePath: string, projectPath: string, projectId: string) => {
+    if (!isPathAllowed(filePath, projectPath)) throw new Error('Path not allowed')
+    if (fs.existsSync(filePath)) fs.unlinkSync(filePath)
+    // Remove any project selections pointing to this file
+    const resolvedProject = path.resolve(projectPath)
+    const rel = path.relative(resolvedProject, filePath)
+    db.prepare(`
+      DELETE FROM ai_config_project_selections WHERE project_id = ? AND target_path = ?
+    `).run(projectId, rel)
   })
 }
