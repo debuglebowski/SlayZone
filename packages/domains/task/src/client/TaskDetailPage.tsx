@@ -139,10 +139,34 @@ export function TaskDetailPage({
   // Dev server URL detection
   const [detectedDevUrl, setDetectedDevUrl] = useState<string | null>(null)
   const devUrlDismissedRef = useRef<Set<string>>(new Set())
+  const devServerToastEnabledRef = useRef(true)
+  const devServerAutoOpenRef = useRef(false)
+  const devServerAutoOpenCallbackRef = useRef<((url: string) => void) | null>(null)
+
+  // Load dev server settings
+  useEffect(() => {
+    Promise.all([
+      window.api.settings.get('dev_server_toast_enabled'),
+      window.api.settings.get('dev_server_auto_open_browser')
+    ]).then(([toast, autoOpen]) => {
+      devServerToastEnabledRef.current = toast !== '0'
+      devServerAutoOpenRef.current = autoOpen === '1'
+    })
+  }, [])
 
   useEffect(() => {
     if (!task) return
     const sid = getMainSessionId(task.id)
+
+    const handleUrl = (url: string) => {
+      if (panelVisibility.browser || devUrlDismissedRef.current.has(url)) return
+      if (devServerAutoOpenRef.current) {
+        // Auto-open uses callback ref set later (after handlePanelToggle is defined)
+        devServerAutoOpenCallbackRef.current?.(url)
+      } else if (devServerToastEnabledRef.current) {
+        setDetectedDevUrl(url)
+      }
+    }
 
     // Check existing buffer for URLs (catches ones emitted before subscription)
     window.api.pty.getBuffer(sid).then((buf) => {
@@ -150,18 +174,12 @@ export function TaskDetailPage({
       const match = buf.match(/https?:\/\/(?:localhost|127\.0\.0\.1|0\.0\.0\.0):\d{2,5}/g)
       if (match) {
         const url = match[match.length - 1].replace('0.0.0.0', 'localhost')
-        if (!devUrlDismissedRef.current.has(url)) {
-          setDetectedDevUrl(url)
-        }
+        handleUrl(url)
       }
     })
 
     // Subscribe for new URLs going forward
-    return subscribeDevServer(sid, (url) => {
-      if (!panelVisibility.browser && !devUrlDismissedRef.current.has(url)) {
-        setDetectedDevUrl(url)
-      }
-    })
+    return subscribeDevServer(sid, handleUrl)
   }, [task?.id, subscribeDevServer, getMainSessionId, panelVisibility.browser])
 
   useEffect(() => {
@@ -755,6 +773,15 @@ export function TaskDetailPage({
     })
   }, [task])
 
+  // Wire up auto-open callback ref (needs handlePanelToggle + handleBrowserTabsChange)
+  useEffect(() => {
+    devServerAutoOpenCallbackRef.current = (url: string) => {
+      handlePanelToggle('browser', true)
+      const newTab = { id: `tab-${crypto.randomUUID().slice(0, 8)}`, url, title: url }
+      handleBrowserTabsChange({ tabs: [newTab], activeTabId: newTab.id })
+    }
+  }, [handlePanelToggle, handleBrowserTabsChange])
+
   const handleTagsChange = (newTagIds: string[]): void => {
     setTaskTagIds(newTagIds)
   }
@@ -1211,7 +1238,7 @@ export function TaskDetailPage({
               <ChevronRight className="size-3 transition-transform" />
               Git
             </CollapsibleTrigger>
-            <CollapsibleContent className="border-l border-border ml-3 pl-3 pt-2">
+            <CollapsibleContent className="border-l border-border ml-2 pl-6 py-3">
               <div data-testid="task-git-panel">
                 <GitPanel
                   task={task}
@@ -1229,7 +1256,7 @@ export function TaskDetailPage({
               <ChevronRight className="size-3 transition-transform" />
               Details
             </CollapsibleTrigger>
-            <CollapsibleContent className="border-l border-border ml-3 pl-3 pt-2">
+            <CollapsibleContent className="border-l border-border ml-2 pl-6 py-3">
               <TaskMetadataSidebar
                 task={task}
                 tags={tags}
