@@ -1,9 +1,10 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
-import { MoreHorizontal, Archive, Trash2, AlertTriangle, RotateCw, RefreshCcw, Link2, Sparkles, Loader2, Terminal as TerminalIcon, Globe, Settings2, GitBranch, Pencil, ChevronRight } from 'lucide-react'
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
+import { MoreHorizontal, Archive, Trash2, AlertTriangle, RotateCw, RefreshCcw, Link2, Sparkles, Loader2, Terminal as TerminalIcon, Globe, Settings2, GitBranch, FileCode, ChevronRight } from 'lucide-react'
 import type { Task, PanelVisibility } from '@slayzone/task/shared'
 import type { BrowserTabsState } from '@slayzone/task-browser/shared'
 import type { Tag } from '@slayzone/tags/shared'
 import type { Project } from '@slayzone/projects/shared'
+import { DEV_SERVER_URL_PATTERN } from '@slayzone/terminal/shared'
 import type { TerminalMode, ClaudeAvailability } from '@slayzone/terminal/shared'
 import { Button, PanelToggle, DevServerToast, Collapsible, CollapsibleTrigger, CollapsibleContent } from '@slayzone/ui'
 import {
@@ -22,7 +23,7 @@ import {
 } from '@slayzone/ui'
 import { Input } from '@slayzone/ui'
 import { DeleteTaskDialog } from './DeleteTaskDialog'
-import { Tooltip, TooltipTrigger, TooltipContent, Popover, PopoverTrigger, PopoverContent } from '@slayzone/ui'
+import { Tooltip, TooltipTrigger, TooltipContent } from '@slayzone/ui'
 import { TaskMetadataSidebar, LinearCard } from './TaskMetadataSidebar'
 import { RichTextEditor } from '@slayzone/editor'
 import { markSkipCache, usePty } from '@slayzone/terminal'
@@ -30,7 +31,8 @@ import { TerminalContainer } from '@slayzone/task-terminals'
 import { GitPanel, GitDiffPanel, MergePanel } from '@slayzone/worktrees'
 import { cn } from '@slayzone/ui'
 import { BrowserPanel } from '@slayzone/task-browser'
-import { usePanelSizes } from './usePanelSizes'
+import { FileEditorView } from '@slayzone/file-editor/client'
+import { usePanelSizes, resolveWidths } from './usePanelSizes'
 import { ResizeHandle } from './ResizeHandle'
 // ErrorBoundary should be provided by the app when rendering this component
 
@@ -94,7 +96,7 @@ export function TaskDetailPage({
   const flagsInputRef = useRef<HTMLInputElement>(null)
 
   // Panel visibility state
-  const defaultPanelVisibility: PanelVisibility = { terminal: true, browser: false, gitDiff: false, settings: true }
+  const defaultPanelVisibility: PanelVisibility = { terminal: true, browser: false, diff: false, settings: true, editor: false }
   const [panelVisibility, setPanelVisibility] = useState<PanelVisibility>(defaultPanelVisibility)
 
   // Browser tabs state
@@ -105,8 +107,28 @@ export function TaskDetailPage({
   const [browserTabs, setBrowserTabs] = useState<BrowserTabsState>(defaultBrowserTabs)
 
   // Panel sizes for resizable panels
-  const [panelSizes, updatePanelSizes] = usePanelSizes()
+  const [panelSizes, updatePanelSizes, resetPanelSize, resetAllPanels] = usePanelSizes()
   const [isResizing, setIsResizing] = useState(false)
+
+  // Measure split-view container width for auto panel sizing
+  const [containerWidth, setContainerWidth] = useState(0)
+  const roRef = useRef<ResizeObserver | null>(null)
+  const splitContainerRef = useCallback((el: HTMLDivElement | null) => {
+    if (roRef.current) {
+      roRef.current.disconnect()
+      roRef.current = null
+    }
+    if (el) {
+      roRef.current = new ResizeObserver(([entry]) => setContainerWidth(entry.contentRect.width))
+      roRef.current.observe(el)
+    }
+  }, [])
+
+  // Resolved panel widths (auto panels get equal share of remaining space)
+  const resolvedWidths = useMemo(
+    () => resolveWidths(panelSizes, panelVisibility, containerWidth),
+    [panelSizes, panelVisibility, containerWidth]
+  )
 
   // Terminal API (exposed via onReady callback)
   const terminalApiRef = useRef<{
@@ -142,6 +164,8 @@ export function TaskDetailPage({
   const devServerToastEnabledRef = useRef(true)
   const devServerAutoOpenRef = useRef(false)
   const devServerAutoOpenCallbackRef = useRef<((url: string) => void) | null>(null)
+  const browserOpenRef = useRef(panelVisibility.browser)
+  useEffect(() => { browserOpenRef.current = panelVisibility.browser }, [panelVisibility.browser])
 
   // Load dev server settings
   useEffect(() => {
@@ -159,28 +183,30 @@ export function TaskDetailPage({
     const sid = getMainSessionId(task.id)
 
     const handleUrl = (url: string) => {
-      if (panelVisibility.browser || devUrlDismissedRef.current.has(url)) return
+      if (browserOpenRef.current || devUrlDismissedRef.current.has(url)) return
+      devUrlDismissedRef.current.add(url)
       if (devServerAutoOpenRef.current) {
-        // Auto-open uses callback ref set later (after handlePanelToggle is defined)
         devServerAutoOpenCallbackRef.current?.(url)
       } else if (devServerToastEnabledRef.current) {
         setDetectedDevUrl(url)
       }
     }
 
-    // Check existing buffer for URLs (catches ones emitted before subscription)
+    // Subscribe first, then check buffer (avoids race where URL emits between read and subscribe)
+    const unsub = subscribeDevServer(sid, handleUrl)
+
     window.api.pty.getBuffer(sid).then((buf) => {
-      if (!buf || panelVisibility.browser) return
-      const match = buf.match(/https?:\/\/(?:localhost|127\.0\.0\.1|0\.0\.0\.0):\d{2,5}/g)
+      if (!buf || browserOpenRef.current) return
+      DEV_SERVER_URL_PATTERN.lastIndex = 0
+      const match = buf.match(DEV_SERVER_URL_PATTERN)
       if (match) {
         const url = match[match.length - 1].replace('0.0.0.0', 'localhost')
         handleUrl(url)
       }
     })
 
-    // Subscribe for new URLs going forward
-    return subscribeDevServer(sid, handleUrl)
-  }, [task?.id, subscribeDevServer, getMainSessionId, panelVisibility.browser])
+    return unsub
+  }, [task?.id, subscribeDevServer, getMainSessionId])
 
   useEffect(() => {
     if (panelVisibility.browser) setDetectedDevUrl(null)
@@ -624,6 +650,8 @@ export function TaskDetailPage({
   const handlePanelToggle = useCallback(
     async (panelId: string, active: boolean) => {
       if (!task) return
+      // Reset panel size to default when opening
+      if (active) resetPanelSize(panelId as keyof typeof panelSizes)
       const newVisibility = { ...panelVisibility, [panelId]: active }
       setPanelVisibility(newVisibility)
       // Persist to DB
@@ -634,7 +662,7 @@ export function TaskDetailPage({
       setTask(updated)
       onTaskUpdated(updated)
     },
-    [task, panelVisibility, onTaskUpdated]
+    [task, panelVisibility, onTaskUpdated, resetPanelSize]
   )
 
   // Cmd+T/B/G/S for panel toggles
@@ -642,8 +670,11 @@ export function TaskDetailPage({
     const handleKeyDown = (e: KeyboardEvent): void => {
       if (!isActive) return
       if (e.metaKey && !e.shiftKey) {
-        // Skip Cmd+B when focus is in a contenteditable editor (conflicts with bold)
-        const inEditor = (e.target as HTMLElement)?.closest?.('[contenteditable="true"]')
+        // Skip shortcuts when focus is in CodeMirror or contenteditable editors
+        const target = e.target as HTMLElement
+        const inEditor = target?.closest?.('[contenteditable="true"]')
+        const inCodeMirror = target?.closest?.('.cm-editor')
+        if (inCodeMirror) return
         if (e.key === 't') {
           e.preventDefault()
           handlePanelToggle('terminal', !panelVisibility.terminal)
@@ -652,10 +683,13 @@ export function TaskDetailPage({
           handlePanelToggle('browser', !panelVisibility.browser)
         } else if (e.key === 'g') {
           e.preventDefault()
-          handlePanelToggle('gitDiff', !panelVisibility.gitDiff)
+          handlePanelToggle('diff', !panelVisibility.diff)
         } else if (e.key === 's') {
           e.preventDefault()
           handlePanelToggle('settings', !panelVisibility.settings)
+        } else if (e.key === 'e') {
+          e.preventDefault()
+          handlePanelToggle('editor', !panelVisibility.editor)
         }
       }
     }
@@ -773,14 +807,20 @@ export function TaskDetailPage({
     })
   }, [task])
 
-  // Wire up auto-open callback ref (needs handlePanelToggle + handleBrowserTabsChange)
-  useEffect(() => {
-    devServerAutoOpenCallbackRef.current = (url: string) => {
-      handlePanelToggle('browser', true)
-      const newTab = { id: `tab-${crypto.randomUUID().slice(0, 8)}`, url, title: url }
+  // Open a dev server URL in the browser panel (used by both auto-open and toast)
+  const openDevServerInBrowser = useCallback((url: string) => {
+    handlePanelToggle('browser', true)
+    const newTab = { id: `tab-${crypto.randomUUID().slice(0, 8)}`, url, title: url }
+    if (browserOpenRef.current) {
+      handleBrowserTabsChange({ tabs: [...browserTabs.tabs, newTab], activeTabId: newTab.id })
+    } else {
       handleBrowserTabsChange({ tabs: [newTab], activeTabId: newTab.id })
     }
-  }, [handlePanelToggle, handleBrowserTabsChange])
+  }, [handlePanelToggle, handleBrowserTabsChange, browserTabs])
+
+  useEffect(() => {
+    devServerAutoOpenCallbackRef.current = openDevServerInBrowser
+  }, [openDevServerInBrowser])
 
   const handleTagsChange = (newTagIds: string[]): void => {
     setTaskTagIds(newTagIds)
@@ -858,8 +898,9 @@ export function TaskDetailPage({
                 panels={[
                   { id: 'terminal', icon: TerminalIcon, label: 'Terminal', active: panelVisibility.terminal, shortcut: '⌘T' },
                   { id: 'browser', icon: Globe, label: 'Browser', active: panelVisibility.browser, shortcut: '⌘B' },
+                  { id: 'editor', icon: FileCode, label: 'Editor', active: panelVisibility.editor, shortcut: '⌘E' },
+                  { id: 'diff', icon: GitBranch, label: 'Diff', active: panelVisibility.diff, shortcut: '⌘G' },
                   { id: 'settings', icon: Settings2, label: 'Settings', active: panelVisibility.settings, shortcut: '⌘S' },
-                  { id: 'gitDiff', icon: GitBranch, label: 'Git diff', active: panelVisibility.gitDiff, shortcut: '⌘G' },
                 ]}
                 onChange={handlePanelToggle}
               />
@@ -937,35 +978,20 @@ export function TaskDetailPage({
         url={detectedDevUrl}
         onOpen={() => {
           if (!detectedDevUrl) return
-          handlePanelToggle('browser', true)
-          const newTab = { id: `tab-${crypto.randomUUID().slice(0, 8)}`, url: detectedDevUrl, title: detectedDevUrl }
-          if (panelVisibility.browser) {
-            handleBrowserTabsChange({
-              tabs: [...browserTabs.tabs, newTab],
-              activeTabId: newTab.id
-            })
-          } else {
-            handleBrowserTabsChange({
-              tabs: [newTab],
-              activeTabId: newTab.id
-            })
-          }
+          openDevServerInBrowser(detectedDevUrl)
           setDetectedDevUrl(null)
         }}
-        onDismiss={() => {
-          if (detectedDevUrl) devUrlDismissedRef.current.add(detectedDevUrl)
-          setDetectedDevUrl(null)
-        }}
+        onDismiss={() => setDetectedDevUrl(null)}
       />
 
       {/* Split view: terminal | browser | settings | git diff */}
-      <div className="flex-1 flex min-h-0 pb-4">
+      <div ref={splitContainerRef} className="flex-1 flex min-h-0 pb-4">
         {/* Terminal Panel */}
         {panelVisibility.terminal && (
-        <div className={cn(
-          "min-w-0 rounded-md bg-surface-1 border border-border overflow-hidden flex flex-col",
-          panelVisibility.browser ? "flex-1 min-w-[300px]" : "flex-1"
-        )}>
+        <div
+          className="min-w-0 shrink-0 rounded-md bg-surface-1 border border-border overflow-hidden flex flex-col"
+          style={containerWidth > 0 ? { width: resolvedWidths.terminal } : { flex: 1 }}
+        >
           {projectPathMissing && project?.path && (
             <div className="shrink-0 bg-amber-500/10 border-b border-amber-500/20 px-4 py-2 flex items-center gap-2">
               <AlertTriangle className="h-4 w-4 text-amber-500" />
@@ -1159,17 +1185,18 @@ export function TaskDetailPage({
         {/* Resize handle: Terminal | Browser */}
         {panelVisibility.terminal && panelVisibility.browser && (
           <ResizeHandle
-            width={panelSizes.browser}
+            width={resolvedWidths.browser ?? 200}
             minWidth={200}
             onWidthChange={(w) => updatePanelSizes({ browser: w })}
             onDragStart={() => setIsResizing(true)}
             onDragEnd={() => setIsResizing(false)}
+            onReset={resetAllPanels}
           />
         )}
 
         {/* Browser Panel */}
         {panelVisibility.browser && (
-          <div className="shrink-0 rounded-md bg-surface-1 border border-border overflow-hidden" style={{ width: panelSizes.browser }}>
+          <div className="shrink-0 rounded-md bg-surface-1 border border-border overflow-hidden" style={{ width: resolvedWidths.browser }}>
             <BrowserPanel
               className="h-full"
               tabs={browserTabs}
@@ -1180,20 +1207,66 @@ export function TaskDetailPage({
           </div>
         )}
 
-        {/* Resize handle: Browser | Settings or Terminal | Settings */}
-        {panelVisibility.settings && (panelVisibility.browser || panelVisibility.terminal) && (
+        {/* Resize handle: Browser | Editor or Terminal | Editor */}
+        {panelVisibility.editor && (panelVisibility.browser || panelVisibility.terminal) && (
           <ResizeHandle
-            width={panelSizes.settings}
+            width={resolvedWidths.editor ?? 250}
+            minWidth={250}
+            onWidthChange={(w) => updatePanelSizes({ editor: w })}
+            onDragStart={() => setIsResizing(true)}
+            onDragEnd={() => setIsResizing(false)}
+            onReset={resetAllPanels}
+          />
+        )}
+
+        {/* File Editor Panel */}
+        {panelVisibility.editor && project?.path && (
+          <div className="shrink-0 overflow-hidden rounded-md bg-surface-1 border border-border" style={{ width: resolvedWidths.editor }}>
+            <FileEditorView
+              projectPath={task.worktree_path || project.path}
+            />
+          </div>
+        )}
+
+        {/* Resize handle: Editor | Diff or Browser | Diff or Terminal | Diff */}
+        {panelVisibility.diff && (panelVisibility.editor || panelVisibility.browser || panelVisibility.terminal) && (
+          <ResizeHandle
+            width={resolvedWidths.diff ?? 50}
+            minWidth={50}
+            onWidthChange={(w) => updatePanelSizes({ diff: w })}
+            onDragStart={() => setIsResizing(true)}
+            onDragEnd={() => setIsResizing(false)}
+            onReset={resetAllPanels}
+          />
+        )}
+
+        {/* Diff Panel */}
+        {panelVisibility.diff && (
+          <div className="shrink-0 rounded-md bg-surface-1 border border-border p-1.5" style={{ width: resolvedWidths.diff }}>
+            <GitDiffPanel
+              task={task}
+              projectPath={project?.path ?? null}
+              visible={panelVisibility.diff}
+              pollIntervalMs={5000}
+            />
+          </div>
+        )}
+
+        {/* Resize handle: Diff | Settings or Editor | Settings or ... */}
+        {panelVisibility.settings && (panelVisibility.diff || panelVisibility.editor || panelVisibility.browser || panelVisibility.terminal) && (
+          <ResizeHandle
+            width={resolvedWidths.settings ?? 440}
             minWidth={200}
             onWidthChange={(w) => updatePanelSizes({ settings: w })}
             onDragStart={() => setIsResizing(true)}
             onDragEnd={() => setIsResizing(false)}
+            onReset={resetAllPanels}
           />
         )}
 
         {/* Settings Panel */}
         {panelVisibility.settings && (
-        <div data-testid="task-settings-panel" className="shrink-0 rounded-md bg-surface-1 border border-border p-3 flex flex-col gap-4 overflow-y-auto" style={{ width: panelSizes.settings }}>
+        <div data-testid="task-settings-panel" className="shrink-0 rounded-md bg-surface-1 border border-border p-3 flex flex-col gap-4 overflow-y-auto" style={{ width: resolvedWidths.settings }}>
           {/* Description */}
           <div className="flex flex-col min-h-0">
             <RichTextEditor
@@ -1267,29 +1340,6 @@ export function TaskDetailPage({
             </CollapsibleContent>
           </Collapsible>
         </div>
-        )}
-
-        {/* Resize handle: Settings | Git Diff or Browser | Git Diff or Terminal | Git Diff */}
-        {panelVisibility.gitDiff && (panelVisibility.settings || panelVisibility.browser || panelVisibility.terminal) && (
-          <ResizeHandle
-            width={panelSizes.gitDiff}
-            minWidth={50}
-            onWidthChange={(w) => updatePanelSizes({ gitDiff: w })}
-            onDragStart={() => setIsResizing(true)}
-            onDragEnd={() => setIsResizing(false)}
-          />
-        )}
-
-        {/* Git Diff Panel */}
-        {panelVisibility.gitDiff && (
-          <div className="shrink-0 rounded-md bg-surface-1 border border-border p-1.5" style={{ width: panelSizes.gitDiff }}>
-            <GitDiffPanel
-              task={task}
-              projectPath={project?.path ?? null}
-              visible={panelVisibility.gitDiff}
-              pollIntervalMs={5000}
-            />
-          </div>
         )}
       </div>
 

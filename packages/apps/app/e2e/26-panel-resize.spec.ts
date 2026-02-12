@@ -41,11 +41,11 @@ test.describe('Panel resize', () => {
   const settingsPanel = (page: import('@playwright/test').Page) =>
     page.getByTestId('task-settings-panel').last()
 
-  test('settings panel has default width of 320px', async ({ mainWindow }) => {
+  test('settings panel has default width of 440px', async ({ mainWindow }) => {
     const panel = settingsPanel(mainWindow)
     await expect(panel).toBeVisible()
-    const width = await panel.evaluate(el => el.style.width)
-    expect(width).toBe('320px')
+    const width = await panel.evaluate(el => parseInt(el.style.width))
+    expect(width).toBe(440)
   })
 
   test('resize handle visible between terminal and settings', async ({ mainWindow }) => {
@@ -66,19 +66,20 @@ test.describe('Panel resize', () => {
     await mainWindow.mouse.up()
     await mainWindow.waitForTimeout(300)
 
-    // Settings panel should now be ~400px (320 + 80)
+    // Settings panel should now be ~520px (440 + 80)
     const width = await settingsPanel(mainWindow).evaluate(el => parseInt(el.style.width))
-    expect(width).toBeGreaterThanOrEqual(380)
-    expect(width).toBeLessThanOrEqual(420)
+    expect(width).toBeGreaterThanOrEqual(500)
+    expect(width).toBeLessThanOrEqual(540)
   })
 
-  test('resize persists to settings DB', async ({ mainWindow }) => {
+  test('resize persists to settings DB with version marker', async ({ mainWindow }) => {
     const stored = await mainWindow.evaluate(() =>
       window.api.settings.get('taskDetailPanelSizes')
     )
     expect(stored).toBeTruthy()
     const parsed = JSON.parse(stored!)
-    expect(parsed.settings).toBeGreaterThanOrEqual(380)
+    expect(parsed.settings).toBeGreaterThanOrEqual(500)
+    expect(parsed._v).toBe(3)
   })
 
   test('min width enforced', async ({ mainWindow }) => {

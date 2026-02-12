@@ -7,8 +7,9 @@ export type MergeState = 'uncommitted' | 'conflicts'
 export interface PanelVisibility {
   terminal: boolean
   browser: boolean
-  gitDiff: boolean
+  diff: boolean
   settings: boolean
+  editor: boolean
 }
 
 export interface Task {

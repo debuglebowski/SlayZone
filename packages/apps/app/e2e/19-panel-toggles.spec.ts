@@ -26,11 +26,11 @@ test.describe('Panel toggles', () => {
   const panelBtn = (page: import('@playwright/test').Page, label: string) =>
     page.locator('.bg-muted.rounded-lg:visible').filter({ has: page.locator('button:has-text("Terminal")') }).locator(`button:has-text("${label}")`)
 
-  test('default panels: terminal + settings active, browser + gitDiff inactive', async ({ mainWindow }) => {
+  test('default panels: terminal + settings active, browser + diff inactive', async ({ mainWindow }) => {
     await expect(panelBtn(mainWindow, 'Terminal')).toHaveClass(/bg-background/)
     await expect(panelBtn(mainWindow, 'Settings')).toHaveClass(/bg-background/)
     await expect(panelBtn(mainWindow, 'Browser')).not.toHaveClass(/bg-background/)
-    await expect(panelBtn(mainWindow, 'Git diff')).not.toHaveClass(/bg-background/)
+    await expect(panelBtn(mainWindow, 'Diff')).not.toHaveClass(/bg-background/)
   })
 
   test('Cmd+T toggles terminal off', async ({ mainWindow }) => {
@@ -45,10 +45,10 @@ test.describe('Panel toggles', () => {
     await expect(panelBtn(mainWindow, 'Browser')).toHaveClass(/bg-background/)
   })
 
-  test('Cmd+G toggles git diff on', async ({ mainWindow }) => {
+  test('Cmd+G toggles diff on', async ({ mainWindow }) => {
     await mainWindow.keyboard.press('Meta+g')
     await mainWindow.waitForTimeout(300)
-    await expect(panelBtn(mainWindow, 'Git diff')).toHaveClass(/bg-background/)
+    await expect(panelBtn(mainWindow, 'Diff')).toHaveClass(/bg-background/)
   })
 
   test('Cmd+S toggles settings off', async ({ mainWindow }) => {
@@ -65,7 +65,7 @@ test.describe('Panel toggles', () => {
   })
 
   test('panel visibility persists across navigation', async ({ mainWindow }) => {
-    // Current state: terminal=on, browser=on, gitDiff=on, settings=off
+    // Current state: terminal=on, browser=on, diff=on, settings=off
     // Navigate away
     await goHome(mainWindow)
     await mainWindow.waitForTimeout(300)
@@ -79,7 +79,7 @@ test.describe('Panel toggles', () => {
     // Verify persisted state
     await expect(panelBtn(mainWindow, 'Terminal')).toHaveClass(/bg-background/)
     await expect(panelBtn(mainWindow, 'Browser')).toHaveClass(/bg-background/)
-    await expect(panelBtn(mainWindow, 'Git diff')).toHaveClass(/bg-background/)
+    await expect(panelBtn(mainWindow, 'Diff')).toHaveClass(/bg-background/)
     await expect(panelBtn(mainWindow, 'Settings')).not.toHaveClass(/bg-background/)
   })
 })

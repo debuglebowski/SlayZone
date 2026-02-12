@@ -95,3 +95,9 @@ domain/
 ## Database
 
 SQLite in user data. Schema: `packages/apps/app/src/main/db/migrations.ts`
+
+## E2E Testing Rules
+
+- **TDD**: Always run tests FIRST to see them fail, then fix code. Never write tests alongside code and assume they pass.
+- **useRef + useEffect for DOM measurement**: If a component has early returns (loading/null guards) before the measured element, `useEffect([], [])` runs when the ref is still null. Use a **callback ref** instead.
+- **Hook lifecycle across tabs**: Hooks' `useEffect` only runs on mount. Tabs stay mounted with `display: none` — seeding settings and navigating doesn't re-trigger effects. Test by opening a NEW task (fresh hook mount).
