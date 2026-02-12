@@ -97,9 +97,7 @@ export function GitPanel({ task, projectPath, onUpdateTask, onTaskUpdated, disab
   if (disabled) {
     return (
       <div className="space-y-3">
-        <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-          Git
-        </div>
+
         <p className="text-xs text-muted-foreground">
           Coming soon
         </p>
@@ -241,9 +239,7 @@ export function GitPanel({ task, projectPath, onUpdateTask, onTaskUpdated, disab
   if (!projectPath) {
     return (
       <div className="space-y-3">
-        <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-          Git
-        </div>
+
         <p className="text-xs text-muted-foreground">
           Set a project path to use Git features
         </p>
@@ -255,9 +251,7 @@ export function GitPanel({ task, projectPath, onUpdateTask, onTaskUpdated, disab
   if (error) {
     return (
       <div className="space-y-3">
-        <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-          Git
-        </div>
+
         <p className="text-xs text-destructive">{error}</p>
       </div>
     )
@@ -267,9 +261,7 @@ export function GitPanel({ task, projectPath, onUpdateTask, onTaskUpdated, disab
   if (isGitRepo === false) {
     return (
       <div className="space-y-3">
-        <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-          Git
-        </div>
+
         <p className="text-xs text-muted-foreground">
           Not a git repository
         </p>
@@ -290,9 +282,7 @@ export function GitPanel({ task, projectPath, onUpdateTask, onTaskUpdated, disab
   if (isGitRepo === null) {
     return (
       <div className="space-y-3">
-        <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-          Git
-        </div>
+
         <p className="text-xs text-muted-foreground">
           Checking...
         </p>
@@ -307,9 +297,7 @@ export function GitPanel({ task, projectPath, onUpdateTask, onTaskUpdated, disab
   if (task.merge_state) {
     return (
       <div className="space-y-3">
-        <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-          Git
-        </div>
+
         <div className="flex items-center gap-2 text-sm">
           <GitMerge className="h-4 w-4 text-purple-400" />
           <span className="text-xs">
@@ -322,19 +310,18 @@ export function GitPanel({ task, projectPath, onUpdateTask, onTaskUpdated, disab
 
   // Is a git repo - show branch + worktree
   return (
-    <div className="space-y-3">
-      <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-        Git
-      </div>
-
+    <div className="space-y-2">
       {/* Branch info - always show root branch */}
-      <div className="flex items-center gap-2 text-sm">
-        <GitBranch className="h-4 w-4 text-muted-foreground" />
-        <span>{currentBranch || 'detached HEAD'}</span>
+      <div>
+        <label className="mb-1 block text-sm text-muted-foreground">Branch</label>
+        <div className="flex items-center gap-2 text-sm">
+          <GitBranch className="h-4 w-4 text-muted-foreground" />
+          <span>{currentBranch || 'detached HEAD'}</span>
+        </div>
       </div>
 
       {/* Worktree section */}
-      <div className="pt-2 border-t border-border/50">
+      <div className="pt-2">
         <div className="text-xs font-medium text-muted-foreground mb-2">
           Worktree
         </div>

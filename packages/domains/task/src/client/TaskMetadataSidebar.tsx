@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { format } from 'date-fns'
-import { CalendarIcon, X } from 'lucide-react'
+import { CalendarIcon, ChevronRight, EllipsisIcon, ExternalLinkIcon, RefreshCwIcon, UnlinkIcon, X } from 'lucide-react'
 import type { Task, TaskStatus } from '@slayzone/task/shared'
 import { statusOptions, priorityOptions } from '@slayzone/task/shared'
 import type { Tag } from '@slayzone/tags/shared'
@@ -16,7 +16,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@slayzone/ui'
 import { Calendar } from '@slayzone/ui'
 import { Button } from '@slayzone/ui'
 import { Checkbox } from '@slayzone/ui'
-import { cn } from '@slayzone/ui'
+import { cn, Collapsible, CollapsibleTrigger, CollapsibleContent, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@slayzone/ui'
 import { ProjectSelect } from '@slayzone/projects'
 
 interface TaskMetadataSidebarProps {
@@ -36,8 +36,6 @@ export function TaskMetadataSidebar({
 }: TaskMetadataSidebarProps): React.JSX.Element {
   const [allTasks, setAllTasks] = useState<Task[]>([])
   const [blockers, setBlockers] = useState<Task[]>([])
-  const [linearLink, setLinearLink] = useState<ExternalLink | null>(null)
-  const [syncMessage, setSyncMessage] = useState('')
 
   // Load all tasks and current blockers
   useEffect(() => {
@@ -48,27 +46,9 @@ export function TaskMetadataSidebar({
       ])
       setAllTasks(tasks.filter((t) => t.id !== task.id))
       setBlockers(currentBlockers)
-      const link = await window.api.integrations.getLink(task.id, 'linear')
-      setLinearLink(link)
     }
     loadData()
   }, [task.id])
-
-  const handleSyncLinear = async (): Promise<void> => {
-    if (!linearLink) return
-    const result = await window.api.integrations.syncNow({ taskId: task.id })
-    const errSuffix = result.errors.length > 0 ? ` (${result.errors.length} errors)` : ''
-    setSyncMessage(`Synced: ${result.pulled} pulled, ${result.pushed} pushed${errSuffix}`)
-    const refreshedTask = await window.api.db.getTask(task.id)
-    if (refreshedTask) onUpdate(refreshedTask)
-  }
-
-  const handleUnlinkLinear = async (): Promise<void> => {
-    if (!linearLink) return
-    await window.api.integrations.unlinkTask(task.id, 'linear')
-    setLinearLink(null)
-    setSyncMessage('Unlinked from Linear')
-  }
 
   const handleAddBlocker = async (blockerTaskId: string): Promise<void> => {
     await window.api.taskDependencies.addBlocker(task.id, blockerTaskId)
@@ -116,7 +96,7 @@ export function TaskMetadataSidebar({
   const selectedTags = tags.filter((t) => taskTagIds.includes(t.id))
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-2">
       {/* Project */}
       <div>
         <label className="mb-1 block text-sm text-muted-foreground">Project</label>
@@ -286,33 +266,79 @@ export function TaskMetadataSidebar({
         </Popover>
       </div>
 
-      {/* Linear */}
-      <div>
-        <label className="mb-1 block text-sm text-muted-foreground">Linear</label>
-        {linearLink ? (
-          <div className="space-y-2 rounded border p-2">
-            <div className="text-sm">{linearLink.external_key}</div>
-            <div className="flex gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => window.api.shell.openExternal(linearLink.external_url)}
-              >
-                Open
-              </Button>
-              <Button variant="outline" size="sm" onClick={handleSyncLinear}>
-                Sync
-              </Button>
-              <Button variant="ghost" size="sm" onClick={handleUnlinkLinear}>
-                Unlink
-              </Button>
-            </div>
-            {syncMessage ? <p className="text-xs text-muted-foreground">{syncMessage}</p> : null}
-          </div>
-        ) : (
-          <p className="text-xs text-muted-foreground">Not linked</p>
-        )}
-      </div>
     </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Linear Card (separate L2 island)
+// ---------------------------------------------------------------------------
+
+interface LinearCardProps {
+  taskId: string
+  onUpdate: (task: Task) => void
+}
+
+export function LinearCard({ taskId, onUpdate }: LinearCardProps) {
+  const [linearLink, setLinearLink] = useState<ExternalLink | null>(null)
+  const [syncMessage, setSyncMessage] = useState('')
+
+  useEffect(() => {
+    void window.api.integrations.getLink(taskId, 'linear').then(setLinearLink)
+  }, [taskId])
+
+  const handleSync = async () => {
+    if (!linearLink) return
+    const result = await window.api.integrations.syncNow({ taskId })
+    const errSuffix = result.errors.length > 0 ? ` (${result.errors.length} errors)` : ''
+    setSyncMessage(`Synced: ${result.pulled} pulled, ${result.pushed} pushed${errSuffix}`)
+    const refreshedTask = await window.api.db.getTask(taskId)
+    if (refreshedTask) onUpdate(refreshedTask)
+  }
+
+  const handleUnlink = async () => {
+    if (!linearLink) return
+    await window.api.integrations.unlinkTask(taskId, 'linear')
+    setLinearLink(null)
+    setSyncMessage('Unlinked from Linear')
+  }
+
+  if (!linearLink) return null
+
+  return (
+    <Collapsible>
+      <CollapsibleTrigger className="flex w-full items-center gap-1.5 rounded-md border border-border bg-muted/50 px-2.5 py-1.5 text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground transition-colors [&[data-state=open]>svg]:rotate-90">
+        <ChevronRight className="size-3 transition-transform" />
+        Linear
+      </CollapsibleTrigger>
+      <CollapsibleContent className="border-l border-border ml-2 pl-6 pt-5">
+        <div className="space-y-2">
+          <div className="flex items-center gap-1">
+            <span className="min-w-0 flex-1 truncate text-sm">{linearLink.external_key}</span>
+            <Button variant="ghost" size="icon" className="size-7" onClick={() => window.api.shell.openExternal(linearLink.external_url)} title="Open in Linear">
+              <ExternalLinkIcon className="size-3.5" />
+            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" className="size-7">
+                  <EllipsisIcon className="size-3.5" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={handleSync}>
+                  <RefreshCwIcon className="size-3.5" />
+                  Sync
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={handleUnlink}>
+                  <UnlinkIcon className="size-3.5" />
+                  Unlink
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+          {syncMessage ? <p className="text-xs text-muted-foreground">{syncMessage}</p> : null}
+        </div>
+      </CollapsibleContent>
+    </Collapsible>
   )
 }

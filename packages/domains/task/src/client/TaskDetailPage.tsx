@@ -1238,7 +1238,7 @@ export function TaskDetailPage({
               <ChevronRight className="size-3 transition-transform" />
               Git
             </CollapsibleTrigger>
-            <CollapsibleContent className="border-l border-border ml-2 pl-6 py-3">
+            <CollapsibleContent className="border-l border-border ml-2 pl-6 pt-5">
               <div data-testid="task-git-panel">
                 <GitPanel
                   task={task}
@@ -1256,7 +1256,7 @@ export function TaskDetailPage({
               <ChevronRight className="size-3 transition-transform" />
               Details
             </CollapsibleTrigger>
-            <CollapsibleContent className="border-l border-border ml-2 pl-6 py-3">
+            <CollapsibleContent className="border-l border-border ml-2 pl-6 pt-5">
               <TaskMetadataSidebar
                 task={task}
                 tags={tags}
