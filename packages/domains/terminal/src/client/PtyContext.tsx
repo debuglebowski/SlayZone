@@ -30,6 +30,7 @@ type AttentionCallback = () => void
 type StateChangeCallback = (newState: TerminalState, oldState: TerminalState) => void
 type PromptCallback = (prompt: PromptInfo) => void
 type SessionDetectedCallback = (sessionId: string) => void
+type DevServerCallback = (url: string) => void
 
 interface PtyContextValue {
   subscribe: (sessionId: string, cb: DataCallback) => () => void
@@ -39,6 +40,7 @@ interface PtyContextValue {
   subscribeState: (sessionId: string, cb: StateChangeCallback) => () => void
   subscribePrompt: (sessionId: string, cb: PromptCallback) => () => void
   subscribeSessionDetected: (sessionId: string, cb: SessionDetectedCallback) => () => void
+  subscribeDevServer: (sessionId: string, cb: DevServerCallback) => () => void
   getLastSeq: (sessionId: string) => number
   getExitCode: (sessionId: string) => number | undefined
   isSessionInvalid: (sessionId: string) => boolean
@@ -70,6 +72,7 @@ export function PtyProvider({ children }: { children: ReactNode }) {
   const stateSubsRef = useRef<Map<string, Set<StateChangeCallback>>>(new Map())
   const promptSubsRef = useRef<Map<string, Set<PromptCallback>>>(new Map())
   const sessionDetectedSubsRef = useRef<Map<string, Set<SessionDetectedCallback>>>(new Map())
+  const devServerSubsRef = useRef<Map<string, Set<DevServerCallback>>>(new Map())
 
   // Track task IDs with pending prompts for global badge
   const [pendingPromptTaskIds, setPendingPromptTaskIds] = useState<Set<string>>(new Set())
@@ -180,6 +183,13 @@ export function PtyProvider({ children }: { children: ReactNode }) {
       }
     })
 
+    const unsubDevServer = window.api.pty.onDevServerDetected((sessionId, url) => {
+      const subs = devServerSubsRef.current.get(sessionId)
+      if (subs) {
+        subs.forEach((cb) => cb(url))
+      }
+    })
+
     return () => {
       unsubData()
       unsubExit()
@@ -188,6 +198,7 @@ export function PtyProvider({ children }: { children: ReactNode }) {
       unsubStateChange()
       unsubPrompt()
       unsubSessionDetected()
+      unsubDevServer()
     }
   }, [getOrCreateState])
 
@@ -307,6 +318,21 @@ export function PtyProvider({ children }: { children: ReactNode }) {
     []
   )
 
+  const subscribeDevServer = useCallback(
+    (sessionId: string, cb: DevServerCallback): (() => void) => {
+      let subs = devServerSubsRef.current.get(sessionId)
+      if (!subs) {
+        subs = new Set()
+        devServerSubsRef.current.set(sessionId, subs)
+      }
+      subs.add(cb)
+      return () => {
+        subs!.delete(cb)
+      }
+    },
+    []
+  )
+
   const getLastSeq = useCallback((sessionId: string): number => {
     return statesRef.current.get(sessionId)?.lastSeq ?? -1
   }, [])
@@ -364,6 +390,7 @@ export function PtyProvider({ children }: { children: ReactNode }) {
     stateSubsRef.current.delete(sessionId)
     promptSubsRef.current.delete(sessionId)
     sessionDetectedSubsRef.current.delete(sessionId)
+    devServerSubsRef.current.delete(sessionId)
     setPendingPromptTaskIds((prev) => {
       const next = new Set(prev)
       next.delete(sessionId)
@@ -402,6 +429,7 @@ export function PtyProvider({ children }: { children: ReactNode }) {
     subscribeState,
     subscribePrompt,
     subscribeSessionDetected,
+    subscribeDevServer,
     getLastSeq,
     getExitCode,
     isSessionInvalid,
@@ -423,6 +451,7 @@ export function PtyProvider({ children }: { children: ReactNode }) {
     subscribeState,
     subscribePrompt,
     subscribeSessionDetected,
+    subscribeDevServer,
     getLastSeq,
     getExitCode,
     isSessionInvalid,

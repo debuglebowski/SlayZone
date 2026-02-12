@@ -1,11 +1,11 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { MoreHorizontal, Archive, Trash2, AlertTriangle, RotateCw, RefreshCcw, Link2, Sparkles, Loader2, Terminal as TerminalIcon, Globe, Settings2, GitBranch, Pencil } from 'lucide-react'
+import { MoreHorizontal, Archive, Trash2, AlertTriangle, RotateCw, RefreshCcw, Link2, Sparkles, Loader2, Terminal as TerminalIcon, Globe, Settings2, GitBranch, Pencil, ChevronRight } from 'lucide-react'
 import type { Task, PanelVisibility } from '@slayzone/task/shared'
 import type { BrowserTabsState } from '@slayzone/task-browser/shared'
 import type { Tag } from '@slayzone/tags/shared'
 import type { Project } from '@slayzone/projects/shared'
 import type { TerminalMode, ClaudeAvailability } from '@slayzone/terminal/shared'
-import { Button, PanelToggle } from '@slayzone/ui'
+import { Button, PanelToggle, DevServerToast, Collapsible, CollapsibleTrigger, CollapsibleContent } from '@slayzone/ui'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -22,8 +22,8 @@ import {
 } from '@slayzone/ui'
 import { Input } from '@slayzone/ui'
 import { DeleteTaskDialog } from './DeleteTaskDialog'
-import { Tooltip, TooltipTrigger, TooltipContent } from '@slayzone/ui'
-import { TaskMetadataSidebar } from './TaskMetadataSidebar'
+import { Tooltip, TooltipTrigger, TooltipContent, Popover, PopoverTrigger, PopoverContent } from '@slayzone/ui'
+import { TaskMetadataSidebar, LinearCard } from './TaskMetadataSidebar'
 import { RichTextEditor } from '@slayzone/editor'
 import { markSkipCache, usePty } from '@slayzone/terminal'
 import { TerminalContainer } from '@slayzone/task-terminals'
@@ -66,7 +66,7 @@ export function TaskDetailPage({
   const [projectPathMissing, setProjectPathMissing] = useState(false)
 
   // PTY context for buffer management
-  const { resetTaskState, subscribeSessionDetected, getQuickRunPrompt, getQuickRunCodeMode, clearQuickRunPrompt } = usePty()
+  const { resetTaskState, subscribeSessionDetected, subscribeDevServer, getQuickRunPrompt, getQuickRunCodeMode, clearQuickRunPrompt } = usePty()
 
   // Detected session ID from /status command
   const [detectedSessionId, setDetectedSessionId] = useState<string | null>(null)
@@ -135,6 +135,38 @@ export function TaskDetailPage({
     if (!task) return
     return subscribeSessionDetected(getMainSessionId(task.id), setDetectedSessionId)
   }, [task?.id, subscribeSessionDetected, getMainSessionId])
+
+  // Dev server URL detection
+  const [detectedDevUrl, setDetectedDevUrl] = useState<string | null>(null)
+  const devUrlDismissedRef = useRef<Set<string>>(new Set())
+
+  useEffect(() => {
+    if (!task) return
+    const sid = getMainSessionId(task.id)
+
+    // Check existing buffer for URLs (catches ones emitted before subscription)
+    window.api.pty.getBuffer(sid).then((buf) => {
+      if (!buf || panelVisibility.browser) return
+      const match = buf.match(/https?:\/\/(?:localhost|127\.0\.0\.1|0\.0\.0\.0):\d{2,5}/g)
+      if (match) {
+        const url = match[match.length - 1].replace('0.0.0.0', 'localhost')
+        if (!devUrlDismissedRef.current.has(url)) {
+          setDetectedDevUrl(url)
+        }
+      }
+    })
+
+    // Subscribe for new URLs going forward
+    return subscribeDevServer(sid, (url) => {
+      if (!panelVisibility.browser && !devUrlDismissedRef.current.has(url)) {
+        setDetectedDevUrl(url)
+      }
+    })
+  }, [task?.id, subscribeDevServer, getMainSessionId, panelVisibility.browser])
+
+  useEffect(() => {
+    if (panelVisibility.browser) setDetectedDevUrl(null)
+  }, [panelVisibility.browser])
 
   // Load task data on mount or when taskId changes
   useEffect(() => {
@@ -760,9 +792,9 @@ export function TaskDetailPage({
   }
 
   return (
-    <div className="h-full flex flex-col">
+    <div className="h-full flex flex-col p-4 pb-0 gap-4">
       {/* Header */}
-      <header className="shrink-0 border-b bg-background">
+      <header className="shrink-0 rounded-md bg-surface-1 border border-border">
         <div className="px-4 py-2">
           <div className="flex items-center gap-4 window-no-drag">
             <input
@@ -873,12 +905,38 @@ export function TaskDetailPage({
         </div>
       </header>
 
+      {/* Dev server detected toast */}
+      <DevServerToast
+        url={detectedDevUrl}
+        onOpen={() => {
+          if (!detectedDevUrl) return
+          handlePanelToggle('browser', true)
+          const newTab = { id: `tab-${crypto.randomUUID().slice(0, 8)}`, url: detectedDevUrl, title: detectedDevUrl }
+          if (panelVisibility.browser) {
+            handleBrowserTabsChange({
+              tabs: [...browserTabs.tabs, newTab],
+              activeTabId: newTab.id
+            })
+          } else {
+            handleBrowserTabsChange({
+              tabs: [newTab],
+              activeTabId: newTab.id
+            })
+          }
+          setDetectedDevUrl(null)
+        }}
+        onDismiss={() => {
+          if (detectedDevUrl) devUrlDismissedRef.current.add(detectedDevUrl)
+          setDetectedDevUrl(null)
+        }}
+      />
+
       {/* Split view: terminal | browser | settings | git diff */}
-      <div className="flex-1 flex min-h-0">
+      <div className="flex-1 flex min-h-0 pb-4">
         {/* Terminal Panel */}
         {panelVisibility.terminal && (
         <div className={cn(
-          "min-w-0 bg-white dark:bg-[#0a0a0a] flex flex-col",
+          "min-w-0 rounded-md bg-surface-1 border border-border overflow-hidden flex flex-col",
           panelVisibility.browser ? "flex-1 min-w-[300px]" : "flex-1"
         )}>
           {projectPathMissing && project?.path && (
@@ -923,8 +981,7 @@ export function TaskDetailPage({
             </div>
           )}
           {/* Terminal + mode bar wrapper */}
-          <div className="flex-1 min-h-0 flex flex-col">
-            <div className="flex-1 min-h-0">
+          <div className="flex-1 min-h-0 overflow-hidden">
               {task.merge_state ? (
                 <MergePanel
                   task={task}
@@ -933,7 +990,7 @@ export function TaskDetailPage({
                   onTaskUpdated={handleTaskUpdate}
                 />
               ) : isResizing ? (
-                <div className="h-full bg-white dark:bg-[#0a0a0a]" />
+                <div className="h-full bg-black" />
               ) : project?.id === task.project_id && project.path && !projectPathMissing ? (
                 <TerminalContainer
                   key={`${terminalKey}-${task.project_id}-${project?.path || ''}-${task.worktree_path || ''}`}
@@ -958,6 +1015,105 @@ export function TaskDetailPage({
                   onSessionInvalid={handleSessionInvalid}
                   onReady={handleTerminalReady}
                   onMainTabActiveChange={setIsMainTabActive}
+                  rightContent={
+                    <Tooltip open={isMainTabActive ? false : undefined}>
+                      <TooltipTrigger asChild>
+                        <div className={cn(
+                          "flex items-center gap-2 transition-opacity",
+                          !isMainTabActive && "opacity-40 pointer-events-none"
+                        )}>
+                          <Select
+                            value={task.terminal_mode}
+                            onValueChange={(value) => handleModeChange(value as TerminalMode)}
+                          >
+                            <SelectTrigger
+                              data-testid="terminal-mode-trigger"
+                              size="sm"
+                              className="w-36 h-7 text-xs bg-neutral-100 border-neutral-300 dark:bg-neutral-800 dark:border-neutral-700"
+                            >
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="claude-code">Claude Code</SelectItem>
+                              <SelectItem value="codex">Codex</SelectItem>
+                              <SelectItem value="terminal">Terminal</SelectItem>
+                            </SelectContent>
+                          </Select>
+
+                          {task.terminal_mode !== 'terminal' && (
+                            isEditingFlags ? (
+                              <Input
+                                ref={flagsInputRef}
+                                value={flagsInputValue}
+                                onChange={(e) => setFlagsInputValue(e.target.value)}
+                                onBlur={() => {
+                                  setIsEditingFlags(false)
+                                  void handleFlagsSave(flagsInputValue)
+                                }}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter') {
+                                    e.preventDefault()
+                                    setIsEditingFlags(false)
+                                    void handleFlagsSave(flagsInputValue)
+                                  } else if (e.key === 'Escape') {
+                                    e.preventDefault()
+                                    setFlagsInputValue(getProviderFlagsForMode(task))
+                                    setIsEditingFlags(false)
+                                  }
+                                }}
+                                placeholder="Flags"
+                                className="h-7 text-xs bg-neutral-100 border-neutral-300 dark:bg-neutral-800 dark:border-neutral-700 w-72"
+                              />
+                            ) : (
+                              flagsInputValue.trim().length === 0 ? (
+                                <div className="flex items-center gap-2">
+                                  <Button variant="outline" size="sm" className="!h-7 !min-h-7 text-xs" onClick={() => setIsEditingFlags(true)}>
+                                    Set flags
+                                  </Button>
+                                  <Button variant="outline" size="sm" className="!h-7 !min-h-7 text-xs" onClick={() => { void handleSetDefaultFlags() }}>
+                                    Set default flags
+                                  </Button>
+                                </div>
+                              ) : (
+                                <div
+                                  className="h-7 w-fit max-w-72 px-2 flex items-center cursor-pointer rounded hover:bg-muted/50"
+                                  onClick={() => setIsEditingFlags(true)}
+                                >
+                                  <div className="text-xs text-neutral-700 dark:text-neutral-200 truncate">
+                                    {flagsInputValue}
+                                  </div>
+                                </div>
+                              )
+                            )
+                          )}
+
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon" className="size-7">
+                                <MoreHorizontal className="size-3.5" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              {task.terminal_mode === 'claude-code' && (
+                                <DropdownMenuItem onClick={handleSyncSessionName}>
+                                  Sync name
+                                </DropdownMenuItem>
+                              )}
+                              <DropdownMenuItem onClick={handleInjectTitle}>
+                                Inject title
+                                <span className="ml-auto text-xs text-muted-foreground">⌘I</span>
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => void handleInjectDescription()}>
+                                Inject description
+                                <span className="ml-auto text-xs text-muted-foreground">⌘⇧I</span>
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </div>
+                      </TooltipTrigger>
+                      <TooltipContent>Switch to Main tab to use these controls</TooltipContent>
+                    </Tooltip>
+                  }
                 />
               ) : (
                 <div className="h-full flex items-center justify-center text-muted-foreground">
@@ -969,148 +1125,6 @@ export function TaskDetailPage({
                   </div>
                 </div>
               )}
-            </div>
-
-            {/* Terminal mode bar - only active on main tab */}
-            <Tooltip open={isMainTabActive ? false : undefined}>
-              <TooltipTrigger asChild>
-                <div className="shrink-0 px-2 py-2 border-t border-neutral-200 dark:border-neutral-800">
-                  <div className={cn(
-                    "flex items-center gap-3 transition-opacity",
-                    !isMainTabActive && "opacity-40 pointer-events-none"
-                  )}>
-            <Select
-              value={task.terminal_mode}
-              onValueChange={(value) => handleModeChange(value as TerminalMode)}
-            >
-              <SelectTrigger
-                data-testid="terminal-mode-trigger"
-                size="sm"
-                className="w-36 h-7 text-xs bg-neutral-100 border-neutral-300 dark:bg-neutral-800 dark:border-neutral-700"
-              >
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="claude-code">Claude Code</SelectItem>
-                <SelectItem value="codex">Codex</SelectItem>
-                <SelectItem value="terminal">Terminal</SelectItem>
-              </SelectContent>
-            </Select>
-
-            {task.terminal_mode !== 'terminal' && (
-              isEditingFlags ? (
-                <Input
-                  ref={flagsInputRef}
-                  value={flagsInputValue}
-                  onChange={(e) => setFlagsInputValue(e.target.value)}
-                  onBlur={() => {
-                    setIsEditingFlags(false)
-                    void handleFlagsSave(flagsInputValue)
-                  }}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault()
-                      setIsEditingFlags(false)
-                      void handleFlagsSave(flagsInputValue)
-                    } else if (e.key === 'Escape') {
-                      e.preventDefault()
-                      setFlagsInputValue(getProviderFlagsForMode(task))
-                      setIsEditingFlags(false)
-                    }
-                  }}
-                  placeholder="Flags"
-                  className="h-7 text-xs bg-neutral-100 border-neutral-300 dark:bg-neutral-800 dark:border-neutral-700 w-72"
-                />
-              ) : (
-                flagsInputValue.trim().length === 0 ? (
-                  <div className="flex items-center gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="!h-8 !min-h-8 text-xs"
-                      onClick={() => setIsEditingFlags(true)}
-                    >
-                      Set flags
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="!h-8 !min-h-8 text-xs"
-                      onClick={() => { void handleSetDefaultFlags() }}
-                    >
-                      Set default flags
-                    </Button>
-                  </div>
-                ) : (
-                  <div className="relative h-7 w-fit max-w-72 px-1 pr-7">
-                    <div className="min-w-0 h-full flex items-center">
-                      <div className="text-xs text-neutral-700 dark:text-neutral-200 truncate">
-                        {flagsInputValue}
-                      </div>
-                    </div>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="absolute right-0 top-1/2 -translate-y-1/2 h-6 w-6"
-                      onClick={() => setIsEditingFlags(true)}
-                    >
-                      <Pencil className="size-3.5" />
-                    </Button>
-                  </div>
-                )
-              )
-            )}
-
-            <div className="ml-auto flex items-center gap-3">
-              {task.terminal_mode === 'claude-code' && (
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="!h-8 !min-h-8 text-xs"
-                      onClick={handleSyncSessionName}
-                    >
-                      Sync name
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>Rename Claude session to match task title</TooltipContent>
-                </Tooltip>
-              )}
-
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="!h-8 !min-h-8 text-xs"
-                    onClick={handleInjectTitle}
-                  >
-                    Inject title
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>Insert task title into terminal (⌘I)</TooltipContent>
-              </Tooltip>
-
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="!h-8 !min-h-8 text-xs"
-                    onClick={handleInjectDescription}
-                  >
-                    Inject description
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>Insert task description into terminal (⌘⇧I)</TooltipContent>
-              </Tooltip>
-            </div>
-                  </div>
-                </div>
-              </TooltipTrigger>
-              <TooltipContent>Switch to Main tab to use these controls</TooltipContent>
-            </Tooltip>
           </div>
         </div>
         )}
@@ -1128,7 +1142,7 @@ export function TaskDetailPage({
 
         {/* Browser Panel */}
         {panelVisibility.browser && (
-          <div className="shrink-0 border-l" style={{ width: panelSizes.browser }}>
+          <div className="shrink-0 rounded-md bg-surface-1 border border-border overflow-hidden" style={{ width: panelSizes.browser }}>
             <BrowserPanel
               className="h-full"
               tabs={browserTabs}
@@ -1152,9 +1166,9 @@ export function TaskDetailPage({
 
         {/* Settings Panel */}
         {panelVisibility.settings && (
-        <div data-testid="task-settings-panel" className="shrink-0 border-l flex flex-col overflow-y-auto" style={{ width: panelSizes.settings }}>
+        <div data-testid="task-settings-panel" className="shrink-0 rounded-md bg-surface-1 border border-border p-3 flex flex-col gap-4 overflow-y-auto" style={{ width: panelSizes.settings }}>
           {/* Description */}
-          <div className="p-4 flex-1 flex flex-col min-h-0">
+          <div className="flex flex-col min-h-0">
             <RichTextEditor
               value={descriptionValue}
               onChange={setDescriptionValue}
@@ -1162,7 +1176,7 @@ export function TaskDetailPage({
               placeholder="Add description..."
               minHeight="150px"
               maxHeight="300px"
-              className="bg-muted/30 rounded-lg p-3"
+              className="rounded-md border border-input bg-transparent p-3"
               testId="task-description-editor"
             />
             {task.terminal_mode !== 'terminal' && (
@@ -1185,26 +1199,46 @@ export function TaskDetailPage({
             )}
           </div>
 
-          {/* Git */}
-          <div data-testid="task-git-panel" className="px-4 py-3 border-t">
-            <GitPanel
-              task={task}
-              projectPath={project?.path ?? null}
-              onUpdateTask={updateTaskAndNotify}
-              onTaskUpdated={handleTaskUpdate}
-            />
-          </div>
+          {/* Spacer — pushes remaining groups to bottom */}
+          <div className="flex-1" />
 
-          {/* Metadata */}
-          <div className="p-4 border-t bg-muted/30">
-            <TaskMetadataSidebar
-              task={task}
-              tags={tags}
-              taskTagIds={taskTagIds}
-              onUpdate={handleTaskUpdate}
-              onTagsChange={handleTagsChange}
-            />
-          </div>
+          {/* Linear group — only shown when linked */}
+          <LinearCard taskId={task.id} onUpdate={handleTaskUpdate} />
+
+          {/* Git group */}
+          <Collapsible>
+            <CollapsibleTrigger className="flex w-full items-center gap-1.5 rounded-md border border-border bg-muted/50 px-2.5 py-1.5 text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground transition-colors [&[data-state=open]>svg]:rotate-90">
+              <ChevronRight className="size-3 transition-transform" />
+              Git
+            </CollapsibleTrigger>
+            <CollapsibleContent className="border-l border-border ml-3 pl-3 pt-2">
+              <div data-testid="task-git-panel">
+                <GitPanel
+                  task={task}
+                  projectPath={project?.path ?? null}
+                  onUpdateTask={updateTaskAndNotify}
+                  onTaskUpdated={handleTaskUpdate}
+                />
+              </div>
+            </CollapsibleContent>
+          </Collapsible>
+
+          {/* Details group */}
+          <Collapsible defaultOpen>
+            <CollapsibleTrigger className="flex w-full items-center gap-1.5 rounded-md border border-border bg-muted/50 px-2.5 py-1.5 text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground transition-colors [&[data-state=open]>svg]:rotate-90">
+              <ChevronRight className="size-3 transition-transform" />
+              Details
+            </CollapsibleTrigger>
+            <CollapsibleContent className="border-l border-border ml-3 pl-3 pt-2">
+              <TaskMetadataSidebar
+                task={task}
+                tags={tags}
+                taskTagIds={taskTagIds}
+                onUpdate={handleTaskUpdate}
+                onTagsChange={handleTagsChange}
+              />
+            </CollapsibleContent>
+          </Collapsible>
         </div>
         )}
 
@@ -1221,7 +1255,7 @@ export function TaskDetailPage({
 
         {/* Git Diff Panel */}
         {panelVisibility.gitDiff && (
-          <div className="shrink-0 border-l" style={{ width: panelSizes.gitDiff }}>
+          <div className="shrink-0 rounded-md bg-surface-1 border border-border p-1.5" style={{ width: panelSizes.gitDiff }}>
             <GitDiffPanel
               task={task}
               projectPath={project?.path ?? null}

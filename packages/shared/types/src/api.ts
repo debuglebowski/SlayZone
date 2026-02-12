@@ -8,17 +8,25 @@ import type { DetectedWorktree, MergeResult, MergeWithAIResult, GitDiffSnapshot,
 import type {
   AiConfigItem,
   AiConfigProjectSelection,
+  CliProvider,
+  CliProviderInfo,
   ContextFileInfo,
   ContextTreeEntry,
   CreateAiConfigItemInput,
   ListAiConfigItemsInput,
   LoadGlobalItemInput,
   McpConfigFileResult,
+  ProjectSkillStatus,
+  RootInstructionsResult,
   SetAiConfigProjectSelectionInput,
+  SyncAllInput,
+  SyncConflict,
+  SyncResult,
   UpdateAiConfigItemInput,
   WriteMcpServerInput,
   RemoveMcpServerInput
 } from '@slayzone/ai-config/shared'
+import type { DirEntry } from '@slayzone/file-editor/shared'
 import type {
   ConnectLinearInput,
   ExternalLink,
@@ -191,6 +199,7 @@ export interface ElectronAPI {
     ) => () => void
     onPrompt: (callback: (sessionId: string, prompt: PromptInfo) => void) => () => void
     onSessionDetected: (callback: (sessionId: string, conversationId: string) => void) => () => void
+    onDevServerDetected: (callback: (sessionId: string, url: string) => void) => () => void
     getState: (sessionId: string) => Promise<TerminalState | null>
   }
   git: {
@@ -253,6 +262,27 @@ export interface ElectronAPI {
     discoverMcpConfigs: (projectPath: string) => Promise<McpConfigFileResult[]>
     writeMcpServer: (input: WriteMcpServerInput) => Promise<void>
     removeMcpServer: (input: RemoveMcpServerInput) => Promise<void>
+    listProviders: () => Promise<CliProviderInfo[]>
+    toggleProvider: (id: string, enabled: boolean) => Promise<void>
+    getProjectProviders: (projectId: string) => Promise<CliProvider[]>
+    setProjectProviders: (projectId: string, providers: CliProvider[]) => Promise<void>
+    needsSync: (projectId: string, projectPath: string) => Promise<boolean>
+    syncAll: (input: SyncAllInput) => Promise<SyncResult>
+    checkSyncStatus: (projectId: string, projectPath: string) => Promise<SyncConflict[]>
+    getGlobalInstructions: () => Promise<string>
+    saveGlobalInstructions: (content: string) => Promise<void>
+    getRootInstructions: (projectId: string, projectPath: string) => Promise<RootInstructionsResult>
+    saveRootInstructions: (projectId: string, projectPath: string, content: string) => Promise<RootInstructionsResult>
+    getProjectSkillsStatus: (projectId: string, projectPath: string) => Promise<ProjectSkillStatus[]>
+  }
+  fs: {
+    readDir: (rootPath: string, dirPath: string) => Promise<DirEntry[]>
+    readFile: (rootPath: string, filePath: string) => Promise<string>
+    writeFile: (rootPath: string, filePath: string, content: string) => Promise<void>
+    createFile: (rootPath: string, filePath: string) => Promise<void>
+    createDir: (rootPath: string, dirPath: string) => Promise<void>
+    rename: (rootPath: string, oldPath: string, newPath: string) => Promise<void>
+    delete: (rootPath: string, targetPath: string) => Promise<void>
   }
   integrations: {
     connectLinear: (input: ConnectLinearInput) => Promise<IntegrationConnectionPublic>

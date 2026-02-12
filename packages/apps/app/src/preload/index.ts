@@ -152,6 +152,12 @@ const api: ElectronAPI = {
       ipcRenderer.on('pty:session-detected', handler)
       return () => ipcRenderer.removeListener('pty:session-detected', handler)
     },
+    onDevServerDetected: (callback: (sessionId: string, url: string) => void) => {
+      const handler = (_event: unknown, sessionId: string, url: string) =>
+        callback(sessionId, url)
+      ipcRenderer.on('pty:dev-server-detected', handler)
+      return () => ipcRenderer.removeListener('pty:dev-server-detected', handler)
+    },
     getState: (sessionId: string) => ipcRenderer.invoke('pty:getState', sessionId)
   },
   git: {
@@ -227,7 +233,40 @@ const api: ElectronAPI = {
     writeMcpServer: (input) =>
       ipcRenderer.invoke('ai-config:write-mcp-server', input),
     removeMcpServer: (input) =>
-      ipcRenderer.invoke('ai-config:remove-mcp-server', input)
+      ipcRenderer.invoke('ai-config:remove-mcp-server', input),
+    listProviders: () =>
+      ipcRenderer.invoke('ai-config:list-providers'),
+    toggleProvider: (id, enabled) =>
+      ipcRenderer.invoke('ai-config:toggle-provider', id, enabled),
+    getProjectProviders: (projectId) =>
+      ipcRenderer.invoke('ai-config:get-project-providers', projectId),
+    setProjectProviders: (projectId, providers) =>
+      ipcRenderer.invoke('ai-config:set-project-providers', projectId, providers),
+    needsSync: (projectId, projectPath) =>
+      ipcRenderer.invoke('ai-config:needs-sync', projectId, projectPath),
+    syncAll: (input) =>
+      ipcRenderer.invoke('ai-config:sync-all', input),
+    checkSyncStatus: (projectId, projectPath) =>
+      ipcRenderer.invoke('ai-config:check-sync-status', projectId, projectPath),
+    getGlobalInstructions: () =>
+      ipcRenderer.invoke('ai-config:get-global-instructions'),
+    saveGlobalInstructions: (content) =>
+      ipcRenderer.invoke('ai-config:save-global-instructions', content),
+    getRootInstructions: (projectId, projectPath) =>
+      ipcRenderer.invoke('ai-config:get-root-instructions', projectId, projectPath),
+    saveRootInstructions: (projectId, projectPath, content) =>
+      ipcRenderer.invoke('ai-config:save-root-instructions', projectId, projectPath, content),
+    getProjectSkillsStatus: (projectId, projectPath) =>
+      ipcRenderer.invoke('ai-config:get-project-skills-status', projectId, projectPath)
+  },
+  fs: {
+    readDir: (rootPath, dirPath) => ipcRenderer.invoke('fs:readDir', rootPath, dirPath),
+    readFile: (rootPath, filePath) => ipcRenderer.invoke('fs:readFile', rootPath, filePath),
+    writeFile: (rootPath, filePath, content) => ipcRenderer.invoke('fs:writeFile', rootPath, filePath, content),
+    createFile: (rootPath, filePath) => ipcRenderer.invoke('fs:createFile', rootPath, filePath),
+    createDir: (rootPath, dirPath) => ipcRenderer.invoke('fs:createDir', rootPath, dirPath),
+    rename: (rootPath, oldPath, newPath) => ipcRenderer.invoke('fs:rename', rootPath, oldPath, newPath),
+    delete: (rootPath, targetPath) => ipcRenderer.invoke('fs:delete', rootPath, targetPath)
   },
   integrations: {
     connectLinear: (input) => ipcRenderer.invoke('integrations:connect-linear', input),

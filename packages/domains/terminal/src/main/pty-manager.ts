@@ -61,6 +61,8 @@ interface PtySession {
   watchingForSessionId: boolean
   statusOutputBuffer: string
   statusWatchTimeout?: NodeJS.Timeout
+  // Dev server URL dedup
+  detectedDevUrls: Set<string>
 }
 
 export type { PtyInfo }
@@ -305,7 +307,9 @@ export function createPty(
       // /status monitoring
       inputBuffer: '',
       watchingForSessionId: false,
-      statusOutputBuffer: ''
+      statusOutputBuffer: '',
+      // Dev server URL dedup
+      detectedDevUrls: new Set()
     })
 
     // Transition out of 'starting' once setup completes
@@ -407,6 +411,22 @@ export function createPty(
           win.webContents.send('pty:data', sessionId, cleanData, currentSeq)
         } catch {
           // Window destroyed between check and send, ignore
+        }
+      }
+
+      // Detect dev server URLs (localhost/127.0.0.1/0.0.0.0 with port)
+      const urlMatches = data.match(/https?:\/\/(?:localhost|127\.0\.0\.1|0\.0\.0\.0):\d{2,5}/g)
+      if (urlMatches && !win.isDestroyed()) {
+        for (const url of urlMatches) {
+          const normalized = url.replace('0.0.0.0', 'localhost')
+          if (!session.detectedDevUrls.has(normalized)) {
+            session.detectedDevUrls.add(normalized)
+            try {
+              win.webContents.send('pty:dev-server-detected', sessionId, normalized)
+            } catch {
+              // Window destroyed, ignore
+            }
+          }
         }
       }
 
