@@ -49,10 +49,10 @@ function TabContent({ title, isActive, isDragging, onClose, terminalState }: Tab
   return (
     <div
       className={cn(
-        'flex items-center gap-1.5 h-8 px-3 rounded-t-md cursor-pointer transition-colors select-none flex-shrink-0',
-        'hover:bg-muted/50',
-        isActive ? 'bg-muted border-b-2 border-b-primary' : 'text-muted-foreground',
-        'min-w-[150px] max-w-[300px]',
+        'flex items-center gap-1.5 h-7 px-3 rounded-md cursor-pointer transition-colors select-none flex-shrink-0',
+        'bg-neutral-100 dark:bg-neutral-800/50 hover:bg-neutral-200/80 dark:hover:bg-neutral-700/50',
+        isActive ? 'bg-neutral-200 dark:bg-neutral-700 border border-neutral-300 dark:border-neutral-600' : 'text-neutral-500 dark:text-neutral-400',
+        'max-w-[300px]',
         isDragging && 'shadow-lg'
       )}
     >
@@ -175,15 +175,15 @@ export function TabBar({
   }
 
   return (
-    <div className="flex items-end h-9 pl-2 pr-2 gap-1 bg-background border-b">
+    <div className="flex items-center h-11 pl-2 pr-2 gap-1 bg-surface-1 border-b">
       {/* Scrollable tabs area */}
-      <div className="flex items-end gap-1 overflow-x-auto scrollbar-hide flex-1 min-w-0">
+      <div className="flex items-center gap-1 overflow-x-auto scrollbar-hide flex-1 min-w-0">
         {/* Home tab - not draggable */}
         <div
           className={cn(
-            'flex items-center gap-1.5 h-8 px-3 rounded-t-md cursor-pointer transition-colors select-none flex-shrink-0',
-            'hover:bg-muted/50',
-            activeIndex === 0 ? 'bg-muted border-b-2 border-b-primary' : 'text-muted-foreground'
+            'flex items-center gap-1.5 h-7 px-3 rounded-md cursor-pointer transition-colors select-none flex-shrink-0',
+            'bg-neutral-100 dark:bg-neutral-800/50 hover:bg-neutral-200/80 dark:hover:bg-neutral-700/50',
+            activeIndex === 0 ? 'bg-neutral-200 dark:bg-neutral-700 border border-neutral-300 dark:border-neutral-600' : 'text-neutral-500 dark:text-neutral-400'
           )}
           onClick={() => onTabClick(0)}
         >

@@ -312,7 +312,7 @@ export function BrowserPanel({ className, tabs, onTabsChange, taskId, isResizing
       onBlur={handleBlur}
     >
       {/* Tab Bar */}
-      <div className="shrink-0 flex items-end h-10 px-2 pt-2 gap-1 bg-background border-b overflow-x-auto scrollbar-hide">
+      <div className="shrink-0 flex items-center h-10 px-2 gap-1 border-b border-border overflow-x-auto scrollbar-hide">
         {tabs.tabs.map(tab => {
           const isActive = tab.id === tabs.activeTabId
           const displayUrl = tab.url === 'about:blank' ? 'New Tab' : tab.url
@@ -335,10 +335,10 @@ export function BrowserPanel({ className, tabs, onTabsChange, taskId, isResizing
                 }
               }}
               className={cn(
-                'group flex items-center gap-1.5 h-8 px-3 rounded-t-md cursor-pointer transition-colors select-none flex-shrink-0',
-                'hover:bg-muted/50',
+                'group flex items-center gap-1.5 h-7 px-3 rounded-md cursor-pointer transition-colors select-none flex-shrink-0',
+                'bg-neutral-100 dark:bg-neutral-800/50 hover:bg-neutral-200/80 dark:hover:bg-neutral-700/50',
                 'min-w-[150px] max-w-[300px]',
-                isActive ? 'bg-muted border-b-2 border-b-primary' : 'text-muted-foreground'
+                isActive ? 'bg-neutral-200 dark:bg-neutral-700 border border-neutral-300 dark:border-neutral-600' : 'text-neutral-500 dark:text-neutral-400'
               )}
             >
               <span className="truncate text-sm">{displayUrl}</span>
@@ -356,14 +356,14 @@ export function BrowserPanel({ className, tabs, onTabsChange, taskId, isResizing
         })}
         <button
           onClick={() => createNewTab()}
-          className="h-8 px-2 rounded-t-md hover:bg-muted/50 text-muted-foreground flex items-center"
+          className="h-7 px-2 rounded-md hover:bg-neutral-200/80 dark:hover:bg-neutral-700/50 text-neutral-500 dark:text-neutral-400 flex items-center"
         >
           <Plus className="size-4" />
         </button>
       </div>
 
       {/* URL Bar */}
-      <div className="shrink-0 p-2 border-b flex items-center gap-1 bg-background">
+      <div className="shrink-0 p-2 border-b flex items-center gap-1">
         <Button
           variant="ghost"
           size="icon-sm"
