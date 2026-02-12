@@ -1048,6 +1048,7 @@ export function TaskDetailPage({
                 <TerminalContainer
                   key={`${terminalKey}-${task.project_id}-${project?.path || ''}-${task.worktree_path || ''}`}
                   taskId={task.id}
+                  isActive={isActive}
                   cwd={task.worktree_path || project.path}
                   defaultMode={task.terminal_mode}
                   conversationId={task.terminal_mode === 'claude-code'

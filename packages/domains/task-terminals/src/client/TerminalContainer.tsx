@@ -13,6 +13,7 @@ interface TerminalContainerProps {
   initialPrompt?: string | null
   codeMode?: CodeMode | null
   providerFlags?: string
+  isActive?: boolean
   autoFocus?: boolean
   onConversationCreated?: (conversationId: string) => void
   onSessionInvalid?: () => void
@@ -22,6 +23,7 @@ interface TerminalContainerProps {
     clearBuffer: () => Promise<void>
   }) => void
   onMainTabActiveChange?: (isMainActive: boolean) => void
+  rightContent?: React.ReactNode
 }
 
 export function TerminalContainer({
@@ -33,11 +35,13 @@ export function TerminalContainer({
   initialPrompt,
   codeMode,
   providerFlags,
+  isActive = true,
   autoFocus = false,
   onConversationCreated,
   onSessionInvalid,
   onReady,
-  onMainTabActiveChange
+  onMainTabActiveChange,
+  rightContent
 }: TerminalContainerProps) {
   const {
     tabs,
@@ -79,8 +83,10 @@ export function TerminalContainer({
     })
   }, [taskId, tabs, getSessionId, subscribePrompt])
 
-  // Keyboard shortcuts
+  // Keyboard shortcuts (only when this container's task tab is active)
   useEffect(() => {
+    if (!isActive) return
+
     const handleKeyDown = (e: KeyboardEvent) => {
       // Cmd+T: New tab
       if (e.metaKey && e.key === 't' && !e.shiftKey) {
@@ -110,7 +116,7 @@ export function TerminalContainer({
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [tabs, activeTabId, activeTab, createTab, closeTab, setActiveTabId])
+  }, [isActive, tabs, activeTabId, activeTab, createTab, closeTab, setActiveTabId])
 
   // Handle terminal ready - pass up to parent (active tab's API)
   const handleTerminalReady = useCallback((api: {
@@ -146,6 +152,7 @@ export function TerminalContainer({
         onTabCreate={() => createTab()}
         onTabClose={closeTab}
         onTabRename={renameTab}
+        rightContent={rightContent}
       />
       <div className="flex-1 min-h-0">
         <Terminal
