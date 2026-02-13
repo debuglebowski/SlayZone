@@ -577,6 +577,90 @@ const migrations: Migration[] = [
         CREATE INDEX idx_tasks_parent ON tasks(parent_id);
       `)
     }
+  },
+  {
+    version: 32,
+    up: (db) => {
+      db.exec(`ALTER TABLE tasks ADD COLUMN web_panel_urls TEXT DEFAULT NULL;`)
+    }
+  },
+  {
+    version: 33,
+    up: (db) => {
+      // Add conversation ID + flags columns for new providers
+      db.exec(`
+        ALTER TABLE tasks ADD COLUMN cursor_conversation_id TEXT DEFAULT NULL;
+        ALTER TABLE tasks ADD COLUMN gemini_conversation_id TEXT DEFAULT NULL;
+        ALTER TABLE tasks ADD COLUMN opencode_conversation_id TEXT DEFAULT NULL;
+        ALTER TABLE tasks ADD COLUMN cursor_flags TEXT NOT NULL DEFAULT '--force';
+        ALTER TABLE tasks ADD COLUMN gemini_flags TEXT NOT NULL DEFAULT '--yolo';
+        ALTER TABLE tasks ADD COLUMN opencode_flags TEXT NOT NULL DEFAULT '';
+      `)
+
+      // Default flag settings
+      const stmt = db.prepare(`INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)`)
+      stmt.run('default_cursor_flags', '--force')
+      stmt.run('default_gemini_flags', '--yolo')
+      stmt.run('default_opencode_flags', '')
+
+      // Seed new CLI providers into ai_config_sources
+      const insertStmt = db.prepare(`INSERT OR IGNORE INTO ai_config_sources (id, name, kind, enabled, status) VALUES (?, ?, ?, ?, ?)`)
+      insertStmt.run('provider-cursor', 'Cursor Agent', 'cursor', 0, 'active')
+      insertStmt.run('provider-opencode', 'OpenCode', 'opencode', 0, 'active')
+
+      // Activate gemini (was seeded as 'placeholder' in v30)
+      db.prepare(`UPDATE ai_config_sources SET status = 'active' WHERE kind = 'gemini'`).run()
+    }
+  },
+  {
+    version: 34,
+    up: (db) => {
+      // Add provider_config JSON column — consolidates all per-provider conversation_id + flags
+      db.exec(`ALTER TABLE tasks ADD COLUMN provider_config TEXT NOT NULL DEFAULT '{}'`)
+
+      // Migrate existing per-provider data into provider_config
+      const tasks = db.prepare(`
+        SELECT id,
+          claude_conversation_id, codex_conversation_id, cursor_conversation_id,
+          gemini_conversation_id, opencode_conversation_id,
+          claude_flags, codex_flags, cursor_flags, gemini_flags, opencode_flags
+        FROM tasks
+      `).all() as Array<{
+        id: string
+        claude_conversation_id: string | null
+        codex_conversation_id: string | null
+        cursor_conversation_id: string | null
+        gemini_conversation_id: string | null
+        opencode_conversation_id: string | null
+        claude_flags: string
+        codex_flags: string
+        cursor_flags: string
+        gemini_flags: string
+        opencode_flags: string
+      }>
+
+      const updateStmt = db.prepare('UPDATE tasks SET provider_config = ? WHERE id = ?')
+      for (const task of tasks) {
+        const config: Record<string, { conversationId?: string | null; flags?: string }> = {}
+        const providers = [
+          { mode: 'claude-code', convId: task.claude_conversation_id, flags: task.claude_flags },
+          { mode: 'codex', convId: task.codex_conversation_id, flags: task.codex_flags },
+          { mode: 'cursor-agent', convId: task.cursor_conversation_id, flags: task.cursor_flags },
+          { mode: 'gemini', convId: task.gemini_conversation_id, flags: task.gemini_flags },
+          { mode: 'opencode', convId: task.opencode_conversation_id, flags: task.opencode_flags },
+        ]
+        for (const p of providers) {
+          if (p.convId || p.flags) {
+            config[p.mode] = {}
+            if (p.convId) config[p.mode].conversationId = p.convId
+            if (p.flags) config[p.mode].flags = p.flags
+          }
+        }
+        updateStmt.run(JSON.stringify(config), task.id)
+      }
+
+      // Old columns kept for backwards compat — drop in future v35
+    }
   }
 ]
 
