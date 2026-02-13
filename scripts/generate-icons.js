@@ -9,7 +9,7 @@ const { Icns, IcnsImage } = require('@fiahfy/icns');
 const APP_DIR = join(__dirname, '../packages/apps/app');
 const BUILD_DIR = join(APP_DIR, 'build');
 const RESOURCES_DIR = join(APP_DIR, 'resources');
-const SOURCE_PNG = join(APP_DIR, 'src/renderer/src/assets/logo-solid.svg');
+const SOURCE_SVG = join(APP_DIR, 'src/renderer/src/assets/logo-solid.svg');
 const LEGACY_ROOT_BUILD_DIR = join(__dirname, '../build');
 const LEGACY_ROOT_RESOURCES_DIR = join(__dirname, '../resources');
 
@@ -45,7 +45,7 @@ async function createIconWithBackground(size) {
     <rect x="${squirclePadding}" y="${squirclePadding}" width="${squircleSize}" height="${squircleSize}" rx="${cornerRadius}" ry="${cornerRadius}" fill="#ffffff"/>
   </svg>`;
 
-  const rendered = await sharp(SOURCE_PNG)
+  const rendered = await sharp(SOURCE_SVG)
     .resize(size, size, { fit: 'cover' })
     .png()
     .toBuffer();
