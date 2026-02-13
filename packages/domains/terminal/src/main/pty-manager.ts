@@ -351,13 +351,19 @@ export function createPty(
 
       // Append to buffer for history restoration (filter problematic sequences)
       const seq = session.buffer.append(filterBufferData(data))
-      // Update idle tracking
-      session.lastOutputTime = Date.now()
       // Track current seq for IPC emission
       const currentSeq = seq
 
       // Use adapter for activity detection
       const detectedActivity = session.adapter.detectActivity(data, session.activity)
+
+      // Update idle tracking: for transitionOnInput adapters (full-screen TUIs that
+      // redraw constantly), only update on meaningful activity detection. Otherwise
+      // the idle timer never fires because lastOutputTime keeps refreshing.
+      if (!session.adapter.transitionOnInput || detectedActivity) {
+        session.lastOutputTime = Date.now()
+      }
+
       if (detectedActivity) {
         session.activity = detectedActivity
         // Clear error state on valid activity (recovery from error)
@@ -556,8 +562,14 @@ export function writePty(sessionId: string, data: string): boolean {
   // Buffer input to detect commands
   session.inputBuffer += data
 
-  // Check for /status command (on Enter)
-  if (data === '\r' || data === '\n') {
+  // On Enter: transition TUI to 'working' if adapter opts in
+  const hasNewline = data.includes('\r') || data.includes('\n')
+  if (hasNewline) {
+    if (session.adapter.transitionOnInput && session.inputBuffer.trim().length > 0 && session.state !== 'running') {
+      session.activity = 'working'
+      session.lastOutputTime = Date.now() // reset idle timer from input submission
+      transitionState(sessionId, 'running')
+    }
     if (session.inputBuffer.includes('/status')) {
       session.watchingForSessionId = true
       session.statusOutputBuffer = ''

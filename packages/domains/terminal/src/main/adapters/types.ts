@@ -1,6 +1,6 @@
 import type { CodeMode } from '@slayzone/terminal/shared'
 
-export type TerminalMode = 'claude-code' | 'codex' | 'terminal'
+export type TerminalMode = 'claude-code' | 'codex' | 'cursor-agent' | 'gemini' | 'opencode' | 'terminal'
 export type { CodeMode }
 
 // Activity states for CLI tools
@@ -39,6 +39,13 @@ export interface TerminalAdapter {
 
   /** Idle timeout in ms (null = use default 60s) */
   readonly idleTimeoutMs: number | null
+
+  /**
+   * If true, pty-manager transitions to 'working' when user presses Enter.
+   * Useful for full-screen TUIs that constantly redraw (making output-based
+   * detection unreliable). Paired with idleTimeoutMs for return to 'attention'.
+   */
+  readonly transitionOnInput?: boolean
 
   /**
    * Build spawn configuration for this terminal mode.

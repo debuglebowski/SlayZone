@@ -81,23 +81,52 @@ test.describe('Terminal mode switching', () => {
   })
 
   test('conversation IDs cleared on mode switch', async ({ mainWindow }) => {
-    // Set a fake conversation ID
+    // Set fake conversation IDs for multiple providers
     await mainWindow.evaluate((id) =>
-      window.api.db.updateTask({ id, claudeConversationId: 'fake-convo-123' }), taskId)
+      window.api.db.updateTask({
+        id,
+        claudeConversationId: 'fake-convo-123',
+        codexConversationId: 'fake-codex-456',
+        cursorConversationId: 'fake-cursor-789',
+        geminiConversationId: 'fake-gemini-abc',
+        opencodeConversationId: 'fake-opencode-def',
+      }), taskId)
 
     // Switch to terminal and back
     await modeTrigger(mainWindow).click()
     await mainWindow.getByRole('option', { name: 'Terminal' }).click()
     await expect(modeTrigger(mainWindow)).toHaveText(/Terminal/)
 
-    // Verify cleared
+    // Verify ALL conversation IDs cleared
     const task = await mainWindow.evaluate((id) => window.api.db.getTask(id), taskId)
     expect(task?.claude_conversation_id).toBeNull()
     expect(task?.codex_conversation_id).toBeNull()
+    expect(task?.cursor_conversation_id).toBeNull()
+    expect(task?.gemini_conversation_id).toBeNull()
+    expect(task?.opencode_conversation_id).toBeNull()
 
     // Switch back to claude-code for clean state
     await modeTrigger(mainWindow).click()
     await mainWindow.getByRole('option', { name: 'Claude Code' }).click()
     await expect(modeTrigger(mainWindow)).toHaveText(/Claude Code/)
+  })
+
+  test('flags persist through mode changes', async ({ mainWindow }) => {
+    // Set custom flags for claude-code
+    await mainWindow.evaluate((id) =>
+      window.api.db.updateTask({ id, claudeFlags: '--custom-flag-test' }), taskId)
+
+    // Switch to codex then back
+    await modeTrigger(mainWindow).click()
+    await mainWindow.getByRole('option', { name: 'Codex' }).click()
+    await expect(modeTrigger(mainWindow)).toHaveText(/Codex/)
+
+    await modeTrigger(mainWindow).click()
+    await mainWindow.getByRole('option', { name: 'Claude Code' }).click()
+    await expect(modeTrigger(mainWindow)).toHaveText(/Claude Code/)
+
+    // Flags should persist (mode switch clears conversation IDs, not flags)
+    const task = await mainWindow.evaluate((id) => window.api.db.getTask(id), taskId)
+    expect(task?.claude_flags).toBe('--custom-flag-test')
   })
 })

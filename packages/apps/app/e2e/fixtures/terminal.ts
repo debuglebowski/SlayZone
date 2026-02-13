@@ -2,6 +2,31 @@ import type { Page } from '@playwright/test'
 import { expect } from './electron'
 import { clickProject, goHome } from './electron'
 import type { TerminalMode, TerminalState } from '@slayzone/terminal/shared'
+import { existsSync } from 'fs'
+import { homedir } from 'os'
+import { execSync } from 'child_process'
+
+/** Check if a binary exists at an absolute path */
+export function binaryExistsAt(absolutePath: string): boolean {
+  return existsSync(absolutePath)
+}
+
+/** Check if a binary is on PATH */
+export function binaryOnPath(name: string): boolean {
+  try {
+    execSync(`which ${name}`, { stdio: 'pipe' })
+    return true
+  } catch {
+    return false
+  }
+}
+
+/** Common binary paths for CLI providers */
+export const CLI_PATHS = {
+  'cursor-agent': `${homedir()}/.local/bin/cursor-agent`,
+  gemini: 'gemini', // on PATH
+  opencode: `${homedir()}/.opencode/bin/opencode`,
+} as const
 
 function activeModeTrigger(page: Page) {
   return page.locator('[data-testid="terminal-mode-trigger"]:visible').first()
@@ -42,6 +67,9 @@ export async function switchTerminalMode(page: Page, mode: TerminalMode): Promis
   const labels: Record<TerminalMode, string> = {
     'claude-code': 'Claude Code',
     codex: 'Codex',
+    'cursor-agent': 'Cursor Agent',
+    gemini: 'Gemini',
+    opencode: 'OpenCode',
     terminal: 'Terminal',
   }
 
