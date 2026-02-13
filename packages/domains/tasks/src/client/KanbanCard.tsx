@@ -5,7 +5,7 @@ import type { Project } from '@slayzone/projects/shared'
 import type { TerminalState } from '@slayzone/terminal/shared'
 import { Card, CardContent, Tooltip, TooltipContent, TooltipTrigger, cn, getTerminalStateStyle } from '@slayzone/ui'
 import { todayISO } from './kanban'
-import { AlertCircle, GitMerge, Link2 } from 'lucide-react'
+import { AlertCircle, Check, GitMerge, Link2 } from 'lucide-react'
 import { usePty } from '@slayzone/terminal'
 
 interface KanbanCardProps {
@@ -15,6 +15,7 @@ interface KanbanCardProps {
   project?: Project
   showProject?: boolean
   isBlocked?: boolean
+  subTaskCount?: { done: number; total: number }
 }
 
 const PRIORITY_COLORS: Record<number, string> = {
@@ -31,7 +32,8 @@ export function KanbanCard({
   onClick,
   project,
   showProject,
-  isBlocked
+  isBlocked,
+  subTaskCount
 }: KanbanCardProps): React.JSX.Element {
   const today = todayISO()
   const isOverdue = task.due_date && task.due_date < today && task.status !== 'done'
@@ -150,6 +152,16 @@ export function KanbanCard({
               {/* Due date */}
               {task.due_date && !isOverdue && (
                 <span className="text-muted-foreground text-[9px] shrink-0">{task.due_date}</span>
+              )}
+              {/* Sub-task count */}
+              {subTaskCount && subTaskCount.total > 0 && (
+                <span className={cn(
+                  "flex items-center gap-0.5 text-[9px] shrink-0",
+                  subTaskCount.done === subTaskCount.total ? "text-green-500" : "text-muted-foreground"
+                )}>
+                  <Check className="size-2" />
+                  {subTaskCount.done}/{subTaskCount.total}
+                </span>
               )}
             </div>
           </div>

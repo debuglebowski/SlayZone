@@ -15,6 +15,7 @@ export interface PanelVisibility {
 export interface Task {
   id: string
   project_id: string
+  parent_id: string | null
   title: string
   description: string | null
   assignee: string | null
@@ -66,6 +67,7 @@ export interface CreateTaskInput {
   terminalMode?: TerminalMode
   claudeFlags?: string
   codexFlags?: string
+  parentId?: string
 }
 
 export interface UpdateTaskInput {

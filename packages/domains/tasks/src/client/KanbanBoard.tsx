@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import {
   DndContext,
   DragOverlay,
@@ -75,6 +75,18 @@ export function KanbanBoard({
 
   const columns = groupTasksBy(tasks, groupBy)
   const activeTask = activeId ? tasks.find((t) => t.id === activeId) : null
+
+  const subTaskCounts = useMemo(() => {
+    const counts = new Map<string, { done: number; total: number }>()
+    for (const t of tasks) {
+      if (!t.parent_id) continue
+      const entry = counts.get(t.parent_id) ?? { done: 0, total: 0 }
+      entry.total++
+      if (t.status === 'done') entry.done++
+      counts.set(t.parent_id, entry)
+    }
+    return counts
+  }, [tasks])
 
   function handleDragStart(event: DragStartEvent): void {
     const taskId = event.active.id as string
@@ -168,6 +180,7 @@ export function KanbanBoard({
             taskTags={taskTags}
             tags={tags}
             blockedTaskIds={blockedTaskIds}
+            subTaskCounts={subTaskCounts}
             allProjects={allProjects}
             onUpdateTask={onUpdateTask}
             onArchiveTask={onArchiveTask}

@@ -79,7 +79,7 @@ function App(): React.JSX.Element {
   const [editingProject, setEditingProject] = useState<Project | null>(null)
   const [deletingProject, setDeletingProject] = useState<Project | null>(null)
   const [settingsOpen, setSettingsOpen] = useState(false)
-  const [settingsInitialTab, setSettingsInitialTab] = useState<'general' | 'terminal' | 'integrations' | 'diagnostics' | 'ai-config' | 'tags' | 'about'>('general')
+  const [settingsInitialTab, setSettingsInitialTab] = useState<string>('general')
   const [onboardingOpen, setOnboardingOpen] = useState(false)
   const [searchOpen, setSearchOpen] = useState(false)
   const [completeTaskDialogOpen, setCompleteTaskDialogOpen] = useState(false)
@@ -175,7 +175,8 @@ function App(): React.JSX.Element {
       const task = tasks.find((t) => t.id === taskId)
       const title = task?.title || 'Task'
       const status = task?.status
-      setTabs([...tabs, { type: 'task', taskId, title, status }])
+      const isSubTask = !!task?.parent_id
+      setTabs([...tabs, { type: 'task', taskId, title, status, isSubTask }])
       setActiveTabIndex(tabs.length)
     }
   }
@@ -186,7 +187,8 @@ function App(): React.JSX.Element {
       const task = tasks.find((t) => t.id === taskId)
       const title = task?.title || 'Task'
       const status = task?.status
-      setTabs([...tabs, { type: 'task', taskId, title, status }])
+      const isSubTask = !!task?.parent_id
+      setTabs([...tabs, { type: 'task', taskId, title, status, isSubTask }])
     }
   }
 
@@ -251,8 +253,11 @@ function App(): React.JSX.Element {
       return filtered.map((tab) => {
         if (tab.type !== 'task') return tab
         const task = tasks.find((t) => t.id === tab.taskId)
-        if (task && (task.title !== tab.title || task.status !== tab.status)) {
-          return { ...tab, title: task.title, status: task.status }
+        if (task) {
+          const isSubTask = !!task.parent_id
+          if (task.title !== tab.title || task.status !== tab.status || isSubTask !== tab.isSubTask) {
+            return { ...tab, title: task.title, status: task.status, isSubTask }
+          }
         }
         return tab
       })
@@ -613,7 +618,7 @@ function App(): React.JSX.Element {
         />
 
         <div className="flex-1 flex flex-col min-w-0">
-              <div className="window-drag-region pt-2">
+              <div className="window-drag-region bg-surface-1">
                 <div className="window-no-drag">
                   <TabBar
                     tabs={tabs}

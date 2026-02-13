@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback, type SetStateAction, type Dis
 import type { TaskStatus } from '@slayzone/task/shared'
 
 // Tab type (matches TabBar.tsx in app)
-export type Tab = { type: 'home' } | { type: 'task'; taskId: string; title: string; status?: TaskStatus }
+export type Tab = { type: 'home' } | { type: 'task'; taskId: string; title: string; status?: TaskStatus; isSubTask?: boolean }
 
 interface ViewState {
   tabs: Tab[]

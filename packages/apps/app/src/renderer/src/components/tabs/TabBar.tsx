@@ -19,7 +19,7 @@ import {
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 
-export type Tab = { type: 'home' } | { type: 'task'; taskId: string; title: string; terminalState?: TerminalState }
+export type Tab = { type: 'home' } | { type: 'task'; taskId: string; title: string; terminalState?: TerminalState; isSubTask?: boolean }
 
 interface TabBarProps {
   tabs: Tab[]
@@ -37,13 +37,14 @@ interface TabContentProps {
   isDragging?: boolean
   onClose?: () => void
   terminalState?: TerminalState
+  isSubTask?: boolean
 }
 
 function getStateInfo(state: TerminalState | undefined) {
   return getTerminalStateStyle(state)
 }
 
-function TabContent({ title, isActive, isDragging, onClose, terminalState }: TabContentProps): React.JSX.Element {
+function TabContent({ title, isActive, isDragging, onClose, terminalState, isSubTask }: TabContentProps): React.JSX.Element {
   const stateInfo = getStateInfo(terminalState)
 
   return (
@@ -66,6 +67,7 @@ function TabContent({ title, isActive, isDragging, onClose, terminalState }: Tab
           </TooltipContent>
         </Tooltip>
       )}
+      {isSubTask && <span className="text-[10px] text-muted-foreground/60 shrink-0">SUB</span>}
       <span className="truncate text-sm">{title}</span>
       {onClose && (
         <button
@@ -129,6 +131,7 @@ function SortableTab({
         isActive={isActive}
         onClose={() => onTabClose(index)}
         terminalState={terminalState}
+        isSubTask={tab.isSubTask}
       />
     </div>
   )

@@ -535,6 +535,48 @@ const migrations: Migration[] = [
       db.prepare(`UPDATE settings SET value = '--allow-dangerously-skip-permissions' WHERE key = 'default_claude_flags' AND value = '--dangerously-skip-permissions'`).run()
       db.prepare(`UPDATE tasks SET claude_flags = '--allow-dangerously-skip-permissions' WHERE claude_flags = '--dangerously-skip-permissions'`).run()
     }
+  },
+  {
+    version: 30,
+    up: (db) => {
+      // Recreate ai_config_project_selections with provider + content_hash columns
+      db.exec(`
+        CREATE TABLE ai_config_project_selections_new (
+          id TEXT PRIMARY KEY,
+          project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+          item_id TEXT NOT NULL REFERENCES ai_config_items(id) ON DELETE CASCADE,
+          provider TEXT NOT NULL DEFAULT 'claude',
+          target_path TEXT NOT NULL,
+          content_hash TEXT DEFAULT NULL,
+          selected_at TEXT NOT NULL DEFAULT (datetime('now')),
+          UNIQUE(project_id, item_id, provider)
+        );
+        INSERT INTO ai_config_project_selections_new (id, project_id, item_id, provider, target_path, selected_at)
+          SELECT id, project_id, item_id, 'claude', target_path, selected_at
+          FROM ai_config_project_selections;
+        DROP TABLE ai_config_project_selections;
+        ALTER TABLE ai_config_project_selections_new RENAME TO ai_config_project_selections;
+        CREATE INDEX idx_ai_config_sel_project ON ai_config_project_selections(project_id);
+        CREATE INDEX idx_ai_config_sel_item ON ai_config_project_selections(item_id);
+      `)
+
+      // Seed CLI providers into existing ai_config_sources table
+      const stmt = db.prepare(`INSERT OR IGNORE INTO ai_config_sources (id, name, kind, enabled, status) VALUES (?, ?, ?, ?, ?)`)
+      stmt.run('provider-claude', 'Claude Code', 'claude', 1, 'active')
+      stmt.run('provider-codex', 'Codex CLI', 'codex', 0, 'active')
+      stmt.run('provider-gemini', 'Gemini CLI', 'gemini', 0, 'placeholder')
+      stmt.run('provider-aider', 'Aider', 'aider', 0, 'placeholder')
+      stmt.run('provider-grok', 'Grok CLI', 'grok', 0, 'placeholder')
+    }
+  },
+  {
+    version: 31,
+    up: (db) => {
+      db.exec(`
+        ALTER TABLE tasks ADD COLUMN parent_id TEXT DEFAULT NULL REFERENCES tasks(id) ON DELETE CASCADE;
+        CREATE INDEX idx_tasks_parent ON tasks(parent_id);
+      `)
+    }
   }
 ]
 

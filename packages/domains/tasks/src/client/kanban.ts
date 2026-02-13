@@ -163,6 +163,11 @@ export function applyFilters(
       return false
     }
 
+    // Hide sub-tasks unless toggle is on
+    if (!filter.showSubTasks && task.parent_id) {
+      return false
+    }
+
     return true
   })
 }

@@ -68,6 +68,10 @@ export function FilterBar({ filter, onChange, tags }: FilterBarProps): React.JSX
     onChange({ ...filter, showArchived })
   }
 
+  const handleShowSubTasksChange = (showSubTasks: boolean): void => {
+    onChange({ ...filter, showSubTasks })
+  }
+
   const selectedTagCount = filter.tagIds.length
 
   return (
@@ -173,6 +177,16 @@ export function FilterBar({ filter, onChange, tags }: FilterBarProps): React.JSX
           />
           <Label htmlFor="show-archived" className="text-xs cursor-pointer">
             Archived
+          </Label>
+        </div>
+        <div className="flex items-center gap-2">
+          <Switch
+            id="show-subtasks"
+            checked={filter.showSubTasks}
+            onCheckedChange={handleShowSubTasksChange}
+          />
+          <Label htmlFor="show-subtasks" className="text-xs cursor-pointer">
+            Sub-tasks
           </Label>
         </div>
       </div>

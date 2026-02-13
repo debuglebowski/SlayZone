@@ -9,7 +9,7 @@ import type { Tag } from '@slayzone/tags/shared'
 import type { Project } from '@slayzone/projects/shared'
 import { DEV_SERVER_URL_PATTERN } from '@slayzone/terminal/shared'
 import type { TerminalMode, ClaudeAvailability } from '@slayzone/terminal/shared'
-import { Button, PanelToggle, DevServerToast, Collapsible, CollapsibleTrigger, CollapsibleContent, Checkbox } from '@slayzone/ui'
+import { Button, PanelToggle, DevServerToast, Collapsible, CollapsibleTrigger, CollapsibleContent } from '@slayzone/ui'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -45,22 +45,23 @@ import { RichTextEditor } from '@slayzone/editor'
 import { markSkipCache, usePty } from '@slayzone/terminal'
 import { TerminalContainer } from '@slayzone/task-terminals'
 import { GitPanel, GitDiffPanel, MergePanel } from '@slayzone/worktrees'
-import { cn } from '@slayzone/ui'
+import { cn, getTaskStatusStyle } from '@slayzone/ui'
 import { BrowserPanel } from '@slayzone/task-browser'
 import { FileEditorView } from '@slayzone/file-editor/client'
 import { usePanelSizes, resolveWidths } from './usePanelSizes'
 import { ResizeHandle } from './ResizeHandle'
 // ErrorBoundary should be provided by the app when rendering this component
 
-function SortableSubTask({ sub, onToggle, onNavigate, onUpdate, onDelete }: {
+function SortableSubTask({ sub, onNavigate, onUpdate, onDelete }: {
   sub: Task
-  onToggle: (id: string, done: boolean) => void
   onNavigate?: (id: string) => void
   onUpdate: (id: string, updates: Record<string, unknown>) => void
   onDelete: (id: string) => void
 }): React.JSX.Element {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: sub.id })
   const style = { transform: CSS.Transform.toString(transform), transition }
+  const statusStyle = getTaskStatusStyle(sub.status)
+  const StatusIcon = statusStyle?.icon
 
   return (
     <ContextMenu>
@@ -76,11 +77,12 @@ function SortableSubTask({ sub, onToggle, onNavigate, onUpdate, onDelete }: {
           <span {...attributes} {...listeners} className="absolute -left-4 cursor-grab opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground">
             <GripVertical className="size-3" />
           </span>
-          <Checkbox
-            checked={sub.status === 'done'}
-            onCheckedChange={(checked) => onToggle(sub.id, !!checked)}
-            className="size-3.5"
-          />
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span className="shrink-0">{StatusIcon && <StatusIcon className={cn("size-3.5", statusStyle?.iconClass)} />}</span>
+            </TooltipTrigger>
+            <TooltipContent side="bottom" className="text-xs">{statusStyle?.label ?? sub.status}</TooltipContent>
+          </Tooltip>
           <span
             className={cn("text-xs flex-1 truncate", sub.status === 'done' && "line-through text-muted-foreground")}
             onClick={() => onNavigate?.(sub.id)}
@@ -880,16 +882,6 @@ export function TaskDetailPage({
     setAddingSubTask(false)
   }
 
-  const handleToggleSubTask = async (subId: string, done: boolean): Promise<void> => {
-    const updated = await window.api.db.updateTask({
-      id: subId,
-      status: done ? 'done' : 'todo'
-    })
-    if (updated) {
-      setSubTasks(prev => prev.map(s => s.id === subId ? updated : s))
-    }
-  }
-
   const handleUpdateSubTask = async (subId: string, updates: Record<string, unknown>): Promise<void> => {
     const updated = await window.api.db.updateTask({ id: subId, ...updates })
     if (updated) {
@@ -1058,7 +1050,7 @@ export function TaskDetailPage({
             <button
               type="button"
               onClick={() => onNavigateToTask?.(parentTask.id)}
-              className="absolute left-0 bottom-full -mb-1.5 flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+              className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors cursor-pointer -mt-1"
             >
               Sub-task of
               <span className="font-medium truncate max-w-[300px]">{parentTask.title}</span>
@@ -1404,8 +1396,8 @@ export function TaskDetailPage({
             )}
           </div>
 
-          {/* Sub-tasks */}
-          <Collapsible defaultOpen>
+          {/* Sub-tasks (only for top-level tasks) */}
+          {!parentTask && <Collapsible defaultOpen>
             <CollapsibleTrigger className="flex w-full items-center gap-1.5 rounded-md border border-border bg-muted/50 px-2.5 py-1.5 text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground transition-colors [&[data-state=open]>svg:first-child]:rotate-90">
               <ChevronRight className="size-3 transition-transform" />
               Sub-tasks
@@ -1423,7 +1415,6 @@ export function TaskDetailPage({
                   <SortableSubTask
                     key={sub.id}
                     sub={sub}
-                    onToggle={handleToggleSubTask}
                     onNavigate={onNavigateToTask}
                     onUpdate={handleUpdateSubTask}
                     onDelete={handleDeleteSubTask}
@@ -1458,7 +1449,7 @@ export function TaskDetailPage({
               </SortableContext>
               </DndContext>
             </CollapsibleContent>
-          </Collapsible>
+          </Collapsible>}
 
           {/* Spacer — pushes remaining groups to bottom */}
           <div className="flex-1" />

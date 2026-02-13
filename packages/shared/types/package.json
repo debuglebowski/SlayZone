@@ -14,6 +14,7 @@
   },
   "dependencies": {
     "@slayzone/ai-config": "workspace:*",
+    "@slayzone/file-editor": "workspace:*",
     "@slayzone/integrations": "workspace:*",
     "@slayzone/projects": "workspace:*",
     "@slayzone/settings": "workspace:*",
