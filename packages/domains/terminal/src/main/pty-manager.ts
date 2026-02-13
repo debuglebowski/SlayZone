@@ -278,10 +278,8 @@ export function createPty(
     const mcpEnv: Record<string, string> = {}
     const taskId = taskIdFromSessionId(sessionId)
     if (taskId) mcpEnv.SLAYZONE_TASK_ID = taskId
-    if (db) {
-      const portRow = db.prepare('SELECT value FROM settings WHERE key = ?').get('mcp_server_port') as { value: string } | undefined
-      mcpEnv.SLAYZONE_MCP_PORT = portRow?.value || '45678'
-    }
+    const mcpPort = (globalThis as Record<string, unknown>).__mcpPort as number | undefined
+    if (mcpPort) mcpEnv.SLAYZONE_MCP_PORT = String(mcpPort)
 
     const ptyProcess = pty.spawn(spawnConfig.shell, spawnConfig.args, {
       name: 'xterm-256color',

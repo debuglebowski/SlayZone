@@ -1,4 +1,12 @@
 import { test, expect, seed, goHome, clickProject, TEST_PROJECT_PATH } from './fixtures/electron'
+import {
+  openTaskTerminal,
+  switchTerminalMode,
+  getMainSessionId,
+  waitForPtySession,
+  runCommand,
+  waitForBufferContains
+} from './fixtures/terminal'
 
 let mcpUrl = ''
 
@@ -266,5 +274,36 @@ test.describe('MCP Server', () => {
     ])
     expect(db1.title).toBe('From session 1')
     expect(db2.title).toBe('From session 2')
+  })
+
+  test('tool description mentions SLAYZONE_TASK_ID env var', async () => {
+    const sid = await mcpInit()
+    const { body } = await mcpRequest('tools/list', {}, sid)
+    const tools = body.result?.tools ?? []
+    const updateTool = tools.find((t: any) => t.name === 'update_task')
+    expect(updateTool).toBeTruthy()
+    expect(updateTool.description).toContain('SLAYZONE_TASK_ID')
+  })
+
+  test('terminal gets SLAYZONE_TASK_ID and SLAYZONE_MCP_PORT env vars', async ({ mainWindow }) => {
+    // Reset task title so we can find it on kanban
+    const s = seed(mainWindow)
+    await s.updateTask({ id: taskId, title: 'MCP env test', status: 'todo' })
+    await s.refreshData()
+
+    // Open the task terminal
+    await openTaskTerminal(mainWindow, { projectAbbrev: 'MC', taskTitle: 'MCP env test' })
+    await switchTerminalMode(mainWindow, 'terminal')
+
+    const sessionId = getMainSessionId(taskId)
+    await waitForPtySession(mainWindow, sessionId)
+
+    // Echo SLAYZONE_TASK_ID and verify it matches
+    await runCommand(mainWindow, sessionId, 'echo "SZTID=$SLAYZONE_TASK_ID"')
+    await waitForBufferContains(mainWindow, sessionId, `SZTID=${taskId}`)
+
+    // Echo SLAYZONE_MCP_PORT and verify it's set (non-empty number)
+    await runCommand(mainWindow, sessionId, 'echo "SZPORT=$SLAYZONE_MCP_PORT"')
+    await waitForBufferContains(mainWindow, sessionId, 'SZPORT=')
   })
 })

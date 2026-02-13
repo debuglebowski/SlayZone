@@ -192,6 +192,7 @@ let splashWindow: BrowserWindow | null = null
 let mainWindow: BrowserWindow | null = null
 let splashShownAt: number = 0
 let linearSyncPoller: NodeJS.Timeout | null = null
+let mcpCleanup: (() => void) | null = null
 
 function emitOpenSettings(): void {
   mainWindow?.webContents.send('app:open-settings')
@@ -468,7 +469,10 @@ app.whenReady().then(() => {
     const row = db.prepare('SELECT value FROM settings WHERE key = ?').get('mcp_server_port') as { value: string } | undefined
     return parseInt(row?.value || '45678', 10) || 45678
   })()
-  import('./mcp-server').then(({ startMcpServer }) => startMcpServer(db, mcpPort)).catch((err) => {
+  import('./mcp-server').then((mod) => {
+    mod.startMcpServer(db, mcpPort)
+    mcpCleanup = () => mod.stopMcpServer()
+  }).catch((err) => {
     console.error('[MCP] Failed to start server:', err)
   })
 
@@ -581,6 +585,7 @@ app.on('will-quit', () => {
     clearInterval(linearSyncPoller)
     linearSyncPoller = null
   }
+  mcpCleanup?.()
   stopDiagnostics()
   stopIdleChecker()
   killAllPtys()

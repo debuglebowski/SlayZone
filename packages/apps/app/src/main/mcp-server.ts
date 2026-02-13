@@ -2,14 +2,18 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js'
 import { isInitializeRequest } from '@modelcontextprotocol/sdk/types.js'
 import express from 'express'
+import type { Server } from 'node:http'
 import { randomUUID } from 'node:crypto'
 import { BrowserWindow } from 'electron'
 import { z } from 'zod'
 import type { Database } from 'better-sqlite3'
 import { updateTask } from '@slayzone/task/main'
-import type { TaskStatus } from '@slayzone/task/shared'
+import { TASK_STATUSES } from '@slayzone/task/shared'
 
-const TASK_STATUSES: [TaskStatus, ...TaskStatus[]] = ['inbox', 'backlog', 'todo', 'in_progress', 'review', 'done']
+let httpServer: Server | null = null
+let idleTimer: NodeJS.Timeout | null = null
+const SESSION_IDLE_TIMEOUT = 30 * 60 * 1000 // 30 min
+const IDLE_CHECK_INTERVAL = 5 * 60 * 1000 // 5 min
 
 function notifyRenderer(): void {
   BrowserWindow.getAllWindows().forEach((win) => {
@@ -27,9 +31,9 @@ function createMcpServer(db: Database): McpServer {
 
   server.tool(
     'update_task',
-    'Update a task\'s details (title, description, status, priority, assignee, due date)',
+    'Update a task\'s details (title, description, status, priority, assignee, due date). Your task ID is available in the SLAYZONE_TASK_ID environment variable.',
     {
-      task_id: z.string().describe('The task ID to update'),
+      task_id: z.string().describe('The task ID to update (read from $SLAYZONE_TASK_ID env var)'),
       title: z.string().optional().describe('New title'),
       description: z.string().nullable().optional().describe('New description (null to clear)'),
       status: z.enum(TASK_STATUSES).optional().describe('New status'),
@@ -55,65 +59,110 @@ function createMcpServer(db: Database): McpServer {
   return server
 }
 
+export function stopMcpServer(): void {
+  if (idleTimer) { clearInterval(idleTimer); idleTimer = null }
+  if (httpServer) { httpServer.close(); httpServer = null }
+}
+
 export function startMcpServer(db: Database, port: number): void {
   const app = express()
   app.use(express.json())
 
   const transports = new Map<string, StreamableHTTPServerTransport>()
+  const sessionActivity = new Map<string, number>()
+
+  function touchSession(sid: string): void {
+    sessionActivity.set(sid, Date.now())
+  }
+
+  function removeSession(sid: string): void {
+    transports.delete(sid)
+    sessionActivity.delete(sid)
+  }
+
+  // Evict sessions idle > 30 min
+  idleTimer = setInterval(() => {
+    const now = Date.now()
+    for (const [sid, lastActive] of sessionActivity) {
+      if (now - lastActive > SESSION_IDLE_TIMEOUT) {
+        try { transports.get(sid)?.close() } catch { /* already closed */ }
+        removeSession(sid)
+      }
+    }
+  }, IDLE_CHECK_INTERVAL)
 
   app.post('/mcp', async (req, res) => {
-    const sessionId = req.headers['mcp-session-id'] as string | undefined
+    try {
+      const sessionId = req.headers['mcp-session-id'] as string | undefined
 
-    if (sessionId && transports.has(sessionId)) {
-      const transport = transports.get(sessionId)!
-      await transport.handleRequest(req, res, req.body)
-      return
-    }
-
-    if (!sessionId && isInitializeRequest(req.body)) {
-      // Each session gets its own McpServer + transport pair
-      const mcpServer = createMcpServer(db)
-      const transport = new StreamableHTTPServerTransport({
-        sessionIdGenerator: () => randomUUID(),
-        onsessioninitialized: (sid) => { transports.set(sid, transport) }
-      })
-
-      transport.onclose = () => {
-        const sid = [...transports.entries()].find(([, t]) => t === transport)?.[0]
-        if (sid) transports.delete(sid)
+      if (sessionId && transports.has(sessionId)) {
+        touchSession(sessionId)
+        const transport = transports.get(sessionId)!
+        await transport.handleRequest(req, res, req.body)
+        return
       }
 
-      await mcpServer.connect(transport)
-      await transport.handleRequest(req, res, req.body)
-      return
-    }
+      if (!sessionId && isInitializeRequest(req.body)) {
+        const mcpServer = createMcpServer(db)
+        const transport = new StreamableHTTPServerTransport({
+          sessionIdGenerator: () => randomUUID(),
+          onsessioninitialized: (sid) => {
+            transports.set(sid, transport)
+            touchSession(sid)
+          }
+        })
 
-    res.status(400).json({ error: 'Invalid request — missing session or not an initialize request' })
+        transport.onclose = () => {
+          const sid = [...transports.entries()].find(([, t]) => t === transport)?.[0]
+          if (sid) removeSession(sid)
+        }
+
+        await mcpServer.connect(transport)
+        await transport.handleRequest(req, res, req.body)
+        return
+      }
+
+      res.status(400).json({ error: 'Invalid request — missing session or not an initialize request' })
+    } catch (err) {
+      console.error('[MCP] POST error:', err)
+      if (!res.headersSent) res.status(500).json({ error: 'Internal error' })
+    }
   })
 
   app.get('/mcp', async (req, res) => {
-    const sessionId = req.headers['mcp-session-id'] as string | undefined
-    if (sessionId && transports.has(sessionId)) {
-      const transport = transports.get(sessionId)!
-      await transport.handleRequest(req, res)
-      return
+    try {
+      const sessionId = req.headers['mcp-session-id'] as string | undefined
+      if (sessionId && transports.has(sessionId)) {
+        touchSession(sessionId)
+        const transport = transports.get(sessionId)!
+        await transport.handleRequest(req, res)
+        return
+      }
+      res.status(400).json({ error: 'Invalid session' })
+    } catch (err) {
+      console.error('[MCP] GET error:', err)
+      if (!res.headersSent) res.status(500).json({ error: 'Internal error' })
     }
-    res.status(400).json({ error: 'Invalid session' })
   })
 
   app.delete('/mcp', async (req, res) => {
-    const sessionId = req.headers['mcp-session-id'] as string | undefined
-    if (sessionId && transports.has(sessionId)) {
-      const transport = transports.get(sessionId)!
-      await transport.handleRequest(req, res)
-      transports.delete(sessionId)
-      return
+    try {
+      const sessionId = req.headers['mcp-session-id'] as string | undefined
+      if (sessionId && transports.has(sessionId)) {
+        const transport = transports.get(sessionId)!
+        await transport.handleRequest(req, res)
+        removeSession(sessionId)
+        return
+      }
+      res.status(400).json({ error: 'Invalid session' })
+    } catch (err) {
+      console.error('[MCP] DELETE error:', err)
+      if (!res.headersSent) res.status(500).json({ error: 'Internal error' })
     }
-    res.status(400).json({ error: 'Invalid session' })
   })
 
-  const server = app.listen(port, '127.0.0.1', () => {
-    const addr = server.address()
+  httpServer = app.listen(port, '127.0.0.1', () => {
+    const addr = httpServer!.address()
     const actualPort = typeof addr === 'object' && addr ? addr.port : port
     ;(globalThis as Record<string, unknown>).__mcpPort = actualPort
     console.log(`[MCP] Server listening on http://127.0.0.1:${actualPort}/mcp`)
