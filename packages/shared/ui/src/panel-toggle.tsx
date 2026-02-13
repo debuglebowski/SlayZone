@@ -18,7 +18,7 @@ interface PanelToggleProps {
 
 export function PanelToggle({ panels, onChange, className }: PanelToggleProps) {
   return (
-    <div className={cn('flex items-center bg-muted rounded-lg p-1 gap-1', className)}>
+    <div className={cn('flex items-center bg-surface-2 rounded-lg p-1 gap-1', className)}>
       {panels.map((panel) => (
         <button
           key={panel.id}
@@ -26,7 +26,7 @@ export function PanelToggle({ panels, onChange, className }: PanelToggleProps) {
           className={cn(
             'flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium transition-colors',
             panel.active
-              ? 'bg-background text-foreground shadow-sm'
+              ? 'bg-muted text-foreground shadow-sm'
               : 'text-muted-foreground hover:text-foreground'
           )}
         >

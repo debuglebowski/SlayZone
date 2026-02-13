@@ -41,7 +41,7 @@ export function SettingsLayout({
         </div>
       </aside>
 
-      <main className="overflow-y-auto px-6 py-5">{children}</main>
+      <main className="overflow-y-auto px-8 py-6">{children}</main>
     </div>
   )
 }
