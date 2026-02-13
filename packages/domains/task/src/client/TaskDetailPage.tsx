@@ -1,12 +1,15 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
-import { MoreHorizontal, Archive, Trash2, AlertTriangle, RotateCw, RefreshCcw, Link2, Sparkles, Loader2, Terminal as TerminalIcon, Globe, Settings2, GitBranch, FileCode, ChevronRight } from 'lucide-react'
+import { MoreHorizontal, Archive, Trash2, AlertTriangle, Sparkles, Loader2, Terminal as TerminalIcon, Globe, Settings2, GitBranch, FileCode, ChevronRight, Plus, GripVertical } from 'lucide-react'
+import { DndContext, PointerSensor, useSensors, useSensor, closestCenter, type DragEndEvent } from '@dnd-kit/core'
+import { SortableContext, useSortable, verticalListSortingStrategy, arrayMove } from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
 import type { Task, PanelVisibility } from '@slayzone/task/shared'
 import type { BrowserTabsState } from '@slayzone/task-browser/shared'
 import type { Tag } from '@slayzone/tags/shared'
 import type { Project } from '@slayzone/projects/shared'
 import { DEV_SERVER_URL_PATTERN } from '@slayzone/terminal/shared'
 import type { TerminalMode, ClaudeAvailability } from '@slayzone/terminal/shared'
-import { Button, PanelToggle, DevServerToast, Collapsible, CollapsibleTrigger, CollapsibleContent } from '@slayzone/ui'
+import { Button, PanelToggle, DevServerToast, Collapsible, CollapsibleTrigger, CollapsibleContent, Checkbox } from '@slayzone/ui'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -22,6 +25,19 @@ import {
   SelectValue
 } from '@slayzone/ui'
 import { Input } from '@slayzone/ui'
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuSeparator,
+  ContextMenuSub,
+  ContextMenuSubContent,
+  ContextMenuSubTrigger,
+  ContextMenuTrigger,
+  ContextMenuRadioGroup,
+  ContextMenuRadioItem,
+  taskStatusOptions
+} from '@slayzone/ui'
 import { DeleteTaskDialog } from './DeleteTaskDialog'
 import { Tooltip, TooltipTrigger, TooltipContent } from '@slayzone/ui'
 import { TaskMetadataSidebar, LinearCard } from './TaskMetadataSidebar'
@@ -35,6 +51,73 @@ import { FileEditorView } from '@slayzone/file-editor/client'
 import { usePanelSizes, resolveWidths } from './usePanelSizes'
 import { ResizeHandle } from './ResizeHandle'
 // ErrorBoundary should be provided by the app when rendering this component
+
+function SortableSubTask({ sub, onToggle, onNavigate, onUpdate, onDelete }: {
+  sub: Task
+  onToggle: (id: string, done: boolean) => void
+  onNavigate?: (id: string) => void
+  onUpdate: (id: string, updates: Record<string, unknown>) => void
+  onDelete: (id: string) => void
+}): React.JSX.Element {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: sub.id })
+  const style = { transform: CSS.Transform.toString(transform), transition }
+
+  return (
+    <ContextMenu>
+      <ContextMenuTrigger asChild>
+        <div
+          ref={setNodeRef}
+          style={style}
+          className={cn(
+            "relative flex items-center gap-2 py-1 px-1 rounded cursor-pointer hover:bg-muted/50 group select-none",
+            isDragging && "opacity-50"
+          )}
+        >
+          <span {...attributes} {...listeners} className="absolute -left-4 cursor-grab opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground">
+            <GripVertical className="size-3" />
+          </span>
+          <Checkbox
+            checked={sub.status === 'done'}
+            onCheckedChange={(checked) => onToggle(sub.id, !!checked)}
+            className="size-3.5"
+          />
+          <span
+            className={cn("text-xs flex-1 truncate", sub.status === 'done' && "line-through text-muted-foreground")}
+            onClick={() => onNavigate?.(sub.id)}
+          >
+            {sub.title}
+          </span>
+        </div>
+      </ContextMenuTrigger>
+      <ContextMenuContent className="w-48">
+        <ContextMenuItem onSelect={() => onNavigate?.(sub.id)}>Open</ContextMenuItem>
+        <ContextMenuSeparator />
+        <ContextMenuSub>
+          <ContextMenuSubTrigger>Status</ContextMenuSubTrigger>
+          <ContextMenuSubContent>
+            <ContextMenuRadioGroup value={sub.status} onValueChange={(v) => onUpdate(sub.id, { status: v })}>
+              {taskStatusOptions.map((s) => (
+                <ContextMenuRadioItem key={s.value} value={s.value}>{s.label}</ContextMenuRadioItem>
+              ))}
+            </ContextMenuRadioGroup>
+          </ContextMenuSubContent>
+        </ContextMenuSub>
+        <ContextMenuSub>
+          <ContextMenuSubTrigger>Priority</ContextMenuSubTrigger>
+          <ContextMenuSubContent>
+            <ContextMenuRadioGroup value={String(sub.priority)} onValueChange={(v) => onUpdate(sub.id, { priority: parseInt(v, 10) })}>
+              {[1, 2, 3, 4, 5].map((p) => (
+                <ContextMenuRadioItem key={p} value={String(p)}>P{p}</ContextMenuRadioItem>
+              ))}
+            </ContextMenuRadioGroup>
+          </ContextMenuSubContent>
+        </ContextMenuSub>
+        <ContextMenuSeparator />
+        <ContextMenuItem variant="destructive" onSelect={() => onDelete(sub.id)}>Delete</ContextMenuItem>
+      </ContextMenuContent>
+    </ContextMenu>
+  )
+}
 
 interface TaskDetailPageProps {
   taskId: string
@@ -52,7 +135,8 @@ export function TaskDetailPage({
   onBack,
   onTaskUpdated,
   onArchiveTask,
-  onDeleteTask
+  onDeleteTask,
+  onNavigateToTask
 }: TaskDetailPageProps): React.JSX.Element {
   // Main tab session ID format used by TerminalContainer/useTaskTerminals.
   const getMainSessionId = useCallback((id: string) => `${id}:${id}`, [])
@@ -63,6 +147,13 @@ export function TaskDetailPage({
   const [taskTagIds, setTaskTagIds] = useState<string[]>([])
   const [loading, setLoading] = useState(true)
   const [claudeAvailability, setClaudeAvailability] = useState<ClaudeAvailability | null>(null)
+
+  // Sub-tasks
+  const [subTasks, setSubTasks] = useState<Task[]>([])
+  const [addingSubTask, setAddingSubTask] = useState(false)
+  const [subTaskTitle, setSubTaskTitle] = useState('')
+  const subTaskInputRef = useRef<HTMLInputElement>(null)
+  const [parentTask, setParentTask] = useState<Task | null>(null)
 
   // Project path validation
   const [projectPathMissing, setProjectPathMissing] = useState(false)
@@ -228,12 +319,13 @@ export function TaskDetailPage({
         return true
       }
 
-      const [loadedTask, loadedTags, loadedTaskTags, projects, claudeCheck] = await Promise.all([
+      const [loadedTask, loadedTags, loadedTaskTags, projects, claudeCheck, loadedSubTasks] = await Promise.all([
         window.api.db.getTask(taskId),
         window.api.tags.getTags(),
         window.api.taskTags.getTagsForTask(taskId),
         window.api.db.getProjects(),
-        window.api.claude.checkAvailability()
+        window.api.claude.checkAvailability(),
+        window.api.db.getSubTasks(taskId)
       ])
 
       if (loadedTask) {
@@ -273,6 +365,13 @@ export function TaskDetailPage({
         } else {
           setProjectPathMissing(false)
         }
+      }
+      setSubTasks(loadedSubTasks)
+      if (loadedTask?.parent_id) {
+        const parent = await window.api.db.getTask(loadedTask.parent_id)
+        setParentTask(parent)
+      } else {
+        setParentTask(null)
       }
       setTags(loadedTags)
       setTaskTagIds(loadedTaskTags.map((t) => t.id))
@@ -768,6 +867,55 @@ export function TaskDetailPage({
     }
   }
 
+  const handleCreateSubTask = async (): Promise<void> => {
+    if (!task || !subTaskTitle.trim()) return
+    const sub = await window.api.db.createTask({
+      projectId: task.project_id,
+      title: subTaskTitle.trim(),
+      parentId: task.id,
+      status: 'todo'
+    })
+    if (sub) setSubTasks(prev => [...prev, sub])
+    setSubTaskTitle('')
+    setAddingSubTask(false)
+  }
+
+  const handleToggleSubTask = async (subId: string, done: boolean): Promise<void> => {
+    const updated = await window.api.db.updateTask({
+      id: subId,
+      status: done ? 'done' : 'todo'
+    })
+    if (updated) {
+      setSubTasks(prev => prev.map(s => s.id === subId ? updated : s))
+    }
+  }
+
+  const handleUpdateSubTask = async (subId: string, updates: Record<string, unknown>): Promise<void> => {
+    const updated = await window.api.db.updateTask({ id: subId, ...updates })
+    if (updated) {
+      setSubTasks(prev => prev.map(s => s.id === subId ? updated : s))
+    }
+  }
+
+  const handleDeleteSubTask = async (subId: string): Promise<void> => {
+    await window.api.db.deleteTask(subId)
+    setSubTasks(prev => prev.filter(s => s.id !== subId))
+  }
+
+  const subTaskSensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }))
+
+  const handleSubTaskDragEnd = (event: DragEndEvent): void => {
+    const { active, over } = event
+    if (!over || active.id === over.id) return
+    setSubTasks(prev => {
+      const oldIndex = prev.findIndex(s => s.id === active.id)
+      const newIndex = prev.findIndex(s => s.id === over.id)
+      const reordered = arrayMove(prev, oldIndex, newIndex)
+      window.api.db.reorderTasks(reordered.map(t => t.id))
+      return reordered
+    })
+  }
+
   const handleTaskUpdate = (updated: Task): void => {
     setTask(updated)
     setTitleValue(updated.title)
@@ -861,8 +1009,8 @@ export function TaskDetailPage({
   return (
     <div className="h-full flex flex-col p-4 pb-0 gap-4">
       {/* Header */}
-      <header className="shrink-0 rounded-md bg-surface-1 border border-border">
-        <div className="px-4 py-2">
+      <header className="shrink-0 relative">
+        <div>
           <div className="flex items-center gap-4 window-no-drag">
             <input
               ref={titleInputRef}
@@ -904,72 +1052,18 @@ export function TaskDetailPage({
                 ]}
                 onChange={handlePanelToggle}
               />
-
-              <div className="h-6 w-px bg-border" />
-
-              {project?.path && (
-                <>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={handleReattachTerminal}
-                      >
-                        <Link2 className="size-4" />
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>Re-attach terminal</TooltipContent>
-                  </Tooltip>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={handleRestartTerminal}
-                      >
-                        <RotateCw className="size-4" />
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>Restart terminal</TooltipContent>
-                  </Tooltip>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={handleResetTerminal}
-                      >
-                        <RefreshCcw className="size-4" />
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>Reset terminal</TooltipContent>
-                  </Tooltip>
-                </>
-              )}
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="icon">
-                    <MoreHorizontal className="size-5" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={handleArchive}>
-                    <Archive className="mr-2 size-4" />
-                    Archive
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem
-                    onClick={() => setDeleteDialogOpen(true)}
-                    className="text-destructive"
-                  >
-                    <Trash2 className="mr-2 size-4" />
-                    Delete
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
             </div>
           </div>
+          {parentTask && (
+            <button
+              type="button"
+              onClick={() => onNavigateToTask?.(parentTask.id)}
+              className="absolute left-0 bottom-full -mb-1.5 flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+            >
+              Sub-task of
+              <span className="font-medium truncate max-w-[300px]">{parentTask.title}</span>
+            </button>
+          )}
         </div>
       </header>
 
@@ -1147,7 +1241,7 @@ export function TaskDetailPage({
                                 <MoreHorizontal className="size-3.5" />
                               </Button>
                             </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
+                            <DropdownMenuContent align="end" className="w-60">
                               {task.terminal_mode === 'claude-code' && (
                                 <DropdownMenuItem onClick={handleSyncSessionName}>
                                   Sync name
@@ -1160,6 +1254,16 @@ export function TaskDetailPage({
                               <DropdownMenuItem onClick={() => void handleInjectDescription()}>
                                 Inject description
                                 <span className="ml-auto text-xs text-muted-foreground">⌘⇧I</span>
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem onClick={handleReattachTerminal}>
+                                Re-attach terminal
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={handleRestartTerminal}>
+                                Restart terminal
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={handleResetTerminal}>
+                                Reset terminal
                               </DropdownMenuItem>
                             </DropdownMenuContent>
                           </DropdownMenu>
@@ -1225,6 +1329,7 @@ export function TaskDetailPage({
           <div className="shrink-0 overflow-hidden rounded-md bg-surface-1 border border-border" style={{ width: resolvedWidths.editor }}>
             <FileEditorView
               projectPath={task.worktree_path || project.path}
+              isActive={isActive}
             />
           </div>
         )}
@@ -1269,7 +1374,7 @@ export function TaskDetailPage({
         {panelVisibility.settings && (
         <div data-testid="task-settings-panel" className="shrink-0 rounded-md bg-surface-1 border border-border p-3 flex flex-col gap-4 overflow-y-auto" style={{ width: resolvedWidths.settings }}>
           {/* Description */}
-          <div className="flex flex-col min-h-0">
+          <div className="flex flex-col min-h-0 relative">
             <RichTextEditor
               value={descriptionValue}
               onChange={setDescriptionValue}
@@ -1285,20 +1390,75 @@ export function TaskDetailPage({
                 data-testid="generate-description-button"
                 type="button"
                 variant="ghost"
-                size="sm"
-                className="mt-2 text-xs text-muted-foreground hover:text-foreground"
+                size="icon"
+                className="absolute bottom-1 right-1 size-6 text-muted-foreground hover:text-foreground"
                 onClick={() => handleGenerateDescription()}
                 disabled={generatingDescription || !task.title}
               >
                 {generatingDescription ? (
-                  <Loader2 className="size-3 mr-1 animate-spin" />
+                  <Loader2 className="size-3 animate-spin" />
                 ) : (
-                  <Sparkles className="size-3 mr-1" />
+                  <Sparkles className="size-3" />
                 )}
-                Generate description
               </Button>
             )}
           </div>
+
+          {/* Sub-tasks */}
+          <Collapsible defaultOpen>
+            <CollapsibleTrigger className="flex w-full items-center gap-1.5 rounded-md border border-border bg-muted/50 px-2.5 py-1.5 text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground transition-colors [&[data-state=open]>svg:first-child]:rotate-90">
+              <ChevronRight className="size-3 transition-transform" />
+              Sub-tasks
+              {subTasks.length > 0 && (
+                <span className="ml-auto text-muted-foreground/60 text-[10px]">
+                  {subTasks.filter(s => s.status === 'done').length}/{subTasks.length}
+                </span>
+              )}
+            </CollapsibleTrigger>
+            <CollapsibleContent className="border-l border-border ml-2 pl-4 pt-2">
+              <DndContext sensors={subTaskSensors} collisionDetection={closestCenter} onDragEnd={handleSubTaskDragEnd}>
+              <SortableContext items={subTasks.map(s => s.id)} strategy={verticalListSortingStrategy}>
+              <div className="flex flex-col gap-0.5">
+                {subTasks.map(sub => (
+                  <SortableSubTask
+                    key={sub.id}
+                    sub={sub}
+                    onToggle={handleToggleSubTask}
+                    onNavigate={onNavigateToTask}
+                    onUpdate={handleUpdateSubTask}
+                    onDelete={handleDeleteSubTask}
+                  />
+                ))}
+                {addingSubTask ? (
+                  <div className="flex items-center gap-2 py-1 px-1">
+                    <Input
+                      ref={subTaskInputRef}
+                      value={subTaskTitle}
+                      onChange={(e) => setSubTaskTitle(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') { e.preventDefault(); handleCreateSubTask() }
+                        if (e.key === 'Escape') { setAddingSubTask(false); setSubTaskTitle('') }
+                      }}
+                      placeholder="Sub-task title..."
+                      className="h-6 text-xs"
+                      autoFocus
+                    />
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setAddingSubTask(true)}
+                    className="flex items-center gap-1.5 py-1 px-1 rounded text-xs text-muted-foreground hover:text-foreground hover:bg-muted/50 mt-1"
+                  >
+                    <Plus className="size-3" />
+                    Add subtask
+                  </button>
+                )}
+              </div>
+              </SortableContext>
+              </DndContext>
+            </CollapsibleContent>
+          </Collapsible>
 
           {/* Spacer — pushes remaining groups to bottom */}
           <div className="flex-1" />
@@ -1338,6 +1498,19 @@ export function TaskDetailPage({
                 onUpdate={handleTaskUpdate}
                 onTagsChange={handleTagsChange}
               />
+              <div className="flex flex-col gap-2 pt-2 border-t border-border">
+                <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Danger zone</span>
+                <div className="flex items-center gap-2">
+                <Button variant="outline" size="sm" className="flex-1 text-xs" onClick={handleArchive}>
+                  <Archive className="mr-1.5 size-3" />
+                  Archive
+                </Button>
+                <Button variant="outline" size="sm" className="flex-1 text-xs text-destructive hover:text-destructive" onClick={() => setDeleteDialogOpen(true)}>
+                  <Trash2 className="mr-1.5 size-3" />
+                  Delete
+                </Button>
+                </div>
+              </div>
             </CollapsibleContent>
           </Collapsible>
         </div>
