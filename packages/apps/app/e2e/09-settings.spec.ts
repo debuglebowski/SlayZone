@@ -4,6 +4,9 @@ test.describe('Settings', () => {
   const settingsDialog = (mainWindow: import('@playwright/test').Page) =>
     mainWindow.getByRole('dialog').last()
 
+  const findCard = (dialog: import('@playwright/test').Locator, name: string) =>
+    dialog.locator('.space-y-2 > div').filter({ hasText: name }).first()
+
   const openTerminalSettings = async (mainWindow: import('@playwright/test').Page) => {
     const dialog = settingsDialog(mainWindow)
     if (await dialog.isVisible().catch(() => false)) {
@@ -12,18 +15,23 @@ test.describe('Settings', () => {
     }
     await clickSettings(mainWindow)
     await expect(dialog).toBeVisible({ timeout: 5_000 })
-    await dialog.locator('aside button').filter({ hasText: 'Terminal' }).first().click()
+    // Terminal config is inside the Panels tab → Terminal card → gear button
+    await dialog.locator('aside button').filter({ hasText: 'Panels' }).first().click()
+    await expect(findCard(settingsDialog(mainWindow), 'Terminal')).toBeVisible({ timeout: 5_000 })
+    // Click the gear button (only non-switch button in the card header)
+    const terminalCard = findCard(dialog, 'Terminal')
+    await terminalCard.locator('button:not([role="switch"])').first().click()
     await expect(dialog.getByText('Default mode')).toBeVisible({ timeout: 5_000 })
   }
 
   test('open settings dialog', async ({ mainWindow }) => {
     await clickSettings(mainWindow)
-    await expect(mainWindow.getByText('Appearance')).toBeVisible({ timeout: 5_000 })
+    await expect(mainWindow.getByText('Worktree base path')).toBeVisible({ timeout: 5_000 })
   })
 
   test('Cmd+, opens settings dialog', async ({ mainWindow }) => {
     await mainWindow.keyboard.press('Meta+,')
-    await expect(mainWindow.getByText('Appearance')).toBeVisible({ timeout: 5_000 })
+    await expect(mainWindow.getByText('Worktree base path')).toBeVisible({ timeout: 5_000 })
   })
 
   test('switch theme to dark', async ({ mainWindow }) => {
@@ -70,6 +78,6 @@ test.describe('Settings', () => {
 
   test('close settings dialog', async ({ mainWindow }) => {
     await mainWindow.keyboard.press('Escape')
-    await expect(mainWindow.getByText('Appearance')).not.toBeVisible({ timeout: 3_000 })
+    await expect(settingsDialog(mainWindow)).not.toBeVisible({ timeout: 3_000 })
   })
 })
