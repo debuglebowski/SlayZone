@@ -1,6 +1,6 @@
 import { motion, useReducedMotion } from 'framer-motion'
 import { useEffect, useState } from 'react'
-import logo from '@/assets/logo-solid.svg'
+import logo from '@/assets/logo.svg'
 
 export function LoadingScreen(): React.JSX.Element {
   const shouldReduceMotion = useReducedMotion()

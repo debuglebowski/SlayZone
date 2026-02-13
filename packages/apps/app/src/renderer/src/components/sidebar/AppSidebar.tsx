@@ -46,7 +46,7 @@ export function AppSidebar({
   const showProjectSelection = !aiCenterActive
 
   return (
-    <Sidebar collapsible="none" className="w-[72px] border-r min-h-svh">
+    <Sidebar collapsible="none" className="w-[82px] border-r min-h-svh">
       {/* Draggable region for window movement - clears traffic lights */}
       <div className="h-10 window-drag-region" />
       <SidebarContent className="py-4 pt-0">
