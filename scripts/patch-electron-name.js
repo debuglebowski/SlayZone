@@ -12,7 +12,7 @@
 const fs = require('fs')
 const path = require('path')
 
-const APP_NAME = 'SlayZone'
+const APP_NAME = 'SlayZoneDev'
 
 // Only run on macOS
 if (process.platform !== 'darwin') {
