@@ -18,6 +18,7 @@ const api: ElectronAPI = {
     getTasks: () => ipcRenderer.invoke('db:tasks:getAll'),
     getTasksByProject: (projectId) => ipcRenderer.invoke('db:tasks:getByProject', projectId),
     getTask: (id) => ipcRenderer.invoke('db:tasks:get', id),
+    getSubTasks: (parentId) => ipcRenderer.invoke('db:tasks:getSubTasks', parentId),
     createTask: (data) => ipcRenderer.invoke('db:tasks:create', data),
     updateTask: (data) => ipcRenderer.invoke('db:tasks:update', data),
     deleteTask: (id) => ipcRenderer.invoke('db:tasks:delete', id),
@@ -87,6 +88,11 @@ const api: ElectronAPI = {
       const handler = () => callback()
       ipcRenderer.on('app:open-project-settings', handler)
       return () => ipcRenderer.removeListener('app:open-project-settings', handler)
+    },
+    onTasksChanged: (callback: () => void) => {
+      const handler = () => callback()
+      ipcRenderer.on('tasks:changed', handler)
+      return () => ipcRenderer.removeListener('tasks:changed', handler)
     }
   },
   window: {
@@ -261,12 +267,20 @@ const api: ElectronAPI = {
   },
   fs: {
     readDir: (rootPath, dirPath) => ipcRenderer.invoke('fs:readDir', rootPath, dirPath),
-    readFile: (rootPath, filePath) => ipcRenderer.invoke('fs:readFile', rootPath, filePath),
+    readFile: (rootPath, filePath, force) => ipcRenderer.invoke('fs:readFile', rootPath, filePath, force),
     writeFile: (rootPath, filePath, content) => ipcRenderer.invoke('fs:writeFile', rootPath, filePath, content),
     createFile: (rootPath, filePath) => ipcRenderer.invoke('fs:createFile', rootPath, filePath),
     createDir: (rootPath, dirPath) => ipcRenderer.invoke('fs:createDir', rootPath, dirPath),
     rename: (rootPath, oldPath, newPath) => ipcRenderer.invoke('fs:rename', rootPath, oldPath, newPath),
-    delete: (rootPath, targetPath) => ipcRenderer.invoke('fs:delete', rootPath, targetPath)
+    delete: (rootPath, targetPath) => ipcRenderer.invoke('fs:delete', rootPath, targetPath),
+    listAllFiles: (rootPath) => ipcRenderer.invoke('fs:listAllFiles', rootPath),
+    watch: (rootPath) => ipcRenderer.invoke('fs:watch', rootPath),
+    unwatch: (rootPath) => ipcRenderer.invoke('fs:unwatch', rootPath),
+    onFileChanged: (callback) => {
+      const handler = (_event: unknown, rootPath: string, relPath: string) => callback(rootPath, relPath)
+      ipcRenderer.on('fs:changed', handler)
+      return () => ipcRenderer.removeListener('fs:changed', handler)
+    }
   },
   integrations: {
     connectLinear: (input) => ipcRenderer.invoke('integrations:connect-linear', input),

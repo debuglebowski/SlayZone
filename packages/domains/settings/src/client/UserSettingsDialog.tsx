@@ -12,19 +12,73 @@ import {
   SelectTrigger,
   SelectValue
 } from '@slayzone/ui'
-import { useTheme } from '@slayzone/settings'
 import type { Tag } from '@slayzone/tags/shared'
-import type { ThemePreference } from '@slayzone/settings/shared'
 import type { ClaudeAvailability, TerminalMode } from '@slayzone/terminal/shared'
 import type { DiagnosticsConfig } from '@slayzone/types'
 import type { IntegrationConnectionPublic } from '@slayzone/integrations/shared'
 import { ContextManagerSettings } from '../../../ai-config/src/client/ContextManagerSettings'
+import {
+  LayoutPreviewA,
+  LayoutPreviewB,
+  LayoutPreviewC,
+  LayoutPreviewD,
+  LayoutPreviewE,
+  LayoutPreviewF,
+  LayoutPreviewG
+} from '../../../ai-config/src/client/LayoutPreviews'
+
+function PreviewWrapper({ layout }: { layout: string }) {
+  const [scope, setScope] = useState<'global' | 'project'>('global')
+  const Component = {
+    'preview-a': LayoutPreviewA,
+    'preview-b': LayoutPreviewB,
+    'preview-c': LayoutPreviewC,
+    'preview-d': LayoutPreviewD,
+    'preview-e': LayoutPreviewE,
+    'preview-f': LayoutPreviewF,
+    'preview-g': LayoutPreviewG
+  }[layout] as React.FC<{ scope: 'global' | 'project' }> | undefined
+  if (!Component) return null
+
+  const labels: Record<string, string> = {
+    'preview-a': 'A: Refined Tabs — providers as persistent bar, no Providers tab',
+    'preview-b': 'B: Secondary Sidebar — vertical nav inside content area',
+    'preview-c': 'C: Master-Detail — item list on left, editor on right',
+    'preview-d': 'D: Dashboard — summary cards, click to drill in',
+    'preview-e': 'E: Accordion — collapsible sections, all on one page',
+    'preview-f': 'F: Hybrid — 2 tabs (Content + MCP), stacked sections',
+    'preview-g': 'G: Minimal — 3 tabs (Content + MCP + Providers), thin dividers'
+  }
+
+  return (
+    <div>
+      <div className="mb-4 flex items-center justify-between">
+        <p className="text-xs text-muted-foreground">{labels[layout]}</p>
+        <div className="flex items-center gap-1 rounded-lg border bg-muted/30 p-1">
+          <button
+            onClick={() => setScope('global')}
+            className={`rounded-md px-3 py-1 text-xs font-medium transition-colors ${scope === 'global' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground'}`}
+          >
+            Global
+          </button>
+          <button
+            onClick={() => setScope('project')}
+            className={`rounded-md px-3 py-1 text-xs font-medium transition-colors ${scope === 'project' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground'}`}
+          >
+            Project
+          </button>
+        </div>
+      </div>
+      <Component scope={scope} />
+    </div>
+  )
+}
 
 interface UserSettingsDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  initialTab?: 'general' | 'terminal' | 'integrations' | 'diagnostics' | 'ai-config' | 'tags' | 'about'
-  onTabChange?: (tab: 'general' | 'terminal' | 'integrations' | 'diagnostics' | 'ai-config' | 'tags' | 'about') => void
+  initialTab?: string
+  onTabChange?: (tab: string) => void
 }
 
 export function UserSettingsDialog({
@@ -33,7 +87,6 @@ export function UserSettingsDialog({
   initialTab = 'general',
   onTabChange
 }: UserSettingsDialogProps) {
-  const { preference, setPreference } = useTheme()
   const [activeTab, setActiveTab] = useState(initialTab)
   const [tags, setTags] = useState<Tag[]>([])
   const [newTagName, setNewTagName] = useState('')
@@ -45,6 +98,9 @@ export function UserSettingsDialog({
   const [defaultShell, setDefaultShell] = useState('')
   const [worktreeBasePath, setWorktreeBasePath] = useState('')
   const [autoCreateWorktreeOnTaskCreate, setAutoCreateWorktreeOnTaskCreate] = useState(false)
+  const [devServerToastEnabled, setDevServerToastEnabled] = useState(true)
+  const [devServerAutoOpenBrowser, setDevServerAutoOpenBrowser] = useState(false)
+  const [mcpPort, setMcpPort] = useState('45678')
   const [defaultTerminalMode, setDefaultTerminalMode] = useState<TerminalMode>('claude-code')
   const [defaultClaudeFlags, setDefaultClaudeFlags] = useState('--allow-dangerously-skip-permissions')
   const [defaultCodexFlags, setDefaultCodexFlags] = useState('--full-auto --search')
@@ -86,7 +142,7 @@ export function UserSettingsDialog({
     const isStale = () => requestId !== loadRequestIdRef.current
 
     try {
-      const [loadedTags, path, shell, wtBasePath, autoCreateWorktree, termMode, claudeFlags, codexFlags] = await Promise.allSettled([
+      const [loadedTags, path, shell, wtBasePath, autoCreateWorktree, termMode, claudeFlags, codexFlags, devToast, devAutoOpen, mcpPortSetting] = await Promise.allSettled([
         window.api.tags.getTags(),
         window.api.settings.get('database_path'),
         window.api.settings.get('shell'),
@@ -94,7 +150,10 @@ export function UserSettingsDialog({
         window.api.settings.get('auto_create_worktree_on_task_create'),
         window.api.settings.get('default_terminal_mode'),
         window.api.settings.get('default_claude_flags'),
-        window.api.settings.get('default_codex_flags')
+        window.api.settings.get('default_codex_flags'),
+        window.api.settings.get('dev_server_toast_enabled'),
+        window.api.settings.get('dev_server_auto_open_browser'),
+        window.api.settings.get('mcp_server_port')
       ])
       if (isStale()) return
 
@@ -106,6 +165,15 @@ export function UserSettingsDialog({
       setWorktreeBasePath(wtBasePath.status === 'fulfilled' ? (wtBasePath.value ?? '') : '')
       setAutoCreateWorktreeOnTaskCreate(
         autoCreateWorktree.status === 'fulfilled' ? autoCreateWorktree.value === '1' : false
+      )
+      setDevServerToastEnabled(
+        devToast.status === 'fulfilled' ? devToast.value !== '0' : true
+      )
+      setDevServerAutoOpenBrowser(
+        devAutoOpen.status === 'fulfilled' ? devAutoOpen.value === '1' : false
+      )
+      setMcpPort(
+        mcpPortSetting.status === 'fulfilled' && mcpPortSetting.value ? mcpPortSetting.value : '45678'
       )
 
       const safeMode =
@@ -250,14 +318,21 @@ export function UserSettingsDialog({
     setTags(tags.filter((t) => t.id !== id))
   }
 
-  const navItems: Array<{ key: typeof activeTab; label: string }> = [
+  const navItems: Array<{ key: string; label: string }> = [
     { key: 'general', label: 'General' },
     { key: 'terminal', label: 'Terminal' },
     { key: 'integrations', label: 'Integrations' },
     { key: 'diagnostics', label: 'Diagnostics' },
     { key: 'ai-config', label: 'Context Manager' },
     { key: 'tags', label: 'Tags' },
-    { key: 'about', label: 'About' }
+    { key: 'about', label: 'About' },
+    { key: 'preview-a', label: 'A: Refined Tabs' },
+    { key: 'preview-b', label: 'B: Sidebar' },
+    { key: 'preview-c', label: 'C: Master-Detail' },
+    { key: 'preview-d', label: 'D: Dashboard' },
+    { key: 'preview-e', label: 'E: Accordion' },
+    { key: 'preview-f', label: 'F: Hybrid' },
+    { key: 'preview-g', label: 'G: Minimal' }
   ]
 
   if (!open) return null
@@ -289,27 +364,10 @@ export function UserSettingsDialog({
             onTabChange?.(tab)
           }}
         >
-          <div className="mx-auto w-full max-w-4xl space-y-4">
+          <div className="mx-auto w-full max-w-4xl space-y-8">
             {activeTab === 'general' && (
               <>
-                <div className="space-y-2">
-                  <Label className="text-base font-semibold">Appearance</Label>
-                  <div className="grid grid-cols-[220px_minmax(0,1fr)] items-center gap-4">
-                    <span className="text-sm">Theme</span>
-                    <Select value={preference} onValueChange={(v) => setPreference(v as ThemePreference)}>
-                      <SelectTrigger className="w-full max-w-xs">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="light">Light</SelectItem>
-                        <SelectItem value="dark">Dark</SelectItem>
-                        <SelectItem value="system">System</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-
-                <div className="space-y-2">
+                <div className="space-y-3">
                   <Label className="text-base font-semibold">Git</Label>
                   <div className="grid grid-cols-[220px_minmax(0,1fr)] items-center gap-4">
                     <span className="text-sm">Worktree base path</span>
@@ -346,12 +404,69 @@ export function UserSettingsDialog({
                     Project settings can override auto-create behavior.
                   </p>
                 </div>
+
+                <div className="space-y-3">
+                  <Label className="text-base font-semibold">Browser</Label>
+                  <div className="grid grid-cols-[220px_minmax(0,1fr)] items-center gap-4">
+                    <span className="text-sm">Dev server detection</span>
+                    <label className="inline-flex items-center gap-2 text-sm">
+                      <input
+                        type="checkbox"
+                        checked={devServerToastEnabled}
+                        onChange={(e) => {
+                          const enabled = e.target.checked
+                          setDevServerToastEnabled(enabled)
+                          window.api.settings.set('dev_server_toast_enabled', enabled ? '1' : '0')
+                        }}
+                      />
+                      <span>Show toast when a dev server is detected</span>
+                    </label>
+                  </div>
+                  <div className="grid grid-cols-[220px_minmax(0,1fr)] items-center gap-4">
+                    <span className="text-sm">Auto-open preview</span>
+                    <label className="inline-flex items-center gap-2 text-sm">
+                      <input
+                        type="checkbox"
+                        checked={devServerAutoOpenBrowser}
+                        onChange={(e) => {
+                          const enabled = e.target.checked
+                          setDevServerAutoOpenBrowser(enabled)
+                          window.api.settings.set('dev_server_auto_open_browser', enabled ? '1' : '0')
+                        }}
+                      />
+                      <span>Automatically open browser panel when a dev server is detected</span>
+                    </label>
+                  </div>
+                </div>
+
+                <div className="space-y-3">
+                  <Label className="text-base font-semibold">MCP Server</Label>
+                  <div className="grid grid-cols-[220px_minmax(0,1fr)] items-center gap-4">
+                    <span className="text-sm">Port</span>
+                    <Input
+                      className="w-full max-w-[120px]"
+                      type="number"
+                      placeholder="45678"
+                      value={mcpPort}
+                      onChange={(e) => setMcpPort(e.target.value)}
+                      onBlur={() => {
+                        const port = parseInt(mcpPort, 10)
+                        if (port >= 1024 && port <= 65535) {
+                          window.api.settings.set('mcp_server_port', String(port))
+                        }
+                      }}
+                    />
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Restart required after changing. Default: 45678
+                  </p>
+                </div>
               </>
             )}
 
             {activeTab === 'terminal' && (
               <>
-                <div className="space-y-2">
+                <div className="space-y-3">
                   <Label className="text-base font-semibold">Mode</Label>
                   <div className="grid grid-cols-[220px_minmax(0,1fr)] items-center gap-4">
                     <span className="text-sm">Default mode</span>
@@ -376,7 +491,7 @@ export function UserSettingsDialog({
                   <p className="text-xs text-muted-foreground">Mode used when creating new tasks</p>
                 </div>
 
-                <div className="space-y-2">
+                <div className="space-y-3">
                   <Label className="text-base font-semibold">Shell</Label>
                   <div className="grid grid-cols-[220px_minmax(0,1fr)] items-center gap-4">
                     <span className="text-sm">Default shell</span>
@@ -397,7 +512,7 @@ export function UserSettingsDialog({
                   <p className="text-xs text-muted-foreground">Leave empty to use system default</p>
                 </div>
 
-                <div className="space-y-2">
+                <div className="space-y-3">
                   <Label className="text-base font-semibold">Flags</Label>
                   <div className="grid grid-cols-[220px_minmax(0,1fr)] items-center gap-4">
                     <span className="text-sm">Default Claude flags</span>
@@ -423,20 +538,20 @@ export function UserSettingsDialog({
             )}
 
             {activeTab === 'integrations' && (
-              <div className="space-y-2">
+              <div className="space-y-8">
                 <Label className="text-base font-semibold">Linear</Label>
-                <div className="space-y-2 rounded border p-3">
-                  <div className="space-y-1">
-                    <Label htmlFor="linear-account-label" className="text-xs">Account label (optional)</Label>
+                <div className="space-y-3">
+                  <div className="grid grid-cols-[220px_minmax(0,1fr)] items-center gap-4">
+                    <span className="text-sm">Account label</span>
                     <Input
                       id="linear-account-label"
                       value={linearAccountLabel}
                       onChange={(e) => setLinearAccountLabel(e.target.value)}
-                      placeholder="Work email label"
+                      placeholder="Work email label (optional)"
                     />
                   </div>
-                  <div className="space-y-1">
-                    <Label htmlFor="linear-api-key" className="text-xs">Personal API key</Label>
+                  <div className="grid grid-cols-[220px_minmax(0,1fr)] items-center gap-4">
+                    <span className="text-sm">Personal API key</span>
                     <Input
                       id="linear-api-key"
                       type="password"
@@ -453,7 +568,7 @@ export function UserSettingsDialog({
                   </p>
                 </div>
 
-                <div className="space-y-2 rounded border p-3">
+                <div className="space-y-3">
                   <div className="flex items-center justify-between">
                     <Label className="text-sm font-medium">Connections</Label>
                     <Button variant="outline" size="sm" onClick={handleSyncAll} disabled={syncingIntegrations}>
@@ -486,7 +601,7 @@ export function UserSettingsDialog({
 
             {activeTab === 'diagnostics' && (
               <>
-                <div className="space-y-2">
+                <div className="space-y-3">
                   <Label className="text-base font-semibold">Logging</Label>
                   <div className="grid grid-cols-[220px_minmax(0,1fr)] items-center gap-4">
                     <span className="text-sm">Diagnostics enabled</span>
@@ -537,7 +652,7 @@ export function UserSettingsDialog({
                   </div>
                 </div>
 
-                <div className="space-y-2">
+                <div className="space-y-3">
                   <Label className="text-base font-semibold">Export</Label>
                   <div className="grid grid-cols-[220px_minmax(0,1fr)] items-center gap-4">
                     <span className="text-sm">Time range</span>
@@ -568,7 +683,7 @@ export function UserSettingsDialog({
             )}
 
             {activeTab === 'tags' && (
-              <div className="space-y-4">
+              <div className="space-y-6">
                 <Label className="text-base font-semibold">Tags</Label>
                 <div className="space-y-2">
                   {tags.map((tag) => (
@@ -644,7 +759,7 @@ export function UserSettingsDialog({
 
             {activeTab === 'about' && (
               <>
-                <div className="space-y-2">
+                <div className="space-y-3">
                   <Label className="text-base font-semibold">Database</Label>
                   <div className="text-sm text-muted-foreground">
                     <p>Location: {dbPath}</p>
@@ -652,7 +767,7 @@ export function UserSettingsDialog({
                   </div>
                 </div>
 
-                <div className="space-y-2">
+                <div className="space-y-3">
                   <Label className="text-base font-semibold">Claude Code</Label>
                   {claudeStatus === null ? (
                     <Skeleton className="h-4 w-40" />
@@ -669,6 +784,10 @@ export function UserSettingsDialog({
                   )}
                 </div>
               </>
+            )}
+
+            {activeTab?.startsWith('preview-') && (
+              <PreviewWrapper layout={activeTab} />
             )}
           </div>
         </SettingsLayout>

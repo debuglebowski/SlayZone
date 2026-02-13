@@ -54,7 +54,11 @@ export function useTasksData(): UseTasksDataReturn {
       })
     loadData()
     ;(window as any).__slayzone_refreshData = loadData
-    return () => { delete (window as any).__slayzone_refreshData }
+    const cleanup = window.api?.app?.onTasksChanged?.(loadData)
+    return () => {
+      delete (window as any).__slayzone_refreshData
+      cleanup?.()
+    }
   }, [])
 
   // Load task tags mapping

@@ -179,6 +179,54 @@ function maybeAutoCreateWorktree(
   }
 }
 
+export function updateTask(db: Database, data: UpdateTaskInput): Task | null {
+  const existing = db.prepare('SELECT project_id FROM tasks WHERE id = ?').get(data.id) as
+    | { project_id: string }
+    | undefined
+  const projectChanged = data.projectId !== undefined && existing?.project_id !== data.projectId
+
+  const fields: string[] = []
+  const values: unknown[] = []
+
+  if (data.title !== undefined) { fields.push('title = ?'); values.push(data.title) }
+  if (data.description !== undefined) { fields.push('description = ?'); values.push(data.description) }
+  if (data.status !== undefined) { fields.push('status = ?'); values.push(data.status) }
+  if (data.assignee !== undefined) { fields.push('assignee = ?'); values.push(data.assignee) }
+  if (data.priority !== undefined) { fields.push('priority = ?'); values.push(data.priority) }
+  if (data.dueDate !== undefined) { fields.push('due_date = ?'); values.push(data.dueDate) }
+  if (data.projectId !== undefined) { fields.push('project_id = ?'); values.push(data.projectId) }
+  if (data.claudeSessionId !== undefined) { fields.push('claude_session_id = ?'); values.push(data.claudeSessionId) }
+  if (data.terminalMode !== undefined) { fields.push('terminal_mode = ?'); values.push(data.terminalMode) }
+  if (data.claudeConversationId !== undefined) { fields.push('claude_conversation_id = ?'); values.push(data.claudeConversationId) }
+  if (data.codexConversationId !== undefined) { fields.push('codex_conversation_id = ?'); values.push(data.codexConversationId) }
+  if (data.terminalShell !== undefined) { fields.push('terminal_shell = ?'); values.push(data.terminalShell) }
+  if (data.claudeFlags !== undefined) { fields.push('claude_flags = ?'); values.push(data.claudeFlags) }
+  if (data.codexFlags !== undefined) { fields.push('codex_flags = ?'); values.push(data.codexFlags) }
+  if (data.panelVisibility !== undefined) { fields.push('panel_visibility = ?'); values.push(data.panelVisibility ? JSON.stringify(data.panelVisibility) : null) }
+  if (data.worktreePath !== undefined) { fields.push('worktree_path = ?'); values.push(data.worktreePath) }
+  if (data.worktreeParentBranch !== undefined) { fields.push('worktree_parent_branch = ?'); values.push(data.worktreeParentBranch) }
+  if (data.browserUrl !== undefined) { fields.push('browser_url = ?'); values.push(data.browserUrl) }
+  if (data.browserTabs !== undefined) { fields.push('browser_tabs = ?'); values.push(data.browserTabs ? JSON.stringify(data.browserTabs) : null) }
+  if (data.mergeState !== undefined) { fields.push('merge_state = ?'); values.push(data.mergeState) }
+
+  if (fields.length === 0) {
+    const row = db.prepare('SELECT * FROM tasks WHERE id = ?').get(data.id) as Record<string, unknown> | undefined
+    return parseTask(row)
+  }
+
+  fields.push("updated_at = datetime('now')")
+  values.push(data.id)
+
+  db.prepare(`UPDATE tasks SET ${fields.join(', ')} WHERE id = ?`).run(...values)
+
+  if (data.status === 'done' || projectChanged) {
+    killPtysByTaskId(data.id)
+  }
+
+  const row = db.prepare('SELECT * FROM tasks WHERE id = ?').get(data.id) as Record<string, unknown> | undefined
+  return parseTask(row)
+}
+
 export function registerTaskHandlers(ipcMain: IpcMain, db: Database): void {
 
   // Task CRUD
@@ -233,6 +281,7 @@ export function registerTaskHandlers(ipcMain: IpcMain, db: Database): void {
       INSERT INTO tasks (
         id,
         project_id,
+        parent_id,
         title,
         description,
         assignee,
@@ -242,11 +291,12 @@ export function registerTaskHandlers(ipcMain: IpcMain, db: Database): void {
         terminal_mode,
         claude_flags,
         codex_flags
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `)
     stmt.run(
       id,
       data.projectId,
+      data.parentId ?? null,
       data.title,
       data.description ?? null,
       data.assignee ?? null,
@@ -262,113 +312,20 @@ export function registerTaskHandlers(ipcMain: IpcMain, db: Database): void {
     return parseTask(row)
   })
 
-  ipcMain.handle('db:tasks:update', (_, data: UpdateTaskInput) => {
-    const existing = db.prepare('SELECT project_id FROM tasks WHERE id = ?').get(data.id) as
-      | { project_id: string }
-      | undefined
-    const projectChanged = data.projectId !== undefined && existing?.project_id !== data.projectId
-
-    const fields: string[] = []
-    const values: unknown[] = []
-
-    if (data.title !== undefined) {
-      fields.push('title = ?')
-      values.push(data.title)
-    }
-    if (data.description !== undefined) {
-      fields.push('description = ?')
-      values.push(data.description)
-    }
-    if (data.status !== undefined) {
-      fields.push('status = ?')
-      values.push(data.status)
-    }
-    if (data.assignee !== undefined) {
-      fields.push('assignee = ?')
-      values.push(data.assignee)
-    }
-    if (data.priority !== undefined) {
-      fields.push('priority = ?')
-      values.push(data.priority)
-    }
-    if (data.dueDate !== undefined) {
-      fields.push('due_date = ?')
-      values.push(data.dueDate)
-    }
-    if (data.projectId !== undefined) {
-      fields.push('project_id = ?')
-      values.push(data.projectId)
-    }
-    if (data.claudeSessionId !== undefined) {
-      fields.push('claude_session_id = ?')
-      values.push(data.claudeSessionId)
-    }
-    if (data.terminalMode !== undefined) {
-      fields.push('terminal_mode = ?')
-      values.push(data.terminalMode)
-    }
-    if (data.claudeConversationId !== undefined) {
-      fields.push('claude_conversation_id = ?')
-      values.push(data.claudeConversationId)
-    }
-    if (data.codexConversationId !== undefined) {
-      fields.push('codex_conversation_id = ?')
-      values.push(data.codexConversationId)
-    }
-    if (data.terminalShell !== undefined) {
-      fields.push('terminal_shell = ?')
-      values.push(data.terminalShell)
-    }
-    if (data.claudeFlags !== undefined) {
-      fields.push('claude_flags = ?')
-      values.push(data.claudeFlags)
-    }
-    if (data.codexFlags !== undefined) {
-      fields.push('codex_flags = ?')
-      values.push(data.codexFlags)
-    }
-    if (data.panelVisibility !== undefined) {
-      fields.push('panel_visibility = ?')
-      values.push(data.panelVisibility ? JSON.stringify(data.panelVisibility) : null)
-    }
-    if (data.worktreePath !== undefined) {
-      fields.push('worktree_path = ?')
-      values.push(data.worktreePath)
-    }
-    if (data.worktreeParentBranch !== undefined) {
-      fields.push('worktree_parent_branch = ?')
-      values.push(data.worktreeParentBranch)
-    }
-    if (data.browserUrl !== undefined) {
-      fields.push('browser_url = ?')
-      values.push(data.browserUrl)
-    }
-    if (data.browserTabs !== undefined) {
-      fields.push('browser_tabs = ?')
-      values.push(data.browserTabs ? JSON.stringify(data.browserTabs) : null)
-    }
-    if (data.mergeState !== undefined) {
-      fields.push('merge_state = ?')
-      values.push(data.mergeState)
-    }
-
-    if (fields.length === 0) {
-      const row = db.prepare('SELECT * FROM tasks WHERE id = ?').get(data.id) as Record<string, unknown> | undefined
-      return parseTask(row)
-    }
-
-    fields.push("updated_at = datetime('now')")
-    values.push(data.id)
-
-    db.prepare(`UPDATE tasks SET ${fields.join(', ')} WHERE id = ?`).run(...values)
-
-    if (data.status === 'done' || projectChanged) {
-      killPtysByTaskId(data.id)
-    }
-
-    const row = db.prepare('SELECT * FROM tasks WHERE id = ?').get(data.id) as Record<string, unknown> | undefined
-    return parseTask(row)
+  ipcMain.handle('db:tasks:getSubTasks', (_, parentId: string) => {
+    const rows = db
+      .prepare(
+        `SELECT t.*, el.external_url AS linear_url
+        FROM tasks t
+        LEFT JOIN external_links el ON el.task_id = t.id AND el.provider = 'linear'
+        WHERE t.parent_id = ? AND t.archived_at IS NULL
+        ORDER BY t."order" ASC, t.created_at DESC`
+      )
+      .all(parentId) as Record<string, unknown>[]
+    return parseTasks(rows)
   })
+
+  ipcMain.handle('db:tasks:update', (_, data: UpdateTaskInput) => updateTask(db, data))
 
   ipcMain.handle('db:tasks:delete', (_, id: string) => {
     cleanupTask(db, id)
@@ -379,10 +336,13 @@ export function registerTaskHandlers(ipcMain: IpcMain, db: Database): void {
   // Archive operations
   ipcMain.handle('db:tasks:archive', (_, id: string) => {
     cleanupTask(db, id)
+    // Also archive sub-tasks
+    const childIds = (db.prepare('SELECT id FROM tasks WHERE parent_id = ? AND archived_at IS NULL').all(id) as { id: string }[]).map(r => r.id)
+    for (const childId of childIds) { cleanupTask(db, childId) }
     db.prepare(`
       UPDATE tasks SET archived_at = datetime('now'), worktree_path = NULL, updated_at = datetime('now')
-      WHERE id = ?
-    `).run(id)
+      WHERE id = ? OR parent_id = ?
+    `).run(id, id)
     const row = db.prepare('SELECT * FROM tasks WHERE id = ?').get(id) as Record<string, unknown> | undefined
     return parseTask(row)
   })
@@ -392,11 +352,16 @@ export function registerTaskHandlers(ipcMain: IpcMain, db: Database): void {
     for (const id of ids) {
       cleanupTask(db, id)
     }
-    const placeholders = ids.map(() => '?').join(',')
+    // Also archive sub-tasks of all given parents
+    const parentPlaceholders = ids.map(() => '?').join(',')
+    const childIds = (db.prepare(`SELECT id FROM tasks WHERE parent_id IN (${parentPlaceholders}) AND archived_at IS NULL`).all(...ids) as { id: string }[]).map(r => r.id)
+    for (const childId of childIds) { cleanupTask(db, childId) }
+    const allIds = [...ids, ...childIds]
+    const placeholders = allIds.map(() => '?').join(',')
     db.prepare(`
       UPDATE tasks SET archived_at = datetime('now'), worktree_path = NULL, updated_at = datetime('now')
       WHERE id IN (${placeholders})
-    `).run(...ids)
+    `).run(...allIds)
   })
 
   ipcMain.handle('db:tasks:unarchive', (_, id: string) => {

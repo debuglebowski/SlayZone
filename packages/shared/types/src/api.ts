@@ -26,7 +26,7 @@ import type {
   WriteMcpServerInput,
   RemoveMcpServerInput
 } from '@slayzone/ai-config/shared'
-import type { DirEntry } from '@slayzone/file-editor/shared'
+import type { DirEntry, ReadFileResult } from '@slayzone/file-editor/shared'
 import type {
   ConnectLinearInput,
   ExternalLink,
@@ -103,6 +103,7 @@ export interface ElectronAPI {
     getTasks: () => Promise<Task[]>
     getTasksByProject: (projectId: string) => Promise<Task[]>
     getTask: (id: string) => Promise<Task | null>
+    getSubTasks: (parentId: string) => Promise<Task[]>
     createTask: (data: CreateTaskInput) => Promise<Task>
     updateTask: (data: UpdateTaskInput) => Promise<Task>
     deleteTask: (id: string) => Promise<boolean>
@@ -158,6 +159,7 @@ export interface ElectronAPI {
     onGoHome: (callback: () => void) => () => void
     onOpenSettings: (callback: () => void) => () => void
     onOpenProjectSettings: (callback: () => void) => () => void
+    onTasksChanged: (callback: () => void) => () => void
   }
   window: {
     close: () => Promise<void>
@@ -277,12 +279,16 @@ export interface ElectronAPI {
   }
   fs: {
     readDir: (rootPath: string, dirPath: string) => Promise<DirEntry[]>
-    readFile: (rootPath: string, filePath: string) => Promise<string>
+    readFile: (rootPath: string, filePath: string, force?: boolean) => Promise<ReadFileResult>
     writeFile: (rootPath: string, filePath: string, content: string) => Promise<void>
     createFile: (rootPath: string, filePath: string) => Promise<void>
     createDir: (rootPath: string, dirPath: string) => Promise<void>
     rename: (rootPath: string, oldPath: string, newPath: string) => Promise<void>
     delete: (rootPath: string, targetPath: string) => Promise<void>
+    listAllFiles: (rootPath: string) => Promise<string[]>
+    watch: (rootPath: string) => Promise<void>
+    unwatch: (rootPath: string) => Promise<void>
+    onFileChanged: (callback: (rootPath: string, relPath: string) => void) => () => void
   }
   integrations: {
     connectLinear: (input: ConnectLinearInput) => Promise<IntegrationConnectionPublic>

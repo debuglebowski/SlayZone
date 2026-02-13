@@ -2,6 +2,7 @@ import * as pty from 'node-pty'
 import { BrowserWindow, Notification, nativeTheme } from 'electron'
 import { homedir, userInfo } from 'os'
 import type { Database } from 'better-sqlite3'
+import { DEV_SERVER_URL_PATTERN } from '@slayzone/terminal/shared'
 import type { TerminalState, PtyInfo, CodeMode, BufferSinceResult } from '@slayzone/terminal/shared'
 import { getDiagnosticsConfig, recordDiagnosticEvent } from '@slayzone/diagnostics/main'
 import { RingBuffer, type BufferChunk } from './ring-buffer'
@@ -273,6 +274,15 @@ export function createPty(
     // Get spawn config from adapter
     const spawnConfig = adapter.buildSpawnConfig(cwd || homedir(), effectiveConversationId || undefined, resuming, globalShell || undefined, initialPrompt || undefined, providerArgs ?? [], codeMode || undefined)
 
+    // Inject MCP env vars so AI terminals know their task and MCP server
+    const mcpEnv: Record<string, string> = {}
+    const taskId = taskIdFromSessionId(sessionId)
+    if (taskId) mcpEnv.SLAYZONE_TASK_ID = taskId
+    if (db) {
+      const portRow = db.prepare('SELECT value FROM settings WHERE key = ?').get('mcp_server_port') as { value: string } | undefined
+      mcpEnv.SLAYZONE_MCP_PORT = portRow?.value || '45678'
+    }
+
     const ptyProcess = pty.spawn(spawnConfig.shell, spawnConfig.args, {
       name: 'xterm-256color',
       cols: 80,
@@ -281,6 +291,7 @@ export function createPty(
       env: {
         ...process.env,
         ...spawnConfig.env,
+        ...mcpEnv,
         USER: process.env.USER || userInfo().username,
         HOME: process.env.HOME || homedir(),
         TERM: 'xterm-256color',
@@ -415,7 +426,8 @@ export function createPty(
       }
 
       // Detect dev server URLs (localhost/127.0.0.1/0.0.0.0 with port)
-      const urlMatches = data.match(/https?:\/\/(?:localhost|127\.0\.0\.1|0\.0\.0\.0):\d{2,5}/g)
+      DEV_SERVER_URL_PATTERN.lastIndex = 0
+      const urlMatches = data.match(DEV_SERVER_URL_PATTERN)
       if (urlMatches && !win.isDestroyed()) {
         for (const url of urlMatches) {
           const normalized = url.replace('0.0.0.0', 'localhost')

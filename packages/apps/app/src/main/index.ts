@@ -23,6 +23,7 @@ import { registerWorktreeHandlers } from '@slayzone/worktrees/main'
 import { registerDiagnosticsHandlers, registerProcessDiagnostics, stopDiagnostics } from '@slayzone/diagnostics/main'
 import { registerAiConfigHandlers } from '@slayzone/ai-config/main'
 import { registerIntegrationHandlers, startLinearSyncPoller } from '@slayzone/integrations/main'
+import { registerFileEditorHandlers } from '@slayzone/file-editor/main'
 
 // Minimum splash screen display time (ms)
 const SPLASH_MIN_DURATION = 4000
@@ -459,6 +460,18 @@ app.whenReady().then(() => {
   registerWorktreeHandlers(ipcMain)
   registerAiConfigHandlers(ipcMain, db)
   registerIntegrationHandlers(ipcMain, db)
+  registerFileEditorHandlers(ipcMain)
+
+  // Start MCP server (use port 0 in Playwright to avoid conflict with dev instance)
+  const mcpPort = (() => {
+    if (isPlaywright) return 0
+    const row = db.prepare('SELECT value FROM settings WHERE key = ?').get('mcp_server_port') as { value: string } | undefined
+    return parseInt(row?.value || '45678', 10) || 45678
+  })()
+  import('./mcp-server').then(({ startMcpServer }) => startMcpServer(db, mcpPort)).catch((err) => {
+    console.error('[MCP] Failed to start server:', err)
+  })
+
   linearSyncPoller = startLinearSyncPoller(db)
 
   // Configure webview session for WebAuthn/passkey support
