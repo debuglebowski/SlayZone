@@ -19,6 +19,7 @@ interface TerminalContainerProps {
   onSessionInvalid?: () => void
   onReady?: (api: {
     sendInput: (text: string) => Promise<void>
+    write: (data: string) => Promise<boolean>
     focus: () => void
     clearBuffer: () => Promise<void>
   }) => void
@@ -57,6 +58,7 @@ export function TerminalContainer({
   const { subscribePrompt } = usePty()
   const terminalApiRef = useRef<{
     sendInput: (text: string) => Promise<void>
+    write: (data: string) => Promise<boolean>
     focus: () => void
     clearBuffer: () => Promise<void>
   } | null>(null)
@@ -121,6 +123,7 @@ export function TerminalContainer({
   // Handle terminal ready - pass up to parent (active tab's API)
   const handleTerminalReady = useCallback((api: {
     sendInput: (text: string) => Promise<void>
+    write: (data: string) => Promise<boolean>
     focus: () => void
     clearBuffer: () => Promise<void>
   }) => {

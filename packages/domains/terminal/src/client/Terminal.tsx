@@ -93,6 +93,7 @@ interface TerminalProps {
   onSessionInvalid?: () => void
   onReady?: (api: {
     sendInput: (text: string) => Promise<void>
+    write: (data: string) => Promise<boolean>
     focus: () => void
     clearBuffer: () => Promise<void>
   }) => void
@@ -221,6 +222,7 @@ export function Terminal({
                 await new Promise(r => setTimeout(r, 1))
               }
             },
+            write: (data) => window.api.pty.write(sessionId, data),
             focus: () => cached.terminal.focus(),
             clearBuffer: clearBufferWithoutRestart
           })
@@ -345,6 +347,7 @@ export function Terminal({
       // Expose API for programmatic input and focus
       onReady?.({
         sendInput: injectText,
+        write: (data) => window.api.pty.write(sessionId, data),
         focus: () => terminal.focus(),
         clearBuffer: clearBufferWithoutRestart
       })

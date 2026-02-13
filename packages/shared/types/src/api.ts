@@ -161,6 +161,7 @@ export interface ElectronAPI {
     onOpenProjectSettings: (callback: () => void) => () => void
     onTasksChanged: (callback: () => void) => () => void
     onCloseTask: (callback: (taskId: string) => void) => () => void
+    onScreenshotTrigger: (callback: () => void) => () => void
   }
   window: {
     close: () => Promise<void>
@@ -290,6 +291,14 @@ export interface ElectronAPI {
     watch: (rootPath: string) => Promise<void>
     unwatch: (rootPath: string) => Promise<void>
     onFileChanged: (callback: (rootPath: string, relPath: string) => void) => () => void
+  }
+  screenshot: {
+    captureRegion: (rect: {
+      x: number
+      y: number
+      width: number
+      height: number
+    }) => Promise<{ success: boolean; path?: string }>
   }
   integrations: {
     connectLinear: (input: ConnectLinearInput) => Promise<IntegrationConnectionPublic>

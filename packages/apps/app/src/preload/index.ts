@@ -98,6 +98,11 @@ const api: ElectronAPI = {
       const handler = (_: unknown, taskId: string) => callback(taskId)
       ipcRenderer.on('app:close-task', handler)
       return () => ipcRenderer.removeListener('app:close-task', handler)
+    },
+    onScreenshotTrigger: (callback: () => void) => {
+      const handler = () => callback()
+      ipcRenderer.on('app:screenshot-trigger', handler)
+      return () => ipcRenderer.removeListener('app:screenshot-trigger', handler)
     }
   },
   window: {
@@ -286,6 +291,9 @@ const api: ElectronAPI = {
       ipcRenderer.on('fs:changed', handler)
       return () => ipcRenderer.removeListener('fs:changed', handler)
     }
+  },
+  screenshot: {
+    captureRegion: (rect) => ipcRenderer.invoke('screenshot:captureRegion', rect)
   },
   integrations: {
     connectLinear: (input) => ipcRenderer.invoke('integrations:connect-linear', input),
