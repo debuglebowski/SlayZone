@@ -391,6 +391,22 @@ function App(): React.JSX.Element {
   }, { enableOnFormTags: true })
 
   useEffect(() => {
+    return window.api.app.onCloseTask((taskId) => {
+      setTabs((prev) => {
+        const index = prev.findIndex((t) => t.type === 'task' && t.taskId === taskId)
+        if (index < 1) return prev
+        const tab = prev[index]
+        if (tab?.type === 'task') {
+          closedTabsRef.current.push(tab)
+          if (closedTabsRef.current.length > 20) closedTabsRef.current.shift()
+        }
+        setActiveTabIndex((idx) => idx >= index ? Math.max(0, idx - 1) : idx)
+        return prev.filter((_, i) => i !== index)
+      })
+    })
+  }, [setTabs, setActiveTabIndex])
+
+  useEffect(() => {
     return window.api.app.onGoHome(() => {
       setActiveTabIndex(0)
     })

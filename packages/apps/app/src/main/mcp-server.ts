@@ -39,14 +39,22 @@ function createMcpServer(db: Database): McpServer {
       status: z.enum(TASK_STATUSES).optional().describe('New status'),
       priority: z.number().min(1).max(5).optional().describe('Priority 1-5 (1=highest)'),
       assignee: z.string().nullable().optional().describe('Assignee name (null to clear)'),
-      due_date: z.string().nullable().optional().describe('Due date ISO string (null to clear)')
+      due_date: z.string().nullable().optional().describe('Due date ISO string (null to clear)'),
+      close: z.boolean().optional().describe('Close the task tab in the UI')
     },
-    async ({ task_id, due_date, ...fields }) => {
+    async ({ task_id, due_date, close, ...fields }) => {
       const updated = updateTask(db, { id: task_id, ...fields, dueDate: due_date })
       if (!updated) {
         return { content: [{ type: 'text' as const, text: `Task ${task_id} not found` }], isError: true }
       }
       notifyRenderer()
+      if (close) {
+        BrowserWindow.getAllWindows().forEach((win) => {
+          if (!win.isDestroyed()) {
+            try { win.webContents.send('app:close-task', task_id) } catch { /* destroyed */ }
+          }
+        })
+      }
       return {
         content: [{
           type: 'text' as const,

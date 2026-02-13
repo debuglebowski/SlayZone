@@ -160,6 +160,7 @@ export interface ElectronAPI {
     onOpenSettings: (callback: () => void) => () => void
     onOpenProjectSettings: (callback: () => void) => () => void
     onTasksChanged: (callback: () => void) => () => void
+    onCloseTask: (callback: (taskId: string) => void) => () => void
   }
   window: {
     close: () => Promise<void>

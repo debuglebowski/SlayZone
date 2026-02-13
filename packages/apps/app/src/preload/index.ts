@@ -93,6 +93,11 @@ const api: ElectronAPI = {
       const handler = () => callback()
       ipcRenderer.on('tasks:changed', handler)
       return () => ipcRenderer.removeListener('tasks:changed', handler)
+    },
+    onCloseTask: (callback: (taskId: string) => void) => {
+      const handler = (_: unknown, taskId: string) => callback(taskId)
+      ipcRenderer.on('app:close-task', handler)
+      return () => ipcRenderer.removeListener('app:close-task', handler)
     }
   },
   window: {
