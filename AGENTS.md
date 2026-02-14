@@ -4,6 +4,8 @@ Desktop task management app with integrated AI coding assistants (Claude Code, C
 
 ## Quick Start
 
+
+
 ```bash
 pnpm install
 ```

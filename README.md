@@ -75,13 +75,13 @@ Link a git worktree to any task. One branch per task, automatic isolation, view 
 
 ## Keyboard-first
 
-| Shortcut | Action |
-|----------|--------|
-| `Cmd+N` | New task |
-| `Cmd+Shift+N` | Quick run — create + open |
-| `Cmd+K` | Search |
-| `Cmd+Shift+D` | Complete task + close |
-| `Cmd+I` | Inject task context into terminal |
+| Shortcut      | Action                            |
+| ------------- | --------------------------------- |
+| `Cmd+N`       | New task                          |
+| `Cmd+Shift+N` | Quick run — create + open         |
+| `Cmd+K`       | Search                            |
+| `Cmd+Shift+D` | Complete task + close             |
+| `Cmd+I`       | Inject task context into terminal |
 
 <br />
 
