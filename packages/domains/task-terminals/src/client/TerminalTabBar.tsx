@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-import { Plus, X, Terminal as TerminalIcon, Bot, Command } from 'lucide-react'
+import { Plus, X, Terminal as TerminalIcon, Bot, Command, MousePointerClick, Sparkles, Code } from 'lucide-react'
 import { cn } from '@slayzone/ui'
 import type { TerminalTab } from '../shared/types'
 import type { TerminalMode } from '@slayzone/terminal/shared'
@@ -17,6 +17,9 @@ interface TerminalTabBarProps {
 const MODE_ICONS: Record<TerminalMode, typeof TerminalIcon> = {
   'claude-code': Bot,
   'codex': Command,
+  'cursor-agent': MousePointerClick,
+  'gemini': Sparkles,
+  'opencode': Code,
   'terminal': TerminalIcon
 }
 
@@ -57,6 +60,9 @@ export function TerminalTabBar({
       switch (tab.mode) {
         case 'claude-code': return 'Claude Code'
         case 'codex': return 'Codex'
+        case 'cursor-agent': return 'Cursor'
+        case 'gemini': return 'Gemini'
+        case 'opencode': return 'OpenCode'
         default: return 'Terminal'
       }
     }
