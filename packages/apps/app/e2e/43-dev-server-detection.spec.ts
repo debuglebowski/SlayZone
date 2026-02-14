@@ -9,29 +9,36 @@ import {
   waitForPtyState,
 } from './fixtures/terminal'
 
+const urlInput = (page: import('@playwright/test').Page) =>
+  page.locator('input[placeholder="Enter URL..."]:visible').first()
+
+const toast = (page: import('@playwright/test').Page) =>
+  page.locator('[data-testid="dev-server-toast"]:visible').first()
+
+const focusForAppShortcut = async (page: import('@playwright/test').Page) => {
+  await page.keyboard.press('Escape').catch(() => {})
+  const sidebar = page.locator('[data-slot="sidebar"]').first()
+  if (await sidebar.isVisible().catch(() => false)) {
+    await sidebar.click({ position: { x: 12, y: 12 } }).catch(() => {})
+  } else {
+    await page.locator('#root').click({ position: { x: 12, y: 12 } }).catch(() => {})
+  }
+}
+
+// ── Toast basics ──────────────────────────────────────────────────────────
+
 test.describe('Dev server URL detection', () => {
   let projectAbbrev: string
   let taskId: string
   let sessionId: string
 
-  const urlInput = (page: import('@playwright/test').Page) =>
-    page.locator('input[placeholder="Enter URL..."]:visible').first()
-
-  const toast = (page: import('@playwright/test').Page) =>
-    page.getByText('Dev server at').first()
-
-  const focusForAppShortcut = async (page: import('@playwright/test').Page) => {
-    await page.keyboard.press('Escape').catch(() => {})
-    const sidebar = page.locator('[data-slot="sidebar"]').first()
-    if (await sidebar.isVisible().catch(() => false)) {
-      await sidebar.click({ position: { x: 12, y: 12 } }).catch(() => {})
-    } else {
-      await page.locator('#root').click({ position: { x: 12, y: 12 } }).catch(() => {})
-    }
-  }
-
   test.beforeAll(async ({ mainWindow }) => {
     const s = seed(mainWindow)
+
+    // Ensure clean defaults (previous runs may have left settings dirty)
+    await s.setSetting('dev_server_toast_enabled', '1')
+    await s.setSetting('dev_server_auto_open_browser', '0')
+
     const p = await s.createProject({ name: 'Dev Detect', color: '#06b6d4', path: TEST_PROJECT_PATH })
     projectAbbrev = p.name.slice(0, 2).toUpperCase()
 
@@ -58,8 +65,7 @@ test.describe('Dev server URL detection', () => {
   test('clicking Open opens browser panel with detected URL', async ({ mainWindow }) => {
     await expect(toast(mainWindow)).toBeVisible({ timeout: 5_000 })
 
-    const openBtn = toast(mainWindow).locator('..').getByText('Open preview').first()
-    await openBtn.click()
+    await toast(mainWindow).getByText('Open preview').click()
 
     // Browser panel should be visible
     await expect(urlInput(mainWindow)).toBeVisible({ timeout: 5_000 })
@@ -86,8 +92,7 @@ test.describe('Dev server URL detection', () => {
     await expect(toast(mainWindow)).toBeVisible({ timeout: 5_000 })
 
     // Click X to dismiss
-    const dismissBtn = toast(mainWindow).locator('..').locator('.lucide-x').first()
-    await dismissBtn.click()
+    await toast(mainWindow).locator('.lucide-x').click()
 
     await expect(toast(mainWindow)).not.toBeVisible({ timeout: 3_000 })
   })
@@ -100,5 +105,93 @@ test.describe('Dev server URL detection', () => {
     // Wait to confirm no toast appears
     await mainWindow.waitForTimeout(1_500)
     await expect(toast(mainWindow)).not.toBeVisible()
+  })
+})
+
+// ── Toast disabled setting ────────────────────────────────────────────────
+
+test.describe('Dev server detection — toast disabled', () => {
+  let sessionId: string
+
+  test.beforeAll(async ({ mainWindow }) => {
+    const s = seed(mainWindow)
+
+    // Disable toast BEFORE task mounts (settings loaded on mount)
+    await s.setSetting('dev_server_toast_enabled', '0')
+
+    const p = await s.createProject({ name: 'NoToast Proj', color: '#f59e0b', path: TEST_PROJECT_PATH })
+    const t = await s.createTask({ projectId: p.id, title: 'No toast task', status: 'todo' })
+    sessionId = getMainSessionId(t.id)
+
+    await mainWindow.evaluate((id) => window.api.db.updateTask({ id, terminalMode: 'terminal' }), t.id)
+    await s.refreshData()
+
+    await openTaskTerminal(mainWindow, { projectAbbrev: 'NO', taskTitle: 'No toast task' })
+    await waitForPtySession(mainWindow, sessionId)
+    await waitForPtyState(mainWindow, sessionId, 'attention')
+  })
+
+  test.afterAll(async ({ mainWindow }) => {
+    // Restore default
+    await seed(mainWindow).setSetting('dev_server_toast_enabled', '1')
+  })
+
+  test('no toast appears when setting disabled', async ({ mainWindow }) => {
+    await runCommand(mainWindow, sessionId, 'echo http://localhost:4001')
+    await waitForBufferContains(mainWindow, sessionId, 'http://localhost:4001')
+
+    await mainWindow.waitForTimeout(2_000)
+    await expect(toast(mainWindow)).not.toBeVisible()
+  })
+})
+
+// ── Auto-open setting ─────────────────────────────────────────────────────
+
+test.describe('Dev server detection — auto-open browser', () => {
+  let sessionId: string
+
+  test.beforeAll(async ({ mainWindow }) => {
+    const s = seed(mainWindow)
+
+    // Enable auto-open BEFORE task mounts
+    await s.setSetting('dev_server_auto_open_browser', '1')
+
+    const p = await s.createProject({ name: 'AutoOpen Proj', color: '#10b981', path: TEST_PROJECT_PATH })
+    const t = await s.createTask({ projectId: p.id, title: 'Auto open task', status: 'todo' })
+    sessionId = getMainSessionId(t.id)
+
+    await mainWindow.evaluate((id) => window.api.db.updateTask({ id, terminalMode: 'terminal' }), t.id)
+    await s.refreshData()
+
+    await openTaskTerminal(mainWindow, { projectAbbrev: 'AU', taskTitle: 'Auto open task' })
+    await waitForPtySession(mainWindow, sessionId)
+    await waitForPtyState(mainWindow, sessionId, 'attention')
+  })
+
+  test.afterAll(async ({ mainWindow }) => {
+    // Restore default
+    await seed(mainWindow).setSetting('dev_server_auto_open_browser', '0')
+  })
+
+  test('browser panel opens automatically without toast', async ({ mainWindow }) => {
+    await runCommand(mainWindow, sessionId, 'echo http://localhost:4002')
+    await waitForBufferContains(mainWindow, sessionId, 'http://localhost:4002')
+
+    // Browser panel should open automatically
+    await expect(urlInput(mainWindow)).toBeVisible({ timeout: 5_000 })
+
+    // No toast should appear
+    await expect(toast(mainWindow)).not.toBeVisible()
+  })
+
+  test('closing browser does not re-trigger auto-open', async ({ mainWindow }) => {
+    // Browser is open from previous test — close it
+    await focusForAppShortcut(mainWindow)
+    await mainWindow.keyboard.press('Meta+b')
+    await expect(urlInput(mainWindow)).not.toBeVisible({ timeout: 3_000 })
+
+    // Wait and verify browser stays closed (one-time behavior)
+    await mainWindow.waitForTimeout(2_000)
+    await expect(urlInput(mainWindow)).not.toBeVisible()
   })
 })
