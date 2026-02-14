@@ -1,5 +1,5 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Plus, Minus, Undo2 } from 'lucide-react'
+import { Plus, Minus, Undo2, ChevronRight } from 'lucide-react'
 import { Button, FileTree, buildFileTree, flattenFileTree, fileTreeIndent, cn } from '@slayzone/ui'
 import type { Task } from '@slayzone/task/shared'
 import type { GitDiffSnapshot } from '../shared/types'
@@ -179,6 +179,10 @@ export function GitDiffPanel({
   const [fileListWidth, setFileListWidth] = useState(320)
   const [untrackedDiffs, setUntrackedDiffs] = useState<Map<string, FileDiff>>(new Map())
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set())
+  const [commitMessage, setCommitMessage] = useState('')
+  const [committing, setCommitting] = useState(false)
+  const [stagedCollapsed, setStagedCollapsed] = useState(false)
+  const [unstagedCollapsed, setUnstagedCollapsed] = useState(false)
   const splitContainerRef = useRef<HTMLDivElement>(null)
   const fileListRef = useRef<HTMLDivElement>(null)
   const selectedItemRef = useRef<HTMLDivElement>(null)
@@ -401,6 +405,20 @@ export function GitDiffPanel({
     }
   }, [targetPath])
 
+  const handleCommit = useCallback(async () => {
+    if (!targetPath || !commitMessage.trim() || stagedEntries.length === 0) return
+    setCommitting(true)
+    try {
+      await window.api.git.commitFiles(targetPath, commitMessage.trim())
+      setCommitMessage('')
+      await fetchDiff()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err))
+    } finally {
+      setCommitting(false)
+    }
+  }, [targetPath, commitMessage, stagedEntries.length])
+
   const handleSelectFile = useCallback((path: string, source: 'unstaged' | 'staged') => {
     setSelectedFile({ path, source })
   }, [])
@@ -514,61 +532,113 @@ export function GitDiffPanel({
       {/* Main content: horizontal split */}
       {targetPath && !error && snapshot && hasAnyChanges && (
         <div ref={splitContainerRef} className="flex-1 min-h-0 flex">
-          {/* Left: stacked file lists */}
+          {/* Left: file lists + commit */}
           <div
-            ref={fileListRef}
-            className="shrink-0 flex flex-col min-h-0 overflow-y-auto border-r outline-none"
+            className="shrink-0 flex flex-col min-h-0 border-r"
             style={{ width: fileListWidth }}
-            tabIndex={0}
-            onKeyDown={handleKeyDown}
           >
+            <div
+              ref={fileListRef}
+              className="flex-1 min-h-0 overflow-y-auto outline-none"
+              tabIndex={0}
+              onKeyDown={handleKeyDown}
+            >
             {/* Staged section */}
             {stagedEntries.length > 0 && (
               <div>
-                <div className="px-3 py-1.5 text-[11px] font-medium text-muted-foreground uppercase tracking-wide bg-muted/30 border-b sticky top-0 z-10 flex items-center justify-between">
-                  <span>Staged ({stagedEntries.length})</span>
+                <div
+                  className="px-3 py-1.5 text-[11px] font-medium text-muted-foreground uppercase tracking-wide bg-muted/30 border-b sticky top-0 z-10 flex items-center justify-between cursor-pointer select-none"
+                  onClick={() => setStagedCollapsed((v) => !v)}
+                >
+                  <span className="flex items-center gap-1">
+                    <ChevronRight className={cn('size-3 transition-transform', !stagedCollapsed && 'rotate-90')} />
+                    Staged ({stagedEntries.length})
+                  </span>
                   <button
                     className="text-muted-foreground hover:text-foreground transition-colors p-0.5 rounded hover:bg-accent"
-                    onClick={() => handleBulkAction('unstageAll')}
+                    onClick={(e) => { e.stopPropagation(); handleBulkAction('unstageAll') }}
                     title="Unstage all"
                   >
                     <Minus className="size-3.5" />
                   </button>
                 </div>
-                <FileTree
-                  items={stagedEntries}
-                  getPath={getEntryPath}
-                  compress
-                  expandedFolders={expandedFolders}
-                  onToggleFolder={toggleFolder}
-                  renderFile={renderFileItem}
-                />
+                {!stagedCollapsed && (
+                  <FileTree
+                    items={stagedEntries}
+                    getPath={getEntryPath}
+                    compress
+                    expandedFolders={expandedFolders}
+                    onToggleFolder={toggleFolder}
+                    renderFile={renderFileItem}
+                  />
+                )}
               </div>
             )}
 
             {/* Unstaged section */}
             {unstagedEntries.length > 0 && (
               <div>
-                <div className="px-3 py-1.5 text-[11px] font-medium text-muted-foreground uppercase tracking-wide bg-muted/30 border-b sticky top-0 z-10 flex items-center justify-between">
-                  <span>Unstaged ({unstagedEntries.length})</span>
+                <div
+                  className="px-3 py-1.5 text-[11px] font-medium text-muted-foreground uppercase tracking-wide bg-muted/30 border-b sticky top-0 z-10 flex items-center justify-between cursor-pointer select-none"
+                  onClick={() => setUnstagedCollapsed((v) => !v)}
+                >
+                  <span className="flex items-center gap-1">
+                    <ChevronRight className={cn('size-3 transition-transform', !unstagedCollapsed && 'rotate-90')} />
+                    Unstaged ({unstagedEntries.length})
+                  </span>
                   <button
                     className="text-muted-foreground hover:text-foreground transition-colors p-0.5 rounded hover:bg-accent"
-                    onClick={() => handleBulkAction('stageAll')}
+                    onClick={(e) => { e.stopPropagation(); handleBulkAction('stageAll') }}
                     title="Stage all"
                   >
                     <Plus className="size-3.5" />
                   </button>
                 </div>
-                <FileTree
-                  items={unstagedEntries}
-                  getPath={getEntryPath}
-                  compress
-                  expandedFolders={expandedFolders}
-                  onToggleFolder={toggleFolder}
-                  renderFile={renderFileItem}
-                />
+                {!unstagedCollapsed && (
+                  <FileTree
+                    items={unstagedEntries}
+                    getPath={getEntryPath}
+                    compress
+                    expandedFolders={expandedFolders}
+                    onToggleFolder={toggleFolder}
+                    renderFile={renderFileItem}
+                  />
+                )}
               </div>
             )}
+            </div>
+
+            {/* Commit input — pinned to bottom */}
+            <div className="shrink-0 p-2 border-t space-y-1.5">
+              <textarea
+                className="w-full resize-none rounded border bg-transparent px-2 py-1.5 text-xs font-mono placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                style={{ maxHeight: 120 }}
+                placeholder="Commit message"
+                rows={3}
+                value={commitMessage}
+                onChange={(e) => {
+                  setCommitMessage(e.target.value)
+                  const el = e.target
+                  el.style.height = 'auto'
+                  el.style.height = `${Math.min(el.scrollHeight, 120)}px`
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+                    e.preventDefault()
+                    handleCommit()
+                  }
+                }}
+              />
+              <Button
+                variant="default"
+                size="sm"
+                className="w-full h-7 text-xs"
+                disabled={!commitMessage.trim() || stagedEntries.length === 0 || committing}
+                onClick={handleCommit}
+              >
+                {committing ? 'Committing...' : `Commit${stagedEntries.length > 0 ? ` (${stagedEntries.length} staged)` : ''}`}
+              </Button>
+            </div>
           </div>
 
           {/* Resize handle */}
