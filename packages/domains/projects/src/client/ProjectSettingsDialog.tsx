@@ -268,7 +268,7 @@ export function ProjectSettingsDialog({
         >
           {activeTab === 'general' && (
             <div className="mx-auto w-full max-w-4xl">
-              <form onSubmit={handleSubmit} className="space-y-4">
+              <form onSubmit={handleSubmit} className="space-y-6">
                 <div className="space-y-1">
                   <Label htmlFor="edit-name">Name</Label>
                   <Input id="edit-name" value={name} onChange={(e) => setName(e.target.value)} />
@@ -325,7 +325,7 @@ export function ProjectSettingsDialog({
           )}
 
           {activeTab === 'integrations' && (
-            <div className="mx-auto w-full max-w-4xl space-y-4">
+            <div className="mx-auto w-full max-w-4xl space-y-6">
               <Card className="gap-4 py-4">
                 <CardHeader className="px-4">
                   <CardTitle className="text-base">Mapping</CardTitle>
