@@ -28,6 +28,7 @@
     "png-to-ico": "^3.0.1",
     "prettier": "^3.7.4",
     "sharp": "^0.34.5",
+    "tsx": "^4.21.0",
     "typescript": "^5.9.3"
   },
   "engines": {
