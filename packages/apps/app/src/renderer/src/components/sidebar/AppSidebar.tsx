@@ -1,4 +1,4 @@
-import { Settings, HelpCircle, SlidersHorizontal } from 'lucide-react'
+import { Settings, HelpCircle } from 'lucide-react'
 import {
   Sidebar,
   SidebarContent,
@@ -26,8 +26,6 @@ interface AppSidebarProps {
   onProjectDelete: (project: Project) => void
   onSettings: () => void
   onTutorial: () => void
-  onAiCenter: () => void
-  aiCenterActive: boolean
 }
 
 export function AppSidebar({
@@ -40,10 +38,7 @@ export function AppSidebar({
   onProjectDelete,
   onSettings,
   onTutorial,
-  onAiCenter,
-  aiCenterActive
 }: AppSidebarProps) {
-  const showProjectSelection = !aiCenterActive
 
   return (
     <Sidebar collapsible="none" className="w-[82px] border-r min-h-svh">
@@ -61,7 +56,7 @@ export function AppSidebar({
                     'w-10 h-10 rounded-lg flex items-center justify-center',
                     'text-xs font-semibold bg-muted transition-all',
                     'hover:scale-105',
-                    showProjectSelection && selectedProjectId === null &&
+                    selectedProjectId === null &&
                       'ring-2 ring-primary ring-offset-2 ring-offset-background'
                   )}
                   title="All projects"
@@ -75,7 +70,7 @@ export function AppSidebar({
                 <SidebarMenuItem key={project.id}>
                   <ProjectItem
                     project={project}
-                    selected={showProjectSelection && selectedProjectId === project.id}
+                    selected={selectedProjectId === project.id}
                     onClick={() => onSelectProject(project.id)}
                     onSettings={() => onProjectSettings(project)}
                     onDelete={() => onProjectDelete(project)}
@@ -98,24 +93,6 @@ export function AppSidebar({
                 </button>
               </SidebarMenuItem>
 
-              <SidebarMenuItem className="my-3">
-                <div className="h-px w-10 bg-border/70" aria-hidden />
-              </SidebarMenuItem>
-
-              {/* Context Manager button */}
-              <SidebarMenuItem>
-                <button
-                  onClick={onAiCenter}
-                  className={cn(
-                    'w-10 h-10 rounded-lg flex items-center justify-center',
-                    'text-muted-foreground bg-muted transition-all hover:scale-105',
-                    aiCenterActive && 'ring-2 ring-primary ring-offset-2 ring-offset-background text-primary'
-                  )}
-                  title="Context Manager"
-                >
-                  <SlidersHorizontal className="size-5" />
-                </button>
-              </SidebarMenuItem>
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>

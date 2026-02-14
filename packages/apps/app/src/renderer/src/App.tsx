@@ -601,11 +601,6 @@ function App(): React.JSX.Element {
     }
   }
 
-  const openGlobalAiCenter = (): void => {
-    setSettingsInitialTab('ai-config')
-    setSettingsOpen(true)
-  }
-
   const handleSidebarSelectProject = (projectId: string | null): void => {
     setSelectedProjectId(projectId)
     setActiveTabIndex(0)
@@ -629,8 +624,6 @@ function App(): React.JSX.Element {
           onProjectDelete={setDeletingProject}
           onSettings={handleOpenSettings}
           onTutorial={() => setOnboardingOpen(true)}
-          onAiCenter={openGlobalAiCenter}
-          aiCenterActive={settingsOpen && settingsInitialTab === 'ai-config'}
         />
 
         <div className="flex-1 flex flex-col min-w-0">
