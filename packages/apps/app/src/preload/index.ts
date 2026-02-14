@@ -185,6 +185,9 @@ const api: ElectronAPI = {
       ipcRenderer.invoke('git:removeWorktree', repoPath, worktreePath),
     init: (path) => ipcRenderer.invoke('git:init', path),
     getCurrentBranch: (path) => ipcRenderer.invoke('git:getCurrentBranch', path),
+    listBranches: (path) => ipcRenderer.invoke('git:listBranches', path),
+    checkoutBranch: (path, branch) => ipcRenderer.invoke('git:checkoutBranch', path, branch),
+    createBranch: (path, branch) => ipcRenderer.invoke('git:createBranch', path, branch),
     hasUncommittedChanges: (path) => ipcRenderer.invoke('git:hasUncommittedChanges', path),
     mergeIntoParent: (projectPath, parentBranch, sourceBranch) =>
       ipcRenderer.invoke('git:mergeIntoParent', projectPath, parentBranch, sourceBranch),

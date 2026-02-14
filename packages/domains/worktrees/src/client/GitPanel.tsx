@@ -1,7 +1,11 @@
 import { useState, useEffect } from 'react'
-import { GitBranch, GitMerge, Plus, Trash2 } from 'lucide-react'
+import { GitBranch, GitMerge, Plus, Trash2, ChevronDown, Check, Loader2 } from 'lucide-react'
 import {
   Button,
+  Input,
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -43,6 +47,12 @@ export function GitPanel({ task, projectPath, onUpdateTask, onTaskUpdated, disab
   const [mergeConfirmOpen, setMergeConfirmOpen] = useState(false)
   const [merging, setMerging] = useState(false)
   const [mergeResult, setMergeResult] = useState<MergeResult | null>(null)
+  const [branchPopoverOpen, setBranchPopoverOpen] = useState(false)
+  const [branches, setBranches] = useState<string[]>([])
+  const [loadingBranches, setLoadingBranches] = useState(false)
+  const [newBranchName, setNewBranchName] = useState('')
+  const [switching, setSwitching] = useState(false)
+  const [branchError, setBranchError] = useState<string | null>(null)
   const hasWorktree = !!task.worktree_path
 
   // Check git status when projectPath changes
@@ -103,6 +113,55 @@ export function GitPanel({ task, projectPath, onUpdateTask, onTaskUpdated, disab
         </p>
       </div>
     )
+  }
+
+  const handleBranchPopoverChange = (open: boolean) => {
+    setBranchPopoverOpen(open)
+    if (open && projectPath) {
+      setLoadingBranches(true)
+      setBranchError(null)
+      window.api.git.listBranches(projectPath).then(setBranches).catch(() => setBranches([])).finally(() => setLoadingBranches(false))
+    }
+    if (!open) {
+      setNewBranchName('')
+      setBranchError(null)
+    }
+  }
+
+  const handleCheckoutBranch = async (branch: string) => {
+    if (!projectPath || branch === currentBranch) return
+    setSwitching(true)
+    setBranchError(null)
+    try {
+      const hasChanges = await window.api.git.hasUncommittedChanges(projectPath)
+      if (hasChanges) {
+        setBranchError('Uncommitted changes — commit or stash first')
+        return
+      }
+      await window.api.git.checkoutBranch(projectPath, branch)
+      setCurrentBranch(branch)
+      setBranchPopoverOpen(false)
+    } catch (err) {
+      setBranchError(err instanceof Error ? err.message : String(err))
+    } finally {
+      setSwitching(false)
+    }
+  }
+
+  const handleCreateBranch = async () => {
+    if (!projectPath || !newBranchName.trim()) return
+    setSwitching(true)
+    setBranchError(null)
+    try {
+      await window.api.git.createBranch(projectPath, newBranchName.trim())
+      setCurrentBranch(newBranchName.trim())
+      setNewBranchName('')
+      setBranchPopoverOpen(false)
+    } catch (err) {
+      setBranchError(err instanceof Error ? err.message : String(err))
+    } finally {
+      setSwitching(false)
+    }
   }
 
   const handleInitGit = async () => {
@@ -311,13 +370,80 @@ export function GitPanel({ task, projectPath, onUpdateTask, onTaskUpdated, disab
   // Is a git repo - show branch + worktree
   return (
     <div className="space-y-2">
-      {/* Branch info - always show root branch */}
+      {/* Branch info */}
       <div>
         <label className="mb-1 block text-sm text-muted-foreground">Branch</label>
-        <div className="flex items-center gap-2 text-sm">
-          <GitBranch className="h-4 w-4 text-muted-foreground" />
-          <span>{currentBranch || 'detached HEAD'}</span>
-        </div>
+        {hasWorktree ? (
+          <div className="flex items-center gap-2 text-sm">
+            <GitBranch className="h-4 w-4 text-muted-foreground" />
+            <span>{currentBranch || 'detached HEAD'}</span>
+          </div>
+        ) : (
+          <Popover open={branchPopoverOpen} onOpenChange={handleBranchPopoverChange}>
+            <PopoverTrigger asChild>
+              <button data-testid="branch-trigger" className="flex items-center gap-2 text-sm hover:bg-muted rounded px-2 py-1 -mx-2 transition-colors w-full text-left">
+                <GitBranch className="h-4 w-4 text-muted-foreground shrink-0" />
+                <span className="truncate flex-1">{currentBranch || 'detached HEAD'}</span>
+                <ChevronDown className="h-3 w-3 text-muted-foreground shrink-0" />
+              </button>
+            </PopoverTrigger>
+            <PopoverContent align="start" className="w-64 p-0">
+              {/* Create new branch */}
+              <form onSubmit={(e) => { e.preventDefault(); handleCreateBranch() }} className="flex gap-1 p-2 border-b">
+                <Input
+                  value={newBranchName}
+                  onChange={(e) => setNewBranchName(e.target.value)}
+                  placeholder="New branch..."
+                  className="h-7 text-xs"
+                  disabled={switching}
+                />
+                <Button
+                  type="submit"
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7 shrink-0"
+                  disabled={!newBranchName.trim() || switching}
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                </Button>
+              </form>
+
+              {/* Error */}
+              {branchError && (
+                <div className="px-2 py-1.5 text-xs text-destructive border-b">
+                  {branchError}
+                </div>
+              )}
+
+              {/* Branch list */}
+              <div className="max-h-48 overflow-y-auto py-1">
+                {loadingBranches ? (
+                  <div className="flex items-center justify-center py-3">
+                    <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                  </div>
+                ) : branches.length === 0 ? (
+                  <p className="text-xs text-muted-foreground px-2 py-2">No branches</p>
+                ) : (
+                  branches.map((branch) => (
+                    <button
+                      key={branch}
+                      onClick={() => handleCheckoutBranch(branch)}
+                      disabled={switching}
+                      className="flex items-center gap-2 w-full px-2 py-1.5 text-xs hover:bg-muted transition-colors text-left"
+                    >
+                      {branch === currentBranch ? (
+                        <Check className="h-3 w-3 text-primary shrink-0" />
+                      ) : (
+                        <span className="w-3 shrink-0" />
+                      )}
+                      <span className="truncate">{branch}</span>
+                    </button>
+                  ))
+                )}
+              </div>
+            </PopoverContent>
+          </Popover>
+        )}
       </div>
 
       {/* Worktree section */}

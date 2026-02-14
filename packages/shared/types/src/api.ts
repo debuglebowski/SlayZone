@@ -213,6 +213,9 @@ export interface ElectronAPI {
     removeWorktree: (repoPath: string, worktreePath: string) => Promise<void>
     init: (path: string) => Promise<void>
     getCurrentBranch: (path: string) => Promise<string | null>
+    listBranches: (path: string) => Promise<string[]>
+    checkoutBranch: (path: string, branch: string) => Promise<void>
+    createBranch: (path: string, branch: string) => Promise<void>
     hasUncommittedChanges: (path: string) => Promise<boolean>
     mergeIntoParent: (projectPath: string, parentBranch: string, sourceBranch: string) => Promise<MergeResult>
     abortMerge: (path: string) => Promise<void>

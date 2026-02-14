@@ -167,6 +167,29 @@ export function getCurrentBranch(path: string): string | null {
   }
 }
 
+export function listBranches(path: string): string[] {
+  try {
+    const output = execGit('git branch --list --no-color', {
+      cwd: path,
+      encoding: 'utf-8'
+    }) as string
+    return output
+      .split('\n')
+      .map(line => line.replace(/^\*?\s+/, '').trim())
+      .filter(Boolean)
+  } catch {
+    return []
+  }
+}
+
+export function checkoutBranch(path: string, branch: string): void {
+  execGit(`git checkout "${branch}"`, { cwd: path })
+}
+
+export function createBranch(path: string, branch: string): void {
+  execGit(`git checkout -b "${branch}"`, { cwd: path })
+}
+
 export function hasUncommittedChanges(path: string): boolean {
   try {
     // -uno: ignore untracked files — they don't block git merge

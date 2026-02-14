@@ -7,6 +7,9 @@ import {
   removeWorktree,
   initRepo,
   getCurrentBranch,
+  listBranches,
+  checkoutBranch,
+  createBranch,
   hasUncommittedChanges,
   mergeIntoParent,
   abortMerge,
@@ -51,6 +54,18 @@ export function registerWorktreeHandlers(ipcMain: IpcMain): void {
 
   ipcMain.handle('git:getCurrentBranch', (_, path: string) => {
     return getCurrentBranch(path)
+  })
+
+  ipcMain.handle('git:listBranches', (_, path: string) => {
+    return listBranches(path)
+  })
+
+  ipcMain.handle('git:checkoutBranch', (_, path: string, branch: string) => {
+    checkoutBranch(path, branch)
+  })
+
+  ipcMain.handle('git:createBranch', (_, path: string, branch: string) => {
+    createBranch(path, branch)
   })
 
   ipcMain.handle('git:hasUncommittedChanges', (_, path: string) => {
