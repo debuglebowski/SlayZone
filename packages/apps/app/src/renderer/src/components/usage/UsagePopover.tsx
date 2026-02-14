@@ -66,6 +66,7 @@ function InlineBar({ pct, label }: { pct: number; label: string }) {
 }
 
 function WindowRow({ label, w }: { label: string; w: UsageWindow }) {
+  const reset = formatReset(w.resetsAt)
   return (
     <div className="flex items-center gap-2">
       <span className="text-xs text-muted-foreground w-8 shrink-0">{label}</span>
@@ -76,7 +77,9 @@ function WindowRow({ label, w }: { label: string; w: UsageWindow }) {
         />
       </div>
       <span className="text-xs tabular-nums w-8 text-right">{Math.round(w.utilization)}%</span>
-      <span className="text-[10px] text-muted-foreground w-12 text-right">{formatReset(w.resetsAt)}</span>
+      <span className="text-[10px] text-muted-foreground w-16 shrink-0 text-right">
+        {reset}
+      </span>
     </div>
   )
 }
@@ -93,7 +96,10 @@ function ProviderSection({ usage }: { usage: ProviderUsage }) {
 
   return (
     <div className="space-y-1.5">
-      <div className="text-xs font-medium">{usage.label}</div>
+      <div className="flex items-center gap-2">
+        <span className="text-xs font-medium flex-1">{usage.label}</span>
+        <span className="text-[10px] text-muted-foreground w-16 shrink-0 text-right">Resets in</span>
+      </div>
       {usage.fiveHour && <WindowRow label="5h" w={usage.fiveHour} />}
       {usage.sevenDay && <WindowRow label="7d" w={usage.sevenDay} />}
       {usage.sevenDayOpus && <WindowRow label="Opus" w={usage.sevenDayOpus} />}
