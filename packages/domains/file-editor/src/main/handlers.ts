@@ -73,15 +73,17 @@ export function registerFileEditorHandlers(ipcMain: IpcMain): void {
     const abs = dirPath ? assertWithinRoot(rootPath, dirPath) : path.resolve(rootPath)
     const entries = fs.readdirSync(abs, { withFileTypes: true })
     return entries
-      .filter((e) => {
+      .filter((e) => !ALWAYS_IGNORED.has(e.name))
+      .map((e) => {
         const relPath = dirPath ? `${dirPath}/${e.name}` : e.name
-        return !isIgnored(rootPath, relPath, e.isDirectory())
+        const ignored = isIgnored(rootPath, relPath, e.isDirectory())
+        return {
+          name: e.name,
+          path: relPath,
+          type: e.isDirectory() ? 'directory' as const : 'file' as const,
+          ...(ignored && { ignored: true })
+        }
       })
-      .map((e) => ({
-        name: e.name,
-        path: dirPath ? `${dirPath}/${e.name}` : e.name,
-        type: e.isDirectory() ? 'directory' as const : 'file' as const
-      }))
       .sort((a, b) => {
         if (a.type !== b.type) return a.type === 'directory' ? -1 : 1
         return a.name.localeCompare(b.name)

@@ -3,6 +3,8 @@ export interface DirEntry {
   /** Relative path from project root (e.g. "src/main/index.ts") */
   path: string
   type: 'file' | 'directory'
+  /** True if matched by .gitignore */
+  ignored?: boolean
 }
 
 export interface ReadFileResult {

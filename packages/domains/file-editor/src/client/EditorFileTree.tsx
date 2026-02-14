@@ -171,7 +171,10 @@ export function EditorFileTree({ projectPath, onOpenFile, activeFilePath, refres
           <ContextMenu>
             <ContextMenuTrigger asChild>
               <button
-                className="group/folder flex w-full select-none items-center gap-1.5 rounded px-1 py-1 text-xs hover:bg-muted/50"
+                className={cn(
+                  'group/folder flex w-full select-none items-center gap-1.5 rounded px-1 py-1 text-xs hover:bg-muted/50',
+                  entry.ignored && 'opacity-50'
+                )}
                 style={{ paddingLeft: pad }}
                 onClick={() => handleToggleFolder(entry.path)}
               >
@@ -245,7 +248,8 @@ export function EditorFileTree({ projectPath, onOpenFile, activeFilePath, refres
           <button
             className={cn(
               'flex w-full items-center gap-1.5 rounded px-1 py-1 text-xs hover:bg-muted/50',
-              entry.path === activeFilePath && 'bg-muted text-foreground'
+              entry.path === activeFilePath && 'bg-muted text-foreground',
+              entry.ignored && 'opacity-50'
             )}
             style={{ paddingLeft: pad }}
             onClick={() => onOpenFile(entry.path)}
