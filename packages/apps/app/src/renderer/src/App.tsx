@@ -287,14 +287,6 @@ function App(): React.JSX.Element {
     return () => window.removeEventListener('focus', handleFocus)
   }, [selectedProjectId, projects, validateProjectPath])
 
-  // Auto-resize textarea
-  useEffect(() => {
-    if (projectNameInputRef.current) {
-      projectNameInputRef.current.style.height = 'auto'
-      projectNameInputRef.current.style.height = `${projectNameInputRef.current.scrollHeight}px`
-    }
-  }, [projectNameValue])
-
   // Computed values
   const projectTasks = selectedProjectId
     ? tasks.filter((t) => t.project_id === selectedProjectId)
@@ -678,7 +670,7 @@ function App(): React.JSX.Element {
                                 onBlur={handleProjectNameSave}
                                 onKeyDown={handleProjectNameKeyDown}
                                 className="text-2xl font-bold bg-transparent border-none outline-none w-full resize-none cursor-text"
-                                style={{ caretColor: 'currentColor' }}
+                                style={{ caretColor: 'currentColor', fieldSizing: 'content' } as React.CSSProperties}
                                 rows={1}
                               />
                             ) : (
