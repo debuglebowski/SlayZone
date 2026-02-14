@@ -1,5 +1,5 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Plus, Minus, Undo2, ChevronRight } from 'lucide-react'
+import { Plus, Minus, Undo2, ChevronRight, RefreshCw } from 'lucide-react'
 import { Button, FileTree, buildFileTree, flattenFileTree, fileTreeIndent, cn } from '@slayzone/ui'
 import type { Task } from '@slayzone/task/shared'
 import type { GitDiffSnapshot } from '../shared/types'
@@ -498,13 +498,13 @@ export function GitDiffPanel({
           )}
         </div>
         <Button
-          variant="outline"
-          size="sm"
-          className="h-7 text-xs"
+          variant="ghost"
+          size="icon"
+          className="h-7 w-7"
           onClick={fetchDiff}
           disabled={!targetPath || loading}
         >
-          {loading ? 'Refreshing...' : 'Refresh'}
+          <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />
         </Button>
       </div>
 
