@@ -1,4 +1,4 @@
-export type AiConfigItemType = 'skill' | 'command' | 'doc'
+export type AiConfigItemType = 'skill' | 'command' | 'doc' | 'root_instructions'
 export type AiConfigScope = 'global' | 'project'
 
 export interface AiConfigItem {
@@ -41,7 +41,9 @@ export interface AiConfigProjectSelection {
   id: string
   project_id: string
   item_id: string
+  provider: string
   target_path: string
+  content_hash: string | null
   selected_at: string
 }
 
@@ -51,7 +53,7 @@ export interface SetAiConfigProjectSelectionInput {
   targetPath: string
 }
 
-export type ContextFileCategory = 'claude' | 'agents' | 'mcp' | 'custom'
+export type ContextFileCategory = 'claude' | 'codex' | 'agents' | 'mcp' | 'custom'
 
 export interface ContextFileInfo {
   path: string
@@ -62,13 +64,26 @@ export interface ContextFileInfo {
 
 export type ContextFileSyncStatus = 'synced' | 'out_of_sync' | 'local_only'
 
-export type ContextFileProvider = 'claude' | 'codex' | 'manual'
+// CLI provider types
+export type CliProvider = 'claude' | 'codex' | 'cursor' | 'gemini' | 'opencode'
+export type CliProviderStatus = 'active' | 'placeholder'
+
+export interface CliProviderInfo {
+  id: string
+  name: string
+  kind: string
+  enabled: boolean
+  status: CliProviderStatus
+}
+
+export type ContextFileProvider = CliProvider | 'manual'
 
 export interface ContextTreeEntry {
   path: string
   relativePath: string
   exists: boolean
   category: ContextFileCategory | 'skill' | 'command'
+  provider?: CliProvider
   linkedItemId: string | null
   syncStatus: ContextFileSyncStatus
 }
@@ -77,8 +92,45 @@ export interface LoadGlobalItemInput {
   projectId: string
   projectPath: string
   itemId: string
-  provider: ContextFileProvider
+  providers: CliProvider[]
   manualPath?: string
+}
+
+export interface ProviderPathMapping {
+  rootInstructions: string | null
+  skillsDir: string | null
+  commandsDir: string | null
+}
+
+export interface SyncAllInput {
+  projectId: string
+  projectPath: string
+  providers?: CliProvider[]
+}
+
+export interface SyncResult {
+  written: { path: string; provider: CliProvider }[]
+  conflicts: SyncConflict[]
+}
+
+export interface SyncConflict {
+  path: string
+  provider: CliProvider
+  itemId: string
+  reason: 'external_edit'
+}
+
+// Root instructions + skills status
+export type ProviderSyncStatus = 'synced' | 'out_of_sync' | 'not_synced'
+
+export interface RootInstructionsResult {
+  content: string
+  providerStatus: Partial<Record<CliProvider, ProviderSyncStatus>>
+}
+
+export interface ProjectSkillStatus {
+  item: AiConfigItem
+  providers: Partial<Record<CliProvider, { path: string; status: ProviderSyncStatus }>>
 }
 
 // MCP server management

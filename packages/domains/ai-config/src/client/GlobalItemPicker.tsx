@@ -1,35 +1,44 @@
 import { useEffect, useState, type ChangeEvent } from 'react'
-import { Button, Dialog, DialogContent, DialogHeader, DialogTitle, Input, Label, cn } from '@slayzone/ui'
-import type { AiConfigItem, ContextFileProvider } from '../shared'
+import { Button, Checkbox, Dialog, DialogContent, DialogHeader, DialogTitle, Input, Label, cn } from '@slayzone/ui'
+import type { AiConfigItem, CliProvider } from '../shared'
+import { PROVIDER_LABELS } from '../shared/provider-registry'
 
 interface GlobalItemPickerProps {
   projectId: string
   projectPath: string
   existingLinks: string[]
+  type?: 'skill' | 'command'
   onLoaded: () => void
   onClose: () => void
 }
 
-const PROVIDERS: Array<{ key: ContextFileProvider; label: string; description: string }> = [
-  { key: 'claude', label: 'Claude Code', description: 'Skills → .claude/skills/, Commands → .claude/commands/' },
-  { key: 'codex', label: 'Codex', description: 'agents/{name}.md' },
-  { key: 'manual', label: 'Custom Path', description: 'Specify a custom relative path' }
-]
-
-export function GlobalItemPicker({ projectId, projectPath, existingLinks, onLoaded, onClose }: GlobalItemPickerProps) {
+export function GlobalItemPicker({ projectId, projectPath, existingLinks, type, onLoaded, onClose }: GlobalItemPickerProps) {
   const [items, setItems] = useState<AiConfigItem[]>([])
   const [selectedItem, setSelectedItem] = useState<AiConfigItem | null>(null)
-  const [provider, setProvider] = useState<ContextFileProvider>('claude')
+  const [enabledProviders, setEnabledProviders] = useState<CliProvider[]>([])
+  const [selectedProviders, setSelectedProviders] = useState<CliProvider[]>([])
+  const [useManualPath, setUseManualPath] = useState(false)
   const [manualPath, setManualPath] = useState('')
   const [loading, setLoading] = useState(false)
 
   useEffect(() => {
     void (async () => {
-      const skills = await window.api.aiConfig.listItems({ scope: 'global', type: 'skill' })
-      const commands = await window.api.aiConfig.listItems({ scope: 'global', type: 'command' })
+      const [skills, commands, providers] = await Promise.all([
+        !type || type === 'skill' ? window.api.aiConfig.listItems({ scope: 'global', type: 'skill' }) : Promise.resolve([]),
+        !type || type === 'command' ? window.api.aiConfig.listItems({ scope: 'global', type: 'command' }) : Promise.resolve([]),
+        window.api.aiConfig.getProjectProviders(projectId)
+      ])
       setItems([...skills, ...commands])
+      setEnabledProviders(providers)
+      setSelectedProviders(providers)
     })()
-  }, [])
+  }, [projectId])
+
+  const toggleProvider = (provider: CliProvider) => {
+    setSelectedProviders(prev =>
+      prev.includes(provider) ? prev.filter(p => p !== provider) : [...prev, provider]
+    )
+  }
 
   const handleLoad = async () => {
     if (!selectedItem) return
@@ -39,8 +48,8 @@ export function GlobalItemPicker({ projectId, projectPath, existingLinks, onLoad
         projectId,
         projectPath,
         itemId: selectedItem.id,
-        provider,
-        manualPath: provider === 'manual' ? manualPath : undefined
+        providers: useManualPath ? ['claude'] : selectedProviders,
+        manualPath: useManualPath ? manualPath : undefined
       })
       onLoaded()
     } catch (err) {
@@ -51,6 +60,7 @@ export function GlobalItemPicker({ projectId, projectPath, existingLinks, onLoad
   }
 
   const alreadyLinked = (id: string) => existingLinks.includes(id)
+  const canLoad = selectedItem && !loading && (useManualPath ? manualPath.trim() : selectedProviders.length > 0)
 
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
@@ -100,29 +110,34 @@ export function GlobalItemPicker({ projectId, projectPath, existingLinks, onLoad
           </div>
 
           {/* Provider selector */}
-          {selectedItem && (
+          {selectedItem && !useManualPath && (
             <div className="space-y-2">
-              <Label className="text-xs">Target provider</Label>
-              <div className="flex gap-1.5">
-                {PROVIDERS.map(({ key, label }) => (
-                  <button
-                    key={key}
-                    onClick={() => setProvider(key)}
-                    className={cn(
-                      'rounded-md border px-3 py-1.5 text-xs font-medium transition-colors',
-                      provider === key
-                        ? 'border-primary bg-primary/10'
-                        : 'hover:bg-muted/50'
-                    )}
-                  >
-                    {label}
-                  </button>
+              <Label className="text-xs">Sync to providers</Label>
+              <div className="flex flex-wrap gap-2">
+                {enabledProviders.map(provider => (
+                  <label key={provider} className="flex items-center gap-1.5 text-sm">
+                    <Checkbox
+                      checked={selectedProviders.includes(provider)}
+                      onCheckedChange={() => toggleProvider(provider)}
+                    />
+                    {PROVIDER_LABELS[provider]}
+                  </label>
                 ))}
               </div>
-              <p className="text-[11px] text-muted-foreground">
-                {PROVIDERS.find((p) => p.key === provider)?.description}
-              </p>
-              {provider === 'manual' && (
+            </div>
+          )}
+
+          {/* Manual path toggle */}
+          {selectedItem && (
+            <div className="space-y-2">
+              <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                <Checkbox
+                  checked={useManualPath}
+                  onCheckedChange={(checked) => setUseManualPath(!!checked)}
+                />
+                Use custom path instead
+              </label>
+              {useManualPath && (
                 <Input
                   className="font-mono text-xs"
                   placeholder="Relative path (e.g. .cursor/rules/my-skill.mdc)"
@@ -136,10 +151,7 @@ export function GlobalItemPicker({ projectId, projectPath, existingLinks, onLoad
           {/* Actions */}
           <div className="flex justify-end gap-2">
             <Button variant="ghost" onClick={onClose}>Cancel</Button>
-            <Button
-              onClick={handleLoad}
-              disabled={!selectedItem || loading || (provider === 'manual' && !manualPath.trim())}
-            >
+            <Button onClick={handleLoad} disabled={!canLoad}>
               {loading ? 'Loading...' : 'Load'}
             </Button>
           </div>

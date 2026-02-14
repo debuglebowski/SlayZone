@@ -1,11 +1,14 @@
 import * as fs from 'node:fs'
 import * as path from 'node:path'
+import { createHash } from 'node:crypto'
 import { app } from 'electron'
 import type { IpcMain } from 'electron'
 import type { Database } from 'better-sqlite3'
 import type {
   AiConfigItem,
   AiConfigProjectSelection,
+  CliProvider,
+  CliProviderInfo,
   ContextFileInfo,
   ContextFileCategory,
   ContextTreeEntry,
@@ -15,20 +18,43 @@ import type {
   McpConfigFileResult,
   McpProvider,
   McpServerConfig,
+  ProjectSkillStatus,
+  ProviderSyncStatus,
+  RootInstructionsResult,
   SetAiConfigProjectSelectionInput,
+  SyncAllInput,
+  SyncConflict,
+  SyncResult,
   UpdateAiConfigItemInput,
   WriteMcpServerInput,
   RemoveMcpServerInput
 } from '../shared'
+import { PROVIDER_PATHS } from '../shared/provider-registry'
 
 const KNOWN_CONTEXT_FILES: Array<{ relative: string; name: string; category: ContextFileCategory }> = [
   { relative: 'CLAUDE.md', name: 'CLAUDE.md', category: 'claude' },
   { relative: '.claude/CLAUDE.md', name: '.claude/CLAUDE.md', category: 'claude' },
-  { relative: 'AGENTS.md', name: 'AGENTS.md', category: 'agents' },
+  { relative: 'AGENTS.md', name: 'AGENTS.md', category: 'codex' },
   { relative: '.mcp.json', name: '.mcp.json', category: 'mcp' },
   { relative: '.cursor/mcp.json', name: '.cursor/mcp.json', category: 'mcp' },
   { relative: '.vscode/mcp.json', name: '.vscode/mcp.json', category: 'mcp' }
 ]
+
+function contentHash(content: string): string {
+  return createHash('sha256').update(content).digest('hex')
+}
+
+function getSkillPath(provider: CliProvider, slug: string): string | null {
+  const mapping = PROVIDER_PATHS[provider]
+  if (!mapping.skillsDir) return null
+  return `${mapping.skillsDir}/${slug}.md`
+}
+
+function getCommandPath(provider: CliProvider, slug: string): string | null {
+  const mapping = PROVIDER_PATHS[provider]
+  if (!mapping.commandsDir) return null
+  return `${mapping.commandsDir}/${slug}.md`
+}
 
 function isPathAllowed(filePath: string, projectPath: string | null): boolean {
   const resolved = path.resolve(filePath)
@@ -151,15 +177,22 @@ export function registerAiConfigHandlers(ipcMain: IpcMain, db: Database): void {
     const id = crypto.randomUUID()
     db.prepare(`
       INSERT INTO ai_config_project_selections (
-        id, project_id, item_id, target_path, selected_at
-      ) VALUES (?, ?, ?, ?, datetime('now'))
-      ON CONFLICT(project_id, item_id) DO UPDATE SET
+        id, project_id, item_id, provider, target_path, selected_at
+      ) VALUES (?, ?, ?, 'claude', ?, datetime('now'))
+      ON CONFLICT(project_id, item_id, provider) DO UPDATE SET
         target_path = excluded.target_path,
         selected_at = datetime('now')
     `).run(id, input.projectId, input.itemId, input.targetPath)
   })
 
-  ipcMain.handle('ai-config:remove-project-selection', (_event, projectId: string, itemId: string) => {
+  ipcMain.handle('ai-config:remove-project-selection', (_event, projectId: string, itemId: string, provider?: string) => {
+    if (provider) {
+      const result = db.prepare(`
+        DELETE FROM ai_config_project_selections
+        WHERE project_id = ? AND item_id = ? AND provider = ?
+      `).run(projectId, itemId, provider)
+      return result.changes > 0
+    }
     const result = db.prepare(`
       DELETE FROM ai_config_project_selections
       WHERE project_id = ? AND item_id = ?
@@ -239,13 +272,14 @@ export function registerAiConfigHandlers(ipcMain: IpcMain, db: Database): void {
       syncStatus: 'local_only'
     })
 
-    // 2. Scan .claude/commands/, .claude/skills/, and agents/ for .md files
-    const scanDirs: Array<{ dir: string; relDir: string; category: 'skill' | 'command' }> = [
-      { dir: path.join(resolvedProject, '.claude', 'commands'), relDir: '.claude/commands', category: 'command' },
-      { dir: path.join(resolvedProject, '.claude', 'skills'), relDir: '.claude/skills', category: 'skill' },
-      { dir: path.join(resolvedProject, 'agents'), relDir: 'agents', category: 'skill' }
+    // 2. Scan skill/command directories for .md files
+    const scanDirs: Array<{ dir: string; relDir: string; category: 'skill' | 'command'; provider?: CliProvider }> = [
+      { dir: path.join(resolvedProject, '.claude', 'commands'), relDir: '.claude/commands', category: 'command', provider: 'claude' },
+      { dir: path.join(resolvedProject, '.claude', 'skills'), relDir: '.claude/skills', category: 'skill', provider: 'claude' },
+      { dir: path.join(resolvedProject, 'agents'), relDir: 'agents', category: 'skill' },
+      { dir: path.join(resolvedProject, '.agents', 'skills'), relDir: '.agents/skills', category: 'skill', provider: 'codex' }
     ]
-    for (const { dir, relDir, category } of scanDirs) {
+    for (const { dir, relDir, category, provider: scanProvider } of scanDirs) {
       if (fs.existsSync(dir) && fs.statSync(dir).isDirectory()) {
         for (const file of fs.readdirSync(dir)) {
           if (!file.endsWith('.md')) continue
@@ -257,8 +291,9 @@ export function registerAiConfigHandlers(ipcMain: IpcMain, db: Database): void {
             relativePath: `${relDir}/${file}`,
             exists: true,
             category,
+            provider: scanProvider,
             linkedItemId: null,
-                syncStatus: 'local_only'
+            syncStatus: 'local_only'
           })
         }
       }
@@ -313,43 +348,62 @@ export function registerAiConfigHandlers(ipcMain: IpcMain, db: Database): void {
     if (!item) throw new Error('Item not found')
 
     const resolvedProject = path.resolve(input.projectPath)
-    let relativePath: string
-    if (input.provider === 'claude') {
-      relativePath = item.type === 'skill'
-        ? `.claude/skills/${item.slug}.md`
-        : `.claude/commands/${item.slug}.md`
-    } else if (input.provider === 'codex') {
-      relativePath = `agents/${item.slug}.md`
-    } else {
-      if (!input.manualPath) throw new Error('Manual path required')
-      relativePath = input.manualPath
+    const hash = contentHash(item.content)
+    const entries: ContextTreeEntry[] = []
+
+    // If manual path provided, write there (no provider-based logic)
+    if (input.manualPath) {
+      const filePath = path.join(resolvedProject, input.manualPath)
+      if (!isPathAllowed(filePath, input.projectPath)) throw new Error('Path not allowed')
+      const dir = path.dirname(filePath)
+      if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true })
+      fs.writeFileSync(filePath, item.content, 'utf-8')
+
+      db.prepare(`
+        INSERT INTO ai_config_project_selections (id, project_id, item_id, provider, target_path, content_hash, selected_at)
+        VALUES (?, ?, ?, 'claude', ?, ?, datetime('now'))
+        ON CONFLICT(project_id, item_id, provider) DO UPDATE SET
+          target_path = excluded.target_path, content_hash = excluded.content_hash, selected_at = datetime('now')
+      `).run(crypto.randomUUID(), input.projectId, input.itemId, input.manualPath, hash)
+
+      entries.push({
+        path: filePath, relativePath: input.manualPath, exists: true,
+        category: item.type === 'skill' ? 'skill' : 'command',
+        linkedItemId: item.id, syncStatus: 'synced'
+      })
+      return entries[0]
     }
 
-    const filePath = path.join(resolvedProject, relativePath)
-    if (!isPathAllowed(filePath, input.projectPath)) throw new Error('Path not allowed')
+    // Write to each selected provider
+    for (const provider of input.providers) {
+      const relativePath = item.type === 'skill'
+        ? getSkillPath(provider, item.slug)
+        : getCommandPath(provider, item.slug)
+      if (!relativePath) continue
 
-    const dir = path.dirname(filePath)
-    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true })
-    fs.writeFileSync(filePath, item.content, 'utf-8')
+      const filePath = path.join(resolvedProject, relativePath)
+      if (!isPathAllowed(filePath, input.projectPath)) continue
 
-    const id = crypto.randomUUID()
-    db.prepare(`
-      INSERT INTO ai_config_project_selections (id, project_id, item_id, target_path, selected_at)
-      VALUES (?, ?, ?, ?, datetime('now'))
-      ON CONFLICT(project_id, item_id) DO UPDATE SET
-        target_path = excluded.target_path,
-        selected_at = datetime('now')
-    `).run(id, input.projectId, input.itemId, relativePath)
+      const dir = path.dirname(filePath)
+      if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true })
+      fs.writeFileSync(filePath, item.content, 'utf-8')
 
-    const entry: ContextTreeEntry = {
-      path: filePath,
-      relativePath,
-      exists: true,
-      category: item.type === 'skill' ? 'skill' : 'command',
-      linkedItemId: item.id,
-      syncStatus: 'synced'
+      db.prepare(`
+        INSERT INTO ai_config_project_selections (id, project_id, item_id, provider, target_path, content_hash, selected_at)
+        VALUES (?, ?, ?, ?, ?, ?, datetime('now'))
+        ON CONFLICT(project_id, item_id, provider) DO UPDATE SET
+          target_path = excluded.target_path, content_hash = excluded.content_hash, selected_at = datetime('now')
+      `).run(crypto.randomUUID(), input.projectId, input.itemId, provider, relativePath, hash)
+
+      entries.push({
+        path: filePath, relativePath, exists: true,
+        category: item.type === 'skill' ? 'skill' : 'command',
+        provider,
+        linkedItemId: item.id, syncStatus: 'synced'
+      })
     }
-    return entry
+
+    return entries[0] ?? null
   })
 
   ipcMain.handle('ai-config:sync-linked-file', (_event, projectId: string, projectPath: string, itemId: string) => {
@@ -415,6 +469,368 @@ export function registerAiConfigHandlers(ipcMain: IpcMain, db: Database): void {
     db.prepare(`
       DELETE FROM ai_config_project_selections WHERE project_id = ? AND target_path = ?
     `).run(projectId, rel)
+  })
+
+  // --- Root instructions + skills status ---
+
+  function getEnabledProviders(projectId: string): CliProvider[] {
+    const row = db.prepare('SELECT value FROM settings WHERE key = ?')
+      .get(`ai_providers:${projectId}`) as { value: string } | undefined
+    if (row) return JSON.parse(row.value) as CliProvider[]
+    const active = db.prepare('SELECT kind FROM ai_config_sources WHERE enabled = 1 AND status = ?')
+      .all('active') as Array<{ kind: string }>
+    return active.map(p => p.kind as CliProvider)
+  }
+
+  ipcMain.handle('ai-config:get-root-instructions', (_event, projectId: string, projectPath: string) => {
+    const item = db.prepare(
+      "SELECT * FROM ai_config_items WHERE type = 'root_instructions' AND scope = 'project' AND project_id = ?"
+    ).get(projectId) as AiConfigItem | undefined
+
+    const providers = getEnabledProviders(projectId)
+    const resolvedProject = path.resolve(projectPath)
+    const providerStatus: Partial<Record<CliProvider, ProviderSyncStatus>> = {}
+
+    for (const provider of providers) {
+      const rootPath = PROVIDER_PATHS[provider]?.rootInstructions
+      if (!rootPath) continue
+      const filePath = path.join(resolvedProject, rootPath)
+      if (!item) {
+        providerStatus[provider] = fs.existsSync(filePath) ? 'out_of_sync' : 'not_synced'
+        continue
+      }
+      if (!fs.existsSync(filePath)) {
+        providerStatus[provider] = 'not_synced'
+        continue
+      }
+      const diskHash = contentHash(fs.readFileSync(filePath, 'utf-8'))
+      const itemHash = contentHash(item.content)
+      providerStatus[provider] = diskHash === itemHash ? 'synced' : 'out_of_sync'
+    }
+
+    const result: RootInstructionsResult = {
+      content: item?.content ?? '',
+      providerStatus
+    }
+    return result
+  })
+
+  ipcMain.handle('ai-config:get-global-instructions', () => {
+    const item = db.prepare(
+      "SELECT * FROM ai_config_items WHERE type = 'root_instructions' AND scope = 'global'"
+    ).get() as AiConfigItem | undefined
+    return item?.content ?? ''
+  })
+
+  ipcMain.handle('ai-config:save-global-instructions', (_event, content: string) => {
+    const existing = db.prepare(
+      "SELECT id FROM ai_config_items WHERE type = 'root_instructions' AND scope = 'global'"
+    ).get() as { id: string } | undefined
+
+    if (existing) {
+      db.prepare("UPDATE ai_config_items SET content = ?, updated_at = datetime('now') WHERE id = ?")
+        .run(content, existing.id)
+    } else {
+      db.prepare(`
+        INSERT INTO ai_config_items (id, type, scope, project_id, name, slug, content, metadata_json, created_at, updated_at)
+        VALUES (?, 'root_instructions', 'global', NULL, 'root_instructions', 'root_instructions', ?, '{}', datetime('now'), datetime('now'))
+      `).run(crypto.randomUUID(), content)
+    }
+  })
+
+  ipcMain.handle('ai-config:save-root-instructions', (_event, projectId: string, projectPath: string, content: string) => {
+    // Upsert the root_instructions item
+    const existing = db.prepare(
+      "SELECT id FROM ai_config_items WHERE type = 'root_instructions' AND scope = 'project' AND project_id = ?"
+    ).get(projectId) as { id: string } | undefined
+
+    let itemId: string
+    if (existing) {
+      db.prepare("UPDATE ai_config_items SET content = ?, updated_at = datetime('now') WHERE id = ?")
+        .run(content, existing.id)
+      itemId = existing.id
+    } else {
+      itemId = crypto.randomUUID()
+      db.prepare(`
+        INSERT INTO ai_config_items (id, type, scope, project_id, name, slug, content, metadata_json, created_at, updated_at)
+        VALUES (?, 'root_instructions', 'project', ?, 'root_instructions', 'root_instructions', ?, '{}', datetime('now'), datetime('now'))
+      `).run(itemId, projectId, content)
+    }
+
+    const hash = contentHash(content)
+    const providers = getEnabledProviders(projectId)
+    const resolvedProject = path.resolve(projectPath)
+    const providerStatus: Partial<Record<CliProvider, ProviderSyncStatus>> = {}
+
+    for (const provider of providers) {
+      const rootPath = PROVIDER_PATHS[provider]?.rootInstructions
+      if (!rootPath) continue
+      const filePath = path.join(resolvedProject, rootPath)
+      if (!isPathAllowed(filePath, projectPath)) continue
+
+      const dir = path.dirname(filePath)
+      if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true })
+      fs.writeFileSync(filePath, content, 'utf-8')
+
+      db.prepare(`
+        INSERT INTO ai_config_project_selections (id, project_id, item_id, provider, target_path, content_hash, selected_at)
+        VALUES (?, ?, ?, ?, ?, ?, datetime('now'))
+        ON CONFLICT(project_id, item_id, provider) DO UPDATE SET
+          target_path = excluded.target_path, content_hash = excluded.content_hash, selected_at = datetime('now')
+      `).run(crypto.randomUUID(), projectId, itemId, provider, rootPath, hash)
+
+      providerStatus[provider] = 'synced'
+    }
+
+    const result: RootInstructionsResult = { content, providerStatus }
+    return result
+  })
+
+  ipcMain.handle('ai-config:get-project-skills-status', (_event, projectId: string, projectPath: string) => {
+    const providers = getEnabledProviders(projectId)
+    const resolvedProject = path.resolve(projectPath)
+
+    const selections = db.prepare(`
+      SELECT ps.*, i.content as item_content, i.type as item_type, i.slug as item_slug,
+             i.name as item_name, i.scope as item_scope, i.metadata_json as item_metadata,
+             i.created_at as item_created, i.updated_at as item_updated
+      FROM ai_config_project_selections ps
+      JOIN ai_config_items i ON i.id = ps.item_id
+      WHERE ps.project_id = ? AND i.type IN ('skill', 'command')
+    `).all(projectId) as Array<AiConfigProjectSelection & {
+      item_content: string; item_type: string; item_slug: string
+      item_name: string; item_scope: string; item_metadata: string
+      item_created: string; item_updated: string
+    }>
+
+    // Group by item_id
+    const byItem = new Map<string, typeof selections>()
+    for (const sel of selections) {
+      const list = byItem.get(sel.item_id) ?? []
+      list.push(sel)
+      byItem.set(sel.item_id, list)
+    }
+
+    const results: ProjectSkillStatus[] = []
+    for (const [, sels] of byItem) {
+      const first = sels[0]
+      const item: AiConfigItem = {
+        id: first.item_id,
+        type: first.item_type as AiConfigItem['type'],
+        scope: first.item_scope as AiConfigItem['scope'],
+        project_id: first.project_id,
+        name: first.item_name,
+        slug: first.item_slug,
+        content: first.item_content,
+        metadata_json: first.item_metadata,
+        created_at: first.item_created,
+        updated_at: first.item_updated
+      }
+
+      const providerMap: ProjectSkillStatus['providers'] = {}
+      for (const provider of providers) {
+        const sel = sels.find(s => s.provider === provider)
+        if (sel) {
+          const filePath = path.isAbsolute(sel.target_path)
+            ? sel.target_path
+            : path.join(resolvedProject, sel.target_path)
+          let status: ProviderSyncStatus = 'not_synced'
+          if (fs.existsSync(filePath)) {
+            const diskHash = contentHash(fs.readFileSync(filePath, 'utf-8'))
+            const itemHash = contentHash(first.item_content)
+            status = diskHash === itemHash ? 'synced' : 'out_of_sync'
+          }
+          providerMap[provider] = { path: sel.target_path, status }
+        } else {
+          // No selection for this provider yet
+          providerMap[provider] = { path: '', status: 'not_synced' }
+        }
+      }
+
+      results.push({ item, providers: providerMap })
+    }
+
+    return results
+  })
+
+  // --- Provider management ---
+
+  ipcMain.handle('ai-config:list-providers', () => {
+    return db.prepare('SELECT * FROM ai_config_sources ORDER BY name').all() as CliProviderInfo[]
+  })
+
+  ipcMain.handle('ai-config:toggle-provider', (_event, id: string, enabled: boolean) => {
+    db.prepare('UPDATE ai_config_sources SET enabled = ?, updated_at = datetime(\'now\') WHERE id = ?')
+      .run(enabled ? 1 : 0, id)
+  })
+
+  ipcMain.handle('ai-config:get-project-providers', (_event, projectId: string) => {
+    const row = db.prepare('SELECT value FROM settings WHERE key = ?')
+      .get(`ai_providers:${projectId}`) as { value: string } | undefined
+    if (row) return JSON.parse(row.value) as CliProvider[]
+    // Fallback: all globally enabled active providers
+    const providers = db.prepare('SELECT kind FROM ai_config_sources WHERE enabled = 1 AND status = ?')
+      .all('active') as Array<{ kind: string }>
+    return providers.map(p => p.kind as CliProvider)
+  })
+
+  ipcMain.handle('ai-config:set-project-providers', (_event, projectId: string, providers: CliProvider[]) => {
+    db.prepare('INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value')
+      .run(`ai_providers:${projectId}`, JSON.stringify(providers))
+  })
+
+  ipcMain.handle('ai-config:needs-sync', (_event, projectId: string, projectPath: string): boolean => {
+    const providers = getEnabledProviders(projectId)
+    if (providers.length === 0) return false
+    const resolvedProject = path.resolve(projectPath)
+
+    // Check root instructions
+    const rootItem = db.prepare(
+      "SELECT content FROM ai_config_items WHERE type = 'root_instructions' AND scope = 'project' AND project_id = ?"
+    ).get(projectId) as { content: string } | undefined
+    if (rootItem) {
+      const hash = contentHash(rootItem.content)
+      for (const provider of providers) {
+        const rootPath = PROVIDER_PATHS[provider]?.rootInstructions
+        if (!rootPath) continue
+        const filePath = path.join(resolvedProject, rootPath)
+        if (!fs.existsSync(filePath)) return true
+        if (contentHash(fs.readFileSync(filePath, 'utf-8')) !== hash) return true
+      }
+    }
+
+    // Check skills/commands
+    const selections = db.prepare(`
+      SELECT ps.provider, ps.target_path, ps.content_hash, i.content as item_content
+      FROM ai_config_project_selections ps
+      JOIN ai_config_items i ON i.id = ps.item_id
+      WHERE ps.project_id = ? AND i.type IN ('skill', 'command')
+    `).all(projectId) as Array<{ provider: string; target_path: string; content_hash: string | null; item_content: string }>
+
+    for (const sel of selections) {
+      const filePath = path.isAbsolute(sel.target_path)
+        ? sel.target_path
+        : path.join(resolvedProject, sel.target_path)
+      if (!fs.existsSync(filePath)) return true
+      const diskHash = contentHash(fs.readFileSync(filePath, 'utf-8'))
+      const itemHash = contentHash(sel.item_content)
+      if (diskHash !== itemHash) return true
+    }
+
+    return false
+  })
+
+  ipcMain.handle('ai-config:sync-all', (_event, input: SyncAllInput) => {
+    const resolvedProject = path.resolve(input.projectPath)
+
+    // Get enabled providers for this project
+    let providers = input.providers
+    if (!providers) {
+      const row = db.prepare('SELECT value FROM settings WHERE key = ?')
+        .get(`ai_providers:${input.projectId}`) as { value: string } | undefined
+      if (row) {
+        providers = JSON.parse(row.value) as CliProvider[]
+      } else {
+        const active = db.prepare('SELECT kind FROM ai_config_sources WHERE enabled = 1 AND status = ?')
+          .all('active') as Array<{ kind: string }>
+        providers = active.map(p => p.kind as CliProvider)
+      }
+    }
+
+    const result: SyncResult = { written: [], conflicts: [] }
+
+    // Get all selections for this project with item content
+    const selections = db.prepare(`
+      SELECT ps.*, i.content as item_content, i.type as item_type, i.slug as item_slug
+      FROM ai_config_project_selections ps
+      JOIN ai_config_items i ON i.id = ps.item_id
+      WHERE ps.project_id = ?
+    `).all(input.projectId) as Array<AiConfigProjectSelection & { item_content: string; item_type: string; item_slug: string }>
+
+    // Group by item_id to find which providers already have selections
+    const byItem = new Map<string, typeof selections>()
+    for (const sel of selections) {
+      const list = byItem.get(sel.item_id) ?? []
+      list.push(sel)
+      byItem.set(sel.item_id, list)
+    }
+
+    for (const [itemId, sels] of byItem) {
+      const first = sels[0]
+      const hash = contentHash(first.item_content)
+
+      for (const provider of providers) {
+        // Compute expected path for this provider
+        const relativePath = first.item_type === 'skill'
+          ? getSkillPath(provider, first.item_slug)
+          : first.item_type === 'command'
+            ? getCommandPath(provider, first.item_slug)
+            : PROVIDER_PATHS[provider]?.rootInstructions
+        if (!relativePath) continue
+
+        const filePath = path.join(resolvedProject, relativePath)
+        if (!isPathAllowed(filePath, input.projectPath)) continue
+
+        // Check for external edits via content hash
+        const existingSel = sels.find(s => s.provider === provider)
+        if (fs.existsSync(filePath) && existingSel?.content_hash) {
+          const diskHash = contentHash(fs.readFileSync(filePath, 'utf-8'))
+          if (diskHash !== existingSel.content_hash && diskHash !== hash) {
+            result.conflicts.push({ path: relativePath, provider, itemId, reason: 'external_edit' })
+            continue
+          }
+        }
+
+        // Write file
+        const dir = path.dirname(filePath)
+        if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true })
+        fs.writeFileSync(filePath, first.item_content, 'utf-8')
+
+        // Upsert selection
+        db.prepare(`
+          INSERT INTO ai_config_project_selections (id, project_id, item_id, provider, target_path, content_hash, selected_at)
+          VALUES (?, ?, ?, ?, ?, ?, datetime('now'))
+          ON CONFLICT(project_id, item_id, provider) DO UPDATE SET
+            target_path = excluded.target_path, content_hash = excluded.content_hash, selected_at = datetime('now')
+        `).run(crypto.randomUUID(), input.projectId, itemId, provider, relativePath, hash)
+
+        result.written.push({ path: relativePath, provider })
+      }
+    }
+
+    return result
+  })
+
+  ipcMain.handle('ai-config:check-sync-status', (_event, projectId: string, projectPath: string) => {
+    const resolvedProject = path.resolve(projectPath)
+    const conflicts: SyncConflict[] = []
+
+    const selections = db.prepare(`
+      SELECT ps.*, i.content as item_content
+      FROM ai_config_project_selections ps
+      JOIN ai_config_items i ON i.id = ps.item_id
+      WHERE ps.project_id = ?
+    `).all(projectId) as Array<AiConfigProjectSelection & { item_content: string }>
+
+    for (const sel of selections) {
+      const filePath = path.isAbsolute(sel.target_path)
+        ? sel.target_path
+        : path.join(resolvedProject, sel.target_path)
+
+      if (!fs.existsSync(filePath)) continue
+      const diskHash = contentHash(fs.readFileSync(filePath, 'utf-8'))
+      const expectedHash = contentHash(sel.item_content)
+      if (sel.content_hash && diskHash !== sel.content_hash && diskHash !== expectedHash) {
+        conflicts.push({
+          path: sel.target_path,
+          provider: sel.provider as CliProvider,
+          itemId: sel.item_id,
+          reason: 'external_edit'
+        })
+      }
+    }
+
+    return conflicts
   })
 
   // MCP config discovery + management

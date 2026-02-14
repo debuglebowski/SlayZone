@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { ExternalLink, Star, Check, AlertTriangle, Search } from 'lucide-react'
-import { Button, cn, Input } from '@slayzone/ui'
+import { ExternalLink, Star, Check, Search } from 'lucide-react'
+import { Button, Input } from '@slayzone/ui'
 import { CURATED_MCP_SERVERS, CATEGORY_LABELS, type CuratedMcpServer } from '../shared/mcp-registry'
 import type { McpConfigFileResult, McpProvider, McpServerConfig } from '../shared'
 
@@ -77,72 +77,42 @@ function GlobalMcpPanel() {
     await window.api.settings.set('mcp_favorites', JSON.stringify(next))
   }
 
-  const favServers = useMemo(() =>
-    CURATED_MCP_SERVERS.filter((s) => favorites.includes(s.id) && matchesSearch(search, s.name, s.description, s.category)),
-    [favorites, search]
-  )
-  const otherServers = useMemo(() =>
-    CURATED_MCP_SERVERS.filter((s) => !favorites.includes(s.id) && matchesSearch(search, s.name, s.description, s.category)),
+  const filtered = useMemo(() =>
+    CURATED_MCP_SERVERS
+      .filter((s) => matchesSearch(search, s.name, s.description, s.category))
+      .sort((a, b) => {
+        const af = favorites.includes(a.id) ? 0 : 1
+        const bf = favorites.includes(b.id) ? 0 : 1
+        return af - bf
+      }),
     [favorites, search]
   )
 
   return (
     <div className="space-y-4">
-      <p className="text-xs text-muted-foreground">
-        Curated MCP servers. Star your favorites for quick access.
-      </p>
-
       <SearchInput value={search} onChange={setSearch} />
 
-      {favServers.length > 0 && (
-        <div className="space-y-2">
-          <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Favorites</p>
-          <div className="grid grid-cols-2 gap-2 xl:grid-cols-3">
-            {favServers.map((s) => (
-              <ServerCard
-                key={s.id}
-                server={s}
-                actions={
-                  <button
-                    onClick={() => toggleFavorite(s.id)}
-                    className="rounded p-0.5 transition-colors hover:bg-muted"
-                    title="Remove from favorites"
-                  >
-                    <Star className="size-3.5 fill-amber-400 text-amber-400" />
-                  </button>
-                }
-              />
-            ))}
-          </div>
+      {filtered.length > 0 ? (
+        <div className="grid grid-cols-2 gap-2 xl:grid-cols-4">
+          {filtered.map((s) => (
+            <ServerCard
+              key={s.id}
+              server={s}
+              actions={
+                <button
+                  onClick={() => toggleFavorite(s.id)}
+                  className="rounded p-0.5 transition-colors hover:bg-muted"
+                  title={favorites.includes(s.id) ? 'Remove from favorites' : 'Add to favorites'}
+                >
+                  <Star className={favorites.includes(s.id) ? 'size-3.5 fill-amber-400 text-amber-400' : 'size-3.5 text-muted-foreground'} />
+                </button>
+              }
+            />
+          ))}
         </div>
-      )}
-
-      <div className="space-y-2">
-        {favServers.length > 0 && (
-          <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">All Servers</p>
-        )}
-        {otherServers.length > 0 ? (
-          <div className="grid grid-cols-2 gap-2 xl:grid-cols-3">
-            {otherServers.map((s) => (
-              <ServerCard
-                key={s.id}
-                server={s}
-                actions={
-                  <button
-                    onClick={() => toggleFavorite(s.id)}
-                    className="rounded p-0.5 transition-colors hover:bg-muted"
-                    title="Add to favorites"
-                  >
-                    <Star className="size-3.5 text-muted-foreground" />
-                  </button>
-                }
-              />
-            ))}
-          </div>
-        ) : search && favServers.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No servers match your search.</p>
-        ) : null}
-      </div>
+      ) : search ? (
+        <p className="text-sm text-muted-foreground">No servers match your search.</p>
+      ) : null}
     </div>
   )
 }
@@ -171,9 +141,9 @@ interface MergedServer {
   providers: McpProvider[]
 }
 
-function ProjectMcpPanel({ projectPath, projectId }: ProjectMcpPanelProps) {
+function ProjectMcpPanel({ projectPath }: ProjectMcpPanelProps) {
   const [configs, setConfigs] = useState<McpConfigFileResult[]>([])
-  const [selectedProviders, setSelectedProviders] = useState<McpProvider[]>(['claude'])
+  const [favorites, setFavorites] = useState<string[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
 
@@ -190,18 +160,20 @@ function ProjectMcpPanel({ projectPath, projectId }: ProjectMcpPanelProps) {
   useEffect(() => { void loadConfigs() }, [loadConfigs])
 
   useEffect(() => {
-    void window.api.settings.get(`mcp_providers:${projectId}`).then((raw) => {
-      if (raw) setSelectedProviders(JSON.parse(raw) as McpProvider[])
+    void window.api.settings.get('mcp_favorites').then((raw) => {
+      if (raw) setFavorites(JSON.parse(raw) as string[])
     })
-  }, [projectId])
+  }, [])
 
-  const toggleProvider = async (p: McpProvider) => {
-    const next = selectedProviders.includes(p)
-      ? selectedProviders.filter((x) => x !== p)
-      : [...selectedProviders, p]
-    setSelectedProviders(next)
-    await window.api.settings.set(`mcp_providers:${projectId}`, JSON.stringify(next))
+  const toggleFavorite = async (id: string) => {
+    const next = favorites.includes(id)
+      ? favorites.filter((f) => f !== id)
+      : [...favorites, id]
+    setFavorites(next)
+    await window.api.settings.set('mcp_favorites', JSON.stringify(next))
   }
+
+  const isFavorite = (id: string) => favorites.includes(id)
 
   // Merge configs into unified server list
   const merged: MergedServer[] = []
@@ -236,7 +208,7 @@ function ProjectMcpPanel({ projectPath, projectId }: ProjectMcpPanelProps) {
   const enableServer = async (server: MergedServer) => {
     const config = server.curated ? { ...server.curated.template } : server.config
     if (!config) return
-    for (const provider of selectedProviders) {
+    for (const provider of ALL_PROVIDERS) {
       if (server.providers.includes(provider)) continue
       await window.api.aiConfig.writeMcpServer({
         projectPath,
@@ -260,10 +232,6 @@ function ProjectMcpPanel({ projectPath, projectId }: ProjectMcpPanelProps) {
   }
 
   const isEnabled = (server: MergedServer) => server.providers.length > 0
-  const hasDrift = (server: MergedServer) => {
-    if (!isEnabled(server)) return false
-    return selectedProviders.some((p) => !server.providers.includes(p))
-  }
 
   const filterServer = (s: MergedServer) =>
     matchesSearch(search, s.curated?.name ?? s.key, s.curated?.description, s.curated?.category)
@@ -281,19 +249,9 @@ function ProjectMcpPanel({ projectPath, projectId }: ProjectMcpPanelProps) {
             <Check className="size-2.5" /> {PROVIDER_LABELS[p]}
           </span>
         ))}
-        {hasDrift(s) && (
-          <span className="flex items-center gap-0.5 text-[10px] text-amber-600 dark:text-amber-400">
-            <AlertTriangle className="size-2.5" />
-          </span>
-        )}
       </div>
       <div className="flex shrink-0 items-center gap-1">
-        {hasDrift(s) && (
-          <Button size="sm" variant="outline" className="h-6 px-2 text-[10px]" onClick={() => enableServer(s)}>
-            Sync
-          </Button>
-        )}
-        <Button size="sm" variant="ghost" className="h-6 px-2 text-[10px] text-destructive" onClick={() => disableServer(s)}>
+<Button size="sm" variant="ghost" className="h-6 px-2 text-[10px] text-destructive" onClick={() => disableServer(s)}>
           Disable
         </Button>
       </div>
@@ -302,39 +260,28 @@ function ProjectMcpPanel({ projectPath, projectId }: ProjectMcpPanelProps) {
 
   return (
     <div className="space-y-4">
-      {/* Provider selector */}
-      <div className="space-y-1.5">
-        <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Target Providers</p>
-        <div className="flex flex-wrap gap-2">
-          {ALL_PROVIDERS.map((p) => (
-            <button
-              key={p}
-              onClick={() => toggleProvider(p)}
-              className={cn(
-                'rounded-md border px-3 py-1.5 text-xs font-medium transition-colors',
-                selectedProviders.includes(p)
-                  ? 'border-primary bg-primary/10 text-foreground'
-                  : 'text-muted-foreground hover:text-foreground'
-              )}
-            >
-              {PROVIDER_LABELS[p]}
-            </button>
-          ))}
-        </div>
-        <p className="text-[11px] text-muted-foreground">
-          Enabling a server writes its config to all selected providers.
-        </p>
-      </div>
-
       <SearchInput value={search} onChange={setSearch} />
 
       {/* Enabled servers */}
       {enabledServers.length > 0 && (
         <div className="space-y-2">
           <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Enabled</p>
-          <div className="grid grid-cols-2 gap-2 xl:grid-cols-3">
+          <div className="grid grid-cols-2 gap-2 xl:grid-cols-4">
             {enabledServers.map((s) => s.curated ? (
-              <ServerCard key={s.key} server={s.curated} footer={enabledFooter(s)} />
+              <ServerCard
+                key={s.key}
+                server={s.curated}
+                actions={
+                  <button
+                    onClick={() => toggleFavorite(s.key)}
+                    className="rounded p-0.5 transition-colors hover:bg-muted"
+                    title={isFavorite(s.key) ? 'Remove from favorites' : 'Add to favorites'}
+                  >
+                    <Star className={isFavorite(s.key) ? 'size-3.5 fill-amber-400 text-amber-400' : 'size-3.5 text-muted-foreground'} />
+                  </button>
+                }
+                footer={enabledFooter(s)}
+              />
             ) : (
               <div key={s.key} className="flex flex-col justify-between rounded-lg border p-3 transition-colors hover:bg-muted/50">
                 <div>
@@ -352,17 +299,29 @@ function ProjectMcpPanel({ projectPath, projectId }: ProjectMcpPanelProps) {
       {availableServers.length > 0 && (
         <div className="space-y-2">
           <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Available</p>
-          <div className="grid grid-cols-2 gap-2 xl:grid-cols-3">
-            {availableServers.map((s) => (
+          <div className="grid grid-cols-2 gap-2 xl:grid-cols-4">
+            {[...availableServers].sort((a, b) => {
+              const af = isFavorite(a.key) ? 0 : 1
+              const bf = isFavorite(b.key) ? 0 : 1
+              return af - bf
+            }).map((s) => (
               <ServerCard
                 key={s.key}
                 server={s.curated!}
+                actions={
+                  <button
+                    onClick={() => toggleFavorite(s.key)}
+                    className="rounded p-0.5 transition-colors hover:bg-muted"
+                    title={isFavorite(s.key) ? 'Remove from favorites' : 'Add to favorites'}
+                  >
+                    <Star className={isFavorite(s.key) ? 'size-3.5 fill-amber-400 text-amber-400' : 'size-3.5 text-muted-foreground'} />
+                  </button>
+                }
                 footer={
                   <Button
                     size="sm"
                     variant="outline"
                     className="h-6 w-full text-[10px]"
-                    disabled={selectedProviders.length === 0}
                     onClick={() => enableServer(s)}
                   >
                     Enable

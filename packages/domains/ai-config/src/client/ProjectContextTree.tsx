@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type ChangeEvent, type MouseEvent as ReactMouseEvent } from 'react'
-import { File, FilePlus, Link, Unlink, RefreshCw, Save, Check, AlertCircle, Plus, Pencil, Trash2 } from 'lucide-react'
+import { File, FilePlus, Link, Unlink, RefreshCw, Save, Check, AlertCircle, Pencil, Trash2, RefreshCcw } from 'lucide-react'
 import { Button, ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuSeparator, ContextMenuTrigger, Dialog, DialogContent, DialogHeader, DialogTitle, Input, Label, Textarea, FileTree, fileTreeIndent, cn } from '@slayzone/ui'
-import type { ContextTreeEntry } from '../shared'
+import type { CliProvider, ContextTreeEntry } from '../shared'
 import { GlobalItemPicker } from './GlobalItemPicker'
 
 function SyncBadge({ status }: { status: ContextTreeEntry['syncStatus'] }) {
@@ -20,6 +20,15 @@ function SyncBadge({ status }: { status: ContextTreeEntry['syncStatus'] }) {
     )
   }
   return null
+}
+
+function ProviderBadge({ provider }: { provider?: CliProvider }) {
+  if (!provider) return null
+  return (
+    <span className="rounded bg-muted px-1 py-0.5 text-[9px] font-medium uppercase text-muted-foreground">
+      {provider}
+    </span>
+  )
 }
 
 const getRelativePath = (entry: ContextTreeEntry) => entry.relativePath
@@ -44,6 +53,7 @@ export function ProjectContextTree({ projectPath, projectId }: ProjectContextTre
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set())
   const [renamingEntry, setRenamingEntry] = useState<ContextTreeEntry | null>(null)
   const [renameValue, setRenameValue] = useState('')
+  const [syncing, setSyncing] = useState(false)
 
   const loadTree = useCallback(async () => {
     setLoading(true)
@@ -181,6 +191,23 @@ export function ProjectContextTree({ projectPath, projectId }: ProjectContextTre
     await loadTree()
   }
 
+  const handleSyncAll = async () => {
+    setSyncing(true)
+    setMessage('')
+    try {
+      const result = await window.api.aiConfig.syncAll({ projectId, projectPath })
+      const parts: string[] = []
+      if (result.written.length) parts.push(`${result.written.length} written`)
+      if (result.conflicts.length) parts.push(`${result.conflicts.length} conflicts`)
+      setMessage(parts.join(', ') || 'Nothing to sync')
+      await loadTree()
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : 'Sync failed')
+    } finally {
+      setSyncing(false)
+    }
+  }
+
   const dirty = content !== originalContent
   const selectedEntry = entries.find((e) => e.path === selectedPath)
   const projectFiles = entries.filter((e) => !e.relativePath.startsWith('~'))
@@ -204,6 +231,7 @@ export function ProjectContextTree({ projectPath, projectId }: ProjectContextTre
               <span className="min-w-0 truncate font-mono">{name}</span>
             </button>
             <div className="flex shrink-0 items-center gap-1">
+              <ProviderBadge provider={entry.provider} />
               {entry.linkedItemId && (
                 <>
                   <Link className="size-3 text-muted-foreground" />
@@ -324,14 +352,16 @@ export function ProjectContextTree({ projectPath, projectId }: ProjectContextTre
           </div>
         )}
 
-        <div className="flex items-center gap-1.5 pt-3">
-          <Button size="sm" variant="outline" className="flex-1 text-xs" onClick={() => setCreatingFile(true)}>
-            <FilePlus className="mr-1 size-3" />
-            New File
-          </Button>
-          <Button size="sm" className="flex-1 text-xs" onClick={() => setShowPicker(true)}>
-            <Plus className="mr-1 size-3" />
-            From Global
+        <div className="pt-3">
+          <Button
+            size="sm"
+            variant="outline"
+            className="w-full text-xs"
+            onClick={handleSyncAll}
+            disabled={syncing}
+          >
+            <RefreshCcw className={cn('mr-1 size-3', syncing && 'animate-spin')} />
+            {syncing ? 'Syncing...' : 'Sync All Providers'}
           </Button>
         </div>
       </div>
