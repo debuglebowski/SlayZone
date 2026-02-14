@@ -1,13 +1,10 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { RefreshCw } from 'lucide-react'
 import {
   cn,
   Popover,
   PopoverContent,
   PopoverTrigger,
-  Tooltip,
-  TooltipTrigger,
-  TooltipContent
 } from '@slayzone/ui'
 import type { ProviderUsage, UsageWindow } from '@slayzone/terminal/shared'
 
@@ -46,22 +43,15 @@ function formatAgo(epochMs: number): string {
 
 function InlineBar({ pct, label }: { pct: number; label: string }) {
   return (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <div className="flex items-center gap-1 cursor-pointer">
-          <span className="text-[10px] text-muted-foreground leading-none">{label}</span>
-          <div className="w-12 h-1.5 rounded-full bg-muted overflow-hidden">
-            <div
-              className={cn('h-full rounded-full transition-all', barColor(pct))}
-              style={{ width: `${Math.min(pct, 100)}%` }}
-            />
-          </div>
-        </div>
-      </TooltipTrigger>
-      <TooltipContent side="bottom" className="text-xs">
-        {label}: {Math.round(pct)}%
-      </TooltipContent>
-    </Tooltip>
+    <div className="flex flex-col items-start gap-0.5">
+      <span className="text-[10px] text-muted-foreground leading-none">{label}</span>
+      <div className="w-12 h-1.5 rounded-full bg-muted overflow-hidden">
+        <div
+          className={cn('h-full rounded-full transition-all', barColor(pct))}
+          style={{ width: `${Math.min(pct, 100)}%` }}
+        />
+      </div>
+    </div>
   )
 }
 
@@ -110,6 +100,15 @@ function ProviderSection({ usage }: { usage: ProviderUsage }) {
 
 export function UsagePopover({ data, onRefresh }: UsagePopoverProps) {
   const [open, setOpen] = useState(false)
+  const closeTimer = useRef<ReturnType<typeof setTimeout>>(null)
+
+  const handleEnter = () => {
+    if (closeTimer.current) clearTimeout(closeTimer.current)
+    setOpen(true)
+  }
+  const handleLeave = () => {
+    closeTimer.current = setTimeout(() => setOpen(false), 200)
+  }
 
   const withData = data.filter((p) => !p.error && (p.fiveHour || p.sevenDay))
   const inlineBars = withData
@@ -124,7 +123,8 @@ export function UsagePopover({ data, onRefresh }: UsagePopoverProps) {
       <PopoverTrigger asChild>
         <button
           className="flex items-center gap-2 h-7 px-1 transition-colors text-muted-foreground hover:text-foreground"
-          onClick={() => setOpen(!open)}
+          onMouseEnter={handleEnter}
+          onMouseLeave={handleLeave}
         >
           {inlineBars.length > 0 ? (
             inlineBars.map((b) => <InlineBar key={b.label} pct={b.pct} label={b.label} />)
@@ -133,7 +133,13 @@ export function UsagePopover({ data, onRefresh }: UsagePopoverProps) {
           )}
         </button>
       </PopoverTrigger>
-      <PopoverContent side="bottom" align="end" className="w-72 p-3 space-y-3">
+      <PopoverContent
+        side="bottom"
+        align="end"
+        className="w-72 p-3 space-y-3"
+        onMouseEnter={handleEnter}
+        onMouseLeave={handleLeave}
+      >
         {data.map((p) => (
           <ProviderSection key={p.provider} usage={p} />
         ))}
