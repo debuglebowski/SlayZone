@@ -7,6 +7,7 @@ import type { TerminalState, PtyInfo, CodeMode, BufferSinceResult } from '@slayz
 import { getDiagnosticsConfig, recordDiagnosticEvent } from '@slayzone/diagnostics/main'
 import { RingBuffer, type BufferChunk } from './ring-buffer'
 import { getAdapter, type TerminalMode, type TerminalAdapter, type ActivityState, type ErrorInfo } from './adapters'
+import { StateMachine, activityToTerminalState } from './state-machine'
 
 // Database reference for notifications
 let db: Database | null = null
@@ -69,7 +70,13 @@ interface PtySession {
 export type { PtyInfo }
 
 const sessions = new Map<string, PtySession>()
-const stateDebounceTimers = new Map<string, NodeJS.Timeout>()
+const stateMachine = new StateMachine((sessionId, newState, oldState) => {
+  const session = sessions.get(sessionId)
+  if (!session) return
+  // Sync session.state for debounced transitions (timer fires after transitionState returns)
+  session.state = newState
+  emitStateChange(session, sessionId, newState, oldState)
+})
 
 // Maximum buffer size (5MB) per session
 const MAX_BUFFER_SIZE = 5 * 1024 * 1024
@@ -110,18 +117,6 @@ function filterBufferData(data: string): string {
     })
 }
 
-// Map ActivityState to TerminalState
-function activityToTerminalState(activity: ActivityState): TerminalState | null {
-  switch (activity) {
-    case 'attention':
-      return 'attention'
-    case 'working':
-      return 'running'
-    default:
-      return null
-  }
-}
-
 // Emit state change via IPC
 function emitStateChange(session: PtySession, sessionId: string, newState: TerminalState, oldState: TerminalState): void {
   recordDiagnosticEvent({
@@ -150,37 +145,16 @@ function emitStateChange(session: PtySession, sessionId: string, newState: Termi
   }
 }
 
-// Transition session state (asymmetric debounce: immediate for 'running', 100ms for others)
+// Delegate state transitions to the extracted state machine
+// (asymmetric debounce: immediate for 'running', 500ms for running→attention, 100ms for others)
 function transitionState(sessionId: string, newState: TerminalState): void {
   const session = sessions.get(sessionId)
   if (!session) return
-
-  // Clear any pending timer
-  const pending = stateDebounceTimers.get(sessionId)
-  if (pending) {
-    clearTimeout(pending)
-    stateDebounceTimers.delete(sessionId)
-  }
-
-  if (session.state === newState) return
-
-  // Immediate transition for 'running' (work resumed, show it right away)
-  // Debounced transition for 'attention' (prevent flicker during output gaps)
-  if (newState === 'running') {
-    const oldState = session.state
-    session.state = newState
-    emitStateChange(session, sessionId, newState, oldState)
-  } else {
-    // Debounce 100ms for attention/error/dead/starting
-    stateDebounceTimers.set(sessionId, setTimeout(() => {
-      stateDebounceTimers.delete(sessionId)
-      const session = sessions.get(sessionId)
-      if (!session || session.state === newState) return
-      const oldState = session.state
-      session.state = newState
-      emitStateChange(session, sessionId, newState, oldState)
-    }, 100))
-  }
+  // Keep session.state in sync for code that reads it directly
+  stateMachine.setState(sessionId, session.state)
+  stateMachine.transition(sessionId, newState)
+  // Update session.state from state machine (immediate transitions update synchronously)
+  session.state = stateMachine.getState(sessionId) ?? session.state
 }
 
 // Check for inactive sessions and transition state (fallback timeout)
@@ -320,6 +294,7 @@ export function createPty(
       // Dev server URL dedup
       detectedDevUrls: new Set()
     })
+    stateMachine.register(sessionId, 'starting')
 
     // Transition out of 'starting' once setup completes
     // (pty.spawn is synchronous, so process is already running)
@@ -624,11 +599,7 @@ export function killPty(sessionId: string): boolean {
     clearTimeout(session.statusWatchTimeout)
   }
   // Clear state debounce timer
-  const debounceTimer = stateDebounceTimers.get(sessionId)
-  if (debounceTimer) {
-    clearTimeout(debounceTimer)
-    stateDebounceTimers.delete(sessionId)
-  }
+  stateMachine.unregister(sessionId)
   // Delete from map FIRST so onData handlers exit early during kill
   sessions.delete(sessionId)
   // Use SIGKILL (9) to forcefully terminate - SIGTERM may not kill child processes
