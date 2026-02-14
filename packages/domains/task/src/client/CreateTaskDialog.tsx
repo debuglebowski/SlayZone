@@ -400,12 +400,12 @@ export function CreateTaskDialog({
                   onClick={() => form.handleSubmit((data) => createTask(data, { andOpen: true }))()}
                 >
                   Create and open
-                  <kbd className="ml-2 text-2xl text-muted-foreground">&#x21E7;&#x2318;&#x21A9;</kbd>
+                  <kbd className="ml-2 text-muted-foreground" style={{ fontFamily: 'system-ui' }}>⇧⌘↩</kbd>
                 </Button>
               )}
               <Button type="submit">
                 Create
-                <kbd className="ml-2 text-2xl text-muted-foreground">&#x2318;&#x21A9;</kbd>
+                <kbd className="ml-2 opacity-70" style={{ fontFamily: 'system-ui' }}>⌘↩</kbd>
               </Button>
             </div>
           </form>
