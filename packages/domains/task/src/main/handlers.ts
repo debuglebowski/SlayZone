@@ -1,6 +1,7 @@
 import type { IpcMain } from 'electron'
 import type { Database } from 'better-sqlite3'
-import type { CreateTaskInput, UpdateTaskInput, Task } from '@slayzone/task/shared'
+import type { CreateTaskInput, UpdateTaskInput, Task, ProviderConfig } from '@slayzone/task/shared'
+import { PROVIDER_DEFAULTS } from '@slayzone/task/shared'
 import { recordDiagnosticEvent } from '@slayzone/diagnostics/main'
 import path from 'path'
 import { removeWorktree, createWorktree, getCurrentBranch, isGitRepo } from '@slayzone/worktrees/main'
@@ -9,16 +10,32 @@ import { killPtysByTaskId } from '@slayzone/terminal/main'
 // Parse JSON columns from DB row
 function parseTask(row: Record<string, unknown> | undefined): Task | null {
   if (!row) return null
+  const providerConfig: ProviderConfig = row.provider_config
+    ? JSON.parse(row.provider_config as string)
+    : {}
   return {
     ...row,
     dangerously_skip_permissions: Boolean(row.dangerously_skip_permissions),
-    claude_flags: typeof row.claude_flags === 'string' ? row.claude_flags : '',
-    codex_flags: typeof row.codex_flags === 'string' ? row.codex_flags : '',
+    provider_config: providerConfig,
+    // Backfill deprecated per-provider fields from provider_config
+    claude_conversation_id: providerConfig['claude-code']?.conversationId ?? null,
+    codex_conversation_id: providerConfig['codex']?.conversationId ?? null,
+    cursor_conversation_id: providerConfig['cursor-agent']?.conversationId ?? null,
+    gemini_conversation_id: providerConfig['gemini']?.conversationId ?? null,
+    opencode_conversation_id: providerConfig['opencode']?.conversationId ?? null,
+    claude_flags: providerConfig['claude-code']?.flags ?? '',
+    codex_flags: providerConfig['codex']?.flags ?? '',
+    cursor_flags: providerConfig['cursor-agent']?.flags ?? '',
+    gemini_flags: providerConfig['gemini']?.flags ?? '',
+    opencode_flags: providerConfig['opencode']?.flags ?? '',
     panel_visibility: row.panel_visibility
       ? JSON.parse(row.panel_visibility as string)
       : null,
     browser_tabs: row.browser_tabs
       ? JSON.parse(row.browser_tabs as string)
+      : null,
+    web_panel_urls: row.web_panel_urls
+      ? JSON.parse(row.web_panel_urls as string)
       : null
   } as Task
 }
@@ -197,16 +214,61 @@ export function updateTask(db: Database, data: UpdateTaskInput): Task | null {
   if (data.projectId !== undefined) { fields.push('project_id = ?'); values.push(data.projectId) }
   if (data.claudeSessionId !== undefined) { fields.push('claude_session_id = ?'); values.push(data.claudeSessionId) }
   if (data.terminalMode !== undefined) { fields.push('terminal_mode = ?'); values.push(data.terminalMode) }
-  if (data.claudeConversationId !== undefined) { fields.push('claude_conversation_id = ?'); values.push(data.claudeConversationId) }
-  if (data.codexConversationId !== undefined) { fields.push('codex_conversation_id = ?'); values.push(data.codexConversationId) }
   if (data.terminalShell !== undefined) { fields.push('terminal_shell = ?'); values.push(data.terminalShell) }
-  if (data.claudeFlags !== undefined) { fields.push('claude_flags = ?'); values.push(data.claudeFlags) }
-  if (data.codexFlags !== undefined) { fields.push('codex_flags = ?'); values.push(data.codexFlags) }
+
+  // --- Provider config: merge providerConfig + legacy per-field updates ---
+  {
+    const legacyMappings: Array<{ mode: string; col: string; convId?: string | null; flags?: string; hasConvId: boolean; hasFlags: boolean }> = [
+      { mode: 'claude-code', col: 'claude', convId: data.claudeConversationId, flags: data.claudeFlags, hasConvId: data.claudeConversationId !== undefined, hasFlags: data.claudeFlags !== undefined },
+      { mode: 'codex', col: 'codex', convId: data.codexConversationId, flags: data.codexFlags, hasConvId: data.codexConversationId !== undefined, hasFlags: data.codexFlags !== undefined },
+      { mode: 'cursor-agent', col: 'cursor', convId: data.cursorConversationId, flags: data.cursorFlags, hasConvId: data.cursorConversationId !== undefined, hasFlags: data.cursorFlags !== undefined },
+      { mode: 'gemini', col: 'gemini', convId: data.geminiConversationId, flags: data.geminiFlags, hasConvId: data.geminiConversationId !== undefined, hasFlags: data.geminiFlags !== undefined },
+      { mode: 'opencode', col: 'opencode', convId: data.opencodeConversationId, flags: data.opencodeFlags, hasConvId: data.opencodeConversationId !== undefined, hasFlags: data.opencodeFlags !== undefined },
+    ]
+    const hasLegacyUpdate = legacyMappings.some(m => m.hasConvId || m.hasFlags)
+
+    if (data.providerConfig !== undefined || hasLegacyUpdate) {
+      // Read current provider_config
+      const currentRow = db.prepare('SELECT provider_config FROM tasks WHERE id = ?').get(data.id) as { provider_config: string } | undefined
+      const current: ProviderConfig = currentRow?.provider_config ? JSON.parse(currentRow.provider_config) : {}
+      // Deep merge: per-mode entry merge so partial updates don't clobber existing fields
+      const merged: ProviderConfig = { ...current }
+      if (data.providerConfig !== undefined) {
+        for (const [mode, entry] of Object.entries(data.providerConfig)) {
+          merged[mode] = { ...current[mode], ...entry }
+        }
+      }
+
+      // Apply legacy field updates on top
+      for (const m of legacyMappings) {
+        if (m.hasConvId || m.hasFlags) {
+          merged[m.mode] = { ...merged[m.mode] }
+          if (m.hasConvId) merged[m.mode].conversationId = m.convId
+          if (m.hasFlags) merged[m.mode].flags = m.flags
+        }
+      }
+
+      fields.push('provider_config = ?'); values.push(JSON.stringify(merged))
+
+      // Dual-write to legacy columns
+      for (const m of legacyMappings) {
+        const entry = merged[m.mode]
+        if (!entry) continue
+        if (m.hasConvId || data.providerConfig !== undefined) {
+          fields.push(`${m.col}_conversation_id = ?`); values.push(entry.conversationId ?? null)
+        }
+        if (m.hasFlags || data.providerConfig !== undefined) {
+          fields.push(`${m.col}_flags = ?`); values.push(entry.flags ?? '')
+        }
+      }
+    }
+  }
   if (data.panelVisibility !== undefined) { fields.push('panel_visibility = ?'); values.push(data.panelVisibility ? JSON.stringify(data.panelVisibility) : null) }
   if (data.worktreePath !== undefined) { fields.push('worktree_path = ?'); values.push(data.worktreePath) }
   if (data.worktreeParentBranch !== undefined) { fields.push('worktree_parent_branch = ?'); values.push(data.worktreeParentBranch) }
   if (data.browserUrl !== undefined) { fields.push('browser_url = ?'); values.push(data.browserUrl) }
   if (data.browserTabs !== undefined) { fields.push('browser_tabs = ?'); values.push(data.browserTabs ? JSON.stringify(data.browserTabs) : null) }
+  if (data.webPanelUrls !== undefined) { fields.push('web_panel_urls = ?'); values.push(data.webPanelUrls ? JSON.stringify(data.webPanelUrls) : null) }
   if (data.mergeState !== undefined) { fields.push('merge_state = ?'); values.push(data.mergeState) }
 
   if (fields.length === 0) {
@@ -269,43 +331,36 @@ export function registerTaskHandlers(ipcMain: IpcMain, db: Database): void {
       ?? (db.prepare("SELECT value FROM settings WHERE key = 'default_terminal_mode'")
           .get() as { value: string } | undefined)?.value
       ?? 'claude-code'
-    const defaultClaudeFlags =
-      (db.prepare("SELECT value FROM settings WHERE key = 'default_claude_flags'")
-        .get() as { value: string } | undefined)?.value ?? '--allow-dangerously-skip-permissions'
-    const defaultCodexFlags =
-      (db.prepare("SELECT value FROM settings WHERE key = 'default_codex_flags'")
-        .get() as { value: string } | undefined)?.value ?? '--full-auto --search'
-    const claudeFlags = data.claudeFlags ?? defaultClaudeFlags
-    const codexFlags = data.codexFlags ?? defaultCodexFlags
+
+    // Build provider_config from defaults + overrides
+    const providerConfig: ProviderConfig = {}
+    const legacyOverrides: Record<string, string | undefined> = {
+      'claude-code': data.claudeFlags, 'codex': data.codexFlags,
+      'cursor-agent': data.cursorFlags, 'gemini': data.geminiFlags, 'opencode': data.opencodeFlags,
+    }
+    for (const [mode, def] of Object.entries(PROVIDER_DEFAULTS)) {
+      const dbDefault = (db.prepare('SELECT value FROM settings WHERE key = ?')
+        .get(def.settingsKey) as { value: string } | undefined)?.value ?? def.fallback
+      providerConfig[mode] = { flags: legacyOverrides[mode] ?? dbDefault }
+    }
+
     const stmt = db.prepare(`
       INSERT INTO tasks (
-        id,
-        project_id,
-        parent_id,
-        title,
-        description,
-        assignee,
-        status,
-        priority,
-        due_date,
-        terminal_mode,
-        claude_flags,
-        codex_flags
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        id, project_id, parent_id, title, description, assignee,
+        status, priority, due_date, terminal_mode, provider_config,
+        claude_flags, codex_flags, cursor_flags, gemini_flags, opencode_flags
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `)
     stmt.run(
-      id,
-      data.projectId,
-      data.parentId ?? null,
-      data.title,
-      data.description ?? null,
-      data.assignee ?? null,
-      data.status ?? 'inbox',
-      data.priority ?? 3,
-      data.dueDate ?? null,
-      terminalMode,
-      claudeFlags,
-      codexFlags
+      id, data.projectId, data.parentId ?? null,
+      data.title, data.description ?? null, data.assignee ?? null,
+      data.status ?? 'inbox', data.priority ?? 3, data.dueDate ?? null,
+      terminalMode, JSON.stringify(providerConfig),
+      providerConfig['claude-code']?.flags ?? '',
+      providerConfig['codex']?.flags ?? '',
+      providerConfig['cursor-agent']?.flags ?? '',
+      providerConfig['gemini']?.flags ?? '',
+      providerConfig['opencode']?.flags ?? ''
     )
     maybeAutoCreateWorktree(db, id, data.projectId, data.title)
     const row = db.prepare('SELECT * FROM tasks WHERE id = ?').get(id) as Record<string, unknown> | undefined

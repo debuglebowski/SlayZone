@@ -1,9 +1,10 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
-import { MoreHorizontal, Archive, Trash2, AlertTriangle, Sparkles, Loader2, Terminal as TerminalIcon, Globe, Settings2, GitBranch, FileCode, ChevronRight, Plus, GripVertical } from 'lucide-react'
+import { MoreHorizontal, Archive, Trash2, AlertTriangle, Sparkles, Loader2, Terminal as TerminalIcon, Globe, Settings2, GitBranch, FileCode, ChevronRight, Plus, GripVertical, Camera } from 'lucide-react'
 import { DndContext, PointerSensor, useSensors, useSensor, closestCenter, type DragEndEvent } from '@dnd-kit/core'
 import { SortableContext, useSortable, verticalListSortingStrategy, arrayMove } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import type { Task, PanelVisibility } from '@slayzone/task/shared'
+import { getProviderConversationId, getProviderFlags, setProviderConversationId, setProviderFlags, clearAllConversationIds, PROVIDER_DEFAULTS } from '@slayzone/task/shared'
 import type { BrowserTabsState } from '@slayzone/task-browser/shared'
 import type { Tag } from '@slayzone/tags/shared'
 import type { Project } from '@slayzone/projects/shared'
@@ -49,7 +50,10 @@ import { cn, getTaskStatusStyle } from '@slayzone/ui'
 import { BrowserPanel } from '@slayzone/task-browser'
 import { FileEditorView } from '@slayzone/file-editor/client'
 import { usePanelSizes, resolveWidths } from './usePanelSizes'
+import { usePanelConfig } from './usePanelConfig'
+import { WebPanelView } from './WebPanelView'
 import { ResizeHandle } from './ResizeHandle'
+import { RegionSelector } from './RegionSelector'
 // ErrorBoundary should be provided by the app when rendering this component
 
 function SortableSubTask({ sub, onNavigate, onUpdate, onDelete }: {
@@ -199,6 +203,9 @@ export function TaskDetailPage({
   }
   const [browserTabs, setBrowserTabs] = useState<BrowserTabsState>(defaultBrowserTabs)
 
+  // Global panel configuration (which panels are enabled, custom web panels)
+  const { enabledWebPanels, isBuiltinEnabled } = usePanelConfig()
+
   // Panel sizes for resizable panels
   const [panelSizes, updatePanelSizes, resetPanelSize, resetAllPanels] = usePanelSizes()
   const [isResizing, setIsResizing] = useState(false)
@@ -226,6 +233,7 @@ export function TaskDetailPage({
   // Terminal API (exposed via onReady callback)
   const terminalApiRef = useRef<{
     sendInput: (text: string) => Promise<void>
+    write: (data: string) => Promise<boolean>
     focus: () => void
     clearBuffer: () => Promise<void>
   } | null>(null)
@@ -441,7 +449,7 @@ export function TaskDetailPage({
       if (!task) return
       const updated = await window.api.db.updateTask({
         id: task.id,
-        claudeConversationId: sessionId
+        providerConfig: setProviderConversationId(task.provider_config, task.terminal_mode, sessionId)
       })
       setTask(updated)
       onTaskUpdated(updated)
@@ -452,16 +460,25 @@ export function TaskDetailPage({
   // Handle terminal ready - memoized to prevent effect cascade
   const handleTerminalReady = useCallback((api: {
     sendInput: (text: string) => Promise<void>
+    write: (data: string) => Promise<boolean>
     focus: () => void
     clearBuffer: () => Promise<void>
   }) => {
     terminalApiRef.current = api
   }, [])
 
-  // Codex has no "create with session id" command; ask it for current session id.
+  // Modes that need /status auto-request for session ID detection
+  const needsStatusRequest = task?.terminal_mode === 'codex' || task?.terminal_mode === 'cursor-agent'
+  const hasConversationId = (() => {
+    if (!task) return true
+    if (task.terminal_mode !== 'codex' && task.terminal_mode !== 'cursor-agent') return true
+    return !!getProviderConversationId(task.provider_config, task.terminal_mode)
+  })()
+
+  // Some CLIs have no "create with session id" command; ask for current session id.
   // Use direct PTY writes with retries to survive startup timing races.
   useEffect(() => {
-    if (!task || task.terminal_mode !== 'codex' || task.codex_conversation_id) return
+    if (!task || !needsStatusRequest || hasConversationId) return
     if (detectedSessionId) return
     if (codexStatusRequestedTaskIdsRef.current.has(task.id)) return
 
@@ -473,7 +490,7 @@ export function TaskDetailPage({
 
     const runAttempt = async (): Promise<void> => {
       if (cancelled) return
-      if (!task || task.codex_conversation_id || detectedSessionId) return
+      if (!task || hasConversationId || detectedSessionId) return
 
       const exists = await window.api.pty.exists(sessionId)
       if (!exists || cancelled) {
@@ -502,25 +519,32 @@ export function TaskDetailPage({
       cancelled = true
       if (retryTimer) clearTimeout(retryTimer)
     }
-  }, [task, detectedSessionId, getMainSessionId])
+  }, [task, needsStatusRequest, hasConversationId, detectedSessionId, getMainSessionId])
+
+  // Get current conversation ID for mode (with claude_session_id legacy fallback)
+  const getConversationIdForMode = useCallback((t: Task): string | null => {
+    const id = getProviderConversationId(t.provider_config, t.terminal_mode)
+    if (id) return id
+    if (t.terminal_mode === 'claude-code') return t.claude_session_id || null
+    return null
+  }, [])
 
   // Update DB with detected session ID
   const handleUpdateSessionId = useCallback(async () => {
     if (!task || !detectedSessionId) return
-    const update =
-      task.terminal_mode === 'codex'
-        ? { id: task.id, codexConversationId: detectedSessionId }
-        : { id: task.id, claudeConversationId: detectedSessionId }
-    const updated = await window.api.db.updateTask(update)
+    const updated = await window.api.db.updateTask({
+      id: task.id,
+      providerConfig: setProviderConversationId(task.provider_config, task.terminal_mode, detectedSessionId)
+    })
     setTask(updated)
     onTaskUpdated(updated)
     setDetectedSessionId(null)
   }, [task, detectedSessionId, onTaskUpdated])
 
-  // Persist detected Codex conversation IDs immediately.
+  // Persist detected conversation IDs immediately for modes that need /status.
   useEffect(() => {
-    if (!task || !detectedSessionId || task.terminal_mode !== 'codex') return
-    if (task.codex_conversation_id === detectedSessionId) {
+    if (!task || !detectedSessionId || !needsStatusRequest) return
+    if (getConversationIdForMode(task) === detectedSessionId) {
       setDetectedSessionId(null)
       return
     }
@@ -529,7 +553,7 @@ export function TaskDetailPage({
     void (async () => {
       const updated = await window.api.db.updateTask({
         id: task.id,
-        codexConversationId: detectedSessionId
+        providerConfig: setProviderConversationId(task.provider_config, task.terminal_mode, detectedSessionId)
       })
       if (cancelled) return
       setTask(updated)
@@ -540,7 +564,7 @@ export function TaskDetailPage({
     return () => {
       cancelled = true
     }
-  }, [task, detectedSessionId, onTaskUpdated])
+  }, [task, detectedSessionId, needsStatusRequest, onTaskUpdated, getConversationIdForMode])
 
   // Handle invalid session (e.g., "No conversation found" error)
   const handleSessionInvalid = useCallback(async () => {
@@ -550,7 +574,7 @@ export function TaskDetailPage({
     // Clear the stale session ID from the database
     const updated = await window.api.db.updateTask({
       id: task.id,
-      claudeConversationId: null
+      providerConfig: setProviderConversationId(task.provider_config, task.terminal_mode, null)
     })
     setTask(updated)
     onTaskUpdated(updated)
@@ -579,7 +603,7 @@ export function TaskDetailPage({
     // Clear session ID so new session starts fresh
     const updated = await window.api.db.updateTask({
       id: task.id,
-      claudeConversationId: null
+      providerConfig: setProviderConversationId(task.provider_config, task.terminal_mode, null)
     })
     setTask(updated)
     onTaskUpdated(updated)
@@ -605,6 +629,27 @@ export function TaskDetailPage({
     if (!task || !terminalApiRef.current) return
     await terminalApiRef.current.sendInput(task.title)
   }, [task])
+
+  // Screenshot: show region selector, then capture and inject
+  const [showRegionSelector, setShowRegionSelector] = useState(false)
+
+  const handleScreenshot = useCallback(() => {
+    setShowRegionSelector(true)
+  }, [])
+
+  const handleRegionSelect = useCallback(async (rect: { x: number; y: number; width: number; height: number }) => {
+    setShowRegionSelector(false)
+    // Small delay to let the overlay unmount before capturing
+    await new Promise(r => setTimeout(r, 50))
+    const result = await window.api.screenshot.captureRegion(rect)
+    if (!result.success || !result.path) return
+    const escaped = result.path.includes(' ') ? `"${result.path}"` : result.path
+    await terminalApiRef.current?.write(escaped)
+  }, [])
+
+  const handleRegionCancel = useCallback(() => {
+    setShowRegionSelector(false)
+  }, [])
 
   // Inject task description into terminal (no execute)
   const handleInjectDescription = useCallback(async () => {
@@ -649,6 +694,14 @@ export function TaskDetailPage({
     return () => window.removeEventListener('keydown', handleKeyDown, { capture: true })
   }, [isActive, handleInjectTitle, handleInjectDescription])
 
+  // Cmd+Shift+S screenshot trigger from main process
+  useEffect(() => {
+    if (!isActive) return
+    return window.api.app.onScreenshotTrigger(() => {
+      void handleScreenshot()
+    })
+  }, [isActive, handleScreenshot])
+
   // Clear quick run prompt after it's been passed to Terminal
   useEffect(() => {
     if (!task) return
@@ -675,8 +728,7 @@ export function TaskDetailPage({
       const updated = await window.api.db.updateTask({
         id: task.id,
         terminalMode: mode,
-        claudeConversationId: null,
-        codexConversationId: null,
+        providerConfig: clearAllConversationIds(task.provider_config),
         claudeSessionId: null
       })
       setTask(updated)
@@ -688,11 +740,8 @@ export function TaskDetailPage({
     [task, onTaskUpdated, resetTaskState]
   )
 
-  // Handle dangerously skip permissions toggle
   const getProviderFlagsForMode = useCallback((currentTask: Task): string => {
-    if (currentTask.terminal_mode === 'claude-code') return currentTask.claude_flags ?? ''
-    if (currentTask.terminal_mode === 'codex') return currentTask.codex_flags ?? ''
-    return ''
+    return getProviderFlags(currentTask.provider_config, currentTask.terminal_mode)
   }, [])
 
   const handleFlagsSave = useCallback(
@@ -701,10 +750,10 @@ export function TaskDetailPage({
       const currentValue = getProviderFlagsForMode(task)
       if (currentValue === nextValue) return
 
-      const update =
-        task.terminal_mode === 'claude-code'
-          ? { id: task.id, claudeFlags: nextValue }
-          : { id: task.id, codexFlags: nextValue }
+      const update = {
+        id: task.id,
+        providerConfig: setProviderFlags(task.provider_config, task.terminal_mode, nextValue)
+      }
 
       const updated = await window.api.db.updateTask(update)
       setTask(updated)
@@ -722,13 +771,9 @@ export function TaskDetailPage({
 
   const handleSetDefaultFlags = useCallback(async () => {
     if (!task || task.terminal_mode === 'terminal') return
-    const settingsKey =
-      task.terminal_mode === 'claude-code' ? 'default_claude_flags' : 'default_codex_flags'
-    const fallback =
-      task.terminal_mode === 'claude-code'
-        ? '--allow-dangerously-skip-permissions'
-        : '--full-auto --search'
-    const defaultFlags = (await window.api.settings.get(settingsKey)) ?? fallback
+    const def = PROVIDER_DEFAULTS[task.terminal_mode]
+    if (!def) return
+    const defaultFlags = (await window.api.settings.get(def.settingsKey)) ?? def.fallback
     setFlagsInputValue(defaultFlags)
     await handleFlagsSave(defaultFlags)
   }, [task, handleFlagsSave])
@@ -752,7 +797,7 @@ export function TaskDetailPage({
     async (panelId: string, active: boolean) => {
       if (!task) return
       // Reset panel size to default when opening
-      if (active) resetPanelSize(panelId as keyof typeof panelSizes)
+      if (active) resetPanelSize(panelId)
       const newVisibility = { ...panelVisibility, [panelId]: active }
       setPanelVisibility(newVisibility)
       // Persist to DB
@@ -766,7 +811,7 @@ export function TaskDetailPage({
     [task, panelVisibility, onTaskUpdated, resetPanelSize]
   )
 
-  // Cmd+T/B/G/S for panel toggles
+  // Cmd+T/B/G/S/E + web panel shortcuts for panel toggles
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent): void => {
       if (!isActive) return
@@ -776,27 +821,38 @@ export function TaskDetailPage({
         const inEditor = target?.closest?.('[contenteditable="true"]')
         const inCodeMirror = target?.closest?.('.cm-editor')
         if (inCodeMirror) return
-        if (e.key === 't') {
+
+        // Built-in panel shortcuts (only if globally enabled)
+        if (e.key === 't' && isBuiltinEnabled('terminal')) {
           e.preventDefault()
           handlePanelToggle('terminal', !panelVisibility.terminal)
-        } else if (e.key === 'b' && !inEditor) {
+        } else if (e.key === 'b' && !inEditor && isBuiltinEnabled('browser')) {
           e.preventDefault()
           handlePanelToggle('browser', !panelVisibility.browser)
-        } else if (e.key === 'g') {
+        } else if (e.key === 'g' && isBuiltinEnabled('diff')) {
           e.preventDefault()
           handlePanelToggle('diff', !panelVisibility.diff)
-        } else if (e.key === 's') {
+        } else if (e.key === 's' && isBuiltinEnabled('settings')) {
           e.preventDefault()
           handlePanelToggle('settings', !panelVisibility.settings)
-        } else if (e.key === 'e') {
+        } else if (e.key === 'e' && isBuiltinEnabled('editor')) {
           e.preventDefault()
           handlePanelToggle('editor', !panelVisibility.editor)
+        } else {
+          // Web panel shortcuts
+          for (const wp of enabledWebPanels) {
+            if (wp.shortcut && e.key === wp.shortcut) {
+              e.preventDefault()
+              handlePanelToggle(wp.id, !panelVisibility[wp.id])
+              return
+            }
+          }
         }
       }
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [isActive, panelVisibility, handlePanelToggle])
+  }, [isActive, panelVisibility, handlePanelToggle, isBuiltinEnabled, enabledWebPanels])
 
   // Focus title input when editing
   useEffect(() => {
@@ -947,6 +1003,58 @@ export function TaskDetailPage({
     })
   }, [task])
 
+  // Web panel URL persistence — use ref to avoid stale closures
+  const webPanelUrlsRef = useRef<Record<string, string>>({})
+  const webPanelUrlTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const taskIdRef = useRef<string | null>(null)
+
+  // Flush any pending URL save (fire-and-forget)
+  const flushPendingUrlSave = useCallback(() => {
+    if (webPanelUrlTimerRef.current) {
+      clearTimeout(webPanelUrlTimerRef.current)
+      webPanelUrlTimerRef.current = null
+      if (taskIdRef.current && Object.keys(webPanelUrlsRef.current).length > 0) {
+        window.api.db.updateTask({
+          id: taskIdRef.current,
+          webPanelUrls: { ...webPanelUrlsRef.current }
+        })
+      }
+    }
+  }, [])
+
+  // Initialize from task on load — flush old task's pending save first
+  useEffect(() => {
+    flushPendingUrlSave()
+    taskIdRef.current = task?.id ?? null
+    if (task?.web_panel_urls) webPanelUrlsRef.current = { ...task.web_panel_urls }
+    else webPanelUrlsRef.current = {}
+  }, [task?.id, flushPendingUrlSave])
+
+  // Flush pending URL save on unmount
+  useEffect(() => {
+    return () => flushPendingUrlSave()
+  }, [flushPendingUrlSave])
+
+  const handleWebPanelUrlChange = useCallback((panelId: string, url: string) => {
+    if (!taskIdRef.current) return
+    webPanelUrlsRef.current = { ...webPanelUrlsRef.current, [panelId]: url }
+    if (webPanelUrlTimerRef.current) clearTimeout(webPanelUrlTimerRef.current)
+    const id = taskIdRef.current
+    const urlSnapshot = { ...webPanelUrlsRef.current }
+    webPanelUrlTimerRef.current = setTimeout(async () => {
+      const updated = await window.api.db.updateTask({
+        id,
+        webPanelUrls: urlSnapshot
+      })
+      setTask(updated)
+    }, 500)
+  }, [])
+
+  // Handle web panel favicon change
+  const handleWebPanelFaviconChange = useCallback((_panelId: string, _favicon: string) => {
+    // Favicon caching — no-op for now, auto-fetched by webview on each load
+  }, [])
+
   // Open a dev server URL in the browser panel (used by both auto-open and toast)
   const openDevServerInBrowser = useCallback((url: string) => {
     handlePanelToggle('browser', true)
@@ -1000,6 +1108,9 @@ export function TaskDetailPage({
 
   return (
     <div className="h-full flex flex-col p-4 pb-0 gap-4">
+      {showRegionSelector && (
+        <RegionSelector onSelect={handleRegionSelect} onCancel={handleRegionCancel} />
+      )}
       {/* Header */}
       <header className="shrink-0 relative">
         <div>
@@ -1035,13 +1146,28 @@ export function TaskDetailPage({
 
             <div className="flex items-center gap-2">
               <PanelToggle
-                panels={[
-                  { id: 'terminal', icon: TerminalIcon, label: 'Terminal', active: panelVisibility.terminal, shortcut: '⌘T' },
-                  { id: 'browser', icon: Globe, label: 'Browser', active: panelVisibility.browser, shortcut: '⌘B' },
-                  { id: 'editor', icon: FileCode, label: 'Editor', active: panelVisibility.editor, shortcut: '⌘E' },
-                  { id: 'diff', icon: GitBranch, label: 'Diff', active: panelVisibility.diff, shortcut: '⌘G' },
-                  { id: 'settings', icon: Settings2, label: 'Settings', active: panelVisibility.settings, shortcut: '⌘S' },
-                ]}
+                panels={(() => {
+                  const builtins: { id: string; icon: typeof Globe; label: string; shortcut?: string }[] = [
+                    { id: 'terminal', icon: TerminalIcon, label: 'Terminal', shortcut: '⌘T' },
+                    { id: 'browser', icon: Globe, label: 'Browser', shortcut: '⌘B' },
+                    { id: 'editor', icon: FileCode, label: 'Editor', shortcut: '⌘E' },
+                    { id: 'diff', icon: GitBranch, label: 'Diff', shortcut: '⌘G' },
+                    { id: 'settings', icon: Settings2, label: 'Settings', shortcut: '⌘S' },
+                  ].filter(p => isBuiltinEnabled(p.id))
+
+                  // Insert web panels after editor
+                  const editorIdx = builtins.findIndex(p => p.id === 'editor')
+                  const webItems = enabledWebPanels.map(wp => ({
+                    id: wp.id,
+                    icon: Globe,
+                    label: wp.name,
+                    shortcut: wp.shortcut ? `⌘${wp.shortcut.toUpperCase()}` : undefined
+                  }))
+                  const insertIdx = editorIdx >= 0 ? editorIdx + 1 : builtins.length
+                  builtins.splice(insertIdx, 0, ...webItems)
+
+                  return builtins.map(p => ({ ...p, active: !!panelVisibility[p.id] }))
+                })()}
                 onChange={handlePanelToggle}
               />
             </div>
@@ -1095,9 +1221,7 @@ export function TaskDetailPage({
             </div>
           )}
           {(() => {
-            const currentConversationId = task.terminal_mode === 'codex'
-              ? task.codex_conversation_id
-              : (task.claude_conversation_id || task.claude_session_id)
+            const currentConversationId = getConversationIdForMode(task)
             return (
               detectedSessionId &&
               currentConversationId &&
@@ -1137,16 +1261,8 @@ export function TaskDetailPage({
                   isActive={isActive}
                   cwd={task.worktree_path || project.path}
                   defaultMode={task.terminal_mode}
-                  conversationId={task.terminal_mode === 'claude-code'
-                    ? (task.claude_conversation_id || task.claude_session_id || undefined)
-                    : task.terminal_mode === 'codex'
-                      ? (task.codex_conversation_id || undefined)
-                      : undefined}
-                  existingConversationId={task.terminal_mode === 'claude-code'
-                    ? (task.claude_conversation_id || task.claude_session_id || undefined)
-                    : task.terminal_mode === 'codex'
-                      ? (task.codex_conversation_id || undefined)
-                      : undefined}
+                  conversationId={getConversationIdForMode(task) || undefined}
+                  existingConversationId={getConversationIdForMode(task) || undefined}
                   initialPrompt={getQuickRunPrompt(task.id)}
                   codeMode={getQuickRunCodeMode(task.id)}
                   providerFlags={getProviderFlagsForMode(task)}
@@ -1176,6 +1292,9 @@ export function TaskDetailPage({
                             <SelectContent>
                               <SelectItem value="claude-code">Claude Code</SelectItem>
                               <SelectItem value="codex">Codex</SelectItem>
+                              <SelectItem value="cursor-agent">Cursor Agent</SelectItem>
+                              <SelectItem value="gemini">Gemini</SelectItem>
+                              <SelectItem value="opencode">OpenCode</SelectItem>
                               <SelectItem value="terminal">Terminal</SelectItem>
                             </SelectContent>
                           </Select>
@@ -1226,6 +1345,15 @@ export function TaskDetailPage({
                               )
                             )
                           )}
+
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button variant="ghost" size="icon" className="size-7" onClick={() => void handleScreenshot()}>
+                                <Camera className="size-3.5" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>Screenshot to terminal (⌘⇧S)</TooltipContent>
+                          </Tooltip>
 
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
@@ -1326,8 +1454,40 @@ export function TaskDetailPage({
           </div>
         )}
 
-        {/* Resize handle: Editor | Diff or Browser | Diff or Terminal | Diff */}
-        {panelVisibility.diff && (panelVisibility.editor || panelVisibility.browser || panelVisibility.terminal) && (
+        {/* Web Panels (custom + predefined) — rendered between editor and diff */}
+        {enabledWebPanels.map((wp, idx) => {
+          if (!panelVisibility[wp.id]) return null
+          // Show resize handle if there's a visible panel before this one
+          const hasLeftNeighbor = panelVisibility.terminal || panelVisibility.browser || panelVisibility.editor ||
+            enabledWebPanels.slice(0, idx).some(prev => panelVisibility[prev.id])
+          return (
+            <div key={wp.id} className="contents">
+              {hasLeftNeighbor && (
+                <ResizeHandle
+                  width={resolvedWidths[wp.id] ?? 200}
+                  minWidth={200}
+                  onWidthChange={(w) => updatePanelSizes({ [wp.id]: w })}
+                  onDragStart={() => setIsResizing(true)}
+                  onDragEnd={() => setIsResizing(false)}
+                  onReset={resetAllPanels}
+                />
+              )}
+              <div className="shrink-0 rounded-md bg-surface-1 border border-border overflow-hidden" style={{ width: resolvedWidths[wp.id] }}>
+                <WebPanelView
+                  panelId={wp.id}
+                  url={task.web_panel_urls?.[wp.id] || wp.baseUrl}
+                  name={wp.name}
+                  onUrlChange={handleWebPanelUrlChange}
+                  onFaviconChange={handleWebPanelFaviconChange}
+                  isResizing={isResizing}
+                />
+              </div>
+            </div>
+          )
+        })}
+
+        {/* Resize handle: Editor/WebPanels | Diff or Browser | Diff or Terminal | Diff */}
+        {panelVisibility.diff && (panelVisibility.editor || panelVisibility.browser || panelVisibility.terminal || enabledWebPanels.some(wp => panelVisibility[wp.id])) && (
           <ResizeHandle
             width={resolvedWidths.diff ?? 50}
             minWidth={50}
@@ -1351,7 +1511,7 @@ export function TaskDetailPage({
         )}
 
         {/* Resize handle: Diff | Settings or Editor | Settings or ... */}
-        {panelVisibility.settings && (panelVisibility.diff || panelVisibility.editor || panelVisibility.browser || panelVisibility.terminal) && (
+        {panelVisibility.settings && (panelVisibility.diff || panelVisibility.editor || panelVisibility.browser || panelVisibility.terminal || enabledWebPanels.some(wp => panelVisibility[wp.id])) && (
           <ResizeHandle
             width={resolvedWidths.settings ?? 440}
             minWidth={200}

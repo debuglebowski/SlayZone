@@ -6,6 +6,48 @@ export const TASK_STATUSES = ['inbox', 'backlog', 'todo', 'in_progress', 'review
 export type TaskStatus = (typeof TASK_STATUSES)[number]
 export type MergeState = 'uncommitted' | 'conflicts'
 
+// --- Provider config (JSON column on tasks table) ---
+
+/** Per-provider config stored as JSON in the provider_config column. Key = TerminalMode value. */
+export interface ProviderConfig {
+  [mode: string]: { conversationId?: string | null; flags?: string }
+}
+
+/** Maps TerminalMode → settings key + fallback flags for new tasks */
+export const PROVIDER_DEFAULTS: Record<string, { settingsKey: string; fallback: string; label: string }> = {
+  'claude-code':  { settingsKey: 'default_claude_flags',   fallback: '--allow-dangerously-skip-permissions', label: 'Claude' },
+  'codex':        { settingsKey: 'default_codex_flags',    fallback: '--full-auto --search',                 label: 'Codex' },
+  'cursor-agent': { settingsKey: 'default_cursor_flags',   fallback: '--force',                              label: 'Cursor' },
+  'gemini':       { settingsKey: 'default_gemini_flags',   fallback: '--yolo',                               label: 'Gemini' },
+  'opencode':     { settingsKey: 'default_opencode_flags', fallback: '',                                     label: 'OpenCode' },
+}
+
+export function getProviderConversationId(cfg: ProviderConfig | undefined | null, mode: string): string | null {
+  return cfg?.[mode]?.conversationId ?? null
+}
+
+export function getProviderFlags(cfg: ProviderConfig | undefined | null, mode: string): string {
+  return cfg?.[mode]?.flags ?? ''
+}
+
+export function setProviderConversationId(cfg: ProviderConfig | undefined | null, mode: string, val: string | null): ProviderConfig {
+  return { ...cfg, [mode]: { ...cfg?.[mode], conversationId: val } }
+}
+
+export function setProviderFlags(cfg: ProviderConfig | undefined | null, mode: string, val: string): ProviderConfig {
+  return { ...cfg, [mode]: { ...cfg?.[mode], flags: val } }
+}
+
+/** Returns a partial ProviderConfig that sets conversationId=null for all modes in cfg.
+ *  Does NOT include flags — the handler deep-merges, so existing flags survive. */
+export function clearAllConversationIds(cfg: ProviderConfig | undefined | null): ProviderConfig {
+  const result: ProviderConfig = {}
+  for (const mode of Object.keys(cfg ?? {})) {
+    result[mode] = { conversationId: null }
+  }
+  return result
+}
+
 export interface PanelVisibility extends Record<string, boolean> {
   terminal: boolean
   browser: boolean
@@ -44,7 +86,10 @@ export const PREDEFINED_WEB_PANELS: WebPanelDefinition[] = [
 ]
 
 export const DEFAULT_PANEL_CONFIG: PanelConfig = {
-  builtinEnabled: Object.fromEntries(BUILTIN_PANEL_IDS.map(id => [id, true])),
+  builtinEnabled: {
+    ...Object.fromEntries(BUILTIN_PANEL_IDS.map(id => [id, true])),
+    ...Object.fromEntries(PREDEFINED_WEB_PANELS.map(wp => [wp.id, false]))
+  },
   webPanels: [...PREDEFINED_WEB_PANELS]
 }
 
@@ -62,13 +107,22 @@ export interface Task {
   archived_at: string | null
   // Terminal configuration
   terminal_mode: TerminalMode
-  claude_conversation_id: string | null
-  codex_conversation_id: string | null
+  provider_config: ProviderConfig
   terminal_shell: string | null
-  claude_flags: string
-  codex_flags: string
   // Legacy (kept for backwards compat, use claude_conversation_id instead)
   claude_session_id: string | null
+  // @deprecated — use provider_config[mode].conversationId
+  claude_conversation_id: string | null
+  codex_conversation_id: string | null
+  cursor_conversation_id: string | null
+  gemini_conversation_id: string | null
+  opencode_conversation_id: string | null
+  // @deprecated — use provider_config[mode].flags
+  claude_flags: string
+  codex_flags: string
+  cursor_flags: string
+  gemini_flags: string
+  opencode_flags: string
   // Permissions
   dangerously_skip_permissions: boolean
   // Panel visibility (JSON)
@@ -105,6 +159,9 @@ export interface CreateTaskInput {
   terminalMode?: TerminalMode
   claudeFlags?: string
   codexFlags?: string
+  cursorFlags?: string
+  geminiFlags?: string
+  opencodeFlags?: string
   parentId?: string
 }
 
@@ -119,11 +176,19 @@ export interface UpdateTaskInput {
   projectId?: string
   // Terminal config
   terminalMode?: TerminalMode
+  providerConfig?: ProviderConfig
+  terminalShell?: string | null
+  // @deprecated — use providerConfig
   claudeConversationId?: string | null
   codexConversationId?: string | null
-  terminalShell?: string | null
+  cursorConversationId?: string | null
+  geminiConversationId?: string | null
+  opencodeConversationId?: string | null
   claudeFlags?: string
   codexFlags?: string
+  cursorFlags?: string
+  geminiFlags?: string
+  opencodeFlags?: string
   // Panel visibility
   panelVisibility?: PanelVisibility | null
   // Worktree
