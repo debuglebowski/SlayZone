@@ -1,6 +1,6 @@
 import type { Task, TaskStatus } from '@slayzone/task/shared'
 import { TASK_STATUS_ORDER, getTaskStatusStyle } from '@slayzone/ui'
-import type { FilterState, DueDateRange } from './FilterState'
+import type { FilterState, DueDateRange, SortKey } from './FilterState'
 
 export type GroupKey = 'status' | 'priority' | 'due_date'
 
@@ -34,8 +34,30 @@ export function addDaysISO(date: string, days: number): string {
   return d.toISOString().split('T')[0]
 }
 
-function groupByStatus(tasks: Task[]): Column[] {
-  const sorted = [...tasks].sort((a, b) => a.order - b.order)
+function sortTasks(tasks: Task[], sortBy: SortKey): Task[] {
+  return [...tasks].sort((a, b) => {
+    switch (sortBy) {
+      case 'priority':
+        return a.priority !== b.priority ? a.priority - b.priority : a.order - b.order
+      case 'due_date': {
+        if (!a.due_date && !b.due_date) return a.order - b.order
+        if (!a.due_date) return 1
+        if (!b.due_date) return -1
+        return a.due_date !== b.due_date ? a.due_date.localeCompare(b.due_date) : a.order - b.order
+      }
+      case 'title':
+        return a.title.localeCompare(b.title)
+      case 'created':
+        return b.created_at.localeCompare(a.created_at) // newest first
+      case 'manual':
+      default:
+        return a.order - b.order
+    }
+  })
+}
+
+function groupByStatus(tasks: Task[], sortBy: SortKey): Column[] {
+  const sorted = sortTasks(tasks, sortBy)
   return STATUS_ORDER.map((status) => ({
     id: status,
     title: STATUS_LABELS[status],
@@ -43,8 +65,8 @@ function groupByStatus(tasks: Task[]): Column[] {
   }))
 }
 
-function groupByPriority(tasks: Task[]): Column[] {
-  const sorted = [...tasks].sort((a, b) => a.order - b.order)
+function groupByPriority(tasks: Task[], sortBy: SortKey): Column[] {
+  const sorted = sortTasks(tasks, sortBy)
   return [1, 2, 3, 4, 5].map((priority) => ({
     id: `p${priority}`,
     title: PRIORITY_LABELS[priority],
@@ -52,8 +74,8 @@ function groupByPriority(tasks: Task[]): Column[] {
   }))
 }
 
-function groupByDueDate(tasks: Task[]): Column[] {
-  const sorted = [...tasks].sort((a, b) => a.order - b.order)
+function groupByDueDate(tasks: Task[], sortBy: SortKey): Column[] {
+  const sorted = sortTasks(tasks, sortBy)
   const today = todayISO()
   const weekEnd = addDaysISO(today, 7)
 
@@ -86,14 +108,14 @@ function groupByDueDate(tasks: Task[]): Column[] {
   ]
 }
 
-export function groupTasksBy(tasks: Task[], groupBy: GroupKey): Column[] {
+export function groupTasksBy(tasks: Task[], groupBy: GroupKey, sortBy: SortKey = 'manual'): Column[] {
   switch (groupBy) {
     case 'status':
-      return groupByStatus(tasks)
+      return groupByStatus(tasks, sortBy)
     case 'priority':
-      return groupByPriority(tasks)
+      return groupByPriority(tasks, sortBy)
     case 'due_date':
-      return groupByDueDate(tasks)
+      return groupByDueDate(tasks, sortBy)
   }
 }
 

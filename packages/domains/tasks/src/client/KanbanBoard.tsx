@@ -17,12 +17,14 @@ import type { Task } from '@slayzone/task/shared'
 import type { Project } from '@slayzone/projects/shared'
 import type { Tag } from '@slayzone/tags/shared'
 import { groupTasksBy, type GroupKey, type Column } from './kanban'
+import type { SortKey } from './FilterState'
 import { KanbanColumn } from './KanbanColumn'
 import { KanbanCard } from './KanbanCard'
 
 interface KanbanBoardProps {
   tasks: Task[]
   groupBy: GroupKey
+  sortBy?: SortKey
   onTaskMove: (taskId: string, newColumnId: string, targetIndex: number) => void
   onTaskReorder: (taskIds: string[]) => void
   onTaskClick?: (task: Task, e: React.MouseEvent) => void
@@ -44,6 +46,7 @@ interface KanbanBoardProps {
 export function KanbanBoard({
   tasks,
   groupBy,
+  sortBy = 'manual',
   onTaskMove,
   onTaskReorder,
   onTaskClick,
@@ -73,7 +76,7 @@ export function KanbanBoard({
     useSensor(KeyboardSensor)
   )
 
-  const columns = groupTasksBy(tasks, groupBy)
+  const columns = groupTasksBy(tasks, groupBy, sortBy)
   const activeTask = activeId ? tasks.find((t) => t.id === activeId) : null
 
   const subTaskCounts = useMemo(() => {

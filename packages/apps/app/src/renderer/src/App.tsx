@@ -11,8 +11,7 @@ import {
   useTasksData,
   useFilterState,
   applyFilters,
-  type Column,
-  type FilterBarVariant
+  type Column
 } from '@slayzone/tasks'
 import { CreateTaskDialog, EditTaskDialog, DeleteTaskDialog, TaskDetailPage } from '@slayzone/task'
 import { CreateProjectDialog, ProjectSettingsDialog, DeleteProjectDialog } from '@slayzone/projects'
@@ -76,8 +75,6 @@ function App(): React.JSX.Element {
 
   // Filter state (persisted per project)
   const [filter, setFilter] = useFilterState(selectedProjectId)
-  const [filterBarVariant, setFilterBarVariant] = useState<FilterBarVariant>('a')
-
   // Dialog state
   const [createOpen, setCreateOpen] = useState(false)
   const [createTaskDefaults, setCreateTaskDefaults] = useState<{
@@ -693,24 +690,8 @@ function App(): React.JSX.Element {
                                 )}
                               </div>
                               {projects.length > 0 && !(projectPathMissing && selectedProjectId) && (
-                                <FilterBar variant={filterBarVariant} filter={filter} onChange={setFilter} tags={tags} />
+                                <FilterBar filter={filter} onChange={setFilter} tags={tags} />
                               )}
-                              {/* Variant picker — remove after choosing */}
-                              <div className="flex items-center gap-0.5 ml-2 border rounded-md p-0.5">
-                                {(['a', 'b', 'c'] as const).map((v) => (
-                                  <button
-                                    key={v}
-                                    onClick={() => setFilterBarVariant(v)}
-                                    className={`px-2 py-0.5 text-xs font-medium rounded transition-colors ${
-                                      filterBarVariant === v
-                                        ? 'bg-primary text-primary-foreground'
-                                        : 'text-muted-foreground hover:text-foreground hover:bg-accent'
-                                    }`}
-                                  >
-                                    {v.toUpperCase()}
-                                  </button>
-                                ))}
-                              </div>
                             </div>
                           </header>
 
@@ -735,13 +716,14 @@ function App(): React.JSX.Element {
                                 <KanbanBoard
                                   tasks={displayTasks}
                                   groupBy={filter.groupBy}
+                                  sortBy={filter.sortBy}
                                   onTaskMove={handleTaskMove}
                                   onTaskReorder={reorderTasks}
                                   onTaskClick={handleTaskClick}
                                   onCreateTask={handleCreateTaskFromColumn}
                                   projectsMap={projectsMap}
                                   showProjectDot={selectedProjectId === null}
-                                  disableDrag={filter.groupBy === 'due_date'}
+                                  disableDrag={filter.groupBy === 'due_date' || filter.sortBy !== 'manual'}
                                   taskTags={taskTags}
                                   tags={tags}
                                   blockedTaskIds={blockedTaskIds}
