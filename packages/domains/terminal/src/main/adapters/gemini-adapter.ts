@@ -8,6 +8,7 @@ export class GeminiAdapter implements TerminalAdapter {
   readonly mode = 'gemini' as const
   // Ink TUI redraws in bursts; short idle timeout to detect when response is done
   readonly idleTimeoutMs = 2500
+  readonly sessionIdCommand = '/stats'
 
   buildSpawnConfig(_cwd: string, conversationId?: string, resuming?: boolean, _shellOverride?: string, initialPrompt?: string, providerArgs: string[] = [], _codeMode?: CodeMode): SpawnConfig {
     const args: string[] = []

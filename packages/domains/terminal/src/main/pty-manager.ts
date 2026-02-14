@@ -570,7 +570,8 @@ export function writePty(sessionId: string, data: string): boolean {
       session.lastOutputTime = Date.now() // reset idle timer from input submission
       transitionState(sessionId, 'running')
     }
-    if (session.inputBuffer.includes('/status')) {
+    const cmd = session.adapter.sessionIdCommand ?? '/status'
+    if (session.inputBuffer.includes(cmd)) {
       session.watchingForSessionId = true
       session.statusOutputBuffer = ''
 

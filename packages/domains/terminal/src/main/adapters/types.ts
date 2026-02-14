@@ -47,6 +47,9 @@ export interface TerminalAdapter {
    */
   readonly transitionOnInput?: boolean
 
+  /** Command to run in terminal to discover session ID. Undefined = supports --session-id at creation. */
+  readonly sessionIdCommand?: string
+
   /**
    * Build spawn configuration for this terminal mode.
    */

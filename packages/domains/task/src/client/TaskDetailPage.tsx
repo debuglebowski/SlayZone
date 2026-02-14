@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
-import { MoreHorizontal, Archive, Trash2, AlertTriangle, Sparkles, Loader2, Terminal as TerminalIcon, Globe, Settings2, GitBranch, FileCode, ChevronRight, Plus, GripVertical, Camera } from 'lucide-react'
+import { MoreHorizontal, Archive, Trash2, AlertTriangle, Sparkles, Loader2, Terminal as TerminalIcon, Globe, Settings2, GitBranch, FileCode, ChevronRight, Plus, GripVertical, Camera, X, Info } from 'lucide-react'
 import { DndContext, PointerSensor, useSensors, useSensor, closestCenter, type DragEndEvent } from '@dnd-kit/core'
 import { SortableContext, useSortable, verticalListSortingStrategy, arrayMove } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
@@ -8,7 +8,7 @@ import { getProviderConversationId, getProviderFlags, setProviderConversationId,
 import type { BrowserTabsState } from '@slayzone/task-browser/shared'
 import type { Tag } from '@slayzone/tags/shared'
 import type { Project } from '@slayzone/projects/shared'
-import { DEV_SERVER_URL_PATTERN } from '@slayzone/terminal/shared'
+import { DEV_SERVER_URL_PATTERN, SESSION_ID_COMMANDS, SESSION_ID_UNAVAILABLE } from '@slayzone/terminal/shared'
 import type { TerminalMode, ClaudeAvailability } from '@slayzone/terminal/shared'
 import { Button, PanelToggle, DevServerToast, Collapsible, CollapsibleTrigger, CollapsibleContent } from '@slayzone/ui'
 import {
@@ -169,7 +169,6 @@ export function TaskDetailPage({
 
   // Detected session ID from /status command
   const [detectedSessionId, setDetectedSessionId] = useState<string | null>(null)
-  const codexStatusRequestedTaskIdsRef = useRef<Set<string>>(new Set())
 
   // Title editing state
   const [editingTitle, setEditingTitle] = useState(false)
@@ -467,59 +466,22 @@ export function TaskDetailPage({
     terminalApiRef.current = api
   }, [])
 
-  // Modes that need /status auto-request for session ID detection
-  const needsStatusRequest = task?.terminal_mode === 'codex' || task?.terminal_mode === 'cursor-agent'
-  const hasConversationId = (() => {
-    if (!task) return true
-    if (task.terminal_mode !== 'codex' && task.terminal_mode !== 'cursor-agent') return true
-    return !!getProviderConversationId(task.provider_config, task.terminal_mode)
-  })()
+  // Session ID discovery: providers that don't support --session-id at creation
+  const sessionIdCommand = task ? SESSION_ID_COMMANDS[task.terminal_mode] : undefined
+  const showSessionBanner = !!sessionIdCommand && !!task && !getProviderConversationId(task.provider_config, task.terminal_mode) && !detectedSessionId
 
-  // Some CLIs have no "create with session id" command; ask for current session id.
-  // Use direct PTY writes with retries to survive startup timing races.
-  useEffect(() => {
-    if (!task || !needsStatusRequest || hasConversationId) return
-    if (detectedSessionId) return
-    if (codexStatusRequestedTaskIdsRef.current.has(task.id)) return
+  // Providers where session ID detection is not possible
+  const sessionIdUnavailable = !!task && SESSION_ID_UNAVAILABLE.includes(task.terminal_mode)
+  const [sessionUnavailableDismissed, setSessionUnavailableDismissed] = useState<string | null>(null)
+  const showUnavailableBanner = sessionIdUnavailable && !getProviderConversationId(task?.provider_config, task?.terminal_mode ?? '') && sessionUnavailableDismissed !== task?.id
 
-    codexStatusRequestedTaskIdsRef.current.add(task.id)
-    const sessionId = getMainSessionId(task.id)
-    let cancelled = false
-    let attempts = 0
-    let retryTimer: ReturnType<typeof setTimeout> | null = null
-
-    const runAttempt = async (): Promise<void> => {
-      if (cancelled) return
-      if (!task || hasConversationId || detectedSessionId) return
-
-      const exists = await window.api.pty.exists(sessionId)
-      if (!exists || cancelled) {
-        retryTimer = setTimeout(() => {
-          void runAttempt()
-        }, 800)
-        return
-      }
-
-      await window.api.pty.write(sessionId, '/status')
-      await window.api.pty.write(sessionId, '\r')
-      attempts += 1
-
-      if (attempts < 8) {
-        retryTimer = setTimeout(() => {
-          void runAttempt()
-        }, 1200)
-      }
-    }
-
-    retryTimer = setTimeout(() => {
-      void runAttempt()
-    }, 500)
-
-    return () => {
-      cancelled = true
-      if (retryTimer) clearTimeout(retryTimer)
-    }
-  }, [task, needsStatusRequest, hasConversationId, detectedSessionId, getMainSessionId])
+  const handleDetectSessionId = useCallback(async () => {
+    if (!task || !sessionIdCommand) return
+    const sid = getMainSessionId(task.id)
+    const exists = await window.api.pty.exists(sid)
+    if (!exists) return
+    await window.api.pty.write(sid, sessionIdCommand + '\r')
+  }, [task, sessionIdCommand, getMainSessionId])
 
   // Get current conversation ID for mode (with claude_session_id legacy fallback)
   const getConversationIdForMode = useCallback((t: Task): string | null => {
@@ -541,9 +503,9 @@ export function TaskDetailPage({
     setDetectedSessionId(null)
   }, [task, detectedSessionId, onTaskUpdated])
 
-  // Persist detected conversation IDs immediately for modes that need /status.
+  // Persist detected conversation IDs immediately for modes that need session discovery.
   useEffect(() => {
-    if (!task || !detectedSessionId || !needsStatusRequest) return
+    if (!task || !detectedSessionId || !sessionIdCommand) return
     if (getConversationIdForMode(task) === detectedSessionId) {
       setDetectedSessionId(null)
       return
@@ -564,7 +526,7 @@ export function TaskDetailPage({
     return () => {
       cancelled = true
     }
-  }, [task, detectedSessionId, needsStatusRequest, onTaskUpdated, getConversationIdForMode])
+  }, [task, detectedSessionId, sessionIdCommand, onTaskUpdated, getConversationIdForMode])
 
   // Handle invalid session (e.g., "No conversation found" error)
   const handleSessionInvalid = useCallback(async () => {
@@ -1241,6 +1203,36 @@ export function TaskDetailPage({
               >
                 Update DB
               </Button>
+            </div>
+          )}
+          {showSessionBanner && (
+            <div className="shrink-0 bg-blue-500/10 border-b border-blue-500/20 px-4 py-1.5 flex items-center gap-2">
+              <TerminalIcon className="h-3.5 w-3.5 text-blue-500" />
+              <span className="text-xs text-blue-500">
+                Session not saved — resume won't work until detected
+              </span>
+              <Button
+                size="sm"
+                variant="outline"
+                className="ml-auto h-6 text-xs"
+                onClick={handleDetectSessionId}
+              >
+                Run {sessionIdCommand}
+              </Button>
+            </div>
+          )}
+          {showUnavailableBanner && (
+            <div className="shrink-0 bg-amber-500/10 border-b border-amber-500/20 px-4 py-1.5 flex items-center gap-2">
+              <Info className="h-3.5 w-3.5 text-amber-500 shrink-0" />
+              <span className="text-xs text-amber-500">
+                Session ID detection not available for this provider — don't close the tab or resume won't work. Providers with resume: Claude Code, Codex, Gemini
+              </span>
+              <button
+                className="ml-auto text-amber-500 hover:text-amber-400 shrink-0"
+                onClick={() => setSessionUnavailableDismissed(task?.id ?? null)}
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
             </div>
           )}
           {/* Terminal + mode bar wrapper */}

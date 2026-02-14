@@ -66,3 +66,12 @@ export interface ProviderUsage {
   error: string | null
   fetchedAt: number
 }
+
+/** Command to discover session ID for providers that don't support --session-id at creation. */
+export const SESSION_ID_COMMANDS: Partial<Record<TerminalMode, string>> = {
+  'codex': '/status',
+  'gemini': '/stats',
+}
+
+/** Providers where session ID detection is not possible — no --session-id flag and no detection command. */
+export const SESSION_ID_UNAVAILABLE: readonly TerminalMode[] = ['cursor-agent', 'opencode']
