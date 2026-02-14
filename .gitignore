@@ -5,6 +5,7 @@ out
 .eslintcache
 *.log*
 *.tsbuildinfo
+logs/
 
 # Auto Claude data directory
 .auto-claude/
