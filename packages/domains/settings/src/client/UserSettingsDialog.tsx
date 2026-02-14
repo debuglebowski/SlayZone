@@ -1,10 +1,11 @@
 import { useState, useEffect, useRef } from 'react'
-import { XIcon } from 'lucide-react'
+import { XIcon, Pencil, Trash2, Plus, Settings2, SquareTerminal, Globe, FileCode, GitCompare, SlidersHorizontal } from 'lucide-react'
 import { SettingsLayout } from '@slayzone/ui'
 import { Button } from '@slayzone/ui'
 import { Input } from '@slayzone/ui'
 import { Label } from '@slayzone/ui'
 import { Skeleton } from '@slayzone/ui'
+import { Switch } from '@slayzone/ui'
 import {
   Select,
   SelectContent,
@@ -14,6 +15,8 @@ import {
 } from '@slayzone/ui'
 import type { Tag } from '@slayzone/tags/shared'
 import type { ClaudeAvailability, TerminalMode } from '@slayzone/terminal/shared'
+import type { PanelConfig, WebPanelDefinition } from '@slayzone/task/shared'
+import { DEFAULT_PANEL_CONFIG, PREDEFINED_WEB_PANELS, PROVIDER_DEFAULTS } from '@slayzone/task/shared'
 import type { DiagnosticsConfig } from '@slayzone/types'
 import type { IntegrationConnectionPublic } from '@slayzone/integrations/shared'
 import { ContextManagerSettings } from '../../../ai-config/src/client/ContextManagerSettings'
@@ -102,8 +105,9 @@ export function UserSettingsDialog({
   const [devServerAutoOpenBrowser, setDevServerAutoOpenBrowser] = useState(false)
   const [mcpPort, setMcpPort] = useState('45678')
   const [defaultTerminalMode, setDefaultTerminalMode] = useState<TerminalMode>('claude-code')
-  const [defaultClaudeFlags, setDefaultClaudeFlags] = useState('--allow-dangerously-skip-permissions')
-  const [defaultCodexFlags, setDefaultCodexFlags] = useState('--full-auto --search')
+  const [defaultProviderFlags, setDefaultProviderFlags] = useState<Record<string, string>>(
+    Object.fromEntries(Object.entries(PROVIDER_DEFAULTS).map(([mode, def]) => [mode, def.fallback]))
+  )
   const [diagnosticsConfig, setDiagnosticsConfig] = useState<DiagnosticsConfig | null>(null)
   const [retentionDaysInput, setRetentionDaysInput] = useState('14')
   const [exportRange, setExportRange] = useState<'15m' | '1h' | '24h' | '7d'>('1h')
@@ -114,6 +118,19 @@ export function UserSettingsDialog({
   const [connections, setConnections] = useState<IntegrationConnectionPublic[]>([])
   const [syncingIntegrations, setSyncingIntegrations] = useState(false)
   const [integrationsMessage, setIntegrationsMessage] = useState('')
+  // Panel config state
+  const [panelConfig, setPanelConfig] = useState<PanelConfig>(DEFAULT_PANEL_CONFIG)
+  const [newPanelName, setNewPanelName] = useState('')
+  const [newPanelUrl, setNewPanelUrl] = useState('')
+  const [newPanelShortcut, setNewPanelShortcut] = useState('')
+  const [panelShortcutError, setPanelShortcutError] = useState('')
+  const [configuringNativeId, setConfiguringNativeId] = useState<string | null>(null)
+  // Edit mode for external panels
+  const [editingPanelId, setEditingPanelId] = useState<string | null>(null)
+  const [editPanelName, setEditPanelName] = useState('')
+  const [editPanelUrl, setEditPanelUrl] = useState('')
+  const [editPanelShortcut, setEditPanelShortcut] = useState('')
+  const [editShortcutError, setEditShortcutError] = useState('')
   const loadRequestIdRef = useRef(0)
 
   useEffect(() => {
@@ -142,15 +159,17 @@ export function UserSettingsDialog({
     const isStale = () => requestId !== loadRequestIdRef.current
 
     try {
-      const [loadedTags, path, shell, wtBasePath, autoCreateWorktree, termMode, claudeFlags, codexFlags, devToast, devAutoOpen, mcpPortSetting] = await Promise.allSettled([
+      const providerFlagKeys = Object.values(PROVIDER_DEFAULTS).map(d => d.settingsKey)
+      const [loadedTags, path, shell, wtBasePath, autoCreateWorktree, termMode, ...flagResults] = await Promise.allSettled([
         window.api.tags.getTags(),
         window.api.settings.get('database_path'),
         window.api.settings.get('shell'),
         window.api.settings.get('worktree_base_path'),
         window.api.settings.get('auto_create_worktree_on_task_create'),
         window.api.settings.get('default_terminal_mode'),
-        window.api.settings.get('default_claude_flags'),
-        window.api.settings.get('default_codex_flags'),
+        ...providerFlagKeys.map(k => window.api.settings.get(k)),
+      ])
+      const [devToast, devAutoOpen, mcpPortSetting] = await Promise.allSettled([
         window.api.settings.get('dev_server_toast_enabled'),
         window.api.settings.get('dev_server_auto_open_browser'),
         window.api.settings.get('mcp_server_port')
@@ -176,23 +195,22 @@ export function UserSettingsDialog({
         mcpPortSetting.status === 'fulfilled' && mcpPortSetting.value ? mcpPortSetting.value : '45678'
       )
 
+      const validModes: TerminalMode[] = ['claude-code', 'codex', 'cursor-agent', 'gemini', 'opencode', 'terminal']
       const safeMode =
         termMode.status === 'fulfilled' &&
-        (termMode.value === 'claude-code' || termMode.value === 'codex' || termMode.value === 'terminal')
-          ? termMode.value
+        validModes.includes(termMode.value as TerminalMode)
+          ? (termMode.value as TerminalMode)
           : 'claude-code'
       setDefaultTerminalMode(safeMode)
 
-      setDefaultClaudeFlags(
-        claudeFlags.status === 'fulfilled'
-          ? (claudeFlags.value ?? '--allow-dangerously-skip-permissions')
-          : '--allow-dangerously-skip-permissions'
-      )
-      setDefaultCodexFlags(
-        codexFlags.status === 'fulfilled'
-          ? (codexFlags.value ?? '--full-auto --search')
-          : '--full-auto --search'
-      )
+      // Load provider flags dynamically
+      const loadedFlags: Record<string, string> = {}
+      const providerEntries = Object.entries(PROVIDER_DEFAULTS)
+      providerEntries.forEach(([mode, def], i) => {
+        const result = flagResults[i]
+        loadedFlags[mode] = result?.status === 'fulfilled' ? (result.value ?? def.fallback) : def.fallback
+      })
+      setDefaultProviderFlags(loadedFlags)
 
       try {
         const diagConfig = await window.api.diagnostics.getConfig()
@@ -214,6 +232,23 @@ export function UserSettingsDialog({
         if (isStale()) return
         setIntegrationsMessage(err instanceof Error ? err.message : String(err))
       }
+
+      // Load panel config
+      try {
+        const panelConfigRaw = await window.api.settings.get('panel_config')
+        if (isStale()) return
+        if (panelConfigRaw) {
+          const parsed = JSON.parse(panelConfigRaw) as PanelConfig
+          // Merge in any new predefined panels (skip user-deleted ones)
+          const existingIds = new Set(parsed.webPanels.map(wp => wp.id))
+          const deleted = new Set(parsed.deletedPredefined ?? [])
+          const missing = PREDEFINED_WEB_PANELS.filter(p => !existingIds.has(p.id) && !deleted.has(p.id))
+          if (missing.length > 0) {
+            parsed.webPanels = [...parsed.webPanels, ...missing]
+          }
+          setPanelConfig(parsed)
+        }
+      } catch { /* ignore */ }
 
       void window.api.claude.checkAvailability().then((status) => {
         if (isStale()) return
@@ -318,9 +353,118 @@ export function UserSettingsDialog({
     setTags(tags.filter((t) => t.id !== id))
   }
 
+  // Panel config helpers
+  const savePanelConfig = async (next: PanelConfig) => {
+    setPanelConfig(next)
+    await window.api.settings.set('panel_config', JSON.stringify(next))
+    window.dispatchEvent(new CustomEvent('panel-config-changed'))
+  }
+
+  const toggleBuiltinPanel = (id: string, enabled: boolean) => {
+    savePanelConfig({
+      ...panelConfig,
+      builtinEnabled: { ...panelConfig.builtinEnabled, [id]: enabled }
+    })
+  }
+
+  const toggleWebPanel = (id: string, enabled: boolean) => {
+    savePanelConfig({
+      ...panelConfig,
+      builtinEnabled: { ...panelConfig.builtinEnabled, [id]: enabled }
+    })
+  }
+
+  const RESERVED_SHORTCUTS = new Set(['t', 'b', 'e', 'g', 's'])
+
+  const validateShortcut = (letter: string, excludeId?: string): string | null => {
+    if (!letter) return null
+    const l = letter.toLowerCase()
+    if (l.length !== 1 || !/[a-z]/.test(l)) return 'Must be a single letter'
+    if (RESERVED_SHORTCUTS.has(l)) return `⌘${l.toUpperCase()} is reserved for a built-in panel`
+    const existing = panelConfig.webPanels.find(wp => wp.shortcut === l && wp.id !== excludeId)
+    if (existing) return `⌘${l.toUpperCase()} is already used by ${existing.name}`
+    return null
+  }
+
+  const handleAddCustomPanel = async () => {
+    if (!newPanelName.trim() || !newPanelUrl.trim()) return
+    const shortcutErr = validateShortcut(newPanelShortcut)
+    if (shortcutErr) { setPanelShortcutError(shortcutErr); return }
+
+    let url = newPanelUrl.trim()
+    if (!url.startsWith('http://') && !url.startsWith('https://')) {
+      url = `https://${url}`
+    }
+
+    const newPanel: WebPanelDefinition = {
+      id: `web:${crypto.randomUUID().slice(0, 8)}`,
+      name: newPanelName.trim(),
+      baseUrl: url,
+      shortcut: newPanelShortcut.trim().toLowerCase() || undefined
+    }
+
+    await savePanelConfig({
+      ...panelConfig,
+      webPanels: [...panelConfig.webPanels, newPanel]
+    })
+    setNewPanelName('')
+    setNewPanelUrl('')
+    setNewPanelShortcut('')
+    setPanelShortcutError('')
+  }
+
+  const handleDeleteWebPanel = async (id: string) => {
+    const wp = panelConfig.webPanels.find(p => p.id === id)
+    const next: PanelConfig = {
+      ...panelConfig,
+      webPanels: panelConfig.webPanels.filter(p => p.id !== id)
+    }
+    // Track deleted predefined panels so mergePredefined doesn't re-add them
+    if (wp?.predefined) {
+      next.deletedPredefined = [...(panelConfig.deletedPredefined ?? []), id]
+    }
+    await savePanelConfig(next)
+    if (editingPanelId === id) setEditingPanelId(null)
+  }
+
+  const startEditingPanel = (wp: WebPanelDefinition) => {
+    setEditingPanelId(wp.id)
+    setEditPanelName(wp.name)
+    setEditPanelUrl(wp.baseUrl)
+    setEditPanelShortcut(wp.shortcut || '')
+    setEditShortcutError('')
+  }
+
+  const handleSaveEditPanel = async () => {
+    if (!editingPanelId || !editPanelName.trim() || !editPanelUrl.trim()) return
+    const shortcutErr = editPanelShortcut ? validateShortcut(editPanelShortcut, editingPanelId) : null
+    if (shortcutErr) { setEditShortcutError(shortcutErr); return }
+
+    let url = editPanelUrl.trim()
+    if (!url.startsWith('http://') && !url.startsWith('https://')) url = `https://${url}`
+
+    await savePanelConfig({
+      ...panelConfig,
+      webPanels: panelConfig.webPanels.map(wp =>
+        wp.id === editingPanelId
+          ? { ...wp, name: editPanelName.trim(), baseUrl: url, shortcut: editPanelShortcut.trim().toLowerCase() || undefined }
+          : wp
+      )
+    })
+    setEditingPanelId(null)
+  }
+
+  const BUILTIN_PANEL_LABELS: Record<string, string> = {
+    terminal: 'Terminal',
+    browser: 'Browser',
+    editor: 'Editor',
+    diff: 'Diff',
+    settings: 'Settings'
+  }
+
   const navItems: Array<{ key: string; label: string }> = [
     { key: 'general', label: 'General' },
-    { key: 'terminal', label: 'Terminal' },
+    { key: 'panels', label: 'Panels' },
     { key: 'integrations', label: 'Integrations' },
     { key: 'diagnostics', label: 'Diagnostics' },
     { key: 'ai-config', label: 'Context Manager' },
@@ -406,40 +550,6 @@ export function UserSettingsDialog({
                 </div>
 
                 <div className="space-y-3">
-                  <Label className="text-base font-semibold">Browser</Label>
-                  <div className="grid grid-cols-[220px_minmax(0,1fr)] items-center gap-4">
-                    <span className="text-sm">Dev server detection</span>
-                    <label className="inline-flex items-center gap-2 text-sm">
-                      <input
-                        type="checkbox"
-                        checked={devServerToastEnabled}
-                        onChange={(e) => {
-                          const enabled = e.target.checked
-                          setDevServerToastEnabled(enabled)
-                          window.api.settings.set('dev_server_toast_enabled', enabled ? '1' : '0')
-                        }}
-                      />
-                      <span>Show toast when a dev server is detected</span>
-                    </label>
-                  </div>
-                  <div className="grid grid-cols-[220px_minmax(0,1fr)] items-center gap-4">
-                    <span className="text-sm">Auto-open preview</span>
-                    <label className="inline-flex items-center gap-2 text-sm">
-                      <input
-                        type="checkbox"
-                        checked={devServerAutoOpenBrowser}
-                        onChange={(e) => {
-                          const enabled = e.target.checked
-                          setDevServerAutoOpenBrowser(enabled)
-                          window.api.settings.set('dev_server_auto_open_browser', enabled ? '1' : '0')
-                        }}
-                      />
-                      <span>Automatically open browser panel when a dev server is detected</span>
-                    </label>
-                  </div>
-                </div>
-
-                <div className="space-y-3">
                   <Label className="text-base font-semibold">MCP Server</Label>
                   <div className="grid grid-cols-[220px_minmax(0,1fr)] items-center gap-4">
                     <span className="text-sm">Port</span>
@@ -464,75 +574,247 @@ export function UserSettingsDialog({
               </>
             )}
 
-            {activeTab === 'terminal' && (
+            {activeTab === 'panels' && (
               <>
+                {/* Native panels */}
                 <div className="space-y-3">
-                  <Label className="text-base font-semibold">Mode</Label>
-                  <div className="grid grid-cols-[220px_minmax(0,1fr)] items-center gap-4">
-                    <span className="text-sm">Default mode</span>
-                    <Select
-                      value={defaultTerminalMode}
-                      onValueChange={(v) => {
-                        const mode = v as TerminalMode
-                        setDefaultTerminalMode(mode)
-                        window.api.settings.set('default_terminal_mode', mode)
-                      }}
-                    >
-                      <SelectTrigger className="w-full max-w-sm">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="claude-code">Claude Code</SelectItem>
-                        <SelectItem value="codex">Codex</SelectItem>
-                        <SelectItem value="terminal">Terminal</SelectItem>
-                      </SelectContent>
-                    </Select>
+                  <div>
+                    <Label className="text-base font-semibold">Native</Label>
+                    <p className="text-xs text-muted-foreground mt-1">Built-in panels. Disabled panels won't appear in any task.</p>
                   </div>
-                  <p className="text-xs text-muted-foreground">Mode used when creating new tasks</p>
+
+                  <div className="space-y-2">
+                    {/* Terminal */}
+                    <div className="rounded-lg border">
+                      <div className="flex items-center gap-3 h-11 px-4">
+                        <SquareTerminal className="size-4 text-muted-foreground shrink-0" />
+                        <span className="text-sm font-medium flex-1">Terminal</span>
+                        <Button variant="ghost" size="icon-sm" onClick={() => setConfiguringNativeId(configuringNativeId === 'terminal' ? null : 'terminal')}>
+                          <Settings2 className="size-3.5" />
+                        </Button>
+                        <kbd className="text-[10px] font-mono bg-muted px-1.5 py-0.5 rounded border shrink-0">⌘T</kbd>
+                        <Switch
+                          checked={panelConfig.builtinEnabled.terminal !== false}
+                          onCheckedChange={(checked) => toggleBuiltinPanel('terminal', checked)}
+                        />
+                      </div>
+                      {configuringNativeId === 'terminal' && (
+                        <div className="border-t px-4 py-3 space-y-3">
+                          <div className="grid grid-cols-[140px_minmax(0,1fr)] items-center gap-3">
+                            <span className="text-xs text-muted-foreground">Default mode</span>
+                            <Select
+                              value={defaultTerminalMode}
+                              onValueChange={(v) => {
+                                const mode = v as TerminalMode
+                                setDefaultTerminalMode(mode)
+                                window.api.settings.set('default_terminal_mode', mode)
+                              }}
+                            >
+                              <SelectTrigger className="h-8 text-xs">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="claude-code">Claude Code</SelectItem>
+                                <SelectItem value="codex">Codex</SelectItem>
+                                <SelectItem value="cursor-agent">Cursor Agent</SelectItem>
+                                <SelectItem value="gemini">Gemini</SelectItem>
+                                <SelectItem value="opencode">OpenCode</SelectItem>
+                                <SelectItem value="terminal">Terminal</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div className="grid grid-cols-[140px_minmax(0,1fr)] items-center gap-3">
+                            <span className="text-xs text-muted-foreground">Shell</span>
+                            <Input
+                              className="h-8 text-xs"
+                              placeholder={defaultShell}
+                              value={shellSetting}
+                              onChange={(e) => setShellSetting(e.target.value)}
+                              onBlur={() => window.api.settings.set('shell', shellSetting.trim())}
+                            />
+                          </div>
+                          {Object.entries(PROVIDER_DEFAULTS).map(([mode, def]) => (
+                          <div key={mode} className="grid grid-cols-[140px_minmax(0,1fr)] items-center gap-3">
+                            <span className="text-xs text-muted-foreground">{def.label} flags</span>
+                            <Input
+                              className="h-8 text-xs"
+                              value={defaultProviderFlags[mode] ?? def.fallback}
+                              onChange={(e) => setDefaultProviderFlags(prev => ({ ...prev, [mode]: e.target.value }))}
+                              onBlur={() => window.api.settings.set(def.settingsKey, (defaultProviderFlags[mode] ?? '').trim())}
+                            />
+                          </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Browser */}
+                    <div className="rounded-lg border">
+                      <div className="flex items-center gap-3 h-11 px-4">
+                        <Globe className="size-4 text-muted-foreground shrink-0" />
+                        <span className="text-sm font-medium flex-1">Browser</span>
+                        <Button variant="ghost" size="icon-sm" onClick={() => setConfiguringNativeId(configuringNativeId === 'browser' ? null : 'browser')}>
+                          <Settings2 className="size-3.5" />
+                        </Button>
+                        <kbd className="text-[10px] font-mono bg-muted px-1.5 py-0.5 rounded border shrink-0">⌘B</kbd>
+                        <Switch
+                          checked={panelConfig.builtinEnabled.browser !== false}
+                          onCheckedChange={(checked) => toggleBuiltinPanel('browser', checked)}
+                        />
+                      </div>
+                      {configuringNativeId === 'browser' && (
+                        <div className="border-t px-4 py-3 space-y-2.5">
+                          <label className="flex items-center gap-2 text-xs cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={devServerToastEnabled}
+                              onChange={(e) => {
+                                const enabled = e.target.checked
+                                setDevServerToastEnabled(enabled)
+                                window.api.settings.set('dev_server_toast_enabled', enabled ? '1' : '0')
+                              }}
+                            />
+                            <span className="text-muted-foreground">Show toast when dev server detected</span>
+                          </label>
+                          <label className="flex items-center gap-2 text-xs cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={devServerAutoOpenBrowser}
+                              onChange={(e) => {
+                                const enabled = e.target.checked
+                                setDevServerAutoOpenBrowser(enabled)
+                                window.api.settings.set('dev_server_auto_open_browser', enabled ? '1' : '0')
+                              }}
+                            />
+                            <span className="text-muted-foreground">Auto-open when dev server detected</span>
+                          </label>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Editor, Diff, Settings (no config) */}
+                    {([
+                      { id: 'editor', icon: FileCode, shortcut: 'E' },
+                      { id: 'diff', icon: GitCompare, shortcut: 'G' },
+                      { id: 'settings', icon: SlidersHorizontal, shortcut: 'S' }
+                    ] as const).map(({ id, icon: Icon, shortcut }) => (
+                      <div key={id} className="flex items-center gap-3 h-11 rounded-lg border px-4">
+                        <Icon className="size-4 text-muted-foreground shrink-0" />
+                        <span className="text-sm font-medium flex-1">{BUILTIN_PANEL_LABELS[id]}</span>
+                        <kbd className="text-[10px] font-mono bg-muted px-1.5 py-0.5 rounded border shrink-0">⌘{shortcut}</kbd>
+                        <Switch
+                          checked={panelConfig.builtinEnabled[id] !== false}
+                          onCheckedChange={(checked) => toggleBuiltinPanel(id, checked)}
+                        />
+                      </div>
+                    ))}
+                  </div>
                 </div>
 
+                {/* External panels */}
                 <div className="space-y-3">
-                  <Label className="text-base font-semibold">Shell</Label>
-                  <div className="grid grid-cols-[220px_minmax(0,1fr)] items-center gap-4">
-                    <span className="text-sm">Default shell</span>
+                  <div>
+                    <Label className="text-base font-semibold">External</Label>
+                    <p className="text-xs text-muted-foreground mt-1">Web views embedded as panels inside tasks.</p>
+                  </div>
+
+                  <div className="space-y-2">
+                    {panelConfig.webPanels.map(wp => (
+                      <div key={wp.id} className="rounded-lg border">
+                        {editingPanelId === wp.id ? (
+                          <div className="px-4 py-3 space-y-3">
+                            <div className="grid grid-cols-[1fr_1fr_80px] gap-2">
+                              <Input
+                                placeholder="Name"
+                                value={editPanelName}
+                                onChange={(e) => setEditPanelName(e.target.value)}
+                              />
+                              <Input
+                                placeholder="URL"
+                                value={editPanelUrl}
+                                onChange={(e) => setEditPanelUrl(e.target.value)}
+                              />
+                              <Input
+                                placeholder="Key"
+                                maxLength={1}
+                                value={editPanelShortcut}
+                                onChange={(e) => {
+                                  const v = e.target.value.slice(-1)
+                                  setEditPanelShortcut(v)
+                                  setEditShortcutError(validateShortcut(v, editingPanelId) || '')
+                                }}
+                              />
+                            </div>
+                            {editShortcutError && (
+                              <p className="text-xs text-destructive">{editShortcutError}</p>
+                            )}
+                            <div className="flex items-center gap-2">
+                              <Button size="sm" onClick={handleSaveEditPanel} disabled={!editPanelName.trim() || !editPanelUrl.trim()}>Save</Button>
+                              <Button size="sm" variant="ghost" onClick={() => setEditingPanelId(null)}>Cancel</Button>
+                              <div className="flex-1" />
+                              <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive" onClick={() => handleDeleteWebPanel(wp.id)}>
+                                <Trash2 className="size-3.5 mr-1" />
+                                Delete
+                              </Button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-3 h-11 px-4">
+                            <Globe className="size-4 text-muted-foreground shrink-0" />
+                            <span className="text-sm font-medium">{wp.name}</span>
+                            <span className="text-xs text-muted-foreground truncate flex-1 min-w-0">{wp.baseUrl}</span>
+                            <Button variant="ghost" size="icon-sm" onClick={() => handleDeleteWebPanel(wp.id)}>
+                              <Trash2 className="size-3.5" />
+                            </Button>
+                            <Button variant="ghost" size="icon-sm" onClick={() => startEditingPanel(wp)}>
+                              <Pencil className="size-3.5" />
+                            </Button>
+                            {wp.shortcut && (
+                              <kbd className="text-[10px] font-mono bg-muted px-1.5 py-0.5 rounded border shrink-0">⌘{wp.shortcut.toUpperCase()}</kbd>
+                            )}
+                            <Switch
+                              checked={panelConfig.builtinEnabled[wp.id] !== false}
+                              onCheckedChange={(checked) => toggleWebPanel(wp.id, checked)}
+                            />
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                    {panelConfig.webPanels.length === 0 && (
+                      <p className="text-sm text-muted-foreground">No external panels configured.</p>
+                    )}
+                  </div>
+
+                  {/* Add custom panel */}
+                  <div className="grid grid-cols-[1fr_1fr_80px] gap-2 pt-2">
                     <Input
-                      className="w-full max-w-lg"
-                      placeholder={defaultShell}
-                      value={shellSetting}
-                      onChange={(e) => setShellSetting(e.target.value)}
-                      onBlur={() => {
-                        if (shellSetting.trim()) {
-                          window.api.settings.set('shell', shellSetting.trim())
-                        } else {
-                          window.api.settings.set('shell', '')
-                        }
+                      placeholder="Name (e.g. Miro)"
+                      value={newPanelName}
+                      onChange={(e) => setNewPanelName(e.target.value)}
+                    />
+                    <Input
+                      placeholder="URL (e.g. miro.com)"
+                      value={newPanelUrl}
+                      onChange={(e) => setNewPanelUrl(e.target.value)}
+                    />
+                    <Input
+                      placeholder="Key"
+                      maxLength={1}
+                      value={newPanelShortcut}
+                      onChange={(e) => {
+                        const v = e.target.value.slice(-1)
+                        setNewPanelShortcut(v)
+                        setPanelShortcutError(validateShortcut(v) || '')
                       }}
                     />
                   </div>
-                  <p className="text-xs text-muted-foreground">Leave empty to use system default</p>
-                </div>
-
-                <div className="space-y-3">
-                  <Label className="text-base font-semibold">Flags</Label>
-                  <div className="grid grid-cols-[220px_minmax(0,1fr)] items-center gap-4">
-                    <span className="text-sm">Default Claude flags</span>
-                    <Input
-                      className="w-full max-w-xl"
-                      value={defaultClaudeFlags}
-                      onChange={(e) => setDefaultClaudeFlags(e.target.value)}
-                      onBlur={() => window.api.settings.set('default_claude_flags', defaultClaudeFlags.trim())}
-                    />
-                  </div>
-                  <div className="grid grid-cols-[220px_minmax(0,1fr)] items-center gap-4">
-                    <span className="text-sm">Default Codex flags</span>
-                    <Input
-                      className="w-full max-w-xl"
-                      value={defaultCodexFlags}
-                      onChange={(e) => setDefaultCodexFlags(e.target.value)}
-                      onBlur={() => window.api.settings.set('default_codex_flags', defaultCodexFlags.trim())}
-                    />
-                  </div>
-                  <p className="text-xs text-muted-foreground">Applied to new tasks only.</p>
+                  {panelShortcutError && (
+                    <p className="text-xs text-destructive">{panelShortcutError}</p>
+                  )}
+                  <Button size="sm" onClick={handleAddCustomPanel} disabled={!newPanelName.trim() || !newPanelUrl.trim()}>
+                    <Plus className="size-3.5 mr-1" />
+                    Add Panel
+                  </Button>
                 </div>
               </>
             )}

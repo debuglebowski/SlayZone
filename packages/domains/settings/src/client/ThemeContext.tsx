@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
+import { createContext, useContext, useEffect, type ReactNode } from 'react'
 import type { Theme, ThemePreference } from '@slayzone/settings/shared'
 
 interface ThemeContextValue {
@@ -10,38 +10,15 @@ interface ThemeContextValue {
 const ThemeContext = createContext<ThemeContextValue | null>(null)
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  const [theme, setTheme] = useState<Theme>('light')
-  const [preference, setPreferenceState] = useState<ThemePreference>('system')
-
-  // Initialize from main process
+  // Hardcoded dark theme
   useEffect(() => {
-    Promise.all([window.api.theme.getEffective(), window.api.theme.getSource()]).then(
-      ([effective, source]) => {
-        setTheme(effective)
-        setPreferenceState(source)
-      }
-    )
-
-    // Listen for system theme changes
-    const unsubscribe = window.api.theme.onChange((newTheme) => {
-      setTheme(newTheme)
-    })
-    return unsubscribe
+    document.documentElement.classList.add('dark')
   }, [])
 
-  // Apply dark class to <html>
-  useEffect(() => {
-    document.documentElement.classList.toggle('dark', theme === 'dark')
-  }, [theme])
-
-  const setPreference = async (pref: ThemePreference) => {
-    const effective = await window.api.theme.set(pref)
-    setPreferenceState(pref)
-    setTheme(effective)
-  }
+  const setPreference = async () => {}
 
   return (
-    <ThemeContext.Provider value={{ theme, preference, setPreference }}>
+    <ThemeContext.Provider value={{ theme: 'dark', preference: 'dark', setPreference }}>
       {children}
     </ThemeContext.Provider>
   )
