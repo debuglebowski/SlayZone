@@ -470,12 +470,12 @@ export function GitDiffPanel({
   return (
     <div data-testid="git-diff-panel" className="h-full flex flex-col">
       {/* Header */}
-      <div className="shrink-0 px-4 py-3 border-b flex items-center justify-between gap-2">
-        <div>
-          <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Diff</div>
+      <div className="shrink-0 h-10 px-4 border-b flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <div className="text-xs font-medium text-muted-foreground uppercase leading-none">Diff</div>
           {snapshot && (
-            <div className="text-[11px] text-muted-foreground mt-1">
-              Updated {new Date(snapshot.generatedAt).toLocaleTimeString()}
+            <div className="text-[11px] text-muted-foreground leading-none">
+              · {new Date(snapshot.generatedAt).toLocaleTimeString()}
             </div>
           )}
         </div>

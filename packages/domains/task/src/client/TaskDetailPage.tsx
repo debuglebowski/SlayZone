@@ -1500,7 +1500,7 @@ export function TaskDetailPage({
 
         {/* Diff Panel */}
         {panelVisibility.diff && (
-          <div className="shrink-0 rounded-md bg-surface-1 border border-border p-1.5" style={{ width: resolvedWidths.diff }}>
+          <div className="shrink-0 rounded-md bg-surface-1 border border-border overflow-hidden flex flex-col" style={{ width: resolvedWidths.diff }}>
             <GitDiffPanel
               task={task}
               projectPath={project?.path ?? null}
