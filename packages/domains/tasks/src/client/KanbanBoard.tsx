@@ -148,6 +148,7 @@ export function KanbanBoard({
     const isSameColumn = currentColumn.id === targetColumn.id
 
     if (isSameColumn) {
+      if (sortBy !== 'manual') return // sort overrides manual order
       // Reorder within same column
       const oldIndex = currentColumn.tasks.findIndex((t) => t.id === taskId)
       if (oldIndex === targetIndex) return

@@ -723,7 +723,7 @@ function App(): React.JSX.Element {
                                   onCreateTask={handleCreateTaskFromColumn}
                                   projectsMap={projectsMap}
                                   showProjectDot={selectedProjectId === null}
-                                  disableDrag={filter.groupBy === 'due_date' || filter.sortBy !== 'manual'}
+                                  disableDrag={filter.groupBy === 'due_date'}
                                   taskTags={taskTags}
                                   tags={tags}
                                   blockedTaskIds={blockedTaskIds}
