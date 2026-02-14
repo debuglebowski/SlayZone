@@ -15,6 +15,7 @@
   },
   "dependencies": {
     "@slayzone/types": "workspace:*",
+    "@slayzone/telemetry": "workspace:*",
     "@slayzone/ui": "workspace:*"
   },
   "peerDependencies": {

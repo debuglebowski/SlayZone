@@ -19,6 +19,8 @@ import type { PanelConfig, WebPanelDefinition } from '@slayzone/task/shared'
 import { DEFAULT_PANEL_CONFIG, PREDEFINED_WEB_PANELS, PROVIDER_DEFAULTS } from '@slayzone/task/shared'
 import type { DiagnosticsConfig } from '@slayzone/types'
 import type { IntegrationConnectionPublic } from '@slayzone/integrations/shared'
+import type { TelemetryTier } from '@slayzone/telemetry/shared'
+import { TelemetrySettings } from '@slayzone/telemetry/client'
 import { ContextManagerSettings } from '../../../ai-config/src/client/ContextManagerSettings'
 import {
   LayoutPreviewA,
@@ -82,13 +84,17 @@ interface UserSettingsDialogProps {
   onOpenChange: (open: boolean) => void
   initialTab?: string
   onTabChange?: (tab: string) => void
+  telemetryTier?: TelemetryTier
+  onTelemetryTierChange?: (tier: TelemetryTier) => void
 }
 
 export function UserSettingsDialog({
   open,
   onOpenChange,
   initialTab = 'general',
-  onTabChange
+  onTabChange,
+  telemetryTier,
+  onTelemetryTierChange
 }: UserSettingsDialogProps) {
   const [activeTab, setActiveTab] = useState(initialTab)
   const [tags, setTags] = useState<Tag[]>([])
@@ -469,6 +475,7 @@ export function UserSettingsDialog({
     { key: 'diagnostics', label: 'Diagnostics' },
     { key: 'ai-config', label: 'Context Manager' },
     { key: 'tags', label: 'Tags' },
+    { key: 'telemetry', label: 'Telemetry' },
     { key: 'about', label: 'About' },
     { key: 'preview-a', label: 'A: Refined Tabs' },
     { key: 'preview-b', label: 'B: Sidebar' },
@@ -1037,6 +1044,10 @@ export function UserSettingsDialog({
                   </Button>
                 </div>
               </div>
+            )}
+
+            {activeTab === 'telemetry' && telemetryTier && onTelemetryTierChange && (
+              <TelemetrySettings tier={telemetryTier} onTierChange={onTelemetryTierChange} />
             )}
 
             {activeTab === 'about' && (

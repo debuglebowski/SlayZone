@@ -30,6 +30,7 @@
     "@slayzone/task": "workspace:*",
     "@slayzone/task-terminals": "workspace:*",
     "@slayzone/tasks": "workspace:*",
+    "@slayzone/telemetry": "workspace:*",
     "@slayzone/terminal": "workspace:*",
     "@slayzone/types": "workspace:*",
     "@slayzone/ui": "workspace:*",

@@ -1,5 +1,5 @@
 {
-  "name": "@slayzone/settings",
+  "name": "@slayzone/telemetry",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -8,21 +8,11 @@
   "exports": {
     ".": "./src/index.ts",
     "./shared": "./src/shared/index.ts",
-    "./main": "./src/main/index.ts",
     "./client": "./src/client/index.ts"
   },
-  "scripts": {
-    "typecheck": "tsc --noEmit"
-  },
   "dependencies": {
-    "@slayzone/types": "workspace:*",
     "@slayzone/ui": "workspace:*",
-    "@slayzone/task": "workspace:*",
-    "@slayzone/integrations": "workspace:*",
-    "@slayzone/tags": "workspace:*",
-    "@slayzone/telemetry": "workspace:*",
-    "@slayzone/terminal": "workspace:*",
-    "date-fns": "^4.1.0"
+    "posthog-js": "^1"
   },
   "peerDependencies": {
     "react": "^19.0.0"
