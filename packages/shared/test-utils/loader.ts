@@ -1,6 +1,6 @@
 /**
  * Custom Node.js module resolve hook that redirects external dependencies to mocks.
- * Usage: npx tsx --loader ./packages/shared/test-utils/loader.ts <test-file>
+ * Usage: ELECTRON_RUN_AS_NODE=1 npx electron --import tsx/esm --loader ./packages/shared/test-utils/loader.ts <test>
  */
 
 const mockElectronUrl = new URL('./mock-electron.ts', import.meta.url).href

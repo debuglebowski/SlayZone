@@ -2,6 +2,7 @@
   "name": "@slayzone/app",
   "version": "0.1.0",
   "private": true,
+  "type": "module",
   "main": "./out/main/index.js",
   "scripts": {
     "dev": "electron-vite dev",

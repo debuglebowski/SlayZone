@@ -1,6 +1,6 @@
 /**
  * Diagnostics service handler contract tests
- * Run with: npx tsx --loader ./packages/shared/test-utils/loader.ts packages/domains/diagnostics/src/main/service.test.ts
+ * Run with: ELECTRON_RUN_AS_NODE=1 npx electron --import tsx/esm --loader ./packages/shared/test-utils/loader.ts packages/domains/diagnostics/src/main/service.test.ts
  */
 import { createTestHarness, test, expect, describe } from '../../../../shared/test-utils/ipc-harness.js'
 import { registerDiagnosticsHandlers, stopDiagnostics } from './service.js'

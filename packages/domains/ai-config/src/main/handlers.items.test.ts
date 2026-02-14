@@ -1,6 +1,6 @@
 /**
  * AI Config items handler contract tests
- * Run with: npx tsx --loader ./packages/shared/test-utils/loader.ts packages/domains/ai-config/src/main/handlers.items.test.ts
+ * Run with: ELECTRON_RUN_AS_NODE=1 npx electron --import tsx/esm --loader ./packages/shared/test-utils/loader.ts packages/domains/ai-config/src/main/handlers.items.test.ts
  */
 import { createTestHarness, test, expect, describe } from '../../../../shared/test-utils/ipc-harness.js'
 import { registerAiConfigHandlers } from './handlers.js'

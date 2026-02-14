@@ -1,6 +1,6 @@
 /**
  * File editor handler contract tests
- * Run with: npx tsx --loader ./packages/shared/test-utils/loader.ts packages/domains/file-editor/src/main/handlers.test.ts
+ * Run with: ELECTRON_RUN_AS_NODE=1 npx electron --import tsx/esm --loader ./packages/shared/test-utils/loader.ts packages/domains/file-editor/src/main/handlers.test.ts
  */
 import { createTestHarness, test, expect, describe } from '../../../../shared/test-utils/ipc-harness.js'
 import { registerFileEditorHandlers } from './handlers.js'
