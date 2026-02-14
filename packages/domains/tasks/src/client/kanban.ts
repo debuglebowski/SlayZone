@@ -190,6 +190,11 @@ export function applyFilters(
       return false
     }
 
+    // Always hide temporary tasks (ephemeral terminal tabs)
+    if (task.is_temporary) {
+      return false
+    }
+
     return true
   })
 }

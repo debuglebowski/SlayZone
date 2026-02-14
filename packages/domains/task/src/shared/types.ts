@@ -138,6 +138,8 @@ export interface Task {
   web_panel_urls: WebPanelUrls | null
   // Merge mode
   merge_state: MergeState | null
+  // Temporary task (ephemeral terminal tab, deleted on close)
+  is_temporary: boolean
   // External link (populated via JOIN)
   linear_url: string | null
   created_at: string
@@ -164,6 +166,7 @@ export interface CreateTaskInput {
   geminiFlags?: string
   opencodeFlags?: string
   parentId?: string
+  isTemporary?: boolean
 }
 
 export interface UpdateTaskInput {
@@ -202,6 +205,8 @@ export interface UpdateTaskInput {
   webPanelUrls?: WebPanelUrls | null
   // Merge mode
   mergeState?: MergeState | null
+  // Temporary task
+  isTemporary?: boolean
   // Legacy
   claudeSessionId?: string | null
 }

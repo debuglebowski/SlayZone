@@ -565,8 +565,6 @@ const migrations: Migration[] = [
       stmt.run('provider-claude', 'Claude Code', 'claude', 1, 'active')
       stmt.run('provider-codex', 'Codex CLI', 'codex', 0, 'active')
       stmt.run('provider-gemini', 'Gemini CLI', 'gemini', 0, 'placeholder')
-      stmt.run('provider-aider', 'Aider', 'aider', 0, 'placeholder')
-      stmt.run('provider-grok', 'Grok CLI', 'grok', 0, 'placeholder')
     }
   },
   {
@@ -660,6 +658,12 @@ const migrations: Migration[] = [
       }
 
       // Old columns kept for backwards compat — drop in future v35
+    }
+  },
+  {
+    version: 35,
+    up: (db) => {
+      db.exec(`ALTER TABLE tasks ADD COLUMN is_temporary INTEGER NOT NULL DEFAULT 0`)
     }
   }
 ]

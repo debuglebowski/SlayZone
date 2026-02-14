@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { useHotkeys } from 'react-hotkeys-hook'
-import { AlertTriangle } from 'lucide-react'
+import { AlertTriangle, TerminalSquare } from 'lucide-react'
 import type { Task } from '@slayzone/task/shared'
 import type { Project } from '@slayzone/projects/shared'
 import type { Tag } from '@slayzone/tags/shared'
@@ -31,7 +31,10 @@ import {
   AlertDialogDescription,
   AlertDialogFooter,
   AlertDialogHeader,
-  AlertDialogTitle
+  AlertDialogTitle,
+  Tooltip,
+  TooltipTrigger,
+  TooltipContent
 } from '@slayzone/ui'
 import { SidebarProvider } from '@slayzone/ui'
 import { AppSidebar } from '@/components/sidebar/AppSidebar'
@@ -92,6 +95,7 @@ function App(): React.JSX.Element {
   const [onboardingOpen, setOnboardingOpen] = useState(false)
   const [searchOpen, setSearchOpen] = useState(false)
   const [completeTaskDialogOpen, setCompleteTaskDialogOpen] = useState(false)
+  const [convertingTask, setConvertingTask] = useState<Task | null>(null)
 
   // Project path validation
   const [projectPathMissing, setProjectPathMissing] = useState(false)
@@ -186,7 +190,8 @@ function App(): React.JSX.Element {
       const title = task?.title || 'Task'
       const status = task?.status
       const isSubTask = !!task?.parent_id
-      setTabs([...tabs, { type: 'task', taskId, title, status, isSubTask }])
+      const isTemporary = !!task?.is_temporary
+      setTabs([...tabs, { type: 'task', taskId, title, status, isSubTask, isTemporary }])
       setActiveTabIndex(tabs.length)
     }
   }
@@ -198,7 +203,8 @@ function App(): React.JSX.Element {
       const title = task?.title || 'Task'
       const status = task?.status
       const isSubTask = !!task?.parent_id
-      setTabs([...tabs, { type: 'task', taskId, title, status, isSubTask }])
+      const isTemporary = !!task?.is_temporary
+      setTabs([...tabs, { type: 'task', taskId, title, status, isSubTask, isTemporary }])
     }
   }
 
@@ -206,8 +212,16 @@ function App(): React.JSX.Element {
     if (index === 0) return
     const tab = tabs[index]
     if (tab?.type === 'task') {
-      closedTabsRef.current.push(tab)
-      if (closedTabsRef.current.length > 20) closedTabsRef.current.shift()
+      const task = tasks.find((t) => t.id === tab.taskId)
+      if (task?.is_temporary) {
+        // Ephemeral: kill PTY + delete from DB + remove from state
+        window.api.pty.kill(`${tab.taskId}:${tab.taskId}`)
+        window.api.db.deleteTask(tab.taskId)
+        setTasks((prev) => prev.filter((t) => t.id !== tab.taskId))
+      } else {
+        closedTabsRef.current.push(tab)
+        if (closedTabsRef.current.length > 20) closedTabsRef.current.shift()
+      }
     }
     const newTabs = tabs.filter((_, i) => i !== index)
     setTabs(newTabs)
@@ -265,14 +279,32 @@ function App(): React.JSX.Element {
         const task = tasks.find((t) => t.id === tab.taskId)
         if (task) {
           const isSubTask = !!task.parent_id
-          if (task.title !== tab.title || task.status !== tab.status || isSubTask !== tab.isSubTask) {
-            return { ...tab, title: task.title, status: task.status, isSubTask }
+          const isTemporary = !!task.is_temporary
+          if (task.title !== tab.title || task.status !== tab.status || isSubTask !== tab.isSubTask || isTemporary !== tab.isTemporary) {
+            return { ...tab, title: task.title, status: task.status, isSubTask, isTemporary }
           }
         }
         return tab
       })
     })
   }, [tasks, setTabs, setActiveTabIndex])
+
+  // Startup cleanup: delete orphaned temporary tasks (no open tab)
+  const didCleanupRef = useRef(false)
+  useEffect(() => {
+    if (didCleanupRef.current || tasks.length === 0) return
+    didCleanupRef.current = true
+    const openTabTaskIds = new Set(
+      tabs.filter((t): t is Extract<typeof t, { type: 'task' }> => t.type === 'task').map((t) => t.taskId)
+    )
+    for (const task of tasks) {
+      if (task.is_temporary && !openTabTaskIds.has(task.id)) {
+        window.api.pty.kill(`${task.id}:${task.id}`)
+        window.api.db.deleteTask(task.id)
+        setTasks((prev) => prev.filter((t) => t.id !== task.id))
+      }
+    }
+  }, [tasks, tabs, setTasks])
 
   // Sync project name value
   useEffect(() => {
@@ -451,6 +483,11 @@ function App(): React.JSX.Element {
     reopenClosedTab()
   }, { enableOnFormTags: true })
 
+  useHotkeys('ctrl+t', (e) => {
+    e.preventDefault()
+    handleCreateScratchTerminal()
+  }, { enableOnFormTags: true })
+
   useHotkeys('mod+shift+d', (e) => {
     e.preventDefault()
     const activeTab = tabs[activeTabIndex]
@@ -469,6 +506,27 @@ function App(): React.JSX.Element {
     setCompleteTaskDialogOpen(false)
     track('task_completed')
   }
+
+  // Scratch terminal (creates unnamed task with terminal mode)
+  const handleCreateScratchTerminal = useCallback(async (): Promise<void> => {
+    if (!selectedProjectId) return
+    // Auto-title: "Terminal N" where N is next available
+    const existing = tasks
+      .filter((t) => t.project_id === selectedProjectId)
+      .map((t) => t.title.match(/^Terminal (\d+)$/))
+      .filter(Boolean)
+      .map((m) => parseInt(m![1], 10))
+    const next = existing.length > 0 ? Math.max(...existing) + 1 : 1
+    const task = await window.api.db.createTask({
+      projectId: selectedProjectId,
+      title: `Terminal ${next}`,
+      status: 'in_progress',
+      isTemporary: true
+    })
+    setTasks((prev) => [task, ...prev])
+    openTask(task.id)
+    track('task_created')
+  }, [selectedProjectId, tasks, setTasks, openTask])
 
   // Task handlers
   const handleTaskCreated = (task: Task): void => {
@@ -514,6 +572,18 @@ function App(): React.JSX.Element {
   const handleTaskUpdated = (task: Task): void => {
     updateTask(task)
     setEditingTask(null)
+  }
+
+  const handleConvertTask = (task: Task): void => {
+    // Open edit dialog with title cleared so user must name it
+    setConvertingTask({ ...task, title: '' })
+  }
+
+  const handleConvertTaskSaved = async (task: Task): Promise<void> => {
+    // Clear is_temporary flag after edit dialog saves title/status/etc.
+    const converted = await window.api.db.updateTask({ id: task.id, isTemporary: false })
+    updateTask(converted)
+    setConvertingTask(null)
   }
 
   const handleTaskDeleted = (): void => {
@@ -646,6 +716,21 @@ function App(): React.JSX.Element {
                     rightContent={
                       <div className="flex items-center gap-1">
                         <UsagePopover data={usageData} onRefresh={refreshUsage} />
+                        {selectedProjectId && (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <button
+                                onClick={handleCreateScratchTerminal}
+                                className="h-7 w-7 flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
+                              >
+                                <TerminalSquare className="size-4" />
+                              </button>
+                            </TooltipTrigger>
+                            <TooltipContent side="bottom" className="text-xs">
+                              New temporary task (Ctrl+T)
+                            </TooltipContent>
+                          </Tooltip>
+                        )}
                         <DesktopNotificationToggle
                           enabled={notificationState.desktopEnabled}
                           onToggle={() =>
@@ -746,6 +831,7 @@ function App(): React.JSX.Element {
                           onArchiveTask={archiveTask}
                           onDeleteTask={deleteTask}
                           onNavigateToTask={openTask}
+                          onConvertTask={handleConvertTask}
                         />
                       )}
                     </div>
@@ -795,6 +881,12 @@ function App(): React.JSX.Element {
           open={!!editingTask}
           onOpenChange={(open) => !open && setEditingTask(null)}
           onUpdated={handleTaskUpdated}
+        />
+        <EditTaskDialog
+          task={convertingTask}
+          open={!!convertingTask}
+          onOpenChange={(open) => !open && setConvertingTask(null)}
+          onUpdated={handleConvertTaskSaved}
         />
         <DeleteTaskDialog
           task={deletingTask}

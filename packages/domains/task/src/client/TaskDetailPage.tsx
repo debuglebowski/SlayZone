@@ -133,6 +133,7 @@ interface TaskDetailPageProps {
   onArchiveTask?: (taskId: string) => Promise<void>
   onDeleteTask?: (taskId: string) => Promise<void>
   onNavigateToTask?: (taskId: string) => void
+  onConvertTask?: (task: Task) => void
 }
 
 export function TaskDetailPage({
@@ -142,7 +143,8 @@ export function TaskDetailPage({
   onTaskUpdated,
   onArchiveTask,
   onDeleteTask,
-  onNavigateToTask
+  onNavigateToTask,
+  onConvertTask
 }: TaskDetailPageProps): React.JSX.Element {
   // Main tab session ID format used by TerminalContainer/useTaskTerminals.
   const getMainSessionId = useCallback((id: string) => `${id}:${id}`, [])
@@ -344,7 +346,8 @@ export function TaskDetailPage({
         // Restore panel visibility and browser tabs (always reset to defaults if not saved)
         setPanelVisibility({
           ...defaultPanelVisibility,
-          ...(loadedTask.panel_visibility ?? {})
+          ...(loadedTask.panel_visibility ?? {}),
+          ...(loadedTask.is_temporary ? { settings: false } : {})
         })
         if (loadedTask.browser_tabs) {
           setBrowserTabs(loadedTask.browser_tabs)
@@ -1077,19 +1080,32 @@ export function TaskDetailPage({
       <header className="shrink-0 relative">
         <div>
           <div className="flex items-center gap-4 window-no-drag">
-            <input
-              ref={titleInputRef}
-              value={titleValue}
-              onChange={(e) => setTitleValue(e.target.value)}
-              onBlur={handleTitleSave}
-              onKeyDown={handleTitleKeyDown}
-              onClick={() => setEditingTitle(true)}
-              readOnly={!editingTitle}
-              className={cn(
-                'text-xl font-semibold bg-transparent border-none outline-none flex-1',
-                !editingTitle && 'cursor-pointer'
-              )}
-            />
+            {task.is_temporary ? (
+              <div className="flex items-center gap-3 flex-1">
+                <span className="text-xl italic text-muted-foreground">Temporary task</span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => onConvertTask?.(task)}
+                >
+                  Keep as task
+                </Button>
+              </div>
+            ) : (
+              <input
+                ref={titleInputRef}
+                value={titleValue}
+                onChange={(e) => setTitleValue(e.target.value)}
+                onBlur={handleTitleSave}
+                onKeyDown={handleTitleKeyDown}
+                onClick={() => setEditingTitle(true)}
+                readOnly={!editingTitle}
+                className={cn(
+                  'text-xl font-semibold bg-transparent border-none outline-none flex-1',
+                  !editingTitle && 'cursor-pointer'
+                )}
+              />
+            )}
 
             {task.linear_url && (
               <Tooltip>
@@ -1115,7 +1131,7 @@ export function TaskDetailPage({
                     { id: 'editor', icon: FileCode, label: 'Editor', shortcut: '⌘E' },
                     { id: 'diff', icon: GitBranch, label: 'Diff', shortcut: '⌘G' },
                     { id: 'settings', icon: Settings2, label: 'Settings', shortcut: '⌘S' },
-                  ].filter(p => isBuiltinEnabled(p.id))
+                  ].filter(p => isBuiltinEnabled(p.id) && !(task.is_temporary && p.id === 'settings'))
 
                   // Insert web panels after editor
                   const editorIdx = builtins.findIndex(p => p.id === 'editor')

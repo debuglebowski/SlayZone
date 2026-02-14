@@ -36,7 +36,8 @@ function parseTask(row: Record<string, unknown> | undefined): Task | null {
       : null,
     web_panel_urls: row.web_panel_urls
       ? JSON.parse(row.web_panel_urls as string)
-      : null
+      : null,
+    is_temporary: Boolean(row.is_temporary)
   } as Task
 }
 
@@ -270,6 +271,7 @@ export function updateTask(db: Database, data: UpdateTaskInput): Task | null {
   if (data.browserTabs !== undefined) { fields.push('browser_tabs = ?'); values.push(data.browserTabs ? JSON.stringify(data.browserTabs) : null) }
   if (data.webPanelUrls !== undefined) { fields.push('web_panel_urls = ?'); values.push(data.webPanelUrls ? JSON.stringify(data.webPanelUrls) : null) }
   if (data.mergeState !== undefined) { fields.push('merge_state = ?'); values.push(data.mergeState) }
+  if (data.isTemporary !== undefined) { fields.push('is_temporary = ?'); values.push(data.isTemporary ? 1 : 0) }
 
   if (fields.length === 0) {
     const row = db.prepare('SELECT * FROM tasks WHERE id = ?').get(data.id) as Record<string, unknown> | undefined
@@ -348,8 +350,9 @@ export function registerTaskHandlers(ipcMain: IpcMain, db: Database): void {
       INSERT INTO tasks (
         id, project_id, parent_id, title, description, assignee,
         status, priority, due_date, terminal_mode, provider_config,
-        claude_flags, codex_flags, cursor_flags, gemini_flags, opencode_flags
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        claude_flags, codex_flags, cursor_flags, gemini_flags, opencode_flags,
+        is_temporary
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `)
     stmt.run(
       id, data.projectId, data.parentId ?? null,
@@ -360,7 +363,8 @@ export function registerTaskHandlers(ipcMain: IpcMain, db: Database): void {
       providerConfig['codex']?.flags ?? '',
       providerConfig['cursor-agent']?.flags ?? '',
       providerConfig['gemini']?.flags ?? '',
-      providerConfig['opencode']?.flags ?? ''
+      providerConfig['opencode']?.flags ?? '',
+      data.isTemporary ? 1 : 0
     )
     maybeAutoCreateWorktree(db, id, data.projectId, data.title)
     const row = db.prepare('SELECT * FROM tasks WHERE id = ?').get(id) as Record<string, unknown> | undefined

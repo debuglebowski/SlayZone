@@ -19,7 +19,7 @@ import {
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 
-export type Tab = { type: 'home' } | { type: 'task'; taskId: string; title: string; terminalState?: TerminalState; isSubTask?: boolean }
+export type Tab = { type: 'home' } | { type: 'task'; taskId: string; title: string; terminalState?: TerminalState; isSubTask?: boolean; isTemporary?: boolean }
 
 interface TabBarProps {
   tabs: Tab[]
@@ -38,13 +38,14 @@ interface TabContentProps {
   onClose?: () => void
   terminalState?: TerminalState
   isSubTask?: boolean
+  isTemporary?: boolean
 }
 
 function getStateInfo(state: TerminalState | undefined) {
   return getTerminalStateStyle(state)
 }
 
-function TabContent({ title, isActive, isDragging, onClose, terminalState, isSubTask }: TabContentProps): React.JSX.Element {
+function TabContent({ title, isActive, isDragging, onClose, terminalState, isSubTask, isTemporary }: TabContentProps): React.JSX.Element {
   const stateInfo = getStateInfo(terminalState)
 
   return (
@@ -53,6 +54,7 @@ function TabContent({ title, isActive, isDragging, onClose, terminalState, isSub
         'flex items-center gap-1.5 h-7 px-3 rounded-md cursor-pointer transition-colors select-none flex-shrink-0',
         'bg-neutral-100 dark:bg-neutral-800/50 hover:bg-neutral-200/80 dark:hover:bg-neutral-700/50',
         isActive ? 'bg-neutral-200 dark:bg-neutral-700 border border-neutral-300 dark:border-neutral-600' : 'text-neutral-500 dark:text-neutral-400',
+        isTemporary && 'border border-dashed border-neutral-400 dark:border-neutral-500',
         'max-w-[300px]',
         isDragging && 'shadow-lg'
       )}
@@ -68,7 +70,7 @@ function TabContent({ title, isActive, isDragging, onClose, terminalState, isSub
         </Tooltip>
       )}
       {isSubTask && <span className="text-[10px] text-muted-foreground/60 shrink-0">SUB</span>}
-      <span className="truncate text-sm">{title}</span>
+      <span className={cn('truncate text-sm', isTemporary && 'italic text-muted-foreground')}>{title}</span>
       {onClose && (
         <button
           className="h-4 w-4 rounded hover:bg-muted-foreground/20 flex items-center justify-center"
@@ -132,6 +134,7 @@ function SortableTab({
         onClose={() => onTabClose(index)}
         terminalState={terminalState}
         isSubTask={tab.isSubTask}
+        isTemporary={tab.isTemporary}
       />
     </div>
   )
@@ -223,6 +226,7 @@ export function TabBar({
                 isActive={tabs.findIndex((t) => t.type === 'task' && t.taskId === activeTab.taskId) === activeIndex}
                 isDragging
                 terminalState={terminalStates?.get(activeTab.taskId)}
+                isTemporary={activeTab.isTemporary}
               />
             )}
           </DragOverlay>
