@@ -513,6 +513,9 @@ importers:
 
   packages/domains/telemetry:
     dependencies:
+      '@posthog/react':
+        specifier: ^1
+        version: 1.7.1(@types/react@19.2.8)(posthog-js@1.347.2)(react@19.2.3)
       '@slayzone/ui':
         specifier: workspace:*
         version: link:../../shared/ui
@@ -1731,6 +1734,16 @@ packages:
 
   '@posthog/core@1.22.0':
     resolution: {integrity: sha512-WkmOnq95aAOu6yk6r5LWr5cfXsQdpVbWDCwOxQwxSne8YV6GuZET1ziO5toSQXgrgbdcjrSz2/GopAfiL6iiAA==}
+
+  '@posthog/react@1.7.1':
+    resolution: {integrity: sha512-x2u7zRjsCpZoZUuvaJRgKWMJWbCPmLO49iXjOx9PdgOB/v5jwphZTj9ZmFZWkXgobdjmqQvVtXaLTMxcb0537g==}
+    peerDependencies:
+      '@types/react': '>=16.8.0'
+      posthog-js: '>=1.257.2'
+      react: '>=16.8.0'
+    peerDependenciesMeta:
+      '@types/react':
+        optional: true
 
   '@posthog/types@1.347.2':
     resolution: {integrity: sha512-aT+r/7jXOzPmUHO6sutoWzczPcYIZyhmWt1f1OvY4zKC7Pwp/ZsJWKFTxjV02p0PZz96AE83eLTe7w7b6tjhIw==}
@@ -6010,6 +6023,13 @@ snapshots:
   '@posthog/core@1.22.0':
     dependencies:
       cross-spawn: 7.0.6
+
+  '@posthog/react@1.7.1(@types/react@19.2.8)(posthog-js@1.347.2)(react@19.2.3)':
+    dependencies:
+      posthog-js: 1.347.2
+      react: 19.2.3
+    optionalDependencies:
+      '@types/react': 19.2.8
 
   '@posthog/types@1.347.2': {}
 

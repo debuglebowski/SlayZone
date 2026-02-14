@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@slayzone/ui": "workspace:*",
+    "@posthog/react": "^1",
     "posthog-js": "^1"
   },
   "peerDependencies": {

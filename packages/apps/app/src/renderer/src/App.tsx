@@ -10,7 +10,7 @@ import { CreateTaskDialog, EditTaskDialog, DeleteTaskDialog, TaskDetailPage } fr
 import { CreateProjectDialog, ProjectSettingsDialog, DeleteProjectDialog } from '@slayzone/projects'
 import { UserSettingsDialog, useViewState } from '@slayzone/settings'
 import { OnboardingDialog } from '@slayzone/onboarding'
-import { useTelemetry } from '@slayzone/telemetry/client'
+import { track } from '@slayzone/telemetry/client'
 import { usePty } from '@slayzone/terminal/client'
 import type { TerminalState } from '@slayzone/terminal/shared'
 // Shared
@@ -59,8 +59,6 @@ function App(): React.JSX.Element {
     updateProject,
     deleteProject
   } = useTasksData()
-
-  const telemetry = useTelemetry()
 
   // View state (tabs + selected project, persisted)
   const [tabs, activeTabIndex, selectedProjectId, setTabs, setActiveTabIndex, setSelectedProjectId] =
@@ -382,7 +380,7 @@ function App(): React.JSX.Element {
   useHotkeys('mod+k', (e) => {
     e.preventDefault()
     setSearchOpen(true)
-    telemetry.track('search_used')
+    track('search_used')
   }, { enableOnFormTags: true })
 
   useHotkeys('mod+w', (e) => {
@@ -468,7 +466,7 @@ function App(): React.JSX.Element {
     updateTask({ ...tasks.find((t) => t.id === activeTab.taskId)!, status: 'done' })
     closeTab(activeTabIndex)
     setCompleteTaskDialogOpen(false)
-    telemetry.track('task_completed')
+    track('task_completed')
   }
 
   // Task handlers
@@ -476,7 +474,7 @@ function App(): React.JSX.Element {
     setTasks((prev) => [task, ...prev])
     setCreateOpen(false)
     setCreateTaskDefaults({})
-    telemetry.track('task_created')
+    track('task_created')
   }
 
   const handleTaskCreatedAndOpen = (task: Task): void => {
@@ -484,7 +482,7 @@ function App(): React.JSX.Element {
     setCreateOpen(false)
     setCreateTaskDefaults({})
     openTask(task.id)
-    telemetry.track('task_created')
+    track('task_created')
   }
 
   const handleCreateTaskFromColumn = (column: Column): void => {
@@ -541,7 +539,7 @@ function App(): React.JSX.Element {
     setProjects((prev) => [...prev, project])
     setSelectedProjectId(project.id)
     setCreateProjectOpen(false)
-    telemetry.track('project_created')
+    track('project_created')
   }
 
   const handleProjectUpdated = (project: Project): void => {
@@ -822,8 +820,6 @@ function App(): React.JSX.Element {
           onOpenChange={setSettingsOpen}
           initialTab={settingsInitialTab}
           onTabChange={setSettingsInitialTab}
-          telemetryTier={telemetry.tier}
-          onTelemetryTierChange={telemetry.setTier}
         />
         <SearchDialog
           open={searchOpen}
@@ -836,8 +832,6 @@ function App(): React.JSX.Element {
         <OnboardingDialog
           externalOpen={onboardingOpen}
           onExternalClose={() => setOnboardingOpen(false)}
-          telemetryTier={telemetry.tier}
-          onTelemetryTierChange={telemetry.setTier}
         />
         <AlertDialog open={completeTaskDialogOpen} onOpenChange={setCompleteTaskDialogOpen}>
           <AlertDialogContent>

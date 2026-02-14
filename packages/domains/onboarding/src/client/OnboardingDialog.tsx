@@ -4,7 +4,7 @@ import { Dialog, DialogContent } from '@slayzone/ui'
 import { Button } from '@slayzone/ui'
 import { Switch } from '@slayzone/ui'
 import { cn } from '@slayzone/ui'
-import type { TelemetryTier } from '@slayzone/telemetry/shared'
+import { useTelemetry } from '@slayzone/telemetry/client'
 
 interface OnboardingStep {
   title: string
@@ -43,18 +43,15 @@ const ONBOARDING_STEPS: OnboardingStep[] = [
 interface OnboardingDialogProps {
   externalOpen?: boolean
   onExternalClose?: () => void
-  telemetryTier?: TelemetryTier
-  onTelemetryTierChange?: (tier: TelemetryTier) => void
 }
 
 export function OnboardingDialog({
   externalOpen,
-  onExternalClose,
-  telemetryTier,
-  onTelemetryTierChange
+  onExternalClose
 }: OnboardingDialogProps): React.JSX.Element | null {
   const [autoOpen, setAutoOpen] = useState(false)
   const [step, setStep] = useState(0)
+  const { tier, setTier } = useTelemetry()
 
   // Combined open state: either auto-triggered or externally controlled
   const open = autoOpen || (externalOpen ?? false)
@@ -105,12 +102,12 @@ export function OnboardingDialog({
             >
               <h2 className="text-xl font-bold mb-3">{current.title}</h2>
               <p className="text-muted-foreground mb-8 px-4">{current.description}</p>
-              {current.custom && telemetryTier && onTelemetryTierChange && (
+              {current.custom && (
                 <div className="flex items-center justify-center gap-3 mb-4">
                   <Switch
-                    checked={telemetryTier === 'opted_in'}
-                    onCheckedChange={(checked) =>
-                      onTelemetryTierChange(checked ? 'opted_in' : 'anonymous')
+                    checked={tier === 'opted_in'}
+                    onCheckedChange={(checked: boolean) =>
+                      setTier(checked ? 'opted_in' : 'anonymous')
                     }
                   />
                   <span className="text-sm">Help improve SlayZone</span>

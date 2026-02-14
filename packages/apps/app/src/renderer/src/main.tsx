@@ -3,6 +3,7 @@ import './assets/main.css'
 import { createRoot } from 'react-dom/client'
 import { ThemeProvider } from '@slayzone/settings'
 import { PtyProvider } from '@slayzone/terminal'
+import { TelemetryProvider } from '@slayzone/telemetry/client'
 import App from './App'
 import { getDiagnosticsContext } from './lib/diagnosticsClient'
 
@@ -33,7 +34,9 @@ window.addEventListener('unhandledrejection', (event) => {
 createRoot(document.getElementById('root')!).render(
   <PtyProvider>
     <ThemeProvider>
-      <App />
+      <TelemetryProvider>
+        <App />
+      </TelemetryProvider>
     </ThemeProvider>
   </PtyProvider>
 )
