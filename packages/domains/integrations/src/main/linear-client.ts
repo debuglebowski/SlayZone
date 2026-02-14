@@ -27,7 +27,7 @@ interface TeamsQuery {
 
 interface ProjectsQuery {
   projects: {
-    nodes: Array<{ id: string; name: string; team: { id: string } | null }>
+    nodes: Array<{ id: string; name: string; teams: { nodes: Array<{ id: string }> } | null }>
   }
 }
 
@@ -169,14 +169,14 @@ export async function listProjects(apiKey: string, teamId: string): Promise<Line
   const data = await requestLinear<ProjectsQuery>(
     apiKey,
     `query Projects($teamId: String!) {
-      projects(filter: { team: { id: { eq: $teamId } } }) {
-        nodes { id name team { id } }
+      projects(filter: { teams: { id: { eq: $teamId } } }) {
+        nodes { id name teams { nodes { id } } }
       }
     }`,
     { teamId }
   )
   return data.projects.nodes
-    .filter((p) => p.team?.id === teamId)
+    .filter((p) => p.teams?.nodes?.some((t) => t.id === teamId))
     .map((p) => ({ id: p.id, name: p.name, teamId }))
 }
 

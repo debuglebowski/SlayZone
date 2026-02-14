@@ -215,8 +215,10 @@ function upsertTaskFromIssue(db: Database, localProjectId: string, issue: Linear
   db.prepare(`
     INSERT INTO tasks (
       id, project_id, title, description, status, priority, assignee,
-      terminal_mode, claude_flags, codex_flags, created_at, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, 'claude-code', '--allow-dangerously-skip-permissions', '--full-auto --search', datetime('now'), ?)
+      terminal_mode, provider_config, claude_flags, codex_flags, created_at, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, 'claude-code',
+      '{"claude-code":{"flags":"--allow-dangerously-skip-permissions"},"codex":{"flags":"--full-auto --search"},"cursor-agent":{"flags":"--force"},"gemini":{"flags":"--yolo"},"opencode":{"flags":""}}',
+      '--allow-dangerously-skip-permissions', '--full-auto --search', datetime('now'), ?)
   `).run(
     id,
     localProjectId,
