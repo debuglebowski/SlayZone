@@ -1,5 +1,6 @@
 import { app, shell, BrowserWindow, ipcMain, nativeTheme, session, webContents, dialog, Menu } from 'electron'
 import { join } from 'path'
+import { readFileSync } from 'fs'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 
 // Use consistent app name for userData path (paired with legacy DB migration)
@@ -24,13 +25,15 @@ import { registerDiagnosticsHandlers, registerProcessDiagnostics, stopDiagnostic
 import { registerAiConfigHandlers } from '@slayzone/ai-config/main'
 import { registerIntegrationHandlers, startLinearSyncPoller } from '@slayzone/integrations/main'
 import { registerFileEditorHandlers } from '@slayzone/file-editor/main'
+import { registerScreenshotHandlers } from './screenshot'
 
 // Minimum splash screen display time (ms)
 const SPLASH_MIN_DURATION = 4000
 const DEFAULT_WINDOW_WIDTH = 1760
 const DEFAULT_WINDOW_HEIGHT = 1280
 
-// Self-contained splash HTML with inline SVG and CSS animations
+// Self-contained splash HTML with inline PNG and CSS animations
+const splashLogoBase64 = readFileSync(icon).toString('base64')
 const splashHTML = (version: string) => `
 <!DOCTYPE html>
 <html>
@@ -112,32 +115,7 @@ const splashHTML = (version: string) => `
 <body>
   <div class="container">
     <div class="logo-wrapper">
-      <svg class="logo" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <defs>
-          <linearGradient id="crown-graffiti" x1="6" y1="10" x2="58" y2="54" gradientUnits="userSpaceOnUse">
-            <stop offset="0" stop-color="#00E5FF"/>
-            <stop offset="0.35" stop-color="#FF3CAC"/>
-            <stop offset="0.7" stop-color="#FFD500"/>
-            <stop offset="1" stop-color="#39FF14"/>
-          </linearGradient>
-          <filter id="soft-glow" x="-40%" y="-40%" width="180%" height="180%">
-            <feGaussianBlur stdDeviation="1.2" result="blur"/>
-            <feMerge>
-              <feMergeNode in="blur"/>
-              <feMergeNode in="SourceGraphic"/>
-            </feMerge>
-          </filter>
-        </defs>
-        <path
-          d="M8,48 L14,24 L24,36 L32,16 L40,36 L50,24 L56,48 Z"
-          stroke="url(#crown-graffiti)"
-          stroke-width="5.2"
-          stroke-linecap="round"
-          stroke-linejoin="round"
-          fill="none"
-          filter="url(#soft-glow)"
-        />
-      </svg>
+      <img class="logo" src="data:image/png;base64,${splashLogoBase64}" />
     </div>
     <div class="title">
       <span class="typed-text" aria-hidden="true"></span>
@@ -319,6 +297,12 @@ function createMainWindow(): void {
     if (input.type === 'keyDown' && input.key === ',' && input.meta) {
       event.preventDefault()
       emitOpenSettings()
+      return
+    }
+
+    if (input.type === 'keyDown' && input.key.toLowerCase() === 's' && input.meta && input.shift) {
+      event.preventDefault()
+      mainWindow?.webContents.send('app:screenshot-trigger')
     }
   })
 
@@ -462,6 +446,7 @@ app.whenReady().then(() => {
   registerAiConfigHandlers(ipcMain, db)
   registerIntegrationHandlers(ipcMain, db)
   registerFileEditorHandlers(ipcMain)
+  registerScreenshotHandlers()
 
   // Start MCP server (use port 0 in Playwright to avoid conflict with dev instance)
   const mcpPort = (() => {
