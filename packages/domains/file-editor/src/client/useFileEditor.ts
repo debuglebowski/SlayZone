@@ -1,46 +1,138 @@
-import { useState, useCallback, useRef } from 'react'
+import { useState, useCallback, useRef, useEffect } from 'react'
 
 export interface OpenFile {
   path: string
-  content: string
-  originalContent: string
+  content: string | null
+  originalContent: string | null
+  tooLarge?: boolean
+  sizeBytes?: number
+  diskChanged?: boolean
 }
 
 export function useFileEditor(projectPath: string) {
   const [openFiles, setOpenFiles] = useState<OpenFile[]>([])
   const [activeFilePath, setActiveFilePath] = useState<string | null>(null)
+  const [treeRefreshKey, setTreeRefreshKey] = useState(0)
   const pendingOpen = useRef<string | null>(null)
+  const treeRefreshTimer = useRef<NodeJS.Timeout | null>(null)
+  // Track version per file for CodeMirror external content reload
+  const [fileVersions, setFileVersions] = useState<Map<string, number>>(new Map())
 
-  const openFile = useCallback(async (filePath: string) => {
-    // Already open — just focus
-    setOpenFiles((prev) => {
-      if (prev.some((f) => f.path === filePath)) {
+  // --- File watcher ---
+  useEffect(() => {
+    window.api.fs.watch(projectPath)
+    return () => { window.api.fs.unwatch(projectPath) }
+  }, [projectPath])
+
+  const reloadFile = useCallback(async (filePath: string) => {
+    try {
+      const result = await window.api.fs.readFile(projectPath, filePath)
+      if (result.tooLarge || result.content == null) return
+      setOpenFiles((prev) =>
+        prev.map((f) =>
+          f.path === filePath
+            ? { ...f, content: result.content, originalContent: result.content, diskChanged: false }
+            : f
+        )
+      )
+      setFileVersions((prev) => {
+        const next = new Map(prev)
+        next.set(filePath, (next.get(filePath) ?? 0) + 1)
+        return next
+      })
+    } catch {
+      // File may have been deleted
+    }
+  }, [projectPath])
+
+  const projectPathRef = useRef(projectPath)
+  projectPathRef.current = projectPath
+
+  useEffect(() => {
+    const unsubscribe = window.api.fs.onFileChanged((rootPath, relPath) => {
+      // Filter: only process events for this editor's project
+      const normalize = (p: string) => p.replace(/\/+$/, '')
+      if (normalize(rootPath) !== normalize(projectPathRef.current)) return
+
+      // Schedule tree refresh (debounced 500ms)
+      if (treeRefreshTimer.current) clearTimeout(treeRefreshTimer.current)
+      treeRefreshTimer.current = setTimeout(() => {
+        setTreeRefreshKey((k) => k + 1)
+      }, 500)
+
+      setOpenFiles((prev) => {
+        const fileIdx = prev.findIndex((f) => f.path === relPath)
+        if (fileIdx === -1) return prev
+
+        const file = prev[fileIdx]
+        const isDirty = file.content !== file.originalContent
+
+        if (isDirty) {
+          // Mark as disk-changed, don't auto-reload
+          const next = [...prev]
+          next[fileIdx] = { ...file, diskChanged: true }
+          return next
+        }
+
+        // Not dirty — schedule silent reload (async, outside setState)
+        reloadFile(relPath)
         return prev
-      }
-      return prev // will be added below
+      })
     })
 
+    return () => {
+      unsubscribe()
+      if (treeRefreshTimer.current) clearTimeout(treeRefreshTimer.current)
+    }
+  }, [reloadFile])
+
+  // --- Open / close / save ---
+  const openFile = useCallback(async (filePath: string) => {
+    // Already open — just focus
     const existing = openFiles.find((f) => f.path === filePath)
     if (existing) {
       setActiveFilePath(filePath)
       return
     }
 
-    // Prevent duplicate reads
     if (pendingOpen.current === filePath) return
     pendingOpen.current = filePath
 
     try {
-      const content = await window.api.fs.readFile(projectPath, filePath)
+      const result = await window.api.fs.readFile(projectPath, filePath)
+      if (result.tooLarge) {
+        setOpenFiles((prev) => {
+          if (prev.some((f) => f.path === filePath)) return prev
+          return [...prev, { path: filePath, content: null, originalContent: null, tooLarge: true, sizeBytes: result.sizeBytes }]
+        })
+        setActiveFilePath(filePath)
+        return
+      }
       setOpenFiles((prev) => {
         if (prev.some((f) => f.path === filePath)) return prev
-        return [...prev, { path: filePath, content, originalContent: content }]
+        return [...prev, { path: filePath, content: result.content, originalContent: result.content }]
       })
       setActiveFilePath(filePath)
     } finally {
       pendingOpen.current = null
     }
   }, [projectPath, openFiles])
+
+  const openFileForced = useCallback(async (filePath: string) => {
+    try {
+      const result = await window.api.fs.readFile(projectPath, filePath, true)
+      if (result.content == null) return
+      setOpenFiles((prev) =>
+        prev.map((f) =>
+          f.path === filePath
+            ? { ...f, content: result.content, originalContent: result.content, tooLarge: false, sizeBytes: undefined }
+            : f
+        )
+      )
+    } catch {
+      // File read failed
+    }
+  }, [projectPath])
 
   const updateContent = useCallback((filePath: string, content: string) => {
     setOpenFiles((prev) =>
@@ -50,19 +142,17 @@ export function useFileEditor(projectPath: string) {
 
   const saveFile = useCallback(async (filePath: string) => {
     const file = openFiles.find((f) => f.path === filePath)
-    if (!file || file.content === file.originalContent) return
+    if (!file || file.content == null || file.content === file.originalContent) return
     await window.api.fs.writeFile(projectPath, filePath, file.content)
     setOpenFiles((prev) =>
       prev.map((f) =>
-        f.path === filePath ? { ...f, originalContent: f.content } : f
+        f.path === filePath ? { ...f, originalContent: f.content, diskChanged: false } : f
       )
     )
   }, [projectPath, openFiles])
 
   const closeFile = useCallback((filePath: string) => {
     setOpenFiles((prev) => {
-      const idx = prev.findIndex((f) => f.path === filePath)
-      if (idx === -1) return prev
       const next = prev.filter((f) => f.path !== filePath)
       return next
     })
@@ -71,12 +161,27 @@ export function useFileEditor(projectPath: string) {
       const remaining = openFiles.filter((f) => f.path !== filePath)
       return remaining.length > 0 ? remaining[remaining.length - 1].path : null
     })
+    setFileVersions((prev) => {
+      const next = new Map(prev)
+      next.delete(filePath)
+      return next
+    })
   }, [openFiles])
 
   const isDirty = useCallback(
     (filePath: string) => {
       const file = openFiles.find((f) => f.path === filePath)
       return file ? file.content !== file.originalContent : false
+    },
+    [openFiles]
+  )
+
+  const hasDirtyFiles = openFiles.some((f) => f.content !== f.originalContent)
+
+  const isFileDiskChanged = useCallback(
+    (filePath: string) => {
+      const file = openFiles.find((f) => f.path === filePath)
+      return file?.diskChanged ?? false
     },
     [openFiles]
   )
@@ -89,9 +194,14 @@ export function useFileEditor(projectPath: string) {
     activeFilePath,
     setActiveFilePath,
     openFile,
+    openFileForced,
     updateContent,
     saveFile,
     closeFile,
-    isDirty
+    isDirty,
+    hasDirtyFiles,
+    isFileDiskChanged,
+    treeRefreshKey,
+    fileVersions
   }
 }

@@ -26,9 +26,11 @@ interface EditorFileTreeProps {
   projectPath: string
   onOpenFile: (path: string) => void
   activeFilePath: string | null
+  /** Increment to trigger reload of expanded directories */
+  refreshKey?: number
 }
 
-export function EditorFileTree({ projectPath, onOpenFile, activeFilePath }: EditorFileTreeProps) {
+export function EditorFileTree({ projectPath, onOpenFile, activeFilePath, refreshKey }: EditorFileTreeProps) {
   // Map of dirPath -> children entries (lazy loaded)
   const [dirContents, setDirContents] = useState<Map<string, DirEntry[]>>(new Map())
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set())
@@ -54,6 +56,14 @@ export function EditorFileTree({ projectPath, onOpenFile, activeFilePath }: Edit
   useEffect(() => {
     loadDir('')
   }, [loadDir])
+
+  // Reload expanded dirs on external file changes
+  useEffect(() => {
+    if (!refreshKey) return
+    loadDir('')
+    expandedFolders.forEach((dir) => loadDir(dir))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [refreshKey])
 
   const handleToggleFolder = useCallback(
     (folderPath: string) => {

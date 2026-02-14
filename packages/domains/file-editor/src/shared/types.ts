@@ -4,3 +4,9 @@ export interface DirEntry {
   path: string
   type: 'file' | 'directory'
 }
+
+export interface ReadFileResult {
+  content: string | null
+  tooLarge?: boolean
+  sizeBytes?: number
+}

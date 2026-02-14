@@ -9,13 +9,14 @@ interface EditorTabBarProps {
   onSelect: (path: string) => void
   onClose: (path: string) => void
   isDirty: (path: string) => boolean
+  diskChanged?: (path: string) => boolean
 }
 
 function fileName(path: string): string {
   return path.split('/').pop() ?? path
 }
 
-export function EditorTabBar({ files, activeFilePath, onSelect, onClose, isDirty }: EditorTabBarProps) {
+export function EditorTabBar({ files, activeFilePath, onSelect, onClose, isDirty, diskChanged }: EditorTabBarProps) {
   if (files.length === 0) return null
 
   return (
@@ -46,6 +47,9 @@ export function EditorTabBar({ files, activeFilePath, onSelect, onClose, isDirty
             </span>
             {dirty && (
               <span className="size-1.5 rounded-full bg-foreground shrink-0" />
+            )}
+            {diskChanged?.(file.path) && (
+              <span className="text-[10px] leading-none text-amber-500 shrink-0">changed</span>
             )}
             <span
               className="size-4 flex items-center justify-center rounded opacity-0 group-hover:opacity-100 hover:bg-muted shrink-0"
