@@ -37,7 +37,8 @@ export default defineConfig(({ mode }) => {
       resolve: {
         alias: {
           '@renderer': resolve('src/renderer/src'),
-          '@': resolve('src/renderer/src')
+          '@': resolve('src/renderer/src'),
+          'posthog-js': 'posthog-js/dist/module.no-external.js'
         }
       },
       plugins: [react(), tailwindcss()],
