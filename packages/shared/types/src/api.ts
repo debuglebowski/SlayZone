@@ -1,7 +1,7 @@
 import type { Project, CreateProjectInput, UpdateProjectInput } from '@slayzone/projects/shared'
 import type { Task, CreateTaskInput, UpdateTaskInput, GenerateDescriptionResult } from '@slayzone/task/shared'
 import type { Tag, CreateTagInput, UpdateTagInput } from '@slayzone/tags/shared'
-import type { TerminalMode, TerminalState, CodeMode, PtyInfo, PromptInfo, ClaudeAvailability, BufferSinceResult } from '@slayzone/terminal/shared'
+import type { TerminalMode, TerminalState, CodeMode, PtyInfo, PromptInfo, ClaudeAvailability, BufferSinceResult, ProviderUsage } from '@slayzone/terminal/shared'
 import type { TerminalTab, CreateTerminalTabInput, UpdateTerminalTabInput } from '@slayzone/task-terminals/shared'
 import type { Theme, ThemePreference } from '@slayzone/settings/shared'
 import type { DetectedWorktree, MergeResult, MergeWithAIResult, GitDiffSnapshot, ConflictFileContent, ConflictAnalysis } from '@slayzone/worktrees/shared'
@@ -302,6 +302,9 @@ export interface ElectronAPI {
       width: number
       height: number
     }) => Promise<{ success: boolean; path?: string }>
+  }
+  usage: {
+    fetch: () => Promise<ProviderUsage[]>
   }
   integrations: {
     connectLinear: (input: ConnectLinearInput) => Promise<IntegrationConnectionPublic>

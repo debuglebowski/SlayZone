@@ -295,6 +295,9 @@ const api: ElectronAPI = {
       return () => ipcRenderer.removeListener('fs:changed', handler)
     }
   },
+  usage: {
+    fetch: () => ipcRenderer.invoke('usage:fetch')
+  },
   screenshot: {
     captureRegion: (rect) => ipcRenderer.invoke('screenshot:captureRegion', rect)
   },

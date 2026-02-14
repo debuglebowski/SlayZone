@@ -5,7 +5,15 @@ import type { Task } from '@slayzone/task/shared'
 import type { Project } from '@slayzone/projects/shared'
 import type { Tag } from '@slayzone/tags/shared'
 // Domains
-import { KanbanBoard, FilterBar, useTasksData, useFilterState, applyFilters, type Column } from '@slayzone/tasks'
+import {
+  KanbanBoard,
+  FilterBar,
+  useTasksData,
+  useFilterState,
+  applyFilters,
+  type Column,
+  type FilterBarVariant
+} from '@slayzone/tasks'
 import { CreateTaskDialog, EditTaskDialog, DeleteTaskDialog, TaskDetailPage } from '@slayzone/task'
 import { CreateProjectDialog, ProjectSettingsDialog, DeleteProjectDialog } from '@slayzone/projects'
 import { UserSettingsDialog, useViewState } from '@slayzone/settings'
@@ -37,6 +45,8 @@ import {
   useAttentionTasks,
   useNotificationState
 } from '@/components/notifications'
+import { UsagePopover } from '@/components/usage/UsagePopover'
+import { useUsage } from '@/components/usage/useUsage'
 
 function App(): React.JSX.Element {
   // Core data from domain hook
@@ -66,6 +76,7 @@ function App(): React.JSX.Element {
 
   // Filter state (persisted per project)
   const [filter, setFilter] = useFilterState(selectedProjectId)
+  const [filterBarVariant, setFilterBarVariant] = useState<FilterBarVariant>('a')
 
   // Dialog state
   const [createOpen, setCreateOpen] = useState(false)
@@ -109,7 +120,8 @@ function App(): React.JSX.Element {
   // Closed tabs stack for Cmd+Shift+T reopen
   const closedTabsRef = useRef<Extract<typeof tabs[number], { type: 'task' }>[]>([])
 
-  // Notification state
+  // Usage & notification state
+  const { data: usageData, refresh: refreshUsage } = useUsage()
   const [notificationState, setNotificationState] = useNotificationState()
   const { attentionTasks, refresh: refreshAttentionTasks } = useAttentionTasks(
     tasks,
@@ -636,6 +648,7 @@ function App(): React.JSX.Element {
                     onTabReorder={reorderTabs}
                     rightContent={
                       <div className="flex items-center gap-1">
+                        <UsagePopover data={usageData} onRefresh={refreshUsage} />
                         <DesktopNotificationToggle
                           enabled={notificationState.desktopEnabled}
                           onToggle={() =>
@@ -661,24 +674,44 @@ function App(): React.JSX.Element {
                     >
                       {tab.type === 'home' ? (
                         <div className="flex flex-col flex-1 p-6 pt-4 h-full">
-                          <header className="mb-6 flex items-center justify-between window-no-drag">
-                            {selectedProjectId ? (
-                              <textarea
-                                ref={projectNameInputRef}
-                                value={projectNameValue}
-                                onChange={(e) => setProjectNameValue(e.target.value)}
-                                onBlur={handleProjectNameSave}
-                                onKeyDown={handleProjectNameKeyDown}
-                                className="text-2xl font-bold bg-transparent border-none outline-none w-full resize-none cursor-text"
-                                style={{ caretColor: 'currentColor', fieldSizing: 'content' } as React.CSSProperties}
-                                rows={1}
-                              />
-                            ) : (
-                              <h1 className="text-2xl font-bold">All Tasks</h1>
-                            )}
-                            <Button onClick={() => setCreateOpen(true)} disabled={projects.length === 0}>
-                              New Task
-                            </Button>
+                          <header className="mb-4 window-no-drag space-y-2">
+                            <div className="flex items-center gap-4">
+                              <div className="flex-shrink-0">
+                                {selectedProjectId ? (
+                                  <textarea
+                                    ref={projectNameInputRef}
+                                    value={projectNameValue}
+                                    onChange={(e) => setProjectNameValue(e.target.value)}
+                                    onBlur={handleProjectNameSave}
+                                    onKeyDown={handleProjectNameKeyDown}
+                                    className="text-2xl font-bold bg-transparent border-none outline-none resize-none cursor-text"
+                                    style={{ caretColor: 'currentColor', fieldSizing: 'content' } as React.CSSProperties}
+                                    rows={1}
+                                  />
+                                ) : (
+                                  <h1 className="text-2xl font-bold">All Tasks</h1>
+                                )}
+                              </div>
+                              {projects.length > 0 && !(projectPathMissing && selectedProjectId) && (
+                                <FilterBar variant={filterBarVariant} filter={filter} onChange={setFilter} tags={tags} />
+                              )}
+                              {/* Variant picker — remove after choosing */}
+                              <div className="flex items-center gap-0.5 ml-2 border rounded-md p-0.5">
+                                {(['a', 'b', 'c'] as const).map((v) => (
+                                  <button
+                                    key={v}
+                                    onClick={() => setFilterBarVariant(v)}
+                                    className={`px-2 py-0.5 text-xs font-medium rounded transition-colors ${
+                                      filterBarVariant === v
+                                        ? 'bg-primary text-primary-foreground'
+                                        : 'text-muted-foreground hover:text-foreground hover:bg-accent'
+                                    }`}
+                                  >
+                                    {v.toUpperCase()}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
                           </header>
 
                           {projects.length === 0 ? (
@@ -698,9 +731,6 @@ function App(): React.JSX.Element {
                             </div>
                           ) : (
                             <>
-                              <div className="mb-4">
-                                <FilterBar filter={filter} onChange={setFilter} tags={tags} />
-                              </div>
                               <div className="flex-1 min-h-0">
                                 <KanbanBoard
                                   tasks={displayTasks}

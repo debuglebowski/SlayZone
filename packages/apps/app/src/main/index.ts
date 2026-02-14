@@ -18,7 +18,7 @@ import { registerProjectHandlers } from '@slayzone/projects/main'
 import { registerTaskHandlers, registerAiHandlers, registerFilesHandlers } from '@slayzone/task/main'
 import { registerTagHandlers } from '@slayzone/tags/main'
 import { registerSettingsHandlers, registerThemeHandlers } from '@slayzone/settings/main'
-import { registerPtyHandlers, registerClaudeHandlers, killAllPtys, startIdleChecker, stopIdleChecker } from '@slayzone/terminal/main'
+import { registerPtyHandlers, registerClaudeHandlers, registerUsageHandlers, killAllPtys, startIdleChecker, stopIdleChecker } from '@slayzone/terminal/main'
 import { registerTerminalTabsHandlers } from '@slayzone/task-terminals/main'
 import { registerWorktreeHandlers } from '@slayzone/worktrees/main'
 import { registerDiagnosticsHandlers, registerProcessDiagnostics, stopDiagnostics } from '@slayzone/diagnostics/main'
@@ -424,6 +424,7 @@ app.whenReady().then(() => {
   registerSettingsHandlers(ipcMain, db)
   registerThemeHandlers(ipcMain, db)
   registerClaudeHandlers(ipcMain)
+  registerUsageHandlers(ipcMain)
   registerPtyHandlers(ipcMain, db)
 
   // Expose test helpers for e2e

@@ -49,3 +49,20 @@ export interface ClaudeAvailability {
   path: string | null
   version: string | null
 }
+
+// Provider usage / rate limiting
+export interface UsageWindow {
+  utilization: number // 0-100
+  resetsAt: string    // ISO timestamp
+}
+
+export interface ProviderUsage {
+  provider: string
+  label: string
+  fiveHour: UsageWindow | null
+  sevenDay: UsageWindow | null
+  sevenDayOpus: UsageWindow | null
+  sevenDaySonnet: UsageWindow | null
+  error: string | null
+  fetchedAt: number
+}
