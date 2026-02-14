@@ -1,13 +1,23 @@
 import posthog from 'posthog-js'
 import type { TelemetryTier, TelemetryEventName, TelemetryEventProps } from '../shared/types'
 
-const POSTHOG_KEY = '__POSTHOG_API_KEY__'
-const POSTHOG_HOST = 'https://us.i.posthog.com'
+declare const __POSTHOG_API_KEY__: string
+declare const __POSTHOG_HOST__: string
+declare const __DEV__: boolean
+declare const __POSTHOG_DEV_ENABLED__: boolean
+
+const POSTHOG_KEY = typeof __POSTHOG_API_KEY__ !== 'undefined' ? __POSTHOG_API_KEY__ : ''
+const POSTHOG_HOST = typeof __POSTHOG_HOST__ !== 'undefined' ? __POSTHOG_HOST__ : ''
+const IS_DEV = typeof __DEV__ !== 'undefined' ? __DEV__ : true
+const DEV_ENABLED = typeof __POSTHOG_DEV_ENABLED__ !== 'undefined' ? __POSTHOG_DEV_ENABLED__ : false
+const ENABLED = POSTHOG_KEY && POSTHOG_HOST && (!IS_DEV || DEV_ENABLED)
 
 let currentTier: TelemetryTier = 'anonymous'
 let initialized = false
 
 export function initTelemetry(tier: TelemetryTier): void {
+  if (!ENABLED) return
+
   if (initialized) {
     posthog.reset()
   }
@@ -25,6 +35,8 @@ export function initTelemetry(tier: TelemetryTier): void {
     disable_session_recording: true,
     ...(isOptedIn ? {} : { disable_persistence: true })
   })
+
+  posthog.register({ environment: IS_DEV ? 'development' : 'production' })
 
   if (isOptedIn) {
     // Use persistent ID from settings, or let PostHog generate one

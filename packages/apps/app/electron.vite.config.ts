@@ -3,34 +3,47 @@ import { readFileSync } from 'fs'
 import { defineConfig, externalizeDepsPlugin } from 'electron-vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
+import { loadEnv } from 'vite'
 
 const pkg = JSON.parse(readFileSync(resolve(__dirname, 'package.json'), 'utf-8'))
 const slayzoneDeps = Object.keys({ ...pkg.dependencies, ...pkg.devDependencies }).filter((d) =>
   d.startsWith('@slayzone/')
 )
 
-export default defineConfig({
-  main: {
-    plugins: [externalizeDepsPlugin({ exclude: slayzoneDeps })],
-    build: {
-      rollupOptions: {
-        external: ['better-sqlite3', 'node-pty']
-      }
-    }
-  },
-  preload: {
-    plugins: [externalizeDepsPlugin({ exclude: slayzoneDeps })]
-  },
-  renderer: {
-    resolve: {
-      alias: {
-        '@renderer': resolve('src/renderer/src'),
-        '@': resolve('src/renderer/src')
+const root = resolve(__dirname, '../../..')
+
+export default defineConfig(({ mode }) => {
+  const env = loadEnv(mode, root, '')
+
+  return {
+    main: {
+      plugins: [externalizeDepsPlugin({ exclude: slayzoneDeps })],
+      build: {
+        rollupOptions: {
+          external: ['better-sqlite3', 'node-pty']
+        }
       }
     },
-    plugins: [react(), tailwindcss()],
-    optimizeDeps: {
-      exclude: slayzoneDeps
+    preload: {
+      plugins: [externalizeDepsPlugin({ exclude: slayzoneDeps })]
+    },
+    renderer: {
+      define: {
+        __POSTHOG_API_KEY__: JSON.stringify(env.POSTHOG_API_KEY ?? ''),
+        __POSTHOG_HOST__: JSON.stringify(env.POSTHOG_HOST ?? ''),
+        __DEV__: JSON.stringify(mode !== 'production'),
+        __POSTHOG_DEV_ENABLED__: JSON.stringify(env.POSTHOG_DEV_ENABLED === '1')
+      },
+      resolve: {
+        alias: {
+          '@renderer': resolve('src/renderer/src'),
+          '@': resolve('src/renderer/src')
+        }
+      },
+      plugins: [react(), tailwindcss()],
+      optimizeDeps: {
+        exclude: slayzoneDeps
+      }
     }
   }
 })
