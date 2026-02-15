@@ -34,7 +34,13 @@ interface TaskContextMenuProps {
   children: React.ReactNode
 }
 
-const PRIORITIES = [1, 2, 3, 4, 5]
+const PRIORITY_LABELS: Record<number, string> = {
+  1: 'Urgent',
+  2: 'High',
+  3: 'Medium',
+  4: 'Low',
+  5: 'Someday'
+}
 
 export function TaskContextMenu({
   task,
@@ -104,9 +110,9 @@ export function TaskContextMenu({
                 value={String(task.priority)}
                 onValueChange={handlePriorityChange}
               >
-                {PRIORITIES.map((p) => (
-                  <ContextMenuRadioItem key={p} value={String(p)}>
-                    P{p}
+                {Object.entries(PRIORITY_LABELS).map(([value, label]) => (
+                  <ContextMenuRadioItem key={value} value={value}>
+                    {label}
                   </ContextMenuRadioItem>
                 ))}
               </ContextMenuRadioGroup>

@@ -112,8 +112,8 @@ function SortableSubTask({ sub, onNavigate, onUpdate, onDelete }: {
           <ContextMenuSubTrigger>Priority</ContextMenuSubTrigger>
           <ContextMenuSubContent>
             <ContextMenuRadioGroup value={String(sub.priority)} onValueChange={(v) => onUpdate(sub.id, { priority: parseInt(v, 10) })}>
-              {[1, 2, 3, 4, 5].map((p) => (
-                <ContextMenuRadioItem key={p} value={String(p)}>P{p}</ContextMenuRadioItem>
+              {Object.entries({ 1: 'Urgent', 2: 'High', 3: 'Medium', 4: 'Low', 5: 'Someday' }).map(([value, label]) => (
+                <ContextMenuRadioItem key={value} value={value}>{label}</ContextMenuRadioItem>
               ))}
             </ContextMenuRadioGroup>
           </ContextMenuSubContent>

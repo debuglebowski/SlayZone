@@ -18,7 +18,7 @@ export function TaskItem({ task, onEdit, onDelete }: TaskItemProps): React.JSX.E
       className="flex items-center gap-3 rounded-md border px-3 py-2 hover:bg-muted/50 transition-colors duration-[400ms] hover:duration-[100ms]"
     >
       {/* Priority */}
-      <span className="w-6 text-xs font-medium text-muted-foreground">P{task.priority}</span>
+      <span className="w-12 text-xs font-medium text-muted-foreground">{({ 1: 'Urgent', 2: 'High', 3: 'Med', 4: 'Low', 5: 'Later' } as Record<number, string>)[task.priority]}</span>
 
       {/* Title */}
       <span

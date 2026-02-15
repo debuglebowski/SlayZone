@@ -106,7 +106,7 @@ export function KanbanCard({
                     priorityColor
                   )}
                 >
-                  P{task.priority}
+                  {task.priority === 1 ? 'Urgent' : 'High'}
                 </span>
               )}
               {/* Terminal state indicator - hide when starting */}
