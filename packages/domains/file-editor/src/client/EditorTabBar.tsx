@@ -1,4 +1,4 @@
-import { X } from 'lucide-react'
+import { X, PanelLeftClose, PanelLeft } from 'lucide-react'
 import { cn } from '@slayzone/ui'
 import type { OpenFile } from './useFileEditor'
 import { FileIcon } from './FileIcon'
@@ -10,17 +10,27 @@ interface EditorTabBarProps {
   onClose: (path: string) => void
   isDirty: (path: string) => boolean
   diskChanged?: (path: string) => boolean
+  treeVisible?: boolean
+  onToggleTree?: () => void
 }
 
 function fileName(path: string): string {
   return path.split('/').pop() ?? path
 }
 
-export function EditorTabBar({ files, activeFilePath, onSelect, onClose, isDirty, diskChanged }: EditorTabBarProps) {
-  if (files.length === 0) return null
-
+export function EditorTabBar({ files, activeFilePath, onSelect, onClose, isDirty, diskChanged, treeVisible, onToggleTree }: EditorTabBarProps) {
   return (
-    <div className="flex items-center h-10 px-2 gap-1 border-b bg-surface-1 overflow-x-auto shrink-0">
+    <div className="flex items-center h-10 px-2 gap-1 border-b bg-surface-1 shrink-0">
+      {onToggleTree && (
+        <button
+          className="flex items-center justify-center size-7 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors shrink-0"
+          onClick={onToggleTree}
+          title={treeVisible ? 'Hide file tree' : 'Show file tree'}
+        >
+          {treeVisible ? <PanelLeftClose className="size-4" /> : <PanelLeft className="size-4" />}
+        </button>
+      )}
+      <div className="flex items-center gap-1 overflow-x-auto flex-1 min-w-0">
       {files.map((file) => {
         const active = file.path === activeFilePath
         const dirty = isDirty(file.path)
@@ -63,6 +73,7 @@ export function EditorTabBar({ files, activeFilePath, onSelect, onClose, isDirty
           </button>
         )
       })}
+      </div>
     </div>
   )
 }

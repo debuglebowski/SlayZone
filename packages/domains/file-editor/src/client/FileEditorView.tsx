@@ -45,6 +45,7 @@ export function FileEditorView({ projectPath, isActive = true }: FileEditorViewP
   } = useFileEditor(projectPath)
 
   const [treeWidth, setTreeWidth] = useState(250)
+  const [treeVisible, setTreeVisible] = useState(true)
   const isDragging = useRef(false)
   const [confirmClose, setConfirmClose] = useState<string | null>(null)
   const [quickOpenVisible, setQuickOpenVisible] = useState(false)
@@ -106,22 +107,26 @@ export function FileEditorView({ projectPath, isActive = true }: FileEditorViewP
   return (
     <div className="h-full flex bg-background">
       {/* File tree */}
-      <div className="shrink-0 border-r overflow-hidden" style={{ width: treeWidth }}>
-        <EditorFileTree
-          projectPath={projectPath}
-          onOpenFile={openFile}
-          activeFilePath={activeFilePath}
-          refreshKey={treeRefreshKey}
-        />
-      </div>
+      {treeVisible && (
+        <div className="shrink-0 border-r overflow-hidden" style={{ width: treeWidth }}>
+          <EditorFileTree
+            projectPath={projectPath}
+            onOpenFile={openFile}
+            activeFilePath={activeFilePath}
+            refreshKey={treeRefreshKey}
+          />
+        </div>
+      )}
 
       {/* Editor area */}
       <div className="relative flex-1 flex flex-col min-w-0">
         {/* Resize handle (overlay) */}
-        <div
-          className="absolute left-0 inset-y-0 w-2 -translate-x-1/2 z-10 cursor-col-resize hover:bg-primary/20 active:bg-primary/30 transition-colors"
-          onMouseDown={handleResizeStart}
-        />
+        {treeVisible && (
+          <div
+            className="absolute left-0 inset-y-0 w-2 -translate-x-1/2 z-10 cursor-col-resize hover:bg-primary/20 active:bg-primary/30 transition-colors"
+            onMouseDown={handleResizeStart}
+          />
+        )}
         <EditorTabBar
           files={openFiles}
           activeFilePath={activeFilePath}
@@ -129,6 +134,8 @@ export function FileEditorView({ projectPath, isActive = true }: FileEditorViewP
           onClose={handleCloseFile}
           isDirty={isDirty}
           diskChanged={isFileDiskChanged}
+          treeVisible={treeVisible}
+          onToggleTree={() => setTreeVisible((v) => !v)}
         />
 
         {activeFile?.tooLarge ? (
