@@ -15,6 +15,7 @@ import {
 } from '@slayzone/ui'
 import type { BrowserTab, BrowserTabsState, DeviceEmulation } from '../shared'
 import { DEVICE_PRESETS } from './device-presets'
+import { computeScale } from './scale'
 
 interface TaskUrlEntry {
   taskId: string
@@ -59,8 +60,21 @@ export function BrowserPanel({ className, tabs, onTabsChange, taskId, isResizing
   const [importDropdownOpen, setImportDropdownOpen] = useState(false)
   const [customWidth, setCustomWidth] = useState('375')
   const [customHeight, setCustomHeight] = useState('667')
+  const [viewportSize, setViewportSize] = useState<{ width: number; height: number } | null>(null)
   const webviewRef = useRef<WebviewElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
+  const viewportRef = useRef<HTMLDivElement>(null)
+
+  // Track viewport container size for scale-to-fit
+  useEffect(() => {
+    const el = viewportRef.current
+    if (!el) return
+    const ro = new ResizeObserver(([entry]) => {
+      setViewportSize({ width: entry.contentRect.width, height: entry.contentRect.height })
+    })
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
 
   // Fetch URLs from other tasks when dropdown opens
   useEffect(() => {
@@ -318,6 +332,7 @@ export function BrowserPanel({ className, tabs, onTabsChange, taskId, isResizing
 
   // Resize handles drag state
   const [dragSize, setDragSize] = useState<{ width: number; height: number } | null>(null)
+  const [dragScale, setDragScale] = useState<number | null>(null)
   const dragRef = useRef<{ startX: number; startY: number; startW: number; startH: number; axis: 'x' | 'y' | 'xy'; latestW: number; latestH: number } | null>(null)
   const dragCleanupRef = useRef<(() => void) | null>(null)
 
@@ -331,6 +346,9 @@ export function BrowserPanel({ className, tabs, onTabsChange, taskId, isResizing
     e.preventDefault()
     const startW = activeEmulation.width
     const startH = activeEmulation.height
+    // Freeze scale during drag so the handle tracks the mouse
+    const frozen = computeScale(viewportSize, { width: startW, height: startH })
+    setDragScale(frozen)
     dragRef.current = { startX: e.clientX, startY: e.clientY, startW, startH, axis, latestW: startW, latestH: startH }
 
     const onMove = (ev: MouseEvent) => {
@@ -364,12 +382,13 @@ export function BrowserPanel({ className, tabs, onTabsChange, taskId, isResizing
         })
       }
       setDragSize(null)
+      setDragScale(null)
     }
 
     document.addEventListener('mousemove', onMove)
     document.addEventListener('mouseup', onUp)
     dragCleanupRef.current = cleanup
-  }, [activeEmulation, setEmulation])
+  }, [activeEmulation, setEmulation, viewportSize])
 
   // Keyboard shortcuts when focused
   useEffect(() => {
@@ -634,27 +653,45 @@ export function BrowserPanel({ className, tabs, onTabsChange, taskId, isResizing
       </div>
 
       {/* Webview */}
-      <div className={cn(
-        'relative flex-1',
-        activeEmulation && 'flex items-center justify-center bg-neutral-900 overflow-hidden'
-      )}>
+      <div
+        ref={viewportRef}
+        className={cn(
+          'relative flex-1',
+          activeEmulation && 'flex items-center justify-center bg-neutral-900 overflow-hidden'
+        )}
+      >
+        {(() => {
+          const emW = dragSize?.width ?? activeEmulation?.width ?? 0
+          const emH = dragSize?.height ?? activeEmulation?.height ?? 0
+          const scale = dragScale ?? computeScale(viewportSize, activeEmulation ? { width: emW, height: emH } : null)
+          return (
         <div
-          className={cn('relative', !activeEmulation && 'absolute inset-0', activeEmulation && 'border border-neutral-700')}
+          className={cn('relative', !activeEmulation && 'absolute inset-0')}
           style={activeEmulation ? {
-            width: dragSize?.width ?? activeEmulation.width,
-            height: dragSize?.height ?? activeEmulation.height,
-            maxWidth: '100%',
-            maxHeight: '100%',
+            width: emW * scale,
+            height: emH * scale,
           } : undefined}
         >
-          <webview
-            ref={webviewRef}
-            src={activeTab?.url || 'about:blank'}
-            partition="persist:browser-tabs"
-            className="absolute inset-0"
-            // @ts-expect-error - webview attributes not in React types
-            allowpopups="true"
-          />
+          {/* Webview content — scaled to fit when device is larger than container */}
+          <div
+            className={cn('absolute', activeEmulation && 'border border-neutral-700 origin-top-left')}
+            style={activeEmulation ? {
+              width: emW,
+              height: emH,
+              transform: scale < 1 ? `scale(${scale})` : undefined,
+              top: 0,
+              left: 0,
+            } : { inset: 0 }}
+          >
+            <webview
+              ref={webviewRef}
+              src={activeTab?.url || 'about:blank'}
+              partition="persist:browser-tabs"
+              className="absolute inset-0"
+              // @ts-expect-error - webview attributes not in React types
+              allowpopups="true"
+            />
+          </div>
           {activeEmulation && (
             <>
               {/* Right handle */}
@@ -685,6 +722,8 @@ export function BrowserPanel({ className, tabs, onTabsChange, taskId, isResizing
           )}
           {(dragSize || isResizing) && <div className="absolute inset-0 z-10" />}
         </div>
+          )
+        })()}
         {activeEmulation && (
           <div className="absolute bottom-2 left-1/2 -translate-x-1/2 text-xs text-neutral-500 pointer-events-none">
             {activeEmulation.name} — {dragSize?.width ?? activeEmulation.width}&times;{dragSize?.height ?? activeEmulation.height}
