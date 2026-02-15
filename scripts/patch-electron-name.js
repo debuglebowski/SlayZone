@@ -7,6 +7,7 @@
  * 1. Renames Electron.app to SlayZone.app
  * 2. Updates path.txt so electron-vite finds the renamed app
  * 3. Patches Info.plist to set CFBundleName and CFBundleDisplayName
+ * 4. Replaces electron.icns with app icon (fixes notification icon)
  */
 
 const fs = require('fs')
@@ -75,11 +76,41 @@ try {
     `<key>CFBundleName</key>\n\t<string>${APP_NAME}</string>`
   )
 
+  // Replace CFBundleIdentifier (busts macOS notification icon cache)
+  plist = plist.replace(
+    /<key>CFBundleIdentifier<\/key>\s*<string>[^<]*<\/string>/,
+    `<key>CFBundleIdentifier</key>\n\t<string>com.slayzone.dev</string>`
+  )
+
   fs.writeFileSync(plistPath, plist)
   console.log(`✓ Patched Info.plist with app name "${APP_NAME}"`)
 } catch (err) {
   console.error(`Failed to patch Info.plist: ${err.message}`)
   process.exit(1)
+}
+
+// Step 4: Copy app icon with new name + update CFBundleIconFile to bust macOS cache
+const resourcesDir = path.join(newAppPath, 'Contents', 'Resources')
+const appIconPath = path.join(__dirname, '..', 'packages', 'apps', 'app', 'build', 'icon.icns')
+const targetIconName = 'slayzone.icns'
+const targetIconPath = path.join(resourcesDir, targetIconName)
+
+if (fs.existsSync(appIconPath)) {
+  try {
+    fs.copyFileSync(appIconPath, targetIconPath)
+    // Also update Info.plist to point to new icon filename
+    let plist2 = fs.readFileSync(plistPath, 'utf-8')
+    plist2 = plist2.replace(
+      /<key>CFBundleIconFile<\/key>\s*<string>[^<]*<\/string>/,
+      `<key>CFBundleIconFile</key>\n\t<string>${targetIconName}</string>`
+    )
+    fs.writeFileSync(plistPath, plist2)
+    console.log(`✓ Installed ${targetIconName} and updated CFBundleIconFile`)
+  } catch (err) {
+    console.error(`Failed to replace icon: ${err.message}`)
+  }
+} else {
+  console.log('Skipping icon replacement (source icon not found)')
 }
 
 console.log(`\n✅ Electron patched successfully! "${APP_NAME}" will appear in macOS menu bar and Cmd+Tab.`)

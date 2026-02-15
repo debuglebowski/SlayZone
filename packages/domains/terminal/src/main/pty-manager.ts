@@ -25,8 +25,16 @@ const MODE_LABELS: Record<string, string> = {
   'terminal': 'Terminal'
 }
 
-// Hold references to active notifications so they don't get GC'd before click
-const activeNotifications = new Set<Notification>()
+// Hold references to active notifications keyed by sessionId so we can dismiss them
+const activeNotifications = new Map<string, Notification>()
+
+function dismissNotification(sessionId: string): void {
+  const existing = activeNotifications.get(sessionId)
+  if (existing) {
+    existing.close()
+    activeNotifications.delete(sessionId)
+  }
+}
 
 function showTaskAttentionNotification(sessionId: string): void {
   if (!db) return
@@ -44,6 +52,8 @@ function showTaskAttentionNotification(sessionId: string): void {
     return // No settings = disabled by default
   }
 
+  dismissNotification(sessionId)
+
   const taskId = taskIdFromSessionId(sessionId)
   const session = sessions.get(sessionId)
   const taskRow = db.prepare('SELECT title FROM tasks WHERE id = ?').get(taskId) as { title: string } | undefined
@@ -53,8 +63,8 @@ function showTaskAttentionNotification(sessionId: string): void {
       title: taskRow.title,
       body: `${label} needs attention`
     })
-    activeNotifications.add(notification)
-    const cleanup = (): void => { activeNotifications.delete(notification) }
+    activeNotifications.set(sessionId, notification)
+    const cleanup = (): void => { activeNotifications.delete(sessionId) }
     notification.on('click', () => {
       cleanup()
       app.focus({ steal: true })
@@ -160,6 +170,8 @@ function emitStateChange(session: PtySession, sessionId: string, newState: Termi
 
   if (oldState === 'running' && newState === 'attention') {
     showTaskAttentionNotification(sessionId)
+  } else if (oldState === 'attention' && newState !== 'attention') {
+    dismissNotification(sessionId)
   }
   if (session.win && !session.win.isDestroyed()) {
     try {
@@ -496,6 +508,7 @@ export function createPty(
     })
 
     ptyProcess.onExit(({ exitCode }) => {
+      dismissNotification(sessionId)
       transitionState(sessionId, 'dead')
       recordDiagnosticEvent({
         level: 'info',
@@ -630,6 +643,8 @@ export function killPty(sessionId: string): boolean {
   }
   // Clear state debounce timer
   stateMachine.unregister(sessionId)
+  // Dismiss any lingering desktop notification
+  dismissNotification(sessionId)
   // Delete from map FIRST so onData handlers exit early during kill
   sessions.delete(sessionId)
   // Use SIGKILL (9) to forcefully terminate - SIGTERM may not kill child processes
