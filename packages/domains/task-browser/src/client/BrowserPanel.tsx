@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { ArrowLeft, ArrowRight, RotateCw, X, Plus, Import } from 'lucide-react'
+import { ArrowLeft, ArrowRight, RotateCw, X, Plus, Import, Smartphone } from 'lucide-react'
 import {
   Button,
   Input,
@@ -7,9 +7,14 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuTrigger
+  DropdownMenuTrigger,
+  Popover,
+  PopoverTrigger,
+  PopoverContent,
+  Separator,
 } from '@slayzone/ui'
-import type { BrowserTab, BrowserTabsState } from '../shared'
+import type { BrowserTab, BrowserTabsState, DeviceEmulation } from '../shared'
+import { DEVICE_PRESETS } from './device-presets'
 
 interface TaskUrlEntry {
   taskId: string
@@ -28,6 +33,7 @@ interface WebviewElement extends HTMLElement {
   stop(): void
   loadURL(url: string): void
   getURL(): string
+  getWebContentsId(): number
 }
 
 interface BrowserPanelProps {
@@ -51,6 +57,8 @@ export function BrowserPanel({ className, tabs, onTabsChange, taskId, isResizing
   const [webviewReady, setWebviewReady] = useState(false)
   const [otherTaskUrls, setOtherTaskUrls] = useState<TaskUrlEntry[]>([])
   const [importDropdownOpen, setImportDropdownOpen] = useState(false)
+  const [customWidth, setCustomWidth] = useState('375')
+  const [customHeight, setCustomHeight] = useState('667')
   const webviewRef = useRef<WebviewElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
 
@@ -238,6 +246,79 @@ export function BrowserPanel({ className, tabs, onTabsChange, taskId, isResizing
     }
   }, [tabs, onTabsChange, createNewTab])
 
+  // Apply/disable device emulation when tab changes
+  const activeEmulation = activeTab?.deviceEmulation ?? null
+  useEffect(() => {
+    const wv = webviewRef.current
+    if (!wv || !webviewReady) return
+
+    const wcId = wv.getWebContentsId()
+    if (activeEmulation) {
+      window.api.webview?.enableDeviceEmulation(wcId, {
+        screenSize: { width: activeEmulation.width, height: activeEmulation.height },
+        viewSize: { width: activeEmulation.width, height: activeEmulation.height },
+        deviceScaleFactor: activeEmulation.deviceScaleFactor,
+        screenPosition: activeEmulation.mobile ? 'mobile' : 'desktop',
+        userAgent: activeEmulation.userAgent,
+      }).then(() => wv.reload())
+    } else {
+      window.api.webview?.disableDeviceEmulation(wcId).then(() => wv.reload())
+    }
+  }, [activeEmulation, webviewReady, activeTab?.id])
+
+  const setEmulation = useCallback((emulation: DeviceEmulation | null) => {
+    if (!tabs.activeTabId) return
+    onTabsChange({
+      ...tabs,
+      tabs: tabs.tabs.map(t =>
+        t.id === tabs.activeTabId ? { ...t, deviceEmulation: emulation } : t
+      )
+    })
+  }, [tabs, onTabsChange])
+
+  // Resize handles drag state
+  const [dragSize, setDragSize] = useState<{ width: number; height: number } | null>(null)
+  const dragRef = useRef<{ startX: number; startY: number; startW: number; startH: number; axis: 'x' | 'y' | 'xy'; latestW: number; latestH: number } | null>(null)
+
+  const handleResizeStart = useCallback((e: React.MouseEvent, axis: 'x' | 'y' | 'xy') => {
+    if (!activeEmulation) return
+    e.preventDefault()
+    const startW = activeEmulation.width
+    const startH = activeEmulation.height
+    dragRef.current = { startX: e.clientX, startY: e.clientY, startW, startH, axis, latestW: startW, latestH: startH }
+
+    const onMove = (ev: MouseEvent) => {
+      const d = dragRef.current
+      if (!d) return
+      const dx = ev.clientX - d.startX
+      const dy = ev.clientY - d.startY
+      d.latestW = Math.max(200, d.axis !== 'y' ? d.startW + dx : d.startW)
+      d.latestH = Math.max(200, d.axis !== 'x' ? d.startH + dy : d.startH)
+      setDragSize({ width: d.latestW, height: d.latestH })
+    }
+
+    const onUp = () => {
+      document.removeEventListener('mousemove', onMove)
+      document.removeEventListener('mouseup', onUp)
+      const d = dragRef.current
+      dragRef.current = null
+      if (d && activeEmulation) {
+        setEmulation({
+          name: 'Custom',
+          width: d.latestW,
+          height: d.latestH,
+          deviceScaleFactor: activeEmulation.deviceScaleFactor,
+          mobile: activeEmulation.mobile,
+          userAgent: activeEmulation.userAgent,
+        })
+      }
+      setDragSize(null)
+    }
+
+    document.addEventListener('mousemove', onMove)
+    document.addEventListener('mouseup', onUp)
+  }, [activeEmulation, setEmulation])
+
   // Keyboard shortcuts when focused
   useEffect(() => {
     const container = containerRef.current
@@ -402,6 +483,73 @@ export function BrowserPanel({ className, tabs, onTabsChange, taskId, isResizing
           className="flex-1 h-7 text-sm"
         />
 
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              className={cn(activeEmulation && 'text-blue-500 bg-blue-500/10')}
+            >
+              <Smartphone className="size-4" />
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-64 p-1" align="end">
+            <button
+              onClick={() => setEmulation(null)}
+              className={cn(
+                'w-full text-left px-2 py-1.5 text-sm rounded-sm hover:bg-accent',
+                !activeEmulation && 'text-blue-500 font-medium'
+              )}
+            >
+              No emulation
+            </button>
+            <Separator className="my-1" />
+            {DEVICE_PRESETS.map(preset => (
+              <button
+                key={preset.name}
+                onClick={() => setEmulation(preset)}
+                className={cn(
+                  'w-full text-left px-2 py-1 text-sm rounded-sm hover:bg-accent flex items-center justify-between',
+                  activeEmulation?.name === preset.name && 'text-blue-500 font-medium'
+                )}
+              >
+                <span>{preset.name}</span>
+                <span className="text-xs text-muted-foreground">{preset.width}&times;{preset.height}</span>
+              </button>
+            ))}
+            <Separator className="my-1" />
+            <div className="flex gap-1 items-center px-2 py-1">
+              <Input
+                value={customWidth}
+                onChange={(e) => setCustomWidth(e.target.value)}
+                className="w-16 h-6 text-xs"
+                placeholder="W"
+              />
+              <span className="text-xs text-muted-foreground">&times;</span>
+              <Input
+                value={customHeight}
+                onChange={(e) => setCustomHeight(e.target.value)}
+                className="w-16 h-6 text-xs"
+                placeholder="H"
+              />
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-6 text-xs"
+                onClick={() => {
+                  const w = parseInt(customWidth, 10)
+                  const h = parseInt(customHeight, 10)
+                  if (w > 0 && h > 0) {
+                    setEmulation({ name: 'Custom', width: w, height: h, deviceScaleFactor: 1, mobile: false })
+                  }
+                }}
+              >
+                Apply
+              </Button>
+            </div>
+          </PopoverContent>
+        </Popover>
+
         {taskId && (
           <DropdownMenu open={importDropdownOpen} onOpenChange={setImportDropdownOpen}>
             <DropdownMenuTrigger asChild>
@@ -434,16 +582,68 @@ export function BrowserPanel({ className, tabs, onTabsChange, taskId, isResizing
       </div>
 
       {/* Webview */}
-      <div className="relative flex-1">
-        <webview
-          ref={webviewRef}
-          src={activeTab?.url || 'about:blank'}
-          partition="persist:browser-tabs"
-          className="absolute inset-0"
-          // @ts-expect-error - webview attributes not in React types
-          allowpopups="true"
-        />
-        {isResizing && <div className="absolute inset-0 z-10" />}
+      <div className={cn(
+        'relative flex-1',
+        activeEmulation && 'flex items-center justify-center bg-neutral-900 overflow-hidden'
+      )}>
+        {activeEmulation ? (
+          (() => {
+            const w = dragSize?.width ?? activeEmulation.width
+            const h = dragSize?.height ?? activeEmulation.height
+            return (
+              <div className="relative border border-neutral-700" style={{ width: w, height: h, maxWidth: '100%', maxHeight: '100%' }}>
+                <webview
+                  ref={webviewRef}
+                  src={activeTab?.url || 'about:blank'}
+                  partition="persist:browser-tabs"
+                  className="absolute inset-0"
+                  // @ts-expect-error - webview attributes not in React types
+                  allowpopups="true"
+                />
+                {/* Right handle — stops short of bottom to leave room for corner */}
+                <div
+                  className="absolute top-0 -right-8 w-10 cursor-ew-resize group flex items-center justify-center"
+                  style={{ height: 'calc(100% - 2rem)' }}
+                  onMouseDown={(e) => handleResizeStart(e, 'x')}
+                >
+                  <div className="w-1 h-8 rounded-full bg-neutral-600 group-hover:bg-blue-500 transition-colors" />
+                </div>
+                {/* Bottom handle — stops short of right to leave room for corner */}
+                <div
+                  className="absolute -bottom-8 left-0 h-10 cursor-ns-resize group flex items-center justify-center"
+                  style={{ width: 'calc(100% - 2rem)' }}
+                  onMouseDown={(e) => handleResizeStart(e, 'y')}
+                >
+                  <div className="h-1 w-8 rounded-full bg-neutral-600 group-hover:bg-blue-500 transition-colors" />
+                </div>
+                {/* Corner handle — same offsets as right/bottom so lines align */}
+                <div
+                  className="absolute -bottom-8 -right-8 w-10 h-10 cursor-nwse-resize group"
+                  onMouseDown={(e) => handleResizeStart(e, 'xy')}
+                >
+                  <div className="absolute top-0 w-1 h-1/2 rounded-full bg-neutral-600 group-hover:bg-blue-500 transition-colors" style={{ left: 'calc(50% - 2px)', transform: 'translateX(-50%)' }} />
+                  <div className="absolute left-0 h-1 w-1/2 rounded-full bg-neutral-600 group-hover:bg-blue-500 transition-colors" style={{ top: 'calc(50% - 2px)', transform: 'translateY(-50%)' }} />
+                </div>
+                {(dragSize || isResizing) && <div className="absolute inset-0 z-10" />}
+              </div>
+            )
+          })()
+        ) : (
+          <webview
+            ref={webviewRef}
+            src={activeTab?.url || 'about:blank'}
+            partition="persist:browser-tabs"
+            className="absolute inset-0"
+            // @ts-expect-error - webview attributes not in React types
+            allowpopups="true"
+          />
+        )}
+        {activeEmulation && (
+          <div className="absolute bottom-2 left-1/2 -translate-x-1/2 text-xs text-neutral-500 pointer-events-none">
+            {activeEmulation.name} — {dragSize?.width ?? activeEmulation.width}&times;{dragSize?.height ?? activeEmulation.height}
+          </div>
+        )}
+        {!activeEmulation && isResizing && <div className="absolute inset-0 z-10" />}
       </div>
     </div>
   )

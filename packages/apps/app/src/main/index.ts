@@ -61,8 +61,8 @@ const splashHTML = (version: string) => `
       animation: fadeInScale 0.4s ease-out forwards;
     }
     .logo {
-      width: 80px;
-      height: 80px;
+      width: 120px;
+      height: 120px;
     }
     .title {
       margin-top: 24px;
@@ -544,6 +544,41 @@ app.whenReady().then(() => {
     })
 
     wc.on('destroyed', () => registeredWebviews.delete(webviewId))
+  })
+
+  // Webview device emulation
+  ipcMain.handle(
+    'webview:enable-device-emulation',
+    (_, webviewId: number, params: {
+      screenSize: { width: number; height: number }
+      viewSize: { width: number; height: number }
+      deviceScaleFactor: number
+      screenPosition: 'mobile' | 'desktop'
+      userAgent?: string
+    }) => {
+      const wc = webContents.fromId(webviewId)
+      if (!wc) return false
+      wc.enableDeviceEmulation({
+        screenPosition: params.screenPosition,
+        screenSize: params.screenSize,
+        viewSize: params.viewSize,
+        deviceScaleFactor: params.deviceScaleFactor,
+        viewPosition: { x: 0, y: 0 },
+        scale: 1,
+      })
+      if (params.userAgent) {
+        wc.setUserAgent(params.userAgent)
+      }
+      return true
+    }
+  )
+
+  ipcMain.handle('webview:disable-device-emulation', (_, webviewId: number) => {
+    const wc = webContents.fromId(webviewId)
+    if (!wc) return false
+    wc.disableDeviceEmulation()
+    wc.setUserAgent('')
+    return true
   })
 
   createWindow()
