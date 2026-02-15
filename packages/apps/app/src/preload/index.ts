@@ -99,6 +99,11 @@ const api: ElectronAPI = {
       ipcRenderer.on('app:close-task', handler)
       return () => ipcRenderer.removeListener('app:close-task', handler)
     },
+    onOpenTask: (callback: (taskId: string) => void) => {
+      const handler = (_: unknown, taskId: string) => callback(taskId)
+      ipcRenderer.on('app:open-task', handler)
+      return () => ipcRenderer.removeListener('app:open-task', handler)
+    },
     onScreenshotTrigger: (callback: () => void) => {
       const handler = () => callback()
       ipcRenderer.on('app:screenshot-trigger', handler)
@@ -276,7 +281,8 @@ const api: ElectronAPI = {
     saveRootInstructions: (projectId, projectPath, content) =>
       ipcRenderer.invoke('ai-config:save-root-instructions', projectId, projectPath, content),
     getProjectSkillsStatus: (projectId, projectPath) =>
-      ipcRenderer.invoke('ai-config:get-project-skills-status', projectId, projectPath)
+      ipcRenderer.invoke('ai-config:get-project-skills-status', projectId, projectPath),
+    getGlobalFiles: () => ipcRenderer.invoke('ai-config:get-global-files')
   },
   fs: {
     readDir: (rootPath, dirPath) => ipcRenderer.invoke('fs:readDir', rootPath, dirPath),
@@ -300,6 +306,12 @@ const api: ElectronAPI = {
   },
   screenshot: {
     captureRegion: (rect) => ipcRenderer.invoke('screenshot:captureRegion', rect)
+  },
+  webview: {
+    enableDeviceEmulation: (webviewId, params) =>
+      ipcRenderer.invoke('webview:enable-device-emulation', webviewId, params),
+    disableDeviceEmulation: (webviewId) =>
+      ipcRenderer.invoke('webview:disable-device-emulation', webviewId),
   },
   integrations: {
     connectLinear: (input) => ipcRenderer.invoke('integrations:connect-linear', input),

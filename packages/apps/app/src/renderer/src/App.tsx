@@ -442,6 +442,20 @@ function App(): React.JSX.Element {
   }, [setTabs, setActiveTabIndex])
 
   useEffect(() => {
+    return window.api.app.onOpenTask((taskId) => {
+      setTabs((prev) => {
+        const existing = prev.findIndex((t) => t.type === 'task' && t.taskId === taskId)
+        if (existing >= 0) {
+          setActiveTabIndex(existing)
+          return prev
+        }
+        setActiveTabIndex(prev.length)
+        return [...prev, { type: 'task' as const, taskId, title: 'Task' }]
+      })
+    })
+  }, [setTabs, setActiveTabIndex])
+
+  useEffect(() => {
     return window.api.app.onGoHome(() => {
       setActiveTabIndex(0)
     })

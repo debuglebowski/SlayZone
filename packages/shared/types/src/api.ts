@@ -24,7 +24,8 @@ import type {
   SyncResult,
   UpdateAiConfigItemInput,
   WriteMcpServerInput,
-  RemoveMcpServerInput
+  RemoveMcpServerInput,
+  GlobalFileEntry
 } from '@slayzone/ai-config/shared'
 import type { DirEntry, ReadFileResult } from '@slayzone/file-editor/shared'
 import type {
@@ -161,6 +162,7 @@ export interface ElectronAPI {
     onOpenProjectSettings: (callback: () => void) => () => void
     onTasksChanged: (callback: () => void) => () => void
     onCloseTask: (callback: (taskId: string) => void) => () => void
+    onOpenTask: (callback: (taskId: string) => void) => () => void
     onScreenshotTrigger: (callback: () => void) => () => void
   }
   window: {
@@ -281,6 +283,7 @@ export interface ElectronAPI {
     getRootInstructions: (projectId: string, projectPath: string) => Promise<RootInstructionsResult>
     saveRootInstructions: (projectId: string, projectPath: string, content: string) => Promise<RootInstructionsResult>
     getProjectSkillsStatus: (projectId: string, projectPath: string) => Promise<ProjectSkillStatus[]>
+    getGlobalFiles: () => Promise<GlobalFileEntry[]>
   }
   fs: {
     readDir: (rootPath: string, dirPath: string) => Promise<DirEntry[]>
@@ -305,6 +308,19 @@ export interface ElectronAPI {
   }
   usage: {
     fetch: () => Promise<ProviderUsage[]>
+  }
+  webview: {
+    enableDeviceEmulation: (
+      webviewId: number,
+      params: {
+        screenSize: { width: number; height: number }
+        viewSize: { width: number; height: number }
+        deviceScaleFactor: number
+        screenPosition: 'mobile' | 'desktop'
+        userAgent?: string
+      }
+    ) => Promise<boolean>
+    disableDeviceEmulation: (webviewId: number) => Promise<boolean>
   }
   integrations: {
     connectLinear: (input: ConnectLinearInput) => Promise<IntegrationConnectionPublic>

@@ -1,5 +1,5 @@
 import * as pty from 'node-pty'
-import { BrowserWindow, Notification, nativeTheme } from 'electron'
+import { app, BrowserWindow, Notification, nativeTheme } from 'electron'
 import { homedir, userInfo } from 'os'
 import type { Database } from 'better-sqlite3'
 import { DEV_SERVER_URL_PATTERN } from '@slayzone/terminal/shared'
@@ -25,6 +25,9 @@ const MODE_LABELS: Record<string, string> = {
   'terminal': 'Terminal'
 }
 
+// Hold references to active notifications so they don't get GC'd before click
+const activeNotifications = new Set<Notification>()
+
 function showTaskAttentionNotification(sessionId: string): void {
   if (!db) return
 
@@ -41,21 +44,27 @@ function showTaskAttentionNotification(sessionId: string): void {
     return // No settings = disabled by default
   }
 
-  const session = sessions.get(sessionId)
   const taskId = taskIdFromSessionId(sessionId)
+  const session = sessions.get(sessionId)
   const taskRow = db.prepare('SELECT title FROM tasks WHERE id = ?').get(taskId) as { title: string } | undefined
   if (taskRow?.title) {
     const label = MODE_LABELS[session?.mode ?? ''] ?? 'Terminal'
     const notification = new Notification({
-      title: `${label} needs attention`,
-      body: taskRow.title
+      title: taskRow.title,
+      body: `${label} needs attention`
     })
+    activeNotifications.add(notification)
+    const cleanup = (): void => { activeNotifications.delete(notification) }
     notification.on('click', () => {
-      if (session?.win && !session.win.isDestroyed()) {
-        session.win.focus()
-        session.win.webContents.send('app:open-task', taskId)
+      cleanup()
+      app.focus({ steal: true })
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.show()
+        mainWindow.focus()
+        mainWindow.webContents.send('app:open-task', taskId)
       }
     })
+    notification.on('close', cleanup)
     notification.show()
   }
 }
