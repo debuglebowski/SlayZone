@@ -22,17 +22,22 @@ export function useTaskTerminals(taskId: string, defaultMode: TerminalMode): Use
   useEffect(() => {
     const loadTabs = async () => {
       setIsLoading(true)
-      // Ensure main tab exists
-      await window.api.tabs.ensureMain(taskId, defaultMode)
-      // Load all tabs
-      const loadedTabs = await window.api.tabs.list(taskId)
-      setTabs(loadedTabs)
-      // Set active to main tab if current active doesn't exist
-      if (!loadedTabs.find(t => t.id === activeTabId)) {
-        const mainTab = loadedTabs.find(t => t.isMain)
-        if (mainTab) setActiveTabId(mainTab.id)
+      try {
+        // Ensure main tab exists
+        await window.api.tabs.ensureMain(taskId, defaultMode)
+        // Load all tabs
+        const loadedTabs = await window.api.tabs.list(taskId)
+        setTabs(loadedTabs)
+        // Set active to main tab if current active doesn't exist
+        if (!loadedTabs.find(t => t.id === activeTabId)) {
+          const mainTab = loadedTabs.find(t => t.isMain)
+          if (mainTab) setActiveTabId(mainTab.id)
+        }
+      } catch (err) {
+        console.error('[useTaskTerminals] Failed to load tabs:', err)
+      } finally {
+        setIsLoading(false)
       }
-      setIsLoading(false)
     }
     loadTabs()
   }, [taskId, defaultMode])

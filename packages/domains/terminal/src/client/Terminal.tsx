@@ -121,10 +121,22 @@ export function Terminal({
   const searchAddonRef = useRef<SearchAddon | null>(null)
   const clearedSeqRef = useRef<number | null>(null)
   const initializedRef = useRef(false)
+  const lastRenderedSeqRef = useRef<number>(-1)
   const [isDragOver, setIsDragOver] = useState(false)
   const [searchOpen, setSearchOpen] = useState(false)
   const [isInitializing, setIsInitializing] = useState(true)
   const [initError, setInitError] = useState<string | null>(null)
+
+  // Refs for callbacks to prevent initTerminal dependency churn.
+  // When onConversationCreated fires (saving conversation ID), it updates task state
+  // in the parent, which recreates callback refs, which would abort+restart initTerminal
+  // mid-initialization — causing a data loss window where PTY output is silently dropped.
+  const onConversationCreatedRef = useRef(onConversationCreated)
+  onConversationCreatedRef.current = onConversationCreated
+  const onSessionInvalidRef = useRef(onSessionInvalid)
+  onSessionInvalidRef.current = onSessionInvalid
+  const onReadyRef = useRef(onReady)
+  onReadyRef.current = onReady
 
   const { subscribe, subscribeExit, subscribeSessionInvalid, subscribeAttention, subscribeState, getState, resetTaskState, cleanupTask } = usePty()
   const { theme } = useTheme()
@@ -157,6 +169,7 @@ export function Terminal({
     if (!containerRef.current || initializedRef.current) return
     setIsInitializing(true)
     setInitError(null)
+    let didInit = false
 
     try {
       // Wait for container to have dimensions BEFORE initializing terminal
@@ -172,11 +185,14 @@ export function Terminal({
       // Re-check after await (component state might have changed)
       if (!containerRef.current || initializedRef.current || signal.aborted) return
 
-      // Don't initialize if container still has 0 dimensions (not visible)
+      // Don't initialize if container still has 0 dimensions (not visible).
+      // Keep isInitializing=true so spinner stays visible — ResizeObserver will
+      // retry initTerminal when the container becomes visible.
       if (rect.width === 0 || rect.height === 0) {
         return
       }
 
+      didInit = true
       initializedRef.current = true
 
       // Check if we have a cached terminal for this task
@@ -215,8 +231,24 @@ export function Terminal({
           if (signal.aborted) return // Don't setState if unmounted
           if (actualState) setPtyState(actualState)
 
+          // Replay any data that arrived while terminal was detached.
+          // During abort/reinit cycles, terminalRef is null so the subscribe
+          // callback's write() is a no-op — this fills that gap.
+          // Use lastRenderedSeqRef (tracks xterm writes) not getLastSeq
+          // (tracks PtyContext receives — advances even when terminalRef is null).
+          const missed = await window.api.pty.getBufferSince(sessionId, lastRenderedSeqRef.current)
+          if (signal.aborted) return
+          if (missed && missed.chunks.length > 0) {
+            cached.terminal.write('\x1b[0m')
+            for (const chunk of missed.chunks) {
+              cached.terminal.write(chunk.data)
+            }
+            cached.terminal.write('\x1b[0m')
+            lastRenderedSeqRef.current = missed.currentSeq
+          }
+
           // Expose API for programmatic input and focus
-          onReady?.({
+          onReadyRef.current?.({
             sendInput: async (text) => {
               for (const char of text) {
                 cached.terminal.input(char)
@@ -298,6 +330,7 @@ export function Terminal({
             terminal.write(chunk.data)
           }
           terminal.write('\x1b[0m') // Reset ANSI state after buffer replay
+          lastRenderedSeqRef.current = result.currentSeq
         }
       } else {
 
@@ -305,7 +338,7 @@ export function Terminal({
         let newConversationId = conversationId
         if (mode === 'claude-code' && !newConversationId && !existingConversationId) {
           newConversationId = crypto.randomUUID()
-          onConversationCreated?.(newConversationId)
+          onConversationCreatedRef.current?.(newConversationId)
         }
 
         // Create PTY with selected mode (conversation IDs apply to AI modes only)
@@ -347,7 +380,7 @@ export function Terminal({
       }
 
       // Expose API for programmatic input and focus
-      onReady?.({
+      onReadyRef.current?.({
         sendInput: injectText,
         write: (data) => window.api.pty.write(sessionId, data),
         focus: () => terminal.focus(),
@@ -373,11 +406,11 @@ export function Terminal({
       setInitError(message)
       setPtyState('error')
     } finally {
-      if (!signal.aborted) {
+      if (!signal.aborted && didInit) {
         setIsInitializing(false)
       }
     }
-  }, [sessionId, cwd, mode, conversationId, existingConversationId, initialPrompt, codeMode, providerFlags, autoFocus, onConversationCreated, onReady, resetTaskState, handleTerminalKeyEvent, clearBufferWithoutRestart])
+  }, [sessionId, cwd, mode, conversationId, existingConversationId, initialPrompt, codeMode, providerFlags, autoFocus, resetTaskState, handleTerminalKeyEvent, clearBufferWithoutRestart])
 
   // Initialize terminal
   useEffect(() => {
@@ -425,7 +458,10 @@ export function Terminal({
     const unsubData = subscribe(sessionId, (data, seq) => {
       const cutoff = clearedSeqRef.current
       if (cutoff !== null && seq <= cutoff) return
-      terminalRef.current?.write(data)
+      if (terminalRef.current) {
+        terminalRef.current.write(data)
+        lastRenderedSeqRef.current = seq
+      }
     })
 
     const unsubExit = subscribeExit(sessionId, (exitCode) => {
@@ -436,7 +472,7 @@ export function Terminal({
     })
 
     const unsubSessionInvalid = subscribeSessionInvalid(sessionId, () => {
-      onSessionInvalid?.()
+      onSessionInvalidRef.current?.()
     })
 
     const unsubAttention = subscribeAttention(sessionId, () => {
@@ -451,7 +487,7 @@ export function Terminal({
       unsubSessionInvalid()
       unsubAttention()
     }
-  }, [sessionId, onSessionInvalid, subscribe, subscribeExit, subscribeSessionInvalid, subscribeAttention])
+  }, [sessionId, subscribe, subscribeExit, subscribeSessionInvalid, subscribeAttention])
 
   // Subscribe to PTY state changes for loading indicator
   useEffect(() => {
