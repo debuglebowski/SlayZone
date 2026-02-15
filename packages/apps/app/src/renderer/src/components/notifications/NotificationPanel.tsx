@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import { PanelRightClose, PanelRightOpen, X } from 'lucide-react'
+import { X } from 'lucide-react'
 import { Button, cn, Tooltip, TooltipTrigger, TooltipContent } from '@slayzone/ui'
 import type { AttentionTask } from './useAttentionTasks'
 import type { Project } from '@slayzone/projects/shared'
@@ -71,38 +71,35 @@ export function NotificationPanel({
 
   return (
     <div className="flex flex-col h-full">
-      <div className="flex items-center justify-between p-3 border-b gap-2">
-        {selectedProjectId ? (
-          <div className="flex gap-1 flex-1">
-            <Button
-              variant={!filterCurrentProject ? 'secondary' : 'ghost'}
-              size="sm"
-              className="h-7 text-xs"
-              onClick={() => filterCurrentProject && onFilterToggle()}
-            >
-              All
-            </Button>
-            <Button
-              variant={filterCurrentProject ? 'secondary' : 'ghost'}
-              size="sm"
-              className="h-7 text-xs"
-              onClick={() => !filterCurrentProject && onFilterToggle()}
-            >
-              {currentProjectName || 'Current'}
-            </Button>
-          </div>
-        ) : (
-          <div className="flex items-center gap-2">
-            <h4 className="font-medium text-sm">All Projects</h4>
-          </div>
+      <div className="flex items-center bg-surface-2 p-1 gap-1 m-4 mb-0 rounded-lg">
+        <button
+          onClick={() => filterCurrentProject && onFilterToggle()}
+          className={cn(
+            'flex-1 px-2.5 py-1 rounded-md text-xs font-medium transition-colors',
+            !filterCurrentProject
+              ? 'bg-muted text-foreground shadow-sm'
+              : 'text-muted-foreground hover:text-foreground'
+          )}
+        >
+          All
+        </button>
+        {selectedProjectId && (
+          <button
+            onClick={() => !filterCurrentProject && onFilterToggle()}
+            className={cn(
+              'flex-1 px-2.5 py-1 rounded-md text-xs font-medium transition-colors truncate',
+              filterCurrentProject
+                ? 'bg-muted text-foreground shadow-sm'
+                : 'text-muted-foreground hover:text-foreground'
+            )}
+          >
+            {currentProjectName || 'Current'}
+          </button>
         )}
-        <Button variant="ghost" size="icon" className="h-7 w-7 flex-shrink-0" onClick={onLockToggle}>
-          {isLocked ? <PanelRightClose className="size-4" /> : <PanelRightOpen className="size-4" />}
-        </Button>
       </div>
 
       <div className="flex-1 min-h-0 relative">
-        <div className="absolute inset-0 overflow-y-auto p-2">
+        <div className="absolute inset-0 overflow-y-auto p-4 pt-6">
         {attentionTasks.length === 0 ? (
           <p className="text-sm text-muted-foreground text-center py-4">No tasks need attention</p>
         ) : (
