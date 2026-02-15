@@ -10,13 +10,14 @@ import type {
   ProviderSyncStatus, UpdateAiConfigItemInput
 } from '../shared'
 import { ContextItemEditor } from './ContextItemEditor'
+import { GlobalContextFiles } from './GlobalContextFiles'
 import { McpServersPanel } from './McpServersPanel'
 import { ProjectContextTree } from './ProjectContextTree'
 import { ProjectInstructions } from './ProjectInstructions'
 import { ProjectSkills } from './ProjectSkills'
 import { ProviderChips } from './ProviderChips'
 
-type GlobalSection = 'providers' | 'instructions' | 'skill' | 'command' | 'mcp'
+type GlobalSection = 'providers' | 'instructions' | 'skill' | 'command' | 'mcp' | 'files'
 type ProjectSection = 'providers' | 'instructions' | 'skills' | 'commands' | 'files' | 'mcp'
 type Section = GlobalSection | ProjectSection
 
@@ -161,9 +162,31 @@ function OverviewPanel({
 
   return (
     <div className="space-y-2.5">
+      {/* Providers — at top */}
+      <button
+        onClick={() => onNavigate('providers')}
+        className="flex w-full items-center gap-3 rounded-lg border p-3.5 text-left transition-colors hover:bg-muted/50"
+      >
+        <Settings2 className="size-5 shrink-0 text-muted-foreground" />
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-medium">Providers</span>
+            <div className="flex items-center gap-2">
+              {enabledProviders.map(p => (
+                <span key={p.id} className="flex items-center gap-1 text-xs text-muted-foreground">
+                  <div className="size-2 rounded-full bg-green-500" />
+                  {p.name}
+                </span>
+              ))}
+            </div>
+          </div>
+        </div>
+        <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
+      </button>
+
       {/* Instructions */}
       <button
-        onClick={() => onNavigate(isProject ? 'instructions' : 'instructions')}
+        onClick={() => onNavigate('instructions')}
         className="flex w-full items-center gap-3 rounded-lg border p-3.5 text-left transition-colors hover:bg-muted/50"
       >
         <FileText className="size-5 shrink-0 text-muted-foreground" />
@@ -265,38 +288,17 @@ function OverviewPanel({
         <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
       </button>
 
-      {/* Files (project only) */}
-      {isProject && (
-        <button
-          onClick={() => onNavigate('files')}
-          className="flex w-full items-center gap-3 rounded-lg border p-3.5 text-left transition-colors hover:bg-muted/50"
-        >
-          <FolderTree className="size-5 shrink-0 text-muted-foreground" />
-          <div className="min-w-0 flex-1">
-            <span className="text-sm font-medium">Files</span>
-          </div>
-          <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
-        </button>
-      )}
-
-      {/* Providers */}
+      {/* Files */}
       <button
-        onClick={() => onNavigate('providers')}
+        onClick={() => onNavigate('files')}
         className="flex w-full items-center gap-3 rounded-lg border p-3.5 text-left transition-colors hover:bg-muted/50"
       >
-        <Settings2 className="size-5 shrink-0 text-muted-foreground" />
+        <FolderTree className="size-5 shrink-0 text-muted-foreground" />
         <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
-            <span className="text-sm font-medium">Providers</span>
-            <div className="flex items-center gap-2">
-              {enabledProviders.map(p => (
-                <span key={p.id} className="flex items-center gap-1 text-xs text-muted-foreground">
-                  <div className="size-2 rounded-full bg-green-500" />
-                  {p.name}
-                </span>
-              ))}
-            </div>
-          </div>
+          <span className="text-sm font-medium">Files</span>
+          {!isProject && (
+            <p className="mt-0.5 text-xs text-muted-foreground">Global config files across all providers</p>
+          )}
         </div>
         <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
       </button>
@@ -497,6 +499,33 @@ export function ContextManagerSettings({ scope, projectId, projectPath, projectN
         </div>
       )}
 
+      {/* Section description */}
+      {section !== null && (
+        <p className="pb-3 text-xs text-muted-foreground">
+          {section === 'providers' && 'Choose which AI coding tools to sync content to.'}
+          {section === 'instructions' && (isProject
+            ? 'Project-level instructions synced to each provider\'s config file (e.g. CLAUDE.md).'
+            : 'Global instructions stored in the database. Not synced to any file.'
+          )}
+          {(section === 'skill' || section === 'skills') && (isProject
+            ? 'Reusable prompt snippets available to AI assistants in this project.'
+            : 'Global skills shared across all projects. Synced to enabled providers.'
+          )}
+          {(section === 'command' || section === 'commands') && (isProject
+            ? 'Slash commands available to AI assistants in this project.'
+            : 'Global commands shared across all projects. Invoked via /command-name.'
+          )}
+          {section === 'mcp' && (isProject
+            ? 'MCP servers configured for this project, written to each provider\'s config.'
+            : 'Browse and favorite MCP servers from the curated catalog.'
+          )}
+          {section === 'files' && (isProject
+            ? 'Raw config files on disk. Managed automatically when you sync.'
+            : 'Global config files across all provider directories.'
+          )}
+        </p>
+      )}
+
       {/* Content area */}
       <div className="flex-1">
         {section === null ? (
@@ -528,6 +557,8 @@ export function ContextManagerSettings({ scope, projectId, projectPath, projectN
             projectPath={projectPath ?? undefined}
             projectId={projectId ?? undefined}
           />
+        ) : section === 'files' && scope === 'global' ? (
+          <GlobalContextFiles />
         ) : section === 'files' && scope === 'project' && projectPath && projectId ? (
           <ProjectContextTree
             projectPath={projectPath}

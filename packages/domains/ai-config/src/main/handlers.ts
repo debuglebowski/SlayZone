@@ -29,7 +29,8 @@ import type {
   WriteMcpServerInput,
   RemoveMcpServerInput
 } from '../shared'
-import { PROVIDER_PATHS } from '../shared/provider-registry'
+import { PROVIDER_PATHS, GLOBAL_PROVIDER_PATHS } from '../shared/provider-registry'
+import type { GlobalFileEntry } from '../shared'
 
 const KNOWN_CONTEXT_FILES: Array<{ relative: string; name: string; category: ContextFileCategory }> = [
   { relative: 'CLAUDE.md', name: 'CLAUDE.md', category: 'claude' },
@@ -58,8 +59,12 @@ function getCommandPath(provider: CliProvider, slug: string): string | null {
 
 function isPathAllowed(filePath: string, projectPath: string | null): boolean {
   const resolved = path.resolve(filePath)
-  const homeClaudeDir = path.join(app.getPath('home'), '.claude')
-  if (resolved.startsWith(homeClaudeDir + path.sep) || resolved === path.join(homeClaudeDir, 'CLAUDE.md')) return true
+  const home = app.getPath('home')
+  // Allow all global provider base dirs
+  for (const spec of Object.values(GLOBAL_PROVIDER_PATHS)) {
+    const dir = path.join(home, spec.baseDir)
+    if (resolved.startsWith(dir + path.sep) || resolved === dir) return true
+  }
   if (projectPath) {
     const resolvedProject = path.resolve(projectPath)
     if (resolved.startsWith(resolvedProject + path.sep) || resolved === resolvedProject) return true
@@ -227,6 +232,67 @@ export function registerAiConfigHandlers(ipcMain: IpcMain, db: Database): void {
     })
 
     return results
+  })
+
+  ipcMain.handle('ai-config:get-global-files', () => {
+    const home = app.getPath('home')
+    const entries: GlobalFileEntry[] = []
+
+    for (const [provider, spec] of Object.entries(GLOBAL_PROVIDER_PATHS)) {
+      const baseDir = path.join(home, spec.baseDir)
+
+      // Instructions file
+      if (spec.instructions) {
+        const filePath = path.join(baseDir, spec.instructions)
+        entries.push({
+          path: filePath,
+          name: `~/${spec.baseDir}/${spec.instructions}`,
+          provider,
+          category: 'instructions',
+          exists: fs.existsSync(filePath)
+        })
+      }
+
+      // Skills directory
+      if (spec.skillsDir) {
+        const dir = path.join(baseDir, spec.skillsDir)
+        if (fs.existsSync(dir)) {
+          try {
+            for (const file of fs.readdirSync(dir)) {
+              if (!file.endsWith('.md')) continue
+              entries.push({
+                path: path.join(dir, file),
+                name: `~/${spec.baseDir}/${spec.skillsDir}/${file}`,
+                provider,
+                category: 'skill',
+                exists: true
+              })
+            }
+          } catch { /* ignore permission errors */ }
+        }
+      }
+
+      // Commands directory
+      if (spec.commandsDir) {
+        const dir = path.join(baseDir, spec.commandsDir)
+        if (fs.existsSync(dir)) {
+          try {
+            for (const file of fs.readdirSync(dir)) {
+              if (!file.endsWith('.md')) continue
+              entries.push({
+                path: path.join(dir, file),
+                name: `~/${spec.baseDir}/${spec.commandsDir}/${file}`,
+                provider,
+                category: 'command',
+                exists: true
+              })
+            }
+          } catch { /* ignore permission errors */ }
+        }
+      }
+    }
+
+    return entries
   })
 
   ipcMain.handle('ai-config:read-context-file', (_event, filePath: string, projectPath: string) => {

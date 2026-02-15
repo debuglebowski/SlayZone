@@ -133,6 +133,15 @@ export interface ProjectSkillStatus {
   providers: Partial<Record<CliProvider, { path: string; status: ProviderSyncStatus }>>
 }
 
+// Global file management
+export interface GlobalFileEntry {
+  path: string
+  name: string
+  provider: string
+  category: 'instructions' | 'skill' | 'command'
+  exists: boolean
+}
+
 // MCP server management
 export type McpProvider = 'claude' | 'cursor' | 'vscode'
 
