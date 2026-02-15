@@ -25,7 +25,15 @@ export default defineConfig(({ mode }) => {
       }
     },
     preload: {
-      plugins: [externalizeDepsPlugin({ exclude: slayzoneDeps })]
+      plugins: [externalizeDepsPlugin({ exclude: slayzoneDeps })],
+      build: {
+        rollupOptions: {
+          output: {
+            format: 'cjs',
+            entryFileNames: '[name].js'
+          }
+        }
+      }
     },
     renderer: {
       define: {
