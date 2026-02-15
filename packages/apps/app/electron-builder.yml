@@ -12,6 +12,7 @@ files:
 asarUnpack:
   - resources/**
   - '**/node_modules/better-sqlite3/**'
+  - '**/node_modules/node-pty/**'
 win:
   executableName: slayzone
 nsis:
@@ -32,14 +33,12 @@ dmg:
 linux:
   target:
     - AppImage
-    - snap
     - deb
-  maintainer: electronjs.org
+  maintainer: slayzone
   category: Utility
 appImage:
   artifactName: ${name}-${version}.${ext}
 npmRebuild: true
 nativeRebuilder: sequential
 publish:
-  provider: generic
-  url: https://example.com/auto-updates
+  provider: github

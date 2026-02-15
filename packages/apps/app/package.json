@@ -38,6 +38,7 @@
     "@slayzone/worktrees": "workspace:*",
     "@tailwindcss/typography": "^0.5.19",
     "better-sqlite3": "^12.6.2",
+    "electron-updater": "^6.7.3",
     "express": "^5.2.1",
     "node-pty": "^1.1.0",
     "react": "^19.2.1",

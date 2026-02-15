@@ -22,7 +22,11 @@
     "typecheck": "pnpm -r typecheck",
     "lint": "pnpm -r lint",
     "format": "prettier --write .",
-    "test:e2e": "pnpm --filter @slayzone/app test:e2e"
+    "test:e2e": "pnpm --filter @slayzone/app test:e2e",
+    "release:patch": "pnpm --filter @slayzone/app exec npm version patch && pnpm release:tag",
+    "release:minor": "pnpm --filter @slayzone/app exec npm version minor && pnpm release:tag",
+    "release:major": "pnpm --filter @slayzone/app exec npm version major && pnpm release:tag",
+    "release:tag": "VERSION=$(node -p \"require('./packages/apps/app/package.json').version\") && git add packages/apps/app/package.json && git commit -m \"release: v$VERSION\" && git tag \"v$VERSION\" && git push && git push --tags"
   },
   "devDependencies": {
     "@fiahfy/icns": "^0.0.7",
