@@ -36,6 +36,13 @@ function dismissNotification(sessionId: string): void {
   }
 }
 
+export function dismissAllNotifications(): void {
+  for (const [, n] of activeNotifications) {
+    n.close()
+  }
+  activeNotifications.clear()
+}
+
 function showTaskAttentionNotification(sessionId: string): void {
   if (!db) return
 

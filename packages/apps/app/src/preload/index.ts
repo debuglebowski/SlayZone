@@ -128,6 +128,7 @@ const api: ElectronAPI = {
     clearBuffer: (sessionId) => ipcRenderer.invoke('pty:clearBuffer', sessionId),
     getBufferSince: (sessionId, afterSeq) => ipcRenderer.invoke('pty:getBufferSince', sessionId, afterSeq),
     list: () => ipcRenderer.invoke('pty:list'),
+    dismissAllNotifications: () => ipcRenderer.invoke('pty:dismissAllNotifications'),
     onData: (callback: (sessionId: string, data: string, seq: number) => void) => {
       const handler = (_event: unknown, sessionId: string, data: string, seq: number) => callback(sessionId, data, seq)
       ipcRenderer.on('pty:data', handler)

@@ -13,7 +13,6 @@ interface NotificationPopoverProps {
   onFilterToggle: () => void
   onNavigate: (taskId: string) => void
   onCloseTerminal: (sessionId: string) => void
-  onLockToggle: () => void
   selectedProjectId: string | null
   currentProjectName?: string
 }
@@ -27,7 +26,6 @@ export function NotificationPopover({
   onFilterToggle,
   onNavigate,
   onCloseTerminal,
-  onLockToggle,
   selectedProjectId,
   currentProjectName
 }: NotificationPopoverProps) {
@@ -44,8 +42,6 @@ export function NotificationPopover({
           onFilterToggle={onFilterToggle}
           onNavigate={onNavigate}
           onCloseTerminal={onCloseTerminal}
-          onLockToggle={onLockToggle}
-          isLocked={false}
           selectedProjectId={selectedProjectId}
           currentProjectName={currentProjectName}
         />

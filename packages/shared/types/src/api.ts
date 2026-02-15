@@ -196,6 +196,7 @@ export interface ElectronAPI {
     ) => Promise<{ success: boolean; clearedSeq: number | null }>
     getBufferSince: (sessionId: string, afterSeq: number) => Promise<BufferSinceResult | null>
     list: () => Promise<PtyInfo[]>
+    dismissAllNotifications: () => Promise<void>
     onData: (callback: (sessionId: string, data: string, seq: number) => void) => () => void
     onExit: (callback: (sessionId: string, exitCode: number) => void) => () => void
     onSessionNotFound: (callback: (sessionId: string) => void) => () => void

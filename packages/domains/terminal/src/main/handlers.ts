@@ -1,7 +1,7 @@
 import { BrowserWindow } from 'electron'
 import type { IpcMain } from 'electron'
 import type { Database } from 'better-sqlite3'
-import { createPty, writePty, resizePty, killPty, hasPty, getBuffer, clearBuffer, getBufferSince, listPtys, getState, setDatabase } from './pty-manager'
+import { createPty, writePty, resizePty, killPty, hasPty, getBuffer, clearBuffer, getBufferSince, listPtys, getState, setDatabase, dismissAllNotifications } from './pty-manager'
 import type { TerminalMode } from './adapters'
 import type { CodeMode } from '@slayzone/terminal/shared'
 import { parseShellArgs } from './adapters/flag-parser'
@@ -75,5 +75,9 @@ export function registerPtyHandlers(ipcMain: IpcMain, db: Database): void {
 
   ipcMain.handle('pty:getState', (_, sessionId: string) => {
     return getState(sessionId)
+  })
+
+  ipcMain.handle('pty:dismissAllNotifications', () => {
+    dismissAllNotifications()
   })
 }

@@ -747,9 +747,12 @@ function App(): React.JSX.Element {
                         )}
                         <DesktopNotificationToggle
                           enabled={notificationState.desktopEnabled}
-                          onToggle={() =>
+                          onToggle={() => {
+                            if (notificationState.desktopEnabled) {
+                              window.api.pty.dismissAllNotifications()
+                            }
                             setNotificationState({ desktopEnabled: !notificationState.desktopEnabled })
-                          }
+                          }}
                         />
                         <NotificationButton
                           active={notificationState.isLocked}
@@ -869,7 +872,6 @@ function App(): React.JSX.Element {
                       await window.api.pty.kill(sessionId)
                       refreshAttentionTasks()
                     }}
-                    onLockToggle={() => setNotificationState({ isLocked: false })}
                     selectedProjectId={selectedProjectId}
                     currentProjectName={projects.find((p) => p.id === selectedProjectId)?.name}
                   />

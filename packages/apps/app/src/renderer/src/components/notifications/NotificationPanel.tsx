@@ -11,8 +11,6 @@ interface NotificationPanelProps {
   onFilterToggle: () => void
   onNavigate: (taskId: string) => void
   onCloseTerminal: (sessionId: string) => void
-  onLockToggle: () => void
-  isLocked: boolean
   selectedProjectId: string | null
   currentProjectName?: string
 }
@@ -43,8 +41,6 @@ export function NotificationPanel({
   onFilterToggle,
   onNavigate,
   onCloseTerminal,
-  onLockToggle,
-  isLocked,
   selectedProjectId,
   currentProjectName
 }: NotificationPanelProps) {
