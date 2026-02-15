@@ -16,6 +16,15 @@ export function setDatabase(database: Database): void {
   db = database
 }
 
+const MODE_LABELS: Record<string, string> = {
+  'claude-code': 'Claude',
+  'codex': 'Codex',
+  'cursor-agent': 'Cursor',
+  'gemini': 'Gemini',
+  'opencode': 'OpenCode',
+  'terminal': 'Terminal'
+}
+
 function showTaskAttentionNotification(sessionId: string): void {
   if (!db) return
 
@@ -32,14 +41,22 @@ function showTaskAttentionNotification(sessionId: string): void {
     return // No settings = disabled by default
   }
 
-  // Get task title
-  const taskId = sessionId.split(':')[0]
+  const session = sessions.get(sessionId)
+  const taskId = taskIdFromSessionId(sessionId)
   const taskRow = db.prepare('SELECT title FROM tasks WHERE id = ?').get(taskId) as { title: string } | undefined
   if (taskRow?.title) {
-    new Notification({
-      title: 'Attention needed',
+    const label = MODE_LABELS[session?.mode ?? ''] ?? 'Terminal'
+    const notification = new Notification({
+      title: `${label} needs attention`,
       body: taskRow.title
-    }).show()
+    })
+    notification.on('click', () => {
+      if (session?.win && !session.win.isDestroyed()) {
+        session.win.focus()
+        session.win.webContents.send('app:open-task', taskId)
+      }
+    })
+    notification.show()
   }
 }
 
@@ -471,7 +488,6 @@ export function createPty(
 
     ptyProcess.onExit(({ exitCode }) => {
       transitionState(sessionId, 'dead')
-      sessions.delete(sessionId)
       recordDiagnosticEvent({
         level: 'info',
         source: 'pty',
@@ -482,6 +498,11 @@ export function createPty(
           exitCode
         }
       })
+      // Delay session cleanup so any trailing onData events (buffered in the PTY fd)
+      // can still be processed and forwarded to the renderer before we drop the session.
+      setTimeout(() => {
+        sessions.delete(sessionId)
+      }, 100)
       if (!win.isDestroyed()) {
         try {
           win.webContents.send('pty:exit', sessionId, exitCode)

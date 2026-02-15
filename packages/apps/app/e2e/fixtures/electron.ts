@@ -2,7 +2,11 @@ import { test as base, type Page } from '@playwright/test'
 import { _electron as electron, type ElectronApplication } from 'playwright'
 import path from 'path'
 import fs from 'fs'
+import { fileURLToPath } from 'url'
+import { createRequire } from 'module'
 
+const __dirname = path.dirname(fileURLToPath(import.meta.url))
+const require = createRequire(import.meta.url)
 const APP_DIR = path.resolve(__dirname, '..', '..')
 const MAIN_JS = path.join(APP_DIR, 'out', 'main', 'index.js')
 const RUNTIME_ROOT_DIR = path.join(APP_DIR, '.e2e-runtime')
