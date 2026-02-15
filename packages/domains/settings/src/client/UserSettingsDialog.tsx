@@ -21,66 +21,9 @@ import type { DiagnosticsConfig } from '@slayzone/types'
 import type { IntegrationConnectionPublic } from '@slayzone/integrations/shared'
 import { useTelemetry, TelemetrySettings } from '@slayzone/telemetry/client'
 import { ContextManagerSettings } from '../../../ai-config/src/client/ContextManagerSettings'
-import {
-  LayoutPreviewA,
-  LayoutPreviewB,
-  LayoutPreviewC,
-  LayoutPreviewD,
-  LayoutPreviewE,
-  LayoutPreviewF,
-  LayoutPreviewG
-} from '../../../ai-config/src/client/LayoutPreviews'
-
 function TelemetrySettingsTab() {
   const { tier, setTier } = useTelemetry()
   return <TelemetrySettings tier={tier} onTierChange={setTier} />
-}
-
-function PreviewWrapper({ layout }: { layout: string }) {
-  const [scope, setScope] = useState<'global' | 'project'>('global')
-  const Component = {
-    'preview-a': LayoutPreviewA,
-    'preview-b': LayoutPreviewB,
-    'preview-c': LayoutPreviewC,
-    'preview-d': LayoutPreviewD,
-    'preview-e': LayoutPreviewE,
-    'preview-f': LayoutPreviewF,
-    'preview-g': LayoutPreviewG
-  }[layout] as React.FC<{ scope: 'global' | 'project' }> | undefined
-  if (!Component) return null
-
-  const labels: Record<string, string> = {
-    'preview-a': 'A: Refined Tabs — providers as persistent bar, no Providers tab',
-    'preview-b': 'B: Secondary Sidebar — vertical nav inside content area',
-    'preview-c': 'C: Master-Detail — item list on left, editor on right',
-    'preview-d': 'D: Dashboard — summary cards, click to drill in',
-    'preview-e': 'E: Accordion — collapsible sections, all on one page',
-    'preview-f': 'F: Hybrid — 2 tabs (Content + MCP), stacked sections',
-    'preview-g': 'G: Minimal — 3 tabs (Content + MCP + Providers), thin dividers'
-  }
-
-  return (
-    <div>
-      <div className="mb-4 flex items-center justify-between">
-        <p className="text-xs text-muted-foreground">{labels[layout]}</p>
-        <div className="flex items-center gap-1 rounded-lg border bg-muted/30 p-1">
-          <button
-            onClick={() => setScope('global')}
-            className={`rounded-md px-3 py-1 text-xs font-medium transition-colors ${scope === 'global' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground'}`}
-          >
-            Global
-          </button>
-          <button
-            onClick={() => setScope('project')}
-            className={`rounded-md px-3 py-1 text-xs font-medium transition-colors ${scope === 'project' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground'}`}
-          >
-            Project
-          </button>
-        </div>
-      </div>
-      <Component scope={scope} />
-    </div>
-  )
 }
 
 interface UserSettingsDialogProps {
@@ -476,14 +419,7 @@ export function UserSettingsDialog({
     { key: 'ai-config', label: 'Context Manager' },
     { key: 'tags', label: 'Tags' },
     { key: 'telemetry', label: 'Telemetry' },
-    { key: 'about', label: 'About' },
-    { key: 'preview-a', label: 'A: Refined Tabs' },
-    { key: 'preview-b', label: 'B: Sidebar' },
-    { key: 'preview-c', label: 'C: Master-Detail' },
-    { key: 'preview-d', label: 'D: Dashboard' },
-    { key: 'preview-e', label: 'E: Accordion' },
-    { key: 'preview-f', label: 'F: Hybrid' },
-    { key: 'preview-g', label: 'G: Minimal' }
+    { key: 'about', label: 'About' }
   ]
 
   if (!open) return null
@@ -1079,9 +1015,7 @@ export function UserSettingsDialog({
               </>
             )}
 
-            {activeTab?.startsWith('preview-') && (
-              <PreviewWrapper layout={activeTab} />
-            )}
+
           </div>
         </SettingsLayout>
       </div>
