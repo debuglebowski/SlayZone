@@ -5,7 +5,7 @@ export function calculatePriorityScore(task: Task): number {
   // Skip done tasks
   if (task.status === 'done') return -Infinity
 
-  // Base score from priority (P1=1000, P2=800, P3=600, P4=400, P5=200)
+  // Base score from priority (Urgent=1000, High=800, Medium=600, Low=400, Someday=200)
   const priorityScore = (6 - task.priority) * 200
 
   // Due date urgency

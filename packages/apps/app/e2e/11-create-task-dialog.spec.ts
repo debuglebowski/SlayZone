@@ -33,7 +33,7 @@ test.describe('Create task dialog & metadata editing', () => {
     // Priority — second Radix Select
     const priorityTrigger = mainWindow.locator('form').getByRole('combobox').nth(1)
     await priorityTrigger.click()
-    await mainWindow.getByRole('option', { name: 'P1 - Urgent' }).click()
+    await mainWindow.getByRole('option', { name: 'Urgent' }).click()
     await mainWindow.waitForTimeout(200)
 
     // Submit
@@ -74,7 +74,7 @@ test.describe('Create task dialog & metadata editing', () => {
     const priorityLabel = mainWindow.getByText('Priority', { exact: true }).locator('..')
     const priorityTrigger = priorityLabel.getByRole('combobox')
     await priorityTrigger.click()
-    await mainWindow.getByRole('option', { name: 'P4 - Low' }).click()
+    await mainWindow.getByRole('option', { name: 'Low' }).click()
     await mainWindow.waitForTimeout(300)
 
     const tasks = await seed(mainWindow).getTasks()

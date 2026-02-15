@@ -17,11 +17,11 @@ export const STATUS_LABELS: Record<TaskStatus, string> = Object.fromEntries(
 ) as Record<TaskStatus, string>
 
 const PRIORITY_LABELS: Record<number, string> = {
-  1: 'P1 - Critical',
-  2: 'P2 - High',
-  3: 'P3 - Medium',
-  4: 'P4 - Low',
-  5: 'P5 - None'
+  1: 'Urgent',
+  2: 'High',
+  3: 'Medium',
+  4: 'Low',
+  5: 'Someday'
 }
 
 export function todayISO(): string {

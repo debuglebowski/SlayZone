@@ -46,7 +46,7 @@ test.describe('Advanced filters & group by', () => {
 
     if (await priorityTrigger.isVisible().catch(() => false)) {
       await priorityTrigger.click()
-      await mainWindow.getByRole('option', { name: /P1/ }).click()
+      await mainWindow.getByRole('option', { name: /Urgent/ }).click()
       await mainWindow.waitForTimeout(500)
 
       // Urgent task should be visible, low should not
@@ -87,8 +87,8 @@ test.describe('Advanced filters & group by', () => {
       await mainWindow.getByRole('option', { name: /Priority/i }).click()
       await mainWindow.waitForTimeout(500)
 
-      // Column headers should now be priority-based (P1, P2, etc.)
-      await expect(mainWindow.locator('h3').getByText(/P1/)).toBeVisible({ timeout: 3_000 })
+      // Column headers should now be priority-based (Urgent, High, etc.)
+      await expect(mainWindow.locator('h3').getByText(/Urgent/)).toBeVisible({ timeout: 3_000 })
 
       // Switch back to status grouping — re-locate trigger since text changed
       const groupByTrigger2 = groupLabel.locator('..').getByRole('combobox')

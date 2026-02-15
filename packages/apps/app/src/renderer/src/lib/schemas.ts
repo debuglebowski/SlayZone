@@ -79,9 +79,9 @@ export const statusOptions = [
 
 // Priority options for Select
 export const priorityOptions = [
-  { value: 1, label: 'P1 - Urgent' },
-  { value: 2, label: 'P2 - High' },
-  { value: 3, label: 'P3 - Medium' },
-  { value: 4, label: 'P4 - Low' },
-  { value: 5, label: 'P5 - Someday' }
+  { value: 1, label: 'Urgent' },
+  { value: 2, label: 'High' },
+  { value: 3, label: 'Medium' },
+  { value: 4, label: 'Low' },
+  { value: 5, label: 'Someday' }
 ] as const
