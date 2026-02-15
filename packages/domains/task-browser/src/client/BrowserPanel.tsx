@@ -246,11 +246,46 @@ export function BrowserPanel({ className, tabs, onTabsChange, taskId, isResizing
     }
   }, [tabs, onTabsChange, createNewTab])
 
-  // Apply/disable device emulation when tab changes
+  // Apply/disable device emulation when tab or emulation changes
   const activeEmulation = activeTab?.deviceEmulation ?? null
+  const prevEmulationRef = useRef<{ tabId: string | null; width: number; height: number; dpr: number; mobile: boolean; ua?: string } | null>(null)
+  const mountedRef = useRef(false)
+
   useEffect(() => {
     const wv = webviewRef.current
     if (!wv || !webviewReady) return
+
+    const cur = activeEmulation ? {
+      tabId: activeTab?.id ?? null,
+      width: activeEmulation.width,
+      height: activeEmulation.height,
+      dpr: activeEmulation.deviceScaleFactor,
+      mobile: activeEmulation.mobile,
+      ua: activeEmulation.userAgent,
+    } : null
+    const prev = prevEmulationRef.current
+
+    // Skip initial mount with no emulation
+    if (!mountedRef.current) {
+      mountedRef.current = true
+      if (!cur) {
+        prevEmulationRef.current = null
+        return
+      }
+    }
+
+    // Skip if nothing meaningful changed
+    if (cur && prev &&
+      cur.tabId === prev.tabId &&
+      cur.width === prev.width &&
+      cur.height === prev.height &&
+      cur.dpr === prev.dpr &&
+      cur.mobile === prev.mobile &&
+      cur.ua === prev.ua
+    ) return
+
+    const prevUa = prev?.ua
+    prevEmulationRef.current = cur
 
     const wcId = wv.getWebContentsId()
     if (activeEmulation) {
@@ -260,9 +295,14 @@ export function BrowserPanel({ className, tabs, onTabsChange, taskId, isResizing
         deviceScaleFactor: activeEmulation.deviceScaleFactor,
         screenPosition: activeEmulation.mobile ? 'mobile' : 'desktop',
         userAgent: activeEmulation.userAgent,
-      }).then(() => wv.reload())
+      }).then(() => {
+        // Only reload if UA changed — viewport changes apply instantly
+        if (activeEmulation.userAgent !== prevUa) wv.reload()
+      })
     } else {
-      window.api.webview?.disableDeviceEmulation(wcId).then(() => wv.reload())
+      window.api.webview?.disableDeviceEmulation(wcId).then(() => {
+        if (prevUa) wv.reload()
+      })
     }
   }, [activeEmulation, webviewReady, activeTab?.id])
 
@@ -279,6 +319,12 @@ export function BrowserPanel({ className, tabs, onTabsChange, taskId, isResizing
   // Resize handles drag state
   const [dragSize, setDragSize] = useState<{ width: number; height: number } | null>(null)
   const dragRef = useRef<{ startX: number; startY: number; startW: number; startH: number; axis: 'x' | 'y' | 'xy'; latestW: number; latestH: number } | null>(null)
+  const dragCleanupRef = useRef<(() => void) | null>(null)
+
+  // Clean up drag listeners on unmount
+  useEffect(() => {
+    return () => { dragCleanupRef.current?.() }
+  }, [])
 
   const handleResizeStart = useCallback((e: React.MouseEvent, axis: 'x' | 'y' | 'xy') => {
     if (!activeEmulation) return
@@ -297,9 +343,14 @@ export function BrowserPanel({ className, tabs, onTabsChange, taskId, isResizing
       setDragSize({ width: d.latestW, height: d.latestH })
     }
 
-    const onUp = () => {
+    const cleanup = () => {
       document.removeEventListener('mousemove', onMove)
       document.removeEventListener('mouseup', onUp)
+      dragCleanupRef.current = null
+    }
+
+    const onUp = () => {
+      cleanup()
       const d = dragRef.current
       dragRef.current = null
       if (d && activeEmulation) {
@@ -317,6 +368,7 @@ export function BrowserPanel({ className, tabs, onTabsChange, taskId, isResizing
 
     document.addEventListener('mousemove', onMove)
     document.addEventListener('mouseup', onUp)
+    dragCleanupRef.current = cleanup
   }, [activeEmulation, setEmulation])
 
   // Keyboard shortcuts when focused
@@ -586,49 +638,15 @@ export function BrowserPanel({ className, tabs, onTabsChange, taskId, isResizing
         'relative flex-1',
         activeEmulation && 'flex items-center justify-center bg-neutral-900 overflow-hidden'
       )}>
-        {activeEmulation ? (
-          (() => {
-            const w = dragSize?.width ?? activeEmulation.width
-            const h = dragSize?.height ?? activeEmulation.height
-            return (
-              <div className="relative border border-neutral-700" style={{ width: w, height: h, maxWidth: '100%', maxHeight: '100%' }}>
-                <webview
-                  ref={webviewRef}
-                  src={activeTab?.url || 'about:blank'}
-                  partition="persist:browser-tabs"
-                  className="absolute inset-0"
-                  // @ts-expect-error - webview attributes not in React types
-                  allowpopups="true"
-                />
-                {/* Right handle — stops short of bottom to leave room for corner */}
-                <div
-                  className="absolute top-0 -right-8 w-10 cursor-ew-resize group flex items-center justify-center"
-                  style={{ height: 'calc(100% - 2rem)' }}
-                  onMouseDown={(e) => handleResizeStart(e, 'x')}
-                >
-                  <div className="w-1 h-8 rounded-full bg-neutral-600 group-hover:bg-blue-500 transition-colors" />
-                </div>
-                {/* Bottom handle — stops short of right to leave room for corner */}
-                <div
-                  className="absolute -bottom-8 left-0 h-10 cursor-ns-resize group flex items-center justify-center"
-                  style={{ width: 'calc(100% - 2rem)' }}
-                  onMouseDown={(e) => handleResizeStart(e, 'y')}
-                >
-                  <div className="h-1 w-8 rounded-full bg-neutral-600 group-hover:bg-blue-500 transition-colors" />
-                </div>
-                {/* Corner handle — same offsets as right/bottom so lines align */}
-                <div
-                  className="absolute -bottom-8 -right-8 w-10 h-10 cursor-nwse-resize group"
-                  onMouseDown={(e) => handleResizeStart(e, 'xy')}
-                >
-                  <div className="absolute top-0 w-1 h-1/2 rounded-full bg-neutral-600 group-hover:bg-blue-500 transition-colors" style={{ left: 'calc(50% - 2px)', transform: 'translateX(-50%)' }} />
-                  <div className="absolute left-0 h-1 w-1/2 rounded-full bg-neutral-600 group-hover:bg-blue-500 transition-colors" style={{ top: 'calc(50% - 2px)', transform: 'translateY(-50%)' }} />
-                </div>
-                {(dragSize || isResizing) && <div className="absolute inset-0 z-10" />}
-              </div>
-            )
-          })()
-        ) : (
+        <div
+          className={cn('relative', !activeEmulation && 'absolute inset-0', activeEmulation && 'border border-neutral-700')}
+          style={activeEmulation ? {
+            width: dragSize?.width ?? activeEmulation.width,
+            height: dragSize?.height ?? activeEmulation.height,
+            maxWidth: '100%',
+            maxHeight: '100%',
+          } : undefined}
+        >
           <webview
             ref={webviewRef}
             src={activeTab?.url || 'about:blank'}
@@ -637,13 +655,41 @@ export function BrowserPanel({ className, tabs, onTabsChange, taskId, isResizing
             // @ts-expect-error - webview attributes not in React types
             allowpopups="true"
           />
-        )}
+          {activeEmulation && (
+            <>
+              {/* Right handle */}
+              <div
+                className="absolute top-0 -right-8 w-10 cursor-ew-resize group flex items-center justify-center"
+                style={{ height: 'calc(100% - 2rem)' }}
+                onMouseDown={(e) => handleResizeStart(e, 'x')}
+              >
+                <div className="w-1 h-8 rounded-full bg-neutral-600 group-hover:bg-blue-500 transition-colors" />
+              </div>
+              {/* Bottom handle */}
+              <div
+                className="absolute -bottom-8 left-0 h-10 cursor-ns-resize group flex items-center justify-center"
+                style={{ width: 'calc(100% - 2rem)' }}
+                onMouseDown={(e) => handleResizeStart(e, 'y')}
+              >
+                <div className="h-1 w-8 rounded-full bg-neutral-600 group-hover:bg-blue-500 transition-colors" />
+              </div>
+              {/* Corner handle */}
+              <div
+                className="absolute -bottom-8 -right-8 w-10 h-10 cursor-nwse-resize group"
+                onMouseDown={(e) => handleResizeStart(e, 'xy')}
+              >
+                <div className="absolute top-0 w-1 h-1/2 rounded-full bg-neutral-600 group-hover:bg-blue-500 transition-colors" style={{ left: 'calc(50% - 2px)', transform: 'translateX(-50%)' }} />
+                <div className="absolute left-0 h-1 w-1/2 rounded-full bg-neutral-600 group-hover:bg-blue-500 transition-colors" style={{ top: 'calc(50% - 2px)', transform: 'translateY(-50%)' }} />
+              </div>
+            </>
+          )}
+          {(dragSize || isResizing) && <div className="absolute inset-0 z-10" />}
+        </div>
         {activeEmulation && (
           <div className="absolute bottom-2 left-1/2 -translate-x-1/2 text-xs text-neutral-500 pointer-events-none">
             {activeEmulation.name} — {dragSize?.width ?? activeEmulation.width}&times;{dragSize?.height ?? activeEmulation.height}
           </div>
         )}
-        {!activeEmulation && isResizing && <div className="absolute inset-0 z-10" />}
       </div>
     </div>
   )
