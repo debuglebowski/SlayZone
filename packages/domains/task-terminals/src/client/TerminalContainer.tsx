@@ -23,6 +23,7 @@ interface TerminalContainerProps {
     focus: () => void
     clearBuffer: () => Promise<void>
   }) => void
+  onFirstInput?: () => void
   onMainTabActiveChange?: (isMainActive: boolean) => void
   rightContent?: React.ReactNode
 }
@@ -41,6 +42,7 @@ export function TerminalContainer({
   onConversationCreated,
   onSessionInvalid,
   onReady,
+  onFirstInput,
   onMainTabActiveChange,
   rightContent
 }: TerminalContainerProps) {
@@ -172,6 +174,7 @@ export function TerminalContainer({
           onConversationCreated={handleConversationCreated}
           onSessionInvalid={activeTab.isMain ? onSessionInvalid : undefined}
           onReady={handleTerminalReady}
+          onFirstInput={onFirstInput}
         />
       </div>
     </div>

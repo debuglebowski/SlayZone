@@ -98,6 +98,7 @@ interface TerminalProps {
     focus: () => void
     clearBuffer: () => Promise<void>
   }) => void
+  onFirstInput?: () => void
 }
 
 export function Terminal({
@@ -112,7 +113,8 @@ export function Terminal({
   autoFocus = false,
   onConversationCreated,
   onSessionInvalid,
-  onReady
+  onReady,
+  onFirstInput
 }: TerminalProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const terminalRef = useRef<XTerm | null>(null)
@@ -137,6 +139,9 @@ export function Terminal({
   onSessionInvalidRef.current = onSessionInvalid
   const onReadyRef = useRef(onReady)
   onReadyRef.current = onReady
+  const onFirstInputRef = useRef(onFirstInput)
+  onFirstInputRef.current = onFirstInput
+  const hasCalledFirstInputRef = useRef(false)
 
   const { subscribe, subscribeExit, subscribeSessionInvalid, subscribeAttention, subscribeState, getState, resetTaskState, cleanupTask } = usePty()
   const { theme } = useTheme()
@@ -359,6 +364,10 @@ export function Terminal({
 
       // Handle terminal input - pass through to PTY
       terminal.onData((data) => {
+        if (!hasCalledFirstInputRef.current) {
+          hasCalledFirstInputRef.current = true
+          onFirstInputRef.current?.()
+        }
         window.api.pty.write(sessionId, data)
       })
 

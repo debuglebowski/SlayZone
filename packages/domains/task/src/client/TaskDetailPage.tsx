@@ -40,12 +40,22 @@ import {
   taskStatusOptions
 } from '@slayzone/ui'
 import { DeleteTaskDialog } from './DeleteTaskDialog'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle
+} from '@slayzone/ui'
 import { Tooltip, TooltipTrigger, TooltipContent } from '@slayzone/ui'
 import { TaskMetadataSidebar, LinearCard } from './TaskMetadataSidebar'
 import { RichTextEditor } from '@slayzone/editor'
 import { markSkipCache, usePty } from '@slayzone/terminal'
 import { TerminalContainer } from '@slayzone/task-terminals'
-import { GitPanel, GitDiffPanel, MergePanel } from '@slayzone/worktrees'
+import { GitPanel, UnifiedGitPanel } from '@slayzone/worktrees'
 import { cn, getTaskStatusStyle } from '@slayzone/ui'
 import { BrowserPanel } from '@slayzone/task-browser'
 import { FileEditorView } from '@slayzone/file-editor/client'
@@ -179,6 +189,10 @@ export function TaskDetailPage({
 
   // Delete dialog state
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+
+  // In-progress prompt state
+  const [inProgressPromptOpen, setInProgressPromptOpen] = useState(false)
+  const hasPromptedInProgressRef = useRef(false)
 
   // Description editing state
   const [descriptionValue, setDescriptionValue] = useState('')
@@ -468,6 +482,14 @@ export function TaskDetailPage({
   }) => {
     terminalApiRef.current = api
   }, [])
+
+  // Prompt to move task to in_progress on first terminal input
+  const handleFirstTerminalInput = useCallback(() => {
+    if (task && task.status !== 'in_progress' && !hasPromptedInProgressRef.current) {
+      hasPromptedInProgressRef.current = true
+      setInProgressPromptOpen(true)
+    }
+  }, [task?.id, task?.status])
 
   // Session ID discovery: providers that don't support --session-id at creation
   const sessionIdCommand = task ? SESSION_ID_COMMANDS[task.terminal_mode] : undefined
@@ -1054,6 +1076,13 @@ export function TaskDetailPage({
     onBack()
   }
 
+  const handleConfirmInProgress = async (): Promise<void> => {
+    if (!task) return
+    const updated = await window.api.db.updateTask({ id: task.id, status: 'in_progress' })
+    handleTaskUpdate(updated)
+    setInProgressPromptOpen(false)
+  }
+
   if (loading) {
     return <div className="flex h-screen items-center justify-center">Loading...</div>
   }
@@ -1129,7 +1158,7 @@ export function TaskDetailPage({
                     { id: 'terminal', icon: TerminalIcon, label: 'Terminal', shortcut: '⌘T' },
                     { id: 'browser', icon: Globe, label: 'Browser', shortcut: '⌘B' },
                     { id: 'editor', icon: FileCode, label: 'Editor', shortcut: '⌘E' },
-                    { id: 'diff', icon: GitBranch, label: 'Diff', shortcut: '⌘G' },
+                    { id: 'diff', icon: GitBranch, label: 'Git', shortcut: '⌘G' },
                     { id: 'settings', icon: Settings2, label: 'Settings', shortcut: '⌘S' },
                   ].filter(p => isBuiltinEnabled(p.id) && !(task.is_temporary && p.id === 'settings'))
 
@@ -1253,14 +1282,7 @@ export function TaskDetailPage({
           )}
           {/* Terminal + mode bar wrapper */}
           <div className="flex-1 min-h-0 overflow-hidden">
-              {task.merge_state ? (
-                <MergePanel
-                  task={task}
-                  projectPath={project?.path ?? ''}
-                  onUpdateTask={updateTaskAndNotify}
-                  onTaskUpdated={handleTaskUpdate}
-                />
-              ) : isResizing ? (
+              {isResizing ? (
                 <div className="h-full bg-black" />
               ) : project?.id === task.project_id && project.path && !projectPathMissing ? (
                 <TerminalContainer
@@ -1278,6 +1300,7 @@ export function TaskDetailPage({
                   onConversationCreated={handleSessionCreated}
                   onSessionInvalid={handleSessionInvalid}
                   onReady={handleTerminalReady}
+                  onFirstInput={handleFirstTerminalInput}
                   onMainTabActiveChange={setIsMainTabActive}
                   rightContent={
                     <Tooltip open={isMainTabActive ? false : undefined}>
@@ -1506,14 +1529,16 @@ export function TaskDetailPage({
           />
         )}
 
-        {/* Diff Panel */}
+        {/* Git Panel */}
         {panelVisibility.diff && (
           <div className="shrink-0 rounded-md bg-surface-1 border border-border overflow-hidden flex flex-col" style={{ width: resolvedWidths.diff }}>
-            <GitDiffPanel
+            <UnifiedGitPanel
               task={task}
               projectPath={project?.path ?? null}
               visible={panelVisibility.diff}
               pollIntervalMs={5000}
+              onUpdateTask={updateTaskAndNotify}
+              onTaskUpdated={handleTaskUpdate}
             />
           </div>
         )}
@@ -1638,6 +1663,9 @@ export function TaskDetailPage({
                   projectPath={project?.path ?? null}
                   onUpdateTask={updateTaskAndNotify}
                   onTaskUpdated={handleTaskUpdate}
+                  onOpenGitPanel={() => {
+                    if (!panelVisibility.diff) handlePanelToggle('diff', true)
+                  }}
                 />
               </div>
             </CollapsibleContent>
@@ -1683,6 +1711,21 @@ export function TaskDetailPage({
         onDeleted={handleDeleteConfirm}
         onDeleteTask={onDeleteTask}
       />
+
+      <AlertDialog open={inProgressPromptOpen} onOpenChange={setInProgressPromptOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Move to In Progress?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This task is currently &ldquo;{task?.status}&rdquo;. Move it to in progress?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>No</AlertDialogCancel>
+            <AlertDialogAction onClick={handleConfirmInProgress}>Yes</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }
