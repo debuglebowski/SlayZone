@@ -114,6 +114,17 @@ export function PtyProvider({ children }: { children: ReactNode }) {
 
       state.exitCode = exitCode
 
+      // Ensure state transitions to dead — the main process may not always
+      // emit pty:state-change (e.g. killPty deletes session before onExit fires)
+      if (state.state !== 'dead') {
+        const oldState = state.state
+        state.state = 'dead'
+        const stateSubs = stateSubsRef.current.get(sessionId)
+        if (stateSubs) {
+          stateSubs.forEach((cb) => cb('dead', oldState))
+        }
+      }
+
       const subs = exitSubsRef.current.get(sessionId)
       if (subs) {
         subs.forEach((cb) => cb(exitCode))
