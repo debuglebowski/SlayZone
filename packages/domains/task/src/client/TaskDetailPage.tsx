@@ -143,7 +143,7 @@ interface TaskDetailPageProps {
   onArchiveTask?: (taskId: string) => Promise<void>
   onDeleteTask?: (taskId: string) => Promise<void>
   onNavigateToTask?: (taskId: string) => void
-  onConvertTask?: (task: Task) => void
+  onConvertTask?: (task: Task) => Promise<Task | void>
 }
 
 export function TaskDetailPage({
@@ -1149,7 +1149,10 @@ export function TaskDetailPage({
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => onConvertTask?.(task)}
+                  onClick={async () => {
+                    const converted = await onConvertTask?.(task)
+                    if (converted) handleTaskUpdate(converted)
+                  }}
                 >
                   Keep as task
                 </Button>

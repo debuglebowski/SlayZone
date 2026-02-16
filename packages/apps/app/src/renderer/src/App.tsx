@@ -97,6 +97,7 @@ function App(): React.JSX.Element {
   const [searchOpen, setSearchOpen] = useState(false)
   const [completeTaskDialogOpen, setCompleteTaskDialogOpen] = useState(false)
   const [convertingTask, setConvertingTask] = useState<Task | null>(null)
+  const convertResolveRef = useRef<((task: Task) => void) | null>(null)
 
   // Project path validation
   const [projectPathMissing, setProjectPathMissing] = useState(false)
@@ -589,9 +590,12 @@ function App(): React.JSX.Element {
     setEditingTask(null)
   }
 
-  const handleConvertTask = (task: Task): void => {
+  const handleConvertTask = (task: Task): Promise<Task> => {
     // Open edit dialog with title cleared so user must name it
     setConvertingTask({ ...task, title: '' })
+    return new Promise<Task>((resolve) => {
+      convertResolveRef.current = resolve
+    })
   }
 
   const handleConvertTaskSaved = async (task: Task): Promise<void> => {
@@ -599,6 +603,8 @@ function App(): React.JSX.Element {
     const converted = await window.api.db.updateTask({ id: task.id, isTemporary: false })
     updateTask(converted)
     setConvertingTask(null)
+    convertResolveRef.current?.(converted)
+    convertResolveRef.current = null
   }
 
   const handleTaskDeleted = (): void => {
@@ -902,7 +908,12 @@ function App(): React.JSX.Element {
         <EditTaskDialog
           task={convertingTask}
           open={!!convertingTask}
-          onOpenChange={(open) => !open && setConvertingTask(null)}
+          onOpenChange={(open) => {
+            if (!open) {
+              setConvertingTask(null)
+              convertResolveRef.current = null
+            }
+          }}
           onUpdated={handleConvertTaskSaved}
         />
         <DeleteTaskDialog
