@@ -40,8 +40,7 @@ export default defineConfig(({ mode }) => {
         __POSTHOG_API_KEY__: JSON.stringify(env.POSTHOG_API_KEY ?? ''),
         __POSTHOG_HOST__: JSON.stringify(env.POSTHOG_HOST ?? ''),
         __DEV__: JSON.stringify(mode !== 'production'),
-        __POSTHOG_DEV_ENABLED__: JSON.stringify(env.POSTHOG_DEV_ENABLED === '1'),
-        __PLAYWRIGHT__: JSON.stringify(process.env.PLAYWRIGHT === '1')
+        __POSTHOG_DEV_ENABLED__: JSON.stringify(env.POSTHOG_DEV_ENABLED === '1')
       },
       resolve: {
         alias: {

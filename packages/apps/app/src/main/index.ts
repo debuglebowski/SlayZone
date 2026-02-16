@@ -1,6 +1,6 @@
 import { app, shell, BrowserWindow, ipcMain, nativeTheme, session, webContents, dialog, Menu, protocol } from 'electron'
 import { join, extname } from 'path'
-import { promises as fsp } from 'fs'
+import { readFileSync, promises as fsp } from 'fs'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 
 // Custom protocol for serving local files in browser panel webviews
@@ -18,6 +18,7 @@ if (is.dev && !isPlaywright) {
   app.commandLine.appendSwitch('remote-debugging-port', '9222')
 }
 import icon from '../../resources/icon.png?asset'
+import logoSolid from '../../resources/logo-solid.svg?asset'
 import { getDatabase, closeDatabase } from './db'
 // Domain handlers
 import { registerProjectHandlers } from '@slayzone/projects/main'
@@ -38,6 +39,129 @@ import { initAutoUpdater } from './auto-updater'
 const DEFAULT_WINDOW_WIDTH = 1760
 const DEFAULT_WINDOW_HEIGHT = 1280
 
+// Splash screen: self-contained HTML with inline logo SVG and typewriter animation
+const splashLogoSvg = readFileSync(logoSolid, 'utf-8')
+const splashHTML = (version: string) => `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body {
+      height: 100%;
+      overflow: hidden;
+      background: transparent;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+    .container {
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: #0a0a0a;
+      border-radius: 16px;
+      position: relative;
+    }
+    .logo-wrapper {
+      animation: fadeInScale 0.4s ease-out forwards;
+    }
+    .logo {
+      width: 192px;
+      height: 192px;
+      border-radius: 2rem;
+      box-shadow: 0 0 80px rgba(59,130,246,0.5), 0 0 160px rgba(59,130,246,0.25);
+    }
+    .title {
+      margin-top: 24px;
+      font-size: 28px;
+      font-weight: 600;
+      color: #fafafa;
+      height: 1.5em;
+      display: inline-flex;
+      align-items: center;
+    }
+    .typed-text { white-space: pre; }
+    .caret {
+      display: inline-block;
+      width: 2px;
+      height: 1.1em;
+      margin-left: 4px;
+      background: #fafafa;
+      animation: blink 0.9s step-end infinite;
+    }
+    .version {
+      position: absolute;
+      bottom: 24px;
+      font-size: 12px;
+      color: #525252;
+      opacity: 0;
+      animation: fadeIn 0.15s ease-out 0.3s forwards;
+    }
+    @keyframes fadeInScale {
+      from { opacity: 0; transform: scale(0.8); }
+      to { opacity: 1; transform: scale(1); }
+    }
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    @keyframes fadeOut { from { opacity: 1; } to { opacity: 0; } }
+    @keyframes blink { 0%, 49% { opacity: 1; } 50%, 100% { opacity: 0; } }
+    .fade-out { animation: fadeOut 0.3s ease-out forwards; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="logo-wrapper">
+      <img class="logo" src="data:image/svg+xml;base64,${Buffer.from(splashLogoSvg).toString('base64')}" />
+    </div>
+    <div class="title">
+      <span class="typed-text" aria-hidden="true"></span>
+      <span class="caret" aria-hidden="true"></span>
+    </div>
+    <div class="version">v${version}</div>
+  </div>
+  <script>
+    const typedText = document.querySelector('.typed-text')
+    const first = 'Breath...'
+    const second = 'then slay'
+    const TYPE_MS = 60
+    const ERASE_MS = 40
+    const PAUSE_BEFORE_START = 300
+    const PAUSE_AFTER_FIRST = 400
+    const PAUSE_AFTER_ERASE = 200
+
+    const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
+
+    const typeText = async (text) => {
+      for (let i = 0; i < text.length; i += 1) {
+        typedText.textContent += text[i]
+        await sleep(TYPE_MS)
+      }
+    }
+
+    const eraseText = async () => {
+      while (typedText.textContent.length > 0) {
+        typedText.textContent = typedText.textContent.slice(0, -1)
+        await sleep(ERASE_MS)
+      }
+    }
+
+    const runSequence = async () => {
+      await sleep(PAUSE_BEFORE_START)
+      await typeText(first)
+      await sleep(PAUSE_AFTER_FIRST)
+      await eraseText()
+      await sleep(PAUSE_AFTER_ERASE)
+      await typeText(second)
+    }
+
+    window.addEventListener('DOMContentLoaded', () => { runSequence() })
+  </script>
+</body>
+</html>
+`
+
+let splashWindow: BrowserWindow | null = null
 let mainWindow: BrowserWindow | null = null
 let linearSyncPoller: NodeJS.Timeout | null = null
 let mcpCleanup: (() => void) | null = null
@@ -48,6 +172,54 @@ function emitOpenSettings(): void {
 
 function emitOpenProjectSettings(): void {
   mainWindow?.webContents.send('app:open-project-settings')
+}
+
+function closeSplash(): void {
+  if (!splashWindow || splashWindow.isDestroyed()) return
+  splashWindow.webContents
+    .executeJavaScript(`document.querySelector('.container').classList.add('fade-out')`)
+    .then(() => {
+      setTimeout(() => {
+        if (splashWindow && !splashWindow.isDestroyed()) splashWindow.close()
+      }, 300)
+    })
+    .catch(() => { splashWindow?.close() })
+}
+
+function createSplashWindow(): void {
+  splashWindow = new BrowserWindow({
+    width: DEFAULT_WINDOW_WIDTH,
+    height: DEFAULT_WINDOW_HEIGHT,
+    titleBarStyle: 'hiddenInset',
+    trafficLightPosition: { x: 16, y: 16 },
+    resizable: false,
+    center: true,
+    skipTaskbar: true,
+    alwaysOnTop: true,
+    show: false,
+    backgroundColor: '#0a0a0a',
+    webPreferences: {
+      nodeIntegration: false,
+      contextIsolation: true
+    }
+  })
+
+  splashWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(splashHTML(app.getVersion()))}`)
+
+  splashWindow.once('ready-to-show', () => {
+    splashWindow?.show()
+  })
+
+  // Escape to dismiss splash early
+  splashWindow.webContents.on('before-input-event', (_event, input) => {
+    if (input.type === 'keyDown' && input.key === 'Escape') {
+      closeSplash()
+    }
+  })
+
+  splashWindow.on('closed', () => {
+    splashWindow = null
+  })
 }
 
 function createMainWindow(): void {
@@ -72,8 +244,18 @@ function createMainWindow(): void {
 
   mainWindow.on('ready-to-show', () => {
     if (mainWindow) startIdleChecker(mainWindow)
-    // In Playwright mode, keep window hidden to avoid focus stealing during tests
-    if (!isPlaywright) mainWindow?.show()
+
+    // If splash is showing, wait for animation to finish before transitioning
+    if (splashWindow && !splashWindow.isDestroyed()) {
+      // Position main window where splash is
+      const bounds = splashWindow.getBounds()
+      mainWindow?.setBounds(bounds)
+      mainWindow?.show()
+      closeSplash()
+    } else {
+      // No splash (Playwright mode) — show directly
+      if (!isPlaywright) mainWindow?.show()
+    }
   })
 
   mainWindow.webContents.setWindowOpenHandler((details) => {
@@ -121,6 +303,9 @@ function createMainWindow(): void {
 }
 
 function createWindow(): void {
+  if (!isPlaywright) {
+    createSplashWindow()
+  }
   createMainWindow()
 }
 
