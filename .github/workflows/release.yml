@@ -39,6 +39,9 @@ jobs:
       - name: Get electron version
         run: echo "ELECTRON_VERSION=$(node -p "require('electron/package.json').version")" >> $GITHUB_ENV
 
+      - name: Remove workspace symlinks (bundled by electron-vite)
+        run: rm -rf node_modules/@slayzone
+
       - name: Package and publish
         run: pnpm --filter @slayzone/app exec electron-builder --mac --arm64 -c.electronVersion=$ELECTRON_VERSION --publish always
         env:
