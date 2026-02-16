@@ -138,7 +138,7 @@ export function KanbanColumn({
 
   return (
     <div className="flex w-72 shrink-0 flex-col h-full">
-      <div className="mb-2 flex items-center justify-between px-2">
+      <div className="mb-2 flex items-center justify-between px-2 select-none">
         <div className="flex items-center gap-2">
           <h3 className="text-sm font-semibold text-muted-foreground">{column.title}</h3>
           <span className="text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
