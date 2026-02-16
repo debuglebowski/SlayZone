@@ -10,22 +10,7 @@ concurrency:
 
 jobs:
   release:
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - os: macos-latest
-            target: mac
-            args: --arm64
-          - os: macos-15-intel
-            target: mac
-            args: --x64
-          - os: windows-latest
-            target: win
-          - os: ubuntu-latest
-            target: linux
-
-    runs-on: ${{ matrix.os }}
+    runs-on: macos-latest
 
     permissions:
       contents: write
@@ -48,7 +33,10 @@ jobs:
       - name: Build
         run: pnpm build
 
+      - name: Get electron version
+        run: echo "ELECTRON_VERSION=$(node -p "require('electron/package.json').version")" >> $GITHUB_ENV
+
       - name: Package and publish
-        run: pnpm --filter @slayzone/app exec electron-builder --${{ matrix.target }} ${{ matrix.args }} --publish always
+        run: pnpm --filter @slayzone/app exec electron-builder --mac --arm64 -c.electronVersion=$ELECTRON_VERSION --publish always
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
