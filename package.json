@@ -10,7 +10,6 @@
     ]
   },
   "scripts": {
-    "postinstall": "bash scripts/fix-native-perms.sh && pnpm run patch-electron-name",
     "dev": "pnpm --filter @slayzone/app dev",
     "generate-icons": "node scripts/generate-icons.js",
     "patch-electron-name": "node scripts/patch-electron-name.js",
@@ -42,5 +41,5 @@
     "node": ">=20",
     "pnpm": ">=9"
   },
-  "version": "0.1.27"
+  "version": "0.1.28"
 }
