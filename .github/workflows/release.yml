@@ -10,7 +10,17 @@ concurrency:
 
 jobs:
   release:
-    runs-on: macos-latest
+    strategy:
+      matrix:
+        include:
+          - os: macos-latest
+            build_args: --mac --arm64
+          - os: ubuntu-latest
+            build_args: --linux
+          - os: windows-latest
+            build_args: --win
+
+    runs-on: ${{ matrix.os }}
 
     permissions:
       contents: write
@@ -28,6 +38,7 @@ jobs:
           cache: pnpm
 
       - name: Install Python setuptools (needed by node-gyp)
+        if: runner.os == 'macOS'
         run: pip3 install --break-system-packages setuptools
 
       - name: Install dependencies
@@ -37,12 +48,13 @@ jobs:
         run: pnpm build
 
       - name: Get electron version
+        shell: bash
         run: echo "ELECTRON_VERSION=$(node -p "require('electron/package.json').version")" >> $GITHUB_ENV
 
       - name: Strip workspace deps (bundled by electron-vite)
         run: node -e "const fs=require('fs'),p='packages/apps/app/package.json',pkg=JSON.parse(fs.readFileSync(p));Object.keys(pkg.dependencies).filter(k=>k.startsWith('@slayzone/')).forEach(k=>delete pkg.dependencies[k]);fs.writeFileSync(p,JSON.stringify(pkg,null,2)+'\n')"
 
       - name: Package and publish
-        run: pnpm --filter @slayzone/app exec electron-builder --mac --arm64 -c.electronVersion=$ELECTRON_VERSION --publish always
+        run: pnpm --filter @slayzone/app exec electron-builder ${{ matrix.build_args }} -c.electronVersion=${{ env.ELECTRON_VERSION }} --publish always
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
