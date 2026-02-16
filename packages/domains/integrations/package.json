@@ -14,5 +14,8 @@
   "scripts": {
     "typecheck": "tsc --noEmit"
   },
-  "dependencies": {}
+  "dependencies": {},
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.13"
+  }
 }

@@ -119,6 +119,9 @@ importers:
       tw-animate-css:
         specifier: ^1.4.0
         version: 1.4.0
+      zod:
+        specifier: ^4.3.5
+        version: 4.3.5
     devDependencies:
       '@electron-toolkit/eslint-config-prettier':
         specifier: ^3.0.0
@@ -184,6 +187,9 @@ importers:
         specifier: ^19.0.0
         version: 19.2.3
     devDependencies:
+      '@types/better-sqlite3':
+        specifier: ^7.6.13
+        version: 7.6.13
       '@types/node':
         specifier: ^22.19.1
         version: 22.19.7
@@ -196,6 +202,9 @@ importers:
 
   packages/domains/diagnostics:
     devDependencies:
+      '@types/better-sqlite3':
+        specifier: ^7.6.13
+        version: 7.6.13
       '@types/node':
         specifier: ^22.19.1
         version: 22.19.7
@@ -270,7 +279,11 @@ importers:
         specifier: ^5.9.3
         version: 5.9.3
 
-  packages/domains/integrations: {}
+  packages/domains/integrations:
+    devDependencies:
+      '@types/better-sqlite3':
+        specifier: ^7.6.13
+        version: 7.6.13
 
   packages/domains/onboarding:
     dependencies:
@@ -312,6 +325,9 @@ importers:
         specifier: ^5.6.1
         version: 5.6.1(react-dom@19.2.3(react@19.2.3))(react@19.2.3)
     devDependencies:
+      '@types/better-sqlite3':
+        specifier: ^7.6.13
+        version: 7.6.13
       '@types/react':
         specifier: ^19.2.7
         version: 19.2.8
@@ -349,6 +365,9 @@ importers:
         specifier: ^19.0.0
         version: 19.2.3
     devDependencies:
+      '@types/better-sqlite3':
+        specifier: ^7.6.13
+        version: 7.6.13
       '@types/react':
         specifier: ^19.2.7
         version: 19.2.8
@@ -368,6 +387,9 @@ importers:
         specifier: ^19.0.0
         version: 19.2.3
     devDependencies:
+      '@types/better-sqlite3':
+        specifier: ^7.6.13
+        version: 7.6.13
       '@types/react':
         specifier: ^19.2.7
         version: 19.2.8
@@ -476,6 +498,9 @@ importers:
         specifier: ^19.0.0
         version: 19.2.3
     devDependencies:
+      '@types/better-sqlite3':
+        specifier: ^7.6.13
+        version: 7.6.13
       '@types/react':
         specifier: ^19.2.7
         version: 19.2.8
@@ -583,10 +608,16 @@ importers:
       '@xterm/xterm':
         specifier: ^6.0.0
         version: 6.0.0
+      node-pty:
+        specifier: ^1.1.0
+        version: 1.1.0
       react:
         specifier: ^19.0.0
         version: 19.2.3
     devDependencies:
+      '@types/better-sqlite3':
+        specifier: ^7.6.13
+        version: 7.6.13
       '@types/react':
         specifier: ^19.2.7
         version: 19.2.8
@@ -781,6 +812,9 @@ importers:
       react-dom:
         specifier: ^19.0.0
         version: 19.2.3(react@19.2.3)
+      react-hook-form:
+        specifier: ^7.71.1
+        version: 7.71.1(react@19.2.3)
       sonner:
         specifier: ^2.0.7
         version: 2.0.7(react-dom@19.2.3(react@19.2.3))(react@19.2.3)
