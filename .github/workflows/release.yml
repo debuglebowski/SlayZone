@@ -38,9 +38,13 @@ jobs:
           node-version: 20
           cache: pnpm
 
-      - name: Install Python setuptools (needed by node-gyp)
+      - name: Install Python setuptools (needed by node-gyp on macOS)
         if: runner.os == 'macOS'
         run: pip3 install --break-system-packages setuptools
+
+      - name: Install Python setuptools (needed by node-gyp on Windows)
+        if: runner.os == 'Windows'
+        run: pip install setuptools
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
