@@ -213,7 +213,16 @@ const api: ElectronAPI = {
     writeResolvedFile: (repoPath, filePath, content) => ipcRenderer.invoke('git:writeResolvedFile', repoPath, filePath, content),
     commitFiles: (repoPath, message) => ipcRenderer.invoke('git:commitFiles', repoPath, message),
     analyzeConflict: (mode, filePath, base, ours, theirs) =>
-      ipcRenderer.invoke('git:analyzeConflict', mode, filePath, base, ours, theirs)
+      ipcRenderer.invoke('git:analyzeConflict', mode, filePath, base, ours, theirs),
+    isRebaseInProgress: (path) => ipcRenderer.invoke('git:isRebaseInProgress', path),
+    getRebaseProgress: (repoPath) => ipcRenderer.invoke('git:getRebaseProgress', repoPath),
+    abortRebase: (path) => ipcRenderer.invoke('git:abortRebase', path),
+    continueRebase: (path) => ipcRenderer.invoke('git:continueRebase', path),
+    skipRebaseCommit: (path) => ipcRenderer.invoke('git:skipRebaseCommit', path),
+    getMergeContext: (repoPath) => ipcRenderer.invoke('git:getMergeContext', repoPath),
+    getRecentCommits: (repoPath, count) => ipcRenderer.invoke('git:getRecentCommits', repoPath, count),
+    getAheadBehind: (repoPath, branch, upstream) => ipcRenderer.invoke('git:getAheadBehind', repoPath, branch, upstream),
+    getStatusSummary: (repoPath) => ipcRenderer.invoke('git:getStatusSummary', repoPath)
   },
   tabs: {
     list: (taskId) => ipcRenderer.invoke('tabs:list', taskId),

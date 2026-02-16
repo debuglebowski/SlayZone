@@ -4,7 +4,13 @@ import type { BrowserTabsState } from '@slayzone/task-browser/shared'
 // keep in sync with TASK_STATUS_ORDER in @slayzone/ui
 export const TASK_STATUSES = ['inbox', 'backlog', 'todo', 'in_progress', 'review', 'done'] as const
 export type TaskStatus = (typeof TASK_STATUSES)[number]
-export type MergeState = 'uncommitted' | 'conflicts'
+export type MergeState = 'uncommitted' | 'conflicts' | 'rebase-conflicts'
+
+export interface MergeContext {
+  type: 'merge' | 'rebase'
+  sourceBranch: string // branch being merged / rebased
+  targetBranch: string // branch being merged INTO / rebased ONTO
+}
 
 // --- Provider config (JSON column on tasks table) ---
 
@@ -138,6 +144,7 @@ export interface Task {
   web_panel_urls: WebPanelUrls | null
   // Merge mode
   merge_state: MergeState | null
+  merge_context: MergeContext | null
   // Temporary task (ephemeral terminal tab, deleted on close)
   is_temporary: boolean
   // External link (populated via JOIN)
@@ -205,6 +212,7 @@ export interface UpdateTaskInput {
   webPanelUrls?: WebPanelUrls | null
   // Merge mode
   mergeState?: MergeState | null
+  mergeContext?: MergeContext | null
   // Temporary task
   isTemporary?: boolean
   // Legacy

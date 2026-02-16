@@ -25,7 +25,16 @@ import {
   discardFile,
   stageAll,
   unstageAll,
-  getUntrackedFileDiff
+  getUntrackedFileDiff,
+  isRebaseInProgress,
+  getRebaseProgress,
+  abortRebase,
+  continueRebase,
+  skipRebaseCommit,
+  getMergeContext,
+  getRecentCommits,
+  getAheadBehind,
+  getStatusSummary
 } from './git-worktree'
 import { runAiCommand } from './merge-ai'
 import type { MergeWithAIResult, ConflictAnalysis } from '../shared/types'
@@ -235,4 +244,41 @@ SUMMARY: <2-3 sentences explaining what each branch changed and why they conflic
       return { summary, suggestion }
     }
   )
+
+  // Rebase operations
+  ipcMain.handle('git:isRebaseInProgress', (_, path: string) => {
+    return isRebaseInProgress(path)
+  })
+
+  ipcMain.handle('git:getRebaseProgress', (_, repoPath: string) => {
+    return getRebaseProgress(repoPath)
+  })
+
+  ipcMain.handle('git:abortRebase', (_, path: string) => {
+    abortRebase(path)
+  })
+
+  ipcMain.handle('git:continueRebase', (_, path: string) => {
+    return continueRebase(path)
+  })
+
+  ipcMain.handle('git:skipRebaseCommit', (_, path: string) => {
+    return skipRebaseCommit(path)
+  })
+
+  ipcMain.handle('git:getMergeContext', (_, repoPath: string) => {
+    return getMergeContext(repoPath)
+  })
+
+  ipcMain.handle('git:getRecentCommits', (_, repoPath: string, count?: number) => {
+    return getRecentCommits(repoPath, count)
+  })
+
+  ipcMain.handle('git:getAheadBehind', (_, repoPath: string, branch: string, upstream: string) => {
+    return getAheadBehind(repoPath, branch, upstream)
+  })
+
+  ipcMain.handle('git:getStatusSummary', (_, repoPath: string) => {
+    return getStatusSummary(repoPath)
+  })
 }

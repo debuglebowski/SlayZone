@@ -1,16 +1,38 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Sparkles, Check, ArrowLeft, ArrowRight } from 'lucide-react'
-import { Button } from '@slayzone/ui'
+import { Sparkles, Check, ArrowLeft, ArrowRight, Info, Layers } from 'lucide-react'
+import { Button, Tooltip, TooltipContent, TooltipTrigger, cn } from '@slayzone/ui'
 import { EditorView, basicSetup } from 'codemirror'
 import { EditorState } from '@codemirror/state'
 import { javascript } from '@codemirror/lang-javascript'
 import type { ConflictFileContent, ConflictAnalysis } from '../shared/types'
+import type { MergeContext } from '@slayzone/task/shared'
 
 interface ConflictFileViewProps {
   repoPath: string
   filePath: string
   terminalMode: string
   onResolved: () => void
+  branchContext: MergeContext
+}
+
+type PanelId = 'base' | 'ours' | 'theirs'
+
+function resolveLabels(ctx: MergeContext): { oursLabel: string; oursDesc: string; theirsLabel: string; theirsDesc: string } {
+  if (ctx.type === 'merge') {
+    return {
+      oursLabel: ctx.targetBranch,
+      oursDesc: 'Your current branch — the code you had before the merge',
+      theirsLabel: ctx.sourceBranch,
+      theirsDesc: 'The incoming branch being merged in',
+    }
+  }
+  // Rebase: git swaps ours/theirs from user perspective
+  return {
+    oursLabel: ctx.targetBranch,
+    oursDesc: 'The branch you\'re rebasing onto — git calls this "ours" during rebase',
+    theirsLabel: ctx.sourceBranch,
+    theirsDesc: 'Your commits being replayed — git calls this "theirs" during rebase',
+  }
 }
 
 const editorTheme = EditorView.theme({
@@ -19,14 +41,25 @@ const editorTheme = EditorView.theme({
   '.cm-content': { fontFamily: 'ui-monospace, monospace' }
 })
 
-export function ConflictFileView({ repoPath, filePath, terminalMode, onResolved }: ConflictFileViewProps) {
+export function ConflictFileView({ repoPath, filePath, terminalMode, onResolved, branchContext }: ConflictFileViewProps) {
   const [content, setContent] = useState<ConflictFileContent | null>(null)
   const [analysis, setAnalysis] = useState<ConflictAnalysis | null>(null)
   const [analyzing, setAnalyzing] = useState(false)
   const [resolved, setResolved] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [visiblePanels, setVisiblePanels] = useState<Record<PanelId, boolean>>({
+    base: false,
+    ours: true,
+    theirs: true
+  })
   const editorRef = useRef<HTMLDivElement>(null)
   const viewRef = useRef<EditorView | null>(null)
+
+  const labels = resolveLabels(branchContext)
+
+  const togglePanel = useCallback((id: PanelId) => {
+    setVisiblePanels(prev => ({ ...prev, [id]: !prev[id] }))
+  }, [])
 
   // Load conflict content
   useEffect(() => {
@@ -132,6 +165,54 @@ export function ConflictFileView({ repoPath, filePath, terminalMode, onResolved 
       <div className="shrink-0 px-4 py-2 border-b flex items-center gap-2 flex-wrap">
         <span className="text-xs font-mono text-muted-foreground mr-auto">{filePath}</span>
 
+        {/* Panel toggles */}
+        <div className="flex items-center gap-0.5 border rounded-md p-0.5">
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                className={cn(
+                  'px-2 py-0.5 text-[10px] font-medium rounded transition-colors',
+                  visiblePanels.base ? 'bg-muted text-foreground' : 'text-muted-foreground hover:text-foreground'
+                )}
+                onClick={() => togglePanel('base')}
+              >
+                Base
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom" className="text-xs">Common ancestor — what both branches started from</TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                className={cn(
+                  'px-2 py-0.5 text-[10px] font-medium rounded transition-colors',
+                  visiblePanels.ours ? 'bg-blue-500/20 text-blue-400' : 'text-muted-foreground hover:text-foreground'
+                )}
+                onClick={() => togglePanel('ours')}
+              >
+                {labels.oursLabel}
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom" className="text-xs max-w-xs">{labels.oursDesc}</TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                className={cn(
+                  'px-2 py-0.5 text-[10px] font-medium rounded transition-colors',
+                  visiblePanels.theirs ? 'bg-yellow-500/20 text-yellow-400' : 'text-muted-foreground hover:text-foreground'
+                )}
+                onClick={() => togglePanel('theirs')}
+              >
+                {labels.theirsLabel}
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom" className="text-xs max-w-xs">{labels.theirsDesc}</TooltipContent>
+          </Tooltip>
+        </div>
+
+        <div className="w-px h-4 bg-border" />
+
         <Button
           variant="outline"
           size="sm"
@@ -139,7 +220,7 @@ export function ConflictFileView({ repoPath, filePath, terminalMode, onResolved 
           onClick={handleAcceptOurs}
           disabled={resolved || !content.ours}
         >
-          <ArrowLeft className="h-3 w-3" /> Accept Ours
+          <ArrowLeft className="h-3 w-3" /> Accept {labels.oursLabel}
         </Button>
         <Button
           variant="outline"
@@ -148,7 +229,7 @@ export function ConflictFileView({ repoPath, filePath, terminalMode, onResolved 
           onClick={handleAcceptTheirs}
           disabled={resolved || !content.theirs}
         >
-          Accept Theirs <ArrowRight className="h-3 w-3" />
+          Accept {labels.theirsLabel} <ArrowRight className="h-3 w-3" />
         </Button>
         <Button
           variant="outline"
@@ -199,20 +280,41 @@ export function ConflictFileView({ repoPath, filePath, terminalMode, onResolved 
         </div>
       )}
 
-      {/* Three-pane view: ours | editor | theirs */}
+      {/* Panes — visible panels share width equally, result always visible */}
       <div className="flex-1 min-h-0 flex">
-        {/* Ours (read-only) */}
-        <div className="w-1/3 border-r overflow-auto">
-          <div className="px-2 py-1 text-[10px] font-medium text-muted-foreground uppercase bg-blue-500/10 border-b sticky top-0">
-            Ours (current branch)
+        {/* Base (read-only, hidden by default) */}
+        {visiblePanels.base && (
+          <div className="flex-1 min-w-0 border-r overflow-auto">
+            <div className="px-2 py-1 text-[10px] font-medium text-muted-foreground uppercase bg-muted/30 border-b sticky top-0 flex items-center gap-1">
+              <Layers className="h-3 w-3" />
+              Base (common ancestor)
+            </div>
+            <pre className="p-2 text-xs font-mono whitespace-pre-wrap break-words">
+              {content.base ?? '(file did not exist)'}
+            </pre>
           </div>
-          <pre className="p-2 text-xs font-mono whitespace-pre-wrap break-words">
-            {content.ours ?? '(file did not exist)'}
-          </pre>
-        </div>
+        )}
 
-        {/* Editor (editable result) */}
-        <div className="w-1/3 border-r flex flex-col">
+        {/* Ours (read-only) */}
+        {visiblePanels.ours && (
+          <div className="flex-1 min-w-0 border-r overflow-auto">
+            <div className="px-2 py-1 text-[10px] font-medium uppercase bg-blue-500/10 border-b sticky top-0 flex items-center gap-1.5">
+              <span className="text-blue-400">{labels.oursLabel}</span>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Info className="h-2.5 w-2.5 text-muted-foreground cursor-help" />
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="text-xs max-w-xs">{labels.oursDesc}</TooltipContent>
+              </Tooltip>
+            </div>
+            <pre className="p-2 text-xs font-mono whitespace-pre-wrap break-words">
+              {content.ours ?? '(file did not exist)'}
+            </pre>
+          </div>
+        )}
+
+        {/* Editor (editable result — always visible) */}
+        <div className="flex-1 min-w-0 border-r flex flex-col">
           <div className="px-2 py-1 text-[10px] font-medium text-muted-foreground uppercase bg-purple-500/10 border-b sticky top-0">
             Result (edit to resolve)
           </div>
@@ -220,14 +322,22 @@ export function ConflictFileView({ repoPath, filePath, terminalMode, onResolved 
         </div>
 
         {/* Theirs (read-only) */}
-        <div className="w-1/3 overflow-auto">
-          <div className="px-2 py-1 text-[10px] font-medium text-muted-foreground uppercase bg-yellow-500/10 border-b sticky top-0">
-            Theirs (incoming branch)
+        {visiblePanels.theirs && (
+          <div className="flex-1 min-w-0 overflow-auto">
+            <div className="px-2 py-1 text-[10px] font-medium uppercase bg-yellow-500/10 border-b sticky top-0 flex items-center gap-1.5">
+              <span className="text-yellow-400">{labels.theirsLabel}</span>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Info className="h-2.5 w-2.5 text-muted-foreground cursor-help" />
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="text-xs max-w-xs">{labels.theirsDesc}</TooltipContent>
+              </Tooltip>
+            </div>
+            <pre className="p-2 text-xs font-mono whitespace-pre-wrap break-words">
+              {content.theirs ?? '(file did not exist)'}
+            </pre>
           </div>
-          <pre className="p-2 text-xs font-mono whitespace-pre-wrap break-words">
-            {content.theirs ?? '(file did not exist)'}
-          </pre>
-        </div>
+        )}
       </div>
     </div>
   )

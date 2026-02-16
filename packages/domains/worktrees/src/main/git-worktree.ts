@@ -1,8 +1,9 @@
 import { execSync } from 'child_process'
-import { readFileSync, writeFileSync } from 'fs'
+import { existsSync, readFileSync, writeFileSync } from 'fs'
 import path from 'path'
 import { recordDiagnosticEvent } from '@slayzone/diagnostics/main'
-import type { ConflictFileContent, DetectedWorktree, GitDiffSnapshot, MergeResult } from '../shared/types'
+import type { ConflictFileContent, DetectedWorktree, GitDiffSnapshot, MergeResult, RebaseProgress, RebaseCommitInfo, CommitInfo, AheadBehind, StatusSummary } from '../shared/types'
+import type { MergeContext } from '@slayzone/task/shared'
 
 function trimOutput(value: unknown, maxLength = 1200): string | null {
   if (typeof value !== 'string') return null
@@ -412,4 +413,216 @@ export function writeResolvedFile(repoPath: string, filePath: string, content: s
 
 export function commitFiles(repoPath: string, message: string): void {
   execGit(`git commit -m "${message.replace(/"/g, '\\"')}"`, { cwd: repoPath })
+}
+
+// --- General tab operations ---
+
+export function getRecentCommits(repoPath: string, count = 5): CommitInfo[] {
+  try {
+    const output = execGit(`git log -${count} --format=%H%n%h%n%s%n%an%n%ar`, {
+      cwd: repoPath,
+      encoding: 'utf-8'
+    }) as string
+    const lines = output.trim().split('\n')
+    const commits: CommitInfo[] = []
+    for (let i = 0; i + 4 < lines.length; i += 5) {
+      commits.push({
+        hash: lines[i],
+        shortHash: lines[i + 1],
+        message: lines[i + 2],
+        author: lines[i + 3],
+        relativeDate: lines[i + 4]
+      })
+    }
+    return commits
+  } catch {
+    return []
+  }
+}
+
+export function getAheadBehind(repoPath: string, branch: string, upstream: string): AheadBehind {
+  try {
+    const output = execGit(`git rev-list --left-right --count "${upstream}...${branch}"`, {
+      cwd: repoPath,
+      encoding: 'utf-8'
+    }) as string
+    const [behind, ahead] = output.trim().split(/\s+/).map(Number)
+    return { ahead: ahead || 0, behind: behind || 0 }
+  } catch {
+    return { ahead: 0, behind: 0 }
+  }
+}
+
+export function getStatusSummary(repoPath: string): StatusSummary {
+  try {
+    const output = execGit('git status --porcelain', {
+      cwd: repoPath,
+      encoding: 'utf-8'
+    }) as string
+    const lines = output.trim().split('\n').filter(Boolean)
+    let staged = 0, unstaged = 0, untracked = 0
+    for (const line of lines) {
+      const x = line[0], y = line[1]
+      if (x === '?') { untracked++; continue }
+      if (x !== ' ' && x !== '?') staged++
+      if (y !== ' ' && y !== '?') unstaged++
+    }
+    return { staged, unstaged, untracked }
+  } catch {
+    return { staged: 0, unstaged: 0, untracked: 0 }
+  }
+}
+
+// --- Rebase operations ---
+
+function getGitDir(repoPath: string): string {
+  const output = execGit('git rev-parse --git-dir', {
+    cwd: repoPath,
+    encoding: 'utf-8'
+  }) as string
+  const dir = output.trim()
+  return path.isAbsolute(dir) ? dir : path.join(repoPath, dir)
+}
+
+export function isRebaseInProgress(repoPath: string): boolean {
+  try {
+    const gitDir = getGitDir(repoPath)
+    return existsSync(path.join(gitDir, 'rebase-merge')) ||
+           existsSync(path.join(gitDir, 'rebase-apply'))
+  } catch {
+    return false
+  }
+}
+
+export function getRebaseProgress(repoPath: string): RebaseProgress | null {
+  try {
+    const gitDir = getGitDir(repoPath)
+    const mergeDir = path.join(gitDir, 'rebase-merge')
+    const applyDir = path.join(gitDir, 'rebase-apply')
+    const dir = existsSync(mergeDir) ? mergeDir : existsSync(applyDir) ? applyDir : null
+    if (!dir) return null
+
+    const current = parseInt(readFileSync(path.join(dir, 'msgnum'), 'utf-8').trim(), 10)
+    const total = parseInt(readFileSync(path.join(dir, 'end'), 'utf-8').trim(), 10)
+
+    // Parse done file (applied commits)
+    const commits: RebaseCommitInfo[] = []
+    try {
+      const doneContent = readFileSync(path.join(dir, 'done'), 'utf-8').trim()
+      for (const line of doneContent.split('\n').filter(Boolean)) {
+        const match = line.match(/^(?:pick|reword|edit|squash|fixup|exec|drop)\s+([a-f0-9]+)\s+(.*)/)
+        if (match) {
+          const idx = commits.length + 1
+          commits.push({
+            hash: match[1],
+            shortHash: match[1].slice(0, 7),
+            message: match[2],
+            status: idx < current ? 'applied' : 'current'
+          })
+        }
+      }
+    } catch { /* no done file yet */ }
+
+    // Parse todo file (pending commits)
+    try {
+      const todoContent = readFileSync(path.join(dir, 'git-rebase-todo'), 'utf-8').trim()
+      for (const line of todoContent.split('\n').filter(Boolean)) {
+        if (line.startsWith('#')) continue
+        const match = line.match(/^(?:pick|reword|edit|squash|fixup|exec|drop)\s+([a-f0-9]+)\s+(.*)/)
+        if (match) {
+          commits.push({
+            hash: match[1],
+            shortHash: match[1].slice(0, 7),
+            message: match[2],
+            status: 'pending'
+          })
+        }
+      }
+    } catch { /* no todo file */ }
+
+    return { current, total, commits }
+  } catch {
+    return null
+  }
+}
+
+export function abortRebase(repoPath: string): void {
+  execGit('git rebase --abort', { cwd: repoPath })
+}
+
+export function continueRebase(repoPath: string): { done: boolean; conflictedFiles: string[] } {
+  try {
+    execGit('git rebase --continue', { cwd: repoPath })
+    // Check if rebase is still in progress
+    if (isRebaseInProgress(repoPath)) {
+      const files = getConflictedFiles(repoPath)
+      return { done: false, conflictedFiles: files }
+    }
+    return { done: true, conflictedFiles: [] }
+  } catch {
+    const files = getConflictedFiles(repoPath)
+    return { done: false, conflictedFiles: files }
+  }
+}
+
+export function skipRebaseCommit(repoPath: string): { done: boolean; conflictedFiles: string[] } {
+  try {
+    execGit('git rebase --skip', { cwd: repoPath })
+    if (isRebaseInProgress(repoPath)) {
+      const files = getConflictedFiles(repoPath)
+      return { done: false, conflictedFiles: files }
+    }
+    return { done: true, conflictedFiles: [] }
+  } catch {
+    const files = getConflictedFiles(repoPath)
+    return { done: false, conflictedFiles: files }
+  }
+}
+
+export function getMergeContext(repoPath: string): MergeContext | null {
+  try {
+    const gitDir = getGitDir(repoPath)
+
+    // Check for rebase
+    const mergeDir = path.join(gitDir, 'rebase-merge')
+    const applyDir = path.join(gitDir, 'rebase-apply')
+    if (existsSync(mergeDir) || existsSync(applyDir)) {
+      const dir = existsSync(mergeDir) ? mergeDir : applyDir
+      // head-name = the branch being rebased (source)
+      // onto = the commit being rebased onto (target)
+      let sourceBranch = 'unknown'
+      let targetBranch = 'unknown'
+      try {
+        sourceBranch = readFileSync(path.join(dir, 'head-name'), 'utf-8').trim().replace('refs/heads/', '')
+      } catch { /* fallback */ }
+      try {
+        const ontoHash = readFileSync(path.join(dir, 'onto'), 'utf-8').trim()
+        // Resolve hash to branch name
+        const name = execGit(`git name-rev --name-only "${ontoHash}"`, {
+          cwd: repoPath,
+          encoding: 'utf-8'
+        }) as string
+        targetBranch = name.trim().replace(/~\d+$/, '')
+      } catch { /* fallback */ }
+      return { type: 'rebase', sourceBranch, targetBranch }
+    }
+
+    // Check for merge
+    if (isMergeInProgress(repoPath)) {
+      const targetBranch = getCurrentBranch(repoPath) ?? 'unknown'
+      let sourceBranch = 'unknown'
+      try {
+        const name = execGit('git name-rev --name-only MERGE_HEAD', {
+          cwd: repoPath,
+          encoding: 'utf-8'
+        }) as string
+        sourceBranch = name.trim().replace(/~\d+$/, '')
+      } catch { /* fallback */ }
+      return { type: 'merge', sourceBranch, targetBranch }
+    }
+
+    return null
+  } catch {
+    return null
+  }
 }

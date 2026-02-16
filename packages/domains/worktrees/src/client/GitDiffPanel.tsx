@@ -1,7 +1,7 @@
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Plus, Minus, Undo2, ChevronRight, RefreshCw } from 'lucide-react'
+import { forwardRef, memo, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react'
+import { Plus, Minus, Undo2, ChevronRight, GitMerge } from 'lucide-react'
 import { Button, FileTree, buildFileTree, flattenFileTree, fileTreeIndent, cn } from '@slayzone/ui'
-import type { Task } from '@slayzone/task/shared'
+import type { Task, MergeState } from '@slayzone/task/shared'
 import type { GitDiffSnapshot } from '../shared/types'
 import { parseUnifiedDiff, type FileDiff } from './parse-diff'
 import { DiffView } from './DiffView'
@@ -29,6 +29,10 @@ interface GitDiffPanelProps {
   projectPath: string | null
   visible: boolean
   pollIntervalMs?: number
+  // Merge mode integration
+  mergeState?: MergeState | null
+  onCommitAndContinueMerge?: () => Promise<void>
+  onAbortMerge?: () => void
 }
 
 interface FileEntry {
@@ -165,12 +169,20 @@ const FileListItem = memo(function FileListItem({
   )
 })
 
-export function GitDiffPanel({
+export interface GitDiffPanelHandle {
+  refresh: () => void
+}
+
+export const GitDiffPanel = forwardRef<GitDiffPanelHandle, GitDiffPanelProps>(function GitDiffPanel({
   task,
   projectPath,
   visible,
-  pollIntervalMs = 5000
-}: GitDiffPanelProps): React.JSX.Element {
+  pollIntervalMs = 5000,
+  mergeState,
+  onCommitAndContinueMerge,
+  onAbortMerge
+}, ref) {
+  const isMergeMode = mergeState === 'uncommitted'
   const targetPath = useMemo(() => task.worktree_path ?? projectPath, [task.worktree_path, projectPath])
   const [snapshot, setSnapshot] = useState<GitDiffSnapshot | null>(null)
   const [loading, setLoading] = useState(false)
@@ -207,6 +219,10 @@ export function GitDiffPanel({
       setLoading(false)
     }
   }
+
+  const fetchDiffRef = useRef(fetchDiff)
+  fetchDiffRef.current = fetchDiff
+  useImperativeHandle(ref, () => ({ refresh: () => { fetchDiffRef.current() } }), [])
 
   useEffect(() => {
     if (!visible || !targetPath) return
@@ -487,26 +503,22 @@ export function GitDiffPanel({
 
   return (
     <div data-testid="git-diff-panel" className="h-full flex flex-col">
-      {/* Header */}
-      <div className="shrink-0 h-10 px-4 border-b flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2">
-          <div className="text-xs font-medium text-muted-foreground uppercase leading-none">Diff</div>
-          {snapshot && (
-            <div className="text-[11px] text-muted-foreground leading-none">
-              · {new Date(snapshot.generatedAt).toLocaleTimeString()}
-            </div>
-          )}
+      {/* Merge-mode banner */}
+      {isMergeMode && (
+        <div className="shrink-0 px-4 py-2 bg-purple-500/10 border-b flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <GitMerge className="h-3.5 w-3.5 text-purple-400" />
+            <span className="text-xs font-medium text-purple-300">Stage and commit your changes to continue the merge</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            {onAbortMerge && (
+              <Button variant="outline" size="sm" className="h-6 text-xs" onClick={onAbortMerge}>
+                Cancel
+              </Button>
+            )}
+          </div>
         </div>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-7 w-7"
-          onClick={fetchDiff}
-          disabled={!targetPath || loading}
-        >
-          <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />
-        </Button>
-      </div>
+      )}
 
       {/* Empty states */}
       {!targetPath && (
@@ -629,15 +641,32 @@ export function GitDiffPanel({
                   }
                 }}
               />
-              <Button
-                variant="default"
-                size="sm"
-                className="w-full h-7 text-xs"
-                disabled={!commitMessage.trim() || stagedEntries.length === 0 || committing}
-                onClick={handleCommit}
-              >
-                {committing ? 'Committing...' : `Commit${stagedEntries.length > 0 ? ` (${stagedEntries.length} staged)` : ''}`}
-              </Button>
+              {isMergeMode && onCommitAndContinueMerge ? (
+                <Button
+                  variant="default"
+                  size="sm"
+                  className="w-full h-7 text-xs"
+                  disabled={committing}
+                  onClick={async () => {
+                    setCommitting(true)
+                    try { await onCommitAndContinueMerge() }
+                    catch (err) { setError(err instanceof Error ? err.message : String(err)) }
+                    finally { setCommitting(false) }
+                  }}
+                >
+                  {committing ? 'Committing...' : 'Commit & Continue Merge'}
+                </Button>
+              ) : (
+                <Button
+                  variant="default"
+                  size="sm"
+                  className="w-full h-7 text-xs"
+                  disabled={!commitMessage.trim() || stagedEntries.length === 0 || committing}
+                  onClick={handleCommit}
+                >
+                  {committing ? 'Committing...' : `Commit${stagedEntries.length > 0 ? ` (${stagedEntries.length} staged)` : ''}`}
+                </Button>
+              )}
             </div>
           </div>
 
@@ -666,4 +695,4 @@ export function GitDiffPanel({
       )}
     </div>
   )
-}
+})

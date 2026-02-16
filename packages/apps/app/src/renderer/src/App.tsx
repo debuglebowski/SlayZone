@@ -34,7 +34,8 @@ import {
   AlertDialogTitle,
   Tooltip,
   TooltipTrigger,
-  TooltipContent
+  TooltipContent,
+  Toaster
 } from '@slayzone/ui'
 import { SidebarProvider } from '@slayzone/ui'
 import { AppSidebar } from '@/components/sidebar/AppSidebar'
@@ -957,6 +958,7 @@ function App(): React.JSX.Element {
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
+        <Toaster position="bottom-right" theme="dark" />
       </div>
     </SidebarProvider>
   )

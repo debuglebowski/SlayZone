@@ -665,6 +665,12 @@ const migrations: Migration[] = [
     up: (db) => {
       db.exec(`ALTER TABLE tasks ADD COLUMN is_temporary INTEGER NOT NULL DEFAULT 0`)
     }
+  },
+  {
+    version: 36,
+    up: (db) => {
+      db.exec(`ALTER TABLE tasks ADD COLUMN merge_context TEXT DEFAULT NULL`)
+    }
   }
 ]
 

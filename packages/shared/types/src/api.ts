@@ -4,7 +4,8 @@ import type { Tag, CreateTagInput, UpdateTagInput } from '@slayzone/tags/shared'
 import type { TerminalMode, TerminalState, CodeMode, PtyInfo, PromptInfo, ClaudeAvailability, BufferSinceResult, ProviderUsage } from '@slayzone/terminal/shared'
 import type { TerminalTab, CreateTerminalTabInput, UpdateTerminalTabInput } from '@slayzone/task-terminals/shared'
 import type { Theme, ThemePreference } from '@slayzone/settings/shared'
-import type { DetectedWorktree, MergeResult, MergeWithAIResult, GitDiffSnapshot, ConflictFileContent, ConflictAnalysis } from '@slayzone/worktrees/shared'
+import type { DetectedWorktree, MergeResult, MergeWithAIResult, GitDiffSnapshot, ConflictFileContent, ConflictAnalysis, RebaseProgress, CommitInfo, AheadBehind, StatusSummary } from '@slayzone/worktrees/shared'
+import type { MergeContext } from '@slayzone/task/shared'
 import type {
   AiConfigItem,
   AiConfigProjectSelection,
@@ -236,6 +237,15 @@ export interface ElectronAPI {
     writeResolvedFile: (repoPath: string, filePath: string, content: string) => Promise<void>
     commitFiles: (repoPath: string, message: string) => Promise<void>
     analyzeConflict: (mode: string, filePath: string, base: string | null, ours: string | null, theirs: string | null) => Promise<ConflictAnalysis>
+    isRebaseInProgress: (path: string) => Promise<boolean>
+    getRebaseProgress: (repoPath: string) => Promise<RebaseProgress | null>
+    abortRebase: (path: string) => Promise<void>
+    continueRebase: (path: string) => Promise<{ done: boolean; conflictedFiles: string[] }>
+    skipRebaseCommit: (path: string) => Promise<{ done: boolean; conflictedFiles: string[] }>
+    getMergeContext: (repoPath: string) => Promise<MergeContext | null>
+    getRecentCommits: (repoPath: string, count?: number) => Promise<CommitInfo[]>
+    getAheadBehind: (repoPath: string, branch: string, upstream: string) => Promise<AheadBehind>
+    getStatusSummary: (repoPath: string) => Promise<StatusSummary>
   }
   tabs: {
     list: (taskId: string) => Promise<TerminalTab[]>

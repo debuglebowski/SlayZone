@@ -37,6 +37,9 @@ export * from './file-tree'
 export * from './textarea'
 export * from './tooltip'
 
+// Toast
+export { Toaster, toast } from 'sonner'
+
 // Animations
 export * from './AnimatedPage'
 export * from './SuccessToast'

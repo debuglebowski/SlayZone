@@ -37,6 +37,9 @@ function parseTask(row: Record<string, unknown> | undefined): Task | null {
     web_panel_urls: row.web_panel_urls
       ? JSON.parse(row.web_panel_urls as string)
       : null,
+    merge_context: row.merge_context
+      ? JSON.parse(row.merge_context as string)
+      : null,
     is_temporary: Boolean(row.is_temporary)
   } as Task
 }
@@ -271,6 +274,7 @@ export function updateTask(db: Database, data: UpdateTaskInput): Task | null {
   if (data.browserTabs !== undefined) { fields.push('browser_tabs = ?'); values.push(data.browserTabs ? JSON.stringify(data.browserTabs) : null) }
   if (data.webPanelUrls !== undefined) { fields.push('web_panel_urls = ?'); values.push(data.webPanelUrls ? JSON.stringify(data.webPanelUrls) : null) }
   if (data.mergeState !== undefined) { fields.push('merge_state = ?'); values.push(data.mergeState) }
+  if (data.mergeContext !== undefined) { fields.push('merge_context = ?'); values.push(data.mergeContext ? JSON.stringify(data.mergeContext) : null) }
   if (data.isTemporary !== undefined) { fields.push('is_temporary = ?'); values.push(data.isTemporary ? 1 : 0) }
 
   if (fields.length === 0) {

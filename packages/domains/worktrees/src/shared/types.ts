@@ -33,6 +33,42 @@ export interface ConflictAnalysis {
   suggestion: string
 }
 
+// --- Rebase / merge context ---
+
+export interface RebaseProgress {
+  current: number // 1-based index of current commit
+  total: number
+  commits: RebaseCommitInfo[]
+}
+
+export interface RebaseCommitInfo {
+  hash: string
+  shortHash: string
+  message: string
+  status: 'applied' | 'current' | 'pending'
+}
+
+// --- General tab data ---
+
+export interface CommitInfo {
+  hash: string
+  shortHash: string
+  message: string
+  author: string
+  relativeDate: string
+}
+
+export interface AheadBehind {
+  ahead: number
+  behind: number
+}
+
+export interface StatusSummary {
+  staged: number
+  unstaged: number
+  untracked: number
+}
+
 export interface GitDiffSnapshot {
   targetPath: string
   files: string[]

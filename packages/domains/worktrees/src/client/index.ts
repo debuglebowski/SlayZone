@@ -1,4 +1,6 @@
 export { GitPanel } from './GitPanel'
 export { CreateWorktreeDialog } from './CreateWorktreeDialog'
 export { GitDiffPanel } from './GitDiffPanel'
-export { MergePanel } from './MergePanel'
+export { UnifiedGitPanel } from './UnifiedGitPanel'
+export { GeneralTabContent } from './GeneralTabContent'
+export { CommitTimeline } from './CommitTimeline'
