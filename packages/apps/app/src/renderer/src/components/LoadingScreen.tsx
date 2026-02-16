@@ -1,23 +1,66 @@
-import { motion, useReducedMotion } from 'framer-motion'
-import { useEffect, useState } from 'react'
-import logo from '@/assets/logo.svg'
+import { motion } from 'framer-motion'
+import { useEffect, useState, useRef } from 'react'
+import logo from '@/assets/logo-solid.svg'
 
-export function LoadingScreen(): React.JSX.Element {
-  const shouldReduceMotion = useReducedMotion()
+const FIRST = 'Breath...'
+const SECOND = 'then slay'
+const TYPE_MS = 60
+const ERASE_MS = 40
+const PAUSE_BEFORE_START = 300
+const PAUSE_AFTER_FIRST = 400
+const PAUSE_AFTER_ERASE = 200
+const HOLD_AFTER_DONE = 600
+
+export function LoadingScreen({ onDone }: { onDone?: () => void }): React.JSX.Element {
   const [version, setVersion] = useState('')
-  const [showSecondText, setShowSecondText] = useState(false)
+  const [text, setText] = useState('')
+  const onDoneRef = useRef(onDone)
+  onDoneRef.current = onDone
 
   useEffect(() => {
     window.api.app.getVersion().then(setVersion)
-    // Show second text after first animation + pause
-    const timer = setTimeout(() => setShowSecondText(true), 450)
-    return () => clearTimeout(timer)
+  }, [])
+
+  useEffect(() => {
+    const timers: ReturnType<typeof setTimeout>[] = []
+    let cancelled = false
+    const sleep = (ms: number) =>
+      new Promise<void>((resolve, reject) => {
+        const id = setTimeout(() => (cancelled ? reject() : resolve()), ms)
+        timers.push(id)
+      })
+
+    async function run() {
+      await sleep(PAUSE_BEFORE_START)
+      for (let i = 1; i <= FIRST.length; i++) {
+        setText(FIRST.slice(0, i))
+        await sleep(TYPE_MS)
+      }
+      await sleep(PAUSE_AFTER_FIRST)
+      for (let i = FIRST.length - 1; i >= 0; i--) {
+        setText(FIRST.slice(0, i))
+        await sleep(ERASE_MS)
+      }
+      await sleep(PAUSE_AFTER_ERASE)
+      for (let i = 1; i <= SECOND.length; i++) {
+        setText(SECOND.slice(0, i))
+        await sleep(TYPE_MS)
+      }
+      await sleep(HOLD_AFTER_DONE)
+      onDoneRef.current?.()
+    }
+
+    run().catch(() => {}) // swallow cancellation
+    return () => {
+      cancelled = true
+      timers.forEach(clearTimeout)
+    }
   }, [])
 
   const containerVariants = {
     initial: { opacity: 0 },
     animate: { opacity: 1 },
-    exit: { opacity: 0 }
+    exit: { opacity: 0, transition: { duration: 0.3, ease: 'easeOut' as const } }
   }
 
   const logoVariants = {
@@ -25,89 +68,29 @@ export function LoadingScreen(): React.JSX.Element {
     animate: {
       opacity: 1,
       scale: 1,
-      transition: {
-        duration: 0.15,
-        ease: 'easeOut' as const
-      }
+      transition: { duration: 0.15, ease: 'easeOut' as const }
     }
   }
 
-  const letters = 'Breath...'.split('')
-  const letterDelay = shouldReduceMotion ? 0 : 0.05
-  const blobTransition = shouldReduceMotion
-    ? undefined
-    : { duration: 6, repeat: Infinity, repeatType: 'mirror' as const, ease: 'easeInOut' as const }
-
   return (
     <motion.div
-      className="fixed inset-0 z-50 flex items-center justify-center overflow-hidden bg-background"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-background"
       variants={containerVariants}
       initial="initial"
       animate="animate"
       exit="exit"
     >
-      <div
-        className="absolute inset-0"
-        style={{
-          background:
-            'radial-gradient(900px circle at 20% 10%, rgba(255, 60, 172, 0.35), transparent 60%),' +
-            'radial-gradient(800px circle at 80% 20%, rgba(0, 229, 255, 0.3), transparent 55%),' +
-            'radial-gradient(700px circle at 50% 90%, rgba(57, 255, 20, 0.25), transparent 60%),' +
-            'linear-gradient(180deg, rgba(8, 8, 8, 1), rgba(8, 8, 8, 1))'
-        }}
-      />
-      <motion.div
-        className="absolute -left-24 -top-24 h-72 w-72 rounded-full bg-[#FF3CAC]/40 blur-3xl"
-        animate={shouldReduceMotion ? undefined : { x: [0, 40, -20], y: [0, -30, 10] }}
-        transition={blobTransition}
-      />
-      <motion.div
-        className="absolute -right-24 top-8 h-80 w-80 rounded-full bg-[#00E5FF]/35 blur-3xl"
-        animate={shouldReduceMotion ? undefined : { x: [0, -30, 20], y: [0, 20, -10] }}
-        transition={blobTransition}
-      />
-      <motion.div
-        className="absolute -bottom-24 left-1/3 h-80 w-80 rounded-full bg-[#FFD500]/30 blur-3xl"
-        animate={shouldReduceMotion ? undefined : { x: [0, 20, -30], y: [0, 30, -20] }}
-        transition={blobTransition}
-      />
-      <div className="relative flex h-full w-full flex-col items-center justify-center gap-6">
+      <div className="flex flex-col items-center justify-center gap-6">
         <motion.div variants={logoVariants} initial="initial" animate="animate">
-          <div
-            className="flex h-20 w-20 items-center justify-center rounded-2xl"
-            style={{
-              background:
-                'linear-gradient(145deg, rgba(6,6,10,0.95), rgba(18,18,28,0.9)), radial-gradient(60% 60% at 20% 20%, rgba(255,60,172,0.25), transparent 60%)'
-            }}
-          >
-            <img src={logo} alt="Focus" className="h-14 w-14" />
-          </div>
+          <img
+            src={logo}
+            alt="SlayZone"
+            className="h-48 w-48 rounded-[2rem] shadow-[0_0_80px_rgba(59,130,246,0.5),0_0_160px_rgba(59,130,246,0.25)]"
+          />
         </motion.div>
-        <div className="flex text-2xl font-semibold text-foreground">
-          {letters.map((letter, i) => (
-            <motion.span
-              key={i}
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{
-                duration: 0.1,
-                delay: 0.05 + i * letterDelay,
-                ease: 'easeOut'
-              }}
-            >
-              {letter}
-            </motion.span>
-          ))}
-          {showSecondText && (
-            <motion.span
-              initial={{ clipPath: 'inset(0 100% 0 0)' }}
-              animate={{ clipPath: 'inset(0 0% 0 0)' }}
-              transition={{ duration: 0.25, ease: 'easeOut' }}
-              className="inline-flex"
-            >
-              &nbsp;&nbsp;&nbsp;then slay
-            </motion.span>
-          )}
+        <div className="flex h-[1.5em] items-center text-2xl font-semibold text-foreground">
+          <span className="whitespace-pre">{text}</span>
+          <span className="ml-1 inline-block h-[1.1em] w-0.5 animate-blink bg-foreground" />
         </div>
         {version && (
           <motion.div

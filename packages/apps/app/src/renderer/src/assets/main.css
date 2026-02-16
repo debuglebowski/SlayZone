@@ -63,7 +63,7 @@
 
   --animate-collapsible-down: collapsible-down 0.15s ease-out;
   --animate-collapsible-up: collapsible-up 0.15s ease-out;
-
+  --animate-blink: blink 0.9s step-end infinite;
   @keyframes collapsible-down {
     from { height: 0; opacity: 0; }
     to { height: var(--radix-collapsible-content-height); opacity: 1; }
@@ -71,6 +71,10 @@
   @keyframes collapsible-up {
     from { height: var(--radix-collapsible-content-height); opacity: 1; }
     to { height: 0; opacity: 0; }
+  }
+  @keyframes blink {
+    0%, 49% { opacity: 1; }
+    50%, 100% { opacity: 0; }
   }
 }
 

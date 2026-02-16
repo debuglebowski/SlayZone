@@ -110,8 +110,8 @@ function closeSessionLogCapture(): void {
 }
 
 /**
- * In regular app runs there is a splash window (data: URL) before the main window (file:// URL).
- * In Playwright mode the splash is disabled, so we resolve the first non-data window either way.
+ * Splash is now an in-renderer overlay (not a separate window).
+ * We resolve the first non-data window either way.
  */
 async function resolveMainWindow(
   app: ElectronApplication,

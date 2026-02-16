@@ -1,10 +1,13 @@
 import './assets/main.css'
 
+import { useState, useCallback, useEffect } from 'react'
 import { createRoot } from 'react-dom/client'
+import { AnimatePresence } from 'framer-motion'
 import { ThemeProvider } from '@slayzone/settings'
 import { PtyProvider } from '@slayzone/terminal'
 import { TelemetryProvider } from '@slayzone/telemetry/client'
 import App from './App'
+import { LoadingScreen } from './components/LoadingScreen'
 import { getDiagnosticsContext } from './lib/diagnosticsClient'
 
 window.addEventListener('error', (event) => {
@@ -31,12 +34,29 @@ window.addEventListener('unhandledrejection', (event) => {
   })
 })
 
-createRoot(document.getElementById('root')!).render(
-  <PtyProvider>
-    <ThemeProvider>
-      <TelemetryProvider>
-        <App />
-      </TelemetryProvider>
-    </ThemeProvider>
-  </PtyProvider>
-)
+function Root(): React.JSX.Element {
+  const [showSplash, setShowSplash] = useState(!__PLAYWRIGHT__)
+  const dismissSplash = useCallback(() => setShowSplash(false), [])
+
+  useEffect(() => {
+    if (!showSplash) return
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') dismissSplash() }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [showSplash, dismissSplash])
+
+  return (
+    <PtyProvider>
+      <ThemeProvider>
+        <TelemetryProvider>
+          <App />
+          <AnimatePresence>
+            {showSplash && <LoadingScreen onDone={dismissSplash} />}
+          </AnimatePresence>
+        </TelemetryProvider>
+      </ThemeProvider>
+    </PtyProvider>
+  )
+}
+
+createRoot(document.getElementById('root')!).render(<Root />)
