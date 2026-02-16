@@ -42,9 +42,9 @@ const shortcutGroups = [
   { heading: 'General', items: [
     { label: 'New Task', keys: isMac ? '⌘ N' : 'Ctrl N' },
     { label: 'Search', keys: isMac ? '⌘ K' : 'Ctrl K' },
-    { label: 'Settings', keys: isMac ? '⌘ ,' : 'Ctrl ,' },
+    { label: 'Global Settings', keys: isMac ? '⌘ ,' : 'Ctrl ,' },
     { label: 'Project Settings', keys: isMac ? '⌘ ⇧ ,' : 'Ctrl ⇧ ,' },
-    ...(isMac ? [{ label: 'Go Home', keys: '⌘ §' }] : []),
+    ...(isMac ? [{ label: 'Kanban Board', keys: '⌘ §' }] : []),
   ]},
   { heading: 'Tabs', items: [
     { label: 'Close Tab', keys: isMac ? '⌘ W' : 'Ctrl W' },
@@ -52,10 +52,22 @@ const shortcutGroups = [
     { label: 'Next Tab', keys: '^ Tab' },
     { label: 'Previous Tab', keys: '^ ⇧ Tab' },
     { label: 'Reopen Closed Tab', keys: isMac ? '⌘ ⇧ T' : 'Ctrl ⇧ T' },
-    { label: 'Scratch Terminal', keys: '^ T' },
+    { label: 'Temporary Task', keys: '^ T' },
   ]},
   { heading: 'Tasks', items: [
-    { label: 'Complete Task', keys: isMac ? '⌘ ⇧ D' : 'Ctrl ⇧ D' },
+    { label: 'Complete Task & Close Tab', keys: isMac ? '⌘ ⇧ D' : 'Ctrl ⇧ D' },
+  ]},
+  { heading: 'Task Panels', items: [
+    { label: 'Terminal', keys: '⌘ T' },
+    { label: 'Browser', keys: '⌘ B' },
+    { label: 'Editor', keys: '⌘ E' },
+    { label: 'Git', keys: '⌘ G' },
+    { label: 'Settings', keys: '⌘ S' },
+  ]},
+  { heading: 'Terminal', items: [
+    { label: 'Inject Title', keys: '⌘ I' },
+    { label: 'Inject Description', keys: '⌘ ⇧ I' },
+    { label: 'Screenshot', keys: '⌘ ⇧ S' },
   ]},
 ]
 

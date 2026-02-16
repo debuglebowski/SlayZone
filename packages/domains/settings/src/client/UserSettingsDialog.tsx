@@ -1,11 +1,12 @@
 import { useState, useEffect, useRef } from 'react'
-import { XIcon, Pencil, Trash2, Plus, Settings2, SquareTerminal, Globe, FileCode, GitCompare, SlidersHorizontal } from 'lucide-react'
+import { XIcon, Pencil, Trash2, Plus, Settings2, SquareTerminal, Globe, FileCode, GitCompare, SlidersHorizontal, FolderOpen } from 'lucide-react'
 import { SettingsLayout } from '@slayzone/ui'
 import { Button } from '@slayzone/ui'
 import { Input } from '@slayzone/ui'
 import { Label } from '@slayzone/ui'
 import { Skeleton } from '@slayzone/ui'
 import { Switch } from '@slayzone/ui'
+import { toast } from '@slayzone/ui'
 import {
   Select,
   SelectContent,
@@ -80,6 +81,9 @@ export function UserSettingsDialog({
   const [editPanelUrl, setEditPanelUrl] = useState('')
   const [editPanelShortcut, setEditPanelShortcut] = useState('')
   const [editShortcutError, setEditShortcutError] = useState('')
+  const [projects, setProjects] = useState<Array<{ id: string; name: string }>>([])
+  const [exportProjectId, setExportProjectId] = useState('')
+  const [importedProjects, setImportedProjects] = useState<Array<{ id: string; name: string; path: string }>>([])
   const loadRequestIdRef = useRef(0)
 
   useEffect(() => {
@@ -109,8 +113,9 @@ export function UserSettingsDialog({
 
     try {
       const providerFlagKeys = Object.values(PROVIDER_DEFAULTS).map(d => d.settingsKey)
-      const [loadedTags, path, shell, wtBasePath, autoCreateWorktree, termMode, ...flagResults] = await Promise.allSettled([
+      const [loadedTags, loadedProjects, path, shell, wtBasePath, autoCreateWorktree, termMode, ...flagResults] = await Promise.allSettled([
         window.api.tags.getTags(),
+        window.api.db.getProjects(),
         window.api.settings.get('database_path'),
         window.api.settings.get('shell'),
         window.api.settings.get('worktree_base_path'),
@@ -126,6 +131,7 @@ export function UserSettingsDialog({
       if (isStale()) return
 
       setTags(loadedTags.status === 'fulfilled' ? loadedTags.value : [])
+      setProjects(loadedProjects.status === 'fulfilled' ? loadedProjects.value : [])
       setDbPath(path.status === 'fulfilled' ? (path.value ?? 'Default location (userData)') : 'Default location (userData)')
       setShellSetting(shell.status === 'fulfilled' ? (shell.value ?? '') : '')
       const envShell = typeof process !== 'undefined' ? process.env?.SHELL : undefined
@@ -419,6 +425,7 @@ export function UserSettingsDialog({
     // { key: 'ai-config', label: 'Context Manager' },
     { key: 'tags', label: 'Tags' },
     { key: 'telemetry', label: 'Telemetry' },
+    { key: 'data', label: 'Import & Export' },
     { key: 'about', label: 'About' }
   ]
 
@@ -514,6 +521,7 @@ export function UserSettingsDialog({
                     Restart required after changing. Default: 45678
                   </p>
                 </div>
+
               </>
             )}
 
@@ -984,6 +992,142 @@ export function UserSettingsDialog({
 
             {activeTab === 'telemetry' && (
               <TelemetrySettingsTab />
+            )}
+
+            {activeTab === 'data' && (
+              <>
+                <div className="space-y-3">
+                  <Label className="text-base font-semibold">Export</Label>
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      variant="outline"
+                      onClick={async () => {
+                        const result = await window.api.exportImport.exportAll()
+                        if (result.canceled) return
+                        if (result.success) toast.success(`Exported to ${result.path}`)
+                        else toast.error(`Export failed: ${result.error}`)
+                      }}
+                    >
+                      Export All Projects
+                    </Button>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Select value={exportProjectId} onValueChange={setExportProjectId}>
+                      <SelectTrigger className="w-full max-w-sm">
+                        <SelectValue placeholder="Select project to export" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {projects.map((p) => (
+                          <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Button
+                      variant="outline"
+                      disabled={!exportProjectId}
+                      onClick={async () => {
+                        const result = await window.api.exportImport.exportProject(exportProjectId)
+                        if (result.canceled) return
+                        if (result.success) toast.success(`Exported to ${result.path}`)
+                        else toast.error(`Export failed: ${result.error}`)
+                      }}
+                    >
+                      Export Project
+                    </Button>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Exports to a .slay file containing projects, tasks, tags, and configuration.
+                  </p>
+                </div>
+
+                <div className="space-y-3">
+                  <Label className="text-base font-semibold">Import</Label>
+                  <Button
+                    variant="outline"
+                    onClick={async () => {
+                      const result = await window.api.exportImport.import()
+                      if (result.canceled) return
+                      if (result.success) {
+                        toast.success(`Imported ${result.projectCount} project(s), ${result.taskCount} task(s)`)
+                        if (result.importedProjects?.length) {
+                          setImportedProjects(result.importedProjects.map((p) => ({ ...p, path: '' })))
+                        }
+                      } else {
+                        toast.error(`Import failed: ${result.error}`)
+                      }
+                    }}
+                  >
+                    Import .slay
+                  </Button>
+                  <p className="text-xs text-muted-foreground">
+                    Imports projects and tasks from a .slay file. Existing data is preserved.
+                  </p>
+                </div>
+
+                {importedProjects.length > 0 && (
+                  <div className="space-y-3">
+                    <Label className="text-base font-semibold">Set Project Paths</Label>
+                    <p className="text-xs text-muted-foreground">
+                      Set the repository path for each imported project.
+                    </p>
+                    {importedProjects.map((p, i) => (
+                      <div key={p.id} className="space-y-1">
+                        <span className="text-sm font-medium">{p.name}</span>
+                        <div className="flex items-center gap-2">
+                          <Input
+                            className="flex-1 max-w-lg"
+                            placeholder="/path/to/repo"
+                            value={p.path}
+                            onChange={(e) => {
+                              setImportedProjects((prev) =>
+                                prev.map((proj, j) => (j === i ? { ...proj, path: e.target.value } : proj))
+                              )
+                            }}
+                          />
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="icon"
+                            onClick={async () => {
+                              const result = await window.api.dialog.showOpenDialog({
+                                title: 'Select Project Directory',
+                                defaultPath: p.path || undefined,
+                                properties: ['openDirectory']
+                              })
+                              if (!result.canceled && result.filePaths[0]) {
+                                setImportedProjects((prev) =>
+                                  prev.map((proj, j) => (j === i ? { ...proj, path: result.filePaths[0] } : proj))
+                                )
+                              }
+                            }}
+                          >
+                            <FolderOpen className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                    <div className="flex gap-2">
+                      <Button
+                        onClick={async () => {
+                          for (const p of importedProjects) {
+                            if (p.path.trim()) {
+                              await window.api.db.updateProject({ id: p.id, path: p.path.trim() })
+                            }
+                          }
+                          const saved = importedProjects.filter((p) => p.path.trim()).length
+                          if (saved > 0) toast.success(`Set paths for ${saved} project(s)`)
+                          setImportedProjects([])
+                        }}
+                      >
+                        Save Paths
+                      </Button>
+                      <Button variant="ghost" onClick={() => setImportedProjects([])}>
+                        Skip
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </>
             )}
 
             {activeTab === 'about' && (

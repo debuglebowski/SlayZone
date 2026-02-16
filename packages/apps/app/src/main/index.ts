@@ -1,6 +1,6 @@
 import { app, shell, BrowserWindow, ipcMain, nativeTheme, session, webContents, dialog, Menu, protocol } from 'electron'
 import { join, extname } from 'path'
-import { readFileSync, promises as fsp } from 'fs'
+import { promises as fsp } from 'fs'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 
 // Custom protocol for serving local files in browser panel webviews
@@ -32,150 +32,13 @@ import { registerAiConfigHandlers } from '@slayzone/ai-config/main'
 import { registerIntegrationHandlers, startLinearSyncPoller } from '@slayzone/integrations/main'
 import { registerFileEditorHandlers } from '@slayzone/file-editor/main'
 import { registerScreenshotHandlers } from './screenshot'
+import { registerExportImportHandlers } from './export-import'
 import { initAutoUpdater } from './auto-updater'
 
-// Minimum splash screen display time (ms)
-const SPLASH_MIN_DURATION = 4000
 const DEFAULT_WINDOW_WIDTH = 1760
 const DEFAULT_WINDOW_HEIGHT = 1280
 
-// Self-contained splash HTML with inline PNG and CSS animations
-const splashLogoBase64 = readFileSync(icon).toString('base64')
-const splashHTML = (version: string) => `
-<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="UTF-8">
-  <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    html, body {
-      height: 100%;
-      overflow: hidden;
-      background: transparent;
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    }
-    .container {
-      height: 100%;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      background: #0a0a0a;
-      border-radius: 16px;
-      position: relative;
-    }
-    .logo-wrapper {
-      animation: fadeInScale 0.4s ease-out forwards;
-    }
-    .logo {
-      width: 200px;
-      height: 200px;
-    }
-    .title {
-      margin-top: 24px;
-      font-size: 28px;
-      font-weight: 600;
-      color: #fafafa;
-      display: inline-flex;
-      align-items: center;
-    }
-    .typed-text {
-      white-space: pre;
-    }
-    .caret {
-      display: inline-block;
-      width: 2px;
-      height: 1.1em;
-      margin-left: 6px;
-      background: #fafafa;
-      animation: blink 0.9s step-end infinite;
-    }
-    .version {
-      position: absolute;
-      bottom: 24px;
-      font-size: 12px;
-      color: #525252;
-      opacity: 0;
-      animation: fadeIn 0.15s ease-out 0.3s forwards;
-    }
-    @keyframes fadeInScale {
-      from { opacity: 0; transform: scale(0.8); }
-      to { opacity: 1; transform: scale(1); }
-    }
-    @keyframes fadeIn {
-      from { opacity: 0; }
-      to { opacity: 1; }
-    }
-    @keyframes fadeOut {
-      from { opacity: 1; }
-      to { opacity: 0; }
-    }
-    @keyframes blink {
-      0%, 49% { opacity: 1; }
-      50%, 100% { opacity: 0; }
-    }
-    .fade-out {
-      animation: fadeOut 0.3s ease-out forwards;
-    }
-  </style>
-</head>
-<body>
-  <div class="container">
-    <div class="logo-wrapper">
-      <img class="logo" src="data:image/png;base64,${splashLogoBase64}" />
-    </div>
-    <div class="title">
-      <span class="typed-text" aria-hidden="true"></span>
-      <span class="caret" aria-hidden="true"></span>
-    </div>
-    <div class="version">v${version}</div>
-  </div>
-  <script>
-    const typedText = document.querySelector('.typed-text')
-    const first = 'Breath...'
-    const second = 'then slay'
-    const TYPE_MS = 90
-    const ERASE_MS = 60
-    const PAUSE_BEFORE_START = 500
-    const PAUSE_AFTER_FIRST = 600
-    const PAUSE_AFTER_ERASE = 250
-
-    const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
-
-    const typeText = async (text) => {
-      for (let i = 0; i < text.length; i += 1) {
-        typedText.textContent += text[i]
-        await sleep(TYPE_MS)
-      }
-    }
-
-    const eraseText = async () => {
-      while (typedText.textContent.length > 0) {
-        typedText.textContent = typedText.textContent.slice(0, -1)
-        await sleep(ERASE_MS)
-      }
-    }
-
-    const runSequence = async () => {
-      await sleep(PAUSE_BEFORE_START)
-      await typeText(first)
-      await sleep(PAUSE_AFTER_FIRST)
-      await eraseText()
-      await sleep(PAUSE_AFTER_ERASE)
-      await typeText(second)
-    }
-
-    window.addEventListener('DOMContentLoaded', () => {
-      runSequence()
-    })
-  </script>
-</body>
-</html>
-`
-
-let splashWindow: BrowserWindow | null = null
 let mainWindow: BrowserWindow | null = null
-let splashShownAt: number = 0
 let linearSyncPoller: NodeJS.Timeout | null = null
 let mcpCleanup: (() => void) | null = null
 
@@ -185,36 +48,6 @@ function emitOpenSettings(): void {
 
 function emitOpenProjectSettings(): void {
   mainWindow?.webContents.send('app:open-project-settings')
-}
-
-function createSplashWindow(): void {
-  splashWindow = new BrowserWindow({
-    width: DEFAULT_WINDOW_WIDTH,
-    height: DEFAULT_WINDOW_HEIGHT,
-    titleBarStyle: 'hiddenInset',
-    trafficLightPosition: { x: 16, y: 16 },
-    resizable: false,
-    center: true,
-    skipTaskbar: true,
-    alwaysOnTop: true,
-    show: false,
-    backgroundColor: '#0a0a0a',
-    webPreferences: {
-      nodeIntegration: false,
-      contextIsolation: true
-    }
-  })
-
-  splashWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(splashHTML(app.getVersion()))}`)
-
-  splashWindow.once('ready-to-show', () => {
-    splashShownAt = Date.now()
-    splashWindow?.show()
-  })
-
-  splashWindow.on('closed', () => {
-    splashWindow = null
-  })
 }
 
 function createMainWindow(): void {
@@ -238,44 +71,9 @@ function createMainWindow(): void {
   })
 
   mainWindow.on('ready-to-show', () => {
-    // In Playwright mode we skip splash entirely and show immediately.
-    const remaining =
-      splashWindow && !splashWindow.isDestroyed()
-        ? Math.max(0, SPLASH_MIN_DURATION - (Date.now() - splashShownAt))
-        : 0
-
-    // Start the idle checker for terminal hibernation
-    if (mainWindow) {
-      startIdleChecker(mainWindow)
-    }
-
-    setTimeout(() => {
-      // Position main window exactly where splash is
-      if (splashWindow && !splashWindow.isDestroyed()) {
-        const bounds = splashWindow.getBounds()
-        mainWindow?.setBounds(bounds)
-      }
-      // Show main window first (splash stays on top due to alwaysOnTop)
-      // In Playwright mode, keep window hidden to avoid focus stealing during tests
-      if (!isPlaywright) mainWindow?.show()
-      // Fade out splash, then close it
-      if (splashWindow && !splashWindow.isDestroyed()) {
-        splashWindow.webContents
-          .executeJavaScript(`document.querySelector('.container').classList.add('fade-out')`)
-          .then(() => {
-            // Wait for fade animation to complete (300ms), then close
-            setTimeout(() => {
-              if (splashWindow && !splashWindow.isDestroyed()) {
-                splashWindow.close()
-              }
-            }, 300)
-          })
-          .catch(() => {
-            // Fallback: just close if JS execution fails
-            splashWindow?.close()
-          })
-      }
-    }, remaining)
+    if (mainWindow) startIdleChecker(mainWindow)
+    // In Playwright mode, keep window hidden to avoid focus stealing during tests
+    if (!isPlaywright) mainWindow?.show()
   })
 
   mainWindow.webContents.setWindowOpenHandler((details) => {
@@ -323,9 +121,6 @@ function createMainWindow(): void {
 }
 
 function createWindow(): void {
-  if (!isPlaywright) {
-    createSplashWindow()
-  }
   createMainWindow()
 }
 
@@ -455,6 +250,7 @@ app.whenReady().then(() => {
   registerIntegrationHandlers(ipcMain, db)
   registerFileEditorHandlers(ipcMain)
   registerScreenshotHandlers()
+  registerExportImportHandlers(ipcMain, db, isPlaywright)
 
   // Start MCP server (use port 0 in Playwright to avoid conflict with dev instance)
   const mcpPort = (() => {

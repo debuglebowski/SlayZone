@@ -323,6 +323,11 @@ const api: ElectronAPI = {
     disableDeviceEmulation: (webviewId) =>
       ipcRenderer.invoke('webview:disable-device-emulation', webviewId),
   },
+  exportImport: {
+    exportAll: () => ipcRenderer.invoke('export-import:export-all'),
+    exportProject: (projectId) => ipcRenderer.invoke('export-import:export-project', projectId),
+    import: () => ipcRenderer.invoke('export-import:import')
+  },
   integrations: {
     connectLinear: (input) => ipcRenderer.invoke('integrations:connect-linear', input),
     listConnections: (provider) => ipcRenderer.invoke('integrations:list-connections', provider),
@@ -347,6 +352,12 @@ const api: ElectronAPI = {
 if (process.contextIsolated) {
   try {
     contextBridge.exposeInMainWorld('api', api)
+    // Test-only: generic IPC invoke for test channels not in the typed API
+    if (process.env.PLAYWRIGHT === '1') {
+      contextBridge.exposeInMainWorld('__testInvoke', (channel: string, ...args: unknown[]) =>
+        ipcRenderer.invoke(channel, ...args)
+      )
+    }
   } catch (error) {
     console.error(error)
   }

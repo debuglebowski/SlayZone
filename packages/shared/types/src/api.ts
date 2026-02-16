@@ -349,4 +349,9 @@ export interface ElectronAPI {
     getLink: (taskId: string, provider: IntegrationProvider) => Promise<ExternalLink | null>
     unlinkTask: (taskId: string, provider: IntegrationProvider) => Promise<boolean>
   }
+  exportImport: {
+    exportAll: () => Promise<{ success: boolean; canceled?: boolean; path?: string; error?: string }>
+    exportProject: (projectId: string) => Promise<{ success: boolean; canceled?: boolean; path?: string; error?: string }>
+    import: () => Promise<{ success: boolean; canceled?: boolean; projectCount?: number; taskCount?: number; importedProjects?: Array<{ id: string; name: string }>; error?: string }>
+  }
 }
