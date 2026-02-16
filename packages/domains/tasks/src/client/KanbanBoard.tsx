@@ -148,7 +148,25 @@ export function KanbanBoard({
     const isSameColumn = currentColumn.id === targetColumn.id
 
     if (isSameColumn) {
-      if (sortBy !== 'manual') return // sort overrides manual order
+      if (sortBy === 'priority') {
+        // Reorder within same priority group only
+        const draggedTask = currentColumn.tasks.find((t) => t.id === taskId)
+        const overTask = targetColumn.tasks.find((t) => t.id === overId)
+        if (!draggedTask || !overTask) return
+        if (draggedTask.priority !== overTask.priority) return
+
+        const samePriorityTasks = currentColumn.tasks.filter(
+          (t) => t.priority === draggedTask.priority
+        )
+        const oldIdx = samePriorityTasks.findIndex((t) => t.id === taskId)
+        const newIdx = samePriorityTasks.findIndex((t) => t.id === overId)
+        if (oldIdx === newIdx) return
+
+        const reordered = arrayMove(samePriorityTasks, oldIdx, newIdx)
+        onTaskReorder(reordered.map((t) => t.id))
+        return
+      }
+      if (sortBy !== 'manual') return // other sorts still block reorder
       // Reorder within same column
       const oldIndex = currentColumn.tasks.findIndex((t) => t.id === taskId)
       if (oldIndex === targetIndex) return
