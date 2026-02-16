@@ -1,5 +1,5 @@
-import { useState, useCallback, useRef, useEffect } from 'react'
-import { FileCode } from 'lucide-react'
+import { useState, useCallback, useRef, useEffect, useMemo } from 'react'
+import { Eye, EyeOff, FileCode } from 'lucide-react'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -15,6 +15,7 @@ import { useFileEditor } from './useFileEditor'
 import { EditorFileTree } from './EditorFileTree'
 import { EditorTabBar } from './EditorTabBar'
 import { CodeEditor } from './CodeEditor'
+import { MarkdownPreview } from './MarkdownPreview'
 import { QuickOpenDialog } from './QuickOpenDialog'
 
 interface FileEditorViewProps {
@@ -49,6 +50,55 @@ export function FileEditorView({ projectPath, isActive = true }: FileEditorViewP
   const isDragging = useRef(false)
   const [confirmClose, setConfirmClose] = useState<string | null>(null)
   const [quickOpenVisible, setQuickOpenVisible] = useState(false)
+  const [previewVisible, setPreviewVisible] = useState(true)
+  const editorContainerRef = useRef<HTMLDivElement>(null)
+  const previewScrollRef = useRef<HTMLDivElement>(null)
+  const scrollSyncSource = useRef<'editor' | 'preview' | null>(null)
+
+  const isMarkdown = useMemo(() => {
+    const ext = activeFilePath?.split('.').pop()?.toLowerCase()
+    return ext === 'md' || ext === 'mdx'
+  }, [activeFilePath])
+
+  // Scroll sync between editor and preview
+  useEffect(() => {
+    if (!isMarkdown || !previewVisible) return
+
+    const editorEl = editorContainerRef.current?.querySelector('.cm-scroller') as HTMLElement | null
+    const previewEl = previewScrollRef.current
+    if (!editorEl || !previewEl) return
+
+    let rafId: number | null = null
+
+    function syncScroll(source: 'editor' | 'preview') {
+      if (scrollSyncSource.current && scrollSyncSource.current !== source) return
+      scrollSyncSource.current = source
+
+      if (rafId) cancelAnimationFrame(rafId)
+      rafId = requestAnimationFrame(() => {
+        const from = source === 'editor' ? editorEl! : previewEl!
+        const to = source === 'editor' ? previewEl! : editorEl!
+        const maxFrom = from.scrollHeight - from.clientHeight
+        const maxTo = to.scrollHeight - to.clientHeight
+        if (maxFrom > 0 && maxTo > 0) {
+          to.scrollTop = (from.scrollTop / maxFrom) * maxTo
+        }
+        scrollSyncSource.current = null
+        rafId = null
+      })
+    }
+
+    const onEditorScroll = () => syncScroll('editor')
+    const onPreviewScroll = () => syncScroll('preview')
+
+    editorEl.addEventListener('scroll', onEditorScroll, { passive: true })
+    previewEl.addEventListener('scroll', onPreviewScroll, { passive: true })
+    return () => {
+      editorEl.removeEventListener('scroll', onEditorScroll)
+      previewEl.removeEventListener('scroll', onPreviewScroll)
+      if (rafId) cancelAnimationFrame(rafId)
+    }
+  }, [isMarkdown, previewVisible, activeFilePath])
 
   // Cmd+P — quick open (only on active tab)
   useEffect(() => {
@@ -127,16 +177,27 @@ export function FileEditorView({ projectPath, isActive = true }: FileEditorViewP
             onMouseDown={handleResizeStart}
           />
         )}
-        <EditorTabBar
-          files={openFiles}
-          activeFilePath={activeFilePath}
-          onSelect={setActiveFilePath}
-          onClose={handleCloseFile}
-          isDirty={isDirty}
-          diskChanged={isFileDiskChanged}
-          treeVisible={treeVisible}
-          onToggleTree={() => setTreeVisible((v) => !v)}
-        />
+        <div className="flex items-center shrink-0 border-b bg-surface-1">
+          <EditorTabBar
+            files={openFiles}
+            activeFilePath={activeFilePath}
+            onSelect={setActiveFilePath}
+            onClose={handleCloseFile}
+            isDirty={isDirty}
+            diskChanged={isFileDiskChanged}
+            treeVisible={treeVisible}
+            onToggleTree={() => setTreeVisible((v) => !v)}
+          />
+          {isMarkdown && activeFile?.content != null && (
+            <button
+              className="flex items-center justify-center size-7 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors shrink-0 mr-2"
+              onClick={() => setPreviewVisible((v) => !v)}
+              title={previewVisible ? 'Hide preview' : 'Show preview'}
+            >
+              {previewVisible ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+            </button>
+          )}
+        </div>
 
         {activeFile?.tooLarge ? (
           <div className="flex-1 flex items-center justify-center text-muted-foreground">
@@ -151,15 +212,22 @@ export function FileEditorView({ projectPath, isActive = true }: FileEditorViewP
             </div>
           </div>
         ) : activeFile?.content != null ? (
-          <div className="flex-1 min-h-0">
-            <CodeEditor
-              key={activeFile.path}
-              filePath={activeFile.path}
-              content={activeFile.content}
-              onChange={(content) => updateContent(activeFile.path, content)}
-              onSave={() => saveFile(activeFile.path)}
-              version={fileVersions.get(activeFile.path)}
-            />
+          <div className="flex-1 min-h-0 flex">
+            <div ref={editorContainerRef} className={isMarkdown && previewVisible ? 'w-1/2 min-w-0' : 'flex-1 min-w-0'}>
+              <CodeEditor
+                key={activeFile.path}
+                filePath={activeFile.path}
+                content={activeFile.content}
+                onChange={(content) => updateContent(activeFile.path, content)}
+                onSave={() => saveFile(activeFile.path)}
+                version={fileVersions.get(activeFile.path)}
+              />
+            </div>
+            {isMarkdown && previewVisible && (
+              <div className="w-1/2 min-w-0 border-l">
+                <MarkdownPreview content={activeFile.content} scrollRef={previewScrollRef} />
+              </div>
+            )}
           </div>
         ) : (
           <div className="flex-1 flex items-center justify-center text-muted-foreground">

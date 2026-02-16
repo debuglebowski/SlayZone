@@ -20,7 +20,7 @@ function fileName(path: string): string {
 
 export function EditorTabBar({ files, activeFilePath, onSelect, onClose, isDirty, diskChanged, treeVisible, onToggleTree }: EditorTabBarProps) {
   return (
-    <div className="flex items-center h-10 px-2 gap-1 border-b bg-surface-1 shrink-0">
+    <div className="flex items-center h-10 px-2 gap-1 flex-1 min-w-0">
       {onToggleTree && (
         <button
           className="flex items-center justify-center size-7 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors shrink-0"
@@ -55,20 +55,20 @@ export function EditorTabBar({ files, activeFilePath, onSelect, onClose, isDirty
             <span className="truncate max-w-[160px] font-mono">
               {name}
             </span>
-            {dirty && (
-              <span className="size-1.5 rounded-full bg-foreground shrink-0" />
-            )}
             {diskChanged?.(file.path) && (
               <span className="text-[10px] leading-none text-amber-500 shrink-0">changed</span>
             )}
             <span
-              className="size-4 flex items-center justify-center rounded opacity-0 group-hover:opacity-100 hover:bg-muted shrink-0"
+              className="size-4 flex items-center justify-center rounded shrink-0 hover:bg-muted"
               onClick={(e) => {
                 e.stopPropagation()
                 onClose(file.path)
               }}
             >
-              <X className="size-3" />
+              {dirty ? (
+                <span className="size-2 rounded-full bg-muted-foreground group-hover:hidden" />
+              ) : null}
+              <X className={cn('size-3', dirty ? 'hidden group-hover:block' : 'opacity-0 group-hover:opacity-100')} />
             </span>
           </button>
         )
