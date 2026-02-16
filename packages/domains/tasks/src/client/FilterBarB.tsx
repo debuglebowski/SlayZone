@@ -230,7 +230,7 @@ export function FilterBarB({ filter, onChange, tags }: FilterBarBProps): React.J
             View
           </Button>
         </PopoverTrigger>
-        <PopoverContent className="w-48 p-3" align="end">
+        <PopoverContent className="w-64 p-3" align="end">
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <Label htmlFor="b-done" className="text-sm cursor-pointer">Show completed tasks</Label>
