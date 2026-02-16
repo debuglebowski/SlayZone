@@ -16,16 +16,15 @@
   },
   "dependencies": {
     "@codemirror/lang-javascript": "^6.2.3",
-    "@codemirror/merge": "^6.7.4",
     "@codemirror/state": "^6.5.2",
-    "@codemirror/view": "^6.36.5",
     "@slayzone/diagnostics": "workspace:*",
     "@slayzone/task": "workspace:*",
-    "@slayzone/types": "workspace:*",
     "@slayzone/ui": "workspace:*",
-    "codemirror": "^6.0.1"
+    "codemirror": "^6.0.1",
+    "lucide-react": "^0.562.0"
   },
   "peerDependencies": {
+    "electron": "^39.0.0",
     "react": "^19.0.0"
   },
   "devDependencies": {

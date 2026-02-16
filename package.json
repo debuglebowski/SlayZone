@@ -21,6 +21,7 @@
     "build:linux": "pnpm --filter @slayzone/app build:linux",
     "typecheck": "pnpm -r typecheck",
     "lint": "pnpm -r lint",
+    "lint:deps": "knip --include dependencies,unlisted",
     "format": "prettier --write .",
     "test:e2e": "pnpm --filter @slayzone/app test:e2e",
     "release:patch": "pnpm --filter @slayzone/app exec npm version patch && pnpm release:tag",
@@ -30,6 +31,7 @@
   },
   "devDependencies": {
     "@fiahfy/icns": "^0.0.7",
+    "knip": "^5.83.1",
     "png-to-ico": "^3.0.1",
     "prettier": "^3.7.4",
     "sharp": "^0.34.5",

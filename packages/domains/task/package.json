@@ -16,7 +16,6 @@
   },
   "dependencies": {
     "@slayzone/diagnostics": "workspace:*",
-    "@slayzone/types": "workspace:*",
     "@slayzone/ui": "workspace:*",
     "@slayzone/editor": "workspace:*",
     "@slayzone/file-editor": "workspace:*",
@@ -33,9 +32,11 @@
     "@hookform/resolvers": "^5.2.2",
     "react-hook-form": "^7.71.1",
     "date-fns": "^4.1.0",
+    "lucide-react": "^0.562.0",
     "zod": "^4.3.5"
   },
   "peerDependencies": {
+    "electron": "^39.0.0",
     "react": "^19.0.0"
   },
   "devDependencies": {

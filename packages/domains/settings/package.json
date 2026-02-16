@@ -22,9 +22,10 @@
     "@slayzone/tags": "workspace:*",
     "@slayzone/telemetry": "workspace:*",
     "@slayzone/terminal": "workspace:*",
-    "date-fns": "^4.1.0"
+    "lucide-react": "^0.562.0"
   },
   "peerDependencies": {
+    "electron": "^39.0.0",
     "react": "^19.0.0"
   },
   "devDependencies": {

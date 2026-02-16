@@ -1,0 +1,47 @@
+{
+  "$schema": "https://unpkg.com/knip@5/schema.json",
+  "workspaces": {
+    ".": {
+      "entry": ["scripts/*.js"],
+      "project": ["scripts/**/*.js"],
+      "ignoreDependencies": ["tsx"]
+    },
+    "packages/domains/*": {
+      "entry": ["src/index.ts", "src/shared/index.ts!", "src/main/index.ts!", "src/client/index.ts!"],
+      "project": ["src/**/*.{ts,tsx}"]
+    },
+    "packages/shared/ui": {
+      "entry": ["src/index.ts", "src/utils.ts"],
+      "project": ["src/**/*.{ts,tsx}"]
+    },
+    "packages/shared/types": {
+      "entry": ["src/index.ts"],
+      "project": ["src/**/*.{ts,tsx}"]
+    },
+    "packages/shared/editor": {
+      "entry": ["src/index.ts"],
+      "project": ["src/**/*.{ts,tsx}"]
+    },
+    "packages/apps/app": {
+      "entry": [
+        "src/main/index.ts",
+        "src/preload/index.ts",
+        "src/preload/index.d.ts",
+        "src/renderer/src/main.tsx",
+        "electron.vite.config.ts"
+      ],
+      "project": ["src/**/*.{ts,tsx}", "e2e/**/*.ts"],
+      "ignoreDependencies": [
+        "@electron-toolkit/eslint-config-prettier",
+        "@electron-toolkit/eslint-config-ts",
+        "@electron-toolkit/preload",
+        "@electron/rebuild",
+        "@tailwindcss/typography",
+        "node-pty",
+        "tailwindcss",
+        "tw-animate-css"
+      ]
+    }
+  },
+  "ignoreWorkspaces": ["packages/shared/test-utils"]
+}

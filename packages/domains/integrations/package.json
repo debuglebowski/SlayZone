@@ -15,6 +15,9 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {},
+  "peerDependencies": {
+    "electron": "^39.0.0"
+  },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.13"
   }

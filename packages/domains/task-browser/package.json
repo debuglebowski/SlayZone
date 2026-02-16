@@ -14,7 +14,8 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@slayzone/ui": "workspace:*"
+    "@slayzone/ui": "workspace:*",
+    "lucide-react": "^0.562.0"
   },
   "peerDependencies": {
     "react": "^19.0.0"
