@@ -1,0 +1,681 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SlayZone — Scale Your AI Coding Agents</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Caveat:wght@500&family=JetBrains+Mono:wght@400;700&family=Outfit:wght@300;500;700&display=swap" rel="stylesheet">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  :root {
+    --bg: #0c0e1a; --surface: #111428; --surface2: #151833;
+    --border: #1e2240; --text: #e8e8f0; --text-dim: #6a6e8a;
+    --accent: #f46817; --accent-light: #f7e463; --accent-dim: rgba(244,104,23,0.08);
+    --red: #f44336; --blue: #4da6ff; --amber: #f7a825; --green: #3dd68c;
+  }
+  body { background: #ffffff; color: var(--text); font-family: 'Outfit', sans-serif; font-weight: 300; line-height: 1.6; overflow-x: hidden; }
+  .hero-bow::before { content: ''; position: absolute; inset: 0; opacity: 0.025; background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); pointer-events: none; z-index: 1; }
+  .container { max-width: 960px; margin: 0 auto; padding: 0 24px; }
+  nav { padding: 28px 0; display: flex; align-items: center; justify-content: center; }
+  .logo { font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 18px; letter-spacing: -0.5px; display: flex; align-items: center; gap: 10px; }
+  .logo-icon { border-radius: 6px; }
+  .logo .slash { color: var(--accent); }
+  .nav-links { display: flex; gap: 28px; list-style: none; }
+  .nav-links a { color: rgba(255,255,255,0.5); text-decoration: none; font-size: 14px; font-weight: 500; transition: color 0.2s; }
+  .nav-links a:hover { color: #fff; }
+
+  .hero { padding: 100px 0 40px; text-align: center; }
+  .hero-logo { height: 180px; margin-bottom: 48px; animation: fadeIn 0.6s ease both; filter: drop-shadow(0 8px 30px rgba(244,104,23,0.25)); }
+  h1 { font-size: clamp(40px,5.5vw,60px); font-weight: 700; letter-spacing: -2px; line-height: 1.05; margin-bottom: 24px; animation: fadeIn 0.6s ease 0.1s both; }
+  h1 .with { font-family: 'Caveat', cursive; font-style: normal; font-weight: 500; font-size: 1.15em; }
+  h1 .highlight { background: linear-gradient(135deg, var(--accent), var(--accent-light)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+  .hero-sub { font-size: 18px; color: rgba(255,255,255,0.55); max-width: 540px; margin: 0 auto 40px; animation: fadeIn 0.6s ease 0.2s both; }
+  .cta-group { display: flex; gap: 12px; justify-content: center; animation: fadeIn 0.6s ease 0.3s both; }
+  .btn { display: inline-flex; align-items: center; gap: 8px; padding: 12px 24px; border-radius: 8px; font-family: 'JetBrains Mono', monospace; font-size: 14px; font-weight: 700; text-decoration: none; transition: all 0.2s; cursor: pointer; border: none; }
+  .btn-primary { background: linear-gradient(135deg, #f46817, #e85d0f); color: #fff; box-shadow: 0 4px 16px rgba(244,104,23,0.3), inset 0 1px 0 rgba(255,255,255,0.2); }
+  .btn-primary:hover { background: linear-gradient(135deg, #f57a30, #f46817); transform: translateY(-1px); box-shadow: 0 6px 28px rgba(244,104,23,0.4), inset 0 1px 0 rgba(255,255,255,0.2); }
+  .btn-ghost { background: rgba(255,255,255,0.05); color: rgba(255,255,255,0.7); border: 1px solid rgba(255,255,255,0.15); }
+  .btn-ghost:hover { color: #fff; border-color: rgba(255,255,255,0.3); background: rgba(255,255,255,0.1); }
+  .btn-ghost-dark { background: rgba(0,0,0,0.04); color: #555; border: 1px solid rgba(0,0,0,0.15); }
+  .btn-ghost-dark:hover { color: #1a1a2e; border-color: rgba(0,0,0,0.3); background: rgba(0,0,0,0.08); }
+
+  .cta-section { text-align: center; padding: 100px 0 100px; }
+  .cta-section h2 { font-size: 32px; font-weight: 700; letter-spacing: -1px; margin-bottom: 12px; color: #1a1a2e; }
+  .cta-sub { font-size: 16px; color: #888; margin-bottom: 32px; }
+
+  /* Hero gradient with curved bottom */
+  .hero-wrap {
+    position: relative;
+  }
+  .hero-bow {
+    position: absolute;
+    top: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 100vw;
+    bottom: 15%;
+    background: linear-gradient(180deg, #27286B 0%, #215274 46%, #1C757B 100%);
+    z-index: 0;
+  }
+  .bubble { position: absolute; border-radius: 50%; pointer-events: none; animation: bubbleRise linear infinite; }
+  @keyframes bubbleRise {
+    0% { transform: translateY(0) translateX(0) scale(0.3); opacity: 0; }
+    15% { opacity: 1; }
+    85% { opacity: 0.8; }
+    100% { transform: translateY(calc(-100vh)) translateX(var(--drift)) scale(1); opacity: 0; }
+  }
+  .hero-wave { position: absolute; bottom: -1px; left: 0; width: 100%; height: 80px; overflow: hidden; }
+  .hero-wave svg { position: absolute; bottom: 0; left: -50%; width: 200%; height: 100%; }
+  .hero-wave .wave-back { animation: waveDrift 8s ease-in-out infinite; }
+  .hero-wave .wave-front { animation: waveDrift 6s ease-in-out infinite reverse; }
+  @keyframes waveDrift { 0%,100% { transform: translateX(0); } 50% { transform: translateX(3%); } }
+  .hero-wrap > *:not(.hero-bow) {
+    position: relative;
+    z-index: 1;
+  }
+
+  /* DEMO */
+  .demo-section { margin: 60px auto 40px; width: 912px; animation: fadeIn 0.8s ease 0.4s both; }
+  .app-frame { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; position: relative; box-shadow: 0 20px 60px rgba(0,0,0,0.4), 0 0 0 1px rgba(255,255,255,0.03); }
+  .app-bar { display: flex; align-items: center; padding: 12px 18px; border-bottom: 1px solid var(--border); position: relative; }
+  .app-bar-default { display: flex; align-items: center; gap: 8px; transition: opacity 0.3s ease; }
+  .app-bar-default.hidden { opacity: 0; pointer-events: none; position: absolute; }
+  .app-bar-task { display: flex; align-items: center; justify-content: space-between; width: 100%; opacity: 0; pointer-events: none; position: absolute; left: 18px; right: 18px; transition: opacity 0.3s ease; }
+  .app-bar-task.visible { opacity: 1; pointer-events: all; position: relative; left: 0; right: 0; }
+  .app-dot { width: 10px; height: 10px; border-radius: 50%; }
+  .app-dot.r { background: var(--red); opacity: 0.7; }
+  .app-dot.y { background: var(--amber); opacity: 0.7; }
+  .app-dot.g { background: var(--green); opacity: 0.7; }
+  .app-title { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--text-dim); margin-left: 8px; }
+  .task-toolbar-left { display: flex; align-items: center; gap: 10px; }
+  .task-name { font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 700; }
+  .task-branch { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--text-dim); background: var(--bg); padding: 2px 8px; border-radius: 4px; }
+  .task-status-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--amber); animation: pulse 2s ease infinite; }
+  .task-toolbar-right { display: flex; gap: 8px; }
+  .app-body { position: relative; height: 400px; overflow: hidden; }
+
+  .fake-cursor { position: absolute; width: 18px; height: 18px; z-index: 50; pointer-events: none; opacity: 0; transition: opacity 0.3s ease; filter: drop-shadow(0 1px 3px rgba(0,0,0,0.5)); }
+  .fake-cursor.visible { opacity: 1; }
+  .fake-cursor svg { width: 18px; height: 18px; }
+  .click-ripple { position: absolute; width: 30px; height: 30px; border-radius: 50%; background: rgba(244,104,23,0.3); transform: translate(-50%,-50%) scale(0); pointer-events: none; z-index: 49; }
+  .click-ripple.animate { animation: ripple 0.5s ease forwards; }
+  @keyframes ripple { 0% { transform: translate(-50%,-50%) scale(0); opacity: 1; } 100% { transform: translate(-50%,-50%) scale(2.5); opacity: 0; } }
+
+  /* KANBAN */
+  .state-kanban { position: absolute; inset: 0; padding: 16px; transition: opacity 0.4s ease, transform 0.4s ease; }
+  .state-kanban.hidden { opacity: 0; transform: scale(0.97); pointer-events: none; }
+  .kanban-board { display: grid; grid-template-columns: repeat(4,1fr); gap: 0; height: 100%; }
+  .kanban-col { padding: 0 8px; border-right: 1px solid var(--border); }
+  .kanban-col:last-child { border-right: none; }
+  .col-header { font-family: 'JetBrains Mono', monospace; font-size: 11px; text-transform: uppercase; letter-spacing: 1.5px; color: var(--text-dim); padding: 4px 8px 12px; display: flex; justify-content: space-between; align-items: center; }
+  .col-count { background: var(--surface2); border-radius: 4px; padding: 1px 6px; font-size: 10px; }
+  .card { background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; padding: 12px; margin-bottom: 8px; transition: border-color 0.3s, box-shadow 0.3s; }
+  .card.hover-effect { border-color: rgba(244,104,23,0.4); box-shadow: 0 0 0 1px rgba(244,104,23,0.15); }
+  .card-title { font-size: 13px; font-weight: 500; margin-bottom: 8px; letter-spacing: -0.2px; }
+  .card-meta { display: flex; justify-content: space-between; align-items: center; font-family: 'JetBrains Mono', monospace; font-size: 10px; }
+  .card-agents { display: flex; gap: 4px; align-items: center; }
+  .agent-dot { width: 7px; height: 7px; border-radius: 50%; }
+  .agent-dot.working { background: var(--green); }
+  .agent-dot.attention { background: var(--amber); animation: pulse 2s ease infinite; }
+  .card-status { color: var(--text-dim); }
+  .card-status.s-working { color: var(--green); }
+  .card-status.s-attention { color: var(--amber); }
+
+  /* TASK VIEW */
+  .state-task { position: absolute; inset: 0; display: flex; flex-direction: column; opacity: 0; transform: scale(1.02); pointer-events: none; transition: opacity 0.4s ease, transform 0.4s ease; }
+  .state-task.visible { opacity: 1; transform: scale(1); pointer-events: all; }
+  .toolbar-btn { background: none; border: 1px solid var(--border); color: var(--text-dim); font-family: 'JetBrains Mono', monospace; font-size: 11px; padding: 4px 12px; border-radius: 4px; cursor: default; transition: all 0.2s; display: flex; align-items: center; gap: 6px; }
+  .toolbar-btn.active { color: var(--accent); border-color: rgba(244,104,23,0.3); background: var(--accent-dim); }
+  .toolbar-btn.hover-effect { color: var(--text); border-color: #3a3e5a; }
+  .task-content { flex: 1; display: flex; overflow: hidden; }
+
+  /* TERMINAL */
+  .pane-terminal { flex: 1; display: flex; flex-direction: column; min-width: 0; transition: flex 0.5s ease; }
+  .pane-header { display: flex; align-items: center; gap: 8px; padding: 8px 16px; border-bottom: 1px solid var(--border); font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--text-dim); background: rgba(0,0,0,0.2); }
+  .pane-header .pane-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--green); }
+  .terminal-content { flex: 1; padding: 14px 16px; font-family: 'JetBrains Mono', monospace; font-size: 11px; line-height: 1.7; background: var(--bg); overflow: hidden; }
+  .t-prompt { color: var(--accent); }
+  .t-cmd { color: var(--text); }
+  .t-output { color: var(--text-dim); }
+  .t-claude { color: var(--blue); }
+  .t-success { color: var(--green); }
+  .t-file { color: var(--amber); }
+  .t-logo { color: #e8946a; }
+  .t-separator { color: #2a2e4a; }
+  .t-muted { color: #4a4e6a; }
+  .cc-header { display: flex; gap: 16px; align-items: flex-start; }
+  .cc-logo { white-space: pre; line-height: 1.4; }
+  .cc-info { line-height: 1.7; }
+  .instant-row { display: block; }
+  .cursor-blink { display: inline-block; width: 7px; height: 14px; background: var(--accent); vertical-align: text-bottom; animation: blink 1s step-end infinite; }
+  .term-line { opacity: 0; transform: translateY(3px); }
+  .term-line.visible { opacity: 1; transform: translateY(0); transition: opacity 0.2s ease, transform 0.2s ease; }
+  .term-line.instant { opacity: 1; transform: translateY(0); transition: none; }
+
+  /* BROWSER PANE */
+  .pane-browser { flex: 0; width: 0; overflow: hidden; border-left: 0px solid var(--border); display: flex; flex-direction: column; transition: flex 0.5s ease, width 0.5s ease, border-left-width 0.15s ease 0.25s; }
+  .pane-browser.visible { flex: 1; width: auto; border-left-width: 1px; }
+  .browser-bar { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-bottom: 1px solid var(--border); background: rgba(0,0,0,0.2); }
+  .browser-url { flex: 1; background: var(--bg); border: 1px solid var(--border); border-radius: 4px; padding: 4px 10px; font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--text-dim); display: flex; align-items: center; gap: 6px; }
+  .browser-url .lock { color: var(--green); font-size: 9px; }
+  .browser-tab { font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--text); padding: 3px 10px; background: var(--surface); border-radius: 4px 4px 0 0; border: 1px solid var(--border); border-bottom: 1px solid var(--surface); position: relative; top: 1px; }
+  .browser-tab-inactive { font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--text-dim); padding: 3px 10px; }
+  .browser-viewport { flex: 1; background: #0a0e1a; overflow: hidden; }
+  .browser-page { width: 100%; height: 100%; opacity: 0; transition: opacity 0.5s ease 0.3s; padding: 16px; }
+  .pane-browser.visible .browser-page { opacity: 1; }
+
+  /* Fake dashboard page */
+  .dash-topbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+  .dash-logo { font-family: 'Outfit', sans-serif; font-size: 13px; font-weight: 700; color: #e8e8ed; }
+  .dash-nav { display: flex; gap: 12px; }
+  .dash-nav-item { font-size: 9px; color: #6a6e8a; font-family: 'JetBrains Mono', monospace; }
+  .dash-nav-item.active { color: #e8e8ed; }
+  .dash-avatar { width: 18px; height: 18px; border-radius: 50%; background: linear-gradient(135deg, var(--accent), var(--blue)); }
+  .dash-hero { background: linear-gradient(135deg, #152040, #132838); border: 1px solid #1e2d4d; border-radius: 8px; padding: 14px 16px; margin-bottom: 12px; }
+  .dash-hero-title { font-size: 12px; font-weight: 600; color: #e8e8ed; margin-bottom: 4px; font-family: 'Outfit', sans-serif; }
+  .dash-hero-sub { font-size: 9px; color: #6a6e8a; }
+  .dash-cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 12px; }
+  .dash-card { background: #101528; border: 1px solid #1a2040; border-radius: 6px; padding: 10px; }
+  .dash-card-label { font-size: 8px; color: #4a4e6a; text-transform: uppercase; letter-spacing: 0.5px; font-family: 'JetBrains Mono', monospace; margin-bottom: 4px; }
+  .dash-card-val { font-size: 16px; font-weight: 700; font-family: 'Outfit', sans-serif; }
+  .dash-card-val.green { color: var(--green); }
+  .dash-card-val.amber { color: var(--amber); }
+  .dash-card-val.blue { color: var(--blue); }
+  .dash-table { width: 100%; }
+  .dash-table-head { display: flex; gap: 8px; padding: 4px 8px; font-size: 8px; color: #3a3e5a; text-transform: uppercase; letter-spacing: 0.5px; font-family: 'JetBrains Mono', monospace; border-bottom: 1px solid #151a30; }
+  .dash-table-row { display: flex; gap: 8px; padding: 6px 8px; font-size: 9px; font-family: 'JetBrains Mono', monospace; border-bottom: 1px solid #0f1325; color: #6a6e8a; }
+  .dash-table-row .endpoint { color: #c0c0d0; flex: 2; }
+  .dash-table-row .method { flex: 1; }
+  .dash-table-row .method.get { color: var(--green); }
+  .dash-table-row .method.post { color: var(--blue); }
+  .dash-table-row .status { flex: 1; color: var(--green); }
+  .dash-table-row .time { flex: 1; color: #4a4e6a; }
+  .dash-table-head span:first-child, .dash-table-row .endpoint { flex: 2; }
+  .dash-table-head span { flex: 1; }
+
+  /* DIFF PANE */
+  .pane-diff { flex: 0; width: 0; overflow: hidden; border-left: 0px solid var(--border); display: flex; flex-direction: column; transition: flex 0.5s ease, width 0.5s ease, border-left-width 0.15s ease 0.25s; }
+  .pane-diff.visible { flex: 1; width: auto; border-left-width: 1px; }
+  .diff-header { display: flex; align-items: center; gap: 8px; padding: 6px 12px; border-bottom: 1px solid var(--border); font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--text-dim); background: rgba(0,0,0,0.2); }
+  .diff-content { flex: 1; padding: 0; font-family: 'JetBrains Mono', monospace; font-size: 9px; line-height: 1.5; background: var(--bg); overflow: hidden; opacity: 0; transition: opacity 0.5s ease 0.3s; }
+  .pane-diff.visible .diff-content { opacity: 1; }
+  .diff-file { padding: 6px 10px; background: #0f1328; border-bottom: 1px solid var(--border); color: var(--text); font-weight: 700; font-size: 9px; }
+  .diff-file .diff-stats { font-weight: 400; color: var(--text-dim); float: right; }
+  .diff-file .diff-stats .add { color: var(--green); }
+  .diff-file .diff-stats .del { color: var(--red); }
+  .diff-hunk { padding: 3px 10px; color: var(--blue); background: rgba(77,166,255,0.05); font-size: 9px; border-bottom: 1px solid rgba(255,255,255,0.03); }
+  .diff-line { padding: 1px 10px; border-bottom: 1px solid rgba(255,255,255,0.015); white-space: nowrap; }
+  .diff-line.add { background: rgba(77,255,136,0.06); color: var(--green); }
+  .diff-line.del { background: rgba(255,77,106,0.06); color: var(--red); }
+  .diff-line.ctx { color: #4a4e6a; }
+  .diff-ln { display: inline-block; width: 20px; color: #2a2e4a; text-align: right; margin-right: 8px; user-select: none; }
+
+
+  .demo-step-label { text-align: center; margin-top: 16px; font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--text-dim); min-height: 20px; transition: opacity 0.3s; }
+  .demo-step-label span { color: var(--accent); }
+
+  /* REST */
+  .bottom-section {
+    background: #ffffff;
+    color: #1a1a2e;
+  }
+  .bottom-section .pitch h2 { color: #1a1a2e; }
+  .bottom-section .pitch p { color: #555; }
+  .bottom-section .features-grid { background: #e0e0e8; border-color: #e0e0e8; }
+  .bottom-section .feature { background: #fff; }
+  .bottom-section .feature h3 { color: #1a1a2e; }
+  .bottom-section .feature p { color: #666; }
+  .bottom-section .feature-icon { color: var(--accent); }
+  .bottom-section footer { border-top-color: #e0e0e8; }
+  .bottom-section footer .left { color: #999; }
+  .bottom-section footer a { color: #888; }
+  .bottom-section footer a:hover { color: #1a1a2e; }
+
+  .stat-bar { text-align: center; padding: 48px 0 80px; }
+  .bottom-section .stat-line { color: #666; }
+  .bottom-section .stat-line .num { color: var(--accent); }
+  .bottom-section .stat-line .sep { color: #ccc; }
+  .bottom-section .pitch strong { color: #1a1a2e; }
+  .stat-line { font-family: 'JetBrains Mono', monospace; font-size: 14px; color: var(--text-dim); }
+  .stat-line .num { color: var(--accent); font-weight: 700; font-size: 18px; }
+  .stat-line .sep { margin: 0 16px; color: var(--border); }
+  .pitch { padding: 0 0 80px; max-width: 600px; margin: 0 auto; text-align: center; }
+  .pitch h2 { font-size: 28px; font-weight: 700; letter-spacing: -1px; margin-bottom: 20px; }
+  .pitch p { color: var(--text-dim); font-size: 16px; line-height: 1.7; }
+  .pitch p + p { margin-top: 16px; }
+  .pitch strong { color: var(--text); font-weight: 500; }
+  .features { padding: 80px 0 0; }
+  .features-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+  .feature { background: var(--surface); padding: 32px 28px; }
+  .feature-icon { font-family: 'JetBrains Mono', monospace; font-size: 18px; color: var(--accent); }
+  .feature-header { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+  .feature h3 { font-size: 15px; font-weight: 700; letter-spacing: -0.3px; }
+  .feature p { font-size: 14px; color: var(--text-dim); line-height: 1.5; }
+  footer { padding: 40px 0; border-top: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+  footer .left { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--text-dim); }
+  footer .right { display: flex; gap: 20px; }
+  footer a { color: var(--text-dim); text-decoration: none; font-size: 13px; transition: color 0.2s; }
+  footer a:hover { color: var(--text); }
+
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+  @keyframes blink { 50% { opacity: 0; } }
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
+
+  @media (max-width: 800px) { .features-grid { grid-template-columns: 1fr; } }
+  @media (max-width: 500px) { .cta-group { flex-direction: column; align-items: center; } .hero { padding: 64px 0 32px; } .nav-links { display: none; } footer { flex-direction: column; gap: 16px; text-align: center; } }
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="hero-wrap">
+    <div class="hero-bow">
+      <div class="hero-wave">
+        <svg viewBox="0 0 1440 80" preserveAspectRatio="none" class="wave-back"><path d="M0,40 C180,80 360,0 540,40 C720,80 900,0 1080,40 C1260,80 1440,0 1440,40 L1440,80 L0,80 Z" fill="rgba(255,255,255,0.3)"/></svg>
+        <svg viewBox="0 0 1440 80" preserveAspectRatio="none" class="wave-front"><path d="M0,50 C180,10 360,80 540,50 C720,10 900,80 1080,50 C1260,10 1440,80 1440,50 L1440,80 L0,80 Z" fill="#ffffff"/></svg>
+      </div>
+    </div>
+
+  <nav>
+    <div class="logo">Slay<span class="slash">/</span>Zone</div>
+  </nav>
+
+  <section class="hero">
+    <svg class="hero-logo" viewBox="0 0 1451 1060" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <mask id="ml" style="mask-type:alpha" maskUnits="userSpaceOnUse" x="0" y="0" width="1452" height="1061">
+        <path d="M679.509 4.68077C736.166-6.2293 792.815 1.78534 843.721 30.2843C859.598 39.1721 873.04 49.9163 887.923 60.3175L916.628 88.8146C976.484 157.009 998.104 250.988 963.578 335.163C949.913 368.478 923.533 401.369 954.204 433.859C992.719 474.36 1077.41 519.583 1128.26 474.707C1146.74 458.466 1157.93 435.467 1159.3 410.885C1163.02 346.655 1109.11 287.908 1136.97 215.165C1156.99 152.978 1221.63 118.24 1284.36 136.323C1294.17 139.151 1308.71 149.111 1315.62 157.225C1341.43 187.549 1323.14 242.796 1277.98 234.368C1197.33 219.314 1255.25 314.954 1262.55 349.516C1290.61 447.487 1247.81 553.284 1151.6 593.048C1144.22 596.102 1115.06 601.996 1112.15 604.48C1134.73 609.994 1182.56 596.102 1208.8 596.918C1250.52 596.594 1291.16 618.517 1311.41 655.361C1326.09 682.083 1345.44 723.245 1336.91 754.184C1325.12 796.923 1267.17 802.079 1247.38 761.242C1237.67 741.209 1236.53 714.219 1213.96 706.087C1194.02 699.23 1167.55 709.621 1146.5 713.122L1112.74 716.702C1053.95 712.698 1008.26 685.182 960.517 651.928L956.796 652.375L955.232 654.847C956.864 659.5 968.919 674.019 970.83 678.571L971.857 680.059C986.986 701.747 1008.63 718.738 1031.37 731.836C1057.22 746.724 1089.21 752.64 1103.13 782.158C1107.64 791.711 1108.9 802.236 1107.1 812.639C1105.01 824.73 1098.44 836.173 1088.33 843.275C1073.57 853.633 1052.33 853.409 1035.32 849.997C970.54 837 897.889 777.326 862.246 723.223C854.358 711.243 846.447 697.955 840.749 684.734L837.229 689.51C843.375 714.476 849.028 739.565 864.202 760.906C880.616 784.015 906.46 797.885 926.002 817.974C954.896 847.682 977.366 902.513 953.712 941.359C947.902 950.889 940.226 955.24 929.556 957.567C916.863 960.318 903.957 959.39 892.772 952.299C872.414 939.402 869.621 912.714 854.168 895.343C841.631 881.249 822.838 872.323 807.251 862.067C759.451 830.602 738.255 775.749 727.807 721.523C727.45 719.711 727.17 717.899 726.902 716.065C713.963 775.045 694.371 831.43 641.055 865.545C625.996 875.175 608.392 882.592 596.382 896.227C573.551 922.143 574.814 966.671 523.032 955.173C519.539 954.401 516.115 953.082 512.761 951.852L495.081 933.597C469.926 878.744 515.927 818.466 558.69 788.333C604.339 756.175 610.695 714.789 620.265 663.024C616.922 671.245 613.293 679.355 609.385 687.318C597.092 712.273 580.584 739.095 560.972 759.81C527.76 794.887 481.975 828.254 436.264 844.607C416.201 851.307 388.713 855.366 369.243 845.065C348.847 834.271 339.038 808.847 346.849 787.203C357.487 757.73 387.759 749.464 412.845 736.679C453.396 716.019 484.054 681.412 505.934 642.084C467.339 678.436 407.476 711.859 354.535 715.572C316.948 718.212 281.384 699.108 244.781 703.023C216.725 706.02 214.875 748.357 201.316 766.298C178.46 799.44 123.568 790.636 115.862 750.023C110.657 713.805 129.865 671.569 151.144 643.517C206.184 570.969 278.874 609.379 348.833 602.634C319.71 600.028 289.497 588.741 265.142 572.601C234.761 552.322 211.254 523.274 197.741 489.316C171.947 426.26 179.044 372.095 201.964 312.864C217.639 272.354 233.248 220.983 173.241 236.005C154.244 240.761 130.396 227.926 126.406 205.965C118.974 165.048 152.114 139.883 188.406 133.986C217.973 128.98 248.298 136.273 272.368 154.176C293.002 169.329 303.9 185.47 313.318 208.391C346.66 289.526 285.697 346.025 294.62 421.467C297.176 443.079 311.878 466.855 329.937 479.695C349.159 493.364 373.782 496.407 397.059 491.865C431.881 485.087 481.985 456.385 502.821 426.675C525.789 395.289 503.65 370.566 490.428 340.775C427.256 198.45 532.69 32.9584 679.509 4.68077ZM803.958 399.87C797.059 405.551 791.218 412.268 784.319 417.959C763.455 435.148 737.742 438.461 711.461 436.087C702.221 435.252 692.428 433.518 683.749 430.116C678.055 427.884 671.625 423.922 665.552 423.196C662.289 422.806 657.808 423.854 655.19 425.897C653.111 427.521 651.961 429.655 652.002 432.315C652.083 437.6 656.503 443.985 660.659 446.962C662.68 448.409 664.844 449.672 666.985 450.929C700.894 464.835 743.003 468.066 777.308 453.49C792.433 447.07 812.362 433.287 818.637 417.515C819.929 414.268 820.587 410.558 819.316 407.189C818.09 403.923 814.925 401.375 811.704 400.235C809.531 399.472 807.313 399.115 805.028 399L803.958 399.87ZM605.365 222.136C597.811 222.045 589.512 221.682 582.05 222.71C569.116 223.723 544.555 224.367 535.673 235.238C527.364 245.407 530.131 265.201 531.917 277.309C534.888 297.471 541.584 322.793 558.795 335.743C577.749 350.006 610.962 348.031 632.915 344.263C634.768 343.945 636.578 343.57 638.412 343.16C657.567 336.739 670.034 325.766 678.942 307.778C688.292 288.903 696.461 262.732 689.231 242.082C669.753 222.387 631.568 222.453 605.365 222.136ZM910.418 231.013C894.125 219.514 849.405 220.092 829.247 222.23C812.607 223.554 777.557 224.824 765.724 238.127C759.36 245.281 758.441 255.092 759.248 264.231C761.198 286.25 770.341 317.018 788.202 331.603C805.492 345.716 831.388 347.301 852.7 346.961C872.197 344.688 887.705 342.391 900.625 325.957C915.36 307.22 923.718 271.818 920.2 248.482C919.158 241.548 916.289 235.153 910.418 231.013Z" fill="black"/>
+        <path d="M867.432 230C869.808 230.465 872.591 231.023 874.638 232.366C876.832 233.813 877.896 236.323 877.998 238.837C878.371 247.786 842.071 314.774 834.99 325.835C833.044 328.882 830.691 331.46 828.112 334C826.088 333.226 823.938 332.448 822.219 331.132C819.877 329.343 817.762 326.27 818.022 323.219C818.69 315.287 854.978 246.352 860.883 237.015C862.647 234.228 864.91 232.12 867.432 230Z" fill="black"/>
+        <path d="M832.898 230C836.998 230.113 839.376 230.112 842.488 232.953C843.043 235.226 843.165 237.055 842.765 239.344C840.476 252.407 811.952 308.194 804.34 320.466C803.074 322.496 801.451 323.655 799.529 325C798.962 324.601 798.384 324.209 797.818 323.802C794.629 321.495 791.295 318.514 791.006 314.311C790.484 306.845 826.286 236.949 832.898 230Z" fill="black"/>
+        <path d="M635.034 231C638.487 231.297 640.93 231.56 644.047 233.276C645.025 234.855 645.818 235.664 645.985 237.563C646.913 248.121 605.925 324.782 596.747 335C594.146 334.889 591.625 334.458 589.494 332.829C587.233 331.103 586.232 328.63 586.005 325.857C585.478 319.394 629.529 236.736 635.034 231Z" fill="black"/>
+        <path d="M599.826 231.038C602.965 230.936 605.362 230.982 608.42 231.94C610.553 234.344 610.986 234.798 611 238.198C611.033 246.305 575.633 319.811 567.579 328.882C565.339 329.15 563.509 329.059 561.634 327.582C559.365 325.796 558.292 323.305 558.028 320.498C556.887 308.362 591.656 241.984 599.826 231.038Z" fill="black"/>
+        <path d="M427.542 892.823C435.546 888.071 446.95 888.261 455.68 890.621C459.97 891.784 464.247 893.964 466.401 898.045C470.239 905.335 463.088 919.435 461.646 927.508C465.651 928.202 469.444 928.336 472.447 931.344C475.695 938.21 471.256 946.686 469.271 953.551L482.141 956.537C480.77 964.263 479.296 971.833 479.239 979.705C499.232 983.339 519.849 988.36 540.058 990.25C543.201 987.734 546.932 989.467 550.891 989.769C551.844 985.062 551.541 979.907 552.527 975.467C553.215 972.359 554.559 971.956 557.038 970.301L558.662 970.659C559.732 968.848 558.994 969.709 561.074 968.266C567.813 961.882 578.995 959.969 588.104 959.768C590.832 959.701 591.772 959.857 593.579 961.96C593.795 962.217 594.96 964.107 595.099 964.319C597.445 967.953 600.387 970.335 604.684 971.241C608.393 972.012 612.263 972.37 616.026 972.817C618.187 967.092 620.106 961.635 621.38 955.63C617.505 954.982 602.785 953.417 600.828 950.901C608.583 944.282 609.879 942.448 611.455 932.306L610.007 931.456C604.938 928.426 600.251 925.541 598.025 919.749C598.855 917.099 599.553 916.17 602.158 914.985C613.541 909.785 679.541 920.409 691.79 926.246C694.649 927.61 696.935 929.108 698.037 932.227C699.871 937.46 698.731 944.293 697.546 949.526C694.19 964.386 687.457 979.414 682.448 993.838C675.648 1013.41 670.027 1033.68 661.805 1052.7C650.985 1060.75 644.187 1060.91 631.21 1058.98C610.958 1055.98 590.849 1051.86 570.646 1048.52L457.12 1030.09C435.09 1026.3 408.299 1024.64 387.216 1018.45C383.655 1017.41 379.812 1014.42 377.724 1011.35C374.08 1005.97 374.666 997.853 376.179 991.893C381.375 971.397 400.77 939.597 411.006 919.213C414.295 912.66 416.959 904.43 421.083 898.459C422.642 896.211 425.21 894.209 427.542 892.823Z" fill="black"/>
+        <path d="M984.551 896.65C994.025 891.913 1006.15 887.677 1016.65 891.456C1032.68 897.218 1039.94 924.583 1048.41 938.192L1059.47 960.117L1060.2 962.157C1065.42 976.346 1081.26 992.953 1074.23 1008.84C1072.71 1012.26 1070.03 1015.34 1067.35 1017.92C1044.59 1023.24 1021.41 1026.11 998.359 1029.86L884.623 1048.24C861.563 1051.81 835.229 1059.13 812.292 1059.98C806.382 1060.2 800.125 1058.92 795.153 1055.61C791.456 1053.14 789.232 1049.31 787.311 1045.41C777.702 1025.81 772.551 1002.13 766.105 981.206C762.898 970.773 758.329 960.184 756.541 949.417C755.267 941.715 756.217 937.267 759.669 930.368C771.032 924.895 837.587 912.857 848.458 916.112C850.033 916.58 851.151 917.449 852.368 918.497C853.173 921.127 852.96 922.342 851.709 924.828C849.408 929.387 844.782 930.613 840.324 932.262C841.196 937.579 841.966 942.896 843.329 948.112C847.709 947.867 851.542 947.377 855.687 949.093L855.597 950.531C847.586 954.321 838.95 955.09 830.492 957.364C831.934 962.413 833.196 967.63 835.051 972.534C841.844 972.601 849.027 972.656 855.038 969.123C858.673 967.793 858.673 967.794 863.173 966.794C872.173 966.294 874.947 964.647 883.673 965.294L886.015 965.59H887.383C889.003 965.199 888.109 965.362 889.673 964.794C894.555 972.016 889.014 982.657 895.673 990.794L897.415 991.855L904.69 991.426C923.191 990.925 956.212 982.642 974.189 977.961L973.942 976.69V974.623C972.457 970.466 971.802 973.124 972.673 970.294C973.533 967.518 970.394 968.05 970.673 964.294L967.513 954.276C970.395 953.017 973.702 954.142 976.674 954.688C977.78 954.655 979.11 954.075 980.171 953.741C981.735 947.365 975.758 940.577 976.92 933.265C979.009 930.401 979.926 930.523 983.233 929.52C981.59 918.642 978.786 907.44 982.629 896.806L984.551 896.65Z" fill="black"/>
+        <path d="M88.2092 711C90.9858 711.135 93.6128 711.503 96.006 713.08C98.3524 714.622 98.2727 715.539 98.4347 718.066C93.9845 726.362 79.9627 732.645 71.9719 737.453C78.0924 741.802 93.8681 750.567 96.5119 757.41C97.111 758.964 96.1497 760.126 95.5695 761.557C87.7051 760.204 71.2849 746.52 64.0275 741.444L44.675 753.944C58.0481 762.195 69.7076 772.95 83.0383 781.346C86.9397 778.506 91.2698 775.712 96.1896 775.5L97.5392 776.785C97.8388 780.877 95.7965 784.578 94.2248 788.256C96.6367 792.094 152.25 830.819 159.709 835.236C160.491 834.945 161.236 834.654 162.053 834.464C167.248 833.257 173.338 838.276 178.053 840.892L190.845 832.339C183.389 823.272 173.392 818.364 164.945 810.65C162.96 808.839 162.551 807.486 162.594 804.904C173.367 799.962 180.75 815.883 190.176 817.996C192.274 818.465 195.219 815.86 197.004 814.753C200.003 814.72 200.767 814.194 203.312 815.96C203.916 819.583 202.257 823.529 201.219 827.006C206.782 829.69 211.614 832.664 216.661 836.186L229.199 824.279C222.115 819.919 214.856 815.692 207.903 811.142C204.711 809.04 203.39 807.687 202.644 803.953C204.654 797.915 214.121 791.14 215.065 786.948C216.383 781.089 213.441 775.812 218.404 770.848C225.301 769.741 240.724 783.18 246.553 787.216C261.743 798.095 289.514 813.68 301.539 826.09C304.364 829.008 306.178 831.691 305.987 835.973C305.779 840.635 303.845 844.828 300.417 847.981C285.531 861.677 265.641 872.354 248.713 883.568C235.63 892.233 222.749 902.217 208.953 909.663C204.139 912.268 195.332 916.873 189.914 915.856C184.374 914.816 176.755 909.483 172.044 906.386C141.44 886.206 112.167 863.331 82.4006 841.899C66.5076 830.439 12.4123 794.428 3.11053 782.722C-0.437677 778.272-0.325552 772.872 0.42791 767.539C6.87739 756.872 74.2713 717.697 88.2092 711Z" fill="black"/>
+        <path d="M1358.98 711.419C1361.37 710.704 1363.17 710.928 1365.38 711.912C1375.2 716.291 1448.28 758.847 1450.33 765.942C1452.06 771.941 1450.19 777.963 1447.64 783.393L1432.5 795.091C1395.33 821.492 1358.88 848.898 1321.85 875.511C1304.77 887.779 1287.38 901.711 1269.15 912.101C1265.28 914.314 1261.02 915.144 1256.69 915.989L1256.63 916C1252.56 914.783 1248.48 913.375 1244.76 911.308C1228.23 902.124 1212.53 890.046 1196.81 879.499C1183.15 870.338 1168.45 861.958 1155.48 851.892C1152.2 849.345 1147.6 845.68 1145.92 841.815C1144.9 839.446 1144.66 838.664 1145.54 836.295C1147.08 832.139 1150.34 828.698 1153.53 825.715C1163.64 816.241 1219.72 776.511 1231.71 770.947C1234.4 771.248 1234.23 771.64 1236.11 773.405C1237.63 778.186 1236.13 783.069 1236.03 788.007C1239.72 793.694 1245.84 797.962 1250.98 802.308C1242.87 811.414 1231.65 818.14 1221.72 825.079C1225.92 829.089 1230.61 832.675 1235.07 836.373C1238.67 833.781 1248.63 828.206 1250.13 824.028C1251.38 820.542 1249.1 818.877 1252.37 816.006C1256.39 816.219 1259.02 817.961 1262.45 819.961C1267.47 815.604 1272.97 809.626 1279.75 808.587C1281.77 809.403 1282.69 809.973 1284.08 811.671C1278.44 818.81 1269.15 824.106 1261.92 829.614C1265.25 833.479 1268.97 837.089 1272.5 840.776C1274.02 839.86 1275.59 838.999 1277.1 838.049C1283.47 834.083 1290.03 835.2 1296.67 831.457C1311.25 823.257 1343.01 799.124 1356.27 787.605C1355.88 783.047 1355.53 780.689 1358.38 776.879C1362.56 775.516 1364.52 777.661 1368.7 778.321C1372.92 778.98 1401.25 756.513 1407.02 752.323C1400.08 748.647 1393.11 745.06 1386.11 741.53C1378.27 746.535 1371.37 753.059 1363.51 757.919C1361.19 759.349 1358.46 761.506 1355.72 760.88L1355.64 757.853C1359.92 748.814 1372.01 743.261 1380.07 737.686C1372.92 732.502 1363.81 729.586 1357.21 723.687C1354.61 721.352 1353.59 719.464 1353.33 716.034C1354.88 713.665 1356.15 712.268 1358.98 711.419Z" fill="black"/>
+      </mask>
+      <g mask="url(#ml)"><rect x="-0.327" y="-1.207" width="1451" height="1060" fill="url(#mlg)"/></g>
+      <defs><linearGradient id="mlg" x1="725" y1="-1.2" x2="725" y2="1059" gradientUnits="userSpaceOnUse"><stop stop-color="#F7E463"/><stop offset="0.5" stop-color="#F46817"/><stop offset="1" stop-color="#F4E450"/></linearGradient></defs>
+    </svg>
+    <h1>Kanban <span class="with">with</span> terminals.<br><span class="highlight">Card → Terminal → Agent</span></h1>
+    <p class="hero-sub">Every card hides a terminal, a browser, git management, worktree, and much more. Agent management for humans.</p>
+    <div class="cta-group">
+      <a href="#" class="btn btn-primary" id="dl-btn"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/></svg>Download for Mac</a>
+      <a href="#" class="btn btn-ghost"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>GitHub</a>
+    </div>
+  </section>
+
+  <section class="demo-section">
+    <div class="app-frame" id="app-frame">
+      <div class="fake-cursor" id="fake-cursor"><svg viewBox="0 0 24 24" fill="none"><path d="M5 3l14 8.5L12 14l-2 7L5 3z" fill="white" stroke="black" stroke-width="1.5" stroke-linejoin="round"/></svg></div>
+      <div class="app-bar" id="app-bar">
+        <div class="app-bar-default" id="app-bar-default">
+          <span class="app-dot r"></span><span class="app-dot y"></span><span class="app-dot g"></span>
+          <span class="app-title" id="app-title">slayzone — project: api-v2 — 14 tasks</span>
+        </div>
+        <div class="app-bar-task" id="app-bar-task">
+          <div class="task-toolbar-left">
+            <span class="app-dot r"></span><span class="app-dot y"></span><span class="app-dot g"></span>
+            <span class="task-name">Auth refactor</span>
+            <span class="task-branch">⎇ feat/auth-refactor</span>
+          </div>
+          <div class="task-toolbar-right">
+            <button class="toolbar-btn active" id="btn-terminal">▸_ Terminal</button>
+            <button class="toolbar-btn" id="btn-browser">◧ Browser</button>
+            <button class="toolbar-btn" id="btn-diff">± Diff</button>
+          </div>
+        </div>
+      </div>
+      <div class="app-body" id="app-body">
+
+        <div class="state-kanban" id="state-kanban">
+          <div class="kanban-board">
+            <div class="kanban-col">
+              <div class="col-header">Backlog <span class="col-count">3</span></div>
+              <div class="card"><div class="card-title">Rate limiting</div><div class="card-meta"><span class="card-status">queued</span></div></div>
+              <div class="card"><div class="card-title">Webhook retries</div><div class="card-meta"><span class="card-status">queued</span></div></div>
+            </div>
+            <div class="kanban-col">
+              <div class="col-header">In Progress <span class="col-count">4</span></div>
+              <div class="card" id="target-card"><div class="card-title">Auth refactor</div><div class="card-meta"><div class="card-agents"><span class="agent-dot working"></span></div><span class="card-status s-working">working</span></div></div>
+              <div class="card"><div class="card-title">Search endpoint</div><div class="card-meta"><div class="card-agents"><span class="agent-dot working"></span></div><span class="card-status s-working">working</span></div></div>
+              <div class="card" style="border-color:rgba(247,168,37,0.3);"><div class="card-title">DB migration</div><div class="card-meta"><div class="card-agents"><span class="agent-dot attention"></span></div><span class="card-status s-attention">attention</span></div></div>
+            </div>
+            <div class="kanban-col">
+              <div class="col-header">Review <span class="col-count">3</span></div>
+              <div class="card"><div class="card-title">Pagination</div><div class="card-meta"><div class="card-agents"><span class="agent-dot working"></span></div><span class="card-status s-working">working</span></div></div>
+              <div class="card"><div class="card-title">Error handling</div><div class="card-meta"><div class="card-agents"><span class="agent-dot attention"></span></div><span class="card-status s-attention">attention</span></div></div>
+            </div>
+            <div class="kanban-col">
+              <div class="col-header">Done <span class="col-count">4</span></div>
+              <div class="card" style="opacity:0.6;"><div class="card-title">Fix navbar</div><div class="card-meta"><span class="card-status">done</span></div></div>
+              <div class="card" style="opacity:0.6;"><div class="card-title">Setup CI</div><div class="card-meta"><span class="card-status">done</span></div></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- TASK VIEW -->
+        <div class="state-task" id="state-task">
+          <div class="task-content">
+            <div class="pane-terminal">
+              <div class="pane-header"><span class="pane-dot"></span> claude code — auth-refactor</div>
+              <div class="terminal-content" id="terminal-content">
+                <!-- Claude Code start screen -->
+                <div class="term-line instant-row" data-delay="0">
+                  <div class="cc-header">
+                    <div class="cc-logo"><span class="t-logo"> ▐▛███▜▌</span><br><span class="t-logo">▝▜█████▛▘</span><br><span class="t-logo">  ▘▘ ▝▝</span></div>
+                    <div class="cc-info"><span class="t-output">Claude Code</span> <span class="t-muted">v2.1.42</span><br><span class="t-muted">Opus 4.6 · Claude Team</span><br><span class="t-muted">~/dev/projects/api-v2</span></div>
+                  </div>
+                </div>
+                <div class="term-line" data-delay="0"><span class="t-separator">────────────────────────────────────────────────────────────────────</span></div>
+                <div class="term-line" data-delay="0"><span class="t-muted">❯ Try "edit auth.ts to..."</span></div>
+                <div class="term-line" data-delay="0"><span class="t-separator">────────────────────────────────────────────────────────────────────</span></div>
+                <div class="term-line" data-delay="0"><span class="t-muted">  ? for shortcuts</span></div>
+                <div class="term-line" data-delay="0"><br></div>
+                <!-- Prompt + work -->
+                <div class="term-line" data-delay="1200"><span class="t-prompt">❯</span> <span class="t-cmd">refactor auth middleware to use JWT validation</span></div>
+                <div class="term-line" data-delay="1800"><br></div>
+                <div class="term-line" data-delay="2000"><span class="t-claude">Claude</span> <span class="t-output">I'll refactor the auth middleware. Examining current code...</span></div>
+                <div class="term-line" data-delay="2600"><br></div>
+                <div class="term-line" data-delay="2800"><span class="t-file">  src/middleware/auth.ts</span> <span class="t-output">— rewriting</span></div>
+                <div class="term-line" data-delay="3100"><span class="t-file">  src/utils/jwt.ts</span> <span class="t-output">— created</span></div>
+                <div class="term-line" data-delay="3400"><span class="t-file">  src/types/auth.d.ts</span> <span class="t-output">— updated</span></div>
+                <div class="term-line" data-delay="3900"><br></div>
+                <div class="term-line" data-delay="4100"><span class="t-success">✓</span> <span class="t-output">JWT middleware replacing session-based auth</span></div>
+                <div class="term-line" data-delay="4400"><span class="t-success">✓</span> <span class="t-output">Token refresh + expiry handling added</span></div>
+                <div class="term-line" data-delay="4700"><span class="t-output">Running tests...</span> <span class="t-success">14 passed</span></div>
+                <div class="term-line" data-delay="5100"><br></div>
+                <div class="term-line" data-delay="5300"><span class="t-prompt">❯</span> <span class="cursor-blink"></span></div>
+              </div>
+            </div>
+
+            <!-- BROWSER -->
+            <div class="pane-browser" id="pane-browser">
+              <div class="browser-bar">
+                <div class="browser-url"><span class="lock">🔒</span> localhost:3000/dashboard</div>
+              </div>
+              <div class="browser-viewport">
+                <div class="browser-page">
+                  <div class="dash-topbar">
+                    <div class="dash-logo">ApiDash</div>
+                    <div class="dash-nav">
+                      <span class="dash-nav-item active">Overview</span>
+                      <span class="dash-nav-item">Endpoints</span>
+                      <span class="dash-nav-item">Logs</span>
+                    </div>
+                    <div class="dash-avatar"></div>
+                  </div>
+                  <div class="dash-hero">
+                    <div class="dash-hero-title">API v2 — Auth Refactor Preview</div>
+                    <div class="dash-hero-sub">JWT validation active · 3 endpoints updated · all tests passing</div>
+                  </div>
+                  <div class="dash-cards">
+                    <div class="dash-card"><div class="dash-card-label">Requests / min</div><div class="dash-card-val green">1,247</div></div>
+                    <div class="dash-card"><div class="dash-card-label">Avg latency</div><div class="dash-card-val amber">42ms</div></div>
+                    <div class="dash-card"><div class="dash-card-label">Auth success</div><div class="dash-card-val blue">99.2%</div></div>
+                  </div>
+                  <div class="dash-table">
+                    <div class="dash-table-head"><span>Endpoint</span><span>Method</span><span>Status</span><span>Time</span></div>
+                    <div class="dash-table-row"><span class="endpoint">/api/v2/auth/token</span><span class="method post">POST</span><span class="status">200</span><span class="time">12ms</span></div>
+                    <div class="dash-table-row"><span class="endpoint">/api/v2/users/me</span><span class="method get">GET</span><span class="status">200</span><span class="time">8ms</span></div>
+                    <div class="dash-table-row"><span class="endpoint">/api/v2/auth/refresh</span><span class="method post">POST</span><span class="status">200</span><span class="time">15ms</span></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- DIFF -->
+            <div class="pane-diff" id="pane-diff">
+              <div class="diff-header">± 3 files changed</div>
+              <div class="diff-content">
+                <div class="diff-file">src/middleware/auth.ts <span class="diff-stats"><span class="add">+47</span> <span class="del">−23</span></span></div>
+                <div class="diff-hunk">@@ -1,12 +1,18 @@</div>
+                <div class="diff-line ctx"><span class="diff-ln">1</span> import { Request, Response, Next } from 'express';</div>
+                <div class="diff-line del"><span class="diff-ln">2</span>-import { getSession } from '../utils/session';</div>
+                <div class="diff-line del"><span class="diff-ln">3</span>-import { SessionStore } from '../types/session';</div>
+                <div class="diff-line add"><span class="diff-ln">2</span>+import { verifyToken, TokenPayload } from '../utils/jwt';</div>
+                <div class="diff-line add"><span class="diff-ln">3</span>+import { AuthError } from '../types/auth';</div>
+                <div class="diff-line ctx"><span class="diff-ln">4</span></div>
+                <div class="diff-line del"><span class="diff-ln">5</span>-export async function authMiddleware(req, res, next) {</div>
+                <div class="diff-line del"><span class="diff-ln">6</span>-  const session = await getSession(req.cookies.sid);</div>
+                <div class="diff-line del"><span class="diff-ln">7</span>-  if (!session) return res.status(401).end();</div>
+                <div class="diff-line del"><span class="diff-ln">8</span>-  req.user = session.user;</div>
+                <div class="diff-line add"><span class="diff-ln">5</span>+export async function authMiddleware(</div>
+                <div class="diff-line add"><span class="diff-ln">6</span>+  req: Request, res: Response, next: Next</div>
+                <div class="diff-line add"><span class="diff-ln">7</span>+) {</div>
+                <div class="diff-line add"><span class="diff-ln">8</span>+  const token = req.headers.authorization?.split(' ')[1];</div>
+                <div class="diff-line add"><span class="diff-ln">9</span>+  if (!token) throw new AuthError('NO_TOKEN');</div>
+                <div class="diff-line add"><span class="diff-ln">10</span>+</div>
+                <div class="diff-line add"><span class="diff-ln">11</span>+  const payload = await verifyToken(token);</div>
+                <div class="diff-line add"><span class="diff-ln">12</span>+  req.user = payload.user;</div>
+                <div class="diff-line ctx"><span class="diff-ln">13</span>   next();</div>
+                <div class="diff-line ctx"><span class="diff-ln">14</span> }</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+    <div class="demo-step-label" id="step-label"><span>1/4</span> &nbsp;Kanban board — scan all tasks at a glance</div>
+  </section>
+
+  </div><!-- end hero-wrap -->
+</div><!-- end container -->
+
+<div class="bottom-section">
+<div class="container">
+
+
+  <section class="features">
+    <div class="features-grid">
+      <div class="feature"><div class="feature-header"><div class="feature-icon">&gt;_</div><h3>Integrated AI agents</h3></div><p>Claude Code, Codex, Gemini, etc. running inside task terminals.</p></div>
+      <div class="feature"><div class="feature-header"><div class="feature-icon">⎇</div><h3>Git worktree per task</h3></div><p>Isolated branches with built-in diff/conflict/commit UI.</p></div>
+      <div class="feature"><div class="feature-header"><div class="feature-icon">◧</div><h3>Kanban board</h3></div><p>Drag-and-drop tasks, priorities, tags, sub-tasks, local SQLite.</p></div>
+      <div class="feature"><div class="feature-header"><div class="feature-icon">◉</div><h3>Embedded browser panels</h3></div><p>Docs/PRs/previews inside tasks.</p></div>
+      <div class="feature"><div class="feature-header"><div class="feature-icon">⇄</div><h3>AI config sync</h3></div><p>SKILL.md standard syncs context across providers per-project.</p></div>
+      <div class="feature"><div class="feature-header"><div class="feature-icon">⌘</div><h3>Fully local</h3></div><p>No cloud, no accounts, no telemetry.</p></div>
+    </div>
+  </section>
+
+  <section class="cta-section">
+    <h2>Ready to Slay?</h2>
+    <p class="cta-sub">All platforms. Free. Open source.</p>
+    <div class="cta-group">
+      <a href="#" class="btn btn-primary" id="dl-btn-2"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/></svg>Download for Mac</a>
+      <a href="#" class="btn btn-ghost-dark"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>GitHub</a>
+    </div>
+  </section>
+
+  <footer>
+    <div class="left">slay.zone — made with 🤖 in Stockholm</div>
+    <div class="right"><a href="#">GitHub</a><a href="#">Twitter</a></div>
+  </footer>
+</div><!-- end container -->
+</div><!-- end bottom-section -->
+
+<script>
+// OS-aware download button
+(function(){
+  var btns = [document.getElementById('dl-btn'), document.getElementById('dl-btn-2')];
+  var ua = navigator.userAgent;
+  var icons = {
+    mac: '<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/></svg>',
+    win: '<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M0 3.449L9.75 2.1v9.451H0m10.949-9.602L24 0v11.4H10.949M0 12.6h9.75v9.451L0 20.699M10.949 12.6H24V24l-12.9-1.801"/></svg>',
+    linux: '<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12.504 0c-.155 0-.315.008-.48.021-4.226.333-3.105 4.807-3.17 6.298-.076 1.092-.3 1.953-1.05 3.02-.885 1.051-2.127 2.75-2.716 4.521-.278.832-.41 1.684-.287 2.489a.424.424 0 00-.11.135c-.26.268-.45.6-.663.839-.199.199-.485.267-.797.4-.313.136-.658.269-.864.68-.09.189-.136.394-.132.602 0 .199.027.4.055.536.058.399.116.728.04.97-.249.68-.28 1.145-.106 1.484.174.334.535.47.94.601.81.2 1.91.135 2.774.6.926.466 1.866.67 2.616.47.526-.116.97-.464 1.208-.946.587-.003 1.23-.269 2.26-.334.699-.058 1.574.267 2.577.2.025.134.063.198.114.333l.003.003c.391.778 1.113 1.132 1.884 1.071.771-.06 1.592-.536 2.257-1.306.631-.765 1.683-1.084 2.378-1.503.348-.199.629-.469.649-.853.023-.4-.2-.811-.714-1.376v-.097a5.1 5.1 0 00-.033-.436c-.204-.801-.324-1.273-.204-1.786.12-.515.4-.868.706-1.27.315-.39.652-.8.862-1.429.21-.63.296-1.436.06-2.53-.548-2.527-2.162-4.186-3.015-5.003-.867-.808-1.33-1.535-1.283-2.538.052-1.188-.583-5.937-4.77-5.937zM11.5 1c2.09 0 2.65 2.167 2.862 3.197.096.455.151.923.099 1.395-.108.928-.554 1.723-1.375 2.53-.672.66-1.275 1.42-1.712 2.27-.139.27-.27.55-.389.84-.21.485-.398.99-.56 1.51-.028.102-.049.2-.063.293-.087.548-.034 1.083.134 1.573.079.24.19.47.33.687l.028.039c.107.148.224.3.354.454.063.075.13.15.204.228.22.234.472.46.787.696.19.139.396.27.62.391.222.12.464.228.727.321.146.052.3.098.462.137.173.042.353.078.542.108l.053.006c1.026.125 2.176-.013 3.052-.432.222-.105.422-.228.59-.368.18-.148.33-.318.432-.508.188-.35.202-.744.058-1.18-.14-.436-.45-.902-.956-1.419.09-.074.18-.153.267-.238.47-.416.94-1.001 1.19-1.715.25-.712.26-1.53.04-2.44-.522-2.15-2.132-3.82-2.982-4.605-.856-.79-1.297-1.51-1.268-2.377.035-.867-.143-2.327-.722-3.423C13.5 1.344 12.67 1 11.5 1z"/></svg>'
+  };
+  var os, icon, label;
+  if (/Mac|iPhone|iPad|iPod/.test(ua)) { os='mac'; icon=icons.mac; label='Download for Mac'; }
+  else if (/Win/.test(ua)) { os='win'; icon=icons.win; label='Download for Windows'; }
+  else { os='linux'; icon=icons.linux; label='Download for Linux'; }
+  btns.forEach(function(b){ if(b) b.innerHTML = icon + label; });
+})();
+</script>
+
+<script>
+const $ = id => document.getElementById(id);
+const cursor = $('fake-cursor'), appFrame = $('app-frame'), appBody = $('app-body');
+const stateKanban = $('state-kanban'), stateTask = $('state-task');
+const targetCard = $('target-card');
+const btnBrowser = $('btn-browser'), btnDiff = $('btn-diff');
+const paneBrowser = $('pane-browser'), paneDiff = $('pane-diff');
+const stepLabel = $('step-label'), terminalContent = $('terminal-content');
+const appBarDefault = $('app-bar-default'), appBarTask = $('app-bar-task');
+
+function pos(el) {
+  const fr = appFrame.getBoundingClientRect(), er = el.getBoundingClientRect();
+  const s = fr.width / appFrame.offsetWidth || 1;
+  return { x: (er.left - fr.left + er.width/2) / s, y: (er.top - fr.top + er.height/2) / s };
+}
+function moveTo(x,y,ms=600) {
+  cursor.style.transition = `left ${ms}ms cubic-bezier(0.25,0.1,0.25,1), top ${ms}ms cubic-bezier(0.25,0.1,0.25,1)`;
+  cursor.style.left = x+'px'; cursor.style.top = y+'px';
+}
+function show() { cursor.classList.add('visible'); }
+function hide() { cursor.classList.remove('visible'); }
+function doClick(x,y) {
+  const r = document.createElement('div');
+  r.className = 'click-ripple'; r.style.left = x+'px'; r.style.top = y+'px';
+  appFrame.appendChild(r);
+  requestAnimationFrame(() => r.classList.add('animate'));
+  setTimeout(() => r.remove(), 600);
+}
+function progress(p) { }
+function label(s, t) { stepLabel.innerHTML = '<span>'+s+'/4</span> \u00a0'+t; }
+
+function showTaskBar() { appBarDefault.classList.add('hidden'); appBarTask.classList.add('visible'); }
+function showDefaultBar() { appBarDefault.classList.remove('hidden'); appBarTask.classList.remove('visible'); }
+
+function resetTerm() { terminalContent.querySelectorAll('.term-line').forEach(l => l.classList.remove('visible','instant')); }
+function animTerm() {
+  terminalContent.querySelectorAll('.term-line').forEach(l => {
+    const d = parseInt(l.dataset.delay);
+    if (d === 0) l.classList.add('instant');
+    else setTimeout(() => l.classList.add('visible'), d);
+  });
+}
+
+function reset() {
+  hide(); showDefaultBar();
+  stateKanban.classList.remove('hidden');
+  stateTask.classList.remove('visible');
+  paneBrowser.classList.remove('visible');
+  paneDiff.classList.remove('visible');
+  btnBrowser.classList.remove('active','hover-effect');
+  btnDiff.classList.remove('active','hover-effect');
+  targetCard.classList.remove('hover-effect');
+  $('btn-terminal').classList.add('active');
+  resetTerm(); progress(0);
+  label('1','Kanban board \u2014 scan all tasks at a glance');
+  cursor.style.transition = 'none';
+  cursor.style.left = '50%'; cursor.style.top = '110%';
+}
+
+function run() {
+  reset();
+  var t = setTimeout;
+
+  t(function(){ show(); progress(5); }, 600);
+  t(function(){ var p = pos(targetCard); moveTo(p.x, p.y, 800); progress(10); }, 900);
+  t(function(){ targetCard.classList.add('hover-effect'); progress(15); }, 1800);
+  t(function(){ var p = pos(targetCard); doClick(p.x, p.y); targetCard.classList.remove('hover-effect'); progress(20); }, 2300);
+
+  t(function(){
+    stateKanban.classList.add('hidden');
+    stateTask.classList.add('visible');
+    showTaskBar();
+    label('2','Task opens \u2014 Claude Code running');
+    progress(25); hide();
+    animTerm();
+  }, 2600);
+
+  t(function(){ progress(35); }, 4000);
+  t(function(){ progress(45); }, 6000);
+
+  t(function(){
+    show();
+    var p = pos(btnBrowser);
+    cursor.style.transition = 'none';
+    cursor.style.left = (p.x+100)+'px'; cursor.style.top = (p.y+50)+'px';
+    progress(50);
+  }, 8000);
+  t(function(){ var p = pos(btnBrowser); moveTo(p.x, p.y, 600); }, 8300);
+  t(function(){ btnBrowser.classList.add('hover-effect'); progress(53); }, 9000);
+  t(function(){
+    var p = pos(btnBrowser); doClick(p.x, p.y);
+    btnBrowser.classList.remove('hover-effect');
+    btnBrowser.classList.add('active');
+    paneBrowser.classList.add('visible');
+    label('3','Inline browser \u2014 preview the running app');
+    progress(58); hide();
+  }, 9500);
+
+  t(function(){ progress(65); }, 11000);
+
+  t(function(){
+    show();
+    var p = pos(btnDiff);
+    cursor.style.transition = 'none';
+    cursor.style.left = (p.x+100)+'px'; cursor.style.top = (p.y+50)+'px';
+    progress(70);
+  }, 12500);
+  t(function(){ var p = pos(btnDiff); moveTo(p.x, p.y, 600); }, 12800);
+  t(function(){ btnDiff.classList.add('hover-effect'); progress(73); }, 13500);
+  t(function(){
+    var p = pos(btnDiff); doClick(p.x, p.y);
+    btnDiff.classList.remove('hover-effect');
+    btnDiff.classList.add('active');
+    paneDiff.classList.add('visible');
+    label('4','Three panels \u2014 terminal, browser, and diff side by side');
+    progress(82); hide();
+  }, 14000);
+
+  t(function(){ progress(90); }, 15500);
+  t(function(){ progress(95); }, 17000);
+
+  t(function(){
+    progress(100);
+    stateTask.classList.remove('visible');
+    paneBrowser.classList.remove('visible');
+    paneDiff.classList.remove('visible');
+    btnBrowser.classList.remove('active');
+    btnDiff.classList.remove('active');
+    showDefaultBar();
+    stateKanban.classList.remove('hidden');
+    label('1','Kanban board \u2014 scan all tasks at a glance');
+  }, 18500);
+
+  t(run, 20500);
+}
+
+(function() {
+  var bow = document.querySelector('.hero-bow');
+  for (var i = 0; i < 25; i++) {
+    var b = document.createElement('div');
+    b.className = 'bubble';
+    var size = Math.random() * 50 + 8;
+    var bright = Math.random() * 0.08 + 0.03;
+    b.style.width = size + 'px';
+    b.style.height = size + 'px';
+    b.style.left = Math.random() * 100 + '%';
+    b.style.bottom = '-' + size + 'px';
+    b.style.background = 'rgba(255,255,255,' + (bright * 0.6) + ')';
+    b.style.border = '1px solid rgba(255,255,255,' + bright + ')';
+    b.style.setProperty('--drift', (Math.random() - 0.5) * 80 + 'px');
+    b.style.animationDuration = (Math.random() * 12 + 8) + 's';
+    b.style.animationDelay = (Math.random() * 12) + 's';
+    bow.appendChild(b);
+  }
+})();
+
+function scaleDemo() {
+  var demo = document.querySelector('.demo-section');
+  var pw = demo.parentElement.clientWidth;
+  demo.style.zoom = Math.min(1, pw / 912);
+}
+window.addEventListener('resize', scaleDemo);
+scaleDemo();
+
+setTimeout(run, 1200);
+</script>
+</body>
+</html>
