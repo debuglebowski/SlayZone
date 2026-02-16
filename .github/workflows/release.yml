@@ -48,6 +48,8 @@ jobs:
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+        env:
+          CI_SKIP_POSTINSTALL: '1'
 
       - name: Build
         run: pnpm build
@@ -62,5 +64,20 @@ jobs:
       - name: Package and publish
         shell: bash
         run: pnpm --filter @slayzone/app exec electron-builder ${{ matrix.build_args }} -c.electronVersion=${{ env.ELECTRON_VERSION }} --publish always
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  cleanup:
+    needs: release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Remove auto-update artifacts
+        run: |
+          TAG="${GITHUB_REF#refs/tags/}"
+          for asset in $(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name | select(test("\\.(blockmap|yml|zip)$"))'); do
+            gh release delete-asset "$TAG" "$asset" --repo "$GITHUB_REPOSITORY" --yes
+          done
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

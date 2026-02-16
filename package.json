@@ -10,7 +10,7 @@
     ]
   },
   "scripts": {
-    "postinstall": "electron-rebuild -f -w better-sqlite3,node-pty",
+    "postinstall": "node -e \"if(!process.env.CI_SKIP_POSTINSTALL)require('child_process').execSync('electron-rebuild -f -w better-sqlite3,node-pty',{stdio:'inherit'})\"",
     "dev": "pnpm --filter @slayzone/app dev",
     "generate-icons": "node scripts/generate-icons.js",
     "patch-electron-name": "node scripts/patch-electron-name.js",
@@ -42,5 +42,5 @@
     "node": ">=20",
     "pnpm": ">=9"
   },
-  "version": "0.1.29"
+  "version": "0.1.30"
 }
