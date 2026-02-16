@@ -62,6 +62,7 @@ const shortcutGroups = [
     { label: 'Browser', keys: '⌘ B' },
     { label: 'Editor', keys: '⌘ E' },
     { label: 'Git', keys: '⌘ G' },
+    { label: 'Git Diff', keys: '⌘ ⇧ G' },
     { label: 'Settings', keys: '⌘ S' },
   ]},
   { heading: 'Terminal', items: [

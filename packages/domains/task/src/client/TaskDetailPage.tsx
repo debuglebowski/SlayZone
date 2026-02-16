@@ -55,7 +55,7 @@ import { TaskMetadataSidebar, LinearCard } from './TaskMetadataSidebar'
 import { RichTextEditor } from '@slayzone/editor'
 import { markSkipCache, usePty } from '@slayzone/terminal'
 import { TerminalContainer } from '@slayzone/task-terminals'
-import { GitPanel, UnifiedGitPanel } from '@slayzone/worktrees'
+import { GitPanel, UnifiedGitPanel, type UnifiedGitPanelHandle, type GitTabId } from '@slayzone/worktrees'
 import { cn, getTaskStatusStyle } from '@slayzone/ui'
 import { BrowserPanel } from '@slayzone/task-browser'
 import { FileEditorView } from '@slayzone/file-editor/client'
@@ -281,6 +281,8 @@ export function TaskDetailPage({
   const devServerAutoOpenRef = useRef(false)
   const devServerAutoOpenCallbackRef = useRef<((url: string) => void) | null>(null)
   const browserOpenRef = useRef(panelVisibility.browser)
+  const gitPanelRef = useRef<UnifiedGitPanelHandle>(null)
+  const [gitDefaultTab, setGitDefaultTab] = useState<GitTabId>('general')
   useEffect(() => { browserOpenRef.current = panelVisibility.browser }, [panelVisibility.browser])
 
   // Load dev server settings
@@ -802,6 +804,21 @@ export function TaskDetailPage({
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent): void => {
       if (!isActive) return
+      // Cmd+Shift+G: git diff tab toggle
+      if (e.metaKey && e.shiftKey) {
+        if (e.key === 'g' && isBuiltinEnabled('diff')) {
+          e.preventDefault()
+          if (!panelVisibility.diff) {
+            setGitDefaultTab('changes')
+            handlePanelToggle('diff', true)
+          } else if (gitPanelRef.current?.getActiveTab() === 'changes') {
+            handlePanelToggle('diff', false)
+          } else {
+            gitPanelRef.current?.switchToTab('changes')
+          }
+        }
+      }
+
       if (e.metaKey && !e.shiftKey) {
         // Skip shortcuts when focus is in CodeMirror or contenteditable editors
         const target = e.target as HTMLElement
@@ -809,16 +826,23 @@ export function TaskDetailPage({
         const inCodeMirror = target?.closest?.('.cm-editor')
         if (inCodeMirror) return
 
-        // Built-in panel shortcuts (only if globally enabled)
-        if (e.key === 't' && isBuiltinEnabled('terminal')) {
+        // Cmd+G: git general tab toggle
+        if (e.key === 'g' && isBuiltinEnabled('diff')) {
+          e.preventDefault()
+          if (!panelVisibility.diff) {
+            setGitDefaultTab('general')
+            handlePanelToggle('diff', true)
+          } else if (gitPanelRef.current?.getActiveTab() === 'general') {
+            handlePanelToggle('diff', false)
+          } else {
+            gitPanelRef.current?.switchToTab('general')
+          }
+        } else if (e.key === 't' && isBuiltinEnabled('terminal')) {
           e.preventDefault()
           handlePanelToggle('terminal', !panelVisibility.terminal)
         } else if (e.key === 'b' && !inEditor && isBuiltinEnabled('browser')) {
           e.preventDefault()
           handlePanelToggle('browser', !panelVisibility.browser)
-        } else if (e.key === 'g' && isBuiltinEnabled('diff')) {
-          e.preventDefault()
-          handlePanelToggle('diff', !panelVisibility.diff)
         } else if (e.key === 's' && isBuiltinEnabled('settings')) {
           e.preventDefault()
           handlePanelToggle('settings', !panelVisibility.settings)
@@ -1533,9 +1557,11 @@ export function TaskDetailPage({
         {panelVisibility.diff && (
           <div className="shrink-0 rounded-md bg-surface-1 border border-border overflow-hidden flex flex-col" style={{ width: resolvedWidths.diff }}>
             <UnifiedGitPanel
+              ref={gitPanelRef}
               task={task}
               projectPath={project?.path ?? null}
               visible={panelVisibility.diff}
+              defaultTab={gitDefaultTab}
               pollIntervalMs={5000}
               onUpdateTask={updateTaskAndNotify}
               onTaskUpdated={handleTaskUpdate}

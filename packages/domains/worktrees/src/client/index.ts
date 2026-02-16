@@ -1,6 +1,6 @@
 export { GitPanel } from './GitPanel'
 export { CreateWorktreeDialog } from './CreateWorktreeDialog'
 export { GitDiffPanel } from './GitDiffPanel'
-export { UnifiedGitPanel } from './UnifiedGitPanel'
+export { UnifiedGitPanel, type UnifiedGitPanelHandle, type GitTabId } from './UnifiedGitPanel'
 export { GeneralTabContent } from './GeneralTabContent'
 export { CommitTimeline } from './CommitTimeline'

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react'
 import { Check, X, SkipForward, AlertTriangle, RefreshCw } from 'lucide-react'
 import { Button, Checkbox, cn } from '@slayzone/ui'
 import type { Task, UpdateTaskInput, MergeContext } from '@slayzone/task/shared'
@@ -8,16 +8,17 @@ import { ConflictFileView } from './ConflictFileView'
 import { CommitTimeline } from './CommitTimeline'
 import { GeneralTabContent } from './GeneralTabContent'
 
+export type GitTabId = 'general' | 'changes' | 'conflicts'
+
 interface UnifiedGitPanelProps {
   task: Task
   projectPath: string | null
   visible: boolean
   pollIntervalMs?: number
+  defaultTab?: GitTabId
   onUpdateTask: (data: UpdateTaskInput) => Promise<Task>
   onTaskUpdated: (task: Task) => void
 }
-
-type TabId = 'general' | 'changes' | 'conflicts'
 
 interface ConflictToolbarData {
   resolvedCount: number
@@ -27,15 +28,26 @@ interface ConflictToolbarData {
   onAbort: () => void
 }
 
-export function UnifiedGitPanel({
+export interface UnifiedGitPanelHandle {
+  switchToTab: (tab: GitTabId) => void
+  getActiveTab: () => GitTabId
+}
+
+export const UnifiedGitPanel = forwardRef<UnifiedGitPanelHandle, UnifiedGitPanelProps>(function UnifiedGitPanel({
   task,
   projectPath,
   visible,
   pollIntervalMs,
+  defaultTab = 'general',
   onUpdateTask,
   onTaskUpdated
-}: UnifiedGitPanelProps) {
-  const [activeTab, setActiveTab] = useState<TabId>('general')
+}, ref) {
+  const [activeTab, setActiveTab] = useState<GitTabId>(defaultTab)
+
+  useImperativeHandle(ref, () => ({
+    switchToTab: setActiveTab,
+    getActiveTab: () => activeTab
+  }), [activeTab])
   const hasConflicts = task.merge_state === 'conflicts' || task.merge_state === 'rebase-conflicts'
   const isUncommitted = task.merge_state === 'uncommitted'
   const isRebase = task.merge_state === 'rebase-conflicts'
@@ -189,7 +201,7 @@ export function UnifiedGitPanel({
       </div>
     </div>
   )
-}
+})
 
 // --- Tab button ---
 
