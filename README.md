@@ -73,37 +73,12 @@ Link a git worktree to any task. One branch per task, automatic isolation, view 
 
 <br />
 
-## Keyboard-first
-
-| Shortcut      | Action                            |
-| ------------- | --------------------------------- |
-| `Cmd+N`       | New task                          |
-| `Cmd+Shift+N` | Quick run — create + open         |
-| `Cmd+K`       | Search                            |
-| `Cmd+Shift+D` | Complete task + close             |
-| `Cmd+I`       | Inject task context into terminal |
-
-<br />
-
 ---
 
 <br />
 
-## Build from source
+## Contributing
 
-```bash
-git clone https://github.com/AustejaJak/slayzone.git
-cd slayzone
-pnpm install
-pnpm dev
-```
+Contributions are welcome! Worth noting is that SlayZone is pretty much built with SlayZone itself.
 
-Requires Node.js 20+ and pnpm 10+.
-
-<br />
-
----
-
-<p align="center">
-  <sub>Built with Electron, React, SQLite, and mass amounts of caffeine.</sub>
-</p>
+SlayZone is a pnpm monorepo built with Electron, React, and SQLite.
