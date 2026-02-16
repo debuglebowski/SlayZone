@@ -457,9 +457,8 @@ app.whenReady().then(() => {
   // Configure webview session for WebAuthn/passkey support
   const browserSession = session.fromPartition('persist:browser-tabs')
 
-  // Serve local files via slz-file:// in browser panel webviews
-  // (Chromium blocks file:// navigation in webviews — custom protocol bypasses this)
-  browserSession.protocol.handle('slz-file', async (request) => {
+  // Serve local files via slz-file:// (Chromium blocks file:// in webviews and cross-origin renderers)
+  const slzFileHandler = async (request: Request) => {
     // slz-file:///path/to/file → /path/to/file
     const filePath = decodeURIComponent(request.url.replace(/^slz-file:\/\//, ''))
     const mimeTypes: Record<string, string> = {
@@ -467,6 +466,7 @@ app.whenReady().then(() => {
       '.js': 'text/javascript', '.mjs': 'text/javascript', '.json': 'application/json',
       '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg',
       '.gif': 'image/gif', '.svg': 'image/svg+xml', '.ico': 'image/x-icon',
+      '.webp': 'image/webp', '.avif': 'image/avif', '.bmp': 'image/bmp',
       '.woff': 'font/woff', '.woff2': 'font/woff2', '.ttf': 'font/ttf',
       '.pdf': 'application/pdf', '.xml': 'application/xml', '.txt': 'text/plain',
     }
@@ -478,7 +478,9 @@ app.whenReady().then(() => {
     } catch {
       return new Response('Not found', { status: 404 })
     }
-  })
+  }
+  browserSession.protocol.handle('slz-file', slzFileHandler)
+  session.defaultSession.protocol.handle('slz-file', slzFileHandler)
 
   browserSession.setPermissionRequestHandler((_webContents, permission, callback) => {
     const allowedPermissions = ['hid', 'usb', 'clipboard-read', 'clipboard-write']

@@ -225,7 +225,7 @@ export function FileEditorView({ projectPath, isActive = true }: FileEditorViewP
             </div>
             {isMarkdown && previewVisible && (
               <div className="w-1/2 min-w-0 border-l">
-                <MarkdownPreview content={activeFile.content} scrollRef={previewScrollRef} />
+                <MarkdownPreview content={activeFile.content} scrollRef={previewScrollRef} projectPath={projectPath} filePath={activeFilePath ?? undefined} />
               </div>
             )}
           </div>
