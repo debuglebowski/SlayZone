@@ -56,6 +56,7 @@ jobs:
         run: node -e "const fs=require('fs'),p='packages/apps/app/package.json',pkg=JSON.parse(fs.readFileSync(p));Object.keys(pkg.dependencies).filter(k=>k.startsWith('@slayzone/')).forEach(k=>delete pkg.dependencies[k]);fs.writeFileSync(p,JSON.stringify(pkg,null,2)+'\n')"
 
       - name: Package and publish
+        shell: bash
         run: pnpm --filter @slayzone/app exec electron-builder ${{ matrix.build_args }} -c.electronVersion=${{ env.ELECTRON_VERSION }} --publish always
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
