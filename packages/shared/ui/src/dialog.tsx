@@ -49,8 +49,10 @@ function DialogContent({
   size?: 'default' | 'settings' | 'project-settings' | 'xl'
 }) {
   const sizeClass =
-    size === 'settings' || size === 'project-settings'
+    size === 'settings'
       ? 'h-[88vh] !w-[80vw] !max-w-[80vw] p-0'
+      : size === 'project-settings'
+      ? 'h-[88vh] !w-[94vw] !max-w-[94vw] xl:!max-w-[1320px] p-0'
       : size === 'xl'
         ? 'w-[min(1200px,92vw)] max-w-[1200px]'
         : ''

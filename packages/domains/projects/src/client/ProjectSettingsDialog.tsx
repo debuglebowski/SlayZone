@@ -251,8 +251,8 @@ export function ProjectSettingsDialog({
 
   const navItems: Array<{ key: typeof activeTab; label: string }> = [
     { key: 'general', label: 'General' },
-    { key: 'integrations', label: 'Integrations' },
-    { key: 'ai-config', label: 'Context Manager' }
+    { key: 'integrations', label: 'Integrations' }
+    // { key: 'ai-config', label: 'Context Manager' }
   ]
 
   return (
@@ -267,7 +267,7 @@ export function ProjectSettingsDialog({
           onSelect={(key) => setActiveTab(key as typeof activeTab)}
         >
           {activeTab === 'general' && (
-            <div className="mx-auto w-full max-w-4xl">
+            <div className="w-full">
               <form onSubmit={handleSubmit} className="space-y-6">
                 <div className="space-y-1">
                   <Label htmlFor="edit-name">Name</Label>
@@ -325,7 +325,7 @@ export function ProjectSettingsDialog({
           )}
 
           {activeTab === 'integrations' && (
-            <div className="mx-auto w-full max-w-4xl space-y-6">
+            <div className="w-full space-y-6">
               <Card className="gap-4 py-4">
                 <CardHeader className="px-4">
                   <CardTitle className="text-base">Mapping</CardTitle>

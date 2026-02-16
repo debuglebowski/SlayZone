@@ -416,7 +416,7 @@ export function UserSettingsDialog({
     { key: 'panels', label: 'Panels' },
     { key: 'integrations', label: 'Integrations' },
     { key: 'diagnostics', label: 'Diagnostics' },
-    { key: 'ai-config', label: 'Context Manager' },
+    // { key: 'ai-config', label: 'Context Manager' },
     { key: 'tags', label: 'Tags' },
     { key: 'telemetry', label: 'Telemetry' },
     { key: 'about', label: 'About' }

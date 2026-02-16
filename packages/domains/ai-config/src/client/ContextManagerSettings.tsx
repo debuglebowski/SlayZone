@@ -1,12 +1,12 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   ArrowLeft, Check, AlertCircle, ChevronRight,
-  Plus, Sparkles, Wrench, Server, FileText, FolderTree, RefreshCcw, Settings2
+  Plus, Sparkles, Wrench, Server, FileText, FolderTree, RefreshCw, Settings2
 } from 'lucide-react'
-import { Button, cn, Switch } from '@slayzone/ui'
+import { Button, cn, FileTree, fileTreeIndent, Switch } from '@slayzone/ui'
 import type {
   AiConfigItem, AiConfigItemType, AiConfigScope,
-  CliProvider, CliProviderInfo, ProjectSkillStatus,
+  CliProvider, CliProviderInfo, ContextTreeEntry, ProjectSkillStatus,
   ProviderSyncStatus, UpdateAiConfigItemInput
 } from '../shared'
 import { ContextItemEditor } from './ContextItemEditor'
@@ -288,20 +288,20 @@ function OverviewPanel({
         <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
       </button>
 
-      {/* Files */}
-      <button
-        onClick={() => onNavigate('files')}
-        className="flex w-full items-center gap-3 rounded-lg border p-3.5 text-left transition-colors hover:bg-muted/50"
-      >
-        <FolderTree className="size-5 shrink-0 text-muted-foreground" />
-        <div className="min-w-0 flex-1">
-          <span className="text-sm font-medium">Files</span>
-          {!isProject && (
+      {/* Files — only for global scope (project has the side panel) */}
+      {!isProject && (
+        <button
+          onClick={() => onNavigate('files')}
+          className="flex w-full items-center gap-3 rounded-lg border p-3.5 text-left transition-colors hover:bg-muted/50"
+        >
+          <FolderTree className="size-5 shrink-0 text-muted-foreground" />
+          <div className="min-w-0 flex-1">
+            <span className="text-sm font-medium">Files</span>
             <p className="mt-0.5 text-xs text-muted-foreground">Global config files across all providers</p>
-          )}
-        </div>
-        <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
-      </button>
+          </div>
+          <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
+        </button>
+      )}
     </div>
   )
 }
@@ -367,6 +367,173 @@ function ProvidersPanel() {
 }
 
 // ---------------------------------------------------------------------------
+// Synced files panel — shows file tree on disk with per-file sync
+// ---------------------------------------------------------------------------
+
+function SyncedFileRow({
+  entry,
+  name,
+  depth,
+  onSync,
+}: {
+  entry: ContextTreeEntry
+  name: string
+  depth: number
+  onSync: () => void
+}) {
+  return (
+    <div
+      className="group flex items-center gap-1.5 rounded px-1 py-1 text-xs hover:bg-muted/50"
+      style={{ paddingLeft: fileTreeIndent(depth) }}
+    >
+      <span className="flex-1 truncate font-mono">{name}</span>
+      {entry.syncStatus === 'synced' && (
+        <Check className="size-3 text-green-600 dark:text-green-400 shrink-0" />
+      )}
+      {entry.syncStatus === 'out_of_sync' && (
+        <AlertCircle className="size-3 text-amber-600 dark:text-amber-400 shrink-0" />
+      )}
+      {entry.linkedItemId && (
+        <button
+          type="button"
+          onClick={onSync}
+          className="text-muted-foreground hover:text-foreground transition-colors p-0.5 opacity-0 group-hover:opacity-100"
+          title={`Sync ${name}`}
+        >
+          <RefreshCw className="size-3" />
+        </button>
+      )}
+    </div>
+  )
+}
+
+function SyncedFilesPanel({
+  projectId,
+  projectPath,
+  version,
+  onSynced,
+}: {
+  projectId: string
+  projectPath: string
+  version: number
+  onSynced: () => void
+}) {
+  const [entries, setEntries] = useState<ContextTreeEntry[]>([])
+  const [loading, setLoading] = useState(false)
+  const [syncingAll, setSyncingAll] = useState(false)
+
+  useEffect(() => {
+    let stale = false
+    setLoading(true)
+    void (async () => {
+      try {
+        const tree = await window.api.aiConfig.getContextTree(projectPath, projectId)
+        if (stale) return
+        setEntries(tree)
+      } finally {
+        if (!stale) setLoading(false)
+      }
+    })()
+    return () => { stale = true }
+  }, [projectId, projectPath, version])
+
+  const handleSyncFile = async (entry: ContextTreeEntry) => {
+    if (!entry.linkedItemId) return
+    try {
+      const updated = await window.api.aiConfig.syncLinkedFile(projectId, projectPath, entry.linkedItemId)
+      setEntries((prev) => prev.map((e) => (e.path === updated.path ? updated : e)))
+      onSynced()
+    } catch {
+      // silently fail
+    }
+  }
+
+  const handleSyncAll = async () => {
+    setSyncingAll(true)
+    try {
+      await window.api.aiConfig.syncAll({ projectId, projectPath })
+      const tree = await window.api.aiConfig.getContextTree(projectPath, projectId)
+      setEntries(tree)
+      onSynced()
+    } finally {
+      setSyncingAll(false)
+    }
+  }
+
+  const getPath = useCallback((e: ContextTreeEntry) => e.relativePath, [])
+  const projectEntries = useMemo(() => entries.filter((e) => !e.relativePath.startsWith('~')), [entries])
+  const globalEntries = useMemo(() => entries.filter((e) => e.relativePath.startsWith('~')), [entries])
+
+  const renderFile = useCallback((entry: ContextTreeEntry, info: { name: string; depth: number }) => (
+    <SyncedFileRow
+      entry={entry}
+      name={info.name}
+      depth={info.depth}
+      onSync={() => handleSyncFile(entry)}
+    />
+  ), [])
+
+  if (loading && entries.length === 0) {
+    return (
+      <div className="space-y-1">
+        {[1, 2, 3].map(i => (
+          <div key={i} className="h-5 animate-pulse rounded bg-muted/20" />
+        ))}
+      </div>
+    )
+  }
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-3">
+        <span className="text-xs font-semibold text-muted-foreground">Synced Files</span>
+        <button
+          type="button"
+          onClick={handleSyncAll}
+          disabled={syncingAll}
+          className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
+        >
+          <RefreshCw className={cn('size-3', syncingAll && 'animate-spin')} />
+          Sync All
+        </button>
+      </div>
+
+      <div className="overflow-y-auto space-y-3" style={{ maxHeight: 'calc(100vh - 340px)' }}>
+        {projectEntries.length > 0 && (
+          <div>
+            <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">Project</span>
+            <FileTree
+              items={projectEntries}
+              getPath={getPath}
+              renderFile={renderFile}
+              defaultExpanded
+            />
+          </div>
+        )}
+
+        {globalEntries.length > 0 && (
+          <div>
+            <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">Global</span>
+            <FileTree
+              items={globalEntries}
+              getPath={getPath}
+              renderFile={renderFile}
+              defaultExpanded
+            />
+          </div>
+        )}
+
+        {entries.length === 0 && !loading && (
+          <p className="text-xs text-muted-foreground py-4 text-center">
+            No synced files yet. Hit Sync to write files to disk.
+          </p>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
 // Main component
 // ---------------------------------------------------------------------------
 
@@ -376,41 +543,11 @@ export function ContextManagerSettings({ scope, projectId, projectPath, projectN
   const [editingId, setEditingId] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [providerVersion, setProviderVersion] = useState(0)
-  const [syncNeeded, setSyncNeeded] = useState(false)
-  const [syncing, setSyncing] = useState(false)
-  const [syncMessage, setSyncMessage] = useState('')
   const [syncCheckVersion, setSyncCheckVersion] = useState(0)
   const [pickerTrigger, setPickerTrigger] = useState(0)
   const [createTrigger, setCreateTrigger] = useState(0)
 
   const isProject = scope === 'project' && !!projectId && !!projectPath
-
-  useEffect(() => {
-    if (!isProject) return
-    void (async () => {
-      const needed = await window.api.aiConfig.needsSync(projectId!, projectPath!)
-      setSyncNeeded(needed)
-    })()
-  }, [isProject, projectId, projectPath, providerVersion, syncCheckVersion])
-
-  const handleSync = async () => {
-    if (!isProject) return
-    setSyncing(true)
-    setSyncMessage('')
-    try {
-      const result = await window.api.aiConfig.syncAll({ projectId: projectId!, projectPath: projectPath! })
-      const parts: string[] = []
-      if (result.written.length) parts.push(`${result.written.length} written`)
-      if (result.conflicts.length) parts.push(`${result.conflicts.length} conflicts`)
-      setSyncMessage(parts.join(', ') || 'All synced')
-      setSyncNeeded(false)
-      setProviderVersion(v => v + 1)
-    } catch (err) {
-      setSyncMessage(err instanceof Error ? err.message : 'Sync failed')
-    } finally {
-      setSyncing(false)
-    }
-  }
 
   const handleChildChanged = () => setSyncCheckVersion(v => v + 1)
 
@@ -463,8 +600,8 @@ export function ContextManagerSettings({ scope, projectId, projectPath, projectN
     setEditingId(null)
   }
 
-  return (
-    <div className={cn(isProject && 'flex min-h-full flex-col')}>
+  const mainContent = (
+    <div className={cn(isProject ? 'flex-1 min-w-0' : 'flex min-h-full flex-col')}>
       {/* Header: back button + actions when drilled in */}
       {section !== null && (
         <div className="flex items-center justify-between gap-3 pb-4">
@@ -619,17 +756,25 @@ export function ContextManagerSettings({ scope, projectId, projectPath, projectN
           </>
         ) : null}
       </div>
-
-      {/* Sync button — pinned to bottom */}
-      {isProject && (
-        <div className="sticky bottom-0 -mx-6 mt-4 flex items-center justify-end gap-2 border-t bg-background px-6 py-3">
-          {syncMessage && <span className="text-[11px] text-muted-foreground">{syncMessage}</span>}
-          <Button size="sm" onClick={handleSync} disabled={!syncNeeded || syncing}>
-            <RefreshCcw className={cn('mr-1 size-3.5', syncing && 'animate-spin')} />
-            {syncing ? 'Syncing...' : 'Sync'}
-          </Button>
-        </div>
-      )}
     </div>
   )
+
+  // Project mode: horizontal split with file tree on the right
+  if (isProject) {
+    return (
+      <div className="flex min-h-full gap-4">
+        {mainContent}
+        <div className="w-64 shrink-0 border-l pl-4">
+          <SyncedFilesPanel
+            projectId={projectId!}
+            projectPath={projectPath!}
+            version={providerVersion + syncCheckVersion}
+            onSynced={() => setSyncCheckVersion(v => v + 1)}
+          />
+        </div>
+      </div>
+    )
+  }
+
+  return mainContent
 }
