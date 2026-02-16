@@ -37,6 +37,8 @@ linux:
     - deb
   maintainer: slayzone
   category: Utility
+deb:
+  artifactName: ${productName}-${version}-${arch}.${ext}
 appImage:
   artifactName: ${productName}-${version}.${ext}
 npmRebuild: true
