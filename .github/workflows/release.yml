@@ -55,3 +55,4 @@ jobs:
         run: pnpm --filter @slayzone/app exec electron-builder --${{ matrix.target }} ${{ matrix.args }} -c.electronVersion=$ELECTRON_VERSION --publish always
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NODE_OPTIONS: --max-old-space-size=4096
