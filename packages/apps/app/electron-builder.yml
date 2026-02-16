@@ -17,7 +17,7 @@ asarUnpack:
 win:
   executableName: slayzone
 nsis:
-  artifactName: ${productName}-${version}-setup.${ext}
+  artifactName: ${productName}-setup.${ext}
   shortcutName: ${productName}
   uninstallDisplayName: ${productName}
   createDesktopShortcut: always
@@ -31,7 +31,7 @@ mac:
     - NSDownloadsFolderUsageDescription: Application requests access to the user's Downloads folder.
   notarize: false
 dmg:
-  artifactName: ${productName}-${version}.${ext}
+  artifactName: ${productName}.${ext}
 linux:
   target:
     - AppImage
@@ -39,9 +39,9 @@ linux:
   maintainer: slayzone
   category: Utility
 deb:
-  artifactName: ${productName}-${version}-${arch}.${ext}
+  artifactName: ${productName}-${arch}.${ext}
 appImage:
-  artifactName: ${productName}-${version}.${ext}
+  artifactName: ${productName}.${ext}
 npmRebuild: true
 nativeRebuilder: sequential
 publish:

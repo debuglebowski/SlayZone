@@ -73,11 +73,16 @@ jobs:
     permissions:
       contents: write
     steps:
-      - name: Remove auto-update artifacts
+      - name: Remove blockmap artifacts (keep .yml for electron-updater)
         run: |
           TAG="${GITHUB_REF#refs/tags/}"
-          for asset in $(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name | select(test("\\.(blockmap|yml|zip)$"))'); do
+          for asset in $(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name | select(test("\\.(blockmap)$"))'); do
             gh release delete-asset "$TAG" "$asset" --repo "$GITHUB_REPOSITORY" --yes
           done
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Publish release
+        run: gh release edit "${GITHUB_REF#refs/tags/}" --repo "$GITHUB_REPOSITORY" --draft=false
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
