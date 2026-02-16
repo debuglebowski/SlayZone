@@ -187,8 +187,9 @@ export function TaskDetailPage({
   const [titleValue, setTitleValue] = useState('')
   const titleInputRef = useRef<HTMLInputElement>(null)
 
-  // Delete dialog state
+  // Delete/archive dialog state
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [archiveDialogOpen, setArchiveDialogOpen] = useState(false)
 
   // In-progress prompt state
   const [inProgressPromptOpen, setInProgressPromptOpen] = useState(false)
@@ -1085,6 +1086,14 @@ export function TaskDetailPage({
     setTaskTagIds(newTagIds)
   }
 
+  const isArchived = !!task?.archived_at
+
+  const handleUnarchive = async (): Promise<void> => {
+    if (!task) return
+    const restored = await window.api.db.unarchiveTask(task.id)
+    handleTaskUpdate(restored)
+  }
+
   const handleArchive = async (): Promise<void> => {
     if (!task) return
     if (onArchiveTask) {
@@ -1092,7 +1101,8 @@ export function TaskDetailPage({
     } else {
       await window.api.db.archiveTask(task.id)
     }
-    onBack()
+    handleTaskUpdate({ ...task, archived_at: new Date().toISOString() })
+    setArchiveDialogOpen(false)
   }
 
   const handleDeleteConfirm = (): void => {
@@ -1676,56 +1686,30 @@ export function TaskDetailPage({
           {/* Linear group — only shown when linked */}
           <LinearCard taskId={task.id} onUpdate={handleTaskUpdate} />
 
-          {/* Git group */}
-          <Collapsible>
-            <CollapsibleTrigger className="flex w-full items-center gap-1.5 rounded-md border border-border bg-muted/50 px-2.5 py-1.5 text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground transition-colors [&[data-state=open]>svg]:rotate-90">
-              <ChevronRight className="size-3 transition-transform" />
-              Git
-            </CollapsibleTrigger>
-            <CollapsibleContent className="border-l border-border ml-2 pl-6 pt-5">
-              <div data-testid="task-git-panel">
-                <GitPanel
-                  task={task}
-                  projectPath={project?.path ?? null}
-                  onUpdateTask={updateTaskAndNotify}
-                  onTaskUpdated={handleTaskUpdate}
-                  onOpenGitPanel={() => {
-                    if (!panelVisibility.diff) handlePanelToggle('diff', true)
-                  }}
-                />
-              </div>
-            </CollapsibleContent>
-          </Collapsible>
+          {/* Details */}
+          <TaskMetadataSidebar
+            task={task}
+            tags={tags}
+            taskTagIds={taskTagIds}
+            onUpdate={handleTaskUpdate}
+            onTagsChange={handleTagsChange}
+          />
 
-          {/* Details group */}
-          <Collapsible defaultOpen>
-            <CollapsibleTrigger className="flex w-full items-center gap-1.5 rounded-md border border-border bg-muted/50 px-2.5 py-1.5 text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground transition-colors [&[data-state=open]>svg]:rotate-90">
-              <ChevronRight className="size-3 transition-transform" />
-              Details
-            </CollapsibleTrigger>
-            <CollapsibleContent className="border-l border-border ml-2 pl-6 pt-5">
-              <TaskMetadataSidebar
-                task={task}
-                tags={tags}
-                taskTagIds={taskTagIds}
-                onUpdate={handleTaskUpdate}
-                onTagsChange={handleTagsChange}
-              />
-              <div className="flex flex-col gap-2 pt-2 border-t border-border">
-                <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Danger zone</span>
-                <div className="flex items-center gap-2">
-                <Button variant="outline" size="sm" className="flex-1 text-xs" onClick={handleArchive}>
-                  <Archive className="mr-1.5 size-3" />
-                  Archive
-                </Button>
-                <Button variant="outline" size="sm" className="flex-1 text-xs text-destructive hover:text-destructive" onClick={() => setDeleteDialogOpen(true)}>
-                  <Trash2 className="mr-1.5 size-3" />
-                  Delete
-                </Button>
-                </div>
-              </div>
-            </CollapsibleContent>
-          </Collapsible>
+          {/* Danger zone */}
+          <div className="flex flex-col gap-2">
+            <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Danger zone</span>
+            <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" className="flex-1 text-xs" onClick={isArchived ? handleUnarchive : () => setArchiveDialogOpen(true)}>
+              <Archive className="mr-1.5 size-3" />
+              {isArchived ? 'Unarchive' : 'Archive'}
+            </Button>
+            <Button variant="outline" size="sm" className="flex-1 text-xs text-destructive hover:text-destructive" onClick={() => setDeleteDialogOpen(true)}>
+              <Trash2 className="mr-1.5 size-3" />
+              Delete
+            </Button>
+            </div>
+          </div>
+
         </div>
         )}
       </div>
@@ -1737,6 +1721,23 @@ export function TaskDetailPage({
         onDeleted={handleDeleteConfirm}
         onDeleteTask={onDeleteTask}
       />
+
+      <AlertDialog open={archiveDialogOpen} onOpenChange={setArchiveDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{isArchived ? 'Unarchive' : 'Archive'} Task</AlertDialogTitle>
+            <AlertDialogDescription>
+              {isArchived
+                ? `Restore "${task?.title}" from the archive?`
+                : `Archive "${task?.title}"? You can restore it later from the archive.`}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleArchive}>{isArchived ? 'Unarchive' : 'Archive'}</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <AlertDialog open={inProgressPromptOpen} onOpenChange={setInProgressPromptOpen}>
         <AlertDialogContent>
