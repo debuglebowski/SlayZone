@@ -59,16 +59,16 @@ export function EditorTabBar({ files, activeFilePath, onSelect, onClose, isDirty
               <span className="text-[10px] leading-none text-amber-500 shrink-0">changed</span>
             )}
             <span
-              className="size-4 flex items-center justify-center rounded shrink-0 hover:bg-muted"
+              className="grid place-items-center size-4 shrink-0 rounded hover:bg-muted"
               onClick={(e) => {
                 e.stopPropagation()
                 onClose(file.path)
               }}
             >
-              {dirty ? (
-                <span className="size-2 rounded-full bg-muted-foreground group-hover:hidden" />
-              ) : null}
-              <X className={cn('size-3', dirty ? 'hidden group-hover:block' : 'opacity-0 group-hover:opacity-100')} />
+              {dirty && (
+                <span className="col-start-1 row-start-1 size-2 rounded-full bg-foreground opacity-40 transition-opacity group-hover:opacity-0" />
+              )}
+              <X className="col-start-1 row-start-1 size-3 opacity-0 transition-opacity group-hover:opacity-100" />
             </span>
           </button>
         )

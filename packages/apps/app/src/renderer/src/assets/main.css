@@ -16,6 +16,7 @@
 @source "../../../../../../../packages/domains/task-browser/src";
 @source "../../../../../../../packages/domains/worktrees/src";
 @source "../../../../../../../packages/domains/ai-config/src";
+@source "../../../../../../../packages/domains/file-editor/src";
 
 @custom-variant dark (&:is(.dark *));
 
