@@ -62,7 +62,7 @@
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^5.1.1",
     "electron": "^39.2.7",
-    "electron-builder": "^26.0.12",
+    "electron-builder": "~25.1.8",
     "electron-vite": "^5.0.0",
     "playwright": "^1.52.0",
     "typescript": "^5.9.3",
