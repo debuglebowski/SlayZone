@@ -175,7 +175,9 @@ export function BrowserPanel({ className, tabs, onTabsChange, taskId, isResizing
 
     const currentUrl = wv.getURL()
     if (activeTab.url && activeTab.url !== currentUrl && activeTab.url !== 'about:blank') {
-      wv.loadURL(activeTab.url)
+      // Convert file:// to slz-file:// for webview loading
+      const loadUrl = activeTab.url.replace(/^file:\/\//, 'slz-file://')
+      wv.loadURL(loadUrl)
     }
   }, [activeTab?.id, webviewReady])
 
@@ -187,7 +189,8 @@ export function BrowserPanel({ className, tabs, onTabsChange, taskId, isResizing
     const handleNavigate = () => {
       setCanGoBack(wv.canGoBack())
       setCanGoForward(wv.canGoForward())
-      const url = wv.getURL()
+      // Convert internal slz-file:// back to file:// for display
+      const url = wv.getURL().replace(/^slz-file:\/\//, 'file://')
       setInputUrl(url)
 
       // Update tab URL
@@ -431,8 +434,14 @@ export function BrowserPanel({ className, tabs, onTabsChange, taskId, isResizing
     if (!wv || !inputUrl.trim()) return
 
     let url = inputUrl.trim()
-    if (!url.startsWith('http://') && !url.startsWith('https://')) {
+    if (url.startsWith('/')) {
+      url = `file://${url}`
+    } else if (!url.startsWith('http://') && !url.startsWith('https://') && !url.startsWith('file://')) {
       url = `https://${url}`
+    }
+    // Chromium blocks file:// in webviews — use custom slz-file:// protocol
+    if (url.startsWith('file://')) {
+      url = url.replace('file://', 'slz-file://')
     }
     wv.loadURL(url)
   }
@@ -685,7 +694,7 @@ export function BrowserPanel({ className, tabs, onTabsChange, taskId, isResizing
           >
             <webview
               ref={webviewRef}
-              src={activeTab?.url || 'about:blank'}
+              src={(activeTab?.url || 'about:blank').replace(/^file:\/\//, 'slz-file://')}
               partition="persist:browser-tabs"
               className="absolute inset-0"
               // @ts-expect-error - webview attributes not in React types

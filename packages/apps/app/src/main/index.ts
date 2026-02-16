@@ -1,7 +1,13 @@
-import { app, shell, BrowserWindow, ipcMain, nativeTheme, session, webContents, dialog, Menu } from 'electron'
-import { join } from 'path'
-import { readFileSync } from 'fs'
+import { app, shell, BrowserWindow, ipcMain, nativeTheme, session, webContents, dialog, Menu, protocol } from 'electron'
+import { join, extname } from 'path'
+import { readFileSync, promises as fsp } from 'fs'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
+
+// Custom protocol for serving local files in browser panel webviews
+// (must be registered before app ready — Chromium blocks file:// in webviews)
+protocol.registerSchemesAsPrivileged([
+  { scheme: 'slz-file', privileges: { secure: true, supportFetchAPI: true, stream: true, bypassCSP: true } }
+])
 
 // Use consistent app name for userData path (paired with legacy DB migration)
 app.name = 'slayzone'
@@ -26,6 +32,7 @@ import { registerAiConfigHandlers } from '@slayzone/ai-config/main'
 import { registerIntegrationHandlers, startLinearSyncPoller } from '@slayzone/integrations/main'
 import { registerFileEditorHandlers } from '@slayzone/file-editor/main'
 import { registerScreenshotHandlers } from './screenshot'
+import { initAutoUpdater } from './auto-updater'
 
 // Minimum splash screen display time (ms)
 const SPLASH_MIN_DURATION = 4000
@@ -61,8 +68,8 @@ const splashHTML = (version: string) => `
       animation: fadeInScale 0.4s ease-out forwards;
     }
     .logo {
-      width: 120px;
-      height: 120px;
+      width: 200px;
+      height: 200px;
     }
     .title {
       margin-top: 24px;
@@ -464,8 +471,33 @@ app.whenReady().then(() => {
 
   linearSyncPoller = startLinearSyncPoller(db)
 
+  initAutoUpdater()
+
   // Configure webview session for WebAuthn/passkey support
   const browserSession = session.fromPartition('persist:browser-tabs')
+
+  // Serve local files via slz-file:// in browser panel webviews
+  // (Chromium blocks file:// navigation in webviews — custom protocol bypasses this)
+  browserSession.protocol.handle('slz-file', async (request) => {
+    // slz-file:///path/to/file → /path/to/file
+    const filePath = decodeURIComponent(request.url.replace(/^slz-file:\/\//, ''))
+    const mimeTypes: Record<string, string> = {
+      '.html': 'text/html', '.htm': 'text/html', '.css': 'text/css',
+      '.js': 'text/javascript', '.mjs': 'text/javascript', '.json': 'application/json',
+      '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg',
+      '.gif': 'image/gif', '.svg': 'image/svg+xml', '.ico': 'image/x-icon',
+      '.woff': 'font/woff', '.woff2': 'font/woff2', '.ttf': 'font/ttf',
+      '.pdf': 'application/pdf', '.xml': 'application/xml', '.txt': 'text/plain',
+    }
+    try {
+      const data = await fsp.readFile(filePath)
+      return new Response(data, {
+        headers: { 'content-type': mimeTypes[extname(filePath).toLowerCase()] || 'application/octet-stream' }
+      })
+    } catch {
+      return new Response('Not found', { status: 404 })
+    }
+  })
 
   browserSession.setPermissionRequestHandler((_webContents, permission, callback) => {
     const allowedPermissions = ['hid', 'usb', 'clipboard-read', 'clipboard-write']
