@@ -9,62 +9,59 @@ test.describe('Task detail actions', () => {
     const p = await s.createProject({ name: 'Actions Test', color: '#8b5cf6', path: TEST_PROJECT_PATH })
     projectAbbrev = p.name.slice(0, 2).toUpperCase()
 
-    await s.createTask({ projectId: p.id, title: 'Archive me from detail', status: 'todo' })
-    await s.createTask({ projectId: p.id, title: 'Delete me from detail', status: 'todo' })
+    await s.createTask({ projectId: p.id, title: 'Archive me from detail', status: 'in_progress' })
+    await s.createTask({ projectId: p.id, title: 'Delete me from detail', status: 'in_progress' })
     await s.createTask({ projectId: p.id, title: 'Complete me task', status: 'in_progress' })
     await s.refreshData()
 
     await goHome(mainWindow)
     await clickProject(mainWindow, projectAbbrev)
-    await mainWindow.waitForTimeout(500)
+    await expect(mainWindow.getByText('Archive me from detail').first()).toBeVisible()
   })
 
-  test('archive task from detail dropdown', async ({ mainWindow }) => {
+  test('archive task from settings danger zone', async ({ mainWindow }) => {
     await mainWindow.getByText('Archive me from detail').first().click()
-    await mainWindow.waitForTimeout(500)
 
-    // Open dropdown menu
-    const moreButton = mainWindow.locator('.lucide-ellipsis:visible, .lucide-more-horizontal:visible').first()
-    await moreButton.click()
-    await mainWindow.waitForTimeout(300)
+    // Archive button is in the settings panel's danger zone — opens confirmation dialog
+    const archiveBtn = mainWindow.getByRole('button', { name: /^Archive$/ }).first()
+    await expect(archiveBtn).toBeVisible()
+    await archiveBtn.scrollIntoViewIfNeeded()
+    await archiveBtn.click()
 
-    // Click Archive — should update kanban state and close tab
-    await mainWindow.getByRole('menuitem', { name: /Archive/ }).click()
-    await mainWindow.waitForTimeout(500)
+    // Confirm in AlertDialog
+    const dialog = mainWindow.locator('[data-slot="alert-dialog-content"]')
+    await expect(dialog).toBeVisible({ timeout: 3_000 })
+    await dialog.getByRole('button', { name: /Archive/ }).click()
+    await expect(dialog).not.toBeVisible({ timeout: 3_000 })
 
-    // Kanban should no longer show archived task (state updated via onArchiveTask)
+    // Kanban should no longer show archived task
     await goHome(mainWindow)
     await clickProject(mainWindow, projectAbbrev)
-    await mainWindow.waitForTimeout(500)
 
-    await expect(mainWindow.getByText('Archive me from detail')).not.toBeVisible({ timeout: 3_000 })
+    // Kanban card (in <p>) should be gone — tab bar (<span>) may still exist
+    await expect(mainWindow.locator('p').filter({ hasText: 'Archive me from detail' })).not.toBeVisible({ timeout: 3_000 })
   })
 
-  test('delete task from detail dropdown', async ({ mainWindow }) => {
+  test('delete task from settings danger zone', async ({ mainWindow }) => {
     await mainWindow.getByText('Delete me from detail').first().click()
-    await mainWindow.waitForTimeout(500)
 
-    const moreButton = mainWindow.locator('.lucide-ellipsis:visible, .lucide-more-horizontal:visible').first()
-    await moreButton.click()
-    await mainWindow.waitForTimeout(300)
-
-    // Click Delete
-    await mainWindow.getByRole('menuitem', { name: /Delete/ }).click()
-    await mainWindow.waitForTimeout(300)
+    // Delete button is in the settings panel's danger zone
+    const deleteBtn = mainWindow.getByRole('button', { name: /^Delete$/ }).first()
+    await expect(deleteBtn).toBeVisible()
+    await deleteBtn.scrollIntoViewIfNeeded()
+    await deleteBtn.click()
 
     // Confirm delete dialog
-    const confirmBtn = mainWindow.getByRole('button', { name: /Delete/i }).last()
-    if (await confirmBtn.isVisible().catch(() => false)) {
-      await confirmBtn.click()
-    }
-    await mainWindow.waitForTimeout(500)
+    const dialog = mainWindow.locator('[data-slot="alert-dialog-content"]')
+    await expect(dialog).toBeVisible({ timeout: 3_000 })
+    await dialog.getByRole('button', { name: /Delete/i }).click()
+    await expect(dialog).not.toBeVisible({ timeout: 3_000 })
 
-    // Kanban should no longer show deleted task (state updated via onDeleteTask)
+    // Kanban should no longer show deleted task
     await goHome(mainWindow)
     await clickProject(mainWindow, projectAbbrev)
-    await mainWindow.waitForTimeout(500)
 
-    await expect(mainWindow.getByText('Delete me from detail')).not.toBeVisible({ timeout: 3_000 })
+    await expect(mainWindow.locator('p').filter({ hasText: 'Delete me from detail' })).not.toBeVisible({ timeout: 3_000 })
   })
 
   test('Cmd+Shift+D opens complete task confirmation', async ({ mainWindow }) => {

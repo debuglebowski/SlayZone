@@ -42,14 +42,18 @@ test.describe('Git diff panel', () => {
 
     await goHome(mainWindow)
     await clickProject(mainWindow, projectAbbrev)
-    await mainWindow.waitForTimeout(500)
+    await expect(mainWindow.getByText('Diff panel task').first()).toBeVisible({ timeout: 5_000 })
 
     await mainWindow.getByText('Diff panel task').first().click()
-    await mainWindow.waitForTimeout(500)
+    await expect(mainWindow.locator('[data-testid="terminal-mode-trigger"]:visible').first()).toBeVisible({ timeout: 5_000 })
 
-    // Toggle git diff panel on
+    // Open git panel (general tab) then switch to changes tab
     await mainWindow.keyboard.press('Meta+g')
-    await mainWindow.waitForTimeout(500)
+    await expect(mainWindow.getByTestId('task-git-panel')).toBeVisible({ timeout: 5_000 })
+    // Click the "Diff" tab to switch to changes view
+    await mainWindow.getByTestId('task-git-panel').locator('button').filter({ hasText: 'Diff' }).click()
+    await expect(mainWindow.getByTestId('git-diff-panel').last()).toBeVisible({ timeout: 5_000 })
+
   })
 
   test.afterAll(() => {
@@ -62,8 +66,8 @@ test.describe('Git diff panel', () => {
     page.locator('[data-testid="git-diff-panel"]:visible')
 
   const refresh = async (page: import('@playwright/test').Page) => {
-    await panel(page).getByRole('button', { name: 'Refresh' }).click()
-    await page.waitForTimeout(500)
+    // Refresh button is in the UnifiedGitPanel header (outside git-diff-panel)
+    await page.getByTestId('task-git-panel').locator('button[title="Refresh"]').click()
   }
 
   test('no changes shows empty state', async ({ mainWindow }) => {
@@ -96,7 +100,6 @@ test.describe('Git diff panel', () => {
     const p = panel(mainWindow)
     // Click base.txt to select it
     await p.locator('.font-mono.text-xs').filter({ hasText: 'base.txt' }).click()
-    await mainWindow.waitForTimeout(300)
 
     // Diff viewer should show hunk header
     await expect(p.locator('text=/@@/')).toBeVisible()
@@ -107,7 +110,6 @@ test.describe('Git diff panel', () => {
     // Click stage button on base.txt (opacity-0, needs force)
     const baseRow = p.locator('.font-mono.text-xs').filter({ hasText: 'base.txt' })
     await baseRow.locator('button[title="Stage file"]').click({ force: true })
-    await mainWindow.waitForTimeout(300)
 
     // Staged section should appear with base.txt
     await expect(p.getByText(/^Staged/)).toBeVisible()
@@ -120,7 +122,6 @@ test.describe('Git diff panel', () => {
     // Find base.txt in staged section and unstage it
     const stagedBase = p.locator('.font-mono.text-xs').filter({ hasText: 'base.txt' })
     await stagedBase.locator('button[title="Unstage file"]').click({ force: true })
-    await mainWindow.waitForTimeout(300)
 
     // base.txt should be back in unstaged
     await expect(p.getByText(/^Unstaged/)).toBeVisible()
@@ -129,7 +130,6 @@ test.describe('Git diff panel', () => {
   test('stage all moves all files to staged', async ({ mainWindow }) => {
     const p = panel(mainWindow)
     await p.locator('button[title="Stage all"]').click()
-    await mainWindow.waitForTimeout(300)
 
     // Staged section should exist with both files
     await expect(p.getByText(/^Staged/)).toBeVisible()
@@ -140,7 +140,6 @@ test.describe('Git diff panel', () => {
   test('unstage all moves all files back to unstaged', async ({ mainWindow }) => {
     const p = panel(mainWindow)
     await p.locator('button[title="Unstage all"]').click()
-    await mainWindow.waitForTimeout(300)
 
     // Unstaged should exist
     await expect(p.getByText(/^Unstaged/)).toBeVisible()
@@ -150,32 +149,28 @@ test.describe('Git diff panel', () => {
 
   test('arrow key navigation selects files', async ({ mainWindow }) => {
     const p = panel(mainWindow)
-    // Focus the file list container
-    const fileList = p.locator('.overflow-y-auto.border-r')
+    // Focus the file list container (scrollable div with tabIndex)
+    const fileList = p.locator('.overflow-y-auto[tabindex="0"]')
     await fileList.click()
-    await mainWindow.waitForTimeout(100)
 
     // Press ArrowDown to select first file
     await mainWindow.keyboard.press('ArrowDown')
-    await mainWindow.waitForTimeout(100)
 
     // First entry should have bg-accent (selected) — but not hover:bg-accent/50
     const firstEntry = p.locator('.font-mono.text-xs').first()
-    await expect(firstEntry).toHaveClass(/(?:^|\s)bg-accent(?:\s|$)/)
+    await expect(firstEntry).toHaveClass(/bg-primary\/10/)
 
     // Press ArrowDown again to select second file
     await mainWindow.keyboard.press('ArrowDown')
-    await mainWindow.waitForTimeout(100)
 
     // First should no longer be selected, second should be
-    await expect(firstEntry).not.toHaveClass(/(?:^|\s)bg-accent(?:\s|$)/)
+    await expect(firstEntry).not.toHaveClass(/bg-primary\/10/)
     const secondEntry = p.locator('.font-mono.text-xs').nth(1)
-    await expect(secondEntry).toHaveClass(/(?:^|\s)bg-accent(?:\s|$)/)
+    await expect(secondEntry).toHaveClass(/bg-primary\/10/)
 
     // ArrowUp goes back
     await mainWindow.keyboard.press('ArrowUp')
-    await mainWindow.waitForTimeout(100)
-    await expect(firstEntry).toHaveClass(/(?:^|\s)bg-accent(?:\s|$)/)
+    await expect(firstEntry).toHaveClass(/bg-primary\/10/)
   })
 
   test('polling picks up file changes', async ({ mainWindow }) => {

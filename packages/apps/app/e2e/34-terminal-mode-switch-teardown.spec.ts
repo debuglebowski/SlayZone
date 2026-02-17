@@ -19,7 +19,7 @@ test.describe('Terminal mode switch teardown', () => {
     const p = await s.createProject({ name: 'Mode Teardown', color: '#14b8a6', path: TEST_PROJECT_PATH })
     projectAbbrev = p.name.slice(0, 2).toUpperCase()
 
-    const t = await s.createTask({ projectId: p.id, title: 'Mode teardown task', status: 'todo' })
+    const t = await s.createTask({ projectId: p.id, title: 'Mode teardown task', status: 'in_progress' })
     taskId = t.id
 
     await mainWindow.evaluate((id) => window.api.db.updateTask({ id, terminalMode: 'terminal' }), taskId)

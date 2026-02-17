@@ -15,11 +15,11 @@ test.describe('Rich text description', () => {
 
     await goHome(mainWindow)
     await clickProject(mainWindow, projectAbbrev)
-    await mainWindow.waitForTimeout(500)
+    await expect(mainWindow.getByText('Editor task').first()).toBeVisible({ timeout: 5_000 })
 
     // Open task detail
     await mainWindow.getByText('Editor task').first().click()
-    await mainWindow.waitForTimeout(500)
+    await expect(mainWindow.getByTestId('task-settings-panel').last()).toBeVisible({ timeout: 5_000 })
   })
 
   /** The TipTap contenteditable editor in the settings panel */
@@ -46,10 +46,11 @@ test.describe('Rich text description', () => {
   test('save on blur persists to DB', async ({ mainWindow }) => {
     // Click outside editor to blur
     await mainWindow.locator('body').click({ position: { x: 10, y: 10 } })
-    await mainWindow.waitForTimeout(500)
 
-    const task = await mainWindow.evaluate((id) => window.api.db.getTask(id), taskId)
-    expect(task?.description).toContain('Hello world')
+    await expect.poll(
+      () => mainWindow.evaluate((id) => window.api.db.getTask(id), taskId).then((t) => t?.description),
+      { timeout: 5_000 }
+    ).toContain('Hello world')
   })
 
   test('bold formatting via Cmd+B', async ({ mainWindow }) => {
@@ -66,10 +67,11 @@ test.describe('Rich text description', () => {
 
     // Blur to save
     await mainWindow.locator('body').click({ position: { x: 10, y: 10 } })
-    await mainWindow.waitForTimeout(500)
 
-    const task = await mainWindow.evaluate((id) => window.api.db.getTask(id), taskId)
-    expect(task?.description).toContain('<strong>bold text</strong>')
+    await expect.poll(
+      () => mainWindow.evaluate((id) => window.api.db.getTask(id), taskId).then((t) => t?.description),
+      { timeout: 5_000 }
+    ).toContain('<strong>bold text</strong>')
   })
 
   test('italic formatting via Cmd+I', async ({ mainWindow }) => {
@@ -83,10 +85,11 @@ test.describe('Rich text description', () => {
     await mainWindow.keyboard.press('Meta+i')
 
     await mainWindow.locator('body').click({ position: { x: 10, y: 10 } })
-    await mainWindow.waitForTimeout(500)
 
-    const task = await mainWindow.evaluate((id) => window.api.db.getTask(id), taskId)
-    expect(task?.description).toContain('<em>italic text</em>')
+    await expect.poll(
+      () => mainWindow.evaluate((id) => window.api.db.getTask(id), taskId).then((t) => t?.description),
+      { timeout: 5_000 }
+    ).toContain('<em>italic text</em>')
   })
 
   test('bullet list via Cmd+Shift+8', async ({ mainWindow }) => {
@@ -101,22 +104,20 @@ test.describe('Rich text description', () => {
     await mainWindow.keyboard.type('List item two')
 
     await mainWindow.locator('body').click({ position: { x: 10, y: 10 } })
-    await mainWindow.waitForTimeout(500)
 
-    const task = await mainWindow.evaluate((id) => window.api.db.getTask(id), taskId)
-    expect(task?.description).toContain('<ul>')
-    expect(task?.description).toContain('List item one')
-    expect(task?.description).toContain('List item two')
+    const getDesc = () => mainWindow.evaluate((id) => window.api.db.getTask(id), taskId).then((t) => t?.description)
+    await expect.poll(getDesc, { timeout: 5_000 }).toContain('<ul>')
+    await expect.poll(getDesc, { timeout: 5_000 }).toContain('List item one')
+    await expect.poll(getDesc, { timeout: 5_000 }).toContain('List item two')
   })
 
   test('content persists across navigation', async ({ mainWindow }) => {
     await goHome(mainWindow)
-    await mainWindow.waitForTimeout(300)
 
     await clickProject(mainWindow, projectAbbrev)
-    await mainWindow.waitForTimeout(300)
+    await expect(mainWindow.getByText('Editor task').first()).toBeVisible({ timeout: 5_000 })
     await mainWindow.getByText('Editor task').first().click()
-    await mainWindow.waitForTimeout(500)
+    await expect(mainWindow.getByTestId('task-settings-panel').last()).toBeVisible({ timeout: 5_000 })
 
     const ed = editor(mainWindow)
     await expect(ed).toContainText('Hello world')
@@ -132,7 +133,6 @@ test.describe('Rich text description', () => {
     await expect(ed).toBeFocused()
 
     await mainWindow.keyboard.press('Escape')
-    await mainWindow.waitForTimeout(200)
 
     // Editor should no longer be focused
     await expect(ed).not.toBeFocused()

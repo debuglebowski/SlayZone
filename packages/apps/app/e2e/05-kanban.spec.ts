@@ -18,7 +18,6 @@ test.describe('Kanban board', () => {
 
     await goHome(mainWindow)
     await clickProject(mainWindow, projectAbbrev)
-    await mainWindow.waitForTimeout(500)
   })
 
   test('all status columns are visible', async ({ mainWindow }) => {

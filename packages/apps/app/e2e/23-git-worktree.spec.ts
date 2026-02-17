@@ -1,6 +1,7 @@
 import { test, expect, seed, goHome, clickProject } from './fixtures/electron'
 import { TEST_PROJECT_PATH } from './fixtures/electron'
 import { execSync } from 'child_process'
+import { existsSync } from 'fs'
 import path from 'path'
 
 test.describe('Git worktree operations', () => {
@@ -20,7 +21,7 @@ test.describe('Git worktree operations', () => {
     await expect(input).toBeVisible()
     await input.fill(title)
     await page.keyboard.press('Enter')
-    await page.waitForTimeout(500)
+    await expect(page.getByTestId('task-detail-page').last()).toBeVisible()
   }
 
   const removeWorktreeButton = (page: import('@playwright/test').Page) => {
@@ -73,8 +74,12 @@ test.describe('Git worktree operations', () => {
 
     await goHome(mainWindow)
     await clickProject(mainWindow, projectAbbrev)
-    await mainWindow.waitForTimeout(500)
+    await expect(mainWindow.locator('p.line-clamp-3:visible', { hasText: 'Worktree task' }).first()).toBeVisible()
     await openTaskViaSearch(mainWindow, 'Worktree task')
+
+    // Toggle git panel on (general tab — shows branch/worktree info)
+    await mainWindow.keyboard.press('Meta+g')
+    await expect(mainWindow.getByTestId('task-git-panel').last()).toBeVisible()
   })
 
   test('git panel shows current branch', async ({ mainWindow }) => {
@@ -102,7 +107,8 @@ test.describe('Git worktree operations', () => {
       .toContain(branchName)
 
     // Worktree name should appear (derived from slugified task title)
-    await expect(mainWindow.getByText(branchName)).toBeVisible()
+    const gitPanel = mainWindow.getByTestId('task-git-panel').last()
+    await expect(gitPanel.getByText(branchName).first()).toBeVisible()
   })
 
   test('worktree shows parent branch', async ({ mainWindow }) => {
@@ -197,7 +203,7 @@ test.describe('Git worktree operations', () => {
 
     // Verify worktree dir exists on disk (read effective path from DB)
     const worktreePath = task?.worktree_path ?? path.join(TEST_PROJECT_PATH, 'worktrees', branchName)
-    const exists = require('fs').existsSync(worktreePath)
+    const exists = existsSync(worktreePath)
     expect(exists).toBe(true)
   })
 
@@ -226,7 +232,7 @@ test.describe('Git worktree operations', () => {
     await expect
       .poll(() => execSync('git worktree list --porcelain', { cwd: TEST_PROJECT_PATH }).toString())
       .toContain(worktreePath)
-    expect(require('fs').existsSync(worktreePath)).toBe(true)
+    expect(existsSync(worktreePath)).toBe(true)
 
     await s.archiveTask(created.id)
 
@@ -247,7 +253,7 @@ test.describe('Git worktree operations', () => {
       .poll(() => execSync('git worktree list --porcelain', { cwd: TEST_PROJECT_PATH }).toString())
       .not.toContain(worktreePath)
     await expect
-      .poll(() => require('fs').existsSync(worktreePath))
+      .poll(() => existsSync(worktreePath))
       .toBe(false)
   })
 
@@ -276,7 +282,7 @@ test.describe('Git worktree operations', () => {
     await expect
       .poll(() => execSync('git worktree list --porcelain', { cwd: TEST_PROJECT_PATH }).toString())
       .toContain(worktreePath)
-    expect(require('fs').existsSync(worktreePath)).toBe(true)
+    expect(existsSync(worktreePath)).toBe(true)
 
     await s.deleteTask(created.id)
 
@@ -291,7 +297,7 @@ test.describe('Git worktree operations', () => {
       .poll(() => execSync('git worktree list --porcelain', { cwd: TEST_PROJECT_PATH }).toString())
       .not.toContain(worktreePath)
     await expect
-      .poll(() => require('fs').existsSync(worktreePath))
+      .poll(() => existsSync(worktreePath))
       .toBe(false)
   })
 })

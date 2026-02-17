@@ -34,7 +34,7 @@ test.describe('Terminal search', () => {
     const p = await s.createProject({ name: 'Echo Search', color: '#8b5cf6', path: TEST_PROJECT_PATH })
     projectAbbrev = p.name.slice(0, 2).toUpperCase()
 
-    const t = await s.createTask({ projectId: p.id, title: 'Search term task', status: 'todo' })
+    const t = await s.createTask({ projectId: p.id, title: 'Search term task', status: 'in_progress' })
     taskId = t.id
     sessionId = getMainSessionId(taskId)
 

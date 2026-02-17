@@ -13,7 +13,7 @@ test.describe('Panel resize', () => {
     await expect(input).toBeVisible()
     await input.fill(title)
     await page.keyboard.press('Enter')
-    await page.waitForTimeout(500)
+    await expect(page.getByTestId('task-settings-panel').last()).toBeVisible()
   }
 
   test.beforeAll(async ({ mainWindow }) => {
@@ -28,8 +28,6 @@ test.describe('Panel resize', () => {
 
     await goHome(mainWindow)
     await clickProject(mainWindow, projectAbbrev)
-    await mainWindow.waitForTimeout(500)
-
     await openTaskViaSearch(mainWindow, 'Resize task')
   })
 
@@ -64,11 +62,12 @@ test.describe('Panel resize', () => {
     await mainWindow.mouse.down()
     await mainWindow.mouse.move(box!.x - 80, box!.y + box!.height / 2, { steps: 5 })
     await mainWindow.mouse.up()
-    await mainWindow.waitForTimeout(300)
 
     // Settings panel should now be ~520px (440 + 80)
+    await expect.poll(async () => {
+      return await settingsPanel(mainWindow).evaluate(el => parseInt(el.style.width))
+    }).toBeGreaterThanOrEqual(500)
     const width = await settingsPanel(mainWindow).evaluate(el => parseInt(el.style.width))
-    expect(width).toBeGreaterThanOrEqual(500)
     expect(width).toBeLessThanOrEqual(540)
   })
 
@@ -79,7 +78,7 @@ test.describe('Panel resize', () => {
     expect(stored).toBeTruthy()
     const parsed = JSON.parse(stored!)
     expect(parsed.settings).toBeGreaterThanOrEqual(500)
-    expect(parsed._v).toBe(3)
+    expect(parsed._v).toBe(4)
   })
 
   test('min width enforced', async ({ mainWindow }) => {
@@ -92,25 +91,24 @@ test.describe('Panel resize', () => {
     await mainWindow.mouse.down()
     await mainWindow.mouse.move(box!.x + 500, box!.y + box!.height / 2, { steps: 5 })
     await mainWindow.mouse.up()
-    await mainWindow.waitForTimeout(300)
 
-    const width = await settingsPanel(mainWindow).evaluate(el => parseInt(el.style.width))
-    expect(width).toBe(200)
+    await expect.poll(async () => {
+      return await settingsPanel(mainWindow).evaluate(el => parseInt(el.style.width))
+    }).toBe(200)
   })
 
   test('resize persists across navigation', async ({ mainWindow }) => {
     // Navigate away
     await goHome(mainWindow)
-    await mainWindow.waitForTimeout(300)
 
     // Come back
     await clickProject(mainWindow, projectAbbrev)
-    await mainWindow.waitForTimeout(300)
     await openTaskViaSearch(mainWindow, 'Resize task')
 
     // Settings panel should still be 200px (the min we dragged to)
-    const width = await settingsPanel(mainWindow).evaluate(el => parseInt(el.style.width))
-    expect(width).toBe(200)
+    await expect.poll(async () => {
+      return await settingsPanel(mainWindow).evaluate(el => parseInt(el.style.width))
+    }).toBe(200)
   })
 
   test('additional resize handles appear when more panels toggled', async ({ mainWindow }) => {
@@ -119,16 +117,15 @@ test.describe('Panel resize', () => {
 
     // Toggle browser on → adds terminal|browser handle
     await mainWindow.keyboard.press('Meta+b')
-    await mainWindow.waitForTimeout(300)
 
-    const handlesAfter = await resizeHandles(mainWindow).count()
-    expect(handlesAfter).toBeGreaterThan(handlesBefore)
+    await expect.poll(async () => {
+      return await resizeHandles(mainWindow).count()
+    }).toBeGreaterThan(handlesBefore)
 
     // Toggle browser off to restore state
     // Focus URL input first to avoid webview stealing keystroke
     await mainWindow.locator('input[placeholder="Enter URL..."]:visible').first().focus()
-    await mainWindow.waitForTimeout(100)
     await mainWindow.keyboard.press('Meta+b')
-    await mainWindow.waitForTimeout(300)
+    await expect(mainWindow.locator('input[placeholder="Enter URL..."]:visible')).toHaveCount(0)
   })
 })

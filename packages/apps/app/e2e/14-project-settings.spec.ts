@@ -11,28 +11,25 @@ test.describe('Project settings & context menu', () => {
     projectAbbrev = project.name.slice(0, 2).toUpperCase()
     await s.refreshData()
     await goHome(mainWindow)
-    await mainWindow.waitForTimeout(300)
+    await expect(projectBlob(mainWindow, projectAbbrev)).toBeVisible({ timeout: 5_000 })
   })
 
   test('right-click project blob opens context menu', async ({ mainWindow }) => {
     const blob = projectBlob(mainWindow, projectAbbrev)
     await blob.click({ button: 'right' })
-    await mainWindow.waitForTimeout(300)
 
     await expect(mainWindow.getByRole('menuitem', { name: 'Settings' })).toBeVisible({ timeout: 3_000 })
     await expect(mainWindow.getByRole('menuitem', { name: 'Delete' })).toBeVisible()
 
     // Dismiss context menu so it doesn't block subsequent tests
     await mainWindow.keyboard.press('Escape')
-    await mainWindow.waitForTimeout(200)
+    await expect(mainWindow.getByRole('menuitem', { name: 'Settings' })).not.toBeVisible({ timeout: 3_000 })
   })
 
   test('context menu Settings opens project settings dialog', async ({ mainWindow }) => {
     // Re-open context menu (may have closed between tests)
     const blob = projectBlob(mainWindow, projectAbbrev)
     await blob.click({ button: 'right' })
-    await mainWindow.waitForTimeout(300)
-
     await mainWindow.getByRole('menuitem', { name: 'Settings' }).click()
 
     await expect(mainWindow.getByRole('heading', { name: 'Project Settings' })).toBeVisible({ timeout: 5_000 })
@@ -53,7 +50,6 @@ test.describe('Project settings & context menu', () => {
     await nameInput.fill('Xylo Project')
 
     await mainWindow.getByRole('button', { name: 'Save' }).click()
-    await mainWindow.waitForTimeout(500)
 
     // Dialog should close
     await expect(mainWindow.getByRole('heading', { name: 'Project Settings' })).not.toBeVisible({ timeout: 3_000 })
@@ -72,10 +68,7 @@ test.describe('Project settings & context menu', () => {
   test('context menu Delete opens delete dialog', async ({ mainWindow }) => {
     const blob = projectBlob(mainWindow, projectAbbrev)
     await blob.click({ button: 'right' })
-    await mainWindow.waitForTimeout(300)
-
     await mainWindow.getByRole('menuitem', { name: 'Delete' }).click()
-    await mainWindow.waitForTimeout(300)
 
     // Delete confirmation dialog should appear
     const deleteText = mainWindow.getByText(/delete|Are you sure/i)
@@ -88,6 +81,6 @@ test.describe('Project settings & context menu', () => {
     } else {
       await mainWindow.keyboard.press('Escape')
     }
-    await mainWindow.waitForTimeout(300)
+    await expect(mainWindow.getByText(/delete|Are you sure/i).first()).not.toBeVisible({ timeout: 3_000 })
   })
 })

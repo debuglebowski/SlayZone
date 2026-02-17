@@ -66,12 +66,12 @@ test.describe('Session banner behavior', () => {
     const p = await s.createProject({ name: 'Zed Retry', color: '#22c55e', path: TEST_PROJECT_PATH })
     projectAbbrev = p.name.slice(0, 2).toUpperCase()
 
-    const noAutoTask = await s.createTask({ projectId: p.id, title: 'SB no auto fire', status: 'todo' })
-    const switchTask = await s.createTask({ projectId: p.id, title: 'SB mode switch', status: 'todo' })
-    const navTask = await s.createTask({ projectId: p.id, title: 'SB nav away', status: 'todo' })
-    const dismissTask1 = await s.createTask({ projectId: p.id, title: 'SB dismiss one', status: 'todo' })
-    const dismissTask2 = await s.createTask({ projectId: p.id, title: 'SB dismiss two', status: 'todo' })
-    const noPtyTask = await s.createTask({ projectId: p.id, title: 'SB no pty', status: 'todo' })
+    const noAutoTask = await s.createTask({ projectId: p.id, title: 'SB no auto fire', status: 'in_progress' })
+    const switchTask = await s.createTask({ projectId: p.id, title: 'SB mode switch', status: 'in_progress' })
+    const navTask = await s.createTask({ projectId: p.id, title: 'SB nav away', status: 'in_progress' })
+    const dismissTask1 = await s.createTask({ projectId: p.id, title: 'SB dismiss one', status: 'in_progress' })
+    const dismissTask2 = await s.createTask({ projectId: p.id, title: 'SB dismiss two', status: 'in_progress' })
+    const noPtyTask = await s.createTask({ projectId: p.id, title: 'SB no pty', status: 'in_progress' })
     noAutoTaskId = noAutoTask.id
     switchTaskId = switchTask.id
     navTaskId = navTask.id
@@ -92,7 +92,7 @@ test.describe('Session banner behavior', () => {
     await s.refreshData()
     await goHome(mainWindow)
     await clickProject(mainWindow, projectAbbrev)
-    await mainWindow.waitForTimeout(500)
+    await expect(mainWindow.getByText('SB no auto fire').first()).toBeVisible({ timeout: 5_000 })
   })
 
   test.afterAll(async ({ electronApp }) => {
@@ -104,10 +104,10 @@ test.describe('Session banner behavior', () => {
 
   test('does not auto-fire /status — requires user click', async ({ mainWindow, electronApp }) => {
     await mainWindow.getByText('SB no auto fire').first().click()
-    await mainWindow.waitForTimeout(500)
+    await expect(mainWindow.getByText('Session not saved').last()).toBeVisible({ timeout: 5_000 })
 
     // Banner visible
-    await expect(mainWindow.getByText('Session not saved')).toBeVisible()
+    await expect(mainWindow.getByText('Session not saved').last()).toBeVisible()
 
     // Wait 3s — no /status should have been sent automatically
     await mainWindow.waitForTimeout(3000)
@@ -126,93 +126,82 @@ test.describe('Session banner behavior', () => {
   test('switching modes transitions between detect / unavailable / no banner', async ({ mainWindow }) => {
     await goHome(mainWindow)
     await clickProject(mainWindow, projectAbbrev)
-    await mainWindow.waitForTimeout(300)
+    await expect(mainWindow.getByText('SB mode switch').first()).toBeVisible({ timeout: 5_000 })
     await mainWindow.getByText('SB mode switch').first().click()
-    await mainWindow.waitForTimeout(500)
 
     // Default claude-code: no banners
-    await expect(mainWindow.getByText('Session not saved')).not.toBeVisible()
-    await expect(mainWindow.getByText(/Session ID detection not available/)).not.toBeVisible()
+    await expect(mainWindow.getByText('Session not saved').first()).not.toBeVisible()
+    await expect(mainWindow.getByText(/Session ID detection not available/).first()).not.toBeVisible()
 
     // Switch to Codex → detect banner
     await switchTerminalMode(mainWindow, 'codex')
-    await mainWindow.waitForTimeout(300)
-    await expect(mainWindow.getByText('Session not saved')).toBeVisible()
-    await expect(mainWindow.getByText(/Session ID detection not available/)).not.toBeVisible()
+    await expect(mainWindow.getByText('Session not saved').last()).toBeVisible()
+    await expect(mainWindow.getByText(/Session ID detection not available/).first()).not.toBeVisible()
 
     // Switch to Cursor → unavailable banner
     await switchTerminalMode(mainWindow, 'cursor-agent')
-    await mainWindow.waitForTimeout(300)
-    await expect(mainWindow.getByText('Session not saved')).not.toBeVisible()
-    await expect(mainWindow.getByText(/Session ID detection not available/)).toBeVisible()
+    await expect(mainWindow.getByText('Session not saved').first()).not.toBeVisible()
+    await expect(mainWindow.getByText(/Session ID detection not available/).last()).toBeVisible()
 
     // Switch to Terminal → no banners
     await switchTerminalMode(mainWindow, 'terminal')
-    await mainWindow.waitForTimeout(300)
-    await expect(mainWindow.getByText('Session not saved')).not.toBeVisible()
-    await expect(mainWindow.getByText(/Session ID detection not available/)).not.toBeVisible()
+    await expect(mainWindow.getByText('Session not saved').first()).not.toBeVisible()
+    await expect(mainWindow.getByText(/Session ID detection not available/).first()).not.toBeVisible()
 
     // Switch to Gemini → detect banner with /stats
     await switchTerminalMode(mainWindow, 'gemini')
-    await mainWindow.waitForTimeout(300)
-    await expect(mainWindow.getByText('Session not saved')).toBeVisible()
-    await expect(mainWindow.getByRole('button', { name: /Run \/stats/ })).toBeVisible()
+    await expect(mainWindow.getByText('Session not saved').last()).toBeVisible()
+    await expect(mainWindow.getByRole('button', { name: /Run \/stats/ }).first()).toBeVisible()
 
     // Switch back to Claude → no banners
     await switchTerminalMode(mainWindow, 'claude-code')
-    await mainWindow.waitForTimeout(300)
-    await expect(mainWindow.getByText('Session not saved')).not.toBeVisible()
-    await expect(mainWindow.getByText(/Session ID detection not available/)).not.toBeVisible()
+    await expect(mainWindow.getByText('Session not saved').first()).not.toBeVisible()
+    await expect(mainWindow.getByText(/Session ID detection not available/).first()).not.toBeVisible()
   })
 
   test('detect banner reappears after navigating away and back', async ({ mainWindow }) => {
     await goHome(mainWindow)
     await clickProject(mainWindow, projectAbbrev)
-    await mainWindow.waitForTimeout(300)
+    await expect(mainWindow.getByText('SB nav away').first()).toBeVisible({ timeout: 5_000 })
     await mainWindow.getByText('SB nav away').first().click()
-    await mainWindow.waitForTimeout(500)
 
     // Banner visible
-    await expect(mainWindow.getByText('Session not saved')).toBeVisible()
+    await expect(mainWindow.getByText('Session not saved').last()).toBeVisible()
 
     // Navigate away to another task
     await goHome(mainWindow)
     await clickProject(mainWindow, projectAbbrev)
-    await mainWindow.waitForTimeout(300)
+    await expect(mainWindow.getByText('SB mode switch').first()).toBeVisible({ timeout: 5_000 })
     await mainWindow.getByText('SB mode switch').first().click()
-    await mainWindow.waitForTimeout(300)
 
     // Navigate back to the codex task
     await goHome(mainWindow)
     await clickProject(mainWindow, projectAbbrev)
-    await mainWindow.waitForTimeout(300)
+    await expect(mainWindow.getByText('SB nav away').first()).toBeVisible({ timeout: 5_000 })
     await mainWindow.getByText('SB nav away').first().click()
-    await mainWindow.waitForTimeout(500)
 
     // Banner should reappear (session still not saved)
-    await expect(mainWindow.getByText('Session not saved')).toBeVisible()
+    await expect(mainWindow.getByText('Session not saved').last()).toBeVisible()
   })
 
   test('unavailable dismiss resets when switching to a different task', async ({ mainWindow }) => {
     await goHome(mainWindow)
     await clickProject(mainWindow, projectAbbrev)
-    await mainWindow.waitForTimeout(300)
+    await expect(mainWindow.getByText('SB dismiss one').first()).toBeVisible({ timeout: 5_000 })
 
     // Open first cursor task, dismiss banner
     await mainWindow.getByText('SB dismiss one').first().click()
-    await mainWindow.waitForTimeout(500)
-    await expect(mainWindow.getByText(/Session ID detection not available/)).toBeVisible()
-    const banner1 = mainWindow.getByText(/Session ID detection not available/).locator('..')
+    await expect(mainWindow.getByText(/Session ID detection not available/).last()).toBeVisible()
+    const banner1 = mainWindow.getByText(/Session ID detection not available/).last().locator('..')
     await banner1.locator('button').click()
-    await expect(mainWindow.getByText(/Session ID detection not available/)).not.toBeVisible()
+    await expect(mainWindow.getByText(/Session ID detection not available/).first()).not.toBeVisible()
 
     // Open second cursor task — banner should appear (dismiss was for task 1 only)
     await goHome(mainWindow)
     await clickProject(mainWindow, projectAbbrev)
-    await mainWindow.waitForTimeout(300)
+    await expect(mainWindow.getByText('SB dismiss two').first()).toBeVisible({ timeout: 5_000 })
     await mainWindow.getByText('SB dismiss two').first().click()
-    await mainWindow.waitForTimeout(500)
-    await expect(mainWindow.getByText(/Session ID detection not available/)).toBeVisible()
+    await expect(mainWindow.getByText(/Session ID detection not available/).last()).toBeVisible()
   })
 
   test('detect button is a no-op when PTY does not exist yet', async ({ mainWindow, electronApp }) => {
@@ -223,18 +212,16 @@ test.describe('Session banner behavior', () => {
 
     await goHome(mainWindow)
     await clickProject(mainWindow, projectAbbrev)
-    await mainWindow.waitForTimeout(300)
+    await expect(mainWindow.getByText('SB no pty').first()).toBeVisible({ timeout: 5_000 })
     await mainWindow.getByText('SB no pty').first().click()
-    await mainWindow.waitForTimeout(500)
 
-    await expect(mainWindow.getByText('Session not saved')).toBeVisible()
+    await expect(mainWindow.getByText('Session not saved').last()).toBeVisible()
 
     // Click detect — should not crash, banner stays (PTY doesn't exist)
     await mainWindow.getByRole('button', { name: /Run \/status/ }).click()
-    await mainWindow.waitForTimeout(500)
 
     // Banner still visible, session not saved
-    await expect(mainWindow.getByText('Session not saved')).toBeVisible()
+    await expect(mainWindow.getByText('Session not saved').last()).toBeVisible()
     const task = await mainWindow.evaluate((id) => window.api.db.getTask(id), noPtyTaskId)
     expect(task?.codex_conversation_id ?? null).toBeNull()
 

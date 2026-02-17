@@ -41,7 +41,7 @@ test.describe('Kanban interactions', () => {
     await s.refreshData()
     await goHome(mainWindow)
     await clickProject(mainWindow, 'KA')
-    await mainWindow.waitForTimeout(500)
+    await expect(mainWindow.getByText('Drag me task').first()).toBeVisible({ timeout: 5_000 })
   })
 
   test('drag task between columns changes status', async ({ mainWindow }) => {
@@ -61,9 +61,7 @@ test.describe('Kanban interactions', () => {
 
       // Move to the In Progress column (below header)
       await mainWindow.mouse.move(columnBox.x + columnBox.width / 2, columnBox.y + 100, { steps: 10 })
-      await mainWindow.waitForTimeout(100)
       await mainWindow.mouse.up()
-      await mainWindow.waitForTimeout(500)
 
       // Verify status changed via API
       const tasks = await seed(mainWindow).getTasks()
@@ -113,7 +111,6 @@ test.describe('Kanban interactions', () => {
     if (doneIds.length > 0) {
       await s.archiveTasks(doneIds)
       await s.refreshData()
-      await mainWindow.waitForTimeout(500)
 
       await expect(mainWindow.getByText('Done bulk 1')).not.toBeVisible({ timeout: 3_000 })
       await expect(mainWindow.getByText('Done bulk 2')).not.toBeVisible()
@@ -124,10 +121,12 @@ test.describe('Kanban interactions', () => {
     // Previous test archived "Done bulk 1/2" — they should be hidden
     await expect(mainWindow.getByText('Done bulk 1')).not.toBeVisible({ timeout: 3_000 })
 
-    // Toggle show archived switch
-    const archivedSwitch = mainWindow.locator('#show-archived')
+    // Open View popover, then toggle show archived switch
+    const viewBtn = mainWindow.locator('button').filter({ has: mainWindow.locator('.lucide-eye') }).first()
+    await viewBtn.click()
+    const archivedSwitch = mainWindow.locator('#b-archived')
+    await expect(archivedSwitch).toBeVisible({ timeout: 3_000 })
     await archivedSwitch.click()
-    await mainWindow.waitForTimeout(500)
 
     // Archived tasks should now be visible
     await expect(mainWindow.getByText('Done bulk 1')).toBeVisible({ timeout: 5_000 })
@@ -135,7 +134,6 @@ test.describe('Kanban interactions', () => {
 
     // Toggle back off
     await archivedSwitch.click()
-    await mainWindow.waitForTimeout(500)
 
     // Should be hidden again
     await expect(mainWindow.getByText('Done bulk 1')).not.toBeVisible({ timeout: 3_000 })
@@ -145,22 +143,21 @@ test.describe('Kanban interactions', () => {
   test('edit task title persists across navigation', async ({ mainWindow }) => {
     // Close any open task tabs first by going home
     await goHome(mainWindow)
-    await mainWindow.waitForTimeout(300)
+    await expect(mainWindow.getByText('Concurrent edit task').first()).toBeVisible({ timeout: 5_000 })
 
     // Open task
     await mainWindow.getByText('Concurrent edit task').first().click()
-    await mainWindow.waitForTimeout(500)
 
     // Edit title — use visible input with the task title
     const titleInput = mainWindow.locator('input:visible').first()
+    await expect(titleInput).toBeVisible({ timeout: 5_000 })
     await titleInput.click()
     await titleInput.fill('Edited concurrent task')
     await titleInput.press('Enter')
-    await mainWindow.waitForTimeout(300)
 
     // Navigate away
     await goHome(mainWindow)
-    await mainWindow.waitForTimeout(300)
+    await expect(mainWindow.getByText('Edited concurrent task').first()).toBeVisible({ timeout: 5_000 })
 
     // Verify persisted via API
     const tasks = await seed(mainWindow).getTasks()
@@ -169,7 +166,6 @@ test.describe('Kanban interactions', () => {
 
     // Navigate back to task
     await mainWindow.getByText('Edited concurrent task').first().click()
-    await mainWindow.waitForTimeout(500)
 
     // Verify title still shows
     const titleAfter = mainWindow.locator('input:visible').first()

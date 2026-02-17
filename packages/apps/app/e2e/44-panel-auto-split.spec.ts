@@ -17,7 +17,7 @@ test.describe('Panel auto-split sizing', () => {
     await expect(input).toBeVisible()
     await input.fill(title)
     await page.keyboard.press('Enter')
-    await page.waitForTimeout(500)
+    await expect(page.locator('[data-testid="terminal-mode-trigger"]:visible').first()).toBeVisible({ timeout: 5_000 })
   }
 
   /** The split-view flex container */
@@ -70,7 +70,8 @@ test.describe('Panel auto-split sizing', () => {
     const input = page.locator('input:visible').first()
     if (await input.count()) await input.focus()
     await page.keyboard.press(`Meta+${key}`)
-    await page.waitForTimeout(400)
+    // Wait for React re-render after panel toggle
+    await expect(splitContainer(page)).toBeVisible()
   }
 
   /** Assert a width is close to expected value */
@@ -113,7 +114,7 @@ test.describe('Panel auto-split sizing', () => {
 
     await goHome(mainWindow)
     await clickProject(mainWindow, projectAbbrev)
-    await mainWindow.waitForTimeout(500)
+    await expect(mainWindow.getByText('Split sizing task').first()).toBeVisible({ timeout: 5_000 })
     await openTaskViaSearch(mainWindow, 'Split sizing task')
   })
 
@@ -148,18 +149,16 @@ test.describe('Panel auto-split sizing', () => {
       window.api.settings.get('taskDetailPanelSizes')
     )
     const parsed = JSON.parse(stored!)
-    expect(parsed._v).toBe(3)
+    expect(parsed._v).toBe(4)
     expect(parsed.browser).toBe('auto')
 
     // Close browser, go back to main task
     const input = mainWindow.locator('input[placeholder="Enter URL..."]:visible')
     if (await input.count()) await input.first().focus()
-    await mainWindow.waitForTimeout(100)
     await togglePanel(mainWindow, 'b')
     await goHome(mainWindow)
-    await mainWindow.waitForTimeout(300)
     await clickProject(mainWindow, projectAbbrev)
-    await mainWindow.waitForTimeout(300)
+    await expect(mainWindow.getByText('Split sizing task').first()).toBeVisible({ timeout: 5_000 })
   })
 
   // ── Clean state: reset for remaining tests ──
@@ -170,7 +169,6 @@ test.describe('Panel auto-split sizing', () => {
       ['taskDetailPanelSizes', ''] as const
     )
     await openTaskViaSearch(mainWindow, 'Split sizing task')
-    await mainWindow.waitForTimeout(300)
   })
 
   // ── Default state: terminal(auto) + settings(440) ─────────────
@@ -274,7 +272,6 @@ test.describe('Panel auto-split sizing', () => {
       'input[placeholder="Enter URL..."]:visible'
     )
     if (await input.count()) await input.first().focus()
-    await mainWindow.waitForTimeout(100)
     await togglePanel(mainWindow, 'b')
 
     const container = await getContainerWidth(mainWindow)
@@ -309,7 +306,12 @@ test.describe('Panel auto-split sizing', () => {
       steps: 5
     })
     await mainWindow.mouse.up()
-    await mainWindow.waitForTimeout(300)
+
+    // Wait for pinned width to persist
+    await expect.poll(async () => {
+      const s = await mainWindow.evaluate(() => window.api.settings.get('taskDetailPanelSizes'))
+      return s ? typeof JSON.parse(s).browser : undefined
+    }, { timeout: 5_000 }).toBe('number')
 
     // Read browser's pinned width
     const widths = await getVisiblePanelWidths(mainWindow)
@@ -343,7 +345,6 @@ test.describe('Panel auto-split sizing', () => {
       'input[placeholder="Enter URL..."]:visible'
     )
     if (await input.count()) await input.first().focus()
-    await mainWindow.waitForTimeout(100)
     await togglePanel(mainWindow, 'b')
 
     // Reopen — should reset to auto
@@ -384,7 +385,12 @@ test.describe('Panel auto-split sizing', () => {
       steps: 5
     })
     await mainWindow.mouse.up()
-    await mainWindow.waitForTimeout(300)
+
+    // Wait for pinned width to persist
+    await expect.poll(async () => {
+      const s = await mainWindow.evaluate(() => window.api.settings.get('taskDetailPanelSizes'))
+      return s ? typeof JSON.parse(s).browser : undefined
+    }, { timeout: 5_000 }).toBe('number')
 
     // Verify pinned
     let stored = await mainWindow.evaluate(() =>
@@ -398,7 +404,12 @@ test.describe('Panel auto-split sizing', () => {
       box2!.x + box2!.width / 2,
       box2!.y + box2!.height / 2
     )
-    await mainWindow.waitForTimeout(300)
+
+    // Wait for reset to persist
+    await expect.poll(async () => {
+      const s = await mainWindow.evaluate(() => window.api.settings.get('taskDetailPanelSizes'))
+      return s ? JSON.parse(s).browser : undefined
+    }, { timeout: 5_000 }).toBe('auto')
 
     // Should be auto again
     stored = await mainWindow.evaluate(() =>
@@ -427,7 +438,12 @@ test.describe('Panel auto-split sizing', () => {
       steps: 5
     })
     await mainWindow.mouse.up()
-    await mainWindow.waitForTimeout(300)
+
+    // Wait for settings width to be persisted as a number (pinned)
+    await expect.poll(async () => {
+      const s = await mainWindow.evaluate(() => window.api.settings.get('taskDetailPanelSizes'))
+      return s ? typeof JSON.parse(s).settings : undefined
+    }, { timeout: 5_000 }).toBe('number')
 
     const widthsBefore = await getVisiblePanelWidths(mainWindow)
     // DOM order: terminal, browser, settings — settings is index 2
@@ -439,7 +455,12 @@ test.describe('Panel auto-split sizing', () => {
       box2!.x + box2!.width / 2,
       box2!.y + box2!.height / 2
     )
-    await mainWindow.waitForTimeout(300)
+
+    // Wait for settings to reset to default width
+    await expect.poll(async () => {
+      const widths = await getVisiblePanelWidths(mainWindow)
+      return widths[2]
+    }, { timeout: 5_000 }).toBeGreaterThanOrEqual(SETTINGS_DEFAULT - TOLERANCE)
 
     const widthsAfter = await getVisiblePanelWidths(mainWindow)
     expectWidth(widthsAfter[2], SETTINGS_DEFAULT, 'settings reset to default')
@@ -453,7 +474,6 @@ test.describe('Panel auto-split sizing', () => {
       'input[placeholder="Enter URL..."]:visible'
     )
     if (await input.count()) await input.first().focus()
-    await mainWindow.waitForTimeout(100)
     await togglePanel(mainWindow, 'b')
     await togglePanel(mainWindow, 's')
 
@@ -479,7 +499,6 @@ test.describe('Panel auto-split sizing', () => {
       'input[placeholder="Enter URL..."]:visible'
     )
     if (await input.count()) await input.first().focus()
-    await mainWindow.waitForTimeout(100)
     await togglePanel(mainWindow, 'b')
     await togglePanel(mainWindow, 'e')
     await togglePanel(mainWindow, 'g')
@@ -534,7 +553,6 @@ test.describe('Panel auto-split sizing', () => {
       'input[placeholder="Enter URL..."]:visible'
     )
     if (await input.count()) await input.first().focus()
-    await mainWindow.waitForTimeout(100)
     await togglePanel(mainWindow, 'b')
   })
 })

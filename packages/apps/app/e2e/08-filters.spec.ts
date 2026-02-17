@@ -23,7 +23,7 @@ test.describe('Filters', () => {
 
     await goHome(mainWindow)
     await clickProject(mainWindow, projectAbbrev)
-    await mainWindow.waitForTimeout(500)
+    await expect(mainWindow.getByText('Critical filter task')).toBeVisible({ timeout: 5_000 })
   })
 
   test('done tasks in DOM by default', async ({ mainWindow }) => {
@@ -36,12 +36,10 @@ test.describe('Filters', () => {
     const doneSwitch = mainWindow.locator('#show-done')
     if (await doneSwitch.isVisible().catch(() => false)) {
       await doneSwitch.click()
-      await mainWindow.waitForTimeout(300)
       await expect(mainWindow.getByText('Done filter task')).not.toBeVisible({ timeout: 5_000 })
 
       // Toggle back on
       await doneSwitch.click()
-      await mainWindow.waitForTimeout(300)
       await expect(mainWindow.getByText('Done filter task')).toBeVisible({ timeout: 5_000 })
     }
   })

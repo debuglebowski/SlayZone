@@ -83,7 +83,7 @@ test.describe('Session ID banners', () => {
     await s.refreshData()
     await goHome(mainWindow)
     await clickProject(mainWindow, projectAbbrev)
-    await mainWindow.waitForTimeout(500)
+    await expect(mainWindow.getByText('BT codex task').first()).toBeVisible({ timeout: 5_000 })
   })
 
   test.afterAll(async ({ electronApp }) => {
@@ -97,7 +97,6 @@ test.describe('Session ID banners', () => {
 
   test('codex: shows detect banner with /status button', async ({ mainWindow }) => {
     await mainWindow.getByText('BT codex task').first().click()
-    await mainWindow.waitForTimeout(500)
 
     await expect(mainWindow.getByText('Session not saved')).toBeVisible()
     await expect(mainWindow.getByRole('button', { name: /Run \/status/ })).toBeVisible()
@@ -121,9 +120,8 @@ test.describe('Session ID banners', () => {
   test('gemini: shows detect banner with /stats button', async ({ mainWindow }) => {
     await goHome(mainWindow)
     await clickProject(mainWindow, projectAbbrev)
-    await mainWindow.waitForTimeout(300)
+    await expect(mainWindow.getByText('BT gemini task').first()).toBeVisible({ timeout: 5_000 })
     await mainWindow.getByText('BT gemini task').first().click()
-    await mainWindow.waitForTimeout(500)
 
     await expect(mainWindow.getByText('Session not saved')).toBeVisible()
     await expect(mainWindow.getByRole('button', { name: /Run \/stats/ })).toBeVisible()
@@ -147,9 +145,8 @@ test.describe('Session ID banners', () => {
   test('cursor: shows unavailable banner (not detect banner)', async ({ mainWindow }) => {
     await goHome(mainWindow)
     await clickProject(mainWindow, projectAbbrev)
-    await mainWindow.waitForTimeout(300)
+    await expect(mainWindow.getByText('BT cursor task').first()).toBeVisible({ timeout: 5_000 })
     await mainWindow.getByText('BT cursor task').first().click()
-    await mainWindow.waitForTimeout(500)
 
     await expect(mainWindow.getByText(/Session ID detection not available/)).toBeVisible()
     await expect(mainWindow.getByText(/don't close the tab/)).toBeVisible()
@@ -171,9 +168,8 @@ test.describe('Session ID banners', () => {
   test('opencode: shows unavailable banner', async ({ mainWindow }) => {
     await goHome(mainWindow)
     await clickProject(mainWindow, projectAbbrev)
-    await mainWindow.waitForTimeout(300)
+    await expect(mainWindow.getByText('BT opencode task').first()).toBeVisible({ timeout: 5_000 })
     await mainWindow.getByText('BT opencode task').first().click()
-    await mainWindow.waitForTimeout(500)
 
     await expect(mainWindow.getByText(/Session ID detection not available/)).toBeVisible()
     await expect(mainWindow.getByText(/don't close the tab/)).toBeVisible()
@@ -191,9 +187,8 @@ test.describe('Session ID banners', () => {
   test('claude-code: no session banner of any kind', async ({ mainWindow }) => {
     await goHome(mainWindow)
     await clickProject(mainWindow, projectAbbrev)
-    await mainWindow.waitForTimeout(300)
+    await expect(mainWindow.getByText('BT claude task').first()).toBeVisible({ timeout: 5_000 })
     await mainWindow.getByText('BT claude task').first().click()
-    await mainWindow.waitForTimeout(500)
 
     await expect(mainWindow.getByText('Session not saved')).not.toBeVisible()
     await expect(mainWindow.getByText(/Session ID detection not available/)).not.toBeVisible()

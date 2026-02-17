@@ -18,7 +18,7 @@ test.describe('Trailing PTY output on exit', () => {
     const p = await s.createProject({ name: 'Ux Trailing', color: '#f97316', path: TEST_PROJECT_PATH })
     projectAbbrev = p.name.slice(0, 2).toUpperCase()
 
-    const t = await s.createTask({ projectId: p.id, title: 'Trailing output task', status: 'todo' })
+    const t = await s.createTask({ projectId: p.id, title: 'Trailing output task', status: 'in_progress' })
     taskId = t.id
 
     await mainWindow.evaluate((id) => window.api.db.updateTask({ id, terminalMode: 'terminal' }), taskId)

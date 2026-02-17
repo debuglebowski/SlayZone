@@ -30,7 +30,7 @@ test.describe('Screenshot to terminal', () => {
     await openTaskTerminal(mainWindow, { projectAbbrev, taskTitle: 'Screenshot task' })
     await switchTerminalMode(mainWindow, 'terminal')
     await waitForPtySession(mainWindow, sessionId)
-    await mainWindow.waitForTimeout(1_000)
+    await expect(mainWindow.locator('.xterm-screen:visible')).toBeVisible({ timeout: 5_000 })
   })
 
   test('screenshot captures region and injects path into terminal', async ({ electronApp, mainWindow }) => {
@@ -69,7 +69,7 @@ test.describe('Screenshot to terminal', () => {
 
   test('pressing Escape cancels region selector', async ({ electronApp, mainWindow }) => {
     await mainWindow.evaluate((id) => window.api.pty.clearBuffer(id), sessionId)
-    await mainWindow.waitForTimeout(300)
+    await expect.poll(() => readFullBuffer(mainWindow, sessionId).then(b => (b ?? '').trim().length === 0), { timeout: 3_000 }).toBe(true)
 
     // Mock handler to track calls
     await electronApp.evaluate(({ ipcMain }) => {
@@ -92,16 +92,13 @@ test.describe('Screenshot to terminal', () => {
     await mainWindow.keyboard.press('Escape')
     await expect(overlay).not.toBeVisible({ timeout: 2_000 })
 
-    await mainWindow.waitForTimeout(500)
-
     // Nothing should be injected
-    const buffer = await readFullBuffer(mainWindow, sessionId)
-    expect(buffer ?? '').not.toContain('/should/not/appear.png')
+    await expect.poll(() => readFullBuffer(mainWindow, sessionId).then(b => (b ?? '').includes('/should/not/appear.png')), { timeout: 2_000 }).toBe(false)
   })
 
   test('camera button triggers region selector', async ({ electronApp, mainWindow }) => {
     await mainWindow.evaluate((id) => window.api.pty.clearBuffer(id), sessionId)
-    await mainWindow.waitForTimeout(300)
+    await expect.poll(() => readFullBuffer(mainWindow, sessionId).then(b => (b ?? '').trim().length === 0), { timeout: 3_000 }).toBe(true)
 
     const buttonScreenshotPath = path.join(TEST_PROJECT_PATH, 'button-screenshot.png')
     fs.writeFileSync(buttonScreenshotPath, 'fake-png-data')

@@ -42,7 +42,7 @@ test.describe('Dev server URL detection', () => {
     const p = await s.createProject({ name: 'Dev Detect', color: '#06b6d4', path: TEST_PROJECT_PATH })
     projectAbbrev = p.name.slice(0, 2).toUpperCase()
 
-    const t = await s.createTask({ projectId: p.id, title: 'Dev server task', status: 'todo' })
+    const t = await s.createTask({ projectId: p.id, title: 'Dev server task', status: 'in_progress' })
     taskId = t.id
     sessionId = getMainSessionId(taskId)
 
@@ -102,9 +102,8 @@ test.describe('Dev server URL detection', () => {
     await runCommand(mainWindow, sessionId, 'echo http://localhost:7777')
     await waitForBufferContains(mainWindow, sessionId, 'http://localhost:7777')
 
-    // Wait to confirm no toast appears
-    await mainWindow.waitForTimeout(1_500)
-    await expect(toast(mainWindow)).not.toBeVisible()
+    // Give the system time to potentially show a toast, then confirm it didn't
+    await expect(toast(mainWindow)).not.toBeVisible({ timeout: 2_000 })
   })
 })
 
@@ -120,7 +119,7 @@ test.describe('Dev server detection — toast disabled', () => {
     await s.setSetting('dev_server_toast_enabled', '0')
 
     const p = await s.createProject({ name: 'NoToast Proj', color: '#f59e0b', path: TEST_PROJECT_PATH })
-    const t = await s.createTask({ projectId: p.id, title: 'No toast task', status: 'todo' })
+    const t = await s.createTask({ projectId: p.id, title: 'No toast task', status: 'in_progress' })
     sessionId = getMainSessionId(t.id)
 
     await mainWindow.evaluate((id) => window.api.db.updateTask({ id, terminalMode: 'terminal' }), t.id)
@@ -140,8 +139,7 @@ test.describe('Dev server detection — toast disabled', () => {
     await runCommand(mainWindow, sessionId, 'echo http://localhost:4001')
     await waitForBufferContains(mainWindow, sessionId, 'http://localhost:4001')
 
-    await mainWindow.waitForTimeout(2_000)
-    await expect(toast(mainWindow)).not.toBeVisible()
+    await expect(toast(mainWindow)).not.toBeVisible({ timeout: 2_000 })
   })
 })
 
@@ -157,7 +155,7 @@ test.describe('Dev server detection — auto-open browser', () => {
     await s.setSetting('dev_server_auto_open_browser', '1')
 
     const p = await s.createProject({ name: 'AutoOpen Proj', color: '#10b981', path: TEST_PROJECT_PATH })
-    const t = await s.createTask({ projectId: p.id, title: 'Auto open task', status: 'todo' })
+    const t = await s.createTask({ projectId: p.id, title: 'Auto open task', status: 'in_progress' })
     sessionId = getMainSessionId(t.id)
 
     await mainWindow.evaluate((id) => window.api.db.updateTask({ id, terminalMode: 'terminal' }), t.id)
@@ -190,8 +188,7 @@ test.describe('Dev server detection — auto-open browser', () => {
     await mainWindow.keyboard.press('Meta+b')
     await expect(urlInput(mainWindow)).not.toBeVisible({ timeout: 3_000 })
 
-    // Wait and verify browser stays closed (one-time behavior)
-    await mainWindow.waitForTimeout(2_000)
-    await expect(urlInput(mainWindow)).not.toBeVisible()
+    // Verify browser stays closed (one-time behavior)
+    await expect(urlInput(mainWindow)).not.toBeVisible({ timeout: 2_000 })
   })
 })

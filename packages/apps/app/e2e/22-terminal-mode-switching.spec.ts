@@ -25,8 +25,16 @@ test.describe('Terminal mode switching', () => {
     await expect(modeTrigger(mainWindow)).toHaveText(/Claude Code/)
   })
 
-  test('claude-code mode shows Sync name action', async ({ mainWindow }) => {
-    await expect(mainWindow.getByRole('button', { name: 'Sync name' })).toBeVisible()
+  /** Open the terminal header dropdown (MoreHorizontal trigger) */
+  const openTerminalMenu = async (page: import('@playwright/test').Page) => {
+    await page.locator('.lucide-ellipsis:visible, .lucide-more-horizontal:visible').first().click()
+    await expect(page.locator('[role="menu"]')).toBeVisible()
+  }
+
+  test('claude-code mode shows Sync name action in menu', async ({ mainWindow }) => {
+    await openTerminalMenu(mainWindow)
+    await expect(mainWindow.getByRole('menuitem', { name: 'Sync name' })).toBeVisible()
+    await mainWindow.keyboard.press('Escape')
   })
 
   test('switch to Terminal mode', async ({ mainWindow }) => {
@@ -38,7 +46,9 @@ test.describe('Terminal mode switching', () => {
   })
 
   test('terminal mode hides Sync name and Flags', async ({ mainWindow }) => {
-    await expect(mainWindow.getByRole('button', { name: 'Sync name' })).not.toBeVisible()
+    await openTerminalMenu(mainWindow)
+    await expect(mainWindow.getByRole('menuitem', { name: 'Sync name' })).not.toBeVisible()
+    await mainWindow.keyboard.press('Escape')
     await expect(mainWindow.locator('input[placeholder="Flags"]')).not.toBeVisible()
   })
 
@@ -55,7 +65,9 @@ test.describe('Terminal mode switching', () => {
   })
 
   test('codex mode hides Sync name', async ({ mainWindow }) => {
-    await expect(mainWindow.getByRole('button', { name: 'Sync name' })).not.toBeVisible()
+    await openTerminalMenu(mainWindow)
+    await expect(mainWindow.getByRole('menuitem', { name: 'Sync name' })).not.toBeVisible()
+    await mainWindow.keyboard.press('Escape')
   })
 
   test('mode persists across navigation', async ({ mainWindow }) => {
@@ -77,7 +89,9 @@ test.describe('Terminal mode switching', () => {
     await mainWindow.getByRole('option', { name: 'Claude Code' }).click()
 
     await expect(modeTrigger(mainWindow)).toHaveText(/Claude Code/)
-    await expect(mainWindow.getByRole('button', { name: 'Sync name' })).toBeVisible()
+    await openTerminalMenu(mainWindow)
+    await expect(mainWindow.getByRole('menuitem', { name: 'Sync name' })).toBeVisible()
+    await mainWindow.keyboard.press('Escape')
   })
 
   test('conversation IDs cleared on mode switch', async ({ mainWindow }) => {

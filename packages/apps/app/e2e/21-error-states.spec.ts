@@ -18,7 +18,6 @@ test.describe('Error states', () => {
 
   test('shows error UI when project path does not exist', async ({ mainWindow }) => {
     await clickProject(mainWindow, projectAbbrev)
-    await mainWindow.waitForTimeout(500)
 
     await expect(mainWindow.getByText('Project path not found')).toBeVisible({ timeout: 3_000 })
     await expect(mainWindow.locator('code').getByText(BAD_PATH)).toBeVisible()
@@ -35,7 +34,6 @@ test.describe('Error states', () => {
     const s = seed(mainWindow)
     await s.updateProject({ id: projectId, path: TEST_PROJECT_PATH })
     await s.refreshData()
-    await mainWindow.waitForTimeout(500)
 
     await expect(mainWindow.getByText('Project path not found')).not.toBeVisible({ timeout: 5_000 })
     // Kanban columns should reappear
