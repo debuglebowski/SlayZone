@@ -7,12 +7,15 @@ import path from 'path'
 import { removeWorktree, createWorktree, getCurrentBranch, isGitRepo } from '@slayzone/worktrees/main'
 import { killPtysByTaskId } from '@slayzone/terminal/main'
 
+function safeJsonParse(value: unknown): unknown {
+  if (!value || typeof value !== 'string') return null
+  try { return JSON.parse(value) } catch { return null }
+}
+
 // Parse JSON columns from DB row
 function parseTask(row: Record<string, unknown> | undefined): Task | null {
   if (!row) return null
-  const providerConfig: ProviderConfig = row.provider_config
-    ? JSON.parse(row.provider_config as string)
-    : {}
+  const providerConfig: ProviderConfig = (safeJsonParse(row.provider_config) as ProviderConfig) ?? {}
   return {
     ...row,
     dangerously_skip_permissions: Boolean(row.dangerously_skip_permissions),
@@ -28,18 +31,10 @@ function parseTask(row: Record<string, unknown> | undefined): Task | null {
     cursor_flags: providerConfig['cursor-agent']?.flags ?? '',
     gemini_flags: providerConfig['gemini']?.flags ?? '',
     opencode_flags: providerConfig['opencode']?.flags ?? '',
-    panel_visibility: row.panel_visibility
-      ? JSON.parse(row.panel_visibility as string)
-      : null,
-    browser_tabs: row.browser_tabs
-      ? JSON.parse(row.browser_tabs as string)
-      : null,
-    web_panel_urls: row.web_panel_urls
-      ? JSON.parse(row.web_panel_urls as string)
-      : null,
-    merge_context: row.merge_context
-      ? JSON.parse(row.merge_context as string)
-      : null,
+    panel_visibility: safeJsonParse(row.panel_visibility),
+    browser_tabs: safeJsonParse(row.browser_tabs),
+    web_panel_urls: safeJsonParse(row.web_panel_urls),
+    merge_context: safeJsonParse(row.merge_context),
     is_temporary: Boolean(row.is_temporary)
   } as Task
 }
@@ -234,7 +229,7 @@ export function updateTask(db: Database, data: UpdateTaskInput): Task | null {
     if (data.providerConfig !== undefined || hasLegacyUpdate) {
       // Read current provider_config
       const currentRow = db.prepare('SELECT provider_config FROM tasks WHERE id = ?').get(data.id) as { provider_config: string } | undefined
-      const current: ProviderConfig = currentRow?.provider_config ? JSON.parse(currentRow.provider_config) : {}
+      const current: ProviderConfig = (safeJsonParse(currentRow?.provider_config) as ProviderConfig) ?? {}
       // Deep merge: per-mode entry merge so partial updates don't clobber existing fields
       const merged: ProviderConfig = { ...current }
       if (data.providerConfig !== undefined) {
