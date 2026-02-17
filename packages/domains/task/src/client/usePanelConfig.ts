@@ -5,13 +5,20 @@ import { DEFAULT_PANEL_CONFIG, PREDEFINED_WEB_PANELS } from '../shared/types'
 const SETTINGS_KEY = 'panel_config'
 const CHANGE_EVENT = 'panel-config-changed'
 
-/** Merge predefined panels into stored config (adds new ones, skips user-deleted) */
+/** Merge predefined panels into stored config (adds new ones, syncs shortcuts, skips user-deleted) */
 function mergePredefined(config: PanelConfig): PanelConfig {
   const existingIds = new Set(config.webPanels.map(wp => wp.id))
   const deleted = new Set(config.deletedPredefined ?? [])
   const missing = PREDEFINED_WEB_PANELS.filter(p => !existingIds.has(p.id) && !deleted.has(p.id))
-  if (missing.length === 0) return config
-  return { ...config, webPanels: [...config.webPanels, ...missing] }
+  const predefinedMap = new Map(PREDEFINED_WEB_PANELS.map(p => [p.id, p]))
+  // Sync shortcuts for existing predefined panels
+  const synced = config.webPanels.map(wp => {
+    const src = predefinedMap.get(wp.id)
+    return src && wp.shortcut !== src.shortcut ? { ...wp, shortcut: src.shortcut } : wp
+  })
+  const changed = missing.length > 0 || synced.some((wp, i) => wp !== config.webPanels[i])
+  if (!changed) return config
+  return { ...config, webPanels: [...synced, ...missing] }
 }
 
 function loadConfig(): Promise<PanelConfig> {
