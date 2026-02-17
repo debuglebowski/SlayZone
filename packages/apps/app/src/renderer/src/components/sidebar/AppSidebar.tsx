@@ -89,7 +89,7 @@ export function AppSidebar({
   const [shortcutsOpen, setShortcutsOpen] = useState(false)
 
   return (
-    <Sidebar collapsible="none" className={zenMode ? "w-16 min-h-svh hidden" : "w-16 min-h-svh"}>
+    <Sidebar collapsible="none" className={zenMode ? "!w-0 min-h-svh overflow-hidden" : "w-16 min-h-svh"}>
       {/* Draggable region for window movement - clears traffic lights */}
       <div className="h-10 window-drag-region" />
       <SidebarContent className="py-4 pt-0">
