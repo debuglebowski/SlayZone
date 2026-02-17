@@ -194,13 +194,18 @@ export function UserSettingsDialog({
         if (isStale()) return
         if (panelConfigRaw) {
           const parsed = JSON.parse(panelConfigRaw) as PanelConfig
-          // Merge in any new predefined panels (skip user-deleted ones)
+          // Merge in any new predefined panels + sync shortcuts (skip user-deleted ones)
           const existingIds = new Set(parsed.webPanels.map(wp => wp.id))
           const deleted = new Set(parsed.deletedPredefined ?? [])
           const missing = PREDEFINED_WEB_PANELS.filter(p => !existingIds.has(p.id) && !deleted.has(p.id))
-          if (missing.length > 0) {
-            parsed.webPanels = [...parsed.webPanels, ...missing]
-          }
+          const predefinedMap = new Map(PREDEFINED_WEB_PANELS.map(p => [p.id, p]))
+          parsed.webPanels = [
+            ...parsed.webPanels.map(wp => {
+              const src = predefinedMap.get(wp.id)
+              return src && wp.shortcut !== src.shortcut ? { ...wp, shortcut: src.shortcut } : wp
+            }),
+            ...missing
+          ]
           setPanelConfig(parsed)
         }
       } catch { /* ignore */ }
