@@ -2,7 +2,7 @@ import { createContext, useState, useEffect, useCallback, useRef, type ReactNode
 import posthog from 'posthog-js'
 import { PostHogProvider } from '@posthog/react'
 import type { TelemetryTier } from '../shared/types'
-import { initTelemetry, setTelemetryTier as setTelemetryTierInternal, track } from './telemetry'
+import { initTelemetry, setTelemetryTier as setTelemetryTierInternal, track, startHeartbeat, stopHeartbeat } from './telemetry'
 
 const SETTINGS_KEY = 'telemetry_tier'
 
@@ -31,12 +31,15 @@ export function TelemetryProvider({ children }: { children: ReactNode }) {
       const t: TelemetryTier = stored === 'opted_in' ? 'opted_in' : 'anonymous'
       setTier(t)
       initTelemetry(t)
+      startHeartbeat()
       setReady(true)
 
       window.api.app.getVersion().then((version) => {
         track('app_opened', { version })
       })
     })
+
+    return () => stopHeartbeat()
   }, [])
 
   const changeTier = useCallback((newTier: TelemetryTier) => {

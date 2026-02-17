@@ -15,18 +15,17 @@ export function TelemetrySettings({ tier, onTierChange }: TelemetrySettingsProps
       <div className="space-y-3">
         <Label className="text-base font-semibold">Anonymous Analytics</Label>
         <p className="text-sm text-muted-foreground">
-          SlayZone collects anonymous usage counts (e.g. features used, app opened) with no
-          personal identifiers. No data is stored on your device and your IP address is not
-          recorded.
+          SlayZone records when the app is opened and sends an activity heartbeat every 5 minutes
+          while you're active. No personal identifiers, no data stored on your device, no IP
+          recording.
         </p>
       </div>
 
       <div className="space-y-3">
         <Label className="text-base font-semibold">Enhanced Analytics</Label>
         <p className="text-sm text-muted-foreground">
-          Opt in to help us understand usage patterns over time — like retention and feature
-          adoption. A random anonymous ID is persisted locally. No personal information is
-          collected.
+          Opt in to help us understand retention patterns over time. A random anonymous ID is
+          persisted locally. No personal information is collected.
         </p>
         <div className="flex items-center gap-3">
           <Switch

@@ -17,7 +17,6 @@ import { CreateTaskDialog, EditTaskDialog, DeleteTaskDialog, TaskDetailPage } fr
 import { CreateProjectDialog, ProjectSettingsDialog, DeleteProjectDialog } from '@slayzone/projects'
 import { UserSettingsDialog, useViewState } from '@slayzone/settings'
 import { OnboardingDialog } from '@slayzone/onboarding'
-import { track } from '@slayzone/telemetry/client'
 import { usePty } from '@slayzone/terminal/client'
 import type { TerminalState } from '@slayzone/terminal/shared'
 // Shared
@@ -415,7 +414,6 @@ function App(): React.JSX.Element {
   useHotkeys('mod+k', (e) => {
     e.preventDefault()
     setSearchOpen(true)
-    track('search_used')
   }, { enableOnFormTags: true })
 
   useHotkeys('mod+w', (e) => {
@@ -515,7 +513,6 @@ function App(): React.JSX.Element {
     updateTask({ ...tasks.find((t) => t.id === activeTab.taskId)!, status: 'done' })
     closeTab(activeTabIndex)
     setCompleteTaskDialogOpen(false)
-    track('task_completed')
   }
 
   // Scratch terminal (creates unnamed task with terminal mode)
@@ -536,7 +533,7 @@ function App(): React.JSX.Element {
     })
     setTasks((prev) => [task, ...prev])
     openTask(task.id)
-    track('task_created')
+
   }, [selectedProjectId, tasks, setTasks, openTask])
 
   useEffect(() => {
@@ -550,7 +547,7 @@ function App(): React.JSX.Element {
     setTasks((prev) => [task, ...prev])
     setCreateOpen(false)
     setCreateTaskDefaults({})
-    track('task_created')
+
   }
 
   const handleTaskCreatedAndOpen = (task: Task): void => {
@@ -558,7 +555,7 @@ function App(): React.JSX.Element {
     setCreateOpen(false)
     setCreateTaskDefaults({})
     openTask(task.id)
-    track('task_created')
+
   }
 
   const handleCreateTaskFromColumn = (column: Column): void => {
@@ -632,7 +629,6 @@ function App(): React.JSX.Element {
     setProjects((prev) => [...prev, project])
     setSelectedProjectId(project.id)
     setCreateProjectOpen(false)
-    track('project_created')
   }
 
   const handleProjectUpdated = (project: Project): void => {

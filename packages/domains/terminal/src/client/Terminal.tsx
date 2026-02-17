@@ -24,7 +24,6 @@ import { useTheme } from '@slayzone/settings/client'
 import { getTerminalTheme } from './terminal-themes'
 import { TerminalSearchBar } from './TerminalSearchBar'
 import type { TerminalMode, TerminalState, CodeMode } from '@slayzone/terminal/shared'
-import { track } from '@slayzone/telemetry/client'
 
 // Wait for container to have non-zero dimensions before opening terminal
 function waitForDimensions(
@@ -352,7 +351,6 @@ export function Terminal({
         const effectiveConversationId = isAiMode ? newConversationId : undefined
         const effectiveExistingConversationId = isAiMode ? existingConversationId : undefined
         const result = await window.api.pty.create(sessionId, cwd, effectiveConversationId, effectiveExistingConversationId, mode, null, codeMode, providerFlags)
-        track('terminal_opened', { mode })
         if (!result.success) {
           const message = result.error || 'Failed to create terminal process'
           terminal.writeln(`\x1b[31mError: ${message}\x1b[0m`)
