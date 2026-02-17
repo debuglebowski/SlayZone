@@ -102,20 +102,6 @@ export function TerminalContainer({
         e.preventDefault()
         closeTab(activeTab.id)
       }
-      // Ctrl+Tab: Next tab
-      if (e.ctrlKey && e.key === 'Tab' && !e.shiftKey) {
-        e.preventDefault()
-        const currentIndex = tabs.findIndex(t => t.id === activeTabId)
-        const nextIndex = (currentIndex + 1) % tabs.length
-        setActiveTabId(tabs[nextIndex].id)
-      }
-      // Ctrl+Shift+Tab: Previous tab
-      if (e.ctrlKey && e.shiftKey && e.key === 'Tab') {
-        e.preventDefault()
-        const currentIndex = tabs.findIndex(t => t.id === activeTabId)
-        const prevIndex = (currentIndex - 1 + tabs.length) % tabs.length
-        setActiveTabId(tabs[prevIndex].id)
-      }
     }
 
     window.addEventListener('keydown', handleKeyDown)
