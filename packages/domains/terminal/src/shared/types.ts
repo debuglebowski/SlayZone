@@ -46,7 +46,6 @@ export interface PromptInfo {
 // Claude CLI availability check result
 export interface ClaudeAvailability {
   available: boolean
-  path: string | null
   version: string | null
 }
 

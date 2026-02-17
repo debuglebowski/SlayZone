@@ -7,49 +7,29 @@ export function registerClaudeHandlers(ipcMain: IpcMain): void {
     const TIMEOUT_MS = 5000
 
     const checkPromise = new Promise<ClaudeAvailability>((resolve) => {
-      const cmd = process.platform === 'win32' ? 'where' : 'which'
-      const proc = spawn(cmd, ['claude'], { shell: true })
+      const proc = spawn('claude', ['--version'])
 
-      let path = ''
+      let version = ''
       proc.stdout?.on('data', (data) => {
-        path += data.toString().trim()
+        version += data.toString().trim()
       })
 
       proc.on('close', (code) => {
-        if (code !== 0 || !path) {
-          resolve({ available: false, path: null, version: null })
-          return
+        if (code !== 0 || !version) {
+          resolve({ available: false, version: null })
+        } else {
+          resolve({ available: true, version })
         }
-
-        // Get version
-        const versionProc = spawn('claude', ['--version'], { shell: true })
-        let version = ''
-
-        versionProc.stdout?.on('data', (data) => {
-          version += data.toString().trim()
-        })
-
-        versionProc.on('close', () => {
-          resolve({
-            available: true,
-            path: path.split('\n')[0],
-            version: version || 'unknown'
-          })
-        })
-
-        versionProc.on('error', () => {
-          resolve({ available: true, path: path.split('\n')[0], version: 'unknown' })
-        })
       })
 
       proc.on('error', () => {
-        resolve({ available: false, path: null, version: null })
+        resolve({ available: false, version: null })
       })
     })
 
     const timeoutPromise = new Promise<ClaudeAvailability>((resolve) => {
       setTimeout(() => {
-        resolve({ available: false, path: null, version: null })
+        resolve({ available: false, version: null })
       }, TIMEOUT_MS)
     })
 
