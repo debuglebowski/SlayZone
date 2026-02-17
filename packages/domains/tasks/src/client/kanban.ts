@@ -16,7 +16,7 @@ export const STATUS_LABELS: Record<TaskStatus, string> = Object.fromEntries(
   TASK_STATUS_ORDER.map((status) => [status, getTaskStatusStyle(status)!.label])
 ) as Record<TaskStatus, string>
 
-const PRIORITY_LABELS: Record<number, string> = {
+export const PRIORITY_LABELS: Record<number, string> = {
   1: 'Urgent',
   2: 'High',
   3: 'Medium',

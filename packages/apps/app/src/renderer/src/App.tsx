@@ -622,7 +622,7 @@ function App(): React.JSX.Element {
     }
   }
 
-  const handleTaskClick = (task: Task, e: React.MouseEvent): void => {
+  const handleTaskClick = (task: Task, e: { metaKey: boolean }): void => {
     if (e.metaKey) {
       openTaskInBackground(task.id)
     } else {
@@ -834,6 +834,7 @@ function App(): React.JSX.Element {
                                   tasks={displayTasks}
                                   groupBy={filter.groupBy}
                                   sortBy={filter.sortBy}
+                                  isActive={activeTabIndex === 0}
                                   onTaskMove={handleTaskMove}
                                   onTaskReorder={reorderTasks}
                                   onTaskClick={handleTaskClick}

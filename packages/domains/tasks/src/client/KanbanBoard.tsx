@@ -20,14 +20,17 @@ import { groupTasksBy, type GroupKey, type Column } from './kanban'
 import type { SortKey } from './FilterState'
 import { KanbanColumn } from './KanbanColumn'
 import { KanbanCard } from './KanbanCard'
+import { KanbanPicker } from './KanbanPicker'
+import { useKanbanKeyboard } from './useKanbanKeyboard'
 
 interface KanbanBoardProps {
   tasks: Task[]
   groupBy: GroupKey
   sortBy?: SortKey
+  isActive?: boolean
   onTaskMove: (taskId: string, newColumnId: string, targetIndex: number) => void
   onTaskReorder: (taskIds: string[]) => void
-  onTaskClick?: (task: Task, e: React.MouseEvent) => void
+  onTaskClick?: (task: Task, e: { metaKey: boolean }) => void
   onCreateTask?: (column: Column) => void
   projectsMap?: Map<string, Project>
   showProjectDot?: boolean
@@ -47,6 +50,7 @@ export function KanbanBoard({
   tasks,
   groupBy,
   sortBy = 'manual',
+  isActive = true,
   onTaskMove,
   onTaskReorder,
   onTaskClick,
@@ -90,6 +94,20 @@ export function KanbanBoard({
     }
     return counts
   }, [tasks])
+
+  const {
+    focusedTaskId,
+    setFocusedTaskId,
+    pickerState,
+    closePickerState,
+    cardRefs
+  } = useKanbanKeyboard({
+    columns,
+    isActive,
+    isDragging: !!activeId,
+    onTaskClick,
+    onUpdateTask
+  })
 
   function handleDragStart(event: DragStartEvent): void {
     const taskId = event.active.id as string
@@ -203,6 +221,9 @@ export function KanbanBoard({
             tags={tags}
             blockedTaskIds={blockedTaskIds}
             subTaskCounts={subTaskCounts}
+            focusedTaskId={focusedTaskId}
+            onCardMouseEnter={setFocusedTaskId}
+            cardRefs={cardRefs}
             allProjects={allProjects}
             onUpdateTask={onUpdateTask}
             onArchiveTask={onArchiveTask}
@@ -232,6 +253,15 @@ export function KanbanBoard({
           </motion.div>
         ) : null}
       </DragOverlay>
+      {onUpdateTask && (
+        <KanbanPicker
+          pickerState={pickerState}
+          onClose={closePickerState}
+          onUpdateTask={onUpdateTask}
+          tasks={tasks}
+          cardRefs={cardRefs}
+        />
+      )}
     </DndContext>
   )
 }

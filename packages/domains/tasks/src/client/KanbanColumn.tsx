@@ -1,3 +1,4 @@
+import { useCallback } from 'react'
 import { useDroppable } from '@dnd-kit/core'
 import { SortableContext, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
@@ -19,11 +20,14 @@ import { cn } from '@slayzone/ui'
 
 interface SortableKanbanCardProps {
   task: Task
-  onTaskClick?: (task: Task, e: React.MouseEvent) => void
+  onTaskClick?: (task: Task, e: { metaKey: boolean }) => void
   project?: Project
   showProject?: boolean
   disableDrag?: boolean
   isBlocked?: boolean
+  isFocused?: boolean
+  onMouseEnter?: () => void
+  cardRefs?: React.MutableRefObject<Map<string, HTMLDivElement>>
   subTaskCount?: { done: number; total: number }
   // Context menu props
   allProjects?: Project[]
@@ -39,6 +43,9 @@ function SortableKanbanCard({
   showProject,
   disableDrag,
   isBlocked,
+  isFocused,
+  onMouseEnter,
+  cardRefs,
   subTaskCount,
   allProjects,
   onUpdateTask,
@@ -50,6 +57,17 @@ function SortableKanbanCard({
     disabled: disableDrag
   })
 
+  const combinedRef = useCallback(
+    (el: HTMLDivElement | null) => {
+      setNodeRef(el)
+      if (cardRefs) {
+        if (el) cardRefs.current.set(task.id, el)
+        else cardRefs.current.delete(task.id)
+      }
+    },
+    [setNodeRef, task.id, cardRefs]
+  )
+
   const style = {
     transform: CSS.Transform.toString(transform),
     transition
@@ -59,10 +77,11 @@ function SortableKanbanCard({
   const dragProps = disableDrag ? {} : { ...attributes, ...listeners }
 
   const card = (
-    <div ref={setNodeRef} style={style} {...dragProps}>
+    <div ref={combinedRef} style={style} {...dragProps} onMouseEnter={onMouseEnter}>
       <KanbanCard
         task={task}
         isDragging={isDragging}
+        isFocused={isFocused}
         onClick={(e) => onTaskClick?.(task, e)}
         project={project}
         showProject={showProject}
@@ -94,7 +113,7 @@ interface KanbanColumnProps {
   column: Column
   activeColumnId?: string | null
   overColumnId?: string | null
-  onTaskClick?: (task: Task, e: React.MouseEvent) => void
+  onTaskClick?: (task: Task, e: { metaKey: boolean }) => void
   onCreateTask?: (column: Column) => void
   projectsMap?: Map<string, Project>
   showProjectDot?: boolean
@@ -103,6 +122,9 @@ interface KanbanColumnProps {
   tags?: Tag[]
   blockedTaskIds?: Set<string>
   subTaskCounts?: Map<string, { done: number; total: number }>
+  focusedTaskId?: string | null
+  onCardMouseEnter?: (taskId: string) => void
+  cardRefs?: React.MutableRefObject<Map<string, HTMLDivElement>>
   // Context menu props
   allProjects?: Project[]
   onUpdateTask?: (taskId: string, updates: Partial<Task>) => void
@@ -122,6 +144,9 @@ export function KanbanColumn({
   disableDrag,
   blockedTaskIds,
   subTaskCounts,
+  focusedTaskId,
+  onCardMouseEnter,
+  cardRefs,
   allProjects,
   onUpdateTask,
   onArchiveTask,
@@ -194,6 +219,9 @@ export function KanbanColumn({
                 showProject={showProjectDot}
                 disableDrag={disableDrag}
                 isBlocked={blockedTaskIds?.has(task.id)}
+                isFocused={focusedTaskId === task.id}
+                onMouseEnter={() => onCardMouseEnter?.(task.id)}
+                cardRefs={cardRefs}
                 subTaskCount={subTaskCounts?.get(task.id)}
                 allProjects={allProjects}
                 onUpdateTask={onUpdateTask}

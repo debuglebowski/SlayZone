@@ -11,6 +11,7 @@ import { usePty } from '@slayzone/terminal'
 interface KanbanCardProps {
   task: Task
   isDragging?: boolean
+  isFocused?: boolean
   onClick?: (e: React.MouseEvent) => void
   project?: Project
   showProject?: boolean
@@ -29,6 +30,7 @@ const PRIORITY_COLORS: Record<number, string> = {
 export function KanbanCard({
   task,
   isDragging,
+  isFocused,
   onClick,
   project,
   showProject,
@@ -79,9 +81,11 @@ export function KanbanCard({
         className={cn(
           'cursor-grab transition-colors duration-[400ms] hover:duration-[100ms] select-none py-0 gap-0 hover:bg-muted/50',
           isDragging && 'opacity-50 shadow-lg',
+          isFocused && 'ring-2 ring-primary bg-muted/50',
           isOverdue && 'border-destructive',
           task.linear_url && 'border-l-2 border-l-indigo-500'
         )}
+        data-task-id={task.id}
         onClick={(e) => onClick?.(e)}
       >
       <CardContent className="px-2.5 py-5">
