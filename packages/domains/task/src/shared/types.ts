@@ -90,7 +90,7 @@ export const PREDEFINED_WEB_PANELS: WebPanelDefinition[] = [
   { id: 'web:notion', name: 'Notion', baseUrl: 'https://notion.so', shortcut: 'n', predefined: true },
   { id: 'web:github', name: 'GitHub', baseUrl: 'https://github.com', shortcut: 'h', predefined: true },
   { id: 'web:excalidraw', name: 'Excalidraw', baseUrl: 'https://excalidraw.com', shortcut: 'x', predefined: true },
-  { id: 'web:monosketch', name: 'Monosketch', baseUrl: 'https://monosketch.io', shortcut: 'k', predefined: true }
+  { id: 'web:monosketch', name: 'Monosketch', baseUrl: 'https://app.monosketch.io', shortcut: 'k', predefined: true }
 ]
 
 export const DEFAULT_PANEL_CONFIG: PanelConfig = {
