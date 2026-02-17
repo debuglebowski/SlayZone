@@ -445,6 +445,7 @@ app.whenReady().then(async () => {
       for (const ch of [
         'pty:create', 'pty:write', 'pty:resize', 'pty:kill', 'pty:exists',
         'pty:getBuffer', 'pty:clearBuffer', 'pty:getBufferSince', 'pty:list', 'pty:getState',
+        'pty:dismissAllNotifications',
       ]) {
         ipcMain.removeHandler(ch)
       }
