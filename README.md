@@ -23,6 +23,8 @@
   <a href="https://github.com/debuglebowski/SlayZone/releases/latest/download/SlayZone.AppImage"><img src="https://img.shields.io/badge/Download_for-Linux-FCC624?style=for-the-badge&logo=linux&logoColor=black" alt="Download for Linux" /></a>
 </p>
 
+> **macOS:** On first launch, macOS will show _"SlayZone can't be opened because Apple cannot check it for malicious software."_ Right-click the app → **Open** → click **Open** again to trust it. This only happens once.
+
 <br />
 
 ---
