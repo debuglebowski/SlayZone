@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react'
-import { Eye, EyeOff, FileCode } from 'lucide-react'
+import { Code, Columns2, Eye, FileCode } from 'lucide-react'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -50,7 +50,7 @@ export function FileEditorView({ projectPath, isActive = true }: FileEditorViewP
   const isDragging = useRef(false)
   const [confirmClose, setConfirmClose] = useState<string | null>(null)
   const [quickOpenVisible, setQuickOpenVisible] = useState(false)
-  const [previewVisible, setPreviewVisible] = useState(true)
+  const [viewMode, setViewMode] = useState<'editor' | 'split' | 'preview'>('split')
   const editorContainerRef = useRef<HTMLDivElement>(null)
   const previewScrollRef = useRef<HTMLDivElement>(null)
   const scrollSyncSource = useRef<'editor' | 'preview' | null>(null)
@@ -62,7 +62,7 @@ export function FileEditorView({ projectPath, isActive = true }: FileEditorViewP
 
   // Scroll sync between editor and preview
   useEffect(() => {
-    if (!isMarkdown || !previewVisible) return
+    if (!isMarkdown || viewMode !== 'split') return
 
     const editorEl = editorContainerRef.current?.querySelector('.cm-scroller') as HTMLElement | null
     const previewEl = previewScrollRef.current
@@ -98,7 +98,7 @@ export function FileEditorView({ projectPath, isActive = true }: FileEditorViewP
       previewEl.removeEventListener('scroll', onPreviewScroll)
       if (rafId) cancelAnimationFrame(rafId)
     }
-  }, [isMarkdown, previewVisible, activeFilePath])
+  }, [isMarkdown, viewMode, activeFilePath])
 
   // Cmd+P — quick open (only on active tab)
   useEffect(() => {
@@ -189,13 +189,22 @@ export function FileEditorView({ projectPath, isActive = true }: FileEditorViewP
             onToggleTree={() => setTreeVisible((v) => !v)}
           />
           {isMarkdown && activeFile?.content != null && (
-            <button
-              className="flex items-center justify-center size-7 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors shrink-0 mr-2"
-              onClick={() => setPreviewVisible((v) => !v)}
-              title={previewVisible ? 'Hide preview' : 'Show preview'}
-            >
-              {previewVisible ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
-            </button>
+            <div className="flex items-center shrink-0 mr-2 bg-surface-2 rounded-md p-0.5 gap-0.5">
+              {([
+                { mode: 'editor' as const, icon: Code, title: 'Editor only' },
+                { mode: 'split' as const, icon: Columns2, title: 'Split view' },
+                { mode: 'preview' as const, icon: Eye, title: 'Preview only' }
+              ]).map(({ mode, icon: Icon, title }) => (
+                <button
+                  key={mode}
+                  className={`flex items-center justify-center size-6 rounded transition-colors ${viewMode === mode ? 'bg-muted text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
+                  onClick={() => setViewMode(mode)}
+                  title={title}
+                >
+                  <Icon className="size-3.5" />
+                </button>
+              ))}
+            </div>
           )}
         </div>
 
@@ -213,18 +222,20 @@ export function FileEditorView({ projectPath, isActive = true }: FileEditorViewP
           </div>
         ) : activeFile?.content != null ? (
           <div className="flex-1 min-h-0 flex">
-            <div ref={editorContainerRef} className={isMarkdown && previewVisible ? 'w-1/2 min-w-0' : 'flex-1 min-w-0'}>
-              <CodeEditor
-                key={activeFile.path}
-                filePath={activeFile.path}
-                content={activeFile.content}
-                onChange={(content) => updateContent(activeFile.path, content)}
-                onSave={() => saveFile(activeFile.path)}
-                version={fileVersions.get(activeFile.path)}
-              />
-            </div>
-            {isMarkdown && previewVisible && (
-              <div className="w-1/2 min-w-0 border-l">
+            {!(isMarkdown && viewMode === 'preview') && (
+              <div ref={editorContainerRef} className={isMarkdown && viewMode === 'split' ? 'w-1/2 min-w-0' : 'flex-1 min-w-0'}>
+                <CodeEditor
+                  key={activeFile.path}
+                  filePath={activeFile.path}
+                  content={activeFile.content}
+                  onChange={(content) => updateContent(activeFile.path, content)}
+                  onSave={() => saveFile(activeFile.path)}
+                  version={fileVersions.get(activeFile.path)}
+                />
+              </div>
+            )}
+            {isMarkdown && viewMode !== 'editor' && (
+              <div className={`${viewMode === 'split' ? 'w-1/2' : 'flex-1'} min-w-0 border-l`}>
                 <MarkdownPreview content={activeFile.content} scrollRef={previewScrollRef} projectPath={projectPath} filePath={activeFilePath ?? undefined} />
               </div>
             )}
