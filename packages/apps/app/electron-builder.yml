@@ -21,7 +21,7 @@ nsis:
   shortcutName: ${productName}
   uninstallDisplayName: ${productName}
   createDesktopShortcut: always
-afterPack: build/afterPack.js
+afterPack: build/afterPack.cjs
 mac:
   identity: null
   icon: build/icon.icns
