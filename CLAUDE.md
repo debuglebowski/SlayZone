@@ -77,6 +77,22 @@ domain/
 | `pnpm build:mac` | Build macOS .app |
 | `pnpm typecheck` | Typecheck all packages |
 
+## Commit Messages
+
+[Conventional Commits](https://www.conventionalcommits.org/):
+
+| Prefix | Use for |
+|--------|---------|
+| `feat:` | New features |
+| `fix:` | Bug fixes |
+| `chore:` | Deps, CI, build, config |
+| `refactor:` | Code restructuring (no behavior change) |
+| `docs:` | Documentation |
+| `test:` | Tests |
+| `release:` | Version bumps (auto-generated) |
+
+Scope optional: `feat(terminal): ...`
+
 ## Key Files
 
 | File | Purpose |

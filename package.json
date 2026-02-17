@@ -28,7 +28,7 @@
     "release:patch": "pnpm --filter @slayzone/app exec npm version patch && pnpm release:tag",
     "release:minor": "pnpm --filter @slayzone/app exec npm version minor && pnpm release:tag",
     "release:major": "pnpm --filter @slayzone/app exec npm version major && pnpm release:tag",
-    "release:tag": "bash scripts/release.sh"
+    "release:tag": "bash scripts/tag-release.sh"
   },
   "devDependencies": {
     "changelogen": "^0.6.2",
