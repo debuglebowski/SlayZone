@@ -19,7 +19,6 @@ test.describe('Edge cases', () => {
     await s.refreshData()
 
     await clickProject(mainWindow, projectAbbrev)
-    await mainWindow.waitForTimeout(500)
 
     await expect(mainWindow.locator('h3').getByText('Inbox', { exact: true })).toBeVisible({
       timeout: 5_000,
@@ -39,7 +38,6 @@ test.describe('Edge cases', () => {
     await s.refreshData()
 
     await clickProject(mainWindow, projectAbbrev)
-    await mainWindow.waitForTimeout(300)
 
     await expect(mainWindow.getByText('Archive me immediately')).not.toBeVisible()
   })
@@ -62,7 +60,6 @@ test.describe('Edge cases', () => {
     await s.refreshData()
 
     await clickProject(mainWindow, projectAbbrev)
-    await mainWindow.waitForTimeout(500)
 
     await expect(mainWindow.getByText('Blocker task')).toBeVisible()
     await expect(mainWindow.getByText('Blocked task')).toBeVisible()

@@ -21,7 +21,7 @@ test.describe('OpenCode CLI integration', () => {
   test.beforeAll(async ({ mainWindow }) => {
     const s = seed(mainWindow)
     const p = await s.createProject({ name: 'OpenCli', color: '#7c3aed', path: TEST_PROJECT_PATH })
-    const t = await s.createTask({ projectId: p.id, title: 'Opencode cli test', status: 'todo' })
+    const t = await s.createTask({ projectId: p.id, title: 'Opencode cli test', status: 'in_progress' })
     taskId = t.id
     await s.refreshData()
 

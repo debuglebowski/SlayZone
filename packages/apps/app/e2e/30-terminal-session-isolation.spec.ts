@@ -20,8 +20,8 @@ test.describe('Terminal session isolation', () => {
     const p = await s.createProject({ name: 'Bravo Isolation', color: '#84cc16', path: TEST_PROJECT_PATH })
     projectAbbrev = p.name.slice(0, 2).toUpperCase()
 
-    const taskA = await s.createTask({ projectId: p.id, title: 'Isolation task A', status: 'todo' })
-    const taskB = await s.createTask({ projectId: p.id, title: 'Isolation task B', status: 'todo' })
+    const taskA = await s.createTask({ projectId: p.id, title: 'Isolation task A', status: 'in_progress' })
+    const taskB = await s.createTask({ projectId: p.id, title: 'Isolation task B', status: 'in_progress' })
     taskAId = taskA.id
     taskBId = taskB.id
 

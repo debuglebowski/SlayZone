@@ -93,7 +93,7 @@ test.describe('MCP Server', () => {
     const s = seed(mainWindow)
     const p = await s.createProject({ name: 'MC Test', color: '#ff6b6b', path: TEST_PROJECT_PATH })
     projectId = p.id
-    const t = await s.createTask({ projectId, title: 'MCP target', status: 'todo' })
+    const t = await s.createTask({ projectId, title: 'MCP target', status: 'in_progress' })
     taskId = t.id
     await s.refreshData()
     await goHome(mainWindow)
@@ -243,7 +243,7 @@ test.describe('MCP Server', () => {
 
   test('concurrent sessions update different tasks', async ({ mainWindow }) => {
     const s = seed(mainWindow)
-    const t2 = await s.createTask({ projectId, title: 'Concurrent target', status: 'backlog' })
+    const t2 = await s.createTask({ projectId, title: 'Concurrent target', status: 'in_progress' })
     await s.refreshData()
 
     // Two independent sessions
@@ -288,7 +288,7 @@ test.describe('MCP Server', () => {
   test('terminal gets SLAYZONE_TASK_ID and SLAYZONE_MCP_PORT env vars', async ({ mainWindow }) => {
     // Reset task title so we can find it on kanban
     const s = seed(mainWindow)
-    await s.updateTask({ id: taskId, title: 'MCP env test', status: 'todo' })
+    await s.updateTask({ id: taskId, title: 'MCP env test', status: 'in_progress' })
     await s.refreshData()
 
     // Open the task terminal

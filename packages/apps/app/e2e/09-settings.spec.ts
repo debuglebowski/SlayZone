@@ -38,12 +38,7 @@ test.describe('Settings', () => {
     const themeSelect = mainWindow.locator('select').filter({ hasText: /Light|Dark|System/ }).first()
     if (await themeSelect.isVisible().catch(() => false)) {
       await themeSelect.selectOption('dark')
-      await mainWindow.waitForTimeout(500)
-
-      const isDark = await mainWindow.evaluate(() =>
-        document.documentElement.classList.contains('dark')
-      )
-      expect(isDark).toBe(true)
+      await expect(mainWindow.locator('html')).toHaveClass(/dark/)
     }
   })
 
@@ -51,12 +46,7 @@ test.describe('Settings', () => {
     const themeSelect = mainWindow.locator('select').filter({ hasText: /Light|Dark|System/ }).first()
     if (await themeSelect.isVisible().catch(() => false)) {
       await themeSelect.selectOption('light')
-      await mainWindow.waitForTimeout(500)
-
-      const isDark = await mainWindow.evaluate(() =>
-        document.documentElement.classList.contains('dark')
-      )
-      expect(isDark).toBe(false)
+      await expect(mainWindow.locator('html')).not.toHaveClass(/dark/)
     }
   })
 

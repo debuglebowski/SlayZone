@@ -111,9 +111,9 @@ test.describe('Clean merge', () => {
 
     await goHome(mainWindow)
     await clickProject(mainWindow, projectAbbrev)
-    await mainWindow.waitForTimeout(500)
+    await expect(mainWindow.getByText('Clean merge task').first()).toBeVisible({ timeout: 5_000 })
     await mainWindow.getByText('Clean merge task').first().click()
-    await mainWindow.waitForTimeout(500)
+    await expect(mainWindow.locator('[data-testid="terminal-mode-trigger"]:visible').first()).toBeVisible({ timeout: 5_000 })
   })
 
   test('clean merge via API returns success', async ({ mainWindow }) => {
@@ -157,9 +157,13 @@ test.describe('Clean merge UI', () => {
 
     await goHome(mainWindow)
     await clickProject(mainWindow, projectAbbrev)
-    await mainWindow.waitForTimeout(500)
+    await expect(mainWindow.getByText('Merge UI task').first()).toBeVisible({ timeout: 5_000 })
     await mainWindow.getByText('Merge UI task').first().click()
-    await mainWindow.waitForTimeout(500)
+    await expect(mainWindow.locator('[data-testid="terminal-mode-trigger"]:visible').first()).toBeVisible({ timeout: 5_000 })
+
+    // Toggle git panel on (general tab — shows merge controls)
+    await mainWindow.keyboard.press('Meta+g')
+    await expect(mainWindow.getByRole('button', { name: new RegExp(`Merge into`) })).toBeVisible({ timeout: 5_000 })
   })
 
   test('merge via UI marks task done and shows success', async ({ mainWindow }) => {
@@ -342,18 +346,20 @@ test.describe('Merge error - detached HEAD', () => {
 
     await goHome(mainWindow)
     await clickProject(mainWindow, projectAbbrev)
-    await mainWindow.waitForTimeout(500)
+    await expect(mainWindow.getByText('Detached task').first()).toBeVisible({ timeout: 5_000 })
     await mainWindow.getByText('Detached task').first().click()
-    await mainWindow.waitForTimeout(500)
+    await expect(mainWindow.locator('[data-testid="terminal-mode-trigger"]:visible').first()).toBeVisible({ timeout: 5_000 })
+
+    // Toggle git panel on (general tab — shows merge controls)
+    await mainWindow.keyboard.press('Meta+g')
+    await expect(mainWindow.getByRole('button', { name: new RegExp(`Merge into`) })).toBeVisible({ timeout: 5_000 })
   })
 
   test('detached HEAD shows error in UI', async ({ mainWindow }) => {
     const main = getMainBranch()
     await mainWindow.getByRole('button', { name: new RegExp(`Merge into ${main}`) }).click()
-    await mainWindow.waitForTimeout(300)
 
     await mainWindow.getByRole('button', { name: 'Start Merge' }).click()
-    await mainWindow.waitForTimeout(1000)
 
     await expect(mainWindow.getByText(/Cannot merge|detached HEAD/).first()).toBeVisible()
   })
@@ -379,9 +385,13 @@ test.describe('Git init', () => {
 
     await goHome(mainWindow)
     await clickProject(mainWindow, projectAbbrev)
-    await mainWindow.waitForTimeout(500)
+    await expect(mainWindow.getByText('Init task').first()).toBeVisible({ timeout: 5_000 })
     await mainWindow.getByText('Init task').first().click()
-    await mainWindow.waitForTimeout(500)
+    await expect(mainWindow.locator('[data-testid="terminal-mode-trigger"]:visible').first()).toBeVisible({ timeout: 5_000 })
+
+    // Toggle git panel on (general tab — shows git init controls)
+    await mainWindow.keyboard.press('Meta+g')
+    await expect(mainWindow.getByText('Not a git repository')).toBeVisible({ timeout: 5_000 })
   })
 
   test.afterAll(() => {
@@ -395,7 +405,6 @@ test.describe('Git init', () => {
 
   test('initialize git creates repo', async ({ mainWindow }) => {
     await mainWindow.getByRole('button', { name: 'Initialize Git' }).click()
-    await mainWindow.waitForTimeout(1000)
 
     // Init button should be gone, "Not a git repository" should be gone
     await expect(mainWindow.getByRole('button', { name: 'Initialize Git' })).not.toBeVisible()

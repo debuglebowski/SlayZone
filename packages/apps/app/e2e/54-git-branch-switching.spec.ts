@@ -21,7 +21,8 @@ test.describe('Git branch switching & creation', () => {
     await expect(input).toBeVisible()
     await input.fill(title)
     await page.keyboard.press('Enter')
-    await page.waitForTimeout(500)
+    // Wait for task detail to load after search navigation
+    await expect(page.getByTestId('task-detail-page').last()).toBeVisible()
   }
 
   const panel = (page: import('@playwright/test').Page) =>
@@ -71,8 +72,11 @@ test.describe('Git branch switching & creation', () => {
 
     await goHome(mainWindow)
     await clickProject(mainWindow, projectAbbrev)
-    await mainWindow.waitForTimeout(500)
     await openTaskViaSearch(mainWindow, 'Branch switching task')
+
+    // Toggle git panel on (general tab — shows branch controls)
+    await mainWindow.keyboard.press('Meta+g')
+    await expect(panel(mainWindow)).toBeVisible()
   })
 
   test('branch popover opens and lists branches', async ({ mainWindow }) => {
@@ -185,13 +189,16 @@ test.describe('Git branch switching & creation', () => {
     await s.refreshData()
     await openTaskViaSearch(mainWindow, `WTBranch ${suffix}`)
 
+    // Toggle git panel on for the new task
+    await mainWindow.keyboard.press('Meta+g')
+
     const p = panel(mainWindow)
     await expect(p).toBeVisible({ timeout: 10_000 })
 
     // No branch trigger — worktree locks branch
     await expect(branchTrigger(mainWindow)).not.toBeVisible()
-    // Static branch text still shows
-    await expect(p.locator('text=/main|master/')).toBeVisible()
+    // "from main/master" text shows parent branch
+    await expect(p.locator('text=/main|master/').first()).toBeVisible({ timeout: 10_000 })
 
     // Cleanup
     try { execSync(`git worktree remove --force "${worktreePath}"`, { cwd: TEST_PROJECT_PATH }) } catch { /* ignore */ }

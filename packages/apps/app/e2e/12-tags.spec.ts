@@ -87,14 +87,21 @@ test.describe('Tag management', () => {
     expect(assignedTags.length).toBeGreaterThan(0)
   })
 
-  test('tag filter button shows in filter bar', async ({ mainWindow }) => {
+  test('tag pills visible in filter popover', async ({ mainWindow }) => {
     await goHome(mainWindow)
     await clickProject(mainWindow, projectAbbrev)
-    await mainWindow.waitForTimeout(500)
 
-    // Tag filter button: Button with "Tags" text in the filter bar
-    const tagButton = mainWindow.locator('button').filter({ hasText: 'Tags' })
-    await expect(tagButton.first()).toBeVisible({ timeout: 5_000 })
+    // Open the Filter popover (ListFilter icon)
+    const filterBtn = mainWindow.locator('button').filter({ has: mainWindow.locator('.lucide-list-filter') }).first()
+    await expect(filterBtn).toBeVisible({ timeout: 5_000 })
+    await filterBtn.click()
+
+    // Tags section with individual tag pill buttons
+    await expect(mainWindow.getByText('Tags', { exact: true })).toBeVisible({ timeout: 5_000 })
+    await expect(mainWindow.locator('button').filter({ hasText: 'e2e-tag' }).first()).toBeVisible()
+
+    // Close popover
+    await mainWindow.keyboard.press('Escape')
   })
 
   test('delete tag', async ({ mainWindow }) => {

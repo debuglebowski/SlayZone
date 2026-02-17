@@ -18,7 +18,7 @@ test.describe('Terminal state behavior', () => {
     const p = await s.createProject({ name: 'Delta State', color: '#eab308', path: TEST_PROJECT_PATH })
     projectAbbrev = p.name.slice(0, 2).toUpperCase()
 
-    const t = await s.createTask({ projectId: p.id, title: 'State transition task', status: 'todo' })
+    const t = await s.createTask({ projectId: p.id, title: 'State transition task', status: 'in_progress' })
     taskId = t.id
 
     await mainWindow.evaluate((id) => window.api.db.updateTask({ id, terminalMode: 'terminal' }), taskId)

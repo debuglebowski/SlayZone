@@ -16,7 +16,7 @@ test.describe('Terminal theme environment variables', () => {
   test.beforeAll(async ({ mainWindow }) => {
     const s = seed(mainWindow)
     const p = await s.createProject({ name: 'Theme Env', color: '#06b6d4', path: TEST_PROJECT_PATH })
-    const t = await s.createTask({ projectId: p.id, title: 'Theme env task', status: 'todo' })
+    const t = await s.createTask({ projectId: p.id, title: 'Theme env task', status: 'in_progress' })
     taskId = t.id
     await s.refreshData()
 

@@ -24,7 +24,7 @@ test.describe('Gemini CLI integration', () => {
     const s = seed(mainWindow)
     const p = await s.createProject({ name: 'GeminiCli', color: '#059669', path: TEST_PROJECT_PATH })
     projectAbbrev = p.name.slice(0, 2).toUpperCase()
-    const t = await s.createTask({ projectId: p.id, title: 'Gemini cli test', status: 'todo' })
+    const t = await s.createTask({ projectId: p.id, title: 'Gemini cli test', status: 'in_progress' })
     taskId = t.id
     await s.refreshData()
 

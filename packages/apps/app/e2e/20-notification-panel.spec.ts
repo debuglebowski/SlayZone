@@ -7,7 +7,6 @@ const clickBell = async (page: import('@playwright/test').Page) => {
   const bell = page.locator('button').filter({ has: page.locator('.lucide-bell') }).first()
   await bell.scrollIntoViewIfNeeded()
   await bell.click()
-  await page.waitForTimeout(300)
 }
 
 test.describe('Notification panel', () => {
@@ -22,13 +21,12 @@ test.describe('Notification panel', () => {
 
     await goHome(mainWindow)
     await clickProject(mainWindow, projectAbbrev)
-    await mainWindow.waitForTimeout(500)
 
     // Ensure notification panel starts closed
     const panelText = mainWindow.getByText('No tasks need attention')
     if (await panelText.isVisible({ timeout: 500 }).catch(() => false)) {
       await clickBell(mainWindow)
-      await mainWindow.waitForTimeout(300)
+      await expect(mainWindow.getByText('No tasks need attention')).not.toBeVisible({ timeout: 3_000 })
     }
   })
 
@@ -61,7 +59,8 @@ test.describe('Notification panel', () => {
   test('notification panel state persists to settings', async ({ mainWindow }) => {
     // Open panel
     await clickBell(mainWindow)
-    await mainWindow.waitForTimeout(500)
+    const panel = mainWindow.locator('div.border-l.bg-background').last()
+    await expect(panel).toBeVisible({ timeout: 5_000 })
 
     const raw = await seed(mainWindow).getSetting('notificationPanelState')
     const state = JSON.parse(raw!)
@@ -69,7 +68,7 @@ test.describe('Notification panel', () => {
 
     // Close panel for cleanup
     await clickBell(mainWindow)
-    await mainWindow.waitForTimeout(300)
+    await expect(panel).not.toBeVisible({ timeout: 5_000 })
   })
 })
 
@@ -80,19 +79,19 @@ test.describe('Desktop notification toggle', () => {
 
   test('clicking podcast toggles desktop notifications on', async ({ mainWindow }) => {
     await mainWindow.locator('.lucide-podcast').first().click()
-    await mainWindow.waitForTimeout(300)
 
-    const raw = await seed(mainWindow).getSetting('notificationPanelState')
-    const state = JSON.parse(raw!)
-    expect(state.desktopEnabled).toBe(true)
+    await expect.poll(async () => {
+      const raw = await seed(mainWindow).getSetting('notificationPanelState')
+      return JSON.parse(raw!).desktopEnabled
+    }, { timeout: 5_000 }).toBe(true)
   })
 
   test('clicking podcast again toggles desktop notifications off', async ({ mainWindow }) => {
     await mainWindow.locator('.lucide-podcast').first().click()
-    await mainWindow.waitForTimeout(300)
 
-    const raw = await seed(mainWindow).getSetting('notificationPanelState')
-    const state = JSON.parse(raw!)
-    expect(state.desktopEnabled).toBe(false)
+    await expect.poll(async () => {
+      const raw = await seed(mainWindow).getSetting('notificationPanelState')
+      return JSON.parse(raw!).desktopEnabled
+    }, { timeout: 5_000 }).toBe(false)
   })
 })

@@ -311,7 +311,7 @@ export function GeneralTabContent({
           ) : (
             <Popover open={branchPopoverOpen} onOpenChange={handleBranchPopoverChange}>
               <PopoverTrigger asChild>
-                <button className="flex items-center gap-2 text-sm hover:bg-muted/50 rounded-lg px-3 py-2 transition-colors w-full text-left border bg-muted/30">
+                <button data-testid="branch-trigger" className="flex items-center gap-2 text-sm hover:bg-muted/50 rounded-lg px-3 py-2 transition-colors w-full text-left border bg-muted/30">
                   <GitBranch className="h-4 w-4 text-muted-foreground shrink-0" />
                   <span className="truncate flex-1">{currentBranch || 'detached HEAD'}</span>
                   <ChevronDown className="h-3 w-3 text-muted-foreground shrink-0" />

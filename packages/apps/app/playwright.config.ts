@@ -9,6 +9,7 @@ export default defineConfig({
   use: {
     trace: 'on-first-retry',
   },
+  testIgnore: ['**/.e2e-runtime/**'],
   projects: [
     {
       name: 'electron',

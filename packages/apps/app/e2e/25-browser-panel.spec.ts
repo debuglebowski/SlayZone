@@ -14,7 +14,7 @@ test.describe('Browser panel', () => {
     await expect(input).toBeVisible()
     await input.fill(title)
     await page.keyboard.press('Enter')
-    await page.waitForTimeout(500)
+    await expect(input).not.toBeVisible()
   }
 
   const focusForAppShortcut = async (page: import('@playwright/test').Page) => {
@@ -75,7 +75,6 @@ test.describe('Browser panel', () => {
     }
     await focusForAppShortcut(mainWindow)
     await mainWindow.keyboard.press('Meta+b')
-    await mainWindow.waitForTimeout(300)
     await expect(urlInput(mainWindow)).toBeVisible()
   })
 
@@ -97,7 +96,6 @@ test.describe('Browser panel', () => {
     await ensureBrowserPanelVisible(mainWindow)
     const beforeCount = await tabEntries(mainWindow).count()
     await newTabBtn(mainWindow).click()
-    await mainWindow.waitForTimeout(500)
     await expect(tabEntries(mainWindow)).toHaveCount(beforeCount + 1)
   })
 
@@ -105,7 +103,7 @@ test.describe('Browser panel', () => {
     await ensureBrowserPanelVisible(mainWindow)
     const count = await tabEntries(mainWindow).count()
     // Last tab (newly created) should be active
-    await expect(tabEntries(mainWindow).nth(count - 1)).toHaveClass(/border-b-primary/)
+    await expect(tabEntries(mainWindow).nth(count - 1)).toHaveClass(/border border-neutral/)
   })
 
   test('close active tab via X', async ({ mainWindow }) => {
@@ -114,16 +112,15 @@ test.describe('Browser panel', () => {
     const countBefore = await tabEntries(mainWindow).count()
     const activeTab = tabEntries(mainWindow).nth(countBefore - 1)
     await activeTab.locator('.lucide-x').click({ force: true })
-    await mainWindow.waitForTimeout(500)
-
     await expect(tabEntries(mainWindow)).toHaveCount(countBefore - 1)
   })
 
   test('tabs state persists in DB after changes', async ({ mainWindow }) => {
     await ensureBrowserPanelVisible(mainWindow)
     // Create a second tab to trigger onTabsChange
+    const countBefore = await tabEntries(mainWindow).count()
     await newTabBtn(mainWindow).click()
-    await mainWindow.waitForTimeout(500)
+    await expect(tabEntries(mainWindow)).toHaveCount(countBefore + 1)
 
     const task = await mainWindow.evaluate((id) => window.api.db.getTask(id), taskId)
     expect(task?.browser_tabs).toBeTruthy()
@@ -132,7 +129,7 @@ test.describe('Browser panel', () => {
     // Clean up: close the extra tab
     const count = await tabEntries(mainWindow).count()
     await tabEntries(mainWindow).nth(count - 1).locator('.lucide-x').click({ force: true })
-    await mainWindow.waitForTimeout(500)
+    await expect(tabEntries(mainWindow)).toHaveCount(count - 1)
   })
 
   test('Cmd+B toggles browser panel off', async ({ mainWindow }) => {
@@ -140,7 +137,6 @@ test.describe('Browser panel', () => {
     await focusForAppShortcut(mainWindow)
 
     await mainWindow.keyboard.press('Meta+b')
-    await mainWindow.waitForTimeout(300)
     await expect(urlInput(mainWindow)).not.toBeVisible()
   })
 
@@ -149,7 +145,7 @@ test.describe('Browser panel', () => {
 
     // Navigate away and back
     await goHome(mainWindow)
-    await mainWindow.waitForTimeout(300)
+    await expect(urlInput(mainWindow)).not.toBeVisible()
     await openTaskViaSearch(mainWindow, 'Browser task')
 
     await expect(urlInput(mainWindow)).toBeVisible()

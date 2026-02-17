@@ -40,7 +40,7 @@ test.describe('Web panels', () => {
     await expect(input).toBeVisible()
     await input.fill(title)
     await page.keyboard.press('Enter')
-    await page.waitForTimeout(500)
+    await expect(page.locator('[data-testid="terminal-mode-trigger"]:visible').first()).toBeVisible({ timeout: 5_000 })
   }
 
   test.beforeAll(async ({ mainWindow }) => {
@@ -58,7 +58,7 @@ test.describe('Web panels', () => {
 
     await goHome(mainWindow)
     await clickProject(mainWindow, projectAbbrev)
-    await mainWindow.waitForTimeout(500)
+    await expect(mainWindow.getByText('WP test task').first()).toBeVisible({ timeout: 5_000 })
   })
 
   // ── Settings: panels tab ──
@@ -95,7 +95,6 @@ test.describe('Web panels', () => {
     await dialog.getByPlaceholder('Key').last().fill('j')
 
     await dialog.getByRole('button', { name: 'Add Panel' }).click()
-    await mainWindow.waitForTimeout(300)
 
     const card = findCard(dialog, 'TestPanel')
     await expect(card).toBeVisible({ timeout: 3_000 })
@@ -107,7 +106,6 @@ test.describe('Web panels', () => {
     const switchEl = findCard(dialog, 'Figma').getByRole('switch')
     await expect(switchEl).toHaveAttribute('data-state', 'unchecked')
     await switchEl.click()
-    await mainWindow.waitForTimeout(300)
     await expect(switchEl).toHaveAttribute('data-state', 'checked')
   })
 
@@ -118,14 +116,12 @@ test.describe('Web panels', () => {
 
     // Pencil = 2nd non-switch button (after trash)
     await cardButtons(figmaCard).nth(1).click()
-    await mainWindow.waitForTimeout(200)
 
     const nameInput = dialog.getByPlaceholder('Name').first()
     await expect(nameInput).toHaveValue('Figma')
     await nameInput.clear()
     await nameInput.fill('Figma Design')
     await dialog.getByRole('button', { name: 'Save' }).click()
-    await mainWindow.waitForTimeout(300)
 
     await expect(findCard(dialog, 'Figma Design')).toBeVisible({ timeout: 3_000 })
   })
@@ -141,10 +137,8 @@ test.describe('Web panels', () => {
     // Focus a safe element first (avoid webview stealing keystrokes)
     const titleEl = mainWindow.locator('h1, [data-testid="task-title"]').first()
     if (await titleEl.isVisible().catch(() => false)) await titleEl.click()
-    await mainWindow.waitForTimeout(100)
 
     await mainWindow.keyboard.press('Meta+j')
-    await mainWindow.waitForTimeout(500)
 
     await expect(
       mainWindow.locator('span').filter({ hasText: 'TestPanel' }).last()
@@ -155,10 +149,8 @@ test.describe('Web panels', () => {
     // Focus outside webview before pressing shortcut again
     const titleEl = mainWindow.locator('h1, [data-testid="task-title"]').first()
     if (await titleEl.isVisible().catch(() => false)) await titleEl.click()
-    await mainWindow.waitForTimeout(100)
 
     await mainWindow.keyboard.press('Meta+j')
-    await mainWindow.waitForTimeout(500)
 
     await expect(
       mainWindow.locator('span').filter({ hasText: 'TestPanel' }).last()
@@ -174,7 +166,6 @@ test.describe('Web panels', () => {
     const card = findCard(dialog, 'Figma Design')
     await expect(card).toBeVisible({ timeout: 5_000 })
     await cardButtons(card).first().click() // trash
-    await mainWindow.waitForTimeout(300)
 
     await expect(findCard(dialog, 'Figma Design')).not.toBeVisible({ timeout: 3_000 })
 
@@ -190,7 +181,6 @@ test.describe('Web panels', () => {
     const card = findCard(dialog, 'TestPanel')
     await expect(card).toBeVisible({ timeout: 5_000 })
     await cardButtons(card).first().click()
-    await mainWindow.waitForTimeout(300)
 
     await expect(findCard(dialog, 'TestPanel')).not.toBeVisible({ timeout: 3_000 })
   })
@@ -204,7 +194,6 @@ test.describe('Web panels', () => {
     await nameInput.fill('BadShortcut')
     await dialog.getByPlaceholder('URL (e.g. miro.com)').fill('test.com')
     await dialog.getByPlaceholder('Key').last().fill('t')
-    await mainWindow.waitForTimeout(200)
 
     await expect(dialog.getByText(/reserved/i).first()).toBeVisible({ timeout: 3_000 })
 
@@ -229,18 +218,15 @@ test.describe('Web panels', () => {
     const defaultModeText = dialog.getByText('Default mode')
     if (await defaultModeText.isVisible().catch(() => false)) {
       await cardButtons(card).first().click()
-      await mainWindow.waitForTimeout(300)
     }
     await expect(defaultModeText).not.toBeVisible({ timeout: 3_000 })
 
     // Toggle open
     await cardButtons(card).first().click()
-    await mainWindow.waitForTimeout(300)
     await expect(defaultModeText).toBeVisible({ timeout: 5_000 })
 
     // Toggle closed
     await cardButtons(card).first().click()
-    await mainWindow.waitForTimeout(300)
     await expect(defaultModeText).not.toBeVisible({ timeout: 3_000 })
   })
 
@@ -252,12 +238,10 @@ test.describe('Web panels', () => {
     await expect(dialog.getByText('Show toast when dev server detected'))
       .not.toBeVisible({ timeout: 2_000 })
     await cardButtons(card).first().click()
-    await mainWindow.waitForTimeout(300)
     await expect(dialog.getByText('Show toast when dev server detected'))
       .toBeVisible({ timeout: 5_000 })
 
     await cardButtons(card).first().click()
-    await mainWindow.waitForTimeout(300)
   })
 
   // ── Disable native panel ──
@@ -270,25 +254,21 @@ test.describe('Web panels', () => {
 
     if ((await switchEl.getAttribute('data-state')) === 'checked') {
       await switchEl.click()
-      await mainWindow.waitForTimeout(300)
     }
     await expect(switchEl).toHaveAttribute('data-state', 'unchecked')
 
     await closePanelsTab(mainWindow)
 
     await mainWindow.keyboard.press('Meta+e')
-    await mainWindow.waitForTimeout(300)
-    expect(await mainWindow.locator('[data-testid="file-editor-panel"]:visible').count()).toBe(0)
+    await expect(mainWindow.locator('[data-testid="file-editor-panel"]:visible')).toHaveCount(0, { timeout: 3_000 })
 
     // Re-enable
     await openPanelsTab(mainWindow)
     await findCard(settingsDialog(mainWindow), 'Editor').getByRole('switch').click()
-    await mainWindow.waitForTimeout(300)
     await closePanelsTab(mainWindow)
   })
 
   test('cleanup: go home', async ({ mainWindow }) => {
     await goHome(mainWindow)
-    await mainWindow.waitForTimeout(300)
   })
 })

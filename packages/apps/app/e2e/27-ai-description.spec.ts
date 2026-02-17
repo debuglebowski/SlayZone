@@ -20,19 +20,18 @@ test.describe('AI description generation', () => {
     })
 
     const s = seed(mainWindow)
-    const p = await s.createProject({ name: 'AI Desc Test', color: '#a855f7', path: TEST_PROJECT_PATH })
+    const p = await s.createProject({ name: 'Desc Gen Test', color: '#a855f7', path: TEST_PROJECT_PATH })
     projectAbbrev = p.name.slice(0, 2).toUpperCase()
-    const t = await s.createTask({ projectId: p.id, title: 'Implement login flow', status: 'todo' })
+    const t = await s.createTask({ projectId: p.id, title: 'Implement login flow', status: 'in_progress' })
     taskId = t.id
     await s.refreshData()
 
     await goHome(mainWindow)
     await clickProject(mainWindow, projectAbbrev)
-    await mainWindow.waitForTimeout(500)
 
     // Open task detail
     await mainWindow.getByText('Implement login flow').first().click()
-    await mainWindow.waitForTimeout(500)
+    await expect(mainWindow.getByTestId('task-settings-panel').last()).toBeVisible()
   })
 
   const generateBtn = (page: import('@playwright/test').Page) =>
@@ -103,7 +102,6 @@ test.describe('AI description generation', () => {
     const modeTrigger = mainWindow.getByRole('combobox').filter({ hasText: /Claude Code|Codex|Terminal/ })
     await modeTrigger.click()
     await mainWindow.getByRole('option', { name: 'Terminal' }).click()
-    await mainWindow.waitForTimeout(500)
 
     await expect(generateBtn(mainWindow)).not.toBeVisible()
   })
@@ -112,7 +110,6 @@ test.describe('AI description generation', () => {
     const modeTrigger = mainWindow.getByRole('combobox').filter({ hasText: /Claude Code|Codex|Terminal/ })
     await modeTrigger.click()
     await mainWindow.getByRole('option', { name: 'Codex' }).click()
-    await mainWindow.waitForTimeout(500)
 
     await expect(generateBtn(mainWindow)).toBeVisible()
   })
@@ -121,15 +118,16 @@ test.describe('AI description generation', () => {
     // Clear existing description first
     await mainWindow.evaluate((id) =>
       window.api.db.updateTask({ id, description: null }), taskId)
-    await mainWindow.waitForTimeout(200)
+    await expect.poll(async () => {
+      const task = await mainWindow.evaluate((id) => window.api.db.getTask(id), taskId)
+      return task?.description
+    }).toBeFalsy()
 
     // Navigate away and back to reload clean state
     await goHome(mainWindow)
-    await mainWindow.waitForTimeout(300)
     await clickProject(mainWindow, projectAbbrev)
-    await mainWindow.waitForTimeout(300)
     await mainWindow.getByText('Implement login flow').first().click()
-    await mainWindow.waitForTimeout(500)
+    await expect(mainWindow.getByTestId('task-settings-panel').last()).toBeVisible()
 
     await clickGenerate(mainWindow)
     await expect
@@ -143,6 +141,6 @@ test.describe('AI description generation', () => {
     const modeTrigger = mainWindow.getByRole('combobox').filter({ hasText: /Claude Code|Codex|Terminal/ })
     await modeTrigger.click()
     await mainWindow.getByRole('option', { name: 'Claude Code' }).click()
-    await mainWindow.waitForTimeout(500)
+    await expect(generateBtn(mainWindow)).toBeVisible()
   })
 })

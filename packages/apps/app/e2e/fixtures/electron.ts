@@ -401,7 +401,7 @@ export function seed(page: Page) {
     refreshData: () =>
       page.evaluate(async () => {
         await (window as any).__slayzone_refreshData?.()
-        await new Promise((resolve) => setTimeout(resolve, 200))
+        await new Promise((resolve) => setTimeout(resolve, 50))
       }),
   }
 }

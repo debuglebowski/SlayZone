@@ -11,7 +11,7 @@ test.describe('Create task dialog & metadata editing', () => {
     await s.refreshData()
     await goHome(mainWindow)
     await clickProject(mainWindow, projectAbbrev)
-    await mainWindow.waitForTimeout(500)
+    await expect(mainWindow.locator('h3').getByText('Inbox', { exact: true })).toBeVisible({ timeout: 5_000 })
   })
 
   test('Cmd+N opens create task dialog', async ({ mainWindow }) => {
@@ -28,41 +28,45 @@ test.describe('Create task dialog & metadata editing', () => {
     const statusTrigger = mainWindow.locator('form').getByRole('combobox').first()
     await statusTrigger.click()
     await mainWindow.getByRole('option', { name: 'In Progress' }).click()
-    await mainWindow.waitForTimeout(200)
 
     // Priority — second Radix Select
     const priorityTrigger = mainWindow.locator('form').getByRole('combobox').nth(1)
     await priorityTrigger.click()
     await mainWindow.getByRole('option', { name: 'Urgent' }).click()
-    await mainWindow.waitForTimeout(200)
 
     // Submit
-    await mainWindow.getByRole('button', { name: 'Create' }).click()
-    await mainWindow.waitForTimeout(500)
-
-    // Close dialog
-    await mainWindow.keyboard.press('Escape')
-    await mainWindow.waitForTimeout(300)
+    await mainWindow.locator('button[type="submit"]').filter({ hasText: 'Create' }).click()
+    await expect(mainWindow.getByText('Create Task')).not.toBeVisible({ timeout: 5_000 })
   })
 
   test('created task appears on kanban', async ({ mainWindow }) => {
     await goHome(mainWindow)
     await clickProject(mainWindow, projectAbbrev)
-    await mainWindow.waitForTimeout(500)
     await expect(mainWindow.getByText('Dialog created task')).toBeVisible({ timeout: 5_000 })
   })
 
   test('change status in task detail metadata sidebar', async ({ mainWindow }) => {
     // Open task detail
     await mainWindow.getByText('Dialog created task').first().click()
-    await mainWindow.waitForTimeout(500)
+    await expect(mainWindow.locator('[data-testid="terminal-mode-trigger"]:visible').first()).toBeVisible({ timeout: 5_000 })
 
-    // Find status select in sidebar (labeled "Status")
-    const statusLabel = mainWindow.getByText('Status', { exact: true }).locator('..')
-    const statusTrigger = statusLabel.getByRole('combobox')
+    // Dismiss "Move to In Progress?" dialog if terminal input triggered it
+    const dialog = mainWindow.getByRole('alertdialog')
+    if (await dialog.isVisible({ timeout: 1_000 }).catch(() => false)) {
+      await dialog.getByRole('button', { name: 'No' }).click()
+    }
+
+    // Scope to visible settings panel to avoid hidden tab DOM matches
+    const sidebar = mainWindow.locator('[data-testid="task-settings-panel"]:visible')
+    const statusTrigger = sidebar.getByText('Status', { exact: true }).locator('..').getByRole('combobox')
     await statusTrigger.click()
     await mainWindow.getByRole('option', { name: 'Review' }).click()
-    await mainWindow.waitForTimeout(300)
+    await expect(statusTrigger).toHaveText('Review', { timeout: 3_000 })
+
+    // Dismiss dialog again if status change triggered it
+    if (await dialog.isVisible({ timeout: 500 }).catch(() => false)) {
+      await dialog.getByRole('button', { name: 'No' }).click()
+    }
 
     // Verify persisted via API
     const tasks = await seed(mainWindow).getTasks()
@@ -71,11 +75,17 @@ test.describe('Create task dialog & metadata editing', () => {
   })
 
   test('change priority in task detail metadata sidebar', async ({ mainWindow }) => {
-    const priorityLabel = mainWindow.getByText('Priority', { exact: true }).locator('..')
-    const priorityTrigger = priorityLabel.getByRole('combobox')
+    // Dismiss "Move to In Progress?" dialog if it appeared after status change
+    const dialog = mainWindow.getByRole('alertdialog')
+    if (await dialog.isVisible({ timeout: 500 }).catch(() => false)) {
+      await dialog.getByRole('button', { name: 'No' }).click()
+    }
+
+    const sidebar = mainWindow.locator('[data-testid="task-settings-panel"]:visible')
+    const priorityTrigger = sidebar.getByText('Priority', { exact: true }).locator('..').getByRole('combobox')
     await priorityTrigger.click()
     await mainWindow.getByRole('option', { name: 'Low' }).click()
-    await mainWindow.waitForTimeout(300)
+    await expect(priorityTrigger).toHaveText('Low', { timeout: 3_000 })
 
     const tasks = await seed(mainWindow).getTasks()
     const task = tasks.find((t: { title: string }) => t.title === 'Dialog created task')
@@ -84,9 +94,7 @@ test.describe('Create task dialog & metadata editing', () => {
 
   test('go back to kanban after metadata edits', async ({ mainWindow }) => {
     await goHome(mainWindow)
-    await mainWindow.waitForTimeout(300)
     await clickProject(mainWindow, projectAbbrev)
-    await mainWindow.waitForTimeout(300)
     await expect(mainWindow.locator('h3').getByText('Inbox', { exact: true })).toBeVisible({ timeout: 5_000 })
   })
 })

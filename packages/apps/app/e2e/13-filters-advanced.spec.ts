@@ -36,7 +36,7 @@ test.describe('Advanced filters & group by', () => {
     await s.refreshData()
     await goHome(mainWindow)
     await clickProject(mainWindow, projectAbbrev)
-    await mainWindow.waitForTimeout(500)
+    await expect(mainWindow.getByText('Urgent filter task')).toBeVisible({ timeout: 5_000 })
   })
 
   test('priority filter shows only matching tasks', async ({ mainWindow }) => {
@@ -47,7 +47,6 @@ test.describe('Advanced filters & group by', () => {
     if (await priorityTrigger.isVisible().catch(() => false)) {
       await priorityTrigger.click()
       await mainWindow.getByRole('option', { name: /Urgent/ }).click()
-      await mainWindow.waitForTimeout(500)
 
       // Urgent task should be visible, low should not
       await expect(mainWindow.getByText('Urgent filter task')).toBeVisible({ timeout: 3_000 })
@@ -56,7 +55,7 @@ test.describe('Advanced filters & group by', () => {
       // Reset filter
       await priorityTrigger.click()
       await mainWindow.getByRole('option', { name: /All/i }).first().click()
-      await mainWindow.waitForTimeout(300)
+      await expect(mainWindow.getByText('Low filter task 2')).toBeVisible({ timeout: 3_000 })
     }
   })
 
@@ -66,14 +65,13 @@ test.describe('Advanced filters & group by', () => {
     if (await dueDateTrigger.isVisible().catch(() => false)) {
       await dueDateTrigger.click()
       await mainWindow.getByRole('option', { name: /Overdue/i }).click()
-      await mainWindow.waitForTimeout(500)
 
       await expect(mainWindow.getByText('Overdue filter task')).toBeVisible({ timeout: 3_000 })
 
       // Reset
       await dueDateTrigger.click()
       await mainWindow.getByRole('option', { name: /All/i }).first().click()
-      await mainWindow.waitForTimeout(300)
+      await expect(mainWindow.getByText('Overdue filter task')).toBeVisible({ timeout: 3_000 })
     }
   })
 
@@ -85,7 +83,6 @@ test.describe('Advanced filters & group by', () => {
     if (await groupByTrigger.isVisible().catch(() => false)) {
       await groupByTrigger.click()
       await mainWindow.getByRole('option', { name: /Priority/i }).click()
-      await mainWindow.waitForTimeout(500)
 
       // Column headers should now be priority-based (Urgent, High, etc.)
       await expect(mainWindow.locator('h3').getByText(/Urgent/)).toBeVisible({ timeout: 3_000 })
@@ -94,7 +91,6 @@ test.describe('Advanced filters & group by', () => {
       const groupByTrigger2 = groupLabel.locator('..').getByRole('combobox')
       await groupByTrigger2.click()
       await mainWindow.getByRole('option', { name: /Status/i }).click()
-      await mainWindow.waitForTimeout(500)
 
       // Verify status columns restored
       await expect(mainWindow.locator('h3').getByText('Inbox', { exact: true })).toBeVisible({ timeout: 3_000 })

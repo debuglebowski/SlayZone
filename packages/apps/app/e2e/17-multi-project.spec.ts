@@ -22,20 +22,18 @@ test.describe('Multi-project & persistence', () => {
     }
     await s.refreshData()
     await goHome(mainWindow)
-    await mainWindow.waitForTimeout(500)
+    await expect(mainWindow.getByText('Alpha Project').first()).toBeVisible({ timeout: 5_000 })
   })
 
   test('switching projects shows correct tasks', async ({ mainWindow }) => {
     // Select Alpha
     await clickProject(mainWindow, 'AL')
-    await mainWindow.waitForTimeout(500)
 
     await expect(mainWindow.getByText('Alpha task one')).toBeVisible({ timeout: 5_000 })
     await expect(mainWindow.getByText('Beta task one')).not.toBeVisible()
 
     // Switch to Beta
     await clickProject(mainWindow, 'BE')
-    await mainWindow.waitForTimeout(500)
 
     await expect(mainWindow.getByText('Beta task one')).toBeVisible({ timeout: 5_000 })
     await expect(mainWindow.getByText('Alpha task one')).not.toBeVisible()
@@ -43,7 +41,6 @@ test.describe('Multi-project & persistence', () => {
 
   test('All view shows tasks from both projects', async ({ mainWindow }) => {
     await clickAll(mainWindow)
-    await mainWindow.waitForTimeout(500)
 
     await expect(mainWindow.getByText('Alpha task one')).toBeAttached({ timeout: 5_000 })
     await expect(mainWindow.getByText('Beta task one')).toBeAttached()
@@ -51,11 +48,10 @@ test.describe('Multi-project & persistence', () => {
 
   test('search finds tasks across projects', async ({ mainWindow }) => {
     await mainWindow.keyboard.press('Meta+k')
-    await mainWindow.waitForTimeout(300)
 
     const searchInput = mainWindow.getByPlaceholder('Search tasks and projects...')
+    await expect(searchInput).toBeVisible({ timeout: 5_000 })
     await searchInput.fill('Beta task')
-    await mainWindow.waitForTimeout(500)
 
     // Should find Beta task even if currently viewing Alpha
     await expect(mainWindow.getByLabel('Tasks').getByText('Beta task one')).toBeVisible({ timeout: 3_000 })
@@ -65,11 +61,10 @@ test.describe('Multi-project & persistence', () => {
 
   test('search with no matching results', async ({ mainWindow }) => {
     await mainWindow.keyboard.press('Meta+k')
-    await mainWindow.waitForTimeout(300)
 
     const searchInput = mainWindow.getByPlaceholder('Search tasks and projects...')
+    await expect(searchInput).toBeVisible({ timeout: 5_000 })
     await searchInput.fill('xyznonexistent999')
-    await mainWindow.waitForTimeout(500)
 
     // No results — the tasks/projects groups should not show matching items
     await expect(mainWindow.getByLabel('Tasks').getByText('xyznonexistent999')).not.toBeVisible()
@@ -79,7 +74,6 @@ test.describe('Multi-project & persistence', () => {
 
   test('empty kanban columns still render headers', async ({ mainWindow }) => {
     await clickProject(mainWindow, 'AL')
-    await mainWindow.waitForTimeout(500)
 
     // Alpha has tasks in todo and in_progress, but other columns should still have headers
     // Check that Inbox header exists (it should be rendered even if empty)
@@ -91,24 +85,16 @@ test.describe('Multi-project & persistence', () => {
 
     // Set dark theme via API
     await s.setTheme('dark')
-    await mainWindow.waitForTimeout(300)
 
-    const isDark = await mainWindow.evaluate(() =>
-      document.documentElement.classList.contains('dark')
-    )
-    expect(isDark).toBe(true)
+    await expect(mainWindow.locator('html.dark')).toBeAttached({ timeout: 5_000 })
 
     // Refresh data (simulates re-render)
     await s.refreshData()
-    await mainWindow.waitForTimeout(300)
 
-    const stillDark = await mainWindow.evaluate(() =>
-      document.documentElement.classList.contains('dark')
-    )
-    expect(stillDark).toBe(true)
+    await expect(mainWindow.locator('html.dark')).toBeAttached({ timeout: 5_000 })
 
     // Restore light theme
     await s.setTheme('light')
-    await mainWindow.waitForTimeout(300)
+    await expect(mainWindow.locator('html.dark')).not.toBeAttached({ timeout: 5_000 })
   })
 })

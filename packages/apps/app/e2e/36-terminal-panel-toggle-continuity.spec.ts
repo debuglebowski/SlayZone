@@ -11,7 +11,7 @@ import {
 
 const panelBtn = (page: import('@playwright/test').Page, label: string) =>
   page
-    .locator('.bg-muted.rounded-lg:visible')
+    .locator('.bg-surface-2.rounded-lg:visible')
     .filter({ has: page.locator('button:has-text("Terminal")') })
     .locator(`button:has-text("${label}")`)
 
@@ -24,7 +24,7 @@ test.describe('Terminal panel toggle continuity', () => {
     const p = await s.createProject({ name: 'Panel Continuity', color: '#8b5cf6', path: TEST_PROJECT_PATH })
     projectAbbrev = p.name.slice(0, 2).toUpperCase()
 
-    const t = await s.createTask({ projectId: p.id, title: 'Panel continuity task', status: 'todo' })
+    const t = await s.createTask({ projectId: p.id, title: 'Panel continuity task', status: 'in_progress' })
     taskId = t.id
 
     await mainWindow.evaluate((id) => window.api.db.updateTask({ id, terminalMode: 'terminal' }), taskId)
@@ -43,10 +43,10 @@ test.describe('Terminal panel toggle continuity', () => {
     await waitForBufferContains(mainWindow, sessionId, marker)
 
     await panelBtn(mainWindow, 'Terminal').click()
-    await expect(panelBtn(mainWindow, 'Terminal')).not.toHaveClass(/bg-background/)
+    await expect(panelBtn(mainWindow, 'Terminal')).not.toHaveClass(/(?:^|\s)bg-muted(?:\s|$)/)
 
     await panelBtn(mainWindow, 'Terminal').click()
-    await expect(panelBtn(mainWindow, 'Terminal')).toHaveClass(/bg-background/)
+    await expect(panelBtn(mainWindow, 'Terminal')).toHaveClass(/bg-muted/)
 
     await waitForPtySession(mainWindow, sessionId)
     const buffer = await readFullBuffer(mainWindow, sessionId)

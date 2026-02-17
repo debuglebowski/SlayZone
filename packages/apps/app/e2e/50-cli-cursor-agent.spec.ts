@@ -22,7 +22,7 @@ test.describe('Cursor Agent CLI integration', () => {
   test.beforeAll(async ({ mainWindow }) => {
     const s = seed(mainWindow)
     const p = await s.createProject({ name: 'CursorCli', color: '#e11d48', path: TEST_PROJECT_PATH })
-    const t = await s.createTask({ projectId: p.id, title: 'Cursor agent test', status: 'todo' })
+    const t = await s.createTask({ projectId: p.id, title: 'Cursor agent test', status: 'in_progress' })
     taskId = t.id
     await s.refreshData()
 
