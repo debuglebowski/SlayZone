@@ -1,6 +1,18 @@
 # Changelog
 
 
+## v0.1.37...main
+
+[compare changes](https://github.com/debuglebowski/omgslayzone/compare/v0.1.37...main)
+
+### 🩹 Fixes
+
+- **tasks:** Add missing react-hotkeys-hook dependency ([903bccf](https://github.com/debuglebowski/omgslayzone/commit/903bccf))
+
+### ❤️ Contributors
+
+- Debuglebowski <kh.hansson@gmail.com>
+
 ## ...main
 
 ## v0.1.35...main
