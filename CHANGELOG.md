@@ -1,6 +1,18 @@
 # Changelog
 
 
+## v0.1.39...main
+
+[compare changes](https://github.com/debuglebowski/omgslayzone/compare/v0.1.39...main)
+
+### 🩹 Fixes
+
+- Change Monosketch shortcut from Cmd+K to Cmd+U ([159cf09](https://github.com/debuglebowski/omgslayzone/commit/159cf09))
+
+### ❤️ Contributors
+
+- Debuglebowski <kh.hansson@gmail.com>
+
 ## v0.1.38...main
 
 [compare changes](https://github.com/debuglebowski/omgslayzone/compare/v0.1.38...main)
