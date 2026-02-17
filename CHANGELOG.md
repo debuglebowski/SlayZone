@@ -1,6 +1,18 @@
 # Changelog
 
 
+## v0.1.38...main
+
+[compare changes](https://github.com/debuglebowski/omgslayzone/compare/v0.1.38...main)
+
+### 🩹 Fixes
+
+- Update Monosketch panel URL to app.monosketch.io ([5a37d14](https://github.com/debuglebowski/omgslayzone/commit/5a37d14))
+
+### ❤️ Contributors
+
+- Debuglebowski <kh.hansson@gmail.com>
+
 ## v0.1.37...main
 
 [compare changes](https://github.com/debuglebowski/omgslayzone/compare/v0.1.37...main)
