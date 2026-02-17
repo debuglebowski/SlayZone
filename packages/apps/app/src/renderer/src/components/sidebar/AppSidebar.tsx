@@ -34,6 +34,7 @@ interface AppSidebarProps {
   onProjectDelete: (project: Project) => void
   onSettings: () => void
   onTutorial: () => void
+  zenMode?: boolean
 }
 
 const isMac = navigator.platform.startsWith('Mac')
@@ -42,6 +43,7 @@ const shortcutGroups = [
   { heading: 'General', items: [
     { label: 'New Task', keys: isMac ? '⌘ N' : 'Ctrl N' },
     { label: 'Search', keys: isMac ? '⌘ K' : 'Ctrl K' },
+    { label: 'Zen Mode', keys: isMac ? '⌘ J' : 'Ctrl J' },
     { label: 'Global Settings', keys: isMac ? '⌘ ,' : 'Ctrl ,' },
     { label: 'Project Settings', keys: isMac ? '⌘ ⇧ ,' : 'Ctrl ⇧ ,' },
     ...(isMac ? [{ label: 'Kanban Board', keys: '⌘ §' }] : []),
@@ -82,11 +84,12 @@ export function AppSidebar({
   onProjectDelete,
   onSettings,
   onTutorial,
+  zenMode,
 }: AppSidebarProps) {
   const [shortcutsOpen, setShortcutsOpen] = useState(false)
 
   return (
-    <Sidebar collapsible="none" className="w-[82px] border-r min-h-svh">
+    <Sidebar collapsible="none" className={zenMode ? "w-16 min-h-svh hidden" : "w-16 min-h-svh"}>
       {/* Draggable region for window movement - clears traffic lights */}
       <div className="h-10 window-drag-region" />
       <SidebarContent className="py-4 pt-0">

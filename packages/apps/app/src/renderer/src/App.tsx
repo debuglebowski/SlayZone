@@ -95,6 +95,7 @@ function App(): React.JSX.Element {
   const [onboardingOpen, setOnboardingOpen] = useState(false)
   const [searchOpen, setSearchOpen] = useState(false)
   const [completeTaskDialogOpen, setCompleteTaskDialogOpen] = useState(false)
+  const [zenMode, setZenMode] = useState(false)
   const [convertingTask, setConvertingTask] = useState<Task | null>(null)
   const convertResolveRef = useRef<((task: Task) => void) | null>(null)
 
@@ -505,6 +506,15 @@ function App(): React.JSX.Element {
     }
   }, { enableOnFormTags: true })
 
+  useHotkeys('mod+j', (e) => {
+    e.preventDefault()
+    setZenMode(prev => !prev)
+  }, { enableOnFormTags: true })
+
+  useHotkeys('escape', () => {
+    if (zenMode) setZenMode(false)
+  }, { enableOnFormTags: true })
+
   const handleCompleteTaskConfirm = async (): Promise<void> => {
     const activeTab = tabs[activeTabIndex]
     if (activeTab.type !== 'task') return
@@ -708,7 +718,7 @@ function App(): React.JSX.Element {
 
   return (
     <SidebarProvider defaultOpen={true}>
-      <div className="h-full w-full flex">
+      <div id="app-shell" className="h-full w-full flex">
         <AppSidebar
           projects={projects}
           tasks={tasks}
@@ -719,9 +729,10 @@ function App(): React.JSX.Element {
           onProjectDelete={setDeletingProject}
           onSettings={handleOpenSettings}
           onTutorial={() => setOnboardingOpen(true)}
+          zenMode={zenMode}
         />
 
-        <div className="flex-1 flex flex-col min-w-0">
+        <div id="right-column" className="flex-1 flex flex-col min-w-0 bg-surface-1 pb-2 pr-2">
               <div className="window-drag-region bg-surface-1">
                 <div className="window-no-drag">
                   <TabBar
@@ -768,8 +779,8 @@ function App(): React.JSX.Element {
                 </div>
               </div>
 
-              <div className="flex-1 min-h-0 flex">
-                <div className="flex-1 min-w-0 relative">
+              <div id="content-wrapper" className="flex-1 min-h-0 flex">
+                <div id="main-area" className="flex-1 min-w-0 relative rounded-lg overflow-hidden bg-background">
                   {tabs.map((tab, i) => (
                     <div
                       key={tab.type === 'home' ? 'home' : tab.taskId}

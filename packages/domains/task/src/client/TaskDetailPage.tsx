@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
-import { MoreHorizontal, Archive, Trash2, AlertTriangle, Sparkles, Loader2, Terminal as TerminalIcon, Globe, Settings2, GitBranch, FileCode, ChevronRight, Plus, GripVertical, Camera, X, Info, Maximize2, Minimize2 } from 'lucide-react'
+import { MoreHorizontal, Archive, Trash2, AlertTriangle, Sparkles, Loader2, Terminal as TerminalIcon, Globe, Settings2, GitBranch, FileCode, ChevronRight, Plus, GripVertical, Camera, X, Info } from 'lucide-react'
 import { DndContext, PointerSensor, useSensors, useSensor, closestCenter, type DragEndEvent } from '@dnd-kit/core'
 import { SortableContext, useSortable, verticalListSortingStrategy, arrayMove } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
@@ -139,8 +139,6 @@ function SortableSubTask({ sub, onNavigate, onUpdate, onDelete }: {
 interface TaskDetailPageProps {
   taskId: string
   isActive?: boolean
-  zenMode?: boolean
-  onZenModeToggle?: () => void
   onBack: () => void
   onTaskUpdated: (task: Task) => void
   onArchiveTask?: (taskId: string) => Promise<void>
@@ -152,8 +150,6 @@ interface TaskDetailPageProps {
 export function TaskDetailPage({
   taskId,
   isActive,
-  zenMode,
-  onZenModeToggle,
   onBack,
   onTaskUpdated,
   onArchiveTask,
@@ -1200,32 +1196,12 @@ export function TaskDetailPage({
   }
 
   return (
-    <div className={cn("h-full flex flex-col pb-0 relative", zenMode ? "p-0" : "p-4 gap-4")}>
+    <div id="task-detail" className="h-full flex flex-col p-4 gap-4">
       {showRegionSelector && (
         <RegionSelector onSelect={handleRegionSelect} onCancel={handleRegionCancel} />
       )}
-      {/* Zen mode exit button */}
-      {zenMode && (
-        <div className="absolute top-1 right-2 z-50 window-no-drag">
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="size-6 opacity-0 hover:opacity-80 transition-opacity"
-                onClick={onZenModeToggle}
-              >
-                <Minimize2 className="size-3" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent side="bottom" className="text-xs">
-              Exit Zen Mode (⌘J or Esc)
-            </TooltipContent>
-          </Tooltip>
-        </div>
-      )}
       {/* Header */}
-      {!zenMode && <header className="shrink-0 relative">
+      <header className="shrink-0 relative">
         <div>
           <div className="flex items-center gap-4 window-no-drag">
             {task.is_temporary ? (
@@ -1299,23 +1275,6 @@ export function TaskDetailPage({
                 })()}
                 onChange={handlePanelToggle}
               />
-              {onZenModeToggle && (
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="size-7"
-                      onClick={onZenModeToggle}
-                    >
-                      <Maximize2 className="size-3.5" />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent side="bottom" className="text-xs">
-                    Zen Mode (⌘J)
-                  </TooltipContent>
-                </Tooltip>
-              )}
             </div>
           </div>
           {parentTask && (
@@ -1329,10 +1288,10 @@ export function TaskDetailPage({
             </button>
           )}
         </div>
-      </header>}
+      </header>
 
       {/* Dev server detected toast */}
-      {!zenMode && <DevServerToast
+      <DevServerToast
         url={detectedDevUrl}
         onOpen={() => {
           if (!detectedDevUrl) return
@@ -1340,10 +1299,10 @@ export function TaskDetailPage({
           setDetectedDevUrl(null)
         }}
         onDismiss={() => setDetectedDevUrl(null)}
-      />}
+      />
 
       {/* Split view: terminal | browser | settings | git diff */}
-      <div ref={splitContainerRef} className={cn("flex-1 flex min-h-0", !zenMode && "pb-4")}>
+      <div id="task-panels" ref={splitContainerRef} className="flex-1 flex min-h-0">
         {/* Terminal Panel */}
         {panelVisibility.terminal && (
         <div
