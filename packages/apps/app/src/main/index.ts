@@ -1,7 +1,10 @@
+import fixPath from 'fix-path'
+fixPath()
+
 import { app, shell, BrowserWindow, ipcMain, nativeTheme, session, webContents, dialog, Menu, protocol } from 'electron'
 import { join, extname } from 'path'
 import { readFileSync, promises as fsp } from 'fs'
-import { electronApp, optimizer, is } from '@electron-toolkit/utils'
+import { electronApp, is } from '@electron-toolkit/utils'
 
 // Custom protocol for serving local files in browser panel webviews
 // (must be registered before app ready — Chromium blocks file:// in webviews)
@@ -497,12 +500,19 @@ app.whenReady().then(() => {
   // Set app user model id for windows
   electronApp.setAppUserModelId('com.slayzone.app')
 
-  // Default open or close DevTools by F12 in development
-  // and ignore CommandOrControl + R in production.
-  // see https://github.com/alex8088/electron-toolkit/tree/master/packages/utils
-  app.on('browser-window-created', (_, window) => {
-    optimizer.watchWindowShortcuts(window)
-  })
+  // Open DevTools by F12 in development
+  if (is.dev) {
+    app.on('browser-window-created', (_, window) => {
+      window.webContents.on('before-input-event', (event, input) => {
+        if (input.type === 'keyDown' && input.code === 'F12') {
+          const wc = window.webContents
+          if (wc.isDevToolsOpened()) wc.closeDevTools()
+          else wc.openDevTools({ mode: 'undocked' })
+          event.preventDefault()
+        }
+      })
+    })
+  }
 
   // IPC test
   ipcMain.on('ping', () => console.log('pong'))
