@@ -37,7 +37,7 @@ import { registerIntegrationHandlers, startLinearSyncPoller } from '@slayzone/in
 import { registerFileEditorHandlers } from '@slayzone/file-editor/main'
 import { registerScreenshotHandlers } from './screenshot'
 import { registerExportImportHandlers } from './export-import'
-import { initAutoUpdater } from './auto-updater'
+import { initAutoUpdater, checkForUpdates } from './auto-updater'
 
 const DEFAULT_WINDOW_WIDTH = 1760
 const DEFAULT_WINDOW_HEIGHT = 1280
@@ -340,6 +340,10 @@ app.whenReady().then(() => {
         label: appName,
         submenu: [
           { role: 'about', label: `About ${appName}` },
+          {
+            label: 'Check for Updates...',
+            click: () => checkForUpdates()
+          },
           {
             label: 'Settings...',
             accelerator: 'Cmd+,',
