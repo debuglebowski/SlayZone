@@ -4,7 +4,7 @@ const sharp = require('sharp');
 const { join } = require('path');
 const { mkdirSync, existsSync, rmSync, writeFileSync } = require('fs');
 const pngToIco = require('png-to-ico').default;
-const { Icns, IcnsImage } = require('@fiahfy/icns');
+const { execSync } = require('child_process');
 
 const APP_DIR = join(__dirname, '../packages/apps/app');
 const BUILD_DIR = join(APP_DIR, 'build');
@@ -77,34 +77,16 @@ async function generateICNS() {
   }
   mkdirSync(iconsetDir, { recursive: true });
 
-  const icns = new Icns();
-
-  const osTypeByFilename = new Map([
-    ['icon_16x16.png', 'icp4'],
-    ['icon_32x32.png', 'icp5'],
-    ['icon_128x128.png', 'ic07'],
-    ['icon_256x256.png', 'ic08'],
-    ['icon_512x512.png', 'ic09'],
-    ['icon_16x16@2x.png', 'ic11'],
-    ['icon_32x32@2x.png', 'ic12'],
-    ['icon_128x128@2x.png', 'ic13'],
-    ['icon_256x256@2x.png', 'ic14'],
-    ['icon_512x512@2x.png', 'ic10'],
-  ]);
-
-  // Generate correctly named iconset files and build ICNS in pure JS
+  // Generate iconset PNGs
   for (const [, pixelSize, filename] of ICONSET_FILES) {
     const iconBuffer = await createIconWithBackground(pixelSize);
     writeFileSync(join(iconsetDir, filename), iconBuffer);
-    const osType = osTypeByFilename.get(filename);
-    if (!osType) {
-      throw new Error(`Unsupported icon filename for ICNS mapping: ${filename}`);
-    }
-    icns.append(IcnsImage.fromPNG(iconBuffer, osType));
   }
 
-  writeFileSync(join(BUILD_DIR, 'icon.icns'), icns.data);
-  console.log('✓ Created build/icon.icns');
+  // Use macOS iconutil to build ICNS (produces valid .icns unlike @fiahfy/icns)
+  const icnsPath = join(BUILD_DIR, 'icon.icns');
+  execSync(`iconutil --convert icns --output "${icnsPath}" "${iconsetDir}"`);
+  console.log('✓ Created build/icon.icns (via iconutil)');
 }
 
 async function generateICO() {

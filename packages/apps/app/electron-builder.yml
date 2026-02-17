@@ -21,10 +21,10 @@ nsis:
   shortcutName: ${productName}
   uninstallDisplayName: ${productName}
   createDesktopShortcut: always
+afterPack: build/afterPack.js
 mac:
-  identity: "-"
-  hardenedRuntime: false
-  entitlements: build/entitlements.mac.plist
+  identity: null
+  icon: build/icon.icns
   entitlementsInherit: build/entitlements.mac.plist
   extendInfo:
     - NSCameraUsageDescription: Application requests access to the device's camera.
