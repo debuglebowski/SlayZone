@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
-import { MoreHorizontal, Archive, Trash2, AlertTriangle, Sparkles, Loader2, Terminal as TerminalIcon, Globe, Settings2, GitBranch, FileCode, ChevronRight, Plus, GripVertical, Camera, X, Info } from 'lucide-react'
+import { MoreHorizontal, Archive, Trash2, AlertTriangle, Sparkles, Loader2, Terminal as TerminalIcon, Globe, Settings2, GitBranch, FileCode, ChevronRight, Plus, GripVertical, Camera, X, Info, Maximize2, Minimize2 } from 'lucide-react'
 import { DndContext, PointerSensor, useSensors, useSensor, closestCenter, type DragEndEvent } from '@dnd-kit/core'
 import { SortableContext, useSortable, verticalListSortingStrategy, arrayMove } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
@@ -58,7 +58,8 @@ import { TerminalContainer } from '@slayzone/task-terminals'
 import { UnifiedGitPanel, type UnifiedGitPanelHandle, type GitTabId } from '@slayzone/worktrees'
 import { cn, getTaskStatusStyle } from '@slayzone/ui'
 import { BrowserPanel } from '@slayzone/task-browser'
-import { FileEditorView } from '@slayzone/file-editor/client'
+import { FileEditorView, QuickOpenDialog, type FileEditorViewHandle } from '@slayzone/file-editor/client'
+import type { EditorOpenFilesState } from '@slayzone/file-editor/shared'
 import { usePanelSizes, resolveWidths } from './usePanelSizes'
 import { usePanelConfig } from './usePanelConfig'
 import { WebPanelView } from './WebPanelView'
@@ -138,6 +139,8 @@ function SortableSubTask({ sub, onNavigate, onUpdate, onDelete }: {
 interface TaskDetailPageProps {
   taskId: string
   isActive?: boolean
+  zenMode?: boolean
+  onZenModeToggle?: () => void
   onBack: () => void
   onTaskUpdated: (task: Task) => void
   onArchiveTask?: (taskId: string) => Promise<void>
@@ -149,6 +152,8 @@ interface TaskDetailPageProps {
 export function TaskDetailPage({
   taskId,
   isActive,
+  zenMode,
+  onZenModeToggle,
   onBack,
   onTaskUpdated,
   onArchiveTask,
@@ -284,6 +289,16 @@ export function TaskDetailPage({
   const browserOpenRef = useRef(panelVisibility.browser)
   const gitPanelRef = useRef<UnifiedGitPanelHandle>(null)
   const [gitDefaultTab, setGitDefaultTab] = useState<GitTabId>('general')
+  const [quickOpenVisible, setQuickOpenVisible] = useState(false)
+  const fileEditorRef = useRef<FileEditorViewHandle>(null)
+  const pendingEditorFileRef = useRef<string | null>(null)
+  const fileEditorRefCallback = useCallback((handle: FileEditorViewHandle | null) => {
+    fileEditorRef.current = handle
+    if (handle && pendingEditorFileRef.current) {
+      handle.openFile(pendingEditorFileRef.current)
+      pendingEditorFileRef.current = null
+    }
+  }, [])
   useEffect(() => { browserOpenRef.current = panelVisibility.browser }, [panelVisibility.browser])
 
   // Load dev server settings
@@ -801,13 +816,23 @@ export function TaskDetailPage({
     [task, panelVisibility, onTaskUpdated, resetPanelSize]
   )
 
-  // Cmd+T/B/G/S/E + web panel shortcuts for panel toggles
+  const handleQuickOpenFile = useCallback((filePath: string) => {
+    if (fileEditorRef.current) {
+      fileEditorRef.current.openFile(filePath)
+    } else {
+      // Editor not mounted yet — queue file and enable panel
+      pendingEditorFileRef.current = filePath
+      handlePanelToggle('editor', true)
+    }
+  }, [handlePanelToggle])
+
+  // Cmd+T/B/G/S/E/P + web panel shortcuts for panel toggles
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent): void => {
       if (!isActive) return
       // Cmd+Shift+G: git diff tab toggle
       if (e.metaKey && e.shiftKey) {
-        if (e.key === 'g' && isBuiltinEnabled('diff')) {
+        if (e.key.toLowerCase() === 'g' && isBuiltinEnabled('diff')) {
           e.preventDefault()
           if (!panelVisibility.diff) {
             setGitDefaultTab('changes')
@@ -821,6 +846,14 @@ export function TaskDetailPage({
       }
 
       if (e.metaKey && !e.shiftKey) {
+        // Cmd+P: quick open — works even inside CodeMirror
+        const editorProjectPath = task?.worktree_path || project?.path
+        if (e.key === 'p' && isBuiltinEnabled('editor') && editorProjectPath) {
+          e.preventDefault()
+          setQuickOpenVisible(true)
+          return
+        }
+
         // Skip shortcuts when focus is in CodeMirror or contenteditable editors
         const target = e.target as HTMLElement
         const inEditor = target?.closest?.('[contenteditable="true"]')
@@ -1062,6 +1095,41 @@ export function TaskDetailPage({
     }, 500)
   }, [])
 
+  // Editor open files persistence — debounced, ref-based (same pattern as webPanelUrls)
+  const editorStateRef = useRef<EditorOpenFilesState | null>(null)
+  const editorStateTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const flushPendingEditorSave = useCallback(() => {
+    if (editorStateTimerRef.current) {
+      clearTimeout(editorStateTimerRef.current)
+      editorStateTimerRef.current = null
+      if (taskIdRef.current && editorStateRef.current) {
+        window.api.db.updateTask({
+          id: taskIdRef.current,
+          editorOpenFiles: editorStateRef.current
+        })
+      }
+    }
+  }, [])
+
+  useEffect(() => {
+    return () => flushPendingEditorSave()
+  }, [flushPendingEditorSave])
+
+  const handleEditorStateChange = useCallback((state: EditorOpenFilesState) => {
+    editorStateRef.current = state
+    if (editorStateTimerRef.current) clearTimeout(editorStateTimerRef.current)
+    const id = taskIdRef.current
+    editorStateTimerRef.current = setTimeout(async () => {
+      if (!id) return
+      const updated = await window.api.db.updateTask({
+        id,
+        editorOpenFiles: state
+      })
+      setTask(updated)
+    }, 500)
+  }, [])
+
   // Handle web panel favicon change
   const handleWebPanelFaviconChange = useCallback((_panelId: string, _favicon: string) => {
     // Favicon caching — no-op for now, auto-fetched by webview on each load
@@ -1135,12 +1203,32 @@ export function TaskDetailPage({
   }
 
   return (
-    <div className="h-full flex flex-col p-4 pb-0 gap-4">
+    <div className={cn("h-full flex flex-col pb-0 relative", zenMode ? "p-0" : "p-4 gap-4")}>
       {showRegionSelector && (
         <RegionSelector onSelect={handleRegionSelect} onCancel={handleRegionCancel} />
       )}
+      {/* Zen mode exit button */}
+      {zenMode && (
+        <div className="absolute top-1 right-2 z-50 window-no-drag">
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="size-6 opacity-0 hover:opacity-80 transition-opacity"
+                onClick={onZenModeToggle}
+              >
+                <Minimize2 className="size-3" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom" className="text-xs">
+              Exit Zen Mode (⌘J or Esc)
+            </TooltipContent>
+          </Tooltip>
+        </div>
+      )}
       {/* Header */}
-      <header className="shrink-0 relative">
+      {!zenMode && <header className="shrink-0 relative">
         <div>
           <div className="flex items-center gap-4 window-no-drag">
             {task.is_temporary ? (
@@ -1214,6 +1302,23 @@ export function TaskDetailPage({
                 })()}
                 onChange={handlePanelToggle}
               />
+              {onZenModeToggle && (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="size-7"
+                      onClick={onZenModeToggle}
+                    >
+                      <Maximize2 className="size-3.5" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom" className="text-xs">
+                    Zen Mode (⌘J)
+                  </TooltipContent>
+                </Tooltip>
+              )}
             </div>
           </div>
           {parentTask && (
@@ -1227,10 +1332,10 @@ export function TaskDetailPage({
             </button>
           )}
         </div>
-      </header>
+      </header>}
 
       {/* Dev server detected toast */}
-      <DevServerToast
+      {!zenMode && <DevServerToast
         url={detectedDevUrl}
         onOpen={() => {
           if (!detectedDevUrl) return
@@ -1238,10 +1343,10 @@ export function TaskDetailPage({
           setDetectedDevUrl(null)
         }}
         onDismiss={() => setDetectedDevUrl(null)}
-      />
+      />}
 
       {/* Split view: terminal | browser | settings | git diff */}
-      <div ref={splitContainerRef} className="flex-1 flex min-h-0 pb-4">
+      <div ref={splitContainerRef} className={cn("flex-1 flex min-h-0", !zenMode && "pb-4")}>
         {/* Terminal Panel */}
         {panelVisibility.terminal && (
         <div
@@ -1516,8 +1621,10 @@ export function TaskDetailPage({
         {panelVisibility.editor && project?.path && (
           <div className="shrink-0 overflow-hidden rounded-md bg-surface-1 border border-border" style={{ width: resolvedWidths.editor }}>
             <FileEditorView
+              ref={fileEditorRefCallback}
               projectPath={task.worktree_path || project.path}
-              isActive={isActive}
+              initialEditorState={task.editor_open_files}
+              onEditorStateChange={handleEditorStateChange}
             />
           </div>
         )}
@@ -1568,7 +1675,7 @@ export function TaskDetailPage({
 
         {/* Git Panel */}
         {panelVisibility.diff && (
-          <div className="shrink-0 rounded-md bg-surface-1 border border-border overflow-hidden flex flex-col" style={{ width: resolvedWidths.diff }}>
+          <div data-testid="task-git-panel" className="shrink-0 rounded-md bg-surface-1 border border-border overflow-hidden flex flex-col" style={{ width: resolvedWidths.diff }}>
             <UnifiedGitPanel
               ref={gitPanelRef}
               task={task}
@@ -1716,6 +1823,15 @@ export function TaskDetailPage({
         </div>
         )}
       </div>
+
+      {project?.path && (
+        <QuickOpenDialog
+          open={quickOpenVisible}
+          onOpenChange={setQuickOpenVisible}
+          projectPath={task.worktree_path || project.path}
+          onOpenFile={handleQuickOpenFile}
+        />
+      )}
 
       <DeleteTaskDialog
         task={task}

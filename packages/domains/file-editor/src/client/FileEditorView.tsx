@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, useEffect, useMemo } from 'react'
+import { useState, useCallback, useRef, useEffect, useMemo, useImperativeHandle, forwardRef } from 'react'
 import { Code, Columns2, Eye, FileCode } from 'lucide-react'
 import {
   AlertDialog,
@@ -11,16 +11,21 @@ import {
   AlertDialogTitle,
   Button
 } from '@slayzone/ui'
+import type { EditorOpenFilesState } from '@slayzone/file-editor/shared'
 import { useFileEditor } from './useFileEditor'
 import { EditorFileTree } from './EditorFileTree'
 import { EditorTabBar } from './EditorTabBar'
 import { CodeEditor } from './CodeEditor'
 import { MarkdownPreview } from './MarkdownPreview'
-import { QuickOpenDialog } from './QuickOpenDialog'
+
+export interface FileEditorViewHandle {
+  openFile: (filePath: string) => void
+}
 
 interface FileEditorViewProps {
   projectPath: string
-  isActive?: boolean
+  initialEditorState?: EditorOpenFilesState | null
+  onEditorStateChange?: (state: EditorOpenFilesState) => void
 }
 
 function formatSize(bytes: number): string {
@@ -28,7 +33,7 @@ function formatSize(bytes: number): string {
   return `${(bytes / 1024).toFixed(0)} KB`
 }
 
-export function FileEditorView({ projectPath, isActive = true }: FileEditorViewProps) {
+export const FileEditorView = forwardRef<FileEditorViewHandle, FileEditorViewProps>(function FileEditorView({ projectPath, initialEditorState, onEditorStateChange }, ref) {
   const {
     openFiles,
     activeFile,
@@ -41,19 +46,40 @@ export function FileEditorView({ projectPath, isActive = true }: FileEditorViewP
     closeFile,
     isDirty,
     isFileDiskChanged,
+    isRestoring,
     treeRefreshKey,
     fileVersions
-  } = useFileEditor(projectPath)
+  } = useFileEditor(projectPath, initialEditorState)
 
-  const [treeWidth, setTreeWidth] = useState(250)
-  const [treeVisible, setTreeVisible] = useState(true)
+  const [treeWidth, setTreeWidth] = useState(initialEditorState?.treeWidth ?? 250)
+  const [treeVisible, setTreeVisible] = useState(initialEditorState?.treeVisible ?? true)
+  const [expandedFolders, setExpandedFolders] = useState<Set<string>>(
+    () => new Set(initialEditorState?.expandedFolders ?? [])
+  )
   const isDragging = useRef(false)
   const [confirmClose, setConfirmClose] = useState<string | null>(null)
-  const [quickOpenVisible, setQuickOpenVisible] = useState(false)
   const [viewMode, setViewMode] = useState<'editor' | 'split' | 'preview'>('split')
   const editorContainerRef = useRef<HTMLDivElement>(null)
   const previewScrollRef = useRef<HTMLDivElement>(null)
   const scrollSyncSource = useRef<'editor' | 'preview' | null>(null)
+
+  // --- Emit state changes to parent for persistence ---
+  // Parent (TaskDetailPage) debounces at 500ms, so frequent calls here are fine.
+  // Use filePathsKey (stable string) instead of openFiles to avoid emitting on every keystroke.
+  const onChangeRef = useRef(onEditorStateChange)
+  onChangeRef.current = onEditorStateChange
+  const filePathsKey = openFiles.map((f) => f.path).join('\0')
+
+  useEffect(() => {
+    if (isRestoring) return
+    onChangeRef.current?.({
+      files: filePathsKey ? filePathsKey.split('\0') : [],
+      activeFile: activeFilePath,
+      treeWidth,
+      treeVisible,
+      expandedFolders: [...expandedFolders]
+    })
+  }, [filePathsKey, activeFilePath, treeWidth, treeVisible, expandedFolders, isRestoring])
 
   const isMarkdown = useMemo(() => {
     const ext = activeFilePath?.split('.').pop()?.toLowerCase()
@@ -100,18 +126,7 @@ export function FileEditorView({ projectPath, isActive = true }: FileEditorViewP
     }
   }, [isMarkdown, viewMode, activeFilePath])
 
-  // Cmd+P — quick open (only on active tab)
-  useEffect(() => {
-    if (!isActive) return
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === 'p') {
-        e.preventDefault()
-        setQuickOpenVisible(true)
-      }
-    }
-    window.addEventListener('keydown', handleKeyDown)
-    return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [isActive])
+  useImperativeHandle(ref, () => ({ openFile }), [openFile])
 
   const handleResizeStart = useCallback(
     (e: React.MouseEvent) => {
@@ -164,6 +179,8 @@ export function FileEditorView({ projectPath, isActive = true }: FileEditorViewP
             onOpenFile={openFile}
             activeFilePath={activeFilePath}
             refreshKey={treeRefreshKey}
+            expandedFolders={expandedFolders}
+            onExpandedFoldersChange={setExpandedFolders}
           />
         </div>
       )}
@@ -250,15 +267,6 @@ export function FileEditorView({ projectPath, isActive = true }: FileEditorViewP
         )}
       </div>
 
-      {/* Quick open dialog */}
-      <QuickOpenDialog
-        open={quickOpenVisible}
-        onOpenChange={setQuickOpenVisible}
-        projectPath={projectPath}
-        onOpenFile={openFile}
-        refreshKey={treeRefreshKey}
-      />
-
       {/* Unsaved changes confirmation */}
       <AlertDialog open={!!confirmClose} onOpenChange={(open) => { if (!open) setConfirmClose(null) }}>
         <AlertDialogContent>
@@ -276,4 +284,4 @@ export function FileEditorView({ projectPath, isActive = true }: FileEditorViewP
       </AlertDialog>
     </div>
   )
-}
+})
