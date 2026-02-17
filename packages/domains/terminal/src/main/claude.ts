@@ -7,7 +7,7 @@ export function registerClaudeHandlers(ipcMain: IpcMain): void {
     const TIMEOUT_MS = 5000
 
     const checkPromise = new Promise<ClaudeAvailability>((resolve) => {
-      const proc = spawn('claude', ['--version'])
+      const proc = spawn('claude', ['--version'], { shell: true })
 
       let version = ''
       proc.stdout?.on('data', (data) => {
