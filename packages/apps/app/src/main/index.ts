@@ -1,8 +1,8 @@
-import fixPath from 'fix-path'
-fixPath()
+import { shellPath } from 'shell-path'
 
 import { app, shell, BrowserWindow, ipcMain, nativeTheme, session, webContents, dialog, Menu, protocol } from 'electron'
-import { join, extname } from 'path'
+import { join, extname, normalize, sep } from 'path'
+import { homedir } from 'os'
 import { readFileSync, promises as fsp } from 'fs'
 import { electronApp, is } from '@electron-toolkit/utils'
 
@@ -319,7 +319,10 @@ function createWindow(): void {
 // This method will be called when Electron has finished
 // initialization and is ready to create browser windows.
 // Some APIs can only be used after this event occurs.
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
+  // Fix $PATH for macOS GUI apps (async to avoid blocking startup on slow shells)
+  shellPath().then((p) => { process.env.PATH = p }).catch(() => {})
+
   // Initialize database
   const db = getDatabase()
   registerProcessDiagnostics(app)
@@ -479,9 +482,15 @@ app.whenReady().then(() => {
   const browserSession = session.fromPartition('persist:browser-tabs')
 
   // Serve local files via slz-file:// (Chromium blocks file:// in webviews and cross-origin renderers)
+  const userHome = homedir()
   const slzFileHandler = async (request: Request) => {
     // slz-file:///path/to/file → /path/to/file
-    const filePath = decodeURIComponent(request.url.replace(/^slz-file:\/\//, ''))
+    const filePath = normalize(decodeURIComponent(request.url.replace(/^slz-file:\/\//, '')))
+
+    // Block path traversal outside user home directory
+    if (!filePath.startsWith(userHome + sep)) {
+      return new Response('Forbidden', { status: 403 })
+    }
     const mimeTypes: Record<string, string> = {
       '.html': 'text/html', '.htm': 'text/html', '.css': 'text/css',
       '.js': 'text/javascript', '.mjs': 'text/javascript', '.json': 'application/json',
@@ -535,8 +544,11 @@ app.whenReady().then(() => {
   // IPC test
   ipcMain.on('ping', () => console.log('pong'))
 
-  // Shell: open external URLs
+  // Shell: open external URLs (restrict to safe schemes)
   ipcMain.handle('shell:open-external', (_event, url: string) => {
+    if (!/^https?:\/\//i.test(url) && !url.startsWith('mailto:')) {
+      throw new Error('Only http, https, and mailto URLs are allowed')
+    }
     shell.openExternal(url)
   })
 
