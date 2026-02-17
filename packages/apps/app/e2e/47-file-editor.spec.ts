@@ -41,13 +41,13 @@ test.describe('File editor', () => {
     // Navigate to task
     await goHome(mainWindow)
     await clickProject(mainWindow, projectAbbrev)
-    await mainWindow.waitForTimeout(500)
+    await expect(mainWindow.getByText('Editor test task').first()).toBeVisible({ timeout: 5_000 })
     await mainWindow.getByText('Editor test task').first().click()
-    await mainWindow.waitForTimeout(500)
+    await expect(mainWindow.locator('[data-testid="terminal-mode-trigger"]:visible').first()).toBeVisible({ timeout: 5_000 })
 
     // Toggle editor panel on via Cmd+E
     await mainWindow.keyboard.press('Meta+e')
-    await mainWindow.waitForTimeout(500)
+    await expect(editorPanel(mainWindow).getByText('Files')).toBeVisible({ timeout: 5_000 })
   })
 
   // --- .gitignore awareness ---
@@ -79,7 +79,6 @@ test.describe('File editor', () => {
 
   test('clicking a file opens it in editor with tab', async ({ mainWindow }) => {
     await treeFile(mainWindow, 'hello.ts').click()
-    await mainWindow.waitForTimeout(300)
 
     // Tab should appear
     await expect(editorTab(mainWindow, 'hello.ts')).toBeVisible()
@@ -89,7 +88,6 @@ test.describe('File editor', () => {
 
   test('opening another file creates a second tab', async ({ mainWindow }) => {
     await treeFile(mainWindow, 'readme.md').click()
-    await mainWindow.waitForTimeout(300)
 
     await expect(editorTab(mainWindow, 'hello.ts')).toBeVisible()
     await expect(editorTab(mainWindow, 'readme.md')).toBeVisible()
@@ -102,12 +100,8 @@ test.describe('File editor', () => {
     const largePath = path.join(TEST_PROJECT_PATH, 'large.txt')
     fs.writeFileSync(largePath, 'x'.repeat(1.5 * 1024 * 1024))
 
-    // Wait for watcher to detect new file and refresh tree
-    await mainWindow.waitForTimeout(2000)
-
     await expect(treeFile(mainWindow, 'large.txt')).toBeVisible({ timeout: 5_000 })
     await treeFile(mainWindow, 'large.txt').click()
-    await mainWindow.waitForTimeout(300)
 
     await expect(mainWindow.getByText('File too large').first()).toBeVisible({ timeout: 5_000 })
     await expect(mainWindow.getByRole('button', { name: 'Open anyway' }).first()).toBeVisible()
@@ -122,16 +116,11 @@ test.describe('File editor', () => {
     const content = 'hello '.repeat(200_000) // ~1.2MB
     fs.writeFileSync(mediumPath, content)
 
-    // Wait for watcher to detect new file and refresh tree
-    await mainWindow.waitForTimeout(2000)
-
     await expect(treeFile(mainWindow, 'medium.txt')).toBeVisible({ timeout: 5_000 })
     await treeFile(mainWindow, 'medium.txt').click()
-    await mainWindow.waitForTimeout(300)
 
     await expect(mainWindow.getByText('File too large').first()).toBeVisible({ timeout: 5_000 })
     await mainWindow.getByRole('button', { name: 'Open anyway' }).first().click()
-    await mainWindow.waitForTimeout(500)
 
     // Should now show CodeMirror editor
     await expect(mainWindow.locator('.cm-editor:visible')).toBeVisible({ timeout: 5_000 })
@@ -144,12 +133,10 @@ test.describe('File editor', () => {
   test('editing a file shows dirty indicator dot on tab', async ({ mainWindow }) => {
     // Open hello.ts via tree (ensures tab is active even if prior tests changed state)
     await treeFile(mainWindow, 'hello.ts').click()
-    await mainWindow.waitForTimeout(300)
 
     // Type something in the CodeMirror editor
     await mainWindow.locator('.cm-editor:visible .cm-content').click()
     await mainWindow.keyboard.type('// modified')
-    await mainWindow.waitForTimeout(300)
 
     // Dirty dot should appear (conditionally rendered — check DOM presence)
     const tab = editorTab(mainWindow, 'hello.ts')
@@ -163,9 +150,7 @@ test.describe('File editor', () => {
     const tab = editorTab(mainWindow, 'hello.ts')
     // Hover to reveal close button, then click X
     await tab.hover()
-    await mainWindow.waitForTimeout(100)
     await tab.locator('.lucide-x').click()
-    await mainWindow.waitForTimeout(300)
 
     // AlertDialog should appear
     await expect(mainWindow.getByRole('heading', { name: 'Unsaved changes' })).toBeVisible({ timeout: 3_000 })
@@ -173,19 +158,15 @@ test.describe('File editor', () => {
 
     // Cancel — should keep the tab open
     await mainWindow.getByRole('button', { name: 'Cancel' }).click()
-    await mainWindow.waitForTimeout(200)
     await expect(editorTab(mainWindow, 'hello.ts')).toBeVisible()
   })
 
   test('discard closes dirty tab without saving', async ({ mainWindow }) => {
     const tab = editorTab(mainWindow, 'hello.ts')
     await tab.hover()
-    await mainWindow.waitForTimeout(100)
     await tab.locator('.lucide-x').click()
-    await mainWindow.waitForTimeout(300)
 
     await mainWindow.getByRole('button', { name: 'Discard' }).click()
-    await mainWindow.waitForTimeout(300)
 
     // Tab should be gone
     await expect(editorTab(mainWindow, 'hello.ts')).not.toBeVisible()
@@ -200,17 +181,15 @@ test.describe('File editor', () => {
   test('external file change reloads clean file in editor', async ({ mainWindow }) => {
     // Open hello.ts fresh
     await treeFile(mainWindow, 'hello.ts').click()
-    await mainWindow.waitForTimeout(500)
 
     // Modify file on disk externally
     fs.writeFileSync(path.join(TEST_PROJECT_PATH, 'hello.ts'), 'export const hello = "changed"\n')
 
     // Wait for watcher to detect + debounce + reload
-    await mainWindow.waitForTimeout(1500)
-
-    // The editor should now contain the new content
-    const editorContent = await mainWindow.locator('.cm-editor:visible .cm-content').textContent()
-    expect(editorContent).toContain('changed')
+    await expect.poll(
+      async () => await mainWindow.locator('.cm-editor:visible .cm-content').textContent(),
+      { timeout: 5_000 }
+    ).toContain('changed')
 
     // Restore original
     fs.writeFileSync(path.join(TEST_PROJECT_PATH, 'hello.ts'), 'export const hello = "world"\n')
@@ -219,16 +198,11 @@ test.describe('File editor', () => {
   test('external change on dirty file shows "changed" indicator', async ({ mainWindow }) => {
     // Open hello.ts, make it dirty
     await treeFile(mainWindow, 'hello.ts').click()
-    await mainWindow.waitForTimeout(300)
     await mainWindow.locator('.cm-editor:visible .cm-content').click()
     await mainWindow.keyboard.type('// dirty edit')
-    await mainWindow.waitForTimeout(300)
 
     // Modify file on disk externally
     fs.writeFileSync(path.join(TEST_PROJECT_PATH, 'hello.ts'), 'export const hello = "disk change"\n')
-
-    // Wait for watcher
-    await mainWindow.waitForTimeout(1500)
 
     // Should show "changed" label on the tab (not auto-reload because dirty)
     await expect(editorTab(mainWindow, 'hello.ts').getByText('changed')).toBeVisible({ timeout: 5_000 })
@@ -236,11 +210,8 @@ test.describe('File editor', () => {
     // Discard the tab to clean up
     const tab = editorTab(mainWindow, 'hello.ts')
     await tab.hover()
-    await mainWindow.waitForTimeout(100)
     await tab.locator('.lucide-x').click()
-    await mainWindow.waitForTimeout(200)
     await mainWindow.getByRole('button', { name: 'Discard' }).click()
-    await mainWindow.waitForTimeout(200)
 
     // Restore original
     fs.writeFileSync(path.join(TEST_PROJECT_PATH, 'hello.ts'), 'export const hello = "world"\n')
@@ -249,9 +220,6 @@ test.describe('File editor', () => {
   test('new file created externally appears in tree', async ({ mainWindow }) => {
     // Create a new file
     fs.writeFileSync(path.join(TEST_PROJECT_PATH, 'newfile.ts'), 'export const x = 1\n')
-
-    // Wait for watcher + tree refresh debounce
-    await mainWindow.waitForTimeout(2000)
 
     await expect(treeFile(mainWindow, 'newfile.ts')).toBeVisible({ timeout: 5_000 })
 
@@ -262,7 +230,6 @@ test.describe('File editor', () => {
 
   test('Cmd+P opens quick open dialog', async ({ mainWindow }) => {
     await mainWindow.keyboard.press('Meta+p')
-    await mainWindow.waitForTimeout(500)
 
     // Should see the dialog with search input
     await expect(mainWindow.getByPlaceholder('Open file by name...')).toBeVisible({ timeout: 3_000 })
@@ -272,51 +239,41 @@ test.describe('File editor', () => {
 
     // Close dialog
     await mainWindow.keyboard.press('Escape')
-    await mainWindow.waitForTimeout(200)
   })
 
   test('quick open filters files by query', async ({ mainWindow }) => {
     await mainWindow.keyboard.press('Meta+p')
-    await mainWindow.waitForTimeout(500)
 
     const input = mainWindow.getByPlaceholder('Open file by name...')
     await input.fill('hello')
-    await mainWindow.waitForTimeout(300)
 
     // Should show hello.ts
     await expect(mainWindow.locator('[cmdk-item]').filter({ hasText: 'hello.ts' })).toBeVisible()
 
     // Close
     await mainWindow.keyboard.press('Escape')
-    await mainWindow.waitForTimeout(200)
   })
 
   test('quick open does not show gitignored files', async ({ mainWindow }) => {
     await mainWindow.keyboard.press('Meta+p')
-    await mainWindow.waitForTimeout(500)
 
     const input = mainWindow.getByPlaceholder('Open file by name...')
     await input.fill('pkg.json')
-    await mainWindow.waitForTimeout(300)
 
     // Should show "No files found" since node_modules/pkg.json is gitignored
     await expect(mainWindow.getByText('No files found.')).toBeVisible()
 
     await mainWindow.keyboard.press('Escape')
-    await mainWindow.waitForTimeout(200)
   })
 
   test('selecting a file in quick open opens it', async ({ mainWindow }) => {
     await mainWindow.keyboard.press('Meta+p')
-    await mainWindow.waitForTimeout(500)
 
     const input = mainWindow.getByPlaceholder('Open file by name...')
     await input.fill('index.ts')
-    await mainWindow.waitForTimeout(300)
 
     // Select the first match
     await mainWindow.locator('[cmdk-item]').filter({ hasText: 'index.ts' }).first().click()
-    await mainWindow.waitForTimeout(300)
 
     // Tab should appear for src/index.ts
     await expect(editorTab(mainWindow, 'index.ts')).toBeVisible()
@@ -327,20 +284,17 @@ test.describe('File editor', () => {
   test('Cmd+S saves the file', async ({ mainWindow }) => {
     // Open hello.ts via tree and edit it
     await treeFile(mainWindow, 'hello.ts').click()
-    await mainWindow.waitForTimeout(300)
     await mainWindow.locator('.cm-editor:visible .cm-content').click()
 
     // Select all and replace
     await mainWindow.keyboard.press('Meta+a')
     await mainWindow.keyboard.type('export const hello = "saved"\n')
-    await mainWindow.waitForTimeout(200)
 
     // Dirty indicator should exist (conditionally rendered)
     await expect(editorTab(mainWindow, 'hello.ts').locator('.rounded-full')).toHaveCount(1)
 
     // Save with Cmd+S (CodeMirror intercepts this)
     await mainWindow.keyboard.press('Meta+s')
-    await mainWindow.waitForTimeout(500)
 
     // Dirty indicator should be gone
     await expect(editorTab(mainWindow, 'hello.ts').locator('.rounded-full')).toHaveCount(0)
@@ -351,5 +305,107 @@ test.describe('File editor', () => {
 
     // Restore
     fs.writeFileSync(path.join(TEST_PROJECT_PATH, 'hello.ts'), 'export const hello = "world"\n')
+  })
+
+  // --- Editor state persistence ---
+
+  test('open files persist across editor panel toggle', async ({ mainWindow }) => {
+    // Open hello.ts and readme.md
+    await treeFile(mainWindow, 'hello.ts').click()
+    await treeFile(mainWindow, 'readme.md').click()
+
+    // Verify both tabs exist
+    await expect(editorTab(mainWindow, 'hello.ts')).toBeVisible()
+    await expect(editorTab(mainWindow, 'readme.md')).toBeVisible()
+
+    // Wait for debounced save to DB (500ms + margin)
+    await mainWindow.waitForTimeout(800)
+
+    // Toggle editor panel off
+    await mainWindow.keyboard.press('Meta+e')
+    await expect(editorPanel(mainWindow)).not.toBeVisible()
+
+    // Toggle editor panel back on
+    await mainWindow.keyboard.press('Meta+e')
+    await expect(editorPanel(mainWindow).getByText('Files')).toBeVisible({ timeout: 5_000 })
+
+    // Both tabs should be restored
+    await expect(editorTab(mainWindow, 'hello.ts')).toBeVisible({ timeout: 5_000 })
+    await expect(editorTab(mainWindow, 'readme.md')).toBeVisible()
+  })
+
+  test('active file persists across editor panel toggle', async ({ mainWindow }) => {
+    // Click hello.ts to make it active
+    await editorTab(mainWindow, 'hello.ts').click()
+    await expect(editorTab(mainWindow, 'hello.ts')).toHaveClass(/border/)
+
+    // Wait for debounced save
+    await mainWindow.waitForTimeout(800)
+
+    // Toggle editor off/on
+    await mainWindow.keyboard.press('Meta+e')
+    await mainWindow.keyboard.press('Meta+e')
+    await expect(editorPanel(mainWindow).getByText('Files')).toBeVisible({ timeout: 5_000 })
+
+    // hello.ts should still be active (has border class)
+    await expect(editorTab(mainWindow, 'hello.ts')).toBeVisible({ timeout: 5_000 })
+    await expect(editorTab(mainWindow, 'hello.ts')).toHaveClass(/border/)
+  })
+
+  test('deleted file silently skipped on restore', async ({ mainWindow }) => {
+    // Create a temp file and open it
+    const tempPath = path.join(TEST_PROJECT_PATH, 'temp-persist.ts')
+    fs.writeFileSync(tempPath, 'export const temp = true\n')
+
+    await expect(treeFile(mainWindow, 'temp-persist.ts')).toBeVisible({ timeout: 5_000 })
+    await treeFile(mainWindow, 'temp-persist.ts').click()
+    await expect(editorTab(mainWindow, 'temp-persist.ts')).toBeVisible()
+
+    // Wait for debounced save
+    await mainWindow.waitForTimeout(800)
+
+    // Toggle editor off
+    await mainWindow.keyboard.press('Meta+e')
+    await expect(editorPanel(mainWindow)).not.toBeVisible()
+
+    // Delete the file while editor is closed
+    fs.unlinkSync(tempPath)
+
+    // Toggle editor back on
+    await mainWindow.keyboard.press('Meta+e')
+    await expect(editorPanel(mainWindow).getByText('Files')).toBeVisible({ timeout: 5_000 })
+
+    // temp-persist.ts should NOT be restored (file doesn't exist)
+    await expect(editorTab(mainWindow, 'temp-persist.ts')).not.toBeVisible()
+
+    // Other files should still be there
+    await expect(editorTab(mainWindow, 'hello.ts')).toBeVisible({ timeout: 5_000 })
+  })
+
+  test('tree visibility persists across editor panel toggle', async ({ mainWindow }) => {
+    // Hide the file tree
+    const hideBtn = mainWindow.locator('button[title="Hide file tree"]:visible').first()
+    await expect(hideBtn).toBeVisible()
+    await hideBtn.click()
+
+    // Show button should appear (tree is hidden)
+    await expect(mainWindow.locator('button[title="Show file tree"]:visible').first()).toBeVisible()
+
+    // Wait for debounced save
+    await mainWindow.waitForTimeout(800)
+
+    // Toggle editor off/on
+    await mainWindow.keyboard.press('Meta+e')
+    await mainWindow.keyboard.press('Meta+e')
+
+    // Wait for tabs to restore (proves editor remounted)
+    await expect(editorTab(mainWindow, 'hello.ts')).toBeVisible({ timeout: 5_000 })
+
+    // Tree should still be hidden — "Show file tree" button visible
+    await expect(mainWindow.locator('button[title="Show file tree"]:visible').first()).toBeVisible()
+
+    // Restore tree visibility for subsequent tests
+    await mainWindow.locator('button[title="Show file tree"]:visible').first().click()
+    await expect(editorPanel(mainWindow).getByText('Files')).toBeVisible()
   })
 })
