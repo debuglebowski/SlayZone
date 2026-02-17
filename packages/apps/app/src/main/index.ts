@@ -320,8 +320,8 @@ function createWindow(): void {
 // initialization and is ready to create browser windows.
 // Some APIs can only be used after this event occurs.
 app.whenReady().then(async () => {
-  // Fix $PATH for macOS GUI apps (async to avoid blocking startup on slow shells)
-  shellPath().then((p) => { process.env.PATH = p }).catch(() => {})
+  // Fix $PATH for macOS GUI apps
+  try { process.env.PATH = await shellPath() } catch (e) { console.warn('Failed to resolve shell PATH:', e) }
 
   // Initialize database
   const db = getDatabase()
