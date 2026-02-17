@@ -1,6 +1,22 @@
 # Changelog
 
 
+## v0.1.35...main
+
+[compare changes](https://github.com/debuglebowski/omgslayzone/compare/v0.1.35...main)
+
+### 🚀 Enhancements
+
+- Add "Check for Updates" to app menu ([bfa6670](https://github.com/debuglebowski/omgslayzone/commit/bfa6670))
+
+### 🩹 Fixes
+
+- Disable auto-download on startup ([50c9bf2](https://github.com/debuglebowski/omgslayzone/commit/50c9bf2))
+
+### ❤️ Contributors
+
+- Debuglebowski <kh.hansson@gmail.com>
+
 ## v0.1.34...main
 
 [compare changes](https://github.com/debuglebowski/omgslayzone/compare/v0.1.34...main)
