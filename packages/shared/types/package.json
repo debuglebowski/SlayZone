@@ -10,7 +10,7 @@
     "./global": "./src/global.d.ts"
   },
   "scripts": {
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsgo --noEmit"
   },
   "dependencies": {
     "@slayzone/ai-config": "workspace:*",

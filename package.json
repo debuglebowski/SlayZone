@@ -33,6 +33,7 @@
     "release:tag": "bash scripts/tag-release.sh"
   },
   "devDependencies": {
+    "@typescript/native-preview": "7.0.0-dev.20260217.1",
     "changelogen": "^0.6.2",
     "knip": "^5.83.1",
     "png-to-ico": "^3.0.1",
