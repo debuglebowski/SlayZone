@@ -1,6 +1,23 @@
 # Changelog
 
 
+## v0.1.40...main
+
+[compare changes](https://github.com/debuglebowski/omgslayzone/compare/v0.1.40...main)
+
+### 🩹 Fixes
+
+- Await shellPath() to fix CLI detection in production ([ca522d6](https://github.com/debuglebowski/omgslayzone/commit/ca522d6))
+- Auto-updater CJS/ESM interop — use default import ([d5774c7](https://github.com/debuglebowski/omgslayzone/commit/d5774c7))
+
+### 🏡 Chore
+
+- Replace tsc with tsgo for typechecking (22s → 5s) ([fd98337](https://github.com/debuglebowski/omgslayzone/commit/fd98337))
+
+### ❤️ Contributors
+
+- Debuglebowski <>
+
 ## v0.1.39...main
 
 [compare changes](https://github.com/debuglebowski/omgslayzone/compare/v0.1.39...main)
