@@ -1,4 +1,5 @@
 import { useState, useCallback, useRef, useEffect } from 'react'
+import type { EditorOpenFilesState } from '@slayzone/file-editor/shared'
 
 export interface OpenFile {
   path: string
@@ -9,7 +10,10 @@ export interface OpenFile {
   diskChanged?: boolean
 }
 
-export function useFileEditor(projectPath: string) {
+export function useFileEditor(
+  projectPath: string,
+  initialEditorState?: EditorOpenFilesState | null
+) {
   const [openFiles, setOpenFiles] = useState<OpenFile[]>([])
   const [activeFilePath, setActiveFilePath] = useState<string | null>(null)
   const [treeRefreshKey, setTreeRefreshKey] = useState(0)
@@ -17,6 +21,38 @@ export function useFileEditor(projectPath: string) {
   const treeRefreshTimer = useRef<NodeJS.Timeout | null>(null)
   // Track version per file for CodeMirror external content reload
   const [fileVersions, setFileVersions] = useState<Map<string, number>>(new Map())
+
+  // --- Restore persisted state on mount ---
+  const [isRestoring, setIsRestoring] = useState(!!(initialEditorState?.files?.length))
+  const hasRestored = useRef(false)
+  useEffect(() => {
+    if (hasRestored.current || !initialEditorState?.files?.length) return
+    hasRestored.current = true
+    ;(async () => {
+      for (const filePath of initialEditorState.files) {
+        try {
+          const result = await window.api.fs.readFile(projectPath, filePath)
+          if (result.tooLarge) {
+            setOpenFiles((prev) => {
+              if (prev.some((f) => f.path === filePath)) return prev
+              return [...prev, { path: filePath, content: null, originalContent: null, tooLarge: true, sizeBytes: result.sizeBytes }]
+            })
+          } else {
+            setOpenFiles((prev) => {
+              if (prev.some((f) => f.path === filePath)) return prev
+              return [...prev, { path: filePath, content: result.content, originalContent: result.content }]
+            })
+          }
+        } catch {
+          // File deleted since last session — skip
+        }
+      }
+      if (initialEditorState.activeFile) {
+        setActiveFilePath(initialEditorState.activeFile)
+      }
+      setIsRestoring(false)
+    })()
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps -- mount only
 
   // --- File watcher ---
   useEffect(() => {
@@ -201,6 +237,7 @@ export function useFileEditor(projectPath: string) {
     isDirty,
     hasDirtyFiles,
     isFileDiskChanged,
+    isRestoring,
     treeRefreshKey,
     fileVersions
   }

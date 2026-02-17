@@ -28,12 +28,29 @@ interface EditorFileTreeProps {
   activeFilePath: string | null
   /** Increment to trigger reload of expanded directories */
   refreshKey?: number
+  /** Controlled expanded folders (optional — uses internal state if not provided) */
+  expandedFolders?: Set<string>
+  onExpandedFoldersChange?: (folders: Set<string>) => void
 }
 
-export function EditorFileTree({ projectPath, onOpenFile, activeFilePath, refreshKey }: EditorFileTreeProps) {
+export function EditorFileTree({ projectPath, onOpenFile, activeFilePath, refreshKey, expandedFolders: controlledExpanded, onExpandedFoldersChange }: EditorFileTreeProps) {
   // Map of dirPath -> children entries (lazy loaded)
   const [dirContents, setDirContents] = useState<Map<string, DirEntry[]>>(new Map())
-  const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set())
+  const [internalExpanded, setInternalExpanded] = useState<Set<string>>(new Set())
+  const expandedFolders = controlledExpanded ?? internalExpanded
+  const setExpandedFolders = useCallback((updater: Set<string> | ((prev: Set<string>) => Set<string>)) => {
+    const update = (prev: Set<string>) => {
+      const next = typeof updater === 'function' ? updater(prev) : updater
+      onExpandedFoldersChange?.(next)
+      return next
+    }
+    if (controlledExpanded) {
+      // Controlled mode — compute and emit, parent owns state
+      update(controlledExpanded)
+    } else {
+      setInternalExpanded(update)
+    }
+  }, [controlledExpanded, onExpandedFoldersChange])
   const [creating, setCreating] = useState<{ parentPath: string; type: 'file' | 'directory' } | null>(null)
   const [renaming, setRenaming] = useState<string | null>(null)
   const [renameValue, setRenameValue] = useState('')
@@ -161,6 +178,7 @@ export function EditorFileTree({ projectPath, onOpenFile, activeFilePath, refres
   }, [renaming])
 
   const renderEntry = (entry: DirEntry, depth: number) => {
+    if (entry.ignored) return null
     const pad = depth * INDENT_PX + BASE_PAD
 
     if (entry.type === 'directory') {
@@ -172,8 +190,7 @@ export function EditorFileTree({ projectPath, onOpenFile, activeFilePath, refres
             <ContextMenuTrigger asChild>
               <button
                 className={cn(
-                  'group/folder flex w-full select-none items-center gap-1.5 rounded px-1 py-1 text-xs hover:bg-muted/50',
-                  entry.ignored && 'opacity-50'
+                  'group/folder flex w-full select-none items-center gap-1.5 rounded px-1 py-1 text-xs hover:bg-muted/50'
                 )}
                 style={{ paddingLeft: pad }}
                 onClick={() => handleToggleFolder(entry.path)}
@@ -248,8 +265,7 @@ export function EditorFileTree({ projectPath, onOpenFile, activeFilePath, refres
           <button
             className={cn(
               'flex w-full items-center gap-1.5 rounded px-1 py-1 text-xs hover:bg-muted/50',
-              entry.path === activeFilePath && 'bg-muted text-foreground',
-              entry.ignored && 'opacity-50'
+              entry.path === activeFilePath && 'bg-muted text-foreground'
             )}
             style={{ paddingLeft: pad }}
             onClick={() => onOpenFile(entry.path)}

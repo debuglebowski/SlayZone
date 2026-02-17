@@ -1067,34 +1067,6 @@ export function TaskDetailPage({
     }
   }, [])
 
-  // Initialize from task on load — flush old task's pending save first
-  useEffect(() => {
-    flushPendingUrlSave()
-    taskIdRef.current = task?.id ?? null
-    if (task?.web_panel_urls) webPanelUrlsRef.current = { ...task.web_panel_urls }
-    else webPanelUrlsRef.current = {}
-  }, [task?.id, flushPendingUrlSave])
-
-  // Flush pending URL save on unmount
-  useEffect(() => {
-    return () => flushPendingUrlSave()
-  }, [flushPendingUrlSave])
-
-  const handleWebPanelUrlChange = useCallback((panelId: string, url: string) => {
-    if (!taskIdRef.current) return
-    webPanelUrlsRef.current = { ...webPanelUrlsRef.current, [panelId]: url }
-    if (webPanelUrlTimerRef.current) clearTimeout(webPanelUrlTimerRef.current)
-    const id = taskIdRef.current
-    const urlSnapshot = { ...webPanelUrlsRef.current }
-    webPanelUrlTimerRef.current = setTimeout(async () => {
-      const updated = await window.api.db.updateTask({
-        id,
-        webPanelUrls: urlSnapshot
-      })
-      setTask(updated)
-    }, 500)
-  }, [])
-
   // Editor open files persistence — debounced, ref-based (same pattern as webPanelUrls)
   const editorStateRef = useRef<EditorOpenFilesState | null>(null)
   const editorStateTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -1112,9 +1084,34 @@ export function TaskDetailPage({
     }
   }, [])
 
+  // Initialize from task on load — flush old task's pending saves first
   useEffect(() => {
-    return () => flushPendingEditorSave()
-  }, [flushPendingEditorSave])
+    flushPendingUrlSave()
+    flushPendingEditorSave()
+    taskIdRef.current = task?.id ?? null
+    if (task?.web_panel_urls) webPanelUrlsRef.current = { ...task.web_panel_urls }
+    else webPanelUrlsRef.current = {}
+  }, [task?.id, flushPendingUrlSave, flushPendingEditorSave])
+
+  // Flush pending saves on unmount
+  useEffect(() => {
+    return () => { flushPendingUrlSave(); flushPendingEditorSave() }
+  }, [flushPendingUrlSave, flushPendingEditorSave])
+
+  const handleWebPanelUrlChange = useCallback((panelId: string, url: string) => {
+    if (!taskIdRef.current) return
+    webPanelUrlsRef.current = { ...webPanelUrlsRef.current, [panelId]: url }
+    if (webPanelUrlTimerRef.current) clearTimeout(webPanelUrlTimerRef.current)
+    const id = taskIdRef.current
+    const urlSnapshot = { ...webPanelUrlsRef.current }
+    webPanelUrlTimerRef.current = setTimeout(async () => {
+      const updated = await window.api.db.updateTask({
+        id,
+        webPanelUrls: urlSnapshot
+      })
+      setTask(updated)
+    }, 500)
+  }, [])
 
   const handleEditorStateChange = useCallback((state: EditorOpenFilesState) => {
     editorStateRef.current = state

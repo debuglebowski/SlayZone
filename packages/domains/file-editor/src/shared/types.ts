@@ -12,3 +12,11 @@ export interface ReadFileResult {
   tooLarge?: boolean
   sizeBytes?: number
 }
+
+export interface EditorOpenFilesState {
+  files: string[]
+  activeFile: string | null
+  treeWidth?: number
+  treeVisible?: boolean
+  expandedFolders?: string[]
+}

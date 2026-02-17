@@ -671,6 +671,12 @@ const migrations: Migration[] = [
     up: (db) => {
       db.exec(`ALTER TABLE tasks ADD COLUMN merge_context TEXT DEFAULT NULL`)
     }
+  },
+  {
+    version: 37,
+    up: (db) => {
+      db.exec(`ALTER TABLE tasks ADD COLUMN editor_open_files TEXT DEFAULT NULL`)
+    }
   }
 ]
 

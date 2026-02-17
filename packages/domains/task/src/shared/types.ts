@@ -1,5 +1,6 @@
 import type { TerminalMode } from '@slayzone/terminal/shared'
 import type { BrowserTabsState } from '@slayzone/task-browser/shared'
+import type { EditorOpenFilesState } from '@slayzone/file-editor/shared'
 
 // keep in sync with TASK_STATUS_ORDER in @slayzone/ui
 export const TASK_STATUSES = ['inbox', 'backlog', 'todo', 'in_progress', 'review', 'done'] as const
@@ -142,6 +143,8 @@ export interface Task {
   browser_tabs: BrowserTabsState | null
   // Web panel URLs (JSON) — per-task persistent URLs for custom/predefined web panels
   web_panel_urls: WebPanelUrls | null
+  // Editor panel state (JSON)
+  editor_open_files: EditorOpenFilesState | null
   // Merge mode
   merge_state: MergeState | null
   merge_context: MergeContext | null
@@ -210,6 +213,8 @@ export interface UpdateTaskInput {
   browserTabs?: BrowserTabsState | null
   // Web panel URLs
   webPanelUrls?: WebPanelUrls | null
+  // Editor state
+  editorOpenFiles?: EditorOpenFilesState | null
   // Merge mode
   mergeState?: MergeState | null
   mergeContext?: MergeContext | null
