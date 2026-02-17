@@ -151,7 +151,6 @@ export function OnboardingDialog({
         className="sm:max-w-[460px] p-0 overflow-hidden border-none shadow-none bg-transparent"
         showCloseButton={false}
         onEscapeKeyDown={handleSkip}
-        overlayClassName="bg-white/80 dark:bg-black/60 backdrop-blur-sm"
       >
         <motion.div
           className="bg-background rounded-lg border shadow-lg"
