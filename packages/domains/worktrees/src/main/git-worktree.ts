@@ -1,4 +1,4 @@
-import { execSync } from 'child_process'
+import { execSync, spawnSync } from 'child_process'
 import { existsSync, readFileSync, writeFileSync } from 'fs'
 import path from 'path'
 import { recordDiagnosticEvent } from '@slayzone/diagnostics/main'
@@ -82,6 +82,54 @@ function execGit(command: string, options: Parameters<typeof execSync>[1] & { cw
   }
 }
 
+/** Safe git execution with argument array — prevents shell injection */
+function spawnGit(args: string[], options: { cwd: string }): string {
+  const startedAt = Date.now()
+  const command = `git ${args.join(' ')}`
+  const result = spawnSync('git', args, {
+    cwd: options.cwd,
+    encoding: 'utf-8',
+    stdio: ['pipe', 'pipe', 'pipe'],
+  })
+  if (result.status !== 0) {
+    const error = new Error(result.stderr?.trim() || `git command failed: ${command}`) as Error & {
+      status: number | null; stderr: string; stdout: string
+    }
+    error.status = result.status
+    error.stderr = result.stderr ?? ''
+    error.stdout = result.stdout ?? ''
+    recordDiagnosticEvent({
+      level: 'error',
+      source: 'git',
+      event: 'git.command_failed',
+      message: error.message,
+      payload: {
+        command,
+        cwd: options.cwd,
+        durationMs: Date.now() - startedAt,
+        success: false,
+        exitCode: result.status,
+        stderr: trimOutput(result.stderr),
+        stdout: trimOutput(result.stdout)
+      }
+    })
+    throw error
+  }
+  recordDiagnosticEvent({
+    level: 'info',
+    source: 'git',
+    event: 'git.command',
+    message: command,
+    payload: {
+      command,
+      cwd: options.cwd,
+      durationMs: Date.now() - startedAt,
+      success: true
+    }
+  })
+  return result.stdout
+}
+
 export function isGitRepo(path: string): boolean {
   try {
     execGit('git rev-parse --git-dir', { cwd: path })
@@ -144,12 +192,12 @@ export function detectWorktrees(repoPath: string): DetectedWorktree[] {
 }
 
 export function createWorktree(repoPath: string, targetPath: string, branch?: string): void {
-  const args = branch ? [targetPath, '-b', branch] : [targetPath]
-  execGit(`git worktree add ${args.map(a => `"${a}"`).join(' ')}`, { cwd: repoPath })
+  const args = branch ? ['worktree', 'add', targetPath, '-b', branch] : ['worktree', 'add', targetPath]
+  spawnGit(args, { cwd: repoPath })
 }
 
 export function removeWorktree(repoPath: string, worktreePath: string): void {
-  execGit(`git worktree remove "${worktreePath}" --force`, { cwd: repoPath })
+  spawnGit(['worktree', 'remove', worktreePath, '--force'], { cwd: repoPath })
 }
 
 export function initRepo(path: string): void {
@@ -184,11 +232,11 @@ export function listBranches(path: string): string[] {
 }
 
 export function checkoutBranch(path: string, branch: string): void {
-  execGit(`git checkout "${branch}"`, { cwd: path })
+  spawnGit(['checkout', branch], { cwd: path })
 }
 
 export function createBranch(path: string, branch: string): void {
-  execGit(`git checkout -b "${branch}"`, { cwd: path })
+  spawnGit(['checkout', '-b', branch], { cwd: path })
 }
 
 export function hasUncommittedChanges(path: string): boolean {
@@ -213,12 +261,12 @@ export function mergeIntoParent(
     // Check if we're on parent branch, if not checkout
     const currentBranch = getCurrentBranch(projectPath)
     if (currentBranch !== parentBranch) {
-      execGit(`git checkout "${parentBranch}"`, { cwd: projectPath })
+      spawnGit(['checkout', parentBranch], { cwd: projectPath })
     }
 
     // Attempt merge
     try {
-      execGit(`git merge "${sourceBranch}" --no-ff --no-edit`, { cwd: projectPath })
+      spawnGit(['merge', sourceBranch, '--no-ff', '--no-edit'], { cwd: projectPath })
       return { success: true, merged: true, conflicted: false }
     } catch {
       // Check for merge conflicts
@@ -266,7 +314,7 @@ export function startMergeNoCommit(
   const currentBranch = getCurrentBranch(projectPath)
   if (currentBranch !== parentBranch) {
     try {
-      execGit(`git checkout "${parentBranch}"`, { cwd: projectPath })
+      spawnGit(['checkout', parentBranch], { cwd: projectPath })
     } catch (err) {
       const msg = err instanceof Error && 'stderr' in err ? String((err as { stderr: unknown }).stderr) : String(err)
       throw new Error(`Cannot checkout ${parentBranch}: ${msg.trim()}`)
@@ -275,7 +323,7 @@ export function startMergeNoCommit(
 
   // Attempt merge with --no-commit
   try {
-    execGit(`git merge "${sourceBranch}" --no-commit --no-ff`, { cwd: projectPath })
+    spawnGit(['merge', sourceBranch, '--no-commit', '--no-ff'], { cwd: projectPath })
     // Clean merge - commit it
     execGit(`git commit --no-edit`, { cwd: projectPath })
     return { clean: true, conflictedFiles: [] }
@@ -301,15 +349,15 @@ export function isMergeInProgress(path: string): boolean {
 }
 
 export function stageFile(path: string, filePath: string): void {
-  execGit(`git add -- "${filePath}"`, { cwd: path })
+  spawnGit(['add', '--', filePath], { cwd: path })
 }
 
 export function unstageFile(path: string, filePath: string): void {
-  execGit(`git reset HEAD -- "${filePath}"`, { cwd: path })
+  spawnGit(['reset', 'HEAD', '--', filePath], { cwd: path })
 }
 
 export function discardFile(path: string, filePath: string): void {
-  execGit(`git checkout -- "${filePath}"`, { cwd: path })
+  spawnGit(['checkout', '--', filePath], { cwd: path })
 }
 
 export function stageAll(path: string): void {
@@ -322,10 +370,7 @@ export function unstageAll(path: string): void {
 
 export function getUntrackedFileDiff(repoPath: string, filePath: string): string {
   try {
-    return execGit(`git diff --no-index --no-ext-diff -- /dev/null "${filePath}"`, {
-      cwd: repoPath,
-      encoding: 'utf-8'
-    }) as string
+    return spawnGit(['diff', '--no-index', '--no-ext-diff', '--', '/dev/null', filePath], { cwd: repoPath })
   } catch (err: unknown) {
     // git diff --no-index exits with code 1 when files differ — expected
     const e = err as { stdout?: string }
@@ -382,10 +427,7 @@ export function getWorkingDiff(path: string): GitDiffSnapshot {
 export function getConflictContent(repoPath: string, filePath: string): ConflictFileContent {
   const gitShow = (stage: string): string | null => {
     try {
-      return execGit(`git show ${stage}:"${filePath}"`, {
-        cwd: repoPath,
-        encoding: 'utf-8'
-      }) as string
+      return spawnGit(['show', `${stage}:${filePath}`], { cwd: repoPath })
     } catch {
       return null
     }
@@ -412,7 +454,7 @@ export function writeResolvedFile(repoPath: string, filePath: string, content: s
 }
 
 export function commitFiles(repoPath: string, message: string): void {
-  execGit(`git commit -m "${message.replace(/"/g, '\\"')}"`, { cwd: repoPath })
+  spawnGit(['commit', '-m', message], { cwd: repoPath })
 }
 
 // --- General tab operations ---
@@ -442,10 +484,7 @@ export function getRecentCommits(repoPath: string, count = 5): CommitInfo[] {
 
 export function getAheadBehind(repoPath: string, branch: string, upstream: string): AheadBehind {
   try {
-    const output = execGit(`git rev-list --left-right --count "${upstream}...${branch}"`, {
-      cwd: repoPath,
-      encoding: 'utf-8'
-    }) as string
+    const output = spawnGit(['rev-list', '--left-right', '--count', `${upstream}...${branch}`], { cwd: repoPath })
     const [behind, ahead] = output.trim().split(/\s+/).map(Number)
     return { ahead: ahead || 0, behind: behind || 0 }
   } catch {
@@ -598,10 +637,7 @@ export function getMergeContext(repoPath: string): MergeContext | null {
       try {
         const ontoHash = readFileSync(path.join(dir, 'onto'), 'utf-8').trim()
         // Resolve hash to branch name
-        const name = execGit(`git name-rev --name-only "${ontoHash}"`, {
-          cwd: repoPath,
-          encoding: 'utf-8'
-        }) as string
+        const name = spawnGit(['name-rev', '--name-only', ontoHash], { cwd: repoPath })
         targetBranch = name.trim().replace(/~\d+$/, '')
       } catch { /* fallback */ }
       return { type: 'rebase', sourceBranch, targetBranch }
@@ -612,10 +648,7 @@ export function getMergeContext(repoPath: string): MergeContext | null {
       const targetBranch = getCurrentBranch(repoPath) ?? 'unknown'
       let sourceBranch = 'unknown'
       try {
-        const name = execGit('git name-rev --name-only MERGE_HEAD', {
-          cwd: repoPath,
-          encoding: 'utf-8'
-        }) as string
+        const name = spawnGit(['name-rev', '--name-only', 'MERGE_HEAD'], { cwd: repoPath })
         sourceBranch = name.trim().replace(/~\d+$/, '')
       } catch { /* fallback */ }
       return { type: 'merge', sourceBranch, targetBranch }
