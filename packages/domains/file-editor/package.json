@@ -12,7 +12,7 @@
     "./client": "./src/client/index.ts"
   },
   "scripts": {
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsgo --noEmit"
   },
   "dependencies": {
     "@codemirror/lang-css": "^6.3.1",

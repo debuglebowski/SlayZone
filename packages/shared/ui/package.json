@@ -10,7 +10,7 @@
     "./utils": "./src/utils.ts"
   },
   "scripts": {
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsgo --noEmit"
   },
   "dependencies": {
     "@radix-ui/react-alert-dialog": "^1.1.15",
