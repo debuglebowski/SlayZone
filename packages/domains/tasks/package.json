@@ -23,7 +23,8 @@
     "@dnd-kit/sortable": "^10.0.0",
     "@dnd-kit/utilities": "^3.2.2",
     "framer-motion": "^12.29.0",
-    "lucide-react": "^0.562.0"
+    "lucide-react": "^0.562.0",
+    "react-hotkeys-hook": "^5.2.3"
   },
   "peerDependencies": {
     "react": "^19.0.0"

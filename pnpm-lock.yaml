@@ -602,6 +602,9 @@ importers:
       react:
         specifier: ^19.0.0
         version: 19.2.3
+      react-hotkeys-hook:
+        specifier: ^5.2.3
+        version: 5.2.3(react-dom@19.2.3(react@19.2.3))(react@19.2.3)
     devDependencies:
       '@types/react':
         specifier: ^19.2.7
