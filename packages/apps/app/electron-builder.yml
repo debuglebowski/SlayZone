@@ -1,0 +1,50 @@
+appId: com.slayzone.app
+productName: SlayZone
+directories:
+  buildResources: build
+files:
+  - '!**/.vscode/*'
+  - '!src/*'
+  - '!electron.vite.config.{js,ts,mjs,cjs}'
+  - '!{.eslintcache,eslint.config.mjs,.prettierignore,.prettierrc.yaml,dev-app-update.yml,CHANGELOG.md,README.md}'
+  - '!{.env,.env.*,.npmrc,pnpm-lock.yaml}'
+  - '!{tsconfig.json,tsconfig.node.json,tsconfig.web.json}'
+  - '!**/node_modules/@slayzone/**'
+asarUnpack:
+  - resources/**
+  - '**/node_modules/better-sqlite3/**'
+  - '**/node_modules/node-pty/**'
+win:
+  executableName: slayzone
+nsis:
+  artifactName: ${productName}-setup.${ext}
+  shortcutName: ${productName}
+  uninstallDisplayName: ${productName}
+  createDesktopShortcut: always
+afterPack: build/afterPack.cjs
+mac:
+  identity: null
+  icon: build/icon.icns
+  entitlementsInherit: build/entitlements.mac.plist
+  extendInfo:
+    - NSCameraUsageDescription: Application requests access to the device's camera.
+    - NSMicrophoneUsageDescription: Application requests access to the device's microphone.
+    - NSDocumentsFolderUsageDescription: Application requests access to the user's Documents folder.
+    - NSDownloadsFolderUsageDescription: Application requests access to the user's Downloads folder.
+  notarize: false
+dmg:
+  artifactName: ${productName}.${ext}
+linux:
+  target:
+    - AppImage
+    - deb
+  maintainer: slayzone
+  category: Utility
+deb:
+  artifactName: ${productName}-${arch}.${ext}
+appImage:
+  artifactName: ${productName}.${ext}
+npmRebuild: true
+nativeRebuilder: sequential
+publish:
+  provider: github

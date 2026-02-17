@@ -1,0 +1,21 @@
+{
+  "mcpServers": {
+    "electron": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "electron-mcp-server"
+      ],
+      "env": {
+        "SCREENSHOT_ENCRYPTION_KEY": "1d40711590c908ec04eba35c167eeb3496861b00f8d0f7b8e67c5e1d9043bd22"
+      }
+    },
+    "context7": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@upstash/context7-mcp@latest"
+      ]
+    }
+  }
+}

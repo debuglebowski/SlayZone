@@ -1,0 +1,38 @@
+{
+  "name": "@slayzone/terminal",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./shared": "./src/shared/index.ts",
+    "./main": "./src/main/index.ts",
+    "./client": "./src/client/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@slayzone/diagnostics": "workspace:*",
+    "@slayzone/telemetry": "workspace:*",
+    "@slayzone/settings": "workspace:*",
+    "@slayzone/ui": "workspace:*",
+    "@xterm/addon-fit": "^0.11.0",
+    "@xterm/addon-search": "^0.16.0",
+    "@xterm/addon-serialize": "^0.14.0",
+    "@xterm/xterm": "^6.0.0",
+    "lucide-react": "^0.562.0",
+    "node-pty": "^1.1.0"
+  },
+  "peerDependencies": {
+    "electron": "^39.0.0",
+    "react": "^19.0.0"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/react": "^19.2.7",
+    "typescript": "^5.9.3"
+  }
+}

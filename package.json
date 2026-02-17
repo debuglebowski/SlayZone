@@ -1,0 +1,47 @@
+{
+  "name": "slayzone-monorepo",
+  "private": true,
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "better-sqlite3",
+      "electron",
+      "esbuild",
+      "node-pty"
+    ]
+  },
+  "scripts": {
+    "postinstall": "node -e \"if(!process.env.CI_SKIP_POSTINSTALL)require('child_process').execSync('electron-rebuild -f -w better-sqlite3,node-pty',{stdio:'inherit'})\"",
+    "dev": "pnpm --filter @slayzone/app dev",
+    "generate-icons": "node scripts/generate-icons.js",
+    "patch-electron-name": "node scripts/patch-electron-name.js",
+    "reset-mac-icon-cache": "bash scripts/reset-mac-icon-cache.sh",
+    "build": "pnpm --filter @slayzone/app build",
+    "build:mac": "pnpm --filter @slayzone/app build:mac",
+    "build:win": "pnpm --filter @slayzone/app build:win",
+    "build:linux": "pnpm --filter @slayzone/app build:linux",
+    "typecheck": "pnpm -r typecheck",
+    "lint": "pnpm -r lint",
+    "lint:deps": "knip --include dependencies,unlisted",
+    "format": "prettier --write .",
+    "test:e2e": "pnpm --filter @slayzone/app test:e2e",
+    "changelog": "changelogen --output CHANGELOG.md",
+    "release:patch": "pnpm --filter @slayzone/app exec npm version patch && pnpm release:tag",
+    "release:minor": "pnpm --filter @slayzone/app exec npm version minor && pnpm release:tag",
+    "release:major": "pnpm --filter @slayzone/app exec npm version major && pnpm release:tag",
+    "release:tag": "bash scripts/tag-release.sh"
+  },
+  "devDependencies": {
+    "changelogen": "^0.6.2",
+    "knip": "^5.83.1",
+    "png-to-ico": "^3.0.1",
+    "prettier": "^3.7.4",
+    "sharp": "^0.34.5",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3"
+  },
+  "engines": {
+    "node": ">=20",
+    "pnpm": ">=9"
+  },
+  "version": "0.1.30"
+}

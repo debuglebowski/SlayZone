@@ -1,0 +1,47 @@
+{
+  "name": "@slayzone/task",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./shared": "./src/shared/index.ts",
+    "./main": "./src/main/index.ts",
+    "./client": "./src/client/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@slayzone/diagnostics": "workspace:*",
+    "@slayzone/ui": "workspace:*",
+    "@slayzone/editor": "workspace:*",
+    "@slayzone/file-editor": "workspace:*",
+    "@slayzone/integrations": "workspace:*",
+    "@slayzone/terminal": "workspace:*",
+    "@slayzone/task-terminals": "workspace:*",
+    "@slayzone/projects": "workspace:*",
+    "@slayzone/tags": "workspace:*",
+    "@slayzone/worktrees": "workspace:*",
+    "@slayzone/task-browser": "workspace:*",
+    "@dnd-kit/core": "^6.3.1",
+    "@dnd-kit/sortable": "^10.0.0",
+    "@dnd-kit/utilities": "^3.2.2",
+    "@hookform/resolvers": "^5.2.2",
+    "react-hook-form": "^7.71.1",
+    "date-fns": "^4.1.0",
+    "lucide-react": "^0.562.0",
+    "zod": "^4.3.5"
+  },
+  "peerDependencies": {
+    "electron": "^39.0.0",
+    "react": "^19.0.0"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/react": "^19.2.7",
+    "typescript": "^5.9.3"
+  }
+}
