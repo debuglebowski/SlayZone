@@ -5,9 +5,9 @@
 <h1 align="center">SlayZone</h1>
 
 <p align="center">
-  <strong>Mission control for your AI coding agents.</strong>
+  <strong>Kanban with terminals. Card → Terminal → Agent.</strong>
   <br />
-  Manage all your agents from one place — scoped to tasks, tracked automatically.
+  Every card hides a terminal, a browser, git management, worktree, and much more. Agent management for humans.
 </p>
 
 <br />
@@ -26,21 +26,29 @@
 
 <br />
 
-### &nbsp;&#x1F916;&nbsp; Run any number of agents per task
+### &nbsp;&#x1F916;&nbsp; Integrated AI agents
 
-Each task contains one or more integrated terminals. Spin up Claude Code, Codex, or a plain shell — run as many as you need. One agent researching, one coding, one testing, all inside the same task. Real PTY sessions, not sandboxed previews.
+Claude Code, Codex, Gemini, and more — running inside task terminals. Spin up as many as you need per task. Real PTY sessions, not sandboxed previews.
+
+### &nbsp;&#x267B;&#xFE0F;&nbsp; Kanban board
+
+Drag-and-drop tasks, priorities, tags, sub-tasks — all stored in local SQLite.
+
+### &nbsp;&#x1F310;&nbsp; Embedded browser panels
+
+Docs, PRs, and previews inside tasks — without leaving the app.
 
 ### &nbsp;&#x1F50D;&nbsp; Automatic status tracking
 
-SlayZone watches your agents and tracks each task's status automatically — idle, working, or waiting for your input. No more switching between terminals to check what's happening.
+SlayZone watches your agents and tracks each task's status automatically — idle, working, or waiting for input.
 
-### &nbsp;&#x1F310;&nbsp; Built-in browser
+### &nbsp;&#x1F33F;&nbsp; Git worktree per task
 
-Each task has an inline browser with multiple tabs. Preview what your agents are building without leaving the app.
+Isolated branches with built-in diff, conflict resolution, and commit UI. One branch per task, no more stashing half-finished work.
 
-### &nbsp;&#x1F33F;&nbsp; Git worktrees, per task
+### &nbsp;&#x1F512;&nbsp; Fully local
 
-Link a git worktree to any task. One branch per task, automatic isolation, view diffs, stage changes, merge when done. No more stashing half-finished work.
+Your agents run locally on your machine — SlayZone is just the interface.
 
 <br />
 
