@@ -1,0 +1,367 @@
+import { contextBridge, ipcRenderer } from 'electron'
+import type { ElectronAPI } from '@slayzone/types'
+import type { TerminalState, PromptInfo } from '@slayzone/terminal/shared'
+
+// Custom APIs for renderer
+const api: ElectronAPI = {
+  ai: {
+    generateDescription: (title, mode) => ipcRenderer.invoke('ai:generate-description', title, mode)
+  },
+  db: {
+    // Projects
+    getProjects: () => ipcRenderer.invoke('db:projects:getAll'),
+    createProject: (data) => ipcRenderer.invoke('db:projects:create', data),
+    updateProject: (data) => ipcRenderer.invoke('db:projects:update', data),
+    deleteProject: (id) => ipcRenderer.invoke('db:projects:delete', id),
+
+    // Tasks
+    getTasks: () => ipcRenderer.invoke('db:tasks:getAll'),
+    getTasksByProject: (projectId) => ipcRenderer.invoke('db:tasks:getByProject', projectId),
+    getTask: (id) => ipcRenderer.invoke('db:tasks:get', id),
+    getSubTasks: (parentId) => ipcRenderer.invoke('db:tasks:getSubTasks', parentId),
+    createTask: (data) => ipcRenderer.invoke('db:tasks:create', data),
+    updateTask: (data) => ipcRenderer.invoke('db:tasks:update', data),
+    deleteTask: (id) => ipcRenderer.invoke('db:tasks:delete', id),
+    archiveTask: (id) => ipcRenderer.invoke('db:tasks:archive', id),
+    archiveTasks: (ids) => ipcRenderer.invoke('db:tasks:archiveMany', ids),
+    unarchiveTask: (id) => ipcRenderer.invoke('db:tasks:unarchive', id),
+    getArchivedTasks: () => ipcRenderer.invoke('db:tasks:getArchived'),
+    reorderTasks: (taskIds) => ipcRenderer.invoke('db:tasks:reorder', taskIds)
+  },
+  tags: {
+    getTags: () => ipcRenderer.invoke('db:tags:getAll'),
+    createTag: (data) => ipcRenderer.invoke('db:tags:create', data),
+    updateTag: (data) => ipcRenderer.invoke('db:tags:update', data),
+    deleteTag: (id) => ipcRenderer.invoke('db:tags:delete', id)
+  },
+  taskTags: {
+    getTagsForTask: (taskId) => ipcRenderer.invoke('db:taskTags:getForTask', taskId),
+    setTagsForTask: (taskId, tagIds) => ipcRenderer.invoke('db:taskTags:setForTask', taskId, tagIds)
+  },
+  taskDependencies: {
+    getBlockers: (taskId) => ipcRenderer.invoke('db:taskDependencies:getBlockers', taskId),
+    getBlocking: (taskId) => ipcRenderer.invoke('db:taskDependencies:getBlocking', taskId),
+    addBlocker: (taskId, blockerTaskId) =>
+      ipcRenderer.invoke('db:taskDependencies:addBlocker', taskId, blockerTaskId),
+    removeBlocker: (taskId, blockerTaskId) =>
+      ipcRenderer.invoke('db:taskDependencies:removeBlocker', taskId, blockerTaskId),
+    setBlockers: (taskId, blockerTaskIds) =>
+      ipcRenderer.invoke('db:taskDependencies:setBlockers', taskId, blockerTaskIds)
+  },
+  settings: {
+    get: (key) => ipcRenderer.invoke('db:settings:get', key),
+    set: (key, value) => ipcRenderer.invoke('db:settings:set', key, value),
+    getAll: () => ipcRenderer.invoke('db:settings:getAll')
+  },
+  claude: {
+    checkAvailability: () => ipcRenderer.invoke('claude:check-availability')
+  },
+  theme: {
+    getEffective: () => ipcRenderer.invoke('theme:get-effective'),
+    getSource: () => ipcRenderer.invoke('theme:get-source'),
+    set: (theme: 'light' | 'dark' | 'system') => ipcRenderer.invoke('theme:set', theme),
+    onChange: (callback: (theme: 'light' | 'dark') => void) => {
+      const handler = (_event: unknown, theme: 'light' | 'dark') => callback(theme)
+      ipcRenderer.on('theme:changed', handler)
+      return () => ipcRenderer.removeListener('theme:changed', handler)
+    }
+  },
+  shell: {
+    openExternal: (url: string) => ipcRenderer.invoke('shell:open-external', url)
+  },
+  dialog: {
+    showOpenDialog: (options) => ipcRenderer.invoke('dialog:showOpenDialog', options)
+  },
+  app: {
+    getVersion: () => ipcRenderer.invoke('app:getVersion'),
+    onGoHome: (callback: () => void) => {
+      const handler = () => callback()
+      ipcRenderer.on('app:go-home', handler)
+      return () => ipcRenderer.removeListener('app:go-home', handler)
+    },
+    onOpenSettings: (callback: () => void) => {
+      const handler = () => callback()
+      ipcRenderer.on('app:open-settings', handler)
+      return () => ipcRenderer.removeListener('app:open-settings', handler)
+    },
+    onOpenProjectSettings: (callback: () => void) => {
+      const handler = () => callback()
+      ipcRenderer.on('app:open-project-settings', handler)
+      return () => ipcRenderer.removeListener('app:open-project-settings', handler)
+    },
+    onTasksChanged: (callback: () => void) => {
+      const handler = () => callback()
+      ipcRenderer.on('tasks:changed', handler)
+      return () => ipcRenderer.removeListener('tasks:changed', handler)
+    },
+    onCloseTask: (callback: (taskId: string) => void) => {
+      const handler = (_: unknown, taskId: string) => callback(taskId)
+      ipcRenderer.on('app:close-task', handler)
+      return () => ipcRenderer.removeListener('app:close-task', handler)
+    },
+    onOpenTask: (callback: (taskId: string) => void) => {
+      const handler = (_: unknown, taskId: string) => callback(taskId)
+      ipcRenderer.on('app:open-task', handler)
+      return () => ipcRenderer.removeListener('app:open-task', handler)
+    },
+    onScreenshotTrigger: (callback: () => void) => {
+      const handler = () => callback()
+      ipcRenderer.on('app:screenshot-trigger', handler)
+      return () => ipcRenderer.removeListener('app:screenshot-trigger', handler)
+    }
+  },
+  window: {
+    close: () => ipcRenderer.invoke('window:close')
+  },
+  files: {
+    saveTempImage: (base64, mimeType) => ipcRenderer.invoke('files:saveTempImage', base64, mimeType),
+    pathExists: (path) => ipcRenderer.invoke('files:pathExists', path)
+  },
+  pty: {
+    create: (sessionId, cwd, conversationId, existingConversationId, mode, initialPrompt, codeMode, providerFlags) =>
+      ipcRenderer.invoke('pty:create', sessionId, cwd, conversationId, existingConversationId, mode, initialPrompt, codeMode, providerFlags),
+    write: (sessionId, data) => ipcRenderer.invoke('pty:write', sessionId, data),
+    resize: (sessionId, cols, rows) => ipcRenderer.invoke('pty:resize', sessionId, cols, rows),
+    kill: (sessionId) => ipcRenderer.invoke('pty:kill', sessionId),
+    exists: (sessionId) => ipcRenderer.invoke('pty:exists', sessionId),
+    getBuffer: (sessionId) => ipcRenderer.invoke('pty:getBuffer', sessionId),
+    clearBuffer: (sessionId) => ipcRenderer.invoke('pty:clearBuffer', sessionId),
+    getBufferSince: (sessionId, afterSeq) => ipcRenderer.invoke('pty:getBufferSince', sessionId, afterSeq),
+    list: () => ipcRenderer.invoke('pty:list'),
+    dismissAllNotifications: () => ipcRenderer.invoke('pty:dismissAllNotifications'),
+    onData: (callback: (sessionId: string, data: string, seq: number) => void) => {
+      const handler = (_event: unknown, sessionId: string, data: string, seq: number) => callback(sessionId, data, seq)
+      ipcRenderer.on('pty:data', handler)
+      return () => ipcRenderer.removeListener('pty:data', handler)
+    },
+    onExit: (callback: (sessionId: string, exitCode: number) => void) => {
+      const handler = (_event: unknown, sessionId: string, exitCode: number) =>
+        callback(sessionId, exitCode)
+      ipcRenderer.on('pty:exit', handler)
+      return () => ipcRenderer.removeListener('pty:exit', handler)
+    },
+    onSessionNotFound: (callback: (sessionId: string) => void) => {
+      const handler = (_event: unknown, sessionId: string) => callback(sessionId)
+      ipcRenderer.on('pty:session-not-found', handler)
+      return () => ipcRenderer.removeListener('pty:session-not-found', handler)
+    },
+    onAttention: (callback: (sessionId: string) => void) => {
+      const handler = (_event: unknown, sessionId: string) => callback(sessionId)
+      ipcRenderer.on('pty:attention', handler)
+      return () => ipcRenderer.removeListener('pty:attention', handler)
+    },
+    onStateChange: (
+      callback: (sessionId: string, newState: TerminalState, oldState: TerminalState) => void
+    ) => {
+      const handler = (
+        _event: unknown,
+        sessionId: string,
+        newState: TerminalState,
+        oldState: TerminalState
+      ) => callback(sessionId, newState, oldState)
+      ipcRenderer.on('pty:state-change', handler)
+      return () => ipcRenderer.removeListener('pty:state-change', handler)
+    },
+    onPrompt: (callback: (sessionId: string, prompt: PromptInfo) => void) => {
+      const handler = (_event: unknown, sessionId: string, prompt: PromptInfo) =>
+        callback(sessionId, prompt)
+      ipcRenderer.on('pty:prompt', handler)
+      return () => ipcRenderer.removeListener('pty:prompt', handler)
+    },
+    onSessionDetected: (callback: (sessionId: string, conversationId: string) => void) => {
+      const handler = (_event: unknown, sessionId: string, conversationId: string) =>
+        callback(sessionId, conversationId)
+      ipcRenderer.on('pty:session-detected', handler)
+      return () => ipcRenderer.removeListener('pty:session-detected', handler)
+    },
+    onDevServerDetected: (callback: (sessionId: string, url: string) => void) => {
+      const handler = (_event: unknown, sessionId: string, url: string) =>
+        callback(sessionId, url)
+      ipcRenderer.on('pty:dev-server-detected', handler)
+      return () => ipcRenderer.removeListener('pty:dev-server-detected', handler)
+    },
+    getState: (sessionId: string) => ipcRenderer.invoke('pty:getState', sessionId)
+  },
+  git: {
+    isGitRepo: (path) => ipcRenderer.invoke('git:isGitRepo', path),
+    detectWorktrees: (repoPath) => ipcRenderer.invoke('git:detectWorktrees', repoPath),
+    createWorktree: (repoPath, targetPath, branch) =>
+      ipcRenderer.invoke('git:createWorktree', repoPath, targetPath, branch),
+    removeWorktree: (repoPath, worktreePath) =>
+      ipcRenderer.invoke('git:removeWorktree', repoPath, worktreePath),
+    init: (path) => ipcRenderer.invoke('git:init', path),
+    getCurrentBranch: (path) => ipcRenderer.invoke('git:getCurrentBranch', path),
+    listBranches: (path) => ipcRenderer.invoke('git:listBranches', path),
+    checkoutBranch: (path, branch) => ipcRenderer.invoke('git:checkoutBranch', path, branch),
+    createBranch: (path, branch) => ipcRenderer.invoke('git:createBranch', path, branch),
+    hasUncommittedChanges: (path) => ipcRenderer.invoke('git:hasUncommittedChanges', path),
+    mergeIntoParent: (projectPath, parentBranch, sourceBranch) =>
+      ipcRenderer.invoke('git:mergeIntoParent', projectPath, parentBranch, sourceBranch),
+    abortMerge: (path) => ipcRenderer.invoke('git:abortMerge', path),
+    mergeWithAI: (projectPath, worktreePath, parentBranch, sourceBranch) =>
+      ipcRenderer.invoke('git:mergeWithAI', projectPath, worktreePath, parentBranch, sourceBranch),
+    isMergeInProgress: (path) => ipcRenderer.invoke('git:isMergeInProgress', path),
+    getConflictedFiles: (path) => ipcRenderer.invoke('git:getConflictedFiles', path),
+    getWorkingDiff: (path) => ipcRenderer.invoke('git:getWorkingDiff', path),
+    stageFile: (path, filePath) => ipcRenderer.invoke('git:stageFile', path, filePath),
+    unstageFile: (path, filePath) => ipcRenderer.invoke('git:unstageFile', path, filePath),
+    discardFile: (path, filePath) => ipcRenderer.invoke('git:discardFile', path, filePath),
+    stageAll: (path) => ipcRenderer.invoke('git:stageAll', path),
+    unstageAll: (path) => ipcRenderer.invoke('git:unstageAll', path),
+    getUntrackedFileDiff: (repoPath, filePath) => ipcRenderer.invoke('git:getUntrackedFileDiff', repoPath, filePath),
+    getConflictContent: (repoPath, filePath) => ipcRenderer.invoke('git:getConflictContent', repoPath, filePath),
+    writeResolvedFile: (repoPath, filePath, content) => ipcRenderer.invoke('git:writeResolvedFile', repoPath, filePath, content),
+    commitFiles: (repoPath, message) => ipcRenderer.invoke('git:commitFiles', repoPath, message),
+    analyzeConflict: (mode, filePath, base, ours, theirs) =>
+      ipcRenderer.invoke('git:analyzeConflict', mode, filePath, base, ours, theirs),
+    isRebaseInProgress: (path) => ipcRenderer.invoke('git:isRebaseInProgress', path),
+    getRebaseProgress: (repoPath) => ipcRenderer.invoke('git:getRebaseProgress', repoPath),
+    abortRebase: (path) => ipcRenderer.invoke('git:abortRebase', path),
+    continueRebase: (path) => ipcRenderer.invoke('git:continueRebase', path),
+    skipRebaseCommit: (path) => ipcRenderer.invoke('git:skipRebaseCommit', path),
+    getMergeContext: (repoPath) => ipcRenderer.invoke('git:getMergeContext', repoPath),
+    getRecentCommits: (repoPath, count) => ipcRenderer.invoke('git:getRecentCommits', repoPath, count),
+    getAheadBehind: (repoPath, branch, upstream) => ipcRenderer.invoke('git:getAheadBehind', repoPath, branch, upstream),
+    getStatusSummary: (repoPath) => ipcRenderer.invoke('git:getStatusSummary', repoPath)
+  },
+  tabs: {
+    list: (taskId) => ipcRenderer.invoke('tabs:list', taskId),
+    create: (input) => ipcRenderer.invoke('tabs:create', input),
+    update: (input) => ipcRenderer.invoke('tabs:update', input),
+    delete: (tabId) => ipcRenderer.invoke('tabs:delete', tabId),
+    ensureMain: (taskId, mode) => ipcRenderer.invoke('tabs:ensureMain', taskId, mode)
+  },
+  diagnostics: {
+    getConfig: () => ipcRenderer.invoke('diagnostics:getConfig'),
+    setConfig: (config) => ipcRenderer.invoke('diagnostics:setConfig', config),
+    export: (request) => ipcRenderer.invoke('diagnostics:export', request),
+    recordClientError: (input) => ipcRenderer.invoke('diagnostics:recordClientError', input),
+    recordClientEvent: (input) => ipcRenderer.invoke('diagnostics:recordClientEvent', input)
+  },
+  aiConfig: {
+    listItems: (input) => ipcRenderer.invoke('ai-config:list-items', input),
+    getItem: (id) => ipcRenderer.invoke('ai-config:get-item', id),
+    createItem: (input) => ipcRenderer.invoke('ai-config:create-item', input),
+    updateItem: (input) => ipcRenderer.invoke('ai-config:update-item', input),
+    deleteItem: (id) => ipcRenderer.invoke('ai-config:delete-item', id),
+    listProjectSelections: (projectId) => ipcRenderer.invoke('ai-config:list-project-selections', projectId),
+    setProjectSelection: (input) => ipcRenderer.invoke('ai-config:set-project-selection', input),
+    removeProjectSelection: (projectId, itemId) =>
+      ipcRenderer.invoke('ai-config:remove-project-selection', projectId, itemId),
+    discoverContextFiles: (projectPath) => ipcRenderer.invoke('ai-config:discover-context-files', projectPath),
+    readContextFile: (filePath, projectPath) => ipcRenderer.invoke('ai-config:read-context-file', filePath, projectPath),
+    writeContextFile: (filePath, content, projectPath) =>
+      ipcRenderer.invoke('ai-config:write-context-file', filePath, content, projectPath),
+    getContextTree: (projectPath, projectId) =>
+      ipcRenderer.invoke('ai-config:get-context-tree', projectPath, projectId),
+    loadGlobalItem: (input) => ipcRenderer.invoke('ai-config:load-global-item', input),
+    syncLinkedFile: (projectId, projectPath, itemId) =>
+      ipcRenderer.invoke('ai-config:sync-linked-file', projectId, projectPath, itemId),
+    unlinkFile: (projectId, itemId) => ipcRenderer.invoke('ai-config:unlink-file', projectId, itemId),
+    renameContextFile: (oldPath, newPath, projectPath) =>
+      ipcRenderer.invoke('ai-config:rename-context-file', oldPath, newPath, projectPath),
+    deleteContextFile: (filePath, projectPath, projectId) =>
+      ipcRenderer.invoke('ai-config:delete-context-file', filePath, projectPath, projectId),
+    discoverMcpConfigs: (projectPath) =>
+      ipcRenderer.invoke('ai-config:discover-mcp-configs', projectPath),
+    writeMcpServer: (input) =>
+      ipcRenderer.invoke('ai-config:write-mcp-server', input),
+    removeMcpServer: (input) =>
+      ipcRenderer.invoke('ai-config:remove-mcp-server', input),
+    listProviders: () =>
+      ipcRenderer.invoke('ai-config:list-providers'),
+    toggleProvider: (id, enabled) =>
+      ipcRenderer.invoke('ai-config:toggle-provider', id, enabled),
+    getProjectProviders: (projectId) =>
+      ipcRenderer.invoke('ai-config:get-project-providers', projectId),
+    setProjectProviders: (projectId, providers) =>
+      ipcRenderer.invoke('ai-config:set-project-providers', projectId, providers),
+    needsSync: (projectId, projectPath) =>
+      ipcRenderer.invoke('ai-config:needs-sync', projectId, projectPath),
+    syncAll: (input) =>
+      ipcRenderer.invoke('ai-config:sync-all', input),
+    checkSyncStatus: (projectId, projectPath) =>
+      ipcRenderer.invoke('ai-config:check-sync-status', projectId, projectPath),
+    getGlobalInstructions: () =>
+      ipcRenderer.invoke('ai-config:get-global-instructions'),
+    saveGlobalInstructions: (content) =>
+      ipcRenderer.invoke('ai-config:save-global-instructions', content),
+    getRootInstructions: (projectId, projectPath) =>
+      ipcRenderer.invoke('ai-config:get-root-instructions', projectId, projectPath),
+    saveRootInstructions: (projectId, projectPath, content) =>
+      ipcRenderer.invoke('ai-config:save-root-instructions', projectId, projectPath, content),
+    getProjectSkillsStatus: (projectId, projectPath) =>
+      ipcRenderer.invoke('ai-config:get-project-skills-status', projectId, projectPath),
+    getGlobalFiles: () => ipcRenderer.invoke('ai-config:get-global-files')
+  },
+  fs: {
+    readDir: (rootPath, dirPath) => ipcRenderer.invoke('fs:readDir', rootPath, dirPath),
+    readFile: (rootPath, filePath, force) => ipcRenderer.invoke('fs:readFile', rootPath, filePath, force),
+    writeFile: (rootPath, filePath, content) => ipcRenderer.invoke('fs:writeFile', rootPath, filePath, content),
+    createFile: (rootPath, filePath) => ipcRenderer.invoke('fs:createFile', rootPath, filePath),
+    createDir: (rootPath, dirPath) => ipcRenderer.invoke('fs:createDir', rootPath, dirPath),
+    rename: (rootPath, oldPath, newPath) => ipcRenderer.invoke('fs:rename', rootPath, oldPath, newPath),
+    delete: (rootPath, targetPath) => ipcRenderer.invoke('fs:delete', rootPath, targetPath),
+    listAllFiles: (rootPath) => ipcRenderer.invoke('fs:listAllFiles', rootPath),
+    watch: (rootPath) => ipcRenderer.invoke('fs:watch', rootPath),
+    unwatch: (rootPath) => ipcRenderer.invoke('fs:unwatch', rootPath),
+    onFileChanged: (callback) => {
+      const handler = (_event: unknown, rootPath: string, relPath: string) => callback(rootPath, relPath)
+      ipcRenderer.on('fs:changed', handler)
+      return () => ipcRenderer.removeListener('fs:changed', handler)
+    }
+  },
+  usage: {
+    fetch: () => ipcRenderer.invoke('usage:fetch')
+  },
+  screenshot: {
+    captureRegion: (rect) => ipcRenderer.invoke('screenshot:captureRegion', rect)
+  },
+  webview: {
+    enableDeviceEmulation: (webviewId, params) =>
+      ipcRenderer.invoke('webview:enable-device-emulation', webviewId, params),
+    disableDeviceEmulation: (webviewId) =>
+      ipcRenderer.invoke('webview:disable-device-emulation', webviewId),
+  },
+  exportImport: {
+    exportAll: () => ipcRenderer.invoke('export-import:export-all'),
+    exportProject: (projectId) => ipcRenderer.invoke('export-import:export-project', projectId),
+    import: () => ipcRenderer.invoke('export-import:import')
+  },
+  integrations: {
+    connectLinear: (input) => ipcRenderer.invoke('integrations:connect-linear', input),
+    listConnections: (provider) => ipcRenderer.invoke('integrations:list-connections', provider),
+    disconnect: (connectionId) => ipcRenderer.invoke('integrations:disconnect', connectionId),
+    listLinearTeams: (connectionId) => ipcRenderer.invoke('integrations:list-linear-teams', connectionId),
+    listLinearProjects: (connectionId, teamId) =>
+      ipcRenderer.invoke('integrations:list-linear-projects', connectionId, teamId),
+    listLinearIssues: (input) => ipcRenderer.invoke('integrations:list-linear-issues', input),
+    setProjectMapping: (input) => ipcRenderer.invoke('integrations:set-project-mapping', input),
+    getProjectMapping: (projectId, provider) =>
+      ipcRenderer.invoke('integrations:get-project-mapping', projectId, provider),
+    importLinearIssues: (input) => ipcRenderer.invoke('integrations:import-linear-issues', input),
+    syncNow: (input) => ipcRenderer.invoke('integrations:sync-now', input),
+    getLink: (taskId, provider) => ipcRenderer.invoke('integrations:get-link', taskId, provider),
+    unlinkTask: (taskId, provider) => ipcRenderer.invoke('integrations:unlink-task', taskId, provider)
+  }
+}
+
+// Use `contextBridge` APIs to expose Electron APIs to
+// renderer only if context isolation is enabled, otherwise
+// just add to the DOM global.
+if (process.contextIsolated) {
+  try {
+    contextBridge.exposeInMainWorld('api', api)
+    // Test-only: generic IPC invoke for test channels not in the typed API
+    if (process.env.PLAYWRIGHT === '1') {
+      contextBridge.exposeInMainWorld('__testInvoke', (channel: string, ...args: unknown[]) =>
+        ipcRenderer.invoke(channel, ...args)
+      )
+    }
+  } catch (error) {
+    console.error(error)
+  }
+} else {
+  // @ts-ignore (define in dts)
+  window.api = api
+}

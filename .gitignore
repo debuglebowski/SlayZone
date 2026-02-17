@@ -1,0 +1,27 @@
+node_modules
+dist
+out
+.DS_Store
+.eslintcache
+*.log*
+*.tsbuildinfo
+logs/
+
+# Environment
+.env
+.env.local
+
+# Auto Claude data directory
+.auto-claude/
+
+# Local Claude settings
+.claude/settings.local.json
+
+# Generated icon intermediates
+packages/apps/app/build/icon.iconset/
+
+# Playwright
+test-results/
+playwright-report/
+.e2e-userdata/
+.e2e-runtime/

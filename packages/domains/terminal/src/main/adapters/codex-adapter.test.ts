@@ -1,0 +1,85 @@
+/**
+ * Tests for CodexAdapter activity detection
+ * Run with: npx tsx packages/domains/terminal/src/main/adapters/codex-adapter.test.ts
+ */
+import { CodexAdapter } from './codex-adapter'
+
+const adapter = new CodexAdapter()
+
+function test(name: string, fn: () => void) {
+  try {
+    fn()
+    console.log(`✓ ${name}`)
+  } catch (e) {
+    console.log(`✗ ${name}`)
+    console.error(`  ${e}`)
+    process.exitCode = 1
+  }
+}
+
+function expect(actual: unknown) {
+  return {
+    toBe(expected: unknown) {
+      if (actual !== expected) throw new Error(`Expected ${JSON.stringify(expected)}, got ${JSON.stringify(actual)}`)
+    }
+  }
+}
+
+console.log('\nCodexAdapter.detectActivity\n')
+
+test('detects "esc to interrupt" as working', () => {
+  const data = '• Planning typecheck and minor updates (3m 37s • esc to interrupt)'
+  expect(adapter.detectActivity(data, 'unknown')).toBe('working')
+})
+
+test('detects "esc to interrupt" with ANSI codes as working', () => {
+  const data = '\x1b[1m• Planning\x1b[0m (1m 2s • \x1b[2mesc to interrupt\x1b[0m)'
+  expect(adapter.detectActivity(data, 'unknown')).toBe('working')
+})
+
+test('detects "esc to interrupt" case-insensitively', () => {
+  expect(adapter.detectActivity('Esc to interrupt', 'unknown')).toBe('working')
+  expect(adapter.detectActivity('ESC TO INTERRUPT', 'unknown')).toBe('working')
+})
+
+test('keeps working latched when chunk lacks indicator', () => {
+  expect(adapter.detectActivity('Some output without the indicator', 'working')).toBe(null)
+})
+
+test('returns null for text when not currently working', () => {
+  expect(adapter.detectActivity('Some random text', 'unknown')).toBe(null)
+  expect(adapter.detectActivity('Some random text', 'attention')).toBe(null)
+})
+
+test('returns null for whitespace-only output when working', () => {
+  expect(adapter.detectActivity('   \n\r  ', 'working')).toBe(null)
+})
+
+test('"esc to interrupt" takes priority even when currently working', () => {
+  const data = '• Editing files (5s • esc to interrupt)'
+  expect(adapter.detectActivity(data, 'working')).toBe('working')
+})
+
+test('detects alternative working indicator phrases', () => {
+  expect(adapter.detectActivity('Escape to cancel', 'unknown')).toBe('working')
+  expect(adapter.detectActivity('Ctrl+C to stop', 'unknown')).toBe('working')
+})
+
+console.log('\nCodexAdapter.buildSpawnConfig\n')
+
+test('starts fresh codex session by default', () => {
+  const result = adapter.buildSpawnConfig('/tmp')
+  expect(result.postSpawnCommand).toBe('codex')
+})
+
+test('resumes codex session when existing conversation ID is provided', () => {
+  const result = adapter.buildSpawnConfig('/tmp', '11111111-2222-4333-8444-555555555555', true)
+  expect(result.postSpawnCommand).toBe("codex resume '11111111-2222-4333-8444-555555555555'")
+})
+
+test('includes provider flags while resuming', () => {
+  const result = adapter.buildSpawnConfig('/tmp', 'thread-123', true, undefined, undefined, ['--search'])
+  expect(result.postSpawnCommand).toBe("codex resume 'thread-123' '--search'")
+})
+
+console.log('\nDone\n')
