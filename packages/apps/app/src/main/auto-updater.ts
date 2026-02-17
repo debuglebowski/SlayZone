@@ -1,25 +1,30 @@
 import { dialog, app } from 'electron'
 import { is } from '@electron-toolkit/utils'
+// electron-updater is CJS. electron-vite v5 outputs ESM for main, and Node's
+// CJS→ESM interop doesn't detect Object.defineProperty getters as named exports.
+// A default import gives us the raw CJS exports object where the getter works.
+import electronUpdater from 'electron-updater'
 
-// Lazy-loaded to avoid blocking startup
-let _autoUpdater: typeof import('electron-updater').autoUpdater | null = null
-async function getAutoUpdater() {
-  if (!_autoUpdater) {
-    const pkg = await import('electron-updater')
-    _autoUpdater = pkg.autoUpdater
-    _autoUpdater.autoDownload = false
-    _autoUpdater.autoInstallOnAppQuit = true
-    _autoUpdater.on('error', (err) => console.error('[updater] error:', err.message))
-    _autoUpdater.on('update-available', (info) => console.log('[updater] update available:', info.version))
-    _autoUpdater.on('update-downloaded', (info) => console.log('[updater] downloaded:', info.version))
+let autoUpdater: typeof electronUpdater.autoUpdater | null = null
+function getAutoUpdater() {
+  if (!autoUpdater) {
+    autoUpdater = electronUpdater.autoUpdater
+    autoUpdater.autoDownload = false
+    autoUpdater.autoInstallOnAppQuit = true
+    autoUpdater.on('error', (err) => console.error('[updater] error:', err.message))
+    autoUpdater.on('update-available', (info) => console.log('[updater] update available:', info.version))
+    autoUpdater.on('update-downloaded', (info) => console.log('[updater] downloaded:', info.version))
   }
-  return _autoUpdater
+  return autoUpdater
 }
 
-export async function initAutoUpdater(): Promise<void> {
+export function initAutoUpdater(): void {
   if (is.dev) return
-  const autoUpdater = await getAutoUpdater()
-  autoUpdater.checkForUpdatesAndNotify()
+  try {
+    getAutoUpdater().checkForUpdatesAndNotify()
+  } catch (err) {
+    console.error('[updater] init failed:', err instanceof Error ? err.message : err)
+  }
 }
 
 export async function checkForUpdates(): Promise<void> {
@@ -29,8 +34,8 @@ export async function checkForUpdates(): Promise<void> {
   }
 
   try {
-    const autoUpdater = await getAutoUpdater()
-    const result = await autoUpdater.checkForUpdates()
+    const updater = getAutoUpdater()
+    const result = await updater.checkForUpdates()
     if (!result || !result.updateInfo) {
       dialog.showMessageBox({ message: `You're on the latest version (${app.getVersion()}).`, buttons: ['OK'] })
       return
@@ -50,7 +55,7 @@ export async function checkForUpdates(): Promise<void> {
     })
 
     if (response === 0) {
-      autoUpdater.quitAndInstall()
+      updater.quitAndInstall()
     }
   } catch (err) {
     dialog.showMessageBox({
