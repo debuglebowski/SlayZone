@@ -6,7 +6,7 @@ import { is } from '@electron-toolkit/utils'
 export function initAutoUpdater(): void {
   if (is.dev) return
 
-  autoUpdater.autoDownload = true
+  autoUpdater.autoDownload = false
   autoUpdater.autoInstallOnAppQuit = true
 
   autoUpdater.on('error', (err) => console.error('[updater] error:', err.message))
