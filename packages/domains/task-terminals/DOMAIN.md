@@ -7,7 +7,7 @@ Task-specific terminal orchestration layer. Manages terminal tabs for tasks.
 - Tab data model + persistence (terminal_tabs table)
 - "Main tab" concept - first tab whose events affect task state
 - Terminal tab UI (tab bar, create, close, rename)
-- Keyboard shortcuts (Cmd+T, Cmd+W, Ctrl+Tab)
+- Keyboard shortcuts (Cmd+Shift+N, Cmd+W, Ctrl+Tab)
 - Session ID generation: `${taskId}:${tabId}`
 
 ## Architecture

@@ -177,6 +177,10 @@ function emitOpenProjectSettings(): void {
   mainWindow?.webContents.send('app:open-project-settings')
 }
 
+function emitNewTemporaryTask(): void {
+  mainWindow?.webContents.send('app:new-temporary-task')
+}
+
 function closeSplash(): void {
   if (!splashWindow || splashWindow.isDestroyed()) return
   splashWindow.webContents
@@ -362,6 +366,16 @@ app.whenReady().then(() => {
           { role: 'unhide' },
           { type: 'separator' },
           { role: 'quit', label: `Quit ${appName}` }
+        ]
+      },
+      {
+        label: 'File',
+        submenu: [
+          {
+            label: 'New Temporary Task',
+            accelerator: 'CmdOrCtrl+Shift+N',
+            click: () => emitNewTemporaryTask()
+          }
         ]
       },
       {

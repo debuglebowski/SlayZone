@@ -499,11 +499,6 @@ function App(): React.JSX.Element {
     reopenClosedTab()
   }, { enableOnFormTags: true })
 
-  useHotkeys('ctrl+t', (e) => {
-    e.preventDefault()
-    handleCreateScratchTerminal()
-  }, { enableOnFormTags: true })
-
   useHotkeys('mod+shift+d', (e) => {
     e.preventDefault()
     const activeTab = tabs[activeTabIndex]
@@ -543,6 +538,12 @@ function App(): React.JSX.Element {
     openTask(task.id)
     track('task_created')
   }, [selectedProjectId, tasks, setTasks, openTask])
+
+  useEffect(() => {
+    return window.api.app.onNewTemporaryTask(() => {
+      handleCreateScratchTerminal()
+    })
+  }, [handleCreateScratchTerminal])
 
   // Task handlers
   const handleTaskCreated = (task: Task): void => {
@@ -748,7 +749,7 @@ function App(): React.JSX.Element {
                               </button>
                             </TooltipTrigger>
                             <TooltipContent side="bottom" className="text-xs">
-                              New temporary task (Ctrl+T)
+                              New temporary task (⌘⇧N)
                             </TooltipContent>
                           </Tooltip>
                         )}

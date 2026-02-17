@@ -161,6 +161,7 @@ export interface ElectronAPI {
     onGoHome: (callback: () => void) => () => void
     onOpenSettings: (callback: () => void) => () => void
     onOpenProjectSettings: (callback: () => void) => () => void
+    onNewTemporaryTask: (callback: () => void) => () => void
     onTasksChanged: (callback: () => void) => () => void
     onCloseTask: (callback: (taskId: string) => void) => () => void
     onOpenTask: (callback: (taskId: string) => void) => () => void
