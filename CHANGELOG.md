@@ -1,6 +1,21 @@
 # Changelog
 
 
+## v0.1.50...main
+
+[compare changes](https://github.com/debuglebowski/SlayZone/compare/v0.1.50...main)
+
+### 🩹 Fixes
+
+- Push specific tag instead of all tags on release ([f2bc8db](https://github.com/debuglebowski/SlayZone/commit/f2bc8db))
+
+### ❤️ Contributors
+
+- Debuglebowski
+
+
+
+
 ## v0.1.49...main
 
 [compare changes](https://github.com/debuglebowski/SlayZone/compare/v0.1.49...main)
