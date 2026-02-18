@@ -176,12 +176,12 @@ export function AppSidebar({
               <TooltipContent side="right">Keyboard Shortcuts</TooltipContent>
             </Tooltip>
             <Dialog open={shortcutsOpen} onOpenChange={setShortcutsOpen}>
-              <DialogContent className="max-w-sm">
+              <DialogContent className="max-h-[80vh] flex flex-col">
                 <DialogHeader>
                   <DialogTitle>Keyboard Shortcuts</DialogTitle>
                   <DialogDescription className="sr-only">List of keyboard shortcuts</DialogDescription>
                 </DialogHeader>
-                <div className="space-y-5">
+                <div className="space-y-5 overflow-y-auto scrollbar-thin">
                   {shortcutGroups.map((group) => (
                     <div key={group.heading}>
                       <p className="text-[11px] uppercase tracking-wider font-semibold text-muted-foreground mb-2">{group.heading}</p>
