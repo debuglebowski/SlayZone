@@ -8,6 +8,15 @@ export interface OpenFile {
   tooLarge?: boolean
   sizeBytes?: number
   diskChanged?: boolean
+  /** Non-text file rendered by dedicated viewer (image, etc.) */
+  binary?: boolean
+}
+
+const IMAGE_EXTENSIONS = new Set(['png', 'jpg', 'jpeg', 'gif', 'svg', 'webp', 'bmp', 'ico', 'avif'])
+
+export function isImageFile(filePath: string): boolean {
+  const ext = filePath.split('.').pop()?.toLowerCase()
+  return !!ext && IMAGE_EXTENSIONS.has(ext)
 }
 
 export function useFileEditor(
@@ -31,6 +40,13 @@ export function useFileEditor(
     ;(async () => {
       for (const filePath of initialEditorState.files) {
         try {
+          if (isImageFile(filePath)) {
+            setOpenFiles((prev) => {
+              if (prev.some((f) => f.path === filePath)) return prev
+              return [...prev, { path: filePath, content: null, originalContent: null, binary: true }]
+            })
+            continue
+          }
           const result = await window.api.fs.readFile(projectPath, filePath)
           if (result.tooLarge) {
             setOpenFiles((prev) => {
@@ -62,6 +78,16 @@ export function useFileEditor(
 
   const reloadFile = useCallback(async (filePath: string) => {
     try {
+      // Binary files: just bump version for cache busting, no content to reload
+      if (isImageFile(filePath)) {
+        setFileVersions((prev) => {
+          const next = new Map(prev)
+          next.set(filePath, (next.get(filePath) ?? 0) + 1)
+          return next
+        })
+        return
+      }
+
       const result = await window.api.fs.readFile(projectPath, filePath)
       if (result.tooLarge || result.content == null) return
       setOpenFiles((prev) =>
@@ -135,6 +161,16 @@ export function useFileEditor(
     pendingOpen.current = filePath
 
     try {
+      // Binary files (images etc.) — rendered via slz-file:// protocol, no content needed
+      if (isImageFile(filePath)) {
+        setOpenFiles((prev) => {
+          if (prev.some((f) => f.path === filePath)) return prev
+          return [...prev, { path: filePath, content: null, originalContent: null, binary: true }]
+        })
+        setActiveFilePath(filePath)
+        return
+      }
+
       const result = await window.api.fs.readFile(projectPath, filePath)
       if (result.tooLarge) {
         setOpenFiles((prev) => {

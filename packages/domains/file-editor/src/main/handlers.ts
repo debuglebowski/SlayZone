@@ -207,4 +207,23 @@ export function registerFileEditorHandlers(ipcMain: IpcMain): void {
     const abs = assertWithinRoot(rootPath, targetPath)
     fs.rmSync(abs, { recursive: true })
   })
+
+  ipcMain.handle('fs:copyIn', (_event, rootPath: string, absoluteSrc: string): string => {
+    const srcResolved = path.resolve(absoluteSrc)
+    if (!fs.existsSync(srcResolved) || !fs.statSync(srcResolved).isFile()) {
+      throw new Error('Source is not a file')
+    }
+    const ext = path.extname(srcResolved)
+    const name = path.basename(srcResolved, ext)
+    let relPath = path.basename(srcResolved)
+    let dest = assertWithinRoot(rootPath, relPath)
+    let i = 1
+    while (fs.existsSync(dest)) {
+      relPath = `${name} (${i})${ext}`
+      dest = assertWithinRoot(rootPath, relPath)
+      i++
+    }
+    fs.copyFileSync(srcResolved, dest)
+    return relPath
+  })
 }

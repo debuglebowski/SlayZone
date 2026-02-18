@@ -59,6 +59,8 @@ export const FileEditorView = forwardRef<FileEditorViewHandle, FileEditorViewPro
   const isDragging = useRef(false)
   const [confirmClose, setConfirmClose] = useState<string | null>(null)
   const [viewMode, setViewMode] = useState<'editor' | 'split' | 'preview'>('split')
+  const [isFileDragOver, setIsFileDragOver] = useState(false)
+  const dragCounter = useRef(0)
   const editorContainerRef = useRef<HTMLDivElement>(null)
   const previewScrollRef = useRef<HTMLDivElement>(null)
   const scrollSyncSource = useRef<'editor' | 'preview' | null>(null)
@@ -85,6 +87,8 @@ export const FileEditorView = forwardRef<FileEditorViewHandle, FileEditorViewPro
     const ext = activeFilePath?.split('.').pop()?.toLowerCase()
     return ext === 'md' || ext === 'mdx'
   }, [activeFilePath])
+
+  const isImage = activeFile?.binary ?? false
 
   // Scroll sync between editor and preview
   useEffect(() => {
@@ -169,8 +173,64 @@ export const FileEditorView = forwardRef<FileEditorViewHandle, FileEditorViewPro
     }
   }, [confirmClose, closeFile])
 
+  const handleFileDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+  }, [])
+
+  const handleFileDragEnter = useCallback((e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    dragCounter.current++
+    if (e.dataTransfer.types.includes('Files')) {
+      setIsFileDragOver(true)
+    }
+  }, [])
+
+  const handleFileDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    dragCounter.current--
+    if (dragCounter.current === 0) {
+      setIsFileDragOver(false)
+    }
+  }, [])
+
+  const handleFileDrop = useCallback(async (e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    dragCounter.current = 0
+    setIsFileDragOver(false)
+
+    // Paths extracted by preload's capture-phase drop listener
+    // (contextBridge proxies File objects, so webUtils must run in preload)
+    const paths = window.api.files.getDropPaths()
+    if (!paths.length) return
+
+    const normalizedRoot = projectPath.replace(/\/+$/, '') + '/'
+    for (const absPath of paths) {
+      if (absPath.startsWith(normalizedRoot)) {
+        openFile(absPath.slice(normalizedRoot.length))
+      } else {
+        // External file — copy into project root
+        try {
+          const relPath = await window.api.fs.copyIn(projectPath, absPath)
+          openFile(relPath)
+        } catch {
+          // Copy failed (e.g. directory, permission error)
+        }
+      }
+    }
+  }, [projectPath, openFile])
+
   return (
-    <div className="h-full flex bg-background">
+    <div
+      className="h-full flex bg-background relative"
+      onDragOver={handleFileDragOver}
+      onDragEnter={handleFileDragEnter}
+      onDragLeave={handleFileDragLeave}
+      onDrop={handleFileDrop}
+    >
       {/* File tree */}
       {treeVisible && (
         <div className="shrink-0 border-r overflow-hidden" style={{ width: treeWidth }}>
@@ -225,7 +285,15 @@ export const FileEditorView = forwardRef<FileEditorViewHandle, FileEditorViewPro
           )}
         </div>
 
-        {activeFile?.tooLarge ? (
+        {activeFile && isImage ? (
+          <div className="flex-1 min-h-0 flex items-center justify-center overflow-auto p-4 bg-[repeating-conic-gradient(hsl(var(--muted))_0%_25%,transparent_0%_50%)_50%/16px_16px]">
+            <img
+              src={`slz-file://${projectPath}/${activeFile.path}${fileVersions.get(activeFile.path) ? `?v=${fileVersions.get(activeFile.path)}` : ''}`}
+              className="max-w-full max-h-full object-contain"
+              draggable={false}
+            />
+          </div>
+        ) : activeFile?.tooLarge ? (
           <div className="flex-1 flex items-center justify-center text-muted-foreground">
             <div className="text-center space-y-3">
               <FileCode className="size-8 mx-auto opacity-40" />
@@ -266,6 +334,13 @@ export const FileEditorView = forwardRef<FileEditorViewHandle, FileEditorViewPro
           </div>
         )}
       </div>
+
+      {/* Drop overlay */}
+      {isFileDragOver && (
+        <div className="absolute inset-0 z-50 flex items-center justify-center bg-background/80 border-2 border-dashed border-primary rounded-md pointer-events-none">
+          <p className="text-sm text-primary font-medium">Drop files to open</p>
+        </div>
+      )}
 
       {/* Unsaved changes confirmation */}
       <AlertDialog open={!!confirmClose} onOpenChange={(open) => { if (!open) setConfirmClose(null) }}>
