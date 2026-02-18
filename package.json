@@ -26,7 +26,7 @@
     "test:e2e": "pnpm --filter @slayzone/app test:e2e",
     "test:e2e:loop": "pnpm --filter @slayzone/app test:e2e:loop",
     "test:e2e:loop:stop": "pnpm --filter @slayzone/app test:e2e:loop:stop",
-    "changelog": "changelogen --output CHANGELOG.md",
+    "changelog": "changelogen --output CHANGELOG.md --hideAuthorEmail",
     "release:patch": "pnpm --filter @slayzone/app exec npm version patch && pnpm release:tag",
     "release:minor": "pnpm --filter @slayzone/app exec npm version minor && pnpm release:tag",
     "release:major": "pnpm --filter @slayzone/app exec npm version major && pnpm release:tag",
