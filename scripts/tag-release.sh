@@ -19,7 +19,7 @@ echo "Releasing v$VERSION..."
 git add packages/apps/app/package.json CHANGELOG.md
 git commit -m "release: v$VERSION"
 git tag "v$VERSION"
-git push
-git push --tags
+git push origin main
+git push origin "v$VERSION"
 
 echo "Released v$VERSION"
