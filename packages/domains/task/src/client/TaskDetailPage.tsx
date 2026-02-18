@@ -194,8 +194,6 @@ export function TaskDetailPage({
   const [archiveDialogOpen, setArchiveDialogOpen] = useState(false)
 
   // In-progress prompt state
-  const [inProgressPromptOpen, setInProgressPromptOpen] = useState(false)
-  const hasPromptedInProgressRef = useRef(false)
 
   // Description editing state
   const [descriptionValue, setDescriptionValue] = useState('')
@@ -496,13 +494,6 @@ export function TaskDetailPage({
     terminalApiRef.current = api
   }, [])
 
-  // Prompt to move task to in_progress on first terminal input
-  const handleFirstTerminalInput = useCallback(() => {
-    if (task && task.status !== 'in_progress' && !hasPromptedInProgressRef.current) {
-      hasPromptedInProgressRef.current = true
-      setInProgressPromptOpen(true)
-    }
-  }, [task?.id, task?.status])
 
   // Session ID discovery: providers that don't support --session-id at creation
   const sessionIdCommand = task ? SESSION_ID_COMMANDS[task.terminal_mode] : undefined
@@ -1174,7 +1165,6 @@ export function TaskDetailPage({
     if (!task) return
     const updated = await window.api.db.updateTask({ id: task.id, status: 'in_progress' })
     handleTaskUpdate(updated)
-    setInProgressPromptOpen(false)
   }
 
   if (loading) {
@@ -1254,6 +1244,16 @@ export function TaskDetailPage({
                 </TooltipTrigger>
                 <TooltipContent>Open in Linear</TooltipContent>
               </Tooltip>
+            )}
+
+            {!task.is_temporary && task.status !== 'in_progress' && (
+              <button
+                type="button"
+                onClick={handleConfirmInProgress}
+                className="shrink-0 rounded-full px-2.5 py-0.5 text-xs font-medium bg-yellow-500/10 text-yellow-600 hover:bg-yellow-500/20 dark:text-yellow-400 transition-colors cursor-pointer"
+              >
+                Set status to <em>In Progress</em>
+              </button>
             )}
 
             <div className="flex items-center gap-2">
@@ -1400,7 +1400,6 @@ export function TaskDetailPage({
                   onConversationCreated={handleSessionCreated}
                   onSessionInvalid={handleSessionInvalid}
                   onReady={handleTerminalReady}
-                  onFirstInput={handleFirstTerminalInput}
                   onMainTabActiveChange={setIsMainTabActive}
                   rightContent={
                     <Tooltip open={isMainTabActive ? false : undefined}>
@@ -1816,20 +1815,6 @@ export function TaskDetailPage({
         </AlertDialogContent>
       </AlertDialog>
 
-      <AlertDialog open={inProgressPromptOpen} onOpenChange={setInProgressPromptOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Move to In Progress?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This task is currently &ldquo;{task?.status}&rdquo;. Move it to in progress?
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>No</AlertDialogCancel>
-            <AlertDialogAction onClick={handleConfirmInProgress}>Yes</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   )
 }
