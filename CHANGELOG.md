@@ -1,6 +1,18 @@
 # Changelog
 
 
+## v0.1.45...main
+
+[compare changes](https://github.com/debuglebowski/omgslayzone/compare/v0.1.45...main)
+
+### 🩹 Fixes
+
+- **terminal:** Catch EBADF on PTY resize when fd is invalid ([9ee1d2f](https://github.com/debuglebowski/omgslayzone/commit/9ee1d2f))
+
+### ❤️ Contributors
+
+- Debuglebowski <kh.hansson@gmail.com>
+
 ## v0.1.44...main
 
 [compare changes](https://github.com/debuglebowski/omgslayzone/compare/v0.1.44...main)
