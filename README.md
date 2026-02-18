@@ -59,8 +59,6 @@ Your agents run locally on your machine — SlayZone is just the interface.
 - Terminal sync works perfectly 99% of the time. Cmd+R is a current workaround for the other situations.
 - Auto-status tracking only fully works for Claude Code — Codex, Cursor, and OpenCode adapters are partial
 - macOS Gatekeeper blocks first launch — right-click → Open to bypass
-- Windows: node-pty occasionally fails to spawn on first install — restart fixes it
-- Browser panel webview doesn't persist cookies across restarts
 - Large kanban boards (100+ cards) can feel sluggish during drag-and-drop
 
 ---
