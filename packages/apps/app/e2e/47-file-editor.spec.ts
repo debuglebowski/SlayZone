@@ -408,4 +408,45 @@ test.describe('File editor', () => {
     await mainWindow.locator('button[title="Show file tree"]:visible').first().click()
     await expect(editorPanel(mainWindow).getByText('Files')).toBeVisible()
   })
+
+  // --- Drag and drop within file tree ---
+
+  test('drag file into folder moves it', async ({ mainWindow }) => {
+    fs.writeFileSync(path.join(TEST_PROJECT_PATH, 'dragme.txt'), 'drag content\n')
+    fs.mkdirSync(path.join(TEST_PROJECT_PATH, 'target-folder'), { recursive: true })
+
+    await expect(treeFile(mainWindow, 'dragme.txt')).toBeVisible({ timeout: 5_000 })
+    await expect(treeFile(mainWindow, 'target-folder')).toBeVisible({ timeout: 5_000 })
+
+    // Dispatch DnD events manually — synthetic DragEvent has null dataTransfer,
+    // but the tree DnD logic uses refs (set by dragstart) not dataTransfer.
+    await mainWindow.evaluate(async () => {
+      const allButtons = Array.from(document.querySelectorAll('button.w-full'))
+        .filter(b => b.offsetParent !== null)
+      const srcBtn = allButtons.find(b => b.textContent?.includes('dragme.txt'))
+      const tgtBtn = allButtons.find(b => b.textContent?.includes('target-folder'))
+      if (!srcBtn || !tgtBtn) throw new Error('buttons not found')
+
+      // Drop target is the wrapper div (parent of ContextMenu > button)
+      const tgtWrapper = tgtBtn.parentElement!
+
+      srcBtn.dispatchEvent(new DragEvent('dragstart', { bubbles: true, cancelable: true }))
+      await new Promise(r => setTimeout(r, 50))
+
+      tgtWrapper.dispatchEvent(new DragEvent('dragenter', { bubbles: true, cancelable: true }))
+      tgtWrapper.dispatchEvent(new DragEvent('dragover', { bubbles: true, cancelable: true }))
+      await new Promise(r => setTimeout(r, 50))
+
+      tgtWrapper.dispatchEvent(new DragEvent('drop', { bubbles: true, cancelable: true }))
+      await new Promise(r => setTimeout(r, 1500))
+
+      srcBtn.dispatchEvent(new DragEvent('dragend', { bubbles: true, cancelable: true }))
+    })
+
+    expect(fs.existsSync(path.join(TEST_PROJECT_PATH, 'dragme.txt'))).toBe(false)
+    expect(fs.existsSync(path.join(TEST_PROJECT_PATH, 'target-folder', 'dragme.txt'))).toBe(true)
+
+    // Cleanup
+    fs.rmSync(path.join(TEST_PROJECT_PATH, 'target-folder'), { recursive: true })
+  })
 })

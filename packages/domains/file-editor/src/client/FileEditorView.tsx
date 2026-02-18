@@ -46,6 +46,7 @@ export const FileEditorView = forwardRef<FileEditorViewHandle, FileEditorViewPro
     closeFile,
     isDirty,
     isFileDiskChanged,
+    renameOpenFile,
     isRestoring,
     treeRefreshKey,
     fileVersions
@@ -174,11 +175,14 @@ export const FileEditorView = forwardRef<FileEditorViewHandle, FileEditorViewPro
   }, [confirmClose, closeFile])
 
   const handleFileDragOver = useCallback((e: React.DragEvent) => {
+    // Skip internal tree drags — let the tree handle them
+    if (e.dataTransfer.types.includes('application/x-slayzone-tree')) return
     e.preventDefault()
     e.stopPropagation()
   }, [])
 
   const handleFileDragEnter = useCallback((e: React.DragEvent) => {
+    if (e.dataTransfer.types.includes('application/x-slayzone-tree')) return
     e.preventDefault()
     e.stopPropagation()
     dragCounter.current++
@@ -188,6 +192,7 @@ export const FileEditorView = forwardRef<FileEditorViewHandle, FileEditorViewPro
   }, [])
 
   const handleFileDragLeave = useCallback((e: React.DragEvent) => {
+    if (e.dataTransfer.types.includes('application/x-slayzone-tree')) return
     e.preventDefault()
     e.stopPropagation()
     dragCounter.current--
@@ -196,20 +201,8 @@ export const FileEditorView = forwardRef<FileEditorViewHandle, FileEditorViewPro
     }
   }, [])
 
-  const expandFolder = useCallback((relPath: string) => {
-    // Expand the folder and all parent segments in the tree
-    const segments = relPath.split('/')
-    setExpandedFolders((prev) => {
-      const next = new Set(prev)
-      for (let i = 1; i <= segments.length; i++) {
-        next.add(segments.slice(0, i).join('/'))
-      }
-      return next
-    })
-    setTreeVisible(true)
-  }, [])
-
   const handleFileDrop = useCallback(async (e: React.DragEvent) => {
+    if (e.dataTransfer.types.includes('application/x-slayzone-tree')) return
     e.preventDefault()
     e.stopPropagation()
     dragCounter.current = 0
@@ -222,34 +215,19 @@ export const FileEditorView = forwardRef<FileEditorViewHandle, FileEditorViewPro
 
     const normalizedRoot = projectPath.replace(/\/+$/, '') + '/'
     for (const absPath of paths) {
-      const isDir = await window.api.files.isDirectory(absPath)
-      const isInternal = absPath.startsWith(normalizedRoot)
-
-      if (isDir) {
-        if (isInternal) {
-          expandFolder(absPath.slice(normalizedRoot.length))
-        } else {
-          try {
-            const relPath = await window.api.fs.copyIn(projectPath, absPath)
-            expandFolder(relPath)
-          } catch {
-            // Copy failed (e.g. permission error)
-          }
-        }
+      if (absPath.startsWith(normalizedRoot)) {
+        openFile(absPath.slice(normalizedRoot.length))
       } else {
-        if (isInternal) {
-          openFile(absPath.slice(normalizedRoot.length))
-        } else {
-          try {
-            const relPath = await window.api.fs.copyIn(projectPath, absPath)
-            openFile(relPath)
-          } catch {
-            // Copy failed (e.g. permission error)
-          }
+        // External file — copy into project root
+        try {
+          const relPath = await window.api.fs.copyIn(projectPath, absPath)
+          openFile(relPath)
+        } catch {
+          // Copy failed (e.g. directory, permission error)
         }
       }
     }
-  }, [projectPath, openFile, expandFolder])
+  }, [projectPath, openFile])
 
   return (
     <div
@@ -265,6 +243,7 @@ export const FileEditorView = forwardRef<FileEditorViewHandle, FileEditorViewPro
           <EditorFileTree
             projectPath={projectPath}
             onOpenFile={openFile}
+            onFileRenamed={renameOpenFile}
             activeFilePath={activeFilePath}
             refreshKey={treeRefreshKey}
             expandedFolders={expandedFolders}
@@ -366,7 +345,7 @@ export const FileEditorView = forwardRef<FileEditorViewHandle, FileEditorViewPro
       {/* Drop overlay */}
       {isFileDragOver && (
         <div className="absolute inset-0 z-50 flex items-center justify-center bg-background/80 border-2 border-dashed border-primary rounded-md pointer-events-none">
-          <p className="text-sm text-primary font-medium">Drop files or folders</p>
+          <p className="text-sm text-primary font-medium">Drop files to open</p>
         </div>
       )}
 
