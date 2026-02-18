@@ -1,6 +1,41 @@
 # Changelog
 
 
+## v0.1.47...main
+
+[compare changes](https://github.com/debuglebowski/omgslayzone/compare/v0.1.47...main)
+
+### 🚀 Enhancements
+
+- **tasks:** Signal bar priority indicators on kanban cards ([f33bc8c](https://github.com/debuglebowski/omgslayzone/commit/f33bc8c))
+- **ui:** Add scroll + thin scrollbar to keyboard shortcuts dialog ([4c64a90](https://github.com/debuglebowski/omgslayzone/commit/4c64a90))
+- **task:** Replace in-progress modal with header button ([ce37d16](https://github.com/debuglebowski/omgslayzone/commit/ce37d16))
+- **updater:** Show in-app toast when update downloaded ([4b25110](https://github.com/debuglebowski/omgslayzone/commit/4b25110))
+- **file-editor:** Render image files in editor panel ([c9d7fcb](https://github.com/debuglebowski/omgslayzone/commit/c9d7fcb))
+- **file-editor:** Drag-and-drop files/folders from Finder into editor ([7d9cdac](https://github.com/debuglebowski/omgslayzone/commit/7d9cdac))
+- **terminal:** Split terminals into groups with drag-and-drop ([dd53716](https://github.com/debuglebowski/omgslayzone/commit/dd53716))
+- **file-editor:** Drag-and-drop to move files/folders within tree ([e0a8279](https://github.com/debuglebowski/omgslayzone/commit/e0a8279))
+- **browser:** Multi-device responsive preview + web panel emulation ([4e8068d](https://github.com/debuglebowski/omgslayzone/commit/4e8068d))
+
+### 🩹 Fixes
+
+- **task:** Align title padding and font with kanban header ([ce6fa15](https://github.com/debuglebowski/omgslayzone/commit/ce6fa15))
+- **ui:** Add left padding in zen mode to match right/bottom ([08c3fc9](https://github.com/debuglebowski/omgslayzone/commit/08c3fc9))
+
+### 📖 Documentation
+
+- Add known bugs section and star history to README ([750003a](https://github.com/debuglebowski/omgslayzone/commit/750003a))
+- Update known bugs list ([656dc14](https://github.com/debuglebowski/omgslayzone/commit/656dc14))
+- Trim known bugs list ([59052ae](https://github.com/debuglebowski/omgslayzone/commit/59052ae))
+
+### 🏡 Chore
+
+- Add star history image to assets ([b66bf1e](https://github.com/debuglebowski/omgslayzone/commit/b66bf1e))
+
+### ❤️ Contributors
+
+- Debuglebowski <kh.hansson@gmail.com>
+
 ## v0.1.46...main
 
 [compare changes](https://github.com/debuglebowski/omgslayzone/compare/v0.1.46...main)
