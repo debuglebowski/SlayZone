@@ -1,4 +1,4 @@
-import { dialog, app } from 'electron'
+import { dialog, app, BrowserWindow } from 'electron'
 import { is } from '@electron-toolkit/utils'
 // electron-updater is CJS. electron-vite v5 outputs ESM for main, and Node's
 // CJS→ESM interop doesn't detect Object.defineProperty getters as named exports.
@@ -6,14 +6,22 @@ import { is } from '@electron-toolkit/utils'
 import electronUpdater from 'electron-updater'
 
 let autoUpdater: typeof electronUpdater.autoUpdater | null = null
+let downloadedVersion: string | null = null
+
 function getAutoUpdater() {
   if (!autoUpdater) {
     autoUpdater = electronUpdater.autoUpdater
-    autoUpdater.autoDownload = false
     autoUpdater.autoInstallOnAppQuit = true
     autoUpdater.on('error', (err) => console.error('[updater] error:', err.message))
     autoUpdater.on('update-available', (info) => console.log('[updater] update available:', info.version))
-    autoUpdater.on('update-downloaded', (info) => console.log('[updater] downloaded:', info.version))
+    autoUpdater.on('download-progress', (p) => {
+      BrowserWindow.getAllWindows()[0]?.setProgressBar(p.percent / 100)
+    })
+    autoUpdater.on('update-downloaded', (info) => {
+      console.log('[updater] downloaded:', info.version)
+      downloadedVersion = info.version
+      BrowserWindow.getAllWindows()[0]?.setProgressBar(-1)
+    })
   }
   return autoUpdater
 }
@@ -47,9 +55,17 @@ export async function checkForUpdates(): Promise<void> {
       return
     }
 
+    // Wait for download (may already be done from startup auto-download)
+    if (!downloadedVersion) {
+      await new Promise<void>((resolve, reject) => {
+        updater.once('update-downloaded', () => resolve())
+        updater.once('error', (err) => reject(err))
+      })
+    }
+
     const { response } = await dialog.showMessageBox({
-      message: `Update available: v${version}`,
-      detail: `Current version: v${app.getVersion()}. The update will be installed on restart.`,
+      message: `Update v${version} is ready`,
+      detail: `Current version: v${app.getVersion()}`,
       buttons: ['Restart Now', 'Later'],
       defaultId: 0
     })
