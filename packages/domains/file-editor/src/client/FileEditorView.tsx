@@ -196,6 +196,19 @@ export const FileEditorView = forwardRef<FileEditorViewHandle, FileEditorViewPro
     }
   }, [])
 
+  const expandFolder = useCallback((relPath: string) => {
+    // Expand the folder and all parent segments in the tree
+    const segments = relPath.split('/')
+    setExpandedFolders((prev) => {
+      const next = new Set(prev)
+      for (let i = 1; i <= segments.length; i++) {
+        next.add(segments.slice(0, i).join('/'))
+      }
+      return next
+    })
+    setTreeVisible(true)
+  }, [])
+
   const handleFileDrop = useCallback(async (e: React.DragEvent) => {
     e.preventDefault()
     e.stopPropagation()
@@ -209,19 +222,34 @@ export const FileEditorView = forwardRef<FileEditorViewHandle, FileEditorViewPro
 
     const normalizedRoot = projectPath.replace(/\/+$/, '') + '/'
     for (const absPath of paths) {
-      if (absPath.startsWith(normalizedRoot)) {
-        openFile(absPath.slice(normalizedRoot.length))
+      const isDir = await window.api.files.isDirectory(absPath)
+      const isInternal = absPath.startsWith(normalizedRoot)
+
+      if (isDir) {
+        if (isInternal) {
+          expandFolder(absPath.slice(normalizedRoot.length))
+        } else {
+          try {
+            const relPath = await window.api.fs.copyIn(projectPath, absPath)
+            expandFolder(relPath)
+          } catch {
+            // Copy failed (e.g. permission error)
+          }
+        }
       } else {
-        // External file — copy into project root
-        try {
-          const relPath = await window.api.fs.copyIn(projectPath, absPath)
-          openFile(relPath)
-        } catch {
-          // Copy failed (e.g. directory, permission error)
+        if (isInternal) {
+          openFile(absPath.slice(normalizedRoot.length))
+        } else {
+          try {
+            const relPath = await window.api.fs.copyIn(projectPath, absPath)
+            openFile(relPath)
+          } catch {
+            // Copy failed (e.g. permission error)
+          }
         }
       }
     }
-  }, [projectPath, openFile])
+  }, [projectPath, openFile, expandFolder])
 
   return (
     <div
@@ -338,7 +366,7 @@ export const FileEditorView = forwardRef<FileEditorViewHandle, FileEditorViewPro
       {/* Drop overlay */}
       {isFileDragOver && (
         <div className="absolute inset-0 z-50 flex items-center justify-center bg-background/80 border-2 border-dashed border-primary rounded-md pointer-events-none">
-          <p className="text-sm text-primary font-medium">Drop files to open</p>
+          <p className="text-sm text-primary font-medium">Drop files or folders</p>
         </div>
       )}
 

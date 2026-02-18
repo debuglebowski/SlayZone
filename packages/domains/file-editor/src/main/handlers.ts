@@ -210,20 +210,34 @@ export function registerFileEditorHandlers(ipcMain: IpcMain): void {
 
   ipcMain.handle('fs:copyIn', (_event, rootPath: string, absoluteSrc: string): string => {
     const srcResolved = path.resolve(absoluteSrc)
-    if (!fs.existsSync(srcResolved) || !fs.statSync(srcResolved).isFile()) {
-      throw new Error('Source is not a file')
+    if (!fs.existsSync(srcResolved)) {
+      throw new Error('Source does not exist')
     }
-    const ext = path.extname(srcResolved)
-    const name = path.basename(srcResolved, ext)
+    const stat = fs.statSync(srcResolved)
+    const isDir = stat.isDirectory()
+    const ext = isDir ? '' : path.extname(srcResolved)
+    const name = isDir ? path.basename(srcResolved) : path.basename(srcResolved, ext)
     let relPath = path.basename(srcResolved)
     let dest = assertWithinRoot(rootPath, relPath)
     let i = 1
     while (fs.existsSync(dest)) {
-      relPath = `${name} (${i})${ext}`
+      relPath = isDir ? `${name} (${i})` : `${name} (${i})${ext}`
       dest = assertWithinRoot(rootPath, relPath)
       i++
     }
-    fs.copyFileSync(srcResolved, dest)
+    if (isDir) {
+      fs.cpSync(srcResolved, dest, { recursive: true })
+    } else {
+      fs.copyFileSync(srcResolved, dest)
+    }
     return relPath
+  })
+
+  ipcMain.handle('fs:isDirectory', (_event, absolutePath: string): boolean => {
+    try {
+      return fs.statSync(path.resolve(absolutePath)).isDirectory()
+    } catch {
+      return false
+    }
   })
 }

@@ -140,7 +140,8 @@ const api: ElectronAPI = {
       const paths = lastDropPaths
       lastDropPaths = []
       return paths
-    }
+    },
+    isDirectory: (absolutePath: string) => ipcRenderer.invoke('fs:isDirectory', absolutePath)
   },
   pty: {
     create: (sessionId, cwd, conversationId, existingConversationId, mode, initialPrompt, codeMode, providerFlags) =>

@@ -183,6 +183,7 @@ export interface ElectronAPI {
     ) => Promise<{ success: boolean; path?: string; error?: string }>
     pathExists: (path: string) => Promise<boolean>
     getDropPaths: () => string[]
+    isDirectory: (absolutePath: string) => Promise<boolean>
   }
   pty: {
     create: (
@@ -262,6 +263,7 @@ export interface ElectronAPI {
     delete: (tabId: string) => Promise<boolean>
     ensureMain: (taskId: string, mode: TerminalMode) => Promise<TerminalTab>
     split: (tabId: string) => Promise<TerminalTab | null>
+    moveToGroup: (tabId: string, targetGroupId: string | null) => Promise<TerminalTab | null>
   }
   diagnostics: {
     getConfig: () => Promise<DiagnosticsConfig>
