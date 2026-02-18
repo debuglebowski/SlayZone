@@ -1,6 +1,21 @@
 # Changelog
 
 
+## v0.1.49...main
+
+[compare changes](https://github.com/debuglebowski/SlayZone/compare/v0.1.49...main)
+
+### 📖 Documentation
+
+- Second test change ([19edc26](https://github.com/debuglebowski/SlayZone/commit/19edc26))
+
+### ❤️ Contributors
+
+- Debuglebowski
+
+
+
+
 ## v0.1.48...main
 
 [compare changes](https://github.com/debuglebowski/SlayZone/compare/v0.1.48...main)
