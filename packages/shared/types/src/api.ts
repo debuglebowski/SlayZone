@@ -183,7 +183,6 @@ export interface ElectronAPI {
     ) => Promise<{ success: boolean; path?: string; error?: string }>
     pathExists: (path: string) => Promise<boolean>
     getDropPaths: () => string[]
-    isDirectory: (absolutePath: string) => Promise<boolean>
   }
   pty: {
     create: (

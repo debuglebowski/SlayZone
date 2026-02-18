@@ -2,33 +2,41 @@ import type { IpcMain } from 'electron'
 import type { Database } from 'better-sqlite3'
 import type { TerminalTab, CreateTerminalTabInput, UpdateTerminalTabInput } from '../shared/types'
 
+interface TabRow {
+  id: string
+  task_id: string
+  group_id: string | null
+  label: string | null
+  mode: string
+  is_main: number
+  position: number
+  created_at: string
+}
+
+function rowToTab(row: TabRow): TerminalTab {
+  return {
+    id: row.id,
+    taskId: row.task_id,
+    groupId: row.group_id || row.id,
+    label: row.label,
+    mode: row.mode as TerminalTab['mode'],
+    isMain: row.is_main === 1,
+    position: row.position,
+    createdAt: row.created_at
+  }
+}
+
 export function registerTerminalTabsHandlers(ipcMain: IpcMain, db: Database): void {
   // List tabs for a task
   ipcMain.handle('tabs:list', (_, taskId: string): TerminalTab[] => {
     const rows = db.prepare(
       'SELECT * FROM terminal_tabs WHERE task_id = ? ORDER BY position ASC'
-    ).all(taskId) as Array<{
-      id: string
-      task_id: string
-      label: string | null
-      mode: string
-      is_main: number
-      position: number
-      created_at: string
-    }>
+    ).all(taskId) as TabRow[]
 
-    return rows.map(row => ({
-      id: row.id,
-      taskId: row.task_id,
-      label: row.label,
-      mode: row.mode as TerminalTab['mode'],
-      isMain: row.is_main === 1,
-      position: row.position,
-      createdAt: row.created_at
-    }))
+    return rows.map(rowToTab)
   })
 
-  // Create a new tab
+  // Create a new tab (new group)
   ipcMain.handle('tabs:create', (_, input: CreateTerminalTabInput): TerminalTab => {
     const id = crypto.randomUUID()
     const mode = input.mode || 'terminal'
@@ -45,7 +53,6 @@ export function registerTerminalTabsHandlers(ipcMain: IpcMain, db: Database): vo
       const count = db.prepare(
         'SELECT COUNT(*) as count FROM terminal_tabs WHERE task_id = ?'
       ).get(input.taskId) as { count: number }
-      // First tab (main) has no label, subsequent tabs get "Terminal 2", etc.
       if (count.count > 0) {
         label = `Terminal ${count.count + 1}`
       }
@@ -53,13 +60,14 @@ export function registerTerminalTabsHandlers(ipcMain: IpcMain, db: Database): vo
 
     const now = new Date().toISOString()
     db.prepare(`
-      INSERT INTO terminal_tabs (id, task_id, label, mode, is_main, position, created_at)
-      VALUES (?, ?, ?, ?, 0, ?, ?)
-    `).run(id, input.taskId, label, mode, position, now)
+      INSERT INTO terminal_tabs (id, task_id, label, mode, is_main, position, group_id, created_at)
+      VALUES (?, ?, ?, ?, 0, ?, ?, ?)
+    `).run(id, input.taskId, label, mode, position, id, now)
 
     return {
       id,
       taskId: input.taskId,
+      groupId: id,
       label,
       mode: mode as TerminalTab['mode'],
       isMain: false,
@@ -68,18 +76,58 @@ export function registerTerminalTabsHandlers(ipcMain: IpcMain, db: Database): vo
     }
   })
 
+  // Split: create a new pane in the same group as the target tab
+  ipcMain.handle('tabs:split', (_, tabId: string): TerminalTab | null => {
+    const target = db.prepare('SELECT * FROM terminal_tabs WHERE id = ?').get(tabId) as TabRow | undefined
+    if (!target) return null
+
+    const groupId = target.group_id || target.id
+    const id = crypto.randomUUID()
+
+    // Get next position within group
+    const maxPos = db.prepare(
+      'SELECT COALESCE(MAX(position), -1) as max_pos FROM terminal_tabs WHERE task_id = ? AND group_id = ?'
+    ).get(target.task_id, groupId) as { max_pos: number }
+    const position = maxPos.max_pos + 1
+
+    // Auto-label
+    const count = db.prepare(
+      'SELECT COUNT(*) as count FROM terminal_tabs WHERE task_id = ?'
+    ).get(target.task_id) as { count: number }
+    const label = `Terminal ${count.count + 1}`
+
+    const now = new Date().toISOString()
+    db.prepare(`
+      INSERT INTO terminal_tabs (id, task_id, label, mode, is_main, position, group_id, created_at)
+      VALUES (?, ?, ?, 'terminal', 0, ?, ?, ?)
+    `).run(id, target.task_id, label, position, groupId, now)
+
+    return {
+      id,
+      taskId: target.task_id,
+      groupId,
+      label,
+      mode: 'terminal',
+      isMain: false,
+      position,
+      createdAt: now
+    }
+  })
+
+  // Move a tab to a different group (or create a new group if targetGroupId is null)
+  ipcMain.handle('tabs:moveToGroup', (_, tabId: string, targetGroupId: string | null): TerminalTab | null => {
+    const tab = db.prepare('SELECT * FROM terminal_tabs WHERE id = ?').get(tabId) as TabRow | undefined
+    if (!tab) return null
+
+    const newGroupId = targetGroupId ?? tabId // null = become own group
+    db.prepare('UPDATE terminal_tabs SET group_id = ? WHERE id = ?').run(newGroupId, tabId)
+    tab.group_id = newGroupId
+    return rowToTab(tab)
+  })
+
   // Update a tab
   ipcMain.handle('tabs:update', (_, input: UpdateTerminalTabInput): TerminalTab | null => {
-    const existing = db.prepare('SELECT * FROM terminal_tabs WHERE id = ?').get(input.id) as {
-      id: string
-      task_id: string
-      label: string | null
-      mode: string
-      is_main: number
-      position: number
-      created_at: string
-    } | undefined
-
+    const existing = db.prepare('SELECT * FROM terminal_tabs WHERE id = ?').get(input.id) as TabRow | undefined
     if (!existing) return null
 
     const mode = input.mode ?? existing.mode
@@ -97,25 +145,8 @@ export function registerTerminalTabsHandlers(ipcMain: IpcMain, db: Database): vo
       input.id
     )
 
-    const updated = db.prepare('SELECT * FROM terminal_tabs WHERE id = ?').get(input.id) as {
-      id: string
-      task_id: string
-      label: string | null
-      mode: string
-      is_main: number
-      position: number
-      created_at: string
-    }
-
-    return {
-      id: updated.id,
-      taskId: updated.task_id,
-      label: updated.label,
-      mode: updated.mode as TerminalTab['mode'],
-      isMain: updated.is_main === 1,
-      position: updated.position,
-      createdAt: updated.created_at
-    }
+    const updated = db.prepare('SELECT * FROM terminal_tabs WHERE id = ?').get(input.id) as TabRow
+    return rowToTab(updated)
   })
 
   // Delete a tab (reject if main)
@@ -132,15 +163,7 @@ export function registerTerminalTabsHandlers(ipcMain: IpcMain, db: Database): vo
   ipcMain.handle('tabs:ensureMain', (_, taskId: string, mode: string): TerminalTab => {
     const existing = db.prepare(
       'SELECT * FROM terminal_tabs WHERE task_id = ? AND is_main = 1'
-    ).get(taskId) as {
-      id: string
-      task_id: string
-      label: string | null
-      mode: string
-      is_main: number
-      position: number
-      created_at: string
-    } | undefined
+    ).get(taskId) as TabRow | undefined
 
     if (existing) {
       // Update mode if it changed (e.g. user switched terminal mode on task)
@@ -148,27 +171,25 @@ export function registerTerminalTabsHandlers(ipcMain: IpcMain, db: Database): vo
         db.prepare('UPDATE terminal_tabs SET mode = ? WHERE id = ?').run(mode, existing.id)
         existing.mode = mode
       }
-      return {
-        id: existing.id,
-        taskId: existing.task_id,
-        label: existing.label,
-        mode: existing.mode as TerminalTab['mode'],
-        isMain: true,
-        position: existing.position,
-        createdAt: existing.created_at
+      // Backfill group_id if missing (pre-v39 rows)
+      if (!existing.group_id) {
+        db.prepare('UPDATE terminal_tabs SET group_id = ? WHERE id = ?').run(existing.id, existing.id)
+        existing.group_id = existing.id
       }
+      return rowToTab(existing)
     }
 
     // Create main tab - use taskId as id (unique since one main per task)
     const now = new Date().toISOString()
     db.prepare(`
-      INSERT INTO terminal_tabs (id, task_id, label, mode, is_main, position, created_at)
-      VALUES (?, ?, NULL, ?, 1, 0, ?)
-    `).run(taskId, taskId, mode, now)
+      INSERT INTO terminal_tabs (id, task_id, label, mode, is_main, position, group_id, created_at)
+      VALUES (?, ?, NULL, ?, 1, 0, ?, ?)
+    `).run(taskId, taskId, mode, taskId, now)
 
     return {
       id: taskId,
       taskId,
+      groupId: taskId,
       label: null,
       mode: mode as TerminalTab['mode'],
       isMain: true,

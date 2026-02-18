@@ -140,8 +140,7 @@ const api: ElectronAPI = {
       const paths = lastDropPaths
       lastDropPaths = []
       return paths
-    },
-    isDirectory: (absolutePath: string) => ipcRenderer.invoke('fs:isDirectory', absolutePath)
+    }
   },
   pty: {
     create: (sessionId, cwd, conversationId, existingConversationId, mode, initialPrompt, codeMode, providerFlags) =>
@@ -256,7 +255,8 @@ const api: ElectronAPI = {
     update: (input) => ipcRenderer.invoke('tabs:update', input),
     delete: (tabId) => ipcRenderer.invoke('tabs:delete', tabId),
     ensureMain: (taskId, mode) => ipcRenderer.invoke('tabs:ensureMain', taskId, mode),
-    split: (tabId) => ipcRenderer.invoke('tabs:split', tabId)
+    split: (tabId) => ipcRenderer.invoke('tabs:split', tabId),
+    moveToGroup: (tabId, targetGroupId) => ipcRenderer.invoke('tabs:moveToGroup', tabId, targetGroupId)
   },
   diagnostics: {
     getConfig: () => ipcRenderer.invoke('diagnostics:getConfig'),
