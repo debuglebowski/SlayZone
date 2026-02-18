@@ -1,5 +1,8 @@
 import type { IpcMain } from 'electron'
 import { spawn } from 'child_process'
+import { homedir, platform } from 'os'
+import { existsSync } from 'fs'
+import { join } from 'path'
 import { shellPath } from 'shell-path'
 import type { ClaudeAvailability } from '@slayzone/terminal/shared'
 
@@ -12,9 +15,29 @@ function getShellPath(): Promise<string | null> {
   return resolvedPath
 }
 
+// shellPath() uses the login shell (e.g. zsh) which may not include dirs
+// added by the user's interactive shell (e.g. fish). Append common locations.
+const COMMON_BIN_DIRS = [
+  join(homedir(), '.local', 'bin'),
+  '/usr/local/bin',
+  '/opt/homebrew/bin',
+]
+
+function enrichPath(basePath: string): string {
+  const dirs = basePath.split(':')
+  for (const dir of COMMON_BIN_DIRS) {
+    if (!dirs.includes(dir)) dirs.push(dir)
+  }
+  return dirs.join(':')
+}
+
 function checkClaude(env: NodeJS.ProcessEnv): Promise<ClaudeAvailability> {
   return new Promise((resolve) => {
-    const proc = spawn('claude', ['--version'], { shell: true, env })
+    // Prefer full path — most reliable for GUI-launched apps
+    const fullPath = platform() === 'win32' ? null : join(homedir(), '.local', 'bin', 'claude')
+    const cmd = fullPath && existsSync(fullPath) ? fullPath : 'claude'
+
+    const proc = spawn(cmd, ['--version'], { shell: true, env })
 
     let version = ''
     proc.stdout?.on('data', (data) => {
@@ -40,7 +63,8 @@ export function registerClaudeHandlers(ipcMain: IpcMain): void {
     const TIMEOUT_MS = 5000
 
     const path = await getShellPath()
-    const env = path ? { ...process.env, PATH: path } : process.env
+    const basePath = path || process.env.PATH || ''
+    const env = { ...process.env, PATH: enrichPath(basePath) }
 
     const timeoutPromise = new Promise<ClaudeAvailability>((resolve) => {
       setTimeout(() => resolve({ available: false, version: null }), TIMEOUT_MS)
