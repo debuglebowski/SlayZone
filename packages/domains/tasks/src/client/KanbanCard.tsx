@@ -4,7 +4,7 @@ import type { Task } from '@slayzone/task/shared'
 import type { Project } from '@slayzone/projects/shared'
 import type { TerminalState } from '@slayzone/terminal/shared'
 import { Card, CardContent, Tooltip, TooltipContent, TooltipTrigger, cn, getTerminalStateStyle } from '@slayzone/ui'
-import { todayISO } from './kanban'
+import { todayISO, PRIORITY_LABELS } from './kanban'
 import { AlertCircle, Check, GitMerge, Link2 } from 'lucide-react'
 import { usePty } from '@slayzone/terminal'
 
@@ -19,12 +19,12 @@ interface KanbanCardProps {
   subTaskCount?: { done: number; total: number }
 }
 
-const PRIORITY_COLORS: Record<number, string> = {
-  1: 'bg-red-500/10 text-red-600 dark:text-red-400',
-  2: 'bg-orange-500/10 text-orange-600 dark:text-orange-400',
-  3: 'bg-yellow-500/10 text-yellow-600 dark:text-yellow-400',
-  4: 'bg-blue-500/10 text-blue-600 dark:text-blue-400',
-  5: 'bg-gray-500/10 text-gray-600 dark:text-gray-400'
+const PRIORITY_BAR_COLORS: Record<number, string> = {
+  1: 'bg-red-500',
+  2: 'bg-orange-500',
+  3: 'bg-yellow-500',
+  4: 'bg-blue-400',
+  5: 'bg-muted-foreground/30'
 }
 
 export function KanbanCard({
@@ -39,7 +39,6 @@ export function KanbanCard({
 }: KanbanCardProps): React.JSX.Element {
   const today = todayISO()
   const isOverdue = task.due_date && task.due_date < today && task.status !== 'done'
-  const priorityColor = PRIORITY_COLORS[task.priority] || PRIORITY_COLORS[3]
   const prevStatusRef = useRef(task.status)
   const [justCompleted, setJustCompleted] = useState(false)
 
@@ -101,25 +100,35 @@ export function KanbanCard({
             <div className="h-1.5 w-1.5 rounded-full bg-muted-foreground/30 shrink-0 mt-1" />
           ) : null}
           <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-1">
+            <div className="flex items-start gap-3">
               <p className="text-xs font-medium line-clamp-3 flex-1 leading-tight whitespace-pre-wrap break-words">{task.title}</p>
-              {task.priority <= 2 && (
-                <span
-                  className={cn(
-                    'shrink-0 text-[8px] font-semibold px-0.5 py-0 rounded',
-                    priorityColor
-                  )}
-                >
-                  {task.priority === 1 ? 'Urgent' : 'High'}
-                </span>
-              )}
+              <div className="flex items-start gap-1.5 shrink-0">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span className="flex items-end gap-[1.5px] shrink-0">
+                    {[3, 5, 7, 9].map((h, i) => (
+                      <span
+                        key={i}
+                        className={cn(
+                          'w-[2px] rounded-[0.5px]',
+                          i < 5 - task.priority
+                            ? PRIORITY_BAR_COLORS[task.priority]
+                            : 'bg-muted-foreground/20'
+                        )}
+                        style={{ height: h }}
+                      />
+                    ))}
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent>{PRIORITY_LABELS[task.priority]}</TooltipContent>
+              </Tooltip>
               {/* Terminal state indicator - hide when starting */}
               {(() => {
                 const stateStyle = terminalState !== 'starting' ? getTerminalStateStyle(terminalState) : null
                 return stateStyle ? (
                   <Tooltip>
                     <TooltipTrigger asChild>
-                      <span className={cn('h-2 w-2 rounded-full shrink-0', stateStyle.color)} />
+                      <span className={cn('h-2 w-2 rounded-full shrink-0 ml-0.5', stateStyle.color)} />
                     </TooltipTrigger>
                     <TooltipContent>{stateStyle.label}</TooltipContent>
                   </Tooltip>
@@ -167,6 +176,7 @@ export function KanbanCard({
                   {subTaskCount.done}/{subTaskCount.total}
                 </span>
               )}
+              </div>
             </div>
           </div>
         </div>
