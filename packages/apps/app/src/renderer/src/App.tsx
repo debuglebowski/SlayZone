@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { useHotkeys } from 'react-hotkeys-hook'
-import { AlertTriangle, TerminalSquare } from 'lucide-react'
+import { AlertTriangle, LayoutGrid, TerminalSquare } from 'lucide-react'
 import type { Task } from '@slayzone/task/shared'
 import type { Project } from '@slayzone/projects/shared'
 import type { Tag } from '@slayzone/tags/shared'
@@ -36,7 +36,7 @@ import {
   TooltipContent,
   Toaster
 } from '@slayzone/ui'
-import { SidebarProvider } from '@slayzone/ui'
+import { SidebarProvider, cn } from '@slayzone/ui'
 import { AppSidebar } from '@/components/sidebar/AppSidebar'
 import { TabBar } from '@/components/tabs/TabBar'
 import { recordDiagnosticsTimeline, updateDiagnosticsContext } from '@/lib/diagnosticsClient'
@@ -96,6 +96,7 @@ function App(): React.JSX.Element {
   const [searchOpen, setSearchOpen] = useState(false)
   const [completeTaskDialogOpen, setCompleteTaskDialogOpen] = useState(false)
   const [zenMode, setZenMode] = useState(false)
+  const [explodeMode, setExplodeMode] = useState(false)
   const [convertingTask, setConvertingTask] = useState<Task | null>(null)
   const convertResolveRef = useRef<((task: Task) => void) | null>(null)
 
@@ -141,6 +142,11 @@ function App(): React.JSX.Element {
     () => tabs.filter((t): t is { type: 'task'; taskId: string; title: string } => t.type === 'task').map((t) => t.taskId),
     [tabs]
   )
+
+  // Auto-disable explode mode when fewer than 2 task tabs
+  useEffect(() => {
+    if (openTaskIds.length < 2) setExplodeMode(false)
+  }, [openTaskIds.length])
 
   // Subscribe to terminal state changes for open tabs
   useEffect(() => {
@@ -511,8 +517,14 @@ function App(): React.JSX.Element {
     setZenMode(prev => !prev)
   }, { enableOnFormTags: true })
 
+  useHotkeys('mod+shift+e', (e) => {
+    e.preventDefault()
+    if (openTaskIds.length >= 2) setExplodeMode(prev => !prev)
+  }, { enableOnFormTags: true })
+
   useHotkeys('escape', () => {
-    if (zenMode) setZenMode(false)
+    if (explodeMode) setExplodeMode(false)
+    else if (zenMode) setZenMode(false)
   }, { enableOnFormTags: true })
 
   const handleCompleteTaskConfirm = async (): Promise<void> => {
@@ -745,6 +757,26 @@ function App(): React.JSX.Element {
                     rightContent={
                       <div className="flex items-center gap-1">
                         <UsagePopover data={usageData} onRefresh={refreshUsage} />
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <button
+                              disabled={openTaskIds.length < 2}
+                              onClick={() => setExplodeMode((prev) => !prev)}
+                              className={cn(
+                                "h-7 w-7 flex items-center justify-center transition-colors border-b-2",
+                                explodeMode
+                                  ? "text-foreground border-foreground"
+                                  : "text-muted-foreground border-transparent hover:text-foreground",
+                                openTaskIds.length < 2 && "opacity-30 pointer-events-none"
+                              )}
+                            >
+                              <LayoutGrid className="size-4" />
+                            </button>
+                          </TooltipTrigger>
+                          <TooltipContent side="bottom" className="text-xs">
+                            {explodeMode ? 'Exit explode mode' : 'Explode mode'} (⌘⇧E)
+                          </TooltipContent>
+                        </Tooltip>
                         {selectedProjectId && (
                           <Tooltip>
                             <TooltipTrigger asChild>
@@ -780,11 +812,31 @@ function App(): React.JSX.Element {
               </div>
 
               <div id="content-wrapper" className="flex-1 min-h-0 flex">
-                <div id="main-area" className="flex-1 min-w-0 relative rounded-lg overflow-hidden bg-background">
-                  {tabs.map((tab, i) => (
+                <div
+                  id="main-area"
+                  className={cn(
+                    "flex-1 min-w-0 min-h-0 rounded-lg overflow-hidden bg-background",
+                    explodeMode ? "grid gap-1 p-1" : "relative"
+                  )}
+                  style={explodeMode ? (() => {
+                    const cols = Math.ceil(Math.sqrt(openTaskIds.length))
+                    const rows = Math.ceil(openTaskIds.length / cols)
+                    return {
+                      gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`,
+                      gridTemplateRows: `repeat(${rows}, minmax(0, 1fr))`
+                    }
+                  })() : undefined}
+                >
+                  {tabs.map((tab, i) => {
+                    if (explodeMode && tab.type === 'home') return null
+                    return (
                     <div
                       key={tab.type === 'home' ? 'home' : tab.taskId}
-                      className={`absolute inset-0 ${i !== activeTabIndex ? 'hidden' : ''}`}
+                      className={
+                        explodeMode
+                          ? "rounded overflow-hidden border border-border min-h-0 relative"
+                          : `absolute inset-0 ${i !== activeTabIndex ? 'hidden' : ''}`
+                      }
                     >
                       {tab.type === 'home' ? (
                         <div className="flex flex-col flex-1 p-6 pt-4 h-full">
@@ -856,19 +908,23 @@ function App(): React.JSX.Element {
                           )}
                         </div>
                       ) : (
-                        <TaskDetailPage
-                          taskId={tab.taskId}
-                          isActive={i === activeTabIndex}
-                          onBack={goBack}
-                          onTaskUpdated={updateTask}
-                          onArchiveTask={archiveTask}
-                          onDeleteTask={deleteTask}
-                          onNavigateToTask={openTask}
-                          onConvertTask={handleConvertTask}
-                        />
+                        <div className={explodeMode ? "absolute inset-0" : "h-full"}>
+                          <TaskDetailPage
+                            taskId={tab.taskId}
+                            isActive={explodeMode || i === activeTabIndex}
+                            compact={explodeMode}
+                            onBack={goBack}
+                            onTaskUpdated={updateTask}
+                            onArchiveTask={archiveTask}
+                            onDeleteTask={deleteTask}
+                            onNavigateToTask={openTask}
+                            onConvertTask={handleConvertTask}
+                          />
+                        </div>
                       )}
                     </div>
-                  ))}
+                    )
+                  })}
                 </div>
 
                 {notificationState.isLocked && (

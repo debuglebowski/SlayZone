@@ -139,6 +139,7 @@ function SortableSubTask({ sub, onNavigate, onUpdate, onDelete }: {
 interface TaskDetailPageProps {
   taskId: string
   isActive?: boolean
+  compact?: boolean
   onBack: () => void
   onTaskUpdated: (task: Task) => void
   onArchiveTask?: (taskId: string) => Promise<void>
@@ -150,6 +151,7 @@ interface TaskDetailPageProps {
 export function TaskDetailPage({
   taskId,
   isActive,
+  compact,
   onBack,
   onTaskUpdated,
   onArchiveTask,
@@ -1196,12 +1198,20 @@ export function TaskDetailPage({
   }
 
   return (
-    <div id="task-detail" className="h-full flex flex-col p-4 gap-4">
-      {showRegionSelector && (
+    <div id="task-detail" className={cn("h-full flex flex-col", compact ? "p-0" : "p-4 gap-4")}>
+      {compact && (
+        <div className="shrink-0 flex items-center gap-2 px-2 py-1 bg-surface-1 border-b border-border min-w-0">
+          <span className="text-xs font-medium truncate flex-1">
+            {task.is_temporary ? 'Temporary task' : task.title}
+          </span>
+          <span className="text-[10px] text-muted-foreground shrink-0">{task.terminal_mode}</span>
+        </div>
+      )}
+      {!compact && showRegionSelector && (
         <RegionSelector onSelect={handleRegionSelect} onCancel={handleRegionCancel} />
       )}
       {/* Header */}
-      <header className="shrink-0 relative">
+      {!compact && <header className="shrink-0 relative">
         <div>
           <div className="flex items-center gap-4 window-no-drag">
             {task.is_temporary ? (
@@ -1288,10 +1298,10 @@ export function TaskDetailPage({
             </button>
           )}
         </div>
-      </header>
+      </header>}
 
       {/* Dev server detected toast */}
-      <DevServerToast
+      {!compact && <DevServerToast
         url={detectedDevUrl}
         onOpen={() => {
           if (!detectedDevUrl) return
@@ -1299,15 +1309,18 @@ export function TaskDetailPage({
           setDetectedDevUrl(null)
         }}
         onDismiss={() => setDetectedDevUrl(null)}
-      />
+      />}
 
       {/* Split view: terminal | browser | settings | git diff */}
       <div id="task-panels" ref={splitContainerRef} className="flex-1 flex min-h-0">
         {/* Terminal Panel */}
-        {panelVisibility.terminal && (
+        {(compact || panelVisibility.terminal) && (
         <div
-          className="min-w-0 shrink-0 rounded-md bg-surface-1 border border-border overflow-hidden flex flex-col"
-          style={containerWidth > 0 ? { width: resolvedWidths.terminal } : { flex: 1 }}
+          className={cn(
+            "min-w-0 shrink-0 overflow-hidden flex flex-col",
+            !compact && "rounded-md bg-surface-1 border border-border"
+          )}
+          style={compact ? { flex: 1 } : containerWidth > 0 ? { width: resolvedWidths.terminal } : { flex: 1 }}
         >
           {projectPathMissing && project?.path && (
             <div className="shrink-0 bg-amber-500/10 border-b border-amber-500/20 px-4 py-2 flex items-center gap-2">
@@ -1536,8 +1549,8 @@ export function TaskDetailPage({
         </div>
         )}
 
-        {/* Resize handle: Terminal | Browser */}
-        {panelVisibility.terminal && panelVisibility.browser && (
+        {/* Non-terminal panels hidden in compact mode */}
+        {!compact && panelVisibility.terminal && panelVisibility.browser && (
           <ResizeHandle
             width={resolvedWidths.browser ?? 200}
             minWidth={200}
@@ -1549,7 +1562,7 @@ export function TaskDetailPage({
         )}
 
         {/* Browser Panel */}
-        {panelVisibility.browser && (
+        {!compact && panelVisibility.browser && (
           <div className="shrink-0 rounded-md bg-surface-1 border border-border overflow-hidden" style={{ width: resolvedWidths.browser }}>
             <BrowserPanel
               className="h-full"
@@ -1562,7 +1575,7 @@ export function TaskDetailPage({
         )}
 
         {/* Resize handle: Browser | Editor or Terminal | Editor */}
-        {panelVisibility.editor && (panelVisibility.browser || panelVisibility.terminal) && (
+        {!compact && panelVisibility.editor && (panelVisibility.browser || panelVisibility.terminal) && (
           <ResizeHandle
             width={resolvedWidths.editor ?? 250}
             minWidth={250}
@@ -1574,7 +1587,7 @@ export function TaskDetailPage({
         )}
 
         {/* File Editor Panel */}
-        {panelVisibility.editor && project?.path && (
+        {!compact && panelVisibility.editor && project?.path && (
           <div className="shrink-0 overflow-hidden rounded-md bg-surface-1 border border-border" style={{ width: resolvedWidths.editor }}>
             <FileEditorView
               ref={fileEditorRefCallback}
@@ -1586,7 +1599,7 @@ export function TaskDetailPage({
         )}
 
         {/* Web Panels (custom + predefined) — rendered between editor and diff */}
-        {enabledWebPanels.map((wp, idx) => {
+        {!compact && enabledWebPanels.map((wp, idx) => {
           if (!panelVisibility[wp.id]) return null
           // Show resize handle if there's a visible panel before this one
           const hasLeftNeighbor = panelVisibility.terminal || panelVisibility.browser || panelVisibility.editor ||
@@ -1618,7 +1631,7 @@ export function TaskDetailPage({
         })}
 
         {/* Resize handle: Editor/WebPanels | Diff or Browser | Diff or Terminal | Diff */}
-        {panelVisibility.diff && (panelVisibility.editor || panelVisibility.browser || panelVisibility.terminal || enabledWebPanels.some(wp => panelVisibility[wp.id])) && (
+        {!compact && panelVisibility.diff && (panelVisibility.editor || panelVisibility.browser || panelVisibility.terminal || enabledWebPanels.some(wp => panelVisibility[wp.id])) && (
           <ResizeHandle
             width={resolvedWidths.diff ?? 50}
             minWidth={50}
@@ -1630,7 +1643,7 @@ export function TaskDetailPage({
         )}
 
         {/* Git Panel */}
-        {panelVisibility.diff && (
+        {!compact && panelVisibility.diff && (
           <div data-testid="task-git-panel" className="shrink-0 rounded-md bg-surface-1 border border-border overflow-hidden flex flex-col" style={{ width: resolvedWidths.diff }}>
             <UnifiedGitPanel
               ref={gitPanelRef}
@@ -1646,7 +1659,7 @@ export function TaskDetailPage({
         )}
 
         {/* Resize handle: Diff | Settings or Editor | Settings or ... */}
-        {panelVisibility.settings && (panelVisibility.diff || panelVisibility.editor || panelVisibility.browser || panelVisibility.terminal || enabledWebPanels.some(wp => panelVisibility[wp.id])) && (
+        {!compact && panelVisibility.settings && (panelVisibility.diff || panelVisibility.editor || panelVisibility.browser || panelVisibility.terminal || enabledWebPanels.some(wp => panelVisibility[wp.id])) && (
           <ResizeHandle
             width={resolvedWidths.settings ?? 440}
             minWidth={200}
@@ -1658,7 +1671,7 @@ export function TaskDetailPage({
         )}
 
         {/* Settings Panel */}
-        {panelVisibility.settings && (
+        {!compact && panelVisibility.settings && (
         <div data-testid="task-settings-panel" className="shrink-0 rounded-md bg-surface-1 border border-border p-3 flex flex-col gap-4 overflow-y-auto" style={{ width: resolvedWidths.settings }}>
           {/* Description */}
           <div className="flex flex-col min-h-0 relative">
