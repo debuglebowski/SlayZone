@@ -1,8 +1,9 @@
-import { useEffect, useCallback, useRef } from 'react'
-import { Terminal, usePty } from '@slayzone/terminal'
+import { useEffect, useCallback, useRef, useMemo } from 'react'
+import { usePty } from '@slayzone/terminal'
 import type { TerminalMode, CodeMode } from '@slayzone/terminal/shared'
 import { useTaskTerminals } from './useTaskTerminals'
 import { TerminalTabBar } from './TerminalTabBar'
+import { TerminalSplitGroup } from './TerminalSplitGroup'
 
 interface TerminalContainerProps {
   taskId: string
@@ -48,11 +49,14 @@ export function TerminalContainer({
 }: TerminalContainerProps) {
   const {
     tabs,
-    activeTabId,
+    groups,
+    activeGroupId,
     isLoading,
-    setActiveTabId,
+    setActiveGroupId,
     createTab,
+    splitTab,
     closeTab,
+    movePane,
     renameTab,
     getSessionId
   } = useTaskTerminals(taskId, defaultMode)
@@ -65,50 +69,48 @@ export function TerminalContainer({
     clearBuffer: () => Promise<void>
   } | null>(null)
 
-  // Get active tab
-  const activeTab = tabs.find(t => t.id === activeTabId)
-  const activeSessionId = activeTab ? getSessionId(activeTab.id) : null
+  // Get active group
+  const activeGroup = groups.find(g => g.id === activeGroupId)
 
   // Notify parent when main tab active state changes
   useEffect(() => {
-    onMainTabActiveChange?.(activeTab?.isMain ?? false)
-  }, [activeTab?.isMain, onMainTabActiveChange])
+    onMainTabActiveChange?.(activeGroup?.isMain ?? false)
+  }, [activeGroup?.isMain, onMainTabActiveChange])
 
   // Forward main tab state changes to task-level callbacks
-  // (This is where the "main tab affects task" logic lives)
   useEffect(() => {
     const mainTab = tabs.find(t => t.isMain)
     if (!mainTab) return
     const mainSessionId = getSessionId(mainTab.id)
-    // Subscribe to main tab prompt events for task-level notifications
     return subscribePrompt(mainSessionId, () => {
       // Main tab prompt events could trigger task-level UI updates
-      // This is handled by the parent via onSessionInvalid, etc.
     })
   }, [taskId, tabs, getSessionId, subscribePrompt])
 
-  // Keyboard shortcuts (only when this container's task tab is active)
+  // Keyboard shortcuts
   useEffect(() => {
     if (!isActive) return
 
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Cmd+T: New tab
+      // Cmd+T: New group
       if (e.metaKey && e.key === 't' && !e.shiftKey) {
         e.preventDefault()
         createTab()
       }
-      // Cmd+W: Close tab (unless main)
-      if (e.metaKey && e.key === 'w' && !e.shiftKey && activeTab && !activeTab.isMain) {
+      // Cmd+D: Split current group
+      if (e.metaKey && e.key === 'd' && !e.shiftKey && activeGroup) {
         e.preventDefault()
-        closeTab(activeTab.id)
+        // Split the last pane in the active group
+        const lastPane = activeGroup.tabs[activeGroup.tabs.length - 1]
+        if (lastPane) splitTab(lastPane.id)
       }
     }
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [isActive, tabs, activeTabId, activeTab, createTab, closeTab, setActiveTabId])
+  }, [isActive, activeGroup, createTab, splitTab])
 
-  // Handle terminal ready - pass up to parent (active tab's API)
+  // Handle terminal ready - pass up to parent (main tab's API)
   const handleTerminalReady = useCallback((api: {
     sendInput: (text: string) => Promise<void>
     write: (data: string) => Promise<boolean>
@@ -121,12 +123,48 @@ export function TerminalContainer({
 
   // Handle conversation created - only for main tab
   const handleConversationCreated = useCallback((convId: string) => {
-    if (activeTab?.isMain) {
-      onConversationCreated?.(convId)
-    }
-  }, [activeTab, onConversationCreated])
+    onConversationCreated?.(convId)
+  }, [onConversationCreated])
 
-  if (isLoading || !activeTab || !activeSessionId) {
+  // Split the active group — add a new pane
+  const handleSplitGroup = useCallback((groupId: string) => {
+    const group = groups.find(g => g.id === groupId)
+    if (!group) return
+    const lastPane = group.tabs[group.tabs.length - 1]
+    if (lastPane) splitTab(lastPane.id)
+  }, [groups, splitTab])
+
+  // Close an entire group (all its panes)
+  const closeGroup = useCallback(async (groupId: string) => {
+    const group = groups.find(g => g.id === groupId)
+    if (!group || group.isMain) return
+    // Close all tabs in the group
+    for (const tab of [...group.tabs].reverse()) {
+      await closeTab(tab.id)
+    }
+  }, [groups, closeTab])
+
+  // Build pane props for the active group
+  const paneProps = useMemo(() => {
+    if (!activeGroup) return []
+    return activeGroup.tabs.map(tab => ({
+      tab,
+      sessionId: getSessionId(tab.id),
+      cwd,
+      conversationId: tab.isMain ? conversationId : undefined,
+      existingConversationId: tab.isMain ? existingConversationId : undefined,
+      initialPrompt: tab.isMain ? initialPrompt : undefined,
+      codeMode: tab.isMain ? codeMode : undefined,
+      providerFlags: tab.isMain ? providerFlags : undefined,
+      autoFocus,
+      onConversationCreated: tab.isMain ? handleConversationCreated : undefined,
+      onSessionInvalid: tab.isMain ? onSessionInvalid : undefined,
+      onReady: tab.isMain ? handleTerminalReady : undefined,
+      onFirstInput: tab.isMain ? onFirstInput : undefined
+    }))
+  }, [activeGroup, getSessionId, cwd, conversationId, existingConversationId, initialPrompt, codeMode, providerFlags, autoFocus, handleConversationCreated, onSessionInvalid, handleTerminalReady, onFirstInput])
+
+  if (isLoading || !activeGroup) {
     return (
       <div className="h-full flex items-center justify-center bg-white dark:bg-[#0a0a0a]">
         <div className="text-neutral-500 text-sm">Loading terminal...</div>
@@ -137,30 +175,21 @@ export function TerminalContainer({
   return (
     <div className="h-full flex flex-col">
       <TerminalTabBar
-        tabs={tabs}
-        activeTabId={activeTabId}
-        onTabSelect={setActiveTabId}
-        onTabCreate={() => createTab()}
-        onTabClose={closeTab}
-        onTabRename={renameTab}
+        groups={groups}
+        activeGroupId={activeGroupId}
+        onGroupSelect={setActiveGroupId}
+        onGroupCreate={() => createTab()}
+        onGroupClose={closeGroup}
+        onGroupSplit={handleSplitGroup}
+        onPaneClose={closeTab}
+        onPaneMove={movePane}
+        onGroupRename={renameTab}
         rightContent={rightContent}
       />
       <div className="flex-1 min-h-0">
-        <Terminal
-          key={activeSessionId}
-          sessionId={activeSessionId}
-          cwd={cwd}
-          mode={activeTab.mode}
-          conversationId={activeTab.isMain ? conversationId : undefined}
-          existingConversationId={activeTab.isMain ? existingConversationId : undefined}
-          initialPrompt={activeTab.isMain ? initialPrompt : undefined}
-          codeMode={activeTab.isMain ? codeMode : undefined}
-          providerFlags={activeTab.isMain ? providerFlags : undefined}
-          autoFocus={autoFocus}
-          onConversationCreated={handleConversationCreated}
-          onSessionInvalid={activeTab.isMain ? onSessionInvalid : undefined}
-          onReady={handleTerminalReady}
-          onFirstInput={onFirstInput}
+        <TerminalSplitGroup
+          key={activeGroupId}
+          panes={paneProps}
         />
       </div>
     </div>

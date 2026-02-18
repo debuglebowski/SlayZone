@@ -1,0 +1,149 @@
+import { useState, useCallback, useRef } from 'react'
+import { Terminal } from '@slayzone/terminal'
+import type { CodeMode } from '@slayzone/terminal/shared'
+import type { TerminalTab } from '../shared/types'
+
+interface PaneProps {
+  tab: TerminalTab
+  sessionId: string
+  cwd: string
+  conversationId?: string | null
+  existingConversationId?: string | null
+  initialPrompt?: string | null
+  codeMode?: CodeMode | null
+  providerFlags?: string
+  autoFocus?: boolean
+  onConversationCreated?: (conversationId: string) => void
+  onSessionInvalid?: () => void
+  onReady?: (api: {
+    sendInput: (text: string) => Promise<void>
+    write: (data: string) => Promise<boolean>
+    focus: () => void
+    clearBuffer: () => Promise<void>
+  }) => void
+  onFirstInput?: () => void
+}
+
+interface TerminalSplitGroupProps {
+  panes: PaneProps[]
+}
+
+export function TerminalSplitGroup({ panes }: TerminalSplitGroupProps) {
+  const [sizes, setSizes] = useState<number[]>(() =>
+    panes.map(() => 100 / panes.length)
+  )
+  const containerRef = useRef<HTMLDivElement>(null)
+  const draggingRef = useRef<{ index: number; startX: number; startSizes: number[] } | null>(null)
+
+  // Reset sizes when pane count changes
+  const prevCountRef = useRef(panes.length)
+  if (panes.length !== prevCountRef.current) {
+    prevCountRef.current = panes.length
+    setSizes(panes.map(() => 100 / panes.length))
+  }
+
+  const handleMouseDown = useCallback((index: number, e: React.MouseEvent) => {
+    e.preventDefault()
+    draggingRef.current = {
+      index,
+      startX: e.clientX,
+      startSizes: [...sizes]
+    }
+
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!draggingRef.current || !containerRef.current) return
+      const { index, startX, startSizes } = draggingRef.current
+      const containerWidth = containerRef.current.getBoundingClientRect().width
+      const deltaPercent = ((e.clientX - startX) / containerWidth) * 100
+
+      const newSizes = [...startSizes]
+      const minSize = 10
+
+      let leftSize = startSizes[index] + deltaPercent
+      let rightSize = startSizes[index + 1] - deltaPercent
+
+      if (leftSize < minSize) {
+        leftSize = minSize
+        rightSize = startSizes[index] + startSizes[index + 1] - minSize
+      }
+      if (rightSize < minSize) {
+        rightSize = minSize
+        leftSize = startSizes[index] + startSizes[index + 1] - minSize
+      }
+
+      newSizes[index] = leftSize
+      newSizes[index + 1] = rightSize
+      setSizes(newSizes)
+    }
+
+    const handleMouseUp = () => {
+      draggingRef.current = null
+      document.removeEventListener('mousemove', handleMouseMove)
+      document.removeEventListener('mouseup', handleMouseUp)
+      document.body.style.cursor = ''
+      document.body.style.userSelect = ''
+    }
+
+    document.body.style.cursor = 'col-resize'
+    document.body.style.userSelect = 'none'
+    document.addEventListener('mousemove', handleMouseMove)
+    document.addEventListener('mouseup', handleMouseUp)
+  }, [sizes])
+
+  if (panes.length === 1) {
+    const pane = panes[0]
+    return (
+      <div className="h-full">
+        <Terminal
+          key={pane.sessionId}
+          sessionId={pane.sessionId}
+          cwd={pane.cwd}
+          mode={pane.tab.mode}
+          conversationId={pane.conversationId}
+          existingConversationId={pane.existingConversationId}
+          initialPrompt={pane.initialPrompt}
+          codeMode={pane.codeMode}
+          providerFlags={pane.providerFlags}
+          autoFocus={pane.autoFocus}
+          onConversationCreated={pane.onConversationCreated}
+          onSessionInvalid={pane.onSessionInvalid}
+          onReady={pane.onReady}
+          onFirstInput={pane.onFirstInput}
+        />
+      </div>
+    )
+  }
+
+  return (
+    <div ref={containerRef} className="h-full flex">
+      {panes.map((pane, i) => (
+        <div key={pane.sessionId} className="flex" style={{ width: `${sizes[i]}%` }}>
+          <div className="flex-1 min-w-0">
+            <Terminal
+              key={pane.sessionId}
+              sessionId={pane.sessionId}
+              cwd={pane.cwd}
+              mode={pane.tab.mode}
+              conversationId={pane.conversationId}
+              existingConversationId={pane.existingConversationId}
+              initialPrompt={pane.initialPrompt}
+              codeMode={pane.codeMode}
+              providerFlags={pane.providerFlags}
+              autoFocus={pane.autoFocus && i === 0}
+              onConversationCreated={pane.onConversationCreated}
+              onSessionInvalid={pane.onSessionInvalid}
+              onReady={pane.onReady}
+              onFirstInput={pane.onFirstInput}
+            />
+          </div>
+          {i < panes.length - 1 && (
+            <div
+              className="w-1 cursor-col-resize bg-neutral-200 dark:bg-neutral-700 hover:bg-blue-400 dark:hover:bg-blue-500 transition-colors shrink-0"
+              onMouseDown={(e) => handleMouseDown(i, e)}
+            />
+          )}
+        </div>
+      ))}
+    </div>
+  )
+}

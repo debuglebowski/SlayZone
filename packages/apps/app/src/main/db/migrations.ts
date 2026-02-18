@@ -677,6 +677,20 @@ const migrations: Migration[] = [
     up: (db) => {
       db.exec(`ALTER TABLE tasks ADD COLUMN editor_open_files TEXT DEFAULT NULL`)
     }
+  },
+  {
+    version: 38,
+    up: (db) => {
+      db.exec(`ALTER TABLE tasks ADD COLUMN web_panel_resolutions TEXT DEFAULT NULL`)
+    }
+  },
+  {
+    version: 39,
+    up: (db) => {
+      db.exec(`ALTER TABLE terminal_tabs ADD COLUMN group_id TEXT`)
+      // Backfill: each existing tab becomes its own group
+      db.exec(`UPDATE terminal_tabs SET group_id = id WHERE group_id IS NULL`)
+    }
   }
 ]
 
