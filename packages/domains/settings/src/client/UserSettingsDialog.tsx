@@ -4,7 +4,6 @@ import { SettingsLayout } from '@slayzone/ui'
 import { Button } from '@slayzone/ui'
 import { Input } from '@slayzone/ui'
 import { Label } from '@slayzone/ui'
-import { Skeleton } from '@slayzone/ui'
 import { Switch } from '@slayzone/ui'
 import { toast } from '@slayzone/ui'
 import {
@@ -15,7 +14,7 @@ import {
   SelectValue
 } from '@slayzone/ui'
 import type { Tag } from '@slayzone/tags/shared'
-import type { ClaudeAvailability, TerminalMode } from '@slayzone/terminal/shared'
+import type { TerminalMode } from '@slayzone/terminal/shared'
 import type { PanelConfig, WebPanelDefinition } from '@slayzone/task/shared'
 import { DEFAULT_PANEL_CONFIG, PREDEFINED_WEB_PANELS, PROVIDER_DEFAULTS } from '@slayzone/task/shared'
 import type { DiagnosticsConfig } from '@slayzone/types'
@@ -46,7 +45,6 @@ export function UserSettingsDialog({
   const [newTagColor, setNewTagColor] = useState('#6b7280')
   const [editingTag, setEditingTag] = useState<Tag | null>(null)
   const [dbPath, setDbPath] = useState<string>('')
-  const [claudeStatus, setClaudeStatus] = useState<ClaudeAvailability | null>(null)
   const [shellSetting, setShellSetting] = useState('')
   const [defaultShell, setDefaultShell] = useState('')
   const [worktreeBasePath, setWorktreeBasePath] = useState('')
@@ -210,10 +208,6 @@ export function UserSettingsDialog({
         }
       } catch { /* ignore */ }
 
-      void window.api.claude.checkAvailability().then((status) => {
-        if (isStale()) return
-        setClaudeStatus(status)
-      })
     } catch (err) {
       if (isStale()) return
       setIntegrationsMessage(err instanceof Error ? err.message : String(err))
@@ -1145,22 +1139,6 @@ export function UserSettingsDialog({
                   </div>
                 </div>
 
-                <div className="space-y-3">
-                  <Label className="text-base font-semibold">Claude Code</Label>
-                  {claudeStatus === null ? (
-                    <Skeleton className="h-4 w-40" />
-                  ) : claudeStatus.available ? (
-                    <div className="flex items-center gap-2">
-                      <div className="size-2 rounded-full bg-green-500" />
-                      <span className="text-sm">{claudeStatus.version}</span>
-                    </div>
-                  ) : (
-                    <div className="flex items-center gap-2">
-                      <div className="size-2 rounded-full bg-red-500" />
-                      <span className="text-sm text-muted-foreground">Not installed</span>
-                    </div>
-                  )}
-                </div>
               </>
             )}
 

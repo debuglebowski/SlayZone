@@ -43,11 +43,6 @@ export interface PromptInfo {
   position: number
 }
 
-// Claude CLI availability check result
-export interface ClaudeAvailability {
-  available: boolean
-  version: string | null
-}
 
 // Provider usage / rate limiting
 export interface UsageWindow {

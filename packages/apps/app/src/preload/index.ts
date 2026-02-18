@@ -53,9 +53,6 @@ const api: ElectronAPI = {
     set: (key, value) => ipcRenderer.invoke('db:settings:set', key, value),
     getAll: () => ipcRenderer.invoke('db:settings:getAll')
   },
-  claude: {
-    checkAvailability: () => ipcRenderer.invoke('claude:check-availability')
-  },
   theme: {
     getEffective: () => ipcRenderer.invoke('theme:get-effective'),
     getSource: () => ipcRenderer.invoke('theme:get-source'),

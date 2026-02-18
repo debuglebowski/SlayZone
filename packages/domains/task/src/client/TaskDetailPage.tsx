@@ -9,7 +9,7 @@ import type { BrowserTabsState } from '@slayzone/task-browser/shared'
 import type { Tag } from '@slayzone/tags/shared'
 import type { Project } from '@slayzone/projects/shared'
 import { DEV_SERVER_URL_PATTERN, SESSION_ID_COMMANDS, SESSION_ID_UNAVAILABLE } from '@slayzone/terminal/shared'
-import type { TerminalMode, ClaudeAvailability } from '@slayzone/terminal/shared'
+import type { TerminalMode } from '@slayzone/terminal/shared'
 import { Button, PanelToggle, DevServerToast, Collapsible, CollapsibleTrigger, CollapsibleContent } from '@slayzone/ui'
 import {
   DropdownMenu,
@@ -167,7 +167,6 @@ export function TaskDetailPage({
   const [tags, setTags] = useState<Tag[]>([])
   const [taskTagIds, setTaskTagIds] = useState<string[]>([])
   const [loading, setLoading] = useState(true)
-  const [claudeAvailability, setClaudeAvailability] = useState<ClaudeAvailability | null>(null)
 
   // Sub-tasks
   const [subTasks, setSubTasks] = useState<Task[]>([])
@@ -360,12 +359,11 @@ export function TaskDetailPage({
         return true
       }
 
-      const [loadedTask, loadedTags, loadedTaskTags, projects, claudeCheck, loadedSubTasks] = await Promise.all([
+      const [loadedTask, loadedTags, loadedTaskTags, projects, loadedSubTasks] = await Promise.all([
         window.api.db.getTask(taskId),
         window.api.tags.getTags(),
         window.api.taskTags.getTagsForTask(taskId),
         window.api.db.getProjects(),
-        window.api.claude.checkAvailability(),
         window.api.db.getSubTasks(taskId)
       ])
 
@@ -417,7 +415,6 @@ export function TaskDetailPage({
       }
       setTags(loadedTags)
       setTaskTagIds(loadedTaskTags.map((t) => t.id))
-      setClaudeAvailability(claudeCheck)
       setLoading(false)
     }
 
@@ -1327,14 +1324,6 @@ export function TaskDetailPage({
               <AlertTriangle className="h-4 w-4 text-amber-500" />
               <span className="text-sm text-amber-500">
                 Project path not found: <code className="bg-amber-500/10 px-1 rounded">{project.path}</code>
-              </span>
-            </div>
-          )}
-          {claudeAvailability && !claudeAvailability.available && (
-            <div className="shrink-0 bg-amber-500/10 border-b border-amber-500/20 px-4 py-2 flex items-center gap-2 text-amber-500">
-              <AlertTriangle className="h-4 w-4" />
-              <span className="text-sm">
-                Claude Code CLI not found. Install it to use AI features.
               </span>
             </div>
           )}
