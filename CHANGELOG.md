@@ -1,6 +1,23 @@
 # Changelog
 
 
+## v0.1.46...main
+
+[compare changes](https://github.com/debuglebowski/omgslayzone/compare/v0.1.46...main)
+
+### 🩹 Fixes
+
+- **file-editor:** Show gitignored files grayed out instead of hiding them ([62929e2](https://github.com/debuglebowski/omgslayzone/commit/62929e2))
+- **ci:** Inject PostHog secrets into release build ([ed4dfc2](https://github.com/debuglebowski/omgslayzone/commit/ed4dfc2))
+
+### 📖 Documentation
+
+- **website:** Sync features with README, add status tracking ([a3b4a90](https://github.com/debuglebowski/omgslayzone/commit/a3b4a90))
+
+### ❤️ Contributors
+
+- Debuglebowski <kh.hansson@gmail.com>
+
 ## v0.1.45...main
 
 [compare changes](https://github.com/debuglebowski/omgslayzone/compare/v0.1.45...main)
