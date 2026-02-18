@@ -621,7 +621,20 @@ export function resizePty(sessionId: string, cols: number, rows: number): boolea
   // Validate bounds to prevent crashes
   const safeCols = Math.max(1, Math.min(cols, 500))
   const safeRows = Math.max(1, Math.min(rows, 500))
-  session.pty.resize(safeCols, safeRows)
+  try {
+    session.pty.resize(safeCols, safeRows)
+  } catch (error) {
+    // PTY fd may be invalid if process died — non-fatal
+    recordDiagnosticEvent({
+      level: 'warn',
+      source: 'pty',
+      event: 'pty.resize_failed',
+      sessionId,
+      taskId: taskIdFromSessionId(sessionId),
+      message: (error as Error).message
+    })
+    return false
+  }
   return true
 }
 
