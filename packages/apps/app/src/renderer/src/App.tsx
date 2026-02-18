@@ -744,7 +744,7 @@ function App(): React.JSX.Element {
           zenMode={zenMode}
         />
 
-        <div id="right-column" className="flex-1 flex flex-col min-w-0 bg-surface-1 pb-2 pr-2">
+        <div id="right-column" className={`flex-1 flex flex-col min-w-0 bg-surface-1 pb-2 pr-2 ${zenMode ? 'pl-2' : ''}`}>
               <div className={zenMode ? "window-drag-region bg-surface-1 pl-16" : "window-drag-region bg-surface-1"}>
                 <div className="window-no-drag">
                   <TabBar
