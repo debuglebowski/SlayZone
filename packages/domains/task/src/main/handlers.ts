@@ -34,6 +34,7 @@ function parseTask(row: Record<string, unknown> | undefined): Task | null {
     panel_visibility: safeJsonParse(row.panel_visibility),
     browser_tabs: safeJsonParse(row.browser_tabs),
     web_panel_urls: safeJsonParse(row.web_panel_urls),
+    web_panel_resolutions: safeJsonParse(row.web_panel_resolutions),
     editor_open_files: safeJsonParse(row.editor_open_files),
     merge_context: safeJsonParse(row.merge_context),
     is_temporary: Boolean(row.is_temporary)
@@ -269,6 +270,7 @@ export function updateTask(db: Database, data: UpdateTaskInput): Task | null {
   if (data.browserUrl !== undefined) { fields.push('browser_url = ?'); values.push(data.browserUrl) }
   if (data.browserTabs !== undefined) { fields.push('browser_tabs = ?'); values.push(data.browserTabs ? JSON.stringify(data.browserTabs) : null) }
   if (data.webPanelUrls !== undefined) { fields.push('web_panel_urls = ?'); values.push(data.webPanelUrls ? JSON.stringify(data.webPanelUrls) : null) }
+  if (data.webPanelResolutions !== undefined) { fields.push('web_panel_resolutions = ?'); values.push(data.webPanelResolutions ? JSON.stringify(data.webPanelResolutions) : null) }
   if (data.editorOpenFiles !== undefined) { fields.push('editor_open_files = ?'); values.push(data.editorOpenFiles ? JSON.stringify(data.editorOpenFiles) : null) }
   if (data.mergeState !== undefined) { fields.push('merge_state = ?'); values.push(data.mergeState) }
   if (data.mergeContext !== undefined) { fields.push('merge_context = ?'); values.push(data.mergeContext ? JSON.stringify(data.mergeContext) : null) }

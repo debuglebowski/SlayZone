@@ -78,10 +78,38 @@ export interface PanelConfig {
   builtinEnabled: Record<string, boolean>
   webPanels: WebPanelDefinition[]
   deletedPredefined?: string[] // IDs of predefined panels the user removed
+  webPanelResolutionDefaults?: WebPanelResolutionDefaults
 }
 
 // Per-task URL state (panelId → current URL)
 export type WebPanelUrls = Record<string, string>
+
+// --- Web panel resolution / device emulation ---
+// Also defined in @slayzone/task-browser/shared (avoid circular dep)
+
+export type WebPanelEnvironment = 'desktop' | 'tablet' | 'mobile'
+
+export interface WebPanelResolutionDefaults {
+  desktop: { width: number; height: number }
+  tablet:  { width: number; height: number }
+  mobile:  { width: number; height: number }
+}
+
+export const DEFAULT_WEB_PANEL_RESOLUTION_DEFAULTS: WebPanelResolutionDefaults = {
+  desktop: { width: 1920, height: 1080 },
+  tablet:  { width: 768,  height: 1024 },
+  mobile:  { width: 375,  height: 667  },
+}
+
+/** Per-panel-per-task resolution state */
+export interface WebPanelResolution {
+  environment: WebPanelEnvironment
+  customWidth?: number
+  customHeight?: number
+}
+
+/** JSON column: Record<panelId, WebPanelResolution> */
+export type WebPanelResolutions = Record<string, WebPanelResolution>
 
 export const BUILTIN_PANEL_IDS = ['terminal', 'browser', 'editor', 'diff', 'settings'] as const
 
@@ -143,6 +171,8 @@ export interface Task {
   browser_tabs: BrowserTabsState | null
   // Web panel URLs (JSON) — per-task persistent URLs for custom/predefined web panels
   web_panel_urls: WebPanelUrls | null
+  // Web panel resolutions (JSON) — per-task resolution state per panel
+  web_panel_resolutions: WebPanelResolutions | null
   // Editor panel state (JSON)
   editor_open_files: EditorOpenFilesState | null
   // Merge mode
@@ -213,6 +243,8 @@ export interface UpdateTaskInput {
   browserTabs?: BrowserTabsState | null
   // Web panel URLs
   webPanelUrls?: WebPanelUrls | null
+  // Web panel resolutions
+  webPanelResolutions?: WebPanelResolutions | null
   // Editor state
   editorOpenFiles?: EditorOpenFilesState | null
   // Merge mode

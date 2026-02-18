@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { ArrowLeft, ArrowRight, RotateCw, X, Plus, Import, Smartphone } from 'lucide-react'
+import { ArrowLeft, ArrowRight, RotateCw, X, Plus, Import, Smartphone, Monitor, Tablet, LayoutGrid, ChevronDown } from 'lucide-react'
 import {
   Button,
   Input,
@@ -8,14 +8,16 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-  Popover,
-  PopoverTrigger,
-  PopoverContent,
-  Separator,
 } from '@slayzone/ui'
-import type { BrowserTab, BrowserTabsState, DeviceEmulation } from '../shared'
-import { DEVICE_PRESETS } from './device-presets'
-import { computeScale } from './scale'
+import type { BrowserTab, BrowserTabsState, MultiDeviceConfig, GridLayout, DeviceSlot } from '../shared'
+import { defaultMultiDeviceConfig } from './device-presets'
+import { MultiDeviceGrid } from './MultiDeviceGrid'
+
+const SLOT_BUTTONS: { slot: DeviceSlot; icon: typeof Monitor; label: string }[] = [
+  { slot: 'desktop', icon: Monitor, label: 'Desktop' },
+  { slot: 'tablet', icon: Tablet, label: 'Tablet' },
+  { slot: 'mobile', icon: Smartphone, label: 'Mobile' },
+]
 
 interface TaskUrlEntry {
   taskId: string
@@ -58,28 +60,13 @@ export function BrowserPanel({ className, tabs, onTabsChange, taskId, isResizing
   const [webviewReady, setWebviewReady] = useState(false)
   const [otherTaskUrls, setOtherTaskUrls] = useState<TaskUrlEntry[]>([])
   const [importDropdownOpen, setImportDropdownOpen] = useState(false)
-  const [customWidth, setCustomWidth] = useState('375')
-  const [customHeight, setCustomHeight] = useState('667')
-  const [viewportSize, setViewportSize] = useState<{ width: number; height: number } | null>(null)
+  const [reloadTrigger, setReloadTrigger] = useState(0)
   const webviewRef = useRef<WebviewElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
-  const viewportRef = useRef<HTMLDivElement>(null)
-
-  // Track viewport container size for scale-to-fit
-  useEffect(() => {
-    const el = viewportRef.current
-    if (!el) return
-    const ro = new ResizeObserver(([entry]) => {
-      setViewportSize({ width: entry.contentRect.width, height: entry.contentRect.height })
-    })
-    ro.observe(el)
-    return () => ro.disconnect()
-  }, [])
 
   // Fetch URLs from other tasks when dropdown opens
   useEffect(() => {
     if (!importDropdownOpen || !taskId) return
-
     window.api.db.getTasks().then(tasks => {
       const entries: TaskUrlEntry[] = []
       for (const t of tasks) {
@@ -87,12 +74,7 @@ export function BrowserPanel({ className, tabs, onTabsChange, taskId, isResizing
         if (!t.browser_tabs?.tabs) continue
         for (const tab of t.browser_tabs.tabs) {
           if (tab.url && tab.url !== 'about:blank') {
-            entries.push({
-              taskId: t.id,
-              taskTitle: t.title,
-              url: tab.url,
-              tabTitle: tab.title
-            })
+            entries.push({ taskId: t.id, taskTitle: t.title, url: tab.url, tabTitle: tab.title })
           }
         }
       }
@@ -102,7 +84,52 @@ export function BrowserPanel({ className, tabs, onTabsChange, taskId, isResizing
 
   const activeTab = tabs.tabs.find(t => t.id === tabs.activeTabId) || null
 
-  // Define callbacks first so they can be used in useEffects
+  // Multi-device state (derived from active tab)
+  const multiDeviceMode = activeTab?.multiDeviceMode ?? false
+  const [defaultConfig] = useState(defaultMultiDeviceConfig)
+  const multiDeviceConfig = activeTab?.multiDeviceConfig ?? defaultConfig
+  const multiDeviceLayout: GridLayout = activeTab?.multiDeviceLayout ?? 'horizontal'
+
+  const updateActiveTab = useCallback((patch: Partial<BrowserTab>) => {
+    if (!tabs.activeTabId) return
+    onTabsChange({
+      ...tabs,
+      tabs: tabs.tabs.map(t =>
+        t.id === tabs.activeTabId ? { ...t, ...patch } : t
+      )
+    })
+  }, [tabs, onTabsChange])
+
+  const toggleMultiDevice = useCallback(() => {
+    if (!activeTab) return
+    const entering = !multiDeviceMode
+    if (!entering) setWebviewReady(false) // reset — single webview will remount
+    updateActiveTab({
+      multiDeviceMode: entering,
+      ...(entering && !activeTab.multiDeviceConfig ? { multiDeviceConfig: defaultMultiDeviceConfig() } : {}),
+      ...(entering && !activeTab.multiDeviceLayout ? { multiDeviceLayout: 'horizontal' as GridLayout } : {}),
+    })
+  }, [activeTab, multiDeviceMode, updateActiveTab])
+
+  const setMultiDeviceLayout = useCallback((layout: GridLayout) => {
+    updateActiveTab({ multiDeviceLayout: layout })
+  }, [updateActiveTab])
+
+  const setMultiDeviceConfig = useCallback((config: MultiDeviceConfig) => {
+    updateActiveTab({ multiDeviceConfig: config })
+  }, [updateActiveTab])
+
+  const toggleSlot = useCallback((slot: DeviceSlot) => {
+    const newConfig = { ...multiDeviceConfig, [slot]: { ...multiDeviceConfig[slot], enabled: !multiDeviceConfig[slot].enabled } }
+    if (!Object.values(newConfig).some(c => c.enabled)) return
+    setMultiDeviceConfig(newConfig)
+  }, [multiDeviceConfig, setMultiDeviceConfig])
+
+  const setPreset = useCallback((slot: DeviceSlot, preset: import('../shared').DeviceEmulation) => {
+    setMultiDeviceConfig({ ...multiDeviceConfig, [slot]: { ...multiDeviceConfig[slot], preset } })
+  }, [multiDeviceConfig, setMultiDeviceConfig])
+
+  // Tab callbacks
   const createNewTab = useCallback((url = 'about:blank') => {
     const newTab: BrowserTab = {
       id: generateTabId(),
@@ -119,48 +146,31 @@ export function BrowserPanel({ className, tabs, onTabsChange, taskId, isResizing
     const idx = tabs.tabs.findIndex(t => t.id === tabId)
     const newTabs = tabs.tabs.filter(t => t.id !== tabId)
 
-    // If closing active tab, switch to adjacent tab
     let newActiveId = tabs.activeTabId
     if (tabId === tabs.activeTabId) {
       if (newTabs.length === 0) {
-        // Create a new blank tab if closing last one
-        const newTab: BrowserTab = {
-          id: generateTabId(),
-          url: 'about:blank',
-          title: 'New Tab'
-        }
-        onTabsChange({
-          tabs: [newTab],
-          activeTabId: newTab.id
-        })
+        const newTab: BrowserTab = { id: generateTabId(), url: 'about:blank', title: 'New Tab' }
+        onTabsChange({ tabs: [newTab], activeTabId: newTab.id })
         return
       }
       newActiveId = newTabs[Math.min(idx, newTabs.length - 1)]?.id || null
     }
 
-    onTabsChange({
-      tabs: newTabs,
-      activeTabId: newActiveId
-    })
+    onTabsChange({ tabs: newTabs, activeTabId: newActiveId })
   }, [tabs, onTabsChange])
 
   const switchToTab = useCallback((tabId: string) => {
-    onTabsChange({
-      ...tabs,
-      activeTabId: tabId
-    })
+    onTabsChange({ ...tabs, activeTabId: tabId })
   }, [tabs, onTabsChange])
 
   const switchToNextTab = useCallback(() => {
     const idx = tabs.tabs.findIndex(t => t.id === tabs.activeTabId)
-    const nextIdx = (idx + 1) % tabs.tabs.length
-    switchToTab(tabs.tabs[nextIdx].id)
+    switchToTab(tabs.tabs[(idx + 1) % tabs.tabs.length].id)
   }, [tabs, switchToTab])
 
   const switchToPrevTab = useCallback(() => {
     const idx = tabs.tabs.findIndex(t => t.id === tabs.activeTabId)
-    const prevIdx = (idx - 1 + tabs.tabs.length) % tabs.tabs.length
-    switchToTab(tabs.tabs[prevIdx].id)
+    switchToTab(tabs.tabs[(idx - 1 + tabs.tabs.length) % tabs.tabs.length].id)
   }, [tabs, switchToTab])
 
   // Update URL bar when active tab changes
@@ -168,20 +178,26 @@ export function BrowserPanel({ className, tabs, onTabsChange, taskId, isResizing
     setInputUrl(activeTab?.url || '')
   }, [activeTab?.id, activeTab?.url])
 
-  // Load URL when active tab changes
+  // Load URL when active tab changes (single webview only)
   useEffect(() => {
     const wv = webviewRef.current
-    if (!wv || !activeTab || !webviewReady) return
+    if (!wv || !activeTab || !webviewReady || multiDeviceMode) return
 
     const currentUrl = wv.getURL()
     if (activeTab.url && activeTab.url !== currentUrl && activeTab.url !== 'about:blank') {
-      // Convert file:// to slz-file:// for webview loading
-      const loadUrl = activeTab.url.replace(/^file:\/\//, 'slz-file://')
-      wv.loadURL(loadUrl)
+      wv.loadURL(activeTab.url.replace(/^file:\/\//, 'slz-file://'))
     }
-  }, [activeTab?.id, webviewReady])
+  }, [activeTab?.id, webviewReady, multiDeviceMode])
 
-  // Webview event listeners
+  // Refs for stable event handler closures (avoids tearing down listeners on every tabs change)
+  const tabsRef = useRef(tabs)
+  const onTabsChangeRef = useRef(onTabsChange)
+  const createNewTabRef = useRef(createNewTab)
+  tabsRef.current = tabs
+  onTabsChangeRef.current = onTabsChange
+  createNewTabRef.current = createNewTab
+
+  // Webview event listeners — attach once, read latest state via refs
   useEffect(() => {
     const wv = webviewRef.current
     if (!wv) return
@@ -189,16 +205,15 @@ export function BrowserPanel({ className, tabs, onTabsChange, taskId, isResizing
     const handleNavigate = () => {
       setCanGoBack(wv.canGoBack())
       setCanGoForward(wv.canGoForward())
-      // Convert internal slz-file:// back to file:// for display
       const url = wv.getURL().replace(/^slz-file:\/\//, 'file://')
       setInputUrl(url)
 
-      // Update tab URL
-      if (tabs.activeTabId) {
-        onTabsChange({
-          ...tabs,
-          tabs: tabs.tabs.map(t =>
-            t.id === tabs.activeTabId ? { ...t, url } : t
+      const t = tabsRef.current
+      if (t.activeTabId) {
+        onTabsChangeRef.current({
+          ...t,
+          tabs: t.tabs.map(tab =>
+            tab.id === t.activeTabId ? { ...tab, url } : tab
           )
         })
       }
@@ -209,11 +224,12 @@ export function BrowserPanel({ className, tabs, onTabsChange, taskId, isResizing
 
     const handleTitleUpdate = (e: Event) => {
       const title = (e as CustomEvent).detail?.title || ''
-      if (tabs.activeTabId && title) {
-        onTabsChange({
-          ...tabs,
-          tabs: tabs.tabs.map(t =>
-            t.id === tabs.activeTabId ? { ...t, title } : t
+      const t = tabsRef.current
+      if (t.activeTabId && title) {
+        onTabsChangeRef.current({
+          ...t,
+          tabs: t.tabs.map(tab =>
+            tab.id === t.activeTabId ? { ...tab, title } : tab
           )
         })
       }
@@ -222,22 +238,20 @@ export function BrowserPanel({ className, tabs, onTabsChange, taskId, isResizing
     const handleFaviconUpdate = (e: Event) => {
       const favicons = (e as CustomEvent).detail?.favicons as string[] | undefined
       const favicon = favicons?.[0]
-      if (tabs.activeTabId && favicon) {
-        onTabsChange({
-          ...tabs,
-          tabs: tabs.tabs.map(t =>
-            t.id === tabs.activeTabId ? { ...t, favicon } : t
+      const t = tabsRef.current
+      if (t.activeTabId && favicon) {
+        onTabsChangeRef.current({
+          ...t,
+          tabs: t.tabs.map(tab =>
+            tab.id === t.activeTabId ? { ...tab, favicon } : tab
           )
         })
       }
     }
 
-    // Handle middle-click / cmd+click opening new tab
     const handleNewWindow = (e: Event) => {
       const url = (e as CustomEvent).detail?.url
-      if (url) {
-        createNewTab(url)
-      }
+      if (url) createNewTabRef.current(url)
     }
 
     const handleDomReady = () => setWebviewReady(true)
@@ -261,137 +275,7 @@ export function BrowserPanel({ className, tabs, onTabsChange, taskId, isResizing
       wv.removeEventListener('page-favicon-updated', handleFaviconUpdate)
       wv.removeEventListener('new-window', handleNewWindow)
     }
-  }, [tabs, onTabsChange, createNewTab])
-
-  // Apply/disable device emulation when tab or emulation changes
-  const activeEmulation = activeTab?.deviceEmulation ?? null
-  const prevEmulationRef = useRef<{ tabId: string | null; width: number; height: number; dpr: number; mobile: boolean; ua?: string } | null>(null)
-  const mountedRef = useRef(false)
-
-  useEffect(() => {
-    const wv = webviewRef.current
-    if (!wv || !webviewReady) return
-
-    const cur = activeEmulation ? {
-      tabId: activeTab?.id ?? null,
-      width: activeEmulation.width,
-      height: activeEmulation.height,
-      dpr: activeEmulation.deviceScaleFactor,
-      mobile: activeEmulation.mobile,
-      ua: activeEmulation.userAgent,
-    } : null
-    const prev = prevEmulationRef.current
-
-    // Skip initial mount with no emulation
-    if (!mountedRef.current) {
-      mountedRef.current = true
-      if (!cur) {
-        prevEmulationRef.current = null
-        return
-      }
-    }
-
-    // Skip if nothing meaningful changed
-    if (cur && prev &&
-      cur.tabId === prev.tabId &&
-      cur.width === prev.width &&
-      cur.height === prev.height &&
-      cur.dpr === prev.dpr &&
-      cur.mobile === prev.mobile &&
-      cur.ua === prev.ua
-    ) return
-
-    const prevUa = prev?.ua
-    prevEmulationRef.current = cur
-
-    const wcId = wv.getWebContentsId()
-    if (activeEmulation) {
-      window.api.webview?.enableDeviceEmulation(wcId, {
-        screenSize: { width: activeEmulation.width, height: activeEmulation.height },
-        viewSize: { width: activeEmulation.width, height: activeEmulation.height },
-        deviceScaleFactor: activeEmulation.deviceScaleFactor,
-        screenPosition: activeEmulation.mobile ? 'mobile' : 'desktop',
-        userAgent: activeEmulation.userAgent,
-      }).then(() => {
-        // Only reload if UA changed — viewport changes apply instantly
-        if (activeEmulation.userAgent !== prevUa) wv.reload()
-      })
-    } else {
-      window.api.webview?.disableDeviceEmulation(wcId).then(() => {
-        if (prevUa) wv.reload()
-      })
-    }
-  }, [activeEmulation, webviewReady, activeTab?.id])
-
-  const setEmulation = useCallback((emulation: DeviceEmulation | null) => {
-    if (!tabs.activeTabId) return
-    onTabsChange({
-      ...tabs,
-      tabs: tabs.tabs.map(t =>
-        t.id === tabs.activeTabId ? { ...t, deviceEmulation: emulation } : t
-      )
-    })
-  }, [tabs, onTabsChange])
-
-  // Resize handles drag state
-  const [dragSize, setDragSize] = useState<{ width: number; height: number } | null>(null)
-  const [dragScale, setDragScale] = useState<number | null>(null)
-  const dragRef = useRef<{ startX: number; startY: number; startW: number; startH: number; axis: 'x' | 'y' | 'xy'; latestW: number; latestH: number } | null>(null)
-  const dragCleanupRef = useRef<(() => void) | null>(null)
-
-  // Clean up drag listeners on unmount
-  useEffect(() => {
-    return () => { dragCleanupRef.current?.() }
-  }, [])
-
-  const handleResizeStart = useCallback((e: React.MouseEvent, axis: 'x' | 'y' | 'xy') => {
-    if (!activeEmulation) return
-    e.preventDefault()
-    const startW = activeEmulation.width
-    const startH = activeEmulation.height
-    // Freeze scale during drag so the handle tracks the mouse
-    const frozen = computeScale(viewportSize, { width: startW, height: startH })
-    setDragScale(frozen)
-    dragRef.current = { startX: e.clientX, startY: e.clientY, startW, startH, axis, latestW: startW, latestH: startH }
-
-    const onMove = (ev: MouseEvent) => {
-      const d = dragRef.current
-      if (!d) return
-      const dx = ev.clientX - d.startX
-      const dy = ev.clientY - d.startY
-      d.latestW = Math.max(200, d.axis !== 'y' ? d.startW + dx : d.startW)
-      d.latestH = Math.max(200, d.axis !== 'x' ? d.startH + dy : d.startH)
-      setDragSize({ width: d.latestW, height: d.latestH })
-    }
-
-    const cleanup = () => {
-      document.removeEventListener('mousemove', onMove)
-      document.removeEventListener('mouseup', onUp)
-      dragCleanupRef.current = null
-    }
-
-    const onUp = () => {
-      cleanup()
-      const d = dragRef.current
-      dragRef.current = null
-      if (d && activeEmulation) {
-        setEmulation({
-          name: 'Custom',
-          width: d.latestW,
-          height: d.latestH,
-          deviceScaleFactor: activeEmulation.deviceScaleFactor,
-          mobile: activeEmulation.mobile,
-          userAgent: activeEmulation.userAgent,
-        })
-      }
-      setDragSize(null)
-      setDragScale(null)
-    }
-
-    document.addEventListener('mousemove', onMove)
-    document.addEventListener('mouseup', onUp)
-    dragCleanupRef.current = cleanup
-  }, [activeEmulation, setEmulation, viewportSize])
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps -- stable via refs
 
   // Keyboard shortcuts when focused
   useEffect(() => {
@@ -400,29 +284,10 @@ export function BrowserPanel({ className, tabs, onTabsChange, taskId, isResizing
 
     const handleKeyDown = (e: KeyboardEvent) => {
       if (!isFocused) return
-
-      // Cmd+T: New tab
-      if (e.metaKey && e.key === 't') {
-        e.preventDefault()
-        createNewTab()
-      }
-      // Cmd+W: Close tab
-      if (e.metaKey && e.key === 'w') {
-        e.preventDefault()
-        if (tabs.activeTabId) {
-          closeTab(tabs.activeTabId)
-        }
-      }
-      // Ctrl+Tab: Next tab
-      if (e.ctrlKey && e.key === 'Tab' && !e.shiftKey) {
-        e.preventDefault()
-        switchToNextTab()
-      }
-      // Ctrl+Shift+Tab: Prev tab
-      if (e.ctrlKey && e.key === 'Tab' && e.shiftKey) {
-        e.preventDefault()
-        switchToPrevTab()
-      }
+      if (e.metaKey && e.key === 't') { e.preventDefault(); createNewTab() }
+      if (e.metaKey && e.key === 'w') { e.preventDefault(); if (tabs.activeTabId) closeTab(tabs.activeTabId) }
+      if (e.ctrlKey && e.key === 'Tab' && !e.shiftKey) { e.preventDefault(); switchToNextTab() }
+      if (e.ctrlKey && e.key === 'Tab' && e.shiftKey) { e.preventDefault(); switchToPrevTab() }
     }
 
     container.addEventListener('keydown', handleKeyDown)
@@ -430,8 +295,7 @@ export function BrowserPanel({ className, tabs, onTabsChange, taskId, isResizing
   }, [isFocused, tabs, createNewTab, closeTab, switchToNextTab, switchToPrevTab])
 
   const handleNavigate = () => {
-    const wv = webviewRef.current
-    if (!wv || !inputUrl.trim()) return
+    if (!inputUrl.trim()) return
 
     let url = inputUrl.trim()
     if (url.startsWith('/')) {
@@ -439,7 +303,15 @@ export function BrowserPanel({ className, tabs, onTabsChange, taskId, isResizing
     } else if (!url.startsWith('http://') && !url.startsWith('https://') && !url.startsWith('file://')) {
       url = `https://${url}`
     }
-    // Chromium blocks file:// in webviews — use custom slz-file:// protocol
+
+    if (multiDeviceMode) {
+      setInputUrl(url)
+      updateActiveTab({ url })
+      return
+    }
+
+    const wv = webviewRef.current
+    if (!wv) return
     if (url.startsWith('file://')) {
       url = url.replace('file://', 'slz-file://')
     }
@@ -447,14 +319,11 @@ export function BrowserPanel({ className, tabs, onTabsChange, taskId, isResizing
   }
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
-      handleNavigate()
-    }
+    if (e.key === 'Enter') handleNavigate()
   }
 
   const handleFocus = () => setIsFocused(true)
   const handleBlur = (e: React.FocusEvent) => {
-    // Only blur if focus is leaving the container entirely
     if (!containerRef.current?.contains(e.relatedTarget as Node)) {
       setIsFocused(false)
     }
@@ -484,16 +353,10 @@ export function BrowserPanel({ className, tabs, onTabsChange, taskId, isResizing
               tabIndex={0}
               onClick={() => switchToTab(tab.id)}
               onKeyDown={(e) => {
-                if (e.key === 'Enter' || e.key === ' ') {
-                  e.preventDefault()
-                  switchToTab(tab.id)
-                }
+                if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); switchToTab(tab.id) }
               }}
               onAuxClick={(e) => {
-                if (e.button === 1) {
-                  e.preventDefault()
-                  closeTab(tab.id)
-                }
+                if (e.button === 1) { e.preventDefault(); closeTab(tab.id) }
               }}
               className={cn(
                 'group flex items-center gap-1.5 h-7 px-3 rounded-md cursor-pointer transition-colors select-none flex-shrink-0',
@@ -504,10 +367,7 @@ export function BrowserPanel({ className, tabs, onTabsChange, taskId, isResizing
             >
               <span className="truncate text-sm">{displayUrl}</span>
               <button
-                onClick={(e) => {
-                  e.stopPropagation()
-                  closeTab(tab.id)
-                }}
+                onClick={(e) => { e.stopPropagation(); closeTab(tab.id) }}
                 className="h-4 w-4 rounded hover:bg-muted-foreground/20 flex items-center justify-center"
               >
                 <X className="h-3 w-3" />
@@ -525,34 +385,22 @@ export function BrowserPanel({ className, tabs, onTabsChange, taskId, isResizing
 
       {/* URL Bar */}
       <div className="shrink-0 p-2 border-b flex items-center gap-1">
-        <Button
-          variant="ghost"
-          size="icon-sm"
-          disabled={!canGoBack}
-          onClick={() => webviewRef.current?.goBack()}
-        >
+        <Button variant="ghost" size="icon-sm" disabled={!canGoBack || multiDeviceMode} onClick={() => webviewRef.current?.goBack()}>
           <ArrowLeft className="size-4" />
         </Button>
-        <Button
-          variant="ghost"
-          size="icon-sm"
-          disabled={!canGoForward}
-          onClick={() => webviewRef.current?.goForward()}
-        >
+        <Button variant="ghost" size="icon-sm" disabled={!canGoForward || multiDeviceMode} onClick={() => webviewRef.current?.goForward()}>
           <ArrowRight className="size-4" />
         </Button>
         <Button
           variant="ghost"
           size="icon-sm"
           onClick={() => {
-            if (isLoading) {
-              webviewRef.current?.stop()
-            } else {
-              webviewRef.current?.reload()
-            }
+            if (multiDeviceMode) setReloadTrigger(r => r + 1)
+            else if (isLoading) webviewRef.current?.stop()
+            else webviewRef.current?.reload()
           }}
         >
-          {isLoading ? <X className="size-4" /> : <RotateCw className="size-4" />}
+          {isLoading && !multiDeviceMode ? <X className="size-4" /> : <RotateCw className="size-4" />}
         </Button>
 
         <Input
@@ -563,72 +411,15 @@ export function BrowserPanel({ className, tabs, onTabsChange, taskId, isResizing
           className="flex-1 h-7 text-sm"
         />
 
-        <Popover>
-          <PopoverTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              className={cn(activeEmulation && 'text-blue-500 bg-blue-500/10')}
-            >
-              <Smartphone className="size-4" />
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent className="w-64 p-1" align="end">
-            <button
-              onClick={() => setEmulation(null)}
-              className={cn(
-                'w-full text-left px-2 py-1.5 text-sm rounded-sm hover:bg-accent',
-                !activeEmulation && 'text-blue-500 font-medium'
-              )}
-            >
-              No emulation
-            </button>
-            <Separator className="my-1" />
-            {DEVICE_PRESETS.map(preset => (
-              <button
-                key={preset.name}
-                onClick={() => setEmulation(preset)}
-                className={cn(
-                  'w-full text-left px-2 py-1 text-sm rounded-sm hover:bg-accent flex items-center justify-between',
-                  activeEmulation?.name === preset.name && 'text-blue-500 font-medium'
-                )}
-              >
-                <span>{preset.name}</span>
-                <span className="text-xs text-muted-foreground">{preset.width}&times;{preset.height}</span>
-              </button>
-            ))}
-            <Separator className="my-1" />
-            <div className="flex gap-1 items-center px-2 py-1">
-              <Input
-                value={customWidth}
-                onChange={(e) => setCustomWidth(e.target.value)}
-                className="w-16 h-6 text-xs"
-                placeholder="W"
-              />
-              <span className="text-xs text-muted-foreground">&times;</span>
-              <Input
-                value={customHeight}
-                onChange={(e) => setCustomHeight(e.target.value)}
-                className="w-16 h-6 text-xs"
-                placeholder="H"
-              />
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-6 text-xs"
-                onClick={() => {
-                  const w = parseInt(customWidth, 10)
-                  const h = parseInt(customHeight, 10)
-                  if (w > 0 && h > 0) {
-                    setEmulation({ name: 'Custom', width: w, height: h, deviceScaleFactor: 1, mobile: false })
-                  }
-                }}
-              >
-                Apply
-              </Button>
-            </div>
-          </PopoverContent>
-        </Popover>
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          className={cn(multiDeviceMode && 'text-blue-500 bg-blue-500/10')}
+          title={multiDeviceMode ? 'Exit responsive preview' : 'Responsive preview'}
+          onClick={toggleMultiDevice}
+        >
+          <LayoutGrid className="size-4" />
+        </Button>
 
         {taskId && (
           <DropdownMenu open={importDropdownOpen} onOpenChange={setImportDropdownOpen}>
@@ -646,7 +437,14 @@ export function BrowserPanel({ className, tabs, onTabsChange, taskId, isResizing
                 otherTaskUrls.map((entry, idx) => (
                   <DropdownMenuItem
                     key={`${entry.taskId}-${idx}`}
-                    onClick={() => webviewRef.current?.loadURL(entry.url)}
+                    onClick={() => {
+                      if (multiDeviceMode) {
+                        updateActiveTab({ url: entry.url })
+                        setInputUrl(entry.url)
+                      } else {
+                        webviewRef.current?.loadURL(entry.url)
+                      }
+                    }}
                     className="flex flex-col items-start gap-0.5"
                   >
                     <span className="text-xs text-muted-foreground truncate w-full">
@@ -661,84 +459,77 @@ export function BrowserPanel({ className, tabs, onTabsChange, taskId, isResizing
         )}
       </div>
 
-      {/* Webview */}
-      <div
-        ref={viewportRef}
-        className={cn(
-          'relative flex-1',
-          activeEmulation && 'flex items-center justify-center bg-neutral-900 overflow-hidden'
-        )}
-      >
-        {(() => {
-          const emW = dragSize?.width ?? activeEmulation?.width ?? 0
-          const emH = dragSize?.height ?? activeEmulation?.height ?? 0
-          const scale = dragScale ?? computeScale(viewportSize, activeEmulation ? { width: emW, height: emH } : null)
-          return (
-        <div
-          className={cn('relative', !activeEmulation && 'absolute inset-0')}
-          style={activeEmulation ? {
-            width: emW * scale,
-            height: emH * scale,
-          } : undefined}
-        >
-          {/* Webview content — scaled to fit when device is larger than container */}
-          <div
-            className={cn('absolute', activeEmulation && 'border border-neutral-700 origin-top-left')}
-            style={activeEmulation ? {
-              width: emW,
-              height: emH,
-              transform: scale < 1 ? `scale(${scale})` : undefined,
-              top: 0,
-              left: 0,
-            } : { inset: 0 }}
-          >
-            <webview
-              ref={webviewRef}
-              src={(activeTab?.url || 'about:blank').replace(/^file:\/\//, 'slz-file://')}
-              partition="persist:browser-tabs"
-              className="absolute inset-0"
-              // @ts-expect-error - webview attributes not in React types
-              allowpopups="true"
-            />
-          </div>
-          {activeEmulation && (
-            <>
-              {/* Right handle */}
-              <div
-                className="absolute top-0 -right-8 w-10 cursor-ew-resize group flex items-center justify-center"
-                style={{ height: 'calc(100% - 2rem)' }}
-                onMouseDown={(e) => handleResizeStart(e, 'x')}
+      {/* Responsive toolbar */}
+      {multiDeviceMode && (
+        <div className="shrink-0 flex items-center py-2 px-2 gap-3 border-b border-border bg-neutral-900">
+          {/* Device toggle buttons */}
+          {SLOT_BUTTONS.map(({ slot, icon: Icon, label }) => {
+            const enabled = multiDeviceConfig[slot].enabled
+            return (
+              <button
+                key={slot}
+                onClick={() => toggleSlot(slot)}
+                className={cn(
+                  'h-8 px-3 flex items-center gap-1.5 text-xs font-medium rounded-lg border transition-colors',
+                  enabled
+                    ? 'text-blue-400 bg-blue-500/15 border-blue-500/30 hover:bg-blue-500/25'
+                    : 'text-neutral-500 border-neutral-700 hover:text-neutral-300 hover:bg-neutral-800'
+                )}
               >
-                <div className="w-1 h-8 rounded-full bg-neutral-600 group-hover:bg-blue-500 transition-colors" />
-              </div>
-              {/* Bottom handle */}
-              <div
-                className="absolute -bottom-8 left-0 h-10 cursor-ns-resize group flex items-center justify-center"
-                style={{ width: 'calc(100% - 2rem)' }}
-                onMouseDown={(e) => handleResizeStart(e, 'y')}
+                <Icon className="size-3.5" />
+                <span>{label}</span>
+              </button>
+            )
+          })}
+          <div className="flex-1" />
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" className="h-8 px-2 text-xs text-neutral-500 hover:text-neutral-300 gap-1">
+                {multiDeviceLayout === 'horizontal' ? 'Side by side' : 'Stacked'}
+                <ChevronDown className="size-3" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem
+                onClick={() => setMultiDeviceLayout('horizontal')}
+                className={cn(multiDeviceLayout === 'horizontal' && 'text-blue-500 font-medium')}
               >
-                <div className="h-1 w-8 rounded-full bg-neutral-600 group-hover:bg-blue-500 transition-colors" />
-              </div>
-              {/* Corner handle */}
-              <div
-                className="absolute -bottom-8 -right-8 w-10 h-10 cursor-nwse-resize group"
-                onMouseDown={(e) => handleResizeStart(e, 'xy')}
+                Side by side
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => setMultiDeviceLayout('vertical')}
+                className={cn(multiDeviceLayout === 'vertical' && 'text-blue-500 font-medium')}
               >
-                <div className="absolute top-0 w-1 h-1/2 rounded-full bg-neutral-600 group-hover:bg-blue-500 transition-colors" style={{ left: 'calc(50% - 2px)', transform: 'translateX(-50%)' }} />
-                <div className="absolute left-0 h-1 w-1/2 rounded-full bg-neutral-600 group-hover:bg-blue-500 transition-colors" style={{ top: 'calc(50% - 2px)', transform: 'translateY(-50%)' }} />
-              </div>
-            </>
-          )}
-          {(dragSize || isResizing) && <div className="absolute inset-0 z-10" />}
+                Stacked
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
-          )
-        })()}
-        {activeEmulation && (
-          <div className="absolute bottom-2 left-1/2 -translate-x-1/2 text-xs text-neutral-500 pointer-events-none">
-            {activeEmulation.name} — {dragSize?.width ?? activeEmulation.width}&times;{dragSize?.height ?? activeEmulation.height}
-          </div>
-        )}
-      </div>
+      )}
+
+      {/* Webview / Multi-device */}
+      {multiDeviceMode ? (
+        <MultiDeviceGrid
+          config={multiDeviceConfig}
+          layout={multiDeviceLayout}
+          url={activeTab?.url || 'about:blank'}
+          isResizing={isResizing}
+          reloadTrigger={reloadTrigger}
+          onPresetChange={setPreset}
+        />
+      ) : (
+        <div className="relative flex-1">
+          <webview
+            ref={webviewRef}
+            src={(activeTab?.url || 'about:blank').replace(/^file:\/\//, 'slz-file://')}
+            partition="persist:browser-tabs"
+            className="absolute inset-0"
+            // @ts-expect-error - webview attributes not in React types
+            allowpopups="true"
+          />
+          {isResizing && <div className="absolute inset-0 z-10" />}
+        </div>
+      )}
     </div>
   )
 }

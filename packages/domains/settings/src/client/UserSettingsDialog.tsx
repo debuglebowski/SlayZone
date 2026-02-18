@@ -16,7 +16,7 @@ import {
 import type { Tag } from '@slayzone/tags/shared'
 import type { TerminalMode } from '@slayzone/terminal/shared'
 import type { PanelConfig, WebPanelDefinition } from '@slayzone/task/shared'
-import { DEFAULT_PANEL_CONFIG, PREDEFINED_WEB_PANELS, PROVIDER_DEFAULTS } from '@slayzone/task/shared'
+import { DEFAULT_PANEL_CONFIG, PREDEFINED_WEB_PANELS, PROVIDER_DEFAULTS, DEFAULT_WEB_PANEL_RESOLUTION_DEFAULTS } from '@slayzone/task/shared'
 import type { DiagnosticsConfig } from '@slayzone/types'
 import type { IntegrationConnectionPublic } from '@slayzone/integrations/shared'
 import { useTelemetry, TelemetrySettings } from '@slayzone/telemetry/client'
@@ -765,6 +765,58 @@ export function UserSettingsDialog({
                     <Plus className="size-3.5 mr-1" />
                     Add Panel
                   </Button>
+                </div>
+
+                {/* Resolution defaults */}
+                <div className="space-y-3">
+                  <div>
+                    <Label className="text-base font-semibold">Resolution Defaults</Label>
+                    <p className="text-xs text-muted-foreground mt-1">Default dimensions for each environment preset in web panels.</p>
+                  </div>
+                  {(['desktop', 'tablet', 'mobile'] as const).map(env => {
+                    const defaults = panelConfig.webPanelResolutionDefaults ?? DEFAULT_WEB_PANEL_RESOLUTION_DEFAULTS
+                    const d = defaults[env]
+                    return (
+                      <div key={env} className="grid grid-cols-[80px_1fr_auto_1fr] items-center gap-2">
+                        <span className="text-sm capitalize">{env}</span>
+                        <Input
+                          type="number"
+                          min={200}
+                          value={d.width}
+                          onChange={(e) => {
+                            const w = parseInt(e.target.value, 10)
+                            if (!w || w < 200) return
+                            const next: PanelConfig = {
+                              ...panelConfig,
+                              webPanelResolutionDefaults: {
+                                ...defaults,
+                                [env]: { ...d, width: w }
+                              }
+                            }
+                            savePanelConfig(next)
+                          }}
+                        />
+                        <span className="text-xs text-muted-foreground">&times;</span>
+                        <Input
+                          type="number"
+                          min={200}
+                          value={d.height}
+                          onChange={(e) => {
+                            const h = parseInt(e.target.value, 10)
+                            if (!h || h < 200) return
+                            const next: PanelConfig = {
+                              ...panelConfig,
+                              webPanelResolutionDefaults: {
+                                ...defaults,
+                                [env]: { ...d, height: h }
+                              }
+                            }
+                            savePanelConfig(next)
+                          }}
+                        />
+                      </div>
+                    )
+                  })}
                 </div>
               </>
             )}

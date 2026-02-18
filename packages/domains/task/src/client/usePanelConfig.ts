@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
-import type { PanelConfig, WebPanelDefinition } from '../shared/types'
-import { DEFAULT_PANEL_CONFIG, PREDEFINED_WEB_PANELS } from '../shared/types'
+import type { PanelConfig, WebPanelDefinition, WebPanelResolutionDefaults } from '../shared/types'
+import { DEFAULT_PANEL_CONFIG, PREDEFINED_WEB_PANELS, DEFAULT_WEB_PANEL_RESOLUTION_DEFAULTS } from '../shared/types'
 
 const SETTINGS_KEY = 'panel_config'
 const CHANGE_EVENT = 'panel-config-changed'
@@ -37,6 +37,7 @@ export function usePanelConfig(): {
   updateConfig: (next: PanelConfig) => Promise<void>
   enabledWebPanels: WebPanelDefinition[]
   isBuiltinEnabled: (id: string) => boolean
+  resolutionDefaults: WebPanelResolutionDefaults
 } {
   const [config, setConfig] = useState<PanelConfig>(DEFAULT_PANEL_CONFIG)
 
@@ -64,5 +65,10 @@ export function usePanelConfig(): {
     [config]
   )
 
-  return { config, updateConfig, enabledWebPanels, isBuiltinEnabled }
+  const resolutionDefaults = useMemo(
+    () => config.webPanelResolutionDefaults ?? DEFAULT_WEB_PANEL_RESOLUTION_DEFAULTS,
+    [config.webPanelResolutionDefaults]
+  )
+
+  return { config, updateConfig, enabledWebPanels, isBuiltinEnabled, resolutionDefaults }
 }
