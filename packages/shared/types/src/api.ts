@@ -89,6 +89,12 @@ export interface ClientDiagnosticEventInput {
   payload?: unknown
 }
 
+export type UpdateStatus =
+  | { type: 'checking' }
+  | { type: 'downloaded'; version: string }
+  | { type: 'not-available' }
+  | { type: 'error'; message: string }
+
 // ElectronAPI interface - the IPC contract between renderer and main
 export interface ElectronAPI {
   ai: {
@@ -163,6 +169,9 @@ export interface ElectronAPI {
     onCloseTask: (callback: (taskId: string) => void) => () => void
     onOpenTask: (callback: (taskId: string) => void) => () => void
     onScreenshotTrigger: (callback: () => void) => () => void
+    onUpdateStatus: (callback: (status: UpdateStatus) => void) => () => void
+    restartForUpdate: () => Promise<void>
+    checkForUpdates: () => Promise<void>
   }
   window: {
     close: () => Promise<void>
@@ -173,6 +182,7 @@ export interface ElectronAPI {
       mimeType: string
     ) => Promise<{ success: boolean; path?: string; error?: string }>
     pathExists: (path: string) => Promise<boolean>
+    getDropPaths: () => string[]
   }
   pty: {
     create: (
@@ -251,6 +261,7 @@ export interface ElectronAPI {
     update: (input: UpdateTerminalTabInput) => Promise<TerminalTab | null>
     delete: (tabId: string) => Promise<boolean>
     ensureMain: (taskId: string, mode: TerminalMode) => Promise<TerminalTab>
+    split: (tabId: string) => Promise<TerminalTab | null>
   }
   diagnostics: {
     getConfig: () => Promise<DiagnosticsConfig>
@@ -302,6 +313,7 @@ export interface ElectronAPI {
     createDir: (rootPath: string, dirPath: string) => Promise<void>
     rename: (rootPath: string, oldPath: string, newPath: string) => Promise<void>
     delete: (rootPath: string, targetPath: string) => Promise<void>
+    copyIn: (rootPath: string, absoluteSrc: string) => Promise<string>
     listAllFiles: (rootPath: string) => Promise<string[]>
     watch: (rootPath: string) => Promise<void>
     unwatch: (rootPath: string) => Promise<void>

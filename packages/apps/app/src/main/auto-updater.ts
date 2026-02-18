@@ -1,4 +1,4 @@
-import { dialog, app, BrowserWindow } from 'electron'
+import { app, BrowserWindow } from 'electron'
 import { is } from '@electron-toolkit/utils'
 // electron-updater is CJS. electron-vite v5 outputs ESM for main, and Node's
 // CJS→ESM interop doesn't detect Object.defineProperty getters as named exports.
@@ -20,7 +20,9 @@ function getAutoUpdater() {
     autoUpdater.on('update-downloaded', (info) => {
       console.log('[updater] downloaded:', info.version)
       downloadedVersion = info.version
-      BrowserWindow.getAllWindows()[0]?.setProgressBar(-1)
+      const win = BrowserWindow.getAllWindows()[0]
+      win?.setProgressBar(-1)
+      win?.webContents.send('app:update-status', { type: 'downloaded', version: info.version })
     })
   }
   return autoUpdater
@@ -35,50 +37,39 @@ export function initAutoUpdater(): void {
   }
 }
 
+export function restartForUpdate(): void {
+  if (autoUpdater) autoUpdater.quitAndInstall()
+}
+
+function sendUpdateStatus(status: import('@slayzone/types').UpdateStatus): void {
+  BrowserWindow.getAllWindows()[0]?.webContents.send('app:update-status', status)
+}
+
 export async function checkForUpdates(): Promise<void> {
+  sendUpdateStatus({ type: 'checking' })
+
   if (is.dev) {
-    dialog.showMessageBox({ message: 'Updates are not available in dev mode.', buttons: ['OK'] })
+    sendUpdateStatus({ type: 'not-available' })
     return
   }
 
   try {
     const updater = getAutoUpdater()
+
+    // If already downloaded, just re-notify renderer
+    if (downloadedVersion) {
+      sendUpdateStatus({ type: 'downloaded', version: downloadedVersion })
+      return
+    }
+
     const result = await updater.checkForUpdates()
-    if (!result || !result.updateInfo) {
-      dialog.showMessageBox({ message: `You're on the latest version (${app.getVersion()}).`, buttons: ['OK'] })
+    if (!result || !result.updateInfo || result.updateInfo.version === app.getVersion()) {
+      sendUpdateStatus({ type: 'not-available' })
       return
     }
 
-    const { version } = result.updateInfo
-    if (version === app.getVersion()) {
-      dialog.showMessageBox({ message: `You're on the latest version (${app.getVersion()}).`, buttons: ['OK'] })
-      return
-    }
-
-    // Wait for download (may already be done from startup auto-download)
-    if (!downloadedVersion) {
-      await new Promise<void>((resolve, reject) => {
-        updater.once('update-downloaded', () => resolve())
-        updater.once('error', (err) => reject(err))
-      })
-    }
-
-    const { response } = await dialog.showMessageBox({
-      message: `Update v${version} is ready`,
-      detail: `Current version: v${app.getVersion()}`,
-      buttons: ['Restart Now', 'Later'],
-      defaultId: 0
-    })
-
-    if (response === 0) {
-      updater.quitAndInstall()
-    }
+    // Download in progress — the 'update-downloaded' handler will notify renderer
   } catch (err) {
-    dialog.showMessageBox({
-      type: 'error',
-      message: 'Update check failed',
-      detail: err instanceof Error ? err.message : String(err),
-      buttons: ['OK']
-    })
+    sendUpdateStatus({ type: 'error', message: err instanceof Error ? err.message : String(err) })
   }
 }

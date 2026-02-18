@@ -1,6 +1,17 @@
-import { contextBridge, ipcRenderer } from 'electron'
+import { contextBridge, ipcRenderer, webUtils } from 'electron'
 import type { ElectronAPI } from '@slayzone/types'
 import type { TerminalState, PromptInfo } from '@slayzone/terminal/shared'
+
+// Prevent Electron's default file drop behavior (navigates to the file).
+// Must be in the preload's main world — isolated world's preventDefault alone
+// may not be seen by Chromium's drop allowance check.
+let lastDropPaths: string[] = []
+window.addEventListener('dragover', (e) => e.preventDefault(), true)
+window.addEventListener('drop', (e) => {
+  e.preventDefault()
+  if (!e.dataTransfer?.files.length) return
+  lastDropPaths = Array.from(e.dataTransfer.files).map((f) => webUtils.getPathForFile(f))
+}, true)
 
 // Custom APIs for renderer
 const api: ElectronAPI = {
@@ -110,14 +121,26 @@ const api: ElectronAPI = {
       const handler = () => callback()
       ipcRenderer.on('app:screenshot-trigger', handler)
       return () => ipcRenderer.removeListener('app:screenshot-trigger', handler)
-    }
+    },
+    onUpdateStatus: (callback) => {
+      const handler = (_: unknown, status: import('@slayzone/types').UpdateStatus) => callback(status)
+      ipcRenderer.on('app:update-status', handler)
+      return () => ipcRenderer.removeListener('app:update-status', handler)
+    },
+    restartForUpdate: () => ipcRenderer.invoke('app:restart-for-update'),
+    checkForUpdates: () => ipcRenderer.invoke('app:check-for-updates')
   },
   window: {
     close: () => ipcRenderer.invoke('window:close')
   },
   files: {
     saveTempImage: (base64, mimeType) => ipcRenderer.invoke('files:saveTempImage', base64, mimeType),
-    pathExists: (path) => ipcRenderer.invoke('files:pathExists', path)
+    pathExists: (path) => ipcRenderer.invoke('files:pathExists', path),
+    getDropPaths: () => {
+      const paths = lastDropPaths
+      lastDropPaths = []
+      return paths
+    }
   },
   pty: {
     create: (sessionId, cwd, conversationId, existingConversationId, mode, initialPrompt, codeMode, providerFlags) =>
@@ -231,7 +254,8 @@ const api: ElectronAPI = {
     create: (input) => ipcRenderer.invoke('tabs:create', input),
     update: (input) => ipcRenderer.invoke('tabs:update', input),
     delete: (tabId) => ipcRenderer.invoke('tabs:delete', tabId),
-    ensureMain: (taskId, mode) => ipcRenderer.invoke('tabs:ensureMain', taskId, mode)
+    ensureMain: (taskId, mode) => ipcRenderer.invoke('tabs:ensureMain', taskId, mode),
+    split: (tabId) => ipcRenderer.invoke('tabs:split', tabId)
   },
   diagnostics: {
     getConfig: () => ipcRenderer.invoke('diagnostics:getConfig'),
@@ -304,6 +328,7 @@ const api: ElectronAPI = {
     createDir: (rootPath, dirPath) => ipcRenderer.invoke('fs:createDir', rootPath, dirPath),
     rename: (rootPath, oldPath, newPath) => ipcRenderer.invoke('fs:rename', rootPath, oldPath, newPath),
     delete: (rootPath, targetPath) => ipcRenderer.invoke('fs:delete', rootPath, targetPath),
+    copyIn: (rootPath, absoluteSrc) => ipcRenderer.invoke('fs:copyIn', rootPath, absoluteSrc),
     listAllFiles: (rootPath) => ipcRenderer.invoke('fs:listAllFiles', rootPath),
     watch: (rootPath) => ipcRenderer.invoke('fs:watch', rootPath),
     unwatch: (rootPath) => ipcRenderer.invoke('fs:unwatch', rootPath),

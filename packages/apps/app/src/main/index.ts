@@ -36,7 +36,7 @@ import { registerIntegrationHandlers, startLinearSyncPoller } from '@slayzone/in
 import { registerFileEditorHandlers } from '@slayzone/file-editor/main'
 import { registerScreenshotHandlers } from './screenshot'
 import { registerExportImportHandlers } from './export-import'
-import { initAutoUpdater, checkForUpdates } from './auto-updater'
+import { initAutoUpdater, checkForUpdates, restartForUpdate } from './auto-updater'
 
 const DEFAULT_WINDOW_WIDTH = 1760
 const DEFAULT_WINDOW_HEIGHT = 1280
@@ -551,6 +551,8 @@ app.whenReady().then(async () => {
 
   // App version
   ipcMain.handle('app:getVersion', () => app.getVersion())
+  ipcMain.handle('app:restart-for-update', () => restartForUpdate())
+  ipcMain.handle('app:check-for-updates', () => checkForUpdates())
 
   // Window close
   ipcMain.handle('window:close', (event) => {

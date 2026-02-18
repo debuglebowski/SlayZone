@@ -34,7 +34,9 @@ import {
   Tooltip,
   TooltipTrigger,
   TooltipContent,
-  Toaster
+  Toaster,
+  toast,
+  UpdateToast
 } from '@slayzone/ui'
 import { SidebarProvider, cn } from '@slayzone/ui'
 import { AppSidebar } from '@/components/sidebar/AppSidebar'
@@ -99,6 +101,7 @@ function App(): React.JSX.Element {
   const [explodeMode, setExplodeMode] = useState(false)
   const [convertingTask, setConvertingTask] = useState<Task | null>(null)
   const convertResolveRef = useRef<((task: Task) => void) | null>(null)
+  const [updateVersion, setUpdateVersion] = useState<string | null>(null)
 
   // Project path validation
   const [projectPathMissing, setProjectPathMissing] = useState(false)
@@ -482,6 +485,26 @@ function App(): React.JSX.Element {
       if (project) setEditingProject(project)
     })
   }, [selectedProjectId, projects])
+
+  useEffect(() => {
+    return window.api.app.onUpdateStatus((status) => {
+      switch (status.type) {
+        case 'checking':
+          toast.loading('Checking for updates...', { id: 'update-check' })
+          break
+        case 'downloaded':
+          toast.dismiss('update-check')
+          setUpdateVersion(status.version)
+          break
+        case 'not-available':
+          toast.success('You\'re on the latest version', { id: 'update-check' })
+          break
+        case 'error':
+          toast.error(`Update check failed: ${status.message}`, { id: 'update-check' })
+          break
+      }
+    })
+  }, [])
 
   useHotkeys('mod+1,mod+2,mod+3,mod+4,mod+5,mod+6,mod+7,mod+8,mod+9', (e) => {
     e.preventDefault()
@@ -1034,6 +1057,11 @@ function App(): React.JSX.Element {
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
+        <UpdateToast
+          version={updateVersion}
+          onRestart={() => window.api.app.restartForUpdate()}
+          onDismiss={() => setUpdateVersion(null)}
+        />
         <Toaster position="bottom-right" theme="dark" />
       </div>
     </SidebarProvider>
