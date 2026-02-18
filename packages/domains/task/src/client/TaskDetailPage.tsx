@@ -1185,7 +1185,7 @@ export function TaskDetailPage({
   }
 
   return (
-    <div id="task-detail" className={cn("h-full flex flex-col", compact ? "p-0" : "p-4 gap-4")}>
+    <div id="task-detail" className={cn("h-full flex flex-col", compact ? "p-0" : "px-6 py-4 gap-4")}>
       {compact && (
         <div className="shrink-0 flex items-center gap-2 px-2 py-1 bg-surface-1 border-b border-border min-w-0">
           <span className="text-xs font-medium truncate flex-1">
@@ -1203,7 +1203,7 @@ export function TaskDetailPage({
           <div className="flex items-center gap-4 window-no-drag">
             {task.is_temporary ? (
               <div className="flex items-center gap-3 flex-1">
-                <span className="text-xl italic text-muted-foreground">Temporary task</span>
+                <span className="text-2xl italic text-muted-foreground">Temporary task</span>
                 <Button
                   variant="outline"
                   size="sm"
@@ -1225,7 +1225,7 @@ export function TaskDetailPage({
                 onClick={() => setEditingTitle(true)}
                 readOnly={!editingTitle}
                 className={cn(
-                  'text-xl font-semibold bg-transparent border-none outline-none flex-1',
+                  'text-2xl font-bold bg-transparent border-none outline-none flex-1',
                   !editingTitle && 'cursor-pointer'
                 )}
               />
