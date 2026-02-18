@@ -1,4 +1,3 @@
-import { shellPath } from 'shell-path'
 
 import { app, shell, BrowserWindow, ipcMain, nativeTheme, session, webContents, dialog, Menu, protocol } from 'electron'
 import { join, extname, normalize, sep } from 'path'
@@ -320,8 +319,6 @@ function createWindow(): void {
 // initialization and is ready to create browser windows.
 // Some APIs can only be used after this event occurs.
 app.whenReady().then(async () => {
-  // Fix $PATH for macOS GUI apps
-  try { process.env.PATH = await shellPath() } catch (e) { console.warn('Failed to resolve shell PATH:', e) }
 
   // Initialize database
   const db = getDatabase()

@@ -198,9 +198,6 @@ importers:
       playwright:
         specifier: ^1.52.0
         version: 1.58.2
-      shell-path:
-        specifier: ^3.0.0
-        version: 3.1.0
       typescript:
         specifier: ^5.9.3
         version: 5.9.3
@@ -676,6 +673,9 @@ importers:
       react:
         specifier: ^19.0.0
         version: 19.2.3
+      shell-path:
+        specifier: ^3.1.0
+        version: 3.1.0
     devDependencies:
       '@types/better-sqlite3':
         specifier: ^7.6.13
