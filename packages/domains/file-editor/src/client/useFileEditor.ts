@@ -258,6 +258,38 @@ export function useFileEditor(
     [openFiles]
   )
 
+  const renameOpenFile = useCallback((oldPath: string, newPath: string) => {
+    // Remap exact match + children (folder moves: "src" → "lib/src" updates "src/index.ts" → "lib/src/index.ts")
+    const prefix = oldPath + '/'
+    const remap = (p: string) =>
+      p === oldPath ? newPath : p.startsWith(prefix) ? newPath + p.slice(oldPath.length) : null
+
+    setOpenFiles((prev) =>
+      prev.map((f) => {
+        const mapped = remap(f.path)
+        return mapped ? { ...f, path: mapped } : f
+      })
+    )
+    setActiveFilePath((current) => {
+      if (!current) return current
+      return remap(current) ?? current
+    })
+    setFileVersions((prev) => {
+      let changed = false
+      const next = new Map<string, number>()
+      for (const [k, v] of prev) {
+        const mapped = remap(k)
+        if (mapped) {
+          next.set(mapped, v)
+          changed = true
+        } else {
+          next.set(k, v)
+        }
+      }
+      return changed ? next : prev
+    })
+  }, [])
+
   const activeFile = openFiles.find((f) => f.path === activeFilePath) ?? null
 
   return {
@@ -273,6 +305,7 @@ export function useFileEditor(
     isDirty,
     hasDirtyFiles,
     isFileDiskChanged,
+    renameOpenFile,
     isRestoring,
     treeRefreshKey,
     fileVersions
