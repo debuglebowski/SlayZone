@@ -53,6 +53,9 @@ jobs:
 
       - name: Build
         run: pnpm build
+        env:
+          POSTHOG_API_KEY: ${{ secrets.POSTHOG_API_KEY }}
+          POSTHOG_HOST: ${{ secrets.POSTHOG_HOST }}
 
       - name: Get electron version
         shell: bash
