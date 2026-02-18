@@ -1,6 +1,18 @@
 # Changelog
 
 
+## v0.1.43...main
+
+[compare changes](https://github.com/debuglebowski/omgslayzone/compare/v0.1.43...main)
+
+### 🩹 Fixes
+
+- CLI detection in prod — use full path + enrich PATH with common bin dirs ([b7440ab](https://github.com/debuglebowski/omgslayzone/commit/b7440ab))
+
+### ❤️ Contributors
+
+- Debuglebowski <kh.hansson@gmail.com>
+
 ## v0.1.42...main
 
 [compare changes](https://github.com/debuglebowski/omgslayzone/compare/v0.1.42...main)
