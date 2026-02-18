@@ -1,6 +1,22 @@
 # Changelog
 
 
+## v0.1.44...main
+
+[compare changes](https://github.com/debuglebowski/omgslayzone/compare/v0.1.44...main)
+
+### 🩹 Fixes
+
+- Auto-updater restart — download before quitAndInstall, add dock progress ([9d0897f](https://github.com/debuglebowski/omgslayzone/commit/9d0897f))
+
+### 💅 Refactors
+
+- Remove checkAvailability + shell-path dependency ([56226fa](https://github.com/debuglebowski/omgslayzone/commit/56226fa))
+
+### ❤️ Contributors
+
+- Debuglebowski <kh.hansson@gmail.com>
+
 ## v0.1.43...main
 
 [compare changes](https://github.com/debuglebowski/omgslayzone/compare/v0.1.43...main)
