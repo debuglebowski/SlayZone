@@ -1,6 +1,22 @@
 # Changelog
 
 
+## v0.1.42...main
+
+[compare changes](https://github.com/debuglebowski/omgslayzone/compare/v0.1.42...main)
+
+### 🚀 Enhancements
+
+- Add explode mode — grid view of all open task terminals ([7126a78](https://github.com/debuglebowski/omgslayzone/commit/7126a78))
+
+### 🩹 Fixes
+
+- Move shellPath() into checkAvailability to fix CLI detection without blocking startup ([77da6c5](https://github.com/debuglebowski/omgslayzone/commit/77da6c5))
+
+### ❤️ Contributors
+
+- Debuglebowski <kh.hansson@gmail.com>
+
 ## v0.1.40...main
 
 [compare changes](https://github.com/debuglebowski/omgslayzone/compare/v0.1.40...main)
