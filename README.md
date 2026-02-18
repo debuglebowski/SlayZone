@@ -54,6 +54,14 @@ Your agents run locally on your machine — SlayZone is just the interface.
 
 ---
 
+### Known bugs
+
+- Terminal resize can lag behind panel resize on slower machines
+- Worktree cleanup may leave stale branches if the app is force-quit
+- Windows: node-pty occasionally fails to spawn on first install — restart fixes it
+
+---
+
 ### Built with
 
 Electron &middot; React &middot; SQLite &middot; node-pty &middot; xterm.js
@@ -74,3 +82,9 @@ pnpm dev
 | `pnpm build` | Production build |
 | `pnpm typecheck` | Typecheck all packages |
 | `pnpm test:e2e` | Run E2E tests (build first) |
+
+---
+
+<p align="center">
+  <img src="assets/star-history.jpg" width="600" alt="Star History" />
+</p>
