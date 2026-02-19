@@ -33,6 +33,34 @@ type PromptCallback = (prompt: PromptInfo) => void
 type SessionDetectedCallback = (sessionId: string) => void
 type DevServerCallback = (url: string) => void
 
+export function applyExitEvent(
+  sessionId: string,
+  exitCode: number,
+  state: PtyState | undefined,
+  stateSubs: Map<string, Set<StateChangeCallback>>,
+  exitSubs: Map<string, Set<ExitCallback>>
+): void {
+  if (state) {
+    // Ensure state transitions to dead — the main process may not always
+    // emit pty:state-change (e.g. killPty deletes session before onExit fires)
+    if (state.state !== 'dead') {
+      const oldState = state.state
+      state.state = 'dead'
+      const currentStateSubs = stateSubs.get(sessionId)
+      if (currentStateSubs) {
+        currentStateSubs.forEach((cb) => cb('dead', oldState))
+      }
+    }
+  }
+
+  // Always notify explicit exit subscribers, even if session state was
+  // already cleaned up before the exit event reached the renderer.
+  const subs = exitSubs.get(sessionId)
+  if (subs) {
+    subs.forEach((cb) => cb(exitCode))
+  }
+}
+
 interface PtyContextValue {
   subscribe: (sessionId: string, cb: DataCallback) => () => void
   subscribeExit: (sessionId: string, cb: ExitCallback) => () => void
@@ -112,38 +140,26 @@ export function PtyProvider({ children }: { children: ReactNode }) {
 
     const unsubExit = window.api.pty.onExit(async (sessionId, exitCode) => {
       const state = statesRef.current.get(sessionId)
-      if (!state) return // Ignore exit for unknown tasks
 
-      state.exitCode = exitCode
+      if (state) {
+        state.exitCode = exitCode
 
-      // Capture crash output before the 100ms backend cleanup window closes
-      // Only capture if process exited non-zero (likely a crash)
-      if (exitCode !== 0) {
-        try {
-          const raw = await window.api.pty.getBuffer(sessionId)
-          if (raw && statesRef.current.get(sessionId)) {
-            statesRef.current.get(sessionId)!.crashOutput = raw
+        // Capture crash output before the 100ms backend cleanup window closes
+        // Only capture if process exited non-zero (likely a crash)
+        if (exitCode !== 0) {
+          try {
+            const raw = await window.api.pty.getBuffer(sessionId)
+            if (raw && statesRef.current.get(sessionId)) {
+              statesRef.current.get(sessionId)!.crashOutput = raw
+            }
+          } catch {
+            // Best-effort; ignore errors
           }
-        } catch {
-          // Best-effort; ignore errors
         }
+
       }
 
-      // Ensure state transitions to dead — the main process may not always
-      // emit pty:state-change (e.g. killPty deletes session before onExit fires)
-      if (state.state !== 'dead') {
-        const oldState = state.state
-        state.state = 'dead'
-        const stateSubs = stateSubsRef.current.get(sessionId)
-        if (stateSubs) {
-          stateSubs.forEach((cb) => cb('dead', oldState))
-        }
-      }
-
-      const subs = exitSubsRef.current.get(sessionId)
-      if (subs) {
-        subs.forEach((cb) => cb(exitCode))
-      }
+      applyExitEvent(sessionId, exitCode, state, stateSubsRef.current, exitSubsRef.current)
     })
 
     const unsubSessionNotFound = window.api.pty.onSessionNotFound((sessionId) => {

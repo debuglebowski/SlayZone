@@ -1,6 +1,7 @@
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import type { TerminalTab, TerminalGroup } from '../shared/types'
 import type { TerminalMode } from '@slayzone/terminal/shared'
+import { usePty } from '@slayzone/terminal'
 
 interface UseTaskTerminalsResult {
   tabs: TerminalTab[]
@@ -51,6 +52,8 @@ export function useTaskTerminals(taskId: string, defaultMode: TerminalMode): Use
   const [tabs, setTabs] = useState<TerminalTab[]>([])
   const [activeGroupId, setActiveGroupId] = useState<string>(taskId) // Main group id = taskId
   const [isLoading, setIsLoading] = useState(true)
+  const closingTabIdsRef = useRef<Set<string>>(new Set())
+  const { subscribeExit } = usePty()
 
   const groups = useMemo(() => computeGroups(tabs), [tabs])
 
@@ -94,27 +97,57 @@ export function useTaskTerminals(taskId: string, defaultMode: TerminalMode): Use
     return newTab
   }, [])
 
-  const closeTab = useCallback(async (tabId: string): Promise<boolean> => {
-    const success = await window.api.tabs.delete(tabId)
-    if (success) {
-      const sessionId = `${taskId}:${tabId}`
-      await window.api.pty.kill(sessionId)
+  const closeTabInternal = useCallback(async (tabId: string, skipKill: boolean): Promise<boolean> => {
+    if (closingTabIdsRef.current.has(tabId)) return false
+    closingTabIdsRef.current.add(tabId)
+    try {
+      const success = await window.api.tabs.delete(tabId)
+      if (success) {
+        const sessionId = `${taskId}:${tabId}`
+        if (!skipKill) {
+          await window.api.pty.kill(sessionId)
+        }
 
-      setTabs(prev => {
-        const remaining = prev.filter(t => t.id !== tabId)
-        // If the closed tab's group is now empty, we'll handle group switching below
-        return remaining
-      })
+        setTabs(prev => {
+          const remaining = prev.filter(t => t.id !== tabId)
+          // If the closed tab's group is now empty, we'll handle group switching below
+          return remaining
+        })
 
-      // Check if we need to switch active group
-      setActiveGroupId(prev => {
-        // Recompute from the updated tabs to see if the group still exists
-        // We use functional updater on tabs to peek at current state
-        return prev // Will be corrected in the effect below if needed
-      })
+        // Check if we need to switch active group
+        setActiveGroupId(prev => {
+          // Recompute from the updated tabs to see if the group still exists
+          // We use functional updater on tabs to peek at current state
+          return prev // Will be corrected in the effect below if needed
+        })
+      }
+      return success
+    } finally {
+      closingTabIdsRef.current.delete(tabId)
     }
-    return success
   }, [taskId])
+
+  const closeTab = useCallback(async (tabId: string): Promise<boolean> => {
+    return closeTabInternal(tabId, false)
+  }, [closeTabInternal])
+
+  // Auto-close secondary terminal tabs when their PTY exits.
+  useEffect(() => {
+    const unsubs: Array<() => void> = []
+
+    for (const tab of tabs) {
+      if (tab.isMain) continue
+      const sessionId = `${taskId}:${tab.id}`
+      const unsub = subscribeExit(sessionId, () => {
+        void closeTabInternal(tab.id, true)
+      })
+      unsubs.push(unsub)
+    }
+
+    return () => {
+      unsubs.forEach((unsub) => unsub())
+    }
+  }, [tabs, taskId, subscribeExit, closeTabInternal])
 
   // Correct activeGroupId if the active group no longer exists
   useEffect(() => {

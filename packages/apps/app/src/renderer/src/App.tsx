@@ -195,6 +195,30 @@ function App(): React.JSX.Element {
     return () => unsubscribes.forEach((fn) => fn())
   }, [openTaskIds, ptyContext])
 
+  // Auto-close temporary task tabs when their main terminal exits.
+  useEffect(() => {
+    const temporaryTaskTabs = tabs.filter((tab): tab is Extract<typeof tab, { type: 'task' }> =>
+      tab.type === 'task' && !!tab.isTemporary
+    )
+    const unsubscribes = temporaryTaskTabs.map((tab) => {
+      const mainSessionId = `${tab.taskId}:${tab.taskId}`
+      return ptyContext.subscribeExit(mainSessionId, () => {
+        void window.api.db.deleteTask(tab.taskId).catch(() => {})
+        setTasks((prev) => prev.filter((task) => task.id !== tab.taskId))
+        setTabs((prev) => {
+          const index = prev.findIndex((t) => t.type === 'task' && t.taskId === tab.taskId)
+          if (index < 1) return prev
+          setActiveTabIndex((idx) => (idx >= index ? Math.max(0, idx - 1) : idx))
+          return prev.filter((_, i) => i !== index)
+        })
+      })
+    })
+
+    return () => {
+      unsubscribes.forEach((unsub) => unsub())
+    }
+  }, [tabs, ptyContext, setTasks, setTabs, setActiveTabIndex])
+
   // Tab management
   const openTask = (taskId: string): void => {
     const existing = tabs.findIndex((t) => t.type === 'task' && t.taskId === taskId)
@@ -848,15 +872,17 @@ function App(): React.JSX.Element {
                           active={notificationState.isLocked}
                           onClick={() => setNotificationState({ isLocked: !notificationState.isLocked })}
                         />
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={handleLeaderboardClick}
-                          className="h-7 px-2 gap-1.5 text-xs text-muted-foreground hover:text-foreground"
-                        >
-                          <Trophy className="size-3.5" />
-                          <span>Leaderboard</span>
-                        </Button>
+                        {import.meta.env.DEV && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={handleLeaderboardClick}
+                            className="h-7 px-2 gap-1.5 text-xs text-muted-foreground hover:text-foreground"
+                          >
+                            <Trophy className="size-3.5" />
+                            <span>Leaderboard</span>
+                          </Button>
+                        )}
                       </div>
                     }
                   />
