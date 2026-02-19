@@ -19,7 +19,9 @@ import {
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 
-export type Tab = { type: 'home' } | { type: 'task'; taskId: string; title: string; terminalState?: TerminalState; isSubTask?: boolean; isTemporary?: boolean }
+export type Tab =
+  | { type: 'home' }
+  | { type: 'task'; taskId: string; title: string; terminalState?: TerminalState; isSubTask?: boolean; isTemporary?: boolean }
 
 interface TabBarProps {
   tabs: Tab[]

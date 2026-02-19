@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { useHotkeys } from 'react-hotkeys-hook'
-import { AlertTriangle, LayoutGrid, TerminalSquare, Trophy } from 'lucide-react'
+import { AlertTriangle, LayoutGrid, TerminalSquare } from 'lucide-react'
 import type { Task } from '@slayzone/task/shared'
 import type { Project } from '@slayzone/projects/shared'
 import type { Tag } from '@slayzone/tags/shared'
@@ -41,6 +41,7 @@ import {
 import { SidebarProvider, cn } from '@slayzone/ui'
 import { AppSidebar } from '@/components/sidebar/AppSidebar'
 import { TabBar } from '@/components/tabs/TabBar'
+import { LeaderboardPage } from '@/components/leaderboard/LeaderboardPage'
 import { recordDiagnosticsTimeline, updateDiagnosticsContext } from '@/lib/diagnosticsClient'
 import {
   DesktopNotificationToggle,
@@ -102,6 +103,7 @@ function App(): React.JSX.Element {
   const [convertingTask, setConvertingTask] = useState<Task | null>(null)
   const convertResolveRef = useRef<((task: Task) => void) | null>(null)
   const [updateVersion, setUpdateVersion] = useState<string | null>(null)
+  const [leaderboardOpen, setLeaderboardOpen] = useState(false)
 
   // Project path validation
   const [projectPathMissing, setProjectPathMissing] = useState(false)
@@ -140,7 +142,7 @@ function App(): React.JSX.Element {
   const previousNotificationLockedRef = useRef(notificationState.isLocked)
 
   const handleLeaderboardClick = useCallback(() => {
-    toast('Leaderboard page is coming soon.')
+    setLeaderboardOpen((prev) => !prev)
   }, [])
   const previousNotificationProjectFilterRef = useRef(notificationState.filterCurrentProject)
 
@@ -223,6 +225,7 @@ function App(): React.JSX.Element {
 
   // Tab management
   const openTask = (taskId: string): void => {
+    setLeaderboardOpen(false)
     const existing = tabs.findIndex((t) => t.type === 'task' && t.taskId === taskId)
     if (existing >= 0) {
       setActiveTabIndex(existing)
@@ -301,6 +304,11 @@ function App(): React.JSX.Element {
     if (activeTabIndex > 0) closeTab(activeTabIndex)
   }
 
+  const handleTabClick = useCallback((index: number): void => {
+    setLeaderboardOpen(false)
+    setActiveTabIndex(index)
+  }, [setActiveTabIndex])
+
   // Sync tab titles/status and remove tabs for deleted tasks
   useEffect(() => {
     const taskIds = new Set(tasks.map((t) => t.id))
@@ -311,7 +319,7 @@ function App(): React.JSX.Element {
           if (closedTabsRef.current.length > 20) closedTabsRef.current.shift()
         }
       }
-      const filtered = prev.filter((tab) => tab.type === 'home' || taskIds.has(tab.taskId))
+      const filtered = prev.filter((tab) => tab.type !== 'task' || taskIds.has(tab.taskId))
       if (filtered.length < prev.length) {
         setActiveTabIndex((idx) => Math.min(idx, filtered.length - 1))
       }
@@ -380,7 +388,7 @@ function App(): React.JSX.Element {
     const activeTab = tabs[activeTabIndex]
     updateDiagnosticsContext({
       activeTabIndex,
-      activeTabType: activeTab?.type ?? 'unknown',
+      activeTabType: leaderboardOpen ? 'leaderboard' : (activeTab?.type ?? 'unknown'),
       activeTaskId: activeTab?.type === 'task' ? activeTab.taskId : null,
       openTaskTabs: tabs.filter((t) => t.type === 'task').length,
       selectedProjectId,
@@ -400,7 +408,8 @@ function App(): React.JSX.Element {
     displayTasks.length,
     notificationState.isLocked,
     notificationState.filterCurrentProject,
-    projectPathMissing
+    projectPathMissing,
+    leaderboardOpen
   ])
 
   useEffect(() => {
@@ -414,7 +423,7 @@ function App(): React.JSX.Element {
 
   useEffect(() => {
     const activeTab = tabs[activeTabIndex]
-    const nextTabKey = activeTab?.type === 'task' ? `task:${activeTab.taskId}` : 'home'
+    const nextTabKey = leaderboardOpen ? 'leaderboard' : activeTab?.type === 'task' ? `task:${activeTab.taskId}` : 'home'
     if (previousActiveTabRef.current === nextTabKey) return
     recordDiagnosticsTimeline('tab_changed', {
       from: previousActiveTabRef.current,
@@ -422,7 +431,7 @@ function App(): React.JSX.Element {
       activeTabIndex
     })
     previousActiveTabRef.current = nextTabKey
-  }, [tabs, activeTabIndex])
+  }, [tabs, activeTabIndex, leaderboardOpen])
 
   useEffect(() => {
     if (previousNotificationLockedRef.current === notificationState.isLocked) return
@@ -459,11 +468,19 @@ function App(): React.JSX.Element {
   // Stable refs so IPC listeners don't need to re-subscribe on every render
   const closeActiveTaskRef = useRef<() => void>(() => {})
   closeActiveTaskRef.current = () => {
+    if (leaderboardOpen) {
+      setLeaderboardOpen(false)
+      return
+    }
     if (activeTabIndex === 0) void window.api.window.close()
     else closeTab(activeTabIndex)
   }
   const closeCurrentHomeRef = useRef<() => void>(() => {})
   closeCurrentHomeRef.current = () => {
+    if (leaderboardOpen) {
+      setLeaderboardOpen(false)
+      return
+    }
     if (activeTabIndex === 0) void window.api.window.close()
   }
 
@@ -553,22 +570,26 @@ function App(): React.JSX.Element {
   }, [])
 
   useHotkeys('mod+1,mod+2,mod+3,mod+4,mod+5,mod+6,mod+7,mod+8,mod+9', (e) => {
+    if (leaderboardOpen) return
     e.preventDefault()
     const num = parseInt(e.key, 10)
     if (num < tabs.length) setActiveTabIndex(num)
   }, { enableOnFormTags: true })
 
   useHotkeys('ctrl+tab', (e) => {
+    if (leaderboardOpen) return
     e.preventDefault()
     setActiveTabIndex((prev) => (prev + 1) % tabs.length)
   }, { enableOnFormTags: true })
 
   useHotkeys('ctrl+shift+tab', (e) => {
+    if (leaderboardOpen) return
     e.preventDefault()
     setActiveTabIndex((prev) => (prev - 1 + tabs.length) % tabs.length)
   }, { enableOnFormTags: true })
 
   useHotkeys('mod+shift+t', (e) => {
+    if (leaderboardOpen) return
     e.preventDefault()
     reopenClosedTab()
   }, { enableOnFormTags: true })
@@ -587,12 +608,14 @@ function App(): React.JSX.Element {
   }, { enableOnFormTags: true })
 
   useHotkeys('mod+shift+e', (e) => {
+    if (leaderboardOpen) return
     e.preventDefault()
     if (openTaskIds.length >= 2) setExplodeMode(prev => !prev)
   }, { enableOnFormTags: true })
 
   useHotkeys('escape', () => {
-    if (explodeMode) setExplodeMode(false)
+    if (leaderboardOpen) setLeaderboardOpen(false)
+    else if (explodeMode) setExplodeMode(false)
     else if (zenMode) setZenMode(false)
   }, { enableOnFormTags: true })
 
@@ -810,17 +833,25 @@ function App(): React.JSX.Element {
           onProjectDelete={setDeletingProject}
           onSettings={handleOpenSettings}
           onTutorial={() => setOnboardingOpen(true)}
+          leaderboardOpen={leaderboardOpen}
+          onToggleLeaderboard={handleLeaderboardClick}
           zenMode={zenMode}
         />
 
         <div id="right-column" className={`flex-1 flex flex-col min-w-0 bg-surface-1 pb-2 pr-2 ${zenMode ? 'pl-2' : ''}`}>
               <div className={zenMode ? "window-drag-region bg-surface-1 pl-16" : "window-drag-region bg-surface-1"}>
-                <div className="window-no-drag">
+                <div
+                  className={cn(
+                    "window-no-drag",
+                    leaderboardOpen && "pointer-events-none opacity-45 saturate-0"
+                  )}
+                  aria-disabled={leaderboardOpen}
+                >
                   <TabBar
                     tabs={tabs}
                     activeIndex={activeTabIndex}
                     terminalStates={terminalStates}
-                    onTabClick={setActiveTabIndex}
+                    onTabClick={handleTabClick}
                     onTabClose={closeTab}
                     onTabReorder={reorderTabs}
                     rightContent={
@@ -874,17 +905,6 @@ function App(): React.JSX.Element {
                           active={notificationState.isLocked}
                           onClick={() => setNotificationState({ isLocked: !notificationState.isLocked })}
                         />
-                        {import.meta.env.DEV && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={handleLeaderboardClick}
-                            className="h-7 px-2 gap-1.5 text-xs shadow-xs"
-                          >
-                            <Trophy className="size-3.5" />
-                            <span>Leaderboard</span>
-                          </Button>
-                        )}
                       </div>
                     }
                   />
@@ -896,9 +916,9 @@ function App(): React.JSX.Element {
                   id="main-area"
                   className={cn(
                     "flex-1 min-w-0 min-h-0 rounded-lg overflow-hidden bg-background",
-                    explodeMode ? "grid gap-1 p-1" : "relative"
+                    explodeMode && !leaderboardOpen ? "grid gap-1 p-1" : "relative"
                   )}
-                  style={explodeMode ? (() => {
+                  style={explodeMode && !leaderboardOpen ? (() => {
                     const cols = Math.ceil(Math.sqrt(openTaskIds.length))
                     const rows = Math.ceil(openTaskIds.length / cols)
                     return {
@@ -907,18 +927,21 @@ function App(): React.JSX.Element {
                     }
                   })() : undefined}
                 >
-                  {tabs.map((tab, i) => {
-                    if (explodeMode && tab.type === 'home') return null
-                    return (
-                    <div
-                      key={tab.type === 'home' ? 'home' : tab.taskId}
-                      className={
-                        explodeMode
-                          ? "rounded overflow-hidden border border-border min-h-0 relative"
-                          : `absolute inset-0 ${i !== activeTabIndex ? 'hidden' : ''}`
-                      }
-                    >
-                      {tab.type === 'home' ? (
+                  {leaderboardOpen ? (
+                    <LeaderboardPage />
+                  ) : (
+                    tabs.map((tab, i) => {
+                      if (explodeMode && tab.type === 'home') return null
+                      return (
+                      <div
+                        key={tab.type === 'home' ? 'home' : tab.taskId}
+                        className={
+                          explodeMode
+                            ? "rounded overflow-hidden border border-border min-h-0 relative"
+                            : `absolute inset-0 ${i !== activeTabIndex ? 'hidden' : ''}`
+                        }
+                      >
+                        {tab.type === 'home' ? (
                         <div className="flex flex-col flex-1 p-6 pt-4 h-full">
                           <header className="mb-4 window-no-drag space-y-2">
                             <div className="flex items-center gap-4">
@@ -987,7 +1010,7 @@ function App(): React.JSX.Element {
                             </>
                           )}
                         </div>
-                      ) : (
+                        ) : (
                         <div className={explodeMode ? "absolute inset-0" : "h-full"}>
                           <TaskDetailPage
                             taskId={tab.taskId}
@@ -1002,10 +1025,11 @@ function App(): React.JSX.Element {
                             onCloseTab={() => closeTab(i)}
                           />
                         </div>
-                      )}
-                    </div>
-                    )
-                  })}
+                        )}
+                      </div>
+                      )
+                    })
+                  )}
                 </div>
 
                 {notificationState.isLocked && (

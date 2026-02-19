@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Settings, HelpCircle, Keyboard, ChevronDown } from 'lucide-react'
+import { Settings, HelpCircle, Keyboard, ChevronDown, Trophy } from 'lucide-react'
 import * as Collapsible from '@radix-ui/react-collapsible'
 import {
   Sidebar,
@@ -35,6 +35,8 @@ interface AppSidebarProps {
   onProjectDelete: (project: Project) => void
   onSettings: () => void
   onTutorial: () => void
+  leaderboardOpen?: boolean
+  onToggleLeaderboard?: () => void
   zenMode?: boolean
 }
 
@@ -91,6 +93,8 @@ export function AppSidebar({
   onProjectDelete,
   onSettings,
   onTutorial,
+  leaderboardOpen,
+  onToggleLeaderboard,
   zenMode,
 }: AppSidebarProps) {
   const [shortcutsOpen, setShortcutsOpen] = useState(false)
@@ -155,6 +159,26 @@ export function AppSidebar({
       <SidebarFooter className="py-4">
         <SidebarMenu>
           <SidebarMenuItem className="flex flex-col items-center gap-2">
+            {import.meta.env.DEV && onToggleLeaderboard && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant={leaderboardOpen ? 'default' : 'secondary'}
+                    size="icon-lg"
+                    onClick={onToggleLeaderboard}
+                    className={cn(
+                      'rounded-lg shadow-sm',
+                      leaderboardOpen
+                        ? 'ring-2 ring-primary/35 ring-offset-2 ring-offset-background'
+                        : 'hover:shadow-md'
+                    )}
+                  >
+                    <Trophy className="size-5" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="right">Leaderboard</TooltipContent>
+              </Tooltip>
+            )}
             <TerminalStatusPopover tasks={tasks} />
             <Tooltip>
               <TooltipTrigger asChild>
