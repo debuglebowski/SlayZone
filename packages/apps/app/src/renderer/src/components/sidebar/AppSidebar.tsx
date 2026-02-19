@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { Settings, HelpCircle, Keyboard } from 'lucide-react'
+import { Settings, HelpCircle, Keyboard, ChevronDown } from 'lucide-react'
+import * as Collapsible from '@radix-ui/react-collapsible'
 import {
   Sidebar,
   SidebarContent,
@@ -43,26 +44,28 @@ const shortcutGroups = [
   { heading: 'General', items: [
     { label: 'New Task', keys: isMac ? '⌘ N' : 'Ctrl N' },
     { label: 'Search', keys: isMac ? '⌘ K' : 'Ctrl K' },
+    { label: 'Complete & Close Tab', keys: isMac ? '⌘ ⇧ D' : 'Ctrl ⇧ D' },
     { label: 'Zen Mode', keys: isMac ? '⌘ J' : 'Ctrl J' },
+    { label: 'Explode Mode', keys: isMac ? '⌘ ⇧ E' : 'Ctrl ⇧ E' },
+    { label: 'Exit Zen / Explode', keys: 'Esc' },
     { label: 'Global Settings', keys: isMac ? '⌘ ,' : 'Ctrl ,' },
     { label: 'Project Settings', keys: isMac ? '⌘ ⇧ ,' : 'Ctrl ⇧ ,' },
-    ...(isMac ? [{ label: 'Kanban Board', keys: '⌘ §' }] : []),
+    ...(isMac ? [{ label: 'Go Home', keys: '⌘ §' }] : []),
   ]},
   { heading: 'Tabs', items: [
-    { label: 'Close Tab', keys: isMac ? '⌘ W' : 'Ctrl W' },
+    { label: 'Close Sub-panel / Tab', keys: isMac ? '⌘ W' : 'Ctrl W' },
+    { label: 'Close Task', keys: isMac ? '⌘ ⇧ W' : 'Ctrl ⇧ W' },
     { label: 'Switch Tab 1–9', keys: isMac ? '⌘ 1–9' : 'Ctrl 1–9' },
     { label: 'Next Tab', keys: '^ Tab' },
     { label: 'Previous Tab', keys: '^ ⇧ Tab' },
     { label: 'Reopen Closed Tab', keys: isMac ? '⌘ ⇧ T' : 'Ctrl ⇧ T' },
-    { label: 'Temporary Task', keys: '^ T' },
-  ]},
-  { heading: 'Tasks', items: [
-    { label: 'Complete Task & Close Tab', keys: isMac ? '⌘ ⇧ D' : 'Ctrl ⇧ D' },
+    { label: 'New Temporary Task', keys: isMac ? '⌘ ⇧ N' : 'Ctrl ⇧ N' },
   ]},
   { heading: 'Task Panels', items: [
     { label: 'Terminal', keys: '⌘ T' },
     { label: 'Browser', keys: '⌘ B' },
     { label: 'Editor', keys: '⌘ E' },
+    { label: 'Quick Open File', keys: '⌘ P' },
     { label: 'Git', keys: '⌘ G' },
     { label: 'Git Diff', keys: '⌘ ⇧ G' },
     { label: 'Settings', keys: '⌘ S' },
@@ -71,6 +74,10 @@ const shortcutGroups = [
     { label: 'Inject Title', keys: '⌘ I' },
     { label: 'Inject Description', keys: '⌘ ⇧ I' },
     { label: 'Screenshot', keys: '⌘ ⇧ S' },
+    { label: 'Search', keys: '⌘ F' },
+    { label: 'Clear Buffer', keys: '⌘ ⇧ K' },
+    { label: 'New Group', keys: '⌘ T' },
+    { label: 'Split', keys: '⌘ D' },
   ]},
 ]
 
@@ -181,19 +188,24 @@ export function AppSidebar({
                   <DialogTitle>Keyboard Shortcuts</DialogTitle>
                   <DialogDescription className="sr-only">List of keyboard shortcuts</DialogDescription>
                 </DialogHeader>
-                <div className="space-y-5 overflow-y-auto scrollbar-thin">
-                  {shortcutGroups.map((group) => (
-                    <div key={group.heading}>
-                      <p className="text-[11px] uppercase tracking-wider font-semibold text-muted-foreground mb-2">{group.heading}</p>
-                      <div className="rounded-lg border divide-y">
-                        {group.items.map((s) => (
-                          <div key={s.label} className="flex items-center justify-between px-3 py-2">
-                            <span className="text-sm">{s.label}</span>
-                            <span className="text-base text-muted-foreground bg-muted border px-2.5 py-0.5 rounded-md font-[system-ui] shadow-[0_1px_0_0_rgba(0,0,0,0.05)]">{s.keys}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
+                <div className="space-y-1 overflow-y-auto scrollbar-thin">
+                  {shortcutGroups.map((group, i) => (
+                    <Collapsible.Root key={group.heading} defaultOpen={i === 0}>
+                      <Collapsible.Trigger className="flex w-full items-center justify-between px-3 py-2 rounded-lg bg-muted hover:bg-accent hover:text-accent-foreground transition-colors group/trigger">
+                        <p className="text-[11px] uppercase tracking-wider font-semibold text-muted-foreground">{group.heading}</p>
+                        <ChevronDown className="size-3.5 text-muted-foreground transition-transform duration-200 group-data-[state=open]/trigger:rotate-180" />
+                      </Collapsible.Trigger>
+                      <Collapsible.Content className="data-[state=closed]:hidden">
+                        <div className="rounded-lg border divide-y mb-3">
+                          {group.items.map((s) => (
+                            <div key={s.label} className="flex items-center justify-between px-3 py-2">
+                              <span className="text-sm">{s.label}</span>
+                              <span className="text-base text-muted-foreground bg-muted border px-2.5 py-0.5 rounded-md font-[system-ui] shadow-[0_1px_0_0_rgba(0,0,0,0.05)]">{s.keys}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </Collapsible.Content>
+                    </Collapsible.Root>
                   ))}
                 </div>
               </DialogContent>
