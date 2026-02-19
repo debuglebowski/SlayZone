@@ -20,7 +20,7 @@ import { MarkdownPreview } from './MarkdownPreview'
 
 export interface FileEditorViewHandle {
   openFile: (filePath: string) => void
-  closeActiveFile: () => void
+  closeActiveFile: () => boolean
 }
 
 interface FileEditorViewProps {
@@ -134,7 +134,7 @@ export const FileEditorView = forwardRef<FileEditorViewHandle, FileEditorViewPro
 
   useImperativeHandle(ref, () => ({
     openFile,
-    closeActiveFile: () => { if (activeFilePath) closeFile(activeFilePath) }
+    closeActiveFile: () => { if (activeFilePath) { closeFile(activeFilePath); return true }; return false }
   }), [openFile, activeFilePath, closeFile])
 
   const handleResizeStart = useCallback(

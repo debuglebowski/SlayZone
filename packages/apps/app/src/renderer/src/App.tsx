@@ -958,6 +958,7 @@ function App(): React.JSX.Element {
                             onDeleteTask={deleteTask}
                             onNavigateToTask={openTask}
                             onConvertTask={handleConvertTask}
+                            onCloseTab={() => closeTab(i)}
                           />
                         </div>
                       )}

@@ -147,6 +147,7 @@ interface TaskDetailPageProps {
   onDeleteTask?: (taskId: string) => Promise<void>
   onNavigateToTask?: (taskId: string) => void
   onConvertTask?: (task: Task) => Promise<Task | void>
+  onCloseTab: () => void
 }
 
 export function TaskDetailPage({
@@ -158,7 +159,8 @@ export function TaskDetailPage({
   onArchiveTask,
   onDeleteTask,
   onNavigateToTask,
-  onConvertTask
+  onConvertTask,
+  onCloseTab
 }: TaskDetailPageProps): React.JSX.Element {
   // Main tab session ID format used by TerminalContainer/useTaskTerminals.
   const getMainSessionId = useCallback((id: string) => `${id}:${id}`, [])
@@ -717,6 +719,8 @@ export function TaskDetailPage({
 
   // Track last-focused sub-panel via focusin (macOS native menu accelerators clear activeElement by callback time)
   const lastFocusedPanelRef = useRef<'terminal' | 'editor' | 'browser' | null>(null)
+  const onCloseTabRef = useRef(onCloseTab)
+  onCloseTabRef.current = onCloseTab
   useEffect(() => {
     const handleFocusIn = (e: FocusEvent): void => {
       const target = e.target as HTMLElement | null
@@ -732,28 +736,30 @@ export function TaskDetailPage({
     return () => window.removeEventListener('focusin', handleFocusIn)
   }, [])
 
-  // Cmd+W: close focused sub-item (terminal group, browser tab, editor file)
+  // Cmd+W: close focused sub-item (terminal group, browser tab, editor file),
+  // or fall through to close the task tab if nothing to close
   useEffect(() => {
     if (!isActive) return
     return window.api.app.onCloseCurrent(async () => {
       const panel = lastFocusedPanelRef.current
       if (panel === 'terminal') {
-        await terminalContainerRef.current?.closeActiveGroup()
-        return
-      }
-      if (panel === 'editor') {
-        fileEditorRef.current?.closeActiveFile()
-        return
-      }
-      if (panel === 'browser') {
+        const closed = await terminalContainerRef.current?.closeActiveGroup() ?? true
+        if (closed) return
+      } else if (panel === 'editor') {
+        const closed = fileEditorRef.current?.closeActiveFile()
+        if (closed) return
+      } else if (panel === 'browser') {
         const bt = browserTabsRef.current
         if (bt.tabs.length > 1) {
           const idx = bt.tabs.findIndex(t => t.id === bt.activeTabId)
           const newTabs = bt.tabs.filter(t => t.id !== bt.activeTabId)
           const newActiveId = newTabs[Math.min(idx, newTabs.length - 1)]?.id ?? null
           setBrowserTabs({ tabs: newTabs, activeTabId: newActiveId })
+          return
         }
       }
+      // Nothing was closed — close the task tab
+      onCloseTabRef.current?.()
     })
   }, [isActive, setBrowserTabs])
 

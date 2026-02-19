@@ -6,7 +6,7 @@ import { TerminalTabBar } from './TerminalTabBar'
 import { TerminalSplitGroup } from './TerminalSplitGroup'
 
 export interface TerminalContainerHandle {
-  closeActiveGroup: () => Promise<void>
+  closeActiveGroup: () => Promise<boolean>
 }
 
 interface TerminalContainerProps {
@@ -180,7 +180,7 @@ export const TerminalContainer = forwardRef<TerminalContainerHandle, TerminalCon
   }, [groups, closeGroup, setActiveGroupId, taskId, focusGroupTerminal])
 
   useImperativeHandle(ref, () => ({
-    closeActiveGroup: async () => {
+    closeActiveGroup: async (): Promise<boolean> => {
       const active = document.activeElement as HTMLElement | null
       const paneEl = active?.closest('[data-session-id]')
       const sessionId = paneEl?.getAttribute('data-session-id')
@@ -188,8 +188,8 @@ export const TerminalContainer = forwardRef<TerminalContainerHandle, TerminalCon
       if (sessionId) {
         const tabId = sessionId.substring(taskId.length + 1)
         const group = groups.find(g => g.tabs.some(t => t.id === tabId))
-        if (!group) return
-        if (group.isMain && group.tabs.length === 1) return
+        if (!group) return false
+        if (group.isMain && group.tabs.length === 1) return false
 
         if (group.tabs.length > 1) {
           // Multiple panes: close focused pane, focus adjacent pane in same group
@@ -201,9 +201,13 @@ export const TerminalContainer = forwardRef<TerminalContainerHandle, TerminalCon
           // Last pane in group: close group and focus adjacent group
           await closeGroupAndFocusAdjacent(group.id)
         }
+        return true
       } else {
         // No focused pane: close active group and focus adjacent group
+        const activeGroup = groups.find(g => g.id === activeGroupId)
+        if (!activeGroup || activeGroup.isMain) return false
         await closeGroupAndFocusAdjacent(activeGroupId)
+        return true
       }
     }
   }), [taskId, groups, closeTab, closeGroupAndFocusAdjacent, focusGroupTerminal, activeGroupId])
