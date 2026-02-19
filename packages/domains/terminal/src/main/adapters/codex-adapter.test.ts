@@ -69,17 +69,17 @@ console.log('\nCodexAdapter.buildSpawnConfig\n')
 
 test('starts fresh codex session by default', () => {
   const result = adapter.buildSpawnConfig('/tmp')
-  expect(result.postSpawnCommand).toBe('codex')
+  expect(result.postSpawnCommand).toBe("exec 'codex'")
 })
 
 test('resumes codex session when existing conversation ID is provided', () => {
   const result = adapter.buildSpawnConfig('/tmp', '11111111-2222-4333-8444-555555555555', true)
-  expect(result.postSpawnCommand).toBe("codex resume '11111111-2222-4333-8444-555555555555'")
+  expect(result.postSpawnCommand).toBe("exec 'codex' 'resume' '11111111-2222-4333-8444-555555555555'")
 })
 
 test('includes provider flags while resuming', () => {
   const result = adapter.buildSpawnConfig('/tmp', 'thread-123', true, undefined, ['--search'])
-  expect(result.postSpawnCommand).toBe("codex resume 'thread-123' '--search'")
+  expect(result.postSpawnCommand).toBe("exec 'codex' 'resume' 'thread-123' '--search'")
 })
 
 console.log('\nDone\n')

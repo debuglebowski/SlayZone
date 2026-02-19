@@ -1,5 +1,5 @@
 import type { TerminalAdapter, SpawnConfig, PromptInfo, CodeMode, ActivityState, ErrorInfo, ValidationResult } from './types'
-import { whichBinary, validateShellEnv } from '../shell-env'
+import { buildExecCommand, getShellStartupArgs, resolveUserShell, whichBinary, validateShellEnv } from '../shell-env'
 
 /**
  * Adapter for Google Gemini CLI.
@@ -24,9 +24,11 @@ export class GeminiAdapter implements TerminalAdapter {
       args.push(initialPrompt)
     }
 
+    const shell = resolveUserShell()
     return {
-      shell: 'gemini',
-      args
+      shell,
+      args: getShellStartupArgs(shell),
+      postSpawnCommand: buildExecCommand('gemini', args)
     }
   }
 

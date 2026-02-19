@@ -8,10 +8,6 @@ import { getDiagnosticsConfig, recordDiagnosticEvent } from '@slayzone/diagnosti
 import { RingBuffer, type BufferChunk } from './ring-buffer'
 import { getAdapter, type TerminalMode, type TerminalAdapter, type ActivityState, type ErrorInfo } from './adapters'
 import { StateMachine, activityToTerminalState } from './state-machine'
-import { getUserShellPath } from './shell-env'
-
-// Pre-warm the shell PATH cache so it's ready before first PTY spawn
-getUserShellPath().catch(() => {})
 
 // Database reference for notifications
 let db: Database | null = null
@@ -133,6 +129,8 @@ const IDLE_TIMEOUT_MS = 60 * 1000
 
 // Check interval for idle sessions (10 seconds)
 const IDLE_CHECK_INTERVAL_MS = 10 * 1000
+const STARTUP_TIMEOUT_MS = 10 * 1000
+const FAST_EXIT_FALLBACK_WINDOW_MS = 2000
 
 // Reference to main window for sending idle events
 let mainWindow: BrowserWindow | null = null
@@ -259,6 +257,8 @@ export async function createPty(
   providerArgs?: string[],
   codeMode?: CodeMode | null
 ): Promise<{ success: boolean; error?: string }> {
+  const createStartedAt = Date.now()
+  let spawnAttempt: { shell: string; shellArgs: string[]; hasPostSpawnCommand: boolean } | null = null
   recordDiagnosticEvent({
     level: 'info',
     source: 'pty',
@@ -294,6 +294,24 @@ export async function createPty(
 
     // Get spawn config from adapter
     const spawnConfig = adapter.buildSpawnConfig(cwd || homedir(), effectiveConversationId || undefined, resuming, initialPrompt || undefined, providerArgs ?? [], codeMode || undefined)
+    spawnAttempt = {
+      shell: spawnConfig.shell,
+      shellArgs: spawnConfig.args,
+      hasPostSpawnCommand: Boolean(spawnConfig.postSpawnCommand)
+    }
+    recordDiagnosticEvent({
+      level: 'info',
+      source: 'pty',
+      event: 'pty.spawn_config',
+      sessionId,
+      taskId: taskIdFromSessionId(sessionId),
+      payload: {
+        launchStrategy: spawnConfig.postSpawnCommand ? 'shell_exec' : 'direct_shell',
+        shell: spawnConfig.shell,
+        shellArgs: spawnConfig.args,
+        hasPostSpawnCommand: Boolean(spawnConfig.postSpawnCommand)
+      }
+    })
 
     // Inject MCP env vars so AI terminals know their task and MCP server
     const mcpEnv: Record<string, string> = {}
@@ -302,18 +320,13 @@ export async function createPty(
     const mcpPort = (globalThis as Record<string, unknown>).__mcpPort as number | undefined
     if (mcpPort) mcpEnv.SLAYZONE_MCP_PORT = String(mcpPort)
 
-    // Enrich PATH from user's login shell so CLI tools (claude, cursor-agent, etc.)
-    // are found even when Electron was launched from the dock (minimal PATH)
-    const shellPath = await getUserShellPath()
-
-    const ptyProcess = pty.spawn(spawnConfig.shell, spawnConfig.args, {
+    const spawnOptions = {
       name: 'xterm-256color',
       cols: 80,
       rows: 24,
       cwd: cwd || homedir(),
       env: {
         ...process.env,
-        PATH: shellPath,
         ...spawnConfig.env,
         ...mcpEnv,
         USER: process.env.USER || userInfo().username,
@@ -323,7 +336,36 @@ export async function createPty(
         COLORFGBG: nativeTheme.shouldUseDarkColors ? '15;0' : '0;15',
         TERM_BACKGROUND: nativeTheme.shouldUseDarkColors ? 'dark' : 'light'
       } as Record<string, string>
-    })
+    }
+    const initialArgs = [...spawnConfig.args]
+    const canRetryInteractiveOnly = initialArgs.includes('-i') && initialArgs.includes('-l')
+    let usedArgs = [...initialArgs]
+    let usedFallback = false
+    const spawnStartTs = Date.now()
+    let ptyProcess: pty.IPty
+    try {
+      ptyProcess = pty.spawn(spawnConfig.shell, initialArgs, spawnOptions)
+    } catch (err) {
+      // Fallback for shells that reject login flag combinations.
+      if (!canRetryInteractiveOnly) throw err
+      usedArgs = initialArgs.filter((arg) => arg !== '-l')
+      ptyProcess = pty.spawn(spawnConfig.shell, usedArgs, spawnOptions)
+      usedFallback = true
+      recordDiagnosticEvent({
+        level: 'warn',
+        source: 'pty',
+        event: 'pty.spawn_fallback',
+        sessionId,
+        taskId: taskIdFromSessionId(sessionId),
+        message: (err as Error).message,
+        payload: {
+          shell: spawnConfig.shell,
+          fromArgs: initialArgs,
+          toArgs: usedArgs
+        }
+      })
+    }
+    const shellSpawnMs = Date.now() - spawnStartTs
 
     sessions.set(sessionId, {
       win,
@@ -347,6 +389,89 @@ export async function createPty(
       detectedDevUrls: new Set()
     })
     stateMachine.register(sessionId, 'starting')
+    let firstOutputTs: number | null = null
+    let commandDispatchedTs: number | null = null
+    let startupTimeout: NodeJS.Timeout | undefined
+    let earlyExitWatchdog: NodeJS.Timeout | undefined
+
+    const clearStartupTimeout = (): void => {
+      if (!startupTimeout) return
+      clearTimeout(startupTimeout)
+      startupTimeout = undefined
+    }
+
+    const clearEarlyExitWatchdog = (): void => {
+      if (!earlyExitWatchdog) return
+      clearTimeout(earlyExitWatchdog)
+      earlyExitWatchdog = undefined
+    }
+
+    const finalizeSessionExit = (exitCode: number): void => {
+      clearStartupTimeout()
+      clearEarlyExitWatchdog()
+      dismissNotification(sessionId)
+      transitionState(sessionId, 'dead')
+      recordDiagnosticEvent({
+        level: 'info',
+        source: 'pty',
+        event: 'pty.exit',
+        sessionId,
+        taskId: taskIdFromSessionId(sessionId),
+        payload: {
+          exitCode
+        }
+      })
+      // Delay session cleanup so any trailing onData events (buffered in the PTY fd)
+      // can still be processed and forwarded to the renderer before we drop the session.
+      setTimeout(() => {
+        sessions.delete(sessionId)
+      }, 100)
+      if (!win.isDestroyed()) {
+        try {
+          win.webContents.send('pty:exit', sessionId, exitCode)
+        } catch {
+          // Window destroyed, ignore
+        }
+      }
+    }
+
+    const armStartupTimeout = (target: pty.IPty): void => {
+      clearStartupTimeout()
+      startupTimeout = setTimeout(() => {
+        const live = sessions.get(sessionId)
+        if (!live || live.pty !== target || firstOutputTs !== null) return
+        recordDiagnosticEvent({
+          level: 'warn',
+          source: 'pty',
+          event: 'pty.startup_timeout',
+          sessionId,
+          taskId: taskIdFromSessionId(sessionId),
+          payload: {
+            timeoutMs: STARTUP_TIMEOUT_MS,
+            shell: spawnConfig.shell,
+            shellArgs: usedArgs,
+            launchStrategy: spawnConfig.postSpawnCommand ? 'shell_exec' : 'direct_shell'
+          }
+        })
+        try {
+          target.kill('SIGKILL')
+        } catch {
+          // ignore
+        }
+      }, STARTUP_TIMEOUT_MS)
+    }
+
+    const schedulePostSpawnCommand = (target: pty.IPty): void => {
+      if (!spawnConfig.postSpawnCommand) return
+      // Delay to let shell initialize - 250ms is conservative but reliable
+      // TODO: Could improve with shell-specific ready detection
+      setTimeout(() => {
+        const live = sessions.get(sessionId)
+        if (!live || live.pty !== target) return
+        commandDispatchedTs = Date.now()
+        target.write(`${spawnConfig.postSpawnCommand}\r`)
+      }, 250)
+    }
 
     // Transition out of 'starting' once setup completes
     // (pty.spawn is synchronous, so process is already running)
@@ -358,31 +483,51 @@ export async function createPty(
       }
     })
 
-    // Forward data to renderer
-    ptyProcess.onData((data) => {
-      // Only process if session still exists (prevents data leaking after kill)
-      const session = sessions.get(sessionId)
-      if (!session) {
-        recordDiagnosticEvent({
-          level: 'warn',
-          source: 'pty',
-          event: 'pty.data_without_session',
-          sessionId,
-          taskId: taskIdFromSessionId(sessionId),
-          payload: {
-            length: data.length
-          }
-        })
-        return
-      }
+    const attachPtyHandlers = (target: pty.IPty): void => {
+      // Forward data to renderer
+      target.onData((data) => {
+        if (firstOutputTs === null) {
+          firstOutputTs = Date.now()
+          clearStartupTimeout()
+          recordDiagnosticEvent({
+            level: 'info',
+            source: 'pty',
+            event: 'pty.startup_timing',
+            sessionId,
+            taskId: taskIdFromSessionId(sessionId),
+            payload: {
+              shellSpawnMs,
+              firstOutputMs: firstOutputTs - createStartedAt,
+              firstOutputAfterCommandMs: commandDispatchedTs ? firstOutputTs - commandDispatchedTs : null,
+              usedFallback,
+              shell: spawnConfig.shell,
+              shellArgs: usedArgs
+            }
+          })
+        }
+        // Only process if session still exists (prevents data leaking after kill)
+        const session = sessions.get(sessionId)
+        if (!session || session.pty !== target) {
+          recordDiagnosticEvent({
+            level: 'warn',
+            source: 'pty',
+            event: 'pty.data_without_session',
+            sessionId,
+            taskId: taskIdFromSessionId(sessionId),
+            payload: {
+              length: data.length
+            }
+          })
+          return
+        }
 
-      // Append to buffer for history restoration (filter problematic sequences)
-      const seq = session.buffer.append(filterBufferData(data))
-      // Track current seq for IPC emission
-      const currentSeq = seq
+        // Append to buffer for history restoration (filter problematic sequences)
+        const seq = session.buffer.append(filterBufferData(data))
+        // Track current seq for IPC emission
+        const currentSeq = seq
 
-      // Use adapter for activity detection
-      const detectedActivity = session.adapter.detectActivity(data, session.activity)
+        // Use adapter for activity detection
+        const detectedActivity = session.adapter.detectActivity(data, session.activity)
 
       // Update idle tracking: for transitionOnInput adapters (full-screen TUIs that
       // redraw constantly), only update on meaningful activity detection. Otherwise
@@ -508,56 +653,107 @@ export async function createPty(
         }
       }
 
-      const config = getDiagnosticsConfig()
-      recordDiagnosticEvent({
-        level: 'debug',
-        source: 'pty',
-        event: 'pty.data',
-        sessionId,
-        taskId: taskIdFromSessionId(sessionId),
-        payload: config.includePtyOutput
-          ? { length: data.length, data }
-          : { length: data.length, included: false }
+        const config = getDiagnosticsConfig()
+        recordDiagnosticEvent({
+          level: 'debug',
+          source: 'pty',
+          event: 'pty.data',
+          sessionId,
+          taskId: taskIdFromSessionId(sessionId),
+          payload: config.includePtyOutput
+            ? { length: data.length, data }
+            : { length: data.length, included: false }
+        })
       })
-    })
 
-    ptyProcess.onExit(({ exitCode }) => {
-      dismissNotification(sessionId)
-      transitionState(sessionId, 'dead')
-      recordDiagnosticEvent({
-        level: 'info',
-        source: 'pty',
-        event: 'pty.exit',
-        sessionId,
-        taskId: taskIdFromSessionId(sessionId),
-        payload: {
-          exitCode
+      target.onExit(({ exitCode }) => {
+        clearStartupTimeout()
+        clearEarlyExitWatchdog()
+
+        const session = sessions.get(sessionId)
+        if (!session || session.pty !== target) return
+
+        const canAsyncFallback = canRetryInteractiveOnly && !usedFallback && firstOutputTs === null && (Date.now() - createStartedAt) <= FAST_EXIT_FALLBACK_WINDOW_MS
+        if (canAsyncFallback) {
+          const fallbackArgs = initialArgs.filter((arg) => arg !== '-l')
+          try {
+            const fallbackPty = pty.spawn(spawnConfig.shell, fallbackArgs, spawnOptions)
+            usedArgs = fallbackArgs
+            usedFallback = true
+            ptyProcess = fallbackPty
+            session.pty = fallbackPty
+            recordDiagnosticEvent({
+              level: 'warn',
+              source: 'pty',
+              event: 'pty.spawn_fallback',
+              sessionId,
+              taskId: taskIdFromSessionId(sessionId),
+              message: `Fast exit (${String(exitCode)}) without output; retrying without -l`,
+              payload: {
+                shell: spawnConfig.shell,
+                fromArgs: initialArgs,
+                toArgs: fallbackArgs,
+                reason: 'fast_exit_no_output'
+              }
+            })
+            armStartupTimeout(fallbackPty)
+            attachPtyHandlers(fallbackPty)
+            schedulePostSpawnCommand(fallbackPty)
+            return
+          } catch (fallbackErr) {
+            recordDiagnosticEvent({
+              level: 'error',
+              source: 'pty',
+              event: 'pty.spawn_fallback_failed',
+              sessionId,
+              taskId: taskIdFromSessionId(sessionId),
+              message: (fallbackErr as Error).message,
+              payload: {
+                shell: spawnConfig.shell,
+                attemptedArgs: fallbackArgs
+              }
+            })
+          }
         }
+
+        finalizeSessionExit(exitCode)
       })
-      // Delay session cleanup so any trailing onData events (buffered in the PTY fd)
-      // can still be processed and forwarded to the renderer before we drop the session.
-      setTimeout(() => {
-        sessions.delete(sessionId)
-      }, 100)
-      if (!win.isDestroyed()) {
-        try {
-          win.webContents.send('pty:exit', sessionId, exitCode)
-        } catch {
-          // Window destroyed, ignore
-        }
-      }
-    })
-
-    // If adapter has post-spawn command, execute it after shell is ready
-    if (spawnConfig.postSpawnCommand) {
-      // Delay to let shell initialize - 250ms is conservative but reliable
-      // TODO: Could improve with shell-specific ready detection
-      setTimeout(() => {
-        if (sessions.has(sessionId)) {
-          ptyProcess.write(`${spawnConfig.postSpawnCommand}\r`)
-        }
-      }, 250)
     }
+
+    attachPtyHandlers(ptyProcess)
+    armStartupTimeout(ptyProcess)
+    schedulePostSpawnCommand(ptyProcess)
+    // Recover from rare race where an ultra-fast child can exit before handlers are attached.
+    earlyExitWatchdog = setTimeout(() => {
+      const session = sessions.get(sessionId)
+      if (!session || firstOutputTs !== null) return
+      const pid = session.pty.pid
+      if (typeof pid !== 'number' || pid <= 0) {
+        recordDiagnosticEvent({
+          level: 'warn',
+          source: 'pty',
+          event: 'pty.missed_exit_recovered',
+          sessionId,
+          taskId: taskIdFromSessionId(sessionId),
+          payload: { reason: 'invalid_pid' }
+        })
+        finalizeSessionExit(-1)
+        return
+      }
+      try {
+        process.kill(pid, 0)
+      } catch {
+        recordDiagnosticEvent({
+          level: 'warn',
+          source: 'pty',
+          event: 'pty.missed_exit_recovered',
+          sessionId,
+          taskId: taskIdFromSessionId(sessionId),
+          payload: { reason: 'pid_not_running', pid }
+        })
+        finalizeSessionExit(-1)
+      }
+    }, 300)
 
     // Stop checking for session errors after 5 seconds
     if (resuming) {
@@ -580,7 +776,10 @@ export async function createPty(
       taskId: taskIdFromSessionId(sessionId),
       message: err.message,
       payload: {
-        stack: err.stack ?? null
+        stack: err.stack ?? null,
+        launchStrategy: spawnAttempt?.hasPostSpawnCommand ? 'shell_exec' : 'direct_shell',
+        shell: spawnAttempt?.shell ?? null,
+        shellArgs: spawnAttempt?.shellArgs ?? null
       }
     })
     return { success: false, error: err.message }

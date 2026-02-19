@@ -1,5 +1,5 @@
 import type { TerminalAdapter, SpawnConfig, PromptInfo, CodeMode, ActivityState, ErrorInfo, ValidationResult } from './types'
-import { whichBinary, validateShellEnv } from '../shell-env'
+import { buildExecCommand, getShellStartupArgs, resolveUserShell, whichBinary, validateShellEnv } from '../shell-env'
 
 /**
  * Adapter for Cursor Agent CLI.
@@ -25,9 +25,11 @@ export class CursorAdapter implements TerminalAdapter {
       args.push(initialPrompt)
     }
 
+    const shell = resolveUserShell()
     return {
-      shell: 'cursor-agent',
-      args
+      shell,
+      args: getShellStartupArgs(shell),
+      postSpawnCommand: buildExecCommand('cursor-agent', args)
     }
   }
 

@@ -1603,7 +1603,7 @@ export function TaskDetailPage({
 
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="icon" className="size-7">
+                              <Button data-testid="terminal-menu-trigger" variant="ghost" size="icon" className="size-7">
                                 <MoreHorizontal className="size-3.5" />
                               </Button>
                             </DropdownMenuTrigger>

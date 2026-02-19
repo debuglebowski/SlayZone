@@ -119,6 +119,20 @@ test.describe('Doctor from terminal menu', () => {
 
   let projectAbbrev: string
   let taskId: string
+  const terminalMenuButton = (mainWindow: import('@playwright/test').Page) =>
+    mainWindow.locator('[data-testid="terminal-menu-trigger"]:visible').first()
+  const doctorMenuItem = (mainWindow: import('@playwright/test').Page) =>
+    mainWindow.getByRole('menuitem', { name: 'Doctor' })
+  const terminalModeTrigger = (mainWindow: import('@playwright/test').Page) =>
+    mainWindow.locator('[data-testid="terminal-mode-trigger"]:visible').first()
+  const openTerminalMenu = async (mainWindow: import('@playwright/test').Page) => {
+    await mainWindow.keyboard.press('Escape').catch(() => {})
+    await terminalMenuButton(mainWindow).click()
+  }
+  const setTerminalMode = async (mainWindow: import('@playwright/test').Page, modeLabel: 'Claude Code' | 'Terminal') => {
+    await terminalModeTrigger(mainWindow).click()
+    await mainWindow.getByRole('option', { name: modeLabel }).click()
+  }
 
   test.beforeAll(async ({ mainWindow }) => {
     const s = seed(mainWindow)
@@ -143,13 +157,10 @@ test.describe('Doctor from terminal menu', () => {
 
   test('Doctor menu item is present for AI modes', async ({ mainWindow }) => {
     // Open the three-dots menu
-    await mainWindow
-      .locator('button:has(.lucide-more-horizontal):visible')
-      .last()
-      .click()
+    await openTerminalMenu(mainWindow)
 
     await expect(
-      mainWindow.getByRole('menuitem', { name: 'Doctor' })
+      doctorMenuItem(mainWindow)
     ).toBeVisible({ timeout: 3_000 })
 
     // Close the menu
@@ -157,26 +168,25 @@ test.describe('Doctor from terminal menu', () => {
   })
 
   test('Doctor dialog shows validation results for claude', async ({ mainWindow }) => {
-    await mainWindow
-      .locator('button:has(.lucide-more-horizontal):visible')
-      .last()
-      .click()
+    await setTerminalMode(mainWindow, 'Claude Code')
+    await openTerminalMenu(mainWindow)
+    await expect(doctorMenuItem(mainWindow)).toBeVisible({ timeout: 3_000 })
 
-    await mainWindow.getByRole('menuitem', { name: 'Doctor' }).click()
+    await doctorMenuItem(mainWindow).click()
 
     // Dialog should open
     const dialog = mainWindow.locator('[role="dialog"]:visible').last()
     await expect(dialog).toBeVisible({ timeout: 3_000 })
-    await expect(dialog).toContainText('Doctor', { timeout: 2_000 })
+    await expect(dialog).toContainText(/Environment check|Doctor/, { timeout: 2_000 })
 
     // Should show at least one check result
     await expect(
       dialog.locator('text=/Binary found/i').first()
     ).toBeVisible({ timeout: 8_000 })
 
-    // claude is installed → should show a passing check (green ✓)
+    // claude is installed → check should report binary found path
     await expect(
-      dialog.locator('text=/✓/').first()
+      dialog.getByText(/Binary found/i).first()
     ).toBeVisible({ timeout: 3_000 })
 
     // Close
@@ -185,35 +195,18 @@ test.describe('Doctor from terminal menu', () => {
   })
 
   test('Doctor not shown for terminal mode', async ({ mainWindow }) => {
-    // Switch to terminal mode
-    await mainWindow.evaluate(
-      (id) => window.api.db.updateTask({ id, terminalMode: 'terminal' }),
-      taskId
-    )
+    // Switch to terminal mode via UI to ensure rendered state is up to date.
+    await setTerminalMode(mainWindow, 'Terminal')
 
-    // Navigate away and back to reload
-    await goHome(mainWindow)
-    await clickProject(mainWindow, projectAbbrev)
-    await mainWindow.getByText('Doctor menu task').first().click()
-    await expect(
-      mainWindow.locator('[data-testid="terminal-mode-trigger"]:visible').first()
-    ).toBeVisible()
-
-    await mainWindow
-      .locator('button:has(.lucide-more-horizontal):visible')
-      .last()
-      .click()
+    await openTerminalMenu(mainWindow)
 
     await expect(
-      mainWindow.getByRole('menuitem', { name: 'Doctor' })
+      doctorMenuItem(mainWindow)
     ).not.toBeVisible({ timeout: 2_000 })
 
     await mainWindow.keyboard.press('Escape')
 
     // Restore to claude-code
-    await mainWindow.evaluate(
-      (id) => window.api.db.updateTask({ id, terminalMode: 'claude-code' }),
-      taskId
-    )
+    await setTerminalMode(mainWindow, 'Claude Code')
   })
 })

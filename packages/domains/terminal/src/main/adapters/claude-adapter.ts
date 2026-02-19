@@ -1,5 +1,5 @@
 import type { TerminalAdapter, SpawnConfig, PromptInfo, CodeMode, ActivityState, ErrorInfo, ValidationResult } from './types'
-import { whichBinary, validateShellEnv } from '../shell-env'
+import { buildExecCommand, getShellStartupArgs, resolveUserShell, whichBinary, validateShellEnv } from '../shell-env'
 
 /**
  * Adapter for Claude Code CLI.
@@ -38,9 +38,11 @@ export class ClaudeAdapter implements TerminalAdapter {
       claudeArgs.push(initialPrompt)
     }
 
+    const shell = resolveUserShell()
     return {
-      shell: 'claude',
-      args: claudeArgs
+      shell,
+      args: getShellStartupArgs(shell),
+      postSpawnCommand: buildExecCommand('claude', claudeArgs)
     }
   }
 

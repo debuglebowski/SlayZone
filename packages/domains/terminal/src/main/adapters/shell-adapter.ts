@@ -1,5 +1,5 @@
 import type { TerminalAdapter, SpawnConfig, PromptInfo, CodeMode, ActivityState, ErrorInfo } from './types'
-import { getDefaultShell } from '../shell-env'
+import { getShellStartupArgs, resolveUserShell } from '../shell-env'
 
 /**
  * Adapter for raw terminal/shell.
@@ -10,9 +10,10 @@ export class ShellAdapter implements TerminalAdapter {
   readonly idleTimeoutMs = null // use default 60s
 
   buildSpawnConfig(_cwd: string, _conversationId?: string, _resuming?: boolean, _initialPrompt?: string, _providerArgs?: string[], _codeMode?: CodeMode): SpawnConfig {
+    const shell = resolveUserShell()
     return {
-      shell: getDefaultShell() ?? '/bin/sh',
-      args: []
+      shell,
+      args: getShellStartupArgs(shell)
     }
   }
 

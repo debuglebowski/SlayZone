@@ -1,5 +1,5 @@
 import type { TerminalAdapter, SpawnConfig, PromptInfo, CodeMode, ActivityState, ErrorInfo, ValidationResult } from './types'
-import { whichBinary, getDefaultShell, validateShellEnv } from '../shell-env'
+import { buildExecCommand, getShellStartupArgs, resolveUserShell, whichBinary, validateShellEnv } from '../shell-env'
 
 /**
  * Adapter for OpenCode CLI.
@@ -12,26 +12,20 @@ export class OpencodeAdapter implements TerminalAdapter {
   // Full-screen TUI constantly redraws — detect working from user input, not output
   readonly transitionOnInput = true
 
-  private static shellEscape(arg: string): string {
-    if (arg.length === 0) return "''"
-    return `'${arg.replace(/'/g, `'\"'\"'`)}'`
-  }
-
   buildSpawnConfig(_cwd: string, conversationId?: string, resuming?: boolean, _initialPrompt?: string, providerArgs: string[] = [], _codeMode?: CodeMode): SpawnConfig {
-    const binary = 'opencode'
-    const escapedFlags = providerArgs.map((arg) => OpencodeAdapter.shellEscape(arg)).join(' ')
+    const cmdArgs: string[] = []
 
-    const shouldResume = !!conversationId && !!resuming
-    const baseCommand = shouldResume
-      ? `${binary} --session ${OpencodeAdapter.shellEscape(conversationId)}`
-      : binary
+    if (conversationId && resuming) {
+      cmdArgs.push('--session', conversationId)
+    }
 
-    const postSpawnCommand = escapedFlags.length > 0 ? `${baseCommand} ${escapedFlags}` : baseCommand
+    cmdArgs.push(...providerArgs)
 
+    const shell = resolveUserShell()
     return {
-      shell: getDefaultShell() ?? '/bin/sh',
-      args: [],
-      postSpawnCommand
+      shell,
+      args: getShellStartupArgs(shell),
+      postSpawnCommand: buildExecCommand('opencode', cmdArgs)
     }
   }
 

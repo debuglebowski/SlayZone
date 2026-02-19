@@ -5,10 +5,16 @@ import { createPty, writePty, resizePty, killPty, hasPty, getBuffer, clearBuffer
 import { getAdapter, type TerminalMode } from './adapters'
 import type { CodeMode } from '@slayzone/terminal/shared'
 import { parseShellArgs } from './adapters/flag-parser'
+import { setShellOverrideProvider } from './shell-env'
 
 export function registerPtyHandlers(ipcMain: IpcMain, db: Database): void {
   // Set database reference for notifications
   setDatabase(db)
+  setShellOverrideProvider(() => {
+    const row = db.prepare('SELECT value FROM settings WHERE key = ?').get('shell') as { value: string } | undefined
+    const value = row?.value?.trim()
+    return value ? value : null
+  })
 
   ipcMain.handle(
     'pty:create',

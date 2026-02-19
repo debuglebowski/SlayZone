@@ -1,5 +1,5 @@
 import type { TerminalAdapter, SpawnConfig, PromptInfo, CodeMode, ActivityState, ErrorInfo, ValidationResult } from './types'
-import { whichBinary, getDefaultShell, validateShellEnv } from '../shell-env'
+import { buildExecCommand, getShellStartupArgs, resolveUserShell, whichBinary, validateShellEnv } from '../shell-env'
 
 /**
  * Adapter for OpenAI Codex CLI.
@@ -13,22 +13,21 @@ export class CodexAdapter implements TerminalAdapter {
   readonly idleTimeoutMs = 2500
   readonly sessionIdCommand = '/status'
 
-  private static shellEscape(arg: string): string {
-    if (arg.length === 0) return "''"
-    return `'${arg.replace(/'/g, `'\"'\"'`)}'`
-  }
-
   buildSpawnConfig(_cwd: string, conversationId?: string, resuming?: boolean, _initialPrompt?: string, providerArgs: string[] = [], _codeMode?: CodeMode): SpawnConfig {
-    const escapedFlags = providerArgs.map((arg) => CodexAdapter.shellEscape(arg)).join(' ')
+    const cmdArgs: string[] = []
     const shouldResume = !!conversationId && !!resuming
-    const baseCommand = shouldResume
-      ? `codex resume ${CodexAdapter.shellEscape(conversationId)}`
-      : 'codex'
-    const postSpawnCommand = escapedFlags.length > 0 ? `${baseCommand} ${escapedFlags}` : baseCommand
+
+    if (shouldResume) {
+      cmdArgs.push('resume', conversationId)
+    }
+
+    cmdArgs.push(...providerArgs)
+
+    const shell = resolveUserShell()
     return {
-      shell: getDefaultShell() ?? '/bin/sh',
-      args: [],
-      postSpawnCommand
+      shell,
+      args: getShellStartupArgs(shell),
+      postSpawnCommand: buildExecCommand('codex', cmdArgs)
     }
   }
 
