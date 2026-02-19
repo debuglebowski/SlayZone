@@ -876,10 +876,10 @@ function App(): React.JSX.Element {
                         />
                         {import.meta.env.DEV && (
                           <Button
-                            variant="ghost"
+                            variant="outline"
                             size="sm"
                             onClick={handleLeaderboardClick}
-                            className="h-7 px-2 gap-1.5 text-xs text-muted-foreground hover:text-foreground"
+                            className="h-7 px-2 gap-1.5 text-xs shadow-xs"
                           >
                             <Trophy className="size-3.5" />
                             <span>Leaderboard</span>
