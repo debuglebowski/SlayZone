@@ -1,6 +1,25 @@
 # Changelog
 
 
+## v0.1.52...main
+
+[compare changes](https://github.com/debuglebowski/SlayZone/compare/v0.1.52...main)
+
+### 🩹 Fixes
+
+- **app:** Add missing radix collapsible dependency ([98a7abf](https://github.com/debuglebowski/SlayZone/commit/98a7abf))
+
+### 📖 Documentation
+
+- Improve get started macOS instructions ([840bcb7](https://github.com/debuglebowski/SlayZone/commit/840bcb7))
+
+### ❤️ Contributors
+
+- Debuglebowski
+
+
+
+
 ## v0.1.51...main
 
 [compare changes](https://github.com/debuglebowski/SlayZone/compare/v0.1.51...main)
