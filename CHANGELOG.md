@@ -1,6 +1,21 @@
 # Changelog
 
 
+## v0.1.54...main
+
+[compare changes](https://github.com/debuglebowski/SlayZone/compare/v0.1.54...main)
+
+### 🩹 Fixes
+
+- **lockfile:** Sync app importer deps ([f7ba93a](https://github.com/debuglebowski/SlayZone/commit/f7ba93a))
+
+### ❤️ Contributors
+
+- Debuglebowski
+
+
+
+
 ## v0.1.52...main
 
 [compare changes](https://github.com/debuglebowski/SlayZone/compare/v0.1.52...main)
