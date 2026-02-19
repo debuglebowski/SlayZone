@@ -101,11 +101,9 @@ export function KanbanCard({
           ) : null}
           <div className="flex-1 min-w-0">
             <div className="flex items-start gap-3">
-              <p className="text-xs font-medium line-clamp-3 flex-1 leading-tight whitespace-pre-wrap break-words">{task.title}</p>
-              <div className="flex items-start gap-1.5 shrink-0">
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <span className="flex items-end gap-[1.5px] shrink-0">
+                  <span className="flex items-end gap-[1.5px] shrink-0 mt-0.5">
                     {[3, 5, 7, 9].map((h, i) => (
                       <span
                         key={i}
@@ -122,6 +120,8 @@ export function KanbanCard({
                 </TooltipTrigger>
                 <TooltipContent>{PRIORITY_LABELS[task.priority]}</TooltipContent>
               </Tooltip>
+              <p className="text-xs font-medium line-clamp-3 flex-1 leading-tight whitespace-pre-wrap break-words">{task.title}</p>
+              <div className="flex items-start gap-1.5 shrink-0">
               {/* Terminal state indicator - hide when starting */}
               {(() => {
                 const stateStyle = terminalState !== 'starting' ? getTerminalStateStyle(terminalState) : null
