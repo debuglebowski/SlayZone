@@ -1,7 +1,7 @@
 import type { Project, CreateProjectInput, UpdateProjectInput } from '@slayzone/projects/shared'
 import type { Task, CreateTaskInput, UpdateTaskInput, GenerateDescriptionResult } from '@slayzone/task/shared'
 import type { Tag, CreateTagInput, UpdateTagInput } from '@slayzone/tags/shared'
-import type { TerminalMode, TerminalState, CodeMode, PtyInfo, PromptInfo, BufferSinceResult, ProviderUsage } from '@slayzone/terminal/shared'
+import type { TerminalMode, TerminalState, CodeMode, PtyInfo, PromptInfo, BufferSinceResult, ProviderUsage, ValidationResult } from '@slayzone/terminal/shared'
 import type { TerminalTab, CreateTerminalTabInput, UpdateTerminalTabInput } from '@slayzone/task-terminals/shared'
 import type { Theme, ThemePreference } from '@slayzone/settings/shared'
 import type { DetectedWorktree, MergeResult, MergeWithAIResult, GitDiffSnapshot, ConflictFileContent, ConflictAnalysis, RebaseProgress, CommitInfo, AheadBehind, StatusSummary } from '@slayzone/worktrees/shared'
@@ -171,6 +171,8 @@ export interface ElectronAPI {
     onOpenTask: (callback: (taskId: string) => void) => () => void
     onScreenshotTrigger: (callback: () => void) => () => void
     onUpdateStatus: (callback: (status: UpdateStatus) => void) => () => void
+    onCloseCurrent: (callback: () => void) => () => void
+    onCloseActiveTask: (callback: () => void) => () => void
     restartForUpdate: () => Promise<void>
     checkForUpdates: () => Promise<void>
   }
@@ -218,6 +220,7 @@ export interface ElectronAPI {
     onSessionDetected: (callback: (sessionId: string, conversationId: string) => void) => () => void
     onDevServerDetected: (callback: (sessionId: string, url: string) => void) => () => void
     getState: (sessionId: string) => Promise<TerminalState | null>
+    validate: (mode: TerminalMode) => Promise<ValidationResult[]>
   }
   git: {
     isGitRepo: (path: string) => Promise<boolean>

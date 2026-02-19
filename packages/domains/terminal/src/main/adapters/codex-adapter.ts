@@ -1,5 +1,6 @@
 import { platform } from 'os'
-import type { TerminalAdapter, SpawnConfig, PromptInfo, CodeMode, ActivityState, ErrorInfo } from './types'
+import type { TerminalAdapter, SpawnConfig, PromptInfo, CodeMode, ActivityState, ErrorInfo, ValidationResult } from './types'
+import { whichBinary } from '../shell-env'
 
 /**
  * Adapter for OpenAI Codex CLI.
@@ -72,6 +73,24 @@ export class CodexAdapter implements TerminalAdapter {
   detectError(_data: string): ErrorInfo | null {
     // TODO: Implement when Codex output format is known
     return null
+  }
+
+  async validate(): Promise<ValidationResult[]> {
+    const [node, codex] = await Promise.all([whichBinary('node'), whichBinary('codex')])
+    return [
+      {
+        check: 'Node.js found',
+        ok: !!node,
+        detail: node ?? 'node not found in PATH',
+        fix: node ? undefined : 'Install Node.js from https://nodejs.org'
+      },
+      {
+        check: 'Codex CLI found',
+        ok: !!codex,
+        detail: codex ?? 'codex not found in PATH',
+        fix: codex ? undefined : 'npm install -g @openai/codex'
+      }
+    ]
   }
 
   detectPrompt(_data: string): PromptInfo | null {

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
-import { MoreHorizontal, Archive, Trash2, AlertTriangle, Sparkles, Loader2, Terminal as TerminalIcon, Globe, Settings2, GitBranch, FileCode, ChevronRight, Plus, GripVertical, Camera, X, Info } from 'lucide-react'
+import { MoreHorizontal, Archive, Trash2, AlertTriangle, Sparkles, Loader2, Terminal as TerminalIcon, Globe, Settings2, GitBranch, FileCode, ChevronRight, Plus, GripVertical, Camera, X, Info, CheckCircle2, XCircle, Stethoscope } from 'lucide-react'
 import { DndContext, PointerSensor, useSensors, useSensor, closestCenter, type DragEndEvent } from '@dnd-kit/core'
 import { SortableContext, useSortable, verticalListSortingStrategy, arrayMove } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
@@ -9,7 +9,7 @@ import type { BrowserTabsState } from '@slayzone/task-browser/shared'
 import type { Tag } from '@slayzone/tags/shared'
 import type { Project } from '@slayzone/projects/shared'
 import { DEV_SERVER_URL_PATTERN, SESSION_ID_COMMANDS, SESSION_ID_UNAVAILABLE } from '@slayzone/terminal/shared'
-import type { TerminalMode } from '@slayzone/terminal/shared'
+import type { TerminalMode, ValidationResult } from '@slayzone/terminal/shared'
 import { Button, PanelToggle, DevServerToast, Collapsible, CollapsibleTrigger, CollapsibleContent } from '@slayzone/ui'
 import {
   DropdownMenu,
@@ -50,11 +50,12 @@ import {
   AlertDialogHeader,
   AlertDialogTitle
 } from '@slayzone/ui'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@slayzone/ui'
 import { Tooltip, TooltipTrigger, TooltipContent } from '@slayzone/ui'
 import { TaskMetadataSidebar, LinearCard } from './TaskMetadataSidebar'
 import { RichTextEditor } from '@slayzone/editor'
 import { markSkipCache, usePty } from '@slayzone/terminal'
-import { TerminalContainer } from '@slayzone/task-terminals'
+import { TerminalContainer, type TerminalContainerHandle } from '@slayzone/task-terminals'
 import { UnifiedGitPanel, type UnifiedGitPanelHandle, type GitTabId } from '@slayzone/worktrees'
 import { cn, getTaskStatusStyle } from '@slayzone/ui'
 import { BrowserPanel } from '@slayzone/task-browser'
@@ -193,6 +194,11 @@ export function TaskDetailPage({
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [archiveDialogOpen, setArchiveDialogOpen] = useState(false)
 
+  // Doctor dialog state
+  const [doctorDialogOpen, setDoctorDialogOpen] = useState(false)
+  const [doctorResults, setDoctorResults] = useState<ValidationResult[] | null>(null)
+  const [doctorLoading, setDoctorLoading] = useState(false)
+
   // In-progress prompt state
 
   // Description editing state
@@ -286,6 +292,7 @@ export function TaskDetailPage({
   const [gitDefaultTab, setGitDefaultTab] = useState<GitTabId>('general')
   const [quickOpenVisible, setQuickOpenVisible] = useState(false)
   const fileEditorRef = useRef<FileEditorViewHandle>(null)
+  const terminalContainerRef = useRef<TerminalContainerHandle>(null)
   const pendingEditorFileRef = useRef<string | null>(null)
   const fileEditorRefCallback = useCallback((handle: FileEditorViewHandle | null) => {
     fileEditorRef.current = handle
@@ -603,6 +610,22 @@ export function TaskDetailPage({
     setTerminalKey((k) => k + 1)
   }, [task, resetTaskState, onTaskUpdated, getMainSessionId])
 
+  // Doctor: validate CLI binary and dependencies
+  const handleDoctor = useCallback(async () => {
+    if (!task || task.terminal_mode === 'terminal') return
+    setDoctorLoading(true)
+    setDoctorResults(null)
+    setDoctorDialogOpen(true)
+    try {
+      const results = await window.api.pty.validate(task.terminal_mode)
+      setDoctorResults(results)
+    } catch {
+      setDoctorResults([{ check: 'Validation', ok: false, detail: 'Failed to run checks' }])
+    } finally {
+      setDoctorLoading(false)
+    }
+  }, [task])
+
   // Re-attach terminal (remount without killing PTY - reuses cached terminal)
   const handleReattachTerminal = useCallback(() => {
     if (!task) return
@@ -654,7 +677,8 @@ export function TaskDetailPage({
     }
   }, [descriptionValue])
 
-  // Cmd+I (title), Cmd+Shift+I (description), Cmd+Shift+K (clear terminal buffer)
+  // Cmd+I (title), Cmd+Shift+I (description)
+  // Note: Cmd+Shift+K (clear buffer) is handled per-terminal in Terminal.tsx via attachCustomKeyEventHandler
   useEffect(() => {
     const isTerminalFocused = (): boolean => {
       const active = document.activeElement as HTMLElement | null
@@ -665,12 +689,6 @@ export function TaskDetailPage({
 
     const handleKeyDown = (e: KeyboardEvent): void => {
       if (!isActive) return
-      if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === 'k') {
-        if (!isTerminalFocused()) return
-        e.preventDefault()
-        void terminalApiRef.current?.clearBuffer()
-        return
-      }
       if (e.metaKey && e.key === 'i') {
         if (!isTerminalFocused()) return
         e.preventDefault()
@@ -692,6 +710,35 @@ export function TaskDetailPage({
       void handleScreenshot()
     })
   }, [isActive, handleScreenshot])
+
+  // Keep a ref so the onCloseCurrent handler always sees current browserTabs without re-subscribing
+  const browserTabsRef = useRef(browserTabs)
+  useEffect(() => { browserTabsRef.current = browserTabs }, [browserTabs])
+
+  // Cmd+W: close focused sub-item (terminal group, browser tab, editor file)
+  useEffect(() => {
+    if (!isActive) return
+    return window.api.app.onCloseCurrent(async () => {
+      const active = document.activeElement as HTMLElement | null
+      if (active?.classList.contains('xterm-helper-textarea') || active?.closest('.xterm')) {
+        await terminalContainerRef.current?.closeActiveGroup()
+        return
+      }
+      if (active?.closest('.cm-editor')) {
+        fileEditorRef.current?.closeActiveFile()
+        return
+      }
+      if (active?.closest('[data-browser-panel]')) {
+        const bt = browserTabsRef.current
+        if (bt.tabs.length > 1) {
+          const idx = bt.tabs.findIndex(t => t.id === bt.activeTabId)
+          const newTabs = bt.tabs.filter(t => t.id !== bt.activeTabId)
+          const newActiveId = newTabs[Math.min(idx, newTabs.length - 1)]?.id ?? null
+          setBrowserTabs({ tabs: newTabs, activeTabId: newActiveId })
+        }
+      }
+    })
+  }, [isActive, setBrowserTabs])
 
   // Clear quick run prompt after it's been passed to Terminal
   useEffect(() => {
@@ -840,6 +887,13 @@ export function TaskDetailPage({
           return
         }
 
+        // Cmd+E: toggle editor panel — works even inside CodeMirror
+        if (e.key === 'e' && isBuiltinEnabled('editor')) {
+          e.preventDefault()
+          handlePanelToggle('editor', !panelVisibility.editor)
+          return
+        }
+
         // Skip shortcuts when focus is in CodeMirror or contenteditable editors
         const target = e.target as HTMLElement
         const inEditor = target?.closest?.('[contenteditable="true"]')
@@ -866,9 +920,6 @@ export function TaskDetailPage({
         } else if (e.key === 's' && isBuiltinEnabled('settings')) {
           e.preventDefault()
           handlePanelToggle('settings', !panelVisibility.settings)
-        } else if (e.key === 'e' && isBuiltinEnabled('editor')) {
-          e.preventDefault()
-          handlePanelToggle('editor', !panelVisibility.editor)
         } else {
           // Web panel shortcuts
           for (const wp of enabledWebPanels) {
@@ -1426,6 +1477,7 @@ export function TaskDetailPage({
                 <div className="h-full bg-black" />
               ) : project?.id === task.project_id && project.path && !projectPathMissing ? (
                 <TerminalContainer
+                  ref={terminalContainerRef}
                   key={`${terminalKey}-${task.project_id}-${project?.path || ''}-${task.worktree_path || ''}`}
                   taskId={task.id}
                   isActive={isActive}
@@ -1440,6 +1492,7 @@ export function TaskDetailPage({
                   onConversationCreated={handleSessionCreated}
                   onSessionInvalid={handleSessionInvalid}
                   onReady={handleTerminalReady}
+                  onRetry={handleRestartTerminal}
                   onMainTabActiveChange={setIsMainTabActive}
                   rightContent={
                     <Tooltip open={isMainTabActive ? false : undefined}>
@@ -1555,6 +1608,14 @@ export function TaskDetailPage({
                               <DropdownMenuItem onClick={handleResetTerminal}>
                                 Reset terminal
                               </DropdownMenuItem>
+                              {task.terminal_mode !== 'terminal' && (
+                                <>
+                                  <DropdownMenuSeparator />
+                                  <DropdownMenuItem onClick={() => void handleDoctor()}>
+                                    Doctor
+                                  </DropdownMenuItem>
+                                </>
+                              )}
                             </DropdownMenuContent>
                           </DropdownMenu>
                         </div>
@@ -1857,6 +1918,59 @@ export function TaskDetailPage({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog open={doctorDialogOpen} onOpenChange={setDoctorDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Stethoscope className="size-4 text-muted-foreground" />
+              Environment check
+              {task && PROVIDER_DEFAULTS[task.terminal_mode] && (
+                <span className="text-muted-foreground font-normal text-sm">
+                  — {PROVIDER_DEFAULTS[task.terminal_mode].label}
+                </span>
+              )}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2 py-1">
+            {doctorLoading && (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground py-2">
+                <Loader2 className="size-4 animate-spin" />
+                Running checks…
+              </div>
+            )}
+            {doctorResults?.map((r) => (
+              <div
+                key={r.check}
+                className={cn(
+                  'rounded-lg border p-3 space-y-2',
+                  r.ok
+                    ? 'border-green-500/20 bg-green-50/40 dark:bg-green-950/20'
+                    : 'border-red-500/20 bg-red-50/40 dark:bg-red-950/20'
+                )}
+              >
+                <div className="flex items-start gap-2">
+                  {r.ok
+                    ? <CheckCircle2 className="size-4 text-green-600 dark:text-green-400 shrink-0 mt-px" />
+                    : <XCircle className="size-4 text-red-500 dark:text-red-400 shrink-0 mt-px" />
+                  }
+                  <div className="min-w-0 space-y-0.5">
+                    <p className="text-sm font-medium leading-none">{r.check}</p>
+                    <p className="text-xs text-muted-foreground">{r.detail}</p>
+                  </div>
+                </div>
+                {!r.ok && r.fix && (
+                  <div className="ml-6">
+                    <code className="text-xs bg-neutral-100 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 rounded px-2 py-1.5 font-mono block">
+                      {r.fix}
+                    </code>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </DialogContent>
+      </Dialog>
 
     </div>
   )

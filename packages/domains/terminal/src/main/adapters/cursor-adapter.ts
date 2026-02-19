@@ -1,5 +1,5 @@
-import { platform, homedir } from 'os'
-import type { TerminalAdapter, SpawnConfig, PromptInfo, CodeMode, ActivityState, ErrorInfo } from './types'
+import type { TerminalAdapter, SpawnConfig, PromptInfo, CodeMode, ActivityState, ErrorInfo, ValidationResult } from './types'
+import { whichBinary } from '../shell-env'
 
 /**
  * Adapter for Cursor Agent CLI.
@@ -25,10 +25,8 @@ export class CursorAdapter implements TerminalAdapter {
       args.push(initialPrompt)
     }
 
-    const binary = platform() === 'win32' ? 'cursor-agent' : `${homedir()}/.local/bin/cursor-agent`
-
     return {
-      shell: binary,
+      shell: 'cursor-agent',
       args
     }
   }
@@ -59,6 +57,16 @@ export class CursorAdapter implements TerminalAdapter {
     }
 
     return null
+  }
+
+  async validate(): Promise<ValidationResult[]> {
+    const found = await whichBinary('cursor-agent')
+    return [{
+      check: 'Binary found',
+      ok: !!found,
+      detail: found ?? 'cursor-agent not found in PATH',
+      fix: found ? undefined : 'Enable via Cursor settings → Background Agent'
+    }]
   }
 
   detectPrompt(_data: string): PromptInfo | null {

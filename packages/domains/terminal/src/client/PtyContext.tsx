@@ -16,6 +16,7 @@ export type CodeMode = 'normal' | 'plan' | 'accept-edits' | 'bypass'
 interface PtyState {
   lastSeq: number // Last sequence number received for ordering
   exitCode?: number
+  crashOutput?: string
   sessionInvalid: boolean
   state: TerminalState
   pendingPrompt?: PromptInfo
@@ -43,6 +44,7 @@ interface PtyContextValue {
   subscribeDevServer: (sessionId: string, cb: DevServerCallback) => () => void
   getLastSeq: (sessionId: string) => number
   getExitCode: (sessionId: string) => number | undefined
+  getCrashOutput: (sessionId: string) => string | undefined
   isSessionInvalid: (sessionId: string) => boolean
   getState: (sessionId: string) => TerminalState
   getPendingPrompt: (sessionId: string) => PromptInfo | undefined
@@ -108,11 +110,24 @@ export function PtyProvider({ children }: { children: ReactNode }) {
       }
     })
 
-    const unsubExit = window.api.pty.onExit((sessionId, exitCode) => {
+    const unsubExit = window.api.pty.onExit(async (sessionId, exitCode) => {
       const state = statesRef.current.get(sessionId)
       if (!state) return // Ignore exit for unknown tasks
 
       state.exitCode = exitCode
+
+      // Capture crash output before the 100ms backend cleanup window closes
+      // Only capture if process exited non-zero (likely a crash)
+      if (exitCode !== 0) {
+        try {
+          const raw = await window.api.pty.getBuffer(sessionId)
+          if (raw && statesRef.current.get(sessionId)) {
+            statesRef.current.get(sessionId)!.crashOutput = raw
+          }
+        } catch {
+          // Best-effort; ignore errors
+        }
+      }
 
       // Ensure state transitions to dead — the main process may not always
       // emit pty:state-change (e.g. killPty deletes session before onExit fires)
@@ -352,6 +367,10 @@ export function PtyProvider({ children }: { children: ReactNode }) {
     return statesRef.current.get(sessionId)?.exitCode
   }, [])
 
+  const getCrashOutput = useCallback((sessionId: string): string | undefined => {
+    return statesRef.current.get(sessionId)?.crashOutput
+  }, [])
+
   const isSessionInvalid = useCallback((sessionId: string): boolean => {
     return statesRef.current.get(sessionId)?.sessionInvalid ?? false
   }, [])
@@ -443,6 +462,7 @@ export function PtyProvider({ children }: { children: ReactNode }) {
     subscribeDevServer,
     getLastSeq,
     getExitCode,
+    getCrashOutput,
     isSessionInvalid,
     getState,
     getPendingPrompt,
@@ -465,6 +485,7 @@ export function PtyProvider({ children }: { children: ReactNode }) {
     subscribeDevServer,
     getLastSeq,
     getExitCode,
+    getCrashOutput,
     isSessionInvalid,
     getState,
     getPendingPrompt,

@@ -43,6 +43,13 @@ export interface PromptInfo {
   position: number
 }
 
+export interface ValidationResult {
+  check: string
+  ok: boolean
+  detail: string
+  fix?: string
+}
+
 
 // Provider usage / rate limiting
 export interface UsageWindow {

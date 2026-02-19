@@ -8,6 +8,10 @@ import { getDiagnosticsConfig, recordDiagnosticEvent } from '@slayzone/diagnosti
 import { RingBuffer, type BufferChunk } from './ring-buffer'
 import { getAdapter, type TerminalMode, type TerminalAdapter, type ActivityState, type ErrorInfo } from './adapters'
 import { StateMachine, activityToTerminalState } from './state-machine'
+import { getUserShellPath } from './shell-env'
+
+// Pre-warm the shell PATH cache so it's ready before first PTY spawn
+getUserShellPath().catch(() => {})
 
 // Database reference for notifications
 let db: Database | null = null
@@ -244,7 +248,7 @@ export interface CreatePtyOptions {
   resuming?: boolean
 }
 
-export function createPty(
+export async function createPty(
   win: BrowserWindow,
   sessionId: string,
   cwd: string,
@@ -255,7 +259,7 @@ export function createPty(
   initialPrompt?: string | null,
   providerArgs?: string[],
   codeMode?: CodeMode | null
-): { success: boolean; error?: string } {
+): Promise<{ success: boolean; error?: string }> {
   recordDiagnosticEvent({
     level: 'info',
     source: 'pty',
@@ -300,6 +304,10 @@ export function createPty(
     const mcpPort = (globalThis as Record<string, unknown>).__mcpPort as number | undefined
     if (mcpPort) mcpEnv.SLAYZONE_MCP_PORT = String(mcpPort)
 
+    // Enrich PATH from user's login shell so CLI tools (claude, cursor-agent, etc.)
+    // are found even when Electron was launched from the dock (minimal PATH)
+    const shellPath = await getUserShellPath()
+
     const ptyProcess = pty.spawn(spawnConfig.shell, spawnConfig.args, {
       name: 'xterm-256color',
       cols: 80,
@@ -307,6 +315,7 @@ export function createPty(
       cwd: cwd || homedir(),
       env: {
         ...process.env,
+        PATH: shellPath,
         ...spawnConfig.env,
         ...mcpEnv,
         USER: process.env.USER || userInfo().username,

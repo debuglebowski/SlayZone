@@ -122,6 +122,16 @@ const api: ElectronAPI = {
       ipcRenderer.on('app:screenshot-trigger', handler)
       return () => ipcRenderer.removeListener('app:screenshot-trigger', handler)
     },
+    onCloseCurrent: (callback: () => void) => {
+      const handler = () => callback()
+      ipcRenderer.on('app:close-current-focus', handler)
+      return () => ipcRenderer.removeListener('app:close-current-focus', handler)
+    },
+    onCloseActiveTask: (callback: () => void) => {
+      const handler = () => callback()
+      ipcRenderer.on('app:close-active-task', handler)
+      return () => ipcRenderer.removeListener('app:close-active-task', handler)
+    },
     onUpdateStatus: (callback) => {
       const handler = (_: unknown, status: import('@slayzone/types').UpdateStatus) => callback(status)
       ipcRenderer.on('app:update-status', handler)
@@ -205,7 +215,8 @@ const api: ElectronAPI = {
       ipcRenderer.on('pty:dev-server-detected', handler)
       return () => ipcRenderer.removeListener('pty:dev-server-detected', handler)
     },
-    getState: (sessionId: string) => ipcRenderer.invoke('pty:getState', sessionId)
+    getState: (sessionId: string) => ipcRenderer.invoke('pty:getState', sessionId),
+    validate: (mode: string) => ipcRenderer.invoke('pty:validate', mode)
   },
   git: {
     isGitRepo: (path) => ipcRenderer.invoke('git:isGitRepo', path),

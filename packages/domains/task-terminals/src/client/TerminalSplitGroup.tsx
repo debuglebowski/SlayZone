@@ -22,6 +22,7 @@ interface PaneProps {
     clearBuffer: () => Promise<void>
   }) => void
   onFirstInput?: () => void
+  onRetry?: () => void
 }
 
 interface TerminalSplitGroupProps {
@@ -109,6 +110,7 @@ export function TerminalSplitGroup({ panes }: TerminalSplitGroupProps) {
           onSessionInvalid={pane.onSessionInvalid}
           onReady={pane.onReady}
           onFirstInput={pane.onFirstInput}
+          onRetry={pane.onRetry}
         />
       </div>
     )
@@ -134,6 +136,7 @@ export function TerminalSplitGroup({ panes }: TerminalSplitGroupProps) {
               onSessionInvalid={pane.onSessionInvalid}
               onReady={pane.onReady}
               onFirstInput={pane.onFirstInput}
+              onRetry={pane.onRetry}
             />
           </div>
           {i < panes.length - 1 && (

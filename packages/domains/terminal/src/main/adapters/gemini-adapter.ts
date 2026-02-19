@@ -1,4 +1,5 @@
-import type { TerminalAdapter, SpawnConfig, PromptInfo, CodeMode, ActivityState, ErrorInfo } from './types'
+import type { TerminalAdapter, SpawnConfig, PromptInfo, CodeMode, ActivityState, ErrorInfo, ValidationResult } from './types'
+import { whichBinary } from '../shell-env'
 
 /**
  * Adapter for Google Gemini CLI.
@@ -70,6 +71,16 @@ export class GeminiAdapter implements TerminalAdapter {
     }
 
     return null
+  }
+
+  async validate(): Promise<ValidationResult[]> {
+    const found = await whichBinary('gemini')
+    return [{
+      check: 'Binary found',
+      ok: !!found,
+      detail: found ?? 'gemini not found in PATH',
+      fix: found ? undefined : 'npm install -g @google/gemini-cli'
+    }]
   }
 
   detectPrompt(data: string): PromptInfo | null {

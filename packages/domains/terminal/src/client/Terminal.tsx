@@ -1,4 +1,5 @@
 import { useEffect, useRef, useCallback, useState } from 'react'
+import { CheckCircle2, XCircle, Loader2 } from 'lucide-react'
 import { Terminal as XTerm } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
 // import { WebLinksAddon } from '@xterm/addon-web-links' // Disabled - causes persistent underlines
@@ -98,6 +99,14 @@ interface TerminalProps {
     clearBuffer: () => Promise<void>
   }) => void
   onFirstInput?: () => void
+  onRetry?: () => void
+}
+
+function stripAnsi(str: string): string {
+  return str
+    .replace(/\x1b\[[0-9;]*[A-Za-z]/g, '')
+    .replace(/\x1b\][^\x07]*\x07/g, '')
+    .replace(/\x1b[()][AB012]/g, '')
 }
 
 export function Terminal({
@@ -113,7 +122,8 @@ export function Terminal({
   onConversationCreated,
   onSessionInvalid,
   onReady,
-  onFirstInput
+  onFirstInput,
+  onRetry
 }: TerminalProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const terminalRef = useRef<XTerm | null>(null)
@@ -127,6 +137,10 @@ export function Terminal({
   const [searchOpen, setSearchOpen] = useState(false)
   const [isInitializing, setIsInitializing] = useState(true)
   const [initError, setInitError] = useState<string | null>(null)
+  const [deadExitCode, setDeadExitCode] = useState<number | null>(null)
+  const [deadCrashOutput, setDeadCrashOutput] = useState<string | null>(null)
+  const [doctorResults, setDoctorResults] = useState<import('@slayzone/terminal/shared').ValidationResult[] | null>(null)
+  const [doctorLoading, setDoctorLoading] = useState(false)
 
   // Refs for callbacks to prevent initTerminal dependency churn.
   // When onConversationCreated fires (saving conversation ID), it updates task state
@@ -142,7 +156,7 @@ export function Terminal({
   onFirstInputRef.current = onFirstInput
   const hasCalledFirstInputRef = useRef(false)
 
-  const { subscribe, subscribeExit, subscribeSessionInvalid, subscribeAttention, subscribeState, getState, resetTaskState, cleanupTask } = usePty()
+  const { subscribe, subscribeExit, subscribeSessionInvalid, subscribeAttention, subscribeState, getState, getCrashOutput, resetTaskState, cleanupTask } = usePty()
   const { theme } = useTheme()
 
   const [ptyState, setPtyState] = useState<TerminalState>(() => getState(sessionId))
@@ -473,9 +487,14 @@ export function Terminal({
 
     const unsubExit = subscribeExit(sessionId, (exitCode) => {
       terminalRef.current?.writeln(`\r\n\x1b[90mProcess exited with code ${exitCode}\x1b[0m`)
+      // Capture crash output before cleanupTask deletes context state
+      const raw = getCrashOutput(sessionId)
       // Clean up cached terminal and context state on exit
       disposeTerminal(sessionId)
       cleanupTask(sessionId)
+      // Show dead overlay for AI modes
+      setDeadExitCode(exitCode)
+      if (raw) setDeadCrashOutput(raw)
     })
 
     const unsubSessionInvalid = subscribeSessionInvalid(sessionId, () => {
@@ -494,7 +513,7 @@ export function Terminal({
       unsubSessionInvalid()
       unsubAttention()
     }
-  }, [sessionId, subscribe, subscribeExit, subscribeSessionInvalid, subscribeAttention])
+  }, [sessionId, subscribe, subscribeExit, subscribeSessionInvalid, subscribeAttention, getCrashOutput, cleanupTask])
 
   // Subscribe to PTY state changes for loading indicator
   useEffect(() => {
@@ -660,6 +679,28 @@ export function Terminal({
     terminalRef.current?.focus()
   }, [])
 
+  const handleRetry = useCallback(() => {
+    setDeadExitCode(null)
+    setDeadCrashOutput(null)
+    setDoctorResults(null)
+    onRetry?.()
+  }, [onRetry])
+
+  const handleDoctor = useCallback(async () => {
+    setDoctorLoading(true)
+    setDoctorResults(null)
+    try {
+      const results = await window.api.pty.validate(mode)
+      setDoctorResults(results)
+    } catch {
+      setDoctorResults([{ check: 'Validation', ok: false, detail: 'Failed to run checks' }])
+    } finally {
+      setDoctorLoading(false)
+    }
+  }, [mode])
+
+  const showDeadOverlay = ptyState === 'dead' && !isInitializing && deadExitCode !== null && mode !== 'terminal'
+
   return (
     <div className="relative h-full w-full">
       {searchOpen && searchAddonRef.current && (
@@ -691,6 +732,64 @@ export function Terminal({
         {initError && (
           <div className="absolute inset-0 flex items-center justify-center bg-white dark:bg-[#0a0a0a] z-10 p-4">
             <div className="text-red-400 text-sm text-center">Failed to start terminal: {initError}</div>
+          </div>
+        )}
+        {showDeadOverlay && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center bg-white dark:bg-[#0a0a0a] z-10 p-6 gap-4 overflow-y-auto">
+            {deadCrashOutput && (
+              <pre className="text-xs text-neutral-500 dark:text-neutral-400 max-h-32 overflow-y-auto w-full max-w-lg bg-neutral-50 dark:bg-neutral-900 rounded p-3 font-mono whitespace-pre-wrap break-all">
+                {stripAnsi(deadCrashOutput).split('\n').slice(-20).join('\n')}
+              </pre>
+            )}
+            <p className="text-sm text-neutral-500">Process exited with code {deadExitCode}</p>
+            <div className="flex gap-2">
+              {onRetry && (
+                <button
+                  onClick={handleRetry}
+                  className="px-3 py-1.5 text-sm rounded-md bg-neutral-100 dark:bg-neutral-800 hover:bg-neutral-200 dark:hover:bg-neutral-700 text-neutral-700 dark:text-neutral-300 transition-colors"
+                >
+                  Retry
+                </button>
+              )}
+              <button
+                onClick={() => void handleDoctor()}
+                disabled={doctorLoading}
+                className="px-3 py-1.5 text-sm rounded-md bg-neutral-100 dark:bg-neutral-800 hover:bg-neutral-200 dark:hover:bg-neutral-700 text-neutral-700 dark:text-neutral-300 transition-colors disabled:opacity-50 flex items-center gap-1.5"
+              >
+                {doctorLoading
+                  ? <><Loader2 className="size-3.5 animate-spin" />Checking…</>
+                  : 'Doctor'
+                }
+              </button>
+            </div>
+            {doctorResults && (
+              <div className="w-full max-w-sm space-y-2">
+                {doctorResults.map((r) => (
+                  <div
+                    key={r.check}
+                    className={`rounded-lg border p-3 space-y-1.5 ${r.ok ? 'border-green-500/20 bg-green-50/40 dark:bg-green-950/20' : 'border-red-500/20 bg-red-50/40 dark:bg-red-950/20'}`}
+                  >
+                    <div className="flex items-start gap-2">
+                      {r.ok
+                        ? <CheckCircle2 className="size-3.5 text-green-600 dark:text-green-400 shrink-0 mt-px" />
+                        : <XCircle className="size-3.5 text-red-500 dark:text-red-400 shrink-0 mt-px" />
+                      }
+                      <div className="min-w-0 space-y-0.5">
+                        <p className="text-xs font-medium leading-none">{r.check}</p>
+                        <p className="text-xs text-neutral-500 dark:text-neutral-400">{r.detail}</p>
+                      </div>
+                    </div>
+                    {!r.ok && r.fix && (
+                      <div className="ml-5">
+                        <code className="text-xs bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-300 rounded px-2 py-1 font-mono block">
+                          {r.fix}
+                        </code>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
       </div>

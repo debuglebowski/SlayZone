@@ -1,5 +1,6 @@
-import { platform, homedir } from 'os'
-import type { TerminalAdapter, SpawnConfig, PromptInfo, CodeMode, ActivityState, ErrorInfo } from './types'
+import { platform } from 'os'
+import type { TerminalAdapter, SpawnConfig, PromptInfo, CodeMode, ActivityState, ErrorInfo, ValidationResult } from './types'
+import { whichBinary } from '../shell-env'
 
 /**
  * Adapter for OpenCode CLI.
@@ -26,7 +27,7 @@ export class OpencodeAdapter implements TerminalAdapter {
   }
 
   buildSpawnConfig(_cwd: string, conversationId?: string, resuming?: boolean, shellOverride?: string, _initialPrompt?: string, providerArgs: string[] = [], _codeMode?: CodeMode): SpawnConfig {
-    const binary = platform() === 'win32' ? 'opencode' : `${homedir()}/.opencode/bin/opencode`
+    const binary = 'opencode'
     const escapedFlags = providerArgs.map((arg) => OpencodeAdapter.shellEscape(arg)).join(' ')
 
     const shouldResume = !!conversationId && !!resuming
@@ -76,6 +77,16 @@ export class OpencodeAdapter implements TerminalAdapter {
     }
 
     return null
+  }
+
+  async validate(): Promise<ValidationResult[]> {
+    const found = await whichBinary('opencode')
+    return [{
+      check: 'Binary found',
+      ok: !!found,
+      detail: found ?? 'opencode not found in PATH',
+      fix: found ? undefined : 'curl -fsSL https://opencode.ai/install | sh'
+    }]
   }
 
   detectPrompt(_data: string): PromptInfo | null {

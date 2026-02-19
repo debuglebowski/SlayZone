@@ -1,9 +1,13 @@
-import { useEffect, useCallback, useRef, useMemo } from 'react'
+import { useEffect, useCallback, useRef, useMemo, forwardRef, useImperativeHandle } from 'react'
 import { usePty } from '@slayzone/terminal'
 import type { TerminalMode, CodeMode } from '@slayzone/terminal/shared'
 import { useTaskTerminals } from './useTaskTerminals'
 import { TerminalTabBar } from './TerminalTabBar'
 import { TerminalSplitGroup } from './TerminalSplitGroup'
+
+export interface TerminalContainerHandle {
+  closeActiveGroup: () => Promise<void>
+}
 
 interface TerminalContainerProps {
   taskId: string
@@ -25,11 +29,12 @@ interface TerminalContainerProps {
     clearBuffer: () => Promise<void>
   }) => void
   onFirstInput?: () => void
+  onRetry?: () => void
   onMainTabActiveChange?: (isMainActive: boolean) => void
   rightContent?: React.ReactNode
 }
 
-export function TerminalContainer({
+export const TerminalContainer = forwardRef<TerminalContainerHandle, TerminalContainerProps>(function TerminalContainer({
   taskId,
   cwd,
   defaultMode,
@@ -44,9 +49,10 @@ export function TerminalContainer({
   onSessionInvalid,
   onReady,
   onFirstInput,
+  onRetry,
   onMainTabActiveChange,
   rightContent
-}: TerminalContainerProps) {
+}: TerminalContainerProps, ref) {
   const {
     tabs,
     groups,
@@ -144,6 +150,10 @@ export function TerminalContainer({
     }
   }, [groups, closeTab])
 
+  useImperativeHandle(ref, () => ({
+    closeActiveGroup: () => closeGroup(activeGroupId)
+  }), [closeGroup, activeGroupId])
+
   // Build pane props for the active group
   const paneProps = useMemo(() => {
     if (!activeGroup) return []
@@ -160,9 +170,10 @@ export function TerminalContainer({
       onConversationCreated: tab.isMain ? handleConversationCreated : undefined,
       onSessionInvalid: tab.isMain ? onSessionInvalid : undefined,
       onReady: tab.isMain ? handleTerminalReady : undefined,
-      onFirstInput: tab.isMain ? onFirstInput : undefined
+      onFirstInput: tab.isMain ? onFirstInput : undefined,
+      onRetry: tab.isMain ? onRetry : undefined
     }))
-  }, [activeGroup, getSessionId, cwd, conversationId, existingConversationId, initialPrompt, codeMode, providerFlags, autoFocus, handleConversationCreated, onSessionInvalid, handleTerminalReady, onFirstInput])
+  }, [activeGroup, getSessionId, cwd, conversationId, existingConversationId, initialPrompt, codeMode, providerFlags, autoFocus, handleConversationCreated, onSessionInvalid, handleTerminalReady, onFirstInput, onRetry])
 
   if (isLoading || !activeGroup) {
     return (
@@ -194,4 +205,4 @@ export function TerminalContainer({
       </div>
     </div>
   )
-}
+})

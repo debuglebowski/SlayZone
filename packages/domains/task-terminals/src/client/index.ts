@@ -1,4 +1,5 @@
 export { TerminalContainer } from './TerminalContainer'
+export type { TerminalContainerHandle } from './TerminalContainer'
 export { TerminalTabBar } from './TerminalTabBar'
 export { TerminalSplitGroup } from './TerminalSplitGroup'
 export { useTaskTerminals } from './useTaskTerminals'

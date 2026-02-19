@@ -1,5 +1,5 @@
-import { platform, homedir } from 'os'
-import type { TerminalAdapter, SpawnConfig, PromptInfo, CodeMode, ActivityState, ErrorInfo } from './types'
+import type { TerminalAdapter, SpawnConfig, PromptInfo, CodeMode, ActivityState, ErrorInfo, ValidationResult } from './types'
+import { whichBinary } from '../shell-env'
 
 /**
  * Adapter for Claude Code CLI.
@@ -38,11 +38,8 @@ export class ClaudeAdapter implements TerminalAdapter {
       claudeArgs.push(initialPrompt)
     }
 
-    // Spawn claude directly
-    const claudePath = platform() === 'win32' ? 'claude' : `${homedir()}/.local/bin/claude`
-
     return {
-      shell: claudePath,
+      shell: 'claude',
       args: claudeArgs
     }
   }
@@ -95,6 +92,16 @@ export class ClaudeAdapter implements TerminalAdapter {
     }
 
     return null
+  }
+
+  async validate(): Promise<ValidationResult[]> {
+    const found = await whichBinary('claude')
+    return [{
+      check: 'Binary found',
+      ok: !!found,
+      detail: found ?? 'claude not found in PATH',
+      fix: found ? undefined : 'npm install -g @anthropic-ai/claude-code'
+    }]
   }
 
   detectPrompt(data: string): PromptInfo | null {

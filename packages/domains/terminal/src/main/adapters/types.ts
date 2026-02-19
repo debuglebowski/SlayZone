@@ -34,6 +34,13 @@ export interface PromptInfo {
   position: number
 }
 
+export interface ValidationResult {
+  check: string
+  ok: boolean
+  detail: string
+  fix?: string
+}
+
 export interface TerminalAdapter {
   readonly mode: TerminalMode
 
@@ -72,4 +79,10 @@ export interface TerminalAdapter {
    * Returns null if no prompt detected.
    */
   detectPrompt(data: string): PromptInfo | null
+
+  /**
+   * Validate that the CLI binary and dependencies are available.
+   * Returns a list of check results with fix instructions for failed checks.
+   */
+  validate?(): Promise<ValidationResult[]>
 }
