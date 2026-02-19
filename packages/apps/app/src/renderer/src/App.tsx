@@ -202,7 +202,9 @@ function App(): React.JSX.Element {
     )
     const unsubscribes = temporaryTaskTabs.map((tab) => {
       const mainSessionId = `${tab.taskId}:${tab.taskId}`
-      return ptyContext.subscribeExit(mainSessionId, () => {
+      return ptyContext.subscribeExit(mainSessionId, (exitCode) => {
+        // Keep failed terminals visible for diagnosis; only auto-close on clean exit.
+        if (exitCode !== 0) return
         void window.api.db.deleteTask(tab.taskId).catch(() => {})
         setTasks((prev) => prev.filter((task) => task.id !== tab.taskId))
         setTabs((prev) => {
