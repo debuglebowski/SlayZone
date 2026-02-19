@@ -4,7 +4,7 @@ import { DndContext, PointerSensor, useSensors, useSensor, closestCenter, type D
 import { SortableContext, useSortable, verticalListSortingStrategy, arrayMove } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import type { Task, PanelVisibility, WebPanelResolution } from '@slayzone/task/shared'
-import { getProviderConversationId, getProviderFlags, setProviderConversationId, setProviderFlags, clearAllConversationIds, PROVIDER_DEFAULTS } from '@slayzone/task/shared'
+import { BUILTIN_PANEL_IDS, getProviderConversationId, getProviderFlags, setProviderConversationId, setProviderFlags, clearAllConversationIds, PROVIDER_DEFAULTS } from '@slayzone/task/shared'
 import type { BrowserTabsState } from '@slayzone/task-browser/shared'
 import type { Tag } from '@slayzone/tags/shared'
 import type { Project } from '@slayzone/projects/shared'
@@ -1298,6 +1298,9 @@ export function TaskDetailPage({
     )
   }
 
+  const hasVisiblePanels = [...BUILTIN_PANEL_IDS, ...enabledWebPanels.map((wp) => wp.id)]
+    .some((panelId) => !!panelVisibility[panelId])
+
   return (
     <div id="task-detail" className={cn("h-full flex flex-col", compact ? "p-0" : "px-6 py-4 gap-4")}>
       {compact && (
@@ -1424,6 +1427,15 @@ export function TaskDetailPage({
 
       {/* Split view: terminal | browser | settings | git diff */}
       <div id="task-panels" ref={splitContainerRef} className="flex-1 flex min-h-0">
+        {!compact && !hasVisiblePanels && (
+          <div className="flex-1 flex items-center justify-center">
+            <div className="w-full max-w-xl min-h-52 rounded-lg border border-border bg-surface-1 px-5 py-7 text-center flex flex-col items-center justify-center">
+              <p className="text-2xl font-semibold">No panel tab is shown</p>
+              <p className="mt-3 text-base text-muted-foreground">Use the panel tabs in the header to open one.</p>
+            </div>
+          </div>
+        )}
+
         {/* Terminal Panel */}
         {(compact || panelVisibility.terminal) && (
         <div
