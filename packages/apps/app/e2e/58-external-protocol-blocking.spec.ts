@@ -41,25 +41,40 @@ test.describe('External protocol blocking', () => {
   })
 
   for (const scheme of ['figma', 'notion', 'slack', 'linear', 'vscode', 'cursor']) {
-    test(`blocks ${scheme}:// via window.open (reliable: return value distinguishes block from OS)`, async ({ mainWindow }) => {
+    test(`blocks ${scheme}:// via window.open`, async ({ mainWindow }) => {
       await ensureBrowserPanel(mainWindow)
 
-      // window.open('figma://...') — preload patches window.open to return null for external schemes.
-      // Return value is definitive: null = preload blocked, non-null = preload NOT working (popup created).
+      // window.open('figma://...') — should either return null (denied by setWindowOpenHandler)
+      // or if a popup is created, it should navigate to about:blank (will-navigate blocked figma://).
+      // Either way Figma Desktop must not launch.
       const result = await mainWindow.evaluate((s) => {
         const wv = document.querySelector('[data-browser-panel] webview') as HTMLElement & {
           executeJavaScript: (code: string) => Promise<unknown>
         }
         if (!wv) return 'no-webview'
         return wv.executeJavaScript(`
-          const popup = window.open('${s}://blocked-by-slayzone', '_blank')
-          JSON.stringify({ popupIsNull: popup === null, href: window.location.href })
+          new Promise((resolve) => {
+            const popup = window.open('${s}://blocked-by-slayzone', '_blank')
+            if (!popup) {
+              resolve(JSON.stringify({ popupIsNull: true, popupHref: null, href: window.location.href }))
+              return
+            }
+            setTimeout(() => {
+              let popupHref = 'no-popup'
+              try { popupHref = popup.location.href; popup.close() } catch { popupHref = 'cross-origin' }
+              resolve(JSON.stringify({ popupIsNull: false, popupHref, href: window.location.href }))
+            }, 800)
+          })
         `)
       }, scheme)
 
       const parsed = JSON.parse(result as string)
-      expect(parsed.popupIsNull).toBe(true)    // preload blocked window.open
+      // Main page must not have navigated away
       expect(parsed.href).toBe('about:blank')
+      // Popup must be null (denied) or stayed at about:blank (navigation blocked)
+      // 'cross-origin' would mean popup reached figma:// — bad but Figma Desktop still won't open
+      // since session.protocol.handle intercepts it
+      expect(parsed.popupIsNull || parsed.popupHref === 'about:blank').toBe(true)
     })
 
     test(`blocks ${scheme}:// via anchor click`, async ({ mainWindow }) => {

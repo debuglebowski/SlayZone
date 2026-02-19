@@ -548,7 +548,6 @@ app.whenReady().then(async () => {
     // Default session covers popup windows created by allowpopups webviews
     session.defaultSession.protocol.handle(scheme, blockProtocol)
   }
-  session.defaultSession.setPreloads([webviewPreload])
 
   browserSession.setPermissionRequestHandler((_webContents, permission, callback) => {
     const allowedPermissions = ['hid', 'usb', 'clipboard-read', 'clipboard-write']
