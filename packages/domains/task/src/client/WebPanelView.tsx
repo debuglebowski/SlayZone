@@ -1,5 +1,5 @@
 import { useRef, useEffect, useCallback, useState } from 'react'
-import { RotateCw, X, Globe, Monitor, Tablet, Smartphone } from 'lucide-react'
+import { RotateCw, X, Globe, Monitor, Tablet, Smartphone, Copy, Check } from 'lucide-react'
 import { Button, cn } from '@slayzone/ui'
 import type { WebPanelEnvironment, WebPanelResolution, WebPanelResolutionDefaults } from '../shared/types'
 import { useWebPanelEmulation } from './useWebPanelEmulation'
@@ -37,6 +37,7 @@ export function WebPanelView({
   const containerRef = useRef<HTMLDivElement>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [webviewReady, setWebviewReady] = useState(false)
+  const [copied, setCopied] = useState(false)
   const [containerSize, setContainerSize] = useState<{ width: number; height: number } | null>(null)
 
   const handleResolutionChange = useCallback((res: WebPanelResolution | null) => {
@@ -145,6 +146,20 @@ export function WebPanelView({
             ))}
           </div>
         )}
+
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          title="Copy URL"
+          onClick={() => {
+            const currentUrl = webviewRef.current?.getURL() ?? url
+            navigator.clipboard.writeText(currentUrl)
+            setCopied(true)
+            setTimeout(() => setCopied(false), 1500)
+          }}
+        >
+          {copied ? <Check className="size-3.5 text-green-500" /> : <Copy className="size-3.5" />}
+        </Button>
 
         <Button
           variant="ghost"
