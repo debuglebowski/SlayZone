@@ -36,9 +36,9 @@
 
 Claude Code, Codex, Gemini, and more — running inside task terminals. Spin up as many as you need per task. Real PTY sessions, not sandboxed previews.
 
-### &nbsp;&#x267B;&#xFE0F;&nbsp; Kanban board
+### &nbsp;&#x1F9E9;&nbsp; Agent-Kanban interaction
 
-Drag-and-drop tasks, priorities, tags, sub-tasks — all stored in local SQLite.
+Use SlayZone's MCP server so agents can read task context and update tasks, statuses, and subtasks from the terminal.
 
 ### &nbsp;&#x1F310;&nbsp; Embedded browser panels
 
