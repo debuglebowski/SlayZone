@@ -56,6 +56,23 @@ import { UsagePopover } from '@/components/usage/UsagePopover'
 import { useUsage } from '@/components/usage/useUsage'
 import { useQuery } from 'convex/react'
 import { api } from 'convex/_generated/api'
+
+// Fetches leaderboard rank only when ConvexProvider is in the tree (i.e. VITE_CONVEX_URL is set).
+// Calling useQuery unconditionally in App crashes when no ConvexProvider exists.
+function LeaderboardRankQuery({
+  isAuthenticated,
+  onRank
+}: {
+  isAuthenticated: boolean
+  onRank: (rank: number | null) => void
+}): null {
+  const rank = useQuery(
+    api.leaderboard.getMyBestRank,
+    import.meta.env.DEV && isAuthenticated ? {} : 'skip'
+  ) ?? null
+  React.useEffect(() => { onRank(rank) }, [rank, onRank])
+  return null
+}
 import { useLeaderboardAuth } from '@/lib/convexAuth'
 
 type HomePanel = 'kanban' | 'git' | 'editor' | 'processes'
@@ -160,10 +177,7 @@ function App(): React.JSX.Element {
 
   // Leaderboard rank for tab badge
   const leaderboardAuth = useLeaderboardAuth()
-  const leaderboardBestRank = useQuery(
-    api.leaderboard.getMyBestRank,
-    import.meta.env.DEV && leaderboardAuth.configured && leaderboardAuth.isAuthenticated ? {} : 'skip'
-  ) ?? null
+  const [leaderboardBestRank, setLeaderboardBestRank] = useState<number | null>(null)
 
   // Usage & notification state
   const { data: usageData, refresh: refreshUsage } = useUsage()
@@ -884,6 +898,12 @@ function App(): React.JSX.Element {
 
   return (
     <SidebarProvider defaultOpen={true}>
+      {leaderboardAuth.configured && (
+        <LeaderboardRankQuery
+          isAuthenticated={leaderboardAuth.isAuthenticated}
+          onRank={setLeaderboardBestRank}
+        />
+      )}
       <div id="app-shell" className="h-full w-full flex">
         <AppSidebar
           projects={projects}

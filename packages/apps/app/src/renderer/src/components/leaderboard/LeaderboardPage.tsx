@@ -72,6 +72,18 @@ function hasResolvedGithubIdentity(viewer: ViewerProfile | null): boolean {
 }
 
 export function LeaderboardPage(): React.JSX.Element {
+  const auth = useLeaderboardAuth()
+  if (!auth.configured) {
+    return (
+      <div className="h-full overflow-hidden flex items-center justify-center text-sm text-muted-foreground">
+        Leaderboard unavailable (Convex not configured)
+      </div>
+    )
+  }
+  return <LeaderboardPageInner />
+}
+
+function LeaderboardPageInner(): React.JSX.Element {
   const [period, setPeriod] = useState<Period>('all-time')
   const [authBusy, setAuthBusy] = useState(false)
   const [syncing, setSyncing] = useState(false)
