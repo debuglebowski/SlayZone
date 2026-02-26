@@ -122,7 +122,7 @@ export function UsagePopover({ data, onRefresh }: UsagePopoverProps) {
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <button
-          className="flex items-center gap-2 h-7 px-1 transition-colors text-muted-foreground hover:text-foreground"
+          className="flex items-center gap-2 h-7 px-1 rounded-lg transition-colors text-muted-foreground hover:text-foreground"
           onMouseEnter={handleEnter}
           onMouseLeave={handleLeave}
         >

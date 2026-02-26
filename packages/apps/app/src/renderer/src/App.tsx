@@ -17,7 +17,7 @@ import { CreateTaskDialog, EditTaskDialog, DeleteTaskDialog, TaskDetailPage, Pro
 import { UnifiedGitPanel, type UnifiedGitPanelHandle, type GitTabId } from '@slayzone/worktrees'
 import { FileEditorView } from '@slayzone/file-editor/client'
 import { CreateProjectDialog, ProjectSettingsDialog, DeleteProjectDialog } from '@slayzone/projects'
-import { UserSettingsDialog, useViewState, AppearanceProvider } from '@slayzone/settings'
+import { UserSettingsDialog, useViewState, AppearanceProvider, useTheme } from '@slayzone/settings'
 import { OnboardingDialog } from '@slayzone/onboarding'
 import { usePty } from '@slayzone/terminal/client'
 import type { TerminalState } from '@slayzone/terminal/shared'
@@ -64,6 +64,8 @@ const HOME_PANEL_SIZE_KEY: Record<HomePanel, string> = { kanban: 'kanban', git: 
 const HANDLE_WIDTH = 16
 
 function App(): React.JSX.Element {
+  const { theme } = useTheme()
+
   // Core data from domain hook
   const {
     tasks,
@@ -956,7 +958,7 @@ function App(): React.JSX.Element {
   return (
     <AppearanceProvider settingsRevision={settingsRevision}>
     <SidebarProvider defaultOpen={true}>
-      <div id="app-shell" className="h-full w-full flex">
+      <div id="app-shell" className="h-full w-full flex overflow-hidden rounded-tl-xl rounded-tr-xl bg-surface-1">
         <AppSidebar
           projects={projects}
           tasks={tasks}
@@ -991,7 +993,7 @@ function App(): React.JSX.Element {
                               disabled={openTaskIds.length < 2}
                               onClick={() => setExplodeMode((prev) => !prev)}
                               className={cn(
-                                "h-7 w-7 flex items-center justify-center transition-colors border-b-2",
+                                "h-7 w-7 rounded-lg flex items-center justify-center transition-colors border-b-2",
                                 explodeMode
                                   ? "text-foreground border-foreground"
                                   : "text-muted-foreground border-transparent hover:text-foreground",
@@ -1011,7 +1013,7 @@ function App(): React.JSX.Element {
                               onClick={selectedProjectId ? handleCreateScratchTerminal : undefined}
                               disabled={!selectedProjectId}
                               className={cn(
-                                "h-7 w-7 flex items-center justify-center transition-colors",
+                                "h-7 w-7 rounded-lg flex items-center justify-center transition-colors",
                                 selectedProjectId
                                   ? "text-muted-foreground hover:text-foreground"
                                   : "text-muted-foreground/40 cursor-not-allowed"
@@ -1324,7 +1326,7 @@ function App(): React.JSX.Element {
           onRestart={() => window.api.app.restartForUpdate()}
           onDismiss={() => setUpdateVersion(null)}
         />
-        <Toaster position="bottom-right" theme="dark" />
+        <Toaster position="bottom-right" theme={theme} />
       </div>
     </SidebarProvider>
     </AppearanceProvider>

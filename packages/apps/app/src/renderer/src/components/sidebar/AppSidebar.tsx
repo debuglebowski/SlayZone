@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Settings, HelpCircle, Keyboard, ChevronDown, Map, Sparkles } from 'lucide-react'
+import { Settings, HelpCircle, Keyboard, ChevronDown, Map, Sparkles, Sun, Moon } from 'lucide-react'
 import * as Collapsible from '@radix-ui/react-collapsible'
 import {
   Sidebar,
@@ -11,6 +11,7 @@ import {
   SidebarMenuItem
 } from '@slayzone/ui'
 import { Button } from '@slayzone/ui'
+import { toast } from '@slayzone/ui'
 import { Tooltip, TooltipTrigger, TooltipContent } from '@slayzone/ui'
 import {
   Dialog,
@@ -22,6 +23,7 @@ import {
 import { ProjectItem } from './ProjectItem'
 import { TerminalStatusPopover } from '@slayzone/terminal'
 import { cn } from '@slayzone/ui'
+import { useTheme } from '@slayzone/settings'
 import type { Task } from '@slayzone/task/shared'
 import type { Project } from '@slayzone/projects/shared'
 
@@ -83,6 +85,9 @@ const shortcutGroups = [
   ]},
 ]
 
+const footerActionClassName =
+  'rounded-lg text-muted-foreground hover:text-foreground hover:bg-sidebar-accent/80 focus-visible:ring-2 focus-visible:ring-sidebar-ring'
+
 export function AppSidebar({
   projects,
   tasks,
@@ -98,11 +103,20 @@ export function AppSidebar({
   zenMode,
 }: AppSidebarProps) {
   const [shortcutsOpen, setShortcutsOpen] = useState(false)
+  const { theme, setPreference } = useTheme()
+  const isDarkTheme = theme === 'dark'
+  const nextThemeLabel = isDarkTheme ? 'Switch to light theme' : 'Switch to dark theme'
 
   return (
-    <Sidebar collapsible="none" className={zenMode ? "!w-0 min-h-svh overflow-hidden" : "w-16 min-h-svh"}>
+    <Sidebar
+      collapsible="none"
+      className={cn(
+        zenMode ? '!w-0 min-h-svh overflow-hidden' : 'w-16 min-h-svh',
+        'bg-sidebar'
+      )}
+    >
       {/* Draggable region for window movement - clears traffic lights */}
-      <div className="h-10 window-drag-region" />
+      <div className="h-11 bg-surface-1 window-drag-region" />
       <SidebarContent className="py-4 pt-0">
         <SidebarGroup>
           <SidebarGroupContent>
@@ -112,11 +126,12 @@ export function AppSidebar({
                 <button
                   onClick={() => onSelectProject(null)}
                   className={cn(
-                    'w-10 h-10 rounded-lg flex items-center justify-center',
-                    'text-xs font-semibold bg-muted transition-all',
-                    'hover:scale-105',
-                    selectedProjectId === null &&
-                      'ring-2 ring-primary ring-offset-2 ring-offset-background'
+                    'w-10 h-10 rounded-lg flex items-center justify-center border border-transparent',
+                    'text-xs font-semibold transition-colors focus-visible:outline-none',
+                    'focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:ring-offset-2 focus-visible:ring-offset-sidebar',
+                    selectedProjectId === null
+                      ? 'bg-card text-foreground border-sidebar-border shadow-sm'
+                      : 'bg-sidebar-accent/75 text-sidebar-foreground hover:bg-sidebar-accent'
                   )}
                   title="All projects"
                 >
@@ -143,8 +158,9 @@ export function AppSidebar({
                   onClick={onAddProject}
                   className={cn(
                     'w-10 h-10 rounded-lg flex items-center justify-center',
-                    'text-lg text-muted-foreground border-2 border-dashed',
-                    'hover:border-primary hover:text-primary transition-colors'
+                    'text-lg border-2 border-dashed transition-colors focus-visible:outline-none',
+                    'focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:ring-offset-2 focus-visible:ring-offset-sidebar',
+                    'text-muted-foreground border-sidebar-border hover:border-sidebar-primary hover:text-sidebar-primary hover:bg-sidebar-accent/70'
                   )}
                   title="Add project"
                 >
@@ -156,7 +172,7 @@ export function AppSidebar({
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
-      <SidebarFooter className="py-4">
+      <SidebarFooter className="py-4 border-t border-sidebar-border/80">
         <SidebarMenu>
           <SidebarMenuItem className="flex flex-col items-center gap-2">
             <TerminalStatusPopover tasks={tasks} />
@@ -166,7 +182,7 @@ export function AppSidebar({
                   variant="ghost"
                   size="icon-lg"
                   onClick={onTutorial}
-                  className="rounded-lg text-muted-foreground"
+                  className={footerActionClassName}
                 >
                   <Map className="size-5" />
                 </Button>
@@ -179,7 +195,7 @@ export function AppSidebar({
                   variant="ghost"
                   size="icon-lg"
                   onClick={onChangelog}
-                  className="rounded-lg text-muted-foreground"
+                  className={footerActionClassName}
                 >
                   <Sparkles className="size-5" />
                 </Button>
@@ -192,7 +208,7 @@ export function AppSidebar({
                   variant="ghost"
                   size="icon-lg"
                   onClick={onOnboarding}
-                  className="rounded-lg text-muted-foreground"
+                  className={footerActionClassName}
                 >
                   <HelpCircle className="size-5" />
                 </Button>
@@ -205,7 +221,7 @@ export function AppSidebar({
                   variant="ghost"
                   size="icon-lg"
                   onClick={() => setShortcutsOpen(true)}
-                  className="rounded-lg text-muted-foreground"
+                  className={footerActionClassName}
                 >
                   <Keyboard className="size-5" />
                 </Button>
@@ -213,7 +229,7 @@ export function AppSidebar({
               <TooltipContent side="right">Keyboard Shortcuts</TooltipContent>
             </Tooltip>
             <Dialog open={shortcutsOpen} onOpenChange={setShortcutsOpen}>
-              <DialogContent className="max-h-[80vh] flex flex-col">
+              <DialogContent className="max-h-[80vh] flex flex-col border-border/80">
                 <DialogHeader>
                   <DialogTitle>Keyboard Shortcuts</DialogTitle>
                   <DialogDescription className="sr-only">List of keyboard shortcuts</DialogDescription>
@@ -221,16 +237,16 @@ export function AppSidebar({
                 <div className="space-y-1 overflow-y-auto scrollbar-thin">
                   {shortcutGroups.map((group, i) => (
                     <Collapsible.Root key={group.heading} defaultOpen={i === 0}>
-                      <Collapsible.Trigger className="flex w-full items-center justify-between px-3 py-2 rounded-lg bg-muted hover:bg-accent hover:text-accent-foreground transition-colors group/trigger">
-                        <p className="text-[11px] uppercase tracking-wider font-semibold text-muted-foreground">{group.heading}</p>
-                        <ChevronDown className="size-3.5 text-muted-foreground transition-transform duration-200 group-data-[state=open]/trigger:rotate-180" />
+                      <Collapsible.Trigger className="flex w-full items-center justify-between px-3 py-2 rounded-lg border border-sidebar-border/70 bg-sidebar-accent/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring transition-colors group/trigger">
+                        <p className="text-[11px] uppercase tracking-wider font-semibold text-muted-foreground group-hover/trigger:text-foreground">{group.heading}</p>
+                        <ChevronDown className="size-3.5 text-muted-foreground transition-transform duration-200 group-hover/trigger:text-foreground group-data-[state=open]/trigger:rotate-180" />
                       </Collapsible.Trigger>
                       <Collapsible.Content className="data-[state=closed]:hidden">
-                        <div className="rounded-lg border divide-y mb-3">
+                        <div className="rounded-lg border border-border/80 divide-y mb-3 bg-card/70">
                           {group.items.map((s) => (
                             <div key={s.label} className="flex items-center justify-between px-3 py-2">
                               <span className="text-sm">{s.label}</span>
-                              <span className="text-base text-muted-foreground bg-muted border px-2.5 py-0.5 rounded-md font-[system-ui] shadow-[0_1px_0_0_rgba(0,0,0,0.05)]">{s.keys}</span>
+                              <span className="text-base text-foreground bg-sidebar-accent border border-sidebar-border/70 px-2.5 py-0.5 rounded-md font-[system-ui] shadow-[0_1px_0_0_rgba(0,0,0,0.04)]">{s.keys}</span>
                             </div>
                           ))}
                         </div>
@@ -245,8 +261,27 @@ export function AppSidebar({
                 <Button
                   variant="ghost"
                   size="icon-lg"
+                  onClick={() => {
+                    void setPreference(isDarkTheme ? 'light' : 'dark').catch((error) => {
+                      toast(error instanceof Error ? error.message : 'Failed to update theme')
+                    })
+                  }}
+                  aria-label={nextThemeLabel}
+                  title={nextThemeLabel}
+                  className={footerActionClassName}
+                >
+                  {isDarkTheme ? <Sun className="size-5" /> : <Moon className="size-5" />}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="right">{nextThemeLabel}</TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon-lg"
                   onClick={onSettings}
-                  className="rounded-lg text-muted-foreground"
+                  className={footerActionClassName}
                 >
                   <Settings className="size-5" />
                 </Button>

@@ -48,6 +48,12 @@ import { initAutoUpdater, checkForUpdates, restartForUpdate } from './auto-updat
 
 const DEFAULT_WINDOW_WIDTH = 1760
 const DEFAULT_WINDOW_HEIGHT = 1280
+const WINDOW_BG_DARK = '#0a0a0a'
+const WINDOW_BG_LIGHT = '#f3f3f3'
+
+function getWindowBackgroundColor(): string {
+  return nativeTheme.shouldUseDarkColors ? WINDOW_BG_DARK : WINDOW_BG_LIGHT
+}
 
 // Splash screen: self-contained HTML with inline logo SVG and typewriter animation
 const splashLogoSvg = readFileSync(logoSolid, 'utf-8')
@@ -502,7 +508,7 @@ function createSplashWindow(): void {
     center: true,
     skipTaskbar: true,
     show: false,
-    backgroundColor: '#0a0a0a',
+    backgroundColor: getWindowBackgroundColor(),
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true
@@ -543,7 +549,7 @@ function createMainWindow(): void {
     title: 'SlayZone',
     titleBarStyle: 'hiddenInset',
     trafficLightPosition: { x: 16, y: 16 },
-    backgroundColor: '#0a0a0a',
+    backgroundColor: getWindowBackgroundColor(),
     ...(process.platform === 'linux' ? { icon } : {}),
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
@@ -639,9 +645,11 @@ app.whenReady().then(async () => {
   const row = db.prepare('SELECT value FROM settings WHERE key = ?').get('theme') as
     | { value: string }
     | undefined
-  const savedTheme = row?.value as 'light' | 'dark' | 'system' | undefined
-  if (savedTheme) {
-    nativeTheme.themeSource = savedTheme
+  const savedTheme = row?.value === 'light' ? 'light' : row?.value === 'dark' ? 'dark' : null
+  const initialThemeSource: 'light' | 'dark' = savedTheme ?? 'dark'
+  nativeTheme.themeSource = initialThemeSource
+  if (!savedTheme) {
+    db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)').run('theme', initialThemeSource)
   }
 
   // Set dock icon on macOS (needed for dev mode)
@@ -944,7 +952,7 @@ app.whenReady().then(async () => {
         parent: mainWindow ?? undefined,
         modal: false,
         show: false,
-        backgroundColor: '#0a0a0a',
+        backgroundColor: getWindowBackgroundColor(),
         webPreferences: {
           sandbox: true,
           contextIsolation: true,
