@@ -1,6 +1,122 @@
 # Changelog
 
 
+## v0.1.68...main
+
+[compare changes](https://github.com/debuglebowski/SlayZone/compare/v0.1.68...main)
+
+### 🚀 Enhancements
+
+- **onboarding:** Add data responsibility disclaimer + refine analytics copy ([ca5eaf8](https://github.com/debuglebowski/SlayZone/commit/ca5eaf8))
+- **worktrees:** Improve git diff empty states ([8222ced](https://github.com/debuglebowski/SlayZone/commit/8222ced))
+- **worktrees:** Add Initialize Git empty state to ProjectGeneralTab ([33cb442](https://github.com/debuglebowski/SlayZone/commit/33cb442))
+- **home:** Panel shortcuts + Cmd+G/Shift+G like task ([9c74a28](https://github.com/debuglebowski/SlayZone/commit/9c74a28))
+- Project color tint on tabs, task detail, and kanban ([f5a3a86](https://github.com/debuglebowski/SlayZone/commit/f5a3a86))
+- **startup:** Parallel splash + populated app on show ([8bb3b0a](https://github.com/debuglebowski/SlayZone/commit/8bb3b0a))
+- **browser:** Per-tab theme toggle (system/dark/light) ([2c96d2f](https://github.com/debuglebowski/SlayZone/commit/2c96d2f))
+- **settings:** Appearance tab with font sizes + reduce motion ([485d163](https://github.com/debuglebowski/SlayZone/commit/485d163))
+- **sidebar:** Prefer capital letters for project abbreviations ([7854647](https://github.com/debuglebowski/SlayZone/commit/7854647))
+- **settings:** Labs tab with leaderboard toggle ([13c7ee7](https://github.com/debuglebowski/SlayZone/commit/13c7ee7))
+- **updater:** Periodic update check every 4 hours ([03cadf0](https://github.com/debuglebowski/SlayZone/commit/03cadf0))
+- In-app changelog modal with auto-open on version upgrade ([795b30e](https://github.com/debuglebowski/SlayZone/commit/795b30e))
+- Tutorial animation modal replacing driver.js ([1c842df](https://github.com/debuglebowski/SlayZone/commit/1c842df))
+- **browser:** Add hard reload and reload context menu ([e5d006c](https://github.com/debuglebowski/SlayZone/commit/e5d006c))
+- **usage:** Configurable inline usage bars via pin toggles ([3990f54](https://github.com/debuglebowski/SlayZone/commit/3990f54))
+- **file-editor:** Global search across project files ([43f4b34](https://github.com/debuglebowski/SlayZone/commit/43f4b34))
+- **notifications:** Add count badge to bell icon ([13eeb36](https://github.com/debuglebowski/SlayZone/commit/13eeb36))
+- **terminal:** Click active terminal in popover to navigate to task ([f55e763](https://github.com/debuglebowski/SlayZone/commit/f55e763))
+- **onboarding:** Show tour prompt to existing users on upgrade ([7ddf3d8](https://github.com/debuglebowski/SlayZone/commit/7ddf3d8))
+- Add Cmd+P and Cmd+Shift+F shortcuts to home tab ([266640d](https://github.com/debuglebowski/SlayZone/commit/266640d))
+- **task:** Focus and select title on temp-to-task conversion ([50089ec](https://github.com/debuglebowski/SlayZone/commit/50089ec))
+- **web-panels:** Add per-panel desktop handoff policy and config migration ([28c47bf](https://github.com/debuglebowski/SlayZone/commit/28c47bf))
+
+### 🩹 Fixes
+
+- **terminal:** Use platform-appropriate command syntax on Windows ([f74c338](https://github.com/debuglebowski/SlayZone/commit/f74c338))
+- **home:** Stable panel toggle layout + disabled states ([afc813f](https://github.com/debuglebowski/SlayZone/commit/afc813f))
+- **worktrees:** Replace FileSlash with FileMinus (lucide-react) ([292f882](https://github.com/debuglebowski/SlayZone/commit/292f882))
+- **sidebar:** Rename Tutorial tooltip to Onboarding ([1ae07de](https://github.com/debuglebowski/SlayZone/commit/1ae07de))
+- **integrations:** Use correct GraphQL query to list projects by team in Linear ([36174a6](https://github.com/debuglebowski/SlayZone/commit/36174a6))
+- **windows:** Stabilize shell, env, and git for win32 ([a9ca6f7](https://github.com/debuglebowski/SlayZone/commit/a9ca6f7))
+- **leaderboard:** Self-guard Convex hooks, remove prop-threading ([c2ee734](https://github.com/debuglebowski/SlayZone/commit/c2ee734))
+- **renderer:** Enable window dragging from tab bar area ([71c886f](https://github.com/debuglebowski/SlayZone/commit/71c886f))
+- **file-editor:** Cmd+Shift+F opens editor panel before toggling search ([e72f2ca](https://github.com/debuglebowski/SlayZone/commit/e72f2ca))
+- **sidebar:** Update tour, changelog, onboarding icons ([b1dd585](https://github.com/debuglebowski/SlayZone/commit/b1dd585))
+- **ui:** Add spacing between usage bars and header buttons ([af34d1d](https://github.com/debuglebowski/SlayZone/commit/af34d1d))
+- **ui:** Fix JSX comment syntax in TabBar return ([f1d2ef0](https://github.com/debuglebowski/SlayZone/commit/f1d2ef0))
+- Deduplicate zod via pnpm override ([19f8289](https://github.com/debuglebowski/SlayZone/commit/19f8289))
+- **ui:** Fix TS errors in NotificationPopover and SceneGit ([81c86b4](https://github.com/debuglebowski/SlayZone/commit/81c86b4))
+- **handoff:** Block encoded + loopback desktop handoff paths ([1cba6b4](https://github.com/debuglebowski/SlayZone/commit/1cba6b4))
+
+### 💅 Refactors
+
+- Remove device emulation from web panels ([a539f84](https://github.com/debuglebowski/SlayZone/commit/a539f84))
+- **usage:** Pin toggles as sole inline bar control, enforce min 1 ([869b846](https://github.com/debuglebowski/SlayZone/commit/869b846))
+- Extract postinstall into script file ([c99354d](https://github.com/debuglebowski/SlayZone/commit/c99354d))
+- **app:** Unify webview desktop-handoff hardening script ([122c74f](https://github.com/debuglebowski/SlayZone/commit/122c74f))
+
+### 📖 Documentation
+
+- Make star history image full width ([18b1c81](https://github.com/debuglebowski/SlayZone/commit/18b1c81))
+
+### 🏡 Chore
+
+- Add Apache 2.0 license ([8bab2bf](https://github.com/debuglebowski/SlayZone/commit/8bab2bf))
+- Add react-icons dependency ([01837d5](https://github.com/debuglebowski/SlayZone/commit/01837d5))
+- **e2e:** Harden fixture sidebar and settings click helpers ([82dc769](https://github.com/debuglebowski/SlayZone/commit/82dc769))
+
+### ✅ Tests
+
+- **handoff:** Add unit and e2e coverage for routing behavior ([250b8b3](https://github.com/debuglebowski/SlayZone/commit/250b8b3))
+
+### ❤️ Contributors
+
+- Debuglebowski
+- Arvidsson-geins
+- David Gundry
+
+## v0.1.62...v0.1.68
+
+[compare changes](https://github.com/debuglebowski/SlayZone/compare/v0.1.62...v0.1.68)
+
+### 🚀 Enhancements
+
+- **cli:** Add slay CLI with DB watcher and install UI ([4345619](https://github.com/debuglebowski/SlayZone/commit/4345619))
+- **cli:** Add update, archive, delete, open, projects list ([a73d5e0](https://github.com/debuglebowski/SlayZone/commit/a73d5e0))
+- **cli:** Add processes list and logs commands ([5f4608f](https://github.com/debuglebowski/SlayZone/commit/5f4608f))
+- **app:** Allow multiple global panels active simultaneously ([a051b2a](https://github.com/debuglebowski/SlayZone/commit/a051b2a))
+- **cli:** Add subtasks, search, kill, follow, completions + auto-scoping ([e011d2a](https://github.com/debuglebowski/SlayZone/commit/e011d2a))
+- **diagnostics:** Separate diagnostics DB to avoid watchDatabase conflicts ([de75eff](https://github.com/debuglebowski/SlayZone/commit/de75eff))
+- **app:** Multi-panel home tab, ResizeHandle cleanup, PTY dispose on exit ([6b35695](https://github.com/debuglebowski/SlayZone/commit/6b35695))
+- **ui:** Add tooltips to panels, settings, and task controls ([b771e70](https://github.com/debuglebowski/SlayZone/commit/b771e70))
+
+### 🩹 Fixes
+
+- **cli:** Replace watchDatabase polling with REST notify ([b33ab51](https://github.com/debuglebowski/SlayZone/commit/b33ab51))
+- **app:** Dynamic remote-debug port, mcp port try-catch, rm stale watchDatabase comments ([9a6be73](https://github.com/debuglebowski/SlayZone/commit/9a6be73))
+- **ui:** Uniform h-10 panel headers, add border-border + bg-surface-1 ([58ccba4](https://github.com/debuglebowski/SlayZone/commit/58ccba4))
+- **ci:** Use random keychain password to unblock codesign ([42508fc](https://github.com/debuglebowski/SlayZone/commit/42508fc))
+- **ci:** Use CSC_LINK for signing, add hardenedRuntime ([94b138f](https://github.com/debuglebowski/SlayZone/commit/94b138f))
+- **ci:** Fix YAML indentation ([e930817](https://github.com/debuglebowski/SlayZone/commit/e930817))
+- **ci:** Restore proper keychain setup with random password + partition list ([001cb30](https://github.com/debuglebowski/SlayZone/commit/001cb30))
+- **ci:** Add 30min timeout to package and publish step ([b9c77b7](https://github.com/debuglebowski/SlayZone/commit/b9c77b7))
+- Restore workspace deps accidentally stripped during local test ([1a03e16](https://github.com/debuglebowski/SlayZone/commit/1a03e16))
+
+### 💅 Refactors
+
+- **worktrees:** Unify home+task git panels, share panel sizes ([f04d218](https://github.com/debuglebowski/SlayZone/commit/f04d218))
+
+### 🏡 Chore
+
+- Add macOS code signing and notarization ([3714c06](https://github.com/debuglebowski/SlayZone/commit/3714c06))
+- Build CLI in CI, fix notarize config ([e640607](https://github.com/debuglebowski/SlayZone/commit/e640607))
+- Update lockfile for v0.1.67 ([1d72550](https://github.com/debuglebowski/SlayZone/commit/1d72550))
+- Disable notarization until Apple clears new account queue ([317548f](https://github.com/debuglebowski/SlayZone/commit/317548f))
+
+### ❤️ Contributors
+
+- Debuglebowski
+
 ## v0.1.62...main
 
 [compare changes](https://github.com/debuglebowski/SlayZone/compare/v0.1.62...main)

@@ -12,9 +12,10 @@ interface TaskRef {
 
 interface TerminalStatusPopoverProps {
   tasks: TaskRef[]
+  onTaskClick?: (taskId: string) => void
 }
 
-export function TerminalStatusPopover({ tasks }: TerminalStatusPopoverProps) {
+export function TerminalStatusPopover({ tasks, onTaskClick }: TerminalStatusPopoverProps) {
   const [ptys, setPtys] = useState<PtyInfo[]>([])
   const [open, setOpen] = useState(false)
 
@@ -107,7 +108,11 @@ export function TerminalStatusPopover({ tasks }: TerminalStatusPopoverProps) {
             {ptys.map((pty) => (
               <div
                 key={pty.sessionId}
-                className="flex items-center justify-between p-2 rounded-md bg-muted/50 hover:bg-muted transition-colors"
+                className="flex items-center justify-between p-2 rounded-md bg-muted/50 hover:bg-muted transition-colors cursor-pointer"
+                onClick={() => {
+                  onTaskClick?.(getTaskIdFromSession(pty.sessionId))
+                  setOpen(false)
+                }}
               >
                 <div className="flex-1 min-w-0 mr-2">
                   <p className="text-sm font-medium truncate">{getTaskName(pty.sessionId)}</p>
@@ -124,7 +129,7 @@ export function TerminalStatusPopover({ tasks }: TerminalStatusPopoverProps) {
                   variant="ghost"
                   size="icon"
                   className="h-7 w-7 text-muted-foreground hover:text-destructive"
-                  onClick={() => handleTerminate(pty.sessionId)}
+                  onClick={(e) => { e.stopPropagation(); handleTerminate(pty.sessionId) }}
                 >
                   <X className="size-4" />
                 </Button>

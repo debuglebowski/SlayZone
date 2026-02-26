@@ -16,7 +16,14 @@ import {
 import type { Tag } from '@slayzone/tags/shared'
 import type { TerminalMode } from '@slayzone/terminal/shared'
 import type { PanelConfig, WebPanelDefinition } from '@slayzone/task/shared'
-import { DEFAULT_PANEL_CONFIG, PREDEFINED_WEB_PANELS, PROVIDER_DEFAULTS } from '@slayzone/task/shared'
+import {
+  DEFAULT_PANEL_CONFIG,
+  PROVIDER_DEFAULTS,
+  inferHostScopeFromUrl,
+  inferProtocolFromUrl,
+  mergePredefinedWebPanels,
+  normalizeDesktopProtocol,
+} from '@slayzone/task/shared'
 import type { DiagnosticsConfig } from '@slayzone/types'
 import type { IntegrationConnectionPublic } from '@slayzone/integrations/shared'
 import { useTelemetry, TelemetrySettings } from '@slayzone/telemetry/client'
@@ -75,6 +82,9 @@ export function UserSettingsDialog({
   const [newPanelName, setNewPanelName] = useState('')
   const [newPanelUrl, setNewPanelUrl] = useState('')
   const [newPanelShortcut, setNewPanelShortcut] = useState('')
+  const [newPanelBlockDesktopHandoff, setNewPanelBlockDesktopHandoff] = useState(false)
+  const [newPanelHandoffProtocol, setNewPanelHandoffProtocol] = useState('')
+  const [newPanelProtocolError, setNewPanelProtocolError] = useState('')
   const [panelShortcutError, setPanelShortcutError] = useState('')
   const [configuringNativeId, setConfiguringNativeId] = useState<string | null>(null)
   // Edit mode for external panels
@@ -82,6 +92,9 @@ export function UserSettingsDialog({
   const [editPanelName, setEditPanelName] = useState('')
   const [editPanelUrl, setEditPanelUrl] = useState('')
   const [editPanelShortcut, setEditPanelShortcut] = useState('')
+  const [editPanelBlockDesktopHandoff, setEditPanelBlockDesktopHandoff] = useState(false)
+  const [editPanelHandoffProtocol, setEditPanelHandoffProtocol] = useState('')
+  const [editPanelProtocolError, setEditPanelProtocolError] = useState('')
   const [editShortcutError, setEditShortcutError] = useState('')
   const [projects, setProjects] = useState<Array<{ id: string; name: string }>>([])
   const [exportProjectId, setExportProjectId] = useState('')
@@ -208,20 +221,7 @@ export function UserSettingsDialog({
         const panelConfigRaw = await window.api.settings.get('panel_config')
         if (isStale()) return
         if (panelConfigRaw) {
-          const parsed = JSON.parse(panelConfigRaw) as PanelConfig
-          // Merge in any new predefined panels + sync shortcuts (skip user-deleted ones)
-          const existingIds = new Set(parsed.webPanels.map(wp => wp.id))
-          const deleted = new Set(parsed.deletedPredefined ?? [])
-          const missing = PREDEFINED_WEB_PANELS.filter(p => !existingIds.has(p.id) && !deleted.has(p.id))
-          const predefinedMap = new Map(PREDEFINED_WEB_PANELS.map(p => [p.id, p]))
-          parsed.webPanels = [
-            ...parsed.webPanels.map(wp => {
-              const src = predefinedMap.get(wp.id)
-              return src && wp.shortcut !== src.shortcut ? { ...wp, shortcut: src.shortcut } : wp
-            }),
-            ...missing
-          ]
-          setPanelConfig(parsed)
+          setPanelConfig(mergePredefinedWebPanels(JSON.parse(panelConfigRaw) as PanelConfig))
         }
       } catch { /* ignore */ }
 
@@ -366,12 +366,23 @@ export function UserSettingsDialog({
     if (!url.startsWith('http://') && !url.startsWith('https://')) {
       url = `https://${url}`
     }
+    const handoffProtocol = newPanelBlockDesktopHandoff
+      ? normalizeDesktopProtocol(newPanelHandoffProtocol) ?? inferProtocolFromUrl(url)
+      : null
+    if (newPanelBlockDesktopHandoff && !handoffProtocol) {
+      setNewPanelProtocolError('Enter a valid protocol (for example: figma)')
+      return
+    }
+    setNewPanelProtocolError('')
 
     const newPanel: WebPanelDefinition = {
       id: `web:${crypto.randomUUID().slice(0, 8)}`,
       name: newPanelName.trim(),
       baseUrl: url,
-      shortcut: newPanelShortcut.trim().toLowerCase() || undefined
+      shortcut: newPanelShortcut.trim().toLowerCase() || undefined,
+      blockDesktopHandoff: newPanelBlockDesktopHandoff,
+      handoffProtocol: handoffProtocol ?? undefined,
+      handoffHostScope: newPanelBlockDesktopHandoff ? (inferHostScopeFromUrl(url) ?? undefined) : undefined,
     }
 
     await savePanelConfig({
@@ -381,6 +392,9 @@ export function UserSettingsDialog({
     setNewPanelName('')
     setNewPanelUrl('')
     setNewPanelShortcut('')
+    setNewPanelBlockDesktopHandoff(false)
+    setNewPanelHandoffProtocol('')
+    setNewPanelProtocolError('')
     setPanelShortcutError('')
   }
 
@@ -403,6 +417,9 @@ export function UserSettingsDialog({
     setEditPanelName(wp.name)
     setEditPanelUrl(wp.baseUrl)
     setEditPanelShortcut(wp.shortcut || '')
+    setEditPanelBlockDesktopHandoff(wp.blockDesktopHandoff ?? false)
+    setEditPanelHandoffProtocol(wp.handoffProtocol ?? inferProtocolFromUrl(wp.baseUrl) ?? '')
+    setEditPanelProtocolError('')
     setEditShortcutError('')
   }
 
@@ -413,12 +430,28 @@ export function UserSettingsDialog({
 
     let url = editPanelUrl.trim()
     if (!url.startsWith('http://') && !url.startsWith('https://')) url = `https://${url}`
+    const handoffProtocol = editPanelBlockDesktopHandoff
+      ? normalizeDesktopProtocol(editPanelHandoffProtocol) ?? inferProtocolFromUrl(url)
+      : null
+    if (editPanelBlockDesktopHandoff && !handoffProtocol) {
+      setEditPanelProtocolError('Enter a valid protocol (for example: figma)')
+      return
+    }
+    setEditPanelProtocolError('')
 
     await savePanelConfig({
       ...panelConfig,
       webPanels: panelConfig.webPanels.map(wp =>
         wp.id === editingPanelId
-          ? { ...wp, name: editPanelName.trim(), baseUrl: url, shortcut: editPanelShortcut.trim().toLowerCase() || undefined }
+          ? {
+            ...wp,
+            name: editPanelName.trim(),
+            baseUrl: url,
+            shortcut: editPanelShortcut.trim().toLowerCase() || undefined,
+            blockDesktopHandoff: editPanelBlockDesktopHandoff,
+            handoffProtocol: editPanelBlockDesktopHandoff ? (handoffProtocol ?? wp.handoffProtocol) : wp.handoffProtocol,
+            handoffHostScope: editPanelBlockDesktopHandoff ? (inferHostScopeFromUrl(url) ?? wp.handoffHostScope) : wp.handoffHostScope,
+          }
           : wp
       )
     })
@@ -795,6 +828,39 @@ export function UserSettingsDialog({
                             {editShortcutError && (
                               <p className="text-xs text-destructive">{editShortcutError}</p>
                             )}
+                            <label className="flex items-center gap-2 text-xs cursor-pointer">
+                              <input
+                                type="checkbox"
+                                checked={editPanelBlockDesktopHandoff}
+                                onChange={(e) => {
+                                  const checked = e.target.checked
+                                  setEditPanelBlockDesktopHandoff(checked)
+                                  if (checked && !editPanelHandoffProtocol.trim()) {
+                                    setEditPanelHandoffProtocol(inferProtocolFromUrl(editPanelUrl) ?? '')
+                                  }
+                                  if (!checked) setEditPanelProtocolError('')
+                                }}
+                              />
+                              <span className="text-muted-foreground">Block desktop app handoff links</span>
+                            </label>
+                            {editPanelBlockDesktopHandoff && (
+                              <div className="space-y-1">
+                                <Input
+                                  placeholder="Protocol (e.g. figma)"
+                                  value={editPanelHandoffProtocol}
+                                  onChange={(e) => {
+                                    setEditPanelHandoffProtocol(e.target.value)
+                                    setEditPanelProtocolError('')
+                                  }}
+                                />
+                                <p className="text-[11px] text-muted-foreground">
+                                  Custom protocol only, no :// (example: figma)
+                                </p>
+                              </div>
+                            )}
+                            {editPanelProtocolError && (
+                              <p className="text-xs text-destructive">{editPanelProtocolError}</p>
+                            )}
                             <div className="flex items-center gap-2">
                               <Button size="sm" onClick={handleSaveEditPanel} disabled={!editPanelName.trim() || !editPanelUrl.trim()}>Save</Button>
                               <Button size="sm" variant="ghost" onClick={() => setEditingPanelId(null)}>Cancel</Button>
@@ -810,6 +876,11 @@ export function UserSettingsDialog({
                             <Globe className="size-4 text-muted-foreground shrink-0" />
                             <span className="text-sm font-medium">{wp.name}</span>
                             <span className="text-xs text-muted-foreground truncate flex-1 min-w-0">{wp.baseUrl}</span>
+                            {wp.blockDesktopHandoff && (
+                              <span className="text-[10px] font-medium text-amber-700 dark:text-amber-300 bg-amber-500/10 px-1.5 py-0.5 rounded border border-amber-500/20 shrink-0">
+                                Handoff: {(wp.handoffProtocol ?? 'custom').toLowerCase()}
+                              </span>
+                            )}
                             <Button variant="ghost" size="icon-sm" onClick={() => handleDeleteWebPanel(wp.id)}>
                               <Trash2 className="size-3.5" />
                             </Button>
@@ -857,6 +928,39 @@ export function UserSettingsDialog({
                   </div>
                   {panelShortcutError && (
                     <p className="text-xs text-destructive">{panelShortcutError}</p>
+                  )}
+                  <label className="flex items-center gap-2 text-xs cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={newPanelBlockDesktopHandoff}
+                      onChange={(e) => {
+                        const checked = e.target.checked
+                        setNewPanelBlockDesktopHandoff(checked)
+                        if (checked && !newPanelHandoffProtocol.trim()) {
+                          setNewPanelHandoffProtocol(inferProtocolFromUrl(newPanelUrl) ?? '')
+                        }
+                        if (!checked) setNewPanelProtocolError('')
+                      }}
+                    />
+                    <span className="text-muted-foreground">Block desktop app handoff links</span>
+                  </label>
+                  {newPanelBlockDesktopHandoff && (
+                    <div className="space-y-1">
+                      <Input
+                        placeholder="Protocol (e.g. figma)"
+                        value={newPanelHandoffProtocol}
+                        onChange={(e) => {
+                          setNewPanelHandoffProtocol(e.target.value)
+                          setNewPanelProtocolError('')
+                        }}
+                      />
+                      <p className="text-[11px] text-muted-foreground">
+                        Custom protocol only, no :// (example: figma)
+                      </p>
+                    </div>
+                  )}
+                  {newPanelProtocolError && (
+                    <p className="text-xs text-destructive">{newPanelProtocolError}</p>
                   )}
                   <Button size="sm" onClick={handleAddCustomPanel} disabled={!newPanelName.trim() || !newPanelUrl.trim()}>
                     <Plus className="size-3.5 mr-1" />

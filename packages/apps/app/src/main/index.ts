@@ -5,13 +5,24 @@ import { homedir } from 'os'
 import { createServer, type Server as HttpServer } from 'http'
 import { readFileSync, promises as fsp, existsSync, unlinkSync, symlinkSync } from 'fs'
 import { electronApp, is } from '@electron-toolkit/utils'
+import {
+  BLOCKED_EXTERNAL_PROTOCOLS,
+  inferHostScopeFromUrl,
+  inferProtocolFromUrl,
+  isBlockedExternalProtocolUrl,
+  isEncodedDesktopHandoffUrl,
+  isLoopbackHost,
+  isLoopbackUrl,
+  isUrlWithinHostScope,
+  normalizeDesktopHostScope,
+  normalizeDesktopProtocol,
+  type DesktopHandoffPolicy,
+} from '@slayzone/task/shared'
 
 // Custom protocol for serving local files in browser panel webviews
 // (must be registered before app ready — Chromium blocks file:// in webviews)
 // External app protocols registered here so Chromium routes them through our session handler
 // instead of passing them to the OS (which would launch desktop apps like Figma, Slack, etc.)
-const BLOCKED_EXTERNAL_PROTOCOLS = ['figma', 'notion', 'slack', 'linear', 'vscode', 'cursor']
-
 protocol.registerSchemesAsPrivileged([
   { scheme: 'slz-file', privileges: { secure: true, supportFetchAPI: true, stream: true, bypassCSP: true } },
   ...BLOCKED_EXTERNAL_PROTOCOLS.map(scheme => ({ scheme, privileges: { standard: true, secure: true } })),
@@ -45,6 +56,7 @@ import { setProcessManagerWindow, initProcessManager, createProcess, spawnProces
 import { registerExportImportHandlers } from './export-import'
 import { registerLeaderboardHandlers } from './leaderboard'
 import { initAutoUpdater, checkForUpdates, restartForUpdate } from './auto-updater'
+import { WEBVIEW_DESKTOP_HANDOFF_SCRIPT } from '../shared/webview-desktop-handoff-script'
 
 const DEFAULT_WINDOW_WIDTH = 1760
 const DEFAULT_WINDOW_HEIGHT = 1280
@@ -437,7 +449,6 @@ if (!gotSingleInstanceLock) {
 // On macOS, protocol launches are delivered via open-url.
 // Register before app ready so early callback events are not missed.
 app.on('open-url', (event, url) => {
-  console.log('[open-url]', url.slice(0, 120))
   event.preventDefault()
   handleOAuthDeepLink(url)
 })
@@ -820,11 +831,12 @@ app.whenReady().then(async () => {
 
   // Strip Electron/app name from user-agent so sites (Figma, etc.) don't detect
   // Electron and redirect to their desktop app instead of serving the web version.
-  const chromeUa = browserSession.getUserAgent()
+  const rawUa = browserSession.getUserAgent()
+  _chromeUa = rawUa
     .replace(/\s*Electron\/\S+/i, '')
     .replace(/\s*slayzone\/\S+/i, '')
-  browserSession.setUserAgent(chromeUa)
-  console.log('[ua]', chromeUa)
+  _chromiumVersion = rawUa.match(/Chrome\/(\d+)/)?.[1] || '142'
+  browserSession.setUserAgent(_chromeUa)
 
   // Serve local files via slz-file:// (Chromium blocks file:// in webviews and cross-origin renderers)
   const userHome = homedir()
@@ -855,14 +867,63 @@ app.whenReady().then(async () => {
     }
   }
   const webPanelSession = session.fromPartition('persist:web-panels')
-  webPanelSession.setUserAgent(chromeUa)
+  webPanelSession.setUserAgent(_chromeUa)
 
   // Block external protocol navigation from inside webview pages (e.g. window.location = 'figma://...')
   // session.protocol.handle only intercepts loadURL from the main process — page-initiated
   // navigation bypasses it. A session preload patches window.open/location before page JS runs.
   const webviewPreload = join(__dirname, '../preload/webview-preload.js')
-  browserSession.setPreloads([webviewPreload])
-  webPanelSession.setPreloads([webviewPreload])
+  browserSession.registerPreloadScript({ type: 'frame', filePath: webviewPreload, id: 'webview-preload' })
+  webPanelSession.registerPreloadScript({ type: 'frame', filePath: webviewPreload, id: 'webview-preload-wp' })
+
+  // Override Sec-CH-UA header to include "Google Chrome" brand.
+  // This is synchronous (fires before each request) so it's reliable even if CDP hasn't finished.
+  const secChUa = `"Google Chrome";v="${_chromiumVersion}", "Chromium";v="${_chromiumVersion}", "Not_A Brand";v="8"`
+  const overrideSecChUa = (details: Electron.OnBeforeSendHeadersListenerDetails, cb: (resp: Electron.BeforeSendResponse) => void) => {
+    details.requestHeaders['Sec-CH-UA'] = secChUa
+    details.requestHeaders['Sec-CH-UA-Full-Version-List'] = `"Google Chrome";v="${_chromiumVersion}.0.0.0", "Chromium";v="${_chromiumVersion}.0.0.0", "Not_A Brand";v="8.0.0.0"`
+    cb({ requestHeaders: details.requestHeaders })
+  }
+  browserSession.webRequest.onBeforeSendHeaders(overrideSecChUa)
+  webPanelSession.webRequest.onBeforeSendHeaders(overrideSecChUa)
+
+  const shouldCancelLoopbackHandoffRequest = (
+    details: Electron.OnBeforeRequestListenerDetails
+  ): boolean => {
+    const webviewId = details.webContentsId
+    if (typeof webviewId !== 'number') return false
+
+    const desktopHandoffPolicy = webviewDesktopHandoffPolicy.get(webviewId)
+    if (!desktopHandoffPolicy) return false
+    if (!isLoopbackUrl(details.url)) return false
+
+    const hostScope = normalizeDesktopHostScope(desktopHandoffPolicy.hostScope)
+    if (isLoopbackHost(hostScope)) return false
+
+    if (hostScope) {
+      const sourceUrl =
+        (details.frame && details.frame.url) ||
+        (details.referrer && details.referrer !== 'about:blank' ? details.referrer : '') ||
+        details.webContents?.getURL() ||
+        ''
+      if (sourceUrl && !isUrlWithinHostScope(sourceUrl, hostScope)) return false
+    }
+
+    return true
+  }
+
+  const blockLoopbackHandoff = (
+    details: Electron.OnBeforeRequestListenerDetails,
+    callback: (response: Electron.CallbackResponse) => void
+  ) => {
+    if (shouldCancelLoopbackHandoffRequest(details)) {
+      callback({ cancel: true })
+      return
+    }
+    callback({ cancel: false })
+  }
+  browserSession.webRequest.onBeforeRequest(blockLoopbackHandoff)
+  webPanelSession.webRequest.onBeforeRequest(blockLoopbackHandoff)
 
   browserSession.protocol.handle('slz-file', slzFileHandler)
   webPanelSession.protocol.handle('slz-file', slzFileHandler)
@@ -913,9 +974,29 @@ app.whenReady().then(async () => {
   ipcMain.on('ping', () => console.log('pong'))
 
   // Shell: open external URLs (restrict to safe schemes)
-  ipcMain.handle('shell:open-external', (_event, url: string) => {
+  ipcMain.handle('shell:open-external', (_event, url: string, options?: {
+    blockDesktopHandoff?: boolean
+    desktopHandoff?: DesktopHandoffPolicy
+  }) => {
     if (!/^https?:\/\//i.test(url) && !url.startsWith('mailto:')) {
       throw new Error('Only http, https, and mailto URLs are allowed')
+    }
+    const desktopHandoffPolicy = options?.desktopHandoff ?? (() => {
+      if (!options?.blockDesktopHandoff) return null
+      const protocol = normalizeDesktopProtocol(inferProtocolFromUrl(url))
+      if (!protocol) return null
+      const hostScope = normalizeDesktopHostScope(inferHostScopeFromUrl(url))
+      return hostScope ? { protocol, hostScope } : { protocol }
+    })()
+    const shouldBlockLoopbackDesktopHandoff =
+      desktopHandoffPolicy !== null &&
+      isLoopbackUrl(url) &&
+      !isLoopbackHost(normalizeDesktopHostScope(desktopHandoffPolicy.hostScope))
+    if (
+      desktopHandoffPolicy &&
+      (isEncodedDesktopHandoffUrl(url, desktopHandoffPolicy) || shouldBlockLoopbackDesktopHandoff)
+    ) {
+      throw new Error('Blocked external app handoff URL')
     }
     shell.openExternal(url)
   })
@@ -1074,6 +1155,32 @@ app.whenReady().then(async () => {
     })
 
     wc.on('destroyed', () => registeredWebviews.delete(webviewId))
+  })
+
+  ipcMain.handle('webview:set-desktop-handoff-policy', (_, webviewId: number, policy: DesktopHandoffPolicy | null) => {
+    const wc = webContents.fromId(webviewId)
+    if (!wc || wc.isDestroyed() || wc.getType() !== 'webview') return false
+
+    if (policy === null) {
+      webviewDesktopHandoffPolicy.delete(webviewId)
+      return true
+    }
+    const protocol = normalizeDesktopProtocol(policy.protocol)
+    if (!protocol) {
+      webviewDesktopHandoffPolicy.delete(webviewId)
+      return false
+    }
+    const hostScope = normalizeDesktopHostScope(policy.hostScope) ?? undefined
+    webviewDesktopHandoffPolicy.set(webviewId, hostScope ? { protocol, hostScope } : { protocol })
+
+    if (!webviewDesktopHandoffPolicyCleanupRegistered.has(webviewId)) {
+      webviewDesktopHandoffPolicyCleanupRegistered.add(webviewId)
+      wc.once('destroyed', () => {
+        webviewDesktopHandoffPolicy.delete(webviewId)
+        webviewDesktopHandoffPolicyCleanupRegistered.delete(webviewId)
+      })
+    }
+    return true
   })
 
   ipcMain.handle('webview:open-devtools-bottom', async (_, webviewId: number, options?: { probe?: boolean }) => {
@@ -1461,10 +1568,38 @@ app.whenReady().then(async () => {
 // 'webview' type: the webview guest pages.
 // 'window' type: popup windows created by webviews with allowpopups="true".
 // Both need guards because allowpopups popups are type 'window', not 'webview'.
-const isBlockedScheme = (url: string) =>
-  BLOCKED_EXTERNAL_PROTOCOLS.some(s => url.startsWith(`${s}://`))
+let _chromeUa = ''
+let _chromiumVersion = ''
+const _uaPlatform = process.platform === 'darwin' ? 'macOS' : process.platform === 'win32' ? 'Windows' : 'Linux'
+const _uaPlatformVersion = process.platform === 'darwin' ? '14.0.0' : process.platform === 'win32' ? '10.0.0' : '6.0.0'
+const isBlockedScheme = (url: string) => isBlockedExternalProtocolUrl(url)
+const webviewDesktopHandoffPolicy = new Map<number, DesktopHandoffPolicy>()
+const webviewDesktopHandoffPolicyCleanupRegistered = new Set<number>()
+
+// Protocol-blocking script injected into the webview main world.
+// NOTE: session.registerPreloadScript runs in an isolated world and can't override page globals,
+// so we also execute this same script in the page main world via webContents.executeJavaScript.
+const WEBVIEW_INIT_SCRIPT = WEBVIEW_DESKTOP_HANDOFF_SCRIPT
 
 app.on('web-contents-created', (_, wc) => {
+  const isLoopbackHandoffUrlForWebview = (url: string): boolean => {
+    if (wc.getType() !== 'webview') return false
+    const desktopHandoffPolicy = webviewDesktopHandoffPolicy.get(wc.id)
+    if (!desktopHandoffPolicy) return false
+    if (!isLoopbackUrl(url)) return false
+    const hostScope = normalizeDesktopHostScope(desktopHandoffPolicy.hostScope)
+    if (isLoopbackHost(hostScope)) return false
+    return true
+  }
+
+  const shouldBlockDesktopHandoffUrl = (url: string): boolean => {
+    if (isLoopbackHandoffUrlForWebview(url)) return true
+    if (wc.getType() !== 'webview') return false
+    const desktopHandoffPolicy = webviewDesktopHandoffPolicy.get(wc.id)
+    if (!desktopHandoffPolicy) return false
+    return isEncodedDesktopHandoffUrl(url, desktopHandoffPolicy)
+  }
+
   // Deny ALL popup windows from webview guest pages.
   // Per Electron docs, the renderer's 'new-window' event fires regardless of action:'deny',
   // so BrowserPanel (new tab) and WebPanelView (system browser) still handle http/https links.
@@ -1472,20 +1607,86 @@ app.on('web-contents-created', (_, wc) => {
   if (wc.getType() === 'webview') {
     wc.setWindowOpenHandler(() => ({ action: 'deny' }))
     wc.on('will-frame-navigate', (event) => {
-      if (isBlockedScheme(event.url)) event.preventDefault()
+      if (isBlockedScheme(event.url) || shouldBlockDesktopHandoffUrl(event.url)) {
+        event.preventDefault()
+      }
+    })
+
+    let spoofingReady = false
+    let spoofingPending = false
+    const ensureDesktopHandoffSpoofing = async () => {
+      if (spoofingReady || spoofingPending) return
+      spoofingPending = true
+      try {
+        if (!wc.debugger.isAttached()) wc.debugger.attach('1.3')
+        await wc.debugger.sendCommand('Emulation.setUserAgentOverride', {
+          userAgent: _chromeUa,
+          userAgentMetadata: {
+            brands: [
+              { brand: 'Google Chrome', version: _chromiumVersion },
+              { brand: 'Chromium', version: _chromiumVersion },
+              { brand: 'Not_A Brand', version: '8' },
+            ],
+            fullVersionList: [
+              { brand: 'Google Chrome', version: `${_chromiumVersion}.0.0.0` },
+              { brand: 'Chromium', version: `${_chromiumVersion}.0.0.0` },
+              { brand: 'Not_A Brand', version: '8.0.0.0' },
+            ],
+            mobile: false,
+            platform: _uaPlatform,
+            platformVersion: _uaPlatformVersion,
+            architecture: process.arch === 'arm64' ? 'arm' : 'x86',
+            model: '',
+            bitness: '64',
+          },
+        })
+        spoofingReady = true
+      } catch {
+        // Best-effort spoofing; fallback session/user-agent overrides remain active.
+        spoofingReady = false
+      } finally {
+        spoofingPending = false
+      }
+    }
+
+    const maybeApplyDesktopHandoffHardening = () => {
+      // Respect the per-panel setting and avoid global side-effects for unrelated webviews.
+      const desktopHandoffPolicy = webviewDesktopHandoffPolicy.get(wc.id)
+      if (!desktopHandoffPolicy) return
+      void ensureDesktopHandoffSpoofing()
+      wc.executeJavaScript(WEBVIEW_INIT_SCRIPT).catch(() => {})
+    }
+
+    wc.on('did-start-navigation', (_event, _navigationUrl, _isInPlace, isMainFrame) => {
+      if (!isMainFrame) return
+      maybeApplyDesktopHandoffHardening()
+    })
+    wc.on('did-navigate', () => {
+      maybeApplyDesktopHandoffHardening()
+    })
+    wc.once('destroyed', () => {
+      webviewDesktopHandoffPolicy.delete(wc.id)
+      webviewDesktopHandoffPolicyCleanupRegistered.delete(wc.id)
+      try {
+        if (wc.debugger.isAttached()) wc.debugger.detach()
+      } catch {
+        // ignore
+      }
     })
   }
 
   // will-navigate: same-frame main navigation (link clicks, window.location, etc.)
   // Covers both webview type AND 'window' type (popup windows spawned by allowpopups webviews).
   wc.on('will-navigate', (event, url) => {
-    console.log('[will-navigate]', wc.getType(), url.slice(0, 120))
-    if (isBlockedScheme(url)) event.preventDefault()
+    if (isBlockedScheme(url) || shouldBlockDesktopHandoffUrl(url)) {
+      event.preventDefault()
+    }
   })
   // will-redirect: server-side HTTP redirects to external app protocols
   wc.on('will-redirect', (event, url) => {
-    console.log('[will-redirect]', wc.getType(), url.slice(0, 120))
-    if (isBlockedScheme(url)) event.preventDefault()
+    if (isBlockedScheme(url) || shouldBlockDesktopHandoffUrl(url)) {
+      event.preventDefault()
+    }
   })
 })
 

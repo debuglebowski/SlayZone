@@ -13,6 +13,7 @@ interface MultiDeviceGridProps {
   url: string
   isResizing?: boolean
   reloadTrigger?: number
+  forceReloadTrigger?: number
   onPresetChange?: (slot: DeviceSlot, preset: DeviceEmulation) => void
 }
 
@@ -22,11 +23,12 @@ interface DeviceColumnProps {
   url: string
   isResizing: boolean
   reloadTrigger?: number
+  forceReloadTrigger?: number
   flex: number
   onPresetChange?: (preset: DeviceEmulation) => void
 }
 
-function DeviceColumn({ slot, preset, url, isResizing, reloadTrigger, flex, onPresetChange }: DeviceColumnProps) {
+function DeviceColumn({ slot, preset, url, isResizing, reloadTrigger, forceReloadTrigger, flex, onPresetChange }: DeviceColumnProps) {
   const [layout, setLayout] = useState<DeviceLayout | null>(null)
   const [customW, setCustomW] = useState(String(preset.width))
   const [customH, setCustomH] = useState(String(preset.height))
@@ -54,6 +56,7 @@ function DeviceColumn({ slot, preset, url, isResizing, reloadTrigger, flex, onPr
         partition="persist:browser-tabs"
         isResizing={isResizing}
         reloadTrigger={reloadTrigger}
+        forceReloadTrigger={forceReloadTrigger}
         onLayout={setLayout}
       />
       {layout && (
@@ -127,7 +130,7 @@ function DeviceColumn({ slot, preset, url, isResizing, reloadTrigger, flex, onPr
   )
 }
 
-export function MultiDeviceGrid({ config, layout, url, isResizing, reloadTrigger, onPresetChange }: MultiDeviceGridProps) {
+export function MultiDeviceGrid({ config, layout, url, isResizing, reloadTrigger, forceReloadTrigger, onPresetChange }: MultiDeviceGridProps) {
   const enabledSlots = useMemo(() => SLOTS.filter(s => config[s].enabled), [config])
   const containerRef = useRef<HTMLDivElement>(null)
   const [dragging, setDragging] = useState(false)
@@ -229,6 +232,7 @@ export function MultiDeviceGrid({ config, layout, url, isResizing, reloadTrigger
             url={url}
             isResizing={(isResizing ?? false) || dragging}
             reloadTrigger={reloadTrigger}
+            forceReloadTrigger={forceReloadTrigger}
             flex={getFlexValue(slot)}
             onPresetChange={(p) => onPresetChange?.(slot, p)}
           />

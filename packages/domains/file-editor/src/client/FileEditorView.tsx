@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef, useEffect, useMemo, useImperativeHandle, forwardRef } from 'react'
-import { Code, Columns2, Eye, FileCode } from 'lucide-react'
+import { Code, Columns2, Eye, FileCode, Files, Search } from 'lucide-react'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -17,10 +17,12 @@ import { EditorFileTree } from './EditorFileTree'
 import { EditorTabBar } from './EditorTabBar'
 import { CodeEditor } from './CodeEditor'
 import { MarkdownPreview } from './MarkdownPreview'
+import { SearchPanel } from './SearchPanel'
 
 export interface FileEditorViewHandle {
   openFile: (filePath: string) => void
   closeActiveFile: () => boolean
+  toggleSearch: () => void
 }
 
 interface FileEditorViewProps {
@@ -61,6 +63,7 @@ export const FileEditorView = forwardRef<FileEditorViewHandle, FileEditorViewPro
   const isDragging = useRef(false)
   const [confirmClose, setConfirmClose] = useState<string | null>(null)
   const [viewMode, setViewMode] = useState<'editor' | 'split' | 'preview'>('split')
+  const [sidebarMode, setSidebarMode] = useState<'tree' | 'search'>('tree')
   const [isFileDragOver, setIsFileDragOver] = useState(false)
   const dragCounter = useRef(0)
   const editorContainerRef = useRef<HTMLDivElement>(null)
@@ -134,8 +137,15 @@ export const FileEditorView = forwardRef<FileEditorViewHandle, FileEditorViewPro
 
   useImperativeHandle(ref, () => ({
     openFile,
-    closeActiveFile: () => { if (activeFilePath) { closeFile(activeFilePath); return true }; return false }
-  }), [openFile, activeFilePath, closeFile])
+    closeActiveFile: () => { if (activeFilePath) { closeFile(activeFilePath); return true }; return false },
+    toggleSearch: () => {
+      setSidebarMode(prev => {
+        const next = prev === 'search' ? 'tree' : 'search'
+        if (next === 'search' && !treeVisible) setTreeVisible(true)
+        return next
+      })
+    }
+  }), [openFile, activeFilePath, closeFile, treeVisible])
 
   const handleResizeStart = useCallback(
     (e: React.MouseEvent) => {
@@ -241,18 +251,47 @@ export const FileEditorView = forwardRef<FileEditorViewHandle, FileEditorViewPro
       onDragLeave={handleFileDragLeave}
       onDrop={handleFileDrop}
     >
-      {/* File tree */}
+      {/* Sidebar: header tabs + file tree or search */}
       {treeVisible && (
-        <div className="shrink-0 border-r overflow-hidden" style={{ width: treeWidth }}>
-          <EditorFileTree
-            projectPath={projectPath}
-            onOpenFile={openFile}
-            onFileRenamed={renameOpenFile}
-            activeFilePath={activeFilePath}
-            refreshKey={treeRefreshKey}
-            expandedFolders={expandedFolders}
-            onExpandedFoldersChange={setExpandedFolders}
-          />
+        <div className="shrink-0 border-r overflow-hidden flex flex-col" style={{ width: treeWidth }}>
+          {/* Sidebar tab header */}
+          <div className="flex items-center gap-1 px-2 h-10 border-b border-border shrink-0 bg-surface-1">
+            <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide mr-auto">
+              {sidebarMode === 'search' ? 'Search' : 'Files'}
+            </span>
+            {([
+              { mode: 'tree' as const, icon: Files, title: 'Explorer' },
+              { mode: 'search' as const, icon: Search, title: 'Search' }
+            ]).map(({ mode, icon: Icon, title }) => (
+              <button
+                key={mode}
+                className={`size-7 flex items-center justify-center rounded transition-colors ${sidebarMode === mode ? 'text-foreground bg-muted' : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'}`}
+                onClick={() => setSidebarMode(mode)}
+                title={title}
+              >
+                <Icon className="size-4" />
+              </button>
+            ))}
+          </div>
+          {/* Sidebar content */}
+          <div className="flex-1 min-w-0 min-h-0">
+            {sidebarMode === 'search' ? (
+              <SearchPanel
+                projectPath={projectPath}
+                onOpenFile={openFile}
+              />
+            ) : (
+              <EditorFileTree
+                projectPath={projectPath}
+                onOpenFile={openFile}
+                onFileRenamed={renameOpenFile}
+                activeFilePath={activeFilePath}
+                refreshKey={treeRefreshKey}
+                expandedFolders={expandedFolders}
+                onExpandedFoldersChange={setExpandedFolders}
+              />
+            )}
+          </div>
         </div>
       )}
 

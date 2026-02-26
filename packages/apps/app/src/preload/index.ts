@@ -77,7 +77,14 @@ const api: ElectronAPI = {
     }
   },
   shell: {
-    openExternal: (url: string) => ipcRenderer.invoke('shell:open-external', url)
+    openExternal: (
+      url: string,
+      options?: {
+        blockDesktopHandoff?: boolean
+        desktopHandoff?: import('@slayzone/task/shared').DesktopHandoffPolicy
+      }
+    ) =>
+      ipcRenderer.invoke('shell:open-external', url, options)
   },
   auth: {
     githubPopupSignIn: (signInUrl: string, callbackUrl: string) =>
@@ -359,6 +366,7 @@ const api: ElectronAPI = {
     delete: (rootPath, targetPath) => ipcRenderer.invoke('fs:delete', rootPath, targetPath),
     copyIn: (rootPath, absoluteSrc) => ipcRenderer.invoke('fs:copyIn', rootPath, absoluteSrc),
     listAllFiles: (rootPath) => ipcRenderer.invoke('fs:listAllFiles', rootPath),
+    searchFiles: (rootPath, query, opts) => ipcRenderer.invoke('fs:searchFiles', rootPath, query, opts),
     watch: (rootPath) => ipcRenderer.invoke('fs:watch', rootPath),
     unwatch: (rootPath) => ipcRenderer.invoke('fs:unwatch', rootPath),
     onFileChanged: (callback) => {
@@ -379,6 +387,8 @@ const api: ElectronAPI = {
   webview: {
     registerShortcuts: (webviewId) =>
       ipcRenderer.invoke('webview:register-shortcuts', webviewId),
+    setDesktopHandoffPolicy: (webviewId, policy) =>
+      ipcRenderer.invoke('webview:set-desktop-handoff-policy', webviewId, policy),
     onShortcut: (callback) => {
       const handler = (_event: unknown, payload: { key: string; shift?: boolean; webviewId?: number }) =>
         callback(payload)

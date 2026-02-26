@@ -431,32 +431,11 @@ export function EditorFileTree({ projectPath, onOpenFile, onFileRenamed, activeF
   const isRootDropHover = dropTarget === ''
 
   return (
-    <div className="h-full flex flex-col bg-surface-1">
-      {/* Header */}
-      <div className="flex items-center justify-between px-3 h-10 border-b border-border shrink-0 bg-surface-1">
-        <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Files</span>
-        <div className="flex items-center gap-1">
-          <button
-            className="size-6 flex items-center justify-center rounded hover:bg-muted text-muted-foreground hover:text-foreground"
-            onClick={() => startCreate('', 'file')}
-            title="New file"
-          >
-            <FilePlus className="size-3.5" />
-          </button>
-          <button
-            className="size-6 flex items-center justify-center rounded hover:bg-muted text-muted-foreground hover:text-foreground"
-            onClick={() => startCreate('', 'directory')}
-            title="New folder"
-          >
-            <FolderPlus className="size-3.5" />
-          </button>
-        </div>
-      </div>
-
-      {/* Tree */}
-      <div
+    <ContextMenu>
+      <ContextMenuTrigger asChild>
+        <div
         className={cn(
-          'flex-1 overflow-auto py-1 select-none text-sm',
+          'h-full overflow-auto py-1 select-none text-sm bg-surface-1',
           isRootDropHover && 'bg-primary/5 ring-1 ring-inset ring-primary/20 rounded'
         )}
         onDragOver={(e) => {
@@ -499,7 +478,16 @@ export function EditorFileTree({ projectPath, onOpenFile, onFileRenamed, activeF
             />
           </div>
         )}
-      </div>
-    </div>
+        </div>
+      </ContextMenuTrigger>
+      <ContextMenuContent>
+        <ContextMenuItem onSelect={() => startCreate('', 'file')}>
+          <FilePlus className="size-3 mr-2" /> New file
+        </ContextMenuItem>
+        <ContextMenuItem onSelect={() => startCreate('', 'directory')}>
+          <FolderPlus className="size-3 mr-2" /> New folder
+        </ContextMenuItem>
+      </ContextMenuContent>
+    </ContextMenu>
   )
 }

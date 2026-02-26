@@ -12,6 +12,11 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  ContextMenu,
+  ContextMenuTrigger,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuShortcut,
 } from '@slayzone/ui'
 import type { BrowserTab, BrowserTabsState, MultiDeviceConfig, GridLayout, DeviceSlot } from '../shared'
 import { defaultMultiDeviceConfig } from './device-presets'
@@ -39,6 +44,7 @@ interface WebviewElement extends HTMLElement {
   goBack(): void
   goForward(): void
   reload(): void
+  reloadIgnoringCache(): void
   stop(): void
   loadURL(url: string): void
   getURL(): string
@@ -98,6 +104,7 @@ export const BrowserPanel = forwardRef<BrowserPanelHandle, BrowserPanelProps>(fu
   const [otherTaskUrls, setOtherTaskUrls] = useState<TaskUrlEntry[]>([])
   const [importDropdownOpen, setImportDropdownOpen] = useState(false)
   const [reloadTrigger, setReloadTrigger] = useState(0)
+  const [forceReloadTrigger, setForceReloadTrigger] = useState(0)
   const [webviewId, setWebviewId] = useState<number | null>(null)
   const [devToolsStatus, setDevToolsStatus] = useState<string | null>(null)
   const [inlineDevToolsOpen, setInlineDevToolsOpen] = useState(false)
@@ -770,24 +777,51 @@ export const BrowserPanel = forwardRef<BrowserPanelHandle, BrowserPanelProps>(fu
           </TooltipTrigger>
           <TooltipContent>Forward</TooltipContent>
         </Tooltip>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <span>
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                onClick={() => {
-                  if (multiDeviceMode) setReloadTrigger(r => r + 1)
-                  else if (isLoading) webviewRef.current?.stop()
-                  else webviewRef.current?.reload()
-                }}
-              >
-                {isLoading && !multiDeviceMode ? <X className="size-4" /> : <RotateCw className="size-4" />}
-              </Button>
-            </span>
-          </TooltipTrigger>
-          <TooltipContent>{isLoading && !multiDeviceMode ? 'Stop loading' : 'Reload'}</TooltipContent>
-        </Tooltip>
+        <ContextMenu>
+          <Tooltip>
+            <ContextMenuTrigger asChild>
+              <TooltipTrigger asChild>
+                <span>
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    onClick={(e) => {
+                      if (multiDeviceMode) {
+                        if (e.shiftKey) setForceReloadTrigger(r => r + 1)
+                        else setReloadTrigger(r => r + 1)
+                      } else if (isLoading) {
+                        webviewRef.current?.stop()
+                      } else if (e.shiftKey) {
+                        webviewRef.current?.reloadIgnoringCache()
+                      } else {
+                        webviewRef.current?.reload()
+                      }
+                    }}
+                  >
+                    {isLoading && !multiDeviceMode ? <X className="size-4" /> : <RotateCw className="size-4" />}
+                  </Button>
+                </span>
+              </TooltipTrigger>
+            </ContextMenuTrigger>
+            <TooltipContent>{isLoading && !multiDeviceMode ? 'Stop loading' : 'Reload'}</TooltipContent>
+          </Tooltip>
+          <ContextMenuContent>
+            <ContextMenuItem onClick={() => {
+              if (multiDeviceMode) setReloadTrigger(r => r + 1)
+              else webviewRef.current?.reload()
+            }}>
+              Reload
+              <ContextMenuShortcut>⌘R</ContextMenuShortcut>
+            </ContextMenuItem>
+            <ContextMenuItem onClick={() => {
+              if (multiDeviceMode) setForceReloadTrigger(r => r + 1)
+              else webviewRef.current?.reloadIgnoringCache()
+            }}>
+              Hard Reload
+              <ContextMenuShortcut>⇧⌘R</ContextMenuShortcut>
+            </ContextMenuItem>
+          </ContextMenuContent>
+        </ContextMenu>
 
         <Input
           value={inputUrl}
@@ -1003,6 +1037,7 @@ export const BrowserPanel = forwardRef<BrowserPanelHandle, BrowserPanelProps>(fu
           url={activeTab?.url || 'about:blank'}
           isResizing={isResizing}
           reloadTrigger={reloadTrigger}
+          forceReloadTrigger={forceReloadTrigger}
           onPresetChange={setPreset}
         />
       ) : (

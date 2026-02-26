@@ -13,6 +13,23 @@ export interface ReadFileResult {
   sizeBytes?: number
 }
 
+export interface FileSearchMatch {
+  line: number
+  col: number
+  lineText: string
+}
+
+export interface FileSearchResult {
+  path: string
+  matches: FileSearchMatch[]
+}
+
+export interface SearchFilesOptions {
+  matchCase?: boolean
+  regex?: boolean
+  maxResults?: number
+}
+
 export interface EditorOpenFilesState {
   files: string[]
   activeFile: string | null

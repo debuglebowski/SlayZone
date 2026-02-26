@@ -3,6 +3,7 @@ import type { DeviceEmulation } from '../shared'
 
 interface WebviewElement extends HTMLElement {
   reload(): void
+  reloadIgnoringCache(): void
   stop(): void
   loadURL(url: string): void
   getURL(): string
@@ -21,10 +22,11 @@ interface DeviceWebviewProps {
   partition: string
   isResizing?: boolean
   reloadTrigger?: number
+  forceReloadTrigger?: number
   onLayout?: (layout: DeviceLayout) => void
 }
 
-export function DeviceWebview({ url, preset, partition, isResizing, reloadTrigger, onLayout }: DeviceWebviewProps) {
+export function DeviceWebview({ url, preset, partition, isResizing, reloadTrigger, forceReloadTrigger, onLayout }: DeviceWebviewProps) {
   const webviewRef = useRef<WebviewElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const [webviewReady, setWebviewReady] = useState(false)
@@ -98,6 +100,15 @@ export function DeviceWebview({ url, preset, partition, isResizing, reloadTrigge
       if (webviewReady) webviewRef.current?.reload()
     }
   }, [reloadTrigger, webviewReady])
+
+  // Force reload (ignore cache) when trigger increments
+  const prevForceReloadRef = useRef(forceReloadTrigger)
+  useEffect(() => {
+    if (forceReloadTrigger !== prevForceReloadRef.current) {
+      prevForceReloadRef.current = forceReloadTrigger
+      if (webviewReady) webviewRef.current?.reloadIgnoringCache()
+    }
+  }, [forceReloadTrigger, webviewReady])
 
   // Disable emulation on unmount
   useEffect(() => {

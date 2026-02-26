@@ -64,6 +64,13 @@ export interface PanelVisibility extends Record<string, boolean> {
   processes: boolean
 }
 
+export interface DesktopHandoffPolicy {
+  // URL protocol without :// (for example "figma", "slack", "notion")
+  protocol: string
+  // Optional host/domain guard to avoid overblocking unrelated popup URLs.
+  hostScope?: string
+}
+
 // Web panel definition (custom or predefined)
 export interface WebPanelDefinition {
   id: string           // 'web:<uuid>' for custom, 'web:figma' for predefined
@@ -72,6 +79,12 @@ export interface WebPanelDefinition {
   shortcut?: string    // single letter, e.g. 'm' → Cmd+M
   predefined?: boolean // true = shipped with app (can still be deleted)
   favicon?: string     // cached favicon URL
+  // Legacy toggle. Prefer handoffProtocol + handoffHostScope.
+  blockDesktopHandoff?: boolean
+  // Custom protocol to block in encoded desktop-handoff URLs (for example "figma").
+  handoffProtocol?: string
+  // Optional host/domain guard used when evaluating encoded desktop-handoff URLs.
+  handoffHostScope?: string
 }
 
 // Global panel config (stored in settings table as JSON)
@@ -87,7 +100,16 @@ export type WebPanelUrls = Record<string, string>
 export const BUILTIN_PANEL_IDS = ['terminal', 'browser', 'editor', 'diff', 'settings', 'processes'] as const
 
 export const PREDEFINED_WEB_PANELS: WebPanelDefinition[] = [
-  { id: 'web:figma', name: 'Figma', baseUrl: 'https://figma.com', shortcut: 'y', predefined: true },
+  {
+    id: 'web:figma',
+    name: 'Figma',
+    baseUrl: 'https://figma.com',
+    shortcut: 'y',
+    predefined: true,
+    blockDesktopHandoff: true,
+    handoffProtocol: 'figma',
+    handoffHostScope: 'figma.com',
+  },
   { id: 'web:notion', name: 'Notion', baseUrl: 'https://notion.so', shortcut: 'n', predefined: true },
   { id: 'web:github', name: 'GitHub', baseUrl: 'https://github.com', shortcut: 'h', predefined: true },
   { id: 'web:excalidraw', name: 'Excalidraw', baseUrl: 'https://excalidraw.com', shortcut: 'x', predefined: true },

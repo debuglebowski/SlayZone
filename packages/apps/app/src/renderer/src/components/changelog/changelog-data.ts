@@ -16,29 +16,51 @@ export interface ChangelogEntry {
 // Newest first. Only user-facing versions with meaningful changes.
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '0.1.68',
-    date: '2026-02-25',
-    tagline: 'Make it yours',
+    version: '0.1.69',
+    date: '2026-02-26',
+    tagline: 'Search everything',
     items: [
       {
         category: 'feature',
-        title: 'Labs settings tab',
-        description: 'Experimental features behind a toggle — starting with the leaderboard.',
+        title: 'Global file search',
+        description:
+          'Cmd+Shift+F searches across all files in your project — from any tab.',
+      },
+      {
+        category: 'feature',
+        title: 'Project color tints',
+        description:
+          "Tabs, task detail, and kanban cards pick up your project's color for quick visual grouping.",
+      },
+      {
+        category: 'feature',
+        title: 'Pinnable usage bars',
+        description:
+          'Pin or unpin inline API usage bars per provider — keep only what you care about visible.',
+      },
+      {
+        category: 'feature',
+        title: 'In-app changelog',
+        description:
+          "See what's new every time you update — opens automatically on version upgrade.",
       },
       {
         category: 'feature',
         title: 'Appearance settings',
-        description: 'Customize font sizes across the app and enable reduced motion for a calmer experience.',
+        description:
+          'Customize font sizes across the app and enable reduced motion for a calmer experience.',
       },
       {
         category: 'improvement',
-        title: 'Per-tab browser themes',
-        description: 'Toggle between system, dark, and light mode independently for each browser tab.',
+        title: 'Faster startup',
+        description:
+          'Parallel splash screen and pre-populated app — visible content on first frame.',
       },
       {
-        category: 'improvement',
-        title: 'Smarter project abbreviations',
-        description: 'Sidebar icons now prefer capital letters — "SlayZone" becomes "SZ" instead of "Sl".',
+        category: 'fix',
+        title: 'Windows support',
+        description:
+          'Shell, environment, and git operations stabilized for Windows.',
       },
     ],
   },

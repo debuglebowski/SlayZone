@@ -15,7 +15,7 @@ import {
 } from '@slayzone/tasks'
 import { CreateTaskDialog, EditTaskDialog, DeleteTaskDialog, TaskDetailPage, ProcessesPanel, ResizeHandle, usePanelSizes } from '@slayzone/task'
 import { UnifiedGitPanel, type UnifiedGitPanelHandle, type GitTabId } from '@slayzone/worktrees'
-import { FileEditorView } from '@slayzone/file-editor/client'
+import { FileEditorView, QuickOpenDialog, type FileEditorViewHandle } from '@slayzone/file-editor/client'
 import { CreateProjectDialog, ProjectSettingsDialog, DeleteProjectDialog } from '@slayzone/projects'
 import { UserSettingsDialog, useViewState, AppearanceProvider, useTheme } from '@slayzone/settings'
 import { OnboardingDialog } from '@slayzone/onboarding'
@@ -121,6 +121,21 @@ function App(): React.JSX.Element {
   const [homePanelVisibility, setHomePanelVisibility] = useState<Record<HomePanel, boolean>>({ kanban: true, git: false, editor: false, processes: false })
   const [homeGitDefaultTab, setHomeGitDefaultTab] = useState<GitTabId>('general')
   const homeGitPanelRef = useRef<UnifiedGitPanelHandle>(null)
+  const homeEditorRef = useRef<FileEditorViewHandle>(null)
+  const pendingHomeEditorFileRef = useRef<string | null>(null)
+  const pendingHomeSearchToggleRef = useRef(false)
+  const homeEditorRefCallback = useCallback((handle: FileEditorViewHandle | null) => {
+    homeEditorRef.current = handle
+    if (handle && pendingHomeEditorFileRef.current) {
+      handle.openFile(pendingHomeEditorFileRef.current)
+      pendingHomeEditorFileRef.current = null
+    }
+    if (handle && pendingHomeSearchToggleRef.current) {
+      handle.toggleSearch()
+      pendingHomeSearchToggleRef.current = false
+    }
+  }, [])
+  const [homeQuickOpenVisible, setHomeQuickOpenVisible] = useState(false)
   const [homeContainerWidth, setHomeContainerWidth] = useState(0)
   const homeRoRef = useRef<ResizeObserver | null>(null)
   const homeContainerRef = useCallback((el: HTMLDivElement | null) => {
@@ -170,6 +185,22 @@ function App(): React.JSX.Element {
 
   const [showAnimatedTour, setShowAnimatedTour] = useState(false)
   const startTutorial = (): void => setShowAnimatedTour(true)
+
+  // Prompt existing users who completed onboarding but never saw the tour toast
+  useEffect(() => {
+    Promise.all([
+      window.api.settings.get('onboarding_completed'),
+      window.api.settings.get('tutorial_prompted')
+    ]).then(([onboarded, prompted]) => {
+      if (onboarded === 'true' && !prompted) {
+        void window.api.settings.set('tutorial_prompted', 'true')
+        toast('Want a quick tour?', {
+          duration: 8000,
+          action: { label: 'Take the tour', onClick: startTutorial }
+        })
+      }
+    })
+  }, [])
 
   // Usage & notification state
   const { data: usageData, refresh: refreshUsage } = useUsage()
@@ -725,7 +756,16 @@ function App(): React.JSX.Element {
       if (!e.metaKey) return
       if ((e.target as HTMLElement)?.closest?.('.cm-editor')) return
       if (e.shiftKey) {
-        if (e.key.toLowerCase() === 'g') {
+        if (e.key.toLowerCase() === 'f') {
+          e.preventDefault()
+          if (homeEditorRef.current) {
+            if (!homePanelVisibility.editor) setHomePanelVisibility(prev => ({ ...prev, editor: true }))
+            homeEditorRef.current.toggleSearch()
+          } else {
+            pendingHomeSearchToggleRef.current = true
+            setHomePanelVisibility(prev => ({ ...prev, editor: true }))
+          }
+        } else if (e.key.toLowerCase() === 'g') {
           e.preventDefault()
           if (!homePanelVisibility.git) {
             setHomeGitDefaultTab('changes')
@@ -736,6 +776,11 @@ function App(): React.JSX.Element {
             homeGitPanelRef.current?.switchToTab('changes')
           }
         }
+        return
+      }
+      if (e.key === 'p') {
+        e.preventDefault()
+        setHomeQuickOpenVisible(true)
         return
       }
       if (e.key === 'g') {
@@ -971,6 +1016,7 @@ function App(): React.JSX.Element {
           onOnboarding={() => setOnboardingOpen(true)}
           onTutorial={startTutorial}
           onChangelog={() => setChangelogOpen(true)}
+          onTaskClick={openTask}
           zenMode={zenMode}
         />
 
@@ -987,6 +1033,7 @@ function App(): React.JSX.Element {
                     rightContent={
                       <div className="flex items-center gap-1">
                         <UsagePopover data={usageData} onRefresh={refreshUsage} />
+                        <div className="w-6" />
                         <Tooltip>
                           <TooltipTrigger asChild>
                             <button
@@ -1044,6 +1091,7 @@ function App(): React.JSX.Element {
                         />
                         <NotificationButton
                           active={notificationState.isLocked}
+                          count={attentionTasks.length}
                           onClick={() => setNotificationState({ isLocked: !notificationState.isLocked })}
                         />
                       </div>
@@ -1173,7 +1221,7 @@ function App(): React.JSX.Element {
                                         />
                                       )}
                                       {id === 'git' && <UnifiedGitPanel ref={homeGitPanelRef} projectPath={projectPath} visible={true} defaultTab={homeGitDefaultTab} />}
-                                      {id === 'editor' && <FileEditorView projectPath={projectPath ?? ''} />}
+                                      {id === 'editor' && <FileEditorView ref={homeEditorRefCallback} projectPath={projectPath ?? ''} />}
                                       {id === 'processes' && <ProcessesPanel taskId={null} cwd={projectPath} />}
                                     </div>
                                   </React.Fragment>
@@ -1230,6 +1278,20 @@ function App(): React.JSX.Element {
         </div>
 
         {/* Dialogs */}
+        <QuickOpenDialog
+          open={homeQuickOpenVisible}
+          onOpenChange={setHomeQuickOpenVisible}
+          projectPath={projects.find(p => p.id === selectedProjectId)?.path ?? ''}
+          onOpenFile={(filePath) => {
+            if (homeEditorRef.current) {
+              if (!homePanelVisibility.editor) setHomePanelVisibility(prev => ({ ...prev, editor: true }))
+              homeEditorRef.current.openFile(filePath)
+            } else {
+              pendingHomeEditorFileRef.current = filePath
+              setHomePanelVisibility(prev => ({ ...prev, editor: true }))
+            }
+          }}
+        />
         <CreateTaskDialog
           open={createOpen}
           onOpenChange={setCreateOpen}

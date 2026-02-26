@@ -3,7 +3,7 @@ import * as path from 'node:path'
 import type { IpcMain } from 'electron'
 import { BrowserWindow } from 'electron'
 import ignore from 'ignore'
-import type { DirEntry, ReadFileResult } from '../shared'
+import type { DirEntry, ReadFileResult, FileSearchResult, FileSearchMatch, SearchFilesOptions } from '../shared'
 
 const ALWAYS_IGNORED = new Set(['.git', '.DS_Store'])
 
@@ -227,4 +227,77 @@ export function registerFileEditorHandlers(ipcMain: IpcMain): void {
     fs.copyFileSync(srcResolved, dest)
     return relPath
   })
+
+  ipcMain.handle('fs:searchFiles', (_event, rootPath: string, query: string, options?: SearchFilesOptions): FileSearchResult[] => {
+    if (!query) return []
+    const root = path.resolve(rootPath)
+    const ig = getIgnoreFilter(rootPath)
+    const matchCase = options?.matchCase ?? false
+    const useRegex = options?.regex ?? false
+    const maxResults = options?.maxResults ?? 500
+    let totalMatches = 0
+
+    let pattern: RegExp
+    try {
+      const flags = matchCase ? 'g' : 'gi'
+      pattern = useRegex ? new RegExp(query, flags) : new RegExp(escapeRegExp(query), flags)
+    } catch {
+      return []
+    }
+
+    const results: FileSearchResult[] = []
+
+    function walk(dir: string, prefix: string): void {
+      if (totalMatches >= maxResults) return
+      let entries: fs.Dirent[]
+      try { entries = fs.readdirSync(dir, { withFileTypes: true }) } catch { return }
+      for (const e of entries) {
+        if (totalMatches >= maxResults) return
+        const relPath = prefix ? `${prefix}/${e.name}` : e.name
+        if (ALWAYS_IGNORED.has(e.name)) continue
+        if (ig.ignores(e.isDirectory() ? relPath + '/' : relPath)) continue
+        if (e.isDirectory()) {
+          walk(path.join(dir, e.name), relPath)
+        } else {
+          searchFile(root, relPath, pattern, results)
+        }
+      }
+    }
+
+    function searchFile(rootDir: string, relPath: string, re: RegExp, out: FileSearchResult[]): void {
+      if (totalMatches >= maxResults) return
+      const abs = path.join(rootDir, relPath)
+      let stat: fs.Stats
+      try { stat = fs.statSync(abs) } catch { return }
+      if (stat.size > MAX_FILE_SIZE) return
+
+      let content: string
+      try { content = fs.readFileSync(abs, 'utf-8') } catch { return }
+
+      // Skip binary files (null bytes in first 8KB)
+      if (content.slice(0, 8192).includes('\0')) return
+
+      const matches: FileSearchMatch[] = []
+      const lines = content.split('\n')
+      for (let i = 0; i < lines.length; i++) {
+        if (totalMatches >= maxResults) break
+        re.lastIndex = 0
+        const m = re.exec(lines[i])
+        if (m) {
+          matches.push({ line: i + 1, col: m.index, lineText: lines[i].slice(0, 500) })
+          totalMatches++
+        }
+      }
+      if (matches.length > 0) {
+        out.push({ path: relPath, matches })
+      }
+    }
+
+    walk(root, '')
+    return results
+  })
+}
+
+function escapeRegExp(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }

@@ -39,6 +39,7 @@ interface AppSidebarProps {
   onOnboarding: () => void
   onTutorial: () => void
   onChangelog: () => void
+  onTaskClick?: (taskId: string) => void
   zenMode?: boolean
 }
 
@@ -100,6 +101,7 @@ export function AppSidebar({
   onOnboarding,
   onTutorial,
   onChangelog,
+  onTaskClick,
   zenMode,
 }: AppSidebarProps) {
   const [shortcutsOpen, setShortcutsOpen] = useState(false)
@@ -175,7 +177,7 @@ export function AppSidebar({
       <SidebarFooter className="py-4 border-t border-sidebar-border/80">
         <SidebarMenu>
           <SidebarMenuItem className="flex flex-col items-center gap-2">
-            <TerminalStatusPopover tasks={tasks} />
+            <TerminalStatusPopover tasks={tasks} onTaskClick={onTaskClick} />
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button
@@ -184,7 +186,7 @@ export function AppSidebar({
                   onClick={onTutorial}
                   className={footerActionClassName}
                 >
-                  <Map className="size-5" />
+                  <IoCompassSharp className="size-6" />
                 </Button>
               </TooltipTrigger>
               <TooltipContent side="right">Take a Tour</TooltipContent>
@@ -197,7 +199,7 @@ export function AppSidebar({
                   onClick={onChangelog}
                   className={footerActionClassName}
                 >
-                  <Sparkles className="size-5" />
+                  <Megaphone className="size-5" />
                 </Button>
               </TooltipTrigger>
               <TooltipContent side="right">What's New</TooltipContent>
@@ -210,7 +212,7 @@ export function AppSidebar({
                   onClick={onOnboarding}
                   className={footerActionClassName}
                 >
-                  <HelpCircle className="size-5" />
+                  <FaRegHandshake className="size-5" />
                 </Button>
               </TooltipTrigger>
               <TooltipContent side="right">Onboarding</TooltipContent>

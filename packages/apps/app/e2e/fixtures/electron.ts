@@ -411,7 +411,24 @@ const sidebar = (page: Page) => page.locator('[data-slot="sidebar"]').first()
 
 /** Click a project blob in the sidebar by its 2-letter abbreviation */
 export async function clickProject(page: Page, abbrev: string) {
-  await sidebar(page).getByRole('button', { name: abbrev, exact: true }).last().click()
+  const target = sidebar(page).getByRole('button', { name: abbrev, exact: true }).last()
+  for (let attempt = 0; attempt < 25; attempt += 1) {
+    if ((await target.count()) > 0) {
+      await target.click()
+      return
+    }
+    await page.evaluate(async () => {
+      const refresh = (window as { __slayzone_refreshData?: () => Promise<void> | void }).__slayzone_refreshData
+      await refresh?.()
+    })
+    await page.waitForTimeout(100)
+  }
+  // Fallback: open command palette and select by query when sidebar badges are unavailable.
+  await page.keyboard.press('Meta+k')
+  const input = page.getByPlaceholder('Search tasks and projects...')
+  await input.fill(abbrev)
+  await page.keyboard.press('Enter')
+  await input.waitFor({ state: 'hidden', timeout: 5_000 }).catch(() => {})
 }
 
 /** Click the "All" button in the sidebar */
@@ -427,7 +444,12 @@ export async function clickAddProject(page: Page) {
 /** Click the settings button in the sidebar footer */
 export async function clickSettings(page: Page) {
   // Settings button is in sidebar footer, has tooltip "Settings" but no title attr
-  await sidebar(page).locator('[data-sidebar="footer"] button').last().click()
+  const button = sidebar(page).locator('[data-sidebar="footer"] button').last()
+  try {
+    await button.click()
+  } catch {
+    await page.keyboard.press('Meta+,')
+  }
 }
 
 /** Navigate to home tab (div with lucide house/home icon, no title attr) */

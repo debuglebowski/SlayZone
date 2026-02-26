@@ -7,10 +7,13 @@
       "electron",
       "esbuild",
       "node-pty"
-    ]
+    ],
+    "overrides": {
+      "zod": "^4"
+    }
   },
   "scripts": {
-    "postinstall": "node -e \"if(!process.env.CI_SKIP_POSTINSTALL)require('child_process').execSync('electron-rebuild -f -w better-sqlite3,node-pty',{stdio:'inherit'})\"",
+    "postinstall": "node scripts/postinstall.js",
     "dev": "pnpm --filter @slayzone/app dev",
     "generate-icons": "node scripts/generate-icons.js",
     "patch-electron-name": "node scripts/patch-electron-name.js",

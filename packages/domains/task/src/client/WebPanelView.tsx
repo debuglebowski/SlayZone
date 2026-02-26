@@ -1,10 +1,21 @@
-import { useRef, useEffect, useCallback, useState } from 'react'
+import { useRef, useEffect, useCallback, useMemo, useState } from 'react'
 import { RotateCw, X, Globe, Copy, Check } from 'lucide-react'
 import { Button } from '@slayzone/ui'
+import {
+  inferHostScopeFromUrl,
+  inferProtocolFromUrl,
+  isEncodedDesktopHandoffUrl,
+  isLoopbackUrl,
+  isUrlWithinHostScope,
+  normalizeDesktopHostScope,
+  normalizeDesktopProtocol,
+} from '../shared/handoff'
+import type { DesktopHandoffPolicy } from '../shared/types'
 
 interface WebviewElement extends HTMLElement {
   reload(): void
   stop(): void
+  loadURL(url: string): void
   getURL(): string
   getWebContentsId(): number
 }
@@ -12,24 +23,59 @@ interface WebviewElement extends HTMLElement {
 interface WebPanelViewProps {
   panelId: string
   url: string
+  baseUrl: string
   name: string
+  blockDesktopHandoff?: boolean
+  handoffProtocol?: string
+  handoffHostScope?: string
   onUrlChange: (panelId: string, url: string) => void
   onFaviconChange?: (panelId: string, favicon: string) => void
   isResizing?: boolean
 }
 
 export function WebPanelView({
-  panelId, url, name, onUrlChange, onFaviconChange, isResizing,
+  panelId,
+  url,
+  baseUrl,
+  name,
+  blockDesktopHandoff = false,
+  handoffProtocol,
+  handoffHostScope,
+  onUrlChange,
+  onFaviconChange,
+  isResizing,
 }: WebPanelViewProps) {
   const webviewRef = useRef<WebviewElement>(null)
+  const [webviewReady, setWebviewReady] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [copied, setCopied] = useState(false)
+  const [initialSrc] = useState(() => (url || 'about:blank').replace(/^file:\/\//, 'slz-file://'))
+  const loadedUrlRef = useRef(url)
 
   const handleNavigate = useCallback(() => {
     const wv = webviewRef.current
     if (!wv) return
-    onUrlChange(panelId, wv.getURL())
+    const currentUrl = wv.getURL().replace(/^slz-file:\/\//, 'file://')
+    loadedUrlRef.current = currentUrl
+    onUrlChange(panelId, currentUrl)
   }, [panelId, onUrlChange])
+
+  const desktopHandoffPolicy = useMemo<DesktopHandoffPolicy | null>(() => {
+    if (!blockDesktopHandoff) return null
+
+    const protocol =
+      normalizeDesktopProtocol(handoffProtocol) ??
+      normalizeDesktopProtocol(inferProtocolFromUrl(baseUrl))
+    if (!protocol) return null
+    const hostScope =
+      normalizeDesktopHostScope(handoffHostScope) ??
+      normalizeDesktopHostScope(inferHostScopeFromUrl(baseUrl))
+    return hostScope ? { protocol, hostScope } : { protocol }
+  }, [blockDesktopHandoff, handoffProtocol, handoffHostScope, baseUrl])
+
+  const syncDesktopHandoffPolicy = useCallback((wv: WebviewElement) => {
+    void window.api.webview.setDesktopHandoffPolicy(wv.getWebContentsId(), desktopHandoffPolicy)
+  }, [desktopHandoffPolicy])
 
   useEffect(() => {
     const wv = webviewRef.current
@@ -37,6 +83,14 @@ export function WebPanelView({
 
     const onStartLoading = () => setIsLoading(true)
     const onStopLoading = () => setIsLoading(false)
+    const onDidAttach = () => {
+      syncDesktopHandoffPolicy(wv)
+    }
+    const onDomReady = () => {
+      setWebviewReady(true)
+      loadedUrlRef.current = wv.getURL().replace(/^slz-file:\/\//, 'file://')
+      syncDesktopHandoffPolicy(wv)
+    }
 
     const onFavicon = (e: Event) => {
       const favicons = (e as CustomEvent).detail?.favicons as string[] | undefined
@@ -46,16 +100,50 @@ export function WebPanelView({
     }
 
     const onNewWindow = (e: Event) => {
-      const url = (e as CustomEvent).detail?.url ?? ''
-      // Block external app protocol popups (figma://, slack://, etc.)
-      // Allow http/https popups (e.g. OAuth windows) to open in system browser
-      if (url.startsWith('http://') || url.startsWith('https://')) {
-        window.api.shell.openExternal(url)
+      const popupUrl = (e as CustomEvent).detail?.url ?? ''
+      if (!popupUrl.startsWith('http://') && !popupUrl.startsWith('https://')) return
+
+      if (desktopHandoffPolicy) {
+        if (isLoopbackUrl(popupUrl)) return
+
+        // Suppress explicit encoded handoff links.
+        if (isEncodedDesktopHandoffUrl(popupUrl, desktopHandoffPolicy)) return
+
+        // Keep same-host popups inside the panel to avoid browser-level handoff paths.
+        if (
+          desktopHandoffPolicy.hostScope &&
+          isUrlWithinHostScope(popupUrl, desktopHandoffPolicy.hostScope)
+        ) {
+          wv.loadURL(popupUrl)
+          return
+        }
       }
+
+      // Default behavior: open popup in system browser.
+      void window.api.shell.openExternal(
+        popupUrl,
+        desktopHandoffPolicy ? { desktopHandoff: desktopHandoffPolicy } : undefined
+      ).catch(() => {})
+    }
+
+    const onWillNavigate = (e: Event) => {
+      if (!desktopHandoffPolicy) return
+      const nextUrl = (e as CustomEvent).detail?.url ?? ''
+      if (!nextUrl) return
+      if (isLoopbackUrl(nextUrl)) {
+        e.preventDefault()
+        return
+      }
+      if (!isEncodedDesktopHandoffUrl(nextUrl, desktopHandoffPolicy)) return
+      e.preventDefault()
     }
 
     const onFocus = () => wv.dispatchEvent(new FocusEvent('focusin', { bubbles: true }))
 
+    wv.addEventListener('did-attach', onDidAttach)
+    wv.addEventListener('dom-ready', onDomReady)
+    wv.addEventListener('will-navigate', onWillNavigate)
+    wv.addEventListener('will-frame-navigate', onWillNavigate)
     wv.addEventListener('did-navigate', handleNavigate)
     wv.addEventListener('did-navigate-in-page', handleNavigate)
     wv.addEventListener('did-start-loading', onStartLoading)
@@ -65,6 +153,10 @@ export function WebPanelView({
     wv.addEventListener('focus', onFocus)
 
     return () => {
+      wv.removeEventListener('did-attach', onDidAttach)
+      wv.removeEventListener('dom-ready', onDomReady)
+      wv.removeEventListener('will-navigate', onWillNavigate)
+      wv.removeEventListener('will-frame-navigate', onWillNavigate)
       wv.removeEventListener('did-navigate', handleNavigate)
       wv.removeEventListener('did-navigate-in-page', handleNavigate)
       wv.removeEventListener('did-start-loading', onStartLoading)
@@ -73,7 +165,26 @@ export function WebPanelView({
       wv.removeEventListener('new-window', onNewWindow)
       wv.removeEventListener('focus', onFocus)
     }
-  }, [handleNavigate, panelId, onFaviconChange])
+  }, [handleNavigate, panelId, onFaviconChange, desktopHandoffPolicy, syncDesktopHandoffPolicy])
+
+  useEffect(() => {
+    const wv = webviewRef.current
+    if (!wv || !webviewReady) return
+    syncDesktopHandoffPolicy(wv)
+  }, [webviewReady, syncDesktopHandoffPolicy])
+
+  useEffect(() => {
+    const wv = webviewRef.current
+    if (!wv || !webviewReady || !url || url === 'about:blank') return
+    if (url === loadedUrlRef.current) return
+    const currentUrl = wv.getURL().replace(/^slz-file:\/\//, 'file://')
+    if (url === currentUrl) {
+      loadedUrlRef.current = url
+      return
+    }
+    loadedUrlRef.current = url
+    wv.loadURL(url.replace(/^file:\/\//, 'slz-file://'))
+  }, [url, webviewReady])
 
   return (
     <div className="flex flex-col h-full">
@@ -114,7 +225,7 @@ export function WebPanelView({
       <div className="relative flex-1">
         <webview
           ref={webviewRef}
-          src={url}
+          src={initialSrc}
           partition="persist:web-panels"
           className="absolute inset-0"
           // @ts-expect-error - webview attributes not in React types
