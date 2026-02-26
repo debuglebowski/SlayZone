@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { useHotkeys } from 'react-hotkeys-hook'
 import { AlertTriangle, LayoutGrid, TerminalSquare, GitBranch, FileCode, Cpu, Kanban } from 'lucide-react'
+import { useQuery } from 'convex/react'
+import { api } from 'convex/_generated/api'
 import type { Task } from '@slayzone/task/shared'
 import type { Project } from '@slayzone/projects/shared'
 import type { Tag } from '@slayzone/tags/shared'
@@ -215,7 +217,7 @@ function App(): React.JSX.Element {
 
   // Leaderboard rank for tab badge
   const leaderboardAuth = useLeaderboardAuth()
-  const [leaderboardBestRank, setLeaderboardBestRank] = useState<number | null>(null)
+  const [, setLeaderboardBestRank] = useState<number | null>(null)
 
   // Usage & notification state
   const { data: usageData, refresh: refreshUsage } = useUsage()
