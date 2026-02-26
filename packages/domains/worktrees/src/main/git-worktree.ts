@@ -257,7 +257,8 @@ function applyWorktreeCopyEntries(
       if (entry.mode === 'copy') {
         cpSync(sourcePath, destPath, { recursive: true })
       } else {
-        symlinkSync(sourcePath, destPath)
+        const stats = require('fs').statSync(sourcePath)
+        symlinkSync(sourcePath, destPath, stats.isDirectory() ? 'dir' : 'file')
       }
       recordDiagnosticEvent({
         level: 'info',
