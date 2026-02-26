@@ -9,20 +9,20 @@ export function registerThemeHandlers(ipcMain: IpcMain, db: Database): void {
     return nativeTheme.shouldUseDarkColors ? 'dark' : 'light'
   })
 
-  // Get user's preference (light/dark/system)
+  // Get user's preference (light/dark)
   ipcMain.handle('theme:get-source', () => {
-    return nativeTheme.themeSource
+    return nativeTheme.themeSource === 'light' ? 'light' : 'dark'
   })
 
   // Set theme preference
-  ipcMain.handle('theme:set', (_, theme: 'light' | 'dark' | 'system') => {
+  ipcMain.handle('theme:set', (_, theme: 'light' | 'dark') => {
     nativeTheme.themeSource = theme
     // Persist to database
     db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)').run('theme', theme)
     return nativeTheme.shouldUseDarkColors ? 'dark' : 'light'
   })
 
-  // Listen for OS theme changes (only matters when themeSource is 'system')
+  // Notify renderer windows whenever Electron reports a theme update.
   nativeTheme.on('updated', () => {
     const effective = nativeTheme.shouldUseDarkColors ? 'dark' : 'light'
     // Notify all windows

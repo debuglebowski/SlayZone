@@ -69,7 +69,7 @@ const api: ElectronAPI = {
   theme: {
     getEffective: () => ipcRenderer.invoke('theme:get-effective'),
     getSource: () => ipcRenderer.invoke('theme:get-source'),
-    set: (theme: 'light' | 'dark' | 'system') => ipcRenderer.invoke('theme:set', theme),
+    set: (theme: 'light' | 'dark') => ipcRenderer.invoke('theme:set', theme),
     onChange: (callback: (theme: 'light' | 'dark') => void) => {
       const handler = (_event: unknown, theme: 'light' | 'dark') => callback(theme)
       ipcRenderer.on('theme:changed', handler)

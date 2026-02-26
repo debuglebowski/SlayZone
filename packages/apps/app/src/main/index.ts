@@ -51,13 +51,17 @@ const DEFAULT_WINDOW_HEIGHT = 1280
 const WINDOW_BG_DARK = '#0a0a0a'
 const WINDOW_BG_LIGHT = '#f3f3f3'
 
+function getEffectiveTheme(): 'light' | 'dark' {
+  return nativeTheme.shouldUseDarkColors ? 'dark' : 'light'
+}
+
 function getWindowBackgroundColor(): string {
-  return nativeTheme.shouldUseDarkColors ? WINDOW_BG_DARK : WINDOW_BG_LIGHT
+  return getEffectiveTheme() === 'dark' ? WINDOW_BG_DARK : WINDOW_BG_LIGHT
 }
 
 // Splash screen: self-contained HTML with inline logo SVG and typewriter animation
 const splashLogoSvg = readFileSync(logoSolid, 'utf-8')
-const splashHTML = (version: string) => `
+const splashHTML = (version: string, theme: 'light' | 'dark') => `
 <!DOCTYPE html>
 <html>
 <head>
@@ -76,7 +80,7 @@ const splashHTML = (version: string) => `
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      background: #0a0a0a;
+      background: ${theme === 'dark' ? '#0a0a0a' : '#f3f3f3'};
       border-radius: 16px;
       position: relative;
     }
@@ -93,7 +97,7 @@ const splashHTML = (version: string) => `
       margin-top: 24px;
       font-size: 28px;
       font-weight: 600;
-      color: #fafafa;
+      color: ${theme === 'dark' ? '#fafafa' : '#171717'};
       height: 1.5em;
       display: inline-flex;
       align-items: center;
@@ -104,14 +108,14 @@ const splashHTML = (version: string) => `
       width: 2px;
       height: 1.1em;
       margin-left: 4px;
-      background: #fafafa;
+      background: ${theme === 'dark' ? '#fafafa' : '#171717'};
       animation: blink 0.9s step-end infinite;
     }
     .version {
       position: absolute;
       bottom: 24px;
       font-size: 12px;
-      color: #525252;
+      color: ${theme === 'dark' ? '#525252' : '#737373'};
       opacity: 0;
       animation: fadeIn 0.15s ease-out 0.3s forwards;
     }
@@ -515,7 +519,7 @@ function createSplashWindow(): void {
     }
   })
 
-  splashWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(splashHTML(app.getVersion()))}`)
+  splashWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(splashHTML(app.getVersion(), getEffectiveTheme()))}`)
 
   splashWindow.once('ready-to-show', () => {
     splashWindow?.show()
