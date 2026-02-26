@@ -93,6 +93,59 @@ describe('git:createWorktree', () => {
     const branch = git('git branch --show-current', wtPath)
     expect(branch).toBe('feature-1')
   })
+
+  test('creates detached worktree when no branch is provided with sourceBranch', () => {
+    const wtPath = path.join(root, 'wt-detached')
+    const sourceBranch = git('git branch --show-current')
+    h.invoke('git:createWorktree', repoPath, wtPath, undefined, undefined, sourceBranch)
+    expect(fs.existsSync(wtPath)).toBe(true)
+    const headRef = git('git rev-parse --abbrev-ref HEAD', wtPath)
+    expect(headRef).toBe('HEAD')
+    h.invoke('git:removeWorktree', repoPath, wtPath)
+  })
+
+  test('ignores copy entries that escape repository/worktree roots', () => {
+    const sourceOutsideRepo = path.join(root, 'outside-source.txt')
+    fs.writeFileSync(sourceOutsideRepo, 'outside')
+    const wtParent = path.join(root, 'nested')
+    const wtPath = path.join(wtParent, 'wt-escape-copy')
+    fs.mkdirSync(wtParent, { recursive: true })
+
+    const sourceBranch = git('git branch --show-current')
+    h.invoke(
+      'git:createWorktree',
+      repoPath,
+      wtPath,
+      'feature-escape-copy',
+      [{ path: '../outside-source.txt', mode: 'copy' }],
+      sourceBranch
+    )
+
+    const escapedDestPath = path.join(wtParent, 'outside-source.txt')
+    expect(fs.existsSync(escapedDestPath)).toBe(false)
+    h.invoke('git:removeWorktree', repoPath, wtPath)
+  })
+
+  test('copies allowed untracked files into new worktree', () => {
+    const sourceFile = path.join(repoPath, 'copy-me.txt')
+    fs.writeFileSync(sourceFile, 'copy payload')
+    const wtPath = path.join(root, 'wt-copy-ok')
+    const sourceBranch = git('git branch --show-current')
+
+    h.invoke(
+      'git:createWorktree',
+      repoPath,
+      wtPath,
+      'feature-copy-ok',
+      [{ path: 'copy-me.txt', mode: 'copy' }],
+      sourceBranch
+    )
+
+    const copied = fs.readFileSync(path.join(wtPath, 'copy-me.txt'), 'utf-8')
+    expect(copied).toBe('copy payload')
+    h.invoke('git:removeWorktree', repoPath, wtPath)
+    fs.unlinkSync(sourceFile)
+  })
 })
 
 describe('git:removeWorktree', () => {
