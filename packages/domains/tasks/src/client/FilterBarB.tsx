@@ -1,10 +1,11 @@
 import type { Tag } from '@slayzone/tags/shared'
-import type { FilterState, GroupKey, DueDateRange, SortKey } from './FilterState'
+import type { FilterState, GroupKey, DueDateRange, SortKey, ViewMode } from './FilterState'
 import { Popover, PopoverContent, PopoverTrigger } from '@slayzone/ui'
 import { Button } from '@slayzone/ui'
 import { Switch } from '@slayzone/ui'
 import { Label } from '@slayzone/ui'
-import { ListFilter, Layers, ArrowUpDown, Eye } from 'lucide-react'
+import { cn } from '@slayzone/ui'
+import { ListFilter, Layers, ArrowUpDown, Eye, Kanban, List } from 'lucide-react'
 
 interface FilterBarBProps {
   filter: FilterState
@@ -51,6 +52,34 @@ export function FilterBarB({ filter, onChange, tags }: FilterBarBProps): React.J
 
   return (
     <div className="ml-auto flex items-center gap-1">
+      {/* View mode toggle */}
+      <div className="flex items-center rounded-md border border-border/50 p-0.5 gap-px">
+        {([
+          { value: 'board' as ViewMode, icon: Kanban, label: 'Board' },
+          { value: 'list' as ViewMode, icon: List, label: 'List' }
+        ]).map((opt) => {
+          const Icon = opt.icon
+          const isActive = (filter.viewMode ?? 'board') === opt.value
+          return (
+            <button
+              key={opt.value}
+              className={cn(
+                'flex items-center gap-1 px-2 py-1 text-xs font-medium rounded transition-colors',
+                isActive
+                  ? 'bg-foreground text-background'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-accent'
+              )}
+              onClick={() => onChange({ ...filter, viewMode: opt.value })}
+              title={opt.label}
+            >
+              <Icon className="size-3.5" />
+            </button>
+          )
+        })}
+      </div>
+
+      <div className="h-4 w-px bg-border" />
+
       {/* Filter */}
       <Popover>
         <PopoverTrigger asChild>

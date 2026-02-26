@@ -1,4 +1,5 @@
 export { KanbanBoard } from './KanbanBoard'
+export { AgentListView } from './AgentListView'
 export { FilterBar } from './FilterBar'
 export { useTasksData } from './useTasksData'
 export { useFilterState } from './useFilterState'

@@ -18,6 +18,9 @@ export default defineConfig(({ mode }) => {
   return {
     main: {
       plugins: [externalizeDepsPlugin({ exclude: slayzoneDeps })],
+      define: {
+        'process.env.SLAYZONE_DB_NAME': JSON.stringify(env.SLAYZONE_DB_NAME ?? '')
+      },
       build: {
         rollupOptions: {
           external: ['better-sqlite3', 'node-pty']

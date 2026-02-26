@@ -157,11 +157,29 @@ function SortableTab({
 /** Self-contained leaderboard tab button. Guards Convex hooks behind auth.configured check. */
 function LeaderboardTab({ isActive, onClick }: { isActive: boolean; onClick: () => void }): React.JSX.Element {
   const auth = useLeaderboardAuth()
+
+  return (
+    <LeaderboardTabShell isActive={isActive} onClick={onClick}>
+      {auth.configured && <LeaderboardTabRank isAuthenticated={auth.isAuthenticated} />}
+    </LeaderboardTabShell>
+  )
+}
+
+function LeaderboardTabRank({ isAuthenticated }: { isAuthenticated: boolean }): React.JSX.Element | null {
   const bestRank = useQuery(
     api.leaderboard.getMyBestRank,
-    auth.configured && auth.isAuthenticated ? {} : 'skip'
+    isAuthenticated ? {} : 'skip'
   ) ?? null
 
+  if (bestRank == null) return null
+  return (
+    <span className="text-[10px] font-semibold tabular-nums leading-none">
+      #{bestRank}
+    </span>
+  )
+}
+
+function LeaderboardTabShell({ isActive, onClick, children }: { isActive: boolean; onClick: () => void; children?: React.ReactNode }): React.JSX.Element {
   return (
     <div
       className={cn(
@@ -174,11 +192,7 @@ function LeaderboardTab({ isActive, onClick }: { isActive: boolean; onClick: () 
       onClick={onClick}
     >
       <Trophy className="h-4 w-4" />
-      {bestRank != null && (
-        <span className="text-[10px] font-semibold tabular-nums leading-none">
-          #{bestRank}
-        </span>
-      )}
+      {children}
     </div>
   )
 }

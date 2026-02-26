@@ -1,6 +1,7 @@
 export type GroupKey = 'status' | 'priority' | 'due_date'
 export type DueDateRange = 'all' | 'overdue' | 'today' | 'week' | 'later'
 export type SortKey = 'manual' | 'priority' | 'due_date' | 'title' | 'created'
+export type ViewMode = 'board' | 'list'
 
 export interface FilterState {
   groupBy: GroupKey
@@ -11,6 +12,7 @@ export interface FilterState {
   showDone: boolean
   showArchived: boolean
   showSubTasks: boolean
+  viewMode: ViewMode
 }
 
 export const defaultFilterState: FilterState = {
@@ -21,5 +23,6 @@ export const defaultFilterState: FilterState = {
   tagIds: [],
   showDone: true,
   showArchived: false,
-  showSubTasks: false
+  showSubTasks: false,
+  viewMode: 'board'
 }
