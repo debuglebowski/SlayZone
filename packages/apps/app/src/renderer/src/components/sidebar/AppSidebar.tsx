@@ -1,5 +1,7 @@
 import { useState } from 'react'
-import { Settings, HelpCircle, Keyboard, ChevronDown, Map, Sparkles, Sun, Moon } from 'lucide-react'
+import { Settings, HelpCircle, Keyboard, ChevronDown, Map, Sparkles, Sun, Moon, Megaphone } from 'lucide-react'
+import { IoCompassSharp } from 'react-icons/io5'
+import { FaRegHandshake } from 'react-icons/fa'
 import * as Collapsible from '@radix-ui/react-collapsible'
 import {
   Sidebar,
