@@ -188,7 +188,9 @@ export function AppSidebar({
                   onClick={onTutorial}
                   className={footerActionClassName}
                 >
-                  <IoCompassSharp className="size-6" />
+import { IoCompassSharp } from 'react-icons/io5'
+import { FaRegHandshake } from 'react-icons/fa'
+import { Settings, HelpCircle, Keyboard, ChevronDown, Map, Sparkles, Sun, Moon, Megaphone } from 'lucide-react'
                 </Button>
               </TooltipTrigger>
               <TooltipContent side="right">Take a Tour</TooltipContent>
