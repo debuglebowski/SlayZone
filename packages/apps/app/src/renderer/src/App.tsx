@@ -27,7 +27,7 @@ import { OnboardingDialog } from '@slayzone/onboarding'
 import { usePty } from '@slayzone/terminal/client'
 import type { TerminalState } from '@slayzone/terminal/shared'
 // Shared
-import { SearchDialog } from '@/components/dialogs/SearchDialog'
+import { SearchDialog, buildDefaultCommands } from '@/components/dialogs/SearchDialog'
 import {
   Button,
   AlertDialog,
@@ -79,7 +79,7 @@ const HOME_PANEL_SIZE_KEY: Record<HomePanel, string> = { kanban: 'kanban', git: 
 const HANDLE_WIDTH = 16
 
 function App(): React.JSX.Element {
-  const { theme } = useTheme()
+  const { theme, setPreference } = useTheme()
 
   // Core data from domain hook
   const {
@@ -871,6 +871,24 @@ function App(): React.JSX.Element {
     })
   }, [handleCreateScratchTerminal])
 
+  // Command palette commands
+  const paletteCommands = useMemo(
+    () =>
+      buildDefaultCommands({
+        createTask: () => setCreateOpen(true),
+        createProject: () => setCreateProjectOpen(true),
+        openSettings: () => setSettingsOpen(true),
+        toggleTheme: () => void setPreference(theme === 'dark' ? 'light' : 'dark'),
+        toggleZenMode: () => setZenMode((prev) => !prev),
+        toggleExplodeMode: () => setExplodeMode((prev) => !prev),
+        newScratchTerminal: () => void handleCreateScratchTerminal(),
+        openChangelog: () => setChangelogOpen(true),
+        openTour: () => startTutorial(),
+        currentTheme: theme
+      }),
+    [theme, setPreference, handleCreateScratchTerminal]
+  )
+
   // Task handlers
   const handleTaskCreated = (task: Task): void => {
     setTasks((prev) => [task, ...prev])
@@ -1403,6 +1421,7 @@ function App(): React.JSX.Element {
           projects={projects}
           onSelectTask={openTask}
           onSelectProject={setSelectedProjectId}
+          commands={paletteCommands}
         />
         <OnboardingDialog
           externalOpen={onboardingOpen}
