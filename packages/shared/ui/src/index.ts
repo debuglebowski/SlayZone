@@ -9,6 +9,7 @@ export {
   taskStatusOptions,
   type TaskStatusStyle
 } from './task-status'
+export { UndoProvider, useUndo, type UndoableAction } from './use-undo'
 
 // Components
 export * from './alert-dialog'

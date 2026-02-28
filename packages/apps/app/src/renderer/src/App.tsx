@@ -45,7 +45,7 @@ import {
   toast,
   UpdateToast
 } from '@slayzone/ui'
-import { SidebarProvider, cn, PanelToggle, projectColorBg } from '@slayzone/ui'
+import { SidebarProvider, cn, PanelToggle, projectColorBg, useUndo } from '@slayzone/ui'
 import { AppSidebar } from '@/components/sidebar/AppSidebar'
 import { ChangelogDialog } from '@/components/changelog/ChangelogDialog'
 import { useChangelogAutoOpen } from '@/components/changelog/useChangelogAutoOpen'
@@ -101,6 +101,9 @@ function App(): React.JSX.Element {
     updateProject,
     deleteProject
   } = useTasksData()
+
+  // Undo/redo stack for destructive operations
+  const { push: pushUndo, undo, redo } = useUndo()
 
   // View state (tabs + selected project, persisted)
   const [tabs, activeTabIndex, selectedProjectId, setTabs, setActiveTabIndex, setSelectedProjectId] =
@@ -624,6 +627,26 @@ function App(): React.JSX.Element {
     setSearchOpen(true)
   }, { enableOnFormTags: true })
 
+  // Undo / Redo
+  useHotkeys('mod+z', async (e) => {
+    // Let text inputs handle their own undo
+    const el = e.target as HTMLElement
+    if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable) return
+    if (el.closest?.('.cm-editor')) return
+    e.preventDefault()
+    const label = await undo()
+    if (label) toast(`Undid: ${label}`)
+  }, { enableOnFormTags: true })
+
+  useHotkeys('mod+shift+z', async (e) => {
+    const el = e.target as HTMLElement
+    if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable) return
+    if (el.closest?.('.cm-editor')) return
+    e.preventDefault()
+    const label = await redo()
+    if (label) toast(`Redid: ${label}`)
+  }, { enableOnFormTags: true })
+
   // Stable refs so IPC listeners don't need to re-subscribe on every render
   const closeActiveTaskRef = useRef<() => void>(() => {})
   closeActiveTaskRef.current = () => {
@@ -838,10 +861,29 @@ function App(): React.JSX.Element {
     const activeTab = tabs[activeTabIndex]
     if (activeTab.type !== 'task') return
 
+    const task = tasks.find((t) => t.id === activeTab.taskId)
+    const prevStatus = task?.status
     await window.api.db.updateTask({ id: activeTab.taskId, status: 'done' })
-    updateTask({ ...tasks.find((t) => t.id === activeTab.taskId)!, status: 'done' })
+    updateTask({ ...task!, status: 'done' })
     closeTab(activeTabIndex)
     setCompleteTaskDialogOpen(false)
+
+    if (task && prevStatus && prevStatus !== 'done') {
+      pushUndo({
+        label: `Completed "${task.title}"`,
+        undo: async () => {
+          await window.api.db.updateTask({ id: task.id, status: prevStatus })
+          updateTask({ ...task, status: prevStatus })
+        },
+        redo: async () => {
+          await window.api.db.updateTask({ id: task.id, status: 'done' })
+          updateTask({ ...task, status: 'done' })
+        }
+      })
+      toast(`Completed "${task.title}"`, {
+        action: { label: 'Undo', onClick: () => void undo() }
+      })
+    }
   }
 
   // Scratch terminal (creates unnamed task with terminal mode)
@@ -890,6 +932,65 @@ function App(): React.JSX.Element {
   )
 
   // Task handlers
+
+  // Undoable wrappers — push onto undo stack so Cmd+Z can revert
+  const undoableArchiveTask = useCallback(async (taskId: string) => {
+    const task = tasks.find((t) => t.id === taskId)
+    await archiveTask(taskId)
+    if (task) {
+      pushUndo({
+        label: `Archived "${task.title}"`,
+        undo: async () => {
+          const restored = await window.api.db.unarchiveTask(taskId)
+          updateTask(restored)
+        },
+        redo: () => archiveTask(taskId)
+      })
+      toast(`Archived "${task.title}"`, {
+        action: { label: 'Undo', onClick: () => void undo() }
+      })
+    }
+  }, [tasks, archiveTask, pushUndo, undo, updateTask])
+
+  const undoableArchiveTasks = useCallback(async (taskIds: string[]) => {
+    const archivedTasks = tasks.filter((t) => taskIds.includes(t.id))
+    await archiveTasks(taskIds)
+    if (archivedTasks.length > 0) {
+      pushUndo({
+        label: `Archived ${archivedTasks.length} tasks`,
+        undo: async () => {
+          for (const id of taskIds) {
+            const restored = await window.api.db.unarchiveTask(id)
+            updateTask(restored)
+          }
+        },
+        redo: () => archiveTasks(taskIds)
+      })
+      toast(`Archived ${archivedTasks.length} tasks`, {
+        action: { label: 'Undo', onClick: () => void undo() }
+      })
+    }
+  }, [tasks, archiveTasks, pushUndo, undo, updateTask])
+
+  const undoableContextMenuUpdate = useCallback(async (taskId: string, updates: Partial<Task>) => {
+    const prevTask = tasks.find((t) => t.id === taskId)
+    await contextMenuUpdate(taskId, updates)
+    if (prevTask) {
+      const revert: Partial<Task> = {}
+      if (updates.status !== undefined) revert.status = prevTask.status
+      if (updates.priority !== undefined) revert.priority = prevTask.priority
+      if (updates.project_id !== undefined) revert.project_id = prevTask.project_id
+      const desc = updates.status
+        ? `Changed "${prevTask.title}" → ${updates.status}`
+        : `Updated "${prevTask.title}"`
+      pushUndo({
+        label: desc,
+        undo: () => contextMenuUpdate(taskId, revert),
+        redo: () => contextMenuUpdate(taskId, updates)
+      })
+    }
+  }, [tasks, contextMenuUpdate, pushUndo])
+
   const handleTaskCreated = (task: Task): void => {
     setTasks((prev) => [task, ...prev])
     setCreateOpen(false)
@@ -1272,10 +1373,10 @@ function App(): React.JSX.Element {
                                           tags={tags}
                                           blockedTaskIds={blockedTaskIds}
                                           allProjects={projects}
-                                          onUpdateTask={contextMenuUpdate}
-                                          onArchiveTask={archiveTask}
+                                          onUpdateTask={undoableContextMenuUpdate}
+                                          onArchiveTask={undoableArchiveTask}
                                           onDeleteTask={deleteTask}
-                                          onArchiveAllTasks={archiveTasks}
+                                          onArchiveAllTasks={undoableArchiveTasks}
                                         />
                                       )}
                                       {id === 'kanban' && (filter.viewMode ?? 'board') === 'list' && (
@@ -1290,8 +1391,8 @@ function App(): React.JSX.Element {
                                           tags={tags}
                                           blockedTaskIds={blockedTaskIds}
                                           allProjects={projects}
-                                          onUpdateTask={contextMenuUpdate}
-                                          onArchiveTask={archiveTask}
+                                          onUpdateTask={undoableContextMenuUpdate}
+                                          onArchiveTask={undoableArchiveTask}
                                           onDeleteTask={deleteTask}
                                         />
                                       )}
@@ -1315,7 +1416,7 @@ function App(): React.JSX.Element {
                             compact={explodeMode}
                             onBack={goBack}
                             onTaskUpdated={updateTask}
-                            onArchiveTask={archiveTask}
+                            onArchiveTask={undoableArchiveTask}
                             onDeleteTask={deleteTask}
                             onNavigateToTask={openTask}
                             onConvertTask={handleConvertTask}
