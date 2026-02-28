@@ -27,3 +27,6 @@ playwright-report/
 .e2e-userdata/
 .e2e-runtime/
 
+
+# pnpm debug
+.pnpm-debug-info.txt
