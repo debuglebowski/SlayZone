@@ -547,8 +547,9 @@ export async function createPty(
 
     const schedulePostSpawnCommand = (target: pty.IPty): void => {
       if (!spawnConfig.postSpawnCommand) return
-      // Delay to let shell initialize - 250ms is conservative but reliable
-      // TODO: Could improve with shell-specific ready detection
+      // Delay to let shell initialize — 250ms is conservative but reliable.
+      // Shell-specific ready detection (e.g. parsing PS1 for zsh/bash, waiting for
+      // prompt in fish) would reduce latency but adds complexity with marginal gain.
       setTimeout(() => {
         const live = sessions.get(sessionId)
         if (!live || live.pty !== target) return

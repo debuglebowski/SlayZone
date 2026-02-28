@@ -60,11 +60,9 @@ export function GlobalContextFiles() {
 
   const deleteFile = async (entry: GlobalFileEntry) => {
     try {
-      // Use writeContextFile to verify path is allowed, then delete via fs
-      // Actually we need a delete handler — but the existing deleteContextFile requires projectId.
-      // For now, write empty and remove from list. The file still exists but is empty.
-      // TODO: proper global file delete handler
-      await window.api.aiConfig.writeContextFile(entry.path, '', '')
+      // Global files have no project context — pass empty strings for projectPath/projectId.
+      // isPathAllowed validates against global provider dirs; the DB cleanup is a harmless no-op.
+      await window.api.aiConfig.deleteContextFile(entry.path, '', '')
       if (selectedPath === entry.path) {
         setSelectedPath(null)
         setContent('')

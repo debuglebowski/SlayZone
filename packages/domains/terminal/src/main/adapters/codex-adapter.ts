@@ -111,7 +111,8 @@ export class CodexAdapter implements TerminalAdapter {
   }
 
   detectPrompt(_data: string): PromptInfo | null {
-    // TODO: Implement when Codex output format is known
+    // Codex CLI does not emit a structured prompt delimiter in its output stream.
+    // If a parseable format is added upstream, implement detection here.
     return null
   }
 }

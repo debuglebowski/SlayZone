@@ -345,7 +345,9 @@ function App(): React.JSX.Element {
         if (exitCode !== 0) return
         // If mode changed since this subscription was created, this exit is stale
         // (e.g. user switched providers); don't auto-delete the temporary task.
-        // TODO: Replace mode-compare heuristic with explicit PTY exit reasons.
+        // Heuristic: if terminal_mode changed since subscription, this exit is stale.
+        // A cleaner approach would be explicit PTY exit reasons (e.g. ExitReason.UserSwitch
+        // vs ExitReason.ProcessDone) but that requires changes to the pty-manager protocol.
         const latestMode = tasks.find((task) => task.id === tab.taskId)?.terminal_mode
         if (subscribedMode && latestMode && subscribedMode !== latestMode) return
         void window.api.db.deleteTask(tab.taskId).catch(() => {})

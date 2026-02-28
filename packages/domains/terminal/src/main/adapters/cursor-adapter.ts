@@ -75,7 +75,8 @@ export class CursorAdapter implements TerminalAdapter {
   }
 
   detectPrompt(_data: string): PromptInfo | null {
-    // TODO: Implement once prompt format is known
+    // Cursor's background agent does not emit parseable text prompts.
+    // If Cursor adds a structured prompt format in the future, implement detection here.
     return null
   }
 }

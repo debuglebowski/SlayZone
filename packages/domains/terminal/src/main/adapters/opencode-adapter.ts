@@ -78,8 +78,9 @@ export class OpencodeAdapter implements TerminalAdapter {
   }
 
   detectPrompt(_data: string): PromptInfo | null {
-    // OpenCode TUI uses keyboard controls (a=Allow, d=Deny) rather than text prompts
-    // TODO: Detect permission overlay if possible
+    // OpenCode TUI uses keyboard controls (a=Allow, d=Deny) rendered as ANSI escape
+    // sequences rather than parseable text prompts. Detection would require full
+    // terminal emulation state tracking, which is outside scope for this adapter.
     return null
   }
 }

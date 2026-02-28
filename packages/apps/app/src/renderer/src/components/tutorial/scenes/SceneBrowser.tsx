@@ -30,7 +30,7 @@ function UnderConstructionPage(): React.JSX.Element {
             <span className="text-[13px] font-semibold text-white">Get started</span>
           </div>
           <div className="h-10 px-5 rounded-lg border-2 border-dashed border-neutral-300 flex items-center">
-            <span className="text-[13px] text-neutral-300">TODO: docs link</span>
+            <span className="text-[13px] text-neutral-500">View docs →</span>
           </div>
         </div>
       </div>
