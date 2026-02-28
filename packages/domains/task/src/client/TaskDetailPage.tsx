@@ -1585,6 +1585,7 @@ export function TaskDetailPage({
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
+                              <SelectItem value="ccs">CCS</SelectItem>
                               <SelectItem value="claude-code">Claude Code</SelectItem>
                               <SelectItem value="codex">Codex</SelectItem>
                               <SelectItem value="cursor-agent">Cursor Agent</SelectItem>

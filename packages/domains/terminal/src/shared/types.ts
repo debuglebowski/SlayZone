@@ -1,4 +1,4 @@
-export type TerminalMode = 'claude-code' | 'codex' | 'cursor-agent' | 'gemini' | 'opencode' | 'terminal'
+export type TerminalMode = 'ccs' | 'claude-code' | 'codex' | 'cursor-agent' | 'gemini' | 'opencode' | 'terminal'
 export type TerminalState = 'starting' | 'running' | 'attention' | 'error' | 'dead'
 export type CodeMode = 'normal' | 'plan' | 'accept-edits' | 'bypass'
 

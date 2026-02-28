@@ -17,6 +17,7 @@ export function setDatabase(database: Database): void {
 }
 
 const MODE_LABELS: Record<string, string> = {
+  'ccs': 'CCS',
   'claude-code': 'Claude',
   'codex': 'Codex',
   'cursor-agent': 'Cursor',

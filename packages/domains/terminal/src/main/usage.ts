@@ -5,6 +5,7 @@ import { readFile } from 'fs/promises'
 import { join } from 'path'
 import { homedir } from 'os'
 import type { ProviderUsage, UsageWindow } from '@slayzone/terminal/shared'
+import { fetchGlmUsage } from './adapters/glm-usage'
 
 const TIMEOUT_MS = 10_000
 
@@ -142,6 +143,10 @@ export function registerUsageHandlers(ipcMain: IpcMain): void {
       })),
       fetchCodexUsage().catch((e): ProviderUsage => ({
         provider: 'codex', label: 'Codex', fiveHour: null, sevenDay: null, sevenDayOpus: null, sevenDaySonnet: null,
+        error: e instanceof Error ? e.message : 'Unknown error', fetchedAt: Date.now()
+      })),
+      fetchGlmUsage().catch((e): ProviderUsage => ({
+        provider: 'glm', label: 'GLM (Z.AI)', fiveHour: null, sevenDay: null, sevenDayOpus: null, sevenDaySonnet: null,
         error: e instanceof Error ? e.message : 'Unknown error', fetchedAt: Date.now()
       }))
     ]

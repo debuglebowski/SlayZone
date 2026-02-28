@@ -71,7 +71,7 @@ function WindowRow({
   w: UsageWindow
   pinned?: boolean
   onTogglePin?: () => void
-}) {
+}): React.JSX.Element {
   const reset = formatReset(w.resetsAt)
   return (
     <div className="flex items-center gap-2">
@@ -122,9 +122,10 @@ function ProviderSection({
     )
   }
 
+  const sevenDayLabel = usage.provider === 'glm' ? '30d' : '7d'
   const rows: { key: UsageWindowKey; label: string; w: UsageWindow }[] = []
   if (usage.fiveHour) rows.push({ key: 'fiveHour', label: '5h', w: usage.fiveHour })
-  if (usage.sevenDay) rows.push({ key: 'sevenDay', label: '7d', w: usage.sevenDay })
+  if (usage.sevenDay) rows.push({ key: 'sevenDay', label: sevenDayLabel, w: usage.sevenDay })
   if (usage.sevenDayOpus) rows.push({ key: 'sevenDayOpus', label: 'Opus', w: usage.sevenDayOpus })
   if (usage.sevenDaySonnet) rows.push({ key: 'sevenDaySonnet', label: 'Son.', w: usage.sevenDaySonnet })
 

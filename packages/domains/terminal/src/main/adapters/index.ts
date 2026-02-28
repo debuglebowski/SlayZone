@@ -1,6 +1,7 @@
 export type { TerminalMode, TerminalAdapter, SpawnConfig, PromptInfo, ActivityState, ErrorInfo, CLIState } from './types'
 
 import type { TerminalMode, TerminalAdapter } from './types'
+import { CcsAdapter } from './ccs-adapter'
 import { ClaudeAdapter } from './claude-adapter'
 import { CodexAdapter } from './codex-adapter'
 import { CursorAdapter } from './cursor-adapter'
@@ -9,6 +10,7 @@ import { OpencodeAdapter } from './opencode-adapter'
 import { ShellAdapter } from './shell-adapter'
 
 const adapters: Record<TerminalMode, TerminalAdapter> = {
+  'ccs': new CcsAdapter(),
   'claude-code': new ClaudeAdapter(),
   'codex': new CodexAdapter(),
   'cursor-agent': new CursorAdapter(),
