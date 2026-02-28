@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { XIcon, Pencil, Trash2, Plus, Settings2, SquareTerminal, Globe, FileCode, GitCompare, SlidersHorizontal, FolderOpen } from 'lucide-react'
+import { XIcon, Pencil, Trash2, Plus, Settings2, SquareTerminal, Globe, FileCode, GitCompare, SlidersHorizontal, FolderOpen, Sun, Moon } from 'lucide-react'
 import { SettingsLayout, Tooltip, TooltipTrigger, TooltipContent } from '@slayzone/ui'
 import { Button } from '@slayzone/ui'
 import { Input } from '@slayzone/ui'
@@ -27,6 +27,7 @@ import {
 import type { DiagnosticsConfig } from '@slayzone/types'
 import type { IntegrationConnectionPublic } from '@slayzone/integrations/shared'
 import { useTelemetry, TelemetrySettings } from '@slayzone/telemetry/client'
+import { useTheme } from './ThemeContext'
 import { ContextManagerSettings } from '../../../ai-config/src/client/ContextManagerSettings'
 function TelemetrySettingsTab() {
   const { tier, setTier } = useTelemetry()
@@ -46,6 +47,7 @@ export function UserSettingsDialog({
   initialTab = 'general',
   onTabChange
 }: UserSettingsDialogProps) {
+  const { theme, setPreference } = useTheme()
   const [activeTab, setActiveTab] = useState(initialTab)
   const [tags, setTags] = useState<Tag[]>([])
   const [newTagName, setNewTagName] = useState('')
@@ -510,6 +512,26 @@ export function UserSettingsDialog({
           <div className="mx-auto w-full max-w-4xl space-y-8">
             {activeTab === 'appearance' && (
               <>
+                <div className="space-y-3">
+                  <Label className="text-base font-semibold">Theme</Label>
+                  <div className="grid grid-cols-[220px_minmax(0,1fr)] items-center gap-4">
+                    <span className="text-sm">Color theme</span>
+                    <div className="inline-flex items-center gap-3">
+                      <Sun className={`size-4 ${theme === 'light' ? 'text-foreground' : 'text-muted-foreground'}`} />
+                      <Switch
+                        checked={theme === 'dark'}
+                        onCheckedChange={(checked) => {
+                          void setPreference(checked ? 'dark' : 'light').catch((error) => {
+                            toast(error instanceof Error ? error.message : 'Failed to update theme')
+                          })
+                        }}
+                        aria-label="Toggle dark mode"
+                      />
+                      <Moon className={`size-4 ${theme === 'dark' ? 'text-foreground' : 'text-muted-foreground'}`} />
+                    </div>
+                  </div>
+                </div>
+
                 <div className="space-y-3">
                   <Label className="text-base font-semibold">Colors</Label>
                   <div className="grid grid-cols-[220px_minmax(0,1fr)] items-center gap-4">

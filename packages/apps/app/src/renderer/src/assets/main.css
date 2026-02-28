@@ -81,39 +81,39 @@
 
 :root {
   --radius: 6px;
-  --background: oklch(0.91 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(0.91 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
+  --background: #ffffff;
+  --foreground: #333333;
+  --card: #ffffff;
+  --card-foreground: #333333;
+  --popover: #ffffff;
+  --popover-foreground: #333333;
+  --primary: #007acc;
+  --primary-foreground: #ffffff;
+  --secondary: #f3f3f3;
+  --secondary-foreground: #333333;
+  --muted: #ececec;
+  --muted-foreground: #616161;
+  --accent: #e8e8e8;
+  --accent-foreground: #333333;
+  --destructive: #d13438;
+  --border: #d9d9d9;
+  --input: #d9d9d9;
+  --ring: #007acc;
   --chart-1: oklch(0.646 0.222 41.116);
   --chart-2: oklch(0.6 0.118 184.704);
   --chart-3: oklch(0.398 0.07 227.392);
   --chart-4: oklch(0.828 0.189 84.429);
   --chart-5: oklch(0.769 0.188 70.08);
-  --sidebar: oklch(0.94 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
-  --surface-1: oklch(0.94 0 0);
-  --surface-2: oklch(1 0 0);
+  --sidebar: #f3f3f3;
+  --sidebar-foreground: #333333;
+  --sidebar-primary: #007acc;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #e8e8e8;
+  --sidebar-accent-foreground: #333333;
+  --sidebar-border: #d9d9d9;
+  --sidebar-ring: #007acc;
+  --surface-1: #f3f3f3;
+  --surface-2: #ffffff;
 }
 
 .dark {
@@ -158,6 +158,24 @@
   }
   body {
     @apply bg-background text-foreground;
+  }
+
+  ::selection {
+    background: color-mix(in oklch, var(--color-primary) 22%, white);
+    color: var(--color-foreground);
+  }
+}
+
+@media (prefers-contrast: more) {
+  :root:not(.dark) {
+    --foreground: #252526;
+    --muted-foreground: #4d4d4d;
+    --primary: #005a9e;
+    --border: #bfbfbf;
+    --input: #bfbfbf;
+    --ring: #005a9e;
+    --sidebar-border: #c3c3c3;
+    --sidebar-accent: #dddddd;
   }
 }
 

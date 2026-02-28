@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, type ReactNode } from 'react'
+import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
 import type { Theme, ThemePreference } from '@slayzone/settings/shared'
 
 interface ThemeContextValue {
@@ -10,15 +10,51 @@ interface ThemeContextValue {
 const ThemeContext = createContext<ThemeContextValue | null>(null)
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  // Hardcoded dark theme
+  const [theme, setTheme] = useState<Theme>('dark')
+  const [preference, setPreferenceState] = useState<ThemePreference>('dark')
+
   useEffect(() => {
-    document.documentElement.classList.add('dark')
+    const applyTheme = (nextTheme: Theme) => {
+      document.documentElement.classList.toggle('dark', nextTheme === 'dark')
+      document.documentElement.dataset.theme = nextTheme
+      document.documentElement.style.colorScheme = nextTheme
+    }
+
+    void Promise.all([
+      window.api.theme.getEffective(),
+      window.api.theme.getSource()
+    ]).then(([effective, source]) => {
+      const effectiveTheme = effective === 'light' ? 'light' : 'dark'
+      const pref = source === 'light' ? 'light' : 'dark'
+      setTheme(effectiveTheme)
+      setPreferenceState(pref)
+      applyTheme(effectiveTheme)
+    }).catch(() => {
+      applyTheme('dark')
+    })
+
+    const unsubscribe = window.api.theme.onChange((effective) => {
+      const effectiveTheme = effective === 'light' ? 'light' : 'dark'
+      setTheme(effectiveTheme)
+      applyTheme(effectiveTheme)
+    })
+
+    return unsubscribe
   }, [])
 
-  const setPreference = async () => {}
+  const setPreference = async (pref: ThemePreference) => {
+    const effective = await window.api.theme.set(pref)
+    const effectiveTheme = effective === 'light' ? 'light' : 'dark'
+    const nextPreference = pref === 'light' ? 'light' : 'dark'
+    setPreferenceState(nextPreference)
+    setTheme(effectiveTheme)
+    document.documentElement.classList.toggle('dark', effectiveTheme === 'dark')
+    document.documentElement.dataset.theme = effectiveTheme
+    document.documentElement.style.colorScheme = effectiveTheme
+  }
 
   return (
-    <ThemeContext.Provider value={{ theme: 'dark', preference: 'dark', setPreference }}>
+    <ThemeContext.Provider value={{ theme, preference, setPreference }}>
       {children}
     </ThemeContext.Provider>
   )

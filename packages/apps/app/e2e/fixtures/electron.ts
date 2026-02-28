@@ -394,7 +394,7 @@ export function seed(page: Page) {
 
     getSetting: (key: string) => page.evaluate((k) => window.api.settings.get(k), key),
 
-    setTheme: (theme: 'light' | 'dark' | 'system') =>
+    setTheme: (theme: 'light' | 'dark') =>
       page.evaluate((t) => window.api.theme.set(t), theme),
 
     /** Re-fetch all data from DB into React state */

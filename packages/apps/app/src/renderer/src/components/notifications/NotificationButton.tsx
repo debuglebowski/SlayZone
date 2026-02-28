@@ -14,7 +14,7 @@ export function NotificationButton({ active, count, onClick }: NotificationButto
         <button
           onClick={onClick}
           className={cn(
-            'relative h-7 w-7 flex items-center justify-center transition-colors border-b-2',
+            'h-7 w-7 rounded-lg flex items-center justify-center transition-colors border-b-2',
             active
               ? 'text-foreground border-foreground'
               : 'text-muted-foreground border-transparent hover:text-foreground'

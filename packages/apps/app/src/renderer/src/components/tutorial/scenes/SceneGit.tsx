@@ -5,13 +5,22 @@ import { SceneShell, TaskHeader, panelButtons } from './SceneShell'
 import { AnimatedCursor } from './AnimatedCursor'
 import { TerminalBanner } from './TerminalBanner'
 
-const FILE_TREE = [
+interface FileTreeEntry {
+  name: string
+  indent: number
+  folder?: boolean
+  status?: '?' | 'M'
+  added?: number
+  removed?: number
+}
+
+const FILE_TREE: FileTreeEntry[] = [
   { name: 'src/middleware', indent: 0, folder: true },
   { name: 'auth.ts', indent: 1, status: '?', added: 42 },
   { name: 'src/routes', indent: 0, folder: true },
   { name: 'index.ts', indent: 1, status: 'M', added: 3, removed: 1 },
   { name: 'package.json', indent: 0, status: 'M', added: 1, removed: 0 },
-] as const
+]
 
 interface DiffLine {
   old?: number

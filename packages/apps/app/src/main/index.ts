@@ -60,10 +60,20 @@ import { WEBVIEW_DESKTOP_HANDOFF_SCRIPT } from '../shared/webview-desktop-handof
 
 const DEFAULT_WINDOW_WIDTH = 1760
 const DEFAULT_WINDOW_HEIGHT = 1280
+const WINDOW_BG_DARK = '#0a0a0a'
+const WINDOW_BG_LIGHT = '#f3f3f3'
+
+function getEffectiveTheme(): 'light' | 'dark' {
+  return nativeTheme.shouldUseDarkColors ? 'dark' : 'light'
+}
+
+function getWindowBackgroundColor(): string {
+  return getEffectiveTheme() === 'dark' ? WINDOW_BG_DARK : WINDOW_BG_LIGHT
+}
 
 // Splash screen: self-contained HTML with inline logo SVG and typewriter animation
 const splashLogoSvg = readFileSync(logoSolid, 'utf-8')
-const splashHTML = (version: string) => `
+const splashHTML = (version: string, theme: 'light' | 'dark') => `
 <!DOCTYPE html>
 <html>
 <head>
@@ -82,7 +92,7 @@ const splashHTML = (version: string) => `
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      background: #0a0a0a;
+      background: ${theme === 'dark' ? '#0a0a0a' : '#f3f3f3'};
       border-radius: 16px;
       position: relative;
     }
@@ -99,7 +109,7 @@ const splashHTML = (version: string) => `
       margin-top: 24px;
       font-size: 28px;
       font-weight: 600;
-      color: #fafafa;
+      color: ${theme === 'dark' ? '#fafafa' : '#171717'};
       height: 1.5em;
       display: inline-flex;
       align-items: center;
@@ -110,14 +120,14 @@ const splashHTML = (version: string) => `
       width: 2px;
       height: 1.1em;
       margin-left: 4px;
-      background: #fafafa;
+      background: ${theme === 'dark' ? '#fafafa' : '#171717'};
       animation: blink 0.9s step-end infinite;
     }
     .version {
       position: absolute;
       bottom: 24px;
       font-size: 12px;
-      color: #525252;
+      color: ${theme === 'dark' ? '#525252' : '#737373'};
       opacity: 0;
       animation: fadeIn 0.15s ease-out 0.3s forwards;
     }
@@ -513,14 +523,14 @@ function createSplashWindow(): void {
     center: true,
     skipTaskbar: true,
     show: false,
-    backgroundColor: '#0a0a0a',
+    backgroundColor: getWindowBackgroundColor(),
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true
     }
   })
 
-  splashWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(splashHTML(app.getVersion()))}`)
+  splashWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(splashHTML(app.getVersion(), getEffectiveTheme()))}`)
 
   splashWindow.once('ready-to-show', () => {
     splashWindow?.show()
@@ -554,7 +564,7 @@ function createMainWindow(): void {
     title: 'SlayZone',
     titleBarStyle: 'hiddenInset',
     trafficLightPosition: { x: 16, y: 16 },
-    backgroundColor: '#0a0a0a',
+    backgroundColor: getWindowBackgroundColor(),
     ...(process.platform === 'linux' ? { icon } : {}),
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
@@ -650,9 +660,11 @@ app.whenReady().then(async () => {
   const row = db.prepare('SELECT value FROM settings WHERE key = ?').get('theme') as
     | { value: string }
     | undefined
-  const savedTheme = row?.value as 'light' | 'dark' | 'system' | undefined
-  if (savedTheme) {
-    nativeTheme.themeSource = savedTheme
+  const savedTheme = row?.value === 'light' ? 'light' : row?.value === 'dark' ? 'dark' : null
+  const initialThemeSource: 'light' | 'dark' = savedTheme ?? 'dark'
+  nativeTheme.themeSource = initialThemeSource
+  if (!savedTheme) {
+    db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)').run('theme', initialThemeSource)
   }
 
   // Set dock icon on macOS (needed for dev mode)
@@ -1025,7 +1037,7 @@ app.whenReady().then(async () => {
         parent: mainWindow ?? undefined,
         modal: false,
         show: false,
-        backgroundColor: '#0a0a0a',
+        backgroundColor: getWindowBackgroundColor(),
         webPreferences: {
           sandbox: true,
           contextIsolation: true,

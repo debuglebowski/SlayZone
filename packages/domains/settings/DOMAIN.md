@@ -6,13 +6,13 @@ User preferences and theme management.
 
 ```typescript
 type Theme = 'light' | 'dark'
-type ThemePreference = 'light' | 'dark' | 'system'
+type ThemePreference = 'light' | 'dark'
 ```
 
 ## Main Process (main/)
 
 - `registerSettingsHandlers(ipcMain, db)` - Key-value settings store
-- `registerThemeHandlers(ipcMain)` - Theme with system preference detection
+- `registerThemeHandlers(ipcMain)` - Theme preference (light/dark)
 
 ## Client (client/)
 
