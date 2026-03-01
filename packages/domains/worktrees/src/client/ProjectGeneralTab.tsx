@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { GitBranch, ChevronDown, Check, Loader2, Plus, GitCommitHorizontal, Copy, FolderGit2 } from 'lucide-react'
-import { Button, Input, Popover, PopoverContent, PopoverTrigger, cn, toast } from '@slayzone/ui'
+import { Button, IconButton, Input, Popover, PopoverContent, PopoverTrigger, cn, toast } from '@slayzone/ui'
 import type { CommitInfo, StatusSummary } from '../shared/types'
 
 interface ProjectGeneralTabProps {
@@ -157,9 +157,9 @@ export function ProjectGeneralTab({ projectPath, visible, onSwitchToDiff }: Proj
                 className="h-7 text-xs"
                 disabled={switching}
               />
-              <Button type="submit" variant="ghost" size="icon" className="h-7 w-7 shrink-0" disabled={!newBranchName.trim() || switching}>
+              <IconButton type="submit" aria-label="Create branch" variant="ghost" className="h-7 w-7 shrink-0" disabled={!newBranchName.trim() || switching}>
                 <Plus className="h-3.5 w-3.5" />
-              </Button>
+              </IconButton>
             </form>
             {branchError && <div className="px-2 py-1.5 text-xs text-destructive border-b">{branchError}</div>}
             <div className="max-h-48 overflow-y-auto py-1">

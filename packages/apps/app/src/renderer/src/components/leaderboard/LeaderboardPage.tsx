@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { CheckCheck, Github, Lock, LogOut, RefreshCw, Sparkles } from 'lucide-react'
-import { Button, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@slayzone/ui'
+import { Button, IconButton, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@slayzone/ui'
 import { useMutation, useQuery } from 'convex/react'
 import { useLeaderboardAuth } from '@/lib/convexAuth'
 import { api } from 'convex/_generated/api'
@@ -203,8 +203,8 @@ function LeaderboardPageInner({ auth }: { auth: ReturnType<typeof useLeaderboard
                 </div>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <Button
-                      size="icon"
+                    <IconButton
+                      aria-label="Account menu"
                       variant="outline"
                       disabled={authBusy || auth.isLoading}
                       className="h-9 w-9 rounded-full p-0 overflow-hidden"
@@ -217,7 +217,7 @@ function LeaderboardPageInner({ auth }: { auth: ReturnType<typeof useLeaderboard
                       ) : (
                         <span className="text-[11px] font-semibold uppercase">{avatarFallback}</span>
                       )}
-                    </Button>
+                    </IconButton>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" className="w-56">
                     <DropdownMenuLabel className="flex flex-col gap-0.5">

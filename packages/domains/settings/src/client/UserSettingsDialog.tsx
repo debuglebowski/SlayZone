@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from 'react'
+import { useTheme } from './ThemeContext'
 import { XIcon, Pencil, Trash2, Plus, Settings2, SquareTerminal, Globe, FileCode, GitCompare, SlidersHorizontal, FolderOpen } from 'lucide-react'
 import { SettingsLayout, Tooltip, TooltipTrigger, TooltipContent } from '@slayzone/ui'
-import { Button } from '@slayzone/ui'
+import { Button, IconButton } from '@slayzone/ui'
 import { Input } from '@slayzone/ui'
 import { Label } from '@slayzone/ui'
 import { Switch } from '@slayzone/ui'
@@ -55,6 +56,7 @@ export function UserSettingsDialog({
   initialTab = 'general',
   onTabChange
 }: UserSettingsDialogProps) {
+  const { preference, setPreference } = useTheme()
   const [activeTab, setActiveTab] = useState(initialTab)
   const [tags, setTags] = useState<Tag[]>([])
   const [newTagName, setNewTagName] = useState('')
@@ -540,6 +542,23 @@ export function UserSettingsDialog({
                   description="Control theme visuals, typography, and motion behavior. These preferences affect readability and comfort across the app."
                 />
                 <div className="space-y-3">
+                  <Label className="text-base font-semibold">Theme</Label>
+                  <div className="grid grid-cols-[220px_minmax(0,1fr)] items-center gap-4">
+                    <span className="text-sm">Appearance</span>
+                    <Select value={preference} onValueChange={(v) => setPreference(v as 'light' | 'dark' | 'system')}>
+                      <SelectTrigger className="w-32">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="dark">Dark</SelectItem>
+                        <SelectItem value="light">Light</SelectItem>
+                        <SelectItem value="system">System</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                <div className="space-y-3">
                   <Label className="text-base font-semibold">Colors</Label>
                   <div className="grid grid-cols-[220px_minmax(0,1fr)] items-center gap-4">
                     <span className="text-sm">Project color tints</span>
@@ -687,9 +706,9 @@ export function UserSettingsDialog({
                       <div className="flex items-center gap-3 h-11 px-4">
                         <SquareTerminal className="size-4 text-muted-foreground shrink-0" />
                         <span className="text-sm font-medium flex-1">Terminal</span>
-                        <Button variant="ghost" size="icon-sm" onClick={() => setConfiguringNativeId(configuringNativeId === 'terminal' ? null : 'terminal')}>
+                        <IconButton variant="ghost" size="icon-sm" aria-label="Terminal settings" onClick={() => setConfiguringNativeId(configuringNativeId === 'terminal' ? null : 'terminal')}>
                           <Settings2 className="size-3.5" />
-                        </Button>
+                        </IconButton>
                         <kbd className="text-[10px] font-mono bg-muted px-1.5 py-0.5 rounded border shrink-0">⌘T</kbd>
                         <Switch
                           checked={panelConfig.builtinEnabled.terminal !== false}
@@ -741,9 +760,9 @@ export function UserSettingsDialog({
                       <div className="flex items-center gap-3 h-11 px-4">
                         <Globe className="size-4 text-muted-foreground shrink-0" />
                         <span className="text-sm font-medium flex-1">Browser</span>
-                        <Button variant="ghost" size="icon-sm" onClick={() => setConfiguringNativeId(configuringNativeId === 'browser' ? null : 'browser')}>
+                        <IconButton variant="ghost" size="icon-sm" aria-label="Browser settings" onClick={() => setConfiguringNativeId(configuringNativeId === 'browser' ? null : 'browser')}>
                           <Settings2 className="size-3.5" />
-                        </Button>
+                        </IconButton>
                         <kbd className="text-[10px] font-mono bg-muted px-1.5 py-0.5 rounded border shrink-0">⌘B</kbd>
                         <Switch
                           checked={panelConfig.builtinEnabled.browser !== false}
@@ -896,12 +915,12 @@ export function UserSettingsDialog({
                                 Handoff: {(wp.handoffProtocol ?? 'custom').toLowerCase()}
                               </span>
                             )}
-                            <Button variant="ghost" size="icon-sm" onClick={() => handleDeleteWebPanel(wp.id)}>
+                            <IconButton variant="ghost" size="icon-sm" aria-label="Delete web panel" onClick={() => handleDeleteWebPanel(wp.id)}>
                               <Trash2 className="size-3.5" />
-                            </Button>
-                            <Button variant="ghost" size="icon-sm" onClick={() => startEditingPanel(wp)}>
+                            </IconButton>
+                            <IconButton variant="ghost" size="icon-sm" aria-label="Edit web panel" onClick={() => startEditingPanel(wp)}>
                               <Pencil className="size-3.5" />
-                            </Button>
+                            </IconButton>
                             {wp.shortcut && (
                               <kbd className="text-[10px] font-mono bg-muted px-1.5 py-0.5 rounded border shrink-0">⌘{wp.shortcut.toUpperCase()}</kbd>
                             )}
@@ -1328,10 +1347,10 @@ export function UserSettingsDialog({
                               )
                             }}
                           />
-                          <Button
+                          <IconButton
                             type="button"
                             variant="outline"
-                            size="icon"
+                            aria-label="Browse folder"
                             onClick={async () => {
                               const result = await window.api.dialog.showOpenDialog({
                                 title: 'Select Project Directory',
@@ -1346,7 +1365,7 @@ export function UserSettingsDialog({
                             }}
                           >
                             <FolderOpen className="h-4 w-4" />
-                          </Button>
+                          </IconButton>
                         </div>
                       </div>
                     ))}

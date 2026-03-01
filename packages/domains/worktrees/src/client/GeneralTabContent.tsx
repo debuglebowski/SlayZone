@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { GitBranch, GitMerge, Plus, Trash2, ChevronDown, Check, Loader2, ArrowUp, ArrowDown, GitCommitHorizontal, AlertTriangle, Copy } from 'lucide-react'
 import {
   Button,
+  IconButton,
   Input,
   Popover,
   PopoverContent,
@@ -328,9 +329,9 @@ export function GeneralTabContent({
                     className="h-7 text-xs"
                     disabled={switching}
                   />
-                  <Button type="submit" variant="ghost" size="icon" className="h-7 w-7 shrink-0" disabled={!newBranchName.trim() || switching}>
+                  <IconButton type="submit" aria-label="Create branch" variant="ghost" className="h-7 w-7 shrink-0" disabled={!newBranchName.trim() || switching}>
                     <Plus className="h-3.5 w-3.5" />
-                  </Button>
+                  </IconButton>
                 </form>
                 {branchError && <div className="px-2 py-1.5 text-xs text-destructive border-b">{branchError}</div>}
                 <div className="max-h-48 overflow-y-auto py-1">
@@ -368,15 +369,15 @@ export function GeneralTabContent({
                 </div>
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <Button
+                    <IconButton
+                      aria-label="Delete worktree"
                       variant="ghost"
-                      size="icon"
                       onClick={handleDeleteWorktree}
                       disabled={deleting}
                       className="shrink-0 h-8 w-8 text-muted-foreground hover:text-destructive"
                     >
                       <Trash2 className="h-4 w-4" />
-                    </Button>
+                    </IconButton>
                   </TooltipTrigger>
                   <TooltipContent>Remove worktree</TooltipContent>
                 </Tooltip>

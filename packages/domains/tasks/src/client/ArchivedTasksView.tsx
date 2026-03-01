@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { ArrowLeft, Undo2 } from 'lucide-react'
 import type { Task } from '@slayzone/task/shared'
 import type { Project } from '@slayzone/projects/shared'
-import { Button } from '@slayzone/ui'
+import { IconButton } from '@slayzone/ui'
 
 interface ArchivedTasksViewProps {
   onBack: () => void
@@ -46,9 +46,9 @@ export function ArchivedTasksView({
       {/* Header */}
       <header className="sticky top-10 z-10 border-b bg-background p-4">
         <div className="flex items-center gap-4 window-no-drag">
-          <Button variant="ghost" size="icon" onClick={onBack}>
+          <IconButton variant="ghost" aria-label="Back to board" onClick={onBack}>
             <ArrowLeft className="size-5" />
-          </Button>
+          </IconButton>
           <h1 className="text-2xl font-bold">Archived Tasks</h1>
         </div>
       </header>
@@ -91,15 +91,15 @@ export function ArchivedTasksView({
                   )}
 
                   {/* Unarchive button */}
-                  <Button
+                  <IconButton
                     variant="ghost"
-                    size="icon"
+                    aria-label="Restore task"
                     className="opacity-0 group-hover:opacity-100 shrink-0"
                     onClick={() => handleUnarchive(task.id)}
                     title="Restore task"
                   >
                     <Undo2 className="size-4" />
-                  </Button>
+                  </IconButton>
                 </div>
               )
             })}

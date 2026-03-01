@@ -16,6 +16,7 @@ export {
 // Components
 export * from './alert-dialog'
 export * from './button'
+export * from './icon-button'
 export * from './calendar'
 export * from './card'
 export * from './checkbox'

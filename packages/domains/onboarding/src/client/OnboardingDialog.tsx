@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Dialog, DialogContent } from '@slayzone/ui'
-import { Button } from '@slayzone/ui'
+import { Button, IconButton } from '@slayzone/ui'
 import { cn } from '@slayzone/ui'
 import { useTelemetry } from '@slayzone/telemetry/client'
 import { Check, BarChart3, Sparkles, SquareTerminal, ChevronLeft, TriangleAlert } from 'lucide-react'
@@ -163,14 +163,14 @@ export function OnboardingDialog({
             <div className="flex items-center justify-between px-4 pt-4">
               <div className="w-9">
                 {step > 0 && (
-                  <Button
+                  <IconButton
+                    aria-label="Back"
                     variant="ghost"
-                    size="icon"
                     className="text-muted-foreground"
                     onClick={handleBack}
                   >
                     <ChevronLeft className="h-4 w-4" />
-                  </Button>
+                  </IconButton>
                 )}
               </div>
               <Button

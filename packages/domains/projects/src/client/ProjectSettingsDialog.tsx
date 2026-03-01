@@ -15,7 +15,7 @@ import {
 import type { LucideIcon } from 'lucide-react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@slayzone/ui'
 import { SettingsLayout } from '@slayzone/ui'
-import { Button } from '@slayzone/ui'
+import { Button, IconButton } from '@slayzone/ui'
 import { Input } from '@slayzone/ui'
 import { Label } from '@slayzone/ui'
 import { ColorPicker } from '@slayzone/ui'
@@ -450,9 +450,9 @@ export function ProjectSettingsDialog({
                       placeholder="/path/to/repo"
                       className="flex-1"
                     />
-                    <Button type="button" variant="outline" size="icon" onClick={handleBrowse}>
+                    <IconButton type="button" variant="outline" aria-label="Browse folder" onClick={handleBrowse}>
                       <FolderOpen className="h-4 w-4" />
-                    </Button>
+                    </IconButton>
                   </div>
                   <p className="text-xs text-muted-foreground">Claude Code terminal will open in this directory</p>
                 </div>
@@ -507,16 +507,15 @@ export function ProjectSettingsDialog({
                     <div key={category} className="space-y-1">
                       <div className="flex items-center justify-between rounded-md border border-border/50 bg-muted/60 py-2 pl-3 pr-2">
                         <p className="text-sm font-medium text-foreground/90">{meta.label}</p>
-                        <Button
+                        <IconButton
                           type="button"
                           variant="ghost"
-                          size="icon"
                           className="h-7 w-7"
                           onClick={() => addColumn(category)}
-                          title={`Add ${meta.label} status`}
+                          aria-label={`Add ${meta.label} status`}
                         >
                           <Plus className="h-4 w-4" />
-                        </Button>
+                        </IconButton>
                       </div>
 
                       {rows.length === 0 ? (
@@ -534,18 +533,17 @@ export function ProjectSettingsDialog({
                               <div className="flex items-center gap-2">
                                 <DropdownMenu>
                                   <DropdownMenuTrigger asChild>
-                                    <Button
+                                    <IconButton
                                       type="button"
                                       variant="ghost"
-                                      size="icon"
                                       className={cn(
                                         'h-9 w-9 rounded-md border border-border/50 p-0',
                                         STATUS_COLOR_BADGE[column.color] ?? STATUS_COLOR_BADGE.gray
                                       )}
-                                      title="Select status color"
+                                      aria-label="Select status color"
                                     >
                                       <Icon className="h-4 w-4" />
-                                    </Button>
+                                    </IconButton>
                                   </DropdownMenuTrigger>
                                   <DropdownMenuContent align="start">
                                     {colorOptions.map((value) => (
@@ -571,10 +569,9 @@ export function ProjectSettingsDialog({
                                   className="h-8 border-0 !bg-transparent dark:!bg-transparent px-0 text-sm font-medium shadow-none focus:bg-transparent focus-visible:!bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0"
                                 />
                                 <div className="ml-1 flex items-center gap-0.5">
-                                  <Button
+                                  <IconButton
                                     type="button"
                                     variant="ghost"
-                                    size="icon"
                                     className="h-7 w-7 text-muted-foreground hover:text-foreground"
                                     data-testid={`move-up-project-column-${column.id}`}
                                     aria-label={`Move ${column.label} status up`}
@@ -582,11 +579,10 @@ export function ProjectSettingsDialog({
                                     onClick={() => moveColumn(column.id, category, -1)}
                                   >
                                     <ChevronUp className="h-4 w-4" />
-                                  </Button>
-                                  <Button
+                                  </IconButton>
+                                  <IconButton
                                     type="button"
                                     variant="ghost"
-                                    size="icon"
                                     className="h-7 w-7 text-muted-foreground hover:text-foreground"
                                     data-testid={`move-down-project-column-${column.id}`}
                                     aria-label={`Move ${column.label} status down`}
@@ -594,18 +590,17 @@ export function ProjectSettingsDialog({
                                     onClick={() => moveColumn(column.id, category, 1)}
                                   >
                                     <ChevronDown className="h-4 w-4" />
-                                  </Button>
-                                  <Button
+                                  </IconButton>
+                                  <IconButton
                                     type="button"
                                     variant="ghost"
-                                    size="icon"
                                     className="h-7 w-7 text-muted-foreground hover:text-destructive"
                                     data-testid={`delete-project-column-${column.id}`}
                                     aria-label={`Delete ${column.label} column`}
                                     onClick={() => deleteColumn(column.id)}
                                   >
                                     <Trash2 className="h-4 w-4" />
-                                  </Button>
+                                  </IconButton>
                                 </div>
                               </div>
                             </div>

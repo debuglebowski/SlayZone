@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { Monitor, X } from 'lucide-react'
-import { Button, getTerminalStateStyle } from '@slayzone/ui'
+import { IconButton, getTerminalStateStyle } from '@slayzone/ui'
 import { Popover, PopoverContent, PopoverTrigger } from '@slayzone/ui'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@slayzone/ui'
 import type { PtyInfo } from '@slayzone/terminal/shared'
@@ -84,7 +84,8 @@ export function TerminalStatusPopover({ tasks, onTaskClick }: TerminalStatusPopo
       <Tooltip>
         <TooltipTrigger asChild>
           <PopoverTrigger asChild>
-            <Button
+            <IconButton
+              aria-label="Active terminals"
               variant="ghost"
               size="icon-lg"
               className="rounded-lg text-muted-foreground relative"
@@ -93,7 +94,7 @@ export function TerminalStatusPopover({ tasks, onTaskClick }: TerminalStatusPopo
               <span className="absolute -top-1 -right-1 bg-primary text-primary-foreground text-xs rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1">
                 {count}
               </span>
-            </Button>
+            </IconButton>
           </PopoverTrigger>
         </TooltipTrigger>
         <TooltipContent side="right">Active Terminals</TooltipContent>
@@ -125,14 +126,14 @@ export function TerminalStatusPopover({ tasks, onTaskClick }: TerminalStatusPopo
                     {formatIdleTime(pty.lastOutputTime)}
                   </p>
                 </div>
-                <Button
+                <IconButton
+                  aria-label="Terminate terminal"
                   variant="ghost"
-                  size="icon"
                   className="h-7 w-7 text-muted-foreground hover:text-destructive"
                   onClick={(e) => { e.stopPropagation(); handleTerminate(pty.sessionId) }}
                 >
                   <X className="size-4" />
-                </Button>
+                </IconButton>
               </div>
             ))}
           </div>

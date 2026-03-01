@@ -1,6 +1,6 @@
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react'
 import { Check, X, SkipForward, AlertTriangle, RefreshCw } from 'lucide-react'
-import { Button, Checkbox, cn } from '@slayzone/ui'
+import { Button, Checkbox, IconButton, cn } from '@slayzone/ui'
 import type { Task, UpdateTaskInput, MergeContext } from '@slayzone/task/shared'
 import type { RebaseProgress } from '../shared/types'
 import { GitDiffPanel, type GitDiffPanelHandle } from './GitDiffPanel'
@@ -145,15 +145,15 @@ export const UnifiedGitPanel = forwardRef<UnifiedGitPanelHandle, UnifiedGitPanel
         {/* Right-aligned actions */}
         <div className="flex-1" />
         {activeTab === 'changes' && (
-          <Button
+          <IconButton
+            aria-label="Refresh"
             variant="ghost"
-            size="icon"
             className="h-7 w-7"
             title="Refresh"
             onClick={() => diffRef.current?.refresh()}
           >
             <RefreshCw className="h-3.5 w-3.5" />
-          </Button>
+          </IconButton>
         )}
         {activeTab === 'conflicts' && conflictToolbar && (
           <div className="flex items-center gap-1.5">

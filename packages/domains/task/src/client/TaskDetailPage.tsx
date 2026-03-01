@@ -11,7 +11,7 @@ import type { Project } from '@slayzone/projects/shared'
 import { getDefaultStatus, getDoneStatus, getStatusByCategory, isTerminalStatus } from '@slayzone/projects/shared'
 import { DEV_SERVER_URL_PATTERN, SESSION_ID_COMMANDS, SESSION_ID_UNAVAILABLE } from '@slayzone/terminal/shared'
 import type { TerminalMode, ValidationResult } from '@slayzone/terminal/shared'
-import { Button, PanelToggle, DevServerToast, Collapsible, CollapsibleTrigger, CollapsibleContent } from '@slayzone/ui'
+import { Button, IconButton, PanelToggle, DevServerToast, Collapsible, CollapsibleTrigger, CollapsibleContent } from '@slayzone/ui'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -1327,7 +1327,7 @@ export function TaskDetailPage({
   const multipleVisiblePanels = visiblePanelCount > 1
 
   return (
-    <div id="task-detail" className={cn("h-full flex flex-col", compact ? "p-0" : "px-6 py-4 gap-4")} style={{ backgroundColor: colorTintsEnabled ? projectColorBg(project?.color) : undefined }}>
+    <div id="task-detail" className={cn("h-full flex flex-col bg-surface-0", compact ? "p-0" : "px-6 py-4 gap-4")} style={{ backgroundColor: colorTintsEnabled ? projectColorBg(project?.color) : undefined }}>
       {compact && (
         <div className="shrink-0 flex items-center gap-2 px-2 h-10 bg-surface-1 border-b border-border min-w-0">
           <span className="text-xs font-medium truncate flex-1">
@@ -1681,18 +1681,18 @@ export function TaskDetailPage({
 
                           <Tooltip>
                             <TooltipTrigger asChild>
-                              <Button variant="ghost" size="icon" className="size-7" onClick={() => void handleScreenshot()}>
+                              <IconButton variant="ghost" aria-label="Screenshot to terminal" className="size-7" onClick={() => void handleScreenshot()}>
                                 <Camera className="size-3.5" />
-                              </Button>
+                              </IconButton>
                             </TooltipTrigger>
                             <TooltipContent>Screenshot to terminal (⌘⇧S)</TooltipContent>
                           </Tooltip>
 
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
-                              <Button data-testid="terminal-menu-trigger" variant="ghost" size="icon" className="size-7">
+                              <IconButton data-testid="terminal-menu-trigger" variant="ghost" aria-label="Terminal menu" className="size-7">
                                 <MoreHorizontal className="size-3.5" />
-                              </Button>
+                              </IconButton>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end" className="w-60">
                               {task.terminal_mode === 'claude-code' && (
@@ -1894,11 +1894,11 @@ export function TaskDetailPage({
               testId="task-description-editor"
             />
             {task.terminal_mode !== 'terminal' && (
-              <Button
+              <IconButton
                 data-testid="generate-description-button"
                 type="button"
                 variant="ghost"
-                size="icon"
+                aria-label="Generate description"
                 className="absolute bottom-1 right-1 size-6 text-muted-foreground hover:text-foreground"
                 onClick={() => handleGenerateDescription()}
                 disabled={generatingDescription || !task.title}
@@ -1908,7 +1908,7 @@ export function TaskDetailPage({
                 ) : (
                   <Sparkles className="size-3" />
                 )}
-              </Button>
+              </IconButton>
             )}
           </div>
 

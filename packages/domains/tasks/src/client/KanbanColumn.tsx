@@ -12,7 +12,7 @@ import type { Column } from './kanban'
 import type { CardProperties } from './FilterState'
 import { KanbanCard } from './KanbanCard'
 import { TaskContextMenu } from './TaskContextMenu'
-import { Button } from '@slayzone/ui'
+import { IconButton } from '@slayzone/ui'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -190,9 +190,9 @@ export function KanbanColumn({
           {isCompletedColumn && onArchiveAllTasks && column.tasks.length > 0 && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-6 w-6">
+                <IconButton variant="ghost" aria-label="Column options" className="h-6 w-6">
                   <MoreHorizontal className="h-4 w-4" />
-                </Button>
+                </IconButton>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
                 <DropdownMenuItem onClick={() => onArchiveAllTasks(column.tasks.map((t) => t.id))}>
@@ -202,15 +202,15 @@ export function KanbanColumn({
             </DropdownMenu>
           )}
           {onCreateTask && (
-            <Button
+            <IconButton
               variant="ghost"
-              size="icon"
+              aria-label="Add task"
               className="h-6 w-6"
               onClick={() => onCreateTask(column)}
               title="Add task"
             >
               <Plus className="h-4 w-4" />
-            </Button>
+            </IconButton>
           )}
         </div>
       </div>

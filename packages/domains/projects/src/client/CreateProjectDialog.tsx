@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { FolderOpen } from 'lucide-react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@slayzone/ui'
-import { Button } from '@slayzone/ui'
+import { Button, IconButton } from '@slayzone/ui'
 import { Input } from '@slayzone/ui'
 import { Label } from '@slayzone/ui'
 import { ColorPicker } from '@slayzone/ui'
@@ -83,9 +83,9 @@ export function CreateProjectDialog({ open, onOpenChange, onCreated }: CreatePro
                 placeholder="/path/to/repo"
                 className="flex-1"
               />
-              <Button type="button" variant="outline" size="icon" onClick={handleBrowse}>
+              <IconButton type="button" variant="outline" aria-label="Browse folder" onClick={handleBrowse}>
                 <FolderOpen className="h-4 w-4" />
-              </Button>
+              </IconButton>
             </div>
             <p className="text-xs text-muted-foreground">
               Claude Code terminal will open in this directory

@@ -12,7 +12,7 @@ import {
   SidebarMenu,
   SidebarMenuItem
 } from '@slayzone/ui'
-import { Button } from '@slayzone/ui'
+import { IconButton } from '@slayzone/ui'
 import { Tooltip, TooltipTrigger, TooltipContent } from '@slayzone/ui'
 import {
   Dialog,
@@ -149,53 +149,57 @@ export function AppSidebar({
             <TerminalStatusPopover tasks={tasks} onTaskClick={onTaskClick} />
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button
+                <IconButton
+                  aria-label="Take a Tour"
                   variant="ghost"
                   size="icon-lg"
                   onClick={onTutorial}
                   className="rounded-lg text-muted-foreground"
                 >
                   <IoCompassSharp className="size-6" />
-                </Button>
+                </IconButton>
               </TooltipTrigger>
               <TooltipContent side="right">Take a Tour</TooltipContent>
             </Tooltip>
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button
+                <IconButton
+                  aria-label="What's New"
                   variant="ghost"
                   size="icon-lg"
                   onClick={onChangelog}
                   className="rounded-lg text-muted-foreground"
                 >
                   <Megaphone className="size-5" />
-                </Button>
+                </IconButton>
               </TooltipTrigger>
               <TooltipContent side="right">What's New</TooltipContent>
             </Tooltip>
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button
+                <IconButton
+                  aria-label="Onboarding"
                   variant="ghost"
                   size="icon-lg"
                   onClick={onOnboarding}
                   className="rounded-lg text-muted-foreground"
                 >
                   <FaRegHandshake className="size-5" />
-                </Button>
+                </IconButton>
               </TooltipTrigger>
               <TooltipContent side="right">Onboarding</TooltipContent>
             </Tooltip>
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button
+                <IconButton
+                  aria-label="Keyboard Shortcuts"
                   variant="ghost"
                   size="icon-lg"
                   onClick={() => setShortcutsOpen(true)}
                   className="rounded-lg text-muted-foreground"
                 >
                   <Keyboard className="size-5" />
-                </Button>
+                </IconButton>
               </TooltipTrigger>
               <TooltipContent side="right">Keyboard Shortcuts</TooltipContent>
             </Tooltip>
@@ -229,14 +233,15 @@ export function AppSidebar({
             </Dialog>
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button
+                <IconButton
+                  aria-label="Settings"
                   variant="ghost"
                   size="icon-lg"
                   onClick={onSettings}
                   className="rounded-lg text-muted-foreground"
                 >
                   <Settings className="size-5" />
-                </Button>
+                </IconButton>
               </TooltipTrigger>
               <TooltipContent side="right">Settings</TooltipContent>
             </Tooltip>

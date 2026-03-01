@@ -21,7 +21,7 @@ import { groupTasksBy, PRIORITY_LABELS, todayISO, type Column } from './kanban'
 import type { ViewConfig, CardProperties } from './FilterState'
 import { TaskContextMenu } from './TaskContextMenu'
 import { cn, getTerminalStateStyle, Tooltip, TooltipContent, TooltipTrigger } from '@slayzone/ui'
-import { Button } from '@slayzone/ui'
+import { IconButton } from '@slayzone/ui'
 import { ChevronDown, Plus, AlertCircle, Check, GitMerge, Link2 } from 'lucide-react'
 import { usePty, useActiveTaskIds } from '@slayzone/terminal'
 import { useEffect } from 'react'
@@ -311,9 +311,9 @@ function GroupSection({
             <span className="text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded">{column.tasks.length}</span>
           </button>
           {onCreateTask && (
-            <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0" onClick={() => onCreateTask(column)} title="Add task">
+            <IconButton variant="ghost" aria-label="Add task" className="h-6 w-6 shrink-0" onClick={() => onCreateTask(column)} title="Add task">
               <Plus className="h-4 w-4" />
-            </Button>
+            </IconButton>
           )}
         </div>
       )}

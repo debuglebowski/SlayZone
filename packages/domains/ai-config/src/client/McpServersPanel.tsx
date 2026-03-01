@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { ExternalLink, Star, Check, Search, Plus, Trash2 } from 'lucide-react'
-import { Button, Input, Label, Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@slayzone/ui'
+import { Button, IconButton, Input, Label, Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@slayzone/ui'
 import { CURATED_MCP_SERVERS, CATEGORY_LABELS, type CuratedMcpServer } from '../shared/mcp-registry'
 import type { McpConfigFileResult, McpTarget, McpServerConfig } from '../shared'
 import { getConfigurableMcpTargets } from '../shared/provider-registry'
@@ -174,13 +174,14 @@ function McpServerFormFields({ serverKey, setServerKey, command, setCommand, arg
               }}
               className="h-8 text-xs"
             />
-            <Button
+            <IconButton
+              aria-label="Remove variable"
               variant="ghost"
               size="icon-sm"
               onClick={() => setEnvVars(envVars.filter((_, idx) => idx !== i))}
             >
               <Trash2 className="size-3.5" />
-            </Button>
+            </IconButton>
           </div>
         ))}
         <Button

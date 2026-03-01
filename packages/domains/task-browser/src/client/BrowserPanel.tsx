@@ -3,6 +3,7 @@ import { ArrowLeft, ArrowRight, RotateCw, X, Plus, Import, Smartphone, Monitor, 
 import type { BrowserTabTheme } from '../shared'
 import {
   Button,
+  IconButton,
   Input,
   cn,
   Tooltip,
@@ -780,9 +781,9 @@ export const BrowserPanel = forwardRef<BrowserPanelHandle, BrowserPanelProps>(fu
         <Tooltip>
           <TooltipTrigger asChild>
             <span>
-              <Button variant="ghost" size="icon-sm" disabled={!canGoBack || multiDeviceMode} onClick={() => webviewRef.current?.goBack()}>
+              <IconButton aria-label="Back" variant="ghost" size="icon-sm" disabled={!canGoBack || multiDeviceMode} onClick={() => webviewRef.current?.goBack()}>
                 <ArrowLeft className="size-4" />
-              </Button>
+              </IconButton>
             </span>
           </TooltipTrigger>
           <TooltipContent>Back</TooltipContent>
@@ -790,9 +791,9 @@ export const BrowserPanel = forwardRef<BrowserPanelHandle, BrowserPanelProps>(fu
         <Tooltip>
           <TooltipTrigger asChild>
             <span>
-              <Button variant="ghost" size="icon-sm" disabled={!canGoForward || multiDeviceMode} onClick={() => webviewRef.current?.goForward()}>
+              <IconButton aria-label="Forward" variant="ghost" size="icon-sm" disabled={!canGoForward || multiDeviceMode} onClick={() => webviewRef.current?.goForward()}>
                 <ArrowRight className="size-4" />
-              </Button>
+              </IconButton>
             </span>
           </TooltipTrigger>
           <TooltipContent>Forward</TooltipContent>
@@ -802,7 +803,8 @@ export const BrowserPanel = forwardRef<BrowserPanelHandle, BrowserPanelProps>(fu
             <ContextMenuTrigger asChild>
               <TooltipTrigger asChild>
                 <span>
-                  <Button
+                  <IconButton
+                    aria-label={isLoading && !multiDeviceMode ? 'Stop loading' : 'Reload'}
                     variant="ghost"
                     size="icon-sm"
                     onClick={(e) => {
@@ -819,7 +821,7 @@ export const BrowserPanel = forwardRef<BrowserPanelHandle, BrowserPanelProps>(fu
                     }}
                   >
                     {isLoading && !multiDeviceMode ? <X className="size-4" /> : <RotateCw className="size-4" />}
-                  </Button>
+                  </IconButton>
                 </span>
               </TooltipTrigger>
             </ContextMenuTrigger>
@@ -857,9 +859,9 @@ export const BrowserPanel = forwardRef<BrowserPanelHandle, BrowserPanelProps>(fu
               <TooltipTrigger asChild>
                 <span>
                   <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="icon-sm">
+                    <IconButton aria-label="Import URL from another task" variant="ghost" size="icon-sm">
                       <Import className="size-4" />
-                    </Button>
+                    </IconButton>
                   </DropdownMenuTrigger>
                 </span>
               </TooltipTrigger>
@@ -898,14 +900,15 @@ export const BrowserPanel = forwardRef<BrowserPanelHandle, BrowserPanelProps>(fu
         <Tooltip>
           <TooltipTrigger asChild>
             <span>
-              <Button
+              <IconButton
+                aria-label={multiDeviceMode ? 'Exit responsive preview' : 'Responsive preview'}
                 variant="ghost"
                 size="icon-sm"
                 className={cn(multiDeviceMode && 'text-blue-500 bg-blue-500/10')}
                 onClick={toggleMultiDevice}
               >
                 <LayoutGrid className="size-4" />
-              </Button>
+              </IconButton>
             </span>
           </TooltipTrigger>
           <TooltipContent>{multiDeviceMode ? 'Exit responsive preview' : 'Responsive preview'}</TooltipContent>
@@ -914,7 +917,8 @@ export const BrowserPanel = forwardRef<BrowserPanelHandle, BrowserPanelProps>(fu
         <Tooltip>
           <TooltipTrigger asChild>
             <span>
-              <Button
+              <IconButton
+                aria-label="Pick element"
                 data-testid="browser-pick-element"
                 variant="ghost"
                 size="icon-sm"
@@ -923,7 +927,7 @@ export const BrowserPanel = forwardRef<BrowserPanelHandle, BrowserPanelProps>(fu
                 onClick={handlePickElement}
               >
                 <Crosshair className="size-4" />
-              </Button>
+              </IconButton>
             </span>
           </TooltipTrigger>
           <TooltipContent>
@@ -938,7 +942,8 @@ export const BrowserPanel = forwardRef<BrowserPanelHandle, BrowserPanelProps>(fu
         <Tooltip>
           <TooltipTrigger asChild>
             <span>
-              <Button
+              <IconButton
+                aria-label="Toggle Chromium DevTools"
                 data-testid="browser-devtools"
                 variant="ghost"
                 size="icon-sm"
@@ -947,7 +952,7 @@ export const BrowserPanel = forwardRef<BrowserPanelHandle, BrowserPanelProps>(fu
                 onClick={toggleDevTools}
               >
                 <Bug className="size-4" />
-              </Button>
+              </IconButton>
             </span>
           </TooltipTrigger>
           <TooltipContent>
@@ -963,7 +968,8 @@ export const BrowserPanel = forwardRef<BrowserPanelHandle, BrowserPanelProps>(fu
             <Tooltip>
               <TooltipTrigger asChild>
                 <span>
-                  <Button
+                  <IconButton
+                    aria-label={themeLabel}
                     data-testid="browser-theme-mode"
                     variant="ghost"
                     size="icon-sm"
@@ -975,7 +981,7 @@ export const BrowserPanel = forwardRef<BrowserPanelHandle, BrowserPanelProps>(fu
                     onClick={cycleTheme}
                   >
                     <ThemeIcon className="size-4" />
-                  </Button>
+                  </IconButton>
                 </span>
               </TooltipTrigger>
               <TooltipContent>

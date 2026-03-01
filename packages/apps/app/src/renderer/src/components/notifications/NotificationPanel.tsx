@@ -1,6 +1,6 @@
 import { useMemo } from 'react'
 import { X } from 'lucide-react'
-import { Button, cn, Tooltip, TooltipTrigger, TooltipContent } from '@slayzone/ui'
+import { IconButton, cn, Tooltip, TooltipTrigger, TooltipContent } from '@slayzone/ui'
 import type { AttentionTask } from './useAttentionTasks'
 import type { Project } from '@slayzone/projects/shared'
 import { groupAttentionTasksByStatus } from './grouping'
@@ -107,9 +107,9 @@ export function NotificationPanel({
                       </span>
                       <Tooltip>
                         <TooltipTrigger asChild>
-                          <Button
+                          <IconButton
+                            aria-label="Dismiss notification"
                             variant="ghost"
-                            size="icon"
                             className="h-6 w-6 text-muted-foreground hover:text-destructive"
                             onClick={(e) => {
                               e.stopPropagation()
@@ -117,7 +117,7 @@ export function NotificationPanel({
                             }}
                           >
                             <X className="size-3" />
-                          </Button>
+                          </IconButton>
                         </TooltipTrigger>
                         <TooltipContent>Kill terminal process</TooltipContent>
                       </Tooltip>

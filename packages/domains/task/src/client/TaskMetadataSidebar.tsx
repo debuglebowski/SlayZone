@@ -16,7 +16,7 @@ import {
 } from '@slayzone/ui'
 import { Popover, PopoverContent, PopoverTrigger } from '@slayzone/ui'
 import { Calendar } from '@slayzone/ui'
-import { Button } from '@slayzone/ui'
+import { Button, IconButton } from '@slayzone/ui'
 import { Checkbox } from '@slayzone/ui'
 import {
   buildStatusOptions,
@@ -334,14 +334,14 @@ export function LinearCard({ taskId, onUpdate }: LinearCardProps) {
         <div className="space-y-2">
           <div className="flex items-center gap-1">
             <span className="min-w-0 flex-1 truncate text-sm">{linearLink.external_key}</span>
-            <Button variant="ghost" size="icon" className="size-7" onClick={() => window.api.shell.openExternal(linearLink.external_url)} title="Open in Linear">
+            <IconButton variant="ghost" aria-label="Open in Linear" className="size-7" onClick={() => window.api.shell.openExternal(linearLink.external_url)} title="Open in Linear">
               <ExternalLinkIcon className="size-3.5" />
-            </Button>
+            </IconButton>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="size-7">
+                <IconButton variant="ghost" aria-label="Linear actions" className="size-7">
                   <EllipsisIcon className="size-3.5" />
-                </Button>
+                </IconButton>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
                 <DropdownMenuItem onClick={handleSync}>

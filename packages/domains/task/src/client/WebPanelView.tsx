@@ -1,6 +1,6 @@
 import { useRef, useEffect, useCallback, useMemo, useState } from 'react'
 import { RotateCw, X, Globe, Copy, Check } from 'lucide-react'
-import { Button } from '@slayzone/ui'
+import { IconButton } from '@slayzone/ui'
 import {
   inferHostScopeFromUrl,
   inferProtocolFromUrl,
@@ -193,10 +193,10 @@ export function WebPanelView({
         <Globe className="size-3.5 text-muted-foreground shrink-0" />
         <span className="text-xs font-medium text-muted-foreground flex-1">{name}</span>
 
-        <Button
+        <IconButton
           variant="ghost"
           size="icon-sm"
-          title="Copy URL"
+          aria-label="Copy URL"
           onClick={() => {
             const currentUrl = webviewRef.current?.getURL() ?? url
             navigator.clipboard.writeText(currentUrl)
@@ -205,11 +205,12 @@ export function WebPanelView({
           }}
         >
           {copied ? <Check className="size-3.5 text-green-500" /> : <Copy className="size-3.5" />}
-        </Button>
+        </IconButton>
 
-        <Button
+        <IconButton
           variant="ghost"
           size="icon-sm"
+          aria-label={isLoading ? 'Stop loading' : 'Reload'}
           onClick={() => {
             const wv = webviewRef.current
             if (!wv) return
@@ -218,7 +219,7 @@ export function WebPanelView({
           }}
         >
           {isLoading ? <X className="size-3.5" /> : <RotateCw className="size-3.5" />}
-        </Button>
+        </IconButton>
       </div>
 
       {/* Webview */}

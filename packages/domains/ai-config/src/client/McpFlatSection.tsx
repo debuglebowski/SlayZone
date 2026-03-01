@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Check, ChevronDown, ChevronRight, Plus, Server, X, Search } from 'lucide-react'
-import { Button, Checkbox, cn, Dialog, DialogContent, DialogHeader, DialogTitle, Input, toast } from '@slayzone/ui'
+import { Checkbox, cn, Dialog, DialogContent, DialogHeader, DialogTitle, IconButton, Input, toast } from '@slayzone/ui'
 import type { CliProvider, McpConfigFileResult, McpServerConfig, McpTarget } from '../shared'
 import { CURATED_MCP_SERVERS, type CuratedMcpServer } from '../shared/mcp-registry'
 
@@ -221,15 +221,15 @@ export function McpFlatSection({ projectPath, enabledProviders, onChanged }: Mcp
                     <div className="flex items-center gap-0.5">
                       {/* spacer to match sync button in ItemSection */}
                       <div className="size-6" />
-                      <Button
+                      <IconButton
+                        aria-label="Remove server"
                         size="icon-sm"
                         variant="ghost"
                         className="size-6 text-muted-foreground hover:text-destructive"
                         onClick={() => handleRemove(server)}
-                        title="Remove"
                       >
                         <X className="size-3" />
-                      </Button>
+                      </IconButton>
                     </div>
                   </div>
                 </div>

@@ -1,18 +1,23 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState, type ChangeEvent } from 'react'
 import {
   Check, AlertCircle, ChevronDown, ChevronRight,
   Plus, Loader2, Sparkles, X
 } from 'lucide-react'
 import {
-  Button, Checkbox, DiffView, Input, Label, Textarea,
-  Tooltip, TooltipContent, TooltipTrigger, cn, toast
+  Button, DiffView, IconButton, Input, Label,
+  Tabs, TabsContent, TabsList, TabsTrigger,
+  Textarea, Tooltip, TooltipContent, TooltipTrigger, cn, toast
 } from '@slayzone/ui'
 import type {
   AiConfigItem, AiConfigItemType, CliProvider,
   ProjectSkillStatus, ProviderSyncStatus
 } from '../shared'
-import { PROVIDER_LABELS, PROVIDER_PATHS } from '../shared/provider-registry'
+import { PROVIDER_PATHS } from '../shared/provider-registry'
 import { AddItemPicker } from './AddItemPicker'
+
+// ============================================================
+// Types & Helpers
+// ============================================================
 
 interface ItemSectionProps {
   type: AiConfigItemType
@@ -22,6 +27,12 @@ interface ItemSectionProps {
   projectId: string
   projectPath: string
   onChanged: () => void
+}
+
+interface ProviderRow {
+  provider: CliProvider
+  path: string
+  status: ProviderSyncStatus
 }
 
 function providerSupportsType(provider: CliProvider): boolean {
@@ -37,6 +48,10 @@ function aggregateStatus(
   if (statuses.some(s => s === 'out_of_sync')) return 'out_of_sync'
   return 'not_synced'
 }
+
+// ============================================================
+// Shared: StatusBadge
+// ============================================================
 
 function StatusBadge({ status }: { status: ProviderSyncStatus }) {
   if (status === 'synced') return (
@@ -56,18 +71,12 @@ function StatusBadge({ status }: { status: ProviderSyncStatus }) {
   )
 }
 
-// ---------------------------------------------------------------------------
-// Expanded skill detail — mirrors ProjectInstructions layout
-// ---------------------------------------------------------------------------
+// ============================================================
+// Hook: useSkillItem
+// ============================================================
 
-function SkillDetail({
-  item,
-  providers,
-  enabledProviders,
-  isLocal,
-  projectId,
-  projectPath,
-  onChanged,
+function useSkillItem({
+  item, providers, enabledProviders, isLocal, projectId, projectPath, onChanged
 }: {
   item: AiConfigItem
   providers: ProjectSkillStatus['providers']
@@ -77,7 +86,7 @@ function SkillDetail({
   projectPath: string
   onChanged: () => void
 }) {
-  const [slug, setSlug] = useState(item.slug)
+  const [slug, setSlugRaw] = useState(item.slug)
   const [content, setContent] = useState(item.content)
   const [slugDirty, setSlugDirty] = useState(false)
   const [savingSlug, setSavingSlug] = useState(false)
@@ -90,14 +99,13 @@ function SkillDetail({
   const [pullingProvider, setPullingProvider] = useState<CliProvider | null>(null)
   const [syncingAll, setSyncingAll] = useState(false)
 
-  // Sync external item changes
   useEffect(() => {
     setContent(item.content)
-    setSlug(item.slug)
+    setSlugRaw(item.slug)
     setSlugDirty(false)
   }, [item.content, item.slug])
 
-  const providerRows = enabledProviders
+  const providerRows: ProviderRow[] = enabledProviders
     .filter(p => providerSupportsType(p))
     .map(p => {
       const info = providers[p]
@@ -106,18 +114,15 @@ function SkillDetail({
       return { provider: p, path, status }
     })
 
-  // Auto-save content to DB (debounced) — matches instructions pattern
   const saveContent = useCallback(async (text: string) => {
     try {
       await window.api.aiConfig.updateItem({ id: item.id, content: text })
-      setExpectedContents({}) // clear cache — expected content depends on DB content
+      setExpectedContents({})
       onChanged()
-    } catch {
-      // silent
-    }
+    } catch { /* silent */ }
   }, [item.id, onChanged])
 
-  const handleContentChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+  const handleContentChange = (e: ChangeEvent<HTMLTextAreaElement>) => {
     const text = e.target.value
     setContent(text)
     if (saveTimer.current) clearTimeout(saveTimer.current)
@@ -151,8 +156,6 @@ function SkillDetail({
       toast.error(err instanceof Error ? err.message : 'Revert failed')
     }
   }
-
-  // --- Provider card helpers ---
 
   const loadDiskAndExpected = useCallback(async (provider: CliProvider) => {
     const [disk, expected] = await Promise.all([
@@ -216,296 +219,273 @@ function SkillDetail({
     }
   }
 
+  return {
+    item, slug, content, slugDirty, savingSlug, isLocal,
+    providerRows, expandedProviders, diskContents, expectedContents,
+    syncingProvider, pullingProvider, syncingAll,
+    setSlug: (v: string) => { setSlugRaw(v); setSlugDirty(v !== item.slug) },
+    handleContentChange, handleSlugSave, handleRevert,
+    toggleExpanded, handlePush, handlePull, handleSyncAll,
+  }
+}
+
+type Sk = ReturnType<typeof useSkillItem>
+
+// ============================================================
+// Shared: ProviderFileCard (expandable card with diff)
+// ============================================================
+
+function ProviderFileCard({ row, sk }: { row: ProviderRow; sk: Sk }) {
+  const { provider, path, status } = row
+  const isPushing = sk.syncingProvider === provider
+  const isPulling = sk.pullingProvider === provider
+  const isExpanded = sk.expandedProviders.has(provider)
+  const isStale = status === 'out_of_sync'
+  const disk = sk.diskContents[provider]
+  const expected = sk.expectedContents[provider]
+
   return (
-    <div className="mt-1 space-y-4 rounded-lg border bg-muted/20 p-4">
-      {/* Filename */}
-      <div className="flex items-center gap-2">
-        <Label className="text-xs shrink-0">Filename</Label>
-        <Input
-          data-testid="skill-detail-filename"
-          className="font-mono text-xs"
-          value={slug}
-          onChange={(e) => {
-            setSlug(e.target.value)
-            setSlugDirty(e.target.value !== item.slug)
-          }}
-        />
-        {slugDirty && (
-          <Button data-testid="skill-detail-rename" size="sm" onClick={handleSlugSave} disabled={savingSlug}>
-            {savingSlug ? 'Renaming...' : 'Rename'}
-          </Button>
+    <div data-testid={`skill-provider-card-${provider}-${sk.item.slug}`} className="rounded-lg border">
+      <div
+        className={cn(
+          'flex items-center gap-3 px-3 py-2.5',
+          isStale && 'cursor-pointer hover:bg-muted/30'
         )}
+        onClick={isStale ? () => sk.toggleExpanded(provider) : undefined}
+      >
+        {isStale && (
+          <ChevronDown className={cn('size-4 text-muted-foreground transition-transform', !isExpanded && '-rotate-90')} />
+        )}
+        <span className="flex-1 font-mono text-sm truncate">{path}</span>
+        <StatusBadge status={status} />
+        {isStale && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                data-testid={`skill-pull-${provider}-${sk.item.slug}`}
+                size="sm" variant="outline"
+                disabled={isPulling || sk.syncingAll}
+                onClick={(e) => { e.stopPropagation(); void sk.handlePull(provider) }}
+              >
+                {isPulling && <Loader2 className="size-3.5 animate-spin" />}
+                File → Config
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Pull from {path}</TooltipContent>
+          </Tooltip>
+        )}
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              data-testid={`skill-push-${provider}-${sk.item.slug}`}
+              size="sm" variant={isStale ? 'default' : 'outline'}
+              disabled={isPushing || sk.syncingAll}
+              onClick={(e) => { e.stopPropagation(); void sk.handlePush(provider) }}
+            >
+              {isPushing && <Loader2 className="size-3.5 animate-spin" />}
+              Config → File
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Push to {path}</TooltipContent>
+        </Tooltip>
       </div>
 
-      {/* Content — auto-saves to DB like instructions */}
-      <Textarea
-        data-testid="skill-detail-content"
-        className="min-h-[200px] resize-y font-mono text-sm"
-        placeholder="Write your skill content here. Use the buttons below to write to provider files."
-        value={content}
-        onChange={handleContentChange}
-      />
-
-      {/* Source + revert */}
-      <div className="flex items-center justify-between">
-        <span className="text-[11px] text-muted-foreground">
-          Source: {isLocal ? 'Project only' : 'Global library'}
-        </span>
-        {!isLocal && (
-          <Button data-testid="skill-detail-revert" size="sm" variant="outline" onClick={handleRevert}>
-            Revert to global
-          </Button>
-        )}
-      </div>
-
-      {/* Provider file cards — identical layout to instructions */}
-      {providerRows.length > 0 && (
-        <>
-          <div className="flex items-center justify-end">
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button data-testid={`skill-push-all-${item.slug}`} size="sm" onClick={handleSyncAll} disabled={syncingAll || !!syncingProvider}>
-                  {syncingAll && <Loader2 className="size-3.5 animate-spin" />}
-                  Config → All Files
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Overwrite all provider skill files on disk with the current config content</TooltipContent>
-            </Tooltip>
+      {isStale && isExpanded && (
+        disk === undefined || expected === undefined ? (
+          <div className="flex items-center justify-center border-t py-6">
+            <Loader2 className="size-4 animate-spin text-muted-foreground" />
           </div>
-
-          <div className="space-y-2">
-            {providerRows.map(({ provider, path, status }) => {
-              const isPushing = syncingProvider === provider
-              const isPulling = pullingProvider === provider
-              const isExpanded = expandedProviders.has(provider)
-              const isStale = status === 'out_of_sync'
-              const disk = diskContents[provider]
-              const expected = expectedContents[provider]
-
-              return (
-                <div key={provider} data-testid={`skill-provider-card-${provider}-${item.slug}`} className="rounded-lg border">
-                  <div
-                    className={cn(
-                      'flex items-center gap-3 px-3 py-2.5',
-                      isStale && 'cursor-pointer hover:bg-muted/30'
-                    )}
-                    onClick={isStale ? () => toggleExpanded(provider) : undefined}
-                  >
-                    {isStale && (
-                      <ChevronDown className={cn('size-4 text-muted-foreground transition-transform', !isExpanded && '-rotate-90')} />
-                    )}
-                    <span className="flex-1 font-mono text-sm">{path}</span>
-                    <StatusBadge status={status} />
-                    {isStale && (
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            data-testid={`skill-pull-${provider}-${item.slug}`}
-                            size="sm"
-                            variant="outline"
-                            disabled={isPulling || syncingAll}
-                            onClick={(e) => { e.stopPropagation(); void handlePull(provider) }}
-                          >
-                            {isPulling && <Loader2 className="size-3.5 animate-spin" />}
-                            File → Config
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>Replace config content with the current contents of {path} on disk</TooltipContent>
-                      </Tooltip>
-                    )}
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button
-                          data-testid={`skill-push-${provider}-${item.slug}`}
-                          size="sm"
-                          variant={isStale ? 'default' : 'outline'}
-                          disabled={isPushing || syncingAll}
-                          onClick={(e) => { e.stopPropagation(); void handlePush(provider) }}
-                        >
-                          {isPushing && <Loader2 className="size-3.5 animate-spin" />}
-                          Config → File
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent>Overwrite {path} on disk with the current config content</TooltipContent>
-                    </Tooltip>
-                  </div>
-
-                  {isStale && isExpanded && (
-                    disk === undefined || expected === undefined ? (
-                      <div className="flex items-center justify-center border-t py-6">
-                        <Loader2 className="size-4 animate-spin text-muted-foreground" />
-                      </div>
-                    ) : (
-                      <DiffView
-                        left={disk}
-                        right={expected}
-                        leftLabel={`${path} (on disk)`}
-                        rightLabel="Expected content"
-                        className="border-t border-x-0 border-b-0 rounded-none"
-                      />
-                    )
-                  )}
-                </div>
-              )
-            })}
-          </div>
-        </>
+        ) : (
+          <DiffView
+            left={disk} right={expected}
+            leftLabel={`${path} (on disk)`}
+            rightLabel="Expected content"
+            className="border-t border-x-0 border-b-0 rounded-none"
+          />
+        )
       )}
     </div>
   )
 }
 
-// ---------------------------------------------------------------------------
-// Main section
-// ---------------------------------------------------------------------------
+// ============================================================
+// Skill item detail (tabbed: Content | Sync)
+// ============================================================
+
+function SkillItemDetail({ item, providers, enabledProviders, isLocal, projectId, projectPath, onChanged, onRemove }: {
+  item: AiConfigItem; providers: ProjectSkillStatus['providers']; enabledProviders: CliProvider[]
+  isLocal: boolean; projectId: string; projectPath: string; onChanged: () => void
+  onRemove: () => void
+}) {
+  const sk = useSkillItem({ item, providers, enabledProviders, isLocal, projectId, projectPath, onChanged })
+  const [expanded, setExpanded] = useState(false)
+  const status = isLocal ? 'not_synced' as ProviderSyncStatus : aggregateStatus(providers)
+
+  return (
+    <div data-testid={`project-context-item-skill-${item.slug}`}>
+      {/* Collapsed row */}
+      <div
+        className={cn(
+          'flex items-center gap-2 rounded-md border px-3 py-2 transition-colors cursor-pointer',
+          expanded ? 'bg-muted/50 border-primary/30' : 'hover:bg-muted/30'
+        )}
+        onClick={() => setExpanded(!expanded)}
+      >
+        {expanded
+          ? <ChevronDown className="size-3 shrink-0 text-muted-foreground" />
+          : <ChevronRight className="size-3 shrink-0 text-muted-foreground" />
+        }
+        <span className="flex-1 truncate font-mono text-xs">
+          {item.slug}
+          {isLocal && <span className="ml-1.5 font-sans text-[10px] text-muted-foreground">(local)</span>}
+        </span>
+        <StatusBadge status={status} />
+        <IconButton
+          aria-label="Remove skill"
+          size="icon-sm" variant="ghost"
+          className="size-6 text-muted-foreground hover:text-destructive shrink-0"
+          onClick={(e) => { e.stopPropagation(); onRemove() }}
+        >
+          <X className="size-3" />
+        </IconButton>
+      </div>
+
+      {/* Expanded: filename + tabs */}
+      {expanded && (
+        <div className="mt-1 rounded-lg border bg-muted/20 p-4 space-y-3">
+          <Tabs defaultValue="content">
+            {/* Filename + tabs on same row */}
+            <div className="flex items-end gap-3">
+              <div className="flex-1 min-w-0 space-y-1">
+                <Label className="text-xs text-muted-foreground">Filename</Label>
+                <div className="flex items-center gap-2">
+                  <Input
+                    data-testid="skill-detail-filename"
+                    className="font-mono text-xs"
+                    value={sk.slug}
+                    onChange={(e) => sk.setSlug(e.target.value)}
+                  />
+                  {sk.slugDirty && (
+                    <Button data-testid="skill-detail-rename" size="sm" onClick={sk.handleSlugSave} disabled={sk.savingSlug}>
+                      {sk.savingSlug ? 'Renaming...' : 'Rename'}
+                    </Button>
+                  )}
+                </div>
+              </div>
+              <TabsList className="h-8 shrink-0">
+                <TabsTrigger value="content" className="text-xs px-3">Content</TabsTrigger>
+                <TabsTrigger value="sync" className="text-xs px-3">
+                  Sync
+                  {status === 'out_of_sync' && (
+                    <span className="ml-1.5 inline-flex size-2 rounded-full bg-amber-500" />
+                  )}
+                </TabsTrigger>
+              </TabsList>
+            </div>
+
+            <TabsContent value="content" className="space-y-3">
+              <Textarea
+                data-testid="skill-detail-content"
+                className="min-h-[200px] resize-y font-mono text-sm"
+                placeholder="Write your skill content here."
+                value={sk.content}
+                onChange={sk.handleContentChange}
+              />
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] text-muted-foreground">
+                  Source: {sk.isLocal ? 'Project only' : 'Global library'}
+                </span>
+                {!sk.isLocal && (
+                  <Button data-testid="skill-detail-revert" size="sm" variant="outline" onClick={sk.handleRevert}>
+                    Revert to global
+                  </Button>
+                )}
+              </div>
+            </TabsContent>
+
+            <TabsContent value="sync" className="space-y-3">
+              {sk.providerRows.length > 0 ? (
+                <>
+                  <div className="space-y-2">
+                    {sk.providerRows.map(row => (
+                      <ProviderFileCard key={row.provider} row={row} sk={sk} />
+                    ))}
+                  </div>
+                  {sk.providerRows.length > 1 && (
+                    <div className="flex items-center justify-end">
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            data-testid={`skill-push-all-${sk.item.slug}`}
+                            size="sm"
+                            onClick={sk.handleSyncAll}
+                            disabled={sk.syncingAll || !!sk.syncingProvider}
+                          >
+                            {sk.syncingAll && <Loader2 className="size-3.5 animate-spin" />}
+                            Config → All Files
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>Overwrite all provider skill files on disk</TooltipContent>
+                      </Tooltip>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <p className="text-sm text-muted-foreground py-4 text-center">No providers configured</p>
+              )}
+            </TabsContent>
+          </Tabs>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ============================================================
+// Main Export
+// ============================================================
 
 export function ItemSection({
   type, linkedItems, localItems, enabledProviders,
   projectId, projectPath, onChanged
 }: ItemSectionProps) {
-  const [expandedId, setExpandedId] = useState<string | null>(null)
   const [showPicker, setShowPicker] = useState(false)
 
-  const label = 'Skills'
-  const Icon = Sparkles
   const allItems = [
     ...localItems.map(item => ({ item, providers: {} as ProjectSkillStatus['providers'], isLocal: true })),
     ...linkedItems.map(s => ({ item: s.item, providers: s.providers, isLocal: false }))
   ]
   const existingLinks = linkedItems.map(s => s.item.id)
 
-  const handleRemoveLinked = async (itemId: string) => {
-    await window.api.aiConfig.removeProjectSelection(projectId, itemId)
-    if (expandedId === itemId) setExpandedId(null)
-    onChanged()
-  }
-
-  const handleRemoveLocal = async (itemId: string) => {
-    await window.api.aiConfig.deleteItem(itemId)
-    if (expandedId === itemId) setExpandedId(null)
-    onChanged()
-  }
-
-  const handleToggleProvider = async (itemId: string, provider: CliProvider, currentlyActive: boolean) => {
-    if (currentlyActive) {
-      await window.api.aiConfig.removeProjectSelection(projectId, itemId, provider)
+  const handleRemove = async (itemId: string, isLocal: boolean) => {
+    if (isLocal) {
+      await window.api.aiConfig.deleteItem(itemId)
     } else {
-      await window.api.aiConfig.loadGlobalItem({
-        projectId, projectPath, itemId, providers: [provider]
-      })
+      await window.api.aiConfig.removeProjectSelection(projectId, itemId)
     }
     onChanged()
   }
 
   return (
     <div>
-      {/* Header — mirrors row layout for column alignment */}
       <div className="flex items-center gap-2 px-3 mb-2">
-        <Icon className="size-3 shrink-0 text-muted-foreground" />
-        <span className="min-w-0 flex-1 text-sm font-medium">
-          {label}
-          <span className="ml-1.5 text-xs font-normal text-muted-foreground">{allItems.length}</span>
+        <Sparkles className="size-3 shrink-0 text-muted-foreground" />
+        <span className="flex-1 text-sm font-medium">
+          Skills <span className="text-xs font-normal text-muted-foreground">{allItems.length}</span>
         </span>
-        {allItems.length > 0 && (
-          <div className="flex items-center gap-0.5">
-            <div className="w-[70px]" />
-            {enabledProviders.map(p => (
-              <span key={p} className="w-16 text-center text-[10px] text-muted-foreground">
-                {PROVIDER_LABELS[p]?.split(' ')[0]}
-              </span>
-            ))}
-            <div className="w-[28px]" />
-          </div>
-        )}
       </div>
 
-      {/* Items */}
-      {allItems.length > 0 && (
-        <div className="space-y-1">
-          {allItems.map(({ item, providers, isLocal }) => {
-            const isExpanded = expandedId === item.id
-            const status = isLocal ? 'not_synced' as ProviderSyncStatus : aggregateStatus(providers)
-            return (
-              <div key={item.id}>
-                <div
-                  data-testid={`project-context-item-${type}-${item.slug}`}
-                  className={cn(
-                    'flex items-center gap-2 rounded-md border px-3 py-2 transition-colors cursor-pointer',
-                    isExpanded ? 'bg-muted/50 border-primary/30' : 'hover:bg-muted/30'
-                  )}
-                  onClick={() => setExpandedId(isExpanded ? null : item.id)}
-                >
-                  {isExpanded
-                    ? <ChevronDown className="size-3 shrink-0 text-muted-foreground" />
-                    : <ChevronRight className="size-3 shrink-0 text-muted-foreground" />
-                  }
-                  <span className="min-w-0 flex-1 truncate font-mono text-xs">
-                    {item.slug}
-                    {isLocal && (
-                      <span className="ml-1.5 font-sans text-[10px] text-muted-foreground">(local)</span>
-                    )}
-                  </span>
+      <div className="space-y-1">
+        {allItems.map(({ item, providers, isLocal }) => (
+          <SkillItemDetail
+            key={item.id}
+            item={item} providers={providers} enabledProviders={enabledProviders}
+            isLocal={isLocal} projectId={projectId} projectPath={projectPath}
+            onChanged={onChanged} onRemove={() => handleRemove(item.id, isLocal)}
+          />
+        ))}
+      </div>
 
-                  <div className="flex items-center gap-0.5" onClick={e => e.stopPropagation()}>
-                    <div className="w-[70px] flex justify-end">
-                      <StatusBadge status={status} />
-                    </div>
-                    {enabledProviders.map(p => {
-                      if (!providerSupportsType(p)) {
-                        return <span key={p} className="w-16" />
-                      }
-                      if (isLocal) {
-                        return (
-                          <span
-                            key={p}
-                            className="w-16 flex justify-center"
-                            title="Project-local items are synced to all enabled providers."
-                          >
-                            <Checkbox checked disabled />
-                          </span>
-                        )
-                      }
-                      const active = !!providers[p]
-                      return (
-                        <span key={p} className="w-16 flex justify-center">
-                          <Checkbox
-                            checked={active}
-                            onCheckedChange={() => handleToggleProvider(item.id, p, active)}
-                          />
-                        </span>
-                      )
-                    })}
-                    <Button
-                      size="icon-sm"
-                      variant="ghost"
-                      className="size-6 text-muted-foreground hover:text-destructive"
-                      onClick={() => isLocal ? handleRemoveLocal(item.id) : handleRemoveLinked(item.id)}
-                      title="Remove"
-                    >
-                      <X className="size-3" />
-                    </Button>
-                  </div>
-                </div>
-
-                {isExpanded && (
-                  <SkillDetail
-                    key={item.id}
-                    item={item}
-                    providers={providers}
-                    enabledProviders={enabledProviders}
-                    isLocal={isLocal}
-                    projectId={projectId}
-                    projectPath={projectPath}
-                    onChanged={onChanged}
-                  />
-                )}
-              </div>
-            )
-          })}
-        </div>
-      )}
-
-      {/* Subtle add row */}
       <div
         data-testid={`project-context-add-${type}`}
         className="flex items-center gap-2 rounded-md border border-dashed px-3 py-2 cursor-pointer text-muted-foreground transition-colors hover:bg-muted/15 hover:text-foreground mt-1"
