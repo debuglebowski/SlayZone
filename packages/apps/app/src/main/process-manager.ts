@@ -90,6 +90,7 @@ function doSpawn(proc: ManagedProcess): void {
   proc.child = child
   proc.pid = child.pid ?? null
   proc.exitCode = null
+  setStatus(proc, 'running')
 
   child.stdout?.on('data', (data: Buffer) => {
     for (const line of data.toString().split('\n')) {
@@ -109,7 +110,7 @@ function doSpawn(proc: ManagedProcess): void {
     proc.exitCode = code
     if (proc.autoRestart && processes.has(proc.id)) {
       pushLog(proc, `[exited with code ${code ?? '?'}, restarting in 1s...]`)
-      setStatus(proc, 'running')
+      setStatus(proc, 'stopped')
       setTimeout(() => {
         if (processes.has(proc.id)) doSpawn(proc)
       }, 1000)
@@ -192,7 +193,7 @@ export function restartProcess(id: string): boolean {
   proc.child?.kill()
   proc.child = null
   proc.logBuffer.push('[restarting...]')
-  setStatus(proc, 'running')
+  setStatus(proc, 'stopped')
   setTimeout(() => doSpawn(proc), 500)
   return true
 }
