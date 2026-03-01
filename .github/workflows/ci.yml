@@ -1,0 +1,43 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+        env:
+          CI_SKIP_POSTINSTALL: '1'
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Build CLI
+        run: pnpm --filter @slayzone/cli build
+
+      - name: Build
+        run: pnpm build
+        env:
+          POSTHOG_API_KEY: ci
+          POSTHOG_HOST: https://app.posthog.com
+          VITE_CONVEX_URL: https://example.invalid

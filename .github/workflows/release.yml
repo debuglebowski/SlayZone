@@ -9,6 +9,26 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  typecheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+        env:
+          CI_SKIP_POSTINSTALL: '1'
+
+      - name: Typecheck
+        run: pnpm typecheck
+
   deploy-convex:
     runs-on: ubuntu-latest
     steps:
@@ -34,7 +54,7 @@ jobs:
 
   release:
     name: Release (${{ matrix.name }})
-    needs: deploy-convex
+    needs: [typecheck, deploy-convex]
     strategy:
       fail-fast: false
       matrix:
