@@ -204,6 +204,7 @@ export function killTaskProcesses(taskId: string): void {
       proc.autoRestart = false
       proc.child?.kill()
       processes.delete(id)
+      db?.prepare('DELETE FROM processes WHERE id = ?').run(id)
     }
   }
 }
