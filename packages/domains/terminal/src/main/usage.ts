@@ -5,6 +5,7 @@ import { readFile } from 'fs/promises'
 import { join } from 'path'
 import { homedir } from 'os'
 import type { ProviderUsage, UsageWindow } from '@slayzone/terminal/shared'
+import { fetchGlmUsage } from './adapters/glm-usage'
 
 const TIMEOUT_MS = 10_000
 
@@ -13,6 +14,7 @@ const TIMEOUT_MS = 10_000
 interface ProviderMeta { id: string; label: string; cli: string; vendor: string }
 const CLAUDE: ProviderMeta = { id: 'claude', label: 'Claude', cli: 'claude', vendor: 'Anthropic' }
 const CODEX: ProviderMeta = { id: 'codex', label: 'Codex', cli: 'codex', vendor: 'OpenAI' }
+const GLM: ProviderMeta = { id: 'glm', label: 'GLM (Z.AI)', cli: 'glm', vendor: 'Z.AI' }
 
 // ── Error helpers ────────────────────────────────────────────────────
 
@@ -159,7 +161,8 @@ export function registerUsageHandlers(ipcMain: IpcMain): void {
   ipcMain.handle('usage:fetch', async (): Promise<ProviderUsage[]> => {
     const fetchers = [
       fetchClaudeUsage().catch((e): ProviderUsage => usageError(CLAUDE, friendlyError(e))),
-      fetchCodexUsage().catch((e): ProviderUsage => usageError(CODEX, friendlyError(e)))
+      fetchCodexUsage().catch((e): ProviderUsage => usageError(CODEX, friendlyError(e))),
+      fetchGlmUsage().catch((e): ProviderUsage => usageError(GLM, friendlyError(e)))
     ]
     return Promise.all(fetchers)
   })

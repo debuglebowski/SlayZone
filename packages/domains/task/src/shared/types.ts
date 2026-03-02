@@ -23,6 +23,7 @@ export interface ProviderConfig {
 
 /** Maps TerminalMode → settings key + fallback flags for new tasks */
 export const PROVIDER_DEFAULTS: Record<string, { settingsKey: string; fallback: string; label: string }> = {
+  'ccs':          { settingsKey: 'default_ccs_flags',      fallback: 'glm --dangerously-skip-permissions', label: 'CCS' },
   'claude-code':  { settingsKey: 'default_claude_flags',   fallback: '--allow-dangerously-skip-permissions', label: 'Claude' },
   'codex':        { settingsKey: 'default_codex_flags',    fallback: '--full-auto --search',                 label: 'Codex' },
   'cursor-agent': { settingsKey: 'default_cursor_flags',   fallback: '--force',                              label: 'Cursor' },

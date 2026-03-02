@@ -9,6 +9,7 @@ import { Check, BarChart3, Sparkles, SquareTerminal, ChevronLeft, TriangleAlert 
 const STEP_COUNT = 5
 
 const PROVIDERS = [
+  { mode: 'ccs', label: 'CCS' },
   { mode: 'claude-code', label: 'Claude Code' },
   { mode: 'codex', label: 'Codex' },
   { mode: 'cursor-agent', label: 'Cursor' },

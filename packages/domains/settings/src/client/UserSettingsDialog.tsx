@@ -203,7 +203,7 @@ export function UserSettingsDialog({
         mcpPortSetting.status === 'fulfilled' && mcpPortSetting.value ? mcpPortSetting.value : '45678'
       )
 
-      const validModes: TerminalMode[] = ['claude-code', 'codex', 'cursor-agent', 'gemini', 'opencode', 'terminal']
+      const validModes: TerminalMode[] = ['ccs', 'claude-code', 'codex', 'cursor-agent', 'gemini', 'opencode', 'terminal']
       const safeMode =
         termMode.status === 'fulfilled' &&
         validModes.includes(termMode.value as TerminalMode)
@@ -731,6 +731,7 @@ export function UserSettingsDialog({
                                 <SelectValue />
                               </SelectTrigger>
                               <SelectContent>
+                                <SelectItem value="ccs">CCS</SelectItem>
                                 <SelectItem value="claude-code">Claude Code</SelectItem>
                                 <SelectItem value="codex">Codex</SelectItem>
                                 <SelectItem value="cursor-agent">Cursor Agent</SelectItem>

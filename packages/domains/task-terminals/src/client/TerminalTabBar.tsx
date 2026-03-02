@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { Plus, X, Columns2, Terminal as TerminalIcon, Bot, Command, MousePointerClick, Sparkles, Code } from 'lucide-react'
+import { Plus, X, Columns2, Terminal as TerminalIcon, Bot, Command, MousePointerClick, Sparkles, Code, Zap } from 'lucide-react'
 import { cn } from '@slayzone/ui'
 import type { TerminalTab, TerminalGroup } from '../shared/types'
 import type { TerminalMode } from '@slayzone/terminal/shared'
@@ -18,6 +18,7 @@ interface TerminalTabBarProps {
 }
 
 const MODE_ICONS: Record<TerminalMode, typeof TerminalIcon> = {
+  'ccs': Zap,
   'claude-code': Bot,
   'codex': Command,
   'cursor-agent': MousePointerClick,
@@ -30,6 +31,7 @@ function getTabLabel(tab: TerminalTab): string {
   if (tab.label) return tab.label
   if (tab.isMain) {
     switch (tab.mode) {
+      case 'ccs': return 'CCS'
       case 'claude-code': return 'Claude Code'
       case 'codex': return 'Codex'
       case 'cursor-agent': return 'Cursor'
