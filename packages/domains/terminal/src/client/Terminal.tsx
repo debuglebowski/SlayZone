@@ -21,7 +21,7 @@ document.head.appendChild(underlineOverride)
 
 import { getTerminal, setTerminal, disposeTerminal, updateAllThemes } from './terminal-cache'
 import { usePty } from './PtyContext'
-import { useAppearance } from '@slayzone/settings/client'
+import { useAppearance, useTheme } from '@slayzone/settings/client'
 import { getTerminalTheme } from './terminal-themes'
 import { TerminalSearchBar } from './TerminalSearchBar'
 import type { TerminalMode, TerminalState, CodeMode } from '@slayzone/terminal/shared'
@@ -158,6 +158,7 @@ export function Terminal({
 
   const { subscribe, subscribeExit, subscribeSessionInvalid, subscribeAttention, subscribeState, getState, getCrashOutput, resetTaskState, cleanupTask } = usePty()
   const { terminalFontSize } = useAppearance()
+  const { theme } = useTheme()
 
   const [ptyState, setPtyState] = useState<TerminalState>(() => getState(sessionId))
 
@@ -226,7 +227,7 @@ export function Terminal({
         } else {
           // Reattach existing terminal (container already has dimensions)
           containerRef.current.appendChild(cached.element)
-          cached.terminal.options.theme = getTerminalTheme('dark')
+          cached.terminal.options.theme = getTerminalTheme(theme)
           cached.terminal.options.minimumContrastRatio = 1
           terminalRef.current = cached.terminal
           fitAddonRef.current = cached.fitAddon
@@ -287,7 +288,7 @@ export function Terminal({
         cursorBlink: true,
         fontSize: terminalFontSize,
         fontFamily: 'Menlo, Monaco, "Courier New", monospace',
-        theme: getTerminalTheme('dark'),
+        theme: getTerminalTheme(theme),
         minimumContrastRatio: 1
       })
 
@@ -433,7 +434,7 @@ export function Terminal({
         setIsInitializing(false)
       }
     }
-  }, [sessionId, cwd, mode, conversationId, existingConversationId, initialPrompt, codeMode, providerFlags, autoFocus, resetTaskState, handleTerminalKeyEvent, clearBufferWithoutRestart])
+  }, [sessionId, cwd, mode, conversationId, existingConversationId, initialPrompt, codeMode, providerFlags, autoFocus, resetTaskState, handleTerminalKeyEvent, clearBufferWithoutRestart, theme, terminalFontSize])
 
   // Initialize terminal
   useEffect(() => {
@@ -523,9 +524,9 @@ export function Terminal({
     return subscribeState(sessionId, (newState) => setPtyState(newState))
   }, [sessionId, getState, subscribeState])
 
-  // Force terminal to remain dark regardless of app theme.
+  // Keep terminal theme aligned with the app theme.
   useEffect(() => {
-    const xtermTheme = getTerminalTheme('dark')
+    const xtermTheme = getTerminalTheme(theme)
     const contrastRatio = 1
     if (terminalRef.current) {
       terminalRef.current.options.theme = xtermTheme
@@ -539,7 +540,7 @@ export function Terminal({
       background: xtermTheme.background ?? '#000000',
       cursor: xtermTheme.cursor ?? '#ffffff',
     })
-  }, [])
+  }, [theme])
 
   // Handle resize
   useEffect(() => {
