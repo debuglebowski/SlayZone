@@ -142,14 +142,10 @@ export function McpFlatSection({ projectPath, enabledProviders, onChanged }: Mcp
 
   return (
     <div>
-      {/* Header — mirrors row layout for column alignment */}
-      <div className="mb-2 flex items-center gap-2 px-3">
-        <Server className="size-3 shrink-0 text-muted-foreground" />
-        <span className="min-w-0 flex-1 text-sm font-medium">
-          MCP Servers
-          <span className="ml-1.5 text-xs font-normal text-muted-foreground">{enabledServers.length}</span>
-        </span>
-        {enabledServers.length > 0 && (
+      {/* Provider column headers */}
+      {enabledServers.length > 0 && (
+        <div className="mb-2 flex items-center gap-2 px-3">
+          <span className="min-w-0 flex-1" />
           <div className="flex items-center gap-0.5">
             <div className="w-[70px]" />
             {enabledProviders.map((provider) => (
@@ -163,8 +159,8 @@ export function McpFlatSection({ projectPath, enabledProviders, onChanged }: Mcp
             ))}
             <div className="w-[52px]" />
           </div>
-        )}
-      </div>
+        </div>
+      )}
 
       {loading ? (
         <div className="space-y-1">

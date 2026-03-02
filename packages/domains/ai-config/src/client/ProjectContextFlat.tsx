@@ -262,7 +262,15 @@ export function ProjectContextFlat({ projectId, projectPath }: ProjectContextFla
     )
   }
 
-  const localSkills = data.localItems.filter(i => i.type === 'skill')
+  const linkedSkillIds = new Set(data.linkedSkills.map(s => s.item.id))
+  const localSkills = data.localItems.filter(i => i.type === 'skill' && !linkedSkillIds.has(i.id))
+
+  const sectionTitles: Record<ProjectSection, string> = {
+    providers: 'Providers',
+    instructions: 'Instructions',
+    skill: 'Skills',
+    mcp: 'MCP Servers'
+  }
 
   const sectionDescriptions: Record<ProjectSection, string> = {
     providers: 'Choose which providers this project syncs to. Defaults inherited from global settings.',
@@ -333,15 +341,12 @@ export function ProjectContextFlat({ projectId, projectPath }: ProjectContextFla
             className="flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
           >
             <ArrowLeft className="size-3.5" />
-            Overview
+            {sectionTitles[section]}
           </button>
+          <span className="text-xs text-muted-foreground">
+            {sectionDescriptions[section]}
+          </span>
         </div>
-      )}
-
-      {section !== null && (
-        <p className="pb-3 text-xs text-muted-foreground">
-          {sectionDescriptions[section]}
-        </p>
       )}
 
       <div className="flex-1">

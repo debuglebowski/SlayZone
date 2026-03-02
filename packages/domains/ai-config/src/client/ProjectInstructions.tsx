@@ -1,31 +1,14 @@
 import { useCallback, useEffect, useRef, useState, type ChangeEvent } from 'react'
-import { Check, AlertCircle, ChevronDown, Loader2 } from 'lucide-react'
-import { Button, DiffView, Textarea, Tooltip, TooltipContent, TooltipTrigger, cn } from '@slayzone/ui'
+import { Loader2 } from 'lucide-react'
+import { Button, Textarea, Tooltip, TooltipContent, TooltipTrigger } from '@slayzone/ui'
 import type { CliProvider, ProviderSyncStatus } from '../shared'
 import { PROVIDER_PATHS } from '../shared/provider-registry'
+import { ProviderFileCard } from './SyncComponents'
 
 interface ProjectInstructionsProps {
   projectId?: string | null
   projectPath?: string | null
   onChanged?: () => void
-}
-
-function StatusBadge({ status }: { status: ProviderSyncStatus }) {
-  if (status === 'synced') return (
-    <span className="inline-flex items-center gap-1 rounded-full bg-green-500/15 px-2 py-0.5 text-xs text-green-700 dark:text-green-300">
-      <Check className="size-3" /> Synced
-    </span>
-  )
-  if (status === 'out_of_sync') return (
-    <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/15 px-2 py-0.5 text-xs text-amber-700 dark:text-amber-300">
-      <AlertCircle className="size-3" /> Stale
-    </span>
-  )
-  return (
-    <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
-      Not synced
-    </span>
-  )
 }
 
 export function ProjectInstructions({ projectId, projectPath, onChanged }: ProjectInstructionsProps) {
@@ -158,95 +141,44 @@ export function ProjectInstructions({ projectId, projectPath, onChanged }: Proje
 
       {isProject && providers.length > 0 && (
         <>
-          <div className="flex items-center justify-end">
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button data-testid="instructions-push-all" size="sm" onClick={handleSyncAll} disabled={syncingAll || !!syncingProvider}>
-                  {syncingAll && <Loader2 className="size-3.5 animate-spin" />}
-                  Config → All Files
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Overwrite all provider files on disk with the current config content</TooltipContent>
-            </Tooltip>
-          </div>
-
           <div className="space-y-2">
             {providers.map(provider => {
-              const status = providerStatus[provider]!
               const rootPath = PROVIDER_PATHS[provider]?.rootInstructions ?? provider
-              const isPushing = syncingProvider === provider
-              const isPulling = pullingProvider === provider
-              const isExpanded = expandedProviders.has(provider)
-              const isStale = status === 'out_of_sync'
-              const disk = diskContents[provider]
-
               return (
-                <div key={provider} data-testid={`instructions-provider-card-${provider}`} className="rounded-lg border">
-                  <div
-                    className={cn(
-                      'flex items-center gap-3 px-3 py-2.5',
-                      isStale && 'cursor-pointer hover:bg-muted/30'
-                    )}
-                    onClick={isStale ? () => toggleExpanded(provider) : undefined}
-                  >
-                    {isStale && (
-                      <ChevronDown className={cn('size-4 text-muted-foreground transition-transform', !isExpanded && '-rotate-90')} />
-                    )}
-                    <span className="flex-1 font-mono text-sm">{rootPath}</span>
-                    <StatusBadge status={status} />
-                    {isStale && (
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            data-testid={`instructions-pull-${provider}`}
-                            size="sm"
-                            variant="outline"
-                            disabled={isPulling || syncingAll}
-                            onClick={(e) => { e.stopPropagation(); void handlePull(provider) }}
-                          >
-                            {isPulling && <Loader2 className="size-3.5 animate-spin" />}
-                            File → Config
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>Replace config content with the current contents of {rootPath} on disk</TooltipContent>
-                      </Tooltip>
-                    )}
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button
-                          data-testid={`instructions-push-${provider}`}
-                          size="sm"
-                          variant={isStale ? 'default' : 'outline'}
-                          disabled={isPushing || syncingAll}
-                          onClick={(e) => { e.stopPropagation(); void handlePush(provider) }}
-                        >
-                          {isPushing && <Loader2 className="size-3.5 animate-spin" />}
-                          Config → File
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent>Overwrite {rootPath} on disk with the current config content</TooltipContent>
-                    </Tooltip>
-                  </div>
-
-                  {isStale && isExpanded && (
-                    disk === undefined ? (
-                      <div className="flex items-center justify-center border-t py-6">
-                        <Loader2 className="size-4 animate-spin text-muted-foreground" />
-                      </div>
-                    ) : (
-                      <DiffView
-                        left={disk}
-                        right={content}
-                        leftLabel={`${rootPath} (on disk)`}
-                        rightLabel="App content"
-                        className="border-t border-x-0 border-b-0 rounded-none"
-                      />
-                    )
-                  )}
-                </div>
+                <ProviderFileCard
+                  key={provider}
+                  testIdPrefix="instructions"
+                  provider={provider}
+                  path={rootPath}
+                  status={providerStatus[provider]!}
+                  isPushing={syncingProvider === provider}
+                  isPulling={pullingProvider === provider}
+                  isExpanded={expandedProviders.has(provider)}
+                  syncingAll={syncingAll}
+                  disk={diskContents[provider]}
+                  expected={content}
+                  rightLabel="App content"
+                  onToggleExpand={() => toggleExpanded(provider)}
+                  onPush={() => void handlePush(provider)}
+                  onPull={() => void handlePull(provider)}
+                />
               )
             })}
           </div>
+
+          {providers.length > 1 && (
+            <div className="flex items-center justify-end">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button data-testid="instructions-push-all" size="sm" onClick={handleSyncAll} disabled={syncingAll || !!syncingProvider}>
+                    {syncingAll && <Loader2 className="size-3.5 animate-spin" />}
+                    Config → All Files
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Overwrite all provider files on disk with the current config content</TooltipContent>
+              </Tooltip>
+            </div>
+          )}
         </>
       )}
     </div>

@@ -288,7 +288,7 @@ function GlobalContextManager() {
 
   return (
     <div className="flex min-h-full flex-col">
-      {/* Header: back button + actions when drilled in */}
+      {/* Header: back button + description + actions when drilled in */}
       {section !== null && (
         <div className="flex items-center justify-between gap-3 pb-4">
           <button
@@ -296,8 +296,16 @@ function GlobalContextManager() {
             className="flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
           >
             <ArrowLeft className="size-3.5" />
-            Overview
+            {{ providers: 'Providers', instructions: 'Instructions', skill: 'Skills', mcp: 'MCP Servers', files: 'Files' }[section]}
           </button>
+
+          <span className="flex-1 text-right text-xs text-muted-foreground">
+            {section === 'providers' && 'Choose which AI coding tools to sync content to.'}
+            {section === 'instructions' && 'Global instructions stored in the database. Not synced to any file.'}
+            {section === 'skill' && 'Global skills shared across all projects. Synced to enabled providers.'}
+            {section === 'mcp' && 'Browse and favorite MCP servers from the curated catalog.'}
+            {section === 'files' && 'Global config files across all provider directories.'}
+          </span>
 
           <div className="flex items-center gap-2">
             {isItemSection && (
@@ -312,17 +320,6 @@ function GlobalContextManager() {
             )}
           </div>
         </div>
-      )}
-
-      {/* Section description */}
-      {section !== null && (
-        <p className="pb-3 text-xs text-muted-foreground">
-          {section === 'providers' && 'Choose which AI coding tools to sync content to.'}
-          {section === 'instructions' && 'Global instructions stored in the database. Not synced to any file.'}
-          {section === 'skill' && 'Global skills shared across all projects. Synced to enabled providers.'}
-          {section === 'mcp' && 'Browse and favorite MCP servers from the curated catalog.'}
-          {section === 'files' && 'Global config files across all provider directories.'}
-        </p>
       )}
 
       {/* Content area */}

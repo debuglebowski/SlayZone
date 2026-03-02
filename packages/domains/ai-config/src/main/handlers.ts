@@ -315,6 +315,7 @@ export function registerAiConfigHandlers(ipcMain: IpcMain, db: Database): void {
   })
 
   ipcMain.handle('ai-config:delete-item', (_event, id: string) => {
+    db.prepare('DELETE FROM ai_config_project_selections WHERE item_id = ?').run(id)
     const result = db.prepare('DELETE FROM ai_config_items WHERE id = ?').run(id)
     return result.changes > 0
   })
@@ -698,6 +699,13 @@ export function registerAiConfigHandlers(ipcMain: IpcMain, db: Database): void {
         ? filterConfigurableCliProviders([provider])
         : getEnabledProviders(projectId)
 
+      const insertSelection = db.prepare(`
+        INSERT INTO ai_config_project_selections (id, project_id, item_id, provider, target_path, content_hash, selected_at)
+        VALUES (?, ?, ?, ?, ?, ?, datetime('now'))
+        ON CONFLICT(project_id, item_id, provider) DO UPDATE SET
+          target_path = excluded.target_path, content_hash = excluded.content_hash, selected_at = datetime('now')
+      `)
+
       let firstEntry: ContextTreeEntry | null = null
       for (const providerId of providersToSync) {
         const relativePath = getSkillPath(providerId, localItem.slug)
@@ -710,6 +718,7 @@ export function registerAiConfigHandlers(ipcMain: IpcMain, db: Database): void {
         const dir = path.dirname(filePath)
         if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true })
         fs.writeFileSync(filePath, syncedContent, 'utf-8')
+        insertSelection.run(crypto.randomUUID(), projectId, localItem.id, providerId, relativePath, contentHash(syncedContent))
         removeLegacySkillFileIfPresent(
           providerId,
           localItem.type,
@@ -1169,6 +1178,20 @@ export function registerAiConfigHandlers(ipcMain: IpcMain, db: Database): void {
 
     db.prepare("UPDATE ai_config_items SET content = ?, updated_at = datetime('now') WHERE id = ?")
       .run(strippedContent, itemId)
+
+    // Update content_hash for ALL provider selections so status is consistent.
+    // After pulling, the new expected content for each provider is derived from strippedContent.
+    const selections = db.prepare(
+      'SELECT id, provider, target_path FROM ai_config_project_selections WHERE project_id = ? AND item_id = ?'
+    ).all(projectId, itemId) as Array<{ id: string; provider: string; target_path: string }>
+
+    for (const sel of selections) {
+      if (!isConfigurableCliProvider(sel.provider)) continue
+      const effectiveTargetPath = getCanonicalSelectionTargetPath(sel.provider as CliProvider, item.type, item.slug, sel.target_path)
+      const expectedContent = getSyncedItemContent(sel.provider as CliProvider, item.type, item.slug, effectiveTargetPath, strippedContent)
+      db.prepare('UPDATE ai_config_project_selections SET content_hash = ? WHERE id = ?')
+        .run(contentHash(expectedContent), sel.id)
+    }
 
     return recomputeSingleSkillStatus(projectId, projectPath, itemId)
   })

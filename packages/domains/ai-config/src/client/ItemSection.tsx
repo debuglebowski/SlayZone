@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useRef, useState, type ChangeEvent } from 'react'
 import {
-  Check, AlertCircle, ChevronDown, ChevronRight,
-  Plus, Loader2, Sparkles, X
+  ChevronDown, ChevronRight,
+  Plus, Loader2, X
 } from 'lucide-react'
 import {
-  Button, DiffView, IconButton, Input, Label,
+  Button, IconButton, Input, Label,
   Tabs, TabsContent, TabsList, TabsTrigger,
   Textarea, Tooltip, TooltipContent, TooltipTrigger, cn, toast
 } from '@slayzone/ui'
@@ -14,6 +14,7 @@ import type {
 } from '../shared'
 import { PROVIDER_PATHS } from '../shared/provider-registry'
 import { AddItemPicker } from './AddItemPicker'
+import { StatusBadge, ProviderFileCard } from './SyncComponents'
 
 // ============================================================
 // Types & Helpers
@@ -47,28 +48,6 @@ function aggregateStatus(
   if (statuses.every(s => s === 'synced')) return 'synced'
   if (statuses.some(s => s === 'out_of_sync')) return 'out_of_sync'
   return 'not_synced'
-}
-
-// ============================================================
-// Shared: StatusBadge
-// ============================================================
-
-function StatusBadge({ status }: { status: ProviderSyncStatus }) {
-  if (status === 'synced') return (
-    <span className="inline-flex items-center gap-1 rounded-full bg-green-500/15 px-2 py-0.5 text-xs text-green-700 dark:text-green-300">
-      <Check className="size-3" /> Synced
-    </span>
-  )
-  if (status === 'out_of_sync') return (
-    <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/15 px-2 py-0.5 text-xs text-amber-700 dark:text-amber-300">
-      <AlertCircle className="size-3" /> Stale
-    </span>
-  )
-  return (
-    <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
-      Not synced
-    </span>
-  )
 }
 
 // ============================================================
@@ -229,85 +208,6 @@ function useSkillItem({
   }
 }
 
-type Sk = ReturnType<typeof useSkillItem>
-
-// ============================================================
-// Shared: ProviderFileCard (expandable card with diff)
-// ============================================================
-
-function ProviderFileCard({ row, sk }: { row: ProviderRow; sk: Sk }) {
-  const { provider, path, status } = row
-  const isPushing = sk.syncingProvider === provider
-  const isPulling = sk.pullingProvider === provider
-  const isExpanded = sk.expandedProviders.has(provider)
-  const isStale = status === 'out_of_sync'
-  const disk = sk.diskContents[provider]
-  const expected = sk.expectedContents[provider]
-
-  return (
-    <div data-testid={`skill-provider-card-${provider}-${sk.item.slug}`} className="rounded-lg border">
-      <div
-        className={cn(
-          'flex items-center gap-3 px-3 py-2.5',
-          isStale && 'cursor-pointer hover:bg-muted/30'
-        )}
-        onClick={isStale ? () => sk.toggleExpanded(provider) : undefined}
-      >
-        {isStale && (
-          <ChevronDown className={cn('size-4 text-muted-foreground transition-transform', !isExpanded && '-rotate-90')} />
-        )}
-        <span className="flex-1 font-mono text-sm truncate">{path}</span>
-        <StatusBadge status={status} />
-        {isStale && (
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                data-testid={`skill-pull-${provider}-${sk.item.slug}`}
-                size="sm" variant="outline"
-                disabled={isPulling || sk.syncingAll}
-                onClick={(e) => { e.stopPropagation(); void sk.handlePull(provider) }}
-              >
-                {isPulling && <Loader2 className="size-3.5 animate-spin" />}
-                File → Config
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>Pull from {path}</TooltipContent>
-          </Tooltip>
-        )}
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              data-testid={`skill-push-${provider}-${sk.item.slug}`}
-              size="sm" variant={isStale ? 'default' : 'outline'}
-              disabled={isPushing || sk.syncingAll}
-              onClick={(e) => { e.stopPropagation(); void sk.handlePush(provider) }}
-            >
-              {isPushing && <Loader2 className="size-3.5 animate-spin" />}
-              Config → File
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>Push to {path}</TooltipContent>
-        </Tooltip>
-      </div>
-
-      {isStale && isExpanded && (
-        disk === undefined || expected === undefined ? (
-          <div className="flex items-center justify-center border-t py-6">
-            <Loader2 className="size-4 animate-spin text-muted-foreground" />
-          </div>
-        ) : (
-          <DiffView
-            left={disk} right={expected}
-            leftLabel={`${path} (on disk)`}
-            rightLabel="Expected content"
-            className="border-t border-x-0 border-b-0 rounded-none"
-          />
-        )
-      )}
-    </div>
-  )
-}
-
 // ============================================================
 // Skill item detail (tabbed: Content | Sync)
 // ============================================================
@@ -408,7 +308,23 @@ function SkillItemDetail({ item, providers, enabledProviders, isLocal, projectId
                 <>
                   <div className="space-y-2">
                     {sk.providerRows.map(row => (
-                      <ProviderFileCard key={row.provider} row={row} sk={sk} />
+                      <ProviderFileCard
+                        key={row.provider}
+                        testIdPrefix="skill"
+                        testIdSuffix={sk.item.slug}
+                        provider={row.provider}
+                        path={row.path}
+                        status={row.status}
+                        isPushing={sk.syncingProvider === row.provider}
+                        isPulling={sk.pullingProvider === row.provider}
+                        isExpanded={sk.expandedProviders.has(row.provider)}
+                        syncingAll={sk.syncingAll}
+                        disk={sk.diskContents[row.provider]}
+                        expected={sk.expectedContents[row.provider]}
+                        onToggleExpand={() => sk.toggleExpanded(row.provider)}
+                        onPush={() => void sk.handlePush(row.provider)}
+                        onPull={() => void sk.handlePull(row.provider)}
+                      />
                     ))}
                   </div>
                   {sk.providerRows.length > 1 && (
@@ -453,7 +369,7 @@ export function ItemSection({
 
   const allItems = [
     ...localItems.map(item => ({ item, providers: {} as ProjectSkillStatus['providers'], isLocal: true })),
-    ...linkedItems.map(s => ({ item: s.item, providers: s.providers, isLocal: false }))
+    ...linkedItems.map(s => ({ item: s.item, providers: s.providers, isLocal: s.item.scope === 'project' }))
   ]
   const existingLinks = linkedItems.map(s => s.item.id)
 
@@ -468,13 +384,6 @@ export function ItemSection({
 
   return (
     <div>
-      <div className="flex items-center gap-2 px-3 mb-2">
-        <Sparkles className="size-3 shrink-0 text-muted-foreground" />
-        <span className="flex-1 text-sm font-medium">
-          Skills <span className="text-xs font-normal text-muted-foreground">{allItems.length}</span>
-        </span>
-      </div>
-
       <div className="space-y-1">
         {allItems.map(({ item, providers, isLocal }) => (
           <SkillItemDetail
