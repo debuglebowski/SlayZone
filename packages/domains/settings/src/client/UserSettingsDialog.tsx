@@ -112,7 +112,7 @@ export function UserSettingsDialog({
   const [cliInstalling, setCliInstalling] = useState(false)
   const [cliMessage, setCliMessage] = useState('')
   const [leaderboardEnabled, setLeaderboardEnabled] = useState(false)
-  const [contextManagerEnabled, setContextManagerEnabled] = useState(import.meta.env.DEV)
+  const [contextManagerEnabled, setContextManagerEnabled] = useState(false)
   const loadRequestIdRef = useRef(0)
 
   useEffect(() => {
@@ -130,7 +130,7 @@ export function UserSettingsDialog({
         if (!cancelled) setContextManagerEnabled(enabled)
       })
       .catch(() => {
-        if (!cancelled) setContextManagerEnabled(import.meta.env.DEV)
+        if (!cancelled) setContextManagerEnabled(false)
       })
     return () => {
       cancelled = true

@@ -112,7 +112,7 @@ export function ProjectSettingsDialog({
   const [selectedIssueIds, setSelectedIssueIds] = useState<Set<string>>(new Set())
   const [loadingIssues, setLoadingIssues] = useState(false)
   const [contextManagerTab, setContextManagerTab] = useState<ProjectContextManagerTab>('config')
-  const [contextManagerEnabled, setContextManagerEnabled] = useState(import.meta.env.DEV)
+  const [contextManagerEnabled, setContextManagerEnabled] = useState(false)
 
   useEffect(() => {
     if (project) {
@@ -145,7 +145,7 @@ export function ProjectSettingsDialog({
         if (!cancelled) setContextManagerEnabled(enabled)
       })
       .catch(() => {
-        if (!cancelled) setContextManagerEnabled(import.meta.env.DEV)
+        if (!cancelled) setContextManagerEnabled(false)
       })
     return () => {
       cancelled = true
