@@ -16,6 +16,25 @@ export interface ChangelogEntry {
 // Newest first. Only user-facing versions with meaningful changes.
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '0.2.2',
+    date: '2026-03-02',
+    tagline: 'Stability fixes',
+    items: [
+      {
+        category: 'fix',
+        title: 'Undo stale snapshot',
+        description:
+          'Undoing task completion no longer uses a stale task snapshot.',
+      },
+      {
+        category: 'fix',
+        title: 'Task processes cleaned up on archive',
+        description:
+          'Archiving or purging a task now kills its background processes, not just terminals.',
+      },
+    ],
+  },
+  {
     version: '0.2.1',
     date: '2026-03-02',
     tagline: 'Light up your workflow',

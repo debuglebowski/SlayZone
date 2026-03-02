@@ -1,6 +1,22 @@
 # Changelog
 
 
+## v0.2.2
+
+[compare changes](https://github.com/debuglebowski/SlayZone/compare/v0.2.1...v0.2.2)
+
+### 🩹 Fixes
+
+- **undo:** Use functional updater in completion undo to avoid stale task snapshot ([358caad](https://github.com/debuglebowski/SlayZone/commit/358caad))
+- **test-utils:** Add missing better-sqlite3 dep for typecheck ([98974a9](https://github.com/debuglebowski/SlayZone/commit/98974a9))
+- **typecheck:** Replace import.meta.env.DEV with false in domain packages ([b2fa65d](https://github.com/debuglebowski/SlayZone/commit/b2fa65d))
+- **types:** Add ImportMeta.env types to shared global.d.ts ([fe1fe0a](https://github.com/debuglebowski/SlayZone/commit/fe1fe0a))
+- **task:** Kill task processes on archive/purge ([323d735](https://github.com/debuglebowski/SlayZone/commit/323d735))
+
+### ❤️ Contributors
+
+- Debuglebowski
+
 ## v0.2.1
 
 [compare changes](https://github.com/debuglebowski/SlayZone/compare/v0.2.0...v0.2.1)
