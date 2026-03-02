@@ -54,6 +54,11 @@ describe('fs:readDir', () => {
     expect(names).toContain('main.ts')
     expect(names).toContain('utils.ts')
   })
+
+  test('returns empty list when directory is missing', () => {
+    const entries = h.invoke('fs:readDir', root, 'does-not-exist') as { name: string }[]
+    expect(entries).toHaveLength(0)
+  })
 })
 
 describe('fs:readFile', () => {
@@ -64,6 +69,11 @@ describe('fs:readFile', () => {
 
   test('rejects path traversal', () => {
     expect(() => h.invoke('fs:readFile', root, '../../../etc/passwd')).toThrow()
+  })
+
+  test('returns null content when file is missing', () => {
+    const result = h.invoke('fs:readFile', root, 'missing.json') as { content: string | null }
+    expect(result.content).toBeNull()
   })
 })
 

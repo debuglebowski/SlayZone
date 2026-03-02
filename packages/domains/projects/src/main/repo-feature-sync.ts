@@ -429,7 +429,7 @@ function createTaskForFeature(
       id, project_id, title, description, status, priority, "order", terminal_mode,
       provider_config, claude_flags, codex_flags, cursor_flags, gemini_flags, opencode_flags,
       created_at, updated_at
-    ) VALUES (?, ?, ?, ?, 'backlog', 3, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
+    ) VALUES (?, ?, ?, ?, 'inbox', 3, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
   `).run(
     id,
     projectId,

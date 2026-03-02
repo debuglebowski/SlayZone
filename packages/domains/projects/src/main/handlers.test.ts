@@ -104,11 +104,12 @@ description: |
     }) as { id: string }
 
     const tasks = h.db
-      .prepare('SELECT title, description FROM tasks WHERE project_id = ? ORDER BY "order" ASC')
-      .all(project.id) as Array<{ title: string; description: string | null }>
+      .prepare('SELECT title, description, status FROM tasks WHERE project_id = ? ORDER BY "order" ASC')
+      .all(project.id) as Array<{ title: string; description: string | null; status: string }>
     expect(tasks).toHaveLength(1)
     expect(tasks[0].title).toBe('FEAT-001 Google Sheets Integration as a HubSpot Alternative (Backend)')
     expect(tasks[0].description).toBeNull()
+    expect(tasks[0].status).toBe('inbox')
 
     const links = h.db
       .prepare('SELECT feature_file_path FROM project_feature_task_links WHERE project_id = ?')
