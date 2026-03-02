@@ -18,7 +18,8 @@ function parseProject(row: Record<string, unknown> | undefined): Record<string, 
   if (!row) return null
   return {
     ...row,
-    columns_config: parseColumnsConfig(row.columns_config)
+    columns_config: parseColumnsConfig(row.columns_config),
+    execution_context: row.execution_context ? (() => { try { return JSON.parse(row.execution_context as string) } catch { return null } })() : null
   }
 }
 
@@ -187,6 +188,10 @@ export function registerProjectHandlers(ipcMain: IpcMain, db: Database): void {
     if (data.worktreeSourceBranch !== undefined) {
       fields.push('worktree_source_branch = ?')
       values.push(data.worktreeSourceBranch)
+    }
+    if (data.executionContext !== undefined) {
+      fields.push('execution_context = ?')
+      values.push(data.executionContext ? JSON.stringify(data.executionContext) : null)
     }
     if (data.columnsConfig !== undefined) {
       fields.push('columns_config = ?')

@@ -1,5 +1,10 @@
 import type { ColumnConfig } from '@slayzone/workflow'
 
+export type ExecutionContext =
+  | { type: 'host' }
+  | { type: 'docker'; container: string; workdir?: string; shell?: string }
+  | { type: 'ssh'; target: string; workdir?: string; shell?: string }
+
 export {
   WORKFLOW_CATEGORIES,
   DEFAULT_COLUMNS,
@@ -15,6 +20,7 @@ export interface Project {
   auto_create_worktree_on_task_create: number | null
   worktree_source_branch: string | null
   columns_config: ColumnConfig[] | null
+  execution_context: ExecutionContext | null
   created_at: string
   updated_at: string
 }
@@ -34,4 +40,5 @@ export interface UpdateProjectInput {
   autoCreateWorktreeOnTaskCreate?: boolean | null
   worktreeSourceBranch?: string | null
   columnsConfig?: ColumnConfig[] | null
+  executionContext?: ExecutionContext | null
 }
