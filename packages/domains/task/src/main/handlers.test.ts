@@ -489,6 +489,36 @@ acceptance:
     expect(details.lastSyncSource).toBe('repo')
   })
 
+  test('unlinks task feature details when linked FEATURE.md is deleted', () => {
+    const repoPath = h.tmpDir()
+    writeFeatureMd(
+      repoPath,
+      'docs/features/feature-missing',
+      `id: FEAT-MISSING
+title: Missing feature file
+description: This feature file will be deleted
+`
+    )
+
+    const project = h.invoke('db:projects:create', {
+      name: 'Missing Feature Project',
+      color: '#6d28d9',
+      path: repoPath,
+      featureRepoIntegrationEnabled: true
+    }) as { id: string }
+
+    const task = (h.invoke('db:tasks:getByProject', project.id) as Task[])[0]
+    fs.rmSync(path.join(repoPath, 'docs/features/feature-missing'), { recursive: true, force: true })
+
+    const details = h.invoke('db:tasks:getFeatureDetails', task.id) as null
+    expect(details).toBeNull()
+
+    const links = h.db
+      .prepare('SELECT COUNT(*) as count FROM project_feature_task_links WHERE task_id = ?')
+      .get(task.id) as { count: number }
+    expect(links.count).toBe(0)
+  })
+
   test('tracks last sync source for repo pull and task push', () => {
     const repoPath = h.tmpDir()
     writeFeatureMd(

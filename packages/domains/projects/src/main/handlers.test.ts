@@ -236,6 +236,45 @@ description: Updated description
     expect(task.title).toBe('FEAT-002 Updated title')
     expect(task.description).toBeNull()
   })
+
+  test('detaches stale links when FEATURE.md is deleted', () => {
+    const repoPath = h.tmpDir()
+    const relDir = 'docs/features/feature-removed'
+    writeFeatureMd(
+      repoPath,
+      relDir,
+      `id: FEAT-REMOVED
+title: Will be removed
+description: Created before delete
+`
+    )
+
+    const project = h.invoke('db:projects:create', {
+      name: 'Sync Remove Project',
+      color: '#14b8a6',
+      path: repoPath,
+      featureRepoIntegrationEnabled: true
+    }) as { id: string }
+
+    const before = h.db
+      .prepare('SELECT COUNT(*) as count FROM project_feature_task_links WHERE project_id = ?')
+      .get(project.id) as { count: number }
+    expect(before.count).toBe(1)
+
+    fs.rmSync(path.join(repoPath, relDir), { recursive: true, force: true })
+
+    h.invoke('db:projects:syncFeatures', project.id)
+
+    const after = h.db
+      .prepare('SELECT COUNT(*) as count FROM project_feature_task_links WHERE project_id = ?')
+      .get(project.id) as { count: number }
+    expect(after.count).toBe(0)
+
+    const tasks = h.db
+      .prepare('SELECT COUNT(*) as count FROM tasks WHERE project_id = ?')
+      .get(project.id) as { count: number }
+    expect(tasks.count).toBe(1)
+  })
 })
 
 describe('repository feature integration settings', () => {

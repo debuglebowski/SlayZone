@@ -47,16 +47,36 @@ interface CodeEditorProps {
   onSave: () => void
   /** Bump to replace editor content from external source (e.g. disk reload) */
   version?: number
+  showLineNumbers?: boolean
+  wrapLongLines?: boolean
 }
 
-export function CodeEditor({ filePath, content, onChange, onSave, version }: CodeEditorProps) {
+export function CodeEditor({
+  filePath,
+  content,
+  onChange,
+  onSave,
+  version,
+  showLineNumbers = true,
+  wrapLongLines = false
+}: CodeEditorProps) {
   const { editorFontSize } = useAppearance()
   const editorTheme = useMemo(() => EditorView.theme({
-    '&': { height: '100%', fontSize: `${editorFontSize}px`, backgroundColor: 'transparent' },
+    '&': {
+      height: '100%',
+      fontSize: `${editorFontSize}px`,
+      backgroundColor: 'transparent'
+    },
     '.cm-scroller': { overflow: 'auto' },
-    '.cm-content': { fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace' },
-    '.cm-gutters': { backgroundColor: 'transparent', border: 'none' }
-  }), [editorFontSize])
+    '.cm-content': {
+      fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace'
+    },
+    '.cm-gutters': {
+      backgroundColor: 'transparent',
+      border: 'none',
+      display: showLineNumbers ? 'flex' : 'none'
+    }
+  }), [editorFontSize, showLineNumbers])
   const containerRef = useRef<HTMLDivElement>(null)
   const viewRef = useRef<EditorView | null>(null)
   const onChangeRef = useRef(onChange)
@@ -91,6 +111,7 @@ export function CodeEditor({ filePath, content, onChange, onSave, version }: Cod
         }
       })
     ]
+    if (wrapLongLines) extensions.push(EditorView.lineWrapping)
     if (lang) extensions.splice(1, 0, lang)
 
     const state = EditorState.create({ doc: content, extensions })
@@ -102,7 +123,7 @@ export function CodeEditor({ filePath, content, onChange, onSave, version }: Cod
       viewRef.current = null
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filePath, editorTheme])
+  }, [filePath, editorTheme, showLineNumbers, wrapLongLines])
 
   // Replace editor content when version bumps (external disk reload)
   useEffect(() => {

@@ -778,6 +778,10 @@ function resolveLinkedFeatureFilePath(
   return null
 }
 
+function unlinkFeatureTaskLink(db: Database, linkId: string): void {
+  db.prepare('DELETE FROM project_feature_task_links WHERE id = ?').run(linkId)
+}
+
 function buildContentHash(content: string): string {
   return crypto.createHash('sha256').update(content).digest('hex')
 }
@@ -846,7 +850,6 @@ export function syncProjectFeatureTasks(db: Database, projectId: string): Projec
   )
   const featureRootAbs = resolveFeatureRoot(project.path, featureRoot)
   const featureFiles = listFeatureSpecFiles(featureRootAbs)
-  if (featureFiles.length === 0) return result
 
   const scannedFeatures: ScannedFeature[] = []
   for (const file of featureFiles) {
@@ -873,16 +876,32 @@ export function syncProjectFeatureTasks(db: Database, projectId: string): Projec
     }
   }
 
-  const existingRows = db.prepare(`
+  const existingRowsRaw = db.prepare(`
     SELECT l.id, l.project_id, l.task_id, l.feature_id, l.feature_file_path, l.content_hash, t.id AS existing_task_id
     FROM project_feature_task_links l
     LEFT JOIN tasks t ON t.id = l.task_id
     WHERE l.project_id = ?
   `).all(projectId) as FeatureLinkRow[]
+  const existingRows: FeatureLinkRow[] = []
+  const staleLinkIds: string[] = []
+  for (const row of existingRowsRaw) {
+    const resolved = resolveLinkedFeatureFilePath(db, {
+      linkId: row.id,
+      projectPath: project.path,
+      featureFilePath: row.feature_file_path
+    })
+    if (!resolved) {
+      staleLinkIds.push(row.id)
+      continue
+    }
+    row.feature_file_path = resolved.featureFilePath
+    existingRows.push(row)
+  }
   const existingByPath = new Map(existingRows.map((row) => [row.feature_file_path, row]))
   const existingByFeatureId = new Map(existingRows.filter((row) => row.feature_id).map((row) => [row.feature_id as string, row]))
 
   db.transaction(() => {
+    const deleteLinkStmt = db.prepare('DELETE FROM project_feature_task_links WHERE id = ?')
     const updateTaskStmt = db.prepare(`
       UPDATE tasks
       SET project_id = ?, title = ?, updated_at = datetime('now')
@@ -898,6 +917,11 @@ export function syncProjectFeatureTasks(db: Database, projectId: string): Projec
         id, project_id, task_id, feature_id, feature_title, feature_file_path, content_hash, last_sync_source, last_sync_at, created_at, updated_at
       ) VALUES (?, ?, ?, ?, ?, ?, ?, 'repo', datetime('now'), datetime('now'), datetime('now'))
     `)
+
+    for (const linkId of staleLinkIds) {
+      deleteLinkStmt.run(linkId)
+      result.updated += 1
+    }
 
     for (const feature of scannedFeatures) {
       const taskTitle = buildTaskTitle(feature.parsed, feature.relPath)
@@ -1062,6 +1086,10 @@ export function getTaskFeatureDetails(db: Database, taskId: string): TaskFeature
         featureFilePath: row.feature_file_path
       })
     : null
+  if (row.project_path && !resolved) {
+    unlinkFeatureTaskLink(db, row.link_id)
+    return null
+  }
 
   const featureFilePath = normalizeRelPath(resolved?.featureFilePath ?? row.feature_file_path)
   const fileSegments = featureFilePath.split('/').filter(Boolean)

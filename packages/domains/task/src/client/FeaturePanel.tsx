@@ -1,9 +1,44 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { FileText, FolderOpen } from 'lucide-react'
+import { FileText } from 'lucide-react'
 import { Button, Input, Label, Textarea, toast } from '@slayzone/ui'
+import { CodeEditor } from '@slayzone/file-editor/client'
 import type { Project } from '@slayzone/projects/shared'
 import type { TaskFeatureDetails } from '@slayzone/projects/shared'
 import type { Task } from '@slayzone/task/shared'
+
+const NON_SOURCE_EXTENSIONS = new Set([
+  'pyc',
+  'pyo',
+  'pyd',
+  'so',
+  'dll',
+  'dylib',
+  'class',
+  'o',
+  'a',
+  'exe',
+  'bin',
+  'zip',
+  'gz',
+  'tar',
+  'jar',
+  'jpg',
+  'jpeg',
+  'png',
+  'gif',
+  'webp',
+  'ico',
+  'pdf'
+])
+
+function isSourceAcceptanceFile(filePath: string): boolean {
+  const normalized = filePath.toLowerCase()
+  if (normalized.includes('/__pycache__/')) return false
+  const fileName = filePath.split('/').pop() ?? filePath
+  const ext = fileName.includes('.') ? (fileName.split('.').pop() ?? '').toLowerCase() : ''
+  if (!ext) return true
+  return !NON_SOURCE_EXTENSIONS.has(ext)
+}
 
 interface FeaturePanelProps {
   taskId: string
@@ -21,6 +56,7 @@ export function FeaturePanel({
   const [details, setDetails] = useState<TaskFeatureDetails | null>(null)
   const [loading, setLoading] = useState(true)
   const [contentRefreshTick, setContentRefreshTick] = useState(0)
+  const [editorVersion, setEditorVersion] = useState(0)
   const [creatingFeature, setCreatingFeature] = useState(false)
   const [newFeatureFolder, setNewFeatureFolder] = useState('')
   const [newFeatureTitle, setNewFeatureTitle] = useState('')
@@ -30,6 +66,9 @@ export function FeaturePanel({
   const [yamlLoading, setYamlLoading] = useState(false)
   const [yamlSaving, setYamlSaving] = useState(false)
   const [yamlError, setYamlError] = useState<string | null>(null)
+  const [acceptanceFiles, setAcceptanceFiles] = useState<string[]>([])
+  const [acceptanceLoading, setAcceptanceLoading] = useState(false)
+  const [acceptanceError, setAcceptanceError] = useState<string | null>(null)
 
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const saveRequestIdRef = useRef(0)
@@ -70,11 +109,13 @@ export function FeaturePanel({
     ? featureFilePath.split('/').filter(Boolean).pop() ?? 'Feature file'
     : 'Feature file'
   const projectPath = project?.path ?? null
+  const acceptanceDirPath = featureDirPath ? `${featureDirPath}/acceptance` : null
 
   useEffect(() => {
     if (!projectPath || !featureFilePath || !featureDirPath) {
       setYamlContent('')
       lastSavedYamlRef.current = null
+      setEditorVersion((prev) => prev + 1)
       return
     }
 
@@ -90,9 +131,11 @@ export function FeaturePanel({
           setYamlContent('')
           setYamlError('Feature file is empty or too large to render')
           lastSavedYamlRef.current = ''
+          setEditorVersion((prev) => prev + 1)
         } else {
           setYamlContent(readResult.content)
           lastSavedYamlRef.current = readResult.content
+          setEditorVersion((prev) => prev + 1)
         }
       } catch (err) {
         if (cancelled) return
@@ -109,6 +152,77 @@ export function FeaturePanel({
   }, [projectPath, featureFilePath, featureDirPath, contentRefreshTick])
 
   useEffect(() => {
+    if (!projectPath || !acceptanceDirPath) {
+      setAcceptanceFiles([])
+      setAcceptanceError(null)
+      return
+    }
+
+    let cancelled = false
+    void (async () => {
+      setAcceptanceLoading(true)
+      setAcceptanceError(null)
+      try {
+        const collected: string[] = []
+        const stack: string[] = [acceptanceDirPath]
+        while (stack.length > 0) {
+          const current = stack.pop()
+          if (!current) break
+          const entries = await window.api.fs.readDir(projectPath, current)
+          for (const entry of entries) {
+            if (entry.type === 'directory') {
+              if (entry.name === '__pycache__') continue
+              stack.push(entry.path)
+            } else {
+              if (isSourceAcceptanceFile(entry.path)) {
+                collected.push(entry.path)
+              }
+            }
+          }
+        }
+        collected.sort((a, b) => a.localeCompare(b))
+        if (cancelled) return
+        setAcceptanceFiles(collected)
+      } catch (err) {
+        if (cancelled) return
+        const message = err instanceof Error ? err.message : String(err)
+        if (/ENOENT/i.test(message)) {
+          setAcceptanceFiles([])
+          setAcceptanceError(null)
+        } else {
+          setAcceptanceFiles([])
+          setAcceptanceError(message)
+        }
+      } finally {
+        if (!cancelled) setAcceptanceLoading(false)
+      }
+    })()
+
+    return () => {
+      cancelled = true
+    }
+  }, [projectPath, acceptanceDirPath, contentRefreshTick])
+
+  const persistFeatureFileContent = useCallback(async (content: string, requestId: number) => {
+    if (!details || !projectPath || !featureFilePath) return
+    setYamlSaving(true)
+    setYamlError(null)
+    try {
+      await window.api.fs.writeFile(projectPath, featureFilePath, content)
+      const sync = await window.api.db.syncTaskFeatureFromRepo(taskId)
+      if (requestId !== saveRequestIdRef.current) return
+      if (sync.task) onTaskUpdated(sync.task)
+      if (sync.details) setDetails(sync.details)
+      lastSavedYamlRef.current = content
+    } catch (err) {
+      if (requestId !== saveRequestIdRef.current) return
+      setYamlError(err instanceof Error ? err.message : 'Failed to save feature file')
+    } finally {
+      if (requestId === saveRequestIdRef.current) setYamlSaving(false)
+    }
+  }, [details, featureFilePath, onTaskUpdated, projectPath, taskId])
+
+  useEffect(() => {
     if (!details || !projectPath || !featureFilePath) return
     if (lastSavedYamlRef.current === null) return
     if (yamlContent === lastSavedYamlRef.current) return
@@ -116,23 +230,7 @@ export function FeaturePanel({
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current)
     saveTimerRef.current = setTimeout(() => {
       const requestId = ++saveRequestIdRef.current
-      void (async () => {
-        setYamlSaving(true)
-        setYamlError(null)
-        try {
-          await window.api.fs.writeFile(projectPath, featureFilePath, yamlContent)
-          const sync = await window.api.db.syncTaskFeatureFromRepo(taskId)
-          if (requestId !== saveRequestIdRef.current) return
-          if (sync.task) onTaskUpdated(sync.task)
-          if (sync.details) setDetails(sync.details)
-          lastSavedYamlRef.current = yamlContent
-        } catch (err) {
-          if (requestId !== saveRequestIdRef.current) return
-          setYamlError(err instanceof Error ? err.message : 'Failed to save feature file')
-        } finally {
-          if (requestId === saveRequestIdRef.current) setYamlSaving(false)
-        }
-      })()
+      void persistFeatureFileContent(yamlContent, requestId)
     }, 350)
 
     return () => {
@@ -141,7 +239,7 @@ export function FeaturePanel({
         saveTimerRef.current = null
       }
     }
-  }, [details, projectPath, featureFilePath, yamlContent, taskId, onTaskUpdated])
+  }, [details, projectPath, featureFilePath, yamlContent, persistFeatureFileContent])
 
   useEffect(() => {
     return () => {
@@ -260,25 +358,22 @@ export function FeaturePanel({
   }
 
   return (
-    <div className="flex h-full flex-col gap-3 overflow-y-auto">
+    <div className="flex h-full min-h-0 flex-col gap-3">
       <div>
-        <label className="mb-1 block text-sm text-muted-foreground">Feature Dir</label>
-        <div className="rounded-md border border-border px-3 py-2">
-          <div className="flex items-center gap-2">
-            <FolderOpen className="size-3.5 text-muted-foreground" />
-            <button
-              type="button"
-              className="truncate text-xs text-foreground hover:underline"
-              onClick={() => onOpenFile(details.featureFilePath)}
-              title={details.featureDirPath}
-            >
-              {details.featureDirPath}
-            </button>
-          </div>
-        </div>
+        <p className="text-sm text-muted-foreground">
+          Feature directory:{' '}
+          <button
+            type="button"
+            className="truncate text-sm text-foreground hover:underline"
+            onClick={() => onOpenFile(details.featureFilePath)}
+            title={details.featureDirPath}
+          >
+            {details.featureDirPath}
+          </button>
+        </p>
       </div>
 
-      <div>
+      <div className="min-h-0 flex flex-1 flex-col">
         <div className="mb-1 flex items-center justify-between gap-2">
           <label className="block text-sm text-muted-foreground">{featureFileName}</label>
           <p className="text-[11px] text-muted-foreground">
@@ -288,16 +383,55 @@ export function FeaturePanel({
                 ? 'Loading...'
                 : yamlSaving
                   ? 'Saving...'
-                  : 'Auto-saved'}
+                : 'Auto-saved'}
           </p>
         </div>
-        <Textarea
-          value={yamlContent}
-          onChange={(e) => setYamlContent(e.target.value)}
-          spellCheck={false}
-          className="min-h-[36rem] font-mono text-xs"
-          placeholder="Feature file content"
-        />
+        <div className="min-h-0 flex-1 rounded-md border border-border bg-surface-1 overflow-hidden">
+          <CodeEditor
+            filePath={featureFilePath || 'FEATURE.md'}
+            content={yamlContent}
+            onChange={setYamlContent}
+            onSave={() => {
+              if (!details || !projectPath || !featureFilePath) return
+              if (lastSavedYamlRef.current === null) return
+              if (yamlContent === lastSavedYamlRef.current) return
+              const requestId = ++saveRequestIdRef.current
+              void persistFeatureFileContent(yamlContent, requestId)
+            }}
+            version={editorVersion}
+            showLineNumbers={false}
+            wrapLongLines={true}
+          />
+        </div>
+      </div>
+
+      <div className="mt-auto">
+        <div className="mb-1 flex items-center justify-between gap-2">
+          <label className="block text-sm text-muted-foreground">Acceptance</label>
+        </div>
+        <div className="h-24 rounded-md border border-border bg-surface-1 overflow-y-auto">
+          {acceptanceLoading
+            ? <p className="px-3 py-2 text-xs text-muted-foreground">Loading files...</p>
+            : acceptanceError
+              ? <p className="px-3 py-2 text-xs text-destructive">{acceptanceError}</p>
+              : acceptanceFiles.length === 0
+                ? <p className="px-3 py-2 text-xs text-muted-foreground">No files in acceptance/</p>
+                : acceptanceFiles.map((filePath) => {
+                  const name = filePath.split('/').pop() ?? filePath
+                  return (
+                    <button
+                      key={filePath}
+                      type="button"
+                      className="flex w-full flex-col items-start px-3 py-2 text-left text-xs text-muted-foreground hover:bg-surface-2/70"
+                      onClick={() => onOpenFile(filePath)}
+                      title={filePath}
+                    >
+                      <span className="truncate font-medium">{name}</span>
+                      <span className="truncate text-[11px]">{filePath}</span>
+                    </button>
+                  )
+                })}
+        </div>
       </div>
     </div>
   )
