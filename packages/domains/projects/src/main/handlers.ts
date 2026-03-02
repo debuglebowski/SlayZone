@@ -193,7 +193,7 @@ export function registerProjectHandlers(ipcMain: IpcMain, db: Database): void {
     const defaultFeaturesPath = getRepoFeatureSyncConfig(db).defaultFeaturesPath || 'docs/features'
     const featureRepoFeaturesPath = normalizeRepoFeaturesPath(data.featureRepoFeaturesPath, defaultFeaturesPath)
     if (featureRepoIntegrationEnabled === 1 && !prepared.path) {
-      throw new Error('Repository path is required when feature.yaml integration is enabled')
+      throw new Error('Repository path is required when FEATURE.md integration is enabled')
     }
     if (featureRepoIntegrationEnabled === 1 && prepared.path) {
       assertFeaturesPathInsideRepo(prepared.path, featureRepoFeaturesPath)
@@ -324,7 +324,7 @@ export function registerProjectHandlers(ipcMain: IpcMain, db: Database): void {
     const shouldDetachFeatureLinks =
       current.feature_repo_integration_enabled === 1 && !nextFeatureIntegrationEnabled
     if (nextFeatureIntegrationEnabled && !nextPath) {
-      throw new Error('Repository path is required when feature.yaml integration is enabled')
+      throw new Error('Repository path is required when FEATURE.md integration is enabled')
     }
     if (nextFeatureIntegrationEnabled && nextPath) {
       assertFeaturesPathInsideRepo(nextPath, nextFeaturesPath)

@@ -11,10 +11,10 @@ import type { ColumnConfig } from '../shared/types.js'
 const h = await createTestHarness()
 registerProjectHandlers(h.ipcMain as never, h.db)
 
-function writeFeatureYaml(repoPath: string, relDir: string, content: string): void {
+function writeFeatureMd(repoPath: string, relDir: string, content: string): void {
   const dir = path.join(repoPath, relDir)
   fs.mkdirSync(dir, { recursive: true })
-  fs.writeFileSync(path.join(dir, 'feature.yaml'), content, 'utf8')
+  fs.writeFileSync(path.join(dir, 'FEATURE.md'), content, 'utf8')
 }
 
 describe('db:projects:create', () => {
@@ -83,9 +83,9 @@ describe('db:projects:create', () => {
     }).toThrow()
   })
 
-  test('creates and syncs tasks from feature.yaml when integration is enabled', () => {
+  test('creates and syncs tasks from FEATURE.md when integration is enabled', () => {
     const repoPath = h.tmpDir()
-    writeFeatureYaml(
+    writeFeatureMd(
       repoPath,
       'docs/features/feature-001',
       `id: FEAT-001
@@ -108,13 +108,13 @@ description: |
       .all(project.id) as Array<{ title: string; description: string | null }>
     expect(tasks).toHaveLength(1)
     expect(tasks[0].title).toBe('FEAT-001 Google Sheets Integration as a HubSpot Alternative (Backend)')
-    expect(Boolean(tasks[0].description?.includes('alternative backend integration'))).toBe(true)
+    expect(tasks[0].description).toBeNull()
 
     const links = h.db
       .prepare('SELECT feature_file_path FROM project_feature_task_links WHERE project_id = ?')
       .all(project.id) as Array<{ feature_file_path: string }>
     expect(links).toHaveLength(1)
-    expect(links[0].feature_file_path).toBe('docs/features/feature-001/feature.yaml')
+    expect(links[0].feature_file_path).toBe('docs/features/feature-001/FEATURE.md')
   })
 })
 
@@ -159,7 +159,7 @@ describe('db:projects:update', () => {
 
   test('detaches linked feature tasks when integration is disabled', () => {
     const repoPath = h.tmpDir()
-    writeFeatureYaml(
+    writeFeatureMd(
       repoPath,
       'docs/features/feature-detach',
       `id: FEAT-DETACH
@@ -202,7 +202,7 @@ describe('db:projects:syncFeatures', () => {
   test('updates linked task title when feature file changes', () => {
     const repoPath = h.tmpDir()
     const relDir = 'docs/features/feature-002'
-    writeFeatureYaml(
+    writeFeatureMd(
       repoPath,
       relDir,
       `id: FEAT-002
@@ -218,7 +218,7 @@ description: Initial
       featureRepoIntegrationEnabled: true
     }) as { id: string }
 
-    writeFeatureYaml(
+    writeFeatureMd(
       repoPath,
       relDir,
       `id: FEAT-002
@@ -234,7 +234,7 @@ description: Updated description
       .prepare('SELECT title, description FROM tasks WHERE project_id = ?')
       .get(project.id) as { title: string; description: string | null }
     expect(task.title).toBe('FEAT-002 Updated title')
-    expect(Boolean(task.description?.includes('Updated description'))).toBe(true)
+    expect(task.description).toBeNull()
   })
 })
 
@@ -272,7 +272,7 @@ describe('repository feature integration settings', () => {
 
   test('syncAllFeatures aggregates enabled projects', () => {
     const repoPath = h.tmpDir()
-    writeFeatureYaml(
+    writeFeatureMd(
       repoPath,
       'features/feat-a',
       `id: FEAT-A

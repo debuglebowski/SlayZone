@@ -451,6 +451,67 @@ export function TaskDetailPage({
     loadData()
   }, [taskId])
 
+  const refreshOpenTaskFromStore = useCallback(async (): Promise<void> => {
+    const [latestTask, latestTaskFeatureContext, projects, latestSubTasks] = await Promise.all([
+      window.api.db.getTask(taskId),
+      window.api.db.getTaskFeatureContext(taskId),
+      window.api.db.getProjects(),
+      window.api.db.getSubTasks(taskId)
+    ])
+
+    if (!latestTask) return
+
+    setTask(latestTask)
+    if (!editingTitle) {
+      setTitleValue(latestTask.title)
+    }
+
+    const descriptionEditorRoot = document.querySelector('[data-testid="task-description-editor"]')
+    const isDescriptionEditorFocused =
+      descriptionEditorRoot instanceof HTMLElement
+      && descriptionEditorRoot.contains(document.activeElement)
+    if (!isDescriptionEditorFocused) {
+      setDescriptionValue(latestTask.description ?? '')
+    }
+
+    setSubTasks(latestSubTasks)
+    if (latestTask.parent_id) {
+      const parent = await window.api.db.getTask(latestTask.parent_id)
+      setParentTask(parent)
+    } else {
+      setParentTask(null)
+    }
+
+    const taskProject = projects.find((p) => p.id === latestTask.project_id) || null
+    setProject(taskProject)
+
+    const pathExists = window.api.files?.pathExists
+    if (taskProject?.path && typeof pathExists === 'function') {
+      const exists = await pathExists(taskProject.path)
+      setProjectPathMissing(!exists)
+    } else {
+      setProjectPathMissing(false)
+    }
+
+    setFeatureTerminalCwd(latestTaskFeatureContext?.featureDirAbsolutePath ?? null)
+  }, [taskId, editingTitle])
+
+  useEffect(() => {
+    const onDataRefreshed = (): void => {
+      void refreshOpenTaskFromStore()
+    }
+    window.addEventListener('slayzone:data-refreshed', onDataRefreshed)
+    return () => {
+      window.removeEventListener('slayzone:data-refreshed', onDataRefreshed)
+    }
+  }, [refreshOpenTaskFromStore])
+
+  useEffect(() => {
+    return window.api.app.onTasksChanged(() => {
+      void refreshOpenTaskFromStore()
+    })
+  }, [refreshOpenTaskFromStore])
+
   useEffect(() => {
     if (!task) {
       setFeatureTerminalCwd(null)
@@ -970,7 +1031,7 @@ export function TaskDetailPage({
     }
   }, [handlePanelToggle])
 
-  // Cmd+T/B/G/S/E/P + web panel shortcuts for panel toggles
+  // Cmd+T/B/G/S/F/E/P + web panel shortcuts for panel toggles
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent): void => {
       if (!isActive) return
@@ -1048,6 +1109,9 @@ export function TaskDetailPage({
         } else if (e.key === 's' && isBuiltinEnabled('settings')) {
           e.preventDefault()
           handlePanelToggle('settings', !panelVisibility.settings)
+        } else if (e.key === 'f' && isBuiltinEnabled('feature')) {
+          e.preventDefault()
+          handlePanelToggle('feature', !panelVisibility.feature)
         } else if (e.key === 'o' && import.meta.env.DEV && isBuiltinEnabled('processes')) {
           e.preventDefault()
           handlePanelToggle('processes', !panelVisibility.processes)
@@ -1436,7 +1500,7 @@ export function TaskDetailPage({
                     { id: 'diff', icon: GitBranch, label: 'Git', shortcut: '⌘G' },
                     ...(import.meta.env.DEV ? [{ id: 'processes', icon: Cpu, label: 'Processes', shortcut: '⌘O' }] : []),
                     { id: 'settings', icon: Settings2, label: 'Settings', shortcut: '⌘S' },
-                    { id: 'feature', icon: FileText, label: 'Feature' },
+                    { id: 'feature', icon: FileText, label: 'Feature', shortcut: '⌘F' },
                   ].filter(p => isBuiltinEnabled(p.id) && !(task.is_temporary && (p.id === 'settings' || p.id === 'feature')))
 
                   // Insert web panels after editor

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { FileText, FolderOpen, Trash2 } from 'lucide-react'
+import { FileText, FolderOpen } from 'lucide-react'
 import { Button, Input, Label, Textarea, toast } from '@slayzone/ui'
 import type { Project } from '@slayzone/projects/shared'
 import type { TaskFeatureDetails } from '@slayzone/projects/shared'
@@ -20,8 +20,8 @@ export function FeaturePanel({
 }: FeaturePanelProps): React.JSX.Element {
   const [details, setDetails] = useState<TaskFeatureDetails | null>(null)
   const [loading, setLoading] = useState(true)
+  const [contentRefreshTick, setContentRefreshTick] = useState(0)
   const [creatingFeature, setCreatingFeature] = useState(false)
-  const [newFeatureId, setNewFeatureId] = useState('')
   const [newFeatureFolder, setNewFeatureFolder] = useState('')
   const [newFeatureTitle, setNewFeatureTitle] = useState('')
   const [newFeatureDescription, setNewFeatureDescription] = useState('')
@@ -30,19 +30,18 @@ export function FeaturePanel({
   const [yamlLoading, setYamlLoading] = useState(false)
   const [yamlSaving, setYamlSaving] = useState(false)
   const [yamlError, setYamlError] = useState<string | null>(null)
-  const [deletingFeature, setDeletingFeature] = useState(false)
 
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const saveRequestIdRef = useRef(0)
   const lastSavedYamlRef = useRef<string | null>(null)
 
-  const loadDetails = useCallback(async () => {
-    setLoading(true)
+  const loadDetails = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true)
     try {
       const loaded = await window.api.db.getTaskFeatureDetails(taskId)
       setDetails(loaded)
     } finally {
-      setLoading(false)
+      if (!silent) setLoading(false)
     }
   }, [taskId])
 
@@ -55,8 +54,21 @@ export function FeaturePanel({
     void loadDetails()
   }, [loadDetails, project?.id, project?.feature_repo_integration_enabled, project?.updated_at])
 
+  useEffect(() => {
+    if (project?.feature_repo_integration_enabled !== 1) return
+    const onDataRefreshed = (): void => {
+      setContentRefreshTick((prev) => prev + 1)
+      void loadDetails(true)
+    }
+    window.addEventListener('slayzone:data-refreshed', onDataRefreshed)
+    return () => window.removeEventListener('slayzone:data-refreshed', onDataRefreshed)
+  }, [loadDetails, project?.feature_repo_integration_enabled])
+
   const featureFilePath = details?.featureFilePath ?? null
   const featureDirPath = details?.featureDirPath ?? null
+  const featureFileName = featureFilePath
+    ? featureFilePath.split('/').filter(Boolean).pop() ?? 'Feature file'
+    : 'Feature file'
   const projectPath = project?.path ?? null
 
   useEffect(() => {
@@ -76,7 +88,7 @@ export function FeaturePanel({
 
         if (readResult.content == null) {
           setYamlContent('')
-          setYamlError('feature.yaml is empty or too large to render')
+          setYamlError('Feature file is empty or too large to render')
           lastSavedYamlRef.current = ''
         } else {
           setYamlContent(readResult.content)
@@ -94,7 +106,7 @@ export function FeaturePanel({
     return () => {
       cancelled = true
     }
-  }, [projectPath, featureFilePath, featureDirPath])
+  }, [projectPath, featureFilePath, featureDirPath, contentRefreshTick])
 
   useEffect(() => {
     if (!details || !projectPath || !featureFilePath) return
@@ -116,7 +128,7 @@ export function FeaturePanel({
           lastSavedYamlRef.current = yamlContent
         } catch (err) {
           if (requestId !== saveRequestIdRef.current) return
-          setYamlError(err instanceof Error ? err.message : 'Failed to save feature.yaml')
+          setYamlError(err instanceof Error ? err.message : 'Failed to save feature file')
         } finally {
           if (requestId === saveRequestIdRef.current) setYamlSaving(false)
         }
@@ -150,7 +162,7 @@ export function FeaturePanel({
         <div className="flex items-start gap-2">
           <FileText className="mt-0.5 size-4 text-muted-foreground" />
           <div className="space-y-1">
-            <p className="text-sm font-medium">feature.yaml integration disabled</p>
+            <p className="text-sm font-medium">FEATURE.md integration disabled</p>
             <p className="text-xs text-muted-foreground">
               To enable, go to Settings -&gt; Integrations.
             </p>
@@ -178,80 +190,71 @@ export function FeaturePanel({
     }
 
     return (
-      <div className="flex h-full flex-col rounded-md border border-dashed border-border p-3">
-        <div className="space-y-2 rounded-md border border-border p-3">
-          <p className="text-xs font-medium">Create Feature Directory</p>
-          <div className="space-y-1">
-            <Label htmlFor="new-feature-folder" className="text-[11px] text-muted-foreground">Feature Directory</Label>
-            <Input
-              id="new-feature-folder"
-              value={newFeatureFolder}
-              onChange={(e) => setNewFeatureFolder(e.target.value)}
-              placeholder="feature-001"
-              className="h-8 text-xs"
-            />
-          </div>
-          <div className="space-y-1">
-            <Label htmlFor="new-feature-id" className="text-[11px] text-muted-foreground">ID (optional)</Label>
-            <Input
-              id="new-feature-id"
-              value={newFeatureId}
-              onChange={(e) => setNewFeatureId(e.target.value)}
-              placeholder="FEAT-001"
-              className="h-8 text-xs"
-            />
-          </div>
-          <div className="space-y-1">
-            <Label htmlFor="new-feature-title" className="text-[11px] text-muted-foreground">Title (optional)</Label>
-            <Input
-              id="new-feature-title"
-              value={newFeatureTitle}
-              onChange={(e) => setNewFeatureTitle(e.target.value)}
-              placeholder="Use task title"
-              className="h-8 text-xs"
-            />
-          </div>
-          <div className="space-y-1">
-            <Label htmlFor="new-feature-description" className="text-[11px] text-muted-foreground">Description (optional)</Label>
-            <Textarea
-              id="new-feature-description"
-              value={newFeatureDescription}
-              onChange={(e) => setNewFeatureDescription(e.target.value)}
-              placeholder="Use task description"
-              className="min-h-24 text-xs"
-            />
-          </div>
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={creatingFeature}
-            onClick={async () => {
-              if (creatingFeature) return
-              setCreatingFeature(true)
-              try {
-                const result = await window.api.db.createTaskFeature(taskId, {
-                  featureId: newFeatureId.trim() || null,
-                  folderName: newFeatureFolder.trim() || null,
-                  title: newFeatureTitle.trim() || null,
-                  description: newFeatureDescription.trim() || null
-                })
-                if (result.task) onTaskUpdated(result.task)
-                setDetails(result.details)
-                setNewFeatureId('')
-                setNewFeatureFolder('')
-                setNewFeatureTitle('')
-                setNewFeatureDescription('')
-                toast.success(`Created ${result.featureFilePath}`)
-              } catch (err) {
-                toast.error(err instanceof Error ? err.message : 'Failed to create feature file')
-              } finally {
-                setCreatingFeature(false)
-              }
-            }}
-          >
-            Create and link feature
-          </Button>
+      <div className="flex h-full flex-col gap-3 rounded-md border border-dashed border-border p-3">
+        <p className="text-xs font-medium">Create FEATURE.md</p>
+
+        <div className="space-y-1">
+          <Label htmlFor="new-feature-folder" className="text-[11px] text-muted-foreground">Feature Directory</Label>
+          <Input
+            id="new-feature-folder"
+            value={newFeatureFolder}
+            onChange={(e) => setNewFeatureFolder(e.target.value)}
+            placeholder="feature-001"
+            className="h-8 text-xs"
+          />
         </div>
+
+        <div className="space-y-1">
+          <Label htmlFor="new-feature-title" className="text-[11px] text-muted-foreground">Title</Label>
+          <Input
+            id="new-feature-title"
+            value={newFeatureTitle}
+            onChange={(e) => setNewFeatureTitle(e.target.value)}
+            placeholder="# Title"
+            className="h-8 text-xs"
+          />
+        </div>
+
+        <div className="space-y-1">
+          <Label htmlFor="new-feature-description" className="text-[11px] text-muted-foreground">Description</Label>
+          <Textarea
+            id="new-feature-description"
+            value={newFeatureDescription}
+            onChange={(e) => setNewFeatureDescription(e.target.value)}
+            placeholder="Description"
+            className="min-h-24 text-xs"
+          />
+        </div>
+
+        <Button
+          variant="outline"
+          size="sm"
+          disabled={creatingFeature}
+          onClick={async () => {
+            if (creatingFeature) return
+            setCreatingFeature(true)
+            try {
+              const result = await window.api.db.createTaskFeature(taskId, {
+                featureId: null,
+                folderName: newFeatureFolder.trim() || null,
+                title: newFeatureTitle.trim() || null,
+                description: newFeatureDescription.trim() || null
+              })
+              if (result.task) onTaskUpdated(result.task)
+              setDetails(result.details)
+              setNewFeatureFolder('')
+              setNewFeatureTitle('')
+              setNewFeatureDescription('')
+              toast.success(`Created ${result.featureFilePath}`)
+            } catch (err) {
+              toast.error(err instanceof Error ? err.message : 'Failed to create feature file')
+            } finally {
+              setCreatingFeature(false)
+            }
+          }}
+        >
+          Create FEATURE.md
+        </Button>
       </div>
     )
   }
@@ -277,7 +280,7 @@ export function FeaturePanel({
 
       <div>
         <div className="mb-1 flex items-center justify-between gap-2">
-          <label className="block text-sm text-muted-foreground">feature.yaml</label>
+          <label className="block text-sm text-muted-foreground">{featureFileName}</label>
           <p className="text-[11px] text-muted-foreground">
             {yamlError
               ? yamlError
@@ -293,47 +296,8 @@ export function FeaturePanel({
           onChange={(e) => setYamlContent(e.target.value)}
           spellCheck={false}
           className="min-h-[36rem] font-mono text-xs"
-          placeholder="feature.yaml content"
+          placeholder="Feature file content"
         />
-      </div>
-
-      <div className="flex flex-col gap-2">
-        <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
-          Danger zone
-        </span>
-        <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={deletingFeature}
-            onClick={async () => {
-              if (deletingFeature) return
-              if (!window.confirm('Delete this feature directory and unlink it from the task?')) return
-              setDeletingFeature(true)
-              try {
-                const result = await window.api.db.deleteTaskFeature(taskId)
-                if (!result.deleted) {
-                  toast.error('No linked feature to delete')
-                  return
-                }
-                if (result.task) onTaskUpdated(result.task)
-                setDetails(result.details)
-                setYamlContent('')
-                setYamlError(null)
-                lastSavedYamlRef.current = null
-                toast.success('Feature directory deleted')
-              } catch (err) {
-                toast.error(err instanceof Error ? err.message : 'Failed to delete feature directory')
-              } finally {
-                setDeletingFeature(false)
-              }
-            }}
-            className="flex-1 gap-1.5 text-xs text-destructive hover:text-destructive"
-          >
-            <Trash2 className="size-3.5" />
-            Delete feature dir
-          </Button>
-        </div>
       </div>
     </div>
   )

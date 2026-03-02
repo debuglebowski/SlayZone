@@ -346,7 +346,7 @@ export function UserSettingsDialog({
     try {
       const next = await window.api.db.setProjectFeatureSyncConfig(partial)
       setRepoFeatureConfig(next)
-      setRepoFeaturesMessage('feature.yaml integration settings updated')
+      setRepoFeaturesMessage('FEATURE.md integration settings updated')
     } catch (err) {
       setRepoFeaturesMessage(err instanceof Error ? err.message : String(err))
     }
@@ -391,7 +391,7 @@ export function UserSettingsDialog({
           `Synced ${project.name}: ${sync.created} created, ${sync.updated} updated${errSuffix}`
         )
       } else {
-        setRepoFeaturesMessage(`Disabled feature.yaml integration for ${project.name}`)
+        setRepoFeaturesMessage(`Disabled FEATURE.md integration for ${project.name}`)
       }
       ;(window as { __slayzone_refreshData?: () => void }).__slayzone_refreshData?.()
       await refreshRepoFeatureIntegrationState()
@@ -430,11 +430,11 @@ export function UserSettingsDialog({
         const sync = await window.api.db.syncProjectFeatures(project.id)
         const errSuffix = sync.errors.length > 0 ? ` (${sync.errors.length} warnings)` : ''
         setRepoFeaturesMessage(
-          `Updated Features folder for ${project.name}. Synced ${sync.created} created, ${sync.updated} updated${errSuffix}`
+          `Updated FEATURE.md folder for ${project.name}. Synced ${sync.created} created, ${sync.updated} updated${errSuffix}`
         )
         ;(window as { __slayzone_refreshData?: () => void }).__slayzone_refreshData?.()
       } else {
-        setRepoFeaturesMessage(`Updated Features folder for ${project.name}`)
+        setRepoFeaturesMessage(`Updated FEATURE.md folder for ${project.name}`)
       }
     } catch (err) {
       setRepoFeaturesMessage(err instanceof Error ? err.message : String(err))
@@ -476,7 +476,7 @@ export function UserSettingsDialog({
     )
 
     const result = await window.api.dialog.showOpenDialog({
-      title: `Select Features folder for ${project.name}`,
+      title: `Select FEATURE.md folder for ${project.name}`,
       defaultPath,
       properties: ['openDirectory']
     })
@@ -1285,7 +1285,7 @@ export function UserSettingsDialog({
 
                 <div className="space-y-3 border-t pt-6">
                   <div className="flex items-center justify-between">
-                    <Label className="text-base font-semibold">feature.yaml</Label>
+                    <Label className="text-base font-semibold">FEATURE.md</Label>
                     <Button
                       variant="outline"
                       size="sm"
@@ -1297,7 +1297,7 @@ export function UserSettingsDialog({
                   </div>
 
                   <div className="grid grid-cols-[220px_minmax(0,1fr)] items-center gap-4">
-                    <span className="text-sm">Default feature.yaml folder</span>
+                    <span className="text-sm">Default FEATURE.md folder</span>
                     <Input
                       value={repoFeatureConfig.defaultFeaturesPath}
                       onChange={(e) =>

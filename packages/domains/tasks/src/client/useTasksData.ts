@@ -64,6 +64,8 @@ export function useTasksData(): UseTasksDataReturn {
         setTags(tg as Tag[])
         setTaskTags(new Map(Object.entries(allTagMap as Record<string, string[]>)))
         setBlockedTaskIds(new Set(allBlockedIds as string[]))
+        // Notify detail panels that data changed so open views can refresh immediately.
+        window.dispatchEvent(new Event('slayzone:data-refreshed'))
       }).finally(() => {
         if (firstLoad) {
           firstLoad = false

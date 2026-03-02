@@ -22,10 +22,10 @@ function createTask(title: string, extra?: Record<string, unknown>): Task {
   return h.invoke('db:tasks:create', { projectId, title, ...extra }) as Task
 }
 
-function writeFeatureYaml(repoPath: string, relDir: string, content: string): void {
+function writeFeatureMd(repoPath: string, relDir: string, content: string): void {
   const dir = path.join(repoPath, relDir)
   fs.mkdirSync(dir, { recursive: true })
-  fs.writeFileSync(path.join(dir, 'feature.yaml'), content, 'utf8')
+  fs.writeFileSync(path.join(dir, 'FEATURE.md'), content, 'utf8')
 }
 
 // --- CRUD ---
@@ -335,9 +335,9 @@ describe('db:tasks:update', () => {
 })
 
 describe('linked feature file sync', () => {
-  test('updates linked feature.yaml when task title/description change', () => {
+  test('updates linked FEATURE.md when task title/description change', () => {
     const repoPath = h.tmpDir()
-    writeFeatureYaml(
+    writeFeatureMd(
       repoPath,
       'docs/features/feature-101',
       `id: FEAT-101
@@ -367,7 +367,7 @@ stories:
     })
 
     const featureFile = fs.readFileSync(
-      path.join(repoPath, 'docs/features/feature-101/feature.yaml'),
+      path.join(repoPath, 'docs/features/feature-101/FEATURE.md'),
       'utf8'
     )
     expect(featureFile.includes('title: "Updated title"')).toBe(true)
@@ -377,7 +377,7 @@ stories:
 
   test('pulls latest PRD/spec title and description on task read', () => {
     const repoPath = h.tmpDir()
-    writeFeatureYaml(
+    writeFeatureMd(
       repoPath,
       'docs/features/feature-102',
       `id: FEAT-102
@@ -394,7 +394,7 @@ description: |
       featureRepoIntegrationEnabled: true
     }) as { id: string }
 
-    writeFeatureYaml(
+    writeFeatureMd(
       repoPath,
       'docs/features/feature-102',
       `id: FEAT-102
@@ -407,12 +407,12 @@ description: |
     const tasks = h.invoke('db:tasks:getByProject', project.id) as Task[]
     expect(tasks).toHaveLength(1)
     expect(tasks[0].title).toBe('FEAT-102 Updated from repo')
-    expect(Boolean(tasks[0].description?.includes('Updated description from repo'))).toBe(true)
+    expect(tasks[0].description).toBeNull()
   })
 
   test('returns linked feature context for codex prompt bootstrap', () => {
     const repoPath = h.tmpDir()
-    writeFeatureYaml(
+    writeFeatureMd(
       repoPath,
       'docs/features/feature-103',
       `id: FEAT-103
@@ -436,14 +436,14 @@ description: |
       featureDirAbsolutePath: string | null
     }
 
-    expect(context.featureFilePath).toBe('docs/features/feature-103/feature.yaml')
+    expect(context.featureFilePath).toBe('docs/features/feature-103/FEATURE.md')
     expect(context.featureDirPath).toBe('docs/features/feature-103')
     expect(Boolean(context.featureDirAbsolutePath?.endsWith('docs/features/feature-103'))).toBe(true)
   })
 
   test('returns linked feature details with acceptance metadata', () => {
     const repoPath = h.tmpDir()
-    writeFeatureYaml(
+    writeFeatureMd(
       repoPath,
       'docs/features/feature-104',
       `id: FEAT-104
@@ -479,7 +479,7 @@ acceptance:
 
     expect(details.featureId).toBe('FEAT-104')
     expect(details.title).toBe('Feature panel test')
-    expect(details.featureFilePath).toBe('docs/features/feature-104/feature.yaml')
+    expect(details.featureFilePath).toBe('docs/features/feature-104/FEATURE.md')
     expect(details.featureDirPath).toBe('docs/features/feature-104')
     expect(details.acceptance).toHaveLength(2)
     expect(details.acceptance[0].id).toBe('SC-US1-1')
@@ -491,7 +491,7 @@ acceptance:
 
   test('tracks last sync source for repo pull and task push', () => {
     const repoPath = h.tmpDir()
-    writeFeatureYaml(
+    writeFeatureMd(
       repoPath,
       'docs/features/feature-105',
       `id: FEAT-105
@@ -517,7 +517,7 @@ description: Initial
     const afterPush = h.invoke('db:tasks:getFeatureDetails', task.id) as { lastSyncSource: 'repo' | 'task' }
     expect(afterPush.lastSyncSource).toBe('task')
 
-    writeFeatureYaml(
+    writeFeatureMd(
       repoPath,
       'docs/features/feature-105',
       `id: FEAT-105
@@ -554,17 +554,16 @@ description: Updated by repo
     }) as { created: boolean; featureFilePath: string; task: Task | null; details: { featureId: string | null } | null }
 
     expect(created.created).toBe(true)
-    expect(created.featureFilePath).toBe('docs/features/feature-200/feature.yaml')
+    expect(created.featureFilePath).toBe('docs/features/feature-200/FEATURE.md')
     expect(created.details?.featureId).toBe('FEAT-200')
     expect(created.task?.title).toBe('FEAT-200 Feature Tab V2')
     expect(created.task?.description).toBe('Canonical feature description')
 
     const featureFile = fs.readFileSync(
-      path.join(repoPath, 'docs/features/feature-200/feature.yaml'),
+      path.join(repoPath, 'docs/features/feature-200/FEATURE.md'),
       'utf8'
     )
-    expect(featureFile.includes('id: "FEAT-200"')).toBe(true)
-    expect(featureFile.includes('title: "Feature Tab V2"')).toBe(true)
+    expect(featureFile.includes('# Feature Tab V2')).toBe(true)
     expect(featureFile.includes('Canonical feature description')).toBe(true)
   })
 
@@ -605,9 +604,9 @@ description: Updated by repo
     expect(h.invoke('db:tasks:getFeatureDetails', task.id)).toBeNull()
   })
 
-  test('updates linked feature.yaml from editable feature payload', () => {
+  test('updates linked FEATURE.md from editable feature payload', () => {
     const repoPath = h.tmpDir()
-    writeFeatureYaml(
+    writeFeatureMd(
       repoPath,
       'docs/features/feature-201',
       `id: "FEAT-201"
@@ -655,7 +654,7 @@ acceptance:
     expect(updated.details.acceptance[1].id).toBe('SC-US1-2')
 
     const featureFile = fs.readFileSync(
-      path.join(repoPath, 'docs/features/feature-201/feature.yaml'),
+      path.join(repoPath, 'docs/features/feature-201/FEATURE.md'),
       'utf8'
     )
     expect(featureFile.includes('id: "FEAT-201"')).toBe(true)

@@ -78,7 +78,10 @@ const SETTINGS = {
   pollIntervalSeconds: 'repo_features_poll_interval_seconds'
 } as const
 
-function listFeatureYamlFiles(rootDir: string): string[] {
+const FEATURE_DOC_FILENAME = 'FEATURE.md'
+const LEGACY_FEATURE_DOC_FILENAME = 'feature.yaml'
+
+function listFeatureSpecFiles(rootDir: string): string[] {
   if (!fs.existsSync(rootDir)) return []
   const files: string[] = []
   const stack = [rootDir]
@@ -94,7 +97,10 @@ function listFeatureYamlFiles(rootDir: string): string[] {
         continue
       }
       if (!entry.isFile()) continue
-      if (entry.name.toLowerCase() === 'feature.yaml') files.push(abs)
+      const normalizedName = entry.name.toLowerCase()
+      if (normalizedName === FEATURE_DOC_FILENAME.toLowerCase()) {
+        files.push(abs)
+      }
     }
   }
 
@@ -192,6 +198,65 @@ function parseFeatureYaml(content: string): ParsedFeature | null {
     title: featureTitle || featureId || 'Untitled feature',
     description: featureDescription,
     acceptance
+  }
+}
+
+function extractMarkdownFrontmatter(content: string): { frontmatter: string | null; body: string } {
+  const normalized = content.replace(/\r\n/g, '\n')
+  if (!normalized.startsWith('---\n')) {
+    return { frontmatter: null, body: normalized }
+  }
+  const closingIndex = normalized.indexOf('\n---\n', 4)
+  if (closingIndex === -1) {
+    return { frontmatter: null, body: normalized }
+  }
+  const frontmatter = normalized.slice(4, closingIndex)
+  const body = normalized.slice(closingIndex + 5)
+  return { frontmatter, body }
+}
+
+function parseMarkdownFallbackMeta(body: string): {
+  title: string | null
+  description: string | null
+} {
+  const lines = body.split('\n')
+  let title: string | null = null
+  let description: string | null = null
+
+  for (const line of lines) {
+    const heading = line.match(/^#\s+(.+)\s*$/)
+    if (heading) {
+      title = heading[1].trim()
+      break
+    }
+  }
+
+  const paragraphs = body
+    .split(/\n\s*\n/g)
+    .map((chunk) => chunk.trim())
+    .filter(Boolean)
+    .filter((chunk) => !chunk.startsWith('#'))
+  if (paragraphs.length > 0) {
+    description = paragraphs[0]
+  }
+
+  return { title, description }
+}
+
+function parseFeatureMarkdown(content: string): ParsedFeature | null {
+  const { frontmatter, body } = extractMarkdownFrontmatter(content)
+  const parsedFrontmatter = frontmatter ? parseFeatureYaml(frontmatter) : null
+  const fallback = parseMarkdownFallbackMeta(body)
+  const featureId = parsedFrontmatter?.id ?? null
+  const featureTitle = parsedFrontmatter?.title?.trim() || fallback.title || featureId || null
+  // Keep task descriptions stable: only sync description when explicitly defined in metadata.
+  const featureDescription = parsedFrontmatter?.description ?? null
+  if (!featureId && !featureTitle) return null
+  return {
+    id: featureId,
+    title: featureTitle || 'Untitled feature',
+    description: featureDescription,
+    acceptance: parsedFrontmatter?.acceptance ?? []
   }
 }
 
@@ -384,7 +449,9 @@ function createTaskForFeature(
 
 function buildTaskTitle(parsed: ParsedFeature, relPath: string): string {
   const normalizedTitle = parsed.title.trim()
-  const fallbackTitle = path.basename(path.dirname(relPath)) || path.basename(relPath, '.yaml')
+  const fallbackTitle =
+    path.basename(path.dirname(relPath))
+    || path.basename(relPath, path.extname(relPath))
   const base = normalizedTitle || fallbackTitle
   return parsed.id ? `${parsed.id} ${base}` : base
 }
@@ -416,6 +483,74 @@ function resolveAcceptanceFilePath(
       ? path.resolve(repoPath, featureDirPath, normalized)
       : path.resolve(repoPath, normalized)
   return resolvePathInsideRepo(repoPath, candidateAbs)
+}
+
+function toScenarioFromFileName(filePath: string): string {
+  const base = path.basename(filePath, path.extname(filePath))
+  const words = base
+    .replace(/[_-]+/g, ' ')
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+  return words.join(' ') || 'Acceptance scenario'
+}
+
+function discoverAcceptancePythonFiles(repoPath: string, featureDirPath: string): FeatureAcceptanceItem[] {
+  const acceptanceRoot = path.resolve(repoPath, featureDirPath, 'acceptance')
+  if (!fs.existsSync(acceptanceRoot)) return []
+
+  const files: string[] = []
+  const stack = [acceptanceRoot]
+  while (stack.length > 0) {
+    const current = stack.pop()
+    if (!current) continue
+    const entries = fs.readdirSync(current, { withFileTypes: true })
+    for (const entry of entries) {
+      const abs = path.join(current, entry.name)
+      if (entry.isDirectory()) {
+        stack.push(abs)
+        continue
+      }
+      if (!entry.isFile()) continue
+      if (entry.name.toLowerCase().endsWith('.py')) files.push(abs)
+    }
+  }
+
+  files.sort((a, b) => a.localeCompare(b))
+  return files
+    .map((absPath, index): FeatureAcceptanceItem | null => {
+      const rel = resolvePathInsideRepo(repoPath, absPath)
+      if (!rel) return null
+      return {
+        id: `SC-PY-${index + 1}`,
+        scenario: toScenarioFromFileName(rel),
+        file: rel,
+        resolvedFilePath: rel
+      }
+    })
+    .filter((item): item is FeatureAcceptanceItem => item !== null)
+}
+
+function parseFeatureSpecContent(
+  content: string,
+  relPath: string,
+  projectPath: string
+): ParsedFeature | null {
+  const lowerRelPath = relPath.toLowerCase()
+  const parsed = lowerRelPath.endsWith('.md')
+    ? parseFeatureMarkdown(content)
+    : parseFeatureYaml(content)
+  if (!parsed) return null
+
+  if (lowerRelPath.endsWith('.md')) {
+    const featureDirPath = normalizeRelPath(path.dirname(relPath))
+    return {
+      ...parsed,
+      acceptance: discoverAcceptancePythonFiles(projectPath, featureDirPath)
+    }
+  }
+  return parsed
 }
 
 function htmlToPlainText(value: string): string {
@@ -497,6 +632,20 @@ function renderAcceptanceYaml(acceptance: FeatureAcceptanceItem[]): string[] {
   return lines
 }
 
+function renderFeatureFrontmatterLines(
+  featureId: string | null,
+  featureTitle: string,
+  description: string | null,
+  acceptance?: FeatureAcceptanceItem[]
+): string[] {
+  const lines: string[] = []
+  if (featureId) lines.push(`id: ${quoteYaml(featureId)}`)
+  lines.push(`title: ${quoteYaml(featureTitle)}`)
+  lines.push(...renderDescriptionYaml(description))
+  if (acceptance) lines.push(...renderAcceptanceYaml(acceptance))
+  return lines
+}
+
 function upsertFeatureFrontMatter(
   content: string,
   featureId: string | null,
@@ -535,15 +684,112 @@ function upsertFeatureFrontMatter(
   return updated
 }
 
+function upsertFeatureMarkdownFrontMatter(
+  content: string,
+  featureId: string | null,
+  featureTitle: string,
+  description: string | null,
+  acceptance?: FeatureAcceptanceItem[]
+): string {
+  const normalized = content.replace(/\r\n/g, '\n')
+  const { body } = extractMarkdownFrontmatter(normalized)
+  const frontmatterLines = renderFeatureFrontmatterLines(featureId, featureTitle, description, acceptance)
+  const canonicalBody = body.trim().length > 0 ? body.trimStart() : `# ${featureTitle}\n`
+  return `---\n${frontmatterLines.join('\n')}\n---\n\n${canonicalBody.replace(/\n+$/, '\n')}`
+}
+
+function buildInitialFeatureMarkdownContent(featureTitle: string, description: string | null): string {
+  const title = featureTitle.trim() || 'Untitled feature'
+  const desc = (description ?? '').trim()
+  if (desc.length === 0) {
+    return `# ${title}\n`
+  }
+  return `# ${title}\n\n${desc}\n`
+}
+
+function resolveLinkedFeatureFilePath(
+  db: Database,
+  input: {
+    linkId: string
+    projectPath: string
+    featureFilePath: string
+  }
+): { featureFilePath: string; featureFileAbs: string } | null {
+  const normalizedRelPath = normalizeRelPath(input.featureFilePath)
+  const normalizedLower = normalizedRelPath.toLowerCase()
+  const featureFileAbs = path.resolve(input.projectPath, normalizedRelPath)
+
+  if (fs.existsSync(featureFileAbs)) {
+    // Canonicalize legacy feature.yaml links to FEATURE.md even when both exist.
+    if (normalizedLower.endsWith(`/${LEGACY_FEATURE_DOC_FILENAME}`) || normalizedLower === LEGACY_FEATURE_DOC_FILENAME) {
+      const nextRelPath = normalizeRelPath(
+        path.join(path.dirname(normalizedRelPath), FEATURE_DOC_FILENAME)
+      )
+      const nextAbsPath = path.resolve(input.projectPath, nextRelPath)
+
+      if (!fs.existsSync(nextAbsPath)) {
+        const legacyParsed = parseFeatureYaml(fs.readFileSync(featureFileAbs, 'utf8'))
+        const migratedContent = upsertFeatureMarkdownFrontMatter(
+          '\n',
+          legacyParsed?.id ?? null,
+          legacyParsed?.title ?? 'Untitled feature',
+          legacyParsed?.description ?? null,
+          legacyParsed?.acceptance ?? []
+        )
+        fs.writeFileSync(nextAbsPath, migratedContent, 'utf8')
+      }
+
+      db.prepare(`
+        UPDATE project_feature_task_links
+        SET feature_file_path = ?, updated_at = datetime('now')
+        WHERE id = ?
+      `).run(nextRelPath, input.linkId)
+
+      return {
+        featureFilePath: nextRelPath,
+        featureFileAbs: nextAbsPath
+      }
+    }
+
+    return {
+      featureFilePath: normalizedRelPath,
+      featureFileAbs
+    }
+  }
+
+  if (normalizedLower.endsWith(`/${LEGACY_FEATURE_DOC_FILENAME}`) || normalizedLower === LEGACY_FEATURE_DOC_FILENAME) {
+    const nextRelPath = normalizeRelPath(
+      path.join(path.dirname(normalizedRelPath), FEATURE_DOC_FILENAME)
+    )
+    const nextAbsPath = path.resolve(input.projectPath, nextRelPath)
+    if (fs.existsSync(nextAbsPath)) {
+      db.prepare(`
+        UPDATE project_feature_task_links
+        SET feature_file_path = ?, updated_at = datetime('now')
+        WHERE id = ?
+      `).run(nextRelPath, input.linkId)
+      return {
+        featureFilePath: nextRelPath,
+        featureFileAbs: nextAbsPath
+      }
+    }
+  }
+
+  return null
+}
+
 function buildContentHash(content: string): string {
   return crypto.createHash('sha256').update(content).digest('hex')
 }
 
-function taskToFeatureFileContent(existingContent: string, taskRow: LinkedTaskFileRow): { content: string; featureId: string | null; featureTitle: string } {
+function taskToFeatureFileContent(existingContent: string, taskRow: LinkedTaskFileRow, acceptance?: FeatureAcceptanceItem[]): { content: string; featureId: string | null; featureTitle: string } {
   const titleParts = splitTaskTitle(taskRow.task_title, taskRow.feature_id)
   const featureTitle = titleParts.featureTitle
   const description = normalizeDescriptionForYaml(taskRow.task_description)
-  const content = upsertFeatureFrontMatter(existingContent, titleParts.featureId, featureTitle, description)
+  const lowerRelPath = taskRow.feature_file_path.toLowerCase()
+  const content = lowerRelPath.endsWith('.md')
+    ? upsertFeatureMarkdownFrontMatter(existingContent, titleParts.featureId, featureTitle, description, acceptance)
+    : upsertFeatureFrontMatter(existingContent, titleParts.featureId, featureTitle, description, acceptance)
   return { content, featureId: titleParts.featureId, featureTitle }
 }
 
@@ -590,7 +836,7 @@ export function syncProjectFeatureTasks(db: Database, projectId: string): Projec
   }
   if (project.feature_repo_integration_enabled !== 1) return result
   if (!project.path) {
-    result.errors.push('Repository path is required for feature.yaml integration')
+    result.errors.push('Repository path is required for FEATURE.md integration')
     return result
   }
 
@@ -599,7 +845,7 @@ export function syncProjectFeatureTasks(db: Database, projectId: string): Projec
     getSetting(db, SETTINGS.defaultFeaturesPath, DEFAULT_FEATURES_PATH)
   )
   const featureRootAbs = resolveFeatureRoot(project.path, featureRoot)
-  const featureFiles = listFeatureYamlFiles(featureRootAbs)
+  const featureFiles = listFeatureSpecFiles(featureRootAbs)
   if (featureFiles.length === 0) return result
 
   const scannedFeatures: ScannedFeature[] = []
@@ -607,14 +853,15 @@ export function syncProjectFeatureTasks(db: Database, projectId: string): Projec
     result.scanned += 1
     try {
       const content = fs.readFileSync(file, 'utf8')
-      const parsed = parseFeatureYaml(content)
+      const relPath = normalizeRelPath(path.relative(project.path, file))
+      const parsed = parseFeatureSpecContent(content, relPath, project.path)
       if (!parsed) {
         result.skipped += 1
-        result.errors.push(`Skipping ${normalizeRelPath(path.relative(project.path, file))}: missing id/title`)
+        result.errors.push(`Skipping ${relPath}: missing id/title`)
         continue
       }
       scannedFeatures.push({
-        relPath: normalizeRelPath(path.relative(project.path, file)),
+        relPath,
         parsed,
         contentHash: crypto.createHash('sha256').update(content).digest('hex')
       })
@@ -638,7 +885,7 @@ export function syncProjectFeatureTasks(db: Database, projectId: string): Projec
   db.transaction(() => {
     const updateTaskStmt = db.prepare(`
       UPDATE tasks
-      SET project_id = ?, title = ?, description = ?, updated_at = datetime('now')
+      SET project_id = ?, title = ?, updated_at = datetime('now')
       WHERE id = ?
     `)
     const updateLinkStmt = db.prepare(`
@@ -654,7 +901,7 @@ export function syncProjectFeatureTasks(db: Database, projectId: string): Projec
 
     for (const feature of scannedFeatures) {
       const taskTitle = buildTaskTitle(feature.parsed, feature.relPath)
-      const taskDescription = feature.parsed.description
+      const taskDescription = null
       const existing = existingByPath.get(feature.relPath)
         ?? (feature.parsed.id ? existingByFeatureId.get(feature.parsed.id) : undefined)
 
@@ -689,7 +936,7 @@ export function syncProjectFeatureTasks(db: Database, projectId: string): Projec
         continue
       }
 
-      updateTaskStmt.run(projectId, taskTitle, taskDescription, existing.existing_task_id)
+      updateTaskStmt.run(projectId, taskTitle, existing.existing_task_id)
       updateLinkStmt.run(existing.existing_task_id, feature.parsed.id, feature.parsed.title, feature.relPath, feature.contentHash, existing.id)
       result.updated += 1
     }
@@ -748,14 +995,23 @@ export function syncTaskToFeatureFile(db: Database, taskId: string): { updated: 
   if (!row) return { updated: false }
   if (!row.project_path) return { updated: false }
 
-  const featureFilePath = path.join(row.project_path, row.feature_file_path)
-  if (!fs.existsSync(featureFilePath)) return { updated: false }
+  const resolved = resolveLinkedFeatureFilePath(db, {
+    linkId: row.link_id,
+    projectPath: row.project_path,
+    featureFilePath: row.feature_file_path
+  })
+  if (!resolved) return { updated: false }
 
-  const existingContent = fs.readFileSync(featureFilePath, 'utf8')
-  const next = taskToFeatureFileContent(existingContent, row)
+  row.feature_file_path = resolved.featureFilePath
+
+  const existingContent = fs.readFileSync(resolved.featureFileAbs, 'utf8')
+  const acceptance = row.feature_file_path.toLowerCase().endsWith('.md')
+    ? discoverAcceptancePythonFiles(row.project_path, normalizeRelPath(path.dirname(row.feature_file_path)))
+    : undefined
+  const next = taskToFeatureFileContent(existingContent, row, acceptance)
   if (next.content === existingContent) return { updated: false }
 
-  fs.writeFileSync(featureFilePath, next.content, 'utf8')
+  fs.writeFileSync(resolved.featureFileAbs, next.content, 'utf8')
   const contentHash = buildContentHash(next.content)
   db.prepare(`
     UPDATE project_feature_task_links
@@ -769,6 +1025,7 @@ export function syncTaskToFeatureFile(db: Database, taskId: string): { updated: 
 export function getTaskFeatureDetails(db: Database, taskId: string): TaskFeatureDetails | null {
   const row = db.prepare(`
     SELECT
+      l.id AS link_id,
       l.project_id,
       l.task_id,
       l.feature_id,
@@ -784,6 +1041,7 @@ export function getTaskFeatureDetails(db: Database, taskId: string): TaskFeature
     WHERE l.task_id = ?
     LIMIT 1
   `).get(taskId) as {
+    link_id: string
     project_id: string
     task_id: string
     feature_id: string | null
@@ -797,17 +1055,29 @@ export function getTaskFeatureDetails(db: Database, taskId: string): TaskFeature
 
   if (!row) return null
 
-  const featureFilePath = normalizeRelPath(row.feature_file_path)
+  const resolved = row.project_path
+    ? resolveLinkedFeatureFilePath(db, {
+        linkId: row.link_id,
+        projectPath: row.project_path,
+        featureFilePath: row.feature_file_path
+      })
+    : null
+
+  const featureFilePath = normalizeRelPath(resolved?.featureFilePath ?? row.feature_file_path)
   const fileSegments = featureFilePath.split('/').filter(Boolean)
   const featureDirPath = fileSegments.length > 1 ? fileSegments.slice(0, -1).join('/') : '.'
   const featureDirAbsolutePath = row.base_path ? path.resolve(row.base_path, featureDirPath) : null
 
   let parsed: ParsedFeature | null = null
   if (row.project_path) {
-    const featureFileAbs = path.resolve(row.project_path, featureFilePath)
+    const featureFileAbs = resolved?.featureFileAbs ?? path.resolve(row.project_path, featureFilePath)
     if (fs.existsSync(featureFileAbs)) {
       try {
-        parsed = parseFeatureYaml(fs.readFileSync(featureFileAbs, 'utf8'))
+        parsed = parseFeatureSpecContent(
+          fs.readFileSync(featureFileAbs, 'utf8'),
+          featureFilePath,
+          row.project_path
+        )
       } catch {
         parsed = null
       }
@@ -862,31 +1132,50 @@ export function updateTaskFeatureFile(
 
   const featureId = (input.featureId ?? '').trim() || null
   const description = normalizeDescriptionForYaml(input.description ?? null)
-  const acceptance = normalizeEditableAcceptance(input.acceptance ?? [])
+  const acceptanceFromInput = normalizeEditableAcceptance(input.acceptance ?? [])
   const nextTaskTitle = buildTaskTitleFromFeature(featureId, featureTitle)
 
-  const featureFilePath = path.join(row.project_path, row.feature_file_path)
-  if (!fs.existsSync(featureFilePath)) throw new Error('Linked feature file does not exist')
-  const existingContent = fs.readFileSync(featureFilePath, 'utf8')
-  const nextContent = upsertFeatureFrontMatter(
-    existingContent,
-    featureId,
-    featureTitle,
-    description,
-    acceptance
-  )
+  const resolved = resolveLinkedFeatureFilePath(db, {
+    linkId: row.link_id,
+    projectPath: row.project_path,
+    featureFilePath: row.feature_file_path
+  })
+  if (!resolved) throw new Error('Linked feature file does not exist')
+
+  row.feature_file_path = resolved.featureFilePath
+  const existingContent = fs.readFileSync(resolved.featureFileAbs, 'utf8')
+  const featureDirPath = normalizeRelPath(path.dirname(row.feature_file_path))
+  const isMarkdown = row.feature_file_path.toLowerCase().endsWith('.md')
+  const acceptance = isMarkdown
+    ? discoverAcceptancePythonFiles(row.project_path, featureDirPath)
+    : acceptanceFromInput
+  const nextContent = isMarkdown
+    ? upsertFeatureMarkdownFrontMatter(
+        existingContent,
+        featureId,
+        featureTitle,
+        description,
+        acceptance
+      )
+    : upsertFeatureFrontMatter(
+        existingContent,
+        featureId,
+        featureTitle,
+        description,
+        acceptance
+      )
 
   const fileChanged = nextContent !== existingContent
-  if (fileChanged) fs.writeFileSync(featureFilePath, nextContent, 'utf8')
+  if (fileChanged) fs.writeFileSync(resolved.featureFileAbs, nextContent, 'utf8')
   const contentHash = buildContentHash(nextContent)
 
-  const taskChanged = row.task_title !== nextTaskTitle || (row.task_description ?? null) !== (description ?? null)
+  const taskChanged = row.task_title !== nextTaskTitle
   if (taskChanged) {
     db.prepare(`
       UPDATE tasks
-      SET title = ?, description = ?, updated_at = datetime('now')
+      SET title = ?, updated_at = datetime('now')
       WHERE id = ?
-    `).run(nextTaskTitle, description, taskId)
+    `).run(nextTaskTitle, taskId)
   }
 
   db.prepare(`
@@ -930,7 +1219,7 @@ export function createFeatureForTask(
   if (!row) throw new Error('Task not found')
   if (row.existing_link_id) throw new Error('Task is already linked to a feature')
   if (row.feature_repo_integration_enabled !== 1) {
-    throw new Error('Enable feature.yaml integration in Settings first')
+    throw new Error('Enable FEATURE.md integration in Settings first')
   }
   if (!row.project_path) {
     throw new Error('Repository path is required to create feature files')
@@ -948,7 +1237,7 @@ export function createFeatureForTask(
   const folderAbs = path.resolve(featuresRootAbs, folderRel)
   assertInsidePath(featuresRootAbs, folderAbs)
 
-  const featureFileAbs = path.join(folderAbs, 'feature.yaml')
+  const featureFileAbs = path.join(folderAbs, FEATURE_DOC_FILENAME)
   const featureFileRel = resolvePathInsideRepo(row.project_path, featureFileAbs)
   if (!featureFileRel) {
     throw new Error('Generated feature path is outside repository path')
@@ -965,15 +1254,13 @@ export function createFeatureForTask(
   }
 
   fs.mkdirSync(folderAbs, { recursive: true })
-  const existingContent = fs.existsSync(featureFileAbs) ? fs.readFileSync(featureFileAbs, 'utf8') : ''
+  fs.mkdirSync(path.join(folderAbs, 'acceptance'), { recursive: true })
+  const existingContent = fs.existsSync(featureFileAbs) ? fs.readFileSync(featureFileAbs, 'utf8') : null
   const normalizedDescription = normalizeDescriptionForYaml(input.description ?? row.task_description)
-  const nextContent = upsertFeatureFrontMatter(
-    existingContent.length > 0 ? existingContent : '\n',
-    normalizedFeatureId,
-    featureTitle,
-    normalizedDescription
-  )
-  fs.writeFileSync(featureFileAbs, nextContent, 'utf8')
+  const nextContent = existingContent ?? buildInitialFeatureMarkdownContent(featureTitle, normalizedDescription)
+  if (existingContent === null) {
+    fs.writeFileSync(featureFileAbs, nextContent, 'utf8')
+  }
 
   const nextTaskTitle = buildTaskTitleFromFeature(normalizedFeatureId, featureTitle)
   if (

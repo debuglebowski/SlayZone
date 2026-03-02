@@ -445,27 +445,12 @@ export function registerTaskHandlers(ipcMain: IpcMain, db: Database): void {
   })
 
   ipcMain.handle('db:tasks:getFeatureContext', (_, taskId: string) => {
-    const row = db.prepare(`
-      SELECT l.feature_file_path, COALESCE(t.worktree_path, p.path) AS base_path
-      FROM project_feature_task_links l
-      JOIN tasks t ON t.id = l.task_id
-      JOIN projects p ON p.id = l.project_id
-      WHERE l.task_id = ?
-      LIMIT 1
-    `).get(taskId) as { feature_file_path: string; base_path: string | null } | undefined
-
-    if (!row) return null
-    const featureFilePath = row.feature_file_path.replace(/\\/g, '/')
-    const fileSegments = featureFilePath.split('/').filter(Boolean)
-    const featureDirPath = fileSegments.length > 1 ? fileSegments.slice(0, -1).join('/') : '.'
-    const featureDirAbsolutePath = row.base_path
-      ? path.resolve(row.base_path, featureDirPath)
-      : null
-
+    const details = getTaskFeatureDetails(db, taskId)
+    if (!details) return null
     return {
-      featureFilePath,
-      featureDirPath,
-      featureDirAbsolutePath
+      featureFilePath: details.featureFilePath,
+      featureDirPath: details.featureDirPath,
+      featureDirAbsolutePath: details.featureDirAbsolutePath
     }
   })
 
