@@ -534,6 +534,9 @@ importers:
       '@slayzone/task-terminals':
         specifier: workspace:*
         version: link:../task-terminals
+      '@slayzone/telemetry':
+        specifier: workspace:*
+        version: link:../telemetry
       '@slayzone/terminal':
         specifier: workspace:*
         version: link:../terminal
@@ -574,6 +577,9 @@ importers:
 
   packages/domains/task-browser:
     dependencies:
+      '@slayzone/settings':
+        specifier: workspace:*
+        version: link:../settings
       '@slayzone/ui':
         specifier: workspace:*
         version: link:../../shared/ui

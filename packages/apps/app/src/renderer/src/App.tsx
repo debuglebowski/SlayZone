@@ -23,6 +23,7 @@ import { FileEditorView, QuickOpenDialog, type FileEditorViewHandle } from '@sla
 import { CreateProjectDialog, ProjectSettingsDialog, DeleteProjectDialog } from '@slayzone/projects'
 import { UserSettingsDialog, useViewState, AppearanceProvider } from '@slayzone/settings'
 import { OnboardingDialog } from '@slayzone/onboarding'
+import { track } from '@slayzone/telemetry/client'
 import { usePty } from '@slayzone/terminal/client'
 import type { TerminalState } from '@slayzone/terminal/shared'
 // Shared
@@ -132,7 +133,16 @@ function App(): React.JSX.Element {
   const [zenMode, setZenMode] = useState(false)
   const [explodeMode, setExplodeMode] = useState(false)
   const [panelSizes, updatePanelSizes, resetPanelSize] = usePanelSizes()
-  const [homePanelVisibility, setHomePanelVisibility] = useState<Record<HomePanel, boolean>>({ kanban: true, git: false, editor: false, processes: false })
+  const [homePanelVisibility, setHomePanelVisibilityRaw] = useState<Record<HomePanel, boolean>>({ kanban: true, git: false, editor: false, processes: false })
+  const setHomePanelVisibility = useCallback((updater: (prev: Record<HomePanel, boolean>) => Record<HomePanel, boolean>) => {
+    setHomePanelVisibilityRaw(prev => {
+      const next = updater(prev)
+      for (const key of Object.keys(next) as HomePanel[]) {
+        if (next[key] !== prev[key]) track('panel_toggled', { panel: key, active: next[key], context: 'home' })
+      }
+      return next
+    })
+  }, [])
   const [homeGitDefaultTab, setHomeGitDefaultTab] = useState<GitTabId>('general')
   const homeGitPanelRef = useRef<UnifiedGitPanelHandle>(null)
   const homeEditorRef = useRef<FileEditorViewHandle>(null)
@@ -461,6 +471,20 @@ function App(): React.JSX.Element {
   const handleTabClick = useCallback((index: number): void => {
     setActiveTabIndex(index)
   }, [setActiveTabIndex])
+
+  // Track page views on tab switch (not on tab content changes)
+  const prevTabIndexRef = useRef(-1)
+  useEffect(() => {
+    if (activeTabIndex === prevTabIndexRef.current) return
+    prevTabIndexRef.current = activeTabIndex
+    const tab = tabs[activeTabIndex]
+    if (!tab) return
+    if (tab.type === 'task') {
+      track('$pageview', { $current_url: `/task/${tab.taskId}`, page: 'task', task_id: tab.taskId })
+    } else {
+      track('$pageview', { $current_url: `/${tab.type}`, page: tab.type })
+    }
+  }, [activeTabIndex, tabs])
 
   // Sync tab titles/status and remove tabs for deleted tasks
   useEffect(() => {

@@ -1,12 +1,13 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
+import { useState, useEffect, useCallback } from 'react'
+import { AnimatePresence, motion } from 'framer-motion'
 import { Dialog, DialogContent } from '@slayzone/ui'
 import { Button, IconButton } from '@slayzone/ui'
 import { cn } from '@slayzone/ui'
-import { useTelemetry } from '@slayzone/telemetry/client'
+import { useTelemetry, track } from '@slayzone/telemetry/client'
 import { Check, BarChart3, Sparkles, SquareTerminal, ChevronLeft, TriangleAlert } from 'lucide-react'
 
-const STEP_COUNT = 5
+const STEP_NAMES = ['welcome', 'disclaimer', 'provider', 'analytics', 'success'] as const
+const STEP_COUNT = STEP_NAMES.length
 
 const PROVIDERS = [
   { mode: 'claude-code', label: 'Claude Code' },
@@ -17,8 +18,15 @@ const PROVIDERS = [
 ]
 
 const TRACKED_EVENTS = [
-  'App opened (with version number)',
-  'Activity heartbeat every 10 minutes while app is active and in the foreground'
+  'App version and active time',
+  'Pages visited (home, task, leaderboard)',
+  'Open panels (terminal, editor, browser, git)'
+]
+
+const NOT_TRACKED = [
+  'Your code, files, or terminal content',
+  'AI conversations or prompts',
+  'Project names or paths'
 ]
 
 function SuccessStep({ onComplete }: { onComplete: () => void }): React.JSX.Element {
@@ -80,21 +88,15 @@ export function OnboardingDialog({
 }: OnboardingDialogProps): React.JSX.Element | null {
   const [autoOpen, setAutoOpen] = useState(false)
   const [step, setStep] = useState(0)
-  const [direction, setDirection] = useState(1) // 1 = forward, -1 = back
   const [selectedProvider, setSelectedProvider] = useState('claude-code')
   const [closing, setClosing] = useState(false)
   const { setTier } = useTelemetry()
 
-  const [contentHeight, setContentHeight] = useState<number | 'auto'>('auto')
-  const contentRef = useRef<HTMLDivElement>(null)
-
-  const measureHeight = useCallback(() => {
-    if (contentRef.current) {
-      setContentHeight(contentRef.current.scrollHeight)
-    }
-  }, [])
-
   const open = autoOpen || (externalOpen ?? false)
+
+  useEffect(() => {
+    if (open) track('onboarding_step', { step, step_name: STEP_NAMES[step] })
+  }, [step, open])
 
   useEffect(() => {
     window.api.settings.get('onboarding_completed').then((value) => {
@@ -109,19 +111,18 @@ export function OnboardingDialog({
       window.api.settings.set('default_terminal_mode', selectedProvider)
     }
     if (step < STEP_COUNT - 1) {
-      setDirection(1)
       setStep(step + 1)
     }
   }
 
   const handleBack = (): void => {
     if (step > 0) {
-      setDirection(-1)
       setStep(step - 1)
     }
   }
 
   const handleSkip = (): void => {
+    track('onboarding_skipped', { from_step: step, from_step_name: STEP_NAMES[step] })
     finishOnboarding()
   }
 
@@ -146,11 +147,12 @@ export function OnboardingDialog({
   if (!open && !closing) return null
 
   return (
-    <Dialog open={open || closing} onOpenChange={() => {}}>
+    <Dialog open={open || closing} onOpenChange={autoOpen ? () => {} : handleSkip}>
       <DialogContent
         className="sm:max-w-[460px] p-0 overflow-hidden border-none shadow-none bg-transparent"
         showCloseButton={false}
-        onEscapeKeyDown={handleSkip}
+        onEscapeKeyDown={autoOpen ? (e) => e.preventDefault() : undefined}
+        onInteractOutside={autoOpen ? (e) => e.preventDefault() : undefined}
       >
         <motion.div
           className="bg-modal rounded-lg border shadow-lg"
@@ -158,8 +160,8 @@ export function OnboardingDialog({
           transition={{ duration: 0.35, ease: [0.4, 0, 0.2, 1] }}
           onAnimationComplete={handleFadeOutComplete}
         >
-          {/* Top bar: back + skip — hidden on success screen */}
-          {step < 4 && (
+          {/* Top bar: back + skip — hidden on success screen and when nothing to show */}
+          {step < 4 && (step > 0 || !autoOpen) && (
             <div className="flex items-center justify-between px-4 pt-4">
               <div className="w-9">
                 {step > 0 && (
@@ -173,223 +175,204 @@ export function OnboardingDialog({
                   </IconButton>
                 )}
               </div>
-              <Button
-                variant="ghost"
-                className="text-muted-foreground"
-                onClick={handleSkip}
-              >
-                Skip
-              </Button>
+              {!autoOpen && (
+                <Button
+                  variant="ghost"
+                  className="text-muted-foreground"
+                  onClick={handleSkip}
+                >
+                  Skip
+                </Button>
+              )}
             </div>
           )}
 
           <div className="px-8 pb-8">
-            <motion.div
-              animate={{ height: contentHeight }}
-              transition={{ type: 'spring', stiffness: 500, damping: 35 }}
-              style={{ overflow: 'hidden' }}
-            >
-            <AnimatePresence mode="wait" onExitComplete={measureHeight}>
+            <AnimatePresence mode="wait" initial={false}>
+            {step === 0 && (
               <motion.div
-                key={step}
-                ref={contentRef}
-                initial={{ opacity: 0, x: direction * 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: direction * -20 }}
-                transition={{ duration: 0.2, ease: [0.25, 0.46, 0.45, 0.94] }}
-                onAnimationComplete={measureHeight}
+                key="welcome"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.15 }}
+                className="text-center"
               >
-                {/* Step 0: Welcome */}
-                {step === 0 && (
-                  <div className="text-center">
-                    <motion.div
-                      className="mx-auto mb-6 flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10"
-                      initial={{ scale: 0.5, opacity: 0 }}
-                      animate={{ scale: 1, opacity: 1 }}
-                      transition={{ type: 'spring', stiffness: 400, damping: 20, delay: 0.1 }}
-                    >
-                      <Sparkles className="h-7 w-7 text-primary" />
-                    </motion.div>
-                    <h2 className="text-2xl font-semibold tracking-tight mb-2">Welcome to SlayZone</h2>
-                    <p className="text-muted-foreground leading-relaxed">
-                      A task manager with built-in AI coding terminals for AI-assisted development.
-                    </p>
-                  </div>
-                )}
-
-                {/* Step 1: Disclaimer */}
-                {step === 1 && (
-                  <div className="text-center">
-                    <motion.div
-                      className="mx-auto mb-6 flex h-14 w-14 items-center justify-center rounded-2xl bg-yellow-500/10"
-                      initial={{ scale: 0.5, opacity: 0 }}
-                      animate={{ scale: 1, opacity: 1 }}
-                      transition={{ type: 'spring', stiffness: 400, damping: 20, delay: 0.1 }}
-                    >
-                      <TriangleAlert className="h-7 w-7 text-yellow-500" />
-                    </motion.div>
-                    <h2 className="text-2xl font-semibold tracking-tight mb-2">Your AI, your responsibility</h2>
-                    <p className="text-muted-foreground leading-relaxed mb-8">
-                      You decide when and how AI runs. We take no responsibility for anything it does or data it handles.
-                    </p>
-                    <Button onClick={handleNext} className="w-full">
-                      I understand
-                    </Button>
-                  </div>
-                )}
-
-                {/* Step 2: Provider selection */}
-                {step === 2 && (
-                  <div>
-                    <div className="text-center mb-6">
-                      <motion.div
-                        className="mx-auto mb-6 flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10"
-                        initial={{ scale: 0.5, opacity: 0 }}
-                        animate={{ scale: 1, opacity: 1 }}
-                        transition={{ type: 'spring', stiffness: 400, damping: 20, delay: 0.1 }}
-                      >
-                        <SquareTerminal className="h-7 w-7 text-primary" />
-                      </motion.div>
-                      <h2 className="text-2xl font-semibold tracking-tight mb-2">Choose your default AI</h2>
-                      <p className="text-muted-foreground">
-                        Pick the CLI you use most. Change anytime in settings.
-                      </p>
-                    </div>
-                    <div className="space-y-1.5">
-                      {PROVIDERS.map(({ mode, label }, i) => (
-                        <motion.button
-                          key={mode}
-                          onClick={() => setSelectedProvider(mode)}
-                          initial={{ opacity: 0, x: -12 }}
-                          animate={{ opacity: 1, x: 0 }}
-                          transition={{ delay: 0.05 * i, duration: 0.2 }}
-                          className={cn(
-                            'w-full flex items-center justify-between rounded-xl px-4 py-3 text-sm font-medium transition-all',
-                            selectedProvider === mode
-                              ? 'bg-primary text-primary-foreground shadow-sm'
-                              : 'hover:bg-muted/60'
-                          )}
-                        >
-                          <span>{label}</span>
-                          {selectedProvider === mode && (
-                            <motion.div
-                              initial={{ scale: 0 }}
-                              animate={{ scale: 1 }}
-                              transition={{ type: 'spring', stiffness: 500, damping: 25 }}
-                            >
-                              <Check className="h-4 w-4" />
-                            </motion.div>
-                          )}
-                        </motion.button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Step 4: Success */}
-                {step === 4 && (
-                  <SuccessStep onComplete={startClosing} />
-                )}
-
-                {/* Step 3: Analytics */}
-                {step === 3 && (
-                  <div>
-                    <div className="text-center mb-6">
-                      <motion.div
-                        className="mx-auto mb-6 flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10"
-                        initial={{ scale: 0.5, opacity: 0 }}
-                        animate={{ scale: 1, opacity: 1 }}
-                        transition={{ type: 'spring', stiffness: 400, damping: 20, delay: 0.1 }}
-                      >
-                        <BarChart3 className="h-7 w-7 text-primary" />
-                      </motion.div>
-                      <h2 className="text-2xl font-semibold tracking-tight mb-2">Analytics</h2>
-                      <p className="text-muted-foreground">
-                        We always collect the following anonymously:
-                      </p>
-                    </div>
-
-                    <div className="rounded-xl bg-muted/40 p-4 mb-8">
-                      <ul className="space-y-2">
-                        {TRACKED_EVENTS.map((event, i) => (
-                          <motion.li
-                            key={event}
-                            initial={{ opacity: 0, x: -8 }}
-                            animate={{ opacity: 1, x: 0 }}
-                            transition={{ delay: 0.04 * i, duration: 0.2 }}
-                            className="flex items-start gap-2.5 text-sm text-muted-foreground"
-                          >
-                            <div className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-primary/15">
-                              <div className="h-1.5 w-1.5 rounded-full bg-primary" />
-                            </div>
-                            {event}
-                          </motion.li>
-                        ))}
-                      </ul>
-                    </div>
-
-                    <p className="text-sm text-muted-foreground text-left mb-2 leading-relaxed">
-                      To understand how often people come back, we can store a <strong className="text-foreground">random anonymous ID</strong> locally on your device. No personal info, no IP recording.
-                    </p>
-                    <p className="text-sm text-muted-foreground text-left mb-6">
-                      All good?
-                    </p>
-
-                    <div className="grid grid-cols-2 gap-3">
-                      <Button
-                        variant="outline"
-                        className="h-11"
-                        onClick={() => {
-                          setTier('anonymous')
-                          window.api.settings.set('onboarding_completed', 'true')
-                          setDirection(1)
-                          setStep(4)
-                        }}
-                      >
-                        No
-                      </Button>
-                      <Button
-                        className="h-11"
-                        onClick={() => {
-                          setTier('opted_in')
-                          window.api.settings.set('onboarding_completed', 'true')
-                          setDirection(1)
-                          setStep(4)
-                        }}
-                      >
-                        Yes
-                      </Button>
-                    </div>
-                  </div>
-                )}
+                <div className="mx-auto mb-6 flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10">
+                  <Sparkles className="h-7 w-7 text-primary" />
+                </div>
+                <h2 className="text-2xl font-semibold tracking-tight mb-2">Welcome to SlayZone</h2>
+                <p className="text-muted-foreground leading-relaxed">
+                  A task manager with built-in AI coding terminals for AI-assisted development.
+                </p>
+                <div className="mt-8">
+                  <Button onClick={handleNext} className="w-full">Continue</Button>
+                </div>
               </motion.div>
-            </AnimatePresence>
-            </motion.div>
+            )}
 
-            {/* Step indicators + actions — hidden on success screen and disclaimer (has own button) */}
-            {step < 4 && (
-              <div className="mt-8">
-                {/* Continue button — not on disclaimer step (has own button) or analytics step */}
-                {step !== 1 && step < 3 && (
-                  <Button onClick={handleNext} className="w-full">
-                    Continue
-                  </Button>
-                )}
+            {step === 1 && (
+              <motion.div
+                key="disclaimer"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.15 }}
+                className="text-center"
+              >
+                <div className="mx-auto mb-6 flex h-14 w-14 items-center justify-center rounded-2xl bg-yellow-500/10">
+                  <TriangleAlert className="h-7 w-7 text-yellow-500" />
+                </div>
+                <h2 className="text-2xl font-semibold tracking-tight mb-2">Your AI, your responsibility</h2>
+                <p className="text-muted-foreground leading-relaxed mb-8">
+                  You decide when and how AI runs. We take no responsibility for anything it does or data it handles.
+                </p>
+                <Button onClick={handleNext} className="w-full">I understand</Button>
+              </motion.div>
+            )}
 
-                {/* Progress bar */}
-                <div className="flex justify-center gap-1.5 mt-5">
-                  {Array.from({ length: STEP_COUNT - 1 }).map((_, i) => (
-                    <motion.div
-                      key={i}
+            {step === 2 && (
+              <motion.div
+                key="provider"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.15 }}
+              >
+                <div className="text-center mb-6">
+                  <div className="mx-auto mb-6 flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10">
+                    <SquareTerminal className="h-7 w-7 text-primary" />
+                  </div>
+                  <h2 className="text-2xl font-semibold tracking-tight mb-2">Choose your default AI</h2>
+                  <p className="text-muted-foreground">
+                    Pick the CLI you use most. Change anytime in settings.
+                  </p>
+                </div>
+                <div className="space-y-1.5">
+                  {PROVIDERS.map(({ mode, label }) => (
+                    <button
+                      key={mode}
+                      onClick={() => setSelectedProvider(mode)}
                       className={cn(
-                        'h-1 rounded-full transition-colors',
-                        i === step ? 'bg-primary' : 'bg-muted'
+                        'w-full flex items-center justify-between rounded-xl px-4 py-3 text-sm font-medium transition-all',
+                        selectedProvider === mode
+                          ? 'bg-primary text-primary-foreground shadow-sm'
+                          : 'hover:bg-muted/60'
                       )}
-                      animate={{ width: i === step ? 24 : 8 }}
-                      transition={{ type: 'spring', stiffness: 500, damping: 30 }}
-                    />
+                    >
+                      <span>{label}</span>
+                      {selectedProvider === mode && <Check className="h-4 w-4" />}
+                    </button>
                   ))}
                 </div>
+                <div className="mt-8">
+                  <Button onClick={handleNext} className="w-full">Continue</Button>
+                </div>
+              </motion.div>
+            )}
+
+            {step === 3 && (
+              <motion.div
+                key="analytics"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.15 }}
+              >
+                <div className="text-center mb-6">
+                  <div className="mx-auto mb-6 flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10">
+                    <BarChart3 className="h-7 w-7 text-primary" />
+                  </div>
+                  <h2 className="text-2xl font-semibold tracking-tight mb-2">Analytics</h2>
+                  <p className="text-muted-foreground">
+                    We want to track as little as possible, but also get a feeling for what features are used.
+                  </p>
+                </div>
+
+                <div className="rounded-xl bg-muted/40 p-4 mb-4">
+                  <p className="text-xs font-medium text-muted-foreground mb-2">We track</p>
+                  <ul className="space-y-2">
+                    {TRACKED_EVENTS.map((event) => (
+                      <li key={event} className="flex items-start gap-2.5 text-sm text-muted-foreground">
+                        <div className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-primary/15">
+                          <div className="h-1.5 w-1.5 rounded-full bg-primary" />
+                        </div>
+                        {event}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+
+                <div className="rounded-xl bg-muted/40 p-4 mb-6">
+                  <p className="text-xs font-medium text-muted-foreground mb-2">We never track</p>
+                  <ul className="space-y-2">
+                    {NOT_TRACKED.map((event) => (
+                      <li key={event} className="flex items-start gap-2.5 text-sm text-muted-foreground">
+                        <div className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-destructive/15">
+                          <div className="h-1.5 w-1.5 rounded-full bg-destructive" />
+                        </div>
+                        {event}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+
+                <p className="text-sm text-muted-foreground text-left mb-6 leading-relaxed">
+                  Store a <strong className="text-foreground">random ID</strong> on your device so we can understand retention? No personal info leaves your machine.
+                </p>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <Button
+                    variant="outline"
+                    className="h-11"
+                    onClick={() => {
+                      setTier('anonymous')
+                      track('onboarding_completed', { provider: selectedProvider, tier: 'anonymous' })
+                      window.api.settings.set('onboarding_completed', 'true')
+                      setStep(4)
+                    }}
+                  >
+                    No
+                  </Button>
+                  <Button
+                    className="h-11"
+                    onClick={() => {
+                      setTier('opted_in')
+                      track('onboarding_completed', { provider: selectedProvider, tier: 'opted_in' })
+                      window.api.settings.set('onboarding_completed', 'true')
+                      setStep(4)
+                    }}
+                  >
+                    Yes
+                  </Button>
+                </div>
+              </motion.div>
+            )}
+
+            {step === 4 && (
+              <motion.div
+                key="success"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.15 }}
+              >
+                <SuccessStep onComplete={startClosing} />
+              </motion.div>
+            )}
+            </AnimatePresence>
+
+            {step < 4 && (
+              <div className="flex justify-center gap-1.5 mt-5">
+                {Array.from({ length: STEP_COUNT - 1 }).map((_, i) => (
+                  <div
+                    key={i}
+                    className={cn(
+                      'h-1 rounded-full transition-all duration-300',
+                      i === step ? 'w-6 bg-primary' : 'w-2 bg-muted'
+                    )}
+                  />
+                ))}
               </div>
             )}
           </div>
