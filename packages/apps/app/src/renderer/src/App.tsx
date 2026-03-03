@@ -1366,6 +1366,7 @@ function App(): React.JSX.Element {
                             onNavigateToTask={openTask}
                             onConvertTask={handleConvertTask}
                             onCloseTab={() => closeTab(i)}
+                            settingsRevision={settingsRevision}
                           />
                         </div>
                         )}

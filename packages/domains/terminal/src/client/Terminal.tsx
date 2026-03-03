@@ -89,6 +89,8 @@ interface TerminalProps {
   initialPrompt?: string | null
   codeMode?: CodeMode | null
   providerFlags?: string | null
+  executionContext?: import('@slayzone/terminal/shared').ExecutionContext | null
+  ccsProfile?: string | null
   autoFocus?: boolean
   onConversationCreated?: (conversationId: string) => void
   onSessionInvalid?: () => void
@@ -118,6 +120,8 @@ export function Terminal({
   initialPrompt,
   codeMode,
   providerFlags,
+  executionContext,
+  ccsProfile,
   autoFocus = false,
   onConversationCreated,
   onSessionInvalid,

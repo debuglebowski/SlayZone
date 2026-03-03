@@ -173,6 +173,8 @@ export interface Task {
   // Merge mode
   merge_state: MergeState | null
   merge_context: MergeContext | null
+  // CCS (Claude Code Switch) profile name
+  ccs_profile: string | null
   // Temporary task (ephemeral terminal tab, deleted on close)
   is_temporary: boolean
   // External link (populated via JOIN)
@@ -243,6 +245,8 @@ export interface UpdateTaskInput {
   // Merge mode
   mergeState?: MergeState | null
   mergeContext?: MergeContext | null
+  // CCS profile
+  ccsProfile?: string | null
   // Temporary task
   isTemporary?: boolean
   // Legacy

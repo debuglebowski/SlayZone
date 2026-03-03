@@ -44,6 +44,7 @@ const projectA: Project = {
     { id: 'queued', label: 'Queue', color: 'gray', position: 0, category: 'unstarted' },
     { id: 'finished', label: 'Finished', color: 'green', position: 1, category: 'completed' }
   ],
+  execution_context: null,
   created_at: '',
   updated_at: ''
 }
@@ -62,6 +63,7 @@ const projectB: Project = {
     { id: 'queued', label: 'Inbox', color: 'gray', position: 0, category: 'triage' },
     { id: 'finished', label: 'Done', color: 'green', position: 1, category: 'completed' }
   ],
+  execution_context: null,
   created_at: '',
   updated_at: ''
 }

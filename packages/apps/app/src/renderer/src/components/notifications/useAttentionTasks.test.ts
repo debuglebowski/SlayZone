@@ -73,6 +73,7 @@ function makeTask(id: string, projectId: string, title: string): Task {
     editor_open_files: null,
     merge_state: null,
     merge_context: null,
+    ccs_profile: null,
     is_temporary: false,
     linear_url: null,
     created_at: new Date(0).toISOString(),
