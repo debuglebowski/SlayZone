@@ -108,6 +108,78 @@ describe('git:createWorktree', () => {
     // Clean up
     h.invoke('git:removeWorktree', repoPath, wtPath)
   })
+
+  test('includes tracked + untracked files with optional path filter', () => {
+    fs.mkdirSync(path.join(repoPath, 'docs'), { recursive: true })
+    fs.writeFileSync(path.join(repoPath, 'docs', 'tracked.md'), 'v1')
+    git('git add docs/tracked.md')
+    git('git commit -m "add tracked docs file"')
+
+    fs.writeFileSync(path.join(repoPath, 'docs', 'tracked.md'), 'v2-local')
+    fs.writeFileSync(path.join(repoPath, 'docs', 'untracked.md'), 'untracked-local')
+    fs.writeFileSync(path.join(repoPath, 'outside.txt'), 'outside-file')
+
+    const wtPath = path.join(root, 'wt-include-files')
+    const result = h.invoke(
+      'git:createWorktree',
+      repoPath,
+      wtPath,
+      'feature-include-files',
+      undefined,
+      {
+        includeTracked: true,
+        includeUntracked: true,
+        includeIgnored: false,
+        pathGlobs: ['docs/**']
+      }
+    ) as {
+      includeResult: { copiedCount: number; skippedLargeCount: number; skippedBlockedCount: number }
+    }
+
+    expect(fs.readFileSync(path.join(wtPath, 'docs', 'tracked.md'), 'utf-8')).toBe('v2-local')
+    expect(fs.readFileSync(path.join(wtPath, 'docs', 'untracked.md'), 'utf-8')).toBe('untracked-local')
+    expect(fs.existsSync(path.join(wtPath, 'outside.txt'))).toBe(false)
+    expect(result.includeResult.copiedCount).toBe(2)
+
+    h.invoke('git:removeWorktree', repoPath, wtPath)
+    git('git checkout -- docs/tracked.md')
+    fs.unlinkSync(path.join(repoPath, 'docs', 'untracked.md'))
+    fs.unlinkSync(path.join(repoPath, 'outside.txt'))
+  })
+
+  test('can include ignored files but excludes blocked directories', () => {
+    fs.writeFileSync(path.join(repoPath, '.gitignore'), '.env\nnode_modules/\n')
+    git('git add .gitignore')
+    git('git commit -m "add ignore rules"')
+
+    fs.writeFileSync(path.join(repoPath, '.env'), 'TOKEN=secret')
+    fs.mkdirSync(path.join(repoPath, 'node_modules', 'pkg'), { recursive: true })
+    fs.writeFileSync(path.join(repoPath, 'node_modules', 'pkg', 'leak.txt'), 'should-not-copy')
+
+    const wtPath = path.join(root, 'wt-include-ignored')
+    const result = h.invoke(
+      'git:createWorktree',
+      repoPath,
+      wtPath,
+      'feature-include-ignored',
+      undefined,
+      {
+        includeTracked: false,
+        includeUntracked: false,
+        includeIgnored: true
+      }
+    ) as {
+      includeResult: { copiedCount: number; skippedLargeCount: number; skippedBlockedCount: number }
+    }
+
+    expect(fs.existsSync(path.join(wtPath, '.env'))).toBe(true)
+    expect(fs.existsSync(path.join(wtPath, 'node_modules', 'pkg', 'leak.txt'))).toBe(false)
+    expect(result.includeResult.skippedBlockedCount).toBeGreaterThan(0)
+
+    h.invoke('git:removeWorktree', repoPath, wtPath)
+    fs.unlinkSync(path.join(repoPath, '.env'))
+    fs.rmSync(path.join(repoPath, 'node_modules'), { recursive: true, force: true })
+  })
 })
 
 // --- .slay/worktree-setup.sh ---

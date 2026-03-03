@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { GitBranch, GitMerge, Plus, Trash2, ChevronDown, Check, Loader2, ArrowUp, ArrowDown, GitCommitHorizontal, AlertTriangle, Copy } from 'lucide-react'
 import {
   Button,
+  Checkbox,
   IconButton,
   Input,
   Popover,
@@ -75,8 +76,15 @@ export function GeneralTabContent({
 
   // Worktree
   const [creating, setCreating] = useState(false)
+  const [createWorktreeConfirmOpen, setCreateWorktreeConfirmOpen] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [includeTracked, setIncludeTracked] = useState(true)
+  const [includeUntracked, setIncludeUntracked] = useState(false)
+  const [includeIgnored, setIncludeIgnored] = useState(false)
+  const [limitPaths, setLimitPaths] = useState(false)
+  const [pathFilters, setPathFilters] = useState('docs/**')
+  const [copyPreset, setCopyPreset] = useState<'custom' | 'docs-only' | 'everything-no-ignored' | 'include-ignored'>('custom')
   const [deleteWorktreeConfirmOpen, setDeleteWorktreeConfirmOpen] = useState(false)
   const [deleteWorktreeHasChanges, setDeleteWorktreeHasChanges] = useState(false)
   const [mergeConfirmOpen, setMergeConfirmOpen] = useState(false)
@@ -187,8 +195,33 @@ export function GeneralTabContent({
   }
 
   // Worktree handlers
-  const handleAddWorktree = async () => {
+  const handlePresetChange = (value: 'custom' | 'docs-only' | 'everything-no-ignored' | 'include-ignored') => {
+    setCopyPreset(value)
+    if (value === 'custom') return
+    if (value === 'docs-only') {
+      setIncludeTracked(true)
+      setIncludeUntracked(true)
+      setIncludeIgnored(false)
+      setLimitPaths(true)
+      setPathFilters('docs/**')
+      return
+    }
+    if (value === 'everything-no-ignored') {
+      setIncludeTracked(true)
+      setIncludeUntracked(true)
+      setIncludeIgnored(false)
+      setLimitPaths(false)
+      return
+    }
+    setIncludeTracked(true)
+    setIncludeUntracked(true)
+    setIncludeIgnored(true)
+    setLimitPaths(false)
+  }
+
+  const handleCreateWorktreeConfirm = async () => {
     if (!projectPath) return
+    setCreateWorktreeConfirmOpen(false)
     setCreating(true)
     setError(null)
     try {
@@ -196,8 +229,24 @@ export function GeneralTabContent({
       const basePath = resolveWorktreeBasePathTemplate(basePathTemplate, projectPath)
       const branch = slugify(task.title) || `task-${task.id.slice(0, 8)}`
       const worktreePath = joinWorktreePath(basePath, branch)
-      await window.api.git.createWorktree(projectPath, worktreePath, branch)
+      const includeResult = await window.api.git.createWorktree(
+        projectPath,
+        worktreePath,
+        branch,
+        undefined,
+        {
+          includeTracked,
+          includeUntracked,
+          includeIgnored,
+          pathGlobs: limitPaths
+            ? pathFilters.split(',').map(value => value.trim()).filter(Boolean)
+            : undefined
+        }
+      )
       await onUpdateTask({ id: task.id, worktreePath, worktreeParentBranch: currentBranch })
+      if (includeResult.includeResult.copiedCount > 0) {
+        toast(`Copied ${includeResult.includeResult.copiedCount} file${includeResult.includeResult.copiedCount === 1 ? '' : 's'} from main workspace`)
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
     } finally {
@@ -440,7 +489,7 @@ export function GeneralTabContent({
           ) : (
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button variant="outline" size="sm" onClick={handleAddWorktree} disabled={creating} className="gap-2 w-full justify-start">
+                <Button variant="outline" size="sm" onClick={() => setCreateWorktreeConfirmOpen(true)} disabled={creating} className="gap-2 w-full justify-start">
                   <Plus className="h-4 w-4" />
                   {creating ? 'Creating...' : 'Add Worktree'}
                 </Button>
@@ -511,6 +560,73 @@ export function GeneralTabContent({
           </Section>
         )}
       </div>
+
+      {/* Delete worktree confirmation dialog */}
+      <AlertDialog open={createWorktreeConfirmOpen} onOpenChange={setCreateWorktreeConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Create Worktree</AlertDialogTitle>
+            <AlertDialogDescription>
+              Include local files from the main workspace into the new worktree.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="space-y-3 text-sm">
+            <div className="space-y-1">
+              <div className="text-xs font-medium text-muted-foreground">Preset</div>
+              <select
+                value={copyPreset}
+                onChange={(e) => handlePresetChange(e.target.value as 'custom' | 'docs-only' | 'everything-no-ignored' | 'include-ignored')}
+                className="w-full h-8 rounded-md border bg-background px-2 text-xs"
+              >
+                <option value="custom">Custom</option>
+                <option value="docs-only">Docs only</option>
+                <option value="everything-no-ignored">Everything except ignored</option>
+                <option value="include-ignored">Include ignored too (advanced)</option>
+              </select>
+            </div>
+
+            <div className="space-y-2 rounded-md border p-3 bg-muted/20">
+              <div className="text-xs font-medium text-muted-foreground">Include local files from main workspace</div>
+              <label className="flex items-center gap-2 text-xs">
+                <Checkbox checked={includeTracked} onCheckedChange={(v) => { setCopyPreset('custom'); setIncludeTracked(!!v) }} />
+                Tracked changes (modified tracked files)
+              </label>
+              <label className="flex items-center gap-2 text-xs">
+                <Checkbox checked={includeUntracked} onCheckedChange={(v) => { setCopyPreset('custom'); setIncludeUntracked(!!v) }} />
+                Untracked files
+              </label>
+              <label className="flex items-center gap-2 text-xs">
+                <Checkbox checked={includeIgnored} onCheckedChange={(v) => { setCopyPreset('custom'); setIncludeIgnored(!!v) }} />
+                Gitignored files (advanced / risky)
+              </label>
+            </div>
+
+            <label className="flex items-center gap-2 text-xs">
+              <Checkbox checked={limitPaths} onCheckedChange={(v) => { setCopyPreset('custom'); setLimitPaths(!!v) }} />
+              Only include under these paths
+            </label>
+            {limitPaths && (
+              <Input
+                value={pathFilters}
+                onChange={(e) => { setCopyPreset('custom'); setPathFilters(e.target.value) }}
+                placeholder="docs/**, FEATURES/**"
+                className="h-8 text-xs"
+              />
+            )}
+            {includeIgnored && (
+              <p className="text-xs text-amber-500">
+                May include secrets and large folders (.env, build artifacts). Prefer selecting paths.
+              </p>
+            )}
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={creating}>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleCreateWorktreeConfirm} disabled={creating}>
+              {creating ? 'Creating...' : 'Create Worktree'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Delete worktree confirmation dialog */}
       <AlertDialog open={deleteWorktreeConfirmOpen} onOpenChange={setDeleteWorktreeConfirmOpen}>

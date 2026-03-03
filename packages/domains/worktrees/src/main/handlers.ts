@@ -4,6 +4,7 @@ import {
   isGitRepo,
   detectWorktrees,
   createWorktree,
+  copyFilesFromMainToWorktree,
   removeWorktree,
   runWorktreeSetupScript,
   initRepo,
@@ -38,7 +39,7 @@ import {
   getStatusSummary
 } from './git-worktree'
 import { runAiCommand } from './merge-ai'
-import type { MergeWithAIResult, ConflictAnalysis } from '../shared/types'
+import type { MergeWithAIResult, ConflictAnalysis, WorktreeIncludeFilesOptions, WorktreeIncludeFilesResult } from '../shared/types'
 
 export function registerWorktreeHandlers(ipcMain: IpcMain): void {
   // Git operations
@@ -50,10 +51,20 @@ export function registerWorktreeHandlers(ipcMain: IpcMain): void {
     return detectWorktrees(repoPath)
   })
 
-  ipcMain.handle('git:createWorktree', async (_, repoPath: string, targetPath: string, branch?: string, sourceBranch?: string) => {
+  ipcMain.handle('git:createWorktree', async (
+    _,
+    repoPath: string,
+    targetPath: string,
+    branch?: string,
+    sourceBranch?: string,
+    includeFiles?: WorktreeIncludeFilesOptions
+  ) => {
     createWorktree(repoPath, targetPath, branch, sourceBranch)
+    const includeResult = includeFiles
+      ? copyFilesFromMainToWorktree(repoPath, targetPath, includeFiles)
+      : ({ copiedCount: 0, skippedLargeCount: 0, skippedBlockedCount: 0 } satisfies WorktreeIncludeFilesResult)
     const setupResult = await runWorktreeSetupScript(targetPath, repoPath, sourceBranch)
-    return { setupResult }
+    return { setupResult, includeResult }
   })
 
   ipcMain.handle('git:removeWorktree', (_, repoPath: string, worktreePath: string) => {

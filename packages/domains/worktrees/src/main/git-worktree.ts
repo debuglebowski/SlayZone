@@ -1,9 +1,9 @@
 import { execSync, spawnSync, spawn } from 'child_process'
 import { platform } from 'os'
-import { existsSync, readFileSync, writeFileSync, chmodSync, constants as fsConstants, accessSync } from 'fs'
+import { existsSync, readFileSync, writeFileSync, chmodSync, constants as fsConstants, accessSync, mkdirSync, copyFileSync, lstatSync } from 'fs'
 import path from 'path'
 import { recordDiagnosticEvent } from '@slayzone/diagnostics/main'
-import type { ConflictFileContent, DetectedWorktree, GitDiffSnapshot, MergeResult, RebaseProgress, RebaseCommitInfo, CommitInfo, AheadBehind, StatusSummary } from '../shared/types'
+import type { ConflictFileContent, DetectedWorktree, GitDiffSnapshot, MergeResult, RebaseProgress, RebaseCommitInfo, CommitInfo, AheadBehind, StatusSummary, WorktreeIncludeFilesOptions, WorktreeIncludeFilesResult } from '../shared/types'
 import type { MergeContext } from '@slayzone/task/shared'
 
 function trimOutput(value: unknown, maxLength = 1200): string | null {
@@ -96,6 +96,7 @@ function spawnGit(args: string[], options: { cwd: string }): string {
     cwd: options.cwd,
     encoding: 'utf-8',
     stdio: ['pipe', 'pipe', 'pipe'],
+    maxBuffer: 64 * 1024 * 1024,
   })
   if (result.status !== 0) {
     const error = new Error(result.stderr?.trim() || `git command failed: ${command}`) as Error & {
@@ -208,6 +209,181 @@ export function createWorktree(repoPath: string, targetPath: string, branch?: st
   if (branch) args.push('-b', branch)
   if (sourceBranch) args.push(sourceBranch)
   spawnGit(args, { cwd: repoPath })
+}
+
+const MAX_INCLUDE_FILE_SIZE_BYTES = 25 * 1024 * 1024
+const DEFAULT_BLOCKED_PREFIXES = ['node_modules/', 'dist/', 'build/', '.git/']
+
+function normalizeRelPath(value: string): string {
+  return value.replace(/\\/g, '/').replace(/^\.\/+/, '').replace(/^\/+/, '').trim()
+}
+
+function normalizeGlobs(globs?: string[]): string[] {
+  return (globs ?? [])
+    .map(value => normalizeRelPath(value))
+    .filter(Boolean)
+}
+
+function matchesPathGlob(relPath: string, globs: string[]): boolean {
+  if (globs.length === 0) return true
+  const normalized = normalizeRelPath(relPath)
+  for (const glob of globs) {
+    if (glob === '**' || glob === '*') return true
+    if (glob.endsWith('/**')) {
+      const base = glob.slice(0, -3)
+      if (!base || normalized === base || normalized.startsWith(`${base}/`)) return true
+      continue
+    }
+    if (glob.endsWith('/')) {
+      if (normalized.startsWith(glob)) return true
+      continue
+    }
+    if (normalized === glob) return true
+  }
+  return false
+}
+
+function runGitListCommand(
+  repoPath: string,
+  args: string[],
+  options?: { allowPartialOnBufferOverflow?: boolean }
+): string {
+  try {
+    return spawnGit(args, { cwd: repoPath })
+  } catch (error) {
+    const partialStdout = typeof (error as { stdout?: unknown }).stdout === 'string'
+      ? (error as { stdout: string }).stdout
+      : ''
+    const message = String((error as { message?: unknown }).message ?? '')
+    const isBufferOverflow =
+      message.includes('ENOBUFS') ||
+      message.includes('maxBuffer') ||
+      (error as { status?: number | null }).status == null
+
+    if (options?.allowPartialOnBufferOverflow && isBufferOverflow && partialStdout.trim()) {
+      recordDiagnosticEvent({
+        level: 'warn',
+        source: 'git',
+        event: 'git.command_partial_output',
+        message: `Using partial output for git ${args.join(' ')}`,
+        payload: {
+          repoPath,
+          args,
+          outputLength: partialStdout.length
+        }
+      })
+      return partialStdout
+    }
+    throw error
+  }
+}
+
+function listGitFilesByMode(repoPath: string, options: {
+  includeTracked: boolean
+  includeUntracked: boolean
+  includeIgnored: boolean
+}): Set<string> {
+  const files = new Set<string>()
+  const addFromOutput = (output: string) => {
+    for (const line of output.split('\n')) {
+      const rel = normalizeRelPath(line)
+      if (rel) files.add(rel)
+    }
+  }
+
+  if (options.includeTracked) {
+    addFromOutput(runGitListCommand(repoPath, ['diff', '--name-only']))
+    addFromOutput(runGitListCommand(repoPath, ['diff', '--cached', '--name-only']))
+  }
+  if (options.includeUntracked) {
+    addFromOutput(runGitListCommand(repoPath, ['ls-files', '--others', '--exclude-standard']))
+  }
+  if (options.includeIgnored) {
+    addFromOutput(runGitListCommand(
+      repoPath,
+      ['ls-files', '--others', '-i', '--exclude-standard'],
+      { allowPartialOnBufferOverflow: true }
+    ))
+  }
+
+  return files
+}
+
+function isBlockedPath(relPath: string): boolean {
+  const normalized = normalizeRelPath(relPath)
+  return DEFAULT_BLOCKED_PREFIXES.some(prefix => normalized === prefix.slice(0, -1) || normalized.startsWith(prefix))
+}
+
+export function copyFilesFromMainToWorktree(
+  repoPath: string,
+  worktreePath: string,
+  input?: WorktreeIncludeFilesOptions
+): WorktreeIncludeFilesResult {
+  const includeTracked = Boolean(input?.includeTracked)
+  const includeUntracked = Boolean(input?.includeUntracked)
+  const includeIgnored = Boolean(input?.includeIgnored)
+  const globs = normalizeGlobs(input?.pathGlobs)
+
+  if (!includeTracked && !includeUntracked && !includeIgnored) {
+    return { copiedCount: 0, skippedLargeCount: 0, skippedBlockedCount: 0 }
+  }
+
+  const files = listGitFilesByMode(repoPath, {
+    includeTracked,
+    includeUntracked,
+    includeIgnored
+  })
+
+  let copiedCount = 0
+  let skippedLargeCount = 0
+  let skippedBlockedCount = 0
+
+  for (const relPath of files) {
+    if (!matchesPathGlob(relPath, globs)) continue
+    if (isBlockedPath(relPath)) {
+      skippedBlockedCount += 1
+      continue
+    }
+
+    const src = path.join(repoPath, relPath)
+    if (!existsSync(src)) continue
+
+    let stat
+    try {
+      stat = lstatSync(src)
+    } catch {
+      continue
+    }
+    if (!stat.isFile()) continue
+    if (stat.size > MAX_INCLUDE_FILE_SIZE_BYTES) {
+      skippedLargeCount += 1
+      continue
+    }
+
+    const dst = path.join(worktreePath, relPath)
+    mkdirSync(path.dirname(dst), { recursive: true })
+    copyFileSync(src, dst)
+    copiedCount += 1
+  }
+
+  recordDiagnosticEvent({
+    level: 'info',
+    source: 'git',
+    event: 'git.worktree_include_files',
+    payload: {
+      repoPath,
+      worktreePath,
+      includeTracked,
+      includeUntracked,
+      includeIgnored,
+      pathGlobs: globs,
+      copiedCount,
+      skippedLargeCount,
+      skippedBlockedCount
+    }
+  })
+
+  return { copiedCount, skippedLargeCount, skippedBlockedCount }
 }
 
 function getWorktreeBranchFromRepo(repoPath: string, worktreePath: string): string | null {

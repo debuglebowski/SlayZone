@@ -80,3 +80,16 @@ export interface GitDiffSnapshot {
   generatedAt: string
   isGitRepo: boolean
 }
+
+export interface WorktreeIncludeFilesOptions {
+  includeTracked?: boolean
+  includeUntracked?: boolean
+  includeIgnored?: boolean
+  pathGlobs?: string[]
+}
+
+export interface WorktreeIncludeFilesResult {
+  copiedCount: number
+  skippedLargeCount: number
+  skippedBlockedCount: number
+}
