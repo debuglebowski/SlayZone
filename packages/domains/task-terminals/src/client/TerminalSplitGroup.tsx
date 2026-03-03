@@ -14,7 +14,6 @@ interface PaneProps {
   providerFlags?: string
   executionContext?: import('@slayzone/terminal/shared').ExecutionContext | null
   ccsProfile?: string | null
-  autoFocus?: boolean
   onConversationCreated?: (conversationId: string) => void
   onSessionInvalid?: () => void
   onReady?: (api: {
@@ -109,7 +108,6 @@ export function TerminalSplitGroup({ panes }: TerminalSplitGroupProps) {
           providerFlags={pane.providerFlags}
           executionContext={pane.executionContext}
           ccsProfile={pane.ccsProfile}
-          autoFocus={pane.autoFocus}
           onConversationCreated={pane.onConversationCreated}
           onSessionInvalid={pane.onSessionInvalid}
           onReady={pane.onReady}
@@ -137,7 +135,6 @@ export function TerminalSplitGroup({ panes }: TerminalSplitGroupProps) {
               providerFlags={pane.providerFlags}
               executionContext={pane.executionContext}
               ccsProfile={pane.ccsProfile}
-              autoFocus={pane.autoFocus && i === 0}
               onConversationCreated={pane.onConversationCreated}
               onSessionInvalid={pane.onSessionInvalid}
               onReady={pane.onReady}

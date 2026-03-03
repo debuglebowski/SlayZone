@@ -153,6 +153,8 @@ interface TaskDetailPageProps {
   onConvertTask?: (task: Task) => Promise<Task | void>
   onCloseTab: () => void
   settingsRevision?: number
+  terminalFocusRequestId?: number
+  onTerminalFocusRequestHandled?: (taskId: string, requestId: number) => void
 }
 
 export function TaskDetailPage({
@@ -167,6 +169,8 @@ export function TaskDetailPage({
   onConvertTask,
   onCloseTab,
   settingsRevision = 0,
+  terminalFocusRequestId = 0,
+  onTerminalFocusRequestHandled,
 }: TaskDetailPageProps): React.JSX.Element {
   const { colorTintsEnabled } = useAppearance()
   // Main tab session ID format used by TerminalContainer/useTaskTerminals.
@@ -280,21 +284,6 @@ export function TaskDetailPage({
     focus: () => void
     clearBuffer: () => Promise<void>
   } | null>(null)
-
-  // Track first mount for auto-focus
-  const isFirstMountRef = useRef(true)
-  useEffect(() => {
-    isFirstMountRef.current = false
-  }, [])
-
-  // Focus terminal when tab becomes active
-  useEffect(() => {
-    if (isActive && !document.querySelector('[role="dialog"]')) {
-      requestAnimationFrame(() => {
-        terminalApiRef.current?.focus()
-      })
-    }
-  }, [isActive])
 
   // Subscribe to session detected events
   useEffect(() => {
@@ -533,6 +522,10 @@ export function TaskDetailPage({
   }) => {
     terminalApiRef.current = api
   }, [])
+
+  const handleTerminalFocusRequestHandled = useCallback((requestId: number): void => {
+    onTerminalFocusRequestHandled?.(taskId, requestId)
+  }, [onTerminalFocusRequestHandled, taskId])
 
 
   // Session ID discovery: providers that don't support --session-id at creation
@@ -1584,11 +1577,12 @@ export function TaskDetailPage({
                   providerFlags={getProviderFlagsForMode(task)}
                   executionContext={project?.execution_context}
                   ccsProfile={task.ccs_profile}
-                  autoFocus={isFirstMountRef.current}
+                  focusRequestId={terminalFocusRequestId}
                   onConversationCreated={handleSessionCreated}
                   onSessionInvalid={handleSessionInvalid}
                   onReady={handleTerminalReady}
                   onRetry={handleRestartTerminal}
+                  onFocusRequestHandled={handleTerminalFocusRequestHandled}
                   onMainTabActiveChange={setIsMainTabActive}
                   rightContent={
                     <Tooltip open={!isMainTabActive && !task.is_temporary ? undefined : false}>

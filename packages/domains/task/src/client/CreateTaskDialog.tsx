@@ -172,6 +172,9 @@ export function CreateTaskDialog({
           e.preventDefault()
           const input = document.querySelector<HTMLInputElement>('[name="title"]')
           input?.focus()
+        }} onCloseAutoFocus={(e) => {
+          // Keep focus control in the task view (terminal/editor) when closing after create.
+          e.preventDefault()
         }}>
         <DialogHeader>
           <DialogTitle>Create Task</DialogTitle>

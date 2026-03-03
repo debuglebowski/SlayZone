@@ -130,6 +130,7 @@ function App(): React.JSX.Element {
   const [autoChangelogOpen, dismissAutoChangelog] = useChangelogAutoOpen()
   const [searchOpen, setSearchOpen] = useState(false)
   const [completeTaskDialogOpen, setCompleteTaskDialogOpen] = useState(false)
+  const [terminalFocusRequests, setTerminalFocusRequests] = useState<Record<string, number>>({})
   const [zenMode, setZenMode] = useState(false)
   const [explodeMode, setExplodeMode] = useState(false)
   const [panelSizes, updatePanelSizes, resetPanelSize] = usePanelSizes()
@@ -514,6 +515,20 @@ function App(): React.JSX.Element {
       })
     })
   }, [tasks, setTabs, setActiveTabIndex])
+
+  // Drop stale focus requests for tasks that no longer exist.
+  useEffect(() => {
+    const taskIds = new Set(tasks.map((t) => t.id))
+    setTerminalFocusRequests((prev) => {
+      let changed = false
+      const next: Record<string, number> = {}
+      for (const [id, requestId] of Object.entries(prev)) {
+        if (taskIds.has(id)) next[id] = requestId
+        else changed = true
+      }
+      return changed ? next : prev
+    })
+  }, [tasks])
 
   // Startup cleanup: delete orphaned temporary tasks (no open tab)
   const didCleanupRef = useRef(false)
@@ -931,6 +946,7 @@ function App(): React.JSX.Element {
       isTemporary: true
     })
     setTasks((prev) => [task, ...prev])
+    setTerminalFocusRequests((prev) => ({ ...prev, [task.id]: (prev[task.id] ?? 0) + 1 }))
     openTask(task.id)
 
   }, [selectedProjectId, selectedProject, tasks, setTasks, openTask])
@@ -966,9 +982,19 @@ function App(): React.JSX.Element {
     setTasks((prev) => [task, ...prev])
     setCreateOpen(false)
     setCreateTaskDefaults({})
+    setTerminalFocusRequests((prev) => ({ ...prev, [task.id]: (prev[task.id] ?? 0) + 1 }))
     openTask(task.id)
 
   }
+
+  const handleTerminalFocusRequestHandled = useCallback((taskId: string, requestId: number): void => {
+    setTerminalFocusRequests((prev) => {
+      if ((prev[taskId] ?? 0) !== requestId) return prev
+      const next = { ...prev }
+      delete next[taskId]
+      return next
+    })
+  }, [])
 
   const handleCreateTaskFromColumn = (column: Column): void => {
     const defaults: typeof createTaskDefaults = {}
@@ -1381,6 +1407,8 @@ function App(): React.JSX.Element {
                             onConvertTask={handleConvertTask}
                             onCloseTab={() => closeTab(i)}
                             settingsRevision={settingsRevision}
+                            terminalFocusRequestId={terminalFocusRequests[tab.taskId] ?? 0}
+                            onTerminalFocusRequestHandled={handleTerminalFocusRequestHandled}
                           />
                         </div>
                         )}

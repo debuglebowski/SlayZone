@@ -21,7 +21,7 @@ interface TerminalContainerProps {
   executionContext?: import('@slayzone/terminal/shared').ExecutionContext | null
   ccsProfile?: string | null
   isActive?: boolean
-  autoFocus?: boolean
+  focusRequestId?: number
   onConversationCreated?: (conversationId: string) => void
   onSessionInvalid?: () => void
   onReady?: (api: {
@@ -32,6 +32,7 @@ interface TerminalContainerProps {
   }) => void
   onFirstInput?: () => void
   onRetry?: () => void
+  onFocusRequestHandled?: (requestId: number) => void
   onMainTabActiveChange?: (isMainActive: boolean) => void
   rightContent?: React.ReactNode
 }
@@ -48,12 +49,13 @@ export const TerminalContainer = forwardRef<TerminalContainerHandle, TerminalCon
   executionContext,
   ccsProfile,
   isActive = true,
-  autoFocus = false,
+  focusRequestId = 0,
   onConversationCreated,
   onSessionInvalid,
   onReady,
   onFirstInput,
   onRetry,
+  onFocusRequestHandled,
   onMainTabActiveChange,
   rightContent
 }: TerminalContainerProps, ref) {
@@ -78,9 +80,13 @@ export const TerminalContainer = forwardRef<TerminalContainerHandle, TerminalCon
     focus: () => void
     clearBuffer: () => Promise<void>
   } | null>(null)
+  const lastHandledFocusRequestRef = useRef(0)
 
   // Get active group
   const activeGroup = groups.find(g => g.id === activeGroupId)
+  const mainTab = tabs.find((tab) => tab.isMain)
+  const mainSessionId = mainTab ? getSessionId(mainTab.id) : null
+  const mainGroupId = groups.find((group) => group.tabs.some((tab) => tab.isMain))?.id ?? null
 
   // Notify parent when main tab active state changes
   useEffect(() => {
@@ -120,17 +126,6 @@ export const TerminalContainer = forwardRef<TerminalContainerHandle, TerminalCon
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [isActive, activeGroup, createTab, splitTab])
 
-  // Handle terminal ready - pass up to parent (main tab's API)
-  const handleTerminalReady = useCallback((api: {
-    sendInput: (text: string) => Promise<void>
-    write: (data: string) => Promise<boolean>
-    focus: () => void
-    clearBuffer: () => Promise<void>
-  }) => {
-    terminalApiRef.current = api
-    onReady?.(api)
-  }, [onReady])
-
   // Handle conversation created - only for main tab
   const handleConversationCreated = useCallback((convId: string) => {
     onConversationCreated?.(convId)
@@ -168,8 +163,51 @@ export const TerminalContainer = forwardRef<TerminalContainerHandle, TerminalCon
       if (tryNow()) observer.disconnect()
     })
     observer.observe(document.body, { childList: true, subtree: true })
-    setTimeout(() => observer.disconnect(), 3000)
+    setTimeout(() => observer.disconnect(), 5000)
   }, [])
+
+  const tryApplyFocusRequest = useCallback(() => {
+    if (focusRequestId <= 0 || focusRequestId <= lastHandledFocusRequestRef.current) return
+    if (!isActive || !mainSessionId || !terminalApiRef.current) return
+
+    if (mainGroupId && activeGroupId !== mainGroupId) {
+      setActiveGroupId(mainGroupId)
+      return
+    }
+
+    requestAnimationFrame(() => {
+      terminalApiRef.current?.focus()
+      focusGroupTerminal(mainSessionId)
+    })
+
+    lastHandledFocusRequestRef.current = focusRequestId
+    onFocusRequestHandled?.(focusRequestId)
+  }, [
+    focusRequestId,
+    isActive,
+    mainSessionId,
+    mainGroupId,
+    activeGroupId,
+    setActiveGroupId,
+    focusGroupTerminal,
+    onFocusRequestHandled
+  ])
+
+  useEffect(() => {
+    tryApplyFocusRequest()
+  }, [tryApplyFocusRequest])
+
+  // Handle terminal ready - pass up to parent (main tab's API)
+  const handleTerminalReady = useCallback((api: {
+    sendInput: (text: string) => Promise<void>
+    write: (data: string) => Promise<boolean>
+    focus: () => void
+    clearBuffer: () => Promise<void>
+  }) => {
+    terminalApiRef.current = api
+    onReady?.(api)
+    tryApplyFocusRequest()
+  }, [onReady, tryApplyFocusRequest])
 
   // Close a group and focus the adjacent group's terminal
   const closeGroupAndFocusAdjacent = useCallback(async (groupId: string) => {
@@ -230,14 +268,13 @@ export const TerminalContainer = forwardRef<TerminalContainerHandle, TerminalCon
       providerFlags: tab.isMain ? providerFlags : undefined,
       executionContext,
       ccsProfile: tab.isMain ? ccsProfile : undefined,
-      autoFocus,
       onConversationCreated: tab.isMain ? handleConversationCreated : undefined,
       onSessionInvalid: tab.isMain ? onSessionInvalid : undefined,
       onReady: tab.isMain ? handleTerminalReady : undefined,
       onFirstInput: tab.isMain ? onFirstInput : undefined,
       onRetry: tab.isMain ? onRetry : undefined
     }))
-  }, [activeGroup, getSessionId, cwd, conversationId, existingConversationId, initialPrompt, codeMode, providerFlags, executionContext, ccsProfile, autoFocus, handleConversationCreated, onSessionInvalid, handleTerminalReady, onFirstInput, onRetry])
+  }, [activeGroup, getSessionId, cwd, conversationId, existingConversationId, initialPrompt, codeMode, providerFlags, executionContext, ccsProfile, handleConversationCreated, onSessionInvalid, handleTerminalReady, onFirstInput, onRetry])
 
   if (isLoading || !activeGroup) {
     return (
