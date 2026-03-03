@@ -1,7 +1,7 @@
 import * as pty from 'node-pty'
 import { execFile } from 'child_process'
 import { app, BrowserWindow, Notification, nativeTheme } from 'electron'
-import { homedir, userInfo } from 'os'
+import { homedir, platform, userInfo } from 'os'
 import type { Database } from 'better-sqlite3'
 import { DEV_SERVER_URL_PATTERN } from '@slayzone/terminal/shared'
 import type { TerminalState, PtyInfo, CodeMode, BufferSinceResult } from '@slayzone/terminal/shared'
@@ -544,6 +544,15 @@ export async function createPty(
 
     const spawnFile = transport ? transport.file : spawnConfig.shell
     const initialArgs = transport ? [...transport.args] : [...spawnConfig.args]
+
+    // When a post-spawn command is present, pass it via -c flag instead of
+    // writing to stdin after a delay.  This prevents shell init prompts
+    // (e.g. oh-my-zsh update [Y/n]) from consuming/corrupting the command.
+    const directExec = !transport && !!spawnConfig.postSpawnCommand && platform() !== 'win32'
+    if (directExec) {
+      initialArgs.push('-c', spawnConfig.postSpawnCommand!)
+    }
+
     const canRetryInteractiveOnly = !transport && initialArgs.includes('-i') && initialArgs.includes('-l')
     let usedArgs = [...initialArgs]
     let usedFallback = false
@@ -676,8 +685,13 @@ export async function createPty(
 
     const schedulePostSpawnCommand = (target: pty.IPty): void => {
       if (!spawnConfig.postSpawnCommand) return
-      // Delay to let shell initialize - 250ms is conservative but reliable
-      // TODO: Could improve with shell-specific ready detection
+      // When using -c (directExec), the command is already in the shell args —
+      // no need to write to stdin.
+      if (directExec) {
+        commandDispatchedTs = Date.now()
+        return
+      }
+      // Fallback for Windows: delay to let shell initialize
       setTimeout(() => {
         const live = sessions.get(sessionId)
         if (!live || live.pty !== target) return

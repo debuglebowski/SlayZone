@@ -761,12 +761,11 @@ export function UserSettingsDialog({
                             />
                           </div>
                           ))}
-                          <div className="grid grid-cols-[140px_minmax(0,1fr)] items-center gap-3">
-                            <div>
-                              <span className="text-xs text-muted-foreground">CCS</span>
-                              <p className="text-[10px] text-muted-foreground/60">Claude Code Switch</p>
-                            </div>
+                          <div className="border-t pt-3 mt-1" />
+                          <div className="bg-accent/40 rounded-md p-3 space-y-3">
                             <div className="flex items-center gap-2">
+                              <span className="text-[10px] font-medium text-purple-700 dark:text-purple-300 bg-purple-500/10 px-1.5 py-0.5 rounded border border-purple-500/20">CCS</span>
+                              <span className="text-xs text-muted-foreground flex-1">Claude Code Switch</span>
                               <Switch
                                 checked={ccsEnabled}
                                 onCheckedChange={(checked) => {
@@ -782,60 +781,60 @@ export function UserSettingsDialog({
                                   }
                                 }}
                               />
-                              <span className="text-[10px] text-muted-foreground">Route providers through CCS</span>
                             </div>
-                          </div>
-                          {ccsEnabled && (
-                            <>
-                              <div className="grid grid-cols-[140px_minmax(0,1fr)] items-center gap-3">
-                                <span className="text-xs text-muted-foreground">Default profile</span>
-                                <div className="flex items-center gap-2">
-                                  <Select
-                                    value={ccsDefaultProfile ?? '__none__'}
-                                    onValueChange={(val) => {
-                                      const profile = val === '__none__' ? null : val
-                                      setCcsDefaultProfile(profile)
-                                      window.api.settings.set('ccs_default_profile', profile ?? '')
-                                    }}
-                                  >
-                                    <SelectTrigger className="h-8 text-xs flex-1">
-                                      <SelectValue />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                      <SelectItem value="__none__">None</SelectItem>
-                                      {ccsProfiles.map((p) => (
-                                        <SelectItem key={p} value={p}>{p}</SelectItem>
-                                      ))}
-                                    </SelectContent>
-                                  </Select>
-                                  <IconButton
-                                    variant="ghost"
-                                    size="icon-sm"
-                                    aria-label="Refresh profiles"
-                                    disabled={ccsProfilesLoading}
-                                    onClick={() => {
-                                      setCcsProfilesLoading(true)
-                                      window.api.pty.ccsListProfiles()
-                                        .then(({ profiles }) => setCcsProfiles(profiles))
-                                        .catch(() => {})
-                                        .finally(() => setCcsProfilesLoading(false))
-                                    }}
-                                  >
-                                    <RefreshCw className={`size-3.5 ${ccsProfilesLoading ? 'animate-spin' : ''}`} />
-                                  </IconButton>
+                            <p className="text-[10px] text-muted-foreground/60">Route providers through CCS</p>
+                            {ccsEnabled && (
+                              <>
+                                <div className="grid grid-cols-[140px_minmax(0,1fr)] items-center gap-3">
+                                  <span className="text-xs text-muted-foreground">Default profile</span>
+                                  <div className="flex items-center gap-2">
+                                    <Select
+                                      value={ccsDefaultProfile ?? '__none__'}
+                                      onValueChange={(val) => {
+                                        const profile = val === '__none__' ? null : val
+                                        setCcsDefaultProfile(profile)
+                                        window.api.settings.set('ccs_default_profile', profile ?? '')
+                                      }}
+                                    >
+                                      <SelectTrigger className="h-8 text-xs flex-1">
+                                        <SelectValue />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        <SelectItem value="__none__">None</SelectItem>
+                                        {ccsProfiles.map((p) => (
+                                          <SelectItem key={p} value={p}>{p}</SelectItem>
+                                        ))}
+                                      </SelectContent>
+                                    </Select>
+                                    <IconButton
+                                      variant="ghost"
+                                      size="icon-sm"
+                                      aria-label="Refresh profiles"
+                                      disabled={ccsProfilesLoading}
+                                      onClick={() => {
+                                        setCcsProfilesLoading(true)
+                                        window.api.pty.ccsListProfiles()
+                                          .then(({ profiles }) => setCcsProfiles(profiles))
+                                          .catch(() => {})
+                                          .finally(() => setCcsProfilesLoading(false))
+                                      }}
+                                    >
+                                      <RefreshCw className={`size-3.5 ${ccsProfilesLoading ? 'animate-spin' : ''}`} />
+                                    </IconButton>
+                                  </div>
                                 </div>
-                              </div>
-                              <div className="grid grid-cols-[140px_minmax(0,1fr)] items-center gap-3">
-                                <span className="text-xs text-muted-foreground">Available</span>
-                                <span className="text-[10px] text-muted-foreground">
-                                  {ccsProfiles.length > 0
-                                    ? ccsProfiles.join(', ')
-                                    : <>No profiles found. Run <code className="font-mono">ccs auth create &lt;name&gt;</code></>
-                                  }
-                                </span>
-                              </div>
-                            </>
-                          )}
+                                <div className="grid grid-cols-[140px_minmax(0,1fr)] items-center gap-3">
+                                  <span className="text-xs text-muted-foreground">Available</span>
+                                  <span className="text-[10px] text-muted-foreground">
+                                    {ccsProfiles.length > 0
+                                      ? ccsProfiles.join(', ')
+                                      : <>No profiles found. Run <code className="font-mono">ccs auth create &lt;name&gt;</code></>
+                                    }
+                                  </span>
+                                </div>
+                              </>
+                            )}
+                          </div>
                         </div>
                       )}
                     </div>
