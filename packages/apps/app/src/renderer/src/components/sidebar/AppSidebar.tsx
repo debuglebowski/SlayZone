@@ -25,22 +25,7 @@ import { TerminalStatusPopover } from '@slayzone/terminal'
 import { cn } from '@slayzone/ui'
 import type { Task } from '@slayzone/task/shared'
 import type { Project } from '@slayzone/projects/shared'
-
-export interface OnboardingChecklistStep {
-  id: string
-  label: string
-  completed: boolean
-  optional?: boolean
-  disabled?: boolean
-  allowWhenCompleted?: boolean
-  onClick: () => void
-}
-
-export interface OnboardingChecklistState {
-  steps: OnboardingChecklistStep[]
-  dismissed: boolean
-  onDismiss: () => void
-}
+import type { OnboardingChecklistState } from '@/hooks/useOnboardingChecklist'
 
 interface AppSidebarProps {
   projects: Project[]
@@ -116,11 +101,6 @@ export function AppSidebar({
 }: AppSidebarProps) {
   const [shortcutsOpen, setShortcutsOpen] = useState(false)
   const [checklistOpen, setChecklistOpen] = useState(false)
-  const coreSteps = onboardingChecklist.steps.filter((step) => !step.optional)
-  const completedCore = coreSteps.filter((step) => step.completed).length
-  const hasCoreRemaining = completedCore < coreSteps.length
-  const showChecklistBadge = hasCoreRemaining && !onboardingChecklist.dismissed
-  const coreRemaining = coreSteps.length - completedCore
 
   return (
     <Sidebar collapsible="none" className={zenMode ? "!w-0 min-h-svh overflow-hidden" : "w-18 min-h-svh"}>
@@ -180,9 +160,9 @@ export function AppSidebar({
                       )}
                     >
                       <FaRegHandshake className="size-5" />
-                      {showChecklistBadge && (
+                      {onboardingChecklist.hasRemaining && !onboardingChecklist.dismissed && (
                         <span className="absolute -top-1 -right-1 min-w-4 rounded-full bg-primary px-1 text-[10px] font-semibold leading-4 text-primary-foreground">
-                          {coreRemaining}
+                          {onboardingChecklist.remainingCount}
                         </span>
                       )}
                     </button>
@@ -193,7 +173,7 @@ export function AppSidebar({
               <PopoverContent side="right" align="end" sideOffset={12} className="w-[320px] p-3">
                 <div className="mb-5 flex items-center justify-between gap-2">
                   <p className="pt-0.5 text-base font-semibold">Getting started</p>
-                  {hasCoreRemaining && !onboardingChecklist.dismissed && (
+                  {onboardingChecklist.hasRemaining && !onboardingChecklist.dismissed && (
                     <button
                       type="button"
                       aria-label="Complete all items"

@@ -46,7 +46,7 @@ import {
   UpdateToast
 } from '@slayzone/ui'
 import { SidebarProvider, cn, PanelToggle, projectColorBg, useUndo } from '@slayzone/ui'
-import { AppSidebar, type OnboardingChecklistStep } from '@/components/sidebar/AppSidebar'
+import { AppSidebar } from '@/components/sidebar/AppSidebar'
 import { ChangelogDialog } from '@/components/changelog/ChangelogDialog'
 import { useChangelogAutoOpen } from '@/components/changelog/useChangelogAutoOpen'
 import { TabBar } from '@/components/tabs/TabBar'
@@ -62,6 +62,7 @@ import {
 import { UsagePopover } from '@/components/usage/UsagePopover'
 import { useUsage } from '@/components/usage/useUsage'
 import { TutorialAnimationModal } from '@/components/tutorial/TutorialAnimationModal'
+import { useOnboardingChecklist } from '@/hooks/useOnboardingChecklist'
 
 type HomePanel = 'kanban' | 'git' | 'editor' | 'processes'
 const HOME_PANEL_ORDER: HomePanel[] = ['kanban', 'git', 'editor', 'processes']
@@ -69,14 +70,6 @@ const HOME_PANEL_SIZE_KEY: Record<HomePanel, string> = { kanban: 'kanban', git: 
 const HANDLE_WIDTH = 16
 const COMMUNITY_DISCORD_URL = import.meta.env.VITE_COMMUNITY_DISCORD_URL?.trim() || 'https://discord.com'
 const COMMUNITY_X_URL = import.meta.env.VITE_UPDATES_X_URL?.trim() || 'https://x.com'
-
-interface OnboardingChecklistFlags {
-  onboardingCompleted: boolean
-  tourCompleted: boolean
-  joinedCommunity: boolean
-  followedOnX: boolean
-  dismissed: boolean
-}
 
 function App(): React.JSX.Element {
   // Core data from domain hook
@@ -219,57 +212,8 @@ function App(): React.JSX.Element {
 
 
   const [showAnimatedTour, setShowAnimatedTour] = useState(false)
-  const [onboardingChecklistFlags, setOnboardingChecklistFlags] = useState<OnboardingChecklistFlags>({
-    onboardingCompleted: false,
-    tourCompleted: false,
-    joinedCommunity: false,
-    followedOnX: false,
-    dismissed: false
-  })
-
-  const loadOnboardingChecklistFlags = useCallback(async (): Promise<void> => {
-    const [onboardingCompleted, tourCompleted, joinedCommunity, followedOnX, dismissed] = await Promise.all([
-      window.api.settings.get('onboarding_completed'),
-      window.api.settings.get('onboarding_tour_completed'),
-      window.api.settings.get('onboarding_joined_discord'),
-      window.api.settings.get('onboarding_followed_x'),
-      window.api.settings.get('onboarding_checklist_dismissed')
-    ])
-    setOnboardingChecklistFlags({
-      onboardingCompleted: onboardingCompleted === 'true',
-      tourCompleted: tourCompleted === '1',
-      joinedCommunity: joinedCommunity === '1',
-      followedOnX: followedOnX === '1',
-      dismissed: dismissed === '1'
-    })
-  }, [])
-
-  useEffect(() => {
-    void loadOnboardingChecklistFlags()
-  }, [loadOnboardingChecklistFlags])
-
-  const startTutorial = useCallback((): void => {
+  const openTutorialModal = useCallback((): void => {
     setShowAnimatedTour(true)
-    setOnboardingChecklistFlags((prev) => (prev.tourCompleted ? prev : { ...prev, tourCompleted: true }))
-    void window.api.settings.set('onboarding_tour_completed', '1')
-  }, [])
-
-  const dismissOnboardingChecklist = useCallback((): void => {
-    setOnboardingChecklistFlags((prev) => ({
-      ...prev,
-      onboardingCompleted: true,
-      tourCompleted: true,
-      joinedCommunity: true,
-      followedOnX: true,
-      dismissed: true
-    }))
-    void Promise.all([
-      window.api.settings.set('onboarding_completed', 'true'),
-      window.api.settings.set('onboarding_tour_completed', '1'),
-      window.api.settings.set('onboarding_joined_discord', '1'),
-      window.api.settings.set('onboarding_followed_x', '1'),
-      window.api.settings.set('onboarding_checklist_dismissed', '1')
-    ])
   }, [])
 
   const handleChecklistCreateFirstProject = useCallback((): void => {
@@ -284,62 +228,27 @@ function App(): React.JSX.Element {
 
   const handleChecklistJoinCommunity = useCallback((): void => {
     void window.api.shell.openExternal(COMMUNITY_DISCORD_URL)
-    setOnboardingChecklistFlags((prev) => (prev.joinedCommunity ? prev : { ...prev, joinedCommunity: true }))
-    void window.api.settings.set('onboarding_joined_discord', '1')
   }, [])
 
   const handleChecklistFollowOnX = useCallback((): void => {
     void window.api.shell.openExternal(COMMUNITY_X_URL)
-    setOnboardingChecklistFlags((prev) => (prev.followedOnX ? prev : { ...prev, followedOnX: true }))
-    void window.api.settings.set('onboarding_followed_x', '1')
   }, [])
 
-  const onboardingChecklistSteps = useMemo<OnboardingChecklistStep[]>(() => {
-    const forceComplete = onboardingChecklistFlags.dismissed
-    return [
-      {
-        id: 'setup-guide',
-        label: 'Setup guide',
-        completed: forceComplete || onboardingChecklistFlags.onboardingCompleted,
-        allowWhenCompleted: true,
-        onClick: () => setOnboardingOpen(true)
-      },
-      {
-        id: 'take-tour',
-        label: 'Take a tour',
-        completed: forceComplete || onboardingChecklistFlags.tourCompleted,
-        allowWhenCompleted: true,
-        onClick: startTutorial
-      },
-      {
-        id: 'create-first-project',
-        label: 'Create first project',
-        completed: forceComplete || projects.length > 0,
-        onClick: handleChecklistCreateFirstProject
-      },
-      {
-        id: 'create-first-task',
-        label: 'Create first task',
-        completed: forceComplete || tasks.some((task) => !task.is_temporary),
-        disabled: !forceComplete && projects.length === 0,
-        onClick: handleChecklistCreateFirstTask
-      },
-      {
-        id: 'join-community',
-        label: 'Join the community',
-        completed: forceComplete || onboardingChecklistFlags.joinedCommunity,
-        optional: true,
-        onClick: handleChecklistJoinCommunity
-      },
-      {
-        id: 'follow-x',
-        label: 'Follow updates on X',
-        completed: forceComplete || onboardingChecklistFlags.followedOnX,
-        optional: true,
-        onClick: handleChecklistFollowOnX
-      }
-    ]
-  }, [onboardingChecklistFlags, projects.length, tasks, startTutorial, handleChecklistCreateFirstProject, handleChecklistCreateFirstTask, handleChecklistJoinCommunity, handleChecklistFollowOnX])
+  const hasCreatedTask = useMemo(() => tasks.some((task) => !task.is_temporary), [tasks])
+  const {
+    checklist: onboardingChecklist,
+    startTour,
+    markSetupGuideCompleted
+  } = useOnboardingChecklist({
+    projectCount: projects.length,
+    hasCreatedTask,
+    onOpenSetupGuide: () => setOnboardingOpen(true),
+    onStartTour: openTutorialModal,
+    onCreateFirstProject: handleChecklistCreateFirstProject,
+    onCreateFirstTask: handleChecklistCreateFirstTask,
+    onJoinCommunity: handleChecklistJoinCommunity,
+    onFollowOnX: handleChecklistFollowOnX
+  })
 
   // Prompt existing users who completed onboarding but never saw the tour toast
   useEffect(() => {
@@ -351,11 +260,11 @@ function App(): React.JSX.Element {
         void window.api.settings.set('tutorial_prompted', 'true')
         toast('Want a quick tour?', {
           duration: 8000,
-          action: { label: 'Take the tour', onClick: startTutorial }
+          action: { label: 'Take the tour', onClick: startTour }
         })
       }
     })
-  }, [startTutorial])
+  }, [startTour])
 
   // Usage & notification state
   const { data: usageData, refresh: refreshUsage } = useUsage()
@@ -1288,11 +1197,7 @@ function App(): React.JSX.Element {
           onChangelog={() => setChangelogOpen(true)}
           onTaskClick={openTask}
           zenMode={zenMode}
-          onboardingChecklist={{
-            steps: onboardingChecklistSteps,
-            dismissed: onboardingChecklistFlags.dismissed,
-            onDismiss: dismissOnboardingChecklist
-          }}
+          onboardingChecklist={onboardingChecklist}
         />
 
         <div id="right-column" className={`flex-1 flex flex-col min-w-0 bg-surface-1 pb-2 pr-2 ${zenMode ? 'pl-2' : ''}`}>
@@ -1653,13 +1558,13 @@ function App(): React.JSX.Element {
               window.api.settings.get('tutorial_prompted')
             ])
             if (onboardingCompleted === 'true') {
-              setOnboardingChecklistFlags((prev) => (prev.onboardingCompleted ? prev : { ...prev, onboardingCompleted: true }))
+              markSetupGuideCompleted()
             }
             if (!prompted) {
               void window.api.settings.set('tutorial_prompted', 'true')
               toast('Want a quick tour?', {
                 duration: 8000,
-                action: { label: 'Take the tour', onClick: startTutorial }
+                action: { label: 'Take the tour', onClick: startTour }
               })
             }
           }}
