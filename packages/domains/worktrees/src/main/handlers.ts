@@ -170,8 +170,8 @@ ${steps.join('\n\n')}`
     return getConflictedFiles(path)
   })
 
-  ipcMain.handle('git:getWorkingDiff', (_, path: string) => {
-    return getWorkingDiff(path)
+  ipcMain.handle('git:getWorkingDiff', (_, path: string, opts?: { contextLines?: string; ignoreWhitespace?: boolean }) => {
+    return getWorkingDiff(path, opts)
   })
 
   ipcMain.handle('git:stageFile', (_, path: string, filePath: string) => {

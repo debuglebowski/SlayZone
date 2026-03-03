@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useRef } from 'react'
 import { useAppearance } from '@slayzone/settings/client'
 import { EditorView, basicSetup } from 'codemirror'
-import { EditorState } from '@codemirror/state'
-import { keymap } from '@codemirror/view'
+import { EditorState, Compartment } from '@codemirror/state'
+import { keymap, highlightWhitespace } from '@codemirror/view'
+import { indentUnit } from '@codemirror/language'
 import { javascript } from '@codemirror/lang-javascript'
 import { json } from '@codemirror/lang-json'
 import { css } from '@codemirror/lang-css'
@@ -50,7 +51,9 @@ interface CodeEditorProps {
 }
 
 export function CodeEditor({ filePath, content, onChange, onSave, version }: CodeEditorProps) {
-  const { editorFontSize } = useAppearance()
+  const {
+    editorFontSize, editorWordWrap, editorTabSize, editorIndentTabs, editorRenderWhitespace
+  } = useAppearance()
   const editorTheme = useMemo(() => EditorView.theme({
     '&': { height: '100%', fontSize: `${editorFontSize}px`, backgroundColor: 'transparent' },
     '.cm-scroller': { overflow: 'auto' },
@@ -66,6 +69,12 @@ export function CodeEditor({ filePath, content, onChange, onSave, version }: Cod
   onChangeRef.current = onChange
   onSaveRef.current = onSave
   contentRef.current = content
+
+  // Compartments for runtime-reconfigurable extensions
+  const tabSizeComp = useRef(new Compartment())
+  const indentComp = useRef(new Compartment())
+  const wrapComp = useRef(new Compartment())
+  const whitespaceComp = useRef(new Compartment())
 
   // Create editor on mount / filePath change
   useEffect(() => {
@@ -89,7 +98,11 @@ export function CodeEditor({ filePath, content, onChange, onSave, version }: Cod
         if (update.docChanged && !suppressOnChange.current) {
           onChangeRef.current(update.state.doc.toString())
         }
-      })
+      }),
+      tabSizeComp.current.of(EditorState.tabSize.of(editorTabSize)),
+      indentComp.current.of(indentUnit.of(editorIndentTabs ? '\t' : ' '.repeat(editorTabSize))),
+      wrapComp.current.of(editorWordWrap === 'on' ? EditorView.lineWrapping : []),
+      whitespaceComp.current.of(editorRenderWhitespace !== 'none' ? highlightWhitespace() : []),
     ]
     if (lang) extensions.splice(1, 0, lang)
 
@@ -103,6 +116,20 @@ export function CodeEditor({ filePath, content, onChange, onSave, version }: Cod
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filePath, editorTheme])
+
+  // Reconfigure editor settings at runtime without destroying the view
+  useEffect(() => {
+    const view = viewRef.current
+    if (!view) return
+    view.dispatch({
+      effects: [
+        tabSizeComp.current.reconfigure(EditorState.tabSize.of(editorTabSize)),
+        indentComp.current.reconfigure(indentUnit.of(editorIndentTabs ? '\t' : ' '.repeat(editorTabSize))),
+        wrapComp.current.reconfigure(editorWordWrap === 'on' ? EditorView.lineWrapping : []),
+        whitespaceComp.current.reconfigure(editorRenderWhitespace !== 'none' ? highlightWhitespace() : []),
+      ]
+    })
+  }, [editorWordWrap, editorTabSize, editorIndentTabs, editorRenderWhitespace])
 
   // Replace editor content when version bumps (external disk reload)
   useEffect(() => {

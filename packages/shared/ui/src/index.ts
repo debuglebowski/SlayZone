@@ -1,7 +1,7 @@
 // Utilities
 export { cn } from './utils'
 export { projectColorBg, type ProjectColorVariant } from './project-color'
-export { useAppearance, AppearanceContext, type AppearanceSettings } from './AppearanceContext'
+export { useAppearance, AppearanceContext, appearanceDefaults, type AppearanceSettings, type BrowserDeviceDefaults } from './AppearanceContext'
 export { getTerminalStateStyle, type TerminalStateStyle } from './terminal-state'
 export {
   getTaskStatusStyle,

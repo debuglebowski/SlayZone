@@ -5,6 +5,7 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle
 } from '@slayzone/ui'
+import { useAppearance } from '@slayzone/settings/client'
 import type { Task, MergeState } from '@slayzone/task/shared'
 import type { GitDiffSnapshot } from '../shared/types'
 import { parseUnifiedDiff } from './parse-diff'
@@ -196,6 +197,7 @@ export const GitDiffPanel = forwardRef<GitDiffPanelHandle, GitDiffPanelProps>(fu
   onAbortMerge
 }, ref) {
   const isMergeMode = mergeState === 'uncommitted'
+  const { diffContextLines, diffIgnoreWhitespace } = useAppearance()
   const targetPath = useMemo(() => task?.worktree_path ?? projectPath, [task?.worktree_path, projectPath])
   const [snapshot, setSnapshot] = useState<GitDiffSnapshot | null>(null)
   const [loading, setLoading] = useState(false)
@@ -221,7 +223,10 @@ export const GitDiffPanel = forwardRef<GitDiffPanelHandle, GitDiffPanelProps>(fu
     if (!targetPath) return
     setLoading(true)
     try {
-      const next = await window.api.git.getWorkingDiff(targetPath)
+      const next = await window.api.git.getWorkingDiff(targetPath, {
+        contextLines: diffContextLines,
+        ignoreWhitespace: diffIgnoreWhitespace,
+      })
       if (!prevSnapshotRef.current || !snapshotsEqual(prevSnapshotRef.current, next)) {
         prevSnapshotRef.current = next
         setSnapshot(next)
@@ -247,7 +252,8 @@ export const GitDiffPanel = forwardRef<GitDiffPanelHandle, GitDiffPanelProps>(fu
       fetchDiff()
     }, pollIntervalMs)
     return () => clearInterval(timer)
-  }, [visible, targetPath, pollIntervalMs])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visible, targetPath, pollIntervalMs, diffContextLines, diffIgnoreWhitespace])
 
   const unstagedFileDiffs = useMemo(
     () => parseUnifiedDiff(snapshot?.unstagedPatch ?? ''),
@@ -407,7 +413,7 @@ export const GitDiffPanel = forwardRef<GitDiffPanelHandle, GitDiffPanelProps>(fu
       } else {
         await window.api.git.unstageAll(targetPath)
       }
-      await fetchDiff()
+      await fetchDiffRef.current()
     } catch {
       // silently fail — next poll will correct state
     }
@@ -421,7 +427,7 @@ export const GitDiffPanel = forwardRef<GitDiffPanelHandle, GitDiffPanelProps>(fu
       } else {
         await window.api.git.unstageFile(targetPath, filePath)
       }
-      await fetchDiff()
+      await fetchDiffRef.current()
     } catch {
       // silently fail — next poll will correct state
     }
@@ -431,7 +437,7 @@ export const GitDiffPanel = forwardRef<GitDiffPanelHandle, GitDiffPanelProps>(fu
     if (!targetPath) return
     try {
       await window.api.git.discardFile(targetPath, filePath, untracked)
-      await fetchDiff()
+      await fetchDiffRef.current()
     } catch {
       // silently fail — next poll will correct state
     }
@@ -445,7 +451,7 @@ export const GitDiffPanel = forwardRef<GitDiffPanelHandle, GitDiffPanelProps>(fu
       } else {
         await window.api.git.unstageFile(targetPath, folderPath)
       }
-      await fetchDiff()
+      await fetchDiffRef.current()
     } catch {
       // silently fail — next poll will correct state
     }
@@ -457,7 +463,7 @@ export const GitDiffPanel = forwardRef<GitDiffPanelHandle, GitDiffPanelProps>(fu
     try {
       await window.api.git.commitFiles(targetPath, commitMessage.trim())
       setCommitMessage('')
-      await fetchDiff()
+      await fetchDiffRef.current()
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
     } finally {

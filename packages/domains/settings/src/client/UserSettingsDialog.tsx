@@ -130,6 +130,25 @@ export function UserSettingsDialog({
   const [cliMessage, setCliMessage] = useState('')
   const [leaderboardEnabled, setLeaderboardEnabled] = useState(false)
   const [contextManagerEnabled, setContextManagerEnabled] = useState(false)
+  // Editor settings
+  const [editorWordWrap, setEditorWordWrap] = useState<'on' | 'off'>('off')
+  const [editorTabSize, setEditorTabSize] = useState<'2' | '4'>('2')
+  const [editorIndentTabs, setEditorIndentTabs] = useState(false)
+  const [editorRenderWhitespace, setEditorRenderWhitespace] = useState<'none' | 'all'>('none')
+  // Terminal extended settings
+  const [terminalFontFamily, setTerminalFontFamily] = useState('Menlo, Monaco, "Courier New", monospace')
+  const [terminalScrollback, setTerminalScrollback] = useState('5000')
+  // Diff settings
+  const [diffContextLines, setDiffContextLines] = useState<'0' | '3' | '5' | 'all'>('3')
+  const [diffIgnoreWhitespace, setDiffIgnoreWhitespace] = useState(false)
+  // Browser extended settings
+  const [browserDefaultUrl, setBrowserDefaultUrl] = useState('')
+  const [browserDefaultZoom, setBrowserDefaultZoom] = useState('100')
+  const [browserDevices, setBrowserDevices] = useState({
+    desktop: { enabled: true, width: '1920', height: '1080' },
+    tablet: { enabled: true, width: '744', height: '1133' },
+    mobile: { enabled: true, width: '393', height: '852' },
+  })
   const loadRequestIdRef = useRef(0)
 
   useEffect(() => {
@@ -191,7 +210,12 @@ export function UserSettingsDialog({
         window.api.settings.get('default_terminal_mode'),
         ...providerFlagKeys.map(k => window.api.settings.get(k)),
       ])
-      const [devToast, devAutoOpen, mcpPortSetting, cliStatus, colorTints, termFontSize, editorFontSizeVal, reduceMotionVal, leaderboardVal, ccsVal, ccsDefProfileVal, ccsProfilesResult] = await Promise.allSettled([
+      const [devToast, devAutoOpen, mcpPortSetting, cliStatus, colorTints, termFontSize, editorFontSizeVal, reduceMotionVal, leaderboardVal, ccsVal, ccsDefProfileVal, ccsProfilesResult,
+        edWordWrap, edTabSize, edIndentTabs, edRenderWs,
+        termFamily, termScrollback,
+        dfContextLines, dfIgnoreWs,
+        brDefaultUrl, brDefaultZoom, brDevices,
+      ] = await Promise.allSettled([
         window.api.settings.get('dev_server_toast_enabled'),
         window.api.settings.get('dev_server_auto_open_browser'),
         window.api.settings.get('mcp_server_port'),
@@ -204,6 +228,17 @@ export function UserSettingsDialog({
         window.api.settings.get('ccs_enabled'),
         window.api.settings.get('ccs_default_profile'),
         window.api.pty.ccsListProfiles(),
+        window.api.settings.get('editor_word_wrap'),
+        window.api.settings.get('editor_tab_size'),
+        window.api.settings.get('editor_indent_tabs'),
+        window.api.settings.get('editor_render_whitespace'),
+        window.api.settings.get('terminal_font_family'),
+        window.api.settings.get('terminal_scrollback'),
+        window.api.settings.get('diff_context_lines'),
+        window.api.settings.get('diff_ignore_whitespace'),
+        window.api.settings.get('browser_default_url'),
+        window.api.settings.get('browser_default_zoom'),
+        window.api.settings.get('browser_default_devices'),
       ])
       if (isStale()) return
 
@@ -250,6 +285,33 @@ export function UserSettingsDialog({
         loadedFlags[mode] = result?.status === 'fulfilled' ? (result.value ?? def.fallback) : def.fallback
       })
       setDefaultProviderFlags(loadedFlags)
+
+      // Editor settings
+      setEditorWordWrap(edWordWrap.status === 'fulfilled' && edWordWrap.value === 'on' ? 'on' : 'off')
+      setEditorTabSize(edTabSize.status === 'fulfilled' && edTabSize.value === '4' ? '4' : '2')
+      setEditorIndentTabs(edIndentTabs.status === 'fulfilled' ? edIndentTabs.value === '1' : false)
+      const ws = edRenderWs.status === 'fulfilled' ? edRenderWs.value : null
+      setEditorRenderWhitespace(ws === 'all' ? 'all' : 'none')
+      // Terminal extended
+      setTerminalFontFamily(termFamily.status === 'fulfilled' && termFamily.value ? termFamily.value : 'Menlo, Monaco, "Courier New", monospace')
+      setTerminalScrollback(termScrollback.status === 'fulfilled' && termScrollback.value ? termScrollback.value : '5000')
+      // Diff settings
+      const dc = dfContextLines.status === 'fulfilled' ? dfContextLines.value : null
+      setDiffContextLines(dc === '0' || dc === '5' || dc === 'all' ? dc : '3')
+      setDiffIgnoreWhitespace(dfIgnoreWs.status === 'fulfilled' ? dfIgnoreWs.value === '1' : false)
+      // Browser extended
+      setBrowserDefaultUrl(brDefaultUrl.status === 'fulfilled' ? (brDefaultUrl.value ?? '') : '')
+      setBrowserDefaultZoom(brDefaultZoom.status === 'fulfilled' && brDefaultZoom.value ? brDefaultZoom.value : '100')
+      if (brDevices.status === 'fulfilled' && brDevices.value) {
+        try {
+          const d = JSON.parse(brDevices.value)
+          setBrowserDevices(prev => ({
+            desktop: d.desktop ? { enabled: d.desktop.enabled !== false, width: String(d.desktop.width), height: String(d.desktop.height) } : prev.desktop,
+            tablet: d.tablet ? { enabled: d.tablet.enabled !== false, width: String(d.tablet.width), height: String(d.tablet.height) } : prev.tablet,
+            mobile: d.mobile ? { enabled: d.mobile.enabled !== false, width: String(d.mobile.width), height: String(d.mobile.height) } : prev.mobile,
+          }))
+        } catch { /* ignore parse errors */ }
+      }
 
       try {
         const diagConfig = await window.api.diagnostics.getConfig()
@@ -515,17 +577,23 @@ export function UserSettingsDialog({
     })
   }
 
-  const BUILTIN_PANEL_LABELS: Record<string, string> = {
-    terminal: 'Terminal',
-    browser: 'Browser',
-    editor: 'Editor',
-    diff: 'Diff',
-    settings: 'Settings'
-  }
-
   const navigateTo = (tab: string) => {
     setActiveTab(tab)
     onTabChange?.(tab)
+  }
+
+  const updateBrowserDevice = (slot: 'desktop' | 'tablet' | 'mobile', field: string, value: string | boolean) => {
+    setBrowserDevices(prev => {
+      const next = { ...prev, [slot]: { ...prev[slot], [field]: value } }
+      // Persist with numeric width/height
+      const persist = {
+        desktop: { enabled: next.desktop.enabled, width: parseInt(next.desktop.width, 10) || 1920, height: parseInt(next.desktop.height, 10) || 1080 },
+        tablet: { enabled: next.tablet.enabled, width: parseInt(next.tablet.width, 10) || 744, height: parseInt(next.tablet.height, 10) || 1133 },
+        mobile: { enabled: next.mobile.enabled, width: parseInt(next.mobile.width, 10) || 393, height: parseInt(next.mobile.height, 10) || 852 },
+      }
+      window.api.settings.set('browser_default_devices', JSON.stringify(persist))
+      return next
+    })
   }
 
   const panelDetailId = activeTab.startsWith('panels/') ? activeTab.slice(7) : null
@@ -539,6 +607,8 @@ export function UserSettingsDialog({
       children: [
         { key: 'panels/terminal', label: 'Terminal' },
         { key: 'panels/browser', label: 'Browser' },
+        { key: 'panels/editor', label: 'Editor' },
+        { key: 'panels/diff', label: 'Diff' },
       ]
     },
     ...(contextManagerEnabled ? [{ key: 'ai-config', label: 'Context Manager' }] : []),
@@ -780,22 +850,50 @@ export function UserSettingsDialog({
                       <ChevronRight className="size-3.5 text-muted-foreground shrink-0" />
                     </button>
 
-                    {/* Editor, Diff, Settings — toggle only, no config */}
-                    {([
-                      { id: 'editor', icon: FileCode, shortcut: 'E' },
-                      { id: 'diff', icon: GitCompare, shortcut: 'G' },
-                      { id: 'settings', icon: SlidersHorizontal, shortcut: 'S' }
-                    ] as const).map(({ id, icon: Icon, shortcut }) => (
-                      <div key={id} className="flex items-center gap-3 h-11 rounded-lg border px-4">
-                        <Icon className="size-4 text-muted-foreground shrink-0" />
-                        <span className="text-sm font-medium flex-1">{BUILTIN_PANEL_LABELS[id]}</span>
-                        <kbd className="text-[10px] font-mono bg-muted px-1.5 py-0.5 rounded border shrink-0">⌘{shortcut}</kbd>
-                        <Switch
-                          checked={panelConfig.builtinEnabled[id] !== false}
-                          onCheckedChange={(checked) => toggleBuiltinPanel(id, checked)}
-                        />
-                      </div>
-                    ))}
+                    {/* Editor — clickable, has config */}
+                    <button
+                      type="button"
+                      className="flex items-center gap-3 h-11 rounded-lg border px-4 w-full text-left hover:bg-accent/30 transition-colors"
+                      onClick={() => { navigateTo('panels/editor') }}
+                    >
+                      <FileCode className="size-4 text-muted-foreground shrink-0" />
+                      <span className="text-sm font-medium flex-1">Editor</span>
+                      <kbd className="text-[10px] font-mono bg-muted px-1.5 py-0.5 rounded border shrink-0">⌘E</kbd>
+                      <Switch
+                        checked={panelConfig.builtinEnabled.editor !== false}
+                        onCheckedChange={(checked) => { toggleBuiltinPanel('editor', checked) }}
+                        onClick={(e) => e.stopPropagation()}
+                      />
+                      <ChevronRight className="size-3.5 text-muted-foreground shrink-0" />
+                    </button>
+
+                    {/* Diff — clickable, has config */}
+                    <button
+                      type="button"
+                      className="flex items-center gap-3 h-11 rounded-lg border px-4 w-full text-left hover:bg-accent/30 transition-colors"
+                      onClick={() => { navigateTo('panels/diff') }}
+                    >
+                      <GitCompare className="size-4 text-muted-foreground shrink-0" />
+                      <span className="text-sm font-medium flex-1">Diff</span>
+                      <kbd className="text-[10px] font-mono bg-muted px-1.5 py-0.5 rounded border shrink-0">⌘G</kbd>
+                      <Switch
+                        checked={panelConfig.builtinEnabled.diff !== false}
+                        onCheckedChange={(checked) => { toggleBuiltinPanel('diff', checked) }}
+                        onClick={(e) => e.stopPropagation()}
+                      />
+                      <ChevronRight className="size-3.5 text-muted-foreground shrink-0" />
+                    </button>
+
+                    {/* Settings — toggle only, no config */}
+                    <div className="flex items-center gap-3 h-11 rounded-lg border px-4">
+                      <SlidersHorizontal className="size-4 text-muted-foreground shrink-0" />
+                      <span className="text-sm font-medium flex-1">Settings</span>
+                      <kbd className="text-[10px] font-mono bg-muted px-1.5 py-0.5 rounded border shrink-0">⌘S</kbd>
+                      <Switch
+                        checked={panelConfig.builtinEnabled.settings !== false}
+                        onCheckedChange={(checked) => toggleBuiltinPanel('settings', checked)}
+                      />
+                    </div>
                   </div>
                 </div>
 
@@ -968,6 +1066,34 @@ export function UserSettingsDialog({
                     ))}
                   </div>
 
+                  <div className="space-y-3">
+                    <Label className="text-sm font-medium">Font & buffer</Label>
+                    <div className="grid grid-cols-[180px_minmax(0,1fr)] items-center gap-3">
+                      <span className="text-sm text-muted-foreground">Font family</span>
+                      <Input
+                        value={terminalFontFamily}
+                        onChange={(e) => setTerminalFontFamily(e.target.value)}
+                        onBlur={() => window.api.settings.set('terminal_font_family', terminalFontFamily.trim())}
+                      />
+                    </div>
+                    <div className="grid grid-cols-[180px_minmax(0,1fr)] items-center gap-3">
+                      <span className="text-sm text-muted-foreground">Scrollback buffer</span>
+                      <Input
+                        className="max-w-32"
+                        type="number"
+                        value={terminalScrollback}
+                        onChange={(e) => setTerminalScrollback(e.target.value)}
+                        onBlur={() => {
+                          const n = parseInt(terminalScrollback, 10)
+                          if (Number.isFinite(n) && n >= 0) {
+                            window.api.settings.set('terminal_scrollback', String(n))
+                          }
+                        }}
+                      />
+                    </div>
+                    <p className="text-[11px] text-muted-foreground">Number of lines kept in scrollback history. Default: 5000</p>
+                  </div>
+
                   <div className="bg-accent/40 rounded-md p-4 space-y-3">
                     <div className="flex items-center gap-2">
                       <span className="text-[10px] font-medium text-purple-700 dark:text-purple-300 bg-purple-500/10 px-1.5 py-0.5 rounded border border-purple-500/20">CCS</span>
@@ -1045,6 +1171,135 @@ export function UserSettingsDialog({
               </>
             )}
 
+            {/* Editor detail view */}
+            {activeTab === 'panels/editor' && (
+              <>
+                <PanelBreadcrumb label="Editor" onBack={() => navigateTo('panels')} />
+
+                <div className="rounded-lg border p-5 space-y-6">
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-1">
+                      <h3 className="text-base font-semibold">Editor</h3>
+                      <p className="text-sm text-muted-foreground">Code editor for viewing and editing files inside each task.</p>
+                    </div>
+                    <Switch
+                      checked={panelConfig.builtinEnabled.editor !== false}
+                      onCheckedChange={(checked) => toggleBuiltinPanel('editor', checked)}
+                    />
+                  </div>
+
+                  <div className="space-y-3">
+                    <Label className="text-sm font-medium">Text</Label>
+                    <div className="grid grid-cols-[180px_minmax(0,1fr)] items-center gap-3">
+                      <span className="text-sm text-muted-foreground">Word wrap</span>
+                      <Switch
+                        checked={editorWordWrap === 'on'}
+                        onCheckedChange={(checked) => {
+                          const v = checked ? 'on' : 'off'
+                          setEditorWordWrap(v)
+                          window.api.settings.set('editor_word_wrap', v)
+                        }}
+                      />
+                    </div>
+                    <div className="grid grid-cols-[180px_minmax(0,1fr)] items-center gap-3">
+                      <span className="text-sm text-muted-foreground">Show whitespace</span>
+                      <Switch
+                        checked={editorRenderWhitespace === 'all'}
+                        onCheckedChange={(checked) => {
+                          const v = checked ? 'all' : 'none'
+                          setEditorRenderWhitespace(v)
+                          window.api.settings.set('editor_render_whitespace', v)
+                        }}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-3">
+                    <Label className="text-sm font-medium">Indentation</Label>
+                    <div className="grid grid-cols-[180px_minmax(0,1fr)] items-center gap-3">
+                      <span className="text-sm text-muted-foreground">Tab size</span>
+                      <Select value={editorTabSize} onValueChange={(v) => {
+                        const val = v as '2' | '4'
+                        setEditorTabSize(val)
+                        window.api.settings.set('editor_tab_size', val)
+                      }}>
+                        <SelectTrigger className="max-w-24">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="2">2</SelectItem>
+                          <SelectItem value="4">4</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="grid grid-cols-[180px_minmax(0,1fr)] items-center gap-3">
+                      <span className="text-sm text-muted-foreground">Indent with tabs</span>
+                      <Switch
+                        checked={editorIndentTabs}
+                        onCheckedChange={(checked) => {
+                          setEditorIndentTabs(checked)
+                          window.api.settings.set('editor_indent_tabs', checked ? '1' : '0')
+                        }}
+                      />
+                    </div>
+                  </div>
+                </div>
+              </>
+            )}
+
+            {/* Diff detail view */}
+            {activeTab === 'panels/diff' && (
+              <>
+                <PanelBreadcrumb label="Diff" onBack={() => navigateTo('panels')} />
+
+                <div className="rounded-lg border p-5 space-y-6">
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-1">
+                      <h3 className="text-base font-semibold">Diff</h3>
+                      <p className="text-sm text-muted-foreground">Git diff viewer for reviewing file changes inside each task.</p>
+                    </div>
+                    <Switch
+                      checked={panelConfig.builtinEnabled.diff !== false}
+                      onCheckedChange={(checked) => toggleBuiltinPanel('diff', checked)}
+                    />
+                  </div>
+
+                  <div className="space-y-3">
+                    <Label className="text-sm font-medium">Display</Label>
+                    <div className="grid grid-cols-[180px_minmax(0,1fr)] items-center gap-3">
+                      <span className="text-sm text-muted-foreground">Context lines</span>
+                      <Select value={diffContextLines} onValueChange={(v) => {
+                        const val = v as '0' | '3' | '5' | 'all'
+                        setDiffContextLines(val)
+                        window.api.settings.set('diff_context_lines', val)
+                      }}>
+                        <SelectTrigger className="max-w-32">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="0">0</SelectItem>
+                          <SelectItem value="3">3</SelectItem>
+                          <SelectItem value="5">5</SelectItem>
+                          <SelectItem value="all">All</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <p className="text-[11px] text-muted-foreground">Number of unchanged lines shown around each change.</p>
+                    <div className="grid grid-cols-[180px_minmax(0,1fr)] items-center gap-3">
+                      <span className="text-sm text-muted-foreground">Ignore whitespace</span>
+                      <Switch
+                        checked={diffIgnoreWhitespace}
+                        onCheckedChange={(checked) => {
+                          setDiffIgnoreWhitespace(checked)
+                          window.api.settings.set('diff_ignore_whitespace', checked ? '1' : '0')
+                        }}
+                      />
+                    </div>
+                  </div>
+                </div>
+              </>
+            )}
+
             {/* Browser detail view */}
             {activeTab === 'panels/browser' && (
               <>
@@ -1088,6 +1343,78 @@ export function UserSettingsDialog({
                       />
                       <span className="text-muted-foreground">Auto-open when dev server detected</span>
                     </label>
+                  </div>
+
+                  <div className="space-y-3">
+                    <Label className="text-sm font-medium">Defaults</Label>
+                    <div className="grid grid-cols-[180px_minmax(0,1fr)] items-center gap-3">
+                      <span className="text-sm text-muted-foreground">Default URL</span>
+                      <Input
+                        placeholder="about:blank"
+                        value={browserDefaultUrl}
+                        onChange={(e) => setBrowserDefaultUrl(e.target.value)}
+                        onBlur={() => window.api.settings.set('browser_default_url', browserDefaultUrl.trim())}
+                      />
+                    </div>
+                    <div className="grid grid-cols-[180px_minmax(0,1fr)] items-center gap-3">
+                      <span className="text-sm text-muted-foreground">Default zoom</span>
+                      <div className="flex items-center gap-2">
+                        <Input
+                          className="max-w-24"
+                          type="number"
+                          min={50}
+                          max={200}
+                          value={browserDefaultZoom}
+                          onChange={(e) => setBrowserDefaultZoom(e.target.value)}
+                          onBlur={() => {
+                            const n = parseInt(browserDefaultZoom, 10)
+                            if (Number.isFinite(n) && n >= 50 && n <= 200) {
+                              window.api.settings.set('browser_default_zoom', String(n))
+                            }
+                          }}
+                        />
+                        <span className="text-sm text-muted-foreground">%</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-3">
+                    <Label className="text-sm font-medium">Device defaults</Label>
+                    <p className="text-[11px] text-muted-foreground">Default viewports for multi-device mode. Changes apply to new tabs.</p>
+                    <div className="space-y-2">
+                      {(['desktop', 'tablet', 'mobile'] as const).map((slot) => {
+                        const dev = browserDevices[slot]
+                        const label = slot.charAt(0).toUpperCase() + slot.slice(1)
+                        return (
+                          <div key={slot} className="grid grid-cols-[180px_minmax(0,1fr)] items-center gap-3">
+                            <span className="text-sm text-muted-foreground">{label}</span>
+                            <div className="flex items-center gap-2">
+                              <Switch
+                                checked={dev.enabled}
+                                onCheckedChange={(checked) => updateBrowserDevice(slot, 'enabled', checked)}
+                              />
+                              <Input
+                                className="max-w-20"
+                                type="number"
+                                placeholder="W"
+                                value={dev.width}
+                                onChange={(e) => setBrowserDevices(prev => ({ ...prev, [slot]: { ...prev[slot], width: e.target.value } }))}
+                                onBlur={() => updateBrowserDevice(slot, 'width', dev.width)}
+                              />
+                              <span className="text-xs text-muted-foreground">×</span>
+                              <Input
+                                className="max-w-20"
+                                type="number"
+                                placeholder="H"
+                                value={dev.height}
+                                onChange={(e) => setBrowserDevices(prev => ({ ...prev, [slot]: { ...prev[slot], height: e.target.value } }))}
+                                onBlur={() => updateBrowserDevice(slot, 'height', dev.height)}
+                              />
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
                   </div>
                 </div>
               </>

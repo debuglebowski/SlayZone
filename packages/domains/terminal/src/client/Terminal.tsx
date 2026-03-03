@@ -162,7 +162,7 @@ export function Terminal({
 
   const { subscribe, subscribeExit, subscribeSessionInvalid, subscribeAttention, subscribeState, getState, getCrashOutput, resetTaskState, cleanupTask } = usePty()
   const { theme } = useTheme()
-  const { terminalFontSize } = useAppearance()
+  const { terminalFontSize, terminalFontFamily, terminalScrollback } = useAppearance()
 
   const [ptyState, setPtyState] = useState<TerminalState>(() => getState(sessionId))
 
@@ -291,7 +291,8 @@ export function Terminal({
         allowProposedApi: true,
         cursorBlink: true,
         fontSize: terminalFontSize,
-        fontFamily: 'Menlo, Monaco, "Courier New", monospace',
+        fontFamily: terminalFontFamily,
+        scrollback: terminalScrollback,
         theme: getTerminalTheme(theme),
         minimumContrastRatio: theme === 'light' ? 4.5 : 1
       })
@@ -589,6 +590,21 @@ export function Terminal({
     t.options.fontSize = terminalFontSize
     fitAddonRef.current?.fit()
   }, [terminalFontSize])
+
+  // Update font family at runtime
+  useEffect(() => {
+    const t = terminalRef.current
+    if (!t) return
+    t.options.fontFamily = terminalFontFamily
+    fitAddonRef.current?.fit()
+  }, [terminalFontFamily])
+
+  // Update scrollback buffer at runtime
+  useEffect(() => {
+    const t = terminalRef.current
+    if (!t) return
+    t.options.scrollback = terminalScrollback
+  }, [terminalScrollback])
 
   // Handle paste and drag-drop for files/images
   useEffect(() => {
