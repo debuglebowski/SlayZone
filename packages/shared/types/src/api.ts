@@ -357,7 +357,7 @@ export interface ElectronAPI {
     mergeWithAI: (projectPath: string, worktreePath: string, parentBranch: string, sourceBranch: string) => Promise<MergeWithAIResult>
     isMergeInProgress: (path: string) => Promise<boolean>
     getConflictedFiles: (path: string) => Promise<string[]>
-    getWorkingDiff: (path: string) => Promise<GitDiffSnapshot>
+    getWorkingDiff: (path: string, opts?: { contextLines?: string; ignoreWhitespace?: boolean }) => Promise<GitDiffSnapshot>
     stageFile: (path: string, filePath: string) => Promise<void>
     unstageFile: (path: string, filePath: string) => Promise<void>
     discardFile: (path: string, filePath: string, untracked?: boolean) => Promise<void>

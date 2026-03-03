@@ -61,6 +61,7 @@ import { buildStatusOptions, cn, getColumnStatusStyle, projectColorBg, useAppear
 import { BrowserPanel, type BrowserPanelHandle } from '@slayzone/task-browser'
 import { FileEditorView, QuickOpenDialog, type FileEditorViewHandle } from '@slayzone/file-editor/client'
 import type { EditorOpenFilesState } from '@slayzone/file-editor/shared'
+import { track } from '@slayzone/telemetry/client'
 import { usePanelSizes, resolveWidths } from './usePanelSizes'
 import { usePanelConfig } from './usePanelConfig'
 import { WebPanelView } from './WebPanelView'
@@ -1027,6 +1028,7 @@ export function TaskDetailPage({
   const handlePanelToggle = useCallback(
     async (panelId: string, active: boolean) => {
       if (!task) return
+      track('panel_toggled', { panel: panelId, active, context: 'task' })
       // Reset panel size to default when opening
       if (active) resetPanelSize(panelId)
       const newVisibility = { ...panelVisibility, [panelId]: active }

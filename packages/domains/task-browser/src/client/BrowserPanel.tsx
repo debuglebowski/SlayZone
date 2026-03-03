@@ -19,6 +19,7 @@ import {
   ContextMenuItem,
   ContextMenuShortcut,
 } from '@slayzone/ui'
+import { useAppearance } from '@slayzone/settings/client'
 import type { BrowserTab, BrowserTabsState, MultiDeviceConfig, GridLayout, DeviceSlot } from '../shared'
 import { defaultMultiDeviceConfig } from './device-presets'
 import { MultiDeviceGrid } from './MultiDeviceGrid'
@@ -56,6 +57,7 @@ interface WebviewElement extends HTMLElement {
   executeJavaScript<T = unknown>(code: string, userGesture?: boolean): Promise<T>
   insertCSS(css: string): Promise<string>
   removeInsertedCSS(key: string): Promise<void>
+  setZoomFactor(factor: number): void
 }
 
 const THEME_CSS: Record<'light' | 'dark', string> = {
@@ -97,6 +99,7 @@ export const BrowserPanel = forwardRef<BrowserPanelHandle, BrowserPanelProps>(fu
   onElementSnippet,
   canUseDomPicker = true,
 }: BrowserPanelProps, ref) {
+  const { browserDefaultUrl, browserDefaultZoom, browserDeviceDefaults } = useAppearance()
   const [inputUrl, setInputUrl] = useState('')
   const [canGoBack, setCanGoBack] = useState(false)
   const [canGoForward, setCanGoForward] = useState(false)
@@ -151,7 +154,7 @@ export const BrowserPanel = forwardRef<BrowserPanelHandle, BrowserPanelProps>(fu
   const activeTab = tabs.tabs.find(t => t.id === tabs.activeTabId) || null
   // Multi-device state (derived from active tab)
   const multiDeviceMode = activeTab?.multiDeviceMode ?? false
-  const [defaultConfig] = useState(defaultMultiDeviceConfig)
+  const [defaultConfig] = useState(() => defaultMultiDeviceConfig(browserDeviceDefaults))
   const multiDeviceConfig = activeTab?.multiDeviceConfig ?? defaultConfig
   const multiDeviceLayout: GridLayout = activeTab?.multiDeviceLayout ?? 'horizontal'
 
@@ -171,7 +174,7 @@ export const BrowserPanel = forwardRef<BrowserPanelHandle, BrowserPanelProps>(fu
     if (!entering) setWebviewReady(false) // reset — single webview will remount
     updateActiveTab({
       multiDeviceMode: entering,
-      ...(entering && !activeTab.multiDeviceConfig ? { multiDeviceConfig: defaultMultiDeviceConfig() } : {}),
+      ...(entering && !activeTab.multiDeviceConfig ? { multiDeviceConfig: defaultMultiDeviceConfig(browserDeviceDefaults) } : {}),
       ...(entering && !activeTab.multiDeviceLayout ? { multiDeviceLayout: 'horizontal' as GridLayout } : {}),
     })
   }, [activeTab, multiDeviceMode, updateActiveTab])
@@ -217,17 +220,19 @@ export const BrowserPanel = forwardRef<BrowserPanelHandle, BrowserPanelProps>(fu
   }, [multiDeviceConfig, setMultiDeviceConfig])
 
   // Tab callbacks
-  const createNewTab = useCallback((url = 'about:blank') => {
+  const newTabUrl = browserDefaultUrl || 'about:blank'
+  const createNewTab = useCallback((url?: string) => {
+    const tabUrl = url ?? newTabUrl
     const newTab: BrowserTab = {
       id: generateTabId(),
-      url,
-      title: url === 'about:blank' ? 'New Tab' : url
+      url: tabUrl,
+      title: tabUrl === 'about:blank' ? 'New Tab' : tabUrl
     }
     onTabsChange({
       tabs: [...tabs.tabs, newTab],
       activeTabId: newTab.id
     })
-  }, [tabs, onTabsChange])
+  }, [tabs, onTabsChange, newTabUrl])
 
   const closeTab = useCallback((tabId: string) => {
     const idx = tabs.tabs.findIndex(t => t.id === tabId)
@@ -236,7 +241,7 @@ export const BrowserPanel = forwardRef<BrowserPanelHandle, BrowserPanelProps>(fu
     let newActiveId = tabs.activeTabId
     if (tabId === tabs.activeTabId) {
       if (newTabs.length === 0) {
-        const newTab: BrowserTab = { id: generateTabId(), url: 'about:blank', title: 'New Tab' }
+        const newTab: BrowserTab = { id: generateTabId(), url: newTabUrl, title: newTabUrl === 'about:blank' ? 'New Tab' : newTabUrl }
         onTabsChange({ tabs: [newTab], activeTabId: newTab.id })
         return
       }
@@ -244,7 +249,7 @@ export const BrowserPanel = forwardRef<BrowserPanelHandle, BrowserPanelProps>(fu
     }
 
     onTabsChange({ tabs: newTabs, activeTabId: newActiveId })
-  }, [tabs, onTabsChange])
+  }, [tabs, onTabsChange, newTabUrl])
 
   const switchToTab = useCallback((tabId: string) => {
     onTabsChange({ ...tabs, activeTabId: tabId })
@@ -392,6 +397,15 @@ export const BrowserPanel = forwardRef<BrowserPanelHandle, BrowserPanelProps>(fu
       wv.removeEventListener('new-window', handleNewWindow)
     }
   }, []) // stable callbacks via refs
+
+  // Apply default zoom
+  useEffect(() => {
+    const wv = webviewRef.current
+    if (!wv || !webviewReady) return
+    try {
+      wv.setZoomFactor(browserDefaultZoom / 100)
+    } catch { /* webview may not support setZoomFactor */ }
+  }, [webviewReady, browserDefaultZoom])
 
   const getInlineDevToolsBounds = useCallback(() => {
     const el = inlineDevToolsPanelRef.current

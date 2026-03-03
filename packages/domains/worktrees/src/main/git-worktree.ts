@@ -540,12 +540,23 @@ export function getUntrackedFileDiff(repoPath: string, filePath: string): string
   }
 }
 
-export function getWorkingDiff(path: string): GitDiffSnapshot {
+export function getWorkingDiff(path: string, opts?: { contextLines?: string; ignoreWhitespace?: boolean }): GitDiffSnapshot {
   try {
     execGit('git rev-parse --git-dir', { cwd: path })
   } catch {
     throw new Error(`Not a git repository: ${path}`)
   }
+
+  // Build extra flags from diff settings
+  const extraFlags: string[] = []
+  const validContextLines = ['0', '3', '5']
+  if (opts?.contextLines && opts.contextLines !== 'all' && validContextLines.includes(opts.contextLines)) {
+    extraFlags.push(`-U${opts.contextLines}`)
+  }
+  if (opts?.ignoreWhitespace) {
+    extraFlags.push('-w')
+  }
+  const extra = extraFlags.length > 0 ? ' ' + extraFlags.join(' ') : ''
 
   const unstagedFilesRaw = execGit('git diff --name-only', {
     cwd: path,
@@ -559,11 +570,11 @@ export function getWorkingDiff(path: string): GitDiffSnapshot {
     cwd: path,
     encoding: 'utf-8'
   }) as string
-  const unstagedPatch = execGit('git diff --no-ext-diff', {
+  const unstagedPatch = execGit(`git diff --no-ext-diff${extra}`, {
     cwd: path,
     encoding: 'utf-8'
   }) as string
-  const stagedPatch = execGit('git diff --cached --no-ext-diff', {
+  const stagedPatch = execGit(`git diff --cached --no-ext-diff${extra}`, {
     cwd: path,
     encoding: 'utf-8'
   }) as string

@@ -35,6 +35,7 @@ export function TelemetryProvider({ children }: { children: ReactNode }) {
       setReady(true)
 
       window.api.app.getVersion().then((version) => {
+        posthog.register({ app_version: version })
         track('app_opened', { version })
       })
     })

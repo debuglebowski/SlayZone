@@ -1,3 +1,4 @@
+import type { BrowserDeviceDefaults } from '@slayzone/ui'
 import type { DeviceEmulation, DeviceSlot, MultiDeviceConfig } from '../shared'
 
 export const MOBILE_UA =
@@ -20,13 +21,24 @@ export const DEVICE_PRESETS: DeviceEmulation[] = [
   { name: 'Pixel 7', width: 412, height: 915, deviceScaleFactor: 2.625, mobile: true, userAgent: ANDROID_UA, category: 'Mobile' },
 ]
 
-/** Default presets per device slot */
-export function defaultMultiDeviceConfig(): MultiDeviceConfig {
-  return {
-    desktop: { enabled: true, preset: DEVICE_PRESETS.find(p => p.name === 'Desktop 1080p')! },
-    tablet:  { enabled: true, preset: DEVICE_PRESETS.find(p => p.name === 'iPad Mini')! },
-    mobile:  { enabled: true, preset: DEVICE_PRESETS.find(p => p.name === 'iPhone 15 Pro')! },
+/** Default presets per device slot, optionally overridden by user settings */
+export function defaultMultiDeviceConfig(overrides?: BrowserDeviceDefaults | null): MultiDeviceConfig {
+  const base = {
+    desktop: { enabled: true, preset: { ...DEVICE_PRESETS.find(p => p.name === 'Desktop 1080p')! } },
+    tablet:  { enabled: true, preset: { ...DEVICE_PRESETS.find(p => p.name === 'iPad Mini')! } },
+    mobile:  { enabled: true, preset: { ...DEVICE_PRESETS.find(p => p.name === 'iPhone 15 Pro')! } },
   }
+  if (overrides) {
+    for (const slot of ['desktop', 'tablet', 'mobile'] as const) {
+      const o = overrides[slot]
+      if (o) {
+        base[slot].enabled = o.enabled
+        base[slot].preset.width = o.width
+        base[slot].preset.height = o.height
+      }
+    }
+  }
+  return base
 }
 
 /** All presets, with slot-relevant ones sorted first */
