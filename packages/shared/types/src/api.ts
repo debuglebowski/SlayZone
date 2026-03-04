@@ -1,9 +1,18 @@
-import type { Project, CreateProjectInput, UpdateProjectInput, ExecutionContext } from '@slayzone/projects/shared'
-import type { Task, CreateTaskInput, UpdateTaskInput, GenerateDescriptionResult, DesktopHandoffPolicy } from '@slayzone/task/shared'
+import type {
+  Project,
+  CreateProjectInput,
+  UpdateProjectInput,
+  ProjectFeatureSyncAggregateResult,
+  RepoFeatureSyncConfig,
+  ProjectFeatureSyncResult,
+  TaskFeatureDetails,
+  UpdateTaskFeatureInput
+} from '@slayzone/projects/shared'
+import type { Task, CreateTaskInput, UpdateTaskInput, DesktopHandoffPolicy } from '@slayzone/task/shared'
 import type { Tag, CreateTagInput, UpdateTagInput } from '@slayzone/tags/shared'
-import type { TerminalMode, TerminalState, CodeMode, PtyInfo, PromptInfo, BufferSinceResult, ProviderUsage, ValidationResult } from '@slayzone/terminal/shared'
-import type { TerminalTab, CreateTerminalTabInput, UpdateTerminalTabInput } from '@slayzone/task-terminals/shared'
 import type { Theme, ThemePreference } from '@slayzone/settings/shared'
+import type { TerminalMode, TerminalState, CodeMode, PtyInfo, PromptInfo, BufferSinceResult, ProviderUsage, ValidationResult, ExecutionContext } from '@slayzone/terminal/shared'
+import type { TerminalTab, CreateTerminalTabInput, UpdateTerminalTabInput } from '@slayzone/task-terminals/shared'
 import type { DetectedWorktree, MergeResult, MergeWithAIResult, GitDiffSnapshot, ConflictFileContent, ConflictAnalysis, RebaseProgress, CommitInfo, AheadBehind, StatusSummary } from '@slayzone/worktrees/shared'
 import type { MergeContext } from '@slayzone/task/shared'
 import type {
@@ -47,7 +56,7 @@ import type {
   SyncNowResult
 } from '@slayzone/integrations/shared'
 
-export type { ExecutionContext } from '@slayzone/projects/shared'
+export type { ExecutionContext } from '@slayzone/terminal/shared'
 
 export interface LocalLeaderboardDay {
   date: string
@@ -141,24 +150,69 @@ export interface PtyCreateOptions {
 
 // ElectronAPI interface - the IPC contract between renderer and main
 export interface ElectronAPI {
-  ai: {
-    generateDescription: (title: string, mode: TerminalMode) => Promise<GenerateDescriptionResult>
-  }
   db: {
     // Projects
     getProjects: () => Promise<Project[]>
     createProject: (data: CreateProjectInput) => Promise<Project>
     updateProject: (data: UpdateProjectInput) => Promise<Project>
+    syncProjectFeatures: (projectId: string) => Promise<ProjectFeatureSyncResult>
+    syncAllProjectFeatures: () => Promise<ProjectFeatureSyncAggregateResult>
+    getProjectFeatureSyncConfig: () => Promise<RepoFeatureSyncConfig>
+    setProjectFeatureSyncConfig: (input: Partial<RepoFeatureSyncConfig>) => Promise<RepoFeatureSyncConfig>
     deleteProject: (id: string) => Promise<boolean>
 
     // Tasks
     getTasks: () => Promise<Task[]>
     getTasksByProject: (projectId: string) => Promise<Task[]>
     getTask: (id: string) => Promise<Task | null>
+    getTaskFeatureContext: (taskId: string) => Promise<{
+      featureFilePath: string
+      featureDirPath: string
+      featureDirAbsolutePath: string | null
+    } | null>
+    getTaskFeatureDetails: (taskId: string) => Promise<TaskFeatureDetails | null>
+    syncTaskFeatureFromRepo: (taskId: string) => Promise<{
+      updated: boolean
+      task: Task | null
+      details: TaskFeatureDetails | null
+      sync: ProjectFeatureSyncResult
+    }>
+    syncTaskFeatureToRepo: (taskId: string) => Promise<{
+      updated: boolean
+      task: Task | null
+      details: TaskFeatureDetails | null
+    }>
+    createTaskFeature: (
+      taskId: string,
+      input?: {
+        featureId?: string | null
+        folderName?: string | null
+        title?: string | null
+        description?: string | null
+      }
+    ) => Promise<{
+      created: boolean
+      featureFilePath: string
+      task: Task | null
+      details: TaskFeatureDetails | null
+    }>
+    deleteTaskFeature: (taskId: string) => Promise<{
+      deleted: boolean
+      task: Task | null
+      details: TaskFeatureDetails | null
+    }>
+    updateTaskFeature: (
+      taskId: string,
+      input: UpdateTaskFeatureInput
+    ) => Promise<{
+      updated: boolean
+      task: Task | null
+      details: TaskFeatureDetails | null
+    }>
     getSubTasks: (parentId: string) => Promise<Task[]>
     createTask: (data: CreateTaskInput) => Promise<Task>
     updateTask: (data: UpdateTaskInput) => Promise<Task>
-    deleteTask: (id: string) => Promise<boolean>
+    deleteTask: (id: string, options?: { deleteFeatureDir?: boolean }) => Promise<boolean>
     restoreTask: (id: string) => Promise<Task>
     archiveTask: (id: string) => Promise<Task>
     archiveTasks: (ids: string[]) => Promise<void>
@@ -240,6 +294,7 @@ export interface ElectronAPI {
     onReloadBrowser: (callback: () => void) => () => void
     onCloseActiveTask: (callback: () => void) => () => void
     dataReady: () => void
+    openProjectSettings: () => Promise<void>
     restartForUpdate: () => Promise<void>
     checkForUpdates: () => Promise<void>
     cliStatus: () => Promise<{ installed: boolean }>

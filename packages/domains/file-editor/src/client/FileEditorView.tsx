@@ -1,5 +1,5 @@
-import { useState, useCallback, useRef, useEffect, useMemo, useImperativeHandle, forwardRef } from 'react'
-import { Code, Columns2, Eye, FileCode, Files, Search } from 'lucide-react'
+import { useState, useCallback, useRef, useEffect, useImperativeHandle, forwardRef } from 'react'
+import { FileCode, Files, Search } from 'lucide-react'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -16,7 +16,6 @@ import { useFileEditor } from './useFileEditor'
 import { EditorFileTree } from './EditorFileTree'
 import { EditorTabBar } from './EditorTabBar'
 import { CodeEditor } from './CodeEditor'
-import { MarkdownPreview } from './MarkdownPreview'
 import { SearchPanel } from './SearchPanel'
 
 export interface FileEditorViewHandle {
@@ -62,13 +61,9 @@ export const FileEditorView = forwardRef<FileEditorViewHandle, FileEditorViewPro
   )
   const isDragging = useRef(false)
   const [confirmClose, setConfirmClose] = useState<string | null>(null)
-  const [viewMode, setViewMode] = useState<'editor' | 'split' | 'preview'>('split')
   const [sidebarMode, setSidebarMode] = useState<'tree' | 'search'>('tree')
   const [isFileDragOver, setIsFileDragOver] = useState(false)
   const dragCounter = useRef(0)
-  const editorContainerRef = useRef<HTMLDivElement>(null)
-  const previewScrollRef = useRef<HTMLDivElement>(null)
-  const scrollSyncSource = useRef<'editor' | 'preview' | null>(null)
 
   // --- Emit state changes to parent for persistence ---
   // Parent (TaskDetailPage) debounces at 500ms, so frequent calls here are fine.
@@ -88,52 +83,7 @@ export const FileEditorView = forwardRef<FileEditorViewHandle, FileEditorViewPro
     })
   }, [filePathsKey, activeFilePath, treeWidth, treeVisible, expandedFolders, isRestoring])
 
-  const isMarkdown = useMemo(() => {
-    const ext = activeFilePath?.split('.').pop()?.toLowerCase()
-    return ext === 'md' || ext === 'mdx'
-  }, [activeFilePath])
-
   const isImage = activeFile?.binary ?? false
-
-  // Scroll sync between editor and preview
-  useEffect(() => {
-    if (!isMarkdown || viewMode !== 'split') return
-
-    const editorEl = editorContainerRef.current?.querySelector('.cm-scroller') as HTMLElement | null
-    const previewEl = previewScrollRef.current
-    if (!editorEl || !previewEl) return
-
-    let rafId: number | null = null
-
-    function syncScroll(source: 'editor' | 'preview') {
-      if (scrollSyncSource.current && scrollSyncSource.current !== source) return
-      scrollSyncSource.current = source
-
-      if (rafId) cancelAnimationFrame(rafId)
-      rafId = requestAnimationFrame(() => {
-        const from = source === 'editor' ? editorEl! : previewEl!
-        const to = source === 'editor' ? previewEl! : editorEl!
-        const maxFrom = from.scrollHeight - from.clientHeight
-        const maxTo = to.scrollHeight - to.clientHeight
-        if (maxFrom > 0 && maxTo > 0) {
-          to.scrollTop = (from.scrollTop / maxFrom) * maxTo
-        }
-        scrollSyncSource.current = null
-        rafId = null
-      })
-    }
-
-    const onEditorScroll = () => syncScroll('editor')
-    const onPreviewScroll = () => syncScroll('preview')
-
-    editorEl.addEventListener('scroll', onEditorScroll, { passive: true })
-    previewEl.addEventListener('scroll', onPreviewScroll, { passive: true })
-    return () => {
-      editorEl.removeEventListener('scroll', onEditorScroll)
-      previewEl.removeEventListener('scroll', onPreviewScroll)
-      if (rafId) cancelAnimationFrame(rafId)
-    }
-  }, [isMarkdown, viewMode, activeFilePath])
 
   useImperativeHandle(ref, () => ({
     openFile,
@@ -315,24 +265,6 @@ export const FileEditorView = forwardRef<FileEditorViewHandle, FileEditorViewPro
             treeVisible={treeVisible}
             onToggleTree={() => setTreeVisible((v) => !v)}
           />
-          {isMarkdown && activeFile?.content != null && (
-            <div className="flex items-center shrink-0 mr-2 bg-surface-2 rounded-md p-0.5 gap-0.5">
-              {([
-                { mode: 'editor' as const, icon: Code, title: 'Editor only' },
-                { mode: 'split' as const, icon: Columns2, title: 'Split view' },
-                { mode: 'preview' as const, icon: Eye, title: 'Preview only' }
-              ]).map(({ mode, icon: Icon, title }) => (
-                <button
-                  key={mode}
-                  className={`flex items-center justify-center size-6 rounded transition-colors ${viewMode === mode ? 'bg-muted text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
-                  onClick={() => setViewMode(mode)}
-                  title={title}
-                >
-                  <Icon className="size-3.5" />
-                </button>
-              ))}
-            </div>
-          )}
         </div>
 
         {activeFile && isImage ? (
@@ -357,23 +289,16 @@ export const FileEditorView = forwardRef<FileEditorViewHandle, FileEditorViewPro
           </div>
         ) : activeFile?.content != null ? (
           <div className="flex-1 min-h-0 flex">
-            {!(isMarkdown && viewMode === 'preview') && (
-              <div ref={editorContainerRef} className={isMarkdown && viewMode === 'split' ? 'w-1/2 min-w-0' : 'flex-1 min-w-0'}>
-                <CodeEditor
-                  key={activeFile.path}
-                  filePath={activeFile.path}
-                  content={activeFile.content}
-                  onChange={(content) => updateContent(activeFile.path, content)}
-                  onSave={() => saveFile(activeFile.path)}
-                  version={fileVersions.get(activeFile.path)}
-                />
-              </div>
-            )}
-            {isMarkdown && viewMode !== 'editor' && (
-              <div className={`${viewMode === 'split' ? 'w-1/2' : 'flex-1'} min-w-0 border-l`}>
-                <MarkdownPreview content={activeFile.content} scrollRef={previewScrollRef} projectPath={projectPath} filePath={activeFilePath ?? undefined} />
-              </div>
-            )}
+            <div className="flex-1 min-w-0">
+              <CodeEditor
+                key={activeFile.path}
+                filePath={activeFile.path}
+                content={activeFile.content}
+                onChange={(content) => updateContent(activeFile.path, content)}
+                onSave={() => saveFile(activeFile.path)}
+                version={fileVersions.get(activeFile.path)}
+              />
+            </div>
           </div>
         ) : (
           <div className="flex-1 flex items-center justify-center text-muted-foreground">

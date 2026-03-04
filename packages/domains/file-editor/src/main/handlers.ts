@@ -10,6 +10,12 @@ const ALWAYS_IGNORED = new Set(['.git', '.DS_Store'])
 const MAX_FILE_SIZE = 1 * 1024 * 1024 // 1 MB
 const FORCE_MAX_FILE_SIZE = 10 * 1024 * 1024 // 10 MB
 
+function isMissingFsError(error: unknown): boolean {
+  if (!(error instanceof Error)) return false
+  const code = (error as NodeJS.ErrnoException).code
+  return code === 'ENOENT' || code === 'ENOTDIR'
+}
+
 function assertWithinRoot(root: string, target: string): string {
   const resolved = path.resolve(root, target)
   if (!resolved.startsWith(path.resolve(root) + path.sep) && resolved !== path.resolve(root)) {
@@ -71,7 +77,13 @@ function addWinToWatcher(root: string, win: BrowserWindow, wins: Set<BrowserWind
 export function registerFileEditorHandlers(ipcMain: IpcMain): void {
   ipcMain.handle('fs:readDir', (_event, rootPath: string, dirPath: string): DirEntry[] => {
     const abs = dirPath ? assertWithinRoot(rootPath, dirPath) : path.resolve(rootPath)
-    const entries = fs.readdirSync(abs, { withFileTypes: true })
+    let entries: fs.Dirent[]
+    try {
+      entries = fs.readdirSync(abs, { withFileTypes: true })
+    } catch (error) {
+      if (isMissingFsError(error)) return []
+      throw error
+    }
     return entries
       .filter((e) => !ALWAYS_IGNORED.has(e.name))
       .map((e) => {
@@ -92,14 +104,26 @@ export function registerFileEditorHandlers(ipcMain: IpcMain): void {
 
   ipcMain.handle('fs:readFile', (_event, rootPath: string, filePath: string, force?: boolean): ReadFileResult => {
     const abs = assertWithinRoot(rootPath, filePath)
-    const stat = fs.statSync(abs)
+    let stat: fs.Stats
+    try {
+      stat = fs.statSync(abs)
+    } catch (error) {
+      if (isMissingFsError(error)) return { content: null }
+      throw error
+    }
+    if (!stat.isFile()) return { content: null }
     if (stat.size > FORCE_MAX_FILE_SIZE) {
       return { content: null, tooLarge: true, sizeBytes: stat.size }
     }
     if (!force && stat.size > MAX_FILE_SIZE) {
       return { content: null, tooLarge: true, sizeBytes: stat.size }
     }
-    return { content: fs.readFileSync(abs, 'utf-8') }
+    try {
+      return { content: fs.readFileSync(abs, 'utf-8') }
+    } catch (error) {
+      if (isMissingFsError(error)) return { content: null }
+      throw error
+    }
   })
 
   ipcMain.handle('fs:listAllFiles', (_event, rootPath: string): string[] => {

@@ -1016,10 +1016,7 @@ function App(): React.JSX.Element {
   }
 
   const handleTaskDeleted = (): void => {
-    if (deletingTask) {
-      deleteTask(deletingTask.id)
-      setDeletingTask(null)
-    }
+    setDeletingTask(null)
   }
 
   const handleTaskClick = (task: Task, e: { metaKey: boolean }): void => {
@@ -1039,12 +1036,22 @@ function App(): React.JSX.Element {
     setProjects((prev) => [...prev, project])
     setSelectedProjectId(project.id)
     setCreateProjectOpen(false)
+    void window.api.db.getTasks().then((allTasks) => {
+      setTasks(allTasks)
+    }).catch((err) => {
+      console.error('[App] Failed to refresh tasks after project create:', err)
+    })
   }
 
   const handleProjectUpdated = (project: Project): void => {
     updateProject(project)
     setEditingProject(null)
     validateProjectPath(project)
+    void window.api.db.getTasks().then((allTasks) => {
+      setTasks(allTasks)
+    }).catch((err) => {
+      console.error('[App] Failed to refresh tasks after project update:', err)
+    })
   }
 
   const handleProjectNameSave = async (): Promise<void> => {
@@ -1451,6 +1458,7 @@ function App(): React.JSX.Element {
           open={!!deletingTask}
           onOpenChange={(open) => !open && setDeletingTask(null)}
           onDeleted={handleTaskDeleted}
+          onDeleteTask={deleteTask}
         />
         <CreateProjectDialog
           open={createProjectOpen}

@@ -4,6 +4,8 @@ import type { CreateTaskInput, UpdateTaskInput, Task, ProviderConfig } from '@sl
 import { PROVIDER_DEFAULTS } from '@slayzone/task/shared'
 import type { ColumnConfig } from '@slayzone/projects/shared'
 import { getDefaultStatus, isKnownStatus, isTerminalStatus, parseColumnsConfig } from '@slayzone/projects/shared'
+import { createFeatureForTask, deleteFeatureForTask, getTaskFeatureDetails, syncAllProjectFeatureTasks, syncProjectFeatureTasks, syncTaskToFeatureFile, updateTaskFeatureFile } from '@slayzone/projects/main'
+import type { UpdateTaskFeatureInput } from '@slayzone/projects/shared'
 import path from 'path'
 import { removeWorktree, createWorktree, runWorktreeSetupScript, getCurrentBranch, isGitRepo } from '@slayzone/worktrees/main'
 
@@ -78,10 +80,14 @@ function parseTasks(rows: Record<string, unknown>[]): Task[] {
 }
 
 function getProjectColumns(db: Database, projectId: string): ColumnConfig[] | null {
-  const row = db.prepare('SELECT columns_config FROM projects WHERE id = ?').get(projectId) as
-    | { columns_config: string | null }
-    | undefined
-  return parseColumnsConfig(row?.columns_config)
+  try {
+    const row = db.prepare('SELECT columns_config FROM projects WHERE id = ?').get(projectId) as
+      | { columns_config: string | null }
+      | undefined
+    return parseColumnsConfig(row?.columns_config)
+  } catch {
+    return null
+  }
 }
 
 /** Kill PTY only — used for soft-delete (preserves worktree for undo) */
@@ -93,7 +99,6 @@ function cleanupTaskImmediate(taskId: string): void {
 function cleanupTaskFull(db: Database, taskId: string): void {
   cleanupTaskImmediate(taskId)
   runtimeAdapters.killTaskProcesses(taskId)
-
   const task = db.prepare(
     'SELECT worktree_path, project_id FROM tasks WHERE id = ?'
   ).get(taskId) as { worktree_path: string | null; project_id: string } | undefined
@@ -358,6 +363,13 @@ export function updateTask(db: Database, data: UpdateTaskInput): Task | null {
 }
 
 export function registerTaskHandlers(ipcMain: IpcMain, db: Database): void {
+  const syncAllRepoFeaturesSafe = (): void => {
+    try {
+      syncAllProjectFeatureTasks(db)
+    } catch (err) {
+      console.error('Failed syncing PRD/spec tasks:', err)
+    }
+  }
 
   // Purge stale soft-deleted tasks from previous sessions
   const stale = db.prepare(
@@ -372,39 +384,138 @@ export function registerTaskHandlers(ipcMain: IpcMain, db: Database): void {
     console.log(`Purged ${stale.length} soft-deleted task(s)`)
   }
 
+  const syncProjectRepoFeaturesSafe = (projectId: string | null | undefined): void => {
+    if (!projectId) return
+    try {
+      syncProjectFeatureTasks(db, projectId)
+    } catch (err) {
+      console.error(`Failed syncing PRD/spec tasks for project ${projectId}:`, err)
+    }
+  }
+
+  const taskExistsInDb = (taskId: string): boolean => {
+    const row = db.prepare('SELECT 1 FROM tasks WHERE id = ?').get(taskId) as { 1: number } | undefined
+    return Boolean(row)
+  }
+
+  const getDbTasksQuery = `
+    SELECT t.*, el.external_url AS linear_url
+    FROM tasks t
+    LEFT JOIN external_links el ON el.task_id = t.id AND el.provider = 'linear'
+  `
+
+  const getDbTask = (id: string): Task | null => {
+    const row = db.prepare(`${getDbTasksQuery} WHERE t.id = ?`).get(id) as Record<string, unknown> | undefined
+    return parseTask(row)
+  }
+
+  const createProviderConfig = (data: CreateTaskInput): ProviderConfig => {
+    const providerConfig: ProviderConfig = {}
+    const legacyOverrides: Record<string, string | undefined> = {
+      'claude-code': data.claudeFlags,
+      codex: data.codexFlags,
+      'cursor-agent': data.cursorFlags,
+      gemini: data.geminiFlags,
+      opencode: data.opencodeFlags
+    }
+    for (const [mode, def] of Object.entries(PROVIDER_DEFAULTS)) {
+      const dbDefault = (db.prepare('SELECT value FROM settings WHERE key = ?')
+        .get(def.settingsKey) as { value: string } | undefined)?.value ?? def.fallback
+      providerConfig[mode] = { flags: legacyOverrides[mode] ?? dbDefault }
+    }
+    return providerConfig
+  }
+
   // Task CRUD
   ipcMain.handle('db:tasks:getAll', () => {
-    const rows = db
-      .prepare(`SELECT t.*, el.external_url AS linear_url
-        FROM tasks t
-        LEFT JOIN external_links el ON el.task_id = t.id AND el.provider = 'linear'
-        WHERE t.deleted_at IS NULL
-        ORDER BY t."order" ASC, t.created_at DESC`)
-      .all() as Record<string, unknown>[]
-    return parseTasks(rows)
+    syncAllRepoFeaturesSafe()
+    const dbRows = db.prepare(`${getDbTasksQuery} WHERE t.deleted_at IS NULL ORDER BY t."order" ASC, t.created_at DESC`).all() as Record<string, unknown>[]
+    return parseTasks(dbRows)
   })
 
   ipcMain.handle('db:tasks:getByProject', (_, projectId: string) => {
-    const rows = db
-      .prepare(
-        `SELECT t.*, el.external_url AS linear_url
-        FROM tasks t
-        LEFT JOIN external_links el ON el.task_id = t.id AND el.provider = 'linear'
-        WHERE t.project_id = ? AND t.archived_at IS NULL AND t.deleted_at IS NULL
-        ORDER BY t."order" ASC, t.created_at DESC`
-      )
-      .all(projectId) as Record<string, unknown>[]
+    syncProjectRepoFeaturesSafe(projectId)
+    const rows = db.prepare(
+      `${getDbTasksQuery}
+      WHERE t.project_id = ? AND t.archived_at IS NULL AND t.deleted_at IS NULL
+      ORDER BY t."order" ASC, t.created_at DESC`
+    ).all(projectId) as Record<string, unknown>[]
     return parseTasks(rows)
   })
 
   ipcMain.handle('db:tasks:get', (_, id: string) => {
-    const row = db.prepare(
-      `SELECT t.*, el.external_url AS linear_url
-      FROM tasks t
-      LEFT JOIN external_links el ON el.task_id = t.id AND el.provider = 'linear'
-      WHERE t.id = ?`
-    ).get(id) as Record<string, unknown> | undefined
-    return parseTask(row)
+    const project = db.prepare('SELECT project_id FROM tasks WHERE id = ?').get(id) as { project_id: string } | undefined
+    syncProjectRepoFeaturesSafe(project?.project_id)
+    return getDbTask(id)
+  })
+
+  ipcMain.handle('db:tasks:getFeatureContext', (_, taskId: string) => {
+    const details = getTaskFeatureDetails(db, taskId)
+    if (!details) return null
+    return {
+      featureFilePath: details.featureFilePath,
+      featureDirPath: details.featureDirPath,
+      featureDirAbsolutePath: details.featureDirAbsolutePath
+    }
+  })
+
+  ipcMain.handle('db:tasks:getFeatureDetails', (_, taskId: string) => {
+    return getTaskFeatureDetails(db, taskId)
+  })
+
+  ipcMain.handle('db:tasks:syncFeatureFromRepo', (_, taskId: string) => {
+    const row = db.prepare('SELECT project_id FROM tasks WHERE id = ?').get(taskId) as { project_id: string } | undefined
+    if (!row) {
+      return { updated: false, task: null, details: null }
+    }
+    const sync = syncProjectFeatureTasks(db, row.project_id)
+    return {
+      updated: sync.created > 0 || sync.updated > 0,
+      task: getDbTask(taskId),
+      details: getTaskFeatureDetails(db, taskId),
+      sync
+    }
+  })
+
+  ipcMain.handle('db:tasks:syncFeatureToRepo', (_, taskId: string) => {
+    const updated = syncTaskToFeatureFile(db, taskId).updated
+    return {
+      updated,
+      task: getDbTask(taskId),
+      details: getTaskFeatureDetails(db, taskId)
+    }
+  })
+
+  ipcMain.handle('db:tasks:createFeature', (_, taskId: string, input?: {
+    featureId?: string | null
+    folderName?: string | null
+    title?: string | null
+    description?: string | null
+  }) => {
+    const created = createFeatureForTask(db, taskId, input ?? {})
+    return {
+      ...created,
+      task: getDbTask(taskId),
+      details: getTaskFeatureDetails(db, taskId)
+    }
+  })
+
+  ipcMain.handle('db:tasks:deleteFeature', (_, taskId: string) => {
+    const deleted = deleteFeatureForTask(db, taskId).deleted
+    return {
+      deleted,
+      task: getDbTask(taskId),
+      details: getTaskFeatureDetails(db, taskId)
+    }
+  })
+
+  ipcMain.handle('db:tasks:updateFeature', (_, taskId: string, input: UpdateTaskFeatureInput) => {
+    const updated = updateTaskFeatureFile(db, taskId, input)
+    return {
+      ...updated,
+      task: getDbTask(taskId),
+      details: getTaskFeatureDetails(db, taskId)
+    }
   })
 
   ipcMain.handle('db:tasks:create', (_, data: CreateTaskInput) => {
@@ -414,22 +525,11 @@ export function registerTaskHandlers(ipcMain: IpcMain, db: Database): void {
       data.status && isKnownStatus(data.status, projectColumns)
         ? data.status
         : getDefaultStatus(projectColumns)
-    const terminalMode = data.terminalMode
+    const terminalMode = (data.terminalMode
       ?? (db.prepare("SELECT value FROM settings WHERE key = 'default_terminal_mode'")
           .get() as { value: string } | undefined)?.value
-      ?? 'claude-code'
-
-    // Build provider_config from defaults + overrides
-    const providerConfig: ProviderConfig = {}
-    const legacyOverrides: Record<string, string | undefined> = {
-      'claude-code': data.claudeFlags, 'codex': data.codexFlags,
-      'cursor-agent': data.cursorFlags, 'gemini': data.geminiFlags, 'opencode': data.opencodeFlags,
-    }
-    for (const [mode, def] of Object.entries(PROVIDER_DEFAULTS)) {
-      const dbDefault = (db.prepare('SELECT value FROM settings WHERE key = ?')
-        .get(def.settingsKey) as { value: string } | undefined)?.value ?? def.fallback
-      providerConfig[mode] = { flags: legacyOverrides[mode] ?? dbDefault }
-    }
+      ?? 'claude-code') as Task['terminal_mode']
+    const providerConfig = createProviderConfig(data)
 
     const ccsDefaultProfile = (db.prepare('SELECT value FROM settings WHERE key = ?')
       .get('ccs_default_profile') as { value: string } | undefined)?.value ?? null
@@ -461,22 +561,59 @@ export function registerTaskHandlers(ipcMain: IpcMain, db: Database): void {
   })
 
   ipcMain.handle('db:tasks:getSubTasks', (_, parentId: string) => {
-    const rows = db
-      .prepare(
-        `SELECT t.*, el.external_url AS linear_url
-        FROM tasks t
-        LEFT JOIN external_links el ON el.task_id = t.id AND el.provider = 'linear'
-        WHERE t.parent_id = ? AND t.archived_at IS NULL AND t.deleted_at IS NULL
-        ORDER BY t."order" ASC, t.created_at DESC`
-      )
-      .all(parentId) as Record<string, unknown>[]
+    const parent = db.prepare('SELECT project_id FROM tasks WHERE id = ?').get(parentId) as { project_id: string } | undefined
+    syncProjectRepoFeaturesSafe(parent?.project_id)
+    const rows = db.prepare(
+      `${getDbTasksQuery}
+      WHERE t.parent_id = ? AND t.archived_at IS NULL AND t.deleted_at IS NULL
+      ORDER BY t."order" ASC, t.created_at DESC`
+    ).all(parentId) as Record<string, unknown>[]
     return parseTasks(rows)
   })
 
-  ipcMain.handle('db:tasks:update', (_, data: UpdateTaskInput) => updateTask(db, data))
+  ipcMain.handle('db:tasks:update', (_, data: UpdateTaskInput) => {
+    const existing = db.prepare('SELECT project_id FROM tasks WHERE id = ?').get(data.id) as
+      | { project_id: string }
+      | undefined
+    if (!existing) return null
+
+    const next = updateTask(db, data)
+    if (!next) return null
+
+    const projectChanged = data.projectId !== undefined && data.projectId !== existing.project_id
+    if (projectChanged) {
+      db.prepare('DELETE FROM project_feature_task_links WHERE task_id = ?').run(data.id)
+    }
+
+    if (data.title !== undefined || data.description !== undefined) {
+      try {
+        syncTaskToFeatureFile(db, data.id)
+      } catch (err) {
+        console.error('Failed syncing linked feature file:', err)
+      }
+    }
+
+    return next
+  })
 
   // Soft-delete: kill PTY but preserve worktree for undo
-  ipcMain.handle('db:tasks:delete', (_, id: string) => {
+  ipcMain.handle('db:tasks:delete', (_, id: string, options?: { deleteFeatureDir?: boolean }) => {
+    if (options?.deleteFeatureDir === true) {
+      try {
+        deleteFeatureForTask(db, id)
+      } catch (err) {
+        console.error('Failed to delete linked feature during task delete:', err)
+        const projectRow = db.prepare('SELECT project_id FROM tasks WHERE id = ?').get(id) as { project_id: string } | undefined
+        runtimeAdapters.recordDiagnosticEvent({
+          level: 'error',
+          source: 'task',
+          event: 'task.delete_feature_cleanup_failed',
+          taskId: id,
+          projectId: projectRow?.project_id,
+          message: err instanceof Error ? err.message : String(err)
+        })
+      }
+    }
     cleanupTaskImmediate(id)
     const result = db.prepare(`
       UPDATE tasks SET deleted_at = datetime('now'), updated_at = datetime('now') WHERE id = ?
@@ -503,8 +640,7 @@ export function registerTaskHandlers(ipcMain: IpcMain, db: Database): void {
       UPDATE tasks SET archived_at = datetime('now'), worktree_path = NULL, updated_at = datetime('now')
       WHERE id = ? OR parent_id = ?
     `).run(id, id)
-    const row = db.prepare('SELECT * FROM tasks WHERE id = ?').get(id) as Record<string, unknown> | undefined
-    return parseTask(row)
+    return getDbTask(id)
   })
 
   ipcMain.handle('db:tasks:archiveMany', (_, ids: string[]) => {
@@ -517,20 +653,20 @@ export function registerTaskHandlers(ipcMain: IpcMain, db: Database): void {
     const childIds = (db.prepare(`SELECT id FROM tasks WHERE parent_id IN (${parentPlaceholders}) AND archived_at IS NULL`).all(...ids) as { id: string }[]).map(r => r.id)
     for (const childId of childIds) { cleanupTaskFull(db, childId) }
     const allIds = [...ids, ...childIds]
-    const placeholders = allIds.map(() => '?').join(',')
     db.prepare(`
       UPDATE tasks SET archived_at = datetime('now'), worktree_path = NULL, updated_at = datetime('now')
-      WHERE id IN (${placeholders})
+      WHERE id IN (${allIds.map(() => '?').join(',')})
     `).run(...allIds)
   })
 
   ipcMain.handle('db:tasks:unarchive', (_, id: string) => {
+    const dbTask = getDbTask(id)
+    if (!dbTask) return null
     db.prepare(`
       UPDATE tasks SET archived_at = NULL, updated_at = datetime('now')
       WHERE id = ?
     `).run(id)
-    const row = db.prepare('SELECT * FROM tasks WHERE id = ?').get(id) as Record<string, unknown> | undefined
-    return parseTask(row)
+    return getDbTask(id)
   })
 
   ipcMain.handle('db:tasks:getArchived', () => {
@@ -542,16 +678,21 @@ export function registerTaskHandlers(ipcMain: IpcMain, db: Database): void {
 
   // Reorder
   ipcMain.handle('db:tasks:reorder', (_, taskIds: string[]) => {
+    if (taskIds.length === 0) return
+
+    const dbRows = db.prepare(`SELECT id FROM tasks WHERE id IN (${taskIds.map(() => '?').join(',')})`).all(...taskIds) as Array<{ id: string }>
+    const dbIds = new Set(dbRows.map((row) => row.id))
     const stmt = db.prepare('UPDATE tasks SET "order" = ? WHERE id = ?')
     db.transaction(() => {
       taskIds.forEach((id, index) => {
-        stmt.run(index, id)
+        if (dbIds.has(id)) stmt.run(index, id)
       })
     })()
   })
 
   // Task Dependencies
   ipcMain.handle('db:taskDependencies:getBlockers', (_, taskId: string) => {
+    if (!taskExistsInDb(taskId)) return []
     const rows = db
       .prepare(
         `SELECT tasks.* FROM tasks
@@ -570,6 +711,7 @@ export function registerTaskHandlers(ipcMain: IpcMain, db: Database): void {
   })
 
   ipcMain.handle('db:taskDependencies:getBlocking', (_, taskId: string) => {
+    if (!taskExistsInDb(taskId)) return []
     const rows = db
       .prepare(
         `SELECT tasks.* FROM tasks
@@ -583,6 +725,7 @@ export function registerTaskHandlers(ipcMain: IpcMain, db: Database): void {
   ipcMain.handle(
     'db:taskDependencies:addBlocker',
     (_, taskId: string, blockerTaskId: string) => {
+      if (!taskExistsInDb(taskId) || !taskExistsInDb(blockerTaskId)) return
       db.prepare(
         'INSERT OR IGNORE INTO task_dependencies (task_id, blocks_task_id) VALUES (?, ?)'
       ).run(blockerTaskId, taskId)
@@ -592,6 +735,7 @@ export function registerTaskHandlers(ipcMain: IpcMain, db: Database): void {
   ipcMain.handle(
     'db:taskDependencies:removeBlocker',
     (_, taskId: string, blockerTaskId: string) => {
+      if (!taskExistsInDb(taskId) || !taskExistsInDb(blockerTaskId)) return
       db.prepare(
         'DELETE FROM task_dependencies WHERE task_id = ? AND blocks_task_id = ?'
       ).run(blockerTaskId, taskId)
@@ -601,14 +745,16 @@ export function registerTaskHandlers(ipcMain: IpcMain, db: Database): void {
   ipcMain.handle(
     'db:taskDependencies:setBlockers',
     (_, taskId: string, blockerTaskIds: string[]) => {
+      if (!taskExistsInDb(taskId)) return
       const deleteStmt = db.prepare('DELETE FROM task_dependencies WHERE blocks_task_id = ?')
       const insertStmt = db.prepare(
         'INSERT INTO task_dependencies (task_id, blocks_task_id) VALUES (?, ?)'
       )
+      const validBlockerTaskIds = blockerTaskIds.filter((id) => taskExistsInDb(id))
 
       db.transaction(() => {
         deleteStmt.run(taskId)
-        for (const blockerTaskId of blockerTaskIds) {
+        for (const blockerTaskId of validBlockerTaskIds) {
           insertStmt.run(blockerTaskId, taskId)
         }
       })()

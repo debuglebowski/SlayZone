@@ -1028,6 +1028,7 @@ export function ProjectSettingsDialog({
                   ) : null}
                 </CardContent>
               </Card>
+
             </div>
           )}
 
