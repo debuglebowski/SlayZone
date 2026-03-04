@@ -4,7 +4,7 @@
  */
 import { createTestHarness, test, expect, describe } from '../../../../shared/test-utils/ipc-harness.js'
 import { registerWorktreeHandlers } from './handlers.js'
-import { createWorktree, runWorktreeSetupScriptSync } from './git-worktree.js'
+import { createWorktree, runWorktreeSetupScriptSync, copyFilesFromMainToWorktree } from './git-worktree.js'
 import { execSync } from 'child_process'
 import * as fs from 'node:fs'
 import * as path from 'node:path'
@@ -110,6 +110,100 @@ describe('git:createWorktree', () => {
   })
 })
 
+describe('copy include combinations', () => {
+  test('copies files according to every combination of environment/path/tracked/untracked', () => {
+    const comboRepo = path.join(root, 'combo-repo')
+    fs.mkdirSync(comboRepo)
+
+    const comboGit = (cmd: string) =>
+      execSync(cmd, {
+        cwd: comboRepo,
+        encoding: 'utf-8',
+        env: {
+          ...process.env,
+          GIT_AUTHOR_NAME: 'Test',
+          GIT_AUTHOR_EMAIL: 'test@test.com',
+          GIT_COMMITTER_NAME: 'Test',
+          GIT_COMMITTER_EMAIL: 'test@test.com'
+        }
+      }).trim()
+
+    comboGit('git init')
+    comboGit('git branch -m main')
+
+    fs.mkdirSync(path.join(comboRepo, 'docs'), { recursive: true })
+    fs.writeFileSync(path.join(comboRepo, '.gitignore'), '.env\ndocs/ignored-doc.bin\nignored-root.txt\n')
+    fs.writeFileSync(path.join(comboRepo, 'tracked-root.txt'), 'tracked root baseline')
+    fs.writeFileSync(path.join(comboRepo, 'docs', 'tracked-doc.txt'), 'tracked doc baseline')
+    comboGit('git add -A')
+    comboGit('git commit -m "combo baseline"')
+
+    fs.writeFileSync(path.join(comboRepo, 'tracked-root.txt'), 'tracked root modified')
+    fs.writeFileSync(path.join(comboRepo, 'docs', 'tracked-doc.txt'), 'tracked doc modified')
+    fs.writeFileSync(path.join(comboRepo, 'untracked-root.txt'), 'untracked root')
+    fs.writeFileSync(path.join(comboRepo, 'docs', 'untracked-doc.txt'), 'untracked doc')
+    fs.writeFileSync(path.join(comboRepo, '.env'), 'API_KEY=test')
+    fs.writeFileSync(path.join(comboRepo, 'docs', 'ignored-doc.bin'), 'ignored doc')
+    fs.writeFileSync(path.join(comboRepo, 'ignored-root.txt'), 'ignored root')
+
+    const assertCopied = (targetPath: string, expected: string[]) => {
+      const actual = [
+        '.env',
+        'tracked-root.txt',
+        'untracked-root.txt',
+        'ignored-root.txt',
+        'docs/tracked-doc.txt',
+        'docs/untracked-doc.txt',
+        'docs/ignored-doc.bin'
+      ].filter((relPath) => fs.existsSync(path.join(targetPath, relPath))).sort()
+
+      expect(actual).toEqual([...expected].sort())
+    }
+
+    for (const includeEnvironmentFiles of [false, true]) {
+      for (const includeAllInPath of [false, true]) {
+        for (const includeTracked of [false, true]) {
+          for (const includeUntracked of [false, true]) {
+            const comboName = `e${Number(includeEnvironmentFiles)}-a${Number(includeAllInPath)}-t${Number(includeTracked)}-u${Number(includeUntracked)}`
+            const targetPath = path.join(root, `combo-copy-${comboName}`)
+            fs.mkdirSync(targetPath, { recursive: true })
+
+            copyFilesFromMainToWorktree(comboRepo, targetPath, {
+              includeIgnored: includeEnvironmentFiles,
+              includeAllStatusesInPaths: includeAllInPath,
+              includeTracked,
+              includeUntracked,
+              pathGlobs: includeAllInPath ? ['docs/**'] : undefined
+            })
+
+            if (includeAllInPath) {
+              const expected = [
+                'docs/tracked-doc.txt',
+                'docs/untracked-doc.txt',
+                'docs/ignored-doc.bin'
+              ]
+              if (includeEnvironmentFiles) expected.push('.env')
+              assertCopied(targetPath, expected)
+            } else {
+              const expected: string[] = []
+              if (includeTracked) {
+                expected.push('tracked-root.txt', 'docs/tracked-doc.txt')
+              }
+              if (includeUntracked) {
+                expected.push('untracked-root.txt', 'docs/untracked-doc.txt')
+              }
+              if (includeEnvironmentFiles) {
+                expected.push('.env')
+              }
+              assertCopied(targetPath, expected)
+            }
+          }
+        }
+      }
+    }
+  })
+})
+
 // --- .slay/worktree-setup.sh ---
 
 describe('worktree setup script', () => {
@@ -156,6 +250,24 @@ describe('git:removeWorktree', () => {
     h.invoke('git:removeWorktree', repoPath, wtPath)
     // Worktree dir should be gone
     expect(fs.existsSync(path.join(wtPath, '.git'))).toBe(false)
+    expect(git('git branch --list feature-1')).toBe('')
+  })
+
+  test('removes branch using provided branch hint', () => {
+    const wtPath = path.join(root, 'wt-hint')
+    createWorktree(repoPath, wtPath, 'feature-hint')
+    h.invoke('git:removeWorktree', repoPath, wtPath, 'feature-hint')
+    expect(fs.existsSync(path.join(wtPath, '.git'))).toBe(false)
+    expect(git('git branch --list feature-hint')).toBe('')
+  })
+
+  test('removes branch when worktree path is relative and branch differs from folder name', () => {
+    const relPath = '../wt-relative'
+    const absPath = path.join(root, 'wt-relative')
+    createWorktree(repoPath, relPath, 'feature-relative')
+    h.invoke('git:removeWorktree', repoPath, relPath)
+    expect(fs.existsSync(path.join(absPath, '.git'))).toBe(false)
+    expect(git('git branch --list feature-relative')).toBe('')
   })
 })
 

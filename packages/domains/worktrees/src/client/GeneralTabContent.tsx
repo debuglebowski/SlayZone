@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { GitBranch, GitMerge, Plus, Trash2, ChevronDown, Check, Loader2, ArrowUp, ArrowDown, GitCommitHorizontal, AlertTriangle, Copy } from 'lucide-react'
 import {
   Button,
+  Checkbox,
   IconButton,
   Input,
   Popover,
@@ -75,8 +76,16 @@ export function GeneralTabContent({
 
   // Worktree
   const [creating, setCreating] = useState(false)
+  const [createWorktreeConfirmOpen, setCreateWorktreeConfirmOpen] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [includeTracked, setIncludeTracked] = useState(false)
+  const [includeUntracked, setIncludeUntracked] = useState(false)
+  const [includeIgnored, setIncludeIgnored] = useState(true)
+  const [ignoredEnvFilesPreview, setIgnoredEnvFilesPreview] = useState<string[]>([])
+  const [loadingIgnoredEnvFilesPreview, setLoadingIgnoredEnvFilesPreview] = useState(false)
+  const [limitPaths, setLimitPaths] = useState(true)
+  const [pathFilters, setPathFilters] = useState('docs/**')
   const [deleteWorktreeConfirmOpen, setDeleteWorktreeConfirmOpen] = useState(false)
   const [deleteWorktreeHasChanges, setDeleteWorktreeHasChanges] = useState(false)
   const [mergeConfirmOpen, setMergeConfirmOpen] = useState(false)
@@ -129,6 +138,32 @@ export function GeneralTabContent({
     if (!task.worktree_path) { setWorktreeBranch(null); return }
     window.api.git.getCurrentBranch(task.worktree_path).then(setWorktreeBranch).catch(() => setWorktreeBranch(null))
   }, [task.worktree_path])
+
+  useEffect(() => {
+    if (!createWorktreeConfirmOpen || !projectPath || !includeIgnored) {
+      setIgnoredEnvFilesPreview([])
+      setLoadingIgnoredEnvFilesPreview(false)
+      return
+    }
+
+    let cancelled = false
+    setLoadingIgnoredEnvFilesPreview(true)
+    window.api.git
+      .listIgnoredEnvLikeFiles(projectPath, 20)
+      .then((files) => {
+        if (!cancelled) setIgnoredEnvFilesPreview(files)
+      })
+      .catch(() => {
+        if (!cancelled) setIgnoredEnvFilesPreview([])
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingIgnoredEnvFilesPreview(false)
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [createWorktreeConfirmOpen, projectPath, includeIgnored])
 
   // Branch popover handlers
   const handleBranchPopoverChange = (open: boolean) => {
@@ -186,9 +221,9 @@ export function GeneralTabContent({
     finally { setInitializing(false) }
   }
 
-  // Worktree handlers
-  const handleAddWorktree = async () => {
+  const handleCreateWorktreeConfirm = async () => {
     if (!projectPath) return
+    setCreateWorktreeConfirmOpen(false)
     setCreating(true)
     setError(null)
     try {
@@ -196,8 +231,25 @@ export function GeneralTabContent({
       const basePath = resolveWorktreeBasePathTemplate(basePathTemplate, projectPath)
       const branch = slugify(task.title) || `task-${task.id.slice(0, 8)}`
       const worktreePath = joinWorktreePath(basePath, branch)
-      await window.api.git.createWorktree(projectPath, worktreePath, branch)
+      const includeResult = await window.api.git.createWorktree(
+        projectPath,
+        worktreePath,
+        branch,
+        undefined,
+        {
+          includeTracked: limitPaths ? true : includeTracked,
+          includeUntracked: limitPaths ? true : includeUntracked,
+          includeIgnored: limitPaths ? true : includeIgnored,
+          pathGlobs: limitPaths
+            ? pathFilters.split(',').map(value => value.trim()).filter(Boolean)
+            : undefined,
+          includeAllStatusesInPaths: limitPaths
+        }
+      )
       await onUpdateTask({ id: task.id, worktreePath, worktreeParentBranch: currentBranch })
+      if (includeResult.includeResult.copiedCount > 0) {
+        toast(`Copied ${includeResult.includeResult.copiedCount} file${includeResult.includeResult.copiedCount === 1 ? '' : 's'} from main workspace`)
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
     } finally {
@@ -440,7 +492,7 @@ export function GeneralTabContent({
           ) : (
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button variant="outline" size="sm" onClick={handleAddWorktree} disabled={creating} className="gap-2 w-full justify-start">
+                <Button variant="outline" size="sm" onClick={() => setCreateWorktreeConfirmOpen(true)} disabled={creating} className="gap-2 w-full justify-start">
                   <Plus className="h-4 w-4" />
                   {creating ? 'Creating...' : 'Add Worktree'}
                 </Button>
@@ -511,6 +563,74 @@ export function GeneralTabContent({
           </Section>
         )}
       </div>
+
+      {/* Delete worktree confirmation dialog */}
+      <AlertDialog open={createWorktreeConfirmOpen} onOpenChange={setCreateWorktreeConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Create Worktree</AlertDialogTitle>
+            <AlertDialogDescription>
+              Include local files from the main workspace into the new worktree.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="space-y-3 text-sm">
+            <div className="space-y-2">
+              <label className="flex items-center gap-2 text-xs">
+                <Checkbox checked={includeIgnored} onCheckedChange={(v) => setIncludeIgnored(!!v)} />
+                Environment files (.env, .env.local, .envrc)
+              </label>
+              {includeIgnored && (
+                <div className="space-y-2 rounded-md border p-2.5">
+                  <p className="text-xs text-muted-foreground">Detected environment-like ignored files to copy</p>
+                  {loadingIgnoredEnvFilesPreview ? (
+                    <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                      Scanning ignored files...
+                    </div>
+                  ) : ignoredEnvFilesPreview.length > 0 ? (
+                    <div className="text-xs space-y-1 max-h-24 overflow-auto">
+                      {ignoredEnvFilesPreview.map((file) => (
+                        <div key={file} className="font-mono text-[11px] text-muted-foreground">{file}</div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-xs text-muted-foreground">No ignored env-like files found.</p>
+                  )}
+                </div>
+              )}
+            </div>
+
+            <label className="flex items-center gap-2 text-xs">
+              <Checkbox checked={limitPaths} onCheckedChange={(v) => setLimitPaths(!!v)} />
+              Include ALL the files included in this path
+            </label>
+            {limitPaths && (
+              <Input
+                value={pathFilters}
+                onChange={(e) => setPathFilters(e.target.value)}
+                placeholder="docs/**, FEATURES/**"
+                className="h-8 text-xs"
+              />
+            )}
+
+            <label className="flex items-center gap-2 text-xs">
+              <Checkbox checked={includeTracked} onCheckedChange={(v) => setIncludeTracked(!!v)} />
+              Tracked changes (modified tracked files)
+            </label>
+
+            <label className="flex items-center gap-2 text-xs">
+              <Checkbox checked={includeUntracked} onCheckedChange={(v) => setIncludeUntracked(!!v)} />
+              Untracked files
+            </label>
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={creating}>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleCreateWorktreeConfirm} disabled={creating}>
+              {creating ? 'Creating...' : 'Create Worktree'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Delete worktree confirmation dialog */}
       <AlertDialog open={deleteWorktreeConfirmOpen} onOpenChange={setDeleteWorktreeConfirmOpen}>

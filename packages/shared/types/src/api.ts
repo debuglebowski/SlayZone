@@ -4,7 +4,7 @@ import type { Tag, CreateTagInput, UpdateTagInput } from '@slayzone/tags/shared'
 import type { TerminalMode, TerminalState, CodeMode, PtyInfo, PromptInfo, BufferSinceResult, ProviderUsage, ValidationResult } from '@slayzone/terminal/shared'
 import type { TerminalTab, CreateTerminalTabInput, UpdateTerminalTabInput } from '@slayzone/task-terminals/shared'
 import type { Theme, ThemePreference } from '@slayzone/settings/shared'
-import type { DetectedWorktree, MergeResult, MergeWithAIResult, GitDiffSnapshot, ConflictFileContent, ConflictAnalysis, RebaseProgress, CommitInfo, AheadBehind, StatusSummary } from '@slayzone/worktrees/shared'
+import type { DetectedWorktree, MergeResult, MergeWithAIResult, GitDiffSnapshot, ConflictFileContent, ConflictAnalysis, RebaseProgress, CommitInfo, AheadBehind, StatusSummary, WorktreeIncludeFilesOptions, WorktreeIncludeFilesResult } from '@slayzone/worktrees/shared'
 import type { MergeContext } from '@slayzone/task/shared'
 import type {
   AiConfigItem,
@@ -289,7 +289,16 @@ export interface ElectronAPI {
   git: {
     isGitRepo: (path: string) => Promise<boolean>
     detectWorktrees: (repoPath: string) => Promise<DetectedWorktree[]>
-    createWorktree: (repoPath: string, targetPath: string, branch?: string, sourceBranch?: string) => Promise<{ setupResult: { ran: boolean; success?: boolean; output?: string } }>
+    createWorktree: (
+      repoPath: string,
+      targetPath: string,
+      branch?: string,
+      sourceBranch?: string,
+      includeFiles?: WorktreeIncludeFilesOptions
+    ) => Promise<{
+      setupResult: { ran: boolean; success?: boolean; output?: string }
+      includeResult: WorktreeIncludeFilesResult
+    }>
     removeWorktree: (repoPath: string, worktreePath: string) => Promise<void>
     init: (path: string) => Promise<void>
     getCurrentBranch: (path: string) => Promise<string | null>
@@ -322,6 +331,7 @@ export interface ElectronAPI {
     getRecentCommits: (repoPath: string, count?: number) => Promise<CommitInfo[]>
     getAheadBehind: (repoPath: string, branch: string, upstream: string) => Promise<AheadBehind>
     getStatusSummary: (repoPath: string) => Promise<StatusSummary>
+    listIgnoredEnvLikeFiles: (repoPath: string, limit?: number) => Promise<string[]>
   }
   tabs: {
     list: (taskId: string) => Promise<TerminalTab[]>

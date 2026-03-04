@@ -254,8 +254,8 @@ const api: ElectronAPI = {
   git: {
     isGitRepo: (path) => ipcRenderer.invoke('git:isGitRepo', path),
     detectWorktrees: (repoPath) => ipcRenderer.invoke('git:detectWorktrees', repoPath),
-    createWorktree: (repoPath, targetPath, branch, sourceBranch) =>
-      ipcRenderer.invoke('git:createWorktree', repoPath, targetPath, branch, sourceBranch),
+    createWorktree: (repoPath, targetPath, branch, sourceBranch, includeFiles) =>
+      ipcRenderer.invoke('git:createWorktree', repoPath, targetPath, branch, sourceBranch, includeFiles),
     removeWorktree: (repoPath, worktreePath) =>
       ipcRenderer.invoke('git:removeWorktree', repoPath, worktreePath),
     init: (path) => ipcRenderer.invoke('git:init', path),
@@ -291,7 +291,8 @@ const api: ElectronAPI = {
     getMergeContext: (repoPath) => ipcRenderer.invoke('git:getMergeContext', repoPath),
     getRecentCommits: (repoPath, count) => ipcRenderer.invoke('git:getRecentCommits', repoPath, count),
     getAheadBehind: (repoPath, branch, upstream) => ipcRenderer.invoke('git:getAheadBehind', repoPath, branch, upstream),
-    getStatusSummary: (repoPath) => ipcRenderer.invoke('git:getStatusSummary', repoPath)
+    getStatusSummary: (repoPath) => ipcRenderer.invoke('git:getStatusSummary', repoPath),
+    listIgnoredEnvLikeFiles: (repoPath, limit) => ipcRenderer.invoke('git:listIgnoredEnvLikeFiles', repoPath, limit)
   },
   tabs: {
     list: (taskId) => ipcRenderer.invoke('tabs:list', taskId),
