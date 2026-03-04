@@ -88,20 +88,14 @@ const api: ElectronAPI = {
       ipcRenderer.invoke('shell:open-external', url, options)
   },
   auth: {
-    githubPopupSignIn: (signInUrl: string, callbackUrl: string) =>
-      ipcRenderer.invoke('auth:github-popup-sign-in', signInUrl, callbackUrl),
-    openSystemSignIn: (signInUrl: string) => ipcRenderer.invoke('auth:open-system-sign-in', signInUrl),
-    consumeOAuthCallback: () => ipcRenderer.invoke('auth:consume-oauth-callback'),
-    onOAuthCallback: (callback) => {
-      const handler = (_event: unknown, payload: { code?: string; error?: string }) => callback(payload)
-      ipcRenderer.on('auth:oauth-callback', handler)
-      return () => ipcRenderer.removeListener('auth:oauth-callback', handler)
-    }
+    githubSystemSignIn: (input: { convexUrl: string; redirectTo: string }) =>
+      ipcRenderer.invoke('auth:github-system-sign-in', input)
   },
   dialog: {
     showOpenDialog: (options) => ipcRenderer.invoke('dialog:showOpenDialog', options)
   },
   app: {
+    getProtocolClientStatus: () => ipcRenderer.invoke('app:get-protocol-client-status'),
     getVersion: () => ipcRenderer.invoke('app:getVersion'),
     isContextManagerEnabled: () => ipcRenderer.invoke('app:is-context-manager-enabled'),
     onGoHome: (callback: () => void) => {

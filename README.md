@@ -114,6 +114,7 @@ pnpm dev
 | Command | |
 |---|---|
 | `pnpm dev` | Start dev server |
+| `pnpm dev:oauth` | Start dev server with OAuth deep-link callback registration enabled |
 | `pnpm build` | Production build |
 | `pnpm typecheck` | Typecheck all packages |
 | `pnpm test:e2e` | Run E2E tests (build first) |

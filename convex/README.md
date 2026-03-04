@@ -14,7 +14,7 @@ This folder contains Convex backend code used by leaderboard auth/data.
 Required env vars:
 - `AUTH_GITHUB_ID`
 - `AUTH_GITHUB_SECRET`
-- `SITE_URL` (desktop callback base, currently `http://127.0.0.1:3210`)
+- `SITE_URL` (base URL for standard redirects, e.g. `http://127.0.0.1:3210`)
 - `JWT_PRIVATE_KEY`
 - `JWKS`
 
@@ -27,13 +27,13 @@ Required env vars:
 4. Set production Convex env vars (`--prod`):
    - `AUTH_GITHUB_ID`
    - `AUTH_GITHUB_SECRET`
-   - `SITE_URL=http://127.0.0.1:3210`
+   - `SITE_URL=http://127.0.0.1:3210` (or your chosen base URL)
 5. Generate and set auth keys as a pair on prod:
    - `JWT_PRIVATE_KEY`
    - `JWKS`
    - Important: these must match each other.
 6. Verify desktop callback routing works in packaged app:
-   - protocol/deeplink and loopback callback flow both tested
+   - protocol/deeplink callback flow tested (`slayzone://auth/callback`)
    - sign-in results in authenticated state after redirect
 7. Verify CSP still allows Convex endpoints in renderer:
    - `https://*.convex.cloud`
@@ -48,6 +48,7 @@ Required env vars:
 ## Notes
 
 - For desktop OAuth, `SITE_URL` is used to validate allowed `redirectTo`.
+- SlayZone auth allows the desktop deep-link destination `slayzone://auth/callback` via `convex/auth.ts` redirect callback.
 - `JWT_PRIVATE_KEY`/`JWKS` errors usually show up as:
   - missing env var
   - sign-in callback succeeds but session activation fails

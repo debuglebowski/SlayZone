@@ -221,15 +221,13 @@ export interface ElectronAPI {
     ) => Promise<void>
   }
   auth: {
-    githubPopupSignIn: (signInUrl: string, callbackUrl: string) => Promise<{
+    githubSystemSignIn: (input: { convexUrl: string; redirectTo: string }) => Promise<{
       ok: boolean
       code?: string
+      verifier?: string
       error?: string
       cancelled?: boolean
     }>
-    openSystemSignIn: (signInUrl: string) => Promise<void>
-    onOAuthCallback: (callback: (payload: { code?: string; error?: string }) => void) => () => void
-    consumeOAuthCallback: () => Promise<{ code?: string; error?: string } | null>
   }
   dialog: {
     showOpenDialog: (options: {
@@ -239,6 +237,12 @@ export interface ElectronAPI {
     }) => Promise<{ canceled: boolean; filePaths: string[] }>
   }
   app: {
+    getProtocolClientStatus: () => Promise<{
+      scheme: string
+      attempted: boolean
+      registered: boolean
+      reason: 'registered' | 'dev-skipped' | 'registration-failed'
+    }>
     getVersion: () => Promise<string>
     isContextManagerEnabled: () => Promise<boolean>
     onGoHome: (callback: () => void) => () => void

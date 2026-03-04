@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { CheckCheck, Github, Lock, LogOut, RefreshCw, Sparkles } from 'lucide-react'
+import { AlertTriangle, CheckCheck, Github, Lock, LogOut, RefreshCw, Sparkles } from 'lucide-react'
 import { Button, IconButton, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@slayzone/ui'
 import { useMutation, useQuery } from 'convex/react'
 import { useLeaderboardAuth } from '@/lib/convexAuth'
@@ -90,6 +90,7 @@ function LeaderboardPageInner({ auth }: { auth: ReturnType<typeof useLeaderboard
   const [resolvedGithubLogin, setResolvedGithubLogin] = useState<string | null>(null)
   const [resolvedGithubAvatar, setResolvedGithubAvatar] = useState<string | null>(null)
   const [resolvedGithubUrl, setResolvedGithubUrl] = useState<string | null>(null)
+  const [devProtocolBanner, setDevProtocolBanner] = useState<string | null>(null)
   const syncViewerProfile = useMutation(api.leaderboard.syncViewerProfile)
   const syncDailyStats = useMutation(api.leaderboard.syncDailyStats)
   const forgetMeMutation = useMutation(api.leaderboard.forgetMe)
@@ -159,6 +160,31 @@ function LeaderboardPageInner({ auth }: { auth: ReturnType<typeof useLeaderboard
     void resolveGithubProfile()
     return () => { cancelled = true }
   }, [viewer, auth.isAuthenticated])
+
+  useEffect(() => {
+    if (!import.meta.env.DEV) return
+    let cancelled = false
+    void window.api.app
+      .getProtocolClientStatus()
+      .then((status) => {
+        if (cancelled) return
+        if (status.reason === 'dev-skipped') {
+          setDevProtocolBanner(
+            'OAuth deep-link callbacks are disabled in dev by default. Use `SLAYZONE_REGISTER_DEV_PROTOCOL=1 pnpm dev` when testing leaderboard sign-in.'
+          )
+          return
+        }
+        if (status.reason === 'registration-failed') {
+          setDevProtocolBanner(`OAuth deep-link callback handler registration failed for ${status.scheme}://.`)
+          return
+        }
+        setDevProtocolBanner(null)
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   async function runAuthAction(type: 'signin' | 'signout' | 'forget'): Promise<void> {
     setAuthBusy(true)
@@ -274,6 +300,22 @@ function LeaderboardPageInner({ auth }: { auth: ReturnType<typeof useLeaderboard
               </div>
             </div>
           </div>
+          {devProtocolBanner && (
+            <div className="mt-4 rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-200">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex items-start gap-2">
+                  <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                  <span>{devProtocolBanner}</span>
+                </div>
+                <button
+                  className="shrink-0 text-amber-100/80 hover:text-amber-100"
+                  onClick={() => setDevProtocolBanner(null)}
+                >
+                  Dismiss
+                </button>
+              </div>
+            </div>
+          )}
           {!canParticipate && (
             <div className="mt-4 rounded-lg border border-primary/30 bg-primary/10 p-4">
               <div className="flex flex-wrap items-center justify-between gap-3">

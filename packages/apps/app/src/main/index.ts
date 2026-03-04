@@ -2,7 +2,6 @@
 import { app, shell, BrowserWindow, BrowserView, ipcMain, nativeTheme, session, webContents, dialog, Menu, protocol } from 'electron'
 import { join, extname, normalize, sep, resolve } from 'path'
 import { homedir } from 'os'
-import { createServer, type Server as HttpServer } from 'http'
 import { readFileSync, promises as fsp, existsSync, unlinkSync, symlinkSync } from 'fs'
 import { electronApp, is } from '@electron-toolkit/utils'
 import { registerBrowserPanel, unregisterBrowserPanel } from './browser-registry'
@@ -193,13 +192,30 @@ let inlineDevToolsViewAttached = false
 let inlineDeviceToolbarDisableTimers: NodeJS.Timeout[] = []
 let linearSyncPoller: NodeJS.Timeout | null = null
 let mcpCleanup: (() => void) | null = null
-let pendingOAuthCallback: { code?: string; error?: string } | null = null
-let oauthCallbackServer: HttpServer | null = null
+type OAuthCallbackPayload = { code?: string; error?: string }
+const oauthCallbackQueue: OAuthCallbackPayload[] = []
+const oauthCallbackWaiters = new Set<(payload: OAuthCallbackPayload) => void>()
 let mainWindowReady = false
 let rendererDataReady = false
-const OAUTH_LOOPBACK_HOST = '127.0.0.1'
-const OAUTH_LOOPBACK_PORT = 3210
-const OAUTH_LOOPBACK_PATH = '/auth/callback'
+const APP_PROTOCOL_SCHEME = 'slayzone'
+// Avoid stealing the global slayzone:// handler from packaged builds during local dev.
+const SHOULD_REGISTER_PROTOCOL_CLIENT = !is.dev || process.env.SLAYZONE_REGISTER_DEV_PROTOCOL === '1'
+type ProtocolClientStatusReason = 'registered' | 'dev-skipped' | 'registration-failed'
+type ProtocolClientStatus = {
+  scheme: string
+  attempted: boolean
+  registered: boolean
+  reason: ProtocolClientStatusReason
+}
+let protocolClientStatus: ProtocolClientStatus = {
+  scheme: APP_PROTOCOL_SCHEME,
+  attempted: false,
+  registered: false,
+  reason: SHOULD_REGISTER_PROTOCOL_CLIENT ? 'registration-failed' : 'dev-skipped'
+}
+const SUPPORTED_PROTOCOL_SCHEMES = new Set([APP_PROTOCOL_SCHEME])
+const OAUTH_DEEP_LINK_REDIRECT_URI = `${APP_PROTOCOL_SCHEME}://auth/callback`
+const OAUTH_CALLBACK_TIMEOUT_MS = 120_000
 
 function logBoot(step: string): void {
   if (is.dev && process.env.SLAYZONE_DEBUG_BOOT === '1') {
@@ -216,9 +232,6 @@ function tryShowMainWindow(): void {
     closeSplash()
   } else {
     if (!isPlaywright) mainWindow?.show()
-  }
-  if (pendingOAuthCallback) {
-    mainWindow?.webContents.send('auth:oauth-callback', pendingOAuthCallback)
   }
 }
 
@@ -336,16 +349,105 @@ function scheduleDisableDevToolsDeviceToolbar(devtoolsContents: Electron.WebCont
 }
 
 function emitOAuthCallback(payload: { code?: string; error?: string }): void {
-  pendingOAuthCallback = payload
   if (mainWindow) {
     if (mainWindow.isMinimized()) mainWindow.restore()
     mainWindow.show()
     mainWindow.focus()
   }
-  const wc = mainWindow?.webContents
-  if (wc && !wc.isDestroyed()) {
-    wc.send('auth:oauth-callback', payload)
+
+  const waiter = oauthCallbackWaiters.values().next().value as ((p: OAuthCallbackPayload) => void) | undefined
+  if (waiter) {
+    oauthCallbackWaiters.delete(waiter)
+    waiter(payload)
+    return
   }
+
+  oauthCallbackQueue.push(payload)
+}
+
+function waitForOAuthCallback(timeoutMs: number): Promise<OAuthCallbackPayload> {
+  const queued = oauthCallbackQueue.shift()
+  if (queued) return Promise.resolve(queued)
+
+  return new Promise<OAuthCallbackPayload>((resolve, reject) => {
+    const resolveOnce = (payload: OAuthCallbackPayload) => {
+      clearTimeout(timeout)
+      oauthCallbackWaiters.delete(resolveOnce)
+      resolve(payload)
+    }
+    const timeout = setTimeout(() => {
+      oauthCallbackWaiters.delete(resolveOnce)
+      reject(new Error('Timed out waiting for OAuth callback'))
+    }, timeoutMs)
+    oauthCallbackWaiters.add(resolveOnce)
+  })
+}
+
+async function requestGithubSignInStart(
+  convexUrl: string,
+  redirectTo: string
+): Promise<{ redirect: string; verifier: string }> {
+  let convexSite: URL
+  try {
+    convexSite = new URL(convexUrl)
+  } catch {
+    throw new Error('Convex URL is invalid')
+  }
+  if (convexSite.protocol !== 'https:' && convexSite.protocol !== 'http:') {
+    throw new Error('Convex URL must use http or https')
+  }
+
+  const response = await fetch(`${convexSite.origin}/api/action`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Convex-Client': 'electron-main'
+    },
+    body: JSON.stringify({
+      path: 'auth:signIn',
+      format: 'convex_encoded_json',
+      args: [
+        {
+          provider: 'github',
+          params: { redirectTo }
+        }
+      ]
+    })
+  })
+
+  if (!response.ok) {
+    throw new Error(`Auth bootstrap failed (${response.status})`)
+  }
+
+  const body = (await response.json()) as {
+    status?: string
+    value?: { redirect?: string; verifier?: string }
+    errorMessage?: string
+  }
+  if (body.status === 'error') {
+    throw new Error(body.errorMessage ?? 'Auth bootstrap failed')
+  }
+  if (body.status !== 'success') {
+    throw new Error('Auth bootstrap returned an unexpected response')
+  }
+
+  const redirect = body.value?.redirect
+  const verifier = body.value?.verifier
+  if (!redirect || !verifier) {
+    throw new Error('Auth bootstrap response missing redirect or verifier')
+  }
+
+  let redirectUrl: URL
+  try {
+    redirectUrl = new URL(redirect)
+  } catch {
+    throw new Error('Auth bootstrap returned an invalid redirect URL')
+  }
+  if (redirectUrl.protocol !== 'https:') {
+    throw new Error('GitHub sign-in URL must use https')
+  }
+
+  return { redirect: redirectUrl.toString(), verifier }
 }
 
 function handleOAuthDeepLink(url: string): void {
@@ -356,7 +458,8 @@ function handleOAuthDeepLink(url: string): void {
     return
   }
 
-  if (parsed.protocol !== 'slayzone:') return
+  const incomingProtocol = parsed.protocol.replace(/:$/, '')
+  if (!SUPPORTED_PROTOCOL_SCHEMES.has(incomingProtocol)) return
   const normalizedPath = parsed.pathname.replace(/\/+$/, '')
 
   // slayzone://task/<id> — open task in app
@@ -391,54 +494,11 @@ function handleOAuthDeepLink(url: string): void {
 
 function handleOAuthDeepLinkFromArgv(argv: string[]): void {
   for (const arg of argv) {
-    if (typeof arg === 'string' && arg.startsWith('slayzone://')) {
+    if (typeof arg === 'string' && arg.startsWith(`${APP_PROTOCOL_SCHEME}://`)) {
       handleOAuthDeepLink(arg)
       break
     }
   }
-}
-
-function startOAuthLoopbackServer(): void {
-  if (oauthCallbackServer) return
-  const server = createServer((req, res) => {
-    try {
-      const reqUrl = new URL(req.url ?? '/', `http://${OAUTH_LOOPBACK_HOST}:${OAUTH_LOOPBACK_PORT}`)
-      if (reqUrl.pathname !== OAUTH_LOOPBACK_PATH) {
-        res.statusCode = 404
-        res.end('Not found')
-        return
-      }
-      const code = reqUrl.searchParams.get('code') ?? undefined
-      const error =
-        reqUrl.searchParams.get('error_description') ??
-        reqUrl.searchParams.get('error') ??
-        undefined
-      const resolvedError = !code && !error ? `OAuth callback missing code (${reqUrl.search || 'no query params'})` : error
-      emitOAuthCallback({ code, error: resolvedError })
-      res.statusCode = 200
-      res.setHeader('content-type', 'text/html; charset=utf-8')
-      if (code) {
-        res.end('<html><body><h3>Sign-in complete. You can return to SlayZone.</h3></body></html>')
-      } else {
-        res.end('<html><body><h3>Sign-in callback reached app, but no code was present.</h3><p>You can return to SlayZone and check the auth error.</p></body></html>')
-      }
-    } catch {
-      res.statusCode = 500
-      res.end('Callback handling failed')
-    }
-  })
-
-  server.on('error', (error) => {
-    const code = (error as NodeJS.ErrnoException).code
-    if (code === 'EADDRINUSE') {
-      console.warn(`[oauth] Loopback callback port ${OAUTH_LOOPBACK_PORT} is already in use; continuing without local callback server`)
-      return
-    }
-    console.error('[oauth] Loopback callback server failed:', error)
-  })
-
-  server.listen(OAUTH_LOOPBACK_PORT, OAUTH_LOOPBACK_HOST, () => {})
-  oauthCallbackServer = server
 }
 
 const shouldEnforceSingleInstanceLock = !isPlaywright && !is.dev
@@ -660,16 +720,34 @@ function createWindow(): void {
 // Some APIs can only be used after this event occurs.
 app.whenReady().then(async () => {
   logBoot('whenReady begin')
-  if (process.defaultApp) {
-    const entry = process.argv[1] ? [resolve(process.argv[1])] : []
-    app.setAsDefaultProtocolClient('slayzone', process.execPath, entry)
+  if (SHOULD_REGISTER_PROTOCOL_CLIENT) {
+    let registered = false
+    if (process.defaultApp) {
+      const entry = process.argv[1] ? [resolve(process.argv[1])] : []
+      registered = app.setAsDefaultProtocolClient(APP_PROTOCOL_SCHEME, process.execPath, entry)
+    } else {
+      registered = app.setAsDefaultProtocolClient(APP_PROTOCOL_SCHEME)
+    }
+    protocolClientStatus = {
+      scheme: APP_PROTOCOL_SCHEME,
+      attempted: true,
+      registered,
+      reason: registered ? 'registered' : 'registration-failed'
+    }
+    if (!registered) {
+      console.warn(
+        `[auth][protocol] Failed to register ${APP_PROTOCOL_SCHEME}:// as default protocol handler. OAuth deep-link callbacks may not open this app.`
+      )
+    }
+    logBoot('protocol client configured')
   } else {
-    app.setAsDefaultProtocolClient('slayzone')
+    console.warn(
+      `[auth][protocol] Dev protocol registration skipped for ${APP_PROTOCOL_SCHEME}://. Set SLAYZONE_REGISTER_DEV_PROTOCOL=1 to test OAuth deep-link callbacks in dev.`
+    )
+    logBoot('protocol client registration skipped in dev')
   }
-  logBoot('protocol client configured')
   handleOAuthDeepLinkFromArgv(process.argv)
-  startOAuthLoopbackServer()
-  logBoot('oauth callback handlers initialized')
+  logBoot('oauth deep-link handlers initialized')
 
   // Initialize databases
   logBoot('database init start')
@@ -1038,98 +1116,41 @@ app.whenReady().then(async () => {
     shell.openExternal(url)
   })
 
-  ipcMain.handle('auth:open-system-sign-in', (_event, signInUrl: string) => {
-    if (!/^https?:\/\//i.test(signInUrl)) {
-      throw new Error('Sign-in URL must use http or https')
-    }
-    shell.openExternal(signInUrl)
-  })
-
-  ipcMain.handle('auth:consume-oauth-callback', () => {
-    const payload = pendingOAuthCallback
-    pendingOAuthCallback = null
-    return payload
-  })
-
-  ipcMain.handle('auth:github-popup-sign-in', async (_event, signInUrl: string, callbackUrl: string) => {
-    const signIn = new URL(signInUrl)
-    const callback = new URL(callbackUrl)
-
-    if (signIn.protocol !== 'https:') {
-      throw new Error('GitHub sign-in URL must use https')
-    }
-    if (callback.protocol !== 'http:' && callback.protocol !== 'https:') {
-      throw new Error('Callback URL must use http or https')
-    }
-
-    return await new Promise<{ ok: boolean; code?: string; error?: string; cancelled?: boolean }>((resolve) => {
-      let settled = false
-      const popup = new BrowserWindow({
-        width: 520,
-        height: 760,
-        resizable: true,
-        minimizable: false,
-        maximizable: false,
-        title: 'Sign in with GitHub',
-        parent: mainWindow ?? undefined,
-        modal: false,
-        show: false,
-        backgroundColor: '#0a0a0a',
-        webPreferences: {
-          sandbox: true,
-          contextIsolation: true,
-          nodeIntegration: false
-        }
-      })
-
-      const finish = (result: { ok: boolean; code?: string; error?: string; cancelled?: boolean }) => {
-        if (settled) return
-        settled = true
-        if (!popup.isDestroyed()) popup.close()
-        resolve(result)
+  ipcMain.handle('auth:github-system-sign-in', async (_event, input: {
+    convexUrl: string
+    redirectTo: string
+  }) => {
+    try {
+      if (!input?.convexUrl) {
+        return { ok: false, error: 'Convex URL is required' }
+      }
+      if (input.redirectTo !== OAUTH_DEEP_LINK_REDIRECT_URI) {
+        return { ok: false, error: `Unsupported redirect URI: ${input.redirectTo}` }
+      }
+      if (oauthCallbackWaiters.size > 0) {
+        return { ok: false, error: 'An OAuth sign-in flow is already in progress' }
       }
 
-      const tryHandleCallbackUrl = (url: string) => {
-        let parsed: URL
-        try {
-          parsed = new URL(url)
-        } catch {
-          return
-        }
+      // Ignore stale callbacks from prior sign-in attempts.
+      oauthCallbackQueue.length = 0
 
-        if (parsed.origin !== callback.origin || parsed.pathname !== callback.pathname) return
+      const start = await requestGithubSignInStart(input.convexUrl, input.redirectTo)
+      await shell.openExternal(start.redirect)
 
-        const code = parsed.searchParams.get('code')
-        const error = parsed.searchParams.get('error') ?? parsed.searchParams.get('error_description')
-        if (code) {
-          finish({ ok: true, code })
-        } else {
-          finish({ ok: false, error: error ?? 'OAuth callback missing code' })
-        }
+      const callback = await waitForOAuthCallback(OAUTH_CALLBACK_TIMEOUT_MS)
+      if (callback.error) {
+        return { ok: false, verifier: start.verifier, error: callback.error }
       }
-
-      popup.webContents.on('will-redirect', (_event, url) => {
-        tryHandleCallbackUrl(url)
-      })
-      popup.webContents.on('will-navigate', (_event, url) => {
-        tryHandleCallbackUrl(url)
-      })
-
-      popup.on('closed', () => {
-        if (!settled) {
-          settled = true
-          resolve({ ok: false, cancelled: true })
-        }
-      })
-
-      popup.once('ready-to-show', () => popup.show())
-      popup.loadURL(signIn.toString()).catch((error) => {
-        finish({
-          ok: false,
-          error: error instanceof Error ? error.message : 'Failed to open sign-in popup'
-        })
-      })
-    })
+      if (!callback.code) {
+        return { ok: false, verifier: start.verifier, error: 'OAuth callback missing code' }
+      }
+      return { ok: true, verifier: start.verifier, code: callback.code }
+    } catch (error) {
+      return {
+        ok: false,
+        error: error instanceof Error ? error.message : 'GitHub sign-in failed'
+      }
+    }
   })
 
   ipcMain.on('app:data-ready', () => {
@@ -1140,6 +1161,7 @@ app.whenReady().then(async () => {
 
   ipcMain.handle('app:getVersion', () => app.getVersion())
   ipcMain.handle('app:is-context-manager-enabled', () => isContextManagerEnabled)
+  ipcMain.handle('app:get-protocol-client-status', () => protocolClientStatus)
   ipcMain.handle('app:restart-for-update', () => restartForUpdate())
   ipcMain.handle('app:check-for-updates', () => checkForUpdates())
   ipcMain.handle('app:cli-status', () => ({ installed: existsSync(CLI_TARGET) }))
@@ -1748,10 +1770,8 @@ app.on('window-all-closed', () => {
 
 // Clean up database connection and active processes before quitting
 app.on('will-quit', () => {
-  if (oauthCallbackServer) {
-    oauthCallbackServer.close()
-    oauthCallbackServer = null
-  }
+  oauthCallbackQueue.length = 0
+  oauthCallbackWaiters.clear()
   if (linearSyncPoller) {
     clearInterval(linearSyncPoller)
     linearSyncPoller = null
