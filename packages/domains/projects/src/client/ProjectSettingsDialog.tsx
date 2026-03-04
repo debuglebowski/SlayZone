@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import {
   FolderOpen,
   Plus,
@@ -36,18 +36,84 @@ import {
   type Project
 } from '@slayzone/projects/shared'
 import type {
+  ExternalLink,
+  GithubIssueSummary,
+  GithubRepositorySummary,
+  ImportGithubRepositoryIssuesResult,
   IntegrationConnectionPublic,
   IntegrationProjectMapping,
   IntegrationSyncMode,
   LinearIssueSummary,
   LinearProject,
-  LinearTeam
+  LinearTeam,
+  TaskSyncStatus
 } from '@slayzone/integrations/shared'
+import { ProjectIntegrationSetupWizard, type ProjectIntegrationProvider } from './ProjectIntegrationSetupWizard'
+
+type GithubTaskSyncRow = {
+  taskId: string
+  link: ExternalLink
+  status: TaskSyncStatus
+  error?: string
+}
+
+type GithubProjectSyncSummary = {
+  total: number
+  in_sync: number
+  local_ahead: number
+  remote_ahead: number
+  conflict: number
+  unknown: number
+  errors: number
+  checkedAt: string
+}
+
+function createUnknownGithubStatus(taskId: string): TaskSyncStatus {
+  return {
+    provider: 'github',
+    taskId,
+    state: 'unknown',
+    fields: [],
+    comparedAt: new Date().toISOString()
+  }
+}
+
+function summarizeGithubRows(rows: GithubTaskSyncRow[]): GithubProjectSyncSummary {
+  const summary: GithubProjectSyncSummary = {
+    total: rows.length,
+    in_sync: 0,
+    local_ahead: 0,
+    remote_ahead: 0,
+    conflict: 0,
+    unknown: 0,
+    errors: rows.filter((row) => Boolean(row.error)).length,
+    checkedAt: new Date().toISOString()
+  }
+  for (const row of rows) {
+    summary[row.status.state] += 1
+  }
+  return summary
+}
+
+function formatGithubImportMessage(result: ImportGithubRepositoryIssuesResult): string {
+  const parts = [
+    `Imported ${result.imported} issues`,
+    `${result.created} new`,
+    `${result.updated} refreshed`
+  ]
+  if (result.skippedAlreadyLinked > 0) {
+    parts.push(`${result.skippedAlreadyLinked} skipped (linked to another project)`)
+  }
+  return parts.join(' • ')
+}
 
 interface ProjectSettingsDialogProps {
   project: Project | null
   open: boolean
   onOpenChange: (open: boolean) => void
+  initialTab?: 'general' | 'environment' | 'columns' | 'integrations' | 'ai-config'
+  integrationOnboardingProvider?: ProjectIntegrationProvider | null
+  onIntegrationOnboardingHandled?: () => void
   onUpdated: (project: Project) => void
 }
 
@@ -87,6 +153,9 @@ export function ProjectSettingsDialog({
   project,
   open,
   onOpenChange,
+  initialTab = 'general',
+  integrationOnboardingProvider = null,
+  onIntegrationOnboardingHandled,
   onUpdated
 }: ProjectSettingsDialogProps) {
   const [activeTab, setActiveTab] = useState<'general' | 'environment' | 'columns' | 'integrations' | 'ai-config'>('general')
@@ -98,9 +167,15 @@ export function ProjectSettingsDialog({
   const [columnsDraft, setColumnsDraft] = useState<ColumnConfig[]>(() => DEFAULT_COLUMNS.map((column) => ({ ...column })))
   const [loading, setLoading] = useState(false)
   const [connections, setConnections] = useState<IntegrationConnectionPublic[]>([])
+  const [githubConnections, setGithubConnections] = useState<IntegrationConnectionPublic[]>([])
   const [teams, setTeams] = useState<LinearTeam[]>([])
   const [linearProjects, setLinearProjects] = useState<LinearProject[]>([])
   const [mapping, setMapping] = useState<IntegrationProjectMapping | null>(null)
+  const [githubMapping, setGithubMapping] = useState<IntegrationProjectMapping | null>(null)
+  const [githubRepoConnectionId, setGithubRepoConnectionId] = useState('')
+  const [githubRepositories, setGithubRepositories] = useState<GithubRepositorySummary[]>([])
+  const [githubRepositoryFullName, setGithubRepositoryFullName] = useState('')
+  const [loadingGithubRepositories, setLoadingGithubRepositories] = useState(false)
   const [connectionId, setConnectionId] = useState<string>('')
   const [teamId, setTeamId] = useState<string>('')
   const [teamKey, setTeamKey] = useState<string>('')
@@ -111,6 +186,19 @@ export function ProjectSettingsDialog({
   const [issueOptions, setIssueOptions] = useState<LinearIssueSummary[]>([])
   const [selectedIssueIds, setSelectedIssueIds] = useState<Set<string>>(new Set())
   const [loadingIssues, setLoadingIssues] = useState(false)
+  const [githubRepoIssueOptions, setGithubRepoIssueOptions] = useState<GithubIssueSummary[]>([])
+  const [selectedGithubRepoIssueIds, setSelectedGithubRepoIssueIds] = useState<Set<string>>(new Set())
+  const [githubRepoIssueQuery, setGithubRepoIssueQuery] = useState('')
+  const [loadingGithubRepoIssues, setLoadingGithubRepoIssues] = useState(false)
+  const [importingGithubRepoIssues, setImportingGithubRepoIssues] = useState(false)
+  const [githubRepoImportMessage, setGithubRepoImportMessage] = useState('')
+  const [githubSyncRows, setGithubSyncRows] = useState<GithubTaskSyncRow[]>([])
+  const [githubSyncSummary, setGithubSyncSummary] = useState<GithubProjectSyncSummary | null>(null)
+  const [checkingGithubSync, setCheckingGithubSync] = useState(false)
+  const [pushingGithubSync, setPushingGithubSync] = useState(false)
+  const [pullingGithubSync, setPullingGithubSync] = useState(false)
+  const [githubSyncMessage, setGithubSyncMessage] = useState('')
+  const [setupProvider, setSetupProvider] = useState<ProjectIntegrationProvider | null>(null)
   const [contextManagerTab, setContextManagerTab] = useState<ProjectContextManagerTab>('config')
   const [contextManagerEnabled, setContextManagerEnabled] = useState(false)
   const [execType, setExecType] = useState<'host' | 'docker' | 'ssh'>('host')
@@ -161,10 +249,19 @@ export function ProjectSettingsDialog({
 
   useEffect(() => {
     if (open) {
-      setActiveTab('general')
+      setActiveTab(initialTab)
       setContextManagerTab('config')
+      setSetupProvider(integrationOnboardingProvider)
     }
-  }, [open, project?.id])
+  }, [open, project?.id, initialTab])
+
+  useEffect(() => {
+    if (!open) return
+    if (!integrationOnboardingProvider) return
+    setActiveTab('integrations')
+    setSetupProvider(integrationOnboardingProvider)
+    onIntegrationOnboardingHandled?.()
+  }, [open, integrationOnboardingProvider, onIntegrationOnboardingHandled])
 
   useEffect(() => {
     let cancelled = false
@@ -180,26 +277,41 @@ export function ProjectSettingsDialog({
     }
   }, [])
 
+  const reloadIntegrationState = useCallback(async () => {
+    if (!open || !project) return
+    const [loadedConnections, loadedMapping, loadedGithubConnections, loadedGithubMapping] = await Promise.all([
+      window.api.integrations.listConnections('linear'),
+      window.api.integrations.getProjectMapping(project.id, 'linear'),
+      window.api.integrations.listConnections('github'),
+      window.api.integrations.getProjectMapping(project.id, 'github')
+    ])
+    setConnections(loadedConnections)
+    setGithubConnections(loadedGithubConnections)
+    setMapping(loadedMapping)
+    setGithubMapping(loadedGithubMapping)
+    setGithubRepoConnectionId(loadedGithubMapping?.connection_id ?? loadedGithubConnections[0]?.id ?? '')
+    setGithubRepositories([])
+    setGithubRepositoryFullName('')
+    setConnectionId(loadedMapping?.connection_id ?? loadedConnections[0]?.id ?? '')
+    setTeamId(loadedMapping?.external_team_id ?? '')
+    setTeamKey(loadedMapping?.external_team_key ?? '')
+    setLinearProjectId(loadedMapping?.external_project_id ?? '')
+    setSyncMode(loadedMapping?.sync_mode ?? 'one_way')
+    setIssueOptions([])
+    setSelectedIssueIds(new Set())
+    setImportMessage('')
+    setGithubRepoIssueOptions([])
+    setSelectedGithubRepoIssueIds(new Set())
+    setGithubRepoIssueQuery('')
+    setGithubRepoImportMessage('')
+    setGithubSyncRows([])
+    setGithubSyncSummary(null)
+    setGithubSyncMessage('')
+  }, [open, project])
+
   useEffect(() => {
-    const loadIntegrationState = async () => {
-      if (!open || !project) return
-      const [loadedConnections, loadedMapping] = await Promise.all([
-        window.api.integrations.listConnections('linear'),
-        window.api.integrations.getProjectMapping(project.id, 'linear')
-      ])
-      setConnections(loadedConnections)
-      setMapping(loadedMapping)
-      setConnectionId(loadedMapping?.connection_id ?? loadedConnections[0]?.id ?? '')
-      setTeamId(loadedMapping?.external_team_id ?? '')
-      setTeamKey(loadedMapping?.external_team_key ?? '')
-      setLinearProjectId(loadedMapping?.external_project_id ?? '')
-      setSyncMode(loadedMapping?.sync_mode ?? 'one_way')
-      setIssueOptions([])
-      setSelectedIssueIds(new Set())
-      setImportMessage('')
-    }
-    void loadIntegrationState()
-  }, [open, project?.id])
+    void reloadIntegrationState()
+  }, [reloadIntegrationState])
 
   useEffect(() => {
     const loadTeams = async () => {
@@ -228,6 +340,39 @@ export function ProjectSettingsDialog({
     }
     void loadLinearProjects()
   }, [connectionId, teamId])
+
+  useEffect(() => {
+    const loadGithubRepositories = async () => {
+      if (!githubRepoConnectionId) {
+        setGithubRepositories([])
+        setGithubRepositoryFullName('')
+        return
+      }
+      setLoadingGithubRepositories(true)
+      try {
+        const repos = await window.api.integrations.listGithubRepositories(githubRepoConnectionId)
+        setGithubRepositories(repos)
+        setGithubRepositoryFullName((current) => {
+          if (current && repos.some((repo) => repo.fullName === current)) return current
+          return repos[0]?.fullName ?? ''
+        })
+      } catch (error) {
+        setGithubRepoImportMessage(error instanceof Error ? error.message : String(error))
+        setGithubRepositories([])
+        setGithubRepositoryFullName('')
+      } finally {
+        setLoadingGithubRepositories(false)
+      }
+    }
+    void loadGithubRepositories()
+  }, [githubRepoConnectionId])
+
+  useEffect(() => {
+    setGithubRepoIssueOptions([])
+    setSelectedGithubRepoIssueIds(new Set())
+    setGithubRepoIssueQuery('')
+    setGithubRepoImportMessage('')
+  }, [githubRepoConnectionId, githubRepositoryFullName])
 
   const handleBrowse = async () => {
     const result = await window.api.dialog.showOpenDialog({
@@ -426,11 +571,201 @@ export function ProjectSettingsDialog({
     }
   }
 
+  const handleLoadGithubRepositoryIssues = async () => {
+    if (!githubRepoConnectionId || !githubRepositoryFullName) return
+    setLoadingGithubRepoIssues(true)
+    setGithubRepoImportMessage('')
+    try {
+      const result = await window.api.integrations.listGithubRepositoryIssues({
+        connectionId: githubRepoConnectionId,
+        projectId: project?.id,
+        repositoryFullName: githubRepositoryFullName,
+        limit: 50
+      })
+      setGithubRepoIssueOptions(result.issues)
+      const importableIds = new Set(result.issues.filter((issue) => !issue.linkedTaskId).map((issue) => issue.id))
+      setSelectedGithubRepoIssueIds((previous) => new Set([...previous].filter((id) => importableIds.has(id))))
+      if (result.issues.length === 0) {
+        setGithubRepoImportMessage('No matching GitHub repository issues found')
+      } else if (importableIds.size === 0) {
+        setGithubRepoImportMessage('All loaded issues are already linked to tasks')
+      }
+    } catch (error) {
+      setGithubRepoImportMessage(error instanceof Error ? error.message : String(error))
+    } finally {
+      setLoadingGithubRepoIssues(false)
+    }
+  }
+
+  const handleImportGithubRepositoryIssues = async () => {
+    if (!project || !githubRepoConnectionId || !githubRepositoryFullName) return
+    setImportingGithubRepoIssues(true)
+    setGithubRepoImportMessage('')
+    try {
+      const importableIdSet = new Set(
+        githubRepoIssueOptions.filter((issue) => !issue.linkedTaskId).map((issue) => issue.id)
+      )
+      const selectedImportableIds = [...selectedGithubRepoIssueIds].filter((id) => importableIdSet.has(id))
+      const result = await window.api.integrations.importGithubRepositoryIssues({
+        projectId: project.id,
+        connectionId: githubRepoConnectionId,
+        repositoryFullName: githubRepositoryFullName,
+        selectedIssueIds: selectedImportableIds.length > 0 ? selectedImportableIds : undefined,
+        limit: 50
+      })
+      setGithubRepoImportMessage(formatGithubImportMessage(result))
+      if (result.imported > 0) {
+        ;(window as any).__slayzone_refreshData?.()
+        await Promise.all([
+          handleLoadGithubRepositoryIssues(),
+          collectGithubSyncRows()
+        ])
+      }
+    } catch (error) {
+      setGithubRepoImportMessage(error instanceof Error ? error.message : String(error))
+    } finally {
+      setImportingGithubRepoIssues(false)
+    }
+  }
+
+  const collectGithubSyncRows = useCallback(async (): Promise<GithubTaskSyncRow[]> => {
+    if (!project) return []
+    const tasks = await window.api.db.getTasksByProject(project.id)
+    const linkLookups = await Promise.all(
+      tasks.map(async (task) => {
+        const link = await window.api.integrations.getLink(task.id, 'github')
+        return { taskId: task.id, link }
+      })
+    )
+    const linkedEntries = linkLookups.filter(
+      (entry): entry is { taskId: string; link: ExternalLink } => Boolean(entry.link)
+    )
+
+    const rows = await Promise.all(
+      linkedEntries.map(async ({ taskId, link }) => {
+        try {
+          const status = await window.api.integrations.getTaskSyncStatus(taskId, 'github')
+          return { taskId, link, status }
+        } catch (error) {
+          return {
+            taskId,
+            link,
+            status: createUnknownGithubStatus(taskId),
+            error: error instanceof Error ? error.message : String(error)
+          }
+        }
+      })
+    )
+
+    setGithubSyncRows(rows)
+    setGithubSyncSummary(summarizeGithubRows(rows))
+    return rows
+  }, [project])
+
+  const handleCheckGithubDiffs = async () => {
+    if (!project) return
+    setCheckingGithubSync(true)
+    setGithubSyncMessage('')
+    try {
+      const rows = await collectGithubSyncRows()
+      setGithubSyncMessage(`Checked ${rows.length} linked GitHub issues`)
+    } catch (error) {
+      setGithubSyncMessage(error instanceof Error ? error.message : String(error))
+    } finally {
+      setCheckingGithubSync(false)
+    }
+  }
+
+  const handlePushGithubLocalAhead = async () => {
+    if (!project) return
+    setPushingGithubSync(true)
+    setGithubSyncMessage('')
+    try {
+      const rows = githubSyncRows.length > 0 ? githubSyncRows : await collectGithubSyncRows()
+      const targets = rows.filter((row) => row.status.state === 'local_ahead')
+      if (targets.length === 0) {
+        setGithubSyncMessage('No local-ahead tasks to push')
+        return
+      }
+
+      let pushed = 0
+      let skipped = 0
+      let errors = 0
+      for (const target of targets) {
+        try {
+          const result = await window.api.integrations.pushTask({
+            taskId: target.taskId,
+            provider: 'github'
+          })
+          if (result.pushed) pushed += 1
+          else skipped += 1
+        } catch {
+          errors += 1
+        }
+      }
+      if (pushed > 0) {
+        ;(window as any).__slayzone_refreshData?.()
+      }
+      setGithubSyncMessage(`Push complete: ${pushed} pushed, ${skipped} skipped${errors > 0 ? `, ${errors} errors` : ''}`)
+      await collectGithubSyncRows()
+    } catch (error) {
+      setGithubSyncMessage(error instanceof Error ? error.message : String(error))
+    } finally {
+      setPushingGithubSync(false)
+    }
+  }
+
+  const handlePullGithubRemoteAhead = async () => {
+    if (!project) return
+    setPullingGithubSync(true)
+    setGithubSyncMessage('')
+    try {
+      const rows = githubSyncRows.length > 0 ? githubSyncRows : await collectGithubSyncRows()
+      const targets = rows.filter((row) => row.status.state === 'remote_ahead')
+      if (targets.length === 0) {
+        setGithubSyncMessage('No remote-ahead tasks to pull')
+        return
+      }
+
+      let pulled = 0
+      let skipped = 0
+      let errors = 0
+      for (const target of targets) {
+        try {
+          const result = await window.api.integrations.pullTask({
+            taskId: target.taskId,
+            provider: 'github'
+          })
+          if (result.pulled) pulled += 1
+          else skipped += 1
+        } catch {
+          errors += 1
+        }
+      }
+      if (pulled > 0) {
+        ;(window as any).__slayzone_refreshData?.()
+      }
+      setGithubSyncMessage(`Pull complete: ${pulled} pulled, ${skipped} skipped${errors > 0 ? `, ${errors} errors` : ''}`)
+      await collectGithubSyncRows()
+    } catch (error) {
+      setGithubSyncMessage(error instanceof Error ? error.message : String(error))
+    } finally {
+      setPullingGithubSync(false)
+    }
+  }
+
   const toggleIssue = (issueId: string, checked: boolean) => {
     const next = new Set(selectedIssueIds)
     if (checked) next.add(issueId)
     else next.delete(issueId)
     setSelectedIssueIds(next)
+  }
+
+  const toggleGithubRepoIssue = (issueId: string, checked: boolean) => {
+    const next = new Set(selectedGithubRepoIssueIds)
+    if (checked) next.add(issueId)
+    else next.delete(issueId)
+    setSelectedGithubRepoIssueIds(next)
   }
 
   const hasConnection = Boolean(connectionId)
@@ -439,6 +774,44 @@ export function ProjectSettingsDialog({
   const canImportIssues = hasConnection && hasTeam
   const importableIssues = issueOptions.filter((i) => !i.linkedTaskId)
   const allVisibleIssuesSelected = importableIssues.length > 0 && selectedIssueIds.size === importableIssues.length
+  const canLoadGithubRepoIssues = Boolean(githubRepoConnectionId && githubRepositoryFullName)
+  const githubRepoIssueQueryNormalized = githubRepoIssueQuery.trim().toLowerCase()
+  const githubRepoFilteredIssues = githubRepoIssueQueryNormalized
+    ? githubRepoIssueOptions.filter((issue) =>
+        `${issue.repository.fullName}#${issue.number} ${issue.title}`.toLowerCase().includes(githubRepoIssueQueryNormalized)
+      )
+    : githubRepoIssueOptions
+  const githubRepoImportableIssues = githubRepoIssueOptions.filter((issue) => !issue.linkedTaskId)
+  const githubRepoVisibleImportableIssues = githubRepoFilteredIssues.filter((issue) => !issue.linkedTaskId)
+  const githubRepoLinkedInProjectCount = githubRepoIssueOptions.filter(
+    (issue) => issue.linkedTaskId && issue.linkedProjectId === project?.id
+  ).length
+  const githubRepoLinkedElsewhereCount = githubRepoIssueOptions.filter(
+    (issue) => issue.linkedTaskId && issue.linkedProjectId && issue.linkedProjectId !== project?.id
+  ).length
+  const githubRepoImportableIdSet = new Set(githubRepoImportableIssues.map((issue) => issue.id))
+  const selectedGithubRepoImportableCount = [...selectedGithubRepoIssueIds].filter((id) =>
+    githubRepoImportableIdSet.has(id)
+  ).length
+  const canImportGithubRepoIssues = Boolean(
+    project &&
+    githubRepoConnectionId &&
+    githubRepositoryFullName &&
+    (githubRepoIssueOptions.length === 0 || githubRepoImportableIssues.length > 0 || selectedGithubRepoImportableCount > 0)
+  )
+  const allVisibleGithubRepoIssuesSelected =
+    githubRepoVisibleImportableIssues.length > 0 &&
+    githubRepoVisibleImportableIssues.every((issue) => selectedGithubRepoIssueIds.has(issue.id))
+  const githubSummary = githubSyncSummary ?? {
+    total: 0,
+    in_sync: 0,
+    local_ahead: 0,
+    remote_ahead: 0,
+    conflict: 0,
+    unknown: 0,
+    errors: 0,
+    checkedAt: ''
+  }
   const hasUnsavedMappingChanges =
     mapping != null &&
     (mapping.connection_id !== connectionId ||
@@ -804,8 +1177,399 @@ export function ProjectSettingsDialog({
             <div className="w-full space-y-6">
               <SettingsTabIntro
                 title="Integrations"
-                description="Map this project to external systems and control sync flow. Use this tab to connect Linear and import issues safely."
+                description="Configure project-scoped sync with external ticket systems. Each project has its own source, mode, mapping, and sync history."
               />
+
+              <Card className="gap-4 py-4">
+                <CardHeader className="px-4">
+                  <CardTitle className="text-base">Project sync setup</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3 px-4">
+                  <div className="grid gap-2 md:grid-cols-2">
+                    <button
+                      type="button"
+                      onClick={() => setSetupProvider('github')}
+                      className={cn(
+                        'rounded-md border p-3 text-left transition-colors',
+                        setupProvider === 'github'
+                          ? 'border-primary bg-primary/5'
+                          : 'border-border hover:border-muted-foreground/50'
+                      )}
+                    >
+                      <p className="text-sm font-medium">Sync with GitHub Projects</p>
+                      <p className="text-xs text-muted-foreground">
+                        Set up this project to sync from a GitHub Project board.
+                      </p>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setSetupProvider('linear')}
+                      className={cn(
+                        'rounded-md border p-3 text-left transition-colors',
+                        setupProvider === 'linear'
+                          ? 'border-primary bg-primary/5'
+                          : 'border-border hover:border-muted-foreground/50'
+                      )}
+                    >
+                      <p className="text-sm font-medium">Sync with Linear</p>
+                      <p className="text-xs text-muted-foreground">
+                        Configure project mapping, sync mode, and first sync import.
+                      </p>
+                    </button>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Use setup wizard for onboarding. Advanced controls remain below.
+                  </p>
+                </CardContent>
+              </Card>
+
+              {setupProvider && project ? (
+                <ProjectIntegrationSetupWizard
+                  provider={setupProvider}
+                  project={project}
+                  initialConnectionId={connectionId || undefined}
+                  initialTeamId={teamId || undefined}
+                  initialLinearProjectId={linearProjectId || undefined}
+                  initialSyncMode={syncMode}
+                  onCancel={() => {
+                    setSetupProvider(null)
+                    onIntegrationOnboardingHandled?.()
+                  }}
+                  onCompleted={({ provider: completedProvider, mapping: savedMapping, imported }) => {
+                    setSetupProvider(null)
+                    onIntegrationOnboardingHandled?.()
+                    if (completedProvider === 'linear') {
+                      setMapping(savedMapping)
+                      setConnectionId(savedMapping.connection_id)
+                      setTeamId(savedMapping.external_team_id)
+                      setTeamKey(savedMapping.external_team_key)
+                      setLinearProjectId(savedMapping.external_project_id ?? '')
+                      setSyncMode(savedMapping.sync_mode)
+                    } else if (completedProvider === 'github') {
+                      setGithubMapping(savedMapping)
+                      setGithubSyncRows([])
+                      setGithubSyncSummary(null)
+                    }
+                    const nextMessage = imported > 0
+                      ? `Imported ${imported} issues`
+                      : 'Integration profile saved'
+                    if (imported > 0) {
+                      ;(window as any).__slayzone_refreshData?.()
+                    }
+                    void reloadIntegrationState().then(() => {
+                      setImportMessage(nextMessage)
+                    })
+                  }}
+                />
+              ) : null}
+
+              <Card className="gap-4 py-4">
+                <CardHeader className="px-4">
+                  <CardTitle className="text-base">GitHub Project Sync Controls</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3 px-4">
+                  {githubConnections.length > 0 ? (
+                    <>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="rounded bg-muted px-2 py-1 text-[11px] text-muted-foreground">
+                          Linked tasks: {githubSummary.total}
+                        </span>
+                        <span className="rounded bg-emerald-500/15 px-2 py-1 text-[11px] text-emerald-300">
+                          In sync: {githubSummary.in_sync}
+                        </span>
+                        <span className="rounded bg-blue-500/15 px-2 py-1 text-[11px] text-blue-300">
+                          Local ahead: {githubSummary.local_ahead}
+                        </span>
+                        <span className="rounded bg-amber-500/15 px-2 py-1 text-[11px] text-amber-300">
+                          Remote ahead: {githubSummary.remote_ahead}
+                        </span>
+                        <span className="rounded bg-red-500/15 px-2 py-1 text-[11px] text-red-300">
+                          Conflicts: {githubSummary.conflict}
+                        </span>
+                      </div>
+
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          data-testid="github-project-check-diffs"
+                          disabled={checkingGithubSync || pushingGithubSync || pullingGithubSync}
+                          onClick={() => void handleCheckGithubDiffs()}
+                        >
+                          {checkingGithubSync ? 'Checking…' : 'Check all diffs'}
+                        </Button>
+                        <Button
+                          size="sm"
+                          data-testid="github-project-push-local-ahead"
+                          disabled={checkingGithubSync || pushingGithubSync || pullingGithubSync}
+                          onClick={() => void handlePushGithubLocalAhead()}
+                        >
+                          {pushingGithubSync ? 'Pushing…' : 'Push all local-ahead'}
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          data-testid="github-project-pull-remote-ahead"
+                          disabled={checkingGithubSync || pushingGithubSync || pullingGithubSync}
+                          onClick={() => void handlePullGithubRemoteAhead()}
+                        >
+                          {pullingGithubSync ? 'Pulling…' : 'Pull all remote-ahead'}
+                        </Button>
+                      </div>
+
+                      <p className="text-xs text-muted-foreground">
+                        Source: {githubMapping?.external_team_key ?? 'No GitHub Project mapping (manual links/import only)'}
+                        {githubSummary.checkedAt ? ` • Checked ${new Date(githubSummary.checkedAt).toLocaleTimeString()}` : ''}
+                        {githubSummary.errors > 0 ? ` • ${githubSummary.errors} errors` : ''}
+                      </p>
+
+                      {githubSyncRows.length > 0 ? (
+                        <div className="max-h-40 space-y-1 overflow-y-auto rounded border p-2">
+                          {githubSyncRows.slice(0, 12).map((row) => (
+                            <div key={row.link.id} className="flex items-center justify-between gap-2 text-xs">
+                              <span className="min-w-0 truncate text-muted-foreground">{row.link.external_key}</span>
+                              <span className={cn(
+                                'shrink-0 rounded px-1.5 py-0.5 uppercase tracking-wide',
+                                row.status.state === 'in_sync' && 'bg-emerald-500/15 text-emerald-300',
+                                row.status.state === 'local_ahead' && 'bg-blue-500/15 text-blue-300',
+                                row.status.state === 'remote_ahead' && 'bg-amber-500/15 text-amber-300',
+                                row.status.state === 'conflict' && 'bg-red-500/15 text-red-300',
+                                row.status.state === 'unknown' && 'bg-muted text-muted-foreground'
+                              )}>
+                                {row.status.state.replace('_', ' ')}
+                              </span>
+                            </div>
+                          ))}
+                          {githubSyncRows.length > 12 ? (
+                            <p className="text-[11px] text-muted-foreground">Showing first 12 of {githubSyncRows.length}</p>
+                          ) : null}
+                        </div>
+                      ) : null}
+
+                      {githubSyncMessage ? <p className="text-xs text-muted-foreground">{githubSyncMessage}</p> : null}
+                    </>
+                  ) : (
+                    <div className="rounded-md border border-dashed p-3">
+                      <p className="text-sm text-muted-foreground">
+                        No GitHub connection found. Connect GitHub in Settings → Integrations first.
+                      </p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              <Card className="gap-4 py-4" data-testid="github-repo-import-card">
+                <CardHeader className="px-4">
+                  <CardTitle className="text-base">Import GitHub Repository Issues</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3 px-4">
+                  {githubConnections.length === 0 ? (
+                    <div className="rounded-md border border-dashed p-3">
+                      <p className="text-sm text-muted-foreground">
+                        No GitHub connection found. Connect GitHub in Settings → Integrations first.
+                      </p>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="grid grid-cols-[220px_minmax(0,1fr)] items-center gap-4">
+                        <Label htmlFor="github-repo-connection" className="text-sm">
+                          Connection
+                        </Label>
+                        <Select value={githubRepoConnectionId} onValueChange={setGithubRepoConnectionId}>
+                          <SelectTrigger id="github-repo-connection" className="w-full max-w-md">
+                            <SelectValue placeholder="Select GitHub connection" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {githubConnections.map((connection) => (
+                              <SelectItem key={connection.id} value={connection.id}>
+                                {connection.workspace_name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      <div className="grid grid-cols-[220px_minmax(0,1fr)] items-center gap-4">
+                        <Label htmlFor="github-repository" className="text-sm">
+                          Repository
+                        </Label>
+                        <Select
+                          value={githubRepositoryFullName || '__none__'}
+                          onValueChange={(value) => setGithubRepositoryFullName(value === '__none__' ? '' : value)}
+                          disabled={!githubRepoConnectionId || loadingGithubRepositories}
+                        >
+                          <SelectTrigger id="github-repository" className="w-full max-w-md">
+                            <SelectValue
+                              placeholder={loadingGithubRepositories ? 'Loading repositories…' : 'Choose repository'}
+                            />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {githubRepositories.length === 0 ? (
+                              <SelectItem value="__none__" disabled>No repositories found</SelectItem>
+                            ) : null}
+                            {githubRepositories.map((repository) => (
+                              <SelectItem key={repository.id} value={repository.fullName}>
+                                {repository.fullName}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div className="space-y-0.5 text-xs text-muted-foreground">
+                          {loadingGithubRepoIssues
+                            ? 'Loading repository issues…'
+                            : githubRepoIssueOptions.length > 0
+                              ? githubRepoIssueQueryNormalized
+                                ? `${githubRepoFilteredIssues.length} of ${githubRepoIssueOptions.length} issues shown`
+                                : `${githubRepoIssueOptions.length} issues loaded`
+                              : 'Load repository issues to import selected tasks'}
+                          {githubRepoIssueOptions.length > 0 ? (
+                            <p>
+                              {githubRepoImportableIssues.length} importable
+                              {githubRepoLinkedInProjectCount > 0 ? ` • ${githubRepoLinkedInProjectCount} linked here` : ''}
+                              {githubRepoLinkedElsewhereCount > 0 ? ` • ${githubRepoLinkedElsewhereCount} linked elsewhere` : ''}
+                            </p>
+                          ) : null}
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            data-testid="github-repo-load-issues"
+                            disabled={!canLoadGithubRepoIssues || loadingGithubRepoIssues}
+                            onClick={handleLoadGithubRepositoryIssues}
+                          >
+                            {loadingGithubRepoIssues ? 'Loading…' : githubRepoIssueOptions.length > 0 ? 'Refresh issues' : 'Load issues'}
+                          </Button>
+                          {githubRepoVisibleImportableIssues.length > 0 ? (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                if (allVisibleGithubRepoIssuesSelected) {
+                                  setSelectedGithubRepoIssueIds((previous) => {
+                                    const next = new Set(previous)
+                                    for (const issue of githubRepoVisibleImportableIssues) {
+                                      next.delete(issue.id)
+                                    }
+                                    return next
+                                  })
+                                  return
+                                }
+                                setSelectedGithubRepoIssueIds((previous) => {
+                                  const next = new Set(previous)
+                                  for (const issue of githubRepoVisibleImportableIssues) {
+                                    next.add(issue.id)
+                                  }
+                                  return next
+                                })
+                              }}
+                            >
+                              {allVisibleGithubRepoIssuesSelected ? 'Clear visible' : 'Select visible'}
+                            </Button>
+                          ) : null}
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-[220px_minmax(0,1fr)] items-center gap-4">
+                        <Label htmlFor="github-repo-issue-filter" className="text-sm">
+                          Filter issues
+                        </Label>
+                        <Input
+                          id="github-repo-issue-filter"
+                          value={githubRepoIssueQuery}
+                          onChange={(event) => setGithubRepoIssueQuery(event.target.value)}
+                          placeholder="Search by #number, title, or repository"
+                          className="w-full max-w-md"
+                        />
+                      </div>
+
+                      <div className="min-h-40 rounded border p-2">
+                        {githubRepoFilteredIssues.length > 0 ? (
+                          <div className="max-h-44 space-y-1 overflow-y-auto">
+                            {githubRepoFilteredIssues.map((issue) =>
+                              issue.linkedTaskId ? (
+                                <div key={issue.id} className="flex items-start gap-2 rounded px-1 py-0.5 text-xs opacity-60">
+                                  {issue.linkedProjectId === project?.id ? (
+                                    <span className="mt-0.5 shrink-0 rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
+                                      Linked
+                                    </span>
+                                  ) : (
+                                    <span className="mt-0.5 shrink-0 rounded bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-medium text-amber-300">
+                                      Linked elsewhere
+                                    </span>
+                                  )}
+                                  <span className="min-w-0">
+                                    <span className="font-medium">{issue.repository.fullName}#{issue.number}</span>
+                                    {' - '}
+                                    <span className="text-muted-foreground">{issue.title}</span>
+                                    {issue.linkedProjectId && issue.linkedProjectId !== project?.id ? (
+                                      <span className="block text-[10px] text-muted-foreground">
+                                        {issue.linkedProjectName
+                                          ? `Already linked in ${issue.linkedProjectName}`
+                                          : 'Already linked in another project'}
+                                      </span>
+                                    ) : null}
+                                  </span>
+                                </div>
+                              ) : (
+                                <label key={issue.id} className="flex cursor-pointer items-start gap-2 rounded px-1 py-0.5 text-xs hover:bg-muted/50">
+                                  <Checkbox
+                                    checked={selectedGithubRepoIssueIds.has(issue.id)}
+                                    onCheckedChange={(checked) => toggleGithubRepoIssue(issue.id, checked === true)}
+                                  />
+                                  <span className="min-w-0">
+                                    <span className="font-medium">{issue.repository.fullName}#{issue.number}</span>
+                                    {' - '}
+                                    <span className="text-muted-foreground">{issue.title}</span>
+                                  </span>
+                                </label>
+                              )
+                            )}
+                          </div>
+                        ) : (
+                          <div className="flex h-full min-h-36 items-center justify-center text-xs text-muted-foreground">
+                            {githubRepoIssueOptions.length > 0
+                              ? 'No issues match the current filter.'
+                              : 'No loaded repository issues yet.'}
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <p className="text-xs text-muted-foreground">
+                          {selectedGithubRepoImportableCount > 0
+                            ? `${selectedGithubRepoImportableCount} selected`
+                            : githubRepoImportableIssues.length > 0
+                              ? `${githubRepoImportableIssues.length} importable issues available`
+                              : 'No importable issues in the loaded set'}
+                        </p>
+                        <Button
+                          size="sm"
+                          data-testid="github-repo-import-issues"
+                          disabled={!canImportGithubRepoIssues || importingGithubRepoIssues}
+                          onClick={handleImportGithubRepositoryIssues}
+                        >
+                          {importingGithubRepoIssues
+                            ? 'Importing…'
+                            : selectedGithubRepoImportableCount > 0
+                              ? `Import selected (${selectedGithubRepoImportableCount})`
+                              : githubRepoIssueOptions.length > 0
+                                ? `Import all importable (${githubRepoImportableIssues.length})`
+                                : 'Import repository issues'}
+                        </Button>
+                      </div>
+
+                      {githubRepoImportMessage ? (
+                        <p className="text-xs text-muted-foreground">{githubRepoImportMessage}</p>
+                      ) : null}
+                    </>
+                  )}
+                </CardContent>
+              </Card>
+
               <Card className="gap-4 py-4">
                 <CardHeader className="px-4">
                   <CardTitle className="text-base">Mapping</CardTitle>

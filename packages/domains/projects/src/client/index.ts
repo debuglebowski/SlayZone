@@ -1,4 +1,5 @@
 export { CreateProjectDialog } from './CreateProjectDialog'
+export type { ProjectCreationContext, ProjectStartMode } from './CreateProjectDialog'
 export { ProjectSettingsDialog } from './ProjectSettingsDialog'
 export { DeleteProjectDialog } from './DeleteProjectDialog'
 export { ProjectSelect } from './ProjectSelect'

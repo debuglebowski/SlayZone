@@ -837,7 +837,7 @@ app.whenReady().then(async () => {
   if (isContextManagerEnabled) {
     registerAiConfigHandlers(ipcMain, db)
   }
-  registerIntegrationHandlers(ipcMain, db)
+  registerIntegrationHandlers(ipcMain, db, { enableTestChannels: isPlaywright })
   registerFileEditorHandlers(ipcMain)
   registerScreenshotHandlers()
   registerExportImportHandlers(ipcMain, db, isPlaywright)

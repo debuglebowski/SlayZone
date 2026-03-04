@@ -52,7 +52,7 @@ import {
 } from '@slayzone/ui'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@slayzone/ui'
 import { Tooltip, TooltipTrigger, TooltipContent } from '@slayzone/ui'
-import { TaskMetadataSidebar, LinearCard } from './TaskMetadataSidebar'
+import { TaskMetadataSidebar, ExternalSyncCard } from './TaskMetadataSidebar'
 import { RichTextEditor } from '@slayzone/editor'
 import { markSkipCache, usePty } from '@slayzone/terminal'
 import { TerminalContainer, type TerminalContainerHandle } from '@slayzone/task-terminals'
@@ -2023,8 +2023,8 @@ export function TaskDetailPage({
           {/* Spacer — pushes remaining groups to bottom */}
           <div className="flex-1" />
 
-          {/* Linear group — only shown when linked */}
-          <LinearCard taskId={task.id} onUpdate={handleTaskUpdate} />
+          {/* External sync group — only shown when linked */}
+          <ExternalSyncCard taskId={task.id} onUpdate={handleTaskUpdate} />
 
           {/* Details */}
           <TaskMetadataSidebar

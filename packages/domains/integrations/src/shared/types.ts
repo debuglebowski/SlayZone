@@ -1,4 +1,4 @@
-export type IntegrationProvider = 'linear'
+export type IntegrationProvider = 'linear' | 'github'
 export type ExternalType = 'issue'
 export type SyncState = 'active' | 'error' | 'paused'
 export type IntegrationSyncMode = 'one_way' | 'two_way'
@@ -74,12 +74,20 @@ export interface ConnectLinearInput {
   accountLabel?: string
 }
 
+export interface ConnectGithubInput {
+  token: string
+  accountLabel?: string
+}
+
 export interface SetProjectMappingInput {
   projectId: string
   provider: IntegrationProvider
   connectionId: string
+  // Linear: team id. GitHub: project owner login.
   externalTeamId: string
+  // Linear: team key. GitHub: owner + project number label.
   externalTeamKey: string
+  // Linear: optional project scope id. GitHub: ProjectV2 node id.
   externalProjectId?: string | null
   syncMode?: IntegrationSyncMode
 }
@@ -124,6 +132,46 @@ export interface SyncNowResult {
   at: string
 }
 
+export type TaskSyncFieldState = 'in_sync' | 'local_ahead' | 'remote_ahead' | 'conflict'
+export type TaskSyncOverallState = 'in_sync' | 'local_ahead' | 'remote_ahead' | 'conflict' | 'unknown'
+
+export interface TaskSyncFieldDiff {
+  field: 'title' | 'description' | 'status'
+  state: TaskSyncFieldState
+}
+
+export interface TaskSyncStatus {
+  provider: IntegrationProvider
+  taskId: string
+  state: TaskSyncOverallState
+  fields: TaskSyncFieldDiff[]
+  comparedAt: string
+}
+
+export interface PushTaskInput {
+  taskId: string
+  provider: IntegrationProvider
+  force?: boolean
+}
+
+export interface PushTaskResult {
+  pushed: boolean
+  status: TaskSyncStatus
+  message?: string
+}
+
+export interface PullTaskInput {
+  taskId: string
+  provider: IntegrationProvider
+  force?: boolean
+}
+
+export interface PullTaskResult {
+  pulled: boolean
+  status: TaskSyncStatus
+  message?: string
+}
+
 export interface LinearIssueSummary {
   id: string
   identifier: string
@@ -151,4 +199,103 @@ export interface LinearIssueSummary {
   } | null
   url: string
   linkedTaskId?: string | null
+}
+
+export interface GithubRepositorySummary {
+  id: string
+  owner: string
+  name: string
+  fullName: string
+  private: boolean
+}
+
+export interface GithubProjectSummary {
+  id: string
+  number: number
+  title: string
+  owner: {
+    login: string
+    type: 'user' | 'organization'
+  }
+  url: string
+  closed: boolean
+  updatedAt: string
+}
+
+export interface GithubIssueSummary {
+  id: string
+  number: number
+  title: string
+  body: string | null
+  updatedAt: string
+  state: 'open' | 'closed'
+  assignee: {
+    id: string
+    login: string
+  } | null
+  labels: Array<{
+    id: string
+    name: string
+  }>
+  repository: {
+    owner: string
+    name: string
+    fullName: string
+  }
+  url: string
+  linkedTaskId?: string | null
+  linkedProjectId?: string | null
+  linkedProjectName?: string | null
+}
+
+export interface ListGithubIssuesInput {
+  connectionId: string
+  projectId?: string
+  githubProjectId?: string
+  limit?: number
+  cursor?: string | null
+}
+
+export interface ImportGithubIssuesInput {
+  projectId: string
+  connectionId: string
+  githubProjectId?: string
+  selectedIssueIds?: string[]
+  limit?: number
+  cursor?: string | null
+}
+
+export interface ImportGithubIssuesResult {
+  imported: number
+  linked: number
+  created: number
+  updated: number
+  skippedAlreadyLinked: number
+  nextCursor: string | null
+}
+
+export interface ListGithubRepositoryIssuesInput {
+  connectionId: string
+  projectId?: string
+  repositoryFullName: string
+  limit?: number
+  cursor?: string | null
+}
+
+export interface ImportGithubRepositoryIssuesInput {
+  projectId: string
+  connectionId: string
+  repositoryFullName: string
+  selectedIssueIds?: string[]
+  limit?: number
+  cursor?: string | null
+}
+
+export interface ImportGithubRepositoryIssuesResult {
+  imported: number
+  linked: number
+  created: number
+  updated: number
+  skippedAlreadyLinked: number
+  nextCursor: string | null
 }

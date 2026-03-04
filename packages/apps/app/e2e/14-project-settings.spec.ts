@@ -1,13 +1,158 @@
 import { test, expect, seed, goHome, clickProject, projectBlob } from './fixtures/electron'
 import { TEST_PROJECT_PATH } from './fixtures/electron'
 
+declare global {
+  interface Window {
+    __testInvoke: (channel: string, ...args: unknown[]) => Promise<unknown>
+  }
+}
+
+function testInvoke(page: import('@playwright/test').Page, channel: string, ...args: unknown[]) {
+  return page.evaluate(
+    ({ ch, a }) => window.__testInvoke(ch, ...a),
+    { ch: channel, a: args }
+  ) as Promise<any>
+}
+
+const GITHUB_REPO_CONNECTION_ID = 'gh-e2e-settings'
+const GITHUB_REPOSITORY_FULL_NAME = 'acme/slay-e2e'
+
+const GITHUB_REPOSITORY_ISSUES = [
+  {
+    id: 'gh-issue-101',
+    number: 101,
+    title: 'Repository issue alpha',
+    body: 'Issue body alpha',
+    updatedAt: '2026-03-04T10:00:00Z',
+    state: 'open' as const,
+    assignee: null,
+    labels: [],
+    repository: {
+      owner: 'acme',
+      name: 'slay-e2e',
+      fullName: GITHUB_REPOSITORY_FULL_NAME
+    },
+    url: 'https://github.com/acme/slay-e2e/issues/101'
+  },
+  {
+    id: 'gh-issue-102',
+    number: 102,
+    title: 'Repository issue beta',
+    body: 'Issue body beta',
+    updatedAt: '2026-03-04T11:00:00Z',
+    state: 'closed' as const,
+    assignee: null,
+    labels: [],
+    repository: {
+      owner: 'acme',
+      name: 'slay-e2e',
+      fullName: GITHUB_REPOSITORY_FULL_NAME
+    },
+    url: 'https://github.com/acme/slay-e2e/issues/102'
+  }
+]
+
+const GITHUB_REPOSITORY_ISSUES_REMOTE_AHEAD = [
+  {
+    ...GITHUB_REPOSITORY_ISSUES[0],
+    updatedAt: '2026-03-04T10:30:00Z'
+  },
+  {
+    ...GITHUB_REPOSITORY_ISSUES[1],
+    title: 'Repository issue beta remote refreshed',
+    updatedAt: '2026-03-04T12:40:00Z'
+  }
+]
+
 test.describe('Project settings & context menu', () => {
   let projectAbbrev: string
+  let projectId: string
+
+  const seedGithubRepoMocks = async (mainWindow: import('@playwright/test').Page) => {
+    await testInvoke(mainWindow, 'integrations:test:clear-github-mocks')
+    await testInvoke(mainWindow, 'integrations:test:seed-github-connection', {
+      id: GITHUB_REPO_CONNECTION_ID,
+      workspaceId: 'gh-e2e-settings-workspace',
+      workspaceName: 'GitHub E2E',
+      accountLabel: 'GitHub E2E',
+      repositories: [
+        {
+          id: 'repo-e2e-1',
+          owner: 'acme',
+          name: 'slay-e2e',
+          fullName: GITHUB_REPOSITORY_FULL_NAME,
+          private: false
+        }
+      ]
+    })
+    await testInvoke(mainWindow, 'integrations:test:set-github-repository-issues', {
+      repositoryFullName: GITHUB_REPOSITORY_FULL_NAME,
+      issues: GITHUB_REPOSITORY_ISSUES
+    })
+    await mainWindow.evaluate(
+      ({ pid, cid }) => window.api.integrations.setProjectMapping({
+        projectId: pid,
+        provider: 'github',
+        connectionId: cid,
+        externalTeamId: 'acme',
+        externalTeamKey: 'acme#1',
+        externalProjectId: 'PVT_test',
+        syncMode: 'one_way'
+      }),
+      { pid: projectId, cid: GITHUB_REPO_CONNECTION_ID }
+    )
+    const githubConnections = await mainWindow.evaluate(
+      () => window.api.integrations.listConnections('github')
+    ) as Array<{ id: string }>
+    for (const connection of githubConnections) {
+      await testInvoke(mainWindow, 'integrations:test:set-github-repositories', {
+        connectionId: connection.id,
+        repositories: [
+          {
+            id: 'repo-e2e-1',
+            owner: 'acme',
+            name: 'slay-e2e',
+            fullName: GITHUB_REPOSITORY_FULL_NAME,
+            private: false
+          }
+        ]
+      })
+    }
+  }
+
+  const setGithubRepoIssues = async (
+    mainWindow: import('@playwright/test').Page,
+    issues: typeof GITHUB_REPOSITORY_ISSUES
+  ) => {
+    await testInvoke(mainWindow, 'integrations:test:set-github-repository-issues', {
+      repositoryFullName: GITHUB_REPOSITORY_FULL_NAME,
+      issues
+    })
+  }
+
+  const openProjectSettingsIntegrations = async (mainWindow: import('@playwright/test').Page) => {
+    const settingsHeading = mainWindow.getByRole('heading', { name: 'Project Settings' })
+    if (await settingsHeading.isVisible().catch(() => false)) {
+      await mainWindow.keyboard.press('Escape')
+      await expect(settingsHeading).not.toBeVisible({ timeout: 3_000 })
+    }
+
+    const blob = projectBlob(mainWindow, projectAbbrev)
+    await blob.click({ button: 'right' })
+    await mainWindow.getByRole('menuitem', { name: 'Settings' }).click()
+    await expect(settingsHeading).toBeVisible({ timeout: 5_000 })
+
+    await mainWindow.getByTestId('settings-tab-integrations').click()
+    const repoCard = mainWindow.getByTestId('github-repo-import-card')
+    await expect(repoCard).toBeVisible({ timeout: 5_000 })
+    return repoCard
+  }
 
   test.beforeAll(async ({ mainWindow }) => {
     const s = seed(mainWindow)
     // Create a dedicated project for this test
     const project = await s.createProject({ name: 'Settings Test', color: '#10b981', path: TEST_PROJECT_PATH })
+    projectId = project.id
     projectAbbrev = project.name.slice(0, 2).toUpperCase()
     await s.refreshData()
     await goHome(mainWindow)
@@ -42,6 +187,154 @@ test.describe('Project settings & context menu', () => {
     // Switch back to General for the next test (edit name)
     await mainWindow.getByText('General').click()
     await expect(mainWindow.locator('#edit-name')).toBeVisible({ timeout: 3_000 })
+  })
+
+  test('imports GitHub repository issues via project settings', async ({ mainWindow }) => {
+    await seedGithubRepoMocks(mainWindow)
+    const repoCard = await openProjectSettingsIntegrations(mainWindow)
+
+    const loadIssuesButton = repoCard.getByTestId('github-repo-load-issues')
+    await expect(loadIssuesButton).toBeEnabled({ timeout: 5_000 })
+    await loadIssuesButton.click()
+    await expect(repoCard.getByText('2 issues loaded')).toBeVisible({ timeout: 5_000 })
+
+    await repoCard
+      .locator('label')
+      .filter({ hasText: 'acme/slay-e2e#101 - Repository issue alpha' })
+      .first()
+      .click()
+    await expect(repoCard.getByText('1 selected')).toBeVisible()
+
+    await repoCard.getByTestId('github-repo-import-issues').click()
+    await expect.poll(async () => {
+      const tasks = await seed(mainWindow).getTasks()
+      return tasks.some((task: { project_id: string; title: string }) =>
+        task.project_id === projectId && task.title === 'Repository issue alpha'
+      )
+    }, { timeout: 5_000 }).toBe(true)
+  })
+
+  test('linked GitHub repository issue row shows Linked and is not selectable', async ({ mainWindow }) => {
+    const repoCard = mainWindow.getByTestId('github-repo-import-card')
+    await expect(repoCard).toBeVisible({ timeout: 5_000 })
+
+    if (!(await repoCard.getByText('2 issues loaded').isVisible().catch(() => false))) {
+      const loadIssuesButton = repoCard.getByTestId('github-repo-load-issues')
+      if (await loadIssuesButton.isEnabled().catch(() => false)) {
+        await loadIssuesButton.click()
+      }
+      await expect(repoCard.getByText('2 issues loaded')).toBeVisible({ timeout: 5_000 })
+    }
+
+    await repoCard
+      .locator('label')
+      .filter({ hasText: 'acme/slay-e2e#102 - Repository issue beta' })
+      .first()
+      .click()
+    await expect(repoCard.getByText('1 selected')).toBeVisible()
+
+    await repoCard.getByTestId('github-repo-import-issues').click()
+    await expect.poll(async () => {
+      const tasks = await seed(mainWindow).getTasks()
+      return tasks.some((task: { project_id: string; title: string }) =>
+        task.project_id === projectId && task.title === 'Repository issue beta'
+      )
+    }, { timeout: 5_000 }).toBe(true)
+
+    const reloadIssuesButton = repoCard.getByTestId('github-repo-load-issues')
+    if (await reloadIssuesButton.isEnabled().catch(() => false)) {
+      await reloadIssuesButton.click()
+    }
+
+    await expect(
+      repoCard.getByText(/Linked\s*acme\/slay-e2e#102 - Repository issue beta/)
+    ).toBeVisible({ timeout: 5_000 })
+    await expect(
+      repoCard.locator('label').filter({ hasText: 'acme/slay-e2e#102 - Repository issue beta' })
+    ).toHaveCount(0)
+  })
+
+  test('GitHub bulk sync controls check diffs and run push/pull', async ({ mainWindow }) => {
+    await seedGithubRepoMocks(mainWindow)
+    await mainWindow.evaluate(
+      ({ pid, cid, repo }) => window.api.integrations.importGithubRepositoryIssues({
+        projectId: pid,
+        connectionId: cid,
+        repositoryFullName: repo,
+        limit: 50
+      }),
+      { pid: projectId, cid: GITHUB_REPO_CONNECTION_ID, repo: GITHUB_REPOSITORY_FULL_NAME }
+    )
+    const repoCard = await openProjectSettingsIntegrations(mainWindow)
+
+    const importedTasks = await seed(mainWindow).getTasks() as Array<{
+      id: string
+      project_id: string
+      title: string
+    }>
+    const alphaTask = importedTasks.find((task) =>
+      task.project_id === projectId && task.title === 'Repository issue alpha'
+    )
+    if (!alphaTask) throw new Error('Expected imported alpha task')
+
+    await mainWindow.evaluate(
+      ({ id, title }) => window.api.db.updateTask({ id, title }),
+      { id: alphaTask.id, title: 'Repository issue alpha local changed' }
+    )
+    await setGithubRepoIssues(mainWindow, GITHUB_REPOSITORY_ISSUES_REMOTE_AHEAD)
+
+    await mainWindow.getByTestId('github-project-check-diffs').click()
+    await expect(mainWindow.getByText('Local ahead: 1')).toBeVisible({ timeout: 5_000 })
+    await expect(mainWindow.getByText('Remote ahead: 1')).toBeVisible({ timeout: 5_000 })
+
+    await mainWindow.getByTestId('github-project-push-local-ahead').click()
+    await expect(mainWindow.getByText('Push complete: 1 pushed, 0 skipped')).toBeVisible({ timeout: 5_000 })
+
+    await mainWindow.getByTestId('github-project-pull-remote-ahead').click()
+    await expect(mainWindow.getByText('Pull complete: 1 pulled, 0 skipped')).toBeVisible({ timeout: 5_000 })
+    await expect.poll(async () => {
+      const tasks = await seed(mainWindow).getTasks() as Array<{ project_id: string; title: string }>
+      return tasks.some((task) =>
+        task.project_id === projectId && task.title === 'Repository issue beta remote refreshed'
+      )
+    }, { timeout: 5_000 }).toBe(true)
+    await expect(mainWindow.getByText('Local ahead: 0')).toBeVisible({ timeout: 5_000 })
+  })
+
+  test('GitHub repo import skips issues linked to another project', async ({ mainWindow }) => {
+    await seedGithubRepoMocks(mainWindow)
+    await mainWindow.evaluate(
+      ({ pid, cid, repo }) => window.api.integrations.importGithubRepositoryIssues({
+        projectId: pid,
+        connectionId: cid,
+        repositoryFullName: repo,
+        selectedIssueIds: ['gh-issue-101'],
+        limit: 50
+      }),
+      { pid: projectId, cid: GITHUB_REPO_CONNECTION_ID, repo: GITHUB_REPOSITORY_FULL_NAME }
+    )
+
+    const otherProject = await seed(mainWindow).createProject({
+      name: 'Overlap Target',
+      color: '#f97316',
+      path: TEST_PROJECT_PATH
+    }) as { id: string }
+
+    const result = await mainWindow.evaluate(
+      ({ pid, cid, repo }) => window.api.integrations.importGithubRepositoryIssues({
+        projectId: pid,
+        connectionId: cid,
+        repositoryFullName: repo,
+        selectedIssueIds: ['gh-issue-101'],
+        limit: 50
+      }),
+      { pid: otherProject.id, cid: GITHUB_REPO_CONNECTION_ID, repo: GITHUB_REPOSITORY_FULL_NAME }
+    ) as { imported: number; created: number; updated: number; skippedAlreadyLinked: number }
+
+    expect(result.imported).toBe(0)
+    expect(result.created).toBe(0)
+    expect(result.updated).toBe(0)
+    expect(result.skippedAlreadyLinked).toBe(1)
   })
 
   test('deleting a column remaps tasks to the project default status', async ({ mainWindow }) => {

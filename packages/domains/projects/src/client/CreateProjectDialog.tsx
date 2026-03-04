@@ -5,20 +5,49 @@ import { Button, IconButton } from '@slayzone/ui'
 import { Input } from '@slayzone/ui'
 import { Label } from '@slayzone/ui'
 import { ColorPicker } from '@slayzone/ui'
+import { cn } from '@slayzone/ui'
 import type { Project } from '@slayzone/projects/shared'
+
+export type ProjectStartMode = 'scratch' | 'github' | 'linear'
+
+export interface ProjectCreationContext {
+  startMode: ProjectStartMode
+}
 
 interface CreateProjectDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  onCreated: (project: Project) => void
+  onCreated: (project: Project, context: ProjectCreationContext) => void
 }
 
 const DEFAULT_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899']
+const START_OPTIONS: Array<{
+  mode: ProjectStartMode
+  label: string
+  description: string
+}> = [
+  {
+    mode: 'scratch',
+    label: 'Start from scratch',
+    description: 'Create tasks manually and configure integrations later.'
+  },
+  {
+    mode: 'github',
+    label: 'Sync with GitHub Projects',
+    description: 'Set up project-scoped sync from a GitHub Project board.'
+  },
+  {
+    mode: 'linear',
+    label: 'Sync with Linear',
+    description: 'Set up project-scoped sync from a Linear team or project.'
+  }
+]
 
 export function CreateProjectDialog({ open, onOpenChange, onCreated }: CreateProjectDialogProps) {
   const [name, setName] = useState('')
   const [color, setColor] = useState(() => DEFAULT_COLORS[Math.floor(Math.random() * DEFAULT_COLORS.length)])
   const [path, setPath] = useState('')
+  const [startMode, setStartMode] = useState<ProjectStartMode>('scratch')
   const [loading, setLoading] = useState(false)
 
   const handleBrowse = async () => {
@@ -47,9 +76,10 @@ export function CreateProjectDialog({ open, onOpenChange, onCreated }: CreatePro
         color,
         path: path || undefined
       })
-      onCreated(project)
+      onCreated(project, { startMode })
       setName('')
       setPath('')
+      setStartMode('scratch')
       setColor(DEFAULT_COLORS[Math.floor(Math.random() * DEFAULT_COLORS.length)])
     } finally {
       setLoading(false)
@@ -95,12 +125,33 @@ export function CreateProjectDialog({ open, onOpenChange, onCreated }: CreatePro
             <Label>Color</Label>
             <ColorPicker value={color} onChange={setColor} />
           </div>
+          <div className="space-y-2">
+            <Label>How do you want to start this project?</Label>
+            <div className="space-y-2">
+              {START_OPTIONS.map((option) => (
+                <button
+                  key={option.mode}
+                  type="button"
+                  onClick={() => setStartMode(option.mode)}
+                  className={cn(
+                    'w-full rounded-lg border px-3 py-2 text-left transition-colors',
+                    startMode === option.mode
+                      ? 'border-primary bg-primary/5'
+                      : 'border-border hover:border-muted-foreground/50'
+                  )}
+                >
+                  <p className="text-sm font-medium">{option.label}</p>
+                  <p className="text-xs text-muted-foreground">{option.description}</p>
+                </button>
+              ))}
+            </div>
+          </div>
           <div className="flex justify-end gap-2">
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
             <Button type="submit" disabled={!name.trim() || loading}>
-              Create
+              {startMode === 'scratch' ? 'Create' : 'Create and continue'}
             </Button>
           </div>
         </form>

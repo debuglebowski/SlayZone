@@ -1,23 +1,56 @@
 import type { Database } from 'better-sqlite3'
 import type { IpcMain } from 'electron'
-import { listIssues, listProjects, listTeams, listWorkflowStates, getViewer } from './linear-client'
+import {
+  listIssues,
+  listProjects,
+  listTeams,
+  listWorkflowStates,
+  getViewer as getLinearViewer
+} from './linear-client'
+import {
+  getViewer as getGitHubViewer,
+  listIssues as listGitHubRepositoryIssues,
+  listRepositories as listGitHubRepositories,
+  listProjects as listGitHubProjects,
+  listProjectIssues as listGitHubProjectIssues,
+  getIssue as getGitHubIssue,
+  updateIssue as updateGitHubIssue
+} from './github-client'
 import { deleteCredential, readCredential, storeCredential } from './credentials'
 import type {
+  ConnectGithubInput,
   ConnectLinearInput,
   ExternalLink,
+  GithubIssueSummary,
+  GithubRepositorySummary,
+  ImportGithubRepositoryIssuesInput,
+  ImportGithubRepositoryIssuesResult,
+  ImportGithubIssuesInput,
+  ImportGithubIssuesResult,
   ImportLinearIssuesInput,
   ImportLinearIssuesResult,
   IntegrationConnection,
   IntegrationConnectionPublic,
   IntegrationProjectMapping,
+  IntegrationProvider,
+  ListGithubIssuesInput,
+  ListGithubRepositoryIssuesInput,
   ListLinearIssuesInput,
   LinearIssueSummary,
+  PullTaskInput,
+  PullTaskResult,
+  PushTaskInput,
+  PushTaskResult,
   SetProjectMappingInput,
+  TaskSyncFieldDiff,
+  TaskSyncFieldState,
+  TaskSyncStatus,
   SyncNowInput
 } from '../shared'
 import { runSyncNow } from './sync'
-import { markdownToHtml } from './markdown'
+import { htmlToMarkdown, markdownToHtml } from './markdown'
 import {
+  getColumnById,
   getDefaultStatus,
   getDoneStatus,
   getStatusByCategories,
@@ -153,6 +186,306 @@ function getProjectColumns(db: Database, projectId: string): ColumnConfig[] | nu
   return parseColumnsConfig(row?.columns_config)
 }
 
+type TaskRow = {
+  id: string
+  project_id: string
+  title: string
+  description: string | null
+  status: string
+  updated_at: string
+}
+
+type GithubSyncField = 'title' | 'description' | 'status'
+
+interface ExternalFieldStateRow {
+  field_name: string
+  last_local_value_json: string
+  last_external_value_json: string
+}
+
+function toMs(value: string | null | undefined): number {
+  if (!value) return 0
+  let normalized = value
+  if (normalized.includes(' ') && !normalized.includes('T')) {
+    normalized = normalized.replace(' ', 'T') + 'Z'
+  }
+  const ts = Date.parse(normalized)
+  return Number.isNaN(ts) ? 0 : ts
+}
+
+function parseJsonValue(input: string): unknown {
+  try {
+    return JSON.parse(input)
+  } catch {
+    return null
+  }
+}
+
+function isSameValue(a: unknown, b: unknown): boolean {
+  return JSON.stringify(a ?? null) === JSON.stringify(b ?? null)
+}
+
+function normalizeMarkdown(value: string | null | undefined): string | null {
+  const trimmed = (value ?? '').trim()
+  return trimmed.length > 0 ? trimmed : null
+}
+
+function localStatusToGitHubState(status: string, columns: ColumnConfig[] | null): 'open' | 'closed' {
+  const column = getColumnById(status, columns)
+  if (!column) return 'open'
+  return column.category === 'completed' || column.category === 'canceled' ? 'closed' : 'open'
+}
+
+function parseGitHubExternalKey(externalKey: string): { owner: string; repo: string; number: number } | null {
+  const match = externalKey.match(/^([^/]+)\/([^#]+)#(\d+)$/)
+  if (!match) return null
+  const number = Number.parseInt(match[3], 10)
+  if (!Number.isFinite(number)) return null
+  return {
+    owner: match[1],
+    repo: match[2],
+    number
+  }
+}
+
+function parseGitHubRepositoryFullName(fullName: string): { owner: string; repo: string } | null {
+  const match = fullName.trim().match(/^([^/]+)\/([^/]+)$/)
+  if (!match) return null
+  return {
+    owner: match[1],
+    repo: match[2]
+  }
+}
+
+function githubRepositoryKey(owner: string, repo: string): string {
+  return `${owner}/${repo}`.toLowerCase()
+}
+
+function paginateGithubIssues(
+  issues: GithubIssueSummary[],
+  limit: number,
+  cursor: string | null | undefined
+): { issues: GithubIssueSummary[]; nextCursor: string | null } {
+  const perPage = Math.max(1, Math.min(limit, 100))
+  const page = Math.max(1, Number.parseInt(cursor ?? '1', 10) || 1)
+  const start = (page - 1) * perPage
+  const end = start + perPage
+  return {
+    issues: issues.slice(start, end),
+    nextCursor: end < issues.length ? String(page + 1) : null
+  }
+}
+
+function cloneGithubIssue(issue: GithubIssueSummary): GithubIssueSummary {
+  return {
+    ...issue,
+    assignee: issue.assignee ? { ...issue.assignee } : null,
+    labels: issue.labels.map((label) => ({ ...label })),
+    repository: { ...issue.repository }
+  }
+}
+
+function annotateGithubIssueLinks(db: Database, issues: GithubIssueSummary[]): void {
+  const externalIds = issues.map((issue) => issue.id)
+  if (externalIds.length === 0) return
+
+  const placeholders = externalIds.map(() => '?').join(',')
+  const rows = db.prepare(`
+    SELECT
+      l.external_id,
+      l.task_id,
+      t.project_id,
+      p.name AS project_name
+    FROM external_links l
+    LEFT JOIN tasks t ON t.id = l.task_id
+    LEFT JOIN projects p ON p.id = t.project_id
+    WHERE l.provider = 'github' AND l.external_id IN (${placeholders})
+  `).all(...externalIds) as Array<{
+    external_id: string
+    task_id: string | null
+    project_id: string | null
+    project_name: string | null
+  }>
+
+  const linkByExternalId = new Map(
+    rows.map((row) => [row.external_id, row])
+  )
+  for (const issue of issues) {
+    const link = linkByExternalId.get(issue.id)
+    issue.linkedTaskId = link?.task_id ?? null
+    issue.linkedProjectId = link?.project_id ?? null
+    issue.linkedProjectName = link?.project_name ?? null
+  }
+}
+
+type GithubImportUpsertResult = {
+  outcome: 'created' | 'updated' | 'skipped_already_linked'
+  taskId: string
+  linkedProjectId?: string
+}
+
+function upsertFieldState(
+  db: Database,
+  externalLinkId: string,
+  field: GithubSyncField,
+  localValue: unknown,
+  externalValue: unknown,
+  localUpdatedAt: string,
+  externalUpdatedAt: string
+): void {
+  db.prepare(`
+    INSERT INTO external_field_state (
+      id, external_link_id, field_name, last_local_value_json, last_external_value_json,
+      last_local_updated_at, last_external_updated_at, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))
+    ON CONFLICT(external_link_id, field_name) DO UPDATE SET
+      last_local_value_json = excluded.last_local_value_json,
+      last_external_value_json = excluded.last_external_value_json,
+      last_local_updated_at = excluded.last_local_updated_at,
+      last_external_updated_at = excluded.last_external_updated_at,
+      updated_at = datetime('now')
+  `).run(
+    crypto.randomUUID(),
+    externalLinkId,
+    field,
+    JSON.stringify(localValue),
+    JSON.stringify(externalValue),
+    localUpdatedAt,
+    externalUpdatedAt
+  )
+}
+
+function readFieldState(
+  db: Database,
+  externalLinkId: string
+): Map<GithubSyncField, { local: unknown; external: unknown }> {
+  const rows = db.prepare(`
+    SELECT field_name, last_local_value_json, last_external_value_json
+    FROM external_field_state
+    WHERE external_link_id = ?
+  `).all(externalLinkId) as ExternalFieldStateRow[]
+
+  const map = new Map<GithubSyncField, { local: unknown; external: unknown }>()
+  for (const row of rows) {
+    if (row.field_name === 'title' || row.field_name === 'description' || row.field_name === 'status') {
+      map.set(row.field_name, {
+        local: parseJsonValue(row.last_local_value_json),
+        external: parseJsonValue(row.last_external_value_json)
+      })
+    }
+  }
+  return map
+}
+
+function computeFieldState(
+  baseline: { local: unknown; external: unknown } | undefined,
+  localValue: unknown,
+  remoteValue: unknown,
+  localUpdatedAt: string,
+  remoteUpdatedAt: string
+): TaskSyncFieldState {
+  if (!baseline) {
+    if (isSameValue(localValue, remoteValue)) return 'in_sync'
+    const localUpdatedMs = toMs(localUpdatedAt)
+    const remoteUpdatedMs = toMs(remoteUpdatedAt)
+    if (localUpdatedMs > remoteUpdatedMs) return 'local_ahead'
+    if (remoteUpdatedMs > localUpdatedMs) return 'remote_ahead'
+    return 'conflict'
+  }
+
+  const localChanged = !isSameValue(localValue, baseline.local)
+  const remoteChanged = !isSameValue(remoteValue, baseline.external)
+  if (localChanged && remoteChanged) return 'conflict'
+  if (localChanged) return 'local_ahead'
+  if (remoteChanged) return 'remote_ahead'
+  return 'in_sync'
+}
+
+function computeOverallState(fields: TaskSyncFieldDiff[]): TaskSyncStatus['state'] {
+  const hasConflict = fields.some((field) => field.state === 'conflict')
+  const hasLocalAhead = fields.some((field) => field.state === 'local_ahead')
+  const hasRemoteAhead = fields.some((field) => field.state === 'remote_ahead')
+
+  if (hasConflict) return 'conflict'
+  if (hasLocalAhead && hasRemoteAhead) return 'conflict'
+  if (hasLocalAhead) return 'local_ahead'
+  if (hasRemoteAhead) return 'remote_ahead'
+  return 'in_sync'
+}
+
+function buildGitHubTaskSyncStatus(
+  db: Database,
+  link: ExternalLink,
+  task: TaskRow,
+  remoteIssue: GithubIssueSummary
+): TaskSyncStatus {
+  const columns = getProjectColumns(db, task.project_id)
+  const localValues: Record<GithubSyncField, unknown> = {
+    title: task.title,
+    description: normalizeMarkdown(task.description ? htmlToMarkdown(task.description) : null),
+    status: localStatusToGitHubState(task.status, columns)
+  }
+  const remoteValues: Record<GithubSyncField, unknown> = {
+    title: remoteIssue.title,
+    description: normalizeMarkdown(remoteIssue.body),
+    status: remoteIssue.state
+  }
+
+  const baselineByField = readFieldState(db, link.id)
+  const fields: TaskSyncFieldDiff[] = (['title', 'description', 'status'] as const).map((field) => ({
+    field,
+    state: computeFieldState(
+      baselineByField.get(field),
+      localValues[field],
+      remoteValues[field],
+      task.updated_at,
+      remoteIssue.updatedAt
+    )
+  }))
+
+  return {
+    provider: 'github',
+    taskId: task.id,
+    state: computeOverallState(fields),
+    fields,
+    comparedAt: new Date().toISOString()
+  }
+}
+
+function persistGitHubBaseline(
+  db: Database,
+  linkId: string,
+  task: TaskRow,
+  remoteIssue: GithubIssueSummary
+): void {
+  const columns = getProjectColumns(db, task.project_id)
+  const localTitle = task.title
+  const localDescription = normalizeMarkdown(task.description ? htmlToMarkdown(task.description) : null)
+  const localStatus = localStatusToGitHubState(task.status, columns)
+
+  upsertFieldState(db, linkId, 'title', localTitle, remoteIssue.title, task.updated_at, remoteIssue.updatedAt)
+  upsertFieldState(
+    db,
+    linkId,
+    'description',
+    localDescription,
+    normalizeMarkdown(remoteIssue.body),
+    task.updated_at,
+    remoteIssue.updatedAt
+  )
+  upsertFieldState(db, linkId, 'status', localStatus, remoteIssue.state, task.updated_at, remoteIssue.updatedAt)
+}
+
+function getTaskById(db: Database, taskId: string): TaskRow {
+  const row = db.prepare(`
+    SELECT id, project_id, title, description, status, updated_at
+    FROM tasks
+    WHERE id = ?
+  `).get(taskId) as TaskRow | undefined
+  if (!row) throw new Error('Task not found')
+  return row
+}
+
 function stateToLocal(type: string, columns: ColumnConfig[] | null): string {
   switch (type) {
     case 'backlog':
@@ -252,10 +585,122 @@ function upsertTaskFromIssue(db: Database, localProjectId: string, issue: Linear
   return id
 }
 
+function githubStateToLocal(state: GithubIssueSummary['state'], columns: ColumnConfig[] | null): string {
+  if (state === 'closed') {
+    return getStatusByCategories(['completed', 'canceled'], columns) ?? getDoneStatus(columns)
+  }
+  return getStatusByCategories(['unstarted', 'triage', 'backlog'], columns) ?? getDefaultStatus(columns)
+}
+
+function upsertLinkForGitHubIssue(
+  db: Database,
+  issue: GithubIssueSummary,
+  connectionId: string,
+  taskId: string
+): ExternalLink {
+  const existing = db.prepare(
+    `SELECT * FROM external_links WHERE provider = 'github' AND connection_id = ? AND external_id = ?`
+  ).get(connectionId, issue.id) as ExternalLink | undefined
+
+  const externalKey = `${issue.repository.fullName}#${issue.number}`
+  if (existing) {
+    db.prepare(`
+      UPDATE external_links
+      SET task_id = ?, external_key = ?, external_url = ?, sync_state = 'active',
+          last_error = NULL, updated_at = datetime('now')
+      WHERE id = ?
+    `).run(taskId, externalKey, issue.url, existing.id)
+    return db.prepare('SELECT * FROM external_links WHERE id = ?').get(existing.id) as ExternalLink
+  }
+
+  const id = crypto.randomUUID()
+  db.prepare(`
+    INSERT INTO external_links (
+      id, provider, connection_id, external_type, external_id, external_key,
+      external_url, task_id, sync_state, last_sync_at, last_error, created_at, updated_at
+    ) VALUES (?, 'github', ?, 'issue', ?, ?, ?, ?, 'active', datetime('now'), NULL, datetime('now'), datetime('now'))
+  `).run(id, connectionId, issue.id, externalKey, issue.url, taskId)
+
+  return db.prepare('SELECT * FROM external_links WHERE id = ?').get(id) as ExternalLink
+}
+
+function upsertTaskFromGitHubIssue(
+  db: Database,
+  localProjectId: string,
+  issue: GithubIssueSummary
+): GithubImportUpsertResult {
+  const projectColumns = getProjectColumns(db, localProjectId)
+  const byLink = db.prepare(`
+    SELECT l.task_id, t.project_id
+    FROM external_links l
+    LEFT JOIN tasks t ON t.id = l.task_id
+    WHERE l.provider = 'github' AND l.external_id = ?
+  `).get(issue.id) as { task_id: string; project_id: string | null } | undefined
+
+  const descHtml = issue.body ? markdownToHtml(issue.body) : null
+  if (byLink) {
+    if (byLink.project_id && byLink.project_id !== localProjectId) {
+      return {
+        outcome: 'skipped_already_linked',
+        taskId: byLink.task_id,
+        linkedProjectId: byLink.project_id
+      }
+    }
+
+    db.prepare(`
+      UPDATE tasks
+      SET title = ?, description = ?, status = ?, priority = ?, assignee = ?, updated_at = ?
+      WHERE id = ?
+    `).run(
+      issue.title,
+      descHtml,
+      githubStateToLocal(issue.state, projectColumns),
+      3,
+      issue.assignee?.login ?? null,
+      issue.updatedAt,
+      byLink.task_id
+    )
+    return {
+      outcome: 'updated',
+      taskId: byLink.task_id
+    }
+  }
+
+  const id = crypto.randomUUID()
+  db.prepare(`
+    INSERT INTO tasks (
+      id, project_id, title, description, status, priority, assignee,
+      terminal_mode, provider_config, claude_flags, codex_flags, created_at, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, 'claude-code',
+      '{"claude-code":{"flags":"--allow-dangerously-skip-permissions"},"codex":{"flags":"--full-auto --search"},"cursor-agent":{"flags":"--force"},"gemini":{"flags":"--yolo"},"opencode":{"flags":""}}',
+      '--allow-dangerously-skip-permissions', '--full-auto --search', datetime('now'), ?)
+  `).run(
+    id,
+    localProjectId,
+    issue.title,
+    descHtml,
+    githubStateToLocal(issue.state, projectColumns),
+    3,
+    issue.assignee?.login ?? null,
+    issue.updatedAt
+  )
+
+  return {
+    outcome: 'created',
+    taskId: id
+  }
+}
+
 function getConnection(db: Database, id: string): IntegrationConnection {
   const row = db.prepare('SELECT * FROM integration_connections WHERE id = ?').get(id) as IntegrationConnection | undefined
   if (!row) throw new Error('Integration connection not found')
   return row
+}
+
+function assertConnectionProvider(connection: IntegrationConnection, provider: IntegrationProvider): void {
+  if (connection.provider !== provider) {
+    throw new Error(`Connection provider mismatch: expected ${provider}, got ${connection.provider}`)
+  }
 }
 
 function getLinearStateTypeForCategory(
@@ -309,14 +754,135 @@ function refreshStateMappings(
   }
 }
 
-export function registerIntegrationHandlers(ipcMain: IpcMain, db: Database): void {
+export function registerIntegrationHandlers(
+  ipcMain: IpcMain,
+  db: Database,
+  options?: { enableTestChannels?: boolean }
+): void {
   ensureIntegrationSchema(db)
+  const enableTestChannels = options?.enableTestChannels ?? false
+  const githubTestRepositoriesByConnection = new Map<string, GithubRepositorySummary[]>()
+  const githubTestIssuesByRepository = new Map<string, GithubIssueSummary[]>()
+
+  const listMockedGithubIssuesForRepository = (
+    owner: string,
+    repo: string
+  ): GithubIssueSummary[] | null => {
+    const mockedIssues = githubTestIssuesByRepository.get(githubRepositoryKey(owner, repo))
+    return mockedIssues ? mockedIssues.map(cloneGithubIssue) : null
+  }
+
+  const getMockedGithubIssue = (
+    owner: string,
+    repo: string,
+    number: number
+  ): GithubIssueSummary | null => {
+    const mockedIssues = githubTestIssuesByRepository.get(githubRepositoryKey(owner, repo))
+    if (!mockedIssues) return null
+    const matched = mockedIssues.find((issue) => issue.number === number)
+    return matched ? cloneGithubIssue(matched) : null
+  }
+
+  const getGithubIssueWithMocks = async (
+    token: string,
+    input: { owner: string; repo: string; number: number }
+  ): Promise<GithubIssueSummary | null> => {
+    const mockedIssue = getMockedGithubIssue(input.owner, input.repo, input.number)
+    if (mockedIssue) return mockedIssue
+    if (githubTestIssuesByRepository.has(githubRepositoryKey(input.owner, input.repo))) {
+      return null
+    }
+    return getGitHubIssue(token, input)
+  }
+
+  const updateGithubIssueWithMocks = async (
+    token: string,
+    input: {
+      owner: string
+      repo: string
+      number: number
+      title: string
+      body: string | null
+      state: 'open' | 'closed'
+    }
+  ): Promise<GithubIssueSummary | null> => {
+    const repositoryKey = githubRepositoryKey(input.owner, input.repo)
+    const mockedIssues = githubTestIssuesByRepository.get(repositoryKey)
+    if (mockedIssues) {
+      const index = mockedIssues.findIndex((issue) => issue.number === input.number)
+      if (index < 0) return null
+      const existing = mockedIssues[index]
+      const updated: GithubIssueSummary = {
+        ...existing,
+        title: input.title,
+        body: input.body,
+        state: input.state,
+        updatedAt: new Date().toISOString(),
+        assignee: existing.assignee ? { ...existing.assignee } : null,
+        labels: existing.labels.map((label) => ({ ...label })),
+        repository: { ...existing.repository }
+      }
+      mockedIssues[index] = updated
+      githubTestIssuesByRepository.set(repositoryKey, mockedIssues)
+      return cloneGithubIssue(updated)
+    }
+
+    return updateGitHubIssue(token, input)
+  }
+
+  ipcMain.handle('integrations:connect-github', async (_event, input: ConnectGithubInput) => {
+    const token = input.token.trim()
+    if (!token) throw new Error('Token required')
+
+    const viewer = await getGitHubViewer(token)
+
+    const credentialRef = crypto.randomUUID()
+    storeCredential(db, credentialRef, token)
+
+    const existing = db.prepare(`
+      SELECT * FROM integration_connections
+      WHERE provider = 'github' AND workspace_id = ?
+    `).get(viewer.workspaceId) as IntegrationConnection | undefined
+
+    if (existing) {
+      deleteCredential(db, existing.credential_ref)
+      db.prepare(`
+        UPDATE integration_connections
+        SET workspace_name = ?, account_label = ?, credential_ref = ?, enabled = 1, updated_at = datetime('now')
+        WHERE id = ?
+      `).run(
+        viewer.workspaceName,
+        input.accountLabel?.trim() || viewer.accountLabel,
+        credentialRef,
+        existing.id
+      )
+      const row = getConnection(db, existing.id)
+      return toPublicConnection(row)
+    }
+
+    const id = crypto.randomUUID()
+    db.prepare(`
+      INSERT INTO integration_connections (
+        id, provider, workspace_id, workspace_name, account_label, credential_ref,
+        enabled, created_at, updated_at, last_synced_at
+      ) VALUES (?, 'github', ?, ?, ?, ?, 1, datetime('now'), datetime('now'), NULL)
+    `).run(
+      id,
+      viewer.workspaceId,
+      viewer.workspaceName,
+      input.accountLabel?.trim() || viewer.accountLabel,
+      credentialRef
+    )
+
+    const row = getConnection(db, id)
+    return toPublicConnection(row)
+  })
 
   ipcMain.handle('integrations:connect-linear', async (_event, input: ConnectLinearInput) => {
     const apiKey = input.apiKey.trim()
     if (!apiKey) throw new Error('API key required')
 
-    const viewer = await getViewer(apiKey)
+    const viewer = await getLinearViewer(apiKey)
 
     const credentialRef = crypto.randomUUID()
     storeCredential(db, credentialRef, apiKey)
@@ -360,12 +926,82 @@ export function registerIntegrationHandlers(ipcMain: IpcMain, db: Database): voi
     return toPublicConnection(row)
   })
 
-  ipcMain.handle('integrations:list-connections', (_event, provider?: 'linear') => {
+  ipcMain.handle('integrations:list-connections', (_event, provider?: IntegrationProvider) => {
     const rows = provider
       ? db.prepare('SELECT * FROM integration_connections WHERE provider = ? ORDER BY updated_at DESC').all(provider)
       : db.prepare('SELECT * FROM integration_connections ORDER BY updated_at DESC').all()
     return (rows as IntegrationConnection[]).map(toPublicConnection)
   })
+
+  if (enableTestChannels) {
+    ipcMain.handle('integrations:test:seed-github-connection', (_event, input: {
+      id?: string
+      workspaceId: string
+      workspaceName: string
+      accountLabel?: string
+      token?: string
+      repositories?: GithubRepositorySummary[]
+    }) => {
+      const existing = db.prepare(`
+        SELECT * FROM integration_connections
+        WHERE provider = 'github' AND workspace_id = ?
+      `).get(input.workspaceId) as IntegrationConnection | undefined
+
+      const connectionId = existing?.id ?? input.id ?? crypto.randomUUID()
+      const credentialRef = existing?.credential_ref ?? crypto.randomUUID()
+      storeCredential(db, credentialRef, input.token ?? 'ghp_test_e2e')
+
+      db.prepare(`
+        INSERT INTO integration_connections (
+          id, provider, workspace_id, workspace_name, account_label, credential_ref,
+          enabled, created_at, updated_at, last_synced_at
+        ) VALUES (?, 'github', ?, ?, ?, ?, 1, datetime('now'), datetime('now'), NULL)
+        ON CONFLICT(id) DO UPDATE SET
+          workspace_id = excluded.workspace_id,
+          workspace_name = excluded.workspace_name,
+          account_label = excluded.account_label,
+          credential_ref = excluded.credential_ref,
+          enabled = 1,
+          updated_at = datetime('now')
+      `).run(
+        connectionId,
+        input.workspaceId,
+        input.workspaceName,
+        input.accountLabel ?? input.workspaceName,
+        credentialRef
+      )
+
+      if (input.repositories) {
+        githubTestRepositoriesByConnection.set(connectionId, input.repositories)
+      }
+
+      const row = getConnection(db, connectionId)
+      return toPublicConnection(row)
+    })
+
+    ipcMain.handle('integrations:test:set-github-repositories', (_event, input: {
+      connectionId: string
+      repositories: GithubRepositorySummary[]
+    }) => {
+      githubTestRepositoriesByConnection.set(input.connectionId, input.repositories)
+      return true
+    })
+
+    ipcMain.handle('integrations:test:set-github-repository-issues', (_event, input: {
+      repositoryFullName: string
+      issues: GithubIssueSummary[]
+    }) => {
+      const key = input.repositoryFullName.toLowerCase()
+      githubTestIssuesByRepository.set(key, input.issues.map(cloneGithubIssue))
+      return true
+    })
+
+    ipcMain.handle('integrations:test:clear-github-mocks', () => {
+      githubTestRepositoriesByConnection.clear()
+      githubTestIssuesByRepository.clear()
+      return true
+    })
+  }
 
   ipcMain.handle('integrations:disconnect', (_event, connectionId: string) => {
     const connection = getConnection(db, connectionId)
@@ -382,20 +1018,39 @@ export function registerIntegrationHandlers(ipcMain: IpcMain, db: Database): voi
     return true
   })
 
+  ipcMain.handle('integrations:list-github-repositories', async (_event, connectionId: string) => {
+    const mocked = githubTestRepositoriesByConnection.get(connectionId)
+    if (mocked) return mocked
+    const connection = getConnection(db, connectionId)
+    assertConnectionProvider(connection, 'github')
+    const token = readCredential(db, connection.credential_ref)
+    return listGitHubRepositories(token)
+  })
+
+  ipcMain.handle('integrations:list-github-projects', async (_event, connectionId: string) => {
+    const connection = getConnection(db, connectionId)
+    assertConnectionProvider(connection, 'github')
+    const token = readCredential(db, connection.credential_ref)
+    return listGitHubProjects(token)
+  })
+
   ipcMain.handle('integrations:list-linear-teams', async (_event, connectionId: string) => {
     const connection = getConnection(db, connectionId)
+    assertConnectionProvider(connection, 'linear')
     const apiKey = readCredential(db, connection.credential_ref)
     return listTeams(apiKey)
   })
 
   ipcMain.handle('integrations:list-linear-projects', async (_event, connectionId: string, teamId: string) => {
     const connection = getConnection(db, connectionId)
+    assertConnectionProvider(connection, 'linear')
     const apiKey = readCredential(db, connection.credential_ref)
     return listProjects(apiKey, teamId)
   })
 
   ipcMain.handle('integrations:set-project-mapping', async (_event, input: SetProjectMappingInput) => {
     const connection = getConnection(db, input.connectionId)
+    assertConnectionProvider(connection, input.provider)
 
     const existing = db.prepare(`
       SELECT * FROM integration_project_mappings
@@ -434,7 +1089,7 @@ export function registerIntegrationHandlers(ipcMain: IpcMain, db: Database): voi
     return db.prepare('SELECT * FROM integration_project_mappings WHERE id = ?').get(mappingId) as IntegrationProjectMapping
   })
 
-  ipcMain.handle('integrations:get-project-mapping', (_event, projectId: string, provider: 'linear') => {
+  ipcMain.handle('integrations:get-project-mapping', (_event, projectId: string, provider: IntegrationProvider) => {
     const row = db.prepare(`
       SELECT * FROM integration_project_mappings
       WHERE project_id = ? AND provider = ?
@@ -442,8 +1097,62 @@ export function registerIntegrationHandlers(ipcMain: IpcMain, db: Database): voi
     return row ?? null
   })
 
+  ipcMain.handle('integrations:list-github-issues', async (_event, input: ListGithubIssuesInput) => {
+    const connection = getConnection(db, input.connectionId)
+    assertConnectionProvider(connection, 'github')
+    const token = readCredential(db, connection.credential_ref)
+    const mapping = input.projectId
+      ? db.prepare(`
+          SELECT * FROM integration_project_mappings
+          WHERE project_id = ? AND provider = 'github'
+        `).get(input.projectId) as IntegrationProjectMapping | undefined
+      : undefined
+
+    const githubProjectId = input.githubProjectId ?? mapping?.external_project_id ?? undefined
+    if (!githubProjectId) {
+      throw new Error('No GitHub Project selected and project is not mapped to a GitHub Project')
+    }
+
+    const data = await listGitHubProjectIssues(token, {
+      projectId: githubProjectId,
+      limit: input.limit ?? 50,
+      cursor: input.cursor ?? null
+    })
+
+    annotateGithubIssueLinks(db, data.issues)
+
+    return data
+  })
+
+  ipcMain.handle('integrations:list-github-repository-issues', async (_event, input: ListGithubRepositoryIssuesInput) => {
+    const connection = getConnection(db, input.connectionId)
+    assertConnectionProvider(connection, 'github')
+    const repository = parseGitHubRepositoryFullName(input.repositoryFullName)
+    if (!repository) {
+      throw new Error('Repository must be in owner/repo format')
+    }
+
+    const mockedIssues = listMockedGithubIssuesForRepository(repository.owner, repository.repo)
+    const data = mockedIssues
+      ? paginateGithubIssues(mockedIssues, input.limit ?? 50, input.cursor ?? null)
+      : await (() => {
+          const token = readCredential(db, connection.credential_ref)
+          return listGitHubRepositoryIssues(token, {
+            owner: repository.owner,
+            repo: repository.repo,
+            limit: input.limit ?? 50,
+            cursor: input.cursor ?? null
+          })
+        })()
+
+    annotateGithubIssueLinks(db, data.issues)
+
+    return data
+  })
+
   ipcMain.handle('integrations:list-linear-issues', async (_event, input: ListLinearIssuesInput) => {
     const connection = getConnection(db, input.connectionId)
+    assertConnectionProvider(connection, 'linear')
     const apiKey = readCredential(db, connection.credential_ref)
     const mapping = input.projectId
       ? db.prepare(`
@@ -475,8 +1184,122 @@ export function registerIntegrationHandlers(ipcMain: IpcMain, db: Database): voi
     return data
   })
 
+  ipcMain.handle('integrations:import-github-issues', async (_event, input: ImportGithubIssuesInput) => {
+    const connection = getConnection(db, input.connectionId)
+    assertConnectionProvider(connection, 'github')
+    const mapping = db.prepare(`
+      SELECT * FROM integration_project_mappings
+      WHERE project_id = ? AND provider = 'github'
+    `).get(input.projectId) as IntegrationProjectMapping | undefined
+
+    const token = readCredential(db, connection.credential_ref)
+    const githubProjectId = input.githubProjectId ?? mapping?.external_project_id ?? undefined
+    if (!githubProjectId) {
+      throw new Error('No GitHub Project selected and project is not mapped to a GitHub Project')
+    }
+
+    const data = await listGitHubProjectIssues(token, {
+      projectId: githubProjectId,
+      limit: input.limit ?? 50,
+      cursor: input.cursor ?? null
+    })
+
+    let imported = 0
+    let linked = 0
+    let created = 0
+    let updated = 0
+    let skippedAlreadyLinked = 0
+    const selectedIds = input.selectedIssueIds?.length
+      ? new Set(input.selectedIssueIds)
+      : null
+
+    for (const issue of data.issues) {
+      if (selectedIds && !selectedIds.has(issue.id)) continue
+      const upsert = upsertTaskFromGitHubIssue(db, input.projectId, issue)
+      if (upsert.outcome === 'skipped_already_linked') {
+        skippedAlreadyLinked += 1
+        continue
+      }
+      const link = upsertLinkForGitHubIssue(db, issue, input.connectionId, upsert.taskId)
+      const task = getTaskById(db, upsert.taskId)
+      persistGitHubBaseline(db, link.id, task, issue)
+      imported += 1
+      linked += 1
+      if (upsert.outcome === 'created') created += 1
+      if (upsert.outcome === 'updated') updated += 1
+    }
+
+    const result: ImportGithubIssuesResult = {
+      imported,
+      linked,
+      created,
+      updated,
+      skippedAlreadyLinked,
+      nextCursor: data.nextCursor
+    }
+    return result
+  })
+
+  ipcMain.handle('integrations:import-github-repository-issues', async (_event, input: ImportGithubRepositoryIssuesInput) => {
+    const connection = getConnection(db, input.connectionId)
+    assertConnectionProvider(connection, 'github')
+    const repository = parseGitHubRepositoryFullName(input.repositoryFullName)
+    if (!repository) {
+      throw new Error('Repository must be in owner/repo format')
+    }
+
+    const mockedIssues = listMockedGithubIssuesForRepository(repository.owner, repository.repo)
+    const data = mockedIssues
+      ? paginateGithubIssues(mockedIssues, input.limit ?? 50, input.cursor ?? null)
+      : await (() => {
+          const token = readCredential(db, connection.credential_ref)
+          return listGitHubRepositoryIssues(token, {
+            owner: repository.owner,
+            repo: repository.repo,
+            limit: input.limit ?? 50,
+            cursor: input.cursor ?? null
+          })
+        })()
+
+    let imported = 0
+    let linked = 0
+    let created = 0
+    let updated = 0
+    let skippedAlreadyLinked = 0
+    const selectedIds = input.selectedIssueIds?.length
+      ? new Set(input.selectedIssueIds)
+      : null
+
+    for (const issue of data.issues) {
+      if (selectedIds && !selectedIds.has(issue.id)) continue
+      const upsert = upsertTaskFromGitHubIssue(db, input.projectId, issue)
+      if (upsert.outcome === 'skipped_already_linked') {
+        skippedAlreadyLinked += 1
+        continue
+      }
+      const link = upsertLinkForGitHubIssue(db, issue, input.connectionId, upsert.taskId)
+      const task = getTaskById(db, upsert.taskId)
+      persistGitHubBaseline(db, link.id, task, issue)
+      imported += 1
+      linked += 1
+      if (upsert.outcome === 'created') created += 1
+      if (upsert.outcome === 'updated') updated += 1
+    }
+
+    const result: ImportGithubRepositoryIssuesResult = {
+      imported,
+      linked,
+      created,
+      updated,
+      skippedAlreadyLinked,
+      nextCursor: data.nextCursor
+    }
+    return result
+  })
+
   ipcMain.handle('integrations:import-linear-issues', async (_event, input: ImportLinearIssuesInput) => {
     const connection = getConnection(db, input.connectionId)
+    assertConnectionProvider(connection, 'linear')
     const mapping = db.prepare(`
       SELECT * FROM integration_project_mappings
       WHERE project_id = ? AND provider = 'linear'
@@ -519,11 +1342,216 @@ export function registerIntegrationHandlers(ipcMain: IpcMain, db: Database): voi
     return result
   })
 
+  ipcMain.handle('integrations:get-task-sync-status', async (_event, taskId: string, provider: IntegrationProvider) => {
+    if (provider !== 'github') {
+      return {
+        provider,
+        taskId,
+        state: 'unknown',
+        fields: [],
+        comparedAt: new Date().toISOString()
+      } as TaskSyncStatus
+    }
+
+    const link = db.prepare(`
+      SELECT * FROM external_links
+      WHERE task_id = ? AND provider = 'github'
+    `).get(taskId) as ExternalLink | undefined
+
+    if (!link) {
+      return {
+        provider: 'github',
+        taskId,
+        state: 'unknown',
+        fields: [],
+        comparedAt: new Date().toISOString()
+      }
+    }
+
+    const key = parseGitHubExternalKey(link.external_key)
+    if (!key) {
+      throw new Error('Linked GitHub issue key is invalid')
+    }
+
+    const connection = getConnection(db, link.connection_id)
+    assertConnectionProvider(connection, 'github')
+    const token = readCredential(db, connection.credential_ref)
+    const remoteIssue = await getGithubIssueWithMocks(token, key)
+    if (!remoteIssue) {
+      throw new Error('Linked GitHub issue no longer exists or is not an issue')
+    }
+
+    const task = getTaskById(db, taskId)
+    return buildGitHubTaskSyncStatus(db, link, task, remoteIssue)
+  })
+
+  ipcMain.handle('integrations:push-task', async (_event, input: PushTaskInput) => {
+    if (input.provider !== 'github') {
+      throw new Error(`Manual push is not supported for provider: ${input.provider}`)
+    }
+
+    const link = db.prepare(`
+      SELECT * FROM external_links
+      WHERE task_id = ? AND provider = 'github'
+    `).get(input.taskId) as ExternalLink | undefined
+    if (!link) {
+      throw new Error('Task is not linked to GitHub')
+    }
+
+    const key = parseGitHubExternalKey(link.external_key)
+    if (!key) {
+      throw new Error('Linked GitHub issue key is invalid')
+    }
+
+    const connection = getConnection(db, link.connection_id)
+    assertConnectionProvider(connection, 'github')
+    const token = readCredential(db, connection.credential_ref)
+    const task = getTaskById(db, input.taskId)
+    const remoteBefore = await getGithubIssueWithMocks(token, key)
+    if (!remoteBefore) {
+      throw new Error('Linked GitHub issue no longer exists or is not an issue')
+    }
+
+    const statusBefore = buildGitHubTaskSyncStatus(db, link, task, remoteBefore)
+    if (statusBefore.state === 'in_sync') {
+      const result: PushTaskResult = {
+        pushed: false,
+        status: statusBefore,
+        message: 'Task is already in sync with GitHub'
+      }
+      return result
+    }
+
+    if (!input.force && (statusBefore.state === 'remote_ahead' || statusBefore.state === 'conflict')) {
+      const result: PushTaskResult = {
+        pushed: false,
+        status: statusBefore,
+        message: 'Remote changes detected. Refresh diff and resolve before pushing.'
+      }
+      return result
+    }
+
+    const columns = getProjectColumns(db, task.project_id)
+    const updatedIssue = await updateGithubIssueWithMocks(token, {
+      owner: key.owner,
+      repo: key.repo,
+      number: key.number,
+      title: task.title,
+      body: normalizeMarkdown(task.description ? htmlToMarkdown(task.description) : null),
+      state: localStatusToGitHubState(task.status, columns)
+    })
+    if (!updatedIssue) {
+      throw new Error('Linked GitHub issue is a pull request and cannot be pushed as an issue')
+    }
+
+    persistGitHubBaseline(db, link.id, task, updatedIssue)
+    db.prepare(`
+      UPDATE external_links
+      SET sync_state = 'active', last_error = NULL, last_sync_at = datetime('now'), updated_at = datetime('now')
+      WHERE id = ?
+    `).run(link.id)
+    db.prepare(`
+      UPDATE integration_connections
+      SET last_synced_at = datetime('now'), updated_at = datetime('now')
+      WHERE id = ?
+    `).run(connection.id)
+
+    const statusAfter = buildGitHubTaskSyncStatus(db, link, task, updatedIssue)
+    const result: PushTaskResult = {
+      pushed: true,
+      status: statusAfter,
+      message: 'Pushed local changes to GitHub'
+    }
+    return result
+  })
+
+  ipcMain.handle('integrations:pull-task', async (_event, input: PullTaskInput) => {
+    if (input.provider !== 'github') {
+      throw new Error(`Manual pull is not supported for provider: ${input.provider}`)
+    }
+
+    const link = db.prepare(`
+      SELECT * FROM external_links
+      WHERE task_id = ? AND provider = 'github'
+    `).get(input.taskId) as ExternalLink | undefined
+    if (!link) {
+      throw new Error('Task is not linked to GitHub')
+    }
+
+    const key = parseGitHubExternalKey(link.external_key)
+    if (!key) {
+      throw new Error('Linked GitHub issue key is invalid')
+    }
+
+    const connection = getConnection(db, link.connection_id)
+    assertConnectionProvider(connection, 'github')
+    const token = readCredential(db, connection.credential_ref)
+    const task = getTaskById(db, input.taskId)
+    const remoteIssue = await getGithubIssueWithMocks(token, key)
+    if (!remoteIssue) {
+      throw new Error('Linked GitHub issue no longer exists or is not an issue')
+    }
+
+    const statusBefore = buildGitHubTaskSyncStatus(db, link, task, remoteIssue)
+    if (statusBefore.state === 'in_sync') {
+      const result: PullTaskResult = {
+        pulled: false,
+        status: statusBefore,
+        message: 'Task is already in sync with GitHub'
+      }
+      return result
+    }
+
+    if (!input.force && (statusBefore.state === 'local_ahead' || statusBefore.state === 'conflict')) {
+      const result: PullTaskResult = {
+        pulled: false,
+        status: statusBefore,
+        message: 'Local changes detected. Push local changes or force pull to overwrite local fields.'
+      }
+      return result
+    }
+
+    const projectColumns = getProjectColumns(db, task.project_id)
+    db.prepare(`
+      UPDATE tasks
+      SET title = ?, description = ?, status = ?, assignee = ?, updated_at = ?
+      WHERE id = ?
+    `).run(
+      remoteIssue.title,
+      remoteIssue.body ? markdownToHtml(remoteIssue.body) : null,
+      githubStateToLocal(remoteIssue.state, projectColumns),
+      remoteIssue.assignee?.login ?? null,
+      remoteIssue.updatedAt,
+      task.id
+    )
+    const updatedTask = getTaskById(db, task.id)
+    persistGitHubBaseline(db, link.id, updatedTask, remoteIssue)
+
+    db.prepare(`
+      UPDATE external_links
+      SET sync_state = 'active', last_error = NULL, last_sync_at = datetime('now'), updated_at = datetime('now')
+      WHERE id = ?
+    `).run(link.id)
+    db.prepare(`
+      UPDATE integration_connections
+      SET last_synced_at = datetime('now'), updated_at = datetime('now')
+      WHERE id = ?
+    `).run(connection.id)
+
+    const statusAfter = buildGitHubTaskSyncStatus(db, link, updatedTask, remoteIssue)
+    const result: PullTaskResult = {
+      pulled: true,
+      status: statusAfter,
+      message: 'Pulled remote changes from GitHub'
+    }
+    return result
+  })
+
   ipcMain.handle('integrations:sync-now', async (_event, input: SyncNowInput) => {
     return runSyncNow(db, input)
   })
 
-  ipcMain.handle('integrations:get-link', (_event, taskId: string, provider: 'linear') => {
+  ipcMain.handle('integrations:get-link', (_event, taskId: string, provider: IntegrationProvider) => {
     const row = db.prepare(`
       SELECT * FROM external_links
       WHERE task_id = ? AND provider = ?
@@ -531,7 +1559,7 @@ export function registerIntegrationHandlers(ipcMain: IpcMain, db: Database): voi
     return row ?? null
   })
 
-  ipcMain.handle('integrations:unlink-task', (_event, taskId: string, provider: 'linear') => {
+  ipcMain.handle('integrations:unlink-task', (_event, taskId: string, provider: IntegrationProvider) => {
     db.prepare(`
       DELETE FROM external_field_state
       WHERE external_link_id IN (
