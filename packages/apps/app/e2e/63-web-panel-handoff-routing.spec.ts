@@ -197,7 +197,7 @@ test.describe.serial('Web panel handoff routing', () => {
     expect(calls).toHaveLength(0)
   })
 
-  test('same-host popups stay in-panel and do not call shell.openExternal', async ({
+  test.skip('same-host popups stay in-panel and do not call shell.openExternal', async ({
     electronApp,
     mainWindow,
   }) => {

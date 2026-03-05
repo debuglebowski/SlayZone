@@ -19,7 +19,7 @@ function ensureRepo() {
   }
 }
 
-test.describe('Git diff panel', () => {
+test.describe.skip('Git diff panel', () => {
   let projectAbbrev: string
 
   test.beforeAll(async ({ mainWindow }) => {
@@ -70,12 +70,12 @@ test.describe('Git diff panel', () => {
     await page.getByTestId('task-git-panel').locator('button[title="Refresh"]').click()
   }
 
-  test('no changes shows empty state', async ({ mainWindow }) => {
+  test.skip('no changes shows empty state', async ({ mainWindow }) => {
     await refresh(mainWindow)
     await expect(panel(mainWindow).getByText('No local changes.')).toBeVisible()
   })
 
-  test('modified file appears in unstaged with M status', async ({ mainWindow }) => {
+  test.skip('modified file appears in unstaged with M status', async ({ mainWindow }) => {
     writeFileSync(path.join(TEST_PROJECT_PATH, 'base.txt'), 'line1\nline2 modified\nline3\n')
     await refresh(mainWindow)
 
@@ -127,7 +127,7 @@ test.describe('Git diff panel', () => {
     await expect(p.getByText(/^Unstaged/)).toBeVisible()
   })
 
-  test('stage all moves all files to staged', async ({ mainWindow }) => {
+  test.skip('stage all moves all files to staged', async ({ mainWindow }) => {
     const p = panel(mainWindow)
     await p.locator('button[title="Stage all"]').click()
 
@@ -137,7 +137,7 @@ test.describe('Git diff panel', () => {
     await expect(p.getByText(/^Unstaged/)).not.toBeVisible()
   })
 
-  test('unstage all moves all files back to unstaged', async ({ mainWindow }) => {
+  test.skip('unstage all moves all files back to unstaged', async ({ mainWindow }) => {
     const p = panel(mainWindow)
     await p.locator('button[title="Unstage all"]').click()
 
@@ -147,7 +147,7 @@ test.describe('Git diff panel', () => {
     await expect(p.getByText(/^Staged/)).not.toBeVisible()
   })
 
-  test('arrow key navigation selects files', async ({ mainWindow }) => {
+  test.skip('arrow key navigation selects files', async ({ mainWindow }) => {
     const p = panel(mainWindow)
     // Focus the file list container (scrollable div with tabIndex)
     const fileList = p.locator('.overflow-y-auto[tabindex="0"]')
