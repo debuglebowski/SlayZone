@@ -1,6 +1,7 @@
 import type { Database } from 'better-sqlite3'
 import type { IpcMain } from 'electron'
 import {
+  getIssue,
   listIssues,
   listProjects,
   listTeams,
@@ -20,6 +21,10 @@ import { deleteCredential, readCredential, storeCredential } from './credentials
 import type {
   ConnectGithubInput,
   ConnectLinearInput,
+  UpdateIntegrationConnectionInput,
+  ClearProjectProviderInput,
+  SetProjectConnectionInput,
+  ClearProjectConnectionInput,
   ExternalLink,
   GithubIssueSummary,
   GithubRepositorySummary,
@@ -31,6 +36,7 @@ import type {
   ImportLinearIssuesResult,
   IntegrationConnection,
   IntegrationConnectionPublic,
+  IntegrationConnectionUsage,
   IntegrationProjectMapping,
   IntegrationProvider,
   ListGithubIssuesInput,
@@ -70,15 +76,11 @@ function ensureIntegrationSchema(db: Database): void {
     CREATE TABLE IF NOT EXISTS integration_connections (
       id TEXT PRIMARY KEY,
       provider TEXT NOT NULL,
-      workspace_id TEXT NOT NULL,
-      workspace_name TEXT NOT NULL,
-      account_label TEXT NOT NULL,
       credential_ref TEXT NOT NULL,
       enabled INTEGER NOT NULL DEFAULT 1,
       created_at TEXT NOT NULL DEFAULT (datetime('now')),
       updated_at TEXT NOT NULL DEFAULT (datetime('now')),
-      last_synced_at TEXT DEFAULT NULL,
-      UNIQUE(provider, workspace_id)
+      last_synced_at TEXT DEFAULT NULL
     );
     CREATE INDEX IF NOT EXISTS idx_integration_connections_provider
       ON integration_connections(provider, updated_at);
@@ -99,6 +101,20 @@ function ensureIntegrationSchema(db: Database): void {
     );
     CREATE INDEX IF NOT EXISTS idx_integration_project_mappings_connection
       ON integration_project_mappings(connection_id);
+  `)
+
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS integration_project_connections (
+      id TEXT PRIMARY KEY,
+      project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+      provider TEXT NOT NULL,
+      connection_id TEXT NOT NULL REFERENCES integration_connections(id) ON DELETE CASCADE,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+      UNIQUE(project_id, provider)
+    );
+    CREATE INDEX IF NOT EXISTS idx_integration_project_connections_connection
+      ON integration_project_connections(connection_id);
   `)
 
   if (!columnExists(db, 'integration_project_mappings', 'sync_mode')) {
@@ -160,9 +176,6 @@ function toPublicConnection(conn: IntegrationConnection): IntegrationConnectionP
   return {
     id: conn.id,
     provider: conn.provider,
-    workspace_id: conn.workspace_id,
-    workspace_name: conn.workspace_name,
-    account_label: conn.account_label,
     enabled: Boolean(conn.enabled),
     created_at: conn.created_at,
     updated_at: conn.updated_at,
@@ -195,7 +208,7 @@ type TaskRow = {
   updated_at: string
 }
 
-type GithubSyncField = 'title' | 'description' | 'status'
+type SyncField = 'title' | 'description' | 'status'
 
 interface ExternalFieldStateRow {
   field_name: string
@@ -327,7 +340,7 @@ type GithubImportUpsertResult = {
 function upsertFieldState(
   db: Database,
   externalLinkId: string,
-  field: GithubSyncField,
+  field: SyncField,
   localValue: unknown,
   externalValue: unknown,
   localUpdatedAt: string,
@@ -358,14 +371,14 @@ function upsertFieldState(
 function readFieldState(
   db: Database,
   externalLinkId: string
-): Map<GithubSyncField, { local: unknown; external: unknown }> {
+): Map<SyncField, { local: unknown; external: unknown }> {
   const rows = db.prepare(`
     SELECT field_name, last_local_value_json, last_external_value_json
     FROM external_field_state
     WHERE external_link_id = ?
   `).all(externalLinkId) as ExternalFieldStateRow[]
 
-  const map = new Map<GithubSyncField, { local: unknown; external: unknown }>()
+  const map = new Map<SyncField, { local: unknown; external: unknown }>()
   for (const row of rows) {
     if (row.field_name === 'title' || row.field_name === 'description' || row.field_name === 'status') {
       map.set(row.field_name, {
@@ -420,12 +433,12 @@ function buildGitHubTaskSyncStatus(
   remoteIssue: GithubIssueSummary
 ): TaskSyncStatus {
   const columns = getProjectColumns(db, task.project_id)
-  const localValues: Record<GithubSyncField, unknown> = {
+  const localValues: Record<SyncField, unknown> = {
     title: task.title,
     description: normalizeMarkdown(task.description ? htmlToMarkdown(task.description) : null),
     status: localStatusToGitHubState(task.status, columns)
   }
-  const remoteValues: Record<GithubSyncField, unknown> = {
+  const remoteValues: Record<SyncField, unknown> = {
     title: remoteIssue.title,
     description: normalizeMarkdown(remoteIssue.body),
     status: remoteIssue.state
@@ -445,6 +458,71 @@ function buildGitHubTaskSyncStatus(
 
   return {
     provider: 'github',
+    taskId: task.id,
+    state: computeOverallState(fields),
+    fields,
+    comparedAt: new Date().toISOString()
+  }
+}
+
+function normalizeLinearBaselineStatus(
+  value: unknown,
+  columns: ColumnConfig[] | null
+): unknown {
+  if (typeof value !== 'string') return value
+  if (
+    value === 'backlog' ||
+    value === 'started' ||
+    value === 'completed' ||
+    value === 'canceled' ||
+    value === 'unstarted' ||
+    value === 'triage'
+  ) {
+    return stateToLocal(value, columns)
+  }
+  return value
+}
+
+function buildLinearTaskSyncStatus(
+  db: Database,
+  link: ExternalLink,
+  task: TaskRow,
+  remoteIssue: LinearIssueSummary
+): TaskSyncStatus {
+  const columns = getProjectColumns(db, task.project_id)
+  const localValues: Record<SyncField, unknown> = {
+    title: task.title,
+    description: normalizeMarkdown(task.description ? htmlToMarkdown(task.description) : null),
+    status: task.status
+  }
+  const remoteValues: Record<SyncField, unknown> = {
+    title: remoteIssue.title,
+    description: normalizeMarkdown(remoteIssue.description),
+    status: stateToLocal(remoteIssue.state.type, columns)
+  }
+
+  const baselineByField = readFieldState(db, link.id)
+  const rawStatusBaseline = baselineByField.get('status')
+  const normalizedStatusBaseline = rawStatusBaseline
+    ? {
+      local: rawStatusBaseline.local,
+      external: normalizeLinearBaselineStatus(rawStatusBaseline.external, columns)
+    }
+    : undefined
+
+  const fields: TaskSyncFieldDiff[] = (['title', 'description', 'status'] as const).map((field) => ({
+    field,
+    state: computeFieldState(
+      field === 'status' ? normalizedStatusBaseline : baselineByField.get(field),
+      localValues[field],
+      remoteValues[field],
+      task.updated_at,
+      remoteIssue.updatedAt
+    )
+  }))
+
+  return {
+    provider: 'linear',
     taskId: task.id,
     state: computeOverallState(fields),
     fields,
@@ -697,6 +775,133 @@ function getConnection(db: Database, id: string): IntegrationConnection {
   return row
 }
 
+function getProjectConnectionId(db: Database, projectId: string, provider: IntegrationProvider): string | null {
+  const direct = db.prepare(`
+    SELECT connection_id
+    FROM integration_project_connections
+    WHERE project_id = ? AND provider = ?
+  `).get(projectId, provider) as { connection_id: string } | undefined
+  if (direct?.connection_id) {
+    return direct.connection_id
+  }
+
+  // Backward compatibility for projects mapped before project-scoped connections existed.
+  const mapping = db.prepare(`
+    SELECT connection_id
+    FROM integration_project_mappings
+    WHERE project_id = ? AND provider = ?
+  `).get(projectId, provider) as { connection_id: string } | undefined
+  return mapping?.connection_id ?? null
+}
+
+function setProjectConnection(db: Database, input: SetProjectConnectionInput): void {
+  const existing = db.prepare(`
+    SELECT id
+    FROM integration_project_connections
+    WHERE project_id = ? AND provider = ?
+  `).get(input.projectId, input.provider) as { id: string } | undefined
+
+  db.prepare(`
+    INSERT INTO integration_project_connections (
+      id, project_id, provider, connection_id, created_at, updated_at
+    ) VALUES (?, ?, ?, ?, datetime('now'), datetime('now'))
+    ON CONFLICT(project_id, provider) DO UPDATE SET
+      connection_id = excluded.connection_id,
+      updated_at = datetime('now')
+  `).run(
+    existing?.id ?? crypto.randomUUID(),
+    input.projectId,
+    input.provider,
+    input.connectionId
+  )
+}
+
+function tryDeleteConnectionIfUnused(db: Database, connectionId: string): void {
+  const usage = db.prepare(`
+    SELECT
+      (SELECT COUNT(*) FROM integration_project_connections WHERE connection_id = ?) +
+      (SELECT COUNT(*) FROM integration_project_mappings WHERE connection_id = ?) +
+      (SELECT COUNT(*) FROM external_links WHERE connection_id = ?) AS total
+  `).get(connectionId, connectionId, connectionId) as { total: number } | undefined
+
+  if (!usage || usage.total > 0) {
+    return
+  }
+
+  const connection = db.prepare('SELECT * FROM integration_connections WHERE id = ?').get(connectionId) as IntegrationConnection | undefined
+  if (!connection) {
+    return
+  }
+
+  deleteCredential(db, connection.credential_ref)
+  db.prepare('DELETE FROM integration_connections WHERE id = ?').run(connectionId)
+}
+
+function getConnectionUsage(db: Database, connection: IntegrationConnection): IntegrationConnectionUsage {
+  type ConnectionUsageRow = {
+    project_id: string
+    project_name: string
+    has_mapping: number
+    linked_task_count: number
+  }
+
+  const rows = db.prepare(`
+    SELECT
+      p.id AS project_id,
+      p.name AS project_name,
+      MAX(CASE WHEN pm.id IS NOT NULL THEN 1 ELSE 0 END) AS has_mapping,
+      COUNT(l.id) AS linked_task_count
+    FROM projects p
+    LEFT JOIN integration_project_mappings pm
+      ON pm.project_id = p.id AND pm.connection_id = ?
+    LEFT JOIN tasks t
+      ON t.project_id = p.id
+    LEFT JOIN external_links l
+      ON l.task_id = t.id AND l.connection_id = ?
+    WHERE pm.id IS NOT NULL OR l.id IS NOT NULL
+    GROUP BY p.id, p.name
+    ORDER BY p.name COLLATE NOCASE
+  `).all(connection.id, connection.id) as ConnectionUsageRow[]
+
+  const mappedProjectCount = rows.reduce((count, row) => count + (row.has_mapping ? 1 : 0), 0)
+  const linkedTaskCount = rows.reduce((count, row) => count + row.linked_task_count, 0)
+
+  return {
+    connection_id: connection.id,
+    provider: connection.provider,
+    mapped_project_count: mappedProjectCount,
+    linked_task_count: linkedTaskCount,
+    projects: rows.map((row) => ({
+      project_id: row.project_id,
+      project_name: row.project_name,
+      has_mapping: Boolean(row.has_mapping),
+      linked_task_count: row.linked_task_count
+    }))
+  }
+}
+
+function clearProjectProviderData(db: Database, projectId: string, provider: IntegrationProvider): void {
+  db.prepare(`
+    DELETE FROM integration_state_mappings
+    WHERE project_mapping_id IN (
+      SELECT id FROM integration_project_mappings
+      WHERE project_id = ? AND provider = ?
+    )
+  `).run(projectId, provider)
+
+  db.prepare(`
+    DELETE FROM integration_project_mappings
+    WHERE project_id = ? AND provider = ?
+  `).run(projectId, provider)
+
+  db.prepare(`
+    DELETE FROM external_links
+    WHERE provider = ? AND task_id IN (
+      SELECT id FROM tasks WHERE project_id = ?
+    )
+  `).run(provider, projectId)
+}
+
 function assertConnectionProvider(connection: IntegrationConnection, provider: IntegrationProvider): void {
   if (connection.provider !== provider) {
     throw new Error(`Connection provider mismatch: expected ${provider}, got ${connection.provider}`)
@@ -834,96 +1039,130 @@ export function registerIntegrationHandlers(
     const token = input.token.trim()
     if (!token) throw new Error('Token required')
 
-    const viewer = await getGitHubViewer(token)
+    // Validate credential against provider, but do not persist profile/workspace metadata.
+    await getGitHubViewer(token)
 
     const credentialRef = crypto.randomUUID()
     storeCredential(db, credentialRef, token)
+    const currentProjectConnectionId = input.projectId
+      ? getProjectConnectionId(db, input.projectId, 'github')
+      : null
 
-    const existing = db.prepare(`
-      SELECT * FROM integration_connections
-      WHERE provider = 'github' AND workspace_id = ?
-    `).get(viewer.workspaceId) as IntegrationConnection | undefined
-
-    if (existing) {
+    if (currentProjectConnectionId) {
+      const existing = getConnection(db, currentProjectConnectionId)
       deleteCredential(db, existing.credential_ref)
       db.prepare(`
         UPDATE integration_connections
-        SET workspace_name = ?, account_label = ?, credential_ref = ?, enabled = 1, updated_at = datetime('now')
+        SET credential_ref = ?, enabled = 1, updated_at = datetime('now')
         WHERE id = ?
-      `).run(
-        viewer.workspaceName,
-        input.accountLabel?.trim() || viewer.accountLabel,
-        credentialRef,
-        existing.id
-      )
-      const row = getConnection(db, existing.id)
-      return toPublicConnection(row)
+      `).run(credentialRef, existing.id)
+
+      if (input.projectId) {
+        setProjectConnection(db, {
+          projectId: input.projectId,
+          provider: 'github',
+          connectionId: existing.id
+        })
+      }
+      return toPublicConnection(getConnection(db, existing.id))
     }
 
     const id = crypto.randomUUID()
     db.prepare(`
       INSERT INTO integration_connections (
-        id, provider, workspace_id, workspace_name, account_label, credential_ref,
-        enabled, created_at, updated_at, last_synced_at
-      ) VALUES (?, 'github', ?, ?, ?, ?, 1, datetime('now'), datetime('now'), NULL)
-    `).run(
-      id,
-      viewer.workspaceId,
-      viewer.workspaceName,
-      input.accountLabel?.trim() || viewer.accountLabel,
-      credentialRef
-    )
+        id, provider, credential_ref, enabled, created_at, updated_at, last_synced_at
+      ) VALUES (?, 'github', ?, 1, datetime('now'), datetime('now'), NULL)
+    `).run(id, credentialRef)
 
-    const row = getConnection(db, id)
-    return toPublicConnection(row)
+    if (input.projectId) {
+      setProjectConnection(db, {
+        projectId: input.projectId,
+        provider: 'github',
+        connectionId: id
+      })
+    }
+
+    return toPublicConnection(getConnection(db, id))
   })
 
   ipcMain.handle('integrations:connect-linear', async (_event, input: ConnectLinearInput) => {
     const apiKey = input.apiKey.trim()
     if (!apiKey) throw new Error('API key required')
 
-    const viewer = await getLinearViewer(apiKey)
+    // Validate credential against provider, but do not persist profile/workspace metadata.
+    await getLinearViewer(apiKey)
 
     const credentialRef = crypto.randomUUID()
     storeCredential(db, credentialRef, apiKey)
+    const currentProjectConnectionId = input.projectId
+      ? getProjectConnectionId(db, input.projectId, 'linear')
+      : null
 
-    const existing = db.prepare(`
-      SELECT * FROM integration_connections
-      WHERE provider = 'linear' AND workspace_id = ?
-    `).get(viewer.workspaceId) as IntegrationConnection | undefined
-
-    if (existing) {
+    if (currentProjectConnectionId) {
+      const existing = getConnection(db, currentProjectConnectionId)
       deleteCredential(db, existing.credential_ref)
       db.prepare(`
         UPDATE integration_connections
-        SET workspace_name = ?, account_label = ?, credential_ref = ?, enabled = 1, updated_at = datetime('now')
+        SET credential_ref = ?, enabled = 1, updated_at = datetime('now')
         WHERE id = ?
-      `).run(
-        viewer.workspaceName,
-        input.accountLabel?.trim() || viewer.accountLabel,
-        credentialRef,
-        existing.id
-      )
-      const row = getConnection(db, existing.id)
-      return toPublicConnection(row)
+      `).run(credentialRef, existing.id)
+
+      if (input.projectId) {
+        setProjectConnection(db, {
+          projectId: input.projectId,
+          provider: 'linear',
+          connectionId: existing.id
+        })
+      }
+      return toPublicConnection(getConnection(db, existing.id))
     }
 
     const id = crypto.randomUUID()
     db.prepare(`
       INSERT INTO integration_connections (
-        id, provider, workspace_id, workspace_name, account_label, credential_ref,
-        enabled, created_at, updated_at, last_synced_at
-      ) VALUES (?, 'linear', ?, ?, ?, ?, 1, datetime('now'), datetime('now'), NULL)
-    `).run(
-      id,
-      viewer.workspaceId,
-      viewer.workspaceName,
-      input.accountLabel?.trim() || viewer.accountLabel,
-      credentialRef
-    )
+        id, provider, credential_ref, enabled, created_at, updated_at, last_synced_at
+      ) VALUES (?, 'linear', ?, 1, datetime('now'), datetime('now'), NULL)
+    `).run(id, credentialRef)
 
-    const row = getConnection(db, id)
-    return toPublicConnection(row)
+    if (input.projectId) {
+      setProjectConnection(db, {
+        projectId: input.projectId,
+        provider: 'linear',
+        connectionId: id
+      })
+    }
+
+    return toPublicConnection(getConnection(db, id))
+  })
+
+  ipcMain.handle('integrations:update-connection', async (_event, input: UpdateIntegrationConnectionInput) => {
+    const connection = getConnection(db, input.connectionId)
+    const credential = input.credential.trim()
+    if (!credential) throw new Error('Credential is required')
+
+    if (connection.provider === 'github') {
+      await getGitHubViewer(credential)
+      const credentialRef = crypto.randomUUID()
+      storeCredential(db, credentialRef, credential)
+      deleteCredential(db, connection.credential_ref)
+      db.prepare(`
+        UPDATE integration_connections
+        SET credential_ref = ?, enabled = 1, updated_at = datetime('now')
+        WHERE id = ?
+      `).run(credentialRef, connection.id)
+      return toPublicConnection(getConnection(db, connection.id))
+    }
+
+    await getLinearViewer(credential)
+    const credentialRef = crypto.randomUUID()
+    storeCredential(db, credentialRef, credential)
+    deleteCredential(db, connection.credential_ref)
+    db.prepare(`
+      UPDATE integration_connections
+      SET credential_ref = ?, enabled = 1, updated_at = datetime('now')
+      WHERE id = ?
+    `).run(credentialRef, connection.id)
+    return toPublicConnection(getConnection(db, connection.id))
   })
 
   ipcMain.handle('integrations:list-connections', (_event, provider?: IntegrationProvider) => {
@@ -933,43 +1172,48 @@ export function registerIntegrationHandlers(
     return (rows as IntegrationConnection[]).map(toPublicConnection)
   })
 
+  ipcMain.handle('integrations:get-connection-usage', (_event, connectionId: string) => {
+    const connection = getConnection(db, connectionId)
+    return getConnectionUsage(db, connection)
+  })
+
   if (enableTestChannels) {
     ipcMain.handle('integrations:test:seed-github-connection', (_event, input: {
       id?: string
-      workspaceId: string
-      workspaceName: string
-      accountLabel?: string
+      projectId?: string
       token?: string
       repositories?: GithubRepositorySummary[]
     }) => {
-      const existing = db.prepare(`
-        SELECT * FROM integration_connections
-        WHERE provider = 'github' AND workspace_id = ?
-      `).get(input.workspaceId) as IntegrationConnection | undefined
-
+      const existingConnectionId = input.projectId
+        ? getProjectConnectionId(db, input.projectId, 'github')
+        : null
+      const existing = existingConnectionId
+        ? getConnection(db, existingConnectionId)
+        : undefined
       const connectionId = existing?.id ?? input.id ?? crypto.randomUUID()
-      const credentialRef = existing?.credential_ref ?? crypto.randomUUID()
+      const credentialRef = crypto.randomUUID()
       storeCredential(db, credentialRef, input.token ?? 'ghp_test_e2e')
+      if (existing) {
+        deleteCredential(db, existing.credential_ref)
+      }
 
       db.prepare(`
         INSERT INTO integration_connections (
-          id, provider, workspace_id, workspace_name, account_label, credential_ref,
-          enabled, created_at, updated_at, last_synced_at
-        ) VALUES (?, 'github', ?, ?, ?, ?, 1, datetime('now'), datetime('now'), NULL)
+          id, provider, credential_ref, enabled, created_at, updated_at, last_synced_at
+        ) VALUES (?, 'github', ?, 1, datetime('now'), datetime('now'), NULL)
         ON CONFLICT(id) DO UPDATE SET
-          workspace_id = excluded.workspace_id,
-          workspace_name = excluded.workspace_name,
-          account_label = excluded.account_label,
           credential_ref = excluded.credential_ref,
           enabled = 1,
           updated_at = datetime('now')
-      `).run(
-        connectionId,
-        input.workspaceId,
-        input.workspaceName,
-        input.accountLabel ?? input.workspaceName,
-        credentialRef
-      )
+      `).run(connectionId, credentialRef)
+
+      if (input.projectId) {
+        setProjectConnection(db, {
+          projectId: input.projectId,
+          provider: 'github',
+          connectionId
+        })
+      }
 
       if (input.repositories) {
         githubTestRepositoriesByConnection.set(connectionId, input.repositories)
@@ -1018,6 +1262,41 @@ export function registerIntegrationHandlers(
     return true
   })
 
+  ipcMain.handle('integrations:clear-project-provider', (_event, input: ClearProjectProviderInput) => {
+    db.transaction(() => {
+      clearProjectProviderData(db, input.projectId, input.provider)
+    })()
+    return true
+  })
+
+  ipcMain.handle('integrations:get-project-connection', (_event, projectId: string, provider: IntegrationProvider) => {
+    return getProjectConnectionId(db, projectId, provider)
+  })
+
+  ipcMain.handle('integrations:set-project-connection', (_event, input: SetProjectConnectionInput) => {
+    const connection = getConnection(db, input.connectionId)
+    assertConnectionProvider(connection, input.provider)
+    db.transaction(() => {
+      setProjectConnection(db, input)
+    })()
+    return true
+  })
+
+  ipcMain.handle('integrations:clear-project-connection', (_event, input: ClearProjectConnectionInput) => {
+    const connectionId = getProjectConnectionId(db, input.projectId, input.provider)
+    db.transaction(() => {
+      clearProjectProviderData(db, input.projectId, input.provider)
+      db.prepare(`
+        DELETE FROM integration_project_connections
+        WHERE project_id = ? AND provider = ?
+      `).run(input.projectId, input.provider)
+      if (connectionId) {
+        tryDeleteConnectionIfUnused(db, connectionId)
+      }
+    })()
+    return true
+  })
+
   ipcMain.handle('integrations:list-github-repositories', async (_event, connectionId: string) => {
     const mocked = githubTestRepositoriesByConnection.get(connectionId)
     if (mocked) return mocked
@@ -1051,6 +1330,7 @@ export function registerIntegrationHandlers(
   ipcMain.handle('integrations:set-project-mapping', async (_event, input: SetProjectMappingInput) => {
     const connection = getConnection(db, input.connectionId)
     assertConnectionProvider(connection, input.provider)
+    const otherProvider: IntegrationProvider = input.provider === 'github' ? 'linear' : 'github'
 
     const existing = db.prepare(`
       SELECT * FROM integration_project_mappings
@@ -1058,27 +1338,35 @@ export function registerIntegrationHandlers(
     `).get(input.provider, input.projectId) as IntegrationProjectMapping | undefined
 
     const mappingId = existing?.id ?? crypto.randomUUID()
-    db.prepare(`
-      INSERT INTO integration_project_mappings (
-        id, project_id, provider, connection_id, external_team_id, external_team_key, external_project_id, sync_mode, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
-      ON CONFLICT(project_id, provider) DO UPDATE SET
-        connection_id = excluded.connection_id,
-        external_team_id = excluded.external_team_id,
-        external_team_key = excluded.external_team_key,
-        external_project_id = excluded.external_project_id,
-        sync_mode = excluded.sync_mode,
-        updated_at = datetime('now')
-    `).run(
-      mappingId,
-      input.projectId,
-      input.provider,
-      input.connectionId,
-      input.externalTeamId,
-      input.externalTeamKey,
-      input.externalProjectId ?? null,
-      input.syncMode ?? 'one_way'
-    )
+    db.transaction(() => {
+      clearProjectProviderData(db, input.projectId, otherProvider)
+      setProjectConnection(db, {
+        projectId: input.projectId,
+        provider: input.provider,
+        connectionId: input.connectionId
+      })
+      db.prepare(`
+        INSERT INTO integration_project_mappings (
+          id, project_id, provider, connection_id, external_team_id, external_team_key, external_project_id, sync_mode, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
+        ON CONFLICT(project_id, provider) DO UPDATE SET
+          connection_id = excluded.connection_id,
+          external_team_id = excluded.external_team_id,
+          external_team_key = excluded.external_team_key,
+          external_project_id = excluded.external_project_id,
+          sync_mode = excluded.sync_mode,
+          updated_at = datetime('now')
+      `).run(
+        mappingId,
+        input.projectId,
+        input.provider,
+        input.connectionId,
+        input.externalTeamId,
+        input.externalTeamKey,
+        input.externalProjectId ?? null,
+        input.syncMode ?? 'one_way'
+      )
+    })()
 
     if (input.provider === 'linear') {
       const apiKey = readCredential(db, connection.credential_ref)
@@ -1343,6 +1631,34 @@ export function registerIntegrationHandlers(
   })
 
   ipcMain.handle('integrations:get-task-sync-status', async (_event, taskId: string, provider: IntegrationProvider) => {
+    if (provider === 'linear') {
+      const link = db.prepare(`
+        SELECT * FROM external_links
+        WHERE task_id = ? AND provider = 'linear'
+      `).get(taskId) as ExternalLink | undefined
+
+      if (!link) {
+        return {
+          provider: 'linear',
+          taskId,
+          state: 'unknown',
+          fields: [],
+          comparedAt: new Date().toISOString()
+        }
+      }
+
+      const connection = getConnection(db, link.connection_id)
+      assertConnectionProvider(connection, 'linear')
+      const apiKey = readCredential(db, connection.credential_ref)
+      const remoteIssue = await getIssue(apiKey, link.external_id)
+      if (!remoteIssue) {
+        throw new Error('Linked Linear issue no longer exists')
+      }
+
+      const task = getTaskById(db, taskId)
+      return buildLinearTaskSyncStatus(db, link, task, remoteIssue)
+    }
+
     if (provider !== 'github') {
       return {
         provider,

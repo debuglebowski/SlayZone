@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { format } from 'date-fns'
-import { ArrowDownToLineIcon, ArrowUpToLineIcon, CalendarIcon, ChevronRight, EllipsisIcon, ExternalLinkIcon, RefreshCwIcon, UnlinkIcon, X } from 'lucide-react'
+import { ArrowDownToLineIcon, ArrowUpToLineIcon, CalendarIcon, Loader2, X } from 'lucide-react'
 import type { Task } from '@slayzone/task/shared'
 import { priorityOptions } from '@slayzone/task/shared'
 import type { Project } from '@slayzone/projects/shared'
@@ -16,19 +16,14 @@ import {
 } from '@slayzone/ui'
 import { Popover, PopoverContent, PopoverTrigger } from '@slayzone/ui'
 import { Calendar } from '@slayzone/ui'
-import { Button, IconButton } from '@slayzone/ui'
+import { Button } from '@slayzone/ui'
 import { Checkbox } from '@slayzone/ui'
 import {
   buildStatusOptions,
-  cn,
-  Collapsible,
-  CollapsibleTrigger,
-  CollapsibleContent,
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger
+  cn
 } from '@slayzone/ui'
+import { toast } from '@slayzone/ui'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@slayzone/ui'
 import { ProjectSelect } from '@slayzone/projects'
 
 interface TaskMetadataSidebarProps {
@@ -304,252 +299,266 @@ const PROVIDER_LABELS: Record<ExternalLink['provider'], string> = {
 }
 
 const SYNC_STATE_META: Record<TaskSyncStatus['state'], { label: string; className: string }> = {
-  in_sync: {
-    label: 'In sync',
-    className: 'bg-emerald-500/15 text-emerald-300'
-  },
-  local_ahead: {
-    label: 'Local ahead',
-    className: 'bg-blue-500/15 text-blue-300'
-  },
-  remote_ahead: {
-    label: 'Remote ahead',
-    className: 'bg-amber-500/15 text-amber-300'
-  },
-  conflict: {
-    label: 'Conflict',
-    className: 'bg-red-500/15 text-red-300'
-  },
-  unknown: {
-    label: 'Unknown',
-    className: 'bg-muted text-muted-foreground'
-  }
+  in_sync: { label: 'In sync', className: 'bg-emerald-500/15 text-emerald-300' },
+  local_ahead: { label: 'Local ahead', className: 'bg-blue-500/15 text-blue-300' },
+  remote_ahead: { label: 'Remote ahead', className: 'bg-amber-500/15 text-amber-300' },
+  conflict: { label: 'Conflict', className: 'bg-red-500/15 text-red-300' },
+  unknown: { label: 'Unknown', className: 'bg-muted text-muted-foreground' }
 }
 
-function formatFieldName(field: TaskSyncStatus['fields'][number]['field']): string {
-  if (field === 'description') return 'Description'
-  if (field === 'status') return 'Status'
-  return 'Title'
+function toUnknownSyncStatus(link: ExternalLink, taskId: string): TaskSyncStatus {
+  return {
+    provider: link.provider,
+    taskId,
+    state: 'unknown',
+    fields: [],
+    comparedAt: new Date().toISOString()
+  }
 }
 
 export function ExternalSyncCard({ taskId, onUpdate }: ExternalSyncCardProps) {
   const [links, setLinks] = useState<ExternalLink[]>([])
-  const [githubSyncByLinkId, setGithubSyncByLinkId] = useState<Record<string, TaskSyncStatus>>({})
-  const [syncMessage, setSyncMessage] = useState('')
+  const [syncStatusByLinkId, setSyncStatusByLinkId] = useState<Record<string, TaskSyncStatus>>({})
+  const [linkLoadingById, setLinkLoadingById] = useState<Record<string, 'open' | 'pull' | 'push' | undefined>>({})
 
   useEffect(() => {
     let cancelled = false
-    void Promise.all([
-      window.api.integrations.getLink(taskId, 'linear'),
-      window.api.integrations.getLink(taskId, 'github')
-    ]).then(async ([linearLink, githubLink]) => {
-      const loadedLinks = [linearLink, githubLink].filter((link): link is ExternalLink => Boolean(link))
-      if (cancelled) return
-      setLinks(loadedLinks)
-
-      const githubExternalLink = loadedLinks.find((link) => link.provider === 'github')
-      if (!githubExternalLink) {
-        setGithubSyncByLinkId({})
-        return
-      }
-
+    void (async () => {
       try {
-        const syncStatus = await window.api.integrations.getTaskSyncStatus(taskId, 'github')
+        const [linearLink, githubLink] = await Promise.all([
+          window.api.integrations.getLink(taskId, 'linear'),
+          window.api.integrations.getLink(taskId, 'github')
+        ])
+
+        const loadedLinks = [linearLink, githubLink].filter((link): link is ExternalLink => Boolean(link))
         if (cancelled) return
-        setGithubSyncByLinkId({ [githubExternalLink.id]: syncStatus })
+        setLinks(loadedLinks)
+
+        if (loadedLinks.length === 0) {
+          setSyncStatusByLinkId({})
+          return
+        }
+
+        const statusEntries = await Promise.all(loadedLinks.map(async (link) => {
+          try {
+            const status = await window.api.integrations.getTaskSyncStatus(taskId, link.provider)
+            return [link.id, status] as const
+          } catch {
+            return [link.id, toUnknownSyncStatus(link, taskId)] as const
+          }
+        }))
+
+        if (cancelled) return
+        setSyncStatusByLinkId(Object.fromEntries(statusEntries))
       } catch {
         if (cancelled) return
-        setGithubSyncByLinkId({})
+        setLinks([])
+        setSyncStatusByLinkId({})
       }
-    })
+    })()
     return () => {
       cancelled = true
     }
   }, [taskId])
 
-  const handleSync = async (link: ExternalLink) => {
+  const refreshLinkSyncStatus = async (link: ExternalLink) => {
     try {
-      if (link.provider !== 'linear') {
-        const status = await window.api.integrations.getTaskSyncStatus(taskId, 'github')
-        setGithubSyncByLinkId((current) => ({ ...current, [link.id]: status }))
-        const changed = status.fields.filter((field) => field.state !== 'in_sync')
-        const summary = changed.length > 0
-          ? changed.map((field) => `${formatFieldName(field.field)} ${field.state.replace('_', ' ')}`).join(', ')
-          : 'No changes'
-        setSyncMessage(`GitHub diff: ${SYNC_STATE_META[status.state].label}${summary ? ` (${summary})` : ''}`)
-        return
-      }
-      const result = await window.api.integrations.syncNow({ taskId })
-      const errSuffix = result.errors.length > 0 ? ` (${result.errors.length} errors)` : ''
-      setSyncMessage(`${PROVIDER_LABELS[link.provider]} synced: ${result.pulled} pulled, ${result.pushed} pushed${errSuffix}`)
-      const refreshedTask = await window.api.db.getTask(taskId)
-      if (refreshedTask) onUpdate(refreshedTask)
-    } catch (error) {
-      setSyncMessage(error instanceof Error ? error.message : String(error))
+      const status = await window.api.integrations.getTaskSyncStatus(taskId, link.provider)
+      setSyncStatusByLinkId((current) => ({ ...current, [link.id]: status }))
+    } catch {
+      setSyncStatusByLinkId((current) => ({ ...current, [link.id]: toUnknownSyncStatus(link, taskId) }))
     }
   }
 
-  const handlePush = async (link: ExternalLink, force = false) => {
+  const setLinkLoading = (linkId: string, action: 'open' | 'pull' | 'push' | null) => {
+    setLinkLoadingById((current) => {
+      const next = { ...current }
+      if (action === null) {
+        delete next[linkId]
+      } else {
+        next[linkId] = action
+      }
+      return next
+    })
+  }
+
+  const handleOpen = async (link: ExternalLink) => {
+    if (!link.external_url) return
+    setLinkLoading(link.id, 'open')
     try {
-      if (link.provider !== 'github') return
-      const result = await window.api.integrations.pushTask({
-        taskId,
-        provider: 'github',
-        force
-      })
-      setGithubSyncByLinkId((current) => ({ ...current, [link.id]: result.status }))
-      setSyncMessage(result.message ?? (result.pushed ? 'Pushed local changes to GitHub' : 'No push performed'))
-      if (result.pushed) {
+      await window.api.shell.openExternal(link.external_url)
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : String(error))
+    } finally {
+      await refreshLinkSyncStatus(link)
+      setLinkLoading(link.id, null)
+    }
+  }
+
+  const handlePull = async (link: ExternalLink) => {
+    setLinkLoading(link.id, 'pull')
+    try {
+      if (link.provider === 'linear') {
+        const result = await window.api.integrations.syncNow({ taskId })
+        const errSuffix = result.errors.length > 0 ? ` (${result.errors.length} errors)` : ''
+        const message = `${PROVIDER_LABELS[link.provider]} synced: ${result.pulled} pulled, ${result.pushed} pushed${errSuffix}`
+        if (result.errors.length > 0) toast.error(message)
+        else toast.success(message)
         const refreshedTask = await window.api.db.getTask(taskId)
         if (refreshedTask) onUpdate(refreshedTask)
+        return
       }
-    } catch (error) {
-      setSyncMessage(error instanceof Error ? error.message : String(error))
-    }
-  }
 
-  const handlePull = async (link: ExternalLink, force = false) => {
-    try {
-      if (link.provider !== 'github') return
       const result = await window.api.integrations.pullTask({
         taskId,
-        provider: 'github',
-        force
+        provider: 'github'
       })
-      setGithubSyncByLinkId((current) => ({ ...current, [link.id]: result.status }))
-      setSyncMessage(result.message ?? (result.pulled ? 'Pulled remote changes from GitHub' : 'No pull performed'))
+      const message = result.message ?? (result.pulled ? 'Pulled remote changes from GitHub' : 'No pull performed')
+      if (result.pulled) toast.success(message)
+      else toast(message)
       if (result.pulled) {
         const refreshedTask = await window.api.db.getTask(taskId)
         if (refreshedTask) onUpdate(refreshedTask)
       }
     } catch (error) {
-      setSyncMessage(error instanceof Error ? error.message : String(error))
+      toast.error(error instanceof Error ? error.message : String(error))
+    } finally {
+      await refreshLinkSyncStatus(link)
+      setLinkLoading(link.id, null)
     }
   }
 
-  const handleUnlink = async (link: ExternalLink) => {
-    await window.api.integrations.unlinkTask(taskId, link.provider)
-    setLinks((current) => current.filter((item) => item.id !== link.id))
-    setGithubSyncByLinkId((current) => {
-      if (!(link.id in current)) return current
-      const copy = { ...current }
-      delete copy[link.id]
-      return copy
-    })
-    setSyncMessage(`Unlinked from ${PROVIDER_LABELS[link.provider]}`)
+  const handlePush = async (link: ExternalLink) => {
+    setLinkLoading(link.id, 'push')
+    try {
+      if (link.provider === 'linear') {
+        const result = await window.api.integrations.syncNow({ taskId })
+        const errSuffix = result.errors.length > 0 ? ` (${result.errors.length} errors)` : ''
+        const message = `${PROVIDER_LABELS[link.provider]} synced: ${result.pulled} pulled, ${result.pushed} pushed${errSuffix}`
+        if (result.pushed > 0) toast.success(message)
+        else if (result.errors.length > 0) toast.error(message)
+        else toast(message)
+        if (result.pulled > 0) {
+          const refreshedTask = await window.api.db.getTask(taskId)
+          if (refreshedTask) onUpdate(refreshedTask)
+        }
+        return
+      }
+
+      const result = await window.api.integrations.pushTask({
+        taskId,
+        provider: 'github'
+      })
+      const message = result.message ?? (result.pushed ? 'Pushed local changes to GitHub' : 'No push performed')
+      if (result.pushed) toast.success(message)
+      else toast(message)
+      if (result.pushed) {
+        const refreshedTask = await window.api.db.getTask(taskId)
+        if (refreshedTask) onUpdate(refreshedTask)
+      }
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : String(error))
+    } finally {
+      setLinkLoading(link.id, null)
+    }
   }
 
   if (links.length === 0) return null
 
   return (
-    <Collapsible>
-      <CollapsibleTrigger className="flex w-full items-center gap-1.5 rounded-md border border-border bg-muted/50 px-2.5 py-1.5 text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground transition-colors [&[data-state=open]>svg]:rotate-90">
-        <ChevronRight className="size-3 transition-transform" />
-        External sync
-      </CollapsibleTrigger>
-      <CollapsibleContent className="border-l border-border ml-2 pl-6 pt-5">
-        <div className="space-y-2">
-          {links.map((link) => (
-            <div key={link.id} className="space-y-1.5">
-              <div className="flex items-center gap-1">
-                <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-muted-foreground">
-                  {PROVIDER_LABELS[link.provider]}
-                </span>
-                <span className="min-w-0 flex-1 truncate text-sm">{link.external_key}</span>
-                {link.provider === 'github' && githubSyncByLinkId[link.id] ? (
-                  <span
-                    className={cn(
-                      'shrink-0 rounded px-1.5 py-0.5 text-[10px] uppercase tracking-wide',
-                      SYNC_STATE_META[githubSyncByLinkId[link.id].state].className
-                    )}
-                  >
-                    {SYNC_STATE_META[githubSyncByLinkId[link.id].state].label}
-                  </span>
-                ) : null}
-                <IconButton
-                  variant="ghost"
-                  aria-label={`Open in ${PROVIDER_LABELS[link.provider]}`}
-                  className="size-7"
-                  onClick={() => window.api.shell.openExternal(link.external_url)}
-                  title={`Open in ${PROVIDER_LABELS[link.provider]}`}
+    <div className="space-y-2">
+      {links.map((link) => {
+        const loadingAction = linkLoadingById[link.id]
+        const linkBusy = Boolean(loadingAction)
+        const syncStatus = syncStatusByLinkId[link.id]
+        return (
+          <div
+            key={link.id}
+            role={link.external_url && !linkBusy ? 'link' : undefined}
+            tabIndex={link.external_url && !linkBusy ? 0 : -1}
+            className={cn(
+              'flex items-center gap-1.5 rounded-md border border-border bg-muted/25 px-2 py-1.5',
+              link.external_url && !linkBusy ? 'cursor-pointer hover:bg-muted/60' : 'cursor-default'
+            )}
+            onClick={() => void handleOpen(link)}
+            onKeyDown={(event) => {
+              if (!link.external_url || linkBusy) return
+              if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault()
+                void handleOpen(link)
+              }
+            }}
+          >
+            <div className="flex min-w-0 flex-1 items-center gap-2" title={link.external_key}>
+              <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-muted-foreground">
+                {PROVIDER_LABELS[link.provider]}
+              </span>
+              {loadingAction === 'open' ? (
+                <Loader2 className="size-3 animate-spin text-muted-foreground" />
+              ) : null}
+              <span className="truncate text-xs text-muted-foreground">{link.external_key}</span>
+              {syncStatus ? (
+                <span
+                  className={cn(
+                    'shrink-0 rounded px-1.5 py-0.5 text-[10px] uppercase tracking-wide',
+                    SYNC_STATE_META[syncStatus.state].className
+                  )}
                 >
-                  <ExternalLinkIcon className="size-3.5" />
-                </IconButton>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <IconButton variant="ghost" aria-label={`${PROVIDER_LABELS[link.provider]} actions`} className="size-7">
-                      <EllipsisIcon className="size-3.5" />
-                    </IconButton>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    {link.provider === 'linear' ? (
-                      <DropdownMenuItem onClick={() => void handleSync(link)}>
-                        <RefreshCwIcon className="size-3.5" />
-                        Sync
-                      </DropdownMenuItem>
-                    ) : (
-                      <>
-                        <DropdownMenuItem onClick={() => void handleSync(link)}>
-                          <RefreshCwIcon className="size-3.5" />
-                          Check diff
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onClick={() => void handlePush(link)}
-                          disabled={githubSyncByLinkId[link.id]?.state === 'in_sync'}
-                        >
-                          <ArrowUpToLineIcon className="size-3.5" />
-                          Push local changes
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onClick={() => void handlePull(link)}
-                          disabled={
-                            githubSyncByLinkId[link.id]?.state === 'in_sync' ||
-                            githubSyncByLinkId[link.id]?.state === 'local_ahead' ||
-                            githubSyncByLinkId[link.id]?.state === 'conflict'
-                          }
-                        >
-                          <ArrowDownToLineIcon className="size-3.5" />
-                          Pull remote changes
-                        </DropdownMenuItem>
-                        {githubSyncByLinkId[link.id] &&
-                        (githubSyncByLinkId[link.id].state === 'remote_ahead' ||
-                          githubSyncByLinkId[link.id].state === 'conflict') ? (
-                          <DropdownMenuItem onClick={() => void handlePush(link, true)}>
-                            <ArrowUpToLineIcon className="size-3.5" />
-                            Force push
-                          </DropdownMenuItem>
-                        ) : null}
-                        {githubSyncByLinkId[link.id] &&
-                        (githubSyncByLinkId[link.id].state === 'local_ahead' ||
-                          githubSyncByLinkId[link.id].state === 'conflict') ? (
-                          <DropdownMenuItem onClick={() => void handlePull(link, true)}>
-                            <ArrowDownToLineIcon className="size-3.5" />
-                            Force pull
-                          </DropdownMenuItem>
-                        ) : null}
-                      </>
-                    )}
-                    <DropdownMenuItem onClick={() => void handleUnlink(link)}>
-                      <UnlinkIcon className="size-3.5" />
-                      Unlink
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </div>
-              {link.provider === 'github' && githubSyncByLinkId[link.id] ? (
-                <p className="text-[11px] text-muted-foreground">
-                  {githubSyncByLinkId[link.id].fields
-                    .filter((field) => field.state !== 'in_sync')
-                    .map((field) => `${formatFieldName(field.field)}: ${field.state.replace('_', ' ')}`)
-                    .join(' • ') || 'No field differences'}
-                </p>
+                  {SYNC_STATE_META[syncStatus.state].label}
+                </span>
               ) : null}
             </div>
-          ))}
-          {syncMessage ? <p className="text-xs text-muted-foreground">{syncMessage}</p> : null}
-        </div>
-      </CollapsibleContent>
-    </Collapsible>
+
+            <div className="ml-auto flex items-center gap-0.5">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    aria-label="Pull from external issue"
+                    className="size-7"
+                    onClick={(event) => {
+                      event.stopPropagation()
+                      void handlePull(link)
+                    }}
+                    disabled={linkBusy}
+                  >
+                    {loadingAction === 'pull' ? (
+                      <Loader2 className="size-3.5 animate-spin" />
+                    ) : (
+                      <ArrowDownToLineIcon className="size-3.5" />
+                    )}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Pull</TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    aria-label="Push to external issue"
+                    className="size-7"
+                    onClick={(event) => {
+                      event.stopPropagation()
+                      void handlePush(link)
+                    }}
+                    disabled={linkBusy}
+                  >
+                    {loadingAction === 'push' ? (
+                      <Loader2 className="size-3.5 animate-spin" />
+                    ) : (
+                      <ArrowUpToLineIcon className="size-3.5" />
+                    )}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Push</TooltipContent>
+              </Tooltip>
+            </div>
+          </div>
+        )
+      })}
+    </div>
   )
 }
 

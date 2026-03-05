@@ -6,9 +6,6 @@ export type IntegrationSyncMode = 'one_way' | 'two_way'
 export interface IntegrationConnection {
   id: string
   provider: IntegrationProvider
-  workspace_id: string
-  workspace_name: string
-  account_label: string
   credential_ref: string
   enabled: boolean
   created_at: string
@@ -19,13 +16,25 @@ export interface IntegrationConnection {
 export interface IntegrationConnectionPublic {
   id: string
   provider: IntegrationProvider
-  workspace_id: string
-  workspace_name: string
-  account_label: string
   enabled: boolean
   created_at: string
   updated_at: string
   last_synced_at: string | null
+}
+
+export interface IntegrationConnectionUsageProject {
+  project_id: string
+  project_name: string
+  has_mapping: boolean
+  linked_task_count: number
+}
+
+export interface IntegrationConnectionUsage {
+  connection_id: string
+  provider: IntegrationProvider
+  mapped_project_count: number
+  linked_task_count: number
+  projects: IntegrationConnectionUsageProject[]
 }
 
 export interface IntegrationProjectMapping {
@@ -71,12 +80,28 @@ export interface LinearProject {
 
 export interface ConnectLinearInput {
   apiKey: string
-  accountLabel?: string
+  projectId?: string
 }
 
 export interface ConnectGithubInput {
   token: string
-  accountLabel?: string
+  projectId?: string
+}
+
+export interface UpdateIntegrationConnectionInput {
+  connectionId: string
+  credential: string
+}
+
+export interface SetProjectConnectionInput {
+  projectId: string
+  provider: IntegrationProvider
+  connectionId: string
+}
+
+export interface ClearProjectConnectionInput {
+  projectId: string
+  provider: IntegrationProvider
 }
 
 export interface SetProjectMappingInput {
@@ -121,6 +146,11 @@ export interface SyncNowInput {
   connectionId?: string
   projectId?: string
   taskId?: string
+}
+
+export interface ClearProjectProviderInput {
+  projectId: string
+  provider: IntegrationProvider
 }
 
 export interface SyncNowResult {

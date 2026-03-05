@@ -189,7 +189,7 @@ export async function listWorkflowStates(
 ): Promise<Array<{ id: string; type: string }>> {
   const data = await requestLinear<WorkflowStatesQuery>(
     apiKey,
-    `query WorkflowStates($teamId: String!) {
+    `query WorkflowStates($teamId: ID!) {
       workflowStates(filter: { team: { id: { eq: $teamId } } }) {
         nodes { id type team { id } }
       }

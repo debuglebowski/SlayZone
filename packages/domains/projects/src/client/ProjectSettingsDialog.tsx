@@ -1,5 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import {
+  ArrowLeft,
+  ChevronRight,
   FolderOpen,
   Plus,
   Trash2,
@@ -10,12 +12,14 @@ import {
   Circle,
   CircleDot,
   CircleCheck,
-  CircleX
+  CircleX,
+  Loader2
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@slayzone/ui'
 import { SettingsLayout } from '@slayzone/ui'
 import { Button, IconButton } from '@slayzone/ui'
+import { toast } from '@slayzone/ui'
 import { Input } from '@slayzone/ui'
 import { Label } from '@slayzone/ui'
 import { ColorPicker } from '@slayzone/ui'
@@ -23,9 +27,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@slayzone/ui'
 import { Checkbox } from '@slayzone/ui'
 import { Card, CardContent, CardHeader, CardTitle } from '@slayzone/ui'
+import { Switch } from '@slayzone/ui'
 import { Tabs, TabsList, TabsTrigger } from '@slayzone/ui'
 import { cn } from '@slayzone/ui'
-import { ContextManagerSettings, type ProjectContextManagerTab } from '../../../ai-config/src/client/ContextManagerSettings'
+import {
+  ContextManagerSettings,
+  type ProjectContextManagerTab,
+  type GlobalContextManagerSection
+} from '../../../ai-config/src/client/ContextManagerSettings'
 import {
   DEFAULT_COLUMNS,
   WORKFLOW_CATEGORIES,
@@ -38,6 +47,8 @@ import {
 import type {
   ExternalLink,
   GithubIssueSummary,
+  GithubProjectSummary,
+  IntegrationProvider,
   GithubRepositorySummary,
   ImportGithubRepositoryIssuesResult,
   IntegrationConnectionPublic,
@@ -48,7 +59,7 @@ import type {
   LinearTeam,
   TaskSyncStatus
 } from '@slayzone/integrations/shared'
-import { ProjectIntegrationSetupWizard, type ProjectIntegrationProvider } from './ProjectIntegrationSetupWizard'
+import { ProjectIntegrationConnectionModal } from './ProjectIntegrationConnectionModal'
 
 type GithubTaskSyncRow = {
   taskId: string
@@ -67,6 +78,9 @@ type GithubProjectSyncSummary = {
   errors: number
   checkedAt: string
 }
+
+type IntegrationSetupEntry = 'github_projects' | 'linear' | 'github_issues'
+type ImportIssueSort = 'updated_desc' | 'updated_asc' | 'title_asc' | 'title_desc'
 
 function createUnknownGithubStatus(taskId: string): TaskSyncStatus {
   return {
@@ -107,13 +121,31 @@ function formatGithubImportMessage(result: ImportGithubRepositoryIssuesResult): 
   return parts.join(' • ')
 }
 
+function sortByMode<T extends { title: string; updatedAt: string }>(rows: T[], sort: ImportIssueSort): T[] {
+  const next = [...rows]
+  next.sort((a, b) => {
+    if (sort === 'updated_desc') {
+      return Date.parse(b.updatedAt) - Date.parse(a.updatedAt)
+    }
+    if (sort === 'updated_asc') {
+      return Date.parse(a.updatedAt) - Date.parse(b.updatedAt)
+    }
+    if (sort === 'title_desc') {
+      return b.title.localeCompare(a.title)
+    }
+    return a.title.localeCompare(b.title)
+  })
+  return next
+}
+
 interface ProjectSettingsDialogProps {
   project: Project | null
   open: boolean
   onOpenChange: (open: boolean) => void
   initialTab?: 'general' | 'environment' | 'columns' | 'integrations' | 'ai-config'
-  integrationOnboardingProvider?: ProjectIntegrationProvider | null
+  integrationOnboardingProvider?: IntegrationProvider | null
   onIntegrationOnboardingHandled?: () => void
+  onOpenGlobalAiConfig?: (section: GlobalContextManagerSection) => void
   onUpdated: (project: Project) => void
 }
 
@@ -149,6 +181,10 @@ const STATUS_COLOR_BADGE: Record<string, string> = {
   orange: 'bg-orange-500/20 text-orange-300'
 }
 
+function providerDisplayName(provider: IntegrationProvider): string {
+  return provider === 'github' ? 'GitHub Projects' : 'Linear'
+}
+
 export function ProjectSettingsDialog({
   project,
   open,
@@ -156,6 +192,7 @@ export function ProjectSettingsDialog({
   initialTab = 'general',
   integrationOnboardingProvider = null,
   onIntegrationOnboardingHandled,
+  onOpenGlobalAiConfig,
   onUpdated
 }: ProjectSettingsDialogProps) {
   const [activeTab, setActiveTab] = useState<'general' | 'environment' | 'columns' | 'integrations' | 'ai-config'>('general')
@@ -168,25 +205,19 @@ export function ProjectSettingsDialog({
   const [loading, setLoading] = useState(false)
   const [connections, setConnections] = useState<IntegrationConnectionPublic[]>([])
   const [githubConnections, setGithubConnections] = useState<IntegrationConnectionPublic[]>([])
-  const [teams, setTeams] = useState<LinearTeam[]>([])
-  const [linearProjects, setLinearProjects] = useState<LinearProject[]>([])
   const [mapping, setMapping] = useState<IntegrationProjectMapping | null>(null)
   const [githubMapping, setGithubMapping] = useState<IntegrationProjectMapping | null>(null)
-  const [githubRepoConnectionId, setGithubRepoConnectionId] = useState('')
   const [githubRepositories, setGithubRepositories] = useState<GithubRepositorySummary[]>([])
   const [githubRepositoryFullName, setGithubRepositoryFullName] = useState('')
   const [loadingGithubRepositories, setLoadingGithubRepositories] = useState(false)
-  const [connectionId, setConnectionId] = useState<string>('')
-  const [teamId, setTeamId] = useState<string>('')
-  const [teamKey, setTeamKey] = useState<string>('')
-  const [linearProjectId, setLinearProjectId] = useState<string>('')
-  const [syncMode, setSyncMode] = useState<IntegrationSyncMode>('one_way')
   const [importing, setImporting] = useState(false)
   const [importMessage, setImportMessage] = useState('')
   const [issueOptions, setIssueOptions] = useState<LinearIssueSummary[]>([])
+  const [linearImportSort, setLinearImportSort] = useState<ImportIssueSort>('updated_desc')
   const [selectedIssueIds, setSelectedIssueIds] = useState<Set<string>>(new Set())
   const [loadingIssues, setLoadingIssues] = useState(false)
   const [githubRepoIssueOptions, setGithubRepoIssueOptions] = useState<GithubIssueSummary[]>([])
+  const [githubImportSort, setGithubImportSort] = useState<ImportIssueSort>('updated_desc')
   const [selectedGithubRepoIssueIds, setSelectedGithubRepoIssueIds] = useState<Set<string>>(new Set())
   const [githubRepoIssueQuery, setGithubRepoIssueQuery] = useState('')
   const [loadingGithubRepoIssues, setLoadingGithubRepoIssues] = useState(false)
@@ -198,7 +229,41 @@ export function ProjectSettingsDialog({
   const [pushingGithubSync, setPushingGithubSync] = useState(false)
   const [pullingGithubSync, setPullingGithubSync] = useState(false)
   const [githubSyncMessage, setGithubSyncMessage] = useState('')
-  const [setupProvider, setSetupProvider] = useState<ProjectIntegrationProvider | null>(null)
+  const [selectedIntegrationEntry, setSelectedIntegrationEntry] = useState<IntegrationSetupEntry | null>(
+    null
+  )
+  const [selectedIntegrationMode, setSelectedIntegrationMode] = useState<'continuous' | 'import' | null>(
+    integrationOnboardingProvider ? 'continuous' : null
+  )
+  const [githubProjectConnectionId, setGithubProjectConnectionId] = useState('')
+  const [linearProjectConnectionId, setLinearProjectConnectionId] = useState('')
+  const [githubSyncProjects, setGithubSyncProjects] = useState<GithubProjectSummary[]>([])
+  const [loadingGithubSyncProjects, setLoadingGithubSyncProjects] = useState(false)
+  const [githubSyncProjectId, setGithubSyncProjectId] = useState('')
+  const [githubSyncMode, setGithubSyncMode] = useState<IntegrationSyncMode>('one_way')
+  const [linearSyncTeamId, setLinearSyncTeamId] = useState('')
+  const [linearSyncProjectId, setLinearSyncProjectId] = useState('')
+  const [linearSyncTeams, setLinearSyncTeams] = useState<LinearTeam[]>([])
+  const [linearSyncProjects, setLinearSyncProjects] = useState<LinearProject[]>([])
+  const [loadingLinearSyncTeams, setLoadingLinearSyncTeams] = useState(false)
+  const [loadingLinearSyncProjects, setLoadingLinearSyncProjects] = useState(false)
+  const [linearSyncMode, setLinearSyncMode] = useState<IntegrationSyncMode>('one_way')
+  const [syncSettingsMessage, setSyncSettingsMessage] = useState('')
+  const [savingSyncProvider, setSavingSyncProvider] = useState<IntegrationProvider | null>(null)
+  const [pullingLinearSyncNow, setPullingLinearSyncNow] = useState(false)
+  const [linearImportTeamId, setLinearImportTeamId] = useState('')
+  const [linearImportProjectId, setLinearImportProjectId] = useState('')
+  const [linearImportTeams, setLinearImportTeams] = useState<LinearTeam[]>([])
+  const [linearImportProjects, setLinearImportProjects] = useState<LinearProject[]>([])
+  const [loadingLinearImportTeams, setLoadingLinearImportTeams] = useState(false)
+  const [loadingLinearImportProjects, setLoadingLinearImportProjects] = useState(false)
+  const [linearImportSourceMessage, setLinearImportSourceMessage] = useState('')
+  const [connectionModalState, setConnectionModalState] = useState<{
+    provider: IntegrationProvider
+    mode: 'connect' | 'edit'
+  } | null>(null)
+  const [disconnectingProjectConnectionProvider, setDisconnectingProjectConnectionProvider] = useState<IntegrationProvider | null>(null)
+  const [switchingProvider, setSwitchingProvider] = useState(false)
   const [contextManagerTab, setContextManagerTab] = useState<ProjectContextManagerTab>('config')
   const [contextManagerEnabled, setContextManagerEnabled] = useState(false)
   const [execType, setExecType] = useState<'host' | 'docker' | 'ssh'>('host')
@@ -251,7 +316,14 @@ export function ProjectSettingsDialog({
     if (open) {
       setActiveTab(initialTab)
       setContextManagerTab('config')
-      setSetupProvider(integrationOnboardingProvider)
+      setSelectedIntegrationEntry(
+        integrationOnboardingProvider === 'github'
+          ? 'github_projects'
+          : integrationOnboardingProvider === 'linear'
+            ? 'linear'
+            : null
+      )
+      setSelectedIntegrationMode(integrationOnboardingProvider ? 'continuous' : null)
     }
   }, [open, project?.id, initialTab])
 
@@ -259,7 +331,8 @@ export function ProjectSettingsDialog({
     if (!open) return
     if (!integrationOnboardingProvider) return
     setActiveTab('integrations')
-    setSetupProvider(integrationOnboardingProvider)
+    setSelectedIntegrationEntry(integrationOnboardingProvider === 'github' ? 'github_projects' : 'linear')
+    setSelectedIntegrationMode('continuous')
     onIntegrationOnboardingHandled?.()
   }, [open, integrationOnboardingProvider, onIntegrationOnboardingHandled])
 
@@ -279,24 +352,58 @@ export function ProjectSettingsDialog({
 
   const reloadIntegrationState = useCallback(async () => {
     if (!open || !project) return
-    const [loadedConnections, loadedMapping, loadedGithubConnections, loadedGithubMapping] = await Promise.all([
+    const [
+      loadedConnections,
+      loadedMapping,
+      loadedLinearProjectConnectionId,
+      loadedGithubConnections,
+      loadedGithubMapping,
+      loadedGithubProjectConnectionId
+    ] = await Promise.all([
       window.api.integrations.listConnections('linear'),
       window.api.integrations.getProjectMapping(project.id, 'linear'),
+      window.api.integrations.getProjectConnection(project.id, 'linear'),
       window.api.integrations.listConnections('github'),
-      window.api.integrations.getProjectMapping(project.id, 'github')
+      window.api.integrations.getProjectMapping(project.id, 'github'),
+      window.api.integrations.getProjectConnection(project.id, 'github')
     ])
     setConnections(loadedConnections)
     setGithubConnections(loadedGithubConnections)
     setMapping(loadedMapping)
     setGithubMapping(loadedGithubMapping)
-    setGithubRepoConnectionId(loadedGithubMapping?.connection_id ?? loadedGithubConnections[0]?.id ?? '')
+    setSelectedIntegrationEntry((current) => {
+      return current
+    })
+    const resolvedGithubConnectionId = loadedGithubProjectConnectionId &&
+      loadedGithubConnections.some((connection) => connection.id === loadedGithubProjectConnectionId)
+      ? loadedGithubProjectConnectionId
+      : loadedGithubMapping?.connection_id &&
+          loadedGithubConnections.some((connection) => connection.id === loadedGithubMapping.connection_id)
+        ? loadedGithubMapping.connection_id
+        : ''
+    const resolvedLinearConnectionId = loadedLinearProjectConnectionId &&
+      loadedConnections.some((connection) => connection.id === loadedLinearProjectConnectionId)
+      ? loadedLinearProjectConnectionId
+      : loadedMapping?.connection_id &&
+          loadedConnections.some((connection) => connection.id === loadedMapping.connection_id)
+        ? loadedMapping.connection_id
+        : ''
+
+    setGithubProjectConnectionId(resolvedGithubConnectionId)
+    setLinearProjectConnectionId(resolvedLinearConnectionId)
+    setGithubSyncProjectId(loadedGithubMapping?.external_project_id ?? '')
+    setGithubSyncMode(loadedGithubMapping?.sync_mode ?? 'one_way')
+    setLinearSyncTeamId(loadedMapping?.external_team_id ?? '')
+    setLinearSyncProjectId(loadedMapping?.external_project_id ?? '')
+    setLinearSyncMode(loadedMapping?.sync_mode ?? 'one_way')
+    setSyncSettingsMessage('')
+    setLinearImportTeamId('')
+    setLinearImportProjectId('')
+    setLinearImportTeams([])
+    setLinearImportProjects([])
+    setLinearImportSourceMessage('')
     setGithubRepositories([])
     setGithubRepositoryFullName('')
-    setConnectionId(loadedMapping?.connection_id ?? loadedConnections[0]?.id ?? '')
-    setTeamId(loadedMapping?.external_team_id ?? '')
-    setTeamKey(loadedMapping?.external_team_key ?? '')
-    setLinearProjectId(loadedMapping?.external_project_id ?? '')
-    setSyncMode(loadedMapping?.sync_mode ?? 'one_way')
     setIssueOptions([])
     setSelectedIssueIds(new Set())
     setImportMessage('')
@@ -314,43 +421,16 @@ export function ProjectSettingsDialog({
   }, [reloadIntegrationState])
 
   useEffect(() => {
-    const loadTeams = async () => {
-      if (!connectionId) {
-        setTeams([])
-        return
-      }
-      const loadedTeams = await window.api.integrations.listLinearTeams(connectionId)
-      setTeams(loadedTeams)
-      if (!teamId && loadedTeams[0]) {
-        setTeamId(loadedTeams[0].id)
-        setTeamKey(loadedTeams[0].key)
-      }
-    }
-    void loadTeams()
-  }, [connectionId])
-
-  useEffect(() => {
-    const loadLinearProjects = async () => {
-      if (!connectionId || !teamId) {
-        setLinearProjects([])
-        return
-      }
-      const loaded = await window.api.integrations.listLinearProjects(connectionId, teamId)
-      setLinearProjects(loaded)
-    }
-    void loadLinearProjects()
-  }, [connectionId, teamId])
-
-  useEffect(() => {
     const loadGithubRepositories = async () => {
-      if (!githubRepoConnectionId) {
+      const connectionId = githubProjectConnectionId || githubMapping?.connection_id
+      if (!connectionId) {
         setGithubRepositories([])
         setGithubRepositoryFullName('')
         return
       }
       setLoadingGithubRepositories(true)
       try {
-        const repos = await window.api.integrations.listGithubRepositories(githubRepoConnectionId)
+        const repos = await window.api.integrations.listGithubRepositories(connectionId)
         setGithubRepositories(repos)
         setGithubRepositoryFullName((current) => {
           if (current && repos.some((repo) => repo.fullName === current)) return current
@@ -365,14 +445,338 @@ export function ProjectSettingsDialog({
       }
     }
     void loadGithubRepositories()
-  }, [githubRepoConnectionId])
+  }, [githubProjectConnectionId, githubMapping?.connection_id])
 
   useEffect(() => {
     setGithubRepoIssueOptions([])
     setSelectedGithubRepoIssueIds(new Set())
     setGithubRepoIssueQuery('')
     setGithubRepoImportMessage('')
-  }, [githubRepoConnectionId, githubRepositoryFullName])
+  }, [selectedIntegrationEntry, githubProjectConnectionId, githubMapping?.connection_id, githubRepositoryFullName])
+
+  useEffect(() => {
+    if (!githubProjectConnectionId) {
+      setGithubSyncProjects([])
+      setGithubSyncProjectId('')
+      return
+    }
+    setLoadingGithubSyncProjects(true)
+    setSyncSettingsMessage('')
+    void window.api.integrations.listGithubProjects(githubProjectConnectionId)
+      .then((projects) => {
+        setGithubSyncProjects(projects)
+        setGithubSyncProjectId((current) => {
+          if (current && projects.some((projectOption) => projectOption.id === current)) return current
+          if (githubMapping?.external_project_id && projects.some((projectOption) => projectOption.id === githubMapping.external_project_id)) {
+            return githubMapping.external_project_id
+          }
+          return projects[0]?.id ?? ''
+        })
+      })
+      .catch((error) => {
+        setSyncSettingsMessage(error instanceof Error ? error.message : String(error))
+        setGithubSyncProjects([])
+        setGithubSyncProjectId('')
+      })
+      .finally(() => {
+        setLoadingGithubSyncProjects(false)
+      })
+  }, [githubProjectConnectionId, githubMapping?.external_project_id])
+
+  useEffect(() => {
+    if (!linearProjectConnectionId) {
+      setLinearSyncTeams([])
+      setLinearSyncTeamId('')
+      setLinearSyncProjects([])
+      setLinearSyncProjectId('')
+      return
+    }
+    setLoadingLinearSyncTeams(true)
+    setSyncSettingsMessage('')
+    void window.api.integrations.listLinearTeams(linearProjectConnectionId)
+      .then((teams) => {
+        setLinearSyncTeams(teams)
+        setLinearSyncTeamId((current) => {
+          if (current && teams.some((team) => team.id === current)) return current
+          if (mapping?.external_team_id && teams.some((team) => team.id === mapping.external_team_id)) {
+            return mapping.external_team_id
+          }
+          return teams[0]?.id ?? ''
+        })
+      })
+      .catch((error) => {
+        setSyncSettingsMessage(error instanceof Error ? error.message : String(error))
+        setLinearSyncTeams([])
+        setLinearSyncTeamId('')
+      })
+      .finally(() => {
+        setLoadingLinearSyncTeams(false)
+      })
+  }, [linearProjectConnectionId, mapping?.external_team_id])
+
+  useEffect(() => {
+    if (!linearProjectConnectionId || !linearSyncTeamId) {
+      setLinearSyncProjects([])
+      setLinearSyncProjectId('')
+      return
+    }
+    setLoadingLinearSyncProjects(true)
+    setSyncSettingsMessage('')
+    void window.api.integrations.listLinearProjects(linearProjectConnectionId, linearSyncTeamId)
+      .then((projects) => {
+        setLinearSyncProjects(projects)
+        setLinearSyncProjectId((current) => {
+          if (current && projects.some((projectOption) => projectOption.id === current)) return current
+          if (mapping?.external_project_id && projects.some((projectOption) => projectOption.id === mapping.external_project_id)) {
+            return mapping.external_project_id
+          }
+          return ''
+        })
+      })
+      .catch((error) => {
+        setSyncSettingsMessage(error instanceof Error ? error.message : String(error))
+        setLinearSyncProjects([])
+        setLinearSyncProjectId('')
+      })
+      .finally(() => {
+        setLoadingLinearSyncProjects(false)
+      })
+  }, [linearProjectConnectionId, linearSyncTeamId, mapping?.external_project_id])
+
+  useEffect(() => {
+    if (!linearProjectConnectionId) {
+      setLinearImportTeams([])
+      setLinearImportTeamId('')
+      setLinearImportProjects([])
+      setLinearImportProjectId('')
+      return
+    }
+    setLoadingLinearImportTeams(true)
+    setLinearImportSourceMessage('')
+    void window.api.integrations.listLinearTeams(linearProjectConnectionId)
+      .then((teams) => {
+        setLinearImportTeams(teams)
+        setLinearImportTeamId((current) => {
+          if (current && teams.some((team) => team.id === current)) return current
+          return teams[0]?.id ?? ''
+        })
+      })
+      .catch((error) => {
+        setLinearImportSourceMessage(error instanceof Error ? error.message : String(error))
+        setLinearImportTeams([])
+        setLinearImportTeamId('')
+      })
+      .finally(() => {
+        setLoadingLinearImportTeams(false)
+      })
+  }, [linearProjectConnectionId])
+
+  useEffect(() => {
+    if (!linearProjectConnectionId || !linearImportTeamId) {
+      setLinearImportProjects([])
+      setLinearImportProjectId('')
+      return
+    }
+    setLoadingLinearImportProjects(true)
+    setLinearImportSourceMessage('')
+    void window.api.integrations.listLinearProjects(linearProjectConnectionId, linearImportTeamId)
+      .then((projects) => {
+        setLinearImportProjects(projects)
+        setLinearImportProjectId((current) => {
+          if (current && projects.some((project) => project.id === current)) return current
+          return current || ''
+        })
+      })
+      .catch((error) => {
+        setLinearImportSourceMessage(error instanceof Error ? error.message : String(error))
+        setLinearImportProjects([])
+        setLinearImportProjectId('')
+      })
+      .finally(() => {
+        setLoadingLinearImportProjects(false)
+      })
+  }, [linearProjectConnectionId, linearImportTeamId])
+
+  const handleSelectIntegrationEntry = (
+    entry: IntegrationSetupEntry,
+    options?: { mode?: 'continuous' | 'import' }
+  ) => {
+    const activeSyncProvider: IntegrationProvider | null = mapping
+      ? 'linear'
+      : githubMapping
+        ? 'github'
+        : null
+
+    if (entry === 'github_issues') {
+      setSelectedIntegrationEntry(entry)
+      setSelectedIntegrationMode(options?.mode ?? 'import')
+      return
+    }
+
+    const nextProvider: IntegrationProvider = entry === 'linear' ? 'linear' : 'github'
+    const mode = options?.mode ?? 'continuous'
+    if (mode === 'continuous' && activeSyncProvider && activeSyncProvider !== nextProvider) {
+      window.alert(
+        `${providerDisplayName(activeSyncProvider)} sync is active. Disable it first to switch.`
+      )
+      return
+    }
+
+    setSelectedIntegrationEntry(entry)
+    setSelectedIntegrationMode(mode)
+  }
+
+  const handleDisableSyncForProvider = async (provider: IntegrationProvider) => {
+    if (!project) return
+
+    setSwitchingProvider(true)
+    try {
+      await window.api.integrations.clearProjectProvider({
+        projectId: project.id,
+        provider
+      })
+      await reloadIntegrationState()
+      setSyncSettingsMessage('Sync disabled')
+    } finally {
+      setSwitchingProvider(false)
+    }
+  }
+
+  const handleDisconnectProjectConnection = async (provider: IntegrationProvider) => {
+    if (!project) return
+    const confirmed = window.confirm(`Disconnect ${providerDisplayName(provider)} for this project?`)
+    if (!confirmed) return
+
+    setDisconnectingProjectConnectionProvider(provider)
+    try {
+      await window.api.integrations.clearProjectConnection({
+        projectId: project.id,
+        provider
+      })
+      if (connectionModalState?.provider === provider) {
+        setConnectionModalState(null)
+      }
+      await reloadIntegrationState()
+    } finally {
+      setDisconnectingProjectConnectionProvider(null)
+    }
+  }
+
+  const handleSaveGithubSyncSettings = async () => {
+    if (!project || !githubProjectConnectionId || !githubSyncProjectId) {
+      setSyncSettingsMessage('Choose a GitHub Project first')
+      return
+    }
+    const selectedProject = githubSyncProjects.find((projectOption) => projectOption.id === githubSyncProjectId)
+    if (!selectedProject) {
+      setSyncSettingsMessage('Choose a valid GitHub Project')
+      return
+    }
+
+    setSavingSyncProvider('github')
+    setSyncSettingsMessage('')
+    try {
+      const saved = await window.api.integrations.setProjectMapping({
+        projectId: project.id,
+        provider: 'github',
+        connectionId: githubProjectConnectionId,
+        externalTeamId: selectedProject.owner.login,
+        externalTeamKey: `${selectedProject.owner.login}#${selectedProject.number}`,
+        externalProjectId: selectedProject.id,
+        syncMode: githubSyncMode
+      })
+      setGithubMapping(saved)
+      setGithubProjectConnectionId(saved.connection_id)
+      await reloadIntegrationState()
+      setSyncSettingsMessage('Sync settings saved')
+    } catch (error) {
+      setSyncSettingsMessage(error instanceof Error ? error.message : String(error))
+    } finally {
+      setSavingSyncProvider(null)
+    }
+  }
+
+  const handleSaveLinearSyncSettings = async () => {
+    if (!project || !linearProjectConnectionId || !linearSyncTeamId) {
+      setSyncSettingsMessage('Choose a Linear team first')
+      return
+    }
+    const selectedTeam = linearSyncTeams.find((team) => team.id === linearSyncTeamId)
+    if (!selectedTeam) {
+      setSyncSettingsMessage('Choose a valid Linear team')
+      return
+    }
+
+    setSavingSyncProvider('linear')
+    setSyncSettingsMessage('')
+    try {
+      const saved = await window.api.integrations.setProjectMapping({
+        projectId: project.id,
+        provider: 'linear',
+        connectionId: linearProjectConnectionId,
+        externalTeamId: selectedTeam.id,
+        externalTeamKey: selectedTeam.key,
+        externalProjectId: linearSyncProjectId || null,
+        syncMode: linearSyncMode
+      })
+      setMapping(saved)
+      setLinearProjectConnectionId(saved.connection_id)
+      await reloadIntegrationState()
+      setSyncSettingsMessage('Sync settings saved')
+    } catch (error) {
+      setSyncSettingsMessage(error instanceof Error ? error.message : String(error))
+    } finally {
+      setSavingSyncProvider(null)
+    }
+  }
+
+  const handleManualLinearPull = async () => {
+    if (!project || !linearSyncEnabled) {
+      toast.error('Enable Linear sync first')
+      return
+    }
+    const connectionId = mapping?.connection_id ?? linearProjectConnectionId
+    const teamId = mapping?.external_team_id ?? linearSyncTeamId
+    const linearProjectId = mapping?.external_project_id ?? (linearSyncProjectId || undefined)
+    if (!connectionId || !teamId) {
+      toast.error('Save Linear sync settings first')
+      return
+    }
+
+    setPullingLinearSyncNow(true)
+    try {
+      let cursor: string | null = null
+      let totalImported = 0
+      let totalLinked = 0
+      let pages = 0
+      const maxPages = 20
+
+      do {
+        const result = await window.api.integrations.importLinearIssues({
+          projectId: project.id,
+          connectionId,
+          teamId,
+          linearProjectId,
+          limit: 50,
+          cursor
+        })
+        totalImported += result.imported
+        totalLinked += result.linked
+        cursor = result.nextCursor
+        pages += 1
+      } while (cursor && pages < maxPages)
+
+      const truncated = cursor ? ' (partial: reached page limit)' : ''
+      toast.success(`Pull complete: ${totalImported} imported/updated, ${totalLinked} linked${truncated}`)
+      if (totalImported > 0) {
+        ;(window as any).__slayzone_refreshData?.()
+      }
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : String(error))
+    } finally {
+      setPullingLinearSyncNow(false)
+    }
+  }
 
   const handleBrowse = async () => {
     const result = await window.api.dialog.showOpenDialog({
@@ -499,38 +903,23 @@ export function ProjectSettingsDialog({
     setColumnsDraft(resolveColumns(updated.columns_config))
   }
 
-  const [savingMapping, setSavingMapping] = useState(false)
-
-  const handleSaveMapping = async () => {
-    if (!project || !connectionId || !teamId) return
-    setSavingMapping(true)
-    try {
-      const team = teams.find((t) => t.id === teamId)
-      const saved = await window.api.integrations.setProjectMapping({
-        projectId: project.id,
-        provider: 'linear',
-        connectionId,
-        externalTeamId: teamId,
-        externalTeamKey: team?.key ?? teamKey,
-        externalProjectId: linearProjectId || null,
-        syncMode
-      })
-      setMapping(saved)
-    } finally {
-      setSavingMapping(false)
-    }
-  }
-
   const handleLoadIssues = async () => {
-    if (!connectionId) return
+    const connectionId = linearProjectConnectionId
+    const teamId = linearImportTeamId
+    const linearProjectId = linearImportProjectId || undefined
+
+    if (!connectionId || !teamId) {
+      setImportMessage('Choose account and team first')
+      return
+    }
     setLoadingIssues(true)
     setImportMessage('')
     try {
       const result = await window.api.integrations.listLinearIssues({
         connectionId,
         projectId: project?.id,
-        teamId: teamId || undefined,
-        linearProjectId: linearProjectId || undefined,
+        teamId,
+        linearProjectId,
         limit: 50
       })
       setIssueOptions(result.issues)
@@ -547,15 +936,19 @@ export function ProjectSettingsDialog({
   }
 
   const handleImportIssues = async () => {
-    if (!project || !connectionId) return
+    const connectionId = linearProjectConnectionId
+    const teamId = linearImportTeamId
+    const linearProjectId = linearImportProjectId || undefined
+
+    if (!project || !connectionId || !teamId) return
     setImporting(true)
     setImportMessage('')
     try {
       const result = await window.api.integrations.importLinearIssues({
         projectId: project.id,
         connectionId,
-        teamId: teamId || undefined,
-        linearProjectId: linearProjectId || undefined,
+        teamId,
+        linearProjectId,
         selectedIssueIds: selectedIssueIds.size > 0 ? [...selectedIssueIds] : undefined,
         limit: 50
       })
@@ -572,12 +965,13 @@ export function ProjectSettingsDialog({
   }
 
   const handleLoadGithubRepositoryIssues = async () => {
-    if (!githubRepoConnectionId || !githubRepositoryFullName) return
+    const connectionId = githubProjectConnectionId || githubMapping?.connection_id
+    if (!connectionId || !githubRepositoryFullName) return
     setLoadingGithubRepoIssues(true)
     setGithubRepoImportMessage('')
     try {
       const result = await window.api.integrations.listGithubRepositoryIssues({
-        connectionId: githubRepoConnectionId,
+        connectionId,
         projectId: project?.id,
         repositoryFullName: githubRepositoryFullName,
         limit: 50
@@ -598,7 +992,8 @@ export function ProjectSettingsDialog({
   }
 
   const handleImportGithubRepositoryIssues = async () => {
-    if (!project || !githubRepoConnectionId || !githubRepositoryFullName) return
+    const connectionId = githubProjectConnectionId || githubMapping?.connection_id
+    if (!project || !connectionId || !githubRepositoryFullName) return
     setImportingGithubRepoIssues(true)
     setGithubRepoImportMessage('')
     try {
@@ -608,7 +1003,7 @@ export function ProjectSettingsDialog({
       const selectedImportableIds = [...selectedGithubRepoIssueIds].filter((id) => importableIdSet.has(id))
       const result = await window.api.integrations.importGithubRepositoryIssues({
         projectId: project.id,
-        connectionId: githubRepoConnectionId,
+        connectionId,
         repositoryFullName: githubRepositoryFullName,
         selectedIssueIds: selectedImportableIds.length > 0 ? selectedImportableIds : undefined,
         limit: 50
@@ -768,25 +1163,66 @@ export function ProjectSettingsDialog({
     setSelectedGithubRepoIssueIds(next)
   }
 
-  const hasConnection = Boolean(connectionId)
-  const hasTeam = Boolean(teamId)
-  const canLoadIssues = hasConnection && hasTeam
-  const canImportIssues = hasConnection && hasTeam
-  const importableIssues = issueOptions.filter((i) => !i.linkedTaskId)
+  const linearMappingSource = mapping
+  const githubMappingSource = githubMapping
+  const isGithubContinuousView = selectedIntegrationEntry === 'github_projects' && selectedIntegrationMode === 'continuous'
+  const isGithubImportView = selectedIntegrationEntry === 'github_issues' && selectedIntegrationMode === 'import'
+  const isLinearContinuousView = selectedIntegrationEntry === 'linear' && selectedIntegrationMode === 'continuous'
+  const isLinearImportView = selectedIntegrationEntry === 'linear' && selectedIntegrationMode === 'import'
+  const syncSetupProvider: IntegrationProvider | null = selectedIntegrationEntry === 'linear'
+    ? 'linear'
+    : selectedIntegrationEntry === 'github_projects'
+      ? 'github'
+      : null
+  const activeSyncProvider: IntegrationProvider | null = linearMappingSource
+    ? 'linear'
+    : githubMappingSource
+      ? 'github'
+      : null
+  const githubSyncEnabled = Boolean(githubMappingSource)
+  const linearSyncEnabled = Boolean(linearMappingSource)
+  const githubConnected = Boolean(githubProjectConnectionId)
+  const linearConnected = Boolean(linearProjectConnectionId)
+  const normalizedLinearSyncProjectId = linearSyncProjectId || null
+  const githubSyncHasChanges = githubMappingSource
+    ? (
+      githubMappingSource.connection_id !== githubProjectConnectionId ||
+      githubMappingSource.external_project_id !== githubSyncProjectId ||
+      githubMappingSource.sync_mode !== githubSyncMode
+    )
+    : Boolean(githubSyncProjectId)
+  const linearSyncHasChanges = linearMappingSource
+    ? (
+      linearMappingSource.connection_id !== linearProjectConnectionId ||
+      linearMappingSource.external_team_id !== linearSyncTeamId ||
+      (linearMappingSource.external_project_id ?? null) !== normalizedLinearSyncProjectId ||
+      linearMappingSource.sync_mode !== linearSyncMode
+    )
+    : Boolean(linearSyncTeamId)
+  const githubProjectsDisabled = activeSyncProvider === 'linear'
+  const linearDisabled = activeSyncProvider === 'github'
+  const githubRepositoryConnectionId = githubProjectConnectionId || githubMappingSource?.connection_id || ''
+  const linearIssueConnectionId = linearProjectConnectionId
+  const linearIssueTeamId = linearImportTeamId
+  const canLoadIssues = Boolean(linearIssueConnectionId && linearIssueTeamId)
+  const canImportIssues = Boolean(linearIssueConnectionId && linearIssueTeamId)
+  const sortedLinearIssueOptions = sortByMode(issueOptions, linearImportSort)
+  const importableIssues = sortedLinearIssueOptions.filter((i) => !i.linkedTaskId)
   const allVisibleIssuesSelected = importableIssues.length > 0 && selectedIssueIds.size === importableIssues.length
-  const canLoadGithubRepoIssues = Boolean(githubRepoConnectionId && githubRepositoryFullName)
+  const canLoadGithubRepoIssues = Boolean(githubRepositoryConnectionId && githubRepositoryFullName)
   const githubRepoIssueQueryNormalized = githubRepoIssueQuery.trim().toLowerCase()
+  const githubRepoSortedIssues = sortByMode(githubRepoIssueOptions, githubImportSort)
   const githubRepoFilteredIssues = githubRepoIssueQueryNormalized
-    ? githubRepoIssueOptions.filter((issue) =>
+    ? githubRepoSortedIssues.filter((issue) =>
         `${issue.repository.fullName}#${issue.number} ${issue.title}`.toLowerCase().includes(githubRepoIssueQueryNormalized)
       )
-    : githubRepoIssueOptions
-  const githubRepoImportableIssues = githubRepoIssueOptions.filter((issue) => !issue.linkedTaskId)
+    : githubRepoSortedIssues
+  const githubRepoImportableIssues = githubRepoSortedIssues.filter((issue) => !issue.linkedTaskId)
   const githubRepoVisibleImportableIssues = githubRepoFilteredIssues.filter((issue) => !issue.linkedTaskId)
-  const githubRepoLinkedInProjectCount = githubRepoIssueOptions.filter(
+  const githubRepoLinkedInProjectCount = githubRepoSortedIssues.filter(
     (issue) => issue.linkedTaskId && issue.linkedProjectId === project?.id
   ).length
-  const githubRepoLinkedElsewhereCount = githubRepoIssueOptions.filter(
+  const githubRepoLinkedElsewhereCount = githubRepoSortedIssues.filter(
     (issue) => issue.linkedTaskId && issue.linkedProjectId && issue.linkedProjectId !== project?.id
   ).length
   const githubRepoImportableIdSet = new Set(githubRepoImportableIssues.map((issue) => issue.id))
@@ -795,9 +1231,9 @@ export function ProjectSettingsDialog({
   ).length
   const canImportGithubRepoIssues = Boolean(
     project &&
-    githubRepoConnectionId &&
+    githubRepositoryConnectionId &&
     githubRepositoryFullName &&
-    (githubRepoIssueOptions.length === 0 || githubRepoImportableIssues.length > 0 || selectedGithubRepoImportableCount > 0)
+    (githubRepoSortedIssues.length === 0 || githubRepoImportableIssues.length > 0 || selectedGithubRepoImportableCount > 0)
   )
   const allVisibleGithubRepoIssuesSelected =
     githubRepoVisibleImportableIssues.length > 0 &&
@@ -812,14 +1248,98 @@ export function ProjectSettingsDialog({
     errors: 0,
     checkedAt: ''
   }
-  const hasUnsavedMappingChanges =
-    mapping != null &&
-    (mapping.connection_id !== connectionId ||
-      mapping.external_team_id !== teamId ||
-      mapping.external_team_key !== teamKey ||
-      (mapping.external_project_id ?? '') !== linearProjectId ||
-      mapping.sync_mode !== syncMode)
-
+  const integrationCategoryItems: Array<{
+    provider: IntegrationProvider
+    title: string
+    items: Array<{
+      key: string
+      entry: IntegrationSetupEntry
+      mode: 'continuous' | 'import'
+      label: string
+      description: string
+      disabled: boolean
+      testId: string
+    }>
+  }> = [
+    {
+      provider: 'github',
+      title: 'GitHub',
+      items: [
+        {
+          key: 'github-continuous-sync',
+          entry: 'github_projects',
+          mode: 'continuous',
+          label: 'Continuous sync',
+          description: 'Sync with a GitHub Project.',
+          disabled: switchingProvider || githubProjectsDisabled,
+          testId: 'project-integration-provider-github'
+        },
+        {
+          key: 'github-one-time-import',
+          entry: 'github_issues',
+          mode: 'import',
+          label: 'One-time import',
+          description: 'Import regular GitHub issues.',
+          disabled: switchingProvider,
+          testId: 'project-integration-provider-github-issues'
+        }
+      ]
+    },
+    {
+      provider: 'linear',
+      title: 'Linear',
+      items: [
+        {
+          key: 'linear-continuous-sync',
+          entry: 'linear',
+          mode: 'continuous',
+          label: 'Continuous sync',
+          description: 'Sync with a Linear team/project.',
+          disabled: switchingProvider || linearDisabled,
+          testId: 'project-integration-provider-linear'
+        },
+        {
+          key: 'linear-one-time-import',
+          entry: 'linear',
+          mode: 'import',
+          label: 'One-time import',
+          description: 'Import Linear issues once.',
+          disabled: switchingProvider,
+          testId: 'project-integration-provider-linear-import'
+        }
+      ]
+    }
+  ]
+  const selectedIntegrationViewMeta = (() => {
+    if (isGithubContinuousView) {
+      return {
+        title: 'GitHub - Continuous sync',
+        description: 'Set up and run continuous sync with a GitHub Project.'
+      }
+    }
+    if (isGithubImportView) {
+      return {
+        title: 'GitHub - One-time import',
+        description: 'Import regular GitHub repository issues once.'
+      }
+    }
+    if (isLinearContinuousView) {
+      return {
+        title: 'Linear - Continuous sync',
+        description: 'Set up and run continuous sync with a Linear team/project.'
+      }
+    }
+    if (isLinearImportView) {
+      return {
+        title: 'Linear - One-time import',
+        description: 'Import Linear issues once into this project.'
+      }
+    }
+    return {
+      title: 'Integrations',
+      description: 'Choose an integration item to continue.'
+    }
+  })()
   const navItems: Array<{ key: typeof activeTab; label: string }> = [
     { key: 'general', label: 'General' },
     { key: 'environment', label: 'Environment' },
@@ -1177,98 +1697,412 @@ export function ProjectSettingsDialog({
             <div className="w-full space-y-6">
               <SettingsTabIntro
                 title="Integrations"
-                description="Configure project-scoped sync with external ticket systems. Each project has its own source, mode, mapping, and sync history."
+                description="Choose one integration path, then configure its project-specific connection and mapping."
               />
 
-              <Card className="gap-4 py-4">
-                <CardHeader className="px-4">
-                  <CardTitle className="text-base">Project sync setup</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3 px-4">
-                  <div className="grid gap-2 md:grid-cols-2">
-                    <button
-                      type="button"
-                      onClick={() => setSetupProvider('github')}
-                      className={cn(
-                        'rounded-md border p-3 text-left transition-colors',
-                        setupProvider === 'github'
-                          ? 'border-primary bg-primary/5'
-                          : 'border-border hover:border-muted-foreground/50'
-                      )}
-                    >
-                      <p className="text-sm font-medium">Sync with GitHub Projects</p>
-                      <p className="text-xs text-muted-foreground">
-                        Set up this project to sync from a GitHub Project board.
-                      </p>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setSetupProvider('linear')}
-                      className={cn(
-                        'rounded-md border p-3 text-left transition-colors',
-                        setupProvider === 'linear'
-                          ? 'border-primary bg-primary/5'
-                          : 'border-border hover:border-muted-foreground/50'
-                      )}
-                    >
-                      <p className="text-sm font-medium">Sync with Linear</p>
-                      <p className="text-xs text-muted-foreground">
-                        Configure project mapping, sync mode, and first sync import.
-                      </p>
-                    </button>
+              {selectedIntegrationEntry === null ? (
+                <div className="space-y-3">
+                  <div className="space-y-6">
+                    {integrationCategoryItems.map((category) => {
+                      const providerConnection = category.provider === 'github'
+                        ? githubConnections.find((connection) => connection.id === githubProjectConnectionId) ?? null
+                        : connections.find((connection) => connection.id === linearProjectConnectionId) ?? null
+                      const providerConnected = Boolean(providerConnection)
+
+                      return (
+                        <div key={category.provider} className="space-y-2">
+                          <div className="flex items-center justify-between gap-3 px-0.5">
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-2">
+                                <p className="text-sm font-semibold">{category.title}</p>
+                                {providerConnected ? (
+                                  <span className="rounded bg-emerald-500/15 px-1.5 py-0.5 text-[10px] font-medium text-emerald-300">
+                                    Connected
+                                  </span>
+                                ) : null}
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              {providerConnected ? (
+                                <>
+                                  <Button
+                                    type="button"
+                                    size="sm"
+                                    variant="outline"
+                                    data-testid={`project-${category.provider}-category-connection`}
+                                    onClick={() => setConnectionModalState({ provider: category.provider, mode: 'edit' })}
+                                    disabled={disconnectingProjectConnectionProvider === category.provider}
+                                  >
+                                    Edit connection
+                                  </Button>
+                                  <Button
+                                    type="button"
+                                    size="sm"
+                                    variant="outline"
+                                    data-testid={`project-${category.provider}-category-disconnect`}
+                                    onClick={() => void handleDisconnectProjectConnection(category.provider)}
+                                    disabled={disconnectingProjectConnectionProvider === category.provider}
+                                  >
+                                    {disconnectingProjectConnectionProvider === category.provider ? 'Disconnecting…' : 'Disconnect'}
+                                  </Button>
+                                </>
+                              ) : (
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="outline"
+                                  data-testid={`project-${category.provider}-category-connection`}
+                                  onClick={() => setConnectionModalState({ provider: category.provider, mode: 'connect' })}
+                                >
+                                  Connect
+                                </Button>
+                              )}
+                            </div>
+                          </div>
+                          <div className="space-y-1.5">
+                            {category.items.map((item) => {
+                              const isContinuousActive = item.mode === 'continuous' && activeSyncProvider === category.provider
+                              const disabledByOtherProvider = item.mode === 'continuous' && Boolean(activeSyncProvider) && activeSyncProvider !== category.provider
+                              const connectionReady = category.provider === 'github' ? githubConnected : linearConnected
+                              const disabledByMissingConnection = !connectionReady
+                              const isItemDisabled = item.disabled || disabledByMissingConnection
+
+                              let stateLabel = ''
+                              if (disabledByOtherProvider) {
+                                stateLabel = activeSyncProvider === 'github' ? 'Disabled by GitHub' : 'Disabled by Linear'
+                              } else if (isContinuousActive) {
+                                stateLabel = 'Active'
+                              } else if (disabledByMissingConnection) {
+                                stateLabel = 'Connect to start using'
+                              } else if (connectionReady) {
+                                stateLabel = 'Connected'
+                              }
+
+                              const stateClass = isContinuousActive
+                                ? 'bg-emerald-500/15 text-emerald-300'
+                                : disabledByOtherProvider
+                                  ? 'bg-muted text-muted-foreground'
+                                  : connectionReady
+                                    ? 'bg-emerald-500/15 text-emerald-300'
+                                    : 'bg-muted/70 text-muted-foreground'
+                              const hideConnectedPillForImport = item.mode === 'import' && stateLabel === 'Connected'
+                              const showStatePill = Boolean(stateLabel) && !hideConnectedPillForImport
+
+                              return (
+                                <button
+                                  key={item.key}
+                                  type="button"
+                                  title={item.description}
+                                  data-testid={item.testId}
+                                  onClick={() => handleSelectIntegrationEntry(item.entry, { mode: item.mode })}
+                                  disabled={isItemDisabled}
+                                  className={cn(
+                                    'flex w-full items-center gap-3 rounded-md border p-3 text-left transition-colors hover:bg-muted/50',
+                                    isItemDisabled && 'cursor-not-allowed opacity-50'
+                                  )}
+                                >
+                                  <div className="min-w-0 flex-1">
+                                    <div className="flex items-center gap-2">
+                                      <p className="text-sm font-medium">{item.label}</p>
+                                      {showStatePill ? (
+                                        <span className={cn('rounded px-1.5 py-0.5 text-[10px] font-medium', stateClass)}>
+                                          {stateLabel}
+                                        </span>
+                                      ) : null}
+                                    </div>
+                                    <p className="text-xs text-muted-foreground">{item.description}</p>
+                                  </div>
+                                  <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
+                                </button>
+                              )
+                            })}
+                          </div>
+                        </div>
+                      )
+                    })}
                   </div>
-                  <p className="text-xs text-muted-foreground">
-                    Use setup wizard for onboarding. Advanced controls remain below.
-                  </p>
-                </CardContent>
-              </Card>
+                </div>
+              ) : (
+                <div className="space-y-6">
+                  <div className="flex items-center justify-between gap-3">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedIntegrationEntry(null)
+                        setSelectedIntegrationMode(null)
+                      }}
+                      className="flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
+                    >
+                      <ArrowLeft className="size-3.5" />
+                      {selectedIntegrationViewMeta.title}
+                    </button>
+                    <span className="text-xs text-muted-foreground">
+                      {selectedIntegrationViewMeta.description}
+                    </span>
+                  </div>
 
-              {setupProvider && project ? (
-                <ProjectIntegrationSetupWizard
-                  provider={setupProvider}
-                  project={project}
-                  initialConnectionId={connectionId || undefined}
-                  initialTeamId={teamId || undefined}
-                  initialLinearProjectId={linearProjectId || undefined}
-                  initialSyncMode={syncMode}
-                  onCancel={() => {
-                    setSetupProvider(null)
-                    onIntegrationOnboardingHandled?.()
-                  }}
-                  onCompleted={({ provider: completedProvider, mapping: savedMapping, imported }) => {
-                    setSetupProvider(null)
-                    onIntegrationOnboardingHandled?.()
-                    if (completedProvider === 'linear') {
-                      setMapping(savedMapping)
-                      setConnectionId(savedMapping.connection_id)
-                      setTeamId(savedMapping.external_team_id)
-                      setTeamKey(savedMapping.external_team_key)
-                      setLinearProjectId(savedMapping.external_project_id ?? '')
-                      setSyncMode(savedMapping.sync_mode)
-                    } else if (completedProvider === 'github') {
-                      setGithubMapping(savedMapping)
-                      setGithubSyncRows([])
-                      setGithubSyncSummary(null)
-                    }
-                    const nextMessage = imported > 0
-                      ? `Imported ${imported} issues`
-                      : 'Integration profile saved'
-                    if (imported > 0) {
-                      ;(window as any).__slayzone_refreshData?.()
-                    }
-                    void reloadIntegrationState().then(() => {
-                      setImportMessage(nextMessage)
-                    })
-                  }}
-                />
-              ) : null}
+                  {(isGithubContinuousView || isLinearContinuousView) && syncSetupProvider ? (
+                    <div className="space-y-4">
+                      {syncSetupProvider === 'github' ? (
+                        githubConnected ? (
+                          <Card className="gap-4 py-4">
+                            <CardHeader className="px-4">
+                              <div className="flex items-center justify-between gap-3">
+                                <CardTitle className="text-base">GitHub Continuous Sync</CardTitle>
+                                <div className="flex items-center gap-2">
+                                  <span className="text-xs text-muted-foreground">Sync enabled</span>
+                                  <Switch
+                                    id="github-sync-enabled"
+                                    checked={githubSyncEnabled}
+                                    disabled={switchingProvider || savingSyncProvider === 'github'}
+                                    onCheckedChange={(checked) => {
+                                      if (checked === true) {
+                                        void handleSaveGithubSyncSettings()
+                                      } else {
+                                        void handleDisableSyncForProvider('github')
+                                      }
+                                    }}
+                                  />
+                                </div>
+                              </div>
+                            </CardHeader>
+                            <CardContent className="space-y-3 px-4">
+                              <div className="grid grid-cols-[220px_minmax(0,1fr)] items-center gap-4">
+                                <Label htmlFor="github-sync-project" className="text-sm">
+                                  GitHub Project
+                                </Label>
+                                <Select
+                                  value={githubSyncProjectId || '__none__'}
+                                  onValueChange={(value) => setGithubSyncProjectId(value === '__none__' ? '' : value)}
+                                  disabled={!githubProjectConnectionId || loadingGithubSyncProjects}
+                                >
+                                  <SelectTrigger id="github-sync-project" className="w-full max-w-md">
+                                    <SelectValue placeholder={loadingGithubSyncProjects ? 'Loading projects…' : 'Choose GitHub Project'} />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {githubSyncProjects.length === 0 ? (
+                                      <SelectItem value="__none__" disabled>No GitHub Projects found</SelectItem>
+                                    ) : null}
+                                    {githubSyncProjects.map((projectOption) => (
+                                      <SelectItem key={projectOption.id} value={projectOption.id}>
+                                        {projectOption.owner.login}#{projectOption.number} - {projectOption.title}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </div>
 
-              <Card className="gap-4 py-4">
+                              <div className="grid grid-cols-[220px_minmax(0,1fr)] items-center gap-4">
+                                <Label htmlFor="github-sync-mode" className="text-sm">
+                                  Sync mode
+                                </Label>
+                                <Select
+                                  value={githubSyncMode}
+                                  onValueChange={(value) => setGithubSyncMode(value as IntegrationSyncMode)}
+                                >
+                                  <SelectTrigger id="github-sync-mode" className="w-full max-w-md">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="one_way">One-way</SelectItem>
+                                    <SelectItem value="two_way">Two-way</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </div>
+
+                              <div className="flex items-center justify-end gap-2">
+                                <Button
+                                  size="sm"
+                                  disabled={
+                                    !githubSyncProjectId ||
+                                    savingSyncProvider === 'github' ||
+                                    !githubSyncHasChanges
+                                  }
+                                  onClick={() => void handleSaveGithubSyncSettings()}
+                                >
+                                  {savingSyncProvider === 'github'
+                                    ? (
+                                      <>
+                                        <Loader2 className="mr-1 size-3 animate-spin" />
+                                        Saving…
+                                      </>
+                                    )
+                                    : githubSyncEnabled
+                                      ? 'Save settings'
+                                      : 'Enable sync'}
+                                </Button>
+                              </div>
+
+                              {syncSettingsMessage ? (
+                                <p className="text-xs text-muted-foreground">{syncSettingsMessage}</p>
+                              ) : null}
+                            </CardContent>
+                          </Card>
+                        ) : (
+                          <Card className="gap-4 py-4">
+                            <CardHeader className="px-4">
+                              <CardTitle className="text-base">Connect GitHub</CardTitle>
+                            </CardHeader>
+                            <CardContent className="space-y-3 px-4">
+                              <p className="text-sm text-muted-foreground">
+                                Connect GitHub from the category header to configure sync.
+                              </p>
+                            </CardContent>
+                          </Card>
+                        )
+                      ) : (
+                        linearConnected ? (
+                          <Card className="gap-4 py-4">
+                            <CardHeader className="px-4">
+                              <div className="flex items-center justify-between gap-3">
+                                <CardTitle className="text-base">Linear Continuous Sync</CardTitle>
+                                <div className="flex items-center gap-2">
+                                  <span className="text-xs text-muted-foreground">Sync enabled</span>
+                                  <Switch
+                                    id="linear-sync-enabled"
+                                    checked={linearSyncEnabled}
+                                    disabled={switchingProvider || savingSyncProvider === 'linear'}
+                                    onCheckedChange={(checked) => {
+                                      if (checked === true) {
+                                        void handleSaveLinearSyncSettings()
+                                      } else {
+                                        void handleDisableSyncForProvider('linear')
+                                      }
+                                    }}
+                                  />
+                                </div>
+                              </div>
+                            </CardHeader>
+                            <CardContent className="space-y-3 px-4">
+                              <div className="grid grid-cols-[220px_minmax(0,1fr)] items-center gap-4">
+                                <Label htmlFor="linear-sync-team" className="text-sm">
+                                  Team
+                                </Label>
+                                <Select
+                                  value={linearSyncTeamId || '__none__'}
+                                  onValueChange={(value) => setLinearSyncTeamId(value === '__none__' ? '' : value)}
+                                  disabled={!linearProjectConnectionId || loadingLinearSyncTeams}
+                                >
+                                  <SelectTrigger id="linear-sync-team" className="w-full max-w-md">
+                                    <SelectValue placeholder={loadingLinearSyncTeams ? 'Loading teams…' : 'Choose team'} />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {linearSyncTeams.length === 0 ? (
+                                      <SelectItem value="__none__" disabled>No teams found</SelectItem>
+                                    ) : null}
+                                    {linearSyncTeams.map((team) => (
+                                      <SelectItem key={team.id} value={team.id}>
+                                        {team.key} - {team.name}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </div>
+
+                              <div className="grid grid-cols-[220px_minmax(0,1fr)] items-center gap-4">
+                                <Label htmlFor="linear-sync-project" className="text-sm">
+                                  Project (optional)
+                                </Label>
+                                <Select
+                                  value={linearSyncProjectId || '__none__'}
+                                  onValueChange={(value) => setLinearSyncProjectId(value === '__none__' ? '' : value)}
+                                  disabled={!linearProjectConnectionId || !linearSyncTeamId || loadingLinearSyncProjects}
+                                >
+                                  <SelectTrigger id="linear-sync-project" className="w-full max-w-md">
+                                    <SelectValue placeholder={loadingLinearSyncProjects ? 'Loading projects…' : 'All team issues'} />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="__none__">All team issues</SelectItem>
+                                    {linearSyncProjects.map((projectOption) => (
+                                      <SelectItem key={projectOption.id} value={projectOption.id}>
+                                        {projectOption.name}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </div>
+
+                              <div className="grid grid-cols-[220px_minmax(0,1fr)] items-center gap-4">
+                                <Label htmlFor="linear-sync-mode" className="text-sm">
+                                  Sync mode
+                                </Label>
+                                <Select
+                                  value={linearSyncMode}
+                                  onValueChange={(value) => setLinearSyncMode(value as IntegrationSyncMode)}
+                                >
+                                  <SelectTrigger id="linear-sync-mode" className="w-full max-w-md">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="one_way">One-way</SelectItem>
+                                    <SelectItem value="two_way">Two-way</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </div>
+
+                              <div className="flex items-center justify-end gap-2">
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  disabled={!linearSyncEnabled || pullingLinearSyncNow}
+                                  onClick={() => void handleManualLinearPull()}
+                                >
+                                  {pullingLinearSyncNow ? (
+                                    <>
+                                      <Loader2 className="mr-1 size-3 animate-spin" />
+                                      Pulling…
+                                    </>
+                                  ) : 'Pull now'}
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  disabled={
+                                    !linearSyncTeamId ||
+                                    savingSyncProvider === 'linear' ||
+                                    pullingLinearSyncNow ||
+                                    !linearSyncHasChanges
+                                  }
+                                  onClick={() => void handleSaveLinearSyncSettings()}
+                                >
+                                  {savingSyncProvider === 'linear'
+                                    ? (
+                                      <>
+                                        <Loader2 className="mr-1 size-3 animate-spin" />
+                                        Saving…
+                                      </>
+                                    )
+                                    : linearSyncEnabled
+                                      ? 'Save settings'
+                                      : 'Enable sync'}
+                                </Button>
+                              </div>
+
+                              {syncSettingsMessage ? (
+                                <p className="text-xs text-muted-foreground">{syncSettingsMessage}</p>
+                              ) : null}
+                            </CardContent>
+                          </Card>
+                        ) : (
+                          <Card className="gap-4 py-4">
+                            <CardHeader className="px-4">
+                              <CardTitle className="text-base">Connect Linear</CardTitle>
+                            </CardHeader>
+                            <CardContent className="space-y-3 px-4">
+                              <p className="text-sm text-muted-foreground">
+                                Connect Linear from the category header to configure sync.
+                              </p>
+                            </CardContent>
+                          </Card>
+                        )
+                      )}
+
+                      {isGithubContinuousView ? (
+                        <Card className="gap-4 py-4">
                 <CardHeader className="px-4">
                   <CardTitle className="text-base">GitHub Project Sync Controls</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-3 px-4">
-                  {githubConnections.length > 0 ? (
+                  {githubMappingSource ? (
                     <>
                       <div className="flex flex-wrap items-center gap-2">
                         <span className="rounded bg-muted px-2 py-1 text-[11px] text-muted-foreground">
@@ -1296,7 +2130,12 @@ export function ProjectSettingsDialog({
                           disabled={checkingGithubSync || pushingGithubSync || pullingGithubSync}
                           onClick={() => void handleCheckGithubDiffs()}
                         >
-                          {checkingGithubSync ? 'Checking…' : 'Check all diffs'}
+                          {checkingGithubSync ? (
+                            <>
+                              <Loader2 className="mr-1 size-3 animate-spin" />
+                              Checking…
+                            </>
+                          ) : 'Check all diffs'}
                         </Button>
                         <Button
                           size="sm"
@@ -1304,7 +2143,12 @@ export function ProjectSettingsDialog({
                           disabled={checkingGithubSync || pushingGithubSync || pullingGithubSync}
                           onClick={() => void handlePushGithubLocalAhead()}
                         >
-                          {pushingGithubSync ? 'Pushing…' : 'Push all local-ahead'}
+                          {pushingGithubSync ? (
+                            <>
+                              <Loader2 className="mr-1 size-3 animate-spin" />
+                              Pushing…
+                            </>
+                          ) : 'Push all local-ahead'}
                         </Button>
                         <Button
                           variant="outline"
@@ -1313,12 +2157,17 @@ export function ProjectSettingsDialog({
                           disabled={checkingGithubSync || pushingGithubSync || pullingGithubSync}
                           onClick={() => void handlePullGithubRemoteAhead()}
                         >
-                          {pullingGithubSync ? 'Pulling…' : 'Pull all remote-ahead'}
+                          {pullingGithubSync ? (
+                            <>
+                              <Loader2 className="mr-1 size-3 animate-spin" />
+                              Pulling…
+                            </>
+                          ) : 'Pull all remote-ahead'}
                         </Button>
                       </div>
 
                       <p className="text-xs text-muted-foreground">
-                        Source: {githubMapping?.external_team_key ?? 'No GitHub Project mapping (manual links/import only)'}
+                        Source: {githubMappingSource.external_team_key}
                         {githubSummary.checkedAt ? ` • Checked ${new Date(githubSummary.checkedAt).toLocaleTimeString()}` : ''}
                         {githubSummary.errors > 0 ? ` • ${githubSummary.errors} errors` : ''}
                       </p>
@@ -1351,44 +2200,24 @@ export function ProjectSettingsDialog({
                   ) : (
                     <div className="rounded-md border border-dashed p-3">
                       <p className="text-sm text-muted-foreground">
-                        No GitHub connection found. Connect GitHub in Settings → Integrations first.
+                        Configure a GitHub source first, then use sync controls here.
                       </p>
                     </div>
                   )}
                 </CardContent>
-              </Card>
+                    </Card>
+                      ) : null}
+                    </div>
+                  ) : null}
 
-              <Card className="gap-4 py-4" data-testid="github-repo-import-card">
+                  {isGithubImportView ? (
+                    <Card className="gap-4 py-4" data-testid="github-repo-import-card">
                 <CardHeader className="px-4">
                   <CardTitle className="text-base">Import GitHub Repository Issues</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-3 px-4">
-                  {githubConnections.length === 0 ? (
-                    <div className="rounded-md border border-dashed p-3">
-                      <p className="text-sm text-muted-foreground">
-                        No GitHub connection found. Connect GitHub in Settings → Integrations first.
-                      </p>
-                    </div>
-                  ) : (
+                  {githubConnected ? (
                     <>
-                      <div className="grid grid-cols-[220px_minmax(0,1fr)] items-center gap-4">
-                        <Label htmlFor="github-repo-connection" className="text-sm">
-                          Connection
-                        </Label>
-                        <Select value={githubRepoConnectionId} onValueChange={setGithubRepoConnectionId}>
-                          <SelectTrigger id="github-repo-connection" className="w-full max-w-md">
-                            <SelectValue placeholder="Select GitHub connection" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {githubConnections.map((connection) => (
-                              <SelectItem key={connection.id} value={connection.id}>
-                                {connection.workspace_name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-
                       <div className="grid grid-cols-[220px_minmax(0,1fr)] items-center gap-4">
                         <Label htmlFor="github-repository" className="text-sm">
                           Repository
@@ -1396,7 +2225,7 @@ export function ProjectSettingsDialog({
                         <Select
                           value={githubRepositoryFullName || '__none__'}
                           onValueChange={(value) => setGithubRepositoryFullName(value === '__none__' ? '' : value)}
-                          disabled={!githubRepoConnectionId || loadingGithubRepositories}
+                          disabled={!githubRepositoryConnectionId || loadingGithubRepositories}
                         >
                           <SelectTrigger id="github-repository" className="w-full max-w-md">
                             <SelectValue
@@ -1420,12 +2249,12 @@ export function ProjectSettingsDialog({
                         <div className="space-y-0.5 text-xs text-muted-foreground">
                           {loadingGithubRepoIssues
                             ? 'Loading repository issues…'
-                            : githubRepoIssueOptions.length > 0
+                            : githubRepoSortedIssues.length > 0
                               ? githubRepoIssueQueryNormalized
-                                ? `${githubRepoFilteredIssues.length} of ${githubRepoIssueOptions.length} issues shown`
-                                : `${githubRepoIssueOptions.length} issues loaded`
+                                ? `${githubRepoFilteredIssues.length} of ${githubRepoSortedIssues.length} issues shown`
+                                : `${githubRepoSortedIssues.length} issues loaded`
                               : 'Load repository issues to import selected tasks'}
-                          {githubRepoIssueOptions.length > 0 ? (
+                          {githubRepoSortedIssues.length > 0 ? (
                             <p>
                               {githubRepoImportableIssues.length} importable
                               {githubRepoLinkedInProjectCount > 0 ? ` • ${githubRepoLinkedInProjectCount} linked here` : ''}
@@ -1441,7 +2270,7 @@ export function ProjectSettingsDialog({
                             disabled={!canLoadGithubRepoIssues || loadingGithubRepoIssues}
                             onClick={handleLoadGithubRepositoryIssues}
                           >
-                            {loadingGithubRepoIssues ? 'Loading…' : githubRepoIssueOptions.length > 0 ? 'Refresh issues' : 'Load issues'}
+                            {loadingGithubRepoIssues ? 'Loading…' : githubRepoSortedIssues.length > 0 ? 'Refresh issues' : 'Load issues'}
                           </Button>
                           {githubRepoVisibleImportableIssues.length > 0 ? (
                             <Button
@@ -1484,6 +2313,26 @@ export function ProjectSettingsDialog({
                           placeholder="Search by #number, title, or repository"
                           className="w-full max-w-md"
                         />
+                      </div>
+
+                      <div className="grid grid-cols-[220px_minmax(0,1fr)] items-center gap-4">
+                        <Label htmlFor="github-repo-issue-sort" className="text-sm">
+                          Sort by
+                        </Label>
+                        <Select
+                          value={githubImportSort}
+                          onValueChange={(value) => setGithubImportSort(value as ImportIssueSort)}
+                        >
+                          <SelectTrigger id="github-repo-issue-sort" className="w-full max-w-md">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="updated_desc">Recently updated</SelectItem>
+                            <SelectItem value="updated_asc">Least recently updated</SelectItem>
+                            <SelectItem value="title_asc">Title A-Z</SelectItem>
+                            <SelectItem value="title_desc">Title Z-A</SelectItem>
+                          </SelectContent>
+                        </Select>
                       </div>
 
                       <div className="min-h-40 rounded border p-2">
@@ -1531,7 +2380,7 @@ export function ProjectSettingsDialog({
                           </div>
                         ) : (
                           <div className="flex h-full min-h-36 items-center justify-center text-xs text-muted-foreground">
-                            {githubRepoIssueOptions.length > 0
+                            {githubRepoSortedIssues.length > 0
                               ? 'No issues match the current filter.'
                               : 'No loaded repository issues yet.'}
                           </div>
@@ -1556,7 +2405,7 @@ export function ProjectSettingsDialog({
                             ? 'Importing…'
                             : selectedGithubRepoImportableCount > 0
                               ? `Import selected (${selectedGithubRepoImportableCount})`
-                              : githubRepoIssueOptions.length > 0
+                              : githubRepoSortedIssues.length > 0
                                 ? `Import all importable (${githubRepoImportableIssues.length})`
                                 : 'Import repository issues'}
                         </Button>
@@ -1566,142 +2415,112 @@ export function ProjectSettingsDialog({
                         <p className="text-xs text-muted-foreground">{githubRepoImportMessage}</p>
                       ) : null}
                     </>
-                  )}
-                </CardContent>
-              </Card>
-
-              <Card className="gap-4 py-4">
-                <CardHeader className="px-4">
-                  <CardTitle className="text-base">Mapping</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3 px-4">
-                  {connections.length === 0 ? (
+                  ) : (
                     <div className="rounded-md border border-dashed p-3">
                       <p className="text-sm text-muted-foreground">
-                        No Linear connection found. Connect Linear in Settings → Integrations.
+                        No GitHub connection is configured for this project. Connect one first.
                       </p>
+                      <div className="mt-3 flex justify-end">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => setConnectionModalState({ provider: 'github', mode: 'connect' })}
+                        >
+                          Open connection settings
+                        </Button>
+                      </div>
                     </div>
+                  )}
+                </CardContent>
+                    </Card>
+                  ) : null}
+
+                  {isLinearImportView ? (
+                    <Card className="gap-4 py-4">
+                            <CardHeader className="px-4">
+                              <CardTitle className="text-base">Import Issues</CardTitle>
+                            </CardHeader>
+                            <CardContent className="space-y-3 px-4">
+                              {linearConnected ? (
+                                <>
+                                  <div className="grid grid-cols-[220px_minmax(0,1fr)] items-center gap-4">
+                                    <Label htmlFor="linear-import-team" className="text-sm">
+                                      Team
+                                    </Label>
+                                    <Select
+                                      value={linearImportTeamId || '__none__'}
+                                      onValueChange={(value) => setLinearImportTeamId(value === '__none__' ? '' : value)}
+                                      disabled={!linearProjectConnectionId || loadingLinearImportTeams}
+                                    >
+                                      <SelectTrigger id="linear-import-team" className="w-full max-w-md">
+                                        <SelectValue placeholder={loadingLinearImportTeams ? 'Loading teams…' : 'Choose team'} />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        {linearImportTeams.length === 0 ? (
+                                          <SelectItem value="__none__" disabled>No teams found</SelectItem>
+                                        ) : null}
+                                        {linearImportTeams.map((team) => (
+                                          <SelectItem key={team.id} value={team.id}>
+                                            {team.key} - {team.name}
+                                          </SelectItem>
+                                        ))}
+                                      </SelectContent>
+                                    </Select>
+                                  </div>
+
+                                  <div className="grid grid-cols-[220px_minmax(0,1fr)] items-center gap-4">
+                                    <Label htmlFor="linear-import-project" className="text-sm">
+                                      Project (optional)
+                                    </Label>
+                                    <Select
+                                      value={linearImportProjectId || '__none__'}
+                                      onValueChange={(value) => setLinearImportProjectId(value === '__none__' ? '' : value)}
+                                      disabled={!linearProjectConnectionId || !linearImportTeamId || loadingLinearImportProjects}
+                                    >
+                                      <SelectTrigger id="linear-import-project" className="w-full max-w-md">
+                                        <SelectValue placeholder={loadingLinearImportProjects ? 'Loading projects…' : 'All team issues'} />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        <SelectItem value="__none__">All team issues</SelectItem>
+                                        {linearImportProjects.map((projectOption) => (
+                                          <SelectItem key={projectOption.id} value={projectOption.id}>
+                                            {projectOption.name}
+                                          </SelectItem>
+                                        ))}
+                                      </SelectContent>
+                                    </Select>
+                                  </div>
+
+                  {linearImportSourceMessage ? (
+                    <p className="text-xs text-muted-foreground">{linearImportSourceMessage}</p>
                   ) : null}
 
                   <div className="grid grid-cols-[220px_minmax(0,1fr)] items-center gap-4">
-                    <Label htmlFor="linear-connection" className="text-sm">
-                      Connection
-                    </Label>
-                    <Select value={connectionId} onValueChange={setConnectionId}>
-                      <SelectTrigger id="linear-connection" className="w-full max-w-md">
-                        <SelectValue placeholder="Select connection" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {connections.map((connection) => (
-                          <SelectItem key={connection.id} value={connection.id}>
-                            {connection.workspace_name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="grid grid-cols-[220px_minmax(0,1fr)] items-center gap-4">
-                    <Label htmlFor="linear-team" className="text-sm">
-                      Team
+                    <Label htmlFor="linear-import-sort" className="text-sm">
+                      Sort by
                     </Label>
                     <Select
-                      value={teamId}
-                      onValueChange={(value) => {
-                        setTeamId(value)
-                        const team = teams.find((t) => t.id === value)
-                        setTeamKey(team?.key ?? '')
-                      }}
-                      disabled={!hasConnection}
+                      value={linearImportSort}
+                      onValueChange={(value) => setLinearImportSort(value as ImportIssueSort)}
                     >
-                      <SelectTrigger id="linear-team" className="w-full max-w-md">
-                        <SelectValue placeholder="Choose a team" />
+                      <SelectTrigger id="linear-import-sort" className="w-full max-w-md">
+                        <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        {teams.map((team) => (
-                          <SelectItem key={team.id} value={team.id}>
-                            {team.key} - {team.name}
-                          </SelectItem>
-                        ))}
+                        <SelectItem value="updated_desc">Recently updated</SelectItem>
+                        <SelectItem value="updated_asc">Least recently updated</SelectItem>
+                        <SelectItem value="title_asc">Title A-Z</SelectItem>
+                        <SelectItem value="title_desc">Title Z-A</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
 
-                  <div className="grid grid-cols-[220px_minmax(0,1fr)] items-center gap-4">
-                    <Label htmlFor="linear-project-scope" className="text-sm">
-                      Project scope
-                    </Label>
-                    <Select
-                      value={linearProjectId || '__none__'}
-                      onValueChange={(value) => setLinearProjectId(value === '__none__' ? '' : value)}
-                      disabled={!hasTeam}
-                    >
-                      <SelectTrigger id="linear-project-scope" className="w-full max-w-md">
-                        <SelectValue placeholder="Any project in selected team" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="__none__">Any project in selected team</SelectItem>
-                        {linearProjects.map((lp) => (
-                          <SelectItem key={lp.id} value={lp.id}>
-                            {lp.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="grid grid-cols-[220px_minmax(0,1fr)] gap-4">
-                    <Label htmlFor="linear-sync-mode" className="pt-2 text-sm">
-                      Sync mode
-                    </Label>
-                    <div className="space-y-1">
-                      <Select value={syncMode} onValueChange={(value) => setSyncMode(value as IntegrationSyncMode)} disabled={!hasConnection}>
-                        <SelectTrigger id="linear-sync-mode" className="w-full max-w-md">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="one_way">One-way (Linear → SlayZone)</SelectItem>
-                          <SelectItem value="two_way">Two-way</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <p className="text-xs text-muted-foreground">
-                        {syncMode === 'two_way'
-                          ? 'Two-way: updates sync both directions.'
-                          : 'One-way: updates flow from Linear to SlayZone only.'}
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center justify-between">
-                    {mapping ? (
-                      <p className="text-xs text-muted-foreground">
-                        Current mapping: {mapping.external_team_key} ({mapping.sync_mode === 'two_way' ? 'two-way' : 'one-way'})
-                      </p>
-                    ) : (
-                      <p className="text-xs text-muted-foreground">No mapping saved yet</p>
-                    )}
-                    <Button
-                      size="sm"
-                      disabled={!hasConnection || !hasTeam || savingMapping}
-                      onClick={handleSaveMapping}
-                    >
-                      {savingMapping ? 'Saving…' : hasUnsavedMappingChanges ? 'Save mapping' : mapping ? 'Mapping saved' : 'Save mapping'}
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card className="gap-4 py-4">
-                <CardHeader className="px-4">
-                  <CardTitle className="text-base">Import Issues</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3 px-4">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <div className="text-xs text-muted-foreground">
                       {loadingIssues
                         ? 'Loading issues…'
-                        : issueOptions.length > 0
-                          ? `${issueOptions.length} issues loaded`
+                        : sortedLinearIssueOptions.length > 0
+                          ? `${sortedLinearIssueOptions.length} issues loaded`
                           : 'Load issues from Linear to import specific tasks'}
                     </div>
                     <div className="flex items-center gap-2">
@@ -1732,9 +2551,9 @@ export function ProjectSettingsDialog({
                   </div>
 
                   <div className="min-h-40 rounded border p-2">
-                    {issueOptions.length > 0 ? (
+                    {sortedLinearIssueOptions.length > 0 ? (
                       <div className="max-h-44 space-y-1 overflow-y-auto">
-                        {issueOptions.map((issue) =>
+                        {sortedLinearIssueOptions.map((issue) =>
                           issue.linkedTaskId ? (
                             <div key={issue.id} className="flex items-start gap-2 rounded px-1 py-0.5 text-xs opacity-60">
                               <span className="mt-0.5 shrink-0 rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
@@ -1781,7 +2600,7 @@ export function ProjectSettingsDialog({
                         ? 'Importing…'
                         : selectedIssueIds.size > 0
                           ? `Import selected (${selectedIssueIds.size})`
-                          : issueOptions.length > 0
+                          : sortedLinearIssueOptions.length > 0
                             ? 'Import all loaded'
                             : 'Import from Linear'}
                     </Button>
@@ -1790,8 +2609,28 @@ export function ProjectSettingsDialog({
                   {importMessage ? (
                     <p className="text-xs text-muted-foreground">{importMessage}</p>
                   ) : null}
+                    </>
+                  ) : (
+                    <div className="rounded-md border border-dashed p-3">
+                      <p className="text-sm text-muted-foreground">
+                        No Linear connection is configured for this project. Connect one first.
+                      </p>
+                      <div className="mt-3 flex justify-end">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => setConnectionModalState({ provider: 'linear', mode: 'connect' })}
+                        >
+                          Open connection settings
+                        </Button>
+                      </div>
+                    </div>
+                  )}
                 </CardContent>
-              </Card>
+                    </Card>
+                  ) : null}
+                </div>
+              )}
             </div>
           )}
 
@@ -1810,8 +2649,8 @@ export function ProjectSettingsDialog({
                   className="shrink-0"
                 >
                   <TabsList>
-                    <TabsTrigger value="config">Config</TabsTrigger>
-                    <TabsTrigger value="files">Files</TabsTrigger>
+                    <TabsTrigger value="config" data-testid="project-context-tab-config">Config</TabsTrigger>
+                    <TabsTrigger value="files" data-testid="project-context-tab-files">Files</TabsTrigger>
                   </TabsList>
                 </Tabs>
               </div>
@@ -1821,10 +2660,26 @@ export function ProjectSettingsDialog({
                 projectPath={project?.path}
                 projectName={project?.name}
                 projectTab={contextManagerTab}
+                onOpenGlobalAiConfig={onOpenGlobalAiConfig}
               />
             </div>
           )}
         </SettingsLayout>
+        {project && connectionModalState ? (
+          <ProjectIntegrationConnectionModal
+            open
+            onOpenChange={(nextOpen) => {
+              if (!nextOpen) {
+                setConnectionModalState(null)
+              }
+            }}
+            projectId={project.id}
+            provider={connectionModalState.provider}
+            mode={connectionModalState.mode}
+            connectionId={connectionModalState.provider === 'github' ? githubProjectConnectionId : linearProjectConnectionId}
+            onConnectionsChanged={reloadIntegrationState}
+          />
+        ) : null}
       </DialogContent>
     </Dialog>
   )

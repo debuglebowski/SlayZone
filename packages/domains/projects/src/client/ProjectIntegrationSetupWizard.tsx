@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { CheckCircle2, Circle, Loader2 } from 'lucide-react'
 import { Button, Card, CardContent, CardHeader, CardTitle } from '@slayzone/ui'
 import { Label } from '@slayzone/ui'
+import { Input } from '@slayzone/ui'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@slayzone/ui'
 import { cn } from '@slayzone/ui'
 import { resolveColumns, type Project } from '@slayzone/projects/shared'
@@ -21,6 +22,7 @@ interface ProjectIntegrationSetupWizardProps {
   project: Project
   provider: ProjectIntegrationProvider
   initialConnectionId?: string
+  connectionLocked?: boolean
   initialTeamId?: string
   initialLinearProjectId?: string
   initialSyncMode?: IntegrationSyncMode
@@ -82,10 +84,19 @@ function providerConnectionLabel(provider: ProjectIntegrationProvider): string {
   return provider === 'github' ? 'GitHub' : 'Linear'
 }
 
+function providerCredentialLabel(provider: ProjectIntegrationProvider): string {
+  return provider === 'github' ? 'Personal access token' : 'Personal API key'
+}
+
+function providerCredentialPlaceholder(provider: ProjectIntegrationProvider): string {
+  return provider === 'github' ? 'github_pat_***' : 'lin_api_***'
+}
+
 export function ProjectIntegrationSetupWizard({
   project,
   provider,
   initialConnectionId,
+  connectionLocked = false,
   initialTeamId,
   initialLinearProjectId,
   initialSyncMode,
@@ -103,6 +114,9 @@ export function ProjectIntegrationSetupWizard({
   const [loadingGithubProjects, setLoadingGithubProjects] = useState(false)
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState('')
+  const [connectingAccount, setConnectingAccount] = useState(false)
+  const [showConnectForm, setShowConnectForm] = useState(false)
+  const [connectionCredential, setConnectionCredential] = useState('')
 
   const [connectionId, setConnectionId] = useState(initialConnectionId ?? '')
   const [teamId, setTeamId] = useState(initialTeamId ?? '')
@@ -144,6 +158,39 @@ export function ProjectIntegrationSetupWizard({
     [githubProjects, githubProjectId]
   )
 
+  const loadConnections = useCallback(async (options?: { preserveMessage?: boolean }) => {
+    setLoadingConnections(true)
+    if (!options?.preserveMessage) {
+      setMessage('')
+    }
+    try {
+      const loadedConnections = await window.api.integrations.listConnections(provider)
+      setConnections(loadedConnections)
+      setConnectionId((current) => {
+        if (connectionLocked) {
+          if (
+            initialConnectionId &&
+            loadedConnections.some((connection) => connection.id === initialConnectionId)
+          ) {
+            return initialConnectionId
+          }
+          return ''
+        }
+
+        return current && loadedConnections.some((connection) => connection.id === current)
+          ? current
+          : loadedConnections[0]?.id || ''
+      })
+      if (!connectionLocked && loadedConnections.length === 0) {
+        setShowConnectForm(true)
+      }
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : String(error))
+    } finally {
+      setLoadingConnections(false)
+    }
+  }, [provider, connectionLocked, initialConnectionId])
+
   useEffect(() => {
     setStep(1)
     setMessage('')
@@ -157,27 +204,13 @@ export function ProjectIntegrationSetupWizard({
     setPreviewLoaded(false)
     setPreviewCount(0)
     setPreviewImportableCount(0)
+    setShowConnectForm(false)
+    setConnectionCredential('')
   }, [provider, initialConnectionId, initialTeamId, initialLinearProjectId, initialSyncMode, project.id])
 
   useEffect(() => {
-    setLoadingConnections(true)
-    setMessage('')
-    void window.api.integrations.listConnections(provider)
-      .then((loadedConnections) => {
-        setConnections(loadedConnections)
-        setConnectionId((current) =>
-          current && loadedConnections.some((connection) => connection.id === current)
-            ? current
-            : loadedConnections[0]?.id || ''
-        )
-      })
-      .catch((error) => {
-        setMessage(error instanceof Error ? error.message : String(error))
-      })
-      .finally(() => {
-        setLoadingConnections(false)
-      })
-  }, [provider])
+    void loadConnections()
+  }, [loadConnections])
 
   useEffect(() => {
     if (provider !== 'linear') return
@@ -353,6 +386,32 @@ export function ProjectIntegrationSetupWizard({
     }
   }
 
+  const handleConnectAccount = async () => {
+    if (!connectionCredential.trim()) return
+    setConnectingAccount(true)
+    setMessage('')
+    try {
+      const connection = provider === 'github'
+        ? await window.api.integrations.connectGithub({
+            token: connectionCredential.trim(),
+            projectId: project.id
+          })
+        : await window.api.integrations.connectLinear({
+            apiKey: connectionCredential.trim(),
+            projectId: project.id
+          })
+      setConnectionId(connection.id)
+      setConnectionCredential('')
+      setShowConnectForm(false)
+      setMessage(`${providerConnectionLabel(provider)} connected`)
+      await loadConnections({ preserveMessage: true })
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : String(error))
+    } finally {
+      setConnectingAccount(false)
+    }
+  }
+
   return (
     <Card className="gap-4 py-4">
       <CardHeader className="space-y-4 px-4">
@@ -389,7 +448,7 @@ export function ProjectIntegrationSetupWizard({
         {step === 1 ? (
           <div className="space-y-3">
             <Label htmlFor="wizard-connection">Connection</Label>
-            <Select value={connectionId} onValueChange={setConnectionId}>
+            <Select value={connectionId} onValueChange={setConnectionId} disabled={connectionLocked}>
               <SelectTrigger id="wizard-connection" className="w-full max-w-md">
                 <SelectValue
                   placeholder={loadingConnections
@@ -400,7 +459,7 @@ export function ProjectIntegrationSetupWizard({
               <SelectContent>
                 {connections.map((connection) => (
                   <SelectItem key={connection.id} value={connection.id}>
-                    {connection.workspace_name}
+                    {providerConnectionLabel(provider)} connection
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -411,13 +470,53 @@ export function ProjectIntegrationSetupWizard({
                 Loading available connections...
               </p>
             ) : null}
-            {connections.length === 0 && !loadingConnections ? (
-              <div className="rounded-md border border-dashed p-3">
-                <p className="text-xs text-muted-foreground">
-                  No {providerLabel(provider)} connection found yet. Connect in Settings -&gt; Integrations, then return here.
-                </p>
+
+            <div className="flex items-center justify-between gap-2 rounded-md border border-dashed p-3">
+              <p className="text-xs text-muted-foreground">
+                {connectionLocked
+                  ? `This project uses the ${providerConnectionLabel(provider)} connection chosen in Project Settings.`
+                  : connections.length === 0
+                    ? `No ${providerLabel(provider)} connection yet. Connect one to continue.`
+                    : `Use an existing ${providerConnectionLabel(provider)} connection or connect a new one.`}
+              </p>
+              {!connectionLocked ? (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setShowConnectForm((current) => !current)}
+                >
+                  {showConnectForm ? 'Hide' : 'Connect account'}
+                </Button>
+              ) : null}
+            </div>
+
+            {!connectionLocked && (showConnectForm || connections.length === 0) && (
+              <div className="space-y-3 rounded-md border p-3">
+                <div className="space-y-1">
+                  <Label htmlFor="wizard-connection-credential" className="text-xs text-muted-foreground">
+                    {providerCredentialLabel(provider)}
+                  </Label>
+                  <Input
+                    id="wizard-connection-credential"
+                    type="password"
+                    value={connectionCredential}
+                    onChange={(event) => setConnectionCredential(event.target.value)}
+                    placeholder={providerCredentialPlaceholder(provider)}
+                  />
+                </div>
+                <div className="flex justify-end">
+                  <Button
+                    type="button"
+                    size="sm"
+                    disabled={!connectionCredential.trim() || connectingAccount}
+                    onClick={() => void handleConnectAccount()}
+                  >
+                    {connectingAccount ? 'Connecting…' : `Connect ${providerConnectionLabel(provider)}`}
+                  </Button>
+                </div>
               </div>
-            ) : null}
+            )}
           </div>
         ) : null}
 
