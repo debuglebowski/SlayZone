@@ -282,6 +282,7 @@ export interface ElectronAPI {
     onPrompt: (callback: (sessionId: string, prompt: PromptInfo) => void) => () => void
     onSessionDetected: (callback: (sessionId: string, conversationId: string) => void) => () => void
     onDevServerDetected: (callback: (sessionId: string, url: string) => void) => () => void
+    onTitleChange: (callback: (sessionId: string, title: string) => void) => () => void
     getState: (sessionId: string) => Promise<TerminalState | null>
     validate: (mode: TerminalMode) => Promise<ValidationResult[]>
     setTheme: (theme: { foreground: string; background: string; cursor: string }) => Promise<void>

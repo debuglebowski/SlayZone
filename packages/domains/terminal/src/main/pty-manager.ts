@@ -121,6 +121,8 @@ interface PtySession {
   detectedDevUrls: Set<string>
   // Pending partial escape sequence from previous onData chunk
   syncQueryPending: string
+  // Last emitted process title (to deduplicate pty:title-change events)
+  lastEmittedTitle: string
 }
 
 export type { PtyInfo }
@@ -172,6 +174,17 @@ function hexToOscRgb(hex: string): string {
   const g = hex.slice(3, 5)
   const b = hex.slice(5, 7)
   return `rgb:${r}${r}/${g}${g}/${b}${b}`
+}
+
+// Extract terminal title from OSC 0/1/2 sequences (returns last title found, or undefined)
+function extractOscTitle(data: string): string | undefined {
+  let title: string | undefined
+  const re = /\x1b\]([012]);([^\x07\x1b]*)(?:\x07|\x1b\\)/g
+  let m: RegExpExecArray | null
+  while ((m = re.exec(data)) !== null) {
+    title = m[2]
+  }
+  return title
 }
 
 // Filter out terminal escape sequences that cause issues
@@ -603,7 +616,8 @@ export async function createPty(
       statusOutputBuffer: '',
       // Dev server URL dedup
       detectedDevUrls: new Set(),
-      syncQueryPending: ''
+      syncQueryPending: '',
+      lastEmittedTitle: ''
     })
     stateMachine.register(sessionId, 'starting')
     let firstOutputTs: number | null = null
@@ -856,6 +870,18 @@ export async function createPty(
       if (prompt && !win.isDestroyed()) {
         try {
           win.webContents.send('pty:prompt', sessionId, prompt)
+        } catch {
+          // Window destroyed, ignore
+        }
+      }
+
+      // Emit terminal title changes: prefer OSC 0/1/2 title, fall back to PTY process name
+      const oscTitle = extractOscTitle(data) ?? extractOscTitle(data0)
+      const processTitle = oscTitle ?? session.pty.process
+      if (processTitle && processTitle !== session.lastEmittedTitle && !win.isDestroyed()) {
+        session.lastEmittedTitle = processTitle
+        try {
+          win.webContents.send('pty:title-change', sessionId, processTitle)
         } catch {
           // Window destroyed, ignore
         }

@@ -248,6 +248,12 @@ const api: ElectronAPI = {
       ipcRenderer.on('pty:dev-server-detected', handler)
       return () => ipcRenderer.removeListener('pty:dev-server-detected', handler)
     },
+    onTitleChange: (callback: (sessionId: string, title: string) => void) => {
+      const handler = (_event: unknown, sessionId: string, title: string) =>
+        callback(sessionId, title)
+      ipcRenderer.on('pty:title-change', handler)
+      return () => ipcRenderer.removeListener('pty:title-change', handler)
+    },
     getState: (sessionId: string) => ipcRenderer.invoke('pty:getState', sessionId),
     validate: (mode: string) => ipcRenderer.invoke('pty:validate', mode)
   },
