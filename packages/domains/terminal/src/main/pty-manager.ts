@@ -176,8 +176,6 @@ function hexToOscRgb(hex: string): string {
   return `rgb:${r}${r}/${g}${g}/${b}${b}`
 }
 
-
-
 // Filter out terminal escape sequences that cause issues
 function filterBufferData(data: string): string {
   return data
@@ -867,7 +865,7 @@ export async function createPty(
       }
 
       // Emit terminal title changes: prefer OSC 0/1/2 title, fall back to PTY process name
-      const oscTitle = extractOscTitle(data) ?? extractOscTitle(data0)
+      const oscTitle = extractOscTitle(data)
       const processTitle = oscTitle ?? session.pty.process
       if (processTitle && processTitle !== session.lastEmittedTitle && !win.isDestroyed()) {
         session.lastEmittedTitle = processTitle
