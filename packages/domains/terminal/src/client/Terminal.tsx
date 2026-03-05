@@ -153,7 +153,10 @@ export function Terminal({
 
   const { subscribe, subscribeExit, subscribeSessionInvalid, subscribeAttention, subscribeState, getState, getCrashOutput, resetTaskState, cleanupTask } = usePty()
   const { theme } = useTheme()
-  const { terminalFontSize, terminalFontFamily, terminalScrollback } = useAppearance()
+  const { terminalFontSize, terminalFontFamily, terminalScrollback, terminalThemeOverride } = useAppearance()
+  const terminalTheme = terminalThemeOverride === 'follow' ? theme : terminalThemeOverride
+  const terminalThemeRef = useRef(terminalTheme)
+  terminalThemeRef.current = terminalTheme
 
   const [ptyState, setPtyState] = useState<TerminalState>(() => getState(sessionId))
 
@@ -222,8 +225,8 @@ export function Terminal({
         } else {
           // Reattach existing terminal (container already has dimensions)
           containerRef.current.appendChild(cached.element)
-          cached.terminal.options.theme = getTerminalTheme(theme)
-          cached.terminal.options.minimumContrastRatio = theme === 'light' ? 4.5 : 1
+          cached.terminal.options.theme = getTerminalTheme(terminalThemeRef.current)
+          cached.terminal.options.minimumContrastRatio = terminalThemeRef.current === 'light' ? 4.5 : 1
           terminalRef.current = cached.terminal
           fitAddonRef.current = cached.fitAddon
           serializeAddonRef.current = cached.serializeAddon
@@ -281,8 +284,8 @@ export function Terminal({
         fontSize: terminalFontSize,
         fontFamily: terminalFontFamily,
         scrollback: terminalScrollback,
-        theme: getTerminalTheme(theme),
-        minimumContrastRatio: theme === 'light' ? 4.5 : 1
+        theme: getTerminalTheme(terminalThemeRef.current),
+        minimumContrastRatio: terminalThemeRef.current === 'light' ? 4.5 : 1
       })
 
       const fitAddon = new FitAddon()
@@ -519,8 +522,8 @@ export function Terminal({
 
   // Sync terminal theme with app theme
   useEffect(() => {
-    const xtermTheme = getTerminalTheme(theme)
-    const contrastRatio = theme === 'light' ? 4.5 : 1
+    const xtermTheme = getTerminalTheme(terminalTheme)
+    const contrastRatio = terminalTheme === 'light' ? 4.5 : 1
     if (terminalRef.current) {
       terminalRef.current.options.theme = xtermTheme
       terminalRef.current.options.minimumContrastRatio = contrastRatio
@@ -533,7 +536,7 @@ export function Terminal({
       background: xtermTheme.background ?? '#000000',
       cursor: xtermTheme.cursor ?? '#ffffff',
     })
-  }, [theme])
+  }, [terminalTheme])
 
   // Handle resize
   useEffect(() => {

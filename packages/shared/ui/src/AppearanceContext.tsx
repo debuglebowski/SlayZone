@@ -19,6 +19,7 @@ export interface AppearanceSettings {
   // Terminal
   terminalFontFamily: string
   terminalScrollback: number
+  terminalThemeOverride: 'follow' | 'dark' | 'light'
   // Diff
   diffContextLines: '0' | '3' | '5' | 'all'
   diffIgnoreWhitespace: boolean
@@ -39,6 +40,7 @@ export const appearanceDefaults: AppearanceSettings = {
   editorRenderWhitespace: 'none',
   terminalFontFamily: 'Menlo, Monaco, "Courier New", monospace',
   terminalScrollback: 5000,
+  terminalThemeOverride: 'follow',
   diffContextLines: '3',
   diffIgnoreWhitespace: false,
   browserDefaultZoom: 100,

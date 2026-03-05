@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useTheme } from './ThemeContext'
 import { XIcon, Trash2, Plus, ChevronLeft, ChevronRight, SquareTerminal, Globe, FileCode, GitCompare, SlidersHorizontal, FolderOpen, RefreshCw } from 'lucide-react'
 import { SettingsLayout, Tooltip, TooltipTrigger, TooltipContent } from '@slayzone/ui'
+import type { AppearanceSettings } from '@slayzone/ui'
 import { Button, IconButton } from '@slayzone/ui'
 import { Input } from '@slayzone/ui'
 import { Label } from '@slayzone/ui'
@@ -137,6 +138,7 @@ export function UserSettingsDialog({
   // Terminal extended settings
   const [terminalFontFamily, setTerminalFontFamily] = useState('Menlo, Monaco, "Courier New", monospace')
   const [terminalScrollback, setTerminalScrollback] = useState('5000')
+  const [terminalThemeOverride, setTerminalThemeOverride] = useState<AppearanceSettings['terminalThemeOverride']>('follow')
   // Diff settings
   const [diffContextLines, setDiffContextLines] = useState<'0' | '3' | '5' | 'all'>('3')
   const [diffIgnoreWhitespace, setDiffIgnoreWhitespace] = useState(false)
@@ -211,7 +213,7 @@ export function UserSettingsDialog({
       ])
       const [devToast, devAutoOpen, mcpPortSetting, cliStatus, colorTints, termFontSize, editorFontSizeVal, reduceMotionVal, leaderboardVal, ccsDefProfileVal, ccsProfilesResult,
         edWordWrap, edTabSize, edIndentTabs, edRenderWs,
-        termFamily, termScrollback,
+        termFamily, termScrollback, termThemeOverride, termForceDarkLegacy,
         dfContextLines, dfIgnoreWs,
         brDefaultUrl, brDefaultZoom, brDevices,
       ] = await Promise.allSettled([
@@ -232,6 +234,8 @@ export function UserSettingsDialog({
         window.api.settings.get('editor_render_whitespace'),
         window.api.settings.get('terminal_font_family'),
         window.api.settings.get('terminal_scrollback'),
+        window.api.settings.get('terminal_theme_override'),
+        window.api.settings.get('terminal_force_dark'),
         window.api.settings.get('diff_context_lines'),
         window.api.settings.get('diff_ignore_whitespace'),
         window.api.settings.get('browser_default_url'),
@@ -292,6 +296,9 @@ export function UserSettingsDialog({
       // Terminal extended
       setTerminalFontFamily(termFamily.status === 'fulfilled' && termFamily.value ? termFamily.value : 'Menlo, Monaco, "Courier New", monospace')
       setTerminalScrollback(termScrollback.status === 'fulfilled' && termScrollback.value ? termScrollback.value : '5000')
+      const tto = termThemeOverride.status === 'fulfilled' ? termThemeOverride.value : null
+      const legacyDark = termForceDarkLegacy.status === 'fulfilled' ? termForceDarkLegacy.value : null
+      setTerminalThemeOverride(tto === 'dark' || tto === 'light' ? tto : legacyDark === '1' ? 'dark' : 'follow')
       // Diff settings
       const dc = dfContextLines.status === 'fulfilled' ? dfContextLines.value : null
       setDiffContextLines(dc === '0' || dc === '5' || dc === 'all' ? dc : '3')
@@ -662,6 +669,23 @@ export function UserSettingsDialog({
                         <SelectItem value="dark">Dark</SelectItem>
                         <SelectItem value="light">Light (Experimental)</SelectItem>
                         <SelectItem value="system">System (Experimental)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="grid grid-cols-[220px_minmax(0,1fr)] items-center gap-4">
+                    <span className="text-sm">Terminal theme</span>
+                    <Select value={terminalThemeOverride} onValueChange={(v) => {
+                      const val = v as 'follow' | 'dark' | 'light'
+                      setTerminalThemeOverride(val)
+                      window.api.settings.set('terminal_theme_override', val)
+                    }}>
+                      <SelectTrigger className="w-48">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="follow">Follow app theme</SelectItem>
+                        <SelectItem value="dark">Dark</SelectItem>
+                        <SelectItem value="light">Light</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
