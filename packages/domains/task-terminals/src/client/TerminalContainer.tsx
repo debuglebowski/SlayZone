@@ -33,6 +33,7 @@ interface TerminalContainerProps {
   onRetry?: () => void
   onFocusRequestHandled?: (requestId: number) => void
   onMainTabActiveChange?: (isMainActive: boolean) => void
+  onMainReset?: () => void
   rightContent?: React.ReactNode
 }
 
@@ -55,6 +56,7 @@ export const TerminalContainer = forwardRef<TerminalContainerHandle, TerminalCon
   onRetry,
   onFocusRequestHandled,
   onMainTabActiveChange,
+  onMainReset,
   rightContent
 }: TerminalContainerProps, ref) {
   const {
@@ -293,6 +295,7 @@ export const TerminalContainer = forwardRef<TerminalContainerHandle, TerminalCon
         onPaneClose={closeTab}
         onPaneMove={movePane}
         onGroupRename={renameTab}
+        onMainReset={onMainReset}
         rightContent={rightContent}
       />
       <div className="flex-1 min-h-0">

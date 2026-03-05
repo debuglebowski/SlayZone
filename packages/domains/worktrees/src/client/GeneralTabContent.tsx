@@ -51,7 +51,7 @@ export function GeneralTabContent({
   onTaskUpdated,
   onSwitchTab
 }: GeneralTabContentProps) {
-  const targetPath = task.worktree_path ?? projectPath
+  const targetPath = task.worktree_path ?? task.base_dir ?? projectPath
   const hasWorktree = !!task.worktree_path
 
   // Git status

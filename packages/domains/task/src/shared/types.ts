@@ -163,6 +163,8 @@ export interface Task {
   // Worktree
   worktree_path: string | null
   worktree_parent_branch: string | null
+  // Custom working directory (overrides project.path, overridden by worktree_path)
+  base_dir: string | null
   browser_url: string | null
   // Browser tabs (JSON)
   browser_tabs: BrowserTabsState | null
@@ -235,6 +237,8 @@ export interface UpdateTaskInput {
   // Worktree
   worktreePath?: string | null
   worktreeParentBranch?: string | null
+  // Custom working directory
+  baseDir?: string | null
   browserUrl?: string | null
   // Browser tabs
   browserTabs?: BrowserTabsState | null

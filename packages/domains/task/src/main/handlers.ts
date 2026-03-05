@@ -327,6 +327,7 @@ export function updateTask(db: Database, data: UpdateTaskInput): Task | null {
   }
   if (data.panelVisibility !== undefined) { fields.push('panel_visibility = ?'); values.push(data.panelVisibility ? JSON.stringify(data.panelVisibility) : null) }
   if (data.worktreePath !== undefined) { fields.push('worktree_path = ?'); values.push(data.worktreePath) }
+  if (data.baseDir !== undefined) { fields.push('base_dir = ?'); values.push(data.baseDir) }
   if (data.worktreeParentBranch !== undefined) { fields.push('worktree_parent_branch = ?'); values.push(data.worktreeParentBranch) }
   if (data.browserUrl !== undefined) { fields.push('browser_url = ?'); values.push(data.browserUrl) }
   if (data.browserTabs !== undefined) { fields.push('browser_tabs = ?'); values.push(data.browserTabs ? JSON.stringify(data.browserTabs) : null) }
@@ -499,7 +500,7 @@ export function registerTaskHandlers(ipcMain: IpcMain, db: Database): void {
     const childIds = (db.prepare('SELECT id FROM tasks WHERE parent_id = ? AND archived_at IS NULL').all(id) as { id: string }[]).map(r => r.id)
     for (const childId of childIds) { cleanupTaskFull(db, childId) }
     db.prepare(`
-      UPDATE tasks SET archived_at = datetime('now'), worktree_path = NULL, updated_at = datetime('now')
+      UPDATE tasks SET archived_at = datetime('now'), worktree_path = NULL, base_dir = NULL, updated_at = datetime('now')
       WHERE id = ? OR parent_id = ?
     `).run(id, id)
     const row = db.prepare('SELECT * FROM tasks WHERE id = ?').get(id) as Record<string, unknown> | undefined
@@ -518,7 +519,7 @@ export function registerTaskHandlers(ipcMain: IpcMain, db: Database): void {
     const allIds = [...ids, ...childIds]
     const placeholders = allIds.map(() => '?').join(',')
     db.prepare(`
-      UPDATE tasks SET archived_at = datetime('now'), worktree_path = NULL, updated_at = datetime('now')
+      UPDATE tasks SET archived_at = datetime('now'), worktree_path = NULL, base_dir = NULL, updated_at = datetime('now')
       WHERE id IN (${placeholders})
     `).run(...allIds)
   })
