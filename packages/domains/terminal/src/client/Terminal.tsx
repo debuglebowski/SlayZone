@@ -85,6 +85,7 @@ interface TerminalProps {
   codeMode?: CodeMode | null
   providerFlags?: string | null
   executionContext?: import('@slayzone/terminal/shared').ExecutionContext | null
+  autoFocus?: boolean
   onConversationCreated?: (conversationId: string) => void
   onSessionInvalid?: () => void
   onReady?: (api: {
@@ -114,6 +115,7 @@ export function Terminal({
   codeMode,
   providerFlags,
   executionContext,
+  autoFocus,
   onConversationCreated,
   onSessionInvalid,
   onReady,
@@ -147,6 +149,8 @@ export function Terminal({
   onSessionInvalidRef.current = onSessionInvalid
   const onReadyRef = useRef(onReady)
   onReadyRef.current = onReady
+  const autoFocusRef = useRef(autoFocus)
+  autoFocusRef.current = autoFocus
   const onFirstInputRef = useRef(onFirstInput)
   onFirstInputRef.current = onFirstInput
   const hasCalledFirstInputRef = useRef(false)
@@ -222,6 +226,7 @@ export function Terminal({
         } else {
           // Reattach existing terminal (container already has dimensions)
           containerRef.current.appendChild(cached.element)
+          if (autoFocusRef.current) cached.terminal.focus()
           cached.terminal.options.theme = getTerminalTheme(theme)
           cached.terminal.options.minimumContrastRatio = theme === 'light' ? 4.5 : 1
           terminalRef.current = cached.terminal
@@ -313,6 +318,7 @@ export function Terminal({
       searchAddonRef.current = searchAddon
 
       terminal.open(containerRef.current)
+      if (autoFocusRef.current) terminal.focus()
       terminal.clear() // Ensure terminal starts completely fresh
       // Simple fit - container is guaranteed to have dimensions from waitForDimensions
       fitAddon.fit()
@@ -403,7 +409,6 @@ export function Terminal({
         focus: () => terminal.focus(),
         clearBuffer: clearBufferWithoutRestart
       })
-
       // Inject initial prompt if provided (after a delay for terminal to be ready)
       if (initialPrompt) {
         setTimeout(async () => {

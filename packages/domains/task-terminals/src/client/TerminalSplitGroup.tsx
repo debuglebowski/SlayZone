@@ -27,9 +27,10 @@ interface PaneProps {
 
 interface TerminalSplitGroupProps {
   panes: PaneProps[]
+  autoFocus?: boolean
 }
 
-export function TerminalSplitGroup({ panes }: TerminalSplitGroupProps) {
+export function TerminalSplitGroup({ panes, autoFocus }: TerminalSplitGroupProps) {
   const [sizes, setSizes] = useState<number[]>(() =>
     panes.map(() => 100 / panes.length)
   )
@@ -106,7 +107,7 @@ export function TerminalSplitGroup({ panes }: TerminalSplitGroupProps) {
           codeMode={pane.codeMode}
           providerFlags={pane.providerFlags}
           executionContext={pane.executionContext}
-
+          autoFocus={autoFocus}
           onConversationCreated={pane.onConversationCreated}
           onSessionInvalid={pane.onSessionInvalid}
           onReady={pane.onReady}
@@ -133,7 +134,7 @@ export function TerminalSplitGroup({ panes }: TerminalSplitGroupProps) {
               codeMode={pane.codeMode}
               providerFlags={pane.providerFlags}
               executionContext={pane.executionContext}
-    
+              autoFocus={autoFocus && i === 0}
               onConversationCreated={pane.onConversationCreated}
               onSessionInvalid={pane.onSessionInvalid}
               onReady={pane.onReady}

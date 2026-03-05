@@ -299,6 +299,7 @@ export const TerminalContainer = forwardRef<TerminalContainerHandle, TerminalCon
         <TerminalSplitGroup
           key={activeGroupId}
           panes={paneProps}
+          autoFocus={isActive}
         />
       </div>
     </div>
