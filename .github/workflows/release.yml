@@ -27,6 +27,9 @@ concurrency:
   group: release-${{ github.event_name == 'push' && github.ref_name || inputs.tag }}-${{ github.event_name == 'push' && 'publish' || inputs.mode }}
   cancel-in-progress: false
 
+permissions:
+  contents: write
+
 jobs:
   release:
     uses: ./.github/workflows/release-foundation.yml
