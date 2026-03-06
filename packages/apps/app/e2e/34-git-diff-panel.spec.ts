@@ -19,6 +19,7 @@ function ensureRepo() {
   }
 }
 
+// Skipped while git-diff panel interactions are being stabilized for deterministic E2E behavior.
 test.describe.skip('Git diff panel', () => {
   let projectAbbrev: string
 
@@ -70,11 +71,13 @@ test.describe.skip('Git diff panel', () => {
     await page.getByTestId('task-git-panel').locator('button[title="Refresh"]').click()
   }
 
+  // Skipped pending stable empty-state detection in this suite.
   test.skip('no changes shows empty state', async ({ mainWindow }) => {
     await refresh(mainWindow)
     await expect(panel(mainWindow).getByText('No local changes.')).toBeVisible()
   })
 
+  // Skipped pending stable unstaged list refresh timing in this suite.
   test.skip('modified file appears in unstaged with M status', async ({ mainWindow }) => {
     writeFileSync(path.join(TEST_PROJECT_PATH, 'base.txt'), 'line1\nline2 modified\nline3\n')
     await refresh(mainWindow)
@@ -127,6 +130,7 @@ test.describe.skip('Git diff panel', () => {
     await expect(p.getByText(/^Unstaged/)).toBeVisible()
   })
 
+  // Skipped because bulk stage assertions are still flaky with list re-render timing.
   test.skip('stage all moves all files to staged', async ({ mainWindow }) => {
     const p = panel(mainWindow)
     await p.locator('button[title="Stage all"]').click()
@@ -137,6 +141,7 @@ test.describe.skip('Git diff panel', () => {
     await expect(p.getByText(/^Unstaged/)).not.toBeVisible()
   })
 
+  // Skipped because bulk unstage assertions are still flaky with list re-render timing.
   test.skip('unstage all moves all files back to unstaged', async ({ mainWindow }) => {
     const p = panel(mainWindow)
     await p.locator('button[title="Unstage all"]').click()
@@ -147,6 +152,7 @@ test.describe.skip('Git diff panel', () => {
     await expect(p.getByText(/^Staged/)).not.toBeVisible()
   })
 
+  // Skipped while keyboard focus/selection behavior in the diff list is being stabilized.
   test.skip('arrow key navigation selects files', async ({ mainWindow }) => {
     const p = panel(mainWindow)
     // Focus the file list container (scrollable div with tabIndex)

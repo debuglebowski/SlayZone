@@ -14,6 +14,7 @@ import {
 const hasBinary = binaryExistsAt(CLI_PATHS.opencode)
 
 test.describe('OpenCode CLI integration', () => {
+  // Environment-gated: this suite requires a local opencode binary installation.
   test.skip(!hasBinary, `opencode not found at ${CLI_PATHS.opencode}`)
 
   let taskId: string

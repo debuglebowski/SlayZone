@@ -135,6 +135,7 @@ test.describe('Git branch switching & creation', () => {
     expect(git('git branch --show-current')).toBe('e2e-new-branch')
   })
 
+  // Skipped while branch-switch UI assertions are flaky after branch creation in the same run.
   test.skip('switch to existing branch', async ({ mainWindow }) => {
     const trigger = branchTrigger(mainWindow)
     await trigger.click()
@@ -150,6 +151,7 @@ test.describe('Git branch switching & creation', () => {
     expect(git('git branch --show-current')).toBe('e2e-branch-a')
   })
 
+  // Skipped pending deterministic dirty-worktree error surface in the branch popover flow.
   test.skip('switching with uncommitted changes shows error', async ({ mainWindow }) => {
     // Create a tracked, staged change
     fs.writeFileSync(path.join(TEST_PROJECT_PATH, 'README.md'), '# dirty\n')

@@ -212,6 +212,7 @@ test.describe('Phase 1 — uncommitted changes', () => {
     await expect(mainWindow.getByTestId('task-git-panel').last()).toBeVisible({ timeout: 5_000 })
   })
 
+  // FIXME: Merge-mode transition to "uncommitted" is still timing-sensitive in E2E.
   test.fixme('clicking merge enters merge mode with uncommitted state', async ({ mainWindow }) => {
     const main = getMainBranch()
     await mainWindow.getByRole('button', { name: new RegExp(`Merge into ${main}`) }).click()
@@ -226,6 +227,7 @@ test.describe('Phase 1 — uncommitted changes', () => {
     await expect(mainWindow.getByText('Merge Mode — Uncommitted Changes')).toBeVisible()
   })
 
+  // FIXME: Exit-from-merge assertions are flaky until merge-mode teardown is stabilized.
   test.fixme('Cancel exits merge mode', async ({ mainWindow }) => {
     await mainWindow.getByRole('button', { name: 'Cancel' }).click()
 
@@ -272,6 +274,7 @@ test.describe('Phase 2 — conflict resolution', () => {
     await expect(mainWindow.getByTestId('task-git-panel').last()).toBeVisible({ timeout: 5_000 })
   })
 
+  // FIXME: Entering conflict mode is flaky due async git-state/UI synchronization.
   test.fixme('enters conflict merge mode', async ({ mainWindow }) => {
     await expect
       .poll(async () => {
@@ -292,6 +295,7 @@ test.describe('Phase 2 — conflict resolution', () => {
   const activeConflictPanel = (page: import('@playwright/test').Page) =>
     page.locator('div').filter({ has: page.getByText(/Merge Mode — Resolve Conflicts/) }).last()
 
+  // FIXME: Conflict file list rendering is intermittently delayed in serial runs.
   test.fixme('conflicted file list shows files', async ({ mainWindow }) => {
     await ensureConflictReady(mainWindow, taskId)
     const panel = activeConflictPanel(mainWindow)
@@ -299,6 +303,7 @@ test.describe('Phase 2 — conflict resolution', () => {
     await expect(fileItem).toBeVisible({ timeout: 10_000 })
   })
 
+  // FIXME: "Accept Ours" resolution flow is not yet deterministic under E2E timing.
   test.fixme('Accept Ours resolves the file', async ({ mainWindow }) => {
     await ensureConflictReady(mainWindow, taskId)
     const panel = activeConflictPanel(mainWindow)
@@ -312,6 +317,7 @@ test.describe('Phase 2 — conflict resolution', () => {
     await expect(panel.getByText('File resolved and staged')).toBeVisible()
   })
 
+  // FIXME: Final merge completion/status update remains flaky in this scenario.
   test.fixme('Complete Merge finishes and marks done', async ({ mainWindow }) => {
     const panel = activeConflictPanel(mainWindow)
     await panel.getByRole('button', { name: 'Complete Merge' }).click()
@@ -356,6 +362,7 @@ test.describe('Accept Theirs resolution', () => {
     await openTaskViaSearch(mainWindow, 'MM theirs task')
   })
 
+  // FIXME: "Accept Theirs" path still has unstable ordering between UI and git writes.
   test.fixme('Accept Theirs resolves with incoming content', async ({ mainWindow }) => {
     const panel = mainWindow.locator('div').filter({ has: mainWindow.getByText(/Merge Mode — Resolve Conflicts/) }).last()
     await panel.locator('span.truncate').first().click()
@@ -409,6 +416,7 @@ test.describe('Abort merge', () => {
     await mainWindow.getByRole('button', { name: 'Start Merge' }).click()
   })
 
+  // FIXME: Abort flow occasionally leaves stale merge UI/state during assertions.
   test.fixme('Abort Merge clears merge state', async ({ mainWindow }) => {
     // Should be in conflict phase
     await expect(mainWindow.getByText(/Merge Mode — Resolve Conflicts/).first()).toBeVisible()
@@ -454,6 +462,7 @@ test.describe('Merge badge on kanban', () => {
     await s.refreshData()
   })
 
+  // FIXME: Kanban merge-badge propagation from merge_state is currently flaky.
   test.fixme('merge badge appears when task is in merge mode', async ({ mainWindow }) => {
     // Set merge_state directly
     await mainWindow.evaluate(
@@ -472,6 +481,7 @@ test.describe('Merge badge on kanban', () => {
     await expect(mergeIcon).toBeVisible()
   })
 
+  // FIXME: Merge-badge removal timing is currently non-deterministic in E2E.
   test.fixme('merge badge disappears when merge_state cleared', async ({ mainWindow }) => {
     await mainWindow.evaluate(
       (d) => window.api.db.updateTask(d),

@@ -31,6 +31,7 @@ const hasClaude = binaryOnPath('claude')
 // ─── Crash overlay ────────────────────────────────────────────────────────────
 
 test.describe('Terminal crash overlay', () => {
+  // Environment-gated: crash-overlay tests only run when at least one AI mode binary is absent.
   test.skip(!absentMode, 'All AI mode binaries are installed — cannot test crash overlay')
 
   let projectAbbrev: string
@@ -116,6 +117,7 @@ test.describe('Terminal crash overlay', () => {
 // ─── Doctor from three-dots menu ─────────────────────────────────────────────
 
 test.describe('Doctor from terminal menu', () => {
+  // Environment-gated: doctor menu test requires claude to be installed.
   test.skip(!hasClaude, 'claude binary not found — skipping doctor menu test')
 
   let projectAbbrev: string

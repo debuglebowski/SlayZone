@@ -24,6 +24,7 @@ test.describe('Terminal tab lifecycle', () => {
     await s.refreshData()
   })
 
+  // Skipped due PTY teardown/recreate timing races during tab close in serial E2E runs.
   test.skip('create/close tab updates DB and PTY lifecycle; main tab cannot be deleted', async ({ mainWindow }) => {
     await openTaskTerminal(mainWindow, { projectAbbrev, taskTitle: 'Terminal tab task' })
 

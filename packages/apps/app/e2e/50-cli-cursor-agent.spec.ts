@@ -15,6 +15,7 @@ import {
 const hasBinary = binaryExistsAt(CLI_PATHS['cursor-agent'])
 
 test.describe('Cursor Agent CLI integration', () => {
+  // Environment-gated: this suite requires a local cursor-agent binary installation.
   test.skip(!hasBinary, `cursor-agent not found at ${CLI_PATHS['cursor-agent']}`)
 
   let taskId: string
@@ -55,6 +56,7 @@ test.describe('Cursor Agent CLI integration', () => {
     // Wait for some response (generous timeout for API call)
     // If auth fails, this will timeout — that's expected in CI without credentials
     await waitForBufferContains(mainWindow, sessionId, 'hello', 60_000).catch(() => {
+      // Environment-gated: prompt/response path requires valid cursor-agent authentication.
       // Auth or API failure — not a code bug, just missing credentials
       test.skip(true, 'cursor-agent did not respond — likely missing auth')
     })

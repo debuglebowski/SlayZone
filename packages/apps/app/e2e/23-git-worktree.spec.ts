@@ -163,6 +163,7 @@ test.describe('Git worktree operations', () => {
     expect(task?.worktree_path).toContain(branchName)
   })
 
+  // Skipped because this path is still flaky after prior worktree-delete cleanup in serial runs.
   test.skip('create and verify branch exists in git', async ({ mainWindow }) => {
     // Ensure previous delete action fully detached worktree branch, if still present.
     const existing = await getTask(mainWindow, taskId)

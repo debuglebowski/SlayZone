@@ -1,6 +1,7 @@
 import { test, expect, seed, goHome, clickProject } from './fixtures/electron'
 import { TEST_PROJECT_PATH } from './fixtures/electron'
 
+// Skipped while panel width assertions remain too platform- and timing-sensitive in E2E.
 test.describe.skip('Panel auto-split sizing', () => {
   let projectAbbrev: string
 

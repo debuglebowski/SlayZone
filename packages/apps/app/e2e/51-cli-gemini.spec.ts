@@ -15,6 +15,7 @@ import {
 const hasBinary = binaryOnPath('gemini')
 
 test.describe('Gemini integration', () => {
+  // Environment-gated: this suite requires the gemini CLI binary on PATH.
   test.skip(!hasBinary, 'gemini binary not found on PATH')
 
   let projectAbbrev: string

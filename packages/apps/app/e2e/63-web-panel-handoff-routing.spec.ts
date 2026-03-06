@@ -197,6 +197,7 @@ test.describe.serial('Web panel handoff routing', () => {
     expect(calls).toHaveLength(0)
   })
 
+  // Skipped while same-host popup routing in embedded webview remains flaky in Playwright.
   test.skip('same-host popups stay in-panel and do not call shell.openExternal', async ({
     electronApp,
     mainWindow,

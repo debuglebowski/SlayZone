@@ -1,6 +1,7 @@
 import { test, expect, seed, goHome, clickProject } from './fixtures/electron'
 import { TEST_PROJECT_PATH } from './fixtures/electron'
 
+// Skipped while TipTap keyboard formatting and blur/save assertions are being stabilized in E2E.
 test.describe.skip('Rich text description', () => {
   let projectAbbrev: string
   let taskId: string

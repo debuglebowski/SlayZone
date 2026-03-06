@@ -11,6 +11,7 @@ import {
 import path from 'path'
 import fs from 'fs'
 
+// Skipped while screenshot region-selection input handling is unstable in automated Electron E2E.
 test.describe.skip('Screenshot to terminal', () => {
   const projectName = 'ScreenshotTest'
   let projectAbbrev: string

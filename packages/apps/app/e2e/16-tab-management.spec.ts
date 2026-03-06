@@ -90,6 +90,7 @@ test.describe('Tab management & keyboard shortcuts', () => {
     await expect(mainWindow.locator('h3').getByText('Inbox', { exact: true })).toBeAttached({ timeout: 3_000 })
   })
 
+  // Skipped due flaky accelerator handling for reopen-tab in Electron E2E.
   test.skip('Cmd+Shift+T reopens closed tab', async ({ mainWindow }) => {
     // Open a known task tab directly
     await goHome(mainWindow)

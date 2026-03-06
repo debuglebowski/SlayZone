@@ -139,6 +139,7 @@ test.describe('Cmd+W / Cmd+Shift+W context-sensitive close', () => {
     }, { timeout: 8_000 }).toBe(1)
   })
 
+  // Skipped while main-group close protection is flaky under focus-sensitive accelerator dispatch.
   test.skip('Cmd+W does not close the main (only) terminal group', async ({ mainWindow, electronApp }) => {
     await expect(terminalGroupTabs(mainWindow)).toHaveCount(1, { timeout: 2_000 })
 
@@ -151,6 +152,7 @@ test.describe('Cmd+W / Cmd+Shift+W context-sensitive close', () => {
 
   // ── Editor file tabs ─────────────────────────────────────────────────────
 
+  // Skipped pending deterministic focus routing for Cmd+W when CodeMirror is active.
   test.skip('Cmd+W closes active editor file when editor is focused', async ({ mainWindow, electronApp }) => {
     await closeOpenDialogs(mainWindow)
     // Open editor panel

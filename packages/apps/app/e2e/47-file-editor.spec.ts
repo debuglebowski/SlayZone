@@ -85,6 +85,7 @@ test.describe('File editor', () => {
     await expect(mainWindow.locator('.cm-editor:visible .cm-content')).toBeVisible()
   })
 
+  // Skipped pending stabilization of editor-tab creation assertions in serial E2E.
   test.skip('opening another file creates a second tab', async ({ mainWindow }) => {
     await treeFile(mainWindow, 'readme.md').click()
 
@@ -308,6 +309,7 @@ test.describe('File editor', () => {
 
   // --- Editor state persistence ---
 
+  // Skipped while persisted open-file restoration is flaky across panel remounts.
   test.skip('open files persist across editor panel toggle', async ({ mainWindow }) => {
     // Open hello.ts and readme.md
     await treeFile(mainWindow, 'hello.ts').click()
@@ -333,6 +335,7 @@ test.describe('File editor', () => {
     await expect(editorTab(mainWindow, 'readme.md')).toBeVisible()
   })
 
+  // Skipped while active-tab restoration after toggle is timing-sensitive in E2E.
   test.skip('active file persists across editor panel toggle', async ({ mainWindow }) => {
     // Click hello.ts to make it active
     await editorTab(mainWindow, 'hello.ts').click()
@@ -351,6 +354,7 @@ test.describe('File editor', () => {
     await expect(editorTab(mainWindow, 'hello.ts')).toHaveClass(/border/)
   })
 
+  // Skipped pending stable handling of missing files during tab-state restore.
   test.skip('deleted file silently skipped on restore', async ({ mainWindow }) => {
     // Create a temp file and open it
     const tempPath = path.join(TEST_PROJECT_PATH, 'temp-persist.ts')
@@ -381,6 +385,7 @@ test.describe('File editor', () => {
     await expect(editorTab(mainWindow, 'hello.ts')).toBeVisible({ timeout: 5_000 })
   })
 
+  // Skipped while file-tree visibility persistence remains flaky after editor remount.
   test.skip('tree visibility persists across editor panel toggle', async ({ mainWindow }) => {
     // Hide the file tree
     const hideBtn = mainWindow.locator('button[title="Hide file tree"]:visible').first()

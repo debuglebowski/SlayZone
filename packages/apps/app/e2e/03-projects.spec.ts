@@ -27,6 +27,7 @@ test.describe('Projects', () => {
     await expect(projectBlob(mainWindow, 'SE')).toBeVisible({ timeout: 5_000 })
   })
 
+  // Skipped pending stable integration-wizard setup in local E2E runs.
   test.skip('create project with Linear start option opens integration setup wizard', async ({ mainWindow }) => {
     await clickAddProject(mainWindow)
     await mainWindow.getByPlaceholder('Project name').fill('Linear Sync Project')
@@ -41,6 +42,7 @@ test.describe('Projects', () => {
     await expect(mainWindow.getByRole('heading', { name: 'Project Settings' })).not.toBeVisible({ timeout: 3_000 })
   })
 
+  // Skipped pending stable integration-wizard setup in local E2E runs.
   test.skip('create project with GitHub Projects option opens GitHub setup wizard', async ({ mainWindow }) => {
     await clickAddProject(mainWindow)
     await mainWindow.getByPlaceholder('Project name').fill('GitHub Sync Project')
@@ -55,6 +57,7 @@ test.describe('Projects', () => {
     await expect(mainWindow.getByRole('heading', { name: 'Project Settings' })).not.toBeVisible({ timeout: 3_000 })
   })
 
+  // Skipped until project switch assertions are stabilized with the current editor title control.
   test.skip('switch between projects', async ({ mainWindow }) => {
     await clickProject(mainWindow, 'TE')
     // Project name is in a <textarea>, not h1

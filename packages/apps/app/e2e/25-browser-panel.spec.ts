@@ -144,11 +144,13 @@ test.describe('Browser panel', () => {
     await expect(input).toHaveValue('https://example.com')
   })
 
+  // Skipped because toolbar DevTools visibility is non-deterministic across headless Chromium runs.
   test.skip('devtools button is visible in browser toolbar', async ({ mainWindow }) => {
     await ensureBrowserPanelVisible(mainWindow)
     await expect(devToolsBtn(mainWindow)).toBeVisible()
   })
 
+  // Skipped because responsive-preview state is not consistently applied in CI-like Electron runs.
   test.skip('devtools button is disabled in responsive mode', async ({ mainWindow }) => {
     await ensureBrowserPanelVisible(mainWindow)
     await expect(devToolsBtn(mainWindow)).toBeEnabled()
@@ -170,6 +172,7 @@ test.describe('Browser panel', () => {
     await expect.poll(() => testInvoke(mainWindow, 'webview:is-devtools-opened', webviewId)).toBe(false)
   })
 
+  // Skipped while inline DevTools open/close status reporting remains flaky in E2E.
   test.skip('devtools toggle reports inline open and close status', async ({ mainWindow }) => {
     await ensureBrowserPanelVisible(mainWindow)
     if (await devToolsBtn(mainWindow).isDisabled().catch(() => false)) {
