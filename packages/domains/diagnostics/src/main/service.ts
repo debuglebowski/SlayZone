@@ -35,8 +35,6 @@ const CRITICAL_SETTINGS_KEYS = new Set([
   'theme',
   'shell',
   'default_terminal_mode',
-  'default_claude_flags',
-  'default_codex_flags',
   CONFIG_KEYS.enabled,
   CONFIG_KEYS.verbose,
   CONFIG_KEYS.includePtyOutput,
