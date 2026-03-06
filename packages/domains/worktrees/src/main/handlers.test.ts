@@ -241,6 +241,33 @@ describe('git:getUntrackedFileDiff', () => {
     expect(diff.includes('hello')).toBe(true)
     fs.unlinkSync(path.join(repoPath, 'new-untracked.txt'))
   })
+
+  test('returns empty string for null filePath', () => {
+    const diff = h.invoke('git:getUntrackedFileDiff', repoPath, null as unknown as string) as string
+    expect(diff).toBe('')
+  })
+
+  test('returns diff for file with unicode name', () => {
+    const unicodeName = 'Protokoll från möte.txt'
+    fs.writeFileSync(path.join(repoPath, unicodeName), 'unicode content')
+    const diff = h.invoke('git:getUntrackedFileDiff', repoPath, unicodeName) as string
+    expect(diff.includes('unicode content')).toBe(true)
+    fs.unlinkSync(path.join(repoPath, unicodeName))
+  })
+})
+
+describe('git:getWorkingDiff unicode', () => {
+  test('lists untracked files with unicode names', () => {
+    const unicodeName = 'ändring av avtal.txt'
+    fs.writeFileSync(path.join(repoPath, unicodeName), 'swedish chars')
+    const diff = h.invoke('git:getWorkingDiff', repoPath) as {
+      untrackedFiles: string[]
+      files: string[]
+    }
+    expect(diff.untrackedFiles).toContain(unicodeName)
+    expect(diff.files).toContain(unicodeName)
+    fs.unlinkSync(path.join(repoPath, unicodeName))
+  })
 })
 
 // --- Commit ---
