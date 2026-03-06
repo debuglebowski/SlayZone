@@ -82,8 +82,6 @@ export const TerminalContainer = forwardRef<TerminalContainerHandle, TerminalCon
 
   // Get active group
   const activeGroup = groups.find(g => g.id === activeGroupId)
-  const mainTab = tabs.find((tab) => tab.isMain)
-  const mainSessionId = mainTab ? getSessionId(mainTab.id) : null
   const mainGroupId = groups.find((group) => group.tabs.some((tab) => tab.isMain))?.id ?? null
 
   // Notify parent when main tab active state changes

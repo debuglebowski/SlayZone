@@ -21,7 +21,6 @@ export interface ProviderConfig {
   [mode: string]: { conversationId?: string | null; flags?: string }
 }
 
-
 export function getProviderConversationId(cfg: ProviderConfig | undefined | null, mode: string): string | null {
   return cfg?.[mode]?.conversationId ?? null
 }
@@ -130,7 +129,7 @@ export interface Task {
   due_date: string | null
   archived_at: string | null
   // Terminal configuration
-  terminal_mode: TerminalMode | null
+  terminal_mode: TerminalMode
   provider_config: ProviderConfig
   terminal_shell: string | null
   // Legacy (kept for backwards compat, use claude_conversation_id instead)
