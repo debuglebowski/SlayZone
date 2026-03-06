@@ -997,6 +997,12 @@ const migrations: Migration[] = [
         WHERE ccs_profile IS NOT NULL AND ccs_profile != ''
       `)
     }
+  },
+  {
+    version: 55,
+    up: (db) => {
+      db.exec(`ALTER TABLE tasks ADD COLUMN base_dir TEXT DEFAULT NULL`)
+    }
   }
 ]
 

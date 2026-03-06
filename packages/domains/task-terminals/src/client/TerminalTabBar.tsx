@@ -14,6 +14,7 @@ interface TerminalTabBarProps {
   onPaneClose: (tabId: string) => void
   onPaneMove: (tabId: string, targetGroupId: string | null) => void
   onGroupRename: (tabId: string, label: string | null) => void
+  onMainReset?: () => void
   rightContent?: React.ReactNode
 }
 
@@ -55,6 +56,7 @@ export function TerminalTabBar({
   onPaneClose,
   onPaneMove,
   onGroupRename,
+  onMainReset,
   rightContent
 }: TerminalTabBarProps) {
   const [editingTabId, setEditingTabId] = useState<string | null>(null)
@@ -211,6 +213,19 @@ export function TerminalTabBar({
                       )}
                       {tab.isMain && (
                         <span className="text-[10px] text-orange-300/80 bg-orange-400/10 px-1.5 rounded-full">main</span>
+                      )}
+                      {tab.isMain && onMainReset && (
+                        <button
+                          data-testid="terminal-main-reset"
+                          className="h-4 w-4 rounded hover:bg-neutral-300/50 dark:hover:bg-neutral-600/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                          onClick={e => {
+                            e.stopPropagation()
+                            onMainReset()
+                          }}
+                          title="Reset terminal session"
+                        >
+                          <X className="size-3" />
+                        </button>
                       )}
                       {!tab.isMain && (
                         <button

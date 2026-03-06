@@ -67,6 +67,7 @@ function makeTask(id: string, projectId: string, title: string): Task {
     panel_visibility: null,
     worktree_path: null,
     worktree_parent_branch: null,
+    base_dir: null,
     browser_url: null,
     browser_tabs: null,
     web_panel_urls: null,

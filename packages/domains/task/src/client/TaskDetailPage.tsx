@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
-import { MoreHorizontal, Archive, Trash2, AlertTriangle, Sparkles, Loader2, Terminal as TerminalIcon, Globe, Settings2, GitBranch, FileCode, ChevronRight, Plus, GripVertical, Camera, X, Info, CheckCircle2, XCircle, Stethoscope, Cpu } from 'lucide-react'
+import { MoreHorizontal, Archive, Trash2, AlertTriangle, Sparkles, Loader2, Terminal as TerminalIcon, Globe, Settings2, GitBranch, FileCode, ChevronRight, Plus, GripVertical, Camera, X, Info, CheckCircle2, XCircle, Stethoscope, Cpu, FolderOpen } from 'lucide-react'
 import { DndContext, PointerSensor, useSensors, useSensor, closestCenter, type DragEndEvent } from '@dnd-kit/core'
 import { SortableContext, useSortable, verticalListSortingStrategy, arrayMove } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
@@ -969,7 +969,7 @@ export function TaskDetailPage({
 
       if (e.metaKey && !e.shiftKey) {
         // Cmd+P: quick open — works even inside CodeMirror
-        const editorProjectPath = task?.worktree_path || project?.path
+        const editorProjectPath = task?.worktree_path || task?.base_dir || project?.path
         if (e.key === 'p' && isBuiltinEnabled('editor') && editorProjectPath) {
           e.preventDefault()
           setQuickOpenVisible(true)
@@ -1145,24 +1145,54 @@ export function TaskDetailPage({
   }
 
   // Wrapper for GitPanel that calls API and notifies parent
-  const updateTaskAndNotify = async (data: { id: string; worktreePath?: string | null; worktreeParentBranch?: string | null; browserUrl?: string | null; status?: Task['status'] }): Promise<Task> => {
-    // If worktreePath is changing, kill old PTY first so terminal restarts with new cwd
-    if (data.worktreePath !== undefined) {
+  const updateTaskAndNotify = async (data: { id: string; worktreePath?: string | null; worktreeParentBranch?: string | null; baseDir?: string | null; browserUrl?: string | null; status?: Task['status'] }): Promise<Task> => {
+    // If worktreePath or baseDir is changing, kill old PTY and clear session so terminal starts fresh
+    if (data.worktreePath !== undefined || data.baseDir !== undefined) {
       const mainSessionId = `${data.id}:${data.id}`
       resetTaskState(mainSessionId)
       await window.api.pty.kill(mainSessionId)
       markSkipCache(mainSessionId)
+
+      // Clear conversation ID — the old session was in a different directory and can't be resumed
+      if (task) {
+        const cleared = await window.api.db.updateTask({
+          id: data.id,
+          providerConfig: setProviderConversationId(task.provider_config, task.terminal_mode, null)
+        })
+        handleTaskUpdate(cleared)
+      }
     }
 
     const updated = await window.api.db.updateTask(data)
     handleTaskUpdate(updated)
 
-    // Force terminal remount if worktreePath changed
-    if (data.worktreePath !== undefined) {
+    // Force terminal remount if cwd-affecting field changed
+    if (data.worktreePath !== undefined || data.baseDir !== undefined) {
       setTerminalKey(k => k + 1)
     }
 
     return updated
+  }
+
+  const handlePickBaseDir = async (): Promise<void> => {
+    if (!task) return
+    const result = await window.api.dialog.showOpenDialog({
+      title: 'Choose working directory',
+      defaultPath: task.base_dir || project?.path || undefined,
+      properties: ['openDirectory']
+    })
+    if (result.canceled || result.filePaths.length === 0) return
+    await updateTaskAndNotify({ id: task.id, baseDir: result.filePaths[0] })
+  }
+
+  const handleClearBaseDir = async (): Promise<void> => {
+    if (!task) return
+    await updateTaskAndNotify({ id: task.id, baseDir: null })
+  }
+
+  const handleDetachWorktree = async (): Promise<void> => {
+    if (!task) return
+    await updateTaskAndNotify({ id: task.id, worktreePath: null, worktreeParentBranch: null })
   }
 
   // Handler for browser tabs changes
@@ -1565,10 +1595,10 @@ export function TaskDetailPage({
               ) : project?.id === task.project_id && project.path && !projectPathMissing ? (
                 <TerminalContainer
                   ref={terminalContainerRef}
-                  key={`${terminalKey}-${task.project_id}-${project?.path || ''}-${task.worktree_path || ''}`}
+                  key={`${terminalKey}-${task.project_id}-${project?.path || ''}-${task.worktree_path || task.base_dir || ''}`}
                   taskId={task.id}
                   isActive={isActive}
-                  cwd={task.worktree_path || project.path}
+                  cwd={task.worktree_path || task.base_dir || project.path}
                   defaultMode={task.terminal_mode}
                   conversationId={getConversationIdForMode(task) || undefined}
                   existingConversationId={getConversationIdForMode(task) || undefined}
@@ -1583,6 +1613,7 @@ export function TaskDetailPage({
                   onRetry={handleRestartTerminal}
                   onFocusRequestHandled={handleTerminalFocusRequestHandled}
                   onMainTabActiveChange={setIsMainTabActive}
+                  onMainReset={handleResetTerminal}
                   rightContent={
                     <Tooltip open={!isMainTabActive && !task.is_temporary ? undefined : false}>
                       <TooltipTrigger asChild>
@@ -1842,7 +1873,7 @@ export function TaskDetailPage({
           <div data-panel-id="editor" className={cn("shrink-0 overflow-hidden rounded-md bg-surface-2 border border-border transition-shadow duration-200", multipleVisiblePanels && focusedPanel === 'editor' && "shadow-[0_0_18px_rgba(255,255,255,0.25)]")} style={{ width: resolvedWidths.editor }}>
             <FileEditorView
               ref={fileEditorRefCallback}
-              projectPath={task.worktree_path || project.path}
+              projectPath={task.worktree_path || task.base_dir || project.path}
               initialEditorState={task.editor_open_files}
               onEditorStateChange={handleEditorStateChange}
             />
@@ -2050,6 +2081,34 @@ export function TaskDetailPage({
             </div>
           </div>
 
+          {/* Working directory */}
+          <div className="flex flex-col gap-2">
+            <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Working directory</span>
+            <div className="text-xs text-muted-foreground truncate px-2 py-1.5 rounded border border-border bg-muted/30" title={(task.worktree_path || task.base_dir || project?.path) ?? 'No directory set'}>
+              {(task.worktree_path || task.base_dir || project?.path) ?? 'No directory set'}
+              {task.worktree_path && <span className="ml-1 text-[10px] opacity-60">(worktree)</span>}
+              {!task.worktree_path && task.base_dir && <span className="ml-1 text-[10px] opacity-60">(custom)</span>}
+            </div>
+            <div className="flex items-center gap-2">
+              <Button variant="outline" size="sm" className="flex-1 text-xs justify-start" onClick={handlePickBaseDir}>
+                <FolderOpen className="mr-1.5 size-3" />
+                {task.base_dir ? 'Change directory' : 'Set custom directory'}
+              </Button>
+              {task.base_dir && (
+                <Button variant="outline" size="sm" className="text-xs" onClick={handleClearBaseDir}>
+                  <X className="mr-1.5 size-3" />
+                  Clear
+                </Button>
+              )}
+            </div>
+            {task.worktree_path && (
+              <Button variant="outline" size="sm" className="text-xs w-full justify-start" onClick={handleDetachWorktree}>
+                <GitBranch className="mr-1.5 size-3" />
+                Detach worktree (keep on disk)
+              </Button>
+            )}
+          </div>
+
         </div>
         )}
 
@@ -2068,7 +2127,7 @@ export function TaskDetailPage({
         {/* Processes Panel — dev mode only */}
         {import.meta.env.DEV && !compact && panelVisibility.processes && (
           <div data-panel-id="processes" className={cn("shrink-0 rounded-md bg-surface-2 border border-border overflow-hidden flex flex-col transition-shadow duration-200", multipleVisiblePanels && focusedPanel === 'processes' && "shadow-[0_0_18px_rgba(255,255,255,0.25)]")} style={{ width: resolvedWidths.processes }}>
-            <ProcessesPanel taskId={task.id} projectId={project?.id ?? null} cwd={task.worktree_path || project?.path} terminalSessionId={getMainSessionId(task.id)} />
+            <ProcessesPanel taskId={task.id} projectId={project?.id ?? null} cwd={task.worktree_path || task.base_dir || project?.path} terminalSessionId={getMainSessionId(task.id)} />
           </div>
         )}
       </div>
@@ -2077,7 +2136,7 @@ export function TaskDetailPage({
         <QuickOpenDialog
           open={quickOpenVisible}
           onOpenChange={setQuickOpenVisible}
-          projectPath={task.worktree_path || project.path}
+          projectPath={task.worktree_path || task.base_dir || project.path}
           onOpenFile={handleQuickOpenFile}
         />
       )}
