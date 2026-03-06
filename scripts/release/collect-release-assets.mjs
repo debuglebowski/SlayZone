@@ -21,6 +21,15 @@ const INCLUDED_SUFFIXES = [
 const EXCLUDED_BASENAMES = new Set(['builder-debug.yml', 'builder-effective-config.yaml'])
 const EXCLUDED_SUFFIXES = ['.blockmap']
 
+// On Windows, electron-builder outputs both installer .exe files and internal
+// helper binaries (winpty-agent.exe, etc.) that appear across arch subdirs.
+// Only include .exe files that look like installers (contain "setup" or "Setup").
+function isInstallerExe(baseName) {
+  const lower = baseName.toLowerCase()
+  if (!lower.endsWith('.exe')) return true // not an exe, defer to other checks
+  return lower.includes('setup')
+}
+
 function parseArgs(argv) {
   const args = {}
 
@@ -68,7 +77,11 @@ function isIncluded(filePath) {
     return false
   }
 
-  return INCLUDED_SUFFIXES.some((suffix) => lowerBase.endsWith(suffix))
+  if (!INCLUDED_SUFFIXES.some((suffix) => lowerBase.endsWith(suffix))) {
+    return false
+  }
+
+  return isInstallerExe(baseName)
 }
 
 function main() {
