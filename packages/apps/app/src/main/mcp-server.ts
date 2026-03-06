@@ -8,7 +8,7 @@ import { BrowserWindow } from 'electron'
 import { z } from 'zod'
 import type { Database } from 'better-sqlite3'
 import { updateTask } from '@slayzone/task/main'
-import { PROVIDER_DEFAULTS } from '@slayzone/task/shared'
+import type { ProviderConfig } from '@slayzone/task/shared'
 import type { ColumnConfig } from '@slayzone/projects/shared'
 import { getDefaultStatus, isKnownStatus, parseColumnsConfig } from '@slayzone/projects/shared'
 import { listAllProcesses, killProcess, subscribeToProcessLogs } from './process-manager'
@@ -40,12 +40,11 @@ function createMcpServer(db: Database): McpServer {
     return explicitTaskId ?? process.env.SLAYZONE_TASK_ID ?? null
   }
 
-  function buildDefaultProviderConfig(): Record<string, { flags: string }> {
-    const providerConfig: Record<string, { flags: string }> = {}
-    for (const [mode, def] of Object.entries(PROVIDER_DEFAULTS)) {
-      const dbDefault = (db.prepare('SELECT value FROM settings WHERE key = ?')
-        .get(def.settingsKey) as { value: string } | undefined)?.value ?? def.fallback
-      providerConfig[mode] = { flags: dbDefault }
+  function buildDefaultProviderConfig(): ProviderConfig {
+    const providerConfig: ProviderConfig = {}
+    const allModes = db.prepare('SELECT id, default_flags FROM terminal_modes WHERE enabled = 1').all() as Array<{ id: string; default_flags: string | null }>
+    for (const row of allModes) {
+      providerConfig[row.id] = { flags: row.default_flags ?? '' }
     }
     return providerConfig
   }

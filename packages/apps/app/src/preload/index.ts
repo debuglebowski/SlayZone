@@ -512,7 +512,10 @@ const api: ElectronAPI = {
     pushTask: (input) => ipcRenderer.invoke('integrations:push-task', input),
     pullTask: (input) => ipcRenderer.invoke('integrations:pull-task', input),
     getLink: (taskId, provider) => ipcRenderer.invoke('integrations:get-link', taskId, provider),
-    unlinkTask: (taskId, provider) => ipcRenderer.invoke('integrations:unlink-task', taskId, provider)
+    unlinkTask: (taskId, provider) => ipcRenderer.invoke('integrations:unlink-task', taskId, provider),
+    fetchProviderStatuses: (input) => ipcRenderer.invoke('integrations:fetch-provider-statuses', input),
+    applyStatusSync: (input) => ipcRenderer.invoke('integrations:apply-status-sync', input),
+    resyncProviderStatuses: (input) => ipcRenderer.invoke('integrations:resync-provider-statuses', input)
   }
 }
 

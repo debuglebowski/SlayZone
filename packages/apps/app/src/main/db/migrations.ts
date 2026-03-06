@@ -1110,6 +1110,34 @@ const migrations: Migration[] = [
         ALTER TABLE terminal_modes_new RENAME TO terminal_modes;
       `)
     }
+  },
+  {
+    version: 60,
+    up: (db) => {
+      db.exec(`UPDATE tasks SET terminal_mode = 'claude-code' WHERE terminal_mode = 'terminal'`)
+    }
+  },
+  {
+    // Migrate legacy settings.default_*_flags → terminal_modes.default_flags
+    // so terminal_modes becomes the single source of truth for default flags.
+    version: 61,
+    up: (db) => {
+      const mapping: Array<[string, string]> = [
+        ['default_claude_flags', 'claude-code'],
+        ['default_codex_flags', 'codex'],
+        ['default_cursor_flags', 'cursor-agent'],
+        ['default_gemini_flags', 'gemini'],
+        ['default_opencode_flags', 'opencode'],
+      ]
+      const readSetting = db.prepare('SELECT value FROM settings WHERE key = ?')
+      const updateMode = db.prepare('UPDATE terminal_modes SET default_flags = ? WHERE id = ?')
+      for (const [settingsKey, modeId] of mapping) {
+        const row = readSetting.get(settingsKey) as { value: string } | undefined
+        if (row) {
+          updateMode.run(row.value, modeId)
+        }
+      }
+    }
   }
 ]
 
