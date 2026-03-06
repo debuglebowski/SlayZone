@@ -306,7 +306,13 @@ jobs:
           while IFS= read -r -d '' file; do
             name=$(basename "$file")
             if [ -f "$ASSETS_DIR/$name" ]; then
-              echo "Duplicate asset filename detected: $name" >&2
+              existing_size=$(stat -c%s "$ASSETS_DIR/$name")
+              new_size=$(stat -c%s "$file")
+              if [ "$existing_size" = "$new_size" ]; then
+                echo "Skipping identical duplicate: $name"
+                continue
+              fi
+              echo "Duplicate asset with different content: $name" >&2
               exit 1
             fi
             cp "$file" "$ASSETS_DIR/$name"
