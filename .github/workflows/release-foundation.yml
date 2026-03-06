@@ -271,6 +271,7 @@ jobs:
           APPLE_TEAM_ID: ${{ needs.resolve.outputs.mode == 'publish' && secrets.APPLE_TEAM_ID || '' }}
 
       - name: Collect release assets
+        shell: bash
         run: |
           node scripts/release/collect-release-assets.mjs \
             --input packages/apps/app/dist \
