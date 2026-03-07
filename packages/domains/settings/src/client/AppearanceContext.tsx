@@ -39,6 +39,9 @@ export function AppearanceProvider({
       window.api.settings.get('browser_default_url'),
       window.api.settings.get('browser_default_devices'),
       window.api.settings.get('sidebar_badge_mode'),
+      window.api.settings.get('terminal_theme_follow_app'),
+      window.api.settings.get('terminal_theme_dark'),
+      window.api.settings.get('terminal_theme_light'),
     ]).then(([
       termSize, editorSize, reduceMotion, colorTints,
       wordWrap, tabSize, indentTabs, renderWs,
@@ -46,6 +49,7 @@ export function AppearanceProvider({
       diffContext, diffWs,
       browserZoom, browserUrl, browserDevices,
       sidebarBadge,
+      termThemeFollow, termThemeDark, termThemeLight,
     ]) => {
       const d = appearanceDefaults
       setSettings({
@@ -65,6 +69,9 @@ export function AppearanceProvider({
         browserDefaultUrl: browserUrl || '',
         browserDeviceDefaults: tryParseJson<BrowserDeviceDefaults | null>(browserDevices, null),
         sidebarBadgeMode: (sidebarBadge === 'none' || sidebarBadge === 'count') ? sidebarBadge : 'blob',
+        terminalThemeFollowApp: termThemeFollow !== '0',
+        terminalThemeDark: termThemeDark || d.terminalThemeDark,
+        terminalThemeLight: termThemeLight || d.terminalThemeLight,
       })
     })
   }, [settingsRevision])

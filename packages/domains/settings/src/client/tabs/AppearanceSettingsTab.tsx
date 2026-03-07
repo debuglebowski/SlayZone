@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { Label, Select, SelectTrigger, SelectValue, SelectContent, SelectItem, Switch } from '@slayzone/ui'
+import { darkThemes, lightThemes } from '@slayzone/terminal/client'
 import { SettingsTabIntro } from './SettingsTabIntro'
 
 interface AppearanceSettingsTabProps {
@@ -16,6 +17,9 @@ export function AppearanceSettingsTab({
   const [editorFontSize, setEditorFontSize] = useState('13')
   const [reduceMotion, setReduceMotion] = useState(false)
   const [sidebarBadgeMode, setSidebarBadgeMode] = useState<'none' | 'blob' | 'count'>('blob')
+  const [terminalThemeFollowApp, setTerminalThemeFollowApp] = useState(true)
+  const [terminalThemeDark, setTerminalThemeDark] = useState('slay')
+  const [terminalThemeLight, setTerminalThemeLight] = useState('slay-light')
 
   useEffect(() => {
     window.api.settings.get('project_color_tints_enabled').then(val => setProjectColorTints(val !== '0'))
@@ -23,6 +27,9 @@ export function AppearanceSettingsTab({
     window.api.settings.get('editor_font_size').then(val => setEditorFontSize(val ?? '13'))
     window.api.settings.get('reduce_motion').then(val => setReduceMotion(val === '1'))
     window.api.settings.get('sidebar_badge_mode').then(val => setSidebarBadgeMode((val === 'none' || val === 'count') ? val : 'blob'))
+    window.api.settings.get('terminal_theme_follow_app').then(val => setTerminalThemeFollowApp(val !== '0'))
+    window.api.settings.get('terminal_theme_dark').then(val => { if (val) setTerminalThemeDark(val) })
+    window.api.settings.get('terminal_theme_light').then(val => { if (val) setTerminalThemeLight(val) })
   }, [])
 
   return (
@@ -46,6 +53,68 @@ export function AppearanceSettingsTab({
             </SelectContent>
           </Select>
         </div>
+      </div>
+
+      <div className="space-y-3">
+        <Label className="text-base font-semibold">Terminal Theme</Label>
+        <div className="grid grid-cols-[220px_minmax(0,1fr)] items-center gap-4">
+          <span className="text-sm">Follow application theme</span>
+          <Switch
+            checked={terminalThemeFollowApp}
+            onCheckedChange={(checked) => {
+              setTerminalThemeFollowApp(checked)
+              window.api.settings.set('terminal_theme_follow_app', checked ? '1' : '0')
+            }}
+          />
+        </div>
+        {terminalThemeFollowApp ? (
+          <>
+            <div className="grid grid-cols-[220px_minmax(0,1fr)] items-center gap-4">
+              <span className="text-sm">Dark theme</span>
+              <div className="flex items-center gap-2">
+                <Select value={terminalThemeDark} onValueChange={(v) => { setTerminalThemeDark(v); window.api.settings.set('terminal_theme_dark', v) }}>
+                  <SelectTrigger className="w-48">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {darkThemes.map(t => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+                <TerminalThemePreview themeId={terminalThemeDark} />
+              </div>
+            </div>
+            <div className="grid grid-cols-[220px_minmax(0,1fr)] items-center gap-4">
+              <span className="text-sm">Light theme</span>
+              <div className="flex items-center gap-2">
+                <Select value={terminalThemeLight} onValueChange={(v) => { setTerminalThemeLight(v); window.api.settings.set('terminal_theme_light', v) }}>
+                  <SelectTrigger className="w-48">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {lightThemes.map(t => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+                <TerminalThemePreview themeId={terminalThemeLight} />
+              </div>
+            </div>
+          </>
+        ) : (
+          <div className="grid grid-cols-[220px_minmax(0,1fr)] items-center gap-4">
+            <span className="text-sm">Theme</span>
+            <div className="flex items-center gap-2">
+              <Select value={terminalThemeDark} onValueChange={(v) => { setTerminalThemeDark(v); window.api.settings.set('terminal_theme_dark', v) }}>
+                <SelectTrigger className="w-48">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {darkThemes.map(t => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}
+                  {lightThemes.map(t => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+              <TerminalThemePreview themeId={terminalThemeDark} />
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="space-y-3">
@@ -115,5 +184,22 @@ export function AppearanceSettingsTab({
         </div>
       </div>
     </>
+  )
+}
+
+function TerminalThemePreview({ themeId }: { themeId: string }) {
+  const theme = useMemo(() => [...darkThemes, ...lightThemes].find(t => t.id === themeId), [themeId])
+  if (!theme) return null
+  const c = theme.colors
+  const colors = [c.red, c.green, c.yellow, c.blue, c.magenta, c.cyan]
+  return (
+    <div
+      className="flex items-center gap-px rounded px-1.5 py-1 border"
+      style={{ backgroundColor: c.background ?? '#000' }}
+    >
+      {colors.map((color, i) => (
+        <div key={i} className="size-2.5 rounded-full" style={{ backgroundColor: color ?? '#888' }} />
+      ))}
+    </div>
   )
 }

@@ -4,4 +4,5 @@ export { PtyProvider, usePty, usePendingPrompts, useActiveTaskIds } from './PtyC
 export { usePtyStatus } from './usePtyStatus'
 export { useTerminalModes } from './useTerminalModes'
 export { markSkipCache } from './terminal-cache'
+export { terminalThemes, darkThemes, lightThemes, getTerminalThemeById, type TerminalThemeDefinition } from './terminal-themes'
 export * from './utils'

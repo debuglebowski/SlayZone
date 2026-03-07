@@ -22,7 +22,7 @@ document.head.appendChild(underlineOverride)
 import { getTerminal, setTerminal, disposeTerminal, updateAllThemes } from './terminal-cache'
 import { usePty } from './PtyContext'
 import { useTheme, useAppearance } from '@slayzone/settings/client'
-import { getTerminalTheme } from './terminal-themes'
+import { getTerminalThemeById, terminalThemes } from './terminal-themes'
 import { TerminalSearchBar } from './TerminalSearchBar'
 import type { TerminalMode, TerminalState } from '@slayzone/terminal/shared'
 
@@ -167,7 +167,13 @@ export const Terminal = forwardRef<TerminalHandle, TerminalProps>(function Termi
 
   const { subscribe, subscribeExit, subscribeSessionInvalid, subscribeAttention, subscribeState, getState, getCrashOutput, resetTaskState, cleanupTask } = usePty()
   const { theme } = useTheme()
-  const { terminalFontSize, terminalFontFamily, terminalScrollback } = useAppearance()
+  const { terminalFontSize, terminalFontFamily, terminalScrollback, terminalThemeFollowApp, terminalThemeDark, terminalThemeLight } = useAppearance()
+
+  const resolvedTerminalThemeId = terminalThemeFollowApp
+    ? (theme === 'dark' ? terminalThemeDark : terminalThemeLight)
+    : terminalThemeDark
+  const resolvedTerminalTheme = getTerminalThemeById(resolvedTerminalThemeId)
+  const resolvedTerminalVariant = terminalThemes.find(t => t.id === resolvedTerminalThemeId)?.variant ?? 'dark'
 
   const [ptyState, setPtyState] = useState<TerminalState>(() => getState(sessionId))
 
@@ -237,8 +243,8 @@ export const Terminal = forwardRef<TerminalHandle, TerminalProps>(function Termi
           // Reattach existing terminal (container already has dimensions)
           containerRef.current.appendChild(cached.element)
           onAttachedRef.current?.({ focus: () => cached.terminal.focus() })
-          cached.terminal.options.theme = getTerminalTheme(theme)
-          cached.terminal.options.minimumContrastRatio = theme === 'light' ? 4.5 : 1
+          cached.terminal.options.theme = resolvedTerminalTheme
+          cached.terminal.options.minimumContrastRatio = resolvedTerminalVariant === 'light' ? 4.5 : 1
           terminalRef.current = cached.terminal
           fitAddonRef.current = cached.fitAddon
           serializeAddonRef.current = cached.serializeAddon
@@ -296,8 +302,8 @@ export const Terminal = forwardRef<TerminalHandle, TerminalProps>(function Termi
         fontSize: terminalFontSize,
         fontFamily: terminalFontFamily,
         scrollback: terminalScrollback,
-        theme: getTerminalTheme(theme),
-        minimumContrastRatio: theme === 'light' ? 4.5 : 1
+        theme: resolvedTerminalTheme,
+        minimumContrastRatio: resolvedTerminalVariant === 'light' ? 4.5 : 1
       })
 
       const fitAddon = new FitAddon()
@@ -554,23 +560,22 @@ export const Terminal = forwardRef<TerminalHandle, TerminalProps>(function Termi
     return subscribeState(sessionId, (newState) => setPtyState(newState))
   }, [sessionId, getState, subscribeState])
 
-  // Sync terminal theme with app theme
+  // Sync terminal theme with app theme / terminal theme settings
   useEffect(() => {
-    const xtermTheme = getTerminalTheme(theme)
-    const contrastRatio = theme === 'light' ? 4.5 : 1
+    const contrastRatio = resolvedTerminalVariant === 'light' ? 4.5 : 1
     if (terminalRef.current) {
-      terminalRef.current.options.theme = xtermTheme
+      terminalRef.current.options.theme = resolvedTerminalTheme
       terminalRef.current.options.minimumContrastRatio = contrastRatio
     }
-    updateAllThemes(xtermTheme, contrastRatio)
+    updateAllThemes(resolvedTerminalTheme, contrastRatio)
     // Keep main process in sync so it can respond to OSC 10/11/12 color queries
     // synchronously (async renderer response arrives too late once readline is active).
     void window.api.pty.setTheme({
-      foreground: xtermTheme.foreground ?? '#ffffff',
-      background: xtermTheme.background ?? '#000000',
-      cursor: xtermTheme.cursor ?? '#ffffff',
+      foreground: resolvedTerminalTheme.foreground ?? '#ffffff',
+      background: resolvedTerminalTheme.background ?? '#000000',
+      cursor: resolvedTerminalTheme.cursor ?? '#ffffff',
     })
-  }, [theme])
+  }, [theme, terminalThemeDark, terminalThemeLight, terminalThemeFollowApp])
 
   // Handle resize
   useEffect(() => {
@@ -775,10 +780,10 @@ export const Terminal = forwardRef<TerminalHandle, TerminalProps>(function Termi
       <div
         ref={containerRef}
         tabIndex={0}
-        className={`h-full w-full bg-white dark:bg-[#0a0a0a] rounded-lg outline-none overflow-hidden transition-colors ${
+        className={`h-full w-full rounded-lg outline-none overflow-hidden transition-colors ${
           isDragOver ? 'ring-2 ring-blue-500/50 ring-inset' : ''
         }`}
-        style={{ padding: '8px' }}
+        style={{ padding: '8px', backgroundColor: resolvedTerminalTheme.background ?? '#0a0a0a' }}
         onClick={() => terminalRef.current?.focus()}
       >
         {isLoading && (
