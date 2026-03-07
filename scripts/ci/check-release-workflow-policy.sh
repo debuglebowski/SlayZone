@@ -69,4 +69,9 @@ require_contains \
   'Publish (${{ matrix.channel }})' \
   "release-foundation.yml must keep channel publish jobs"
 
+require_contains \
+  ".github/workflows/release-foundation.yml" \
+  "generate-homebrew-cask.mjs" \
+  "release-foundation.yml must generate Homebrew cask formula"
+
 echo "Release workflow policy checks passed."

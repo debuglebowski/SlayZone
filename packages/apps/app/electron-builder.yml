@@ -36,7 +36,7 @@ mac:
     - NSDownloadsFolderUsageDescription: Application requests access to the user's Downloads folder.
   notarize: true
 dmg:
-  artifactName: ${productName}.${ext}
+  artifactName: ${productName}-${arch}.${ext}
 linux:
   target:
     - AppImage
@@ -46,7 +46,7 @@ linux:
 deb:
   artifactName: ${productName}-${arch}.${ext}
 appImage:
-  artifactName: ${productName}.${ext}
+  artifactName: ${productName}-${arch}.${ext}
 extraResources:
   - from: "../cli/dist/slay.js"
     to: "bin/slay.js"
