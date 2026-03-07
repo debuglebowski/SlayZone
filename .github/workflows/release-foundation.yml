@@ -555,3 +555,40 @@ jobs:
           gh api "repos/$TAP_REPO/git/refs/heads/main" \
             -X PATCH \
             -f sha="$COMMIT_SHA"
+
+  update-nix:
+    runs-on: ubuntu-latest
+    needs: [resolve, publish-channel]
+    if: needs.resolve.outputs.mode == 'publish'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Download release bundle
+        uses: actions/download-artifact@v4
+        with:
+          name: release-bundle
+          path: release-bundle
+
+      - name: Update nix sources
+        run: |
+          node scripts/release/update-nix-sources.mjs \
+            --manifest release-bundle/release-manifest.json \
+            --output nix/sources.json
+
+      - name: Push updated sources
+        shell: bash
+        env:
+          VERSION: ${{ needs.resolve.outputs.version }}
+        run: |
+          set -euo pipefail
+          if git diff --quiet nix/sources.json; then
+            echo "No changes to nix/sources.json"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add nix/sources.json
+          git commit -m "chore(nix): update sources to $VERSION"
+          git push
