@@ -52,6 +52,12 @@ export interface TestFileLabel {
   label_id: string
 }
 
+export interface TestFileNote {
+  project_id: string
+  file_path: string
+  note: string
+}
+
 export interface CreateTestLabelInput {
   project_id: string
   name: string

@@ -379,6 +379,9 @@ importers:
 
   packages/domains/integrations:
     dependencies:
+      '@slayzone/terminal':
+        specifier: workspace:*
+        version: link:../terminal
       '@slayzone/workflow':
         specifier: workspace:*
         version: link:../../shared/workflow
@@ -420,6 +423,9 @@ importers:
       '@slayzone/integrations':
         specifier: workspace:*
         version: link:../integrations
+      '@slayzone/test-panel':
+        specifier: workspace:*
+        version: link:../test-panel
       '@slayzone/ui':
         specifier: workspace:*
         version: link:../../shared/ui

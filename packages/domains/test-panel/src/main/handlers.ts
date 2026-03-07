@@ -162,6 +162,20 @@ export function registerTestPanelHandlers(ipcMain: IpcMain, db: Database): void 
     return db.prepare('SELECT * FROM test_file_labels WHERE project_id = ?').all(projectId)
   })
 
+  // File notes
+
+  ipcMain.handle('db:testPanel:getFileNotes', (_, projectId: string) => {
+    return db.prepare('SELECT * FROM test_file_notes WHERE project_id = ?').all(projectId)
+  })
+
+  ipcMain.handle('db:testPanel:setFileNote', (_, projectId: string, filePath: string, note: string) => {
+    if (note.trim() === '') {
+      db.prepare('DELETE FROM test_file_notes WHERE project_id = ? AND file_path = ?').run(projectId, filePath)
+    } else {
+      db.prepare('INSERT OR REPLACE INTO test_file_notes (project_id, file_path, note) VALUES (?, ?, ?)').run(projectId, filePath, note)
+    }
+  })
+
   ipcMain.handle('db:testPanel:toggleFileLabel', (_, projectId: string, filePath: string, labelId: string) => {
     const existing = db.prepare('SELECT 1 FROM test_file_labels WHERE project_id = ? AND file_path = ? AND label_id = ?').get(projectId, filePath, labelId)
     if (existing) {

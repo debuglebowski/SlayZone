@@ -72,7 +72,7 @@ import { TutorialAnimationModal } from '@/components/tutorial/TutorialAnimationM
 import { useOnboardingChecklist } from '@/hooks/useOnboardingChecklist'
 
 type HomePanel = 'kanban' | 'git' | 'editor' | 'processes' | 'tests'
-type ProjectSettingsTab = 'general' | 'environment' | 'columns' | 'integrations' | 'ai-config'
+type ProjectSettingsTab = 'general' | 'environment' | 'columns' | 'integrations' | 'ai-config' | 'tests'
 type ProjectIntegrationOnboardingProvider = Exclude<ProjectStartMode, 'scratch'>
 type GlobalAiConfigSection = 'providers' | 'instructions' | 'skill' | 'mcp' | 'files'
 const HOME_PANEL_ORDER: HomePanel[] = ['kanban', 'git', 'editor', 'processes', 'tests']
@@ -133,6 +133,7 @@ function App(): React.JSX.Element {
   const [createProjectOpen, setCreateProjectOpen] = useState(false)
   const [editingProject, setEditingProject] = useState<Project | null>(null)
   const [projectSettingsInitialTab, setProjectSettingsInitialTab] = useState<ProjectSettingsTab>('general')
+  const [testGroupBy, setTestGroupBy] = useState<'none' | 'path' | 'label'>('none')
   const [projectSettingsOnboardingProvider, setProjectSettingsOnboardingProvider] =
     useState<ProjectIntegrationOnboardingProvider | null>(null)
   const [deletingProject, setDeletingProject] = useState<Project | null>(null)
@@ -861,6 +862,15 @@ function App(): React.JSX.Element {
     if (num < tabs.length) setActiveTabIndex(num)
   }, { enableOnFormTags: true })
 
+  useHotkeys('mod+shift+1,mod+shift+2,mod+shift+3,mod+shift+4,mod+shift+5,mod+shift+6,mod+shift+7,mod+shift+8,mod+shift+9', (e) => {
+    e.preventDefault()
+    const num = parseInt(e.code.replace('Digit', ''), 10)
+    if (num > 0 && num <= projects.length) {
+      setSelectedProjectId(projects[num - 1].id)
+      setActiveTabIndex(0)
+    }
+  }, { enableOnFormTags: true })
+
   useHotkeys('ctrl+tab', (e) => {
     e.preventDefault()
     if (tabCycleOrder.length === 0) return
@@ -1505,7 +1515,7 @@ function App(): React.JSX.Element {
                                       )}
                                       {id === 'editor' && <FileEditorView ref={homeEditorRefCallback} projectPath={projectPath ?? ''} />}
                                       {id === 'processes' && <ProcessesPanel taskId={null} projectId={selectedProjectId} cwd={projectPath} />}
-                                      {id === 'tests' && <TestPanel projectId={selectedProjectId} projectPath={projectPath} />}
+                                      {id === 'tests' && <TestPanel projectId={selectedProjectId} projectPath={projectPath} groupBy={testGroupBy} onOpenSettings={() => { if (selectedProject) openProjectSettings(selectedProject, { initialTab: 'tests' }) }} />}
                                     </div>
                                   </React.Fragment>
                                 )
@@ -1612,6 +1622,8 @@ function App(): React.JSX.Element {
           open={!!editingProject}
           onOpenChange={(open) => !open && closeProjectSettings()}
           initialTab={projectSettingsInitialTab}
+          groupBy={testGroupBy}
+          onGroupByChange={setTestGroupBy}
           integrationOnboardingProvider={projectSettingsOnboardingProvider}
           onIntegrationOnboardingHandled={() => setProjectSettingsOnboardingProvider(null)}
           onOpenGlobalAiConfig={openGlobalAiConfigFromProject}

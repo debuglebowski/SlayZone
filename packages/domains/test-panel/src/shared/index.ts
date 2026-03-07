@@ -7,6 +7,7 @@ export type {
   ScanResult,
   TestLabel,
   TestFileLabel,
+  TestFileNote,
   CreateTestLabelInput,
   UpdateTestLabelInput
 } from './types'

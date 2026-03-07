@@ -1193,6 +1193,29 @@ const migrations: Migration[] = [
         CREATE INDEX idx_test_file_labels_label ON test_file_labels(label_id);
       `)
     }
+  },
+  {
+    version: 65,
+    up: (db) => {
+      db.exec(`
+        CREATE TABLE test_file_notes (
+          project_id TEXT NOT NULL,
+          file_path TEXT NOT NULL,
+          note TEXT NOT NULL DEFAULT '',
+          PRIMARY KEY (project_id, file_path)
+        );
+      `)
+    }
+  },
+  {
+    version: 66,
+    up: (db) => {
+      db.exec(`
+        ALTER TABLE integration_project_mappings ADD COLUMN external_repo_owner TEXT DEFAULT NULL;
+        ALTER TABLE integration_project_mappings ADD COLUMN external_repo_name TEXT DEFAULT NULL;
+        ALTER TABLE integration_project_mappings ADD COLUMN last_discovery_at TEXT DEFAULT NULL;
+      `)
+    }
   }
 ]
 

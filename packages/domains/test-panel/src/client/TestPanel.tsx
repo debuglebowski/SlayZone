@@ -1,13 +1,14 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react'
-import { Settings, RefreshCw, ChevronRight, Tags, FolderTree } from 'lucide-react'
+import { Settings, RefreshCw, ChevronRight } from 'lucide-react'
 import { Button, Card, Collapsible, CollapsibleTrigger, CollapsibleContent } from '@slayzone/ui'
-import type { TestCategory, ScanResult, TestLabel, TestFileLabel } from '../shared/types'
+import type { TestCategory, ScanResult, TestLabel, TestFileLabel, TestFileNote } from '../shared/types'
 import { TestFileRow } from './TestFileRow'
-import { CategoryManager } from './CategoryManager'
 
 interface TestPanelProps {
   projectId: string | null
   projectPath: string | null
+  groupBy: 'none' | 'path' | 'label'
+  onOpenSettings: () => void
 }
 
 interface DirNode {
@@ -49,14 +50,13 @@ function collapseTree(node: DirNode): DirNode {
   return { ...node, children: collapsed }
 }
 
-export function TestPanel({ projectId, projectPath }: TestPanelProps): React.JSX.Element {
+export function TestPanel({ projectId, projectPath, groupBy, onOpenSettings }: TestPanelProps): React.JSX.Element {
   const [categories, setCategories] = useState<TestCategory[]>([])
   const [scanResult, setScanResult] = useState<ScanResult | null>(null)
   const [loading, setLoading] = useState(false)
-  const [managerOpen, setManagerOpen] = useState(false)
-  const [groupBy, setGroupBy] = useState<'none' | 'path' | 'label'>('none')
   const [labels, setLabels] = useState<TestLabel[]>([])
   const [fileLabels, setFileLabels] = useState<TestFileLabel[]>([])
+  const [fileNotes, setFileNotes] = useState<TestFileNote[]>([])
   const requestIdRef = useRef(0)
 
   const fileLabelMap = useMemo(() => {
@@ -68,23 +68,24 @@ export function TestPanel({ projectId, projectPath }: TestPanelProps): React.JSX
     return map
   }, [fileLabels])
 
-  const reloadCategories = useCallback(async () => {
-    if (!projectId) return
-    const id = ++requestIdRef.current
-    const cats = await window.api.testPanel.getCategories(projectId)
-    if (requestIdRef.current === id) setCategories(cats)
-  }, [projectId])
+  const fileNoteMap = useMemo(() => {
+    const map = new Map<string, string>()
+    for (const fn of fileNotes) map.set(fn.file_path, fn.note)
+    return map
+  }, [fileNotes])
 
   const reloadLabels = useCallback(async () => {
     if (!projectId) return
     const id = ++requestIdRef.current
-    const [lbls, fls] = await Promise.all([
+    const [lbls, fls, fns] = await Promise.all([
       window.api.testPanel.getLabels(projectId),
-      window.api.testPanel.getFileLabels(projectId)
+      window.api.testPanel.getFileLabels(projectId),
+      window.api.testPanel.getFileNotes(projectId)
     ])
     if (requestIdRef.current === id) {
       setLabels(lbls)
       setFileLabels(fls)
+      setFileNotes(fns)
     }
   }, [projectId])
 
@@ -93,17 +94,19 @@ export function TestPanel({ projectId, projectPath }: TestPanelProps): React.JSX
     const id = ++requestIdRef.current
     setLoading(true)
     try {
-      const [cats, scan, lbls, fls] = await Promise.all([
+      const [cats, scan, lbls, fls, fns] = await Promise.all([
         window.api.testPanel.getCategories(projectId),
         window.api.testPanel.scanFiles(projectPath, projectId),
         window.api.testPanel.getLabels(projectId),
-        window.api.testPanel.getFileLabels(projectId)
+        window.api.testPanel.getFileLabels(projectId),
+        window.api.testPanel.getFileNotes(projectId)
       ])
       if (requestIdRef.current === id) {
         setCategories(cats)
         setScanResult(scan)
         setLabels(lbls)
         setFileLabels(fls)
+        setFileNotes(fns)
       }
     } finally {
       if (requestIdRef.current === id) setLoading(false)
@@ -127,6 +130,12 @@ export function TestPanel({ projectId, projectPath }: TestPanelProps): React.JSX
     reloadLabels()
   }
 
+  const handleSetNote = async (filePath: string, note: string) => {
+    if (!projectId) return
+    await window.api.testPanel.setFileNote(projectId, filePath, note)
+    reloadLabels()
+  }
+
   if (!projectId || !projectPath) {
     return (
       <div className="flex items-center justify-center h-full text-sm text-muted-foreground">
@@ -145,10 +154,12 @@ export function TestPanel({ projectId, projectPath }: TestPanelProps): React.JSX
     <TestFileRow
       key={path}
       path={path}
+      note={fileNoteMap.get(path) ?? ''}
       fileLabels={getFileLabelsForPath(path)}
       labels={labels}
       onToggleLabel={(id) => handleToggleLabel(path, id)}
-      onManageLabels={() => setManagerOpen(true)}
+      onNoteChange={(note) => handleSetNote(path, note)}
+      onManageLabels={onOpenSettings}
     />
   )
 
@@ -287,28 +298,10 @@ export function TestPanel({ projectId, projectPath }: TestPanelProps): React.JSX
           )}
         </div>
         <div className="flex items-center gap-1">
-          <Button
-            variant={groupBy === 'label' ? 'secondary' : 'ghost'}
-            size="icon"
-            className="h-7 w-7"
-            onClick={() => setGroupBy((g) => g === 'label' ? 'none' : 'label')}
-            title="Group by label"
-          >
-            <Tags className="h-3.5 w-3.5" />
-          </Button>
-          <Button
-            variant={groupBy === 'path' ? 'secondary' : 'ghost'}
-            size="icon"
-            className="h-7 w-7"
-            onClick={() => setGroupBy((g) => g === 'path' ? 'none' : 'path')}
-            title="Group by path"
-          >
-            <FolderTree className="h-3.5 w-3.5" />
-          </Button>
           <Button variant="ghost" size="icon" className="h-7 w-7" onClick={rescanFiles} disabled={loading}>
             <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />
           </Button>
-          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setManagerOpen(true)}>
+          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={onOpenSettings}>
             <Settings className="h-3.5 w-3.5" />
           </Button>
         </div>
@@ -318,7 +311,7 @@ export function TestPanel({ projectId, projectPath }: TestPanelProps): React.JSX
         <div className="flex-1 flex items-center justify-center">
           <div className="text-center space-y-2">
             <p className="text-sm text-muted-foreground">No test categories configured</p>
-            <Button variant="outline" size="sm" onClick={() => setManagerOpen(true)}>
+            <Button variant="outline" size="sm" onClick={onOpenSettings}>
               Configure Categories
             </Button>
           </div>
@@ -353,16 +346,6 @@ export function TestPanel({ projectId, projectPath }: TestPanelProps): React.JSX
         </div>
       )}
 
-      <CategoryManager
-        open={managerOpen}
-        onOpenChange={setManagerOpen}
-        projectId={projectId}
-        categories={categories}
-        labels={labels}
-        onCategoriesChanged={reloadCategories}
-        onPatternsChanged={rescanFiles}
-        onLabelsChanged={reloadLabels}
-      />
     </div>
   )
 }

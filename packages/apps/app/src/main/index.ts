@@ -53,7 +53,7 @@ import { registerTerminalTabsHandlers } from '@slayzone/task-terminals/main'
 import { registerWorktreeHandlers } from '@slayzone/worktrees/main'
 import { registerDiagnosticsHandlers, registerProcessDiagnostics, recordDiagnosticEvent, stopDiagnostics } from '@slayzone/diagnostics/main'
 import { registerAiConfigHandlers } from '@slayzone/ai-config/main'
-import { registerIntegrationHandlers, startSyncPoller, pushTaskAfterEdit } from '@slayzone/integrations/main'
+import { registerIntegrationHandlers, startSyncPoller, pushTaskAfterEdit, pushNewTaskToProviders, pushArchiveToProviders, pushUnarchiveToProviders, startDiscoveryPoller } from '@slayzone/integrations/main'
 import type { IntegrationHandles } from '@slayzone/integrations/main'
 import { registerFileEditorHandlers } from '@slayzone/file-editor/main'
 import { registerTestPanelHandlers } from '@slayzone/test-panel/main'
@@ -195,6 +195,7 @@ let inlineDevToolsView: BrowserView | null = null
 let inlineDevToolsViewAttached = false
 let inlineDeviceToolbarDisableTimers: NodeJS.Timeout[] = []
 let linearSyncPoller: NodeJS.Timeout | null = null
+let discoveryPoller: NodeJS.Timeout | null = null
 let mcpCleanup: (() => void) | null = null
 type OAuthCallbackPayload = { code?: string; error?: string }
 const oauthCallbackQueue: OAuthCallbackPayload[] = []
@@ -967,13 +968,27 @@ app.whenReady().then(async () => {
 
   if (isIntegrationsEnabled) {
     linearSyncPoller = startSyncPoller(db)
-    logBoot('integration poller started (10s)')
+    discoveryPoller = startDiscoveryPoller(db)
+    logBoot('integration pollers started (sync 10s, discovery 60s)')
 
     // Push to providers immediately after local task edits
     ipcMain.on('db:tasks:update:done', (_event, taskId: string) => {
       void pushTaskAfterEdit(db, taskId, {
         pushGithubTask: integrationHandles?.pushGithubTask
       })
+    })
+
+    // Push new tasks to providers (two_way sync)
+    ipcMain.on('db:tasks:create:done', (_event, taskId: string, projectId: string) => {
+      void pushNewTaskToProviders(db, taskId, projectId)
+    })
+
+    // Archive/unarchive sync to providers
+    ipcMain.on('db:tasks:archive:done', (_event, taskId: string) => {
+      void pushArchiveToProviders(db, taskId)
+    })
+    ipcMain.on('db:tasks:unarchive:done', (_event, taskId: string) => {
+      void pushUnarchiveToProviders(db, taskId)
     })
   } else {
     logBoot('integrations disabled')
@@ -1816,6 +1831,10 @@ app.on('will-quit', () => {
   if (linearSyncPoller) {
     clearInterval(linearSyncPoller)
     linearSyncPoller = null
+  }
+  if (discoveryPoller) {
+    clearInterval(discoveryPoller)
+    discoveryPoller = null
   }
   mcpCleanup?.()
   stopDiagnostics()

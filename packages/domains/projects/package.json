@@ -16,6 +16,7 @@
   },
   "dependencies": {
     "@slayzone/integrations": "workspace:*",
+    "@slayzone/test-panel": "workspace:*",
     "@slayzone/workflow": "workspace:*",
     "@slayzone/ui": "workspace:*",
     "lucide-react": "^0.562.0"

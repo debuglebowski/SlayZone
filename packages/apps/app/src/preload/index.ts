@@ -543,7 +543,9 @@ const api: ElectronAPI = {
     updateLabel: (data) => ipcRenderer.invoke('db:testPanel:updateLabel', data),
     deleteLabel: (id) => ipcRenderer.invoke('db:testPanel:deleteLabel', id),
     getFileLabels: (projectId) => ipcRenderer.invoke('db:testPanel:getFileLabels', projectId),
-    toggleFileLabel: (projectId, filePath, labelId) => ipcRenderer.invoke('db:testPanel:toggleFileLabel', projectId, filePath, labelId)
+    toggleFileLabel: (projectId, filePath, labelId) => ipcRenderer.invoke('db:testPanel:toggleFileLabel', projectId, filePath, labelId),
+    getFileNotes: (projectId) => ipcRenderer.invoke('db:testPanel:getFileNotes', projectId),
+    setFileNote: (projectId, filePath, note) => ipcRenderer.invoke('db:testPanel:setFileNote', projectId, filePath, note)
   }
 }
 

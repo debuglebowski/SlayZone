@@ -41,7 +41,7 @@ import type {
   GlobalFileEntry
 } from '@slayzone/ai-config/shared'
 import type { DirEntry, ReadFileResult, FileSearchResult, SearchFilesOptions } from '@slayzone/file-editor/shared'
-import type { TestCategory, CreateTestCategoryInput, UpdateTestCategoryInput, TestProfile, ScanResult, TestLabel, CreateTestLabelInput, UpdateTestLabelInput, TestFileLabel } from '@slayzone/test-panel/shared'
+import type { TestCategory, CreateTestCategoryInput, UpdateTestCategoryInput, TestProfile, ScanResult, TestLabel, CreateTestLabelInput, UpdateTestLabelInput, TestFileLabel, TestFileNote } from '@slayzone/test-panel/shared'
 import type {
   ConnectGithubInput,
   ConnectLinearInput,
@@ -533,7 +533,7 @@ export interface ElectronAPI {
     importGithubRepositoryIssues: (
       input: ImportGithubRepositoryIssuesInput
     ) => Promise<ImportGithubRepositoryIssuesResult>
-    listLinearTeams: (connectionId: string) => Promise<LinearTeam[]>
+    listLinearTeams: (connectionId: string) => Promise<{ teams: LinearTeam[]; orgUrlKey: string }>
     listLinearProjects: (connectionId: string, teamId: string) => Promise<LinearProject[]>
     listLinearIssues: (
       input: ListLinearIssuesInput
@@ -595,5 +595,7 @@ export interface ElectronAPI {
     deleteLabel: (id: string) => Promise<boolean>
     getFileLabels: (projectId: string) => Promise<TestFileLabel[]>
     toggleFileLabel: (projectId: string, filePath: string, labelId: string) => Promise<void>
+    getFileNotes: (projectId: string) => Promise<TestFileNote[]>
+    setFileNote: (projectId: string, filePath: string, note: string) => Promise<void>
   }
 }
