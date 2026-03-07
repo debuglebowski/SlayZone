@@ -22,14 +22,14 @@ const INCLUDED_SUFFIXES = [
 const EXCLUDED_BASENAMES = new Set(['builder-debug.yml', 'builder-effective-config.yaml'])
 const EXCLUDED_SUFFIXES = ['.blockmap']
 
-// electron-builder outputs internal helper binaries alongside installers.
-// Exclude known non-installer exe patterns rather than guessing installer names.
-const EXCLUDED_EXE_PATTERNS = ['winpty-agent.exe', 'openconsole.exe']
+// electron-builder outputs helper binaries and unpacked app executables alongside
+// installers. Only include exe files matching known installer patterns.
+const INSTALLER_EXE_PATTERN = /setup/i
 
 function isExcludedExe(baseName) {
   const lower = baseName.toLowerCase()
   if (!lower.endsWith('.exe')) return false
-  return EXCLUDED_EXE_PATTERNS.some((pattern) => lower === pattern)
+  return !INSTALLER_EXE_PATTERN.test(baseName)
 }
 
 function fileHash(filePath) {
