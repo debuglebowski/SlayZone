@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { useHotkeys } from 'react-hotkeys-hook'
-import { AlertTriangle, LayoutGrid, TerminalSquare, GitBranch, FileCode, Cpu, Kanban } from 'lucide-react'
+import { AlertTriangle, LayoutGrid, TerminalSquare, GitBranch, FileCode, Cpu, Kanban, FlaskConical } from 'lucide-react'
 import type { Task } from '@slayzone/task/shared'
 import type { Project } from '@slayzone/projects/shared'
 import { getDefaultStatus, getDoneStatus } from '@slayzone/projects/shared'
@@ -29,6 +29,7 @@ import {
 } from '@slayzone/projects'
 import { UserSettingsDialog, useViewState, AppearanceProvider } from '@slayzone/settings'
 import { OnboardingDialog } from '@slayzone/onboarding'
+import { TestPanel } from '@slayzone/test-panel'
 import { track } from '@slayzone/telemetry/client'
 import { usePty } from '@slayzone/terminal/client'
 import type { TerminalState } from '@slayzone/terminal/shared'
@@ -70,12 +71,12 @@ import { useUsage } from '@/components/usage/useUsage'
 import { TutorialAnimationModal } from '@/components/tutorial/TutorialAnimationModal'
 import { useOnboardingChecklist } from '@/hooks/useOnboardingChecklist'
 
-type HomePanel = 'kanban' | 'git' | 'editor' | 'processes'
+type HomePanel = 'kanban' | 'git' | 'editor' | 'processes' | 'tests'
 type ProjectSettingsTab = 'general' | 'environment' | 'columns' | 'integrations' | 'ai-config'
 type ProjectIntegrationOnboardingProvider = Exclude<ProjectStartMode, 'scratch'>
 type GlobalAiConfigSection = 'providers' | 'instructions' | 'skill' | 'mcp' | 'files'
-const HOME_PANEL_ORDER: HomePanel[] = ['kanban', 'git', 'editor', 'processes']
-const HOME_PANEL_SIZE_KEY: Record<HomePanel, string> = { kanban: 'kanban', git: 'diff', editor: 'editor', processes: 'processes' }
+const HOME_PANEL_ORDER: HomePanel[] = ['kanban', 'git', 'editor', 'processes', 'tests']
+const HOME_PANEL_SIZE_KEY: Record<HomePanel, string> = { kanban: 'kanban', git: 'diff', editor: 'editor', processes: 'processes', tests: 'tests' }
 const HANDLE_WIDTH = 16
 const COMMUNITY_DISCORD_URL = import.meta.env.VITE_COMMUNITY_DISCORD_URL?.trim() || 'https://discord.com'
 const COMMUNITY_X_URL = import.meta.env.VITE_UPDATES_X_URL?.trim() || 'https://x.com'
@@ -150,7 +151,7 @@ function App(): React.JSX.Element {
   const [zenMode, setZenMode] = useState(false)
   const [explodeMode, setExplodeMode] = useState(false)
   const [panelSizes, updatePanelSizes, resetPanelSize] = usePanelSizes()
-  const [homePanelVisibility, setHomePanelVisibilityRaw] = useState<Record<HomePanel, boolean>>({ kanban: true, git: false, editor: false, processes: false })
+  const [homePanelVisibility, setHomePanelVisibilityRaw] = useState<Record<HomePanel, boolean>>({ kanban: true, git: false, editor: false, processes: false, tests: false })
   const setHomePanelVisibility = useCallback((updater: (prev: Record<HomePanel, boolean>) => Record<HomePanel, boolean>) => {
     setHomePanelVisibilityRaw(prev => {
       const next = updater(prev)
@@ -959,6 +960,9 @@ function App(): React.JSX.Element {
       } else if (e.key === 'o' && import.meta.env.DEV) {
         e.preventDefault()
         setHomePanelVisibility(prev => ({ ...prev, processes: !prev.processes }))
+      } else if (e.key === 'u' && import.meta.env.DEV) {
+        e.preventDefault()
+        setHomePanelVisibility(prev => ({ ...prev, tests: !prev.tests }))
       }
     }
     window.addEventListener('keydown', handleKeyDown)
@@ -1400,6 +1404,7 @@ function App(): React.JSX.Element {
                                     { id: 'git', icon: GitBranch, label: 'Git', shortcut: '⌘G', active: homePanelVisibility.git, disabled: !selectedProjectId },
                                     { id: 'editor', icon: FileCode, label: 'Editor', shortcut: '⌘E', active: homePanelVisibility.editor, disabled: !selectedProjectId },
                                     ...(import.meta.env.DEV ? [{ id: 'processes', icon: Cpu, label: 'Processes', shortcut: '⌘O', active: homePanelVisibility.processes, disabled: !selectedProjectId }] : [{ id: 'processes', icon: Cpu, label: 'Processes', active: homePanelVisibility.processes, disabled: !selectedProjectId }]),
+                                    ...(import.meta.env.DEV ? [{ id: 'tests', icon: FlaskConical, label: 'Tests', shortcut: '⌘U', active: homePanelVisibility.tests, disabled: !selectedProjectId }] : []),
                                   ]}
                                   onChange={(id, active) => setHomePanelVisibility(prev => ({ ...prev, [id]: active }))}
                                 />
@@ -1500,6 +1505,7 @@ function App(): React.JSX.Element {
                                       )}
                                       {id === 'editor' && <FileEditorView ref={homeEditorRefCallback} projectPath={projectPath ?? ''} />}
                                       {id === 'processes' && <ProcessesPanel taskId={null} projectId={selectedProjectId} cwd={projectPath} />}
+                                      {id === 'tests' && <TestPanel projectId={selectedProjectId} projectPath={projectPath} />}
                                     </div>
                                   </React.Fragment>
                                 )

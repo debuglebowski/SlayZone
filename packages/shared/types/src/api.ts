@@ -41,6 +41,7 @@ import type {
   GlobalFileEntry
 } from '@slayzone/ai-config/shared'
 import type { DirEntry, ReadFileResult, FileSearchResult, SearchFilesOptions } from '@slayzone/file-editor/shared'
+import type { TestCategory, CreateTestCategoryInput, UpdateTestCategoryInput, TestProfile, ScanResult, TestLabel, CreateTestLabelInput, UpdateTestLabelInput, TestFileLabel } from '@slayzone/test-panel/shared'
 import type {
   ConnectGithubInput,
   ConnectLinearInput,
@@ -576,5 +577,23 @@ export interface ElectronAPI {
     getSettings: () => Promise<BackupSettings>
     setSettings: (settings: Partial<BackupSettings>) => Promise<BackupSettings>
     revealInFinder: () => Promise<void>
+  }
+  testPanel: {
+    getCategories: (projectId: string) => Promise<TestCategory[]>
+    createCategory: (data: CreateTestCategoryInput) => Promise<TestCategory>
+    updateCategory: (data: UpdateTestCategoryInput) => Promise<TestCategory>
+    deleteCategory: (id: string) => Promise<boolean>
+    reorderCategories: (ids: string[]) => Promise<void>
+    getProfiles: () => Promise<TestProfile[]>
+    saveProfile: (profile: TestProfile) => Promise<void>
+    deleteProfile: (id: string) => Promise<void>
+    applyProfile: (projectId: string, profileId: string) => Promise<TestCategory[]>
+    scanFiles: (projectPath: string, projectId: string) => Promise<ScanResult>
+    getLabels: (projectId: string) => Promise<TestLabel[]>
+    createLabel: (data: CreateTestLabelInput) => Promise<TestLabel>
+    updateLabel: (data: UpdateTestLabelInput) => Promise<TestLabel>
+    deleteLabel: (id: string) => Promise<boolean>
+    getFileLabels: (projectId: string) => Promise<TestFileLabel[]>
+    toggleFileLabel: (projectId: string, filePath: string, labelId: string) => Promise<void>
   }
 }

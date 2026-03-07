@@ -38,6 +38,33 @@ export interface ScanResult {
   totalScanned: number
 }
 
+export interface TestLabel {
+  id: string
+  project_id: string
+  name: string
+  color: string
+  sort_order: number
+}
+
+export interface TestFileLabel {
+  project_id: string
+  file_path: string
+  label_id: string
+}
+
+export interface CreateTestLabelInput {
+  project_id: string
+  name: string
+  color?: string
+}
+
+export interface UpdateTestLabelInput {
+  id: string
+  name?: string
+  color?: string
+  sort_order?: number
+}
+
 export const DEFAULT_PROFILES: TestProfile[] = [
   {
     id: 'builtin:typescript',

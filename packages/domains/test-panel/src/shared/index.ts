@@ -4,6 +4,10 @@ export type {
   UpdateTestCategoryInput,
   TestProfile,
   TestFileMatch,
-  ScanResult
+  ScanResult,
+  TestLabel,
+  TestFileLabel,
+  CreateTestLabelInput,
+  UpdateTestLabelInput
 } from './types'
 export { DEFAULT_PROFILES } from './types'

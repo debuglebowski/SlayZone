@@ -113,6 +113,9 @@ importers:
       '@slayzone/terminal':
         specifier: workspace:*
         version: link:../../domains/terminal
+      '@slayzone/test-panel':
+        specifier: workspace:*
+        version: link:../../domains/test-panel
       '@slayzone/types':
         specifier: workspace:*
         version: link:../../shared/types
@@ -751,6 +754,34 @@ importers:
         specifier: ^5.9.3
         version: 5.9.3
 
+  packages/domains/test-panel:
+    dependencies:
+      '@slayzone/ui':
+        specifier: workspace:*
+        version: link:../../shared/ui
+      electron:
+        specifier: ^39.0.0
+        version: 39.4.0
+      picomatch:
+        specifier: ^4.0.0
+        version: 4.0.3
+      react:
+        specifier: ^19.0.0
+        version: 19.2.3
+    devDependencies:
+      '@types/better-sqlite3':
+        specifier: ^7.6.13
+        version: 7.6.13
+      '@types/react':
+        specifier: ^19.2.7
+        version: 19.2.8
+      lucide-react:
+        specifier: ^0.562.0
+        version: 0.562.0(react@19.2.3)
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+
   packages/domains/worktrees:
     dependencies:
       '@codemirror/lang-javascript':
@@ -873,6 +904,9 @@ importers:
       '@slayzone/terminal':
         specifier: workspace:*
         version: link:../../domains/terminal
+      '@slayzone/test-panel':
+        specifier: workspace:*
+        version: link:../../domains/test-panel
       '@slayzone/worktrees':
         specifier: workspace:*
         version: link:../../domains/worktrees

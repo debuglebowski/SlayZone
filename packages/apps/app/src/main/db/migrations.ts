@@ -1138,6 +1138,61 @@ const migrations: Migration[] = [
         }
       }
     }
+  },
+  {
+    version: 62,
+    up: (db) => {
+      db.exec(`
+        CREATE TABLE test_categories (
+          id TEXT PRIMARY KEY,
+          project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+          name TEXT NOT NULL,
+          pattern TEXT NOT NULL,
+          color TEXT NOT NULL DEFAULT '#6b7280',
+          sort_order INTEGER NOT NULL DEFAULT 0,
+          created_at TEXT NOT NULL DEFAULT (datetime('now'))
+        );
+        CREATE INDEX idx_test_categories_project ON test_categories(project_id);
+      `)
+    }
+  },
+  {
+    version: 63,
+    up: (db) => {
+      db.exec(`
+        CREATE TABLE test_labels (
+          id TEXT PRIMARY KEY,
+          project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+          name TEXT NOT NULL,
+          color TEXT NOT NULL DEFAULT '#6b7280',
+          sort_order INTEGER NOT NULL DEFAULT 0
+        );
+        CREATE INDEX idx_test_labels_project ON test_labels(project_id);
+
+        CREATE TABLE test_file_labels (
+          project_id TEXT NOT NULL,
+          file_path TEXT NOT NULL,
+          label_id TEXT NOT NULL REFERENCES test_labels(id) ON DELETE CASCADE,
+          PRIMARY KEY (project_id, file_path)
+        );
+        CREATE INDEX idx_test_file_labels_label ON test_file_labels(label_id);
+      `)
+    }
+  },
+  {
+    version: 64,
+    up: (db) => {
+      db.exec(`
+        DROP TABLE IF EXISTS test_file_labels;
+        CREATE TABLE test_file_labels (
+          project_id TEXT NOT NULL,
+          file_path TEXT NOT NULL,
+          label_id TEXT NOT NULL REFERENCES test_labels(id) ON DELETE CASCADE,
+          PRIMARY KEY (project_id, file_path, label_id)
+        );
+        CREATE INDEX idx_test_file_labels_label ON test_file_labels(label_id);
+      `)
+    }
   }
 ]
 

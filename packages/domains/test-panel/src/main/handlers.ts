@@ -1,6 +1,6 @@
 import type { IpcMain } from 'electron'
 import type { Database } from 'better-sqlite3'
-import type { CreateTestCategoryInput, UpdateTestCategoryInput, TestCategory, TestProfile } from '../shared/types'
+import type { CreateTestCategoryInput, UpdateTestCategoryInput, TestCategory, TestProfile, CreateTestLabelInput, UpdateTestLabelInput } from '../shared/types'
 import { DEFAULT_PROFILES } from '../shared/types'
 import { scanTestFiles } from './scanner'
 
@@ -117,5 +117,57 @@ export function registerTestPanelHandlers(ipcMain: IpcMain, db: Database): void 
   ipcMain.handle('db:testPanel:scanFiles', (_, projectPath: string, projectId: string) => {
     const categories = db.prepare('SELECT * FROM test_categories WHERE project_id = ? ORDER BY sort_order').all(projectId) as TestCategory[]
     return scanTestFiles(projectPath, categories)
+  })
+
+  // Labels CRUD
+
+  ipcMain.handle('db:testPanel:getLabels', (_, projectId: string) => {
+    return db.prepare('SELECT * FROM test_labels WHERE project_id = ? ORDER BY sort_order, rowid').all(projectId)
+  })
+
+  ipcMain.handle('db:testPanel:createLabel', (_, data: CreateTestLabelInput) => {
+    const id = crypto.randomUUID()
+    const maxOrder = db.prepare('SELECT COALESCE(MAX(sort_order), -1) as m FROM test_labels WHERE project_id = ?').get(data.project_id) as { m: number }
+    db.prepare('INSERT INTO test_labels (id, project_id, name, color, sort_order) VALUES (?, ?, ?, ?, ?)').run(
+      id,
+      data.project_id,
+      data.name,
+      data.color ?? '#6b7280',
+      maxOrder.m + 1
+    )
+    return db.prepare('SELECT * FROM test_labels WHERE id = ?').get(id)
+  })
+
+  ipcMain.handle('db:testPanel:updateLabel', (_, data: UpdateTestLabelInput) => {
+    const fields: string[] = []
+    const values: unknown[] = []
+    if (data.name !== undefined) { fields.push('name = ?'); values.push(data.name) }
+    if (data.color !== undefined) { fields.push('color = ?'); values.push(data.color) }
+    if (data.sort_order !== undefined) { fields.push('sort_order = ?'); values.push(data.sort_order) }
+    if (fields.length > 0) {
+      values.push(data.id)
+      db.prepare(`UPDATE test_labels SET ${fields.join(', ')} WHERE id = ?`).run(...values)
+    }
+    return db.prepare('SELECT * FROM test_labels WHERE id = ?').get(data.id)
+  })
+
+  ipcMain.handle('db:testPanel:deleteLabel', (_, id: string) => {
+    const result = db.prepare('DELETE FROM test_labels WHERE id = ?').run(id)
+    return result.changes > 0
+  })
+
+  // File label assignments
+
+  ipcMain.handle('db:testPanel:getFileLabels', (_, projectId: string) => {
+    return db.prepare('SELECT * FROM test_file_labels WHERE project_id = ?').all(projectId)
+  })
+
+  ipcMain.handle('db:testPanel:toggleFileLabel', (_, projectId: string, filePath: string, labelId: string) => {
+    const existing = db.prepare('SELECT 1 FROM test_file_labels WHERE project_id = ? AND file_path = ? AND label_id = ?').get(projectId, filePath, labelId)
+    if (existing) {
+      db.prepare('DELETE FROM test_file_labels WHERE project_id = ? AND file_path = ? AND label_id = ?').run(projectId, filePath, labelId)
+    } else {
+      db.prepare('INSERT INTO test_file_labels (project_id, file_path, label_id) VALUES (?, ?, ?)').run(projectId, filePath, labelId)
+    }
   })
 }

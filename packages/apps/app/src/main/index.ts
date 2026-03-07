@@ -53,8 +53,10 @@ import { registerTerminalTabsHandlers } from '@slayzone/task-terminals/main'
 import { registerWorktreeHandlers } from '@slayzone/worktrees/main'
 import { registerDiagnosticsHandlers, registerProcessDiagnostics, recordDiagnosticEvent, stopDiagnostics } from '@slayzone/diagnostics/main'
 import { registerAiConfigHandlers } from '@slayzone/ai-config/main'
-import { registerIntegrationHandlers, startLinearSyncPoller } from '@slayzone/integrations/main'
+import { registerIntegrationHandlers, startSyncPoller, pushTaskAfterEdit } from '@slayzone/integrations/main'
+import type { IntegrationHandles } from '@slayzone/integrations/main'
 import { registerFileEditorHandlers } from '@slayzone/file-editor/main'
+import { registerTestPanelHandlers } from '@slayzone/test-panel/main'
 import { registerScreenshotHandlers } from './screenshot'
 import { setProcessManagerWindow, initProcessManager, createProcess, spawnProcess, updateProcess, killProcess, restartProcess, listForTask, listAllProcesses, killTaskProcesses, killAllProcesses } from './process-manager'
 import { registerExportImportHandlers } from './export-import'
@@ -937,13 +939,15 @@ app.whenReady().then(async () => {
   if (isContextManagerEnabled) {
     registerAiConfigHandlers(ipcMain, db)
   }
+  let integrationHandles: IntegrationHandles | null = null
   if (isIntegrationsEnabled) {
-    registerIntegrationHandlers(ipcMain, db, { enableTestChannels: isPlaywright })
+    integrationHandles = registerIntegrationHandlers(ipcMain, db, { enableTestChannels: isPlaywright })
   }
   registerFileEditorHandlers(ipcMain)
   registerScreenshotHandlers()
   registerExportImportHandlers(ipcMain, db, isPlaywright)
   registerLeaderboardHandlers(ipcMain, db)
+  registerTestPanelHandlers(ipcMain, db)
   registerBackupHandlers(ipcMain, db)
   startAutoBackup(db)
   logBoot('domain IPC handlers registered')
@@ -962,8 +966,15 @@ app.whenReady().then(async () => {
   })
 
   if (isIntegrationsEnabled) {
-    linearSyncPoller = startLinearSyncPoller(db)
-    logBoot('integration poller started')
+    linearSyncPoller = startSyncPoller(db)
+    logBoot('integration poller started (10s)')
+
+    // Push to providers immediately after local task edits
+    ipcMain.on('db:tasks:update:done', (_event, taskId: string) => {
+      void pushTaskAfterEdit(db, taskId, {
+        pushGithubTask: integrationHandles?.pushGithubTask
+      })
+    })
   } else {
     logBoot('integrations disabled')
   }
