@@ -516,6 +516,16 @@ const api: ElectronAPI = {
     fetchProviderStatuses: (input) => ipcRenderer.invoke('integrations:fetch-provider-statuses', input),
     applyStatusSync: (input) => ipcRenderer.invoke('integrations:apply-status-sync', input),
     resyncProviderStatuses: (input) => ipcRenderer.invoke('integrations:resync-provider-statuses', input)
+  },
+  backup: {
+    list: () => ipcRenderer.invoke('backup:list'),
+    create: (name?: string) => ipcRenderer.invoke('backup:create', name),
+    rename: (filename: string, name: string) => ipcRenderer.invoke('backup:rename', filename, name),
+    delete: (filename: string) => ipcRenderer.invoke('backup:delete', filename),
+    restore: (filename: string) => ipcRenderer.invoke('backup:restore', filename),
+    getSettings: () => ipcRenderer.invoke('backup:getSettings'),
+    setSettings: (settings: Partial<import('@slayzone/types').BackupSettings>) => ipcRenderer.invoke('backup:setSettings', settings),
+    revealInFinder: () => ipcRenderer.invoke('backup:revealInFinder')
   }
 }
 

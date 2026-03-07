@@ -42,6 +42,7 @@ if (is.dev && !isPlaywright) {
 import icon from '../../resources/icon.png?asset'
 import logoSolid from '../../resources/logo-solid.svg?asset'
 import { getDatabase, closeDatabase, getDiagnosticsDatabase, closeDiagnosticsDatabase } from './db'
+import { registerBackupHandlers, startAutoBackup, stopAutoBackup } from './backup'
 // Domain handlers
 import { registerProjectHandlers } from '@slayzone/projects/main'
 import { configureTaskRuntimeAdapters, registerTaskHandlers, registerAiHandlers, registerFilesHandlers } from '@slayzone/task/main'
@@ -943,6 +944,8 @@ app.whenReady().then(async () => {
   registerScreenshotHandlers()
   registerExportImportHandlers(ipcMain, db, isPlaywright)
   registerLeaderboardHandlers(ipcMain, db)
+  registerBackupHandlers(ipcMain, db)
+  startAutoBackup(db)
   logBoot('domain IPC handlers registered')
 
   // Start MCP server (use port 0 in Playwright to avoid conflict with dev instance)
@@ -1806,6 +1809,7 @@ app.on('will-quit', () => {
   mcpCleanup?.()
   stopDiagnostics()
   stopIdleChecker()
+  stopAutoBackup()
   killAllPtys()
   killAllProcesses()
   closeDatabase()

@@ -19,6 +19,7 @@ import { DataSettingsTab } from './tabs/DataSettingsTab'
 import { LabsSettingsTab } from './tabs/LabsSettingsTab'
 import { DiagnosticsSettingsTab } from './tabs/DiagnosticsSettingsTab'
 import { AboutSettingsTab } from './tabs/AboutSettingsTab'
+import { BackupSettingsTab } from './tabs/BackupSettingsTab'
 import { SettingsTabIntro } from './tabs/SettingsTabIntro'
 
 function TelemetrySettingsTab() {
@@ -88,6 +89,7 @@ export function UserSettingsDialog({
     ...(contextManagerEnabled ? [{ key: 'ai-config', label: 'Context Manager' }] : []),
     { key: 'tags', label: 'Tags' },
     { key: 'data', label: 'Import & Export' },
+    { key: 'backup', label: 'Backup' },
     { key: 'labs', label: 'Labs' },
     { key: 'diagnostics', label: 'Diagnostics' },
     { key: 'telemetry', label: 'Telemetry' },
@@ -149,6 +151,8 @@ export function UserSettingsDialog({
             {activeTab === 'tags' && <TagsSettingsTab />}
 
             {activeTab === 'data' && <DataSettingsTab />}
+
+            {activeTab === 'backup' && <BackupSettingsTab />}
 
             {activeTab === 'labs' && <LabsSettingsTab />}
 

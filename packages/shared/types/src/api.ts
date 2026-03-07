@@ -84,6 +84,21 @@ import type {
 
 export type { ExecutionContext } from '@slayzone/projects/shared'
 
+export interface BackupInfo {
+  filename: string
+  name: string
+  timestamp: string
+  type: 'auto' | 'manual'
+  sizeBytes: number
+}
+
+export interface BackupSettings {
+  autoEnabled: boolean
+  intervalMinutes: number
+  maxAutoBackups: number
+  nextBackupNumber: number
+}
+
 export interface LocalLeaderboardDay {
   date: string
   totalTokens: number
@@ -551,5 +566,15 @@ export interface ElectronAPI {
     killTask: (taskId: string) => Promise<void>
     onLog: (cb: (processId: string, line: string) => void) => () => void
     onStatus: (cb: (processId: string, status: ProcessStatus) => void) => () => void
+  }
+  backup: {
+    list: () => Promise<BackupInfo[]>
+    create: (name?: string) => Promise<BackupInfo>
+    rename: (filename: string, name: string) => Promise<void>
+    delete: (filename: string) => Promise<void>
+    restore: (filename: string) => Promise<void>
+    getSettings: () => Promise<BackupSettings>
+    setSettings: (settings: Partial<BackupSettings>) => Promise<BackupSettings>
+    revealInFinder: () => Promise<void>
   }
 }

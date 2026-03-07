@@ -9,7 +9,7 @@ const LEGACY_APP_NAME = 'omgslayzone'
 const LEGACY_DB_NAMES = ['omgslayzone.sqlite', 'omgslayzone.dev.sqlite'] as const
 const DB_SUFFIXES = ['', '-wal', '-shm'] as const
 
-const getDatabasePath = (): string => {
+export const getDatabasePath = (): string => {
   const userDataPath = process.env.SLAYZONE_DB_DIR || app.getPath('userData')
   const dbName = app.isPackaged ? 'slayzone.sqlite' : 'slayzone.dev.sqlite'
   return path.join(userDataPath, dbName)

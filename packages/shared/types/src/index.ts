@@ -3,3 +3,4 @@ export type { DiagnosticsConfig, DiagnosticsExportRequest, DiagnosticsExportResu
 export type { ProcessStatus, ProcessInfo } from './api'
 export type { ExecutionContext } from './api'
 export type { LocalLeaderboardDay, LocalLeaderboardStats } from './api'
+export type { BackupInfo, BackupSettings } from './api'
