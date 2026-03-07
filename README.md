@@ -13,14 +13,33 @@
 <br />
 
 <p align="center">
-  <a href="https://github.com/debuglebowski/SlayZone/releases/latest/download/SlayZone.dmg"><img src="https://img.shields.io/badge/Download_for-macOS-000000?style=for-the-badge&logo=apple&logoColor=white" alt="Download for macOS" /></a>&nbsp;&nbsp;
-  <a href="https://github.com/debuglebowski/SlayZone/releases/latest/download/SlayZone-setup.exe"><img src="https://img.shields.io/badge/Download_for-Windows-0078D4?style=for-the-badge&logo=windows&logoColor=white" alt="Download for Windows" /></a>&nbsp;&nbsp;
-  <a href="https://github.com/debuglebowski/SlayZone/releases/latest/download/SlayZone.AppImage"><img src="https://img.shields.io/badge/Download_for-Linux-FCC624?style=for-the-badge&logo=linux&logoColor=black" alt="Download for Linux" /></a>
+  <a href="https://github.com/debuglebowski/slayzone/releases/latest/download/SlayZone-arm64.dmg"><img src="https://img.shields.io/badge/Download_for-macOS-000000?style=for-the-badge&logo=apple&logoColor=white" alt="Download for macOS" /></a>&nbsp;&nbsp;
+  <a href="https://github.com/debuglebowski/slayzone/releases/latest/download/SlayZone-setup-x64.exe"><img src="https://img.shields.io/badge/Download_for-Windows-0078D4?style=for-the-badge&logo=windows&logoColor=white" alt="Download for Windows" /></a>&nbsp;&nbsp;
+  <a href="https://github.com/debuglebowski/slayzone/releases/latest/download/SlayZone-x64.AppImage"><img src="https://img.shields.io/badge/Download_for-Linux-FCC624?style=for-the-badge&logo=linux&logoColor=black" alt="Download for Linux" /></a>
 </p>
+
+<details>
+<summary><strong>More install options</strong></summary>
+<br />
+
+**Homebrew** (macOS):
+```bash
+brew tap debuglebowski/slayzone
+brew install --cask slayzone
+```
+
+**Nix** (macOS / Linux):
+```bash
+nix profile install github:debuglebowski/slayzone
+```
+
+**Direct download** — or grab a specific build from [Releases](https://github.com/debuglebowski/slayzone/releases).
+
+</details>
 
 ### Get started
 
-1. Download the app for your platform above and run the installer.
+1. Install the app using any method above.
 2. Create a project — click **+** in the sidebar and point it to a folder on your machine.
 3. Add a task — click **+** inside the project, then open the card to access the terminal, browser, and git panels.
 
@@ -106,8 +125,8 @@ Electron &middot; React &middot; SQLite &middot; node-pty &middot; xterm.js
 SlayZone is built with SlayZone. PRs, issues, and ideas are all welcome.
 
 ```bash
-git clone https://github.com/debuglebowski/SlayZone.git
-cd SlayZone && pnpm install
+git clone https://github.com/debuglebowski/slayzone.git
+cd slayzone && pnpm install
 pnpm dev
 ```
 
