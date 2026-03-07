@@ -319,6 +319,15 @@ jobs:
                 echo "Skipping identical duplicate: $name"
                 continue
               fi
+              # electron-builder auto-update manifests (latest-*.yml) from
+              # separate arch builds contain different file entries. Merge them.
+              if [[ "$name" == latest-*.yml ]]; then
+                echo "Merging auto-update manifest: $name"
+                node scripts/release/merge-update-manifest.mjs \
+                  --existing "$ASSETS_DIR/$name" \
+                  --incoming "$file"
+                continue
+              fi
               echo "Duplicate asset with different content: $name" >&2
               exit 1
             fi
