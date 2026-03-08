@@ -23,6 +23,9 @@ interface TeamsQuery {
   teams: {
     nodes: Array<{ id: string; key: string; name: string }>
   }
+  organization: {
+    urlKey: string
+  }
 }
 
 interface TeamProjectsQuery {
@@ -96,6 +99,13 @@ interface IssueQuery {
   } | null
 }
 
+interface CreateIssueMutation {
+  issueCreate: {
+    success: boolean
+    issue: IssueQuery['issue']
+  }
+}
+
 interface UpdateIssueMutation {
   issueUpdate: {
     success: boolean
@@ -160,14 +170,15 @@ export async function getViewer(apiKey: string): Promise<{ workspaceId: string; 
   }
 }
 
-export async function listTeams(apiKey: string): Promise<LinearTeam[]> {
+export async function listTeams(apiKey: string): Promise<{ teams: LinearTeam[]; orgUrlKey: string }> {
   const data = await requestLinear<TeamsQuery>(
     apiKey,
     `query Teams {
       teams { nodes { id key name } }
+      organization { urlKey }
     }`
   )
-  return data.teams.nodes
+  return { teams: data.teams.nodes, orgUrlKey: data.organization.urlKey }
 }
 
 export async function listProjects(apiKey: string, teamId: string): Promise<LinearProject[]> {
@@ -207,12 +218,16 @@ export async function listWorkflowStates(
 
 export async function listIssues(
   apiKey: string,
-  input: { teamId?: string; projectId?: string; first: number; after?: string | null }
+  input: { teamId?: string; projectId?: string; first: number; after?: string | null; updatedAfter?: string | null }
 ): Promise<{ issues: LinearIssueSummary[]; nextCursor: string | null }> {
   const variables: Record<string, unknown> = {
     first: input.first,
     after: input.after ?? null
   }
+
+  const updatedAtFilter = input.updatedAfter
+    ? `, filter: { updatedAt: { gte: "${input.updatedAfter}" } }`
+    : ''
 
   if (input.projectId) {
     variables.projectId = input.projectId
@@ -221,7 +236,7 @@ export async function listIssues(
       apiKey,
       `query ProjectIssues($projectId: String!, $first: Int!, $after: String) {
       project(id: $projectId) {
-        issues(first: $first, after: $after) {
+        issues(first: $first, after: $after${updatedAtFilter}, orderBy: updatedAt) {
           pageInfo { hasNextPage endCursor }
           nodes {
             id identifier title description priority updatedAt url
@@ -254,7 +269,7 @@ export async function listIssues(
       apiKey,
       `query TeamIssues($teamId: String!, $first: Int!, $after: String) {
       team(id: $teamId) {
-        issues(first: $first, after: $after) {
+        issues(first: $first, after: $after${updatedAtFilter}, orderBy: updatedAt) {
           pageInfo { hasNextPage endCursor }
           nodes {
             id identifier title description priority updatedAt url
@@ -283,7 +298,7 @@ export async function listIssues(
   const data = await requestLinear<IssuesQuery>(
     apiKey,
     `query Issues($first: Int!, $after: String) {
-      issues(first: $first, after: $after) {
+      issues(first: $first, after: $after${updatedAtFilter}, orderBy: updatedAt) {
         pageInfo { hasNextPage endCursor }
         nodes {
           id identifier title description priority updatedAt url
@@ -322,6 +337,35 @@ export async function getIssue(apiKey: string, issueId: string): Promise<LinearI
   return mapIssue(data.issue)
 }
 
+export async function getIssuesBatch(
+  apiKey: string,
+  issueIds: string[]
+): Promise<Map<string, LinearIssueSummary>> {
+  if (issueIds.length === 0) return new Map()
+
+  const data = await requestLinear<{ issues: { nodes: NonNullable<IssueQuery['issue']>[] } }>(
+    apiKey,
+    `query IssuesBatch($ids: [ID!]!) {
+      issues(filter: { id: { in: $ids } }) {
+        nodes {
+          id identifier title description priority updatedAt url
+          state { id name type }
+          assignee { id name }
+          team { id key name }
+          project { id name }
+        }
+      }
+    }`,
+    { ids: issueIds }
+  )
+
+  const result = new Map<string, LinearIssueSummary>()
+  for (const issue of data.issues.nodes) {
+    result.set(issue.id, mapIssue(issue))
+  }
+  return result
+}
+
 export async function updateIssue(
   apiKey: string,
   issueId: string,
@@ -358,4 +402,48 @@ export async function updateIssue(
   }
 
   return mapIssue(data.issueUpdate.issue)
+}
+
+export async function createIssue(
+  apiKey: string,
+  input: {
+    teamId: string
+    title: string
+    description?: string | null
+    priority?: number
+    stateId?: string
+    projectId?: string | null
+  }
+): Promise<LinearIssueSummary | null> {
+  const data = await requestLinear<CreateIssueMutation>(
+    apiKey,
+    `mutation CreateIssue($input: IssueCreateInput!) {
+      issueCreate(input: $input) {
+        success
+        issue {
+          id identifier title description priority updatedAt url
+          state { id name type }
+          assignee { id name }
+          team { id key name }
+          project { id name }
+        }
+      }
+    }`,
+    {
+      input: {
+        teamId: input.teamId,
+        title: input.title,
+        description: input.description ?? undefined,
+        priority: input.priority,
+        stateId: input.stateId,
+        projectId: input.projectId ?? undefined
+      }
+    }
+  )
+
+  if (!data.issueCreate.success || !data.issueCreate.issue) {
+    return null
+  }
+
+  return mapIssue(data.issueCreate.issue)
 }

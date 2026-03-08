@@ -47,6 +47,9 @@ export interface IntegrationProjectMapping {
   external_project_id: string | null
   sync_mode: IntegrationSyncMode
   status_setup_complete: number
+  external_repo_owner: string | null
+  external_repo_name: string | null
+  last_discovery_at: string | null
   created_at: string
   updated_at: string
 }
@@ -359,7 +362,6 @@ export interface ApplyStatusSyncInput {
   projectId: string
   provider: IntegrationProvider
   statuses: ProviderStatus[]
-  categoryOverrides?: Record<string, string>
   taskRemapping?: Record<string, string>
 }
 

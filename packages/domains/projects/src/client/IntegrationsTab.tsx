@@ -361,9 +361,10 @@ export function IntegrationsTab({
     setLoadingLinearSyncTeams(true)
     setSyncSettingsMessage('')
     void window.api.integrations.listLinearTeams(linearProjectConnectionId)
-      .then(({ teams, orgUrlKey }) => {
+      .then((result) => {
+        const teams = Array.isArray(result) ? result : result.teams
         setLinearSyncTeams(teams)
-        setLinearOrgUrlKey(orgUrlKey)
+        if (!Array.isArray(result)) setLinearOrgUrlKey(result.orgUrlKey)
         setLinearSyncTeamId((current) => {
           if (current && teams.some((team) => team.id === current)) return current
           if (mapping?.external_team_id && teams.some((team) => team.id === mapping.external_team_id)) {
@@ -422,7 +423,8 @@ export function IntegrationsTab({
     setLoadingLinearImportTeams(true)
     setLinearImportSourceMessage('')
     void window.api.integrations.listLinearTeams(linearProjectConnectionId)
-      .then(({ teams }) => {
+      .then((result) => {
+        const teams = Array.isArray(result) ? result : result.teams
         setLinearImportTeams(teams)
         setLinearImportTeamId((current) => {
           if (current && teams.some((team) => team.id === current)) return current
@@ -1407,19 +1409,6 @@ export function IntegrationsTab({
                           </div>
                           <span className="text-sm font-medium">Setup</span>
                           <span className="text-xs text-muted-foreground">{syncStep1Summary}</span>
-                          {syncExternalUrlLoading ? (
-                            <Loader2 className="size-3 animate-spin text-muted-foreground" />
-                          ) : syncExternalUrl ? (
-                            <span
-                              role="button"
-                              tabIndex={0}
-                              className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
-                              onClick={(e) => { e.stopPropagation(); window.api.shell.openExternal(syncExternalUrl) }}
-                              onKeyDown={(e) => { if (e.key === 'Enter') { e.stopPropagation(); window.api.shell.openExternal(syncExternalUrl) } }}
-                            >
-                              <ExternalLinkIcon className="size-3" />
-                            </span>
-                          ) : null}
                         </div>
                         <Pencil className="size-3.5 text-muted-foreground" />
                       </button>
@@ -1754,6 +1743,22 @@ export function IntegrationsTab({
                       </div>
                     )}
                   </Card>
+
+                  {syncExternalUrlLoading ? (
+                    <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                      <Loader2 className="size-3 animate-spin" />
+                      Loading...
+                    </div>
+                  ) : syncExternalUrl ? (
+                    <button
+                      type="button"
+                      className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                      onClick={() => window.api.shell.openExternal(syncExternalUrl)}
+                    >
+                      <ExternalLinkIcon className="size-3" />
+                      Open in {syncSetupProvider === 'linear' ? 'Linear' : 'GitHub'}
+                    </button>
+                  ) : null}
                 </>
               )}
             </div>

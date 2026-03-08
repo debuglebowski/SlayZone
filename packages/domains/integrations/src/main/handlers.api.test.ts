@@ -139,13 +139,16 @@ try {
 // ── list-linear-teams ─────────────────────────────────────────────────────
 console.log('\nintegrations:list-linear-teams')
 try {
-  _mock.listTeams = async () => [
-    { id: 'team-1', key: 'ENG', name: 'Engineering' },
-    { id: 'team-2', key: 'DES', name: 'Design' }
-  ]
-  const teams = await h.invoke('integrations:list-linear-teams', connId) as any[]
-  expect(teams.length).toBe(2)
-  expect(teams[0].key).toBe('ENG')
+  _mock.listTeams = async () => ({
+    teams: [
+      { id: 'team-1', key: 'ENG', name: 'Engineering' },
+      { id: 'team-2', key: 'DES', name: 'Design' }
+    ],
+    orgUrlKey: 'my-workspace'
+  })
+  const result = await h.invoke('integrations:list-linear-teams', connId) as any
+  expect(result.teams.length).toBe(2)
+  expect(result.teams[0].key).toBe('ENG')
   ok('returns teams from mock')
 } catch (e) { no('returns teams from mock', e) }
 

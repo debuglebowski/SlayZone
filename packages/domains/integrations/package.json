@@ -15,6 +15,7 @@
     "typecheck": "tsgo --noEmit"
   },
   "dependencies": {
+    "@slayzone/terminal": "workspace:*",
     "@slayzone/workflow": "workspace:*"
   },
   "peerDependencies": {

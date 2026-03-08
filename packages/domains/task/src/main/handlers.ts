@@ -493,7 +493,11 @@ export function registerTaskHandlers(ipcMain: IpcMain, db: Database): void {
     )
     maybeAutoCreateWorktree(db, id, data.projectId, data.title)
     const row = db.prepare('SELECT * FROM tasks WHERE id = ?').get(id) as Record<string, unknown> | undefined
-    return parseTask(row)
+    const task = parseTask(row)
+    if (task) {
+      ipcMain.emit('db:tasks:create:done', null, id, data.projectId)
+    }
+    return task
   })
 
   ipcMain.handle('db:tasks:getSubTasks', (_, parentId: string) => {
@@ -509,10 +513,24 @@ export function registerTaskHandlers(ipcMain: IpcMain, db: Database): void {
     return parseTasks(rows)
   })
 
-  ipcMain.handle('db:tasks:update', (_, data: UpdateTaskInput) => updateTask(db, data))
+  ipcMain.handle('db:tasks:update', (_, data: UpdateTaskInput) => {
+    const result = updateTask(db, data)
+    if (result) {
+      ipcMain.emit('db:tasks:update:done', null, data.id)
+    }
+    return result
+  })
 
   // Soft-delete: kill PTY but preserve worktree for undo
+  // Block deletion of tasks linked to external providers — archive instead
   ipcMain.handle('db:tasks:delete', (_, id: string) => {
+    const linkCount = (db.prepare(
+      'SELECT COUNT(*) as count FROM external_links WHERE task_id = ?'
+    ).get(id) as { count: number }).count
+    if (linkCount > 0) {
+      return { blocked: true, reason: 'linked_to_provider' }
+    }
+
     cleanupTaskImmediate(id)
     const result = db.prepare(`
       UPDATE tasks SET deleted_at = datetime('now'), updated_at = datetime('now') WHERE id = ?
@@ -539,6 +557,7 @@ export function registerTaskHandlers(ipcMain: IpcMain, db: Database): void {
       UPDATE tasks SET archived_at = datetime('now'), worktree_path = NULL, updated_at = datetime('now')
       WHERE id = ? OR parent_id = ?
     `).run(id, id)
+    ipcMain.emit('db:tasks:archive:done', null, id)
     const row = db.prepare('SELECT * FROM tasks WHERE id = ?').get(id) as Record<string, unknown> | undefined
     return parseTask(row)
   })
@@ -558,6 +577,9 @@ export function registerTaskHandlers(ipcMain: IpcMain, db: Database): void {
       UPDATE tasks SET archived_at = datetime('now'), worktree_path = NULL, updated_at = datetime('now')
       WHERE id IN (${placeholders})
     `).run(...allIds)
+    for (const id of allIds) {
+      ipcMain.emit('db:tasks:archive:done', null, id)
+    }
   })
 
   ipcMain.handle('db:tasks:unarchive', (_, id: string) => {
@@ -565,6 +587,7 @@ export function registerTaskHandlers(ipcMain: IpcMain, db: Database): void {
       UPDATE tasks SET archived_at = NULL, updated_at = datetime('now')
       WHERE id = ?
     `).run(id)
+    ipcMain.emit('db:tasks:unarchive:done', null, id)
     const row = db.prepare('SELECT * FROM tasks WHERE id = ?').get(id) as Record<string, unknown> | undefined
     return parseTask(row)
   })

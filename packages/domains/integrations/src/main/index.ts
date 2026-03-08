@@ -1,2 +1,3 @@
 export { registerIntegrationHandlers } from './handlers'
-export { startLinearSyncPoller } from './sync'
+export type { IntegrationHandles } from './handlers'
+export { startSyncPoller, pushTaskAfterEdit, pushNewTaskToProviders, pushArchiveToProviders, pushUnarchiveToProviders, startDiscoveryPoller } from './sync'

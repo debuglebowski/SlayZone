@@ -83,20 +83,12 @@ export interface StatusSyncResult {
 
 export function providerStatusesToColumns(
   provider: IntegrationProvider,
-  statuses: ProviderStatus[],
-  categoryOverrides?: Record<string, WorkflowCategory>
+  statuses: ProviderStatus[]
 ): StatusSyncResult {
   const columns: ColumnConfig[] = statuses.map((status, index) => {
-    const overriddenCategory = categoryOverrides?.[status.id]
-
-    let category: WorkflowCategory
-    if (overriddenCategory) {
-      category = overriddenCategory
-    } else if (provider === 'linear' && status.type) {
-      category = LINEAR_TYPE_TO_CATEGORY[status.type] ?? 'unstarted'
-    } else {
-      category = guessGithubCategory(status.name)
-    }
+    const category: WorkflowCategory = provider === 'linear' && status.type
+      ? (LINEAR_TYPE_TO_CATEGORY[status.type] ?? 'unstarted')
+      : guessGithubCategory(status.name)
 
     const color =
       provider === 'linear'

@@ -62,11 +62,18 @@ import { runSyncNow } from './sync'
 import { providerStatusesToColumns, computeStatusDiff } from './status-sync'
 import { htmlToMarkdown, markdownToHtml } from './markdown'
 import {
-  getColumnById,
+  toMs,
+  getProjectColumns,
+  normalizeMarkdown,
+  localStatusToGitHubState,
+  githubStateToLocal,
+  parseGitHubExternalKey,
+  upsertFieldState,
+  linearStateToTaskStatus,
+  linearPriorityToLocal
+} from './sync-helpers'
+import {
   getDefaultStatus,
-  getDoneStatus,
-  getStatusByCategories,
-  parseColumnsConfig,
   resolveColumns,
   type ColumnConfig,
   type WorkflowCategory
@@ -193,21 +200,6 @@ function toPublicConnection(conn: IntegrationConnection): IntegrationConnectionP
   }
 }
 
-function priorityToLocal(priority: number): number {
-  if (priority <= 1) return 5
-  if (priority === 2) return 4
-  if (priority === 3) return 3
-  if (priority === 4) return 2
-  if (priority >= 5) return 1
-  return 3
-}
-
-function getProjectColumns(db: Database, projectId: string): ColumnConfig[] | null {
-  const row = db.prepare('SELECT columns_config FROM projects WHERE id = ?').get(projectId) as
-    | { columns_config: string | null }
-    | undefined
-  return parseColumnsConfig(row?.columns_config)
-}
 
 type TaskRow = {
   id: string
@@ -226,16 +218,6 @@ interface ExternalFieldStateRow {
   last_external_value_json: string
 }
 
-function toMs(value: string | null | undefined): number {
-  if (!value) return 0
-  let normalized = value
-  if (normalized.includes(' ') && !normalized.includes('T')) {
-    normalized = normalized.replace(' ', 'T') + 'Z'
-  }
-  const ts = Date.parse(normalized)
-  return Number.isNaN(ts) ? 0 : ts
-}
-
 function parseJsonValue(input: string): unknown {
   try {
     return JSON.parse(input)
@@ -246,29 +228,6 @@ function parseJsonValue(input: string): unknown {
 
 function isSameValue(a: unknown, b: unknown): boolean {
   return JSON.stringify(a ?? null) === JSON.stringify(b ?? null)
-}
-
-function normalizeMarkdown(value: string | null | undefined): string | null {
-  const trimmed = (value ?? '').trim()
-  return trimmed.length > 0 ? trimmed : null
-}
-
-function localStatusToGitHubState(status: string, columns: ColumnConfig[] | null): 'open' | 'closed' {
-  const column = getColumnById(status, columns)
-  if (!column) return 'open'
-  return column.category === 'completed' || column.category === 'canceled' ? 'closed' : 'open'
-}
-
-function parseGitHubExternalKey(externalKey: string): { owner: string; repo: string; number: number } | null {
-  const match = externalKey.match(/^([^/]+)\/([^#]+)#(\d+)$/)
-  if (!match) return null
-  const number = Number.parseInt(match[3], 10)
-  if (!Number.isFinite(number)) return null
-  return {
-    owner: match[1],
-    repo: match[2],
-    number
-  }
 }
 
 function parseGitHubRepositoryFullName(fullName: string): { owner: string; repo: string } | null {
@@ -345,37 +304,6 @@ type GithubImportUpsertResult = {
   outcome: 'created' | 'updated' | 'skipped_already_linked'
   taskId: string
   linkedProjectId?: string
-}
-
-function upsertFieldState(
-  db: Database,
-  externalLinkId: string,
-  field: SyncField,
-  localValue: unknown,
-  externalValue: unknown,
-  localUpdatedAt: string,
-  externalUpdatedAt: string
-): void {
-  db.prepare(`
-    INSERT INTO external_field_state (
-      id, external_link_id, field_name, last_local_value_json, last_external_value_json,
-      last_local_updated_at, last_external_updated_at, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))
-    ON CONFLICT(external_link_id, field_name) DO UPDATE SET
-      last_local_value_json = excluded.last_local_value_json,
-      last_external_value_json = excluded.last_external_value_json,
-      last_local_updated_at = excluded.last_local_updated_at,
-      last_external_updated_at = excluded.last_external_updated_at,
-      updated_at = datetime('now')
-  `).run(
-    crypto.randomUUID(),
-    externalLinkId,
-    field,
-    JSON.stringify(localValue),
-    JSON.stringify(externalValue),
-    localUpdatedAt,
-    externalUpdatedAt
-  )
 }
 
 function readFieldState(
@@ -488,7 +416,7 @@ function normalizeLinearBaselineStatus(
     value === 'unstarted' ||
     value === 'triage'
   ) {
-    return stateToLocal(value, columns)
+    return linearStateToTaskStatus(value, columns)
   }
   return value
 }
@@ -508,7 +436,7 @@ function buildLinearTaskSyncStatus(
   const remoteValues: Record<SyncField, unknown> = {
     title: remoteIssue.title,
     description: normalizeMarkdown(remoteIssue.description),
-    status: stateToLocal(remoteIssue.state.type, columns)
+    status: linearStateToTaskStatus(remoteIssue.state.type, columns)
   }
 
   const baselineByField = readFieldState(db, link.id)
@@ -574,24 +502,6 @@ function getTaskById(db: Database, taskId: string): TaskRow {
   return row
 }
 
-function stateToLocal(type: string, columns: ColumnConfig[] | null): string {
-  switch (type) {
-    case 'backlog':
-      return getStatusByCategories(['backlog', 'unstarted', 'triage'], columns) ?? getDefaultStatus(columns)
-    case 'started':
-      return getStatusByCategories(['started'], columns) ?? getDefaultStatus(columns)
-    case 'completed':
-      return getStatusByCategories(['completed'], columns) ?? getDoneStatus(columns)
-    case 'canceled':
-      return getStatusByCategories(['canceled', 'completed'], columns) ?? getDoneStatus(columns)
-    case 'unstarted':
-      return getStatusByCategories(['unstarted', 'triage', 'backlog'], columns) ?? getDefaultStatus(columns)
-    case 'triage':
-      return getStatusByCategories(['triage', 'unstarted', 'backlog'], columns) ?? getDefaultStatus(columns)
-    default:
-      return getDefaultStatus(columns)
-  }
-}
 
 function upsertLinkForIssue(
   db: Database,
@@ -642,8 +552,8 @@ function upsertTaskFromIssue(db: Database, localProjectId: string, issue: Linear
       localProjectId,
       issue.title,
       descHtml,
-      stateToLocal(issue.state.type, projectColumns),
-      priorityToLocal(issue.priority),
+      linearStateToTaskStatus(issue.state.type, projectColumns),
+      linearPriorityToLocal(issue.priority),
       issue.assignee?.name ?? null,
       issue.updatedAt,
       byLink.task_id
@@ -664,20 +574,13 @@ function upsertTaskFromIssue(db: Database, localProjectId: string, issue: Linear
     localProjectId,
     issue.title,
     descHtml,
-    stateToLocal(issue.state.type, projectColumns),
-    priorityToLocal(issue.priority),
+    linearStateToTaskStatus(issue.state.type, projectColumns),
+    linearPriorityToLocal(issue.priority),
     issue.assignee?.name ?? null,
     issue.updatedAt
   )
 
   return id
-}
-
-function githubStateToLocal(state: GithubIssueSummary['state'], columns: ColumnConfig[] | null): string {
-  if (state === 'closed') {
-    return getStatusByCategories(['completed', 'canceled'], columns) ?? getDoneStatus(columns)
-  }
-  return getStatusByCategories(['unstarted', 'triage', 'backlog'], columns) ?? getDefaultStatus(columns)
 }
 
 function upsertLinkForGitHubIssue(
@@ -969,11 +872,15 @@ function refreshStateMappings(
   }
 }
 
+export interface IntegrationHandles {
+  pushGithubTask: (taskId: string) => Promise<void>
+}
+
 export function registerIntegrationHandlers(
   ipcMain: IpcMain,
   db: Database,
   options?: { enableTestChannels?: boolean }
-): void {
+): IntegrationHandles {
   ensureIntegrationSchema(db)
   const enableTestChannels = options?.enableTestChannels ?? false
   const githubTestRepositoriesByConnection = new Map<string, GithubRepositorySummary[]>()
@@ -1964,8 +1871,7 @@ export function registerIntegrationHandlers(
 
     const { columns: newColumns, providerIdToColumnId } = providerStatusesToColumns(
       input.provider,
-      input.statuses,
-      input.categoryOverrides as Record<string, WorkflowCategory> | undefined
+      input.statuses
     )
 
     // Remap existing tasks
@@ -2055,4 +1961,48 @@ export function registerIntegrationHandlers(
 
     return { current, incoming, diff, providerStatuses }
   })
+
+  async function pushGithubTask(taskId: string): Promise<void> {
+    const link = db.prepare(
+      "SELECT * FROM external_links WHERE task_id = ? AND provider = 'github'"
+    ).get(taskId) as ExternalLink | undefined
+    if (!link) return
+
+    const task = getTaskById(db, taskId)
+    const mapping = db.prepare(
+      "SELECT * FROM integration_project_mappings WHERE project_id = ? AND provider = 'github'"
+    ).get(task.project_id) as IntegrationProjectMapping | undefined
+    if (!mapping?.status_setup_complete) return
+
+    const key = parseGitHubExternalKey(link.external_key)
+    if (!key) return
+
+    const connection = getConnection(db, link.connection_id)
+    assertConnectionProvider(connection, 'github')
+    const token = readCredential(db, connection.credential_ref)
+
+    const remoteIssue = await getGithubIssueWithMocks(token, key)
+    if (!remoteIssue) return
+
+    const status = buildGitHubTaskSyncStatus(db, link, task, remoteIssue)
+    if (status.state !== 'local_ahead') return
+
+    const columns = getProjectColumns(db, task.project_id)
+    const updatedIssue = await updateGithubIssueWithMocks(token, {
+      owner: key.owner,
+      repo: key.repo,
+      number: key.number,
+      title: task.title,
+      body: normalizeMarkdown(task.description ? htmlToMarkdown(task.description) : null),
+      state: localStatusToGitHubState(task.status, columns)
+    })
+    if (!updatedIssue) return
+
+    persistGitHubBaseline(db, link.id, task, updatedIssue)
+    db.prepare(
+      "UPDATE external_links SET sync_state = 'active', last_error = NULL, last_sync_at = datetime('now'), updated_at = datetime('now') WHERE id = ?"
+    ).run(link.id)
+  }
+
+  return { pushGithubTask }
 }

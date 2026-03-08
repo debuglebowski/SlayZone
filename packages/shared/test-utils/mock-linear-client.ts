@@ -10,9 +10,10 @@ export const _mock = {
     workspaceName: 'Test Workspace',
     accountLabel: 'test@test.com'
   }),
-  listTeams: async (_apiKey: string) => [
-    { id: 'team-1', key: 'ENG', name: 'Engineering' }
-  ],
+  listTeams: async (_apiKey: string) => ({
+    teams: [{ id: 'team-1', key: 'ENG', name: 'Engineering' }],
+    orgUrlKey: 'test-workspace'
+  }),
   listProjects: async (_apiKey: string, _teamId: string) => [
     { id: 'lp-1', name: 'Alpha', teamId: 'team-1' }
   ],

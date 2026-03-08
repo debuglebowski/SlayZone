@@ -235,7 +235,8 @@ export function ProjectIntegrationSetupWizard({
     }
     setLoadingTeams(true)
     void window.api.integrations.listLinearTeams(connectionId)
-      .then((loadedTeams) => {
+      .then((result) => {
+        const loadedTeams = Array.isArray(result) ? result : result.teams
         setTeams(loadedTeams)
         setTeamId((current) => current || loadedTeams[0]?.id || '')
       })
@@ -333,7 +334,6 @@ export function ProjectIntegrationSetupWizard({
         projectId: project.id,
         provider,
         statuses: providerStatuses,
-        categoryOverrides: Object.keys(categoryOverrides).length > 0 ? categoryOverrides : undefined,
         taskRemapping: Object.keys(taskRemapping).length > 0 ? taskRemapping : undefined
       })
       setStatusSetupComplete(true)

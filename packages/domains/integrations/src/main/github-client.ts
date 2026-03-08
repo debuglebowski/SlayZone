@@ -411,6 +411,7 @@ export async function listIssues(
     repo: string
     limit: number
     cursor?: string | null
+    since?: string | null
   }
 ): Promise<{ issues: GithubIssueSummary[]; nextCursor: string | null }> {
   const page = Math.max(1, Number.parseInt(input.cursor ?? '1', 10) || 1)
@@ -426,7 +427,8 @@ export async function listIssues(
       per_page: perPage,
       page,
       sort: 'updated',
-      direction: 'desc'
+      direction: 'desc',
+      since: input.since ?? undefined
     }
   )
 
@@ -461,6 +463,43 @@ export async function getIssue(
   return mapIssue(input.owner, input.repo, issue)
 }
 
+export async function getIssuesBatch(
+  token: string,
+  issues: Array<{ id: string; owner: string; repo: string; number: number }>
+): Promise<Map<string, GithubIssueSummary>> {
+  if (issues.length === 0) return new Map()
+
+  // Build aliased GraphQL query: one alias per issue
+  const fragment = `
+    fragment IssueFields on Issue {
+      id number title body updatedAt state url
+      assignees(first: 1) { nodes { id login } }
+      labels(first: 10) { nodes { id name } }
+      repository { name owner { login } }
+    }
+  `
+  const aliases = issues.map((issue, i) =>
+    `i${i}: repository(owner: "${issue.owner}", name: "${issue.repo}") { issue(number: ${issue.number}) { ...IssueFields } }`
+  ).join('\n')
+
+  const query = `${fragment}\nquery BatchIssues { ${aliases} }`
+
+  type BatchResult = Record<string, { issue: GitHubGraphQLIssueNode | null } | null>
+  const data = await requestGitHubGraphQL<BatchResult>(token, query)
+
+  const result = new Map<string, GithubIssueSummary>()
+  for (let i = 0; i < issues.length; i++) {
+    const repo = data[`i${i}`]
+    if (!repo?.issue) continue
+    const node = repo.issue
+    if ((node as any).__typename === 'PullRequest') continue
+    // Ensure __typename for mapGraphQLIssue
+    const issueNode: GitHubGraphQLIssueNode = { ...node, __typename: 'Issue' }
+    result.set(issues[i].id, mapGraphQLIssue(issueNode))
+  }
+  return result
+}
+
 export async function updateIssue(
   token: string,
   input: {
@@ -491,6 +530,32 @@ export async function updateIssue(
   if (issue.pull_request) {
     return null
   }
+  return mapIssue(input.owner, input.repo, issue)
+}
+
+export async function createIssue(
+  token: string,
+  input: {
+    owner: string
+    repo: string
+    title: string
+    body?: string | null
+  }
+): Promise<GithubIssueSummary> {
+  const owner = encodeURIComponent(input.owner)
+  const repo = encodeURIComponent(input.repo)
+  const issue = await requestGitHub<GitHubIssue>(
+    token,
+    `/repos/${owner}/${repo}/issues`,
+    undefined,
+    {
+      method: 'POST',
+      body: {
+        title: input.title,
+        body: input.body ?? undefined
+      }
+    }
+  )
   return mapIssue(input.owner, input.repo, issue)
 }
 
