@@ -1,6 +1,53 @@
 # Changelog
 
 
+## v0.2.6
+
+[compare changes](https://github.com/debuglebowski/slayzone/compare/v0.2.5...v0.2.6)
+
+### 🚀 Enhancements
+
+- **ci:** Add Intel Mac build and Homebrew tap automation ([8035c14](https://github.com/debuglebowski/slayzone/commit/8035c14))
+- **nix:** Add flake with pre-built binary wrapping ([3d22d44](https://github.com/debuglebowski/slayzone/commit/3d22d44))
+- **test-panel:** Add test file discovery domain package ([70686d2](https://github.com/debuglebowski/slayzone/commit/70686d2))
+- Add SQLite database backup system ([573dc08](https://github.com/debuglebowski/slayzone/commit/573dc08))
+- **terminal:** Add terminal theme picker with 16 curated themes ([977c091](https://github.com/debuglebowski/slayzone/commit/977c091))
+- **test-panel:** Add multi-label support, label/path grouping, deterministic sort ([04fa80d](https://github.com/debuglebowski/slayzone/commit/04fa80d))
+- **test-panel:** Add file notes, move settings to project settings dialog ([5c141ab](https://github.com/debuglebowski/slayzone/commit/5c141ab))
+- **integrations:** Bidirectional sync w/ external link in sync settings ([8078e51](https://github.com/debuglebowski/slayzone/commit/8078e51))
+- **integrations:** Add repo selector to GitHub sync, run discovery on startup ([b448b61](https://github.com/debuglebowski/slayzone/commit/b448b61))
+
+### 🩹 Fixes
+
+- Use scoped electron-rebuild in postinstall ([81eefa1](https://github.com/debuglebowski/slayzone/commit/81eefa1))
+- **ci:** Harden release asset dedup and exe filtering ([63498d7](https://github.com/debuglebowski/slayzone/commit/63498d7))
+- **ci:** Exclude OpenConsole.exe from release assets ([be9221e](https://github.com/debuglebowski/slayzone/commit/be9221e))
+- **ci:** Only include installer exe files in release assets ([f971f0e](https://github.com/debuglebowski/slayzone/commit/f971f0e))
+- **ci:** Merge multi-arch auto-update manifests in bundle ([363d1ea](https://github.com/debuglebowski/slayzone/commit/363d1ea))
+- **terminal:** Sync query responses + filter OSC to fix interactive CLI prompts ([972131e](https://github.com/debuglebowski/slayzone/commit/972131e))
+- **terminal:** Add Ctrl+Shift+C/V for copy/paste on Linux/Windows ([7d1ff27](https://github.com/debuglebowski/slayzone/commit/7d1ff27))
+- **usage:** Add caching + 429 backoff to prevent rate limiting ([1eefed1](https://github.com/debuglebowski/slayzone/commit/1eefed1))
+
+### 💅 Refactors
+
+- **test-panel:** Merge label mgmt into settings dialog w/ tabs ([847ffc2](https://github.com/debuglebowski/slayzone/commit/847ffc2))
+- **test-panel:** Stacked card layout, fix save profile, add tooltips ([783008c](https://github.com/debuglebowski/slayzone/commit/783008c))
+
+### 📖 Documentation
+
+- Update install instructions and download links ([51bb2e1](https://github.com/debuglebowski/slayzone/commit/51bb2e1))
+- Add e2e test isolation working notes ([d7eab12](https://github.com/debuglebowski/slayzone/commit/d7eab12))
+
+### 🏡 Chore
+
+- **settings:** Rename theme labels from Experimental to Beta ([28ac5b8](https://github.com/debuglebowski/slayzone/commit/28ac5b8))
+
+### ❤️ Contributors
+
+- Debuglebowski
+- Mjacniacki
+- Jimmy Stridh
+
 ## v0.2.5
 
 [compare changes](https://github.com/debuglebowski/SlayZone/compare/v0.2.4...v0.2.5)

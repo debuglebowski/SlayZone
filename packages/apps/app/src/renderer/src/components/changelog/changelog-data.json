@@ -1,5 +1,37 @@
 [
   {
+    "version": "0.2.6",
+    "date": "2026-03-08",
+    "tagline": "Themes & reliability",
+    "items": [
+      {
+        "category": "feature",
+        "title": "Terminal theme picker",
+        "description": "Choose from 16 curated terminal color themes."
+      },
+      {
+        "category": "feature",
+        "title": "Database backups",
+        "description": "Automatic SQLite database backup system to protect your data."
+      },
+{
+        "category": "fix",
+        "title": "Interactive CLI prompts fixed",
+        "description": "Sync query responses and OSC filtering fix broken interactive prompts."
+      },
+      {
+        "category": "fix",
+        "title": "Copy/paste on Linux & Windows",
+        "description": "Ctrl+Shift+C/V now works for terminal copy/paste on non-macOS."
+      },
+      {
+        "category": "fix",
+        "title": "Usage rate limiting",
+        "description": "Added caching and 429 backoff to prevent API rate limiting."
+      }
+    ]
+  },
+  {
     "version": "0.2.5",
     "date": "2026-03-06",
     "tagline": "Providers unleashed",
