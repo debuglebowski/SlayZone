@@ -20,10 +20,28 @@ function usageError(p: ProviderMeta, error: string): ProviderUsage {
   return { provider: p.id, label: p.label, fiveHour: null, sevenDay: null, sevenDayOpus: null, sevenDaySonnet: null, error, fetchedAt: Date.now() }
 }
 
+class RateLimitError extends Error {
+  retryAfterMs: number
+  constructor(retryAfterMs: number) {
+    super(`Too many requests — try again in ${Math.ceil(retryAfterMs / 1000)}s`)
+    this.retryAfterMs = retryAfterMs
+  }
+}
+
+function parseRetryAfter(res: Response): number {
+  const header = res.headers.get('retry-after')
+  if (!header) return 60_000 // default 60s backoff
+  const secs = Number(header)
+  if (!Number.isNaN(secs)) return secs * 1000
+  // HTTP-date format
+  const date = Date.parse(header)
+  if (!Number.isNaN(date)) return Math.max(0, date - Date.now())
+  return 60_000
+}
+
 function httpError(status: number, p: ProviderMeta): string {
   if (status === 401) return `Token expired — re-authenticate with \`${p.cli}\``
   if (status === 403) return `Access denied — check your ${p.label} plan`
-  if (status === 429) return 'Too many requests — try again later'
   if (status >= 500) return `${p.vendor} API error (${status})`
   return `HTTP ${status}`
 }
@@ -84,6 +102,7 @@ async function fetchClaudeUsage(): Promise<ProviderUsage> {
     }
   })
 
+  if (res.status === 429) throw new RateLimitError(parseRetryAfter(res))
   if (!res.ok) return usageError(CLAUDE, httpError(res.status, CLAUDE))
 
   const data = await res.json()
@@ -137,6 +156,7 @@ async function fetchCodexUsage(): Promise<ProviderUsage> {
     }
   })
 
+  if (res.status === 429) throw new RateLimitError(parseRetryAfter(res))
   if (!res.ok) return usageError(CODEX, httpError(res.status, CODEX))
 
   const data = await res.json()
@@ -153,14 +173,56 @@ async function fetchCodexUsage(): Promise<ProviderUsage> {
   }
 }
 
+// ── Cache + backoff ───────────────────────────────────────────────────
+
+const MIN_INTERVAL_MS = 10_000   // hard floor: never fetch faster than 10s apart
+const DEFAULT_TTL_MS = 60_000    // auto-poll cache: 1 minute
+
+let cachedResult: ProviderUsage[] | null = null
+let cachedAt = 0
+let backoffUntil = 0             // extended on 429 via Retry-After
+let inflight: Promise<ProviderUsage[]> | null = null
+
+function fetchProvider(p: ProviderMeta, fetcher: () => Promise<ProviderUsage>): Promise<ProviderUsage> {
+  return fetcher().catch((e): ProviderUsage => {
+    if (e instanceof RateLimitError) {
+      backoffUntil = Math.max(backoffUntil, Date.now() + e.retryAfterMs)
+    }
+    return usageError(p, e instanceof RateLimitError ? e.message : friendlyError(e))
+  })
+}
+
 // ── Handler ──────────────────────────────────────────────────────────
 
 export function registerUsageHandlers(ipcMain: IpcMain): void {
-  ipcMain.handle('usage:fetch', async (): Promise<ProviderUsage[]> => {
-    const fetchers = [
-      fetchClaudeUsage().catch((e): ProviderUsage => usageError(CLAUDE, friendlyError(e))),
-      fetchCodexUsage().catch((e): ProviderUsage => usageError(CODEX, friendlyError(e)))
-    ]
-    return Promise.all(fetchers)
+  ipcMain.handle('usage:fetch', async (_e, force?: boolean): Promise<ProviderUsage[]> => {
+    const now = Date.now()
+
+    // Respect 429 backoff — even for force refreshes
+    if (cachedResult && now < backoffUntil) return cachedResult
+
+    // Hard floor: never refetch within 10s (blocks spam-clicking)
+    if (cachedResult && now - cachedAt < MIN_INTERVAL_MS) return cachedResult
+
+    // Auto-poll uses longer cache TTL
+    if (!force && cachedResult && now - cachedAt < DEFAULT_TTL_MS) return cachedResult
+
+    // Deduplicate concurrent requests
+    if (inflight) return inflight
+
+    inflight = Promise.all([
+      fetchProvider(CLAUDE, fetchClaudeUsage),
+      fetchProvider(CODEX, fetchCodexUsage)
+    ]).then((result) => {
+      cachedResult = result
+      cachedAt = Date.now()
+      inflight = null
+      return result
+    }).catch((e) => {
+      inflight = null
+      throw e
+    })
+
+    return inflight
   })
 }

@@ -474,7 +474,7 @@ export interface ElectronAPI {
     getLocalStats: () => Promise<LocalLeaderboardStats>
   }
   usage: {
-    fetch: () => Promise<ProviderUsage[]>
+    fetch: (force?: boolean) => Promise<ProviderUsage[]>
   }
   webview: {
     registerShortcuts: (webviewId: number) => Promise<void>

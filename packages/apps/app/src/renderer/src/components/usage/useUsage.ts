@@ -7,9 +7,9 @@ export function useUsage() {
   const [data, setData] = useState<ProviderUsage[]>([])
   const [loading, setLoading] = useState(true)
 
-  const refresh = useCallback(async () => {
+  const refresh = useCallback(async (force?: boolean) => {
     try {
-      const result = await window.api.usage.fetch()
+      const result = await window.api.usage.fetch(force)
       setData(result)
     } catch {
       // silent — stale data is fine

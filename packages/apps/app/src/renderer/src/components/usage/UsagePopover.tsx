@@ -20,7 +20,7 @@ const WINDOW_LABELS: Record<UsageWindowKey, string> = {
 
 interface UsagePopoverProps {
   data: ProviderUsage[]
-  onRefresh: () => void
+  onRefresh: (force?: boolean) => void
 }
 
 function barColor(pct: number) {
@@ -269,7 +269,7 @@ export function UsagePopover({ data, onRefresh }: UsagePopoverProps) {
           <button
             onClick={(e) => {
               e.stopPropagation()
-              onRefresh()
+              onRefresh(true)
             }}
             className="text-muted-foreground hover:text-foreground transition-colors"
           >

@@ -411,7 +411,7 @@ const api: ElectronAPI = {
     getLocalStats: () => ipcRenderer.invoke('leaderboard:get-local-stats')
   },
   usage: {
-    fetch: () => ipcRenderer.invoke('usage:fetch')
+    fetch: (force?: boolean) => ipcRenderer.invoke('usage:fetch', force)
   },
   screenshot: {
     captureRegion: (rect) => ipcRenderer.invoke('screenshot:captureRegion', rect)
