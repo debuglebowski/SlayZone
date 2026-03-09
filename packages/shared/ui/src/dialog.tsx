@@ -9,8 +9,7 @@ import { cn } from './utils'
 const isPlaywright = typeof window !== 'undefined' && !!(window as any).api?.app?.isPlaywright
 
 function Dialog({ ...props }: React.ComponentProps<typeof DialogPrimitive.Root>) {
-  // In Playwright, disable modal scroll-lock to prevent pointer-events:none lingering on <body>
-  return <DialogPrimitive.Root data-slot="dialog" {...(isPlaywright ? { modal: false } : {})} {...props} />
+  return <DialogPrimitive.Root data-slot="dialog" {...props} />
 }
 
 function DialogTrigger({ ...props }: React.ComponentProps<typeof DialogPrimitive.Trigger>) {
@@ -34,9 +33,7 @@ function DialogOverlay({
       data-slot="dialog-overlay"
       className={cn(
         'data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 fixed inset-0 z-50 bg-black/40 dark:bg-black/60 backdrop-blur-sm',
-        typeof window !== 'undefined' && (window as any).api?.app?.isPlaywright
-          ? 'data-[state=closed]:duration-0'
-          : '',
+        isPlaywright ? 'data-[state=closed]:duration-0' : '',
         className
       )}
       {...props}
@@ -73,12 +70,15 @@ function DialogContent({
         className={cn(
           'bg-modal data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 fixed top-[50%] left-[50%] z-50 grid w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] gap-4 rounded-lg border border-[var(--modal-border)] p-6 shadow-lg outline-none sm:max-w-lg',
           // Skip close animation in Playwright to avoid race conditions with dialog re-open
-          typeof window !== 'undefined' && (window as any).api?.app?.isPlaywright
+          isPlaywright
             ? 'data-[state=closed]:duration-0 data-[state=open]:duration-200'
             : 'duration-200',
           sizeClass,
           className
         )}
+        // Playwright's click({ force: true }) is interpreted by Radix as an outside-click,
+        // dismissing the dialog. Prevent this in test environments.
+        {...(isPlaywright ? { onInteractOutside: (e: Event) => e.preventDefault() } : {})}
         {...props}
       >
         {children}

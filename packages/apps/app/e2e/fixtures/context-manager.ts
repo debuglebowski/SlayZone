@@ -41,8 +41,7 @@ async function openSettingsTabWithRetry(
   for (let attempt = 0; attempt < 5; attempt += 1) {
     if (await readyLocator.isVisible({ timeout: 600 }).catch(() => false)) return
     const tab = dialog.getByTestId(tabTestId).first()
-    // Use dispatchEvent — Radix Dialog interprets force-click as outside-click and closes
-    await tab.dispatchEvent('click').catch(() => {})
+    await tab.click().catch(() => {})
     if (await readyLocator.isVisible({ timeout: 1_200 }).catch(() => false)) return
     await mainWindow.waitForTimeout(120)
   }
@@ -222,13 +221,13 @@ export async function openProjectContextSection(
       if (await isProjectSectionVisible(dialog, section)) return dialog
 
       if (await sectionCard.isVisible({ timeout: 400 }).catch(() => false)) {
-        await sectionCard.dispatchEvent('click').catch(() => {})
+        await sectionCard.click().catch(() => {})
         if (await isProjectSectionVisible(dialog, section)) return dialog
       }
 
       const backToOverview = dialog.getByRole('button', { name: /^(Providers|Instructions|Skills|MCP Servers)$/ }).first()
       if (await backToOverview.isVisible({ timeout: 400 }).catch(() => false)) {
-        await backToOverview.dispatchEvent('click').catch(() => {})
+        await backToOverview.click().catch(() => {})
       }
 
       await mainWindow.waitForTimeout(100)
@@ -238,7 +237,7 @@ export async function openProjectContextSection(
 
   const dialog = await openProjectContextManager(mainWindow, projectAbbrev)
   await expect(dialog.getByTestId(sectionTestIdMap[section]).first()).toBeVisible({ timeout: 5_000 })
-  await dialog.getByTestId(sectionTestIdMap[section]).first().dispatchEvent('click')
+  await dialog.getByTestId(sectionTestIdMap[section]).first().click()
   return dialog
 }
 

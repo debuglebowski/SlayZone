@@ -39,7 +39,7 @@ async function clickSettingsTab(
 ): Promise<void> {
   for (let attempt = 0; attempt < 5; attempt += 1) {
     if (await readyLocator.isVisible({ timeout: 300 }).catch(() => false)) return
-    await tab.dispatchEvent('click').catch(() => {})
+    await tab.click().catch(() => {})
     if (await readyLocator.isVisible({ timeout: 500 }).catch(() => false)) return
     await mainWindow.waitForTimeout(80)
   }
@@ -225,7 +225,7 @@ test.describe('Project settings & context menu', () => {
       mainWindow.getByTestId('settings-tab-integrations'),
       integrationsReady
     )
-    await integrationsReady.dispatchEvent('click')
+    await integrationsReady.click()
 
     if (!ensureRepoCard) return null
     const repoCard = mainWindow.getByTestId('github-repo-import-card')
@@ -273,7 +273,7 @@ test.describe('Project settings & context menu', () => {
       githubProjectsProvider
     )
     if (await githubProjectsProvider.isEnabled().catch(() => false)) {
-      await githubProjectsProvider.dispatchEvent('click')
+      await githubProjectsProvider.click()
     }
     await expect(mainWindow.getByTestId('project-integration-provider-github-issues')).toBeVisible({ timeout: 3_000 })
     // Switch back to General for the next test (edit name)
@@ -291,17 +291,17 @@ test.describe('Project settings & context menu', () => {
 
     const loadIssuesButton = repoCard.getByTestId('github-repo-load-issues')
     await expect(loadIssuesButton).toBeEnabled({ timeout: 5_000 })
-    await loadIssuesButton.dispatchEvent('click')
+    await loadIssuesButton.click()
     await expect(repoCard.getByText('2 issues loaded')).toBeVisible({ timeout: 5_000 })
 
     await repoCard
       .locator('label')
       .filter({ hasText: 'acme/slay-e2e#101 - Repository issue alpha' })
       .first()
-      .dispatchEvent('click')
+      .click()
     await expect(repoCard.getByText('1 selected')).toBeVisible()
 
-    await repoCard.getByTestId('github-repo-import-issues').dispatchEvent('click')
+    await repoCard.getByTestId('github-repo-import-issues').click()
     await expect.poll(async () => {
       const tasks = await seed(mainWindow).getTasks()
       return tasks.some((task: { project_id: string; title: string }) =>
@@ -335,7 +335,7 @@ test.describe('Project settings & context menu', () => {
 
     const reloadIssuesButton = repoCard.getByTestId('github-repo-load-issues')
     await expect(reloadIssuesButton).toBeEnabled({ timeout: 5_000 })
-    await reloadIssuesButton.dispatchEvent('click')
+    await reloadIssuesButton.click()
     // Wait for issues to load before asserting
     await expect(repoCard.getByText(/issues loaded/)).toBeVisible({ timeout: 5_000 })
 
@@ -477,9 +477,9 @@ test.describe('Project settings & context menu', () => {
       mainWindow.getByTestId('settings-tab-columns'),
       mainWindow.getByTestId('project-column-review')
     )
-    await mainWindow.getByTestId('delete-project-column-review').dispatchEvent('click')
+    await mainWindow.getByTestId('delete-project-column-review').click()
     await expect(mainWindow.getByTestId('project-column-review')).not.toBeVisible({ timeout: 3_000 })
-    await mainWindow.getByTestId('save-project-columns').dispatchEvent('click')
+    await mainWindow.getByTestId('save-project-columns').click()
 
     const updatedTasks = await s.getTasks()
     const updatedTask = updatedTasks.find((t: { id: string; status: string }) => t.id === remapTask.id)
@@ -509,7 +509,7 @@ test.describe('Project settings & context menu', () => {
     await nameInput.clear()
     await nameInput.fill('Xylo Project')
 
-    await mainWindow.getByRole('button', { name: 'Save' }).dispatchEvent('click')
+    await mainWindow.getByRole('button', { name: 'Save' }).click()
 
     // Dialog should close
     await expect(mainWindow.getByRole('heading', { name: 'Project Settings' })).not.toBeVisible({ timeout: 3_000 })

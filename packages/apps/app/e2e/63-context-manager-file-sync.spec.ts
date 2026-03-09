@@ -153,7 +153,7 @@ test.describe('Context manager file sync', () => {
       if (await dialog.isVisible({ timeout: 500 }).catch(() => false)) {
         const sectionCard = dialog.getByTestId('project-context-overview-instructions').first()
         if (await sectionCard.isVisible({ timeout: 500 }).catch(() => false)) {
-          await sectionCard.click({ force: true }).catch(() => {})
+          await sectionCard.click().catch(() => {})
           if (await textarea.isVisible({ timeout: 1_500 }).catch(() => false)) return dialog
         }
       }
@@ -164,11 +164,11 @@ test.describe('Context manager file sync', () => {
     async function reopenInstructionsSection(dialog: Locator): Promise<void> {
       const backToOverview = dialog.getByRole('button', { name: 'Instructions', exact: true }).first()
       if (await backToOverview.isVisible({ timeout: 500 }).catch(() => false)) {
-        await backToOverview.click({ force: true }).catch(() => {})
+        await backToOverview.click().catch(() => {})
       }
       const instructionsCard = dialog.getByTestId('project-context-overview-instructions').first()
       await expect(instructionsCard).toBeVisible({ timeout: 5_000 })
-      await instructionsCard.click({ force: true })
+      await instructionsCard.click()
       await expect(dialog.getByTestId('instructions-textarea')).toBeVisible({ timeout: 5_000 })
     }
 

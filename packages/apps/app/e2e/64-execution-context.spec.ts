@@ -24,7 +24,7 @@ test.describe('Project execution context settings', () => {
 
     const execContext = dialog.locator('#exec-context')
     for (let attempt = 0; attempt < 5; attempt += 1) {
-      await dialog.getByTestId('settings-tab-environment').first().dispatchEvent('click').catch(() => {})
+      await dialog.getByTestId('settings-tab-environment').first().click().catch(() => {})
       if (await execContext.isVisible({ timeout: 1_500 }).catch(() => false)) return
       await mainWindow.waitForTimeout(120)
     }
@@ -37,10 +37,10 @@ test.describe('Project execution context settings', () => {
   ) {
     for (let attempt = 0; attempt < 4; attempt += 1) {
       const trigger = mainWindow.locator('#exec-context').first()
-      await trigger.dispatchEvent('click').catch(() => {})
+      await trigger.click().catch(() => {})
       const option = mainWindow.getByRole('option', { name: optionName }).first()
       if (await option.isVisible({ timeout: 1_200 }).catch(() => false)) {
-        await option.dispatchEvent('click')
+        await option.click()
         return
       }
       await mainWindow.waitForTimeout(120)
@@ -91,7 +91,7 @@ test.describe('Project execution context settings', () => {
     await mainWindow.locator('#exec-workdir').fill('/workspace')
     await mainWindow.locator('#exec-shell').fill('/bin/zsh')
 
-    await mainWindow.getByRole('button', { name: 'Save' }).dispatchEvent('click')
+    await mainWindow.getByRole('button', { name: 'Save' }).click()
     await expect(mainWindow.getByRole('heading', { name: 'Project Settings' }))
       .not.toBeVisible({ timeout: 3_000 })
 
@@ -129,7 +129,7 @@ test.describe('Project execution context settings', () => {
     await mainWindow.locator('#exec-ssh-target').fill('user@remote-host')
     await mainWindow.locator('#exec-workdir-ssh').fill('/home/user/project')
 
-    await mainWindow.getByRole('button', { name: 'Save' }).dispatchEvent('click')
+    await mainWindow.getByRole('button', { name: 'Save' }).click()
     await expect(mainWindow.getByRole('heading', { name: 'Project Settings' }))
       .not.toBeVisible({ timeout: 3_000 })
 
@@ -151,7 +151,7 @@ test.describe('Project execution context settings', () => {
     await openSettings(mainWindow)
     await selectExecutionContext(mainWindow, 'This machine')
 
-    await mainWindow.getByRole('button', { name: 'Save' }).dispatchEvent('click')
+    await mainWindow.getByRole('button', { name: 'Save' }).click()
     await expect(mainWindow.getByRole('heading', { name: 'Project Settings' }))
       .not.toBeVisible({ timeout: 3_000 })
 
@@ -170,7 +170,7 @@ test.describe('Project execution context settings', () => {
     await selectExecutionContext(mainWindow, 'A Docker container')
     await mainWindow.locator('#exec-container').fill('nonexistent-container-12345')
 
-    await mainWindow.getByRole('button', { name: 'Test connection' }).dispatchEvent('click')
+    await mainWindow.getByRole('button', { name: 'Test connection' }).click()
 
     // Should show error (docker not found or container not running)
     await expect(mainWindow.getByText(/Failed|Error|not found|No such container/i).first())
