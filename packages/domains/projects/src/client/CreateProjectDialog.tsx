@@ -49,7 +49,7 @@ export function CreateProjectDialog({ open, onOpenChange, onCreated }: CreatePro
   const [path, setPath] = useState('')
   const [startMode, setStartMode] = useState<ProjectStartMode>('scratch')
   const [loading, setLoading] = useState(false)
-  const integrationsEnabled = import.meta.env.DEV
+  const integrationsEnabled = window.api.app.isIntegrationsEnabled
   const visibleStartOptions = integrationsEnabled
     ? START_OPTIONS
     : START_OPTIONS.filter((option) => option.mode === 'scratch')
