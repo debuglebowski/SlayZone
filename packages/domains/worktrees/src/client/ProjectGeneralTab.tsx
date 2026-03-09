@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { GitBranch, ChevronDown, Check, Loader2, Plus, GitCommitHorizontal, Copy, FolderGit2 } from 'lucide-react'
 import { Button, IconButton, Input, Popover, PopoverContent, PopoverTrigger, cn, toast } from '@slayzone/ui'
-import type { CommitInfo, StatusSummary } from '../shared/types'
+import type { CommitInfo, StatusSummary, AheadBehind } from '../shared/types'
+import { RemoteSection } from './RemoteSection'
 
 interface ProjectGeneralTabProps {
   projectPath: string | null
@@ -19,6 +20,9 @@ export function ProjectGeneralTab({ projectPath, visible, onSwitchToDiff }: Proj
 
   const [initializing, setInitializing] = useState(false)
 
+  const [remoteUrl, setRemoteUrl] = useState<string | null>(null)
+  const [upstreamAB, setUpstreamAB] = useState<AheadBehind | null>(null)
+
   const [branchPopoverOpen, setBranchPopoverOpen] = useState(false)
   const [branches, setBranches] = useState<string[]>([])
   const [loadingBranches, setLoadingBranches] = useState(false)
@@ -32,14 +36,22 @@ export function ProjectGeneralTab({ projectPath, visible, onSwitchToDiff }: Proj
       const isRepo = await window.api.git.isGitRepo(projectPath)
       setIsGitRepo(isRepo)
       if (!isRepo) return
-      const [branch, status, commits] = await Promise.all([
+      const [branch, status, commits, remote] = await Promise.all([
         window.api.git.getCurrentBranch(projectPath),
         window.api.git.getStatusSummary(projectPath),
-        window.api.git.getRecentCommits(projectPath, 40)
+        window.api.git.getRecentCommits(projectPath, 40),
+        window.api.git.getRemoteUrl(projectPath)
       ])
       setCurrentBranch(branch)
       setStatusSummary(status)
       setRecentCommits(commits)
+      setRemoteUrl(remote)
+      if (branch) {
+        const uab = await window.api.git.getAheadBehindUpstream(projectPath, branch)
+        setUpstreamAB(uab)
+      } else {
+        setUpstreamAB(null)
+      }
     } catch { /* polling error */ }
   }, [projectPath])
 
@@ -138,7 +150,8 @@ export function ProjectGeneralTab({ projectPath, visible, onSwitchToDiff }: Proj
   const totalChanges = statusSummary ? statusSummary.staged + statusSummary.unstaged + statusSummary.untracked : 0
 
   return (
-    <div className="p-4 space-y-6">
+    <div className="h-full flex flex-col">
+      <div className="min-h-0 overflow-y-auto p-4 pb-0 space-y-6">
       <Section label="Branch">
         <Popover open={branchPopoverOpen} onOpenChange={handleBranchPopoverChange}>
           <PopoverTrigger asChild>
@@ -183,6 +196,18 @@ export function ProjectGeneralTab({ projectPath, visible, onSwitchToDiff }: Proj
         </Popover>
       </Section>
 
+      {remoteUrl && (
+        <Section label="Remote">
+          <RemoteSection
+            remoteUrl={remoteUrl}
+            upstreamAB={upstreamAB}
+            targetPath={projectPath}
+            branch={currentBranch}
+            onSyncDone={fetchGitData}
+          />
+        </Section>
+      )}
+
       {statusSummary && totalChanges > 0 && (
         <Section label="Current Changes">
           <div className="flex items-center gap-2 flex-wrap px-3 py-2.5 rounded-lg border bg-muted/30">
@@ -199,9 +224,13 @@ export function ProjectGeneralTab({ projectPath, visible, onSwitchToDiff }: Proj
         </Section>
       )}
 
+      </div>
+
+      {/* Recent commits — fills remaining height, scrolls internally */}
       {recentCommits.length > 0 && (
-        <Section label="Recent Commits">
-          <div className="space-y-0.5 px-3 py-2.5 rounded-lg border bg-muted/30">
+        <div className="flex-1 min-h-[200px] flex flex-col px-4 pt-6 pb-4">
+          <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">Recent Commits</div>
+          <div className="flex-1 min-h-0 space-y-0.5 px-3 py-2.5 rounded-lg border bg-muted/30 overflow-y-auto">
             {recentCommits.map((commit) => (
               <div
                 key={commit.hash}
@@ -224,7 +253,7 @@ export function ProjectGeneralTab({ projectPath, visible, onSwitchToDiff }: Proj
               </div>
             ))}
           </div>
-        </Section>
+        </div>
       )}
     </div>
   )

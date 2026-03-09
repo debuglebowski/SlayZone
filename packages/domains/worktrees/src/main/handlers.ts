@@ -35,10 +35,22 @@ import {
   getMergeContext,
   getRecentCommits,
   getAheadBehind,
-  getStatusSummary
+  getAheadBehindUpstream,
+  getStatusSummary,
+  getRemoteUrl,
+  gitFetch,
+  gitPush,
+  gitPull
 } from './git-worktree'
 import { runAiCommand } from './merge-ai'
-import type { MergeWithAIResult, ConflictAnalysis } from '../shared/types'
+import {
+  checkGhInstalled,
+  hasGithubRemote,
+  listOpenPrs,
+  getPrByUrl,
+  createPr
+} from './gh-cli'
+import type { MergeWithAIResult, ConflictAnalysis, CreatePrInput } from '../shared/types'
 
 export function registerWorktreeHandlers(ipcMain: IpcMain): void {
   // Git operations
@@ -293,5 +305,46 @@ SUMMARY: <2-3 sentences explaining what each branch changed and why they conflic
   ipcMain.handle('git:isDirty', (_, path: string) => {
     const summary = getStatusSummary(path)
     return (summary.staged + summary.unstaged + summary.untracked) > 0
+  })
+
+  ipcMain.handle('git:getRemoteUrl', (_, path: string) => {
+    return getRemoteUrl(path)
+  })
+
+  ipcMain.handle('git:getAheadBehindUpstream', (_, path: string, branch: string) => {
+    return getAheadBehindUpstream(path, branch)
+  })
+
+  ipcMain.handle('git:fetch', (_, path: string) => {
+    return gitFetch(path)
+  })
+
+  ipcMain.handle('git:push', (_, path: string, branch?: string, force?: boolean) => {
+    return gitPush(path, branch, force)
+  })
+
+  ipcMain.handle('git:pull', (_, path: string) => {
+    return gitPull(path)
+  })
+
+  // GitHub CLI (gh) operations
+  ipcMain.handle('git:checkGhInstalled', () => {
+    return checkGhInstalled()
+  })
+
+  ipcMain.handle('git:hasGithubRemote', (_, repoPath: string) => {
+    return hasGithubRemote(repoPath)
+  })
+
+  ipcMain.handle('git:listOpenPrs', (_, repoPath: string) => {
+    return listOpenPrs(repoPath)
+  })
+
+  ipcMain.handle('git:getPrByUrl', (_, repoPath: string, url: string) => {
+    return getPrByUrl(repoPath, url)
+  })
+
+  ipcMain.handle('git:createPr', (_, input: CreatePrInput) => {
+    return createPr(input)
   })
 }

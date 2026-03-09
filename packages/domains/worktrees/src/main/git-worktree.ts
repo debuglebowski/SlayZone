@@ -3,7 +3,7 @@ import { platform } from 'os'
 import { existsSync, readFileSync, writeFileSync, chmodSync, constants as fsConstants, accessSync } from 'fs'
 import path from 'path'
 import { recordDiagnosticEvent } from '@slayzone/diagnostics/main'
-import type { ConflictFileContent, DetectedWorktree, GitDiffSnapshot, MergeResult, RebaseProgress, RebaseCommitInfo, CommitInfo, AheadBehind, StatusSummary } from '../shared/types'
+import type { ConflictFileContent, DetectedWorktree, GitDiffSnapshot, GitSyncResult, MergeResult, RebaseProgress, RebaseCommitInfo, CommitInfo, AheadBehind, StatusSummary } from '../shared/types'
 import type { MergeContext } from '@slayzone/task/shared'
 
 function trimOutput(value: unknown, maxLength = 1200): string | null {
@@ -837,5 +837,87 @@ export function getMergeContext(repoPath: string): MergeContext | null {
     return null
   } catch {
     return null
+  }
+}
+
+// --- Remote operations ---
+
+export function getRemoteUrl(repoPath: string): string | null {
+  try {
+    const output = spawnGit(['remote', 'get-url', 'origin'], { cwd: repoPath })
+    return output.trim() || null
+  } catch {
+    return null
+  }
+}
+
+export function getAheadBehindUpstream(repoPath: string, branch: string): AheadBehind | null {
+  try {
+    const output = spawnGit(['rev-list', '--left-right', '--count', `${branch}...${branch}@{upstream}`], { cwd: repoPath })
+    const [ahead, behind] = output.trim().split(/\s+/).map(Number)
+    return { ahead: ahead || 0, behind: behind || 0 }
+  } catch {
+    return null
+  }
+}
+
+/** Async git execution for network operations — won't block the main process */
+function spawnGitAsync(args: string[], options: { cwd: string }): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const command = `git ${args.join(' ')}`
+    const startedAt = Date.now()
+    const child = spawn('git', args, {
+      cwd: options.cwd,
+      stdio: ['pipe', 'pipe', 'pipe']
+    })
+    const stdout: string[] = []
+    const stderr: string[] = []
+    child.stdout.on('data', (data: Buffer) => stdout.push(data.toString()))
+    child.stderr.on('data', (data: Buffer) => stderr.push(data.toString()))
+    child.on('close', (code) => {
+      const durationMs = Date.now() - startedAt
+      if (code !== 0) {
+        const errMsg = stderr.join('').trim() || `git command failed: ${command}`
+        recordDiagnosticEvent({
+          level: 'error', source: 'git', event: 'git.command_failed',
+          message: errMsg,
+          payload: { command, cwd: options.cwd, durationMs, success: false, exitCode: code, stderr: trimOutput(stderr.join('')), stdout: trimOutput(stdout.join('')) }
+        })
+        reject(new Error(errMsg))
+      } else {
+        recordDiagnosticEvent({
+          level: 'info', source: 'git', event: 'git.command',
+          message: command,
+          payload: { command, cwd: options.cwd, durationMs, success: true }
+        })
+        resolve(stdout.join(''))
+      }
+    })
+    child.on('error', (err) => reject(err))
+  })
+}
+
+export async function gitFetch(repoPath: string): Promise<void> {
+  await spawnGitAsync(['fetch'], { cwd: repoPath })
+}
+
+export async function gitPush(repoPath: string, branch?: string, force?: boolean): Promise<GitSyncResult> {
+  try {
+    const args = ['push']
+    if (force) args.push('--force-with-lease')
+    if (branch) args.push('-u', 'origin', branch)
+    await spawnGitAsync(args, { cwd: repoPath })
+    return { success: true }
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) }
+  }
+}
+
+export async function gitPull(repoPath: string): Promise<GitSyncResult> {
+  try {
+    await spawnGitAsync(['pull'], { cwd: repoPath })
+    return { success: true }
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) }
   }
 }

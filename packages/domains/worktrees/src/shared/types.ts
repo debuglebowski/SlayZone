@@ -70,6 +70,38 @@ export interface StatusSummary {
   untracked: number
 }
 
+export interface GitSyncResult {
+  success: boolean
+  error?: string
+}
+
+// --- Pull Request (gh CLI) ---
+
+export interface GhPullRequest {
+  number: number
+  title: string
+  url: string
+  state: 'OPEN' | 'CLOSED' | 'MERGED'
+  headRefName: string
+  baseRefName: string
+  isDraft: boolean
+  author: string
+  createdAt: string
+}
+
+export interface CreatePrInput {
+  repoPath: string
+  title: string
+  body: string
+  baseBranch: string
+  draft?: boolean
+}
+
+export interface CreatePrResult {
+  url: string
+  number: number
+}
+
 export interface GitDiffSnapshot {
   targetPath: string
   files: string[]

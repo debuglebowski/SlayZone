@@ -23,6 +23,7 @@ import {
 } from '@slayzone/ui'
 import type { Task, UpdateTaskInput } from '@slayzone/task/shared'
 import type { MergeResult, CommitInfo, AheadBehind, StatusSummary } from '../shared/types'
+import { RemoteSection } from './RemoteSection'
 import {
   DEFAULT_WORKTREE_BASE_PATH_TEMPLATE,
   joinWorktreePath,
@@ -83,6 +84,10 @@ export function GeneralTabContent({
   const [merging, setMerging] = useState(false)
   const [mergeResult, setMergeResult] = useState<MergeResult | null>(null)
 
+  // Remote
+  const [remoteUrl, setRemoteUrl] = useState<string | null>(null)
+  const [upstreamAB, setUpstreamAB] = useState<AheadBehind | null>(null)
+
   // Poll for git data
   const fetchGitData = useCallback(async () => {
     if (!projectPath) return
@@ -91,16 +96,23 @@ export function GeneralTabContent({
       setIsGitRepo(isRepo)
       if (!isRepo) return
 
-      const branch = await window.api.git.getCurrentBranch(projectPath)
+      const [branch, remote] = await Promise.all([
+        window.api.git.getCurrentBranch(projectPath),
+        window.api.git.getRemoteUrl(projectPath)
+      ])
       setCurrentBranch(branch)
+      setRemoteUrl(remote)
 
       if (targetPath) {
-        const [status, commits] = await Promise.all([
+        const activeBranch = hasWorktree ? worktreeBranch : branch
+        const [status, commits, uab] = await Promise.all([
           window.api.git.getStatusSummary(targetPath),
-          window.api.git.getRecentCommits(targetPath, 40)
+          window.api.git.getRecentCommits(targetPath, 40),
+          activeBranch ? window.api.git.getAheadBehindUpstream(targetPath, activeBranch) : Promise.resolve(null)
         ])
         setStatusSummary(status)
         setRecentCommits(commits)
+        setUpstreamAB(uab)
 
         // Ahead/behind only for worktrees with parent branch
         if (hasWorktree && task.worktree_parent_branch && worktreeBranch) {
@@ -302,8 +314,8 @@ export function GeneralTabContent({
   const totalChanges = statusSummary ? statusSummary.staged + statusSummary.unstaged + statusSummary.untracked : 0
 
   return (
-    <div className="h-full overflow-y-auto">
-      <div className="p-4 space-y-6">
+    <div className="h-full flex flex-col">
+      <div className="min-h-0 overflow-y-auto p-4 pb-0 space-y-6">
         {/* Merge/rebase banner */}
         {task.merge_state && (
           <button
@@ -370,6 +382,19 @@ export function GeneralTabContent({
             </Popover>
           )}
         </Section>
+
+        {/* Remote */}
+        {remoteUrl && (
+          <Section label="Remote">
+            <RemoteSection
+              remoteUrl={remoteUrl}
+              upstreamAB={upstreamAB}
+              targetPath={targetPath!}
+              branch={hasWorktree ? worktreeBranch : currentBranch}
+              onSyncDone={fetchGitData}
+            />
+          </Section>
+        )}
 
         {/* Worktree */}
         <Section label="Worktree">
@@ -482,35 +507,37 @@ export function GeneralTabContent({
           </Section>
         )}
 
-        {/* Recent commits */}
-        {recentCommits.length > 0 && (
-          <Section label="Recent Commits">
-            <div className="space-y-0.5 px-3 py-2.5 rounded-lg border bg-muted/30">
-              {recentCommits.map((commit) => (
-                <div
-                  key={commit.hash}
-                  className="flex items-start gap-2 py-1 px-1.5 -mx-1.5 rounded cursor-pointer hover:bg-accent/50 group"
-                  onClick={() => handleCopyHash(commit.shortHash)}
-                  title="Click to copy hash"
-                >
-                  <GitCommitHorizontal className="h-3.5 w-3.5 text-muted-foreground shrink-0 mt-0.5" />
-                  <div className="flex-1 min-w-0">
-                    <div className="text-xs truncate">{commit.message}</div>
-                    <div className="text-[10px] text-muted-foreground">
-                      <span className="font-mono">{commit.shortHash}</span> · {commit.relativeDate}
-                    </div>
-                  </div>
-                  {copiedHash === commit.shortHash ? (
-                    <Check className="h-3 w-3 text-green-500 shrink-0 mt-0.5" />
-                  ) : (
-                    <Copy className="h-3 w-3 text-muted-foreground shrink-0 mt-0.5 opacity-0 group-hover:opacity-100 transition-opacity" />
-                  )}
-                </div>
-              ))}
-            </div>
-          </Section>
-        )}
       </div>
+
+      {/* Recent commits — fills remaining height, scrolls internally */}
+      {recentCommits.length > 0 && (
+        <div className="flex-1 min-h-[200px] flex flex-col px-4 pt-6 pb-4">
+          <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">Recent Commits</div>
+          <div className="flex-1 min-h-0 space-y-0.5 px-3 py-2.5 rounded-lg border bg-muted/30 overflow-y-auto">
+            {recentCommits.map((commit) => (
+              <div
+                key={commit.hash}
+                className="flex items-start gap-2 py-1 px-1.5 -mx-1.5 rounded cursor-pointer hover:bg-accent/50 group"
+                onClick={() => handleCopyHash(commit.shortHash)}
+                title="Click to copy hash"
+              >
+                <GitCommitHorizontal className="h-3.5 w-3.5 text-muted-foreground shrink-0 mt-0.5" />
+                <div className="flex-1 min-w-0">
+                  <div className="text-xs truncate">{commit.message}</div>
+                  <div className="text-[10px] text-muted-foreground">
+                    <span className="font-mono">{commit.shortHash}</span> · {commit.relativeDate}
+                  </div>
+                </div>
+                {copiedHash === commit.shortHash ? (
+                  <Check className="h-3 w-3 text-green-500 shrink-0 mt-0.5" />
+                ) : (
+                  <Copy className="h-3 w-3 text-muted-foreground shrink-0 mt-0.5 opacity-0 group-hover:opacity-100 transition-opacity" />
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Delete worktree confirmation dialog */}
       <AlertDialog open={deleteWorktreeConfirmOpen} onOpenChange={setDeleteWorktreeConfirmOpen}>
