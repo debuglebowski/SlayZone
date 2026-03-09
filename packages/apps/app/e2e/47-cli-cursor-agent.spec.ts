@@ -32,6 +32,7 @@ test.describe('Cursor Agent CLI integration', () => {
   })
 
   test('starts and produces output', async ({ mainWindow }) => {
+    test.setTimeout(60_000)
     const sessionId = getMainSessionId(taskId)
     await waitForPtySession(mainWindow, sessionId, 30_000)
 

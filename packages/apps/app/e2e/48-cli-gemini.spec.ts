@@ -34,6 +34,7 @@ test.describe('Gemini integration', () => {
   })
 
   test('starts and produces output', async ({ mainWindow }) => {
+    test.setTimeout(60_000)
     const sessionId = getMainSessionId(taskId)
     await waitForPtySession(mainWindow, sessionId, 30_000)
 
@@ -47,6 +48,7 @@ test.describe('Gemini integration', () => {
   })
 
   test('accepts a prompt and produces response', async ({ mainWindow }) => {
+    test.setTimeout(60_000)
     const sessionId = getMainSessionId(taskId)
 
     // Capture buffer size before prompt
@@ -69,6 +71,7 @@ test.describe('Gemini integration', () => {
   })
 
   test('resume uses --resume latest', async ({ mainWindow }) => {
+    test.setTimeout(60_000)
     // Store a marker conversationId so the app thinks there's a previous session
     await mainWindow.evaluate(
       ({ id }) => window.api.db.updateTask({

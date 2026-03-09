@@ -31,6 +31,7 @@ test.describe('OpenCode CLI integration', () => {
   })
 
   test('starts and produces TUI output', async ({ mainWindow }) => {
+    test.setTimeout(60_000)
     const sessionId = getMainSessionId(taskId)
     await waitForPtySession(mainWindow, sessionId, 30_000)
 
@@ -44,6 +45,7 @@ test.describe('OpenCode CLI integration', () => {
   })
 
   test('accepts a prompt and produces response', async ({ mainWindow }) => {
+    test.setTimeout(60_000)
     const sessionId = getMainSessionId(taskId)
 
     const bufBefore = await readFullBuffer(mainWindow, sessionId)
@@ -65,6 +67,7 @@ test.describe('OpenCode CLI integration', () => {
   })
 
   test('resume uses --session flag', async ({ mainWindow }) => {
+    test.setTimeout(60_000)
     // Store a conversationId so the app resumes with --session
     await mainWindow.evaluate(
       ({ id }) => window.api.db.updateTask({

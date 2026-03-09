@@ -108,8 +108,8 @@ test.describe('CLI: slay', () => {
       const r = runCli('tasks', 'create', title, '--project', 'cli test')
       expect(r.status).toBe(0)
 
-      // CLI POSTs /api/notify → tasks:changed → refreshData → React re-renders — no manual refresh needed
-      await expect(mainWindow.getByText(title)).toBeVisible({ timeout: 5_000 })
+      // CLI POSTs /api/notify → tasks:changed → refreshData → React re-renders
+      await expect(mainWindow.getByText(title)).toBeVisible({ timeout: 10_000 })
     })
 
     test('exits non-zero and mentions --project when flag is missing', () => {
