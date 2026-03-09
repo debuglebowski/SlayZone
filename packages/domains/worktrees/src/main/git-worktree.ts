@@ -537,6 +537,7 @@ export function unstageAll(path: string): void {
 }
 
 export function getUntrackedFileDiff(repoPath: string, filePath: string): string {
+  if (!filePath) return ''
   try {
     const devNull = platform() === 'win32' ? 'NUL' : '/dev/null'
     return spawnGit(['diff', '--no-index', '--no-ext-diff', '--', devNull, filePath], { cwd: repoPath })
@@ -566,15 +567,15 @@ export function getWorkingDiff(path: string, opts?: { contextLines?: string; ign
   }
   const extra = extraFlags.length > 0 ? ' ' + extraFlags.join(' ') : ''
 
-  const unstagedFilesRaw = execGit('git diff --name-only', {
+  const unstagedFilesRaw = execGit('git diff --name-only -z', {
     cwd: path,
     encoding: 'utf-8'
   }) as string
-  const stagedFilesRaw = execGit('git diff --cached --name-only', {
+  const stagedFilesRaw = execGit('git diff --cached --name-only -z', {
     cwd: path,
     encoding: 'utf-8'
   }) as string
-  const untrackedFilesRaw = execGit('git ls-files --others --exclude-standard', {
+  const untrackedFilesRaw = execGit('git ls-files --others --exclude-standard -z', {
     cwd: path,
     encoding: 'utf-8'
   }) as string
@@ -587,9 +588,9 @@ export function getWorkingDiff(path: string, opts?: { contextLines?: string; ign
     encoding: 'utf-8'
   }) as string
 
-  const unstagedFiles = unstagedFilesRaw.trim().split('\n').filter(Boolean)
-  const stagedFiles = stagedFilesRaw.trim().split('\n').filter(Boolean)
-  const untrackedFiles = untrackedFilesRaw.trim().split('\n').filter(Boolean)
+  const unstagedFiles = unstagedFilesRaw.split('\0').filter(Boolean)
+  const stagedFiles = stagedFilesRaw.split('\0').filter(Boolean)
+  const untrackedFiles = untrackedFilesRaw.split('\0').filter(Boolean)
 
   return {
     targetPath: path,
