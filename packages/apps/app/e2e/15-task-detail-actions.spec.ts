@@ -7,30 +7,15 @@ test.describe('Task detail actions', () => {
     await goHome(mainWindow)
     await clickProject(mainWindow, projectAbbrev)
 
-    // Previous specs can leave dialogs/overlays open in long serial runs.
-    const openDialogs = mainWindow.locator('[role="dialog"][data-state="open"], [role="dialog"][aria-modal="true"]')
-    for (let attempt = 0; attempt < 8; attempt += 1) {
-      if ((await openDialogs.count()) === 0) break
-      const topDialog = openDialogs.last()
-      const closeButton = topDialog.getByRole('button', { name: /close|cancel|done|skip/i }).first()
-      if (await closeButton.isVisible({ timeout: 150 }).catch(() => false)) {
-        await closeButton.click({ force: true }).catch(() => {})
-      } else {
-        await topDialog.press('Escape').catch(() => {})
-        await mainWindow.keyboard.press('Escape').catch(() => {})
-      }
-      await mainWindow.waitForTimeout(100)
-    }
-
-    const openAlertOverlay = mainWindow.locator('[data-slot="alert-dialog-overlay"][data-state="open"]')
-    for (let attempt = 0; attempt < 3; attempt += 1) {
-      if (!(await openAlertOverlay.isVisible({ timeout: 100 }).catch(() => false))) break
+    // Dismiss any stale dialog/overlay from previous tests (2 passes max)
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      const hasDialog = await mainWindow.locator('[role="dialog"][data-state="open"], [data-slot="alert-dialog-overlay"][data-state="open"]').first().isVisible({ timeout: 50 }).catch(() => false)
+      if (!hasDialog) break
       await mainWindow.keyboard.press('Escape').catch(() => {})
-      await mainWindow.waitForTimeout(100)
     }
 
     const card = mainWindow.locator('p').filter({ hasText: title }).first()
-    await expect(card).toBeVisible({ timeout: 10_000 })
+    await expect(card).toBeVisible({ timeout: 5_000 })
     await card.click()
   }
 
@@ -50,9 +35,10 @@ test.describe('Task detail actions', () => {
       ]
     })
 
-    await s.createTask({ projectId: p.id, title: 'Archive me from detail', status: 'in_progress' })
-    await s.createTask({ projectId: p.id, title: 'Delete me from detail', status: 'in_progress' })
-    await s.createTask({ projectId: p.id, title: 'Complete me task', status: 'in_progress' })
+    // Use plain terminal mode — these tests don't need AI PTY, avoids slow claude-code spawn
+    await s.createTask({ projectId: p.id, title: 'Archive me from detail', status: 'in_progress', terminalMode: 'terminal' })
+    await s.createTask({ projectId: p.id, title: 'Delete me from detail', status: 'in_progress', terminalMode: 'terminal' })
+    await s.createTask({ projectId: p.id, title: 'Complete me task', status: 'in_progress', terminalMode: 'terminal' })
     await s.refreshData()
 
     await goHome(mainWindow)

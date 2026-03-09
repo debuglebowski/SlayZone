@@ -16,34 +16,30 @@ test.describe('Web panels', () => {
     dialog.locator('.space-y-2 > *').filter({ hasText: name }).first()
 
   const openPanelsTab = async (page: import('@playwright/test').Page) => {
-    await goHome(page)
-    await clickProject(page, projectAbbrev)
     const dialog = settingsDialog(page)
+    // If dialog not already visible, navigate and open it
     if (!(await dialog.isVisible().catch(() => false))) {
-      for (let attempt = 0; attempt < 8; attempt += 1) {
+      await goHome(page)
+      await clickProject(page, projectAbbrev)
+      for (let attempt = 0; attempt < 2; attempt += 1) {
+        await page.keyboard.press('Meta+,')
+        if (await dialog.isVisible({ timeout: 2_000 }).catch(() => false)) break
         await clickSettings(page)
-        if (await dialog.isVisible({ timeout: 1_200 }).catch(() => false)) break
-        await page.keyboard.press('Meta+,').catch(() => {})
-        if (await dialog.isVisible({ timeout: 1_200 }).catch(() => false)) break
-        await page.waitForTimeout(120)
+        if (await dialog.isVisible({ timeout: 1_000 }).catch(() => false)) break
       }
-      await expect(dialog).toBeVisible({ timeout: 5_000 })
+      await expect(dialog).toBeVisible({ timeout: 3_000 })
     }
-    for (let attempt = 0; attempt < 4; attempt += 1) {
-      await dialog.getByTestId('settings-tab-panels').click()
-      const nameInput = dialog.getByPlaceholder('Name')
-      if (await nameInput.isVisible({ timeout: 800 }).catch(() => false)) {
-        await expect(findCard(settingsDialog(page), 'Terminal')).toBeVisible({ timeout: 5_000 })
-        return
+    // Navigate to panels tab; handle being in a sub-config by clicking back first
+    const panelsTab = dialog.getByTestId('settings-tab-panels')
+    await panelsTab.click()
+    if (!(await dialog.getByPlaceholder('Name').isVisible({ timeout: 500 }).catch(() => false))) {
+      const backBtn = dialog.getByRole('button', { name: 'Panels', exact: true }).first()
+      if (await backBtn.isVisible({ timeout: 300 }).catch(() => false)) {
+        await backBtn.click({ force: true }).catch(() => {})
       }
-      const backToPanels = dialog.getByRole('button', { name: 'Panels', exact: true }).first()
-      if (await backToPanels.isVisible({ timeout: 500 }).catch(() => false)) {
-        await backToPanels.click({ force: true }).catch(() => {})
-      }
-      await page.waitForTimeout(120)
+      await panelsTab.click()
     }
-    await expect(dialog.getByPlaceholder('Name')).toBeVisible({ timeout: 5_000 })
-    await expect(findCard(settingsDialog(page), 'Terminal')).toBeVisible({ timeout: 5_000 })
+    await expect(findCard(settingsDialog(page), 'Terminal')).toBeVisible({ timeout: 3_000 })
   }
 
   const closePanelsTab = async (page: import('@playwright/test').Page) => {

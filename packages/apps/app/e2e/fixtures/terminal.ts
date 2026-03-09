@@ -75,7 +75,7 @@ export async function switchTerminalMode(page: Page, mode: TerminalMode): Promis
 
   // Dismiss any blocking overlay (dialog, popover, select) that may linger from a previous test
   await page.keyboard.press('Escape').catch(() => {})
-  await page.waitForTimeout(200)
+  await page.waitForTimeout(100)
 
   // Radix Dialog scroll-lock (react-remove-scroll) can leave pointer-events:none on <body>
   // if the dialog close animation completes before the cleanup runs. Force-clear it.

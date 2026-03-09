@@ -460,17 +460,18 @@ export async function clickAddProject(page: Page) {
 /** Click the settings button in the sidebar footer */
 export async function clickSettings(page: Page) {
   const dialog = page.locator('[role="dialog"][aria-label="Settings"]').first()
-  for (let attempt = 0; attempt < 5; attempt += 1) {
+  if (await dialog.isVisible({ timeout: 200 }).catch(() => false)) return
+
+  for (let attempt = 0; attempt < 3; attempt += 1) {
     await page.bringToFront().catch(() => {})
-    if (await dialog.isVisible({ timeout: 400 }).catch(() => false)) return
 
     await page.keyboard.press('Meta+,').catch(() => {})
-    if (await dialog.isVisible({ timeout: 800 }).catch(() => false)) return
+    if (await dialog.isVisible({ timeout: 500 }).catch(() => false)) return
 
     const sidebarSettingsButton = page.getByRole('button', { name: 'Settings', exact: true }).first()
-    if (await sidebarSettingsButton.isVisible({ timeout: 500 }).catch(() => false)) {
+    if (await sidebarSettingsButton.isVisible({ timeout: 300 }).catch(() => false)) {
       await sidebarSettingsButton.click({ force: true }).catch(() => {})
-      if (await dialog.isVisible({ timeout: 800 }).catch(() => false)) return
+      if (await dialog.isVisible({ timeout: 500 }).catch(() => false)) return
     }
 
     const footer = sidebar(page).locator('[data-sidebar="footer"]').first()
@@ -478,25 +479,20 @@ export async function clickSettings(page: Page) {
       .locator('button')
       .filter({ has: page.locator('.lucide-settings') })
       .first()
-    if (await footerIconButton.isVisible({ timeout: 500 }).catch(() => false)) {
+    if (await footerIconButton.isVisible({ timeout: 300 }).catch(() => false)) {
       await footerIconButton.click({ force: true }).catch(() => {})
-      if (await dialog.isVisible({ timeout: 800 }).catch(() => false)) return
+      if (await dialog.isVisible({ timeout: 500 }).catch(() => false)) return
     }
-
-    await page.waitForTimeout(120)
   }
 }
 
 /** Navigate to home tab (div with lucide house/home icon, no title attr) */
 export async function goHome(page: Page) {
-  for (const sel of ['.lucide-house', '.lucide-home']) {
-    const icon = page.locator(sel).first()
-    if (await icon.isVisible({ timeout: 500 }).catch(() => false)) {
-      await icon.click({ timeout: 2_000 }).catch(async () => {
-        await icon.click({ force: true, timeout: 2_000 }).catch(() => {})
-      })
-      return
-    }
+  const icon = page.locator('.lucide-house, .lucide-home').first()
+  if (await icon.isVisible({ timeout: 500 }).catch(() => false)) {
+    await icon.click({ timeout: 2_000 }).catch(async () => {
+      await icon.click({ force: true, timeout: 2_000 }).catch(() => {})
+    })
   }
 }
 

@@ -109,8 +109,8 @@ test.describe('Session banner behavior', () => {
     // Banner visible
     await expect(mainWindow.getByText('Session not saved').last()).toBeVisible()
 
-    // Wait 3s — no /status should have been sent automatically
-    await mainWindow.waitForTimeout(3000)
+    // Wait 1.5s — no /status should have been sent automatically
+    await mainWindow.waitForTimeout(1500)
 
     const statusCount = await electronApp.evaluate(() => {
       const counts = (globalThis as unknown as { __statusCommandCounts?: Record<string, number> }).__statusCommandCounts ?? {}

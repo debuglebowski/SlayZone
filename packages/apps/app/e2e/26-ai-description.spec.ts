@@ -1,6 +1,5 @@
 import { test, expect, seed, goHome, clickProject } from './fixtures/electron'
 import { TEST_PROJECT_PATH } from './fixtures/electron'
-import { switchTerminalMode } from './fixtures/terminal'
 
 test.describe('AI description generation', () => {
   let projectAbbrev: string
@@ -96,14 +95,10 @@ test.describe('AI description generation', () => {
   })
 
   test('generate works in codex mode too', async ({ mainWindow }) => {
-    await switchTerminalMode(mainWindow, 'codex')
-    // Clear existing description first
+    // Seed codex mode via DB instead of UI switching (faster)
     await mainWindow.evaluate((id) =>
-      window.api.db.updateTask({ id, description: null }), taskId)
-    await expect.poll(async () => {
-      const task = await mainWindow.evaluate((id) => window.api.db.getTask(id), taskId)
-      return task?.description
-    }).toBeFalsy()
+      window.api.db.updateTask({ id, terminalMode: 'codex', description: null }), taskId)
+    await seed(mainWindow).refreshData()
 
     // Navigate away and back to reload clean state
     await goHome(mainWindow)
@@ -119,8 +114,13 @@ test.describe('AI description generation', () => {
       })
       .toContain('Mock description for: Implement login flow')
 
-    // Switch back to claude-code for clean state
-    await switchTerminalMode(mainWindow, 'claude-code')
+    // Restore claude-code mode via DB for clean state
+    await mainWindow.evaluate((id) =>
+      window.api.db.updateTask({ id, terminalMode: 'claude-code' }), taskId)
+    await seed(mainWindow).refreshData()
+    await goHome(mainWindow)
+    await clickProject(mainWindow, projectAbbrev)
+    await mainWindow.getByText('Implement login flow').first().click()
     await expect(generateBtn(mainWindow)).toBeVisible()
   })
 })
