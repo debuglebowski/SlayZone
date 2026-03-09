@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { Home, Trophy, X } from 'lucide-react'
 import { cn, Tooltip, TooltipTrigger, TooltipContent, getTerminalStateStyle, projectColorBg } from '@slayzone/ui'
 import type { TerminalState } from '@slayzone/terminal/shared'
@@ -32,6 +32,7 @@ interface TabBarProps {
   activeIndex: number
   terminalStates?: Map<string, TerminalState>
   projectColors?: Map<string, string>
+  worktreeColors?: Map<string, string>
   onTabClick: (index: number) => void
   onTabClose: (index: number) => void
   onTabReorder: (fromIndex: number, toIndex: number) => void
@@ -67,7 +68,9 @@ function TabContent({ title, isActive, isDragging, onClose, terminalState, isSub
         'max-w-[300px]',
         isDragging && 'shadow-lg'
       )}
-      style={{ backgroundColor: projectColorBg(projectColor, isActive ? 'tabActive' : 'tab') }}
+      style={{
+        backgroundColor: projectColorBg(projectColor, isActive ? 'tabActive' : 'tab')
+      }}
     >
       {projectColor && <div className="pointer-events-none absolute inset-0 rounded-md opacity-0 transition-opacity group-hover:opacity-100 bg-black/10 dark:bg-white/10" />}
       {stateInfo && (
@@ -97,6 +100,8 @@ function TabContent({ title, isActive, isDragging, onClose, terminalState, isSub
   )
 }
 
+type GroupPosition = 'solo' | 'first' | 'middle' | 'last'
+
 interface SortableTabProps {
   tab: Tab & { type: 'task' }
   index: number
@@ -105,6 +110,8 @@ interface SortableTabProps {
   onTabClose: (index: number) => void
   terminalState?: TerminalState
   projectColor?: string
+  worktreeColor?: string
+  groupPosition?: GroupPosition
 }
 
 function SortableTab({
@@ -114,17 +121,40 @@ function SortableTab({
   onTabClick,
   onTabClose,
   terminalState,
-  projectColor
+  projectColor,
+  worktreeColor,
+  groupPosition
 }: SortableTabProps): React.JSX.Element {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: tab.taskId
   })
 
-  const style = {
+  const inGroup = groupPosition === 'middle' || groupPosition === 'last'
+
+  const style: React.CSSProperties = {
     transform: CSS.Transform.toString(transform),
     transition,
     zIndex: isDragging ? 10 : undefined,
-    opacity: isDragging ? 0.5 : 1
+    opacity: isDragging ? 0.5 : 1,
+    marginLeft: inGroup ? 0 : 4
+  }
+
+  if (worktreeColor && groupPosition) {
+    const bw = 1.5
+    style.borderColor = worktreeColor
+    style.borderStyle = 'solid'
+    style.borderTopWidth = bw
+    style.borderBottomWidth = bw
+    style.borderLeftWidth = groupPosition === 'first' || groupPosition === 'solo' ? bw : 0
+    style.borderRightWidth = groupPosition === 'last' || groupPosition === 'solo' ? bw : 0
+    style.borderRadius =
+      groupPosition === 'solo' ? 8 :
+      groupPosition === 'first' ? '8px 0 0 8px' :
+      groupPosition === 'last' ? '0 8px 8px 0' : 0
+    style.paddingTop = 2
+    style.paddingBottom = 2
+    style.paddingLeft = groupPosition === 'first' || groupPosition === 'solo' ? 4 : 0
+    style.paddingRight = groupPosition === 'last' || groupPosition === 'solo' ? 4 : 0
   }
 
   return (
@@ -197,6 +227,7 @@ export function TabBar({
   activeIndex,
   terminalStates,
   projectColors,
+  worktreeColors,
   onTabClick,
   onTabClose,
   onTabReorder,
@@ -217,6 +248,27 @@ export function TabBar({
   const activeTab = activeId ? taskTabs.find((t) => t.taskId === activeId) : null
   const homeIndex = tabs.findIndex((t) => t.type === 'home')
   const leaderboardIndex = tabs.findIndex((t) => t.type === 'leaderboard')
+
+  // Compute group position for each task tab based on consecutive worktree colors
+  const groupPositions = useMemo(() => {
+    const positions = new Map<string, GroupPosition>()
+    if (!worktreeColors || worktreeColors.size === 0) return positions
+    const tt = tabs.filter((t): t is Tab & { type: 'task' } => t.type === 'task')
+    for (let i = 0; i < tt.length; i++) {
+      const tab = tt[i]
+      const color = worktreeColors.get(tab.taskId)
+      if (!color) continue
+      const prevColor = i > 0 ? worktreeColors.get(tt[i - 1].taskId) : undefined
+      const nextColor = i < tt.length - 1 ? worktreeColors.get(tt[i + 1].taskId) : undefined
+      const sameAsPrev = color === prevColor
+      const sameAsNext = color === nextColor
+      if (!sameAsPrev && !sameAsNext) positions.set(tab.taskId, 'solo')
+      else if (!sameAsPrev && sameAsNext) positions.set(tab.taskId, 'first')
+      else if (sameAsPrev && sameAsNext) positions.set(tab.taskId, 'middle')
+      else positions.set(tab.taskId, 'last')
+    }
+    return positions
+  }, [tabs, worktreeColors])
 
   function handleDragStart(event: DragStartEvent): void {
     setActiveId(event.active.id as string)
@@ -239,19 +291,21 @@ export function TabBar({
     /* window-drag-region: all interactive children MUST have window-no-drag */
     <div className="flex items-center h-11 pr-2 gap-1 bg-sidebar window-drag-region">
       {/* Scrollable tabs area */}
-      <div className="flex items-center gap-1 overflow-x-auto scrollbar-hide flex-1 min-w-0">
+      <div className="flex items-center overflow-x-auto scrollbar-hide flex-1 min-w-0">
         {/* Leaderboard tab — self-contained, guards its own Convex hooks */}
         {leaderboardIndex >= 0 && (
+          <div className="ml-1">
           <LeaderboardTab
             isActive={activeIndex === leaderboardIndex}
             onClick={() => onTabClick(leaderboardIndex)}
           />
+          </div>
         )}
 
         {/* Home tab - not draggable */}
         <div
           className={cn(
-            'flex items-center gap-1.5 h-7 px-3 rounded-md cursor-pointer transition-colors select-none flex-shrink-0 window-no-drag',
+            'ml-1 flex items-center gap-1.5 h-7 px-3 rounded-md cursor-pointer transition-colors select-none flex-shrink-0 window-no-drag',
             'bg-neutral-100 dark:bg-neutral-800/50 hover:bg-neutral-200/80 dark:hover:bg-neutral-700/50',
             'border',
             activeIndex === homeIndex
@@ -263,7 +317,7 @@ export function TabBar({
           <Home className="h-4 w-4" />
         </div>
 
-        {/* Task tabs - sortable */}
+        {/* Task tabs - sortable, flat DOM for dnd-kit compatibility */}
         <DndContext
           sensors={sensors}
           collisionDetection={closestCenter}
@@ -283,6 +337,8 @@ export function TabBar({
                   onTabClose={onTabClose}
                   terminalState={terminalStates?.get(tab.taskId)}
                   projectColor={projectColors?.get(tab.taskId)}
+                  worktreeColor={worktreeColors?.get(tab.taskId)}
+                  groupPosition={groupPositions.get(tab.taskId)}
                 />
               )
             })}

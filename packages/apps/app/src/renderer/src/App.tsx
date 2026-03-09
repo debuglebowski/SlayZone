@@ -27,7 +27,7 @@ import {
   type ProjectCreationContext,
   type ProjectStartMode
 } from '@slayzone/projects'
-import { UserSettingsDialog, useViewState, AppearanceProvider } from '@slayzone/settings'
+import { UserSettingsDialog, useViewState, AppearanceProvider, type Tab } from '@slayzone/settings'
 import { OnboardingDialog } from '@slayzone/onboarding'
 import { TestPanel } from '@slayzone/test-panel'
 import { track } from '@slayzone/telemetry/client'
@@ -368,6 +368,50 @@ function App(): React.JSX.Element {
     }
     return map
   }, [tabs, tasks, projects, colorTintsEnabled])
+
+  // Map of taskId → worktree color for grouping indicator
+  // Only active when a project has 2+ distinct worktrees among open tabs
+  const WORKTREE_COLORS = ['#6366f1', '#f59e0b', '#10b981', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16']
+  const taskWorktreeColors = useMemo(() => {
+    const map = new Map<string, string>()
+    // Group open task tabs by project, using project path as fallback for tasks on main worktree
+    const byProject = new Map<string, { taskId: string; effectivePath: string }[]>()
+    for (const tab of tabs) {
+      if (tab.type !== 'task') continue
+      const task = tasks.find((t) => t.id === tab.taskId)
+      if (!task?.project_id) continue
+      const project = projects.find((p) => p.id === task.project_id)
+      const effectivePath = task.worktree_path || project?.path
+      if (!effectivePath) continue
+      const group = byProject.get(task.project_id) ?? []
+      group.push({ taskId: tab.taskId, effectivePath })
+      byProject.set(task.project_id, group)
+    }
+    // Deterministic hash: same path always gets the same color
+    const hashStr = (s: string): number => {
+      let h = 0
+      for (let i = 0; i < s.length; i++) h = ((h << 5) - h + s.charCodeAt(i)) | 0
+      return Math.abs(h)
+    }
+    // For each project with 2+ distinct worktrees, assign colors with collision avoidance
+    for (const entries of byProject.values()) {
+      const distinctPaths = [...new Set(entries.map((e) => e.effectivePath))]
+      if (distinctPaths.length < 2) continue
+      const pathToColor = new Map<string, string>()
+      const usedIndices = new Set<number>()
+      for (const path of distinctPaths) {
+        let idx = hashStr(path) % WORKTREE_COLORS.length
+        while (usedIndices.has(idx) && usedIndices.size < WORKTREE_COLORS.length) idx = (idx + 1) % WORKTREE_COLORS.length
+        usedIndices.add(idx)
+        pathToColor.set(path, WORKTREE_COLORS[idx])
+      }
+      for (const entry of entries) {
+        map.set(entry.taskId, pathToColor.get(entry.effectivePath)!)
+      }
+    }
+    return map
+  }, [tabs, tasks, projects])
+
   const tabCycleOrder = useMemo(() => {
     const homeIndex = tabs.findIndex((tab) => tab.type === 'home')
     const taskIndexes = tabs
@@ -458,6 +502,30 @@ function App(): React.JSX.Element {
   }, [tabs, tasks, ptyContext, setTasks, setTabs, setActiveTabIndex])
 
   // Tab management
+  /** Find insertion index: adjacent to tabs sharing the same worktree, or append. */
+  const findWorktreeInsertIndex = (taskId: string): number => {
+    const task = tasks.find((t) => t.id === taskId)
+    if (!task?.project_id) return tabs.length
+    const project = projects.find((p) => p.id === task.project_id)
+    const effectivePath = task.worktree_path || project?.path
+    if (!effectivePath) return tabs.length
+    // Find the last tab index sharing the same effective worktree path
+    let lastSibling = -1
+    for (let i = tabs.length - 1; i >= 0; i--) {
+      const tab = tabs[i]
+      if (tab.type !== 'task') continue
+      const t = tasks.find((x) => x.id === tab.taskId)
+      if (!t?.project_id) continue
+      const p = projects.find((pr) => pr.id === t.project_id)
+      const otherPath = t.worktree_path || p?.path
+      if (otherPath === effectivePath) {
+        lastSibling = i
+        break
+      }
+    }
+    return lastSibling >= 0 ? lastSibling + 1 : tabs.length
+  }
+
   const openTask = (taskId: string): void => {
     const existing = tabs.findIndex((t) => t.type === 'task' && t.taskId === taskId)
     if (existing >= 0) {
@@ -468,8 +536,12 @@ function App(): React.JSX.Element {
       const status = task?.status
       const isSubTask = !!task?.parent_id
       const isTemporary = !!task?.is_temporary
-      setTabs([...tabs, { type: 'task', taskId, title, status, isSubTask, isTemporary }])
-      setActiveTabIndex(tabs.length)
+      const newTab: Tab = { type: 'task', taskId, title, status, isSubTask, isTemporary }
+      const insertAt = findWorktreeInsertIndex(taskId)
+      const newTabs = [...tabs]
+      newTabs.splice(insertAt, 0, newTab)
+      setTabs(newTabs)
+      setActiveTabIndex(insertAt)
     }
   }
 
@@ -481,7 +553,11 @@ function App(): React.JSX.Element {
       const status = task?.status
       const isSubTask = !!task?.parent_id
       const isTemporary = !!task?.is_temporary
-      setTabs([...tabs, { type: 'task', taskId, title, status, isSubTask, isTemporary }])
+      const newTab: Tab = { type: 'task', taskId, title, status, isSubTask, isTemporary }
+      const insertAt = findWorktreeInsertIndex(taskId)
+      const newTabs = [...tabs]
+      newTabs.splice(insertAt, 0, newTab)
+      setTabs(newTabs)
     }
   }
 
@@ -1284,6 +1360,7 @@ function App(): React.JSX.Element {
                     activeIndex={activeTabIndex}
                     terminalStates={terminalStates}
                     projectColors={taskProjectColors}
+                    worktreeColors={taskWorktreeColors}
                     onTabClick={handleTabClick}
                     onTabClose={closeTab}
                     onTabReorder={reorderTabs}

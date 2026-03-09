@@ -1,6 +1,6 @@
 export { UserSettingsDialog } from './UserSettingsDialog'
 export { ThemeProvider, useTheme } from './ThemeContext'
 export { applyTheme } from './apply-theme'
-export { useViewState } from './useViewState'
+export { useViewState, type Tab } from './useViewState'
 export { AppearanceProvider } from './AppearanceContext'
 export { useAppearance, type AppearanceSettings } from '@slayzone/ui'
