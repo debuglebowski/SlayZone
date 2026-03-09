@@ -334,14 +334,15 @@ test.describe('Project settings & context menu', () => {
     }, { timeout: 5_000 }).toBe(true)
 
     const reloadIssuesButton = repoCard.getByTestId('github-repo-load-issues')
-    if (await reloadIssuesButton.isEnabled().catch(() => false)) {
-      await reloadIssuesButton.dispatchEvent('click')
-    }
+    await expect(reloadIssuesButton).toBeEnabled({ timeout: 5_000 })
+    await reloadIssuesButton.dispatchEvent('click')
+    // Wait for issues to load before asserting
+    await expect(repoCard.getByText(/issues loaded/)).toBeVisible({ timeout: 5_000 })
 
-    const linkedRow = repoCard.getByText(/Linked\s*acme\/slay-e2e#101 - Repository issue alpha/)
-    if (await linkedRow.isVisible().catch(() => false)) {
-      await expect(linkedRow).toBeVisible({ timeout: 5_000 })
-    }
+    // Issue #101 should show as "Linked" (not a selectable checkbox label)
+    await expect(
+      repoCard.getByText(/Linked\s*acme\/slay-e2e#101 - Repository issue alpha/)
+    ).toBeVisible({ timeout: 5_000 })
     await expect(
       repoCard.locator('label').filter({ hasText: 'acme/slay-e2e#101 - Repository issue alpha' })
     ).toHaveCount(0)

@@ -84,7 +84,7 @@ function columnExists(db: Database, table: string, column: string): boolean {
   return columns.some((c) => c.name === column)
 }
 
-function ensureIntegrationSchema(db: Database): void {
+export function ensureIntegrationSchema(db: Database): void {
   db.exec(`
     CREATE TABLE IF NOT EXISTS integration_connections (
       id TEXT PRIMARY KEY,
