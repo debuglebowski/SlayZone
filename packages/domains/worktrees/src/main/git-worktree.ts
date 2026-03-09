@@ -3,56 +3,9 @@ import { platform } from 'os'
 import { existsSync, readFileSync, writeFileSync, chmodSync, constants as fsConstants, accessSync } from 'fs'
 import path from 'path'
 import { recordDiagnosticEvent } from '@slayzone/diagnostics/main'
-import type { ConflictFileContent, DetectedWorktree, GitDiffSnapshot, GitSyncResult, MergeResult, RebaseProgress, RebaseCommitInfo, CommitInfo, AheadBehind, StatusSummary } from '../shared/types'
+import type { ConflictFileContent, DetectedWorktree, GitDiffSnapshot, GitSyncResult, MergeResult, RebaseProgress, RebaseCommitInfo, CommitInfo, AheadBehind, StatusSummary, BranchDetail, DeleteBranchResult, PruneResult } from '../shared/types'
 import type { MergeContext } from '@slayzone/task/shared'
-
-function trimOutput(value: unknown, maxLength = 1200): string | null {
-  if (typeof value !== 'string') return null
-  const normalized = value.trim()
-  if (!normalized) return null
-  if (normalized.length <= maxLength) return normalized
-  return `${normalized.slice(0, maxLength)}...[trimmed:${normalized.length - maxLength}]`
-}
-
-/** Async git execution — won't block the main process */
-function execGit(args: string[], options: { cwd: string }): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const command = `git ${args.join(' ')}`
-    const startedAt = Date.now()
-    const child = spawn('git', args, {
-      cwd: options.cwd,
-      stdio: ['pipe', 'pipe', 'pipe']
-    })
-    const stdout: string[] = []
-    const stderr: string[] = []
-    child.stdout.on('data', (data: Buffer) => stdout.push(data.toString()))
-    child.stderr.on('data', (data: Buffer) => stderr.push(data.toString()))
-    child.on('close', (code) => {
-      const durationMs = Date.now() - startedAt
-      if (code !== 0) {
-        const errMsg = stderr.join('').trim() || `git command failed: ${command}`
-        recordDiagnosticEvent({
-          level: 'error', source: 'git', event: 'git.command_failed',
-          message: errMsg,
-          payload: { command, cwd: options.cwd, durationMs, success: false, exitCode: code, stderr: trimOutput(stderr.join('')), stdout: trimOutput(stdout.join('')) }
-        })
-        const error = new Error(errMsg) as Error & { status: number | null; stderr: string; stdout: string }
-        error.status = code
-        error.stderr = stderr.join('')
-        error.stdout = stdout.join('')
-        reject(error)
-      } else {
-        recordDiagnosticEvent({
-          level: 'info', source: 'git', event: 'git.command',
-          message: command,
-          payload: { command, cwd: options.cwd, durationMs, success: true }
-        })
-        resolve(stdout.join(''))
-      }
-    })
-    child.on('error', (err) => reject(err))
-  })
-}
+import { execGit, trimOutput } from './exec-async'
 
 export async function isGitRepo(repoPath: string): Promise<boolean> {
   try {
@@ -764,5 +717,130 @@ export async function gitPull(repoPath: string): Promise<GitSyncResult> {
     return { success: true }
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : String(err) }
+  }
+}
+
+// --- Branch tab operations ---
+
+export async function getDefaultBranch(repoPath: string): Promise<string> {
+  try {
+    const output = await execGit(['symbolic-ref', 'refs/remotes/origin/HEAD'], { cwd: repoPath })
+    return output.trim().replace('refs/remotes/origin/', '')
+  } catch {
+    // Fallback: check for main/master
+    const branches = await listBranches(repoPath)
+    if (branches.includes('main')) return 'main'
+    if (branches.includes('master')) return 'master'
+    return branches[0] ?? 'main'
+  }
+}
+
+export async function listBranchesDetailed(repoPath: string): Promise<BranchDetail[]> {
+  try {
+    const format = '%(refname:short)%00%(objectname:short)%00%(objectname)%00%(subject)%00%(authorname)%00%(committerdate:relative)%00%(upstream:short)'
+    const output = await execGit(
+      ['for-each-ref', '--sort=-committerdate', `--format=${format}`, 'refs/heads/'],
+      { cwd: repoPath }
+    )
+
+    const currentBranch = await getCurrentBranch(repoPath)
+    const defaultBranch = await getDefaultBranch(repoPath)
+
+    const lines = output.trim().split('\n').filter(Boolean)
+    const branches: BranchDetail[] = []
+
+    // Parse all branches first
+    const parsed = lines.map(line => {
+      const [name, shortHash, hash, message, author, relativeDate, upstream] = line.split('\0')
+      return { name, shortHash, hash, message, author, relativeDate, upstream: upstream || null }
+    })
+
+    // Batch ahead/behind computations (cap at 30)
+    const toCompute = parsed.slice(0, 30)
+    const results = await Promise.all(
+      toCompute.map(async (b) => {
+        const [abUpstream, abDefault] = await Promise.all([
+          b.upstream ? getAheadBehindUpstream(repoPath, b.name).catch(() => null) : Promise.resolve(null),
+          b.name !== defaultBranch ? getAheadBehind(repoPath, b.name, defaultBranch).catch(() => ({ ahead: 0, behind: 0 })) : Promise.resolve(null)
+        ])
+        return { abUpstream, abDefault }
+      })
+    )
+
+    for (let i = 0; i < parsed.length; i++) {
+      const b = parsed[i]
+      const ab = i < results.length ? results[i] : { abUpstream: null, abDefault: null }
+      branches.push({
+        name: b.name,
+        lastCommit: {
+          hash: b.hash,
+          shortHash: b.shortHash,
+          message: b.message,
+          author: b.author,
+          relativeDate: b.relativeDate
+        },
+        upstream: b.upstream,
+        aheadBehindUpstream: ab.abUpstream,
+        aheadBehindDefault: ab.abDefault,
+        isDefault: b.name === defaultBranch,
+        isCurrent: b.name === currentBranch
+      })
+    }
+
+    return branches
+  } catch {
+    return []
+  }
+}
+
+export async function listRemoteBranches(repoPath: string): Promise<string[]> {
+  try {
+    const output = await execGit(['branch', '-r', '--list', '--no-color'], { cwd: repoPath })
+    return output
+      .split('\n')
+      .map(line => line.trim())
+      .filter(line => line && !line.includes(' -> '))
+  } catch {
+    return []
+  }
+}
+
+export async function getMergeBase(repoPath: string, branch1: string, branch2: string): Promise<string | null> {
+  try {
+    const output = await execGit(['merge-base', branch1, branch2], { cwd: repoPath })
+    return output.trim() || null
+  } catch {
+    return null
+  }
+}
+
+export async function getCommitsSince(repoPath: string, sinceRef: string, branch: string): Promise<CommitInfo[]> {
+  try {
+    const output = await execGit(['log', `${sinceRef}..${branch}`, '--format=%H%n%h%n%s%n%an%n%ar'], { cwd: repoPath })
+    return parseCommitOutput(output)
+  } catch {
+    return []
+  }
+}
+
+export async function deleteBranch(repoPath: string, branch: string, force?: boolean): Promise<DeleteBranchResult> {
+  try {
+    await execGit(['branch', force ? '-D' : '-d', branch], { cwd: repoPath })
+    return { success: true }
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) }
+  }
+}
+
+export async function pruneRemote(repoPath: string): Promise<PruneResult> {
+  try {
+    const output = await execGit(['remote', 'prune', 'origin'], { cwd: repoPath })
+    const pruned = output
+      .split('\n')
+      .filter(line => line.includes('[pruned]'))
+      .map(line => line.replace(/.*\[pruned\]\s*/, '').trim())
+    return { pruned }
+  } catch {
+    return { pruned: [] }
   }
 }

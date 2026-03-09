@@ -1,6 +1,6 @@
-import { spawnSync, execSync } from 'child_process'
 import { whichBinary, resolveUserShell, getShellStartupArgs } from '@slayzone/terminal/main'
-import type { GhPullRequest, GhPrComment, CreatePrInput, CreatePrResult, MergePrInput, EditPrCommentInput } from '../shared/types'
+import type { GhPullRequest, GhPrComment, GhPrTimelineEvent, CreatePrInput, CreatePrResult, MergePrInput, EditPrCommentInput } from '../shared/types'
+import { execAsync, execGit } from './exec-async'
 
 const GH_PR_JSON_FIELDS = 'number,title,body,url,state,headRefName,baseRefName,isDraft,author,createdAt,reviewDecision,statusCheckRollup'
 
@@ -14,18 +14,14 @@ async function resolveGhPath(): Promise<string | null> {
 }
 
 /** Run gh with the user's shell environment so PATH is correct. */
-function spawnGh(args: string[], opts: { cwd?: string; timeout?: number } = {}) {
+async function spawnGh(args: string[], opts: { cwd?: string; timeout?: number } = {}) {
   if (!ghPath) throw new Error('gh CLI not found')
 
   const shell = resolveUserShell()
   const shellArgs = getShellStartupArgs(shell)
   const cmd = [ghPath, ...args].map(a => `'${a.replace(/'/g, `'"'"'`)}'`).join(' ')
 
-  return spawnSync(shell, [...shellArgs, '-c', cmd], {
-    cwd: opts.cwd,
-    encoding: 'utf-8' as const,
-    timeout: opts.timeout ?? 15000
-  })
+  return execAsync(shell, [...shellArgs, '-c', cmd], { ...opts, source: 'gh' })
 }
 
 interface RawGhPr {
@@ -74,42 +70,35 @@ export async function checkGhInstalled(): Promise<boolean> {
   return path !== null
 }
 
-export function hasGithubRemote(repoPath: string): boolean {
+export async function hasGithubRemote(repoPath: string): Promise<boolean> {
   try {
-    const output = execSync('git remote -v', { cwd: repoPath, encoding: 'utf-8', timeout: 5000 })
+    const output = await execGit(['remote', '-v'], { cwd: repoPath })
     return /github\.com/i.test(output)
   } catch {
     return false
   }
 }
 
-function ensureBranchPushed(repoPath: string): void {
-  const result = spawnSync('git', ['rev-parse', '--abbrev-ref', '--symbolic-full-name', '@{u}'], {
-    cwd: repoPath,
-    encoding: 'utf-8',
-    timeout: 5000
-  })
-  if (result.status === 0) return
+async function ensureBranchPushed(repoPath: string): Promise<void> {
+  try {
+    await execGit(['rev-parse', '--abbrev-ref', '--symbolic-full-name', '@{u}'], { cwd: repoPath })
+    return // upstream exists
+  } catch {
+    // no upstream — push
+  }
 
-  const branch = execSync('git rev-parse --abbrev-ref HEAD', {
-    cwd: repoPath,
-    encoding: 'utf-8',
-    timeout: 5000
-  }).trim()
+  const branchOutput = await execGit(['rev-parse', '--abbrev-ref', 'HEAD'], { cwd: repoPath })
+  const branch = branchOutput.trim()
 
-  const push = spawnSync('git', ['push', '-u', 'origin', branch], {
-    cwd: repoPath,
-    encoding: 'utf-8',
-    timeout: 30000
-  })
+  const push = await execAsync('git', ['push', '-u', 'origin', branch], { cwd: repoPath, timeout: 30000 })
   if (push.status !== 0) {
-    const stderr = push.stderr?.toString().trim() || 'Unknown error'
+    const stderr = push.stderr?.trim() || 'Unknown error'
     throw new Error(`Failed to push branch: ${stderr}`)
   }
 }
 
-export function listOpenPrs(repoPath: string): GhPullRequest[] {
-  const result = spawnGh([
+export async function listOpenPrs(repoPath: string): Promise<GhPullRequest[]> {
+  const result = await spawnGh([
     'pr', 'list',
     '--json', GH_PR_JSON_FIELDS,
     '--state', 'open',
@@ -117,18 +106,18 @@ export function listOpenPrs(repoPath: string): GhPullRequest[] {
   ], { cwd: repoPath })
 
   if (result.status !== 0) {
-    const stderr = result.stderr?.toString().trim() || ''
+    const stderr = result.stderr?.trim() || ''
     throw new Error(`gh pr list failed: ${stderr}`)
   }
   const parsed = JSON.parse(result.stdout) as RawGhPr[]
   return parsed.map(parseGhPr)
 }
 
-export function getPrByUrl(repoPath: string, url: string): GhPullRequest | null {
+export async function getPrByUrl(repoPath: string, url: string): Promise<GhPullRequest | null> {
   const match = url.match(/\/pull\/(\d+)/)
   if (!match) return null
 
-  const result = spawnGh([
+  const result = await spawnGh([
     'pr', 'view', match[1],
     '--json', GH_PR_JSON_FIELDS
   ], { cwd: repoPath })
@@ -137,8 +126,8 @@ export function getPrByUrl(repoPath: string, url: string): GhPullRequest | null 
   return parseGhPr(JSON.parse(result.stdout))
 }
 
-export function createPr(input: CreatePrInput): CreatePrResult {
-  ensureBranchPushed(input.repoPath)
+export async function createPr(input: CreatePrInput): Promise<CreatePrResult> {
+  await ensureBranchPushed(input.repoPath)
 
   const args = [
     'pr', 'create',
@@ -148,10 +137,10 @@ export function createPr(input: CreatePrInput): CreatePrResult {
   ]
   if (input.draft) args.push('--draft')
 
-  const result = spawnGh(args, { cwd: input.repoPath, timeout: 30000 })
+  const result = await spawnGh(args, { cwd: input.repoPath, timeout: 30000 })
 
   if (result.status !== 0) {
-    const stderr = result.stderr?.toString().trim() || 'Unknown error'
+    const stderr = result.stderr?.trim() || 'Unknown error'
     throw new Error(`gh pr create failed: ${stderr}`)
   }
 
@@ -162,11 +151,20 @@ export function createPr(input: CreatePrInput): CreatePrResult {
   return { url, number }
 }
 
-export function getPrComments(repoPath: string, prNumber: number): GhPrComment[] {
-  const result = spawnGh([
-    'pr', 'view', String(prNumber),
-    '--json', 'comments,reviews'
-  ], { cwd: repoPath })
+export async function getPrComments(repoPath: string, prNumber: number): Promise<GhPrTimelineEvent[]> {
+  const [result, reviewFilesResult] = await Promise.all([
+    spawnGh([
+      'pr', 'view', String(prNumber),
+      '--json', 'comments,reviews,commits'
+    ], { cwd: repoPath }),
+    // Fetch review file comments to know which files each review touched
+    getRepoOwnerAndName(repoPath)
+      .then(({ owner, repo }) => spawnGh([
+        'api', `repos/${owner}/${repo}/pulls/${prNumber}/comments`,
+        '--jq', '[.[] | {path, review_id: .pull_request_review_id}]'
+      ], { cwd: repoPath }))
+      .catch(() => ({ status: 1, stdout: '', stderr: '' }))
+  ])
 
   if (result.status !== 0) return []
 
@@ -182,14 +180,47 @@ export function getPrComments(repoPath: string, prNumber: number): GhPrComment[]
       author: { login: string }
       body: string
       state: string
-      createdAt: string
+      submittedAt: string
+    }>
+    commits: Array<{
+      oid: string
+      messageHeadline: string
+      committedDate: string
+      authors: Array<{ login?: string; name?: string }>
     }>
   }
 
-  const comments: GhPrComment[] = []
+  // Build review_id → unique file paths map
+  const reviewFileMap = new Map<number, string[]>()
+  if (reviewFilesResult.status === 0 && reviewFilesResult.stdout) {
+    try {
+      const fileComments = JSON.parse(reviewFilesResult.stdout) as Array<{ path: string; review_id: number }>
+      for (const fc of fileComments) {
+        const files = reviewFileMap.get(fc.review_id) ?? []
+        if (!files.includes(fc.path)) files.push(fc.path)
+        reviewFileMap.set(fc.review_id, files)
+      }
+    } catch { /* ignore parse errors */ }
+  }
+
+  // Fetch REST reviews to get numeric IDs for matching with file comments
+  let reviewIdBySubmittedAt = new Map<string, number>()
+  try {
+    const { owner, repo } = await getRepoOwnerAndName(repoPath)
+    const restReviews = await spawnGh([
+      'api', `repos/${owner}/${repo}/pulls/${prNumber}/reviews`,
+      '--jq', '[.[] | {id, submitted_at}]'
+    ], { cwd: repoPath })
+    if (restReviews.status === 0) {
+      const parsed = JSON.parse(restReviews.stdout) as Array<{ id: number; submitted_at: string }>
+      reviewIdBySubmittedAt = new Map(parsed.map(r => [r.submitted_at, r.id]))
+    }
+  } catch { /* ignore */ }
+
+  const events: GhPrTimelineEvent[] = []
 
   for (const c of data.comments ?? []) {
-    comments.push({
+    events.push({
       id: c.id,
       author: c.author.login,
       body: c.body,
@@ -199,64 +230,78 @@ export function getPrComments(repoPath: string, prNumber: number): GhPrComment[]
   }
 
   for (const r of data.reviews ?? []) {
-    // Skip reviews with no body (just approval clicks with no text)
+    const numericId = reviewIdBySubmittedAt.get(r.submittedAt)
+    const reviewFiles = numericId ? reviewFileMap.get(numericId) : undefined
+
     if (!r.body?.trim()) {
-      // Still show approval/rejection as a status-only entry
-      comments.push({
+      events.push({
         id: r.id,
         author: r.author.login,
         body: '',
-        createdAt: r.createdAt,
+        createdAt: r.submittedAt,
         type: 'review',
-        reviewState: r.state as GhPrComment['reviewState']
+        reviewState: r.state as GhPrComment['reviewState'],
+        reviewFiles
       })
       continue
     }
-    comments.push({
+    events.push({
       id: r.id,
       author: r.author.login,
       body: r.body,
-      createdAt: r.createdAt,
+      createdAt: r.submittedAt,
       type: 'review',
-      reviewState: r.state as GhPrComment['reviewState']
+      reviewState: r.state as GhPrComment['reviewState'],
+      reviewFiles
+    })
+  }
+
+  for (const c of data.commits ?? []) {
+    const author = c.authors?.[0]
+    events.push({
+      type: 'commit',
+      oid: c.oid,
+      messageHeadline: c.messageHeadline,
+      author: author?.login || author?.name || 'unknown',
+      createdAt: c.committedDate
     })
   }
 
   // Sort chronologically
-  comments.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
-  return comments
+  events.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
+  return events
 }
 
-export function addPrComment(repoPath: string, prNumber: number, body: string): void {
-  const result = spawnGh([
+export async function addPrComment(repoPath: string, prNumber: number, body: string): Promise<void> {
+  const result = await spawnGh([
     'pr', 'comment', String(prNumber),
     '--body', body
   ], { cwd: repoPath, timeout: 15000 })
 
   if (result.status !== 0) {
-    const stderr = result.stderr?.toString().trim() || 'Unknown error'
+    const stderr = result.stderr?.trim() || 'Unknown error'
     throw new Error(`gh pr comment failed: ${stderr}`)
   }
 }
 
-export function mergePr(input: MergePrInput): void {
+export async function mergePr(input: MergePrInput): Promise<void> {
   const args = ['pr', 'merge', String(input.prNumber), `--${input.strategy}`]
   if (input.deleteBranch) args.push('--delete-branch')
   if (input.auto) args.push('--auto')
 
-  const result = spawnGh(args, { cwd: input.repoPath, timeout: 30000 })
+  const result = await spawnGh(args, { cwd: input.repoPath, timeout: 30000 })
 
   if (result.status !== 0) {
-    const stderr = result.stderr?.toString().trim() || 'Unknown error'
+    const stderr = result.stderr?.trim() || 'Unknown error'
     throw new Error(`gh pr merge failed: ${stderr}`)
   }
 }
 
-export function getPrDiff(repoPath: string, prNumber: number): string {
-  const result = spawnGh(['pr', 'diff', String(prNumber)], { cwd: repoPath, timeout: 30000 })
+export async function getPrDiff(repoPath: string, prNumber: number): Promise<string> {
+  const result = await spawnGh(['pr', 'diff', String(prNumber)], { cwd: repoPath, timeout: 30000 })
 
   if (result.status !== 0) {
-    const stderr = result.stderr?.toString().trim() || 'Unknown error'
+    const stderr = result.stderr?.trim() || 'Unknown error'
     throw new Error(`gh pr diff failed: ${stderr}`)
   }
   return result.stdout
@@ -265,37 +310,37 @@ export function getPrDiff(repoPath: string, prNumber: number): string {
 // Cache gh user per session
 let cachedGhUser: string | null = null
 
-export function getGhUser(repoPath: string): string {
+export async function getGhUser(repoPath: string): Promise<string> {
   if (cachedGhUser) return cachedGhUser
-  const result = spawnGh(['api', 'user', '--jq', '.login'], { cwd: repoPath })
+  const result = await spawnGh(['api', 'user', '--jq', '.login'], { cwd: repoPath })
   if (result.status !== 0) {
-    const stderr = result.stderr?.toString().trim() || 'Unknown error'
+    const stderr = result.stderr?.trim() || 'Unknown error'
     throw new Error(`gh api user failed: ${stderr}`)
   }
   cachedGhUser = result.stdout.trim()
   return cachedGhUser
 }
 
-function getRepoOwnerAndName(repoPath: string): { owner: string; repo: string } {
-  const result = spawnGh(['repo', 'view', '--json', 'owner,name'], { cwd: repoPath })
+async function getRepoOwnerAndName(repoPath: string): Promise<{ owner: string; repo: string }> {
+  const result = await spawnGh(['repo', 'view', '--json', 'owner,name'], { cwd: repoPath })
   if (result.status !== 0) {
-    const stderr = result.stderr?.toString().trim() || 'Unknown error'
+    const stderr = result.stderr?.trim() || 'Unknown error'
     throw new Error(`gh repo view failed: ${stderr}`)
   }
   const data = JSON.parse(result.stdout) as { owner: { login: string }; name: string }
   return { owner: data.owner.login, repo: data.name }
 }
 
-export function editPrComment(input: EditPrCommentInput): void {
-  const { owner, repo } = getRepoOwnerAndName(input.repoPath)
-  const result = spawnGh([
+export async function editPrComment(input: EditPrCommentInput): Promise<void> {
+  const { owner, repo } = await getRepoOwnerAndName(input.repoPath)
+  const result = await spawnGh([
     'api', `repos/${owner}/${repo}/issues/comments/${input.commentId}`,
     '-X', 'PATCH',
     '-f', `body=${input.body}`
   ], { cwd: input.repoPath, timeout: 15000 })
 
   if (result.status !== 0) {
-    const stderr = result.stderr?.toString().trim() || 'Unknown error'
+    const stderr = result.stderr?.trim() || 'Unknown error'
     throw new Error(`Edit comment failed: ${stderr}`)
   }
 }

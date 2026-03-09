@@ -6,6 +6,7 @@ export type DiagnosticSource =
   | 'main'
   | 'renderer'
   | 'git'
+  | 'gh'
   | 'task'
   | 'settings'
   | 'db'
