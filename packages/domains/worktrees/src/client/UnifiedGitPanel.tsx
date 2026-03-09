@@ -220,7 +220,7 @@ export const UnifiedGitPanel = forwardRef<UnifiedGitPanelHandle, UnifiedGitPanel
             active={activeTab === 'pr'}
             onClick={() => setActiveTab('pr')}
           >
-            {task ? 'Pull request' : 'Pull requests'}
+            {task ? <>Pull request{task.pr_url && <span className="text-muted-foreground ml-1">#{task.pr_url.match(/\/pull\/(\d+)/)?.[1]}</span>}</> : 'Pull requests'}
           </TabButton>
         )}
 
