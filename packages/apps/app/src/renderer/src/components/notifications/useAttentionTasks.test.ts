@@ -75,6 +75,7 @@ function makeTask(id: string, projectId: string, title: string): Task {
     merge_context: null,
     ccs_profile: null,
     is_temporary: false,
+    pr_url: null,
     linear_url: null,
     created_at: new Date(0).toISOString(),
     updated_at: new Date(0).toISOString()

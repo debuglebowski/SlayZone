@@ -19,12 +19,15 @@
     "@codemirror/state": "^6.5.2",
     "@slayzone/diagnostics": "workspace:*",
     "@slayzone/projects": "workspace:*",
+    "@slayzone/settings": "workspace:*",
     "@slayzone/task": "workspace:*",
     "@slayzone/tasks": "workspace:*",
-    "@slayzone/settings": "workspace:*",
+    "@slayzone/terminal": "workspace:*",
     "@slayzone/ui": "workspace:*",
     "codemirror": "^6.0.1",
-    "lucide-react": "^0.562.0"
+    "lucide-react": "^0.562.0",
+    "react-markdown": "^10.1.0",
+    "remark-gfm": "^4.0.1"
   },
   "peerDependencies": {
     "electron": "^39.0.0",

@@ -811,6 +811,9 @@ importers:
       '@slayzone/tasks':
         specifier: workspace:*
         version: link:../tasks
+      '@slayzone/terminal':
+        specifier: workspace:*
+        version: link:../terminal
       '@slayzone/ui':
         specifier: workspace:*
         version: link:../../shared/ui
@@ -826,6 +829,12 @@ importers:
       react:
         specifier: ^19.0.0
         version: 19.2.3
+      react-markdown:
+        specifier: ^10.1.0
+        version: 10.1.0(@types/react@19.2.8)(react@19.2.3)
+      remark-gfm:
+        specifier: ^4.0.1
+        version: 4.0.1
     devDependencies:
       '@types/react':
         specifier: ^19.2.7

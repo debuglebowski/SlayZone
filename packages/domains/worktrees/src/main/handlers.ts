@@ -48,7 +48,9 @@ import {
   hasGithubRemote,
   listOpenPrs,
   getPrByUrl,
-  createPr
+  createPr,
+  getPrComments,
+  addPrComment
 } from './gh-cli'
 import type { MergeWithAIResult, ConflictAnalysis, CreatePrInput } from '../shared/types'
 
@@ -346,5 +348,13 @@ SUMMARY: <2-3 sentences explaining what each branch changed and why they conflic
 
   ipcMain.handle('git:createPr', (_, input: CreatePrInput) => {
     return createPr(input)
+  })
+
+  ipcMain.handle('git:getPrComments', (_, repoPath: string, prNumber: number) => {
+    return getPrComments(repoPath, prNumber)
+  })
+
+  ipcMain.handle('git:addPrComment', (_, repoPath: string, prNumber: number, body: string) => {
+    return addPrComment(repoPath, prNumber, body)
   })
 }

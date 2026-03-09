@@ -80,6 +80,7 @@ export interface GitSyncResult {
 export interface GhPullRequest {
   number: number
   title: string
+  body: string
   url: string
   state: 'OPEN' | 'CLOSED' | 'MERGED'
   headRefName: string
@@ -87,6 +88,19 @@ export interface GhPullRequest {
   isDraft: boolean
   author: string
   createdAt: string
+  reviewDecision: 'APPROVED' | 'CHANGES_REQUESTED' | 'REVIEW_REQUIRED' | ''
+  statusCheckRollup: 'SUCCESS' | 'FAILURE' | 'PENDING' | ''
+}
+
+export interface GhPrComment {
+  id: string
+  author: string
+  body: string
+  createdAt: string
+  /** 'comment' = general PR comment, 'review' = review body */
+  type: 'comment' | 'review'
+  /** Only for review type */
+  reviewState?: 'APPROVED' | 'CHANGES_REQUESTED' | 'COMMENTED' | 'DISMISSED'
 }
 
 export interface CreatePrInput {

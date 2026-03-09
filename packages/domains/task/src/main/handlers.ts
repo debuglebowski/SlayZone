@@ -367,6 +367,7 @@ export function updateTask(db: Database, data: UpdateTaskInput): Task | null {
   if (data.worktreePath !== undefined) { fields.push('worktree_path = ?'); values.push(data.worktreePath) }
   if (data.worktreeParentBranch !== undefined) { fields.push('worktree_parent_branch = ?'); values.push(data.worktreeParentBranch) }
   if (data.browserUrl !== undefined) { fields.push('browser_url = ?'); values.push(data.browserUrl) }
+  if (data.prUrl !== undefined) { fields.push('pr_url = ?'); values.push(data.prUrl) }
   if (data.browserTabs !== undefined) { fields.push('browser_tabs = ?'); values.push(data.browserTabs ? JSON.stringify(data.browserTabs) : null) }
   if (data.webPanelUrls !== undefined) { fields.push('web_panel_urls = ?'); values.push(data.webPanelUrls ? JSON.stringify(data.webPanelUrls) : null) }
   if (data.editorOpenFiles !== undefined) { fields.push('editor_open_files = ?'); values.push(data.editorOpenFiles ? JSON.stringify(data.editorOpenFiles) : null) }
