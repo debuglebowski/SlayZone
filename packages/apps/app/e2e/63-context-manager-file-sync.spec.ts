@@ -1,4 +1,4 @@
-import { test, expect, seed, goHome, projectBlob, TEST_PROJECT_PATH } from './fixtures/electron'
+import { test, expect, seed, goHome, projectBlob, resetApp, TEST_PROJECT_PATH } from './fixtures/electron'
 import {
   closeTopDialog,
   openProjectContextSection,
@@ -89,6 +89,7 @@ test.describe('Context manager file sync', () => {
   let projectId: string
 
   test.beforeAll(async ({ mainWindow }) => {
+    await resetApp(mainWindow)
     cleanupDiskFiles()
 
     const s = seed(mainWindow)

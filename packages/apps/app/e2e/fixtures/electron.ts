@@ -109,39 +109,15 @@ function closeSessionLogCapture(): void {
   sessionStderrStream = null
 }
 
-async function dismissOnboardingIfPresent(page: Page): Promise<void> {
-  const onboardingDialog = page
-    .locator('[role="dialog"]')
-    .filter({ hasText: /Welcome to SlayZone|Your AI, your responsibility|Choose your default AI|Analytics|You're all set!/i })
-    .last()
-
-  for (let attempt = 0; attempt < 12; attempt += 1) {
-    const visible = await onboardingDialog.isVisible({ timeout: 250 }).catch(() => false)
-    if (!visible) return
-
-    const actions = [
-      onboardingDialog.getByRole('button', { name: 'Skip', exact: true }),
-      onboardingDialog.getByRole('button', { name: 'I understand', exact: true }),
-      onboardingDialog.getByRole('button', { name: 'Continue', exact: true }),
-      onboardingDialog.getByRole('button', { name: 'No', exact: true }),
-      onboardingDialog.getByRole('button', { name: 'Yes', exact: true }),
-    ]
-
-    let clicked = false
-    for (const action of actions) {
-      const actionVisible = await action.isVisible({ timeout: 150 }).catch(() => false)
-      if (!actionVisible) continue
-      await action.click({ timeout: 2_000 }).catch(() => {})
-      clicked = true
-      break
-    }
-
-    if (!clicked) break
-    await page.waitForTimeout(200)
-  }
-
-  // Step 4 auto-closes after animation; give it time to complete.
-  await page.waitForTimeout(2_000)
+/**
+ * Reset the app to a clean state: kill all processes/PTYs, drop all tables,
+ * re-migrate, reload the renderer. Call in `test.beforeAll` for test isolation.
+ * Onboarding is pre-seeded as completed by the reset handler.
+ */
+export async function resetApp(page: Page): Promise<void> {
+  await page.evaluate(() => (window as any).__testInvoke('app:reset-for-test'))
+  await page.reload({ waitUntil: 'domcontentloaded' })
+  await page.waitForSelector('#root', { timeout: 10_000 })
 }
 
 /**
@@ -350,9 +326,6 @@ export const test = base.extend<ElectronFixtures>({
           win.center()
         }
       })
-
-      // Dismiss onboarding if it appears
-      await dismissOnboardingIfPresent(sharedPage)
 
       await use(sharedPage)
     },

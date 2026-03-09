@@ -1,10 +1,11 @@
-import { test, expect, seed, goHome, clickProject } from './fixtures/electron'
+import { test, expect, seed, goHome, clickProject, resetApp } from './fixtures/electron'
 import { TEST_PROJECT_PATH } from './fixtures/electron'
 
 test.describe('Navigation & tabs', () => {
   let projectAbbrev: string
 
   test.beforeAll(async ({ mainWindow }) => {
+    await resetApp(mainWindow)
     const s = seed(mainWindow)
     const p = await s.createProject({ name: 'Nav Test', color: '#06b6d4', path: TEST_PROJECT_PATH })
     projectAbbrev = p.name.slice(0, 2).toUpperCase()
@@ -47,7 +48,7 @@ test.describe('Navigation & tabs', () => {
     await expect.poll(() => mainWindow.evaluate(() => {
       const inputs = document.querySelectorAll('input')
       for (const input of inputs) {
-        if (input.offsetParent !== null && input.value) return input.value
+        if (input.offsetParent !== null && input.value && !input.closest('.invisible')) return input.value
       }
       return null
     }), { timeout: 5_000 }).toBe('Nav detail task')
@@ -65,7 +66,7 @@ test.describe('Navigation & tabs', () => {
     await expect.poll(() => mainWindow.evaluate(() => {
       const inputs = document.querySelectorAll('input')
       for (const input of inputs) {
-        if (input.offsetParent !== null && input.value) return input.value
+        if (input.offsetParent !== null && input.value && !input.closest('.invisible')) return input.value
       }
       return null
     }), { timeout: 5_000 }).toBe('Nav open task')

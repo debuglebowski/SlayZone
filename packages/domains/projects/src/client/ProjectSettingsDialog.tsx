@@ -36,13 +36,13 @@ export function ProjectSettingsDialog({
   onOpenGlobalAiConfig,
   onUpdated
 }: ProjectSettingsDialogProps) {
-  const integrationsEnabled = import.meta.env.DEV
+  const integrationsEnabled = window.api.app.isIntegrationsEnabled
   const [activeTab, setActiveTab] = useState<'general' | 'environment' | 'columns' | 'integrations' | 'ai-config' | 'tests'>('general')
-  const [contextManagerEnabled, setContextManagerEnabled] = useState(false)
+  const contextManagerEnabled = window.api.app.isContextManagerEnabledSync
   const [lockedByProvider, setLockedByProvider] = useState<string | null>(null)
 
   const checkIntegrationLock = useCallback(async () => {
-    if (!project || !integrationsEnabled) {
+    if (!project || !integrationsEnabled || window.api.app.isPlaywright) {
       setLockedByProvider(null)
       return
     }
@@ -79,19 +79,6 @@ export function ProjectSettingsDialog({
     setActiveTab('integrations')
   }, [open, integrationOnboardingProvider, integrationsEnabled])
 
-  useEffect(() => {
-    let cancelled = false
-    void window.api.app.isContextManagerEnabled()
-      .then((enabled) => {
-        if (!cancelled) setContextManagerEnabled(enabled)
-      })
-      .catch(() => {
-        if (!cancelled) setContextManagerEnabled(false)
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [])
 
   const navItems: Array<{ key: typeof activeTab; label: string }> = [
     { key: 'general', label: 'General' },

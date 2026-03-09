@@ -199,16 +199,10 @@ export function IntegrationsTab({
 
   useEffect(() => {
     if (open) {
-      setSelectedIntegrationEntry(
-        integrationOnboardingProvider === 'github'
-          ? 'github_projects'
-          : integrationOnboardingProvider === 'linear'
-            ? 'linear'
-            : null
-      )
-      setSelectedIntegrationMode(integrationOnboardingProvider ? 'continuous' : null)
+      setSelectedIntegrationEntry(null)
+      setSelectedIntegrationMode(null)
     }
-  }, [open, project.id, integrationOnboardingProvider])
+  }, [open, project.id])
 
   useEffect(() => {
     if (!open) return
@@ -1752,20 +1746,16 @@ export function IntegrationsTab({
                         <CardContent className="space-y-2 px-4 pb-4">
                           <div className="grid grid-cols-4 gap-2">
                             <div className="rounded-md border border-border/50 bg-muted/40 px-3 py-2 text-center">
-                              <p className="text-lg tabular-nums font-medium">{githubSummary.in_sync}</p>
-                              <p className="text-[10px] text-muted-foreground">In sync</p>
+                              <p className="text-xs text-muted-foreground">In sync: {githubSummary.in_sync}</p>
                             </div>
                             <div className="rounded-md border border-border/50 bg-muted/40 px-3 py-2 text-center">
-                              <p className="text-lg tabular-nums font-medium">{githubSummary.local_ahead}</p>
-                              <p className="text-[10px] text-muted-foreground">Local ahead</p>
+                              <p className="text-xs text-muted-foreground">Local ahead: {githubSummary.local_ahead}</p>
                             </div>
                             <div className="rounded-md border border-border/50 bg-muted/40 px-3 py-2 text-center">
-                              <p className="text-lg tabular-nums font-medium">{githubSummary.remote_ahead}</p>
-                              <p className="text-[10px] text-muted-foreground">Remote ahead</p>
+                              <p className="text-xs text-muted-foreground">Remote ahead: {githubSummary.remote_ahead}</p>
                             </div>
                             <div className="rounded-md border border-border/50 bg-muted/40 px-3 py-2 text-center">
-                              <p className="text-lg tabular-nums font-medium">{githubSummary.conflict}</p>
-                              <p className="text-[10px] text-muted-foreground">Conflicts</p>
+                              <p className="text-xs text-muted-foreground">Conflicts: {githubSummary.conflict}</p>
                             </div>
                           </div>
 

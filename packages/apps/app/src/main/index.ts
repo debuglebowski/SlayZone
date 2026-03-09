@@ -4,7 +4,7 @@ import { join, extname, normalize, sep, resolve } from 'path'
 import { homedir } from 'os'
 import { readFileSync, promises as fsp, existsSync, unlinkSync, symlinkSync } from 'fs'
 import { electronApp, is } from '@electron-toolkit/utils'
-import { registerBrowserPanel, unregisterBrowserPanel } from './browser-registry'
+import { registerBrowserPanel, unregisterBrowserPanel, clearBrowserRegistry } from './browser-registry'
 import {
   BLOCKED_EXTERNAL_PROTOCOLS,
   inferHostScopeFromUrl,
@@ -42,20 +42,22 @@ if (is.dev && !isPlaywright) {
 import icon from '../../resources/icon.png?asset'
 import logoSolid from '../../resources/logo-solid.svg?asset'
 import { getDatabase, closeDatabase, getDiagnosticsDatabase, closeDiagnosticsDatabase } from './db'
+import { runMigrations } from './db/migrations'
+import { normalizeProjectStatusData } from './db/status-normalization'
 import { registerBackupHandlers, startAutoBackup, stopAutoBackup } from './backup'
 // Domain handlers
 import { registerProjectHandlers } from '@slayzone/projects/main'
 import { configureTaskRuntimeAdapters, registerTaskHandlers, registerAiHandlers, registerFilesHandlers } from '@slayzone/task/main'
 import { registerTagHandlers } from '@slayzone/tags/main'
 import { registerSettingsHandlers, registerThemeHandlers } from '@slayzone/settings/main'
-import { registerPtyHandlers, registerUsageHandlers, killAllPtys, killPtysByTaskId, startIdleChecker, stopIdleChecker } from '@slayzone/terminal/main'
+import { registerPtyHandlers, registerUsageHandlers, killAllPtys, killPtysByTaskId, startIdleChecker, stopIdleChecker, dismissAllNotifications, syncTerminalModes } from '@slayzone/terminal/main'
 import { registerTerminalTabsHandlers } from '@slayzone/task-terminals/main'
 import { registerWorktreeHandlers } from '@slayzone/worktrees/main'
 import { registerDiagnosticsHandlers, registerProcessDiagnostics, recordDiagnosticEvent, stopDiagnostics } from '@slayzone/diagnostics/main'
 import { registerAiConfigHandlers } from '@slayzone/ai-config/main'
-import { registerIntegrationHandlers, startSyncPoller, pushTaskAfterEdit, pushNewTaskToProviders, pushArchiveToProviders, pushUnarchiveToProviders, startDiscoveryPoller } from '@slayzone/integrations/main'
+import { registerIntegrationHandlers, startSyncPoller, pushTaskAfterEdit, pushNewTaskToProviders, pushArchiveToProviders, pushUnarchiveToProviders, startDiscoveryPoller, resetSyncFlags } from '@slayzone/integrations/main'
 import type { IntegrationHandles } from '@slayzone/integrations/main'
-import { registerFileEditorHandlers } from '@slayzone/file-editor/main'
+import { registerFileEditorHandlers, closeAllWatchers } from '@slayzone/file-editor/main'
 import { registerTestPanelHandlers } from '@slayzone/test-panel/main'
 import { registerScreenshotHandlers } from './screenshot'
 import { setProcessManagerWindow, initProcessManager, createProcess, spawnProcess, updateProcess, killProcess, restartProcess, listForTask, listAllProcesses, killTaskProcesses, killAllProcesses } from './process-manager'
@@ -759,6 +761,12 @@ app.whenReady().then(async () => {
   const db = getDatabase()
   const diagDb = getDiagnosticsDatabase()
   logBoot('database init complete')
+
+  // Skip onboarding in Playwright — tested explicitly in 02-onboarding.spec.ts
+  if (isPlaywright) {
+    db.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('onboarding_completed', 'true')").run()
+  }
+
   registerProcessDiagnostics(app)
   logBoot('process diagnostics registered')
 
@@ -895,7 +903,7 @@ app.whenReady().then(async () => {
   registerTagHandlers(ipcMain, db)
   registerSettingsHandlers(ipcMain, db)
   registerThemeHandlers(ipcMain, db)
-  registerUsageHandlers(ipcMain)
+  registerUsageHandlers(ipcMain, db)
   registerPtyHandlers(ipcMain, db)
 
   // Expose test helpers for e2e
@@ -971,25 +979,29 @@ app.whenReady().then(async () => {
     discoveryPoller = startDiscoveryPoller(db)
     logBoot('integration pollers started (sync 10s, discovery 60s)')
 
-    // Push to providers immediately after local task edits
-    ipcMain.on('db:tasks:update:done', (_event, taskId: string) => {
-      void pushTaskAfterEdit(db, taskId, {
-        pushGithubTask: integrationHandles?.pushGithubTask
+    // Push to providers immediately after local task edits (skip in E2E — tests exercise push explicitly)
+    if (!isPlaywright) {
+      ipcMain.on('db:tasks:update:done', (_event, taskId: string) => {
+        void pushTaskAfterEdit(db, taskId, {
+          pushGithubTask: integrationHandles?.pushGithubTask
+        })
       })
-    })
+    }
 
-    // Push new tasks to providers (two_way sync)
-    ipcMain.on('db:tasks:create:done', (_event, taskId: string, projectId: string) => {
-      void pushNewTaskToProviders(db, taskId, projectId)
-    })
+    if (!isPlaywright) {
+      // Push new tasks to providers (two_way sync)
+      ipcMain.on('db:tasks:create:done', (_event, taskId: string, projectId: string) => {
+        void pushNewTaskToProviders(db, taskId, projectId)
+      })
 
-    // Archive/unarchive sync to providers
-    ipcMain.on('db:tasks:archive:done', (_event, taskId: string) => {
-      void pushArchiveToProviders(db, taskId)
-    })
-    ipcMain.on('db:tasks:unarchive:done', (_event, taskId: string) => {
-      void pushUnarchiveToProviders(db, taskId)
-    })
+      // Archive/unarchive sync to providers
+      ipcMain.on('db:tasks:archive:done', (_event, taskId: string) => {
+        void pushArchiveToProviders(db, taskId)
+      })
+      ipcMain.on('db:tasks:unarchive:done', (_event, taskId: string) => {
+        void pushUnarchiveToProviders(db, taskId)
+      })
+    }
   } else {
     logBoot('integrations disabled')
   }
@@ -1217,6 +1229,9 @@ app.whenReady().then(async () => {
 
   ipcMain.handle('app:getVersion', () => app.getVersion())
   ipcMain.handle('app:is-context-manager-enabled', () => isContextManagerEnabled)
+  ipcMain.on('app:is-context-manager-enabled-sync', (event) => { event.returnValue = isContextManagerEnabled })
+  ipcMain.handle('app:is-integrations-enabled', () => isIntegrationsEnabled)
+  ipcMain.on('app:is-integrations-enabled-sync', (event) => { event.returnValue = isIntegrationsEnabled })
   ipcMain.handle('app:get-protocol-client-status', () => protocolClientStatus)
   ipcMain.handle('app:restart-for-update', () => restartForUpdate())
   ipcMain.handle('app:check-for-updates', () => checkForUpdates())
@@ -1649,6 +1664,57 @@ app.whenReady().then(async () => {
 
   initProcessManager(db)
   logBoot('process manager initialized')
+
+  // Reset all main-process state + DB for test isolation (Playwright only)
+  if (isPlaywright) {
+    ipcMain.handle('app:reset-for-test', async () => {
+      // 1. Kill running processes
+      killAllPtys()
+      dismissAllNotifications()
+      stopIdleChecker()
+      killAllProcesses()
+
+      // 2. Stop timers
+      stopAutoBackup()
+      if (linearSyncPoller) { clearInterval(linearSyncPoller); linearSyncPoller = null }
+      if (discoveryPoller) { clearInterval(discoveryPoller); discoveryPoller = null }
+
+      // 3. Stop MCP
+      mcpCleanup?.()
+      mcpCleanup = null
+
+      // 4. Close file watchers
+      closeAllWatchers()
+
+      // 5. Clear registries + flags
+      clearBrowserRegistry()
+      resetSyncFlags()
+
+      // 6. Clear oauth state
+      oauthCallbackQueue.length = 0
+      oauthCallbackWaiters.clear()
+
+      // 7. Drop all tables + re-migrate
+      const tables = db.prepare(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'"
+      ).all() as { name: string }[]
+      db.exec('PRAGMA foreign_keys = OFF')
+      for (const { name } of tables) db.exec(`DROP TABLE IF EXISTS "${name}"`)
+      db.exec('PRAGMA foreign_keys = ON')
+      db.pragma('user_version = 0')
+      runMigrations(db)
+      normalizeProjectStatusData(db)
+      syncTerminalModes(db)
+
+      // 7b. Seed post-onboarding baseline so tests skip the onboarding wizard
+      db.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('onboarding_completed', 'true')").run()
+
+      // 8. Re-init process manager
+      initProcessManager(db)
+      return { ok: true }
+    })
+  }
+
   createWindow()
   logBoot('windows created')
   if (mainWindow) setProcessManagerWindow(mainWindow)

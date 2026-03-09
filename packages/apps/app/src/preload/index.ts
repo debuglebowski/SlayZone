@@ -98,6 +98,9 @@ const api: ElectronAPI = {
     getProtocolClientStatus: () => ipcRenderer.invoke('app:get-protocol-client-status'),
     getVersion: () => ipcRenderer.invoke('app:getVersion'),
     isContextManagerEnabled: () => ipcRenderer.invoke('app:is-context-manager-enabled'),
+    isContextManagerEnabledSync: ipcRenderer.sendSync('app:is-context-manager-enabled-sync') as boolean,
+    isIntegrationsEnabled: ipcRenderer.sendSync('app:is-integrations-enabled-sync') as boolean,
+    isPlaywright: process.env.PLAYWRIGHT === '1',
     onGoHome: (callback: () => void) => {
       const handler = () => callback()
       ipcRenderer.on('app:go-home', handler)
@@ -296,7 +299,17 @@ const api: ElectronAPI = {
     getAheadBehind: (repoPath, branch, upstream) => ipcRenderer.invoke('git:getAheadBehind', repoPath, branch, upstream),
     getStatusSummary: (repoPath) => ipcRenderer.invoke('git:getStatusSummary', repoPath),
     revealInFinder: (path) => ipcRenderer.invoke('git:revealInFinder', path),
-    isDirty: (path) => ipcRenderer.invoke('git:isDirty', path)
+    isDirty: (path) => ipcRenderer.invoke('git:isDirty', path),
+    getRemoteUrl: (path) => ipcRenderer.invoke('git:getRemoteUrl', path),
+    getAheadBehindUpstream: (path, branch) => ipcRenderer.invoke('git:getAheadBehindUpstream', path, branch),
+    fetch: (path) => ipcRenderer.invoke('git:fetch', path),
+    push: (path, branch?, force?) => ipcRenderer.invoke('git:push', path, branch, force),
+    pull: (path) => ipcRenderer.invoke('git:pull', path),
+    checkGhInstalled: () => ipcRenderer.invoke('git:checkGhInstalled'),
+    hasGithubRemote: (repoPath) => ipcRenderer.invoke('git:hasGithubRemote', repoPath),
+    listOpenPrs: (repoPath) => ipcRenderer.invoke('git:listOpenPrs', repoPath),
+    getPrByUrl: (repoPath, url) => ipcRenderer.invoke('git:getPrByUrl', repoPath, url),
+    createPr: (input) => ipcRenderer.invoke('git:createPr', input)
   },
   tabs: {
     list: (taskId) => ipcRenderer.invoke('tabs:list', taskId),
@@ -411,7 +424,8 @@ const api: ElectronAPI = {
     getLocalStats: () => ipcRenderer.invoke('leaderboard:get-local-stats')
   },
   usage: {
-    fetch: (force?: boolean) => ipcRenderer.invoke('usage:fetch', force)
+    fetch: (force?: boolean) => ipcRenderer.invoke('usage:fetch', force),
+    test: (config: any) => ipcRenderer.invoke('usage:test', config)
   },
   screenshot: {
     captureRegion: (rect) => ipcRenderer.invoke('screenshot:captureRegion', rect)

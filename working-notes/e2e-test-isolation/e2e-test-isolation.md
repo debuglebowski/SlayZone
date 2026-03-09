@@ -78,7 +78,7 @@ Unit tests are fully isolated — each file creates a fresh in-memory SQLite DB 
 | DB reset strategy | Drop all tables + re-migrate | Simpler than truncating (no need to enumerate tables correctly). Guarantees clean schema. ~50ms. |
 | Restart pollers/timers after reset? | No | Keep stopped. Tests that need sync/MCP start them explicitly. Avoids interference. |
 | Renderer reload | `page.reload()` after IPC completes | Clears all React state, re-initializes from fresh DB. |
-| Opt-in vs automatic | Opt-in via `resetApp()` in `beforeAll` | Allows incremental migration. Tests not yet converted keep working. |
+| Opt-in vs automatic | Auto-reset w/ guard | `resetApp()` in `beforeAll`. After full migration, `beforeEach` guard fails if file didn't call it. Prevents regression from new files forgetting reset. |
 | File naming | Keep numbered files | Renaming 67 files is churn with no functional benefit. Numbers become meaningless (good — they shouldn't imply ordering). |
 | Diagnostics DB | Leave it | Useful for debugging across test runs. Not a source of test pollution. |
 
@@ -93,7 +93,7 @@ Each domain that holds main-process state exports a reset function:
 | `domains/file-editor/src/main/handlers.ts` | `closeAllWatchers()` | Close all FSWatcher instances, clear debounce timeouts, clear `ignoreCache` |
 | `app/src/main/browser-registry.ts` | `clearBrowserRegistry()` | `registry.clear()` |
 | `domains/integrations/src/main/sync.ts` | `resetSyncFlags()` | `syncRunning = false`, `discoveryRunning = false` |
-| `domains/terminal/src/main/pty-manager.ts` | `resetPtyState()` | `killAllPtys()` + clear `activeNotifications` |
+| `domains/terminal/src/main/pty-manager.ts` | `dismissAllNotifications()` | Close + clear all notification refs |
 
 ### Phase 2: Add `app:reset-for-test` IPC handler
 
@@ -102,16 +102,15 @@ In `packages/apps/app/src/main/index.ts`, guarded by `if (isPlaywright)`:
 ```ts
 ipcMain.handle('app:reset-for-test', async () => {
   // 1. Kill running processes
-  resetPtyState()
+  killAllPtys()
+  dismissAllNotifications()
+  stopIdleChecker()
   killAllProcesses()
 
   // 2. Stop timers
-  stopIdleChecker()
   stopAutoBackup()
   if (linearSyncPoller) { clearInterval(linearSyncPoller); linearSyncPoller = null }
   if (discoveryPoller) { clearInterval(discoveryPoller); discoveryPoller = null }
-  for (const t of inlineDeviceToolbarDisableTimers) clearTimeout(t)
-  inlineDeviceToolbarDisableTimers = []
 
   // 3. Stop MCP
   mcpCleanup?.()
@@ -129,40 +128,52 @@ ipcMain.handle('app:reset-for-test', async () => {
   oauthCallbackWaiters.clear()
 
   // 7. Drop all tables + re-migrate
-  const db = getDatabase()
   const tables = db.prepare(
     "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'"
   ).all() as { name: string }[]
-
   db.exec('PRAGMA foreign_keys = OFF')
-  for (const { name } of tables) {
-    db.exec(`DROP TABLE IF EXISTS "${name}"`)
-  }
+  for (const { name } of tables) db.exec(`DROP TABLE IF EXISTS "${name}"`)
   db.exec('PRAGMA foreign_keys = ON')
   db.pragma('user_version = 0')
-
   runMigrations(db)
   normalizeProjectStatusData(db)
 
   // 8. Re-init process manager
   initProcessManager(db)
-
   return { ok: true }
 })
 ```
 
-### Phase 3: Add `resetApp` fixture helper
+### Phase 3: Add `resetApp` fixture helper + auto-reset guard
 
 In `packages/apps/app/e2e/fixtures/electron.ts`:
 
 ```ts
+const resetFiles = new Set<string>()
+
 export async function resetApp(page: Page) {
+  resetFiles.add(test.info().file)
   await page.evaluate(() => window.__testInvoke('app:reset-for-test'))
   await page.reload({ waitUntil: 'domcontentloaded' })
   await page.waitForSelector('#root', { timeout: 10_000 })
   await dismissOnboardingIfPresent(page)
 }
 ```
+
+After all 67 files are migrated, add a guard to the base fixture that fails if a file didn't call `resetApp()`:
+
+```ts
+test.beforeEach(({ }, testInfo) => {
+  if (!resetFiles.has(testInfo.file)) {
+    throw new Error(
+      `Test file ${testInfo.file} did not call resetApp() in beforeAll. ` +
+      `All test files must reset state for isolation.`
+    )
+  }
+})
+```
+
+This prevents regression from new test files forgetting to reset. The guard is added only after full migration (Phase 6) to avoid breaking unconverted files during incremental rollout.
 
 ### Phase 4: Convert first test as proof-of-concept
 
@@ -220,9 +231,11 @@ This is acceptable given the isolation benefits. The onboarding dismissal wait c
 | `packages/domains/file-editor/src/main/handlers.ts` | Add `closeAllWatchers()` export |
 | `packages/apps/app/src/main/browser-registry.ts` | Add `clearBrowserRegistry()` export |
 | `packages/domains/integrations/src/main/sync.ts` | Add `resetSyncFlags()` export |
-| `packages/domains/terminal/src/main/pty-manager.ts` | Add `resetPtyState()` export |
-| `packages/apps/app/src/main/index.ts` | Add `app:reset-for-test` IPC handler (Playwright-only) |
-| `packages/apps/app/e2e/fixtures/electron.ts` | Add `resetApp()` helper |
+| `packages/domains/terminal/src/main/index.ts` | Re-export `dismissAllNotifications` |
+| `packages/domains/file-editor/src/main/index.ts` | Re-export `closeAllWatchers` |
+| `packages/domains/integrations/src/main/index.ts` | Re-export `resetSyncFlags` |
+| `packages/apps/app/src/main/index.ts` | Import cleanup fns, add `app:reset-for-test` handler |
+| `packages/apps/app/e2e/fixtures/electron.ts` | Add `resetApp()` helper + auto-reset guard (guard enabled after full migration) |
 | `packages/apps/app/e2e/04-tasks-crud.spec.ts` | First conversion (proof-of-concept) |
 
 ## Verification

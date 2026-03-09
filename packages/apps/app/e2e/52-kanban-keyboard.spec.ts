@@ -1,4 +1,4 @@
-import { test, expect, seed, goHome, clickProject } from './fixtures/electron'
+import { test, expect, seed, goHome, clickProject, resetApp } from './fixtures/electron'
 import { TEST_PROJECT_PATH } from './fixtures/electron'
 
 test.describe('Kanban keyboard shortcuts', () => {
@@ -6,6 +6,7 @@ test.describe('Kanban keyboard shortcuts', () => {
   let taskIds: Record<string, string>
 
   test.beforeAll(async ({ mainWindow }) => {
+    await resetApp(mainWindow)
     const s = seed(mainWindow)
     const p = await s.createProject({ name: 'Keyb Nav', color: '#06b6d4', path: TEST_PROJECT_PATH })
     projectAbbrev = p.name.slice(0, 2).toUpperCase()
@@ -31,8 +32,9 @@ test.describe('Kanban keyboard shortcuts', () => {
   async function focusedTaskId(page: import('@playwright/test').Page): Promise<string | null> {
     return page.evaluate(() => {
       for (const el of document.querySelectorAll('[data-task-id]')) {
-        // offsetParent is null for display:none (hidden tabs)
-        if (el.className.includes('ring-primary') && (el as HTMLElement).offsetParent !== null) {
+        const htmlEl = el as HTMLElement
+        // offsetParent is null for display:none; closest('.invisible') catches visibility:hidden tabs
+        if (el.className.includes('ring-primary') && htmlEl.offsetParent !== null && !el.closest('.invisible')) {
           return el.getAttribute('data-task-id')
         }
       }

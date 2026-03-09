@@ -19,6 +19,10 @@ export function unregisterBrowserPanel(taskId: string): void {
   registry.delete(taskId)
 }
 
+export function clearBrowserRegistry(): void {
+  registry.clear()
+}
+
 export function getBrowserWebContents(taskId: string): Electron.WebContents | null {
   const id = registry.get(taskId)
   if (id == null) return null

@@ -510,6 +510,7 @@ export function TaskDetailPage({
   const handleSessionCreated = useCallback(
     (sessionId: string) => {
       if (!task) return
+      if (window.api.app.isPlaywright) return
       void window.api.db.updateTask({
         id: task.id,
         providerConfig: setProviderConversationId(task.provider_config, task.terminal_mode, sessionId)
@@ -942,7 +943,7 @@ export function TaskDetailPage({
       // Cmd+Shift+G: git diff tab toggle
       if (e.metaKey && e.shiftKey) {
         // Cmd+Shift+F: open editor panel + search sidebar
-        if (e.key.toLowerCase() === 'f' && isBuiltinEnabled('editor')) {
+        if (e.key.toLowerCase() === 'f' && isBuiltinEnabled('editor', 'task')) {
           e.preventDefault()
           if (fileEditorRef.current) {
             if (!panelVisibility.editor) handlePanelToggle('editor', true)
@@ -953,12 +954,12 @@ export function TaskDetailPage({
           }
           return
         }
-        if (e.key.toLowerCase() === 'l' && isBuiltinEnabled('browser') && panelVisibility.browser) {
+        if (e.key.toLowerCase() === 'l' && isBuiltinEnabled('browser', 'task') && panelVisibility.browser) {
           e.preventDefault()
           browserPanelRef.current?.pickElement()
           return
         }
-        if (e.key.toLowerCase() === 'g' && isBuiltinEnabled('diff')) {
+        if (e.key.toLowerCase() === 'g' && isBuiltinEnabled('diff', 'task')) {
           e.preventDefault()
           if (!panelVisibility.diff) {
             setGitDefaultTab('changes')
@@ -974,14 +975,14 @@ export function TaskDetailPage({
       if (e.metaKey && !e.shiftKey) {
         // Cmd+P: quick open — works even inside CodeMirror
         const editorProjectPath = task?.worktree_path || project?.path
-        if (e.key === 'p' && isBuiltinEnabled('editor') && editorProjectPath) {
+        if (e.key === 'p' && isBuiltinEnabled('editor', 'task') && editorProjectPath) {
           e.preventDefault()
           setQuickOpenVisible(true)
           return
         }
 
         // Cmd+E: toggle editor panel — works even inside CodeMirror
-        if (e.key === 'e' && isBuiltinEnabled('editor')) {
+        if (e.key === 'e' && isBuiltinEnabled('editor', 'task')) {
           e.preventDefault()
           handlePanelToggle('editor', !panelVisibility.editor)
           return
@@ -994,7 +995,7 @@ export function TaskDetailPage({
         if (inCodeMirror) return
 
         // Cmd+G: git general tab toggle
-        if (e.key === 'g' && isBuiltinEnabled('diff')) {
+        if (e.key === 'g' && isBuiltinEnabled('diff', 'task')) {
           e.preventDefault()
           if (!panelVisibility.diff) {
             setGitDefaultTab('general')
@@ -1004,16 +1005,16 @@ export function TaskDetailPage({
           } else {
             gitPanelRef.current?.switchToTab('general')
           }
-        } else if (e.key === 't' && isBuiltinEnabled('terminal')) {
+        } else if (e.key === 't' && isBuiltinEnabled('terminal', 'task')) {
           e.preventDefault()
           handlePanelToggle('terminal', !panelVisibility.terminal)
-        } else if (e.key === 'b' && !inEditor && isBuiltinEnabled('browser')) {
+        } else if (e.key === 'b' && !inEditor && isBuiltinEnabled('browser', 'task')) {
           e.preventDefault()
           handlePanelToggle('browser', !panelVisibility.browser)
-        } else if (e.key === 's' && isBuiltinEnabled('settings')) {
+        } else if (e.key === 's' && isBuiltinEnabled('settings', 'task')) {
           e.preventDefault()
           handlePanelToggle('settings', !panelVisibility.settings)
-        } else if (e.key === 'o' && import.meta.env.DEV && isBuiltinEnabled('processes')) {
+        } else if (e.key === 'o' && import.meta.env.DEV && isBuiltinEnabled('processes', 'task')) {
           e.preventDefault()
           handlePanelToggle('processes', !panelVisibility.processes)
         } else {
@@ -1428,7 +1429,7 @@ export function TaskDetailPage({
                     { id: 'diff', icon: GitBranch, label: 'Git', shortcut: '⌘G' },
                     ...(import.meta.env.DEV ? [{ id: 'processes', icon: Cpu, label: 'Processes', shortcut: '⌘O' }] : []),
                     { id: 'settings', icon: Settings2, label: 'Settings', shortcut: '⌘S' },
-                  ].filter(p => isBuiltinEnabled(p.id) && !(task.is_temporary && p.id === 'settings'))
+                  ].filter(p => isBuiltinEnabled(p.id, 'task') && !(task.is_temporary && p.id === 'settings'))
 
                   // Insert web panels after editor
                   const editorIdx = builtins.findIndex(p => p.id === 'editor')
@@ -1597,7 +1598,9 @@ export function TaskDetailPage({
                             <TooltipTrigger asChild>
                           <Select
                             value={task.terminal_mode}
-                            onValueChange={(value) => handleModeChange(value as TerminalMode)}
+                            onValueChange={(value) => {
+                              if (modes.some(m => m.id === value)) handleModeChange(value as TerminalMode)
+                            }}
                           >
                             <SelectTrigger
                               data-testid="terminal-mode-trigger"
@@ -1781,10 +1784,14 @@ export function TaskDetailPage({
                               <DropdownMenuItem onClick={handleResetTerminal}>
                                 Reset terminal
                               </DropdownMenuItem>
-                              <DropdownMenuSeparator />
-                              <DropdownMenuItem onClick={() => void handleDoctor()}>
-                                Doctor
-                              </DropdownMenuItem>
+                              {task.terminal_mode !== 'terminal' && (
+                                <>
+                                  <DropdownMenuSeparator />
+                                  <DropdownMenuItem onClick={() => void handleDoctor()}>
+                                    Doctor
+                                  </DropdownMenuItem>
+                                </>
+                              )}
                             </DropdownMenuContent>
                           </DropdownMenu>
                         </div>

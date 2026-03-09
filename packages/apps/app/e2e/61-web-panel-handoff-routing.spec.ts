@@ -93,14 +93,16 @@ test.describe.serial('Web panel handoff routing', () => {
     expect(patchResult.ok, patchResult.error ?? 'Failed to patch shell.openExternal').toBe(true)
 
     const panelConfig = {
-      builtinEnabled: {
-        terminal: true,
-        browser: true,
-        editor: true,
-        diff: true,
-        settings: true,
-        processes: true,
-        [PANEL_ID]: true,
+      viewEnabled: {
+        task: {
+          terminal: true,
+          browser: true,
+          editor: true,
+          diff: true,
+          settings: true,
+          processes: true,
+          [PANEL_ID]: true,
+        },
       },
       webPanels: [
         {

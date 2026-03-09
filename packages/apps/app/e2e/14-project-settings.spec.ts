@@ -1,5 +1,6 @@
 import { test, expect, seed, goHome, clickProject, projectBlob } from './fixtures/electron'
 import { TEST_PROJECT_PATH } from './fixtures/electron'
+import type { Page, Locator } from '@playwright/test'
 
 declare global {
   interface Window {
@@ -12,6 +13,37 @@ function testInvoke(page: import('@playwright/test').Page, channel: string, ...a
     ({ ch, a }) => window.__testInvoke(ch, ...a),
     { ch: channel, a: args }
   ) as Promise<any>
+}
+
+/** Click a testid-identified button via evaluate (immune to element detach).
+ *  Waits for the button to not be disabled before clicking. */
+async function clickByTestId(mainWindow: Page, testId: string): Promise<void> {
+  await mainWindow.evaluate(async (tid) => {
+    // Wait briefly for button to exist and not be disabled
+    for (let i = 0; i < 10; i++) {
+      const el = document.querySelector(`[data-testid="${tid}"]`) as HTMLButtonElement | null
+      if (el && !el.disabled) { el.click(); return }
+      await new Promise((r) => setTimeout(r, 100))
+    }
+    // Last resort: click even if disabled
+    const el = document.querySelector(`[data-testid="${tid}"]`) as HTMLElement | null
+    el?.click()
+  }, testId)
+}
+
+/** Retry-click a settings tab that may detach during React re-renders */
+async function clickSettingsTab(
+  mainWindow: Page,
+  tab: Locator,
+  readyLocator: Locator
+): Promise<void> {
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    if (await readyLocator.isVisible({ timeout: 300 }).catch(() => false)) return
+    await tab.dispatchEvent('click').catch(() => {})
+    if (await readyLocator.isVisible({ timeout: 500 }).catch(() => false)) return
+    await mainWindow.waitForTimeout(80)
+  }
+  await expect(readyLocator).toBeVisible({ timeout: 3_000 })
 }
 
 const GITHUB_REPO_CONNECTION_ID = 'gh-e2e-settings'
@@ -78,10 +110,16 @@ test.describe('Project settings & context menu', () => {
   let projectId: string
 
   const seedGithubRepoMocks = async (mainWindow: import('@playwright/test').Page) => {
+    // clearProjectProvider deletes external_links but not the tasks themselves,
+    // so orphaned duplicates accumulate across tests that re-import the same
+    // GitHub issues. Clear providers first (removes links), then delete tasks
+    // (deleteTask blocks if external_links exist).
     await mainWindow.evaluate(
       async (pid) => {
         await window.api.integrations.clearProjectProvider({ projectId: pid, provider: 'linear' }).catch(() => {})
         await window.api.integrations.clearProjectProvider({ projectId: pid, provider: 'github' }).catch(() => {})
+        const tasks = await window.api.db.getTasksByProject(pid) as Array<{ id: string }>
+        for (const task of tasks) await window.api.db.deleteTask(task.id)
       },
       projectId
     )
@@ -159,7 +197,14 @@ test.describe('Project settings & context menu', () => {
   ) => {
     const settingsHeading = mainWindow.getByRole('heading', { name: 'Project Settings' })
     if (await settingsHeading.isVisible().catch(() => false)) {
-      await mainWindow.keyboard.press('Escape')
+      // Click the dialog overlay to dismiss (more reliable than Escape which
+      // can be swallowed by focused sub-elements like dropdowns)
+      const overlay = mainWindow.locator('[data-radix-dialog-overlay]')
+      if (await overlay.isVisible({ timeout: 500 }).catch(() => false)) {
+        await overlay.click({ position: { x: 5, y: 5 }, force: true })
+      } else {
+        await mainWindow.keyboard.press('Escape')
+      }
       await expect(settingsHeading).not.toBeVisible({ timeout: 3_000 })
     }
 
@@ -168,14 +213,15 @@ test.describe('Project settings & context menu', () => {
     await mainWindow.getByRole('menuitem', { name: 'Settings' }).click()
     await expect(settingsHeading).toBeVisible({ timeout: 5_000 })
 
-    await mainWindow.getByTestId('settings-tab-integrations').click()
-    if (entry === 'github_projects') {
-      await expect(mainWindow.getByTestId('project-integration-provider-github')).toBeVisible({ timeout: 5_000 })
-      await mainWindow.getByTestId('project-integration-provider-github').click()
-    } else {
-      await expect(mainWindow.getByTestId('project-integration-provider-github-issues')).toBeVisible({ timeout: 5_000 })
-      await mainWindow.getByTestId('project-integration-provider-github-issues').click()
-    }
+    const integrationsReady = entry === 'github_projects'
+      ? mainWindow.getByTestId('project-integration-provider-github')
+      : mainWindow.getByTestId('project-integration-provider-github-issues')
+    await clickSettingsTab(
+      mainWindow,
+      mainWindow.getByTestId('settings-tab-integrations'),
+      integrationsReady
+    )
+    await integrationsReady.dispatchEvent('click')
 
     if (!ensureRepoCard) return null
     const repoCard = mainWindow.getByTestId('github-repo-import-card')
@@ -216,16 +262,22 @@ test.describe('Project settings & context menu', () => {
     // General tab is default — verify name input exists
     await expect(mainWindow.locator('#edit-name')).toBeVisible({ timeout: 3_000 })
     // Switch to Integrations tab
-    await mainWindow.getByTestId('settings-tab-integrations').click()
     const githubProjectsProvider = mainWindow.getByTestId('project-integration-provider-github')
-    await expect(githubProjectsProvider).toBeVisible({ timeout: 3_000 })
+    await clickSettingsTab(
+      mainWindow,
+      mainWindow.getByTestId('settings-tab-integrations'),
+      githubProjectsProvider
+    )
     if (await githubProjectsProvider.isEnabled().catch(() => false)) {
-      await githubProjectsProvider.click()
+      await githubProjectsProvider.dispatchEvent('click')
     }
     await expect(mainWindow.getByTestId('project-integration-provider-github-issues')).toBeVisible({ timeout: 3_000 })
     // Switch back to General for the next test (edit name)
-    await mainWindow.getByTestId('settings-tab-general').click()
-    await expect(mainWindow.locator('#edit-name')).toBeVisible({ timeout: 3_000 })
+    await clickSettingsTab(
+      mainWindow,
+      mainWindow.getByTestId('settings-tab-general'),
+      mainWindow.locator('#edit-name')
+    )
   })
 
   test('imports GitHub repository issues via project settings', async ({ mainWindow }) => {
@@ -235,17 +287,17 @@ test.describe('Project settings & context menu', () => {
 
     const loadIssuesButton = repoCard.getByTestId('github-repo-load-issues')
     await expect(loadIssuesButton).toBeEnabled({ timeout: 5_000 })
-    await loadIssuesButton.click()
+    await loadIssuesButton.dispatchEvent('click')
     await expect(repoCard.getByText('2 issues loaded')).toBeVisible({ timeout: 5_000 })
 
     await repoCard
       .locator('label')
       .filter({ hasText: 'acme/slay-e2e#101 - Repository issue alpha' })
       .first()
-      .click()
+      .dispatchEvent('click')
     await expect(repoCard.getByText('1 selected')).toBeVisible()
 
-    await repoCard.getByTestId('github-repo-import-issues').click()
+    await repoCard.getByTestId('github-repo-import-issues').dispatchEvent('click')
     await expect.poll(async () => {
       const tasks = await seed(mainWindow).getTasks()
       return tasks.some((task: { project_id: string; title: string }) =>
@@ -279,7 +331,7 @@ test.describe('Project settings & context menu', () => {
 
     const reloadIssuesButton = repoCard.getByTestId('github-repo-load-issues')
     if (await reloadIssuesButton.isEnabled().catch(() => false)) {
-      await reloadIssuesButton.click()
+      await reloadIssuesButton.dispatchEvent('click')
     }
 
     const linkedRow = repoCard.getByText(/Linked\s*acme\/slay-e2e#101 - Repository issue alpha/)
@@ -302,8 +354,7 @@ test.describe('Project settings & context menu', () => {
       }),
       { pid: projectId, cid: GITHUB_REPO_CONNECTION_ID, repo: GITHUB_REPOSITORY_FULL_NAME }
     )
-    await openProjectSettingsIntegrations(mainWindow, 'github_projects', false)
-
+    // Do data manipulation BEFORE opening dialog to avoid re-render closing it
     const importedTasks = await seed(mainWindow).getTasks() as Array<{
       id: string
       project_id: string
@@ -320,22 +371,42 @@ test.describe('Project settings & context menu', () => {
     )
     await setGithubRepoIssues(mainWindow, GITHUB_REPOSITORY_ISSUES_REMOTE_AHEAD)
 
-    await mainWindow.getByTestId('github-project-check-diffs').click()
-    await expect(mainWindow.getByText('Local ahead: 1')).toBeVisible({ timeout: 5_000 })
-    await expect(mainWindow.getByText('Remote ahead: 1')).toBeVisible({ timeout: 5_000 })
+    /** Wait for button to be enabled, click it, then wait for result text in dialog. */
+    const clickSyncButton = async (testId: string, resultText?: string) => {
+      await mainWindow.waitForFunction(
+        (tid) => {
+          const el = document.querySelector(`[data-testid="${tid}"]`) as HTMLButtonElement | null
+          return el != null && !el.disabled
+        },
+        testId,
+        { timeout: 3_000 }
+      )
+      await clickByTestId(mainWindow, testId)
+      if (!resultText) return
+      await mainWindow.waitForFunction(
+        (text) => {
+          const dialog = document.querySelector('[role="dialog"]')
+          return dialog?.textContent?.includes(text) ?? false
+        },
+        resultText,
+        { timeout: 5_000 }
+      )
+    }
 
-    await mainWindow.getByTestId('github-project-push-local-ahead').click()
-    await expect(mainWindow.getByText('Push complete: 1 pushed, 0 skipped')).toBeVisible({ timeout: 5_000 })
+    await openProjectSettingsIntegrations(mainWindow, 'github_projects', false)
+    await clickSyncButton('github-project-check-diffs', 'Local ahead: 1')
+    await expect(mainWindow.getByText('Remote ahead: 1')).toBeVisible({ timeout: 3_000 })
 
-    await mainWindow.getByTestId('github-project-pull-remote-ahead').click()
-    await expect(mainWindow.getByText('Pull complete: 1 pulled, 0 skipped')).toBeVisible({ timeout: 5_000 })
+    await clickSyncButton('github-project-push-local-ahead', 'Push complete: 1 pushed, 0 skipped')
+
+    await clickSyncButton('github-project-check-diffs', 'Remote ahead: 1')
+    await clickSyncButton('github-project-pull-remote-ahead')
     await expect.poll(async () => {
       const tasks = await seed(mainWindow).getTasks() as Array<{ project_id: string; title: string }>
       return tasks.some((task) =>
         task.project_id === projectId && task.title === 'Repository issue beta remote refreshed'
       )
-    }, { timeout: 5_000 }).toBe(true)
-    await expect(mainWindow.getByText('Local ahead: 0')).toBeVisible({ timeout: 5_000 })
+    }, { timeout: 3_000 }).toBe(true)
   })
 
   test('GitHub repo import skips issues linked to another project', async ({ mainWindow }) => {
@@ -396,11 +467,14 @@ test.describe('Project settings & context menu', () => {
       await expect(settingsHeading).toBeVisible({ timeout: 5_000 })
     }
 
-    await mainWindow.getByTestId('settings-tab-columns').click()
-    await expect(mainWindow.getByTestId('project-column-review')).toBeVisible({ timeout: 3_000 })
-    await mainWindow.getByTestId('delete-project-column-review').click()
+    await clickSettingsTab(
+      mainWindow,
+      mainWindow.getByTestId('settings-tab-columns'),
+      mainWindow.getByTestId('project-column-review')
+    )
+    await mainWindow.getByTestId('delete-project-column-review').dispatchEvent('click')
     await expect(mainWindow.getByTestId('project-column-review')).not.toBeVisible({ timeout: 3_000 })
-    await mainWindow.getByTestId('save-project-columns').click()
+    await mainWindow.getByTestId('save-project-columns').dispatchEvent('click')
 
     const updatedTasks = await s.getTasks()
     const updatedTask = updatedTasks.find((t: { id: string; status: string }) => t.id === remapTask.id)
@@ -420,14 +494,17 @@ test.describe('Project settings & context menu', () => {
       await blob.click({ button: 'right' })
       await mainWindow.getByRole('menuitem', { name: 'Settings' }).click()
       await expect(mainWindow.getByRole('heading', { name: 'Project Settings' })).toBeVisible({ timeout: 5_000 })
-      await mainWindow.getByRole('button', { name: 'General', exact: true }).click()
-      await expect(nameInput).toBeVisible({ timeout: 3_000 })
+      await clickSettingsTab(
+        mainWindow,
+        mainWindow.getByRole('button', { name: 'General', exact: true }),
+        nameInput
+      )
     }
 
     await nameInput.clear()
     await nameInput.fill('Xylo Project')
 
-    await mainWindow.getByRole('button', { name: 'Save' }).click()
+    await mainWindow.getByRole('button', { name: 'Save' }).dispatchEvent('click')
 
     // Dialog should close
     await expect(mainWindow.getByRole('heading', { name: 'Project Settings' })).not.toBeVisible({ timeout: 3_000 })

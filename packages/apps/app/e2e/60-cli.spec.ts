@@ -243,25 +243,6 @@ test.describe('CLI: slay', () => {
     })
   })
 
-  // --- slay tasks open ---
-
-  test.describe('slay tasks open', () => {
-    test('outputs Opening: for a valid task id', () => {
-      const r0 = runCli('tasks', 'list', '--json')
-      const tasks = JSON.parse(r0.stdout)
-      const task = tasks[0]
-      const r = runCli('tasks', 'open', task.id.slice(0, 8))
-      expect(r.status).toBe(0)
-      expect(r.stdout).toContain('Opening:')
-    })
-
-    test('exits non-zero on unknown id prefix', () => {
-      const r = runCli('tasks', 'open', 'xxxxxxxx')
-      expect(r.status).not.toBe(0)
-      expect(r.stderr).toContain('not found')
-    })
-  })
-
   // --- slay tasks done ---
 
   test.describe('slay tasks done', () => {

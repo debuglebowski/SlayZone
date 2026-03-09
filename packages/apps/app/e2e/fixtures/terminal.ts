@@ -73,6 +73,18 @@ export async function switchTerminalMode(page: Page, mode: TerminalMode): Promis
     terminal: ['Terminal'],
   }
 
+  // Dismiss any blocking overlay (dialog, popover, select) that may linger from a previous test
+  await page.keyboard.press('Escape').catch(() => {})
+  await page.waitForTimeout(200)
+
+  // Radix Dialog scroll-lock (react-remove-scroll) can leave pointer-events:none on <body>
+  // if the dialog close animation completes before the cleanup runs. Force-clear it.
+  await page.evaluate(() => {
+    if (getComputedStyle(document.body).pointerEvents === 'none') {
+      document.body.style.pointerEvents = ''
+    }
+  })
+
   const trigger = activeModeTrigger(page)
   await trigger.click()
 

@@ -59,6 +59,15 @@ function cleanupWatcherEntry(root: string): void {
   watchers.delete(root)
 }
 
+export function closeAllWatchers(): void {
+  for (const [, entry] of watchers) {
+    entry.watcher.close()
+    for (const t of entry.debounceMap.values()) clearTimeout(t)
+  }
+  watchers.clear()
+  ignoreCache.clear()
+}
+
 function addWinToWatcher(root: string, win: BrowserWindow, wins: Set<BrowserWindow>): void {
   if (wins.has(win)) return
   wins.add(win)

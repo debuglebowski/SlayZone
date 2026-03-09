@@ -507,6 +507,11 @@ export async function runGithubSyncNow(db: Database, input: SyncNowInput): Promi
 
 let syncRunning = false
 
+export function resetSyncFlags(): void {
+  syncRunning = false
+  discoveryRunning = false
+}
+
 export function startSyncPoller(db: Database): NodeJS.Timeout {
   return setInterval(() => {
     if (syncRunning) return

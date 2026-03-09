@@ -64,7 +64,6 @@ export function EnvironmentTab({ project, onUpdated, onClose }: EnvironmentTabPr
         id: project.id,
         executionContext
       })
-
       onUpdated(updated)
     } finally {
       setLoading(false)
@@ -83,8 +82,10 @@ export function EnvironmentTab({ project, onUpdated, onClose }: EnvironmentTabPr
           <Select
             value={execType}
             onValueChange={(value) => {
-              setExecType(value as typeof execType)
-              setTestResult(null)
+              if (value === 'host' || value === 'docker' || value === 'ssh') {
+                setExecType(value)
+                setTestResult(null)
+              }
             }}
           >
             <SelectTrigger id="exec-context" className="max-w-sm">

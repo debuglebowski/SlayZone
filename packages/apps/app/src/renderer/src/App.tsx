@@ -17,7 +17,7 @@ import {
   getViewConfig,
   type Column
 } from '@slayzone/tasks'
-import { CreateTaskDialog, EditTaskDialog, DeleteTaskDialog, TaskDetailPage, ProcessesPanel, ResizeHandle, usePanelSizes } from '@slayzone/task'
+import { CreateTaskDialog, EditTaskDialog, DeleteTaskDialog, TaskDetailPage, ProcessesPanel, ResizeHandle, usePanelSizes, usePanelConfig } from '@slayzone/task'
 import { UnifiedGitPanel, type UnifiedGitPanelHandle, type GitTabId } from '@slayzone/worktrees'
 import { FileEditorView, QuickOpenDialog, type FileEditorViewHandle } from '@slayzone/file-editor/client'
 import {
@@ -152,6 +152,7 @@ function App(): React.JSX.Element {
   const [zenMode, setZenMode] = useState(false)
   const [explodeMode, setExplodeMode] = useState(false)
   const [panelSizes, updatePanelSizes, resetPanelSize] = usePanelSizes()
+  const { isBuiltinEnabled: isHomePanelEnabled } = usePanelConfig()
   const [homePanelVisibility, setHomePanelVisibilityRaw] = useState<Record<HomePanel, boolean>>({ kanban: true, git: false, editor: false, processes: false, tests: false })
   const setHomePanelVisibility = useCallback((updater: (prev: Record<HomePanel, boolean>) => Record<HomePanel, boolean>) => {
     setHomePanelVisibilityRaw(prev => {
@@ -927,7 +928,7 @@ function App(): React.JSX.Element {
       if (!e.metaKey) return
       if ((e.target as HTMLElement)?.closest?.('.cm-editor')) return
       if (e.shiftKey) {
-        if (e.key.toLowerCase() === 'f') {
+        if (e.key.toLowerCase() === 'f' && isHomePanelEnabled('editor', 'home')) {
           e.preventDefault()
           if (homeEditorRef.current) {
             if (!homePanelVisibility.editor) setHomePanelVisibility(prev => ({ ...prev, editor: true }))
@@ -936,7 +937,7 @@ function App(): React.JSX.Element {
             pendingHomeSearchToggleRef.current = true
             setHomePanelVisibility(prev => ({ ...prev, editor: true }))
           }
-        } else if (e.key.toLowerCase() === 'g') {
+        } else if (e.key.toLowerCase() === 'g' && isHomePanelEnabled('git', 'home')) {
           e.preventDefault()
           if (!homePanelVisibility.git) {
             setHomeGitDefaultTab('changes')
@@ -949,12 +950,12 @@ function App(): React.JSX.Element {
         }
         return
       }
-      if (e.key === 'p') {
+      if (e.key === 'p' && isHomePanelEnabled('editor', 'home')) {
         e.preventDefault()
         setHomeQuickOpenVisible(true)
         return
       }
-      if (e.key === 'g') {
+      if (e.key === 'g' && isHomePanelEnabled('git', 'home')) {
         e.preventDefault()
         if (!homePanelVisibility.git) {
           setHomeGitDefaultTab('general')
@@ -964,13 +965,13 @@ function App(): React.JSX.Element {
         } else {
           homeGitPanelRef.current?.switchToTab('general')
         }
-      } else if (e.key === 'e') {
+      } else if (e.key === 'e' && isHomePanelEnabled('editor', 'home')) {
         e.preventDefault()
         setHomePanelVisibility(prev => ({ ...prev, editor: !prev.editor }))
-      } else if (e.key === 'o' && import.meta.env.DEV) {
+      } else if (e.key === 'o' && import.meta.env.DEV && isHomePanelEnabled('processes', 'home')) {
         e.preventDefault()
         setHomePanelVisibility(prev => ({ ...prev, processes: !prev.processes }))
-      } else if (e.key === 'u' && import.meta.env.DEV) {
+      } else if (e.key === 'u' && import.meta.env.DEV && isHomePanelEnabled('tests', 'home')) {
         e.preventDefault()
         setHomePanelVisibility(prev => ({ ...prev, tests: !prev.tests }))
       }
@@ -1415,7 +1416,7 @@ function App(): React.JSX.Element {
                                     { id: 'editor', icon: FileCode, label: 'Editor', shortcut: '⌘E', active: homePanelVisibility.editor, disabled: !selectedProjectId },
                                     ...(import.meta.env.DEV ? [{ id: 'processes', icon: Cpu, label: 'Processes', shortcut: '⌘O', active: homePanelVisibility.processes, disabled: !selectedProjectId }] : [{ id: 'processes', icon: Cpu, label: 'Processes', active: homePanelVisibility.processes, disabled: !selectedProjectId }]),
                                     ...(import.meta.env.DEV ? [{ id: 'tests', icon: FlaskConical, label: 'Tests', shortcut: '⌘U', active: homePanelVisibility.tests, disabled: !selectedProjectId }] : []),
-                                  ]}
+                                  ].filter(p => p.id === 'kanban' || isHomePanelEnabled(p.id, 'home'))}
                                   onChange={(id, active) => setHomePanelVisibility(prev => ({ ...prev, [id]: active }))}
                                 />
                                 </div>

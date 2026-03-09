@@ -8,6 +8,8 @@ import type {
   PromptInfo,
   BufferSinceResult,
   ProviderUsage,
+  UsageWindow,
+  UsageProviderConfig,
   ValidationResult,
   TerminalModeInfo,
   CreateTerminalModeInput,
@@ -15,7 +17,7 @@ import type {
 } from '@slayzone/terminal/shared'
 import type { TerminalTab, CreateTerminalTabInput, UpdateTerminalTabInput } from '@slayzone/task-terminals/shared'
 import type { Theme, ThemePreference } from '@slayzone/settings/shared'
-import type { DetectedWorktree, MergeResult, MergeWithAIResult, GitDiffSnapshot, ConflictFileContent, ConflictAnalysis, RebaseProgress, CommitInfo, AheadBehind, StatusSummary } from '@slayzone/worktrees/shared'
+import type { DetectedWorktree, MergeResult, MergeWithAIResult, GitDiffSnapshot, GitSyncResult, ConflictFileContent, ConflictAnalysis, RebaseProgress, CommitInfo, AheadBehind, StatusSummary, GhPullRequest, CreatePrInput, CreatePrResult } from '@slayzone/worktrees/shared'
 import type { MergeContext } from '@slayzone/task/shared'
 import type {
   AiConfigItem,
@@ -280,6 +282,9 @@ export interface ElectronAPI {
     }>
     getVersion: () => Promise<string>
     isContextManagerEnabled: () => Promise<boolean>
+    isContextManagerEnabledSync: boolean
+    isIntegrationsEnabled: boolean
+    isPlaywright: boolean
     onGoHome: (callback: () => void) => () => void
     onOpenSettings: (callback: () => void) => () => void
     onOpenProjectSettings: (callback: () => void) => () => void
@@ -386,6 +391,17 @@ export interface ElectronAPI {
     getStatusSummary: (repoPath: string) => Promise<StatusSummary>
     revealInFinder: (path: string) => Promise<void>
     isDirty: (path: string) => Promise<boolean>
+    getRemoteUrl: (path: string) => Promise<string | null>
+    getAheadBehindUpstream: (path: string, branch: string) => Promise<AheadBehind | null>
+    fetch: (path: string) => Promise<void>
+    push: (path: string, branch?: string, force?: boolean) => Promise<GitSyncResult>
+    pull: (path: string) => Promise<GitSyncResult>
+    // GitHub CLI (gh)
+    checkGhInstalled: () => Promise<boolean>
+    hasGithubRemote: (repoPath: string) => Promise<boolean>
+    listOpenPrs: (repoPath: string) => Promise<GhPullRequest[]>
+    getPrByUrl: (repoPath: string, url: string) => Promise<GhPullRequest | null>
+    createPr: (input: CreatePrInput) => Promise<CreatePrResult>
   }
   tabs: {
     list: (taskId: string) => Promise<TerminalTab[]>
@@ -475,6 +491,7 @@ export interface ElectronAPI {
   }
   usage: {
     fetch: (force?: boolean) => Promise<ProviderUsage[]>
+    test: (config: UsageProviderConfig) => Promise<{ ok: boolean; windows?: UsageWindow[]; error?: string }>
   }
   webview: {
     registerShortcuts: (webviewId: number) => Promise<void>
