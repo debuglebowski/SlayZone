@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { GitBranch, GitMerge, Plus, Trash2, ChevronDown, Check, Loader2, ArrowUp, ArrowDown, GitCommitHorizontal, AlertTriangle, Copy } from 'lucide-react'
+import { GitBranch, GitMerge, GitPullRequest, Plus, Trash2, ChevronDown, Check, Loader2, ArrowUp, ArrowDown, GitCommitHorizontal, AlertTriangle, Copy, Link2, ExternalLink } from 'lucide-react'
 import {
   Button,
   IconButton,
@@ -40,6 +40,7 @@ interface GeneralTabContentProps {
   onUpdateTask: (data: UpdateTaskInput) => Promise<Task>
   onTaskUpdated: (task: Task) => void
   onSwitchTab: (tab: 'changes' | 'conflicts') => void
+  onSwitchToPrView?: (view: 'create' | 'link') => void
 }
 
 export function GeneralTabContent({
@@ -50,7 +51,8 @@ export function GeneralTabContent({
   pollIntervalMs = 5000,
   onUpdateTask,
   onTaskUpdated,
-  onSwitchTab
+  onSwitchTab,
+  onSwitchToPrView
 }: GeneralTabContentProps) {
   const targetPath = task.worktree_path ?? projectPath
   const hasWorktree = !!task.worktree_path
@@ -87,6 +89,13 @@ export function GeneralTabContent({
   // Remote
   const [remoteUrl, setRemoteUrl] = useState<string | null>(null)
   const [upstreamAB, setUpstreamAB] = useState<AheadBehind | null>(null)
+  const [hasGithubRemote, setHasGithubRemote] = useState(false)
+
+  // Check GitHub remote
+  useEffect(() => {
+    if (!projectPath) { setHasGithubRemote(false); return }
+    window.api.git.hasGithubRemote(projectPath).then(setHasGithubRemote).catch(() => setHasGithubRemote(false))
+  }, [projectPath])
 
   // Poll for git data
   const fetchGitData = useCallback(async () => {
@@ -383,21 +392,8 @@ export function GeneralTabContent({
           )}
         </Section>
 
-        {/* Remote */}
-        {remoteUrl && (
-          <Section label="Remote">
-            <RemoteSection
-              remoteUrl={remoteUrl}
-              upstreamAB={upstreamAB}
-              targetPath={targetPath!}
-              branch={hasWorktree ? worktreeBranch : currentBranch}
-              onSyncDone={fetchGitData}
-            />
-          </Section>
-        )}
-
-        {/* Worktree */}
-        <Section label="Worktree">
+        {/* Actions */}
+        <Section label="Actions">
           {hasWorktree ? (
             <div className="p-3 rounded-lg border bg-muted/30 space-y-3">
               <div className="flex items-center gap-2">
@@ -461,51 +457,132 @@ export function GeneralTabContent({
                   )}
                 </>
               )}
+
+              {/* PR actions */}
+              {hasGithubRemote && onSwitchToPrView && !task.pr_url && (
+                <div className="flex gap-2">
+                  <Button variant="outline" size="sm" onClick={() => onSwitchToPrView('create')} className="gap-2 flex-1 justify-center min-w-0">
+                    <GitPullRequest className="h-3.5 w-3.5 shrink-0" /> <span className="truncate">Create new PR</span>
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={() => onSwitchToPrView('link')} className="gap-2 flex-1 justify-center min-w-0">
+                    <Link2 className="h-3.5 w-3.5 shrink-0" /> <span className="truncate">Link to existing PR</span>
+                  </Button>
+                </div>
+              )}
+              {hasGithubRemote && task.pr_url && (
+                <button
+                  onClick={() => onSwitchToPrView?.('create')}
+                  className="flex items-center gap-2 w-full text-left px-3 py-2 rounded-md bg-muted/50 hover:bg-muted transition-colors"
+                >
+                  <GitPullRequest className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                  <span className="text-xs truncate flex-1">
+                    #{task.pr_url.match(/\/pull\/(\d+)/)?.[1]} — {task.pr_url.replace(/^https?:\/\/github\.com\//, '')}
+                  </span>
+                  <ExternalLink className="h-3 w-3 text-muted-foreground shrink-0" />
+                </button>
+              )}
             </div>
           ) : (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button variant="outline" size="sm" onClick={handleAddWorktree} disabled={creating} className="gap-2 w-full justify-start">
-                  <Plus className="h-4 w-4" />
-                  {creating ? 'Creating...' : 'Add Worktree'}
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>
-                Create branch "{slugify(task.title) || `task-${task.id.slice(0, 8)}`}"
-              </TooltipContent>
-            </Tooltip>
+            <div className="flex gap-2">
+              {hasGithubRemote && onSwitchToPrView && !task.pr_url && (
+                <>
+                  <Button variant="outline" size="sm" onClick={() => onSwitchToPrView('create')} className="gap-2 flex-1 justify-center min-w-0">
+                    <GitPullRequest className="h-3.5 w-3.5 shrink-0" /> <span className="truncate">Create new PR</span>
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={() => onSwitchToPrView('link')} className="gap-2 flex-1 justify-center min-w-0">
+                    <Link2 className="h-3.5 w-3.5 shrink-0" /> <span className="truncate">Link to existing PR</span>
+                  </Button>
+                </>
+              )}
+              {hasGithubRemote && task.pr_url && (
+                <button
+                  onClick={() => onSwitchToPrView?.('create')}
+                  className="flex items-center gap-2 flex-1 text-left px-3 py-1.5 rounded-md border bg-muted/30 hover:bg-muted/50 transition-colors"
+                >
+                  <GitPullRequest className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                  <span className="text-xs truncate flex-1">
+                    PR #{task.pr_url.match(/\/pull\/(\d+)/)?.[1]}
+                  </span>
+                  <ExternalLink className="h-3 w-3 text-muted-foreground shrink-0" />
+                </button>
+              )}
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="outline" size="sm" onClick={handleAddWorktree} disabled={creating} className="gap-2 flex-1 justify-center min-w-0">
+                    <Plus className="h-4 w-4 shrink-0" />
+                    <span className="truncate">{creating ? 'Creating...' : 'Branch to worktree'}</span>
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  Create branch "{slugify(task.title) || `task-${task.id.slice(0, 8)}`}"
+                </TooltipContent>
+              </Tooltip>
+            </div>
           )}
           {error && <p className="text-xs text-destructive mt-1">{error}</p>}
         </Section>
 
-        {/* Status summary */}
-        {statusSummary && totalChanges > 0 && (
-          <Section label="Current Changes">
-            <div className="flex items-center gap-2 flex-wrap px-3 py-2.5 rounded-lg border bg-muted/30">
-              {statusSummary.staged > 0 && (
-                <StatusChip
-                  label={`${statusSummary.staged} staged`}
-                  className="text-green-400 bg-green-500/10"
-                  onClick={() => onSwitchTab('changes')}
+        {/* Changes + remote sync */}
+        <Section
+          label="Status"
+          right={remoteUrl && (
+            <button
+              onClick={() => { navigator.clipboard.writeText(remoteUrl); toast('Remote URL copied') }}
+              className="flex items-center gap-1 group"
+              title="Click to copy"
+            >
+              <span className="text-[10px] font-mono text-muted-foreground truncate max-w-[200px]">
+                {remoteUrl.replace(/^https?:\/\//, '').replace(/\.git$/, '')}
+              </span>
+              <Copy className="h-2.5 w-2.5 text-muted-foreground shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" />
+            </button>
+          )}
+        >
+          <div className="flex items-center gap-2 flex-wrap px-3 py-2.5 rounded-lg border bg-muted/30">
+            {statusSummary && totalChanges > 0 ? (
+              <>
+                {statusSummary.staged > 0 && (
+                  <StatusChip
+                    label={`${statusSummary.staged} staged`}
+                    className="text-green-400 bg-green-500/10"
+                    onClick={() => onSwitchTab('changes')}
+                  />
+                )}
+                {statusSummary.unstaged > 0 && (
+                  <StatusChip
+                    label={`${statusSummary.unstaged} modified`}
+                    className="text-yellow-400 bg-yellow-500/10"
+                    onClick={() => onSwitchTab('changes')}
+                  />
+                )}
+                {statusSummary.untracked > 0 && (
+                  <StatusChip
+                    label={`${statusSummary.untracked} untracked`}
+                    className="text-muted-foreground bg-muted"
+                    onClick={() => onSwitchTab('changes')}
+                  />
+                )}
+              </>
+            ) : (
+              <span className="text-xs text-muted-foreground">No changes</span>
+            )}
+            <Button variant="ghost" size="sm" onClick={() => onSwitchTab('changes')} className="h-7 px-2 text-xs text-muted-foreground">
+              View diff
+            </Button>
+            {remoteUrl && (
+              <div className="ml-auto">
+                <RemoteSection
+                  remoteUrl={remoteUrl}
+                  upstreamAB={upstreamAB}
+                  targetPath={targetPath!}
+                  branch={hasWorktree ? worktreeBranch : currentBranch}
+                  onSyncDone={fetchGitData}
                 />
-              )}
-              {statusSummary.unstaged > 0 && (
-                <StatusChip
-                  label={`${statusSummary.unstaged} modified`}
-                  className="text-yellow-400 bg-yellow-500/10"
-                  onClick={() => onSwitchTab('changes')}
-                />
-              )}
-              {statusSummary.untracked > 0 && (
-                <StatusChip
-                  label={`${statusSummary.untracked} untracked`}
-                  className="text-muted-foreground bg-muted"
-                  onClick={() => onSwitchTab('changes')}
-                />
-              )}
-            </div>
-          </Section>
-        )}
+              </div>
+            )}
+          </div>
+        </Section>
+
 
       </div>
 
@@ -579,10 +656,13 @@ export function GeneralTabContent({
   )
 }
 
-function Section({ label, children }: { label: string; children: React.ReactNode }) {
+function Section({ label, right, children }: { label: string; right?: React.ReactNode; children: React.ReactNode }) {
   return (
     <div>
-      <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">{label}</div>
+      <div className="flex items-baseline gap-2 mb-2">
+        <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide">{label}</div>
+        {right && <div className="flex-1 min-w-0 flex justify-end">{right}</div>}
+      </div>
       {children}
     </div>
   )

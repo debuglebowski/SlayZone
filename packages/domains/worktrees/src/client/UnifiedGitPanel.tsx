@@ -97,6 +97,12 @@ export const UnifiedGitPanel = forwardRef<UnifiedGitPanelHandle, UnifiedGitPanel
   const diffRef = useRef<GitDiffPanelHandle>(null)
   const worktreesRef = useRef<WorktreesTabHandle>(null)
   const [conflictToolbar, setConflictToolbar] = useState<ConflictToolbarData | null>(null)
+  const [prInitialView, setPrInitialView] = useState<'create' | 'link' | null>(null)
+
+  const handleSwitchToPrView = useCallback((view: 'create' | 'link') => {
+    setPrInitialView(view)
+    setActiveTab('pr')
+  }, [])
 
   const showWorktrees = !task
   const showBranchTab = task ? !!task.worktree_path : true
@@ -229,7 +235,7 @@ export const UnifiedGitPanel = forwardRef<UnifiedGitPanelHandle, UnifiedGitPanel
             Conflicts
           </TabButton>
         )}
-        {hasGithubRemote && (
+        {hasGithubRemote && (!task || task.pr_url) && (
           <TabButton
             active={activeTab === 'pr'}
             onClick={() => setActiveTab('pr')}
@@ -292,6 +298,7 @@ export const UnifiedGitPanel = forwardRef<UnifiedGitPanelHandle, UnifiedGitPanel
               onUpdateTask={onUpdateTask!}
               onTaskUpdated={onTaskUpdated!}
               onSwitchTab={setActiveTab}
+              onSwitchToPrView={handleSwitchToPrView}
             />
           ) : (
             <ProjectGeneralTab
@@ -354,6 +361,8 @@ export const UnifiedGitPanel = forwardRef<UnifiedGitPanelHandle, UnifiedGitPanel
                 task={task}
                 projectPath={projectPath}
                 visible={visible && activeTab === 'pr'}
+                initialView={prInitialView}
+                onInitialViewConsumed={() => setPrInitialView(null)}
                 onUpdateTask={onUpdateTask!}
                 onTaskUpdated={onTaskUpdated!}
               />

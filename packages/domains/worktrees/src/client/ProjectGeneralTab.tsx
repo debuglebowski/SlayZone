@@ -196,33 +196,50 @@ export function ProjectGeneralTab({ projectPath, visible, onSwitchToDiff }: Proj
         </Popover>
       </Section>
 
-      {remoteUrl && (
-        <Section label="Remote">
-          <RemoteSection
-            remoteUrl={remoteUrl}
-            upstreamAB={upstreamAB}
-            targetPath={projectPath}
-            branch={currentBranch}
-            onSyncDone={fetchGitData}
-          />
-        </Section>
-      )}
-
-      {statusSummary && totalChanges > 0 && (
-        <Section label="Current Changes">
-          <div className="flex items-center gap-2 flex-wrap px-3 py-2.5 rounded-lg border bg-muted/30">
-            {statusSummary.staged > 0 && (
-              <StatusChip label={`${statusSummary.staged} staged`} className="text-green-400 bg-green-500/10" onClick={onSwitchToDiff} />
-            )}
-            {statusSummary.unstaged > 0 && (
-              <StatusChip label={`${statusSummary.unstaged} modified`} className="text-yellow-400 bg-yellow-500/10" onClick={onSwitchToDiff} />
-            )}
-            {statusSummary.untracked > 0 && (
-              <StatusChip label={`${statusSummary.untracked} untracked`} className="text-muted-foreground bg-muted" onClick={onSwitchToDiff} />
-            )}
-          </div>
-        </Section>
-      )}
+      <Section
+        label="Status"
+        right={remoteUrl && (
+          <button
+            onClick={() => { navigator.clipboard.writeText(remoteUrl); toast('Remote URL copied') }}
+            className="flex items-center gap-1 group"
+            title="Click to copy"
+          >
+            <span className="text-[10px] font-mono text-muted-foreground truncate max-w-[200px]">
+              {remoteUrl.replace(/^https?:\/\//, '').replace(/\.git$/, '')}
+            </span>
+            <Copy className="h-2.5 w-2.5 text-muted-foreground shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" />
+          </button>
+        )}
+      >
+        <div className="flex items-center gap-2 flex-wrap px-3 py-2.5 rounded-lg border bg-muted/30">
+          {statusSummary && totalChanges > 0 ? (
+            <>
+              {statusSummary.staged > 0 && (
+                <StatusChip label={`${statusSummary.staged} staged`} className="text-green-400 bg-green-500/10" onClick={onSwitchToDiff} />
+              )}
+              {statusSummary.unstaged > 0 && (
+                <StatusChip label={`${statusSummary.unstaged} modified`} className="text-yellow-400 bg-yellow-500/10" onClick={onSwitchToDiff} />
+              )}
+              {statusSummary.untracked > 0 && (
+                <StatusChip label={`${statusSummary.untracked} untracked`} className="text-muted-foreground bg-muted" onClick={onSwitchToDiff} />
+              )}
+            </>
+          ) : (
+            <span className="text-xs text-muted-foreground">No changes</span>
+          )}
+          {remoteUrl && (
+            <div className="ml-auto">
+              <RemoteSection
+                remoteUrl={remoteUrl}
+                upstreamAB={upstreamAB}
+                targetPath={projectPath}
+                branch={currentBranch}
+                onSyncDone={fetchGitData}
+              />
+            </div>
+          )}
+        </div>
+      </Section>
 
       </div>
 
@@ -259,10 +276,13 @@ export function ProjectGeneralTab({ projectPath, visible, onSwitchToDiff }: Proj
   )
 }
 
-function Section({ label, children }: { label: string; children: React.ReactNode }) {
+function Section({ label, right, children }: { label: string; right?: React.ReactNode; children: React.ReactNode }) {
   return (
     <div>
-      <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">{label}</div>
+      <div className="flex items-baseline gap-2 mb-2">
+        <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide">{label}</div>
+        {right && <div className="flex-1 min-w-0 flex justify-end">{right}</div>}
+      </div>
       {children}
     </div>
   )

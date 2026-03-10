@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react'
-import { ChevronDown, Loader2, ArrowUp, ArrowDown, Copy, Download, Upload, ExternalLink } from 'lucide-react'
+import { ChevronDown, Loader2, Download, Upload } from 'lucide-react'
 import {
   Button,
   Popover,
@@ -18,14 +18,14 @@ import {
 import type { AheadBehind } from '../shared/types'
 
 interface RemoteSectionProps {
-  remoteUrl: string
+  remoteUrl?: string
   upstreamAB: AheadBehind | null
   targetPath: string
   branch: string | null
   onSyncDone: () => void
 }
 
-export function RemoteSection({ remoteUrl, upstreamAB, targetPath, branch, onSyncDone }: RemoteSectionProps) {
+export function RemoteSection({ upstreamAB, targetPath, branch, onSyncDone }: RemoteSectionProps) {
   const [pushing, setPushing] = useState(false)
   const [pulling, setPulling] = useState(false)
   const [pushMenuOpen, setPushMenuOpen] = useState(false)
@@ -67,85 +67,53 @@ export function RemoteSection({ remoteUrl, upstreamAB, targetPath, branch, onSyn
     }
   }, [targetPath, onSyncDone])
 
+  const behind = upstreamAB?.behind ?? 0
+  const ahead = upstreamAB?.ahead ?? 0
+
   return (
     <>
-      <div className="p-3 rounded-lg border bg-muted/30 space-y-2">
-        <div className="flex items-start gap-2">
-          {/* Left: URL + ahead/behind */}
-          <div className="flex-1 min-w-0 space-y-1">
-            <button
-              onClick={() => { navigator.clipboard.writeText(remoteUrl); toast('Remote URL copied') }}
-              className="flex items-center gap-2 w-full text-left group"
-              title="Click to copy"
-            >
-              <ExternalLink className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-              <span className="text-xs font-mono text-muted-foreground truncate flex-1">
-                {remoteUrl.replace(/^https?:\/\//, '').replace(/\.git$/, '')}
-              </span>
-              <Copy className="h-3 w-3 text-muted-foreground shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" />
-            </button>
-
-            {upstreamAB && (upstreamAB.ahead > 0 || upstreamAB.behind > 0) && (
-              <div className="flex items-center gap-3 text-xs text-muted-foreground pl-5.5">
-                {upstreamAB.ahead > 0 && (
-                  <span className="flex items-center gap-1">
-                    <ArrowUp className="h-3 w-3" /> {upstreamAB.ahead} ahead
-                  </span>
-                )}
-                {upstreamAB.behind > 0 && (
-                  <span className="flex items-center gap-1">
-                    <ArrowDown className="h-3 w-3" /> {upstreamAB.behind} behind
-                  </span>
-                )}
-              </div>
-            )}
-          </div>
-
-          {/* Right: Push / Pull buttons */}
-          <div className="flex items-center gap-1.5 shrink-0">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handlePull}
-              disabled={pulling || pushing}
-              className="gap-1 h-7 px-2"
-            >
-              {pulling ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
-              Pull
-            </Button>
-            <div className="flex">
+      <div className="flex items-center gap-1.5 shrink-0">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handlePull}
+          disabled={pulling || pushing}
+          className="gap-1 h-7 px-2"
+        >
+          {pulling ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
+          Pull{behind > 0 && ` ↓${behind}`}
+        </Button>
+        <div className="flex">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => handlePush(false)}
+            disabled={pushing || pulling}
+            className="gap-1 h-7 px-2 rounded-r-none border-r-0"
+          >
+            {pushing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}
+            Push{ahead > 0 && ` ↑${ahead}`}
+          </Button>
+          <Popover open={pushMenuOpen} onOpenChange={setPushMenuOpen}>
+            <PopoverTrigger asChild>
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => handlePush(false)}
                 disabled={pushing || pulling}
-                className="gap-1 h-7 px-2 rounded-r-none border-r-0"
+                className="px-1 h-7 rounded-l-none"
               >
-                {pushing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}
-                Push
+                <ChevronDown className="h-3 w-3" />
               </Button>
-              <Popover open={pushMenuOpen} onOpenChange={setPushMenuOpen}>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    disabled={pushing || pulling}
-                    className="px-1 h-7 rounded-l-none"
-                  >
-                    <ChevronDown className="h-3 w-3" />
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent align="end" className="w-40 p-1">
-                  <button
-                    onClick={() => { setPushMenuOpen(false); setForcePushConfirmOpen(true) }}
-                    className="flex items-center gap-2 w-full px-2 py-1.5 text-xs hover:bg-muted rounded transition-colors text-left text-destructive"
-                  >
-                    Force Push
-                  </button>
-                </PopoverContent>
-              </Popover>
-            </div>
-          </div>
+            </PopoverTrigger>
+            <PopoverContent align="end" className="w-40 p-1">
+              <button
+                onClick={() => { setPushMenuOpen(false); setForcePushConfirmOpen(true) }}
+                className="flex items-center gap-2 w-full px-2 py-1.5 text-xs hover:bg-muted rounded transition-colors text-left text-destructive"
+              >
+                Force Push
+              </button>
+            </PopoverContent>
+          </Popover>
         </div>
       </div>
 

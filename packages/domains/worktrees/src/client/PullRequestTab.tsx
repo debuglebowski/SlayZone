@@ -59,17 +59,28 @@ interface PullRequestTabProps {
   task: Task
   projectPath: string | null
   visible: boolean
+  initialView?: 'create' | 'link' | null
+  onInitialViewConsumed?: () => void
   onUpdateTask: (data: UpdateTaskInput) => Promise<Task>
   onTaskUpdated: (task: Task) => void
 }
 
 type View = 'idle' | 'create' | 'link'
 
-export function PullRequestTab({ task, projectPath, visible, onUpdateTask, onTaskUpdated }: PullRequestTabProps) {
+export function PullRequestTab({ task, projectPath, visible, initialView, onInitialViewConsumed, onUpdateTask, onTaskUpdated }: PullRequestTabProps) {
   const [ghInstalled, setGhInstalled] = useState<boolean | null>(null)
   const [pr, setPr] = useState<GhPullRequest | null>(null)
   const [loading, setLoading] = useState(true)
   const [view, setView] = useState<View>('idle')
+
+  // Apply initial view from parent (e.g. general tab → create PR)
+  useEffect(() => {
+    if (initialView && !task.pr_url) {
+      setView(initialView)
+      onInitialViewConsumed?.()
+    }
+  }, [initialView])
+
   const [error, setError] = useState<string | null>(null)
   const pollRef = useRef<ReturnType<typeof setInterval>>(undefined)
 
