@@ -171,26 +171,52 @@ export function BranchTab({ task, projectPath, visible, pollIntervalMs = 5000 }:
     return <div className="h-full flex items-center justify-center"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
   }
 
-  // Build graph
+  // Build graph — always show both branch tips for a visual fork
   const graphNodes: GraphNode[] = []
 
-  for (let i = 0; i < branchCommits.length; i++) {
+  // Column 0 = parent branch (main track), Column 1 = task branch (fork)
+  if (incomingCommits.length > 0) {
+    for (let i = 0; i < incomingCommits.length; i++) {
+      graphNodes.push({
+        commit: incomingCommits[i],
+        column: 0,
+        type: i === 0 ? 'branch-tip' : 'commit',
+        branchName: parentBranch,
+        branchLabel: i === 0 ? parentBranch : undefined
+      })
+    }
+  } else if (forkPoint) {
+    // Synthetic tip: parent branch is at fork point
     graphNodes.push({
-      commit: branchCommits[i],
+      commit: { hash: forkPoint, shortHash: forkPoint.slice(0, 7), message: 'Up to date', author: '', relativeDate: '' },
       column: 0,
-      type: i === 0 ? 'branch-tip' : 'commit',
-      branchName: taskBranch ?? undefined,
-      branchLabel: i === 0 ? (taskBranch ?? 'HEAD') : undefined
+      type: 'branch-tip',
+      branchName: parentBranch,
+      branchLabel: parentBranch
     })
   }
 
-  for (let i = 0; i < incomingCommits.length; i++) {
+  if (branchCommits.length > 0) {
+    for (let i = 0; i < branchCommits.length; i++) {
+      graphNodes.push({
+        commit: branchCommits[i],
+        column: 1,
+        type: i === 0 ? 'branch-tip' : 'commit',
+        branchName: taskBranch ?? undefined,
+        branchLabel: i === 0 ? (taskBranch ?? 'HEAD') : undefined
+      })
+    }
+  } else if (forkPoint) {
+    // Synthetic tip: no commits yet on this branch
+    const statusMsg = diffStats && diffStats.filesChanged > 0
+      ? `${diffStats.filesChanged} file${diffStats.filesChanged !== 1 ? 's' : ''} changed (uncommitted)`
+      : 'No changes yet'
     graphNodes.push({
-      commit: incomingCommits[i],
+      commit: { hash: forkPoint, shortHash: forkPoint.slice(0, 7), message: statusMsg, author: '', relativeDate: '' },
       column: 1,
-      type: i === 0 ? 'branch-tip' : 'commit',
-      branchName: parentBranch,
-      branchLabel: i === 0 ? parentBranch : undefined
+      type: 'branch-tip',
+      branchName: taskBranch ?? undefined,
+      branchLabel: taskBranch ?? 'HEAD'
     })
   }
 
@@ -212,7 +238,8 @@ export function BranchTab({ task, projectPath, visible, pollIntervalMs = 5000 }:
     graphNodes.push({ commit: c, column: 0, type: 'commit' })
   }
 
-  const hasColumns = incomingCommits.length > 0 ? 2 : 1
+  // Always 2 columns when we have a fork point (ensures visual fork)
+  const hasColumns = forkPoint ? 2 : (incomingCommits.length > 0 ? 2 : 1)
 
   return (
     <div className="h-full flex flex-col">
@@ -304,7 +331,7 @@ export function BranchTab({ task, projectPath, visible, pollIntervalMs = 5000 }:
         {/* Graph */}
         {graphNodes.length > 0 ? (
           <div className="rounded-lg border bg-muted/30 p-2">
-            <BranchGraph nodes={graphNodes} maxColumns={hasColumns} />
+            <BranchGraph mode="tips" nodes={graphNodes} maxColumns={hasColumns} />
           </div>
         ) : (
           <div className="flex items-center justify-center h-32 text-xs text-muted-foreground">
