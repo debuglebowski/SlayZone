@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback } from 'react'
-import { GitBranch, GitMerge, GitPullRequest, Plus, Link2, ArrowUp, ArrowDown, Loader2, AlertTriangle, FileText, ChevronDown, Trash2 } from 'lucide-react'
+import { GitBranch, GitMerge, GitPullRequest, Plus, Link2, Loader2, AlertTriangle, ChevronDown, Trash2 } from 'lucide-react'
 import {
   Button, Tooltip, TooltipContent, TooltipTrigger,
   Popover, PopoverContent, PopoverTrigger,
@@ -7,6 +7,7 @@ import {
   toast
 } from '@slayzone/ui'
 import type { ConsolidatedGeneralData } from './useConsolidatedGeneralData'
+import type { GhPullRequest } from '../shared/types'
 
 // --- Not a git repo / no project fallbacks ---
 
@@ -166,9 +167,28 @@ export function WorktreeRemoveButton({ data }: { data: ConsolidatedGeneralData }
   )
 }
 
+// --- PR status chip (shown when PR is linked) ---
+
+export function PrStatusChip({ pr, onClick }: { pr: GhPullRequest; onClick: () => void }) {
+  const stateLabel = pr.state === 'MERGED' ? 'Merged' : pr.state === 'CLOSED' ? 'Closed' : pr.isDraft ? 'Draft' : 'Open'
+  const stateClass = pr.state === 'MERGED' ? 'bg-purple-500/20 text-purple-600 dark:text-purple-400'
+    : pr.state === 'CLOSED' ? 'bg-red-500/20 text-red-600 dark:text-red-400'
+    : pr.isDraft ? 'bg-muted text-muted-foreground'
+    : 'bg-green-500/20 text-green-600 dark:text-green-400'
+
+  return (
+    <Button variant="outline" size="sm" onClick={onClick} className="gap-4">
+      View PR
+      <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${stateClass}`}>
+        #{pr.number} · {stateLabel}
+      </span>
+    </Button>
+  )
+}
+
 // --- PR buttons ---
 
-export function PrButtons({ onSwitchToPrView }: { onSwitchToPrView: (view: 'create' | 'link') => void }) {
+export function PrButtons({ onSwitchToPrView }: { onSwitchToPrView: (view: 'create' | 'link' | null) => void }) {
   const [menuOpen, setMenuOpen] = useState(false)
   return (
     <div className="flex">
@@ -196,49 +216,6 @@ export function PrButtons({ onSwitchToPrView }: { onSwitchToPrView: (view: 'crea
           </button>
         </PopoverContent>
       </Popover>
-    </div>
-  )
-}
-
-// --- Branch comparison header ---
-
-export function BranchComparisonHeader({ data }: { data: ConsolidatedGeneralData }) {
-  const { taskBranch, parentBranch, branchCommits, incomingCommits, diffStats } = data
-  return (
-    <div className="px-3 py-2.5 rounded-lg border bg-muted/30">
-      <div className="flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2 min-w-0">
-          <GitBranch className="h-4 w-4 text-primary shrink-0" />
-          <span className="text-sm font-medium truncate">{taskBranch ?? '...'}</span>
-          <span className="text-xs text-muted-foreground shrink-0">vs</span>
-          <span className="text-xs text-muted-foreground truncate">{parentBranch}</span>
-        </div>
-        <div className="flex items-center gap-2 shrink-0 text-xs">
-          {branchCommits.length > 0 && (
-            <span className="flex items-center gap-0.5 text-green-500">
-              <ArrowUp className="h-3 w-3" />{branchCommits.length}
-            </span>
-          )}
-          {incomingCommits.length > 0 && (
-            <span className="flex items-center gap-0.5 text-yellow-500">
-              <ArrowDown className="h-3 w-3" />{incomingCommits.length}
-            </span>
-          )}
-          {branchCommits.length === 0 && incomingCommits.length === 0 && (
-            <span className="text-green-500 flex items-center gap-1">
-              <Check className="h-3 w-3" /> Up to date
-            </span>
-          )}
-        </div>
-      </div>
-      {diffStats && diffStats.filesChanged > 0 && (
-        <div className="flex items-center gap-2 mt-1.5 text-[11px] text-muted-foreground">
-          <FileText className="h-3 w-3" />
-          {diffStats.filesChanged} file{diffStats.filesChanged !== 1 ? 's' : ''} changed
-          {diffStats.insertions > 0 && <span className="text-green-500">+{diffStats.insertions}</span>}
-          {diffStats.deletions > 0 && <span className="text-red-500">-{diffStats.deletions}</span>}
-        </div>
-      )}
     </div>
   )
 }

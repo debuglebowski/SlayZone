@@ -16,6 +16,15 @@ export interface DetectedWorktreeItem {
   isMain: boolean
 }
 
+export interface CopyFilesDialogState {
+  open: boolean
+  repoPath: string
+  /** Pending worktree creation params — worktree doesn't exist yet */
+  pendingWorktreePath: string
+  pendingBranch: string
+  pendingSourceBranch: string | null
+}
+
 export interface ConsolidatedGeneralData {
   // General data
   isGitRepo: boolean | null
@@ -53,10 +62,15 @@ export interface ConsolidatedGeneralData {
   handleInitGit: () => Promise<void>
   handleAction: (action: string) => Promise<void>
   handleConfirmedAction: (action: string, label: string) => void
+  handleCopyFilesConfirm: (selectedPaths: string[], remember: boolean) => Promise<void>
+  handleCopyFilesCancel: () => void
   fetchGitData: () => Promise<void>
 
   // Detected worktrees for linking
   detectedWorktrees: DetectedWorktreeItem[]
+
+  // Copy files dialog
+  copyFilesDialog: CopyFilesDialogState
 
   // Action state
   creating: boolean
@@ -90,6 +104,9 @@ export function useConsolidatedGeneralData(
   const [removing, setRemoving] = useState(false)
   const [createError, setCreateError] = useState<string | null>(null)
   const [detectedWorktrees, setDetectedWorktrees] = useState<DetectedWorktreeItem[]>([])
+  const [copyFilesDialog, setCopyFilesDialog] = useState<CopyFilesDialogState>({ open: false, repoPath: '', pendingWorktreePath: '', pendingBranch: '', pendingSourceBranch: null })
+  const copyFilesDialogRef = useRef(copyFilesDialog)
+  copyFilesDialogRef.current = copyFilesDialog
 
   // Branch state
   const [branchCommits, setBranchCommits] = useState<CommitInfo[]>([])
@@ -104,7 +121,7 @@ export function useConsolidatedGeneralData(
   const [actionLoading, setActionLoading] = useState<string | null>(null)
 
   const initialLoad = useRef(false)
-  const onetimeFetched = useRef(false)
+
 
   // Fetch general git data
   const fetchGitData = useCallback(async () => {
@@ -198,31 +215,30 @@ export function useConsolidatedGeneralData(
     return () => clearInterval(timer)
   }, [visible, targetPath, parentBranch, fetchBranchData, pollIntervalMs])
 
-  // One-time fetch for PR + metadata
+  // PR — reactive fetch when pr_url or branch changes
+  const activeBranch = hasWorktree ? worktreeBranch : currentBranch
   useEffect(() => {
-    if (!initialLoad.current || onetimeFetched.current || !taskBranch) return
-    onetimeFetched.current = true
-
     const repoPath = projectPath || targetPath
     if (!repoPath) return
-
-    Promise.all([
+    if (task.pr_url) {
+      window.api.git.getPrByUrl(repoPath, task.pr_url).then(setPr).catch(() => setPr(null))
+    } else if (activeBranch) {
       window.api.git.listOpenPrs(repoPath)
-        .then(prs => prs.find(p => p.headRefName === taskBranch) ?? null)
-        .catch(() => null),
-      task.worktree_path
-        ? window.api.git.getWorktreeMetadata(task.worktree_path).catch(() => null)
-        : Promise.resolve(null)
-    ]).then(([foundPr, meta]) => {
-      setPr(foundPr)
-      setMetadata(meta)
-    })
-  }, [taskBranch, projectPath, targetPath, task.worktree_path])
+        .then(prs => setPr(prs.find(p => p.headRefName === activeBranch) ?? null))
+        .catch(() => setPr(null))
+    }
+  }, [task.pr_url, activeBranch, projectPath, targetPath])
+
+  // Metadata — one-time per worktree path
+  useEffect(() => {
+    if (!task.worktree_path) return
+    window.api.git.getWorktreeMetadata(task.worktree_path)
+      .then(setMetadata).catch(() => setMetadata(null))
+  }, [task.worktree_path])
 
   // Reset on path change
   useEffect(() => {
     initialLoad.current = false
-    onetimeFetched.current = false
   }, [targetPath])
 
   // Actions
@@ -238,23 +254,102 @@ export function useConsolidatedGeneralData(
     finally { setInitializing(false) }
   }, [projectPath])
 
+  /** Resolve worktree path params (shared by direct create and ask-dialog flows) */
+  const resolveWorktreeParams = useCallback(async () => {
+    if (!projectPath) return null
+    const basePathTemplate = (await window.api.settings.get('worktree_base_path')) || DEFAULT_WORKTREE_BASE_PATH_TEMPLATE
+    const basePath = resolveWorktreeBasePathTemplate(basePathTemplate, projectPath)
+    const branch = slugify(task.title) || `task-${task.id.slice(0, 8)}`
+    const worktreePath = joinWorktreePath(basePath, branch)
+    return { branch, worktreePath }
+  }, [projectPath, task.title, task.id])
+
+  /** Create worktree (no auto-copy), optionally copy specific files, then link to task */
+  const createWorktreeAndLink = useCallback(async (
+    worktreePath: string,
+    branch: string,
+    filesToCopy?: string[]
+  ) => {
+    if (!projectPath) return
+    // Omit projectId so server skips copy resolution — we handle it here
+    await window.api.git.createWorktree({
+      repoPath: projectPath, targetPath: worktreePath, branch
+    })
+    if (filesToCopy && filesToCopy.length > 0) {
+      await window.api.git.copyIgnoredFiles(projectPath, worktreePath, filesToCopy)
+    }
+    await onUpdateTask({ id: task.id, worktreePath, worktreeParentBranch: currentBranch })
+  }, [projectPath, task.id, currentBranch, onUpdateTask])
+
   const handleAddWorktree = useCallback(async () => {
     if (!projectPath) return
-    setCreating(true)
     setCreateError(null)
     try {
-      const basePathTemplate = (await window.api.settings.get('worktree_base_path')) || DEFAULT_WORKTREE_BASE_PATH_TEMPLATE
-      const basePath = resolveWorktreeBasePathTemplate(basePathTemplate, projectPath)
-      const branch = slugify(task.title) || `task-${task.id.slice(0, 8)}`
-      const worktreePath = joinWorktreePath(basePath, branch)
-      await window.api.git.createWorktree({ repoPath: projectPath, targetPath: worktreePath, branch, projectId: task.project_id })
-      await onUpdateTask({ id: task.id, worktreePath, worktreeParentBranch: currentBranch })
+      const params = await resolveWorktreeParams()
+      if (!params) return
+
+      // Check copy behavior before creating
+      const { behavior } = await window.api.git.resolveCopyBehavior(task.project_id)
+      if (behavior === 'ask') {
+        // Show dialog — worktree created on confirm
+        setCopyFilesDialog({
+          open: true, repoPath: projectPath,
+          pendingWorktreePath: params.worktreePath,
+          pendingBranch: params.branch,
+          pendingSourceBranch: currentBranch
+        })
+        return
+      }
+
+      // Non-ask: create immediately (server handles copy for all/custom/none)
+      setCreating(true)
+      await window.api.git.createWorktree({
+        repoPath: projectPath, targetPath: params.worktreePath, branch: params.branch,
+        projectId: task.project_id
+      })
+      await onUpdateTask({ id: task.id, worktreePath: params.worktreePath, worktreeParentBranch: currentBranch })
     } catch (err) {
       setCreateError(err instanceof Error ? err.message : String(err))
     } finally {
       setCreating(false)
     }
-  }, [projectPath, task.id, task.title, currentBranch, onUpdateTask])
+  }, [projectPath, task.id, task.project_id, currentBranch, onUpdateTask, resolveWorktreeParams])
+
+  const handleCopyFilesConfirm = useCallback(async (selectedPaths: string[], remember: boolean) => {
+    const pending = copyFilesDialogRef.current
+    setCopyFilesDialog(prev => ({ ...prev, open: false }))
+
+    // Create the worktree now + copy selected files + link task
+    setCreating(true)
+    setCreateError(null)
+    try {
+      await createWorktreeAndLink(pending.pendingWorktreePath, pending.pendingBranch, selectedPaths)
+    } catch (err) {
+      setCreateError(err instanceof Error ? err.message : String(err))
+    } finally {
+      setCreating(false)
+    }
+
+    // Persist selection if "remember" checked
+    if (remember && task.project_id) {
+      try {
+        if (selectedPaths.length === 0) {
+          await window.api.db.updateProject({ id: task.project_id, worktreeCopyBehavior: 'none' })
+        } else {
+          await window.api.db.updateProject({
+            id: task.project_id,
+            worktreeCopyBehavior: 'custom',
+            // Paths must not contain commas
+            worktreeCopyPaths: selectedPaths.join(', ')
+          })
+        }
+      } catch { /* best-effort */ }
+    }
+  }, [task.project_id, createWorktreeAndLink])
+
+  const handleCopyFilesCancel = useCallback(() => {
+    setCopyFilesDialog(prev => ({ ...prev, open: false }))
+  }, [])
 
   const handleLinkWorktree = useCallback(async (worktreePath: string, _branch: string | null) => {
     try {
@@ -390,7 +485,8 @@ export function useConsolidatedGeneralData(
     branchLoading, hasWorktree, targetPath, totalChanges, parentBranch,
     sluggedBranch: slugify(task.title) || `task-${task.id.slice(0, 8)}`,
     handleAddWorktree, handleLinkWorktree, handleRemoveWorktree, handleInitGit,
-    handleAction, handleConfirmedAction, fetchGitData, detectedWorktrees,
+    handleAction, handleConfirmedAction, handleCopyFilesConfirm, handleCopyFilesCancel, fetchGitData,
+    detectedWorktrees, copyFilesDialog,
     creating, initializing, removing, actionLoading, createError
   }
 }

@@ -3,15 +3,16 @@
  *
  * Top: header (branch pill + PR/worktree buttons, blue when worktree)
  * Middle: status chips + rebase/merge + pull/push
- * Bottom (worktree): fork graph + PR snippet + metadata
+ * Bottom (worktree): fork graph
  * Bottom (no worktree): recent commits
  */
-import { Loader2, Copy, GitCommitHorizontal, Check, GitBranch, FolderOpen } from 'lucide-react'
+import { Loader2, Copy, GitCommitHorizontal, Check, GitBranch, FolderOpen, ArrowLeft, Cloud, CloudOff } from 'lucide-react'
 import { Button, toast } from '@slayzone/ui'
 import type { Task, UpdateTaskInput } from '@slayzone/task/shared'
 import { useConsolidatedGeneralData } from './useConsolidatedGeneralData'
 import { BranchGraph } from './BranchGraph'
 import { RemoteSection } from './RemoteSection'
+import { CopyFilesDialog } from './CopyFilesDialog'
 import {
   NoProjectFallback,
   CheckingFallback,
@@ -20,12 +21,13 @@ import {
   StatusChips,
   WorktreeButton,
   WorktreeRemoveButton,
+  PrStatusChip,
   PrButtons,
   RebaseMergeButtons,
   StaleNudge,
   Section,
   useCopyHash
-} from './consolidated-shared'
+} from './general-tab-shared'
 
 interface GeneralTabContentProps {
   task: Task
@@ -34,7 +36,7 @@ interface GeneralTabContentProps {
   pollIntervalMs?: number
   onUpdateTask: (data: UpdateTaskInput) => Promise<Task>
   onSwitchTab: (tab: 'changes' | 'conflicts' | 'branches') => void
-  onSwitchToPrView?: (view: 'create' | 'link') => void
+  onSwitchToPrView?: (view: 'create' | 'link' | null) => void
 }
 
 export function GeneralTabContent({
@@ -66,8 +68,31 @@ export function GeneralTabContent({
           <span className="text-[10px] font-mono font-medium px-1.5 py-0.5 rounded-full bg-muted border truncate">
             {activeBranch || 'detached HEAD'}
           </span>
+          {data.hasWorktree && data.parentBranch && (
+            <span className="text-[10px] text-muted-foreground flex items-center gap-1">
+              <ArrowLeft className="h-3 w-3" />
+              <span className="font-mono">{data.parentBranch}</span>
+            </span>
+          )}
+          {data.upstreamAB ? (
+            <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-muted border flex items-center gap-1 text-muted-foreground">
+              <Cloud className="h-3 w-3" />
+              tracked
+            </span>
+          ) : data.remoteUrl ? (
+            <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-yellow-500/10 border border-yellow-500/20 flex items-center gap-1 text-yellow-600 dark:text-yellow-400">
+              <CloudOff className="h-3 w-3" />
+              no upstream
+            </span>
+          ) : null}
           <div className="ml-auto flex items-center gap-2">
-            {onSwitchToPrView && <PrButtons onSwitchToPrView={onSwitchToPrView} />}
+            {onSwitchToPrView && (
+              data.pr ? (
+                <PrStatusChip pr={data.pr} onClick={() => onSwitchToPrView(null)} />
+              ) : (
+                <PrButtons onSwitchToPrView={onSwitchToPrView} />
+              )
+            )}
             {data.hasWorktree ? (
               <WorktreeRemoveButton data={data} />
             ) : (
@@ -189,6 +214,12 @@ export function GeneralTabContent({
         </div>
       )}
 
+      <CopyFilesDialog
+        open={data.copyFilesDialog.open}
+        onOpenChange={(open) => { if (!open) data.handleCopyFilesCancel() }}
+        repoPath={data.copyFilesDialog.repoPath}
+        onConfirm={data.handleCopyFilesConfirm}
+      />
     </div>
   )
 }
