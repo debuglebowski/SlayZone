@@ -3,7 +3,7 @@ import { Copy, Check } from 'lucide-react'
 import { useState, useRef, useCallback, useMemo } from 'react'
 import type { CommitInfo, DagCommit } from '../shared/types'
 
-// --- Public interfaces (backward-compatible for BranchTab) ---
+// --- Public interfaces ---
 
 export interface GraphNode {
   commit: CommitInfo
@@ -13,9 +13,67 @@ export interface GraphNode {
   branchLabel?: string
 }
 
-type BranchGraphProps =
-  | { mode: 'tips'; nodes: GraphNode[]; maxColumns: number; className?: string }
+type CommitGraphProps =
+  | { mode: 'fork'; nodes: GraphNode[]; maxColumns: number; className?: string }
   | { mode: 'dag'; commits: DagCommit[]; filterQuery?: string; tipsOnly?: boolean; className?: string }
+
+// --- Fork graph builder ---
+
+export function buildForkGraphNodes(opts: {
+  column0Commits: CommitInfo[]
+  column0Label: string
+  column1Commits: CommitInfo[]
+  column1Label: string
+  forkPoint: string
+  preForkCommits: CommitInfo[]
+  column1EmptyMessage?: string
+}): { nodes: GraphNode[]; columns: number } {
+  const nodes: GraphNode[] = []
+  const fp = opts.forkPoint
+
+  // Column 0
+  if (opts.column0Commits.length > 0) {
+    for (let i = 0; i < opts.column0Commits.length; i++) {
+      nodes.push({
+        commit: opts.column0Commits[i], column: 0,
+        type: i === 0 ? 'branch-tip' : 'commit',
+        branchName: opts.column0Label, branchLabel: i === 0 ? opts.column0Label : undefined
+      })
+    }
+  } else {
+    nodes.push({
+      commit: { hash: fp, shortHash: fp.slice(0, 7), message: 'Up to date', author: '', relativeDate: '' },
+      column: 0, type: 'branch-tip', branchName: opts.column0Label, branchLabel: opts.column0Label
+    })
+  }
+
+  // Column 1
+  if (opts.column1Commits.length > 0) {
+    for (let i = 0; i < opts.column1Commits.length; i++) {
+      nodes.push({
+        commit: opts.column1Commits[i], column: 1,
+        type: i === 0 ? 'branch-tip' : 'commit',
+        branchName: opts.column1Label, branchLabel: i === 0 ? opts.column1Label : undefined
+      })
+    }
+  } else {
+    nodes.push({
+      commit: { hash: fp, shortHash: fp.slice(0, 7), message: opts.column1EmptyMessage ?? 'Up to date', author: '', relativeDate: '' },
+      column: 1, type: 'branch-tip', branchName: opts.column1Label, branchLabel: opts.column1Label
+    })
+  }
+
+  // Fork point + pre-fork context
+  nodes.push({
+    commit: { hash: fp, shortHash: fp.slice(0, 7), message: 'fork point', author: '', relativeDate: '' },
+    column: 0, type: 'fork-point'
+  })
+  for (const c of opts.preForkCommits) {
+    nodes.push({ commit: c, column: 0, type: 'commit' })
+  }
+
+  return { nodes, columns: 2 }
+}
 
 // --- Constants ---
 
@@ -233,12 +291,9 @@ function computeCollapsedLayout(commits: DagCommit[], fullLayout: DagLayout): Co
     hashToCol.set(n.commit.hash, n.column)
   }
 
-  // A commit is "interesting" if it has refs, is a fork (multiple children in different columns),
-  // or is a merge (multiple parents)
   function isForkPoint(hash: string): boolean {
     const children = childrenOf.get(hash) || []
     if (children.length < 2) return false
-    // Fork = children in different columns
     const cols = new Set(children.map(ch => hashToCol.get(ch)).filter(c => c !== undefined))
     return cols.size > 1
   }
@@ -255,12 +310,14 @@ function computeCollapsedLayout(commits: DagCommit[], fullLayout: DagLayout): Co
   const collapsedEdges: LayoutEdge[] = []
   let nextRow = 0
 
-  // Track which fork points we've already emitted (they can appear in multiple column walks)
   const emittedForks = new Set<string>()
-  // Map from original hash → collapsed row (for edges)
+  // Map EVERY commit hash → collapsed row (not just interesting ones)
   const hashToCollapsedRow = new Map<string, number>()
 
-  // Process columns in order (0 first = main trunk)
+  function mapHashes(hashes: string[], row: number) {
+    for (const h of hashes) hashToCollapsedRow.set(h, row)
+  }
+
   const sortedCols = [...columnNodes.keys()].sort((a, b) => a - b)
 
   for (const col of sortedCols) {
@@ -275,7 +332,6 @@ function computeCollapsedLayout(commits: DagCommit[], fullLayout: DagLayout): Co
       const isFork = isForkPoint(node.commit.hash)
 
       if (hasRefs) {
-        // Emit branch label node
         const branchRow = nextRow++
         collapsedNodes.push({
           kind: 'branch',
@@ -289,94 +345,83 @@ function computeCollapsedLayout(commits: DagCommit[], fullLayout: DagLayout): Co
         hashToCollapsedRow.set(node.commit.hash, branchRow)
         segmentStart++
 
-        // Now count commits until next interesting point
-        let count = 0
-        let forkHash: string | null = null
+        const groupHashes: string[] = []
         while (segmentStart < nodes.length) {
           const n = nodes[segmentStart]
-          const nHasRefs = n.commit.refs.length > 0
-          const nIsFork = isForkPoint(n.commit.hash)
-
-          if (nHasRefs) break // next branch label
-          if (nIsFork) {
-            forkHash = n.commit.hash
-            count++ // the fork commit itself counts
+          if (n.commit.refs.length > 0) break
+          if (isForkPoint(n.commit.hash)) {
+            groupHashes.push(n.commit.hash)
+            emittedForks.add(n.commit.hash)
             segmentStart++
             break
           }
-          count++
+          groupHashes.push(n.commit.hash)
           segmentStart++
         }
 
-        if (count > 0) {
+        if (groupHashes.length > 0) {
           const groupRow = nextRow++
           collapsedNodes.push({
             kind: 'group',
-            label: `${count} commit${count > 1 ? 's' : ''}`,
+            label: `${groupHashes.length} commit${groupHashes.length > 1 ? 's' : ''}`,
             column: col,
             row: groupRow,
             color,
             id: `group-${col}-${branchRow}`,
-            commitCount: count
+            commitCount: groupHashes.length
           })
-          // Edge from branch label to group
           collapsedEdges.push({
             fromRow: branchRow, fromCol: col, toRow: groupRow, toCol: col,
             color, type: 'straight'
           })
-          if (forkHash) {
-            hashToCollapsedRow.set(forkHash, groupRow)
-            emittedForks.add(forkHash)
-          }
+          mapHashes(groupHashes, groupRow)
         }
       } else if (isFork && !emittedForks.has(node.commit.hash)) {
-        // Fork point without refs — count commits from here
         segmentStart++
-        let count = 1 // the fork commit itself
+        const groupHashes = [node.commit.hash]
         emittedForks.add(node.commit.hash)
 
         while (segmentStart < nodes.length) {
           const n = nodes[segmentStart]
           if (n.commit.refs.length > 0 || isForkPoint(n.commit.hash)) break
-          count++
+          groupHashes.push(n.commit.hash)
           segmentStart++
         }
 
         const groupRow = nextRow++
         collapsedNodes.push({
           kind: 'group',
-          label: `${count} commit${count > 1 ? 's' : ''}`,
+          label: `${groupHashes.length} commit${groupHashes.length > 1 ? 's' : ''}`,
           column: col,
           row: groupRow,
           color,
           id: `group-${col}-${node.commit.hash}`,
-          commitCount: count
+          commitCount: groupHashes.length
         })
-        hashToCollapsedRow.set(node.commit.hash, groupRow)
+        mapHashes(groupHashes, groupRow)
       } else {
-        // Regular commit, not interesting on its own — accumulate until next interesting
         segmentStart++
-        let count = 1
+        const groupHashes = [node.commit.hash]
 
         while (segmentStart < nodes.length) {
           const n = nodes[segmentStart]
           if (n.commit.refs.length > 0 || isForkPoint(n.commit.hash)) break
-          count++
+          groupHashes.push(n.commit.hash)
           segmentStart++
         }
 
-        if (count > 0) {
+        if (groupHashes.length > 0) {
           const groupRow = nextRow++
           collapsedNodes.push({
             kind: 'group',
-            label: `${count} commit${count > 1 ? 's' : ''}`,
+            label: `${groupHashes.length} commit${groupHashes.length > 1 ? 's' : ''}`,
             column: col,
             row: groupRow,
             color,
             id: `group-${col}-${node.commit.hash}`,
-            commitCount: count
+            commitCount: groupHashes.length
           })
-          hashToCollapsedRow.set(node.commit.hash, groupRow)
+          mapHashes(groupHashes, groupRow)
         }
       }
     }
@@ -384,7 +429,6 @@ function computeCollapsedLayout(commits: DagCommit[], fullLayout: DagLayout): Co
     // Connect consecutive collapsed nodes in this column
     const colCollapsed = collapsedNodes.filter(n => n.column === col)
     for (let i = 0; i < colCollapsed.length - 1; i++) {
-      // Avoid duplicate edges (branch→group already added)
       const from = colCollapsed[i]
       const to = colCollapsed[i + 1]
       const exists = collapsedEdges.some(
@@ -399,24 +443,26 @@ function computeCollapsedLayout(commits: DagCommit[], fullLayout: DagLayout): Co
     }
   }
 
-  // Add cross-column fork edges: where a branch's first commit's parent is in another column
-  for (const col of sortedCols) {
-    const nodes = columnNodes.get(col)!
-    if (nodes.length === 0) continue
-    const firstInCol = nodes[0]
-    // Find the parent that's in a different column (the fork source)
-    for (const parentHash of firstInCol.commit.parents) {
-      const parentCol = hashToCol.get(parentHash)
-      if (parentCol !== undefined && parentCol !== col) {
-        const fromRow = hashToCollapsedRow.get(parentHash)
-        const toRow = hashToCollapsedRow.get(firstInCol.commit.hash)
-          ?? collapsedNodes.find(n => n.column === col)?.row
-        if (fromRow !== undefined && toRow !== undefined) {
-          collapsedEdges.push({
-            fromRow, fromCol: parentCol, toRow, toCol: col,
-            color: getColor(col), type: 'curve'
-          })
-        }
+  // Cross-column fork edges: a commit whose FIRST parent is in a different column
+  // marks a fork point (where a branch diverged). Second+ parents are merges, not forks.
+  // Deduplicate since multiple commits in the same collapsed group may share the same edge.
+  const addedForkEdges = new Set<string>()
+  for (const node of fullLayout.nodes) {
+    if (node.commit.parents.length === 0) continue
+    const firstParent = node.commit.parents[0]
+    const parentCol = hashToCol.get(firstParent)
+    if (parentCol === undefined || parentCol === node.column) continue
+
+    const fromRow = hashToCollapsedRow.get(firstParent)
+    const toRow = hashToCollapsedRow.get(node.commit.hash)
+    if (fromRow !== undefined && toRow !== undefined) {
+      const key = `${fromRow},${parentCol},${toRow},${node.column}`
+      if (!addedForkEdges.has(key)) {
+        addedForkEdges.add(key)
+        collapsedEdges.push({
+          fromRow, fromCol: parentCol, toRow, toCol: node.column,
+          color: getColor(node.column), type: 'curve'
+        })
       }
     }
   }
@@ -424,7 +470,7 @@ function computeCollapsedLayout(commits: DagCommit[], fullLayout: DagLayout): Co
   return { nodes: collapsedNodes, edges: collapsedEdges, maxColumn: fullLayout.maxColumn }
 }
 
-// --- Tips mode layout (backward-compat for BranchTab) ---
+// --- Fork mode layout ---
 
 interface TipsLayout {
   nodes: Array<{ node: GraphNode; row: number }>
@@ -600,7 +646,7 @@ function CommitGroupRow({ count, color, gutterWidth }: {
 
 // --- Main component ---
 
-export function BranchGraph(props: BranchGraphProps) {
+export function CommitGraph(props: CommitGraphProps) {
   const { copiedHash, handleCopy } = useCopyHash()
 
   if (props.mode === 'dag') {
@@ -708,7 +754,7 @@ function CollapsedGraph({ layout, className }: { layout: CollapsedLayout; classN
   )
 }
 
-// --- Tips mode (backward-compat for BranchTab) ---
+// --- Fork mode ---
 
 function TipsGraph({ nodes, maxColumns, className, copiedHash, onCopy }: {
   nodes: GraphNode[]; maxColumns: number; className?: string

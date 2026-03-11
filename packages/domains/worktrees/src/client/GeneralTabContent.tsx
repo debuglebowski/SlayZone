@@ -6,11 +6,11 @@
  * Bottom (worktree): fork graph
  * Bottom (no worktree): recent commits
  */
-import { Loader2, Copy, GitCommitHorizontal, Check, GitBranch, FolderOpen, ArrowLeft, Cloud, CloudOff } from 'lucide-react'
+import { Loader2, GitBranch, FolderOpen, ArrowLeft, Cloud, CloudOff } from 'lucide-react'
 import { Button, toast } from '@slayzone/ui'
 import type { Task, UpdateTaskInput } from '@slayzone/task/shared'
 import { useConsolidatedGeneralData } from './useConsolidatedGeneralData'
-import { BranchGraph } from './BranchGraph'
+import { CommitGraph } from './CommitGraph'
 import { RemoteSection } from './RemoteSection'
 import { CopyFilesDialog } from './CopyFilesDialog'
 import {
@@ -26,7 +26,6 @@ import {
   RebaseMergeButtons,
   StaleNudge,
   Section,
-  useCopyHash
 } from './general-tab-shared'
 
 interface GeneralTabContentProps {
@@ -44,7 +43,6 @@ export function GeneralTabContent({
   onUpdateTask, onSwitchTab, onSwitchToPrView
 }: GeneralTabContentProps) {
   const data = useConsolidatedGeneralData(task, projectPath, visible, pollIntervalMs, onUpdateTask)
-  const { copiedHash, handleCopy } = useCopyHash()
 
   if (!projectPath) return <NoProjectFallback />
   if (data.isGitRepo === null) return <CheckingFallback />
@@ -171,7 +169,7 @@ export function GeneralTabContent({
             </div>
           ) : data.graphNodes.length > 0 ? (
             <div className="rounded-lg border bg-muted/30 p-2">
-              <BranchGraph mode="tips" nodes={data.graphNodes} maxColumns={data.graphColumns} />
+              <CommitGraph mode="fork" nodes={data.graphNodes} maxColumns={data.graphColumns} />
             </div>
           ) : (
             <div className="flex items-center justify-center h-20 text-xs text-muted-foreground">
@@ -181,33 +179,13 @@ export function GeneralTabContent({
 
         </div>
       ) : (
-        /* No worktree — recent commits */
+        /* No worktree — commit graph (local vs remote when diverged, or single-column recent) */
         <div className="flex-1 min-h-0 flex flex-col">
-          {data.recentCommits.length > 0 && (
+          {data.upstreamGraphNodes.length > 0 && (
             <div className="flex-1 min-h-[200px] flex flex-col p-4 pt-4">
               <div className="shrink-0 text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">Recent Commits</div>
-              <div className="min-h-0 overflow-y-auto space-y-0.5 px-3 py-2.5 rounded-lg border bg-muted/30">
-                {data.recentCommits.map((commit) => (
-                  <div
-                    key={commit.hash}
-                    className="flex items-start gap-2 py-1 px-1.5 -mx-1.5 rounded cursor-pointer hover:bg-accent/50 group"
-                    onClick={() => handleCopy(commit.shortHash)}
-                    title="Click to copy hash"
-                  >
-                    <GitCommitHorizontal className="h-3.5 w-3.5 text-muted-foreground shrink-0 mt-0.5" />
-                    <div className="flex-1 min-w-0">
-                      <div className="text-xs truncate">{commit.message}</div>
-                      <div className="text-[10px] text-muted-foreground">
-                        <span className="font-mono">{commit.shortHash}</span> · {commit.relativeDate}
-                      </div>
-                    </div>
-                    {copiedHash === commit.shortHash ? (
-                      <Check className="h-3 w-3 text-green-500 shrink-0 mt-0.5" />
-                    ) : (
-                      <Copy className="h-3 w-3 text-muted-foreground shrink-0 mt-0.5 opacity-0 group-hover:opacity-100 transition-opacity" />
-                    )}
-                  </div>
-                ))}
+              <div className="min-h-0 overflow-y-auto rounded-lg border bg-muted/30 p-2">
+                <CommitGraph mode="fork" nodes={data.upstreamGraphNodes} maxColumns={data.upstreamGraphColumns} />
               </div>
             </div>
           )}
@@ -218,6 +196,7 @@ export function GeneralTabContent({
         open={data.copyFilesDialog.open}
         onOpenChange={(open) => { if (!open) data.handleCopyFilesCancel() }}
         repoPath={data.copyFilesDialog.repoPath}
+        projectId={task.project_id}
         onConfirm={data.handleCopyFilesConfirm}
       />
     </div>

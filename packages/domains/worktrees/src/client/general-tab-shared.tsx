@@ -1,10 +1,9 @@
-import { useState, useRef, useCallback } from 'react'
+import { useState } from 'react'
 import { GitBranch, GitMerge, GitPullRequest, FolderTree, Link2, Loader2, AlertTriangle, ChevronDown, Trash2 } from 'lucide-react'
 import {
   Button, Tooltip, TooltipContent, TooltipTrigger,
   Popover, PopoverContent, PopoverTrigger,
-  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
-  toast
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle
 } from '@slayzone/ui'
 import type { ConsolidatedGeneralData } from './useConsolidatedGeneralData'
 import type { GhPullRequest } from '../shared/types'
@@ -274,23 +273,6 @@ export function RebaseMergeButtons({ data }: { data: ConsolidatedGeneralData }) 
   )
 }
 
-
-// --- Copy hash hook ---
-
-export function useCopyHash() {
-  const [copiedHash, setCopiedHash] = useState<string | null>(null)
-  const copiedTimer = useRef<ReturnType<typeof setTimeout>>(undefined)
-
-  const handleCopy = useCallback((hash: string) => {
-    navigator.clipboard.writeText(hash)
-    setCopiedHash(hash)
-    clearTimeout(copiedTimer.current)
-    copiedTimer.current = setTimeout(() => setCopiedHash(null), 1500)
-    toast('Commit hash copied to clipboard')
-  }, [])
-
-  return { copiedHash, handleCopy }
-}
 
 // --- Section helper ---
 

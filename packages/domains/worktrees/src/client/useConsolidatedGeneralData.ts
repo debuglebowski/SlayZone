@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import type { Task, UpdateTaskInput } from '@slayzone/task/shared'
 import type { CommitInfo, AheadBehind, StatusSummary, DiffStatsSummary, WorktreeMetadata, GhPullRequest } from '../shared/types'
-import type { GraphNode } from './BranchGraph'
+import { type GraphNode, buildForkGraphNodes } from './CommitGraph'
 import {
   DEFAULT_WORKTREE_BASE_PATH_TEMPLATE,
   joinWorktreePath,
@@ -47,6 +47,10 @@ export interface ConsolidatedGeneralData {
   graphNodes: GraphNode[]
   graphColumns: number
   branchLoading: boolean
+
+  // Upstream (local vs remote) graph — used when no worktree
+  upstreamGraphNodes: GraphNode[]
+  upstreamGraphColumns: number
 
   // Computed
   hasWorktree: boolean
@@ -120,6 +124,12 @@ export function useConsolidatedGeneralData(
   const [branchLoading, setBranchLoading] = useState(true)
   const [actionLoading, setActionLoading] = useState<string | null>(null)
 
+  // Upstream (local vs remote) state — for non-worktree tasks
+  const [upstreamLocalCommits, setUpstreamLocalCommits] = useState<CommitInfo[]>([])
+  const [upstreamRemoteCommits, setUpstreamRemoteCommits] = useState<CommitInfo[]>([])
+  const [upstreamPreForkCommits, setUpstreamPreForkCommits] = useState<CommitInfo[]>([])
+  const [upstreamForkPoint, setUpstreamForkPoint] = useState<string | null>(null)
+
   const initialLoad = useRef(false)
 
 
@@ -148,6 +158,35 @@ export function useConsolidatedGeneralData(
         setStatusSummary(status)
         setRecentCommits(commits)
         setUpstreamAB(uab)
+
+        // Fetch upstream divergence commits (for non-worktree graph)
+        if (!hasWorktree && activeBranch && uab && (uab.ahead > 0 || uab.behind > 0)) {
+          try {
+            const upstreamRef = `${activeBranch}@{upstream}`
+            const base = await window.api.git.getMergeBase(targetPath, activeBranch, upstreamRef)
+            setUpstreamForkPoint(base)
+            if (base) {
+              const [local, remote, preFork] = await Promise.all([
+                window.api.git.getCommitsSince(targetPath, base, activeBranch),
+                window.api.git.getCommitsSince(targetPath, base, upstreamRef),
+                window.api.git.getCommitsBeforeRef(targetPath, base, 3)
+              ])
+              setUpstreamLocalCommits(local)
+              setUpstreamRemoteCommits(remote)
+              setUpstreamPreForkCommits(preFork)
+            }
+          } catch {
+            setUpstreamForkPoint(null)
+            setUpstreamLocalCommits([])
+            setUpstreamRemoteCommits([])
+            setUpstreamPreForkCommits([])
+          }
+        } else {
+          setUpstreamForkPoint(null)
+          setUpstreamLocalCommits([])
+          setUpstreamRemoteCommits([])
+          setUpstreamPreForkCommits([])
+        }
       }
     } catch { /* polling error */ }
   }, [projectPath, targetPath, hasWorktree, worktreeBranch])
@@ -416,65 +455,43 @@ export function useConsolidatedGeneralData(
     })
   }, [handleAction])
 
-  // Build graph nodes
-  const graphNodes: GraphNode[] = []
+  // Build worktree fork graph nodes
+  let graphNodes: GraphNode[] = []
+  let graphColumns = 1
 
   if (hasWorktree && parentBranch && forkPoint) {
-    if (incomingCommits.length > 0) {
-      for (let i = 0; i < incomingCommits.length; i++) {
-        graphNodes.push({
-          commit: incomingCommits[i],
-          column: 0,
-          type: i === 0 ? 'branch-tip' : 'commit',
-          branchName: parentBranch,
-          branchLabel: i === 0 ? parentBranch : undefined
-        })
-      }
-    } else {
-      graphNodes.push({
-        commit: { hash: forkPoint, shortHash: forkPoint.slice(0, 7), message: 'Up to date', author: '', relativeDate: '' },
-        column: 0,
-        type: 'branch-tip',
-        branchName: parentBranch,
-        branchLabel: parentBranch
-      })
-    }
-
-    if (branchCommits.length > 0) {
-      for (let i = 0; i < branchCommits.length; i++) {
-        graphNodes.push({
-          commit: branchCommits[i],
-          column: 1,
-          type: i === 0 ? 'branch-tip' : 'commit',
-          branchName: taskBranch ?? undefined,
-          branchLabel: i === 0 ? (taskBranch ?? 'HEAD') : undefined
-        })
-      }
-    } else {
-      const statusMsg = diffStats && diffStats.filesChanged > 0
-        ? `${diffStats.filesChanged} file${diffStats.filesChanged !== 1 ? 's' : ''} changed (uncommitted)`
-        : 'No changes yet'
-      graphNodes.push({
-        commit: { hash: forkPoint, shortHash: forkPoint.slice(0, 7), message: statusMsg, author: '', relativeDate: '' },
-        column: 1,
-        type: 'branch-tip',
-        branchName: taskBranch ?? undefined,
-        branchLabel: taskBranch ?? 'HEAD'
-      })
-    }
-
-    graphNodes.push({
-      commit: { hash: forkPoint, shortHash: forkPoint.slice(0, 7), message: 'fork point', author: '', relativeDate: '' },
-      column: 0,
-      type: 'fork-point'
+    const column1EmptyMessage = diffStats && diffStats.filesChanged > 0
+      ? `${diffStats.filesChanged} file${diffStats.filesChanged !== 1 ? 's' : ''} changed (uncommitted)`
+      : 'No changes yet'
+    const result = buildForkGraphNodes({
+      column0Commits: incomingCommits, column0Label: parentBranch,
+      column1Commits: branchCommits, column1Label: taskBranch ?? 'HEAD',
+      forkPoint, preForkCommits, column1EmptyMessage
     })
-
-    for (const c of preForkCommits) {
-      graphNodes.push({ commit: c, column: 0, type: 'commit' })
-    }
+    graphNodes = result.nodes
+    graphColumns = result.columns
   }
 
-  const graphColumns = forkPoint ? 2 : (incomingCommits.length > 0 ? 2 : 1)
+  // Build upstream (local vs remote) graph nodes — for non-worktree tasks
+  let upstreamGraphNodes: GraphNode[] = []
+  let upstreamGraphColumns = 1
+  const activeBranchName = hasWorktree ? worktreeBranch : currentBranch
+  const upstreamLabel = activeBranchName ? `origin/${activeBranchName}` : 'origin'
+
+  if (!hasWorktree && upstreamForkPoint && (upstreamLocalCommits.length > 0 || upstreamRemoteCommits.length > 0)) {
+    const result = buildForkGraphNodes({
+      column0Commits: upstreamRemoteCommits, column0Label: upstreamLabel,
+      column1Commits: upstreamLocalCommits, column1Label: activeBranchName ?? 'HEAD',
+      forkPoint: upstreamForkPoint, preForkCommits: upstreamPreForkCommits
+    })
+    upstreamGraphNodes = result.nodes
+    upstreamGraphColumns = result.columns
+  } else if (!hasWorktree && recentCommits.length > 0) {
+    // No divergence — single column of recent commits
+    for (const c of recentCommits) {
+      upstreamGraphNodes.push({ commit: c, column: 0, type: 'commit' })
+    }
+  }
 
   const totalChanges = statusSummary ? statusSummary.staged + statusSummary.unstaged + statusSummary.untracked : 0
 
@@ -482,7 +499,8 @@ export function useConsolidatedGeneralData(
     isGitRepo, currentBranch, worktreeBranch, statusSummary, recentCommits,
     remoteUrl, upstreamAB, branchCommits, incomingCommits, preForkCommits,
     forkPoint, taskBranch, diffStats, pr, metadata, graphNodes, graphColumns,
-    branchLoading, hasWorktree, targetPath, totalChanges, parentBranch,
+    branchLoading, upstreamGraphNodes, upstreamGraphColumns,
+    hasWorktree, targetPath, totalChanges, parentBranch,
     sluggedBranch: slugify(task.title) || `task-${task.id.slice(0, 8)}`,
     handleAddWorktree, handleLinkWorktree, handleRemoveWorktree, handleInitGit,
     handleAction, handleConfirmedAction, handleCopyFilesConfirm, handleCopyFilesCancel, fetchGitData,

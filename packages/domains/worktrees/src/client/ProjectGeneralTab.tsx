@@ -1,8 +1,9 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
-import { GitBranch, ChevronDown, Check, Loader2, Plus, GitCommitHorizontal, Copy, FolderGit2 } from 'lucide-react'
+import { useState, useEffect, useCallback } from 'react'
+import { GitBranch, ChevronDown, Check, Loader2, Plus, Copy, FolderGit2 } from 'lucide-react'
 import { Button, IconButton, Input, Popover, PopoverContent, PopoverTrigger, cn, toast } from '@slayzone/ui'
 import type { CommitInfo, StatusSummary, AheadBehind } from '../shared/types'
 import { RemoteSection } from './RemoteSection'
+import { CommitGraph, type GraphNode, buildForkGraphNodes } from './CommitGraph'
 
 interface ProjectGeneralTabProps {
   projectPath: string | null
@@ -15,13 +16,15 @@ export function ProjectGeneralTab({ projectPath, visible, onSwitchToDiff }: Proj
   const [currentBranch, setCurrentBranch] = useState<string | null>(null)
   const [statusSummary, setStatusSummary] = useState<StatusSummary | null>(null)
   const [recentCommits, setRecentCommits] = useState<CommitInfo[]>([])
-  const [copiedHash, setCopiedHash] = useState<string | null>(null)
-  const copiedTimer = useRef<ReturnType<typeof setTimeout>>(undefined)
 
   const [initializing, setInitializing] = useState(false)
 
   const [remoteUrl, setRemoteUrl] = useState<string | null>(null)
   const [upstreamAB, setUpstreamAB] = useState<AheadBehind | null>(null)
+  const [upstreamLocalCommits, setUpstreamLocalCommits] = useState<CommitInfo[]>([])
+  const [upstreamRemoteCommits, setUpstreamRemoteCommits] = useState<CommitInfo[]>([])
+  const [upstreamPreForkCommits, setUpstreamPreForkCommits] = useState<CommitInfo[]>([])
+  const [upstreamForkPoint, setUpstreamForkPoint] = useState<string | null>(null)
 
   const [branchPopoverOpen, setBranchPopoverOpen] = useState(false)
   const [branches, setBranches] = useState<string[]>([])
@@ -49,6 +52,34 @@ export function ProjectGeneralTab({ projectPath, visible, onSwitchToDiff }: Proj
       if (branch) {
         const uab = await window.api.git.getAheadBehindUpstream(projectPath, branch)
         setUpstreamAB(uab)
+
+        if (uab && (uab.ahead > 0 || uab.behind > 0)) {
+          try {
+            const upstreamRef = `${branch}@{upstream}`
+            const base = await window.api.git.getMergeBase(projectPath, branch, upstreamRef)
+            setUpstreamForkPoint(base)
+            if (base) {
+              const [local, remote, preFork] = await Promise.all([
+                window.api.git.getCommitsSince(projectPath, base, branch),
+                window.api.git.getCommitsSince(projectPath, base, upstreamRef),
+                window.api.git.getCommitsBeforeRef(projectPath, base, 3)
+              ])
+              setUpstreamLocalCommits(local)
+              setUpstreamRemoteCommits(remote)
+              setUpstreamPreForkCommits(preFork)
+            }
+          } catch {
+            setUpstreamForkPoint(null)
+            setUpstreamLocalCommits([])
+            setUpstreamRemoteCommits([])
+            setUpstreamPreForkCommits([])
+          }
+        } else {
+          setUpstreamForkPoint(null)
+          setUpstreamLocalCommits([])
+          setUpstreamRemoteCommits([])
+          setUpstreamPreForkCommits([])
+        }
       } else {
         setUpstreamAB(null)
       }
@@ -117,14 +148,6 @@ export function ProjectGeneralTab({ projectPath, visible, onSwitchToDiff }: Proj
     finally { setInitializing(false) }
   }
 
-  const handleCopyHash = useCallback((hash: string) => {
-    navigator.clipboard.writeText(hash)
-    setCopiedHash(hash)
-    clearTimeout(copiedTimer.current)
-    copiedTimer.current = setTimeout(() => setCopiedHash(null), 1500)
-    toast('Commit hash copied to clipboard')
-  }, [])
-
   if (!projectPath) {
     return <div className="p-4 text-xs text-muted-foreground">Set a project path to use Git features</div>
   }
@@ -148,6 +171,25 @@ export function ProjectGeneralTab({ projectPath, visible, onSwitchToDiff }: Proj
   }
 
   const totalChanges = statusSummary ? statusSummary.staged + statusSummary.unstaged + statusSummary.untracked : 0
+
+  // Build upstream graph nodes
+  const upstreamLabel = currentBranch ? `origin/${currentBranch}` : 'origin'
+  let graphNodes: GraphNode[] = []
+  let graphColumns = 1
+
+  if (upstreamForkPoint && (upstreamLocalCommits.length > 0 || upstreamRemoteCommits.length > 0)) {
+    const result = buildForkGraphNodes({
+      column0Commits: upstreamRemoteCommits, column0Label: upstreamLabel,
+      column1Commits: upstreamLocalCommits, column1Label: currentBranch ?? 'HEAD',
+      forkPoint: upstreamForkPoint, preForkCommits: upstreamPreForkCommits
+    })
+    graphNodes = result.nodes
+    graphColumns = result.columns
+  } else {
+    for (const c of recentCommits) {
+      graphNodes.push({ commit: c, column: 0, type: 'commit' })
+    }
+  }
 
   return (
     <div className="h-full flex flex-col">
@@ -244,31 +286,11 @@ export function ProjectGeneralTab({ projectPath, visible, onSwitchToDiff }: Proj
       </div>
 
       {/* Recent commits */}
-      {recentCommits.length > 0 && (
+      {graphNodes.length > 0 && (
         <div className="flex-1 min-h-[200px] flex flex-col p-4 pt-6">
           <div className="shrink-0 text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">Recent Commits</div>
-          <div className="min-h-0 overflow-y-auto space-y-0.5 px-3 py-2.5 rounded-lg border bg-muted/30">
-            {recentCommits.map((commit) => (
-              <div
-                key={commit.hash}
-                className="flex items-start gap-2 py-1 px-1.5 -mx-1.5 rounded cursor-pointer hover:bg-accent/50 group"
-                onClick={() => handleCopyHash(commit.shortHash)}
-                title="Click to copy hash"
-              >
-                <GitCommitHorizontal className="h-3.5 w-3.5 text-muted-foreground shrink-0 mt-0.5" />
-                <div className="flex-1 min-w-0">
-                  <div className="text-xs truncate">{commit.message}</div>
-                  <div className="text-[10px] text-muted-foreground">
-                    <span className="font-mono">{commit.shortHash}</span> · {commit.relativeDate}
-                  </div>
-                </div>
-                {copiedHash === commit.shortHash ? (
-                  <Check className="h-3 w-3 text-green-500 shrink-0 mt-0.5" />
-                ) : (
-                  <Copy className="h-3 w-3 text-muted-foreground shrink-0 mt-0.5 opacity-0 group-hover:opacity-100 transition-opacity" />
-                )}
-              </div>
-            ))}
+          <div className="min-h-0 overflow-y-auto rounded-lg border bg-muted/30 p-2">
+            <CommitGraph mode="fork" nodes={graphNodes} maxColumns={graphColumns} />
           </div>
         </div>
       )}
