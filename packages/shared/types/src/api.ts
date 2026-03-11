@@ -17,7 +17,7 @@ import type {
 } from '@slayzone/terminal/shared'
 import type { TerminalTab, CreateTerminalTabInput, UpdateTerminalTabInput } from '@slayzone/task-terminals/shared'
 import type { Theme, ThemePreference } from '@slayzone/settings/shared'
-import type { DetectedWorktree, MergeResult, MergeWithAIResult, GitDiffSnapshot, GitSyncResult, ConflictFileContent, ConflictAnalysis, RebaseProgress, CommitInfo, AheadBehind, StatusSummary, BranchListResult, DeleteBranchResult, PruneResult, DiffStatsSummary, WorktreeMetadata, RebaseOntoResult, GhPullRequest, GhPrTimelineEvent, CreatePrInput, CreatePrResult, MergePrInput, EditPrCommentInput } from '@slayzone/worktrees/shared'
+import type { CreateWorktreeOpts, IgnoredFileNode, DetectedWorktree, MergeResult, MergeWithAIResult, GitDiffSnapshot, GitSyncResult, ConflictFileContent, ConflictAnalysis, RebaseProgress, CommitInfo, AheadBehind, StatusSummary, BranchListResult, DeleteBranchResult, PruneResult, DiffStatsSummary, WorktreeMetadata, RebaseOntoResult, DagCommit, GhPullRequest, GhPrTimelineEvent, CreatePrInput, CreatePrResult, MergePrInput, EditPrCommentInput } from '@slayzone/worktrees/shared'
 import type { MergeContext } from '@slayzone/task/shared'
 import type {
   AiConfigItem,
@@ -356,7 +356,7 @@ export interface ElectronAPI {
   git: {
     isGitRepo: (path: string) => Promise<boolean>
     detectWorktrees: (repoPath: string) => Promise<DetectedWorktree[]>
-    createWorktree: (repoPath: string, targetPath: string, branch?: string, sourceBranch?: string) => Promise<{ setupResult: { ran: boolean; success?: boolean; output?: string } }>
+    createWorktree: (opts: CreateWorktreeOpts) => Promise<{ setupResult: { ran: boolean; success?: boolean; output?: string } }>
     removeWorktree: (repoPath: string, worktreePath: string) => Promise<void>
     init: (path: string) => Promise<void>
     getCurrentBranch: (path: string) => Promise<string | null>
@@ -410,6 +410,11 @@ export interface ElectronAPI {
     mergeFrom: (path: string, branch: string) => Promise<MergeResult>
     getDiffStats: (path: string, ref: string) => Promise<DiffStatsSummary>
     getWorktreeMetadata: (path: string) => Promise<WorktreeMetadata>
+    // DAG graph
+    getCommitDag: (path: string, limit: number) => Promise<DagCommit[]>
+    resolveCopyBehavior: (projectId?: string) => Promise<{ behavior: string; customPaths: string[] }>
+    getIgnoredFileTree: (repoPath: string) => Promise<IgnoredFileNode[]>
+    copyIgnoredFiles: (repoPath: string, worktreePath: string, paths: string[]) => Promise<void>
     // GitHub CLI (gh)
     checkGhInstalled: () => Promise<boolean>
     hasGithubRemote: (repoPath: string) => Promise<boolean>

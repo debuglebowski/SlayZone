@@ -1,3 +1,22 @@
+export interface CreateWorktreeOpts {
+  repoPath: string
+  targetPath: string
+  branch?: string
+  sourceBranch?: string
+  projectId?: string
+}
+
+export interface IgnoredFileNode {
+  name: string
+  path: string
+  isDirectory: boolean
+  /** Byte size (files only, 0 for dirs) */
+  size: number
+  /** Number of descendant files */
+  fileCount: number
+  children: IgnoredFileNode[]
+}
+
 export interface DetectedWorktree {
   path: string
   branch: string | null
@@ -184,6 +203,18 @@ export interface WorktreeMetadata {
   path: string
   diskSize: string
   createdAt: string | null
+}
+
+// --- DAG graph data ---
+
+export interface DagCommit {
+  hash: string
+  shortHash: string
+  message: string
+  author: string
+  relativeDate: string
+  parents: string[]
+  refs: string[]
 }
 
 export interface RebaseOntoResult {

@@ -1,2 +1,2 @@
-export { registerWorktreeHandlers } from './handlers'
-export { removeWorktree, createWorktree, runWorktreeSetupScript, runWorktreeSetupScriptSync, getCurrentBranch, isGitRepo } from './git-worktree'
+export { registerWorktreeHandlers, resolveCopyBehavior } from './handlers'
+export { removeWorktree, createWorktree, runWorktreeSetupScript, runWorktreeSetupScriptSync, getCurrentBranch, isGitRepo, copyIgnoredFiles, getIgnoredFileTree } from './git-worktree'

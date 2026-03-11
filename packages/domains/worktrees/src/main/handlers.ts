@@ -1,4 +1,5 @@
 import type { IpcMain } from 'electron'
+import type { Database } from 'better-sqlite3'
 import { recordDiagnosticEvent } from '@slayzone/diagnostics/main'
 import {
   isGitRepo,
@@ -52,7 +53,10 @@ import {
   rebaseOnto,
   mergeFrom,
   getDiffStats,
-  getWorktreeMetadata
+  getWorktreeMetadata,
+  getCommitDag,
+  copyIgnoredFiles,
+  getIgnoredFileTree
 } from './git-worktree'
 import { runAiCommand } from './merge-ai'
 import {
@@ -68,9 +72,39 @@ import {
   getGhUser,
   editPrComment
 } from './gh-cli'
-import type { MergeWithAIResult, ConflictAnalysis, CreatePrInput, MergePrInput, EditPrCommentInput } from '../shared/types'
+import type { CreateWorktreeOpts, MergeWithAIResult, ConflictAnalysis, CreatePrInput, MergePrInput, EditPrCommentInput } from '../shared/types'
 
-export function registerWorktreeHandlers(ipcMain: IpcMain): void {
+import type { WorktreeCopyBehavior } from '@slayzone/projects/shared'
+
+export function resolveCopyBehavior(db: Database, projectId?: string): { behavior: WorktreeCopyBehavior; customPaths: string[] } {
+  // Check project-level override first (null = inherit from global)
+  if (projectId) {
+    const row = db.prepare('SELECT worktree_copy_behavior, worktree_copy_paths FROM projects WHERE id = ?')
+      .get(projectId) as { worktree_copy_behavior: string | null; worktree_copy_paths: string | null } | undefined
+    if (row?.worktree_copy_behavior) {
+      const behavior = row.worktree_copy_behavior as WorktreeCopyBehavior
+      const customPaths = behavior === 'custom' && row.worktree_copy_paths
+        ? row.worktree_copy_paths.split(',').map(p => p.trim()).filter(Boolean)
+        : []
+      return { behavior, customPaths }
+    }
+  }
+
+  // Fall back to global setting
+  const settingRow = db.prepare("SELECT value FROM settings WHERE key = 'worktree_copy_behavior'")
+    .get() as { value: string } | undefined
+  const behavior = (settingRow?.value as WorktreeCopyBehavior) || 'ask'
+  let customPaths: string[] = []
+  if (behavior === 'custom') {
+    const pathsRow = db.prepare("SELECT value FROM settings WHERE key = 'worktree_copy_paths'")
+      .get() as { value: string } | undefined
+    customPaths = pathsRow?.value ? pathsRow.value.split(',').map(p => p.trim()).filter(Boolean) : []
+  }
+
+  return { behavior, customPaths }
+}
+
+export function registerWorktreeHandlers(ipcMain: IpcMain, db: Database): void {
   // Git operations
   ipcMain.handle('git:isGitRepo', (_, path: string) => {
     return isGitRepo(path)
@@ -80,8 +114,16 @@ export function registerWorktreeHandlers(ipcMain: IpcMain): void {
     return detectWorktrees(repoPath)
   })
 
-  ipcMain.handle('git:createWorktree', async (_, repoPath: string, targetPath: string, branch?: string, sourceBranch?: string) => {
+  ipcMain.handle('git:createWorktree', async (_, opts: CreateWorktreeOpts) => {
+    const { repoPath, targetPath, branch, sourceBranch, projectId } = opts
     await createWorktree(repoPath, targetPath, branch, sourceBranch)
+
+    // Copy ignored files based on settings ('ask' is handled client-side)
+    const { behavior, customPaths } = resolveCopyBehavior(db, projectId)
+    if (behavior === 'all' || behavior === 'custom') {
+      await copyIgnoredFiles(repoPath, targetPath, behavior, customPaths)
+    }
+
     const setupResult = await runWorktreeSetupScript(targetPath, repoPath, sourceBranch)
     return { setupResult }
   })
@@ -393,6 +435,22 @@ SUMMARY: <2-3 sentences explaining what each branch changed and why they conflic
 
   ipcMain.handle('git:getWorktreeMetadata', (_, path: string) => {
     return getWorktreeMetadata(path)
+  })
+
+  ipcMain.handle('git:getCommitDag', (_, path: string, limit: number) => {
+    return getCommitDag(path, limit)
+  })
+
+  ipcMain.handle('git:resolveCopyBehavior', (_, projectId?: string) => {
+    return resolveCopyBehavior(db, projectId)
+  })
+
+  ipcMain.handle('git:getIgnoredFileTree', (_, repoPath: string) => {
+    return getIgnoredFileTree(repoPath)
+  })
+
+  ipcMain.handle('git:copyIgnoredFiles', (_, repoPath: string, worktreePath: string, paths: string[]) => {
+    return copyIgnoredFiles(repoPath, worktreePath, 'custom', paths)
   })
 
   // GitHub CLI (gh) operations

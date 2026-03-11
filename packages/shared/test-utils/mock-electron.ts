@@ -66,6 +66,15 @@ export const webContents = {
   fromId: () => null
 }
 
+export const net = {
+  request: () => ({
+    on: () => {},
+    write: () => {},
+    end: () => {}
+  }),
+  fetch: async () => new Response()
+}
+
 // In-memory credential store for tests (replaces OS keychain)
 const _credentialStore = new Map<string, Buffer>()
 export const safeStorage = {
@@ -83,5 +92,5 @@ export const safeStorage = {
 
 export default {
   app, dialog, BrowserWindow, Notification, ipcMain, nativeTheme, shell,
-  clipboard, nativeImage, session, webContents, safeStorage
+  clipboard, nativeImage, session, webContents, safeStorage, net
 }

@@ -1,9 +1,9 @@
 import { spawnSync, spawn } from 'child_process'
 import { platform } from 'os'
-import { existsSync, readFileSync, writeFileSync, chmodSync, constants as fsConstants, accessSync } from 'fs'
+import { existsSync, readFileSync, writeFileSync, chmodSync, constants as fsConstants, accessSync, cpSync, statSync, mkdirSync } from 'fs'
 import path from 'path'
 import { recordDiagnosticEvent } from '@slayzone/diagnostics/main'
-import type { ConflictFileContent, DetectedWorktree, GitDiffSnapshot, GitSyncResult, MergeResult, RebaseProgress, RebaseCommitInfo, CommitInfo, AheadBehind, StatusSummary, BranchDetail, BranchListResult, DeleteBranchResult, PruneResult, DiffStatsSummary, WorktreeMetadata, RebaseOntoResult } from '../shared/types'
+import type { ConflictFileContent, DetectedWorktree, GitDiffSnapshot, GitSyncResult, MergeResult, RebaseProgress, RebaseCommitInfo, CommitInfo, AheadBehind, StatusSummary, BranchDetail, BranchListResult, DeleteBranchResult, PruneResult, DiffStatsSummary, WorktreeMetadata, RebaseOntoResult, DagCommit, IgnoredFileNode } from '../shared/types'
 import type { MergeContext } from '@slayzone/task/shared'
 import { execAsync, execGit, trimOutput } from './exec-async'
 
@@ -218,6 +218,153 @@ export function runWorktreeSetupScriptSync(
   })
 
   return { ran: true, success, output }
+}
+
+/** Build a tree of all git-ignored files. One git call, grouped server-side. */
+export async function getIgnoredFileTree(repoPath: string): Promise<IgnoredFileNode[]> {
+  try {
+    const output = await execGit(
+      ['ls-files', '--others', '--ignored', '--exclude-standard'],
+      { cwd: repoPath }
+    )
+    const allFiles = output.trim().split('\n').filter(Boolean)
+    if (allFiles.length === 0) return []
+
+    // Build nested tree
+    const root: IgnoredFileNode = { name: '', path: '', isDirectory: true, size: 0, fileCount: 0, children: [] }
+
+    for (const f of allFiles) {
+      const parts = f.split('/')
+      let current = root
+      for (let i = 0; i < parts.length; i++) {
+        const name = parts[i]
+        const fullPath = parts.slice(0, i + 1).join('/')
+        const isLast = i === parts.length - 1
+        let child = current.children.find(c => c.name === name)
+        if (!child) {
+          child = { name, path: fullPath, isDirectory: !isLast, size: 0, fileCount: 0, children: [] }
+          current.children.push(child)
+        } else if (!isLast) {
+          child.isDirectory = true
+        }
+        current = child
+      }
+    }
+
+    // Aggregate fileCount + sort (bottom-up)
+    function aggregate(node: IgnoredFileNode): void {
+      if (node.children.length === 0) {
+        node.fileCount = 1
+        return
+      }
+      node.isDirectory = true
+      let count = 0
+      for (const child of node.children) {
+        aggregate(child)
+        count += child.fileCount
+      }
+      node.fileCount = count
+      node.children.sort((a, b) => {
+        if (a.isDirectory !== b.isDirectory) return a.isDirectory ? -1 : 1
+        return a.name.localeCompare(b.name)
+      })
+    }
+    aggregate(root)
+
+    // Stat only root-level files for size
+    for (const child of root.children) {
+      if (!child.isDirectory) {
+        try { child.size = statSync(path.join(repoPath, child.name)).size } catch { /* skip */ }
+      }
+    }
+
+    return root.children
+  } catch {
+    return []
+  }
+}
+
+
+/**
+ * Copy ignored files from the source repo into a new worktree.
+ * - 'all': copies every git-ignored file (via `git ls-files --others --ignored --exclude-standard`)
+ * - 'custom': copies only the specified paths
+ */
+export async function copyIgnoredFiles(
+  repoPath: string,
+  worktreePath: string,
+  behavior: 'all' | 'custom',
+  customPaths: string[]
+): Promise<void> {
+  let filesToCopy: string[] = []
+
+  if (behavior === 'all') {
+    try {
+      const output = await execGit(
+        ['ls-files', '--others', '--ignored', '--exclude-standard'],
+        { cwd: repoPath }
+      )
+      const allFiles = output.trim().split('\n').filter(Boolean)
+      // Deduplicate to top-level entries to avoid copying thousands of individual files
+      // e.g. node_modules/a/b.js, node_modules/c.js → node_modules
+      const topLevel = new Set<string>()
+      for (const f of allFiles) {
+        const first = f.split('/')[0]
+        topLevel.add(first)
+      }
+      filesToCopy = [...topLevel]
+    } catch {
+      return
+    }
+  } else {
+    filesToCopy = customPaths
+  }
+
+  for (const relPath of filesToCopy) {
+    const sourcePath = path.resolve(repoPath, relPath)
+    const destPath = path.resolve(worktreePath, relPath)
+
+    // Path containment check — prevent traversal
+    if (!sourcePath.startsWith(path.resolve(repoPath)) || !destPath.startsWith(path.resolve(worktreePath))) {
+      recordDiagnosticEvent({
+        level: 'warn',
+        source: 'git',
+        event: 'worktree.copy_skipped_traversal',
+        message: `Skipped "${relPath}" — path escapes repo/worktree root`,
+        payload: { repoPath, worktreePath, relPath }
+      })
+      continue
+    }
+
+    if (!existsSync(sourcePath)) continue
+
+    try {
+      const destDir = path.dirname(destPath)
+      if (!existsSync(destDir)) mkdirSync(destDir, { recursive: true })
+
+      const stats = statSync(sourcePath)
+      cpSync(sourcePath, destPath, {
+        recursive: stats.isDirectory(),
+        force: true
+      })
+    } catch (err) {
+      recordDiagnosticEvent({
+        level: 'warn',
+        source: 'git',
+        event: 'worktree.copy_failed',
+        message: `Failed to copy "${relPath}": ${err instanceof Error ? err.message : String(err)}`,
+        payload: { repoPath, worktreePath, relPath }
+      })
+    }
+  }
+
+  recordDiagnosticEvent({
+    level: 'info',
+    source: 'git',
+    event: 'worktree.copy_done',
+    message: `Copied ${filesToCopy.length} ignored file(s) to worktree`,
+    payload: { repoPath, worktreePath, behavior, count: filesToCopy.length }
+  })
 }
 
 export async function removeWorktree(repoPath: string, worktreePath: string): Promise<void> {
@@ -898,6 +1045,33 @@ export async function getDiffStats(repoPath: string, ref: string): Promise<DiffS
     return { filesChanged, insertions, deletions }
   } catch {
     return { filesChanged: 0, insertions: 0, deletions: 0 }
+  }
+}
+
+// --- DAG graph operations ---
+
+export async function getCommitDag(repoPath: string, limit: number): Promise<DagCommit[]> {
+  try {
+    const output = await execGit(
+      ['log', '--all', '--topo-order', `-${limit}`, '--format=%H%n%h%n%P%n%s%n%an%n%ar%n%D'],
+      { cwd: repoPath }
+    )
+    const lines = output.trim().split('\n')
+    const commits: DagCommit[] = []
+    for (let i = 0; i + 6 < lines.length; i += 7) {
+      commits.push({
+        hash: lines[i],
+        shortHash: lines[i + 1],
+        parents: lines[i + 2] ? lines[i + 2].split(' ').filter(Boolean) : [],
+        message: lines[i + 3],
+        author: lines[i + 4],
+        relativeDate: lines[i + 5],
+        refs: lines[i + 6] ? lines[i + 6].split(', ').map(r => r.trim()).filter(Boolean) : []
+      })
+    }
+    return commits
+  } catch {
+    return []
   }
 }
 

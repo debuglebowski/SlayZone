@@ -260,8 +260,8 @@ const api: ElectronAPI = {
   git: {
     isGitRepo: (path) => ipcRenderer.invoke('git:isGitRepo', path),
     detectWorktrees: (repoPath) => ipcRenderer.invoke('git:detectWorktrees', repoPath),
-    createWorktree: (repoPath, targetPath, branch, sourceBranch) =>
-      ipcRenderer.invoke('git:createWorktree', repoPath, targetPath, branch, sourceBranch),
+    createWorktree: (opts) =>
+      ipcRenderer.invoke('git:createWorktree', opts),
     removeWorktree: (repoPath, worktreePath) =>
       ipcRenderer.invoke('git:removeWorktree', repoPath, worktreePath),
     init: (path) => ipcRenderer.invoke('git:init', path),
@@ -317,6 +317,10 @@ const api: ElectronAPI = {
     mergeFrom: (path, branch) => ipcRenderer.invoke('git:mergeFrom', path, branch),
     getDiffStats: (path, ref) => ipcRenderer.invoke('git:getDiffStats', path, ref),
     getWorktreeMetadata: (path) => ipcRenderer.invoke('git:getWorktreeMetadata', path),
+    getCommitDag: (path, limit) => ipcRenderer.invoke('git:getCommitDag', path, limit),
+    resolveCopyBehavior: (projectId?) => ipcRenderer.invoke('git:resolveCopyBehavior', projectId),
+    getIgnoredFileTree: (repoPath) => ipcRenderer.invoke('git:getIgnoredFileTree', repoPath),
+    copyIgnoredFiles: (repoPath, worktreePath, paths) => ipcRenderer.invoke('git:copyIgnoredFiles', repoPath, worktreePath, paths),
     checkGhInstalled: () => ipcRenderer.invoke('git:checkGhInstalled'),
     hasGithubRemote: (repoPath) => ipcRenderer.invoke('git:hasGithubRemote', repoPath),
     listOpenPrs: (repoPath) => ipcRenderer.invoke('git:listOpenPrs', repoPath),
