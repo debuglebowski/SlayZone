@@ -4,7 +4,6 @@ import { Button, IconButton } from '@slayzone/ui'
 import { Input } from '@slayzone/ui'
 import { Label } from '@slayzone/ui'
 import { ColorPicker } from '@slayzone/ui'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@slayzone/ui'
 import type { Project } from '@slayzone/projects/shared'
 import { SettingsTabIntro } from './project-settings-shared'
 
@@ -18,22 +17,12 @@ export function GeneralTab({ project, onUpdated, onClose }: GeneralTabProps) {
   const [name, setName] = useState('')
   const [color, setColor] = useState('')
   const [path, setPath] = useState('')
-  const [autoCreateWorktreeOverride, setAutoCreateWorktreeOverride] = useState<'inherit' | 'on' | 'off'>('inherit')
-  const [worktreeSourceBranch, setWorktreeSourceBranch] = useState('')
   const [loading, setLoading] = useState(false)
 
   useEffect(() => {
     setName(project.name)
     setColor(project.color)
     setPath(project.path || '')
-    setAutoCreateWorktreeOverride(
-      project.auto_create_worktree_on_task_create === 1
-        ? 'on'
-        : project.auto_create_worktree_on_task_create === 0
-          ? 'off'
-          : 'inherit'
-    )
-    setWorktreeSourceBranch(project.worktree_source_branch || '')
   }, [project])
 
   const handleBrowse = async () => {
@@ -57,12 +46,7 @@ export function GeneralTab({ project, onUpdated, onClose }: GeneralTabProps) {
         id: project.id,
         name: name.trim(),
         color,
-        path: path || null,
-        autoCreateWorktreeOnTaskCreate:
-          autoCreateWorktreeOverride === 'inherit'
-            ? null
-            : autoCreateWorktreeOverride === 'on',
-        worktreeSourceBranch: worktreeSourceBranch.trim() || null
+        path: path || null
       })
 
       onUpdated(updated)
@@ -97,38 +81,6 @@ export function GeneralTab({ project, onUpdated, onClose }: GeneralTabProps) {
             </IconButton>
           </div>
           <p className="text-xs text-muted-foreground">Claude Code terminal will open in this directory</p>
-        </div>
-        <div className="space-y-1">
-          <Label htmlFor="auto-create-worktree-override">Auto-create worktree on task creation</Label>
-          <Select
-            value={autoCreateWorktreeOverride}
-            onValueChange={(value) => setAutoCreateWorktreeOverride(value as typeof autoCreateWorktreeOverride)}
-          >
-            <SelectTrigger id="auto-create-worktree-override" className="max-w-sm">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="inherit">Use global setting</SelectItem>
-              <SelectItem value="on">Always on</SelectItem>
-              <SelectItem value="off">Always off</SelectItem>
-            </SelectContent>
-          </Select>
-          <p className="text-xs text-muted-foreground">
-            Overrides the global Git setting for this project only.
-          </p>
-        </div>
-        <div className="space-y-1">
-          <Label htmlFor="worktree-source-branch">Worktree source branch</Label>
-          <Input
-            id="worktree-source-branch"
-            value={worktreeSourceBranch}
-            onChange={(e) => setWorktreeSourceBranch(e.target.value)}
-            placeholder="main"
-            className="max-w-sm"
-          />
-          <p className="text-xs text-muted-foreground">
-            Branch to create worktrees from. Defaults to the current branch if empty.
-          </p>
         </div>
         <div className="space-y-1">
           <Label>Color</Label>

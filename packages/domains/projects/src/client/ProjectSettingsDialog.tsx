@@ -10,12 +10,13 @@ import { ColumnsTab } from './ColumnsTab'
 import { IntegrationsTab } from './IntegrationsTab'
 import { AiConfigTab } from './AiConfigTab'
 import { TestsTab } from '@slayzone/test-panel/client'
+import { WorktreesTab } from './WorktreesTab'
 
 interface ProjectSettingsDialogProps {
   project: Project | null
   open: boolean
   onOpenChange: (open: boolean) => void
-  initialTab?: 'general' | 'environment' | 'columns' | 'integrations' | 'ai-config' | 'tests'
+  initialTab?: 'general' | 'environment' | 'columns' | 'worktrees' | 'integrations' | 'ai-config' | 'tests'
   groupBy?: 'none' | 'path' | 'label'
   onGroupByChange?: (value: 'none' | 'path' | 'label') => void
   integrationOnboardingProvider?: IntegrationProvider | null
@@ -37,7 +38,7 @@ export function ProjectSettingsDialog({
   onUpdated
 }: ProjectSettingsDialogProps) {
   const integrationsEnabled = window.api.app.isIntegrationsEnabled
-  const [activeTab, setActiveTab] = useState<'general' | 'environment' | 'columns' | 'integrations' | 'ai-config' | 'tests'>('general')
+  const [activeTab, setActiveTab] = useState<'general' | 'environment' | 'columns' | 'worktrees' | 'integrations' | 'ai-config' | 'tests'>('general')
   const contextManagerEnabled = window.api.app.isContextManagerEnabledSync
   const [lockedByProvider, setLockedByProvider] = useState<string | null>(null)
 
@@ -84,6 +85,7 @@ export function ProjectSettingsDialog({
     { key: 'general', label: 'General' },
     { key: 'environment', label: 'Environment' },
     { key: 'columns', label: 'Task statuses' },
+    { key: 'worktrees', label: 'Worktrees' },
     { key: 'tests', label: 'Tests' },
     ...(integrationsEnabled ? [{ key: 'integrations' as const, label: 'Integrations' }] : []),
   ]
@@ -112,6 +114,14 @@ export function ProjectSettingsDialog({
 
           {activeTab === 'environment' && project && (
             <EnvironmentTab
+              project={project}
+              onUpdated={onUpdated}
+              onClose={() => onOpenChange(false)}
+            />
+          )}
+
+          {activeTab === 'worktrees' && project && (
+            <WorktreesTab
               project={project}
               onUpdated={onUpdated}
               onClose={() => onOpenChange(false)}

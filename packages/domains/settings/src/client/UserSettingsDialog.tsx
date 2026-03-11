@@ -19,6 +19,7 @@ import { DataSettingsTab } from './tabs/DataSettingsTab'
 import { LabsSettingsTab } from './tabs/LabsSettingsTab'
 import { DiagnosticsSettingsTab } from './tabs/DiagnosticsSettingsTab'
 import { AboutSettingsTab } from './tabs/AboutSettingsTab'
+import { WorktreesSettingsTab } from './tabs/WorktreesSettingsTab'
 import { BackupSettingsTab } from './tabs/BackupSettingsTab'
 import { SettingsTabIntro } from './tabs/SettingsTabIntro'
 
@@ -75,6 +76,7 @@ export function UserSettingsDialog({
   const navItems = [
     { key: 'general', label: 'General' },
     { key: 'appearance', label: 'Appearance' },
+    { key: 'worktrees', label: 'Worktrees' },
     { key: 'ai-providers', label: 'Providers' },
     {
       key: 'panels',
@@ -111,6 +113,8 @@ export function UserSettingsDialog({
         <SettingsLayout items={navItems} activeKey={activeTab} onSelect={navigateTo}>
           <div className="mx-auto w-full max-w-4xl space-y-8">
             {activeTab === 'general' && <GeneralSettingsTab />}
+
+            {activeTab === 'worktrees' && <WorktreesSettingsTab />}
 
             {activeTab === 'appearance' && (
               <AppearanceSettingsTab
