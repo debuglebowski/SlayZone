@@ -56,7 +56,7 @@ import { registerIntegrationHandlers, ensureIntegrationSchema, startSyncPoller, 
 import { registerFileEditorHandlers, closeAllWatchers } from '@slayzone/file-editor/main'
 import { registerTestPanelHandlers } from '@slayzone/test-panel/main'
 import { registerScreenshotHandlers } from './screenshot'
-import { setProcessManagerWindow, initProcessManager, createProcess, spawnProcess, updateProcess, killProcess, restartProcess, listForTask, listAllProcesses, killTaskProcesses, killAllProcesses } from './process-manager'
+import { setProcessManagerWindow, initProcessManager, createProcess, spawnProcess, updateProcess, stopProcess, killProcess, restartProcess, listForTask, listAllProcesses, killTaskProcesses, killAllProcesses } from './process-manager'
 import { registerExportImportHandlers } from './export-import'
 import { registerLeaderboardHandlers } from './leaderboard'
 import { initAutoUpdater, checkForUpdates, restartForUpdate } from './auto-updater'
@@ -1732,6 +1732,9 @@ app.whenReady().then(async () => {
   })
   ipcMain.handle('processes:update', (_event, processId: string, updates: Parameters<typeof updateProcess>[1]) => {
     return updateProcess(processId, updates)
+  })
+  ipcMain.handle('processes:stop', (_event, processId: string) => {
+    return stopProcess(processId)
   })
   ipcMain.handle('processes:kill', (_event, processId: string) => {
     return killProcess(processId)

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
-import { Play, RotateCcw, Plus, Trash2, ArrowLeft, Cpu, Pencil, FileText, MoreHorizontal, CornerDownLeft, Info } from 'lucide-react'
+import { Play, Square, RotateCcw, Plus, Trash2, ArrowLeft, Cpu, Pencil, FileText, MoreHorizontal, CornerDownLeft, Info } from 'lucide-react'
 import { cn, DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, Tooltip, TooltipTrigger, TooltipContent } from '@slayzone/ui'
 
 type ProcessStatus = 'running' | 'stopped' | 'completed' | 'error'
@@ -112,6 +112,7 @@ function ProcessRow({
   expanded,
   onToggleLog,
   onRestart,
+  onStop,
   onKill,
   onEdit,
   onInject,
@@ -121,6 +122,7 @@ function ProcessRow({
   expanded: boolean
   onToggleLog: () => void
   onRestart: () => void
+  onStop: () => void
   onKill: () => void
   onEdit: () => void
   onInject: () => void
@@ -151,16 +153,26 @@ function ProcessRow({
           <StatusBadge status={proc.status} />
         </div>
 
-        {/* Restart — always visible when running */}
+        {/* Stop + Restart — visible when running */}
         {proc.status === 'running' && (
-          <Tip label="Restart">
-            <button
-              onClick={onRestart}
-              className="p-1.5 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-colors shrink-0"
-            >
-              <RotateCcw className="size-3.5" />
-            </button>
-          </Tip>
+          <>
+            <Tip label="Stop">
+              <button
+                onClick={onStop}
+                className="p-1.5 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-colors shrink-0"
+              >
+                <Square className="size-3.5" />
+              </button>
+            </Tip>
+            <Tip label="Restart">
+              <button
+                onClick={onRestart}
+                className="p-1.5 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-colors shrink-0"
+              >
+                <RotateCcw className="size-3.5" />
+              </button>
+            </Tip>
+          </>
         )}
 
         <div className="flex items-center gap-0.5 shrink-0">
@@ -398,6 +410,10 @@ export function ProcessesPanel({ taskId, projectId, cwd, terminalSessionId }: { 
     setExpandedLogs(prev => { const next = new Set(prev); next.delete(id); return next })
   }, [])
 
+  const handleStop = useCallback(async (id: string) => {
+    await window.api.processes.stop(id)
+  }, [])
+
   const handleRestart = useCallback(async (id: string) => {
     await window.api.processes.restart(id)
   }, [])
@@ -502,6 +518,7 @@ export function ProcessesPanel({ taskId, projectId, cwd, terminalSessionId }: { 
                       expanded={expandedLogs.has(proc.id)}
                       onToggleLog={() => toggleLog(proc.id)}
                       onRestart={() => void handleRestart(proc.id)}
+                      onStop={() => void handleStop(proc.id)}
                       onKill={() => void handleKill(proc.id)}
                       onEdit={() => goToEdit(proc)}
                       onInject={() => handleInject(proc)}
@@ -520,6 +537,7 @@ export function ProcessesPanel({ taskId, projectId, cwd, terminalSessionId }: { 
                       expanded={expandedLogs.has(proc.id)}
                       onToggleLog={() => toggleLog(proc.id)}
                       onRestart={() => void handleRestart(proc.id)}
+                      onStop={() => void handleStop(proc.id)}
                       onKill={() => void handleKill(proc.id)}
                       onEdit={() => goToEdit(proc)}
                       onInject={() => handleInject(proc)}

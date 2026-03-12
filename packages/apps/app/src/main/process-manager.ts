@@ -180,6 +180,19 @@ export function updateProcess(
   return true
 }
 
+export function stopProcess(id: string): boolean {
+  const proc = processes.get(id)
+  if (!proc) return false
+  // Set child to null before kill so the exit handler's `proc.child !== child`
+  // guard bails out (prevents auto-restart from firing)
+  const child = proc.child
+  proc.child = null
+  proc.pid = null
+  child?.kill()
+  setStatus(proc, 'stopped')
+  return true
+}
+
 export function killProcess(id: string): boolean {
   const proc = processes.get(id)
   if (!proc) return false
