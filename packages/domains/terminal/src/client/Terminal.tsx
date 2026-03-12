@@ -813,7 +813,6 @@ export const Terminal = forwardRef<TerminalHandle, TerminalProps>(function Termi
         />
       )}
       <div
-        ref={containerRef}
         tabIndex={0}
         className={`h-full w-full rounded-lg outline-none overflow-hidden transition-colors ${
           isDragOver ? 'ring-2 ring-blue-500/50 ring-inset' : ''
@@ -821,6 +820,7 @@ export const Terminal = forwardRef<TerminalHandle, TerminalProps>(function Termi
         style={{ padding: '8px', backgroundColor: resolvedTerminalTheme.background ?? '#0a0a0a' }}
         onClick={() => terminalRef.current?.focus()}
       >
+        <div ref={containerRef} className="h-full w-full overflow-hidden" />
         {isLoading && (
           <div className="absolute inset-0 flex items-center justify-center bg-white dark:bg-[#0a0a0a] z-10">
             <div className="flex items-center gap-2 text-neutral-500">
