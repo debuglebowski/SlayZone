@@ -501,6 +501,7 @@ const api: ElectronAPI = {
     spawn: (projectId, taskId, label, command, cwd, autoRestart) =>
       ipcRenderer.invoke('processes:spawn', projectId, taskId, label, command, cwd, autoRestart),
     update: (processId, updates) => ipcRenderer.invoke('processes:update', processId, updates),
+    stop: (processId) => ipcRenderer.invoke('processes:stop', processId),
     kill: (processId) => ipcRenderer.invoke('processes:kill', processId),
     restart: (processId) => ipcRenderer.invoke('processes:restart', processId),
     listForTask: (taskId, projectId) => ipcRenderer.invoke('processes:listForTask', taskId, projectId),

@@ -606,6 +606,7 @@ export interface ElectronAPI {
     create: (projectId: string | null, taskId: string | null, label: string, command: string, cwd: string, autoRestart: boolean) => Promise<string>
     spawn: (projectId: string | null, taskId: string | null, label: string, command: string, cwd: string, autoRestart: boolean) => Promise<string>
     update: (processId: string, updates: Partial<Pick<ProcessInfo, 'label' | 'command' | 'cwd' | 'autoRestart' | 'taskId' | 'projectId'>>) => Promise<boolean>
+    stop: (processId: string) => Promise<boolean>
     kill: (processId: string) => Promise<boolean>
     restart: (processId: string) => Promise<boolean>
     listForTask: (taskId: string | null, projectId: string | null) => Promise<ProcessInfo[]>
