@@ -62,6 +62,13 @@ const api: ElectronAPI = {
     setBlockers: (taskId, blockerTaskIds) =>
       ipcRenderer.invoke('db:taskDependencies:setBlockers', taskId, blockerTaskIds)
   },
+  feedback: {
+    listThreads: () => ipcRenderer.invoke('db:feedback:listThreads'),
+    createThread: (input) => ipcRenderer.invoke('db:feedback:createThread', input),
+    getMessages: (threadId) => ipcRenderer.invoke('db:feedback:getMessages', threadId),
+    addMessage: (input) => ipcRenderer.invoke('db:feedback:addMessage', input),
+    updateThreadDiscordId: (threadId, discordThreadId) => ipcRenderer.invoke('db:feedback:updateThreadDiscordId', threadId, discordThreadId),
+  },
   settings: {
     get: (key) => ipcRenderer.invoke('db:settings:get', key),
     set: (key, value) => ipcRenderer.invoke('db:settings:set', key, value),
@@ -321,6 +328,10 @@ const api: ElectronAPI = {
     getDiffStats: (path, ref) => ipcRenderer.invoke('git:getDiffStats', path, ref),
     getWorktreeMetadata: (path) => ipcRenderer.invoke('git:getWorktreeMetadata', path),
     getCommitDag: (path, limit, branches?) => ipcRenderer.invoke('git:getCommitDag', path, limit, branches),
+    getResolvedCommitDag: (path, limit, branches, baseBranch) => ipcRenderer.invoke('git:getResolvedCommitDag', path, limit, branches, baseBranch),
+    getResolvedForkGraph: (targetPath, repoPath, activeBranch, compareBranch, activeBranchLabel, compareBranchLabel) => ipcRenderer.invoke('git:getResolvedForkGraph', targetPath, repoPath, activeBranch, compareBranch, activeBranchLabel, compareBranchLabel),
+    getResolvedUpstreamGraph: (repoPath, branch) => ipcRenderer.invoke('git:getResolvedUpstreamGraph', repoPath, branch),
+    getResolvedRecentCommits: (path, count, branchName) => ipcRenderer.invoke('git:getResolvedRecentCommits', path, count, branchName),
     resolveChildBranches: (path, baseBranch) => ipcRenderer.invoke('git:resolveChildBranches', path, baseBranch),
     resolveCopyBehavior: (projectId?) => ipcRenderer.invoke('git:resolveCopyBehavior', projectId),
     getIgnoredFileTree: (repoPath) => ipcRenderer.invoke('git:getIgnoredFileTree', repoPath),

@@ -1265,6 +1265,40 @@ const migrations: Migration[] = [
       db.exec(`ALTER TABLE projects ADD COLUMN graph_config TEXT DEFAULT NULL`)
       db.exec(`ALTER TABLE tasks ADD COLUMN graph_config TEXT DEFAULT NULL`)
     }
+  },
+  {
+    version: 72,
+    up: (db) => {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS feedback (
+          id TEXT PRIMARY KEY,
+          content TEXT NOT NULL,
+          thread_id TEXT,
+          created_at TEXT NOT NULL DEFAULT (datetime('now'))
+        )
+      `)
+    }
+  },
+  {
+    version: 73,
+    up: (db) => {
+      db.exec(`DROP TABLE IF EXISTS feedback`)
+      db.exec(`
+        CREATE TABLE feedback_threads (
+          id TEXT PRIMARY KEY,
+          title TEXT NOT NULL,
+          discord_thread_id TEXT,
+          created_at TEXT NOT NULL DEFAULT (datetime('now'))
+        );
+        CREATE TABLE feedback_messages (
+          id TEXT PRIMARY KEY,
+          thread_id TEXT NOT NULL REFERENCES feedback_threads(id) ON DELETE CASCADE,
+          content TEXT NOT NULL,
+          created_at TEXT NOT NULL DEFAULT (datetime('now'))
+        );
+        CREATE INDEX idx_feedback_messages_thread ON feedback_messages(thread_id);
+      `)
+    }
   }
 ]
 

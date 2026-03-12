@@ -25,6 +25,7 @@ const defaultState: LeaderboardAuthState = {
 const LeaderboardAuthContext = createContext<LeaderboardAuthState>(defaultState)
 const convexUrl = import.meta.env.VITE_CONVEX_URL?.trim() ?? ''
 const convexClient = convexUrl ? new ConvexReactClient(convexUrl) : null
+export const isConvexConfigured = !!convexClient
 const OAUTH_REDIRECT_URI = 'slayzone://auth/callback'
 const VERIFIER_STORAGE_KEY = '__convexAuthOAuthVerifier'
 const AUTH_STORAGE_NAMESPACE = convexUrl.replace(/\/+$/, '')

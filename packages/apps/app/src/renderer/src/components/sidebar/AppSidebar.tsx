@@ -1,5 +1,7 @@
 import { useState } from 'react'
 import { Settings, Keyboard, ChevronDown, Megaphone, Check, CheckCheck } from 'lucide-react'
+import { isConvexConfigured } from '@/lib/convexAuth'
+import { FeedbackDialog } from '../feedback/FeedbackDialog'
 import { FaRegHandshake } from 'react-icons/fa'
 import * as Collapsible from '@radix-ui/react-collapsible'
 import {
@@ -261,6 +263,7 @@ export function AppSidebar({
               </TooltipTrigger>
               <TooltipContent side="right">What's New</TooltipContent>
             </Tooltip>
+            {isConvexConfigured && <FeedbackDialog />}
             <Tooltip>
               <TooltipTrigger asChild>
                 <IconButton

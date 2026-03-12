@@ -17,7 +17,7 @@ import type {
 } from '@slayzone/terminal/shared'
 import type { TerminalTab, CreateTerminalTabInput, UpdateTerminalTabInput } from '@slayzone/task-terminals/shared'
 import type { Theme, ThemePreference } from '@slayzone/settings/shared'
-import type { CreateWorktreeOpts, IgnoredFileNode, DetectedWorktree, MergeResult, MergeWithAIResult, GitDiffSnapshot, GitSyncResult, ConflictFileContent, ConflictAnalysis, RebaseProgress, CommitInfo, AheadBehind, StatusSummary, BranchListResult, DeleteBranchResult, PruneResult, DiffStatsSummary, WorktreeMetadata, RebaseOntoResult, DagCommit, GhPullRequest, GhPrTimelineEvent, CreatePrInput, CreatePrResult, MergePrInput, EditPrCommentInput } from '@slayzone/worktrees/shared'
+import type { CreateWorktreeOpts, IgnoredFileNode, DetectedWorktree, MergeResult, MergeWithAIResult, GitDiffSnapshot, GitSyncResult, ConflictFileContent, ConflictAnalysis, RebaseProgress, CommitInfo, AheadBehind, StatusSummary, BranchListResult, DeleteBranchResult, PruneResult, DiffStatsSummary, WorktreeMetadata, RebaseOntoResult, DagCommit, ResolvedGraph, ForkGraphResult, GhPullRequest, GhPrTimelineEvent, CreatePrInput, CreatePrResult, MergePrInput, EditPrCommentInput } from '@slayzone/worktrees/shared'
 import type { MergeContext } from '@slayzone/task/shared'
 import type {
   AiConfigItem,
@@ -236,6 +236,13 @@ export interface ElectronAPI {
     removeBlocker: (taskId: string, blockerTaskId: string) => Promise<void>
     setBlockers: (taskId: string, blockerTaskIds: string[]) => Promise<void>
   }
+  feedback: {
+    listThreads: () => Promise<Array<{ id: string; title: string; discord_thread_id: string | null; created_at: string }>>
+    createThread: (input: { id: string; title: string; discord_thread_id: string | null }) => Promise<void>
+    getMessages: (threadId: string) => Promise<Array<{ id: string; thread_id: string; content: string; created_at: string }>>
+    addMessage: (input: { id: string; thread_id: string; content: string }) => Promise<void>
+    updateThreadDiscordId: (threadId: string, discordThreadId: string) => Promise<void>
+  }
   settings: {
     get: (key: string) => Promise<string | null>
     set: (key: string, value: string) => Promise<void>
@@ -415,6 +422,10 @@ export interface ElectronAPI {
     getWorktreeMetadata: (path: string) => Promise<WorktreeMetadata>
     // DAG graph
     getCommitDag: (path: string, limit: number, branches?: string[]) => Promise<DagCommit[]>
+    getResolvedCommitDag: (path: string, limit: number, branches: string[] | undefined, baseBranch: string) => Promise<ResolvedGraph>
+    getResolvedForkGraph: (targetPath: string, repoPath: string, activeBranch: string, compareBranch: string, activeBranchLabel: string, compareBranchLabel: string) => Promise<ForkGraphResult | null>
+    getResolvedUpstreamGraph: (repoPath: string, branch: string) => Promise<ForkGraphResult | null>
+    getResolvedRecentCommits: (path: string, count: number, branchName: string) => Promise<ResolvedGraph>
     resolveChildBranches: (path: string, baseBranch: string) => Promise<{ children: string[]; merged: string[] }>
     resolveCopyBehavior: (projectId?: string) => Promise<{ behavior: string; customPaths: string[] }>
     getIgnoredFileTree: (repoPath: string) => Promise<IgnoredFileNode[]>
