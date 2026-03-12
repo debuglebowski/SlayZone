@@ -10,7 +10,7 @@ import { getAdapter, type ExecutionContext } from './adapters'
 import type { TerminalMode, TerminalModeInfo, CreateTerminalModeInput, UpdateTerminalModeInput } from '@slayzone/terminal/shared'
 import { DEFAULT_TERMINAL_MODES } from '@slayzone/terminal/shared'
 import { parseShellArgs } from './adapters/flag-parser'
-import { setShellOverrideProvider, listCcsProfiles } from './shell-env'
+import { listCcsProfiles, setShellOverride } from './shell-env'
 import { syncTerminalModes } from './startup-sync'
 
 interface PtyCreateOpts {
@@ -49,11 +49,6 @@ function mapModeRow(row: any): TerminalModeInfo {
 export function registerPtyHandlers(ipcMain: IpcMain, db: Database): void {
   // Set database reference for notifications
   setDatabase(db)
-  setShellOverrideProvider(() => {
-    const row = db.prepare('SELECT value FROM settings WHERE key = ?').get('shell') as { value: string } | undefined
-    const value = row?.value?.trim()
-    return value ? value : null
-  })
 
   // Synchronize built-in modes from code to database
   syncTerminalModes(db)
@@ -321,5 +316,9 @@ ipcMain.handle('pty:resize', (_, sessionId: string, cols: number, rows: number) 
   ipcMain.handle('pty:validate', async (_, mode: TerminalMode) => {
     const adapter = getAdapter({ mode })
     return adapter.validate ? adapter.validate() : []
+  })
+
+  ipcMain.handle('pty:setShellOverride', (_, value: string | null) => {
+    setShellOverride(value)
   })
 }

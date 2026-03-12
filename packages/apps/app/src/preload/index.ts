@@ -196,6 +196,7 @@ const api: ElectronAPI = {
     ccsListProfiles: () => ipcRenderer.invoke('pty:ccsListProfiles'),
     write: (sessionId, data) => ipcRenderer.invoke('pty:write', sessionId, data),
     setTheme: (theme) => ipcRenderer.invoke('pty:set-theme', theme),
+    setShellOverride: (value) => ipcRenderer.invoke('pty:setShellOverride', value),
     resize: (sessionId, cols, rows) => ipcRenderer.invoke('pty:resize', sessionId, cols, rows),
     kill: (sessionId) => ipcRenderer.invoke('pty:kill', sessionId),
     exists: (sessionId) => ipcRenderer.invoke('pty:exists', sessionId),

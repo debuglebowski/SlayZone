@@ -353,6 +353,7 @@ export interface ElectronAPI {
     getState: (sessionId: string) => Promise<TerminalState | null>
     validate: (mode: TerminalMode) => Promise<ValidationResult[]>
     setTheme: (theme: { foreground: string; background: string; cursor: string }) => Promise<void>
+    setShellOverride: (value: string | null) => Promise<void>
   }
   terminalModes: {
     list: () => Promise<TerminalModeInfo[]>

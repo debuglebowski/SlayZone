@@ -21,12 +21,12 @@ test.describe('Terminal fast exit', () => {
 
     // Terminal mode with /usr/bin/true as shell — exits immediately with code 0
     await mainWindow.evaluate((id) => window.api.db.updateTask({ id, terminalMode: 'terminal' }), taskId)
-    await mainWindow.evaluate(() => window.api.settings.set('shell', '/usr/bin/true'))
+    await mainWindow.evaluate(() => window.api.pty.setShellOverride('/usr/bin/true'))
     await s.refreshData()
   })
 
   test.afterAll(async ({ mainWindow }) => {
-    await mainWindow.evaluate(() => window.api.settings.set('shell', ''))
+    await mainWindow.evaluate(() => window.api.pty.setShellOverride(null))
   })
 
   test('UI does not stay stuck on Starting when PTY exits immediately', async ({ mainWindow }) => {

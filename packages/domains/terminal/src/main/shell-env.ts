@@ -6,22 +6,11 @@ import type { ValidationResult } from './adapters/types'
 
 const execFileAsync = promisify(execFile)
 
-type ShellOverrideProvider = () => string | null
+/** In-memory shell override — used by E2E tests via IPC, never persisted. */
+let shellOverride: string | null = null
 
-let shellOverrideProvider: ShellOverrideProvider | null = null
-
-export function setShellOverrideProvider(provider: ShellOverrideProvider | null): void {
-  shellOverrideProvider = provider
-}
-
-function getConfiguredShellOverride(): string | null {
-  if (!shellOverrideProvider) return null
-  try {
-    const value = shellOverrideProvider()?.trim()
-    return value ? value : null
-  } catch {
-    return null
-  }
+export function setShellOverride(value: string | null): void {
+  shellOverride = value?.trim() || null
 }
 
 function shellExists(shellPath: string): boolean {
@@ -43,14 +32,13 @@ function defaultShellForPlatform(): string {
 /**
  * Resolve the shell used to launch terminal sessions.
  * Priority:
- * 1) settings override (`shell`)
+ * 1) in-memory override (tests only)
  * 2) SHELL env var
  * 3) os.userInfo().shell
  * 4) platform fallback
  */
 export function resolveUserShell(): string {
-  const configured = getConfiguredShellOverride()
-  if (configured) return configured
+  if (shellOverride && shellExists(shellOverride)) return shellOverride
 
   const fromEnv = process.env.SHELL?.trim()
   if (fromEnv && shellExists(fromEnv)) return fromEnv
@@ -79,7 +67,8 @@ export function getShellStartupArgs(shellPath: string): string[] {
   if (platform() === 'win32') return []
 
   const shell = shellPath.toLowerCase()
-  if (shell.endsWith('/zsh') || shell.endsWith('/bash') || shell.endsWith('/fish')) {
+  const name = shell.split('/').pop() ?? shell
+  if (name === 'zsh' || name === 'bash' || name === 'fish') {
     return ['-i', '-l']
   }
 
@@ -106,13 +95,12 @@ export function buildExecCommand(binary: string, args: string[] = []): string {
  * Check if shell environment is available for terminal launching.
  */
 export function validateShellEnv(): ValidationResult {
-  const configured = getConfiguredShellOverride()
-  if (configured && !shellExists(configured)) {
+  if (shellOverride && !shellExists(shellOverride)) {
     return {
       check: 'Shell detected',
       ok: false,
-      detail: `Configured shell not found: ${configured}`,
-      fix: 'Clear advanced shell override or set it to a valid shell path'
+      detail: `Shell override not found: ${shellOverride}`,
+      fix: 'Clear the shell override or set it to a valid absolute path'
     }
   }
 

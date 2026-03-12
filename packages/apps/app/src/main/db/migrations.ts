@@ -1299,6 +1299,12 @@ const migrations: Migration[] = [
         CREATE INDEX idx_feedback_messages_thread ON feedback_messages(thread_id);
       `)
     }
+  },
+  {
+    version: 74,
+    up: (db) => {
+      db.exec(`DELETE FROM settings WHERE key = 'shell'`)
+    }
   }
 ]
 

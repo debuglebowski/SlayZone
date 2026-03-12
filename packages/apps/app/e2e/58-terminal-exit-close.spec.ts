@@ -23,12 +23,12 @@ test.describe('Terminal exit closes tab', () => {
     taskId = t.id
 
     await mainWindow.evaluate((id) => window.api.db.updateTask({ id, terminalMode: 'terminal' }), taskId)
-    await mainWindow.evaluate(() => window.api.settings.set('shell', '/bin/sh'))
+    await mainWindow.evaluate(() => window.api.pty.setShellOverride('/bin/sh'))
     await s.refreshData()
   })
 
   test.afterAll(async ({ mainWindow }) => {
-    await mainWindow.evaluate(() => window.api.settings.set('shell', ''))
+    await mainWindow.evaluate(() => window.api.pty.setShellOverride(null))
   })
 
   test('exiting a secondary pure terminal closes its tab', async ({ mainWindow }) => {

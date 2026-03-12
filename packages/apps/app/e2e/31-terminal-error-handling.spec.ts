@@ -23,13 +23,13 @@ test.describe('Terminal error handling', () => {
   })
 
   test.afterAll(async ({ mainWindow }) => {
-    await mainWindow.evaluate(() => window.api.settings.set('shell', ''))
+    await mainWindow.evaluate(() => window.api.pty.setShellOverride(null))
   })
 
   test('shows startup error for invalid shell and recovers after shell reset', async ({ mainWindow }) => {
     const sessionId = getMainSessionId(taskId)
 
-    await mainWindow.evaluate(() => window.api.settings.set('shell', '/definitely/not/a/real/shell'))
+    await mainWindow.evaluate(() => window.api.pty.setShellOverride('/definitely/not/a/real/shell'))
 
     await openTaskTerminal(mainWindow, { projectAbbrev, taskTitle: 'Terminal error task' })
 
@@ -37,7 +37,7 @@ test.describe('Terminal error handling', () => {
       .poll(async () => mainWindow.evaluate((id) => window.api.pty.exists(id), sessionId))
       .toBe(false)
 
-    await mainWindow.evaluate(() => window.api.settings.set('shell', ''))
+    await mainWindow.evaluate(() => window.api.pty.setShellOverride(null))
     const createResult = await mainWindow.evaluate(
       ({ id, cwd }) => window.api.pty.create({ sessionId: id, cwd, mode: 'terminal' }),
       { id: sessionId, cwd: TEST_PROJECT_PATH }
