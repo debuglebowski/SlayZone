@@ -69,8 +69,9 @@ const MERGE_DOT_OUTER = 6
 const MERGE_DOT_INNER = 3
 const GUTTER_PAD = 12
 
+/** Index 0 = base branch (white), rest are for other branches */
 const COLUMN_COLORS = [
-  'var(--color-primary)',
+  '#e2e2e2', // white/light — base branch
   '#a78bfa', // violet
   '#f59e0b', // amber
   '#10b981', // emerald
@@ -80,11 +81,26 @@ const COLUMN_COLORS = [
   '#8b5cf6', // purple
   '#14b8a6', // teal
   '#f97316', // orange
+  'var(--color-primary)',
 ]
 
-function getColor(column: number): string {
-  return COLUMN_COLORS[column % COLUMN_COLORS.length]
+function getColor(index: number): string {
+  const len = COLUMN_COLORS.length
+  return COLUMN_COLORS[((index % len) + len) % len]
 }
+
+/** Deterministic hash of a branch name to a color index (skips 0, reserved for base branch) */
+function hashBranchColor(name: string): number {
+  let h = 0
+  for (let i = 0; i < name.length; i++) {
+    h = ((h << 5) - h + name.charCodeAt(i)) | 0
+  }
+  // Map to 1..N (skip index 0 which is reserved for base branch)
+  return (Math.abs(h) % (COLUMN_COLORS.length - 1)) + 1
+}
+
+/** Color index for the base/first branch — always white */
+const BASE_BRANCH_COLOR_INDEX = 0
 
 function colX(col: number): number {
   return col * COLUMN_WIDTH + COLUMN_WIDTH / 2 + GUTTER_PAD / 2
@@ -102,6 +118,7 @@ interface LayoutNode {
   row: number
   isMerge: boolean
   isBranchTip: boolean
+  colorIndex: number
 }
 
 interface LayoutEdge {
@@ -129,12 +146,72 @@ function computeDagLayout(commits: DagCommit[]): DagLayout {
   const edges: LayoutEdge[] = []
 
   const activeColumns: (string | null)[] = []
+  const columnColorIndex: number[] = []  // current colorIndex per column
+  let nextFallbackColor = 0
+
+  // Pre-compute: map each commit hash → branch name by finding the nearest branch tip
+  // In topo order, tips come first, so we can walk forward to find which branch owns each commit
+  const commitBranchName = new Map<string, string>()
+  {
+    // First pass: map branch tip commits to their branch name
+    for (const c of commits) {
+      const branchRef = c.refs.find(r => !r.startsWith('tag:') && r !== 'HEAD')
+      if (branchRef) {
+        commitBranchName.set(c.hash, branchRef.replace(/^HEAD -> /, ''))
+      }
+    }
+    // Second pass: for merge commits, assign synthetic branch names to second+ parents
+    // These represent branches that were merged and had their refs deleted
+    const hashToCommit = new Map<string, DagCommit>()
+    for (const c of commits) hashToCommit.set(c.hash, c)
+    for (const c of commits) {
+      if (c.parents.length < 2) continue
+      for (let p = 1; p < c.parents.length; p++) {
+        const parentHash = c.parents[p]
+        if (commitBranchName.has(parentHash)) continue
+        // Extract branch name from merge message (e.g. "Merge pull request #2 from user/branch-name")
+        const mergeMatch = c.message.match(/from\s+\S+\/(.+)$/) ?? c.message.match(/Merge branch '([^']+)'/)
+        const syntheticName = mergeMatch ? mergeMatch[1] : `merged-${c.hash.slice(0, 7)}-p${p}`
+        commitBranchName.set(parentHash, syntheticName)
+      }
+    }
+    // Third pass: propagate branch name down through first-parent chain
+    for (const c of commits) {
+      if (!commitBranchName.has(c.hash)) continue
+      const name = commitBranchName.get(c.hash)!
+      let current = c
+      while (current.parents.length > 0) {
+        const parent = hashToCommit.get(current.parents[0])
+        if (!parent) break
+        // Stop at commits owned by a different branch, but walk through unowned commits (tag-only)
+        if (commitBranchName.has(parent.hash) && commitBranchName.get(parent.hash) !== name) break
+        commitBranchName.set(parent.hash, name)
+        current = parent
+      }
+    }
+  }
+
+  // The first branch tip in topo order is the base branch — give it white
+  const baseBranchName = commits.find(c => {
+    const ref = c.refs.find(r => !r.startsWith('tag:') && r !== 'HEAD')
+    return ref !== undefined
+  })?.refs.find(r => !r.startsWith('tag:') && r !== 'HEAD')?.replace(/^HEAD -> /, '')
+
+  function getCommitColorIndex(hash: string): number {
+    const name = commitBranchName.get(hash)
+    if (name) {
+      if (name === baseBranchName) return BASE_BRANCH_COLOR_INDEX
+      return hashBranchColor(name)
+    }
+    return nextFallbackColor++
+  }
 
   function findFreeColumn(): number {
     for (let i = 0; i < activeColumns.length; i++) {
       if (activeColumns[i] === null) return i
     }
     activeColumns.push(null)
+    columnColorIndex.push(0)
     return activeColumns.length - 1
   }
 
@@ -145,6 +222,12 @@ function computeDagLayout(commits: DagCommit[]): DagLayout {
     return null
   }
 
+  const hashToColorIndex = new Map<string, number>()
+
+  function isBaseBranch(hash: string): boolean {
+    return baseBranchName !== undefined && commitBranchName.get(hash) === baseBranchName
+  }
+
   for (let row = 0; row < commits.length; row++) {
     const commit = commits[row]
     hashToRow.set(commit.hash, row)
@@ -152,6 +235,20 @@ function computeDagLayout(commits: DagCommit[]): DagLayout {
     let col = findColumnReservedFor(commit.hash)
 
     if (col !== null) {
+      // Base branch commits should always stay in column 0
+      const isBase = isBaseBranch(commit.hash)
+      if (isBase && col !== 0) {
+        // Swap: move whatever is in col 0 to the column we found, take col 0
+        if (activeColumns[0] === commit.hash) {
+          // Column 0 also reserved for this commit — just pick column 0
+        } else if (activeColumns[0] !== null) {
+          activeColumns[col] = activeColumns[0]
+        } else {
+          activeColumns[col] = null
+        }
+        col = 0
+      }
+
       for (let i = 0; i < activeColumns.length; i++) {
         if (i !== col && activeColumns[i] === commit.hash) {
           activeColumns[i] = null
@@ -163,12 +260,16 @@ function computeDagLayout(commits: DagCommit[]): DagLayout {
       col = findFreeColumn()
     }
 
+    const ci = getCommitColorIndex(commit.hash)
+    columnColorIndex[col] = ci
+
     hashToCol.set(commit.hash, col)
+    hashToColorIndex.set(commit.hash, ci)
 
     const isMerge = commit.parents.length >= 2
     const isBranchTip = commit.refs.length > 0
 
-    nodes.push({ commit, column: col, row, isMerge, isBranchTip })
+    nodes.push({ commit, column: col, row, isMerge, isBranchTip, colorIndex: ci })
 
     if (commit.parents.length === 0) {
       activeColumns[col] = null
@@ -179,7 +280,7 @@ function computeDagLayout(commits: DagCommit[]): DagLayout {
         activeColumns[col] = null
         edges.push({
           fromRow: row, fromCol: col, toRow: -1, toCol: existingCol,
-          color: getColor(col), type: 'curve', targetHash: firstParent
+          color: getColor(ci), type: 'curve', targetHash: firstParent
         })
       } else if (existingCol === null) {
         activeColumns[col] = firstParent
@@ -190,15 +291,17 @@ function computeDagLayout(commits: DagCommit[]): DagLayout {
         const pExisting = findColumnReservedFor(parentHash)
         if (pExisting === null) {
           const pCol = findFreeColumn()
+          const pci = getCommitColorIndex(parentHash)
+          columnColorIndex[pCol] = pci
           activeColumns[pCol] = parentHash
           edges.push({
             fromRow: row, fromCol: col, toRow: -1, toCol: pCol,
-            color: getColor(pCol), type: 'curve', targetHash: parentHash
+            color: getColor(pci), type: 'curve', targetHash: parentHash
           })
         } else {
           edges.push({
             fromRow: row, fromCol: col, toRow: -1, toCol: pExisting,
-            color: getColor(pExisting), type: 'curve', targetHash: parentHash
+            color: getColor(columnColorIndex[pExisting]), type: 'curve', targetHash: parentHash
           })
         }
       }
@@ -227,7 +330,7 @@ function computeDagLayout(commits: DagCommit[]): DagLayout {
     if (parentRow !== undefined && hashToCol.get(firstParent) === col) {
       edges.push({
         fromRow: row, fromCol: col, toRow: parentRow, toCol: col,
-        color: getColor(col), type: 'straight'
+        color: getColor(hashToColorIndex.get(commit.hash) ?? col), type: 'straight'
       })
     }
   }
@@ -307,12 +410,12 @@ function computeCollapsedLayout(commits: DagCommit[], fullLayout: DagLayout): Co
 
   for (const col of sortedCols) {
     const nodes = columnNodes.get(col)!
-    const color = getColor(col)
 
     let segmentStart = 0
 
     while (segmentStart < nodes.length) {
       const node = nodes[segmentStart]
+      const color = getColor(node.colorIndex)
       const hasRefs = node.commit.refs.length > 0
       const isFork = isForkPoint(node.commit.hash)
 
@@ -422,7 +525,7 @@ function computeCollapsedLayout(commits: DagCommit[], fullLayout: DagLayout): Co
       if (!exists) {
         collapsedEdges.push({
           fromRow: from.row, fromCol: col, toRow: to.row, toCol: col,
-          color, type: 'straight'
+          color: from.color, type: 'straight'
         })
       }
     }
@@ -446,7 +549,7 @@ function computeCollapsedLayout(commits: DagCommit[], fullLayout: DagLayout): Co
         addedForkEdges.add(key)
         collapsedEdges.push({
           fromRow, fromCol: parentCol, toRow, toCol: node.column,
-          color: getColor(node.column), type: 'curve'
+          color: getColor(node.colorIndex), type: 'curve'
         })
       }
     }
@@ -563,22 +666,58 @@ function SvgDot({ cx, cy, color, type, dimmed }: { cx: number; cy: number; color
   return <circle cx={cx} cy={cy} r={DOT_RADIUS} fill={color} opacity={opacity} />
 }
 
+// --- Dot tooltip overlay ---
+
+const DOT_HIT_SIZE = 18
+
+function DotOverlays({ items }: { items: Array<{ key: string; row: number; column: number; color: string; branchName?: string }> }) {
+  return (
+    <>
+      {items.map(({ key, row, column, color, branchName }) => {
+        if (!branchName) return null
+        const cx = colX(column)
+        const cy = rowY(row)
+        return (
+          <Tooltip key={key}>
+            <TooltipTrigger asChild>
+              <div className="absolute transition-shadow duration-150" style={{
+                left: cx - DOT_HIT_SIZE / 2,
+                top: cy - DOT_HIT_SIZE / 2,
+                width: DOT_HIT_SIZE,
+                height: DOT_HIT_SIZE,
+                borderRadius: '50%',
+                zIndex: 1,
+                boxShadow: `0 0 0 0px ${color}50`,
+              }}
+              onMouseEnter={e => { e.currentTarget.style.boxShadow = `0 0 0 2px ${color}50` }}
+              onMouseLeave={e => { e.currentTarget.style.boxShadow = `0 0 0 0px ${color}50` }}
+              />
+            </TooltipTrigger>
+            <TooltipContent side="top">{branchName}</TooltipContent>
+          </Tooltip>
+        )
+      })}
+    </>
+  )
+}
+
 // --- Row renderers ---
 
 function CommitRow({
-  shortHash, message, author, relativeDate, refs, color, gutterWidth, copiedHash, onCopy, dimmed, branchName
+  shortHash, message, author, relativeDate, refs, color, gutterWidth, copiedHash, onCopy, dimmed
 }: {
   shortHash: string; message: string; author: string; relativeDate: string
   refs?: string[]; color: string; gutterWidth: number
-  copiedHash: string | null; onCopy: (hash: string) => void; dimmed?: boolean; branchName?: string
+  copiedHash: string | null; onCopy: (hash: string) => void; dimmed?: boolean
 }) {
-  const row = (
+  return (
     <div
-      className={cn('flex items-center group hover:bg-accent/50 rounded transition-colors cursor-pointer', dimmed && 'opacity-20')}
-      style={{ height: ROW_HEIGHT, paddingLeft: gutterWidth }}
+      className={cn('flex items-center cursor-pointer', dimmed && 'opacity-20')}
+      style={{ height: ROW_HEIGHT, paddingLeft: gutterWidth, paddingTop: 3, paddingBottom: 3 }}
       onClick={() => onCopy(shortHash)}
     >
-      <div className="flex-1 min-w-0 flex items-center gap-2 pr-3">
+      <div className="flex-1 min-w-0 flex items-center gap-2 pr-3 h-full rounded group transition-colors px-2"
+        style={{ backgroundColor: `${color}12` }}>
         <div className="flex-1 min-w-0">
           <div className="text-xs truncate">
             {refs && refs.map(ref => (
@@ -597,15 +736,6 @@ function CommitRow({
         }
       </div>
     </div>
-  )
-
-  if (!branchName) return row
-
-  return (
-    <Tooltip>
-      <TooltipTrigger asChild>{row}</TooltipTrigger>
-      <TooltipContent side="top">{branchName}</TooltipContent>
-    </Tooltip>
   )
 }
 
@@ -662,12 +792,16 @@ function DagGraph({ commits, filterQuery, tipsOnly, className, copiedHash, onCop
     [commits, fullLayout, tipsOnly]
   )
 
-  // Map column → branch name from the first ref-bearing node in that column
-  const columnBranch = useMemo(() => {
+  // Map colorIndex → branch name from branch refs (skip tags, HEAD pointer)
+  const colorBranch = useMemo(() => {
     const map = new Map<number, string>()
     for (const node of fullLayout.nodes) {
-      if (node.commit.refs.length > 0 && !map.has(node.column)) {
-        map.set(node.column, node.commit.refs.join(', '))
+      if (map.has(node.colorIndex)) continue
+      const branches = node.commit.refs
+        .filter(r => !r.startsWith('tag:') && r !== 'HEAD')
+        .map(r => r.replace(/^HEAD -> /, ''))
+      if (branches.length > 0) {
+        map.set(node.colorIndex, branches.join(', '))
       }
     }
     return map
@@ -705,12 +839,16 @@ function DagGraph({ commits, filterQuery, tipsOnly, className, copiedHash, onCop
         })}
         {fullLayout.nodes.map((node) => {
           const cx = colX(node.column), cy = rowY(node.row)
-          const color = getColor(node.column)
+          const color = getColor(node.colorIndex)
           const dotType = node.isBranchTip ? 'tip' : node.isMerge ? 'merge' : 'regular'
           const dimmed = matchSet !== null && !matchSet.has(node.commit.hash)
           return <SvgDot key={node.commit.hash} cx={cx} cy={cy} color={color} type={dotType} dimmed={dimmed} />
         })}
       </svg>
+      <DotOverlays items={fullLayout.nodes.map(node => ({
+        key: node.commit.hash, row: node.row, column: node.column,
+        color: getColor(node.colorIndex), branchName: colorBranch.get(node.colorIndex)
+      }))} />
       {fullLayout.nodes.map((node) => {
         const dimmed = matchSet !== null && !matchSet.has(node.commit.hash)
         return (
@@ -718,11 +856,14 @@ function DagGraph({ commits, filterQuery, tipsOnly, className, copiedHash, onCop
             shortHash={node.commit.shortHash} message={node.commit.message}
             author={node.commit.author} relativeDate={node.commit.relativeDate}
             refs={node.commit.refs.length > 0 ? node.commit.refs : undefined}
-            color={getColor(node.column)} gutterWidth={gutterWidth}
-            copiedHash={copiedHash} onCopy={onCopy} dimmed={dimmed}
-            branchName={columnBranch.get(node.column)} />
+            color={getColor(node.colorIndex)} gutterWidth={gutterWidth}
+            copiedHash={copiedHash} onCopy={onCopy} dimmed={dimmed} />
         )
       })}
+      {/* Fade-out at bottom */}
+      <div className="h-8 pointer-events-none" style={{
+        background: 'linear-gradient(to bottom, var(--color-card), transparent)'
+      }} />
     </div>
   )
 }
@@ -784,14 +925,17 @@ function TipsGraph({ nodes, maxColumns, className, copiedHash, onCopy }: {
           return <SvgDot key={`${node.commit.hash}-${row}`} cx={cx} cy={cy} color={color} type={dotType} />
         })}
       </svg>
+      <DotOverlays items={layout.nodes.map(({ node, row }) => ({
+        key: `${node.commit.hash}-${row}`, row, column: node.column,
+        color: getColor(node.column), branchName: node.branchName
+      }))} />
       {layout.nodes.map(({ node, row }) => (
         <CommitRow key={`${node.commit.hash}-${row}`}
           shortHash={node.commit.shortHash} message={node.commit.message}
           author={node.commit.author} relativeDate={node.commit.relativeDate}
           refs={node.branchLabel ? [node.branchLabel] : undefined}
           color={getColor(node.column)} gutterWidth={gutterWidth}
-          copiedHash={copiedHash} onCopy={onCopy}
-          branchName={node.branchName} />
+          copiedHash={copiedHash} onCopy={onCopy} />
       ))}
     </div>
   )

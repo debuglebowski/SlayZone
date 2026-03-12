@@ -205,6 +205,21 @@ export interface WorktreeMetadata {
   createdAt: string | null
 }
 
+// --- Commit graph config ---
+
+export interface CommitGraphConfig {
+  /** Branch shown as the left/base column */
+  baseBranch: string
+  /** Branches always shown (additional columns) */
+  forcedBranches: string[]
+  /** Branches whose children are auto-included */
+  includeChildrenOf: string[]
+  /** Include already-merged branches */
+  showMergedBranches: boolean
+  /** Show individual commits vs collapsed summaries */
+  collapsed: boolean
+}
+
 // --- DAG graph data ---
 
 export interface DagCommit {

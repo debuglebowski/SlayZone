@@ -1,10 +1,23 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
-import { RefreshCw, Search, Loader2 } from 'lucide-react'
-import { IconButton, Input, Switch, cn, toast } from '@slayzone/ui'
-import type { DagCommit } from '../shared/types'
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
+import { RefreshCw, Search, Loader2, Settings2, X } from 'lucide-react'
+import {
+  IconButton, Input, Switch, cn, toast,
+  Popover, PopoverTrigger, PopoverContent,
+  Select, SelectTrigger, SelectValue, SelectContent, SelectItem,
+  Label
+} from '@slayzone/ui'
+import type { DagCommit, CommitGraphConfig } from '../shared/types'
 import { CommitGraph } from './CommitGraph'
 
-const LIMIT_OPTIONS = [50, 100, 200, 500] as const
+const COMMIT_LIMIT = 500
+
+const DEFAULT_CONFIG: CommitGraphConfig = {
+  baseBranch: '',  // resolved at runtime to current branch
+  forcedBranches: [],
+  includeChildrenOf: [],
+  showMergedBranches: false,
+  collapsed: false
+}
 
 interface BranchesTabProps {
   projectPath: string | null
@@ -12,24 +25,71 @@ interface BranchesTabProps {
 }
 
 export function BranchesTab({ projectPath, visible }: BranchesTabProps) {
-  const [showCommits, setShowCommits] = useState(true)
-  const [commitLimit, setCommitLimit] = useState(200)
   const [dagCommits, setDagCommits] = useState<DagCommit[]>([])
   const [filter, setFilter] = useState('')
   const [loading, setLoading] = useState(false)
   const [fetching, setFetching] = useState(false)
   const initialLoad = useRef(false)
 
+  // Branch metadata
+  const [currentBranch, setCurrentBranch] = useState<string>('')
+  const [allBranches, setAllBranches] = useState<string[]>([])
+
+  // Graph config
+  const [config, setConfig] = useState<CommitGraphConfig>(DEFAULT_CONFIG)
+
+  // Resolve effective config (fill in runtime defaults)
+  const effectiveConfig = useMemo((): CommitGraphConfig => ({
+    ...config,
+    baseBranch: config.baseBranch || currentBranch || 'main',
+    includeChildrenOf: config.includeChildrenOf.length > 0
+      ? config.includeChildrenOf
+      : [config.baseBranch || currentBranch || 'main']
+  }), [config, currentBranch])
+
   const fetchData = useCallback(async () => {
     if (!projectPath) return
     try {
-      const commits = await window.api.git.getCommitDag(projectPath, commitLimit)
+      const [branch, branches] = await Promise.all([
+        window.api.git.getCurrentBranch(projectPath),
+        window.api.git.listBranches(projectPath)
+      ])
+      if (branch) setCurrentBranch(branch)
+      setAllBranches(branches)
+
+      // Resolve effective base
+      const baseBranch = config.baseBranch || branch || 'main'
+      const includeChildren = config.includeChildrenOf.length > 0
+        ? config.includeChildrenOf
+        : [baseBranch]
+
+      // Resolve child branches via backend
+      const childResults = await Promise.all(
+        includeChildren.map(b => window.api.git.resolveChildBranches(projectPath, b))
+      )
+
+      // Build the set of branches to show
+      const branchSet = new Set<string>([baseBranch, ...config.forcedBranches])
+      for (const result of childResults) {
+        for (const child of result.children) branchSet.add(child)
+        if (config.showMergedBranches) {
+          for (const merged of result.merged) branchSet.add(merged)
+        }
+      }
+
+      // Fetch DAG for only the resolved branches
+      const commits = await window.api.git.getCommitDag(
+        projectPath, COMMIT_LIMIT, [...branchSet]
+      )
       setDagCommits(commits)
     } catch { /* polling error */ }
-  }, [projectPath, commitLimit])
+  }, [projectPath, config])
 
   // Reset on project change
-  useEffect(() => { initialLoad.current = false }, [projectPath])
+  useEffect(() => {
+    initialLoad.current = false
+    setConfig(DEFAULT_CONFIG)
+  }, [projectPath])
 
   useEffect(() => {
     if (!visible || !projectPath) return
@@ -73,23 +133,12 @@ export function BranchesTab({ projectPath, visible }: BranchesTabProps) {
           {/* Show all commits toggle */}
           <label className="flex items-center gap-1.5 text-[10px] text-muted-foreground cursor-pointer select-none">
             <Switch
-              checked={showCommits}
-              onCheckedChange={setShowCommits}
+              checked={!config.collapsed}
+              onCheckedChange={(v) => setConfig(c => ({ ...c, collapsed: !v }))}
               className="scale-75"
             />
             All commits
           </label>
-
-          {/* Commit limit */}
-          <select
-            value={commitLimit}
-            onChange={(e) => { setCommitLimit(Number(e.target.value)); initialLoad.current = false }}
-            className="h-6 text-[10px] rounded border bg-muted/50 px-1.5 text-foreground"
-          >
-            {LIMIT_OPTIONS.map(n => (
-              <option key={n} value={n}>{n}</option>
-            ))}
-          </select>
 
           {/* Filter */}
           <div className="flex-1 relative">
@@ -101,6 +150,15 @@ export function BranchesTab({ projectPath, visible }: BranchesTabProps) {
               className="h-7 text-xs pl-8"
             />
           </div>
+
+          {/* Graph config */}
+          <GraphConfigPopover
+            config={config}
+            effectiveConfig={effectiveConfig}
+            currentBranch={currentBranch}
+            allBranches={allBranches}
+            onChange={setConfig}
+          />
 
           {/* Fetch */}
           <IconButton
@@ -124,7 +182,7 @@ export function BranchesTab({ projectPath, visible }: BranchesTabProps) {
               mode="dag"
               commits={dagCommits}
               filterQuery={filter || undefined}
-              tipsOnly={!showCommits}
+              tipsOnly={config.collapsed}
             />
           </div>
         ) : (
@@ -134,5 +192,118 @@ export function BranchesTab({ projectPath, visible }: BranchesTabProps) {
         )}
       </div>
     </div>
+  )
+}
+
+// --- Graph config popover ---
+
+function GraphConfigPopover({ config, effectiveConfig, currentBranch, allBranches, onChange }: {
+  config: CommitGraphConfig
+  effectiveConfig: CommitGraphConfig
+  currentBranch: string
+  allBranches: string[]
+  onChange: (config: CommitGraphConfig) => void
+}) {
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <IconButton
+          aria-label="Graph settings"
+          variant="ghost"
+          className="h-7 w-7"
+          title="Graph settings"
+        >
+          <Settings2 className="h-3.5 w-3.5" />
+        </IconButton>
+      </PopoverTrigger>
+      <PopoverContent className="w-72 p-3 space-y-3" align="end">
+        <div className="text-xs font-medium">Graph settings</div>
+
+        {/* Base branch */}
+        <div className="space-y-1">
+          <Label className="text-[10px] text-muted-foreground">Base branch</Label>
+          <Select
+            value={config.baseBranch || '__current__'}
+            onValueChange={(v) => onChange({ ...config, baseBranch: v === '__current__' ? '' : v })}
+          >
+            <SelectTrigger className="h-7 text-xs">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__current__">
+                Current ({currentBranch || 'none'})
+              </SelectItem>
+              {allBranches.map(b => (
+                <SelectItem key={b} value={b}>{b}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        {/* Include children */}
+        <div className="space-y-1">
+          <label className="flex items-center gap-1.5 text-[10px] text-muted-foreground cursor-pointer select-none">
+            <Switch
+              checked={effectiveConfig.includeChildrenOf.length > 0}
+              onCheckedChange={(v) => onChange({
+                ...config,
+                includeChildrenOf: v ? [effectiveConfig.baseBranch] : []
+              })}
+              className="scale-75"
+            />
+            Show child branches
+          </label>
+        </div>
+
+        {/* Show merged */}
+        <div className="space-y-1">
+          <label className="flex items-center gap-1.5 text-[10px] text-muted-foreground cursor-pointer select-none">
+            <Switch
+              checked={config.showMergedBranches}
+              onCheckedChange={(v) => onChange({ ...config, showMergedBranches: v })}
+              className="scale-75"
+            />
+            Show merged branches
+          </label>
+        </div>
+
+        {/* Forced branches */}
+        <div className="space-y-1.5">
+          <Label className="text-[10px] text-muted-foreground">Always show</Label>
+          <div className="flex flex-wrap gap-1">
+            {config.forcedBranches.map(b => (
+              <span key={b} className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] bg-muted border">
+                {b}
+                <button
+                  className="hover:text-destructive"
+                  onClick={() => onChange({ ...config, forcedBranches: config.forcedBranches.filter(x => x !== b) })}
+                >
+                  <X className="h-2.5 w-2.5" />
+                </button>
+              </span>
+            ))}
+          </div>
+          <Select
+            value=""
+            onValueChange={(v) => {
+              if (v && !config.forcedBranches.includes(v)) {
+                onChange({ ...config, forcedBranches: [...config.forcedBranches, v] })
+              }
+            }}
+          >
+            <SelectTrigger className="h-7 text-xs">
+              <SelectValue placeholder="Add branch..." />
+            </SelectTrigger>
+            <SelectContent>
+              {allBranches
+                .filter(b => !config.forcedBranches.includes(b))
+                .map(b => (
+                  <SelectItem key={b} value={b}>{b}</SelectItem>
+                ))}
+            </SelectContent>
+          </Select>
+        </div>
+      </PopoverContent>
+    </Popover>
   )
 }

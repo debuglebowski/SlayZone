@@ -100,6 +100,7 @@ const api: ElectronAPI = {
     isContextManagerEnabled: () => ipcRenderer.invoke('app:is-context-manager-enabled'),
     isContextManagerEnabledSync: ipcRenderer.sendSync('app:is-context-manager-enabled-sync') as boolean,
     isIntegrationsEnabled: ipcRenderer.sendSync('app:is-integrations-enabled-sync') as boolean,
+    isTestsPanelEnabled: ipcRenderer.sendSync('app:is-tests-panel-enabled-sync') as boolean,
     isPlaywright: process.env.PLAYWRIGHT === '1',
     onGoHome: (callback: () => void) => {
       const handler = () => callback()
@@ -317,7 +318,8 @@ const api: ElectronAPI = {
     mergeFrom: (path, branch) => ipcRenderer.invoke('git:mergeFrom', path, branch),
     getDiffStats: (path, ref) => ipcRenderer.invoke('git:getDiffStats', path, ref),
     getWorktreeMetadata: (path) => ipcRenderer.invoke('git:getWorktreeMetadata', path),
-    getCommitDag: (path, limit) => ipcRenderer.invoke('git:getCommitDag', path, limit),
+    getCommitDag: (path, limit, branches?) => ipcRenderer.invoke('git:getCommitDag', path, limit, branches),
+    resolveChildBranches: (path, baseBranch) => ipcRenderer.invoke('git:resolveChildBranches', path, baseBranch),
     resolveCopyBehavior: (projectId?) => ipcRenderer.invoke('git:resolveCopyBehavior', projectId),
     getIgnoredFileTree: (repoPath) => ipcRenderer.invoke('git:getIgnoredFileTree', repoPath),
     copyIgnoredFiles: (repoPath, worktreePath, paths) => ipcRenderer.invoke('git:copyIgnoredFiles', repoPath, worktreePath, paths),

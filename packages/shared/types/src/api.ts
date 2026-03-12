@@ -284,6 +284,7 @@ export interface ElectronAPI {
     isContextManagerEnabled: () => Promise<boolean>
     isContextManagerEnabledSync: boolean
     isIntegrationsEnabled: boolean
+    isTestsPanelEnabled: boolean
     isPlaywright: boolean
     onGoHome: (callback: () => void) => () => void
     onOpenSettings: (callback: () => void) => () => void
@@ -411,7 +412,8 @@ export interface ElectronAPI {
     getDiffStats: (path: string, ref: string) => Promise<DiffStatsSummary>
     getWorktreeMetadata: (path: string) => Promise<WorktreeMetadata>
     // DAG graph
-    getCommitDag: (path: string, limit: number) => Promise<DagCommit[]>
+    getCommitDag: (path: string, limit: number, branches?: string[]) => Promise<DagCommit[]>
+    resolveChildBranches: (path: string, baseBranch: string) => Promise<{ children: string[]; merged: string[] }>
     resolveCopyBehavior: (projectId?: string) => Promise<{ behavior: string; customPaths: string[] }>
     getIgnoredFileTree: (repoPath: string) => Promise<IgnoredFileNode[]>
     copyIgnoredFiles: (repoPath: string, worktreePath: string, paths: string[]) => Promise<void>

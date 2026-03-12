@@ -1050,10 +1050,16 @@ export async function getDiffStats(repoPath: string, ref: string): Promise<DiffS
 
 // --- DAG graph operations ---
 
-export async function getCommitDag(repoPath: string, limit: number): Promise<DagCommit[]> {
+export async function getCommitDag(repoPath: string, limit: number, branches?: string[]): Promise<DagCommit[]> {
   try {
+    const args = ['log', '--topo-order', `-${limit}`, '--format=%H%n%h%n%P%n%s%n%an%n%ar%n%D']
+    if (branches && branches.length > 0) {
+      args.push(...branches)
+    } else {
+      args.push('--all')
+    }
     const output = await execGit(
-      ['log', '--all', '--topo-order', `-${limit}`, '--format=%H%n%h%n%P%n%s%n%an%n%ar%n%D'],
+      args,
       { cwd: repoPath }
     )
     const lines = output.trim().split('\n')
@@ -1072,6 +1078,65 @@ export async function getCommitDag(repoPath: string, limit: number): Promise<Dag
     return commits
   } catch {
     return []
+  }
+}
+
+export interface ResolvedBranches {
+  /** Branches that forked from baseBranch (direct children) */
+  children: string[]
+  /** Branches already merged into baseBranch */
+  merged: string[]
+}
+
+export async function resolveChildBranches(repoPath: string, baseBranch: string): Promise<ResolvedBranches> {
+  try {
+    const [allBranches, mergedOutput] = await Promise.all([
+      listBranches(repoPath),
+      execGit(['branch', '--merged', baseBranch, '--no-color'], { cwd: repoPath })
+    ])
+
+    const mergedBranches = new Set(
+      mergedOutput.split('\n').map(l => l.replace(/^\*?\s+/, '').trim()).filter(Boolean)
+    )
+
+    const otherBranches = allBranches.filter(b => b !== baseBranch)
+
+    // For each non-merged branch, check if baseBranch is its nearest ancestor
+    // Use merge-base --is-ancestor to check if baseBranch is in branch's history
+    const children: string[] = []
+    const results = await Promise.all(
+      otherBranches
+        .filter(b => !mergedBranches.has(b))
+        .map(async (branch) => {
+          try {
+            // merge-base returns the common ancestor
+            const base = await execGit(['merge-base', baseBranch, branch], { cwd: repoPath })
+            // Check if the merge-base is the tip of baseBranch (meaning branch forked from baseBranch)
+            // or somewhere in baseBranch's history (meaning branch forked from an ancestor of baseBranch)
+            const baseTip = await execGit(['rev-parse', baseBranch], { cwd: repoPath })
+            // A branch is a "child" if its merge-base with baseBranch is on baseBranch
+            // (i.e., baseBranch contains the fork point)
+            const isAncestor = await execGit(
+              ['merge-base', '--is-ancestor', base.trim(), baseTip.trim()],
+              { cwd: repoPath }
+            ).then(() => true).catch(() => false)
+            return { branch, isChild: isAncestor }
+          } catch {
+            return { branch, isChild: false }
+          }
+        })
+    )
+
+    for (const { branch, isChild } of results) {
+      if (isChild) children.push(branch)
+    }
+
+    return {
+      children,
+      merged: [...mergedBranches].filter(b => b !== baseBranch)
+    }
+  } catch {
+    return { children: [], merged: [] }
   }
 }
 

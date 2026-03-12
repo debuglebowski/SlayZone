@@ -55,6 +55,7 @@ import {
   getDiffStats,
   getWorktreeMetadata,
   getCommitDag,
+  resolveChildBranches,
   copyIgnoredFiles,
   getIgnoredFileTree
 } from './git-worktree'
@@ -437,8 +438,12 @@ SUMMARY: <2-3 sentences explaining what each branch changed and why they conflic
     return getWorktreeMetadata(path)
   })
 
-  ipcMain.handle('git:getCommitDag', (_, path: string, limit: number) => {
-    return getCommitDag(path, limit)
+  ipcMain.handle('git:getCommitDag', (_, path: string, limit: number, branches?: string[]) => {
+    return getCommitDag(path, limit, branches)
+  })
+
+  ipcMain.handle('git:resolveChildBranches', (_, path: string, baseBranch: string) => {
+    return resolveChildBranches(path, baseBranch)
   })
 
   ipcMain.handle('git:resolveCopyBehavior', (_, projectId?: string) => {

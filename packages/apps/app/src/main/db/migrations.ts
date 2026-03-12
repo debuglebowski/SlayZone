@@ -1258,6 +1258,13 @@ const migrations: Migration[] = [
       db.exec(`ALTER TABLE projects ADD COLUMN worktree_copy_behavior TEXT DEFAULT NULL`)
       db.exec(`ALTER TABLE projects ADD COLUMN worktree_copy_paths TEXT DEFAULT NULL`)
     }
+  },
+  {
+    version: 71,
+    up: (db) => {
+      db.exec(`ALTER TABLE projects ADD COLUMN graph_config TEXT DEFAULT NULL`)
+      db.exec(`ALTER TABLE tasks ADD COLUMN graph_config TEXT DEFAULT NULL`)
+    }
   }
 ]
 
