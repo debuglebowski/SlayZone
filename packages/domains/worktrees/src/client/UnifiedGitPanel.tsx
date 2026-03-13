@@ -4,10 +4,8 @@ import { Button, Checkbox, IconButton, cn } from '@slayzone/ui'
 import type { Task, UpdateTaskInput, MergeContext } from '@slayzone/task/shared'
 import type { FilterState } from '@slayzone/tasks'
 import type { Project } from '@slayzone/projects/shared'
-import type { RebaseProgress } from '../shared/types'
 import { GitDiffPanel, type GitDiffPanelHandle } from './GitDiffPanel'
 import { ConflictFileView } from './ConflictFileView'
-import { CommitTimeline } from './CommitTimeline'
 import { GeneralTabContent } from './GeneralTabContent'
 import { ProjectGeneralTab } from './ProjectGeneralTab'
 import { WorktreesTab, type WorktreesTabHandle } from './WorktreesTab'
@@ -420,7 +418,6 @@ function ConflictPhaseContent({ task, projectPath, completedStatus, isRebase, on
   const [markDone, setMarkDone] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [mergeContext, setMergeContext] = useState<MergeContext | null>(task.merge_context)
-  const [rebaseProgress, setRebaseProgress] = useState<RebaseProgress | null>(null)
 
   // Load merge context if not on task
   useEffect(() => {
@@ -433,12 +430,6 @@ function ConflictPhaseContent({ task, projectPath, completedStatus, isRebase, on
       })
     }
   }, [projectPath, mergeContext])
-
-  // Load rebase progress
-  useEffect(() => {
-    if (!isRebase) return
-    window.api.git.getRebaseProgress(projectPath).then(setRebaseProgress)
-  }, [projectPath, isRebase])
 
   // Load conflicted files
   useEffect(() => {
@@ -488,8 +479,6 @@ function ConflictPhaseContent({ task, projectPath, completedStatus, isRebase, on
         setConflictedFiles(result.conflictedFiles)
         setResolvedFiles(new Set())
         setSelectedFile(result.conflictedFiles[0] ?? null)
-        const progress = await window.api.git.getRebaseProgress(projectPath)
-        setRebaseProgress(progress)
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
@@ -510,8 +499,6 @@ function ConflictPhaseContent({ task, projectPath, completedStatus, isRebase, on
         setConflictedFiles(result.conflictedFiles)
         setResolvedFiles(new Set())
         setSelectedFile(result.conflictedFiles[0] ?? null)
-        const progress = await window.api.git.getRebaseProgress(projectPath)
-        setRebaseProgress(progress)
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
@@ -549,9 +536,6 @@ function ConflictPhaseContent({ task, projectPath, completedStatus, isRebase, on
 
   return (
     <div className="h-full flex flex-col">
-      {/* Commit timeline */}
-      <CommitTimeline context={fallbackContext} rebaseProgress={rebaseProgress} />
-
       {error && (
         <div className="px-4 py-2 bg-destructive/10 text-destructive text-xs">{error}</div>
       )}
