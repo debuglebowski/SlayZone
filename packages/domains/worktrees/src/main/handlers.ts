@@ -27,6 +27,7 @@ import {
   discardFile,
   stageAll,
   unstageAll,
+  getFileDiff,
   getUntrackedFileDiff,
   isRebaseInProgress,
   getRebaseProgress,
@@ -269,6 +270,10 @@ ${steps.join('\n\n')}`
 
   ipcMain.handle('git:unstageAll', (_, path: string) => {
     return unstageAll(path)
+  })
+
+  ipcMain.handle('git:getFileDiff', (_, repoPath: string, filePath: string, staged: boolean, opts?: { contextLines?: string; ignoreWhitespace?: boolean }) => {
+    return getFileDiff(repoPath, filePath, staged, opts)
   })
 
   ipcMain.handle('git:getUntrackedFileDiff', (_, repoPath: string, filePath: string) => {

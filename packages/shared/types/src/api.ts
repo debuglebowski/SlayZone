@@ -387,6 +387,7 @@ export interface ElectronAPI {
     discardFile: (path: string, filePath: string, untracked?: boolean) => Promise<void>
     stageAll: (path: string) => Promise<void>
     unstageAll: (path: string) => Promise<void>
+    getFileDiff: (repoPath: string, filePath: string, staged: boolean, opts?: { contextLines?: string; ignoreWhitespace?: boolean }) => Promise<string>
     getUntrackedFileDiff: (repoPath: string, filePath: string) => Promise<string>
     getConflictContent: (repoPath: string, filePath: string) => Promise<ConflictFileContent>
     writeResolvedFile: (repoPath: string, filePath: string, content: string) => Promise<void>

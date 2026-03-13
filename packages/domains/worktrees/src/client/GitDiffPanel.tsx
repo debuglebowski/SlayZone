@@ -1,5 +1,5 @@
 import { forwardRef, memo, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react'
-import { Plus, Minus, Undo2, ChevronRight, GitMerge, CheckCircle2, FileDiff } from 'lucide-react'
+import { Plus, Minus, Undo2, ChevronRight, GitMerge, CheckCircle2, FileDiff, FileText } from 'lucide-react'
 import {
   Button, FileTree, buildFileTree, flattenFileTree, fileTreeIndent, cn, buttonVariants,
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
@@ -210,6 +210,7 @@ export const GitDiffPanel = forwardRef<GitDiffPanelHandle, GitDiffPanelProps>(fu
   const [committing, setCommitting] = useState(false)
   const [stagedCollapsed, setStagedCollapsed] = useState(false)
   const [unstagedCollapsed, setUnstagedCollapsed] = useState(false)
+  const [showFullFile, setShowFullFile] = useState(false)
   const [confirmAction, setConfirmAction] = useState<ConfirmAction | null>(null)
   const confirmActionRef = useRef<ConfirmAction | null>(null)
   if (confirmAction) confirmActionRef.current = confirmAction
@@ -353,12 +354,37 @@ export const GitDiffPanel = forwardRef<GitDiffPanelHandle, GitDiffPanelProps>(fu
     return allDiffsMap.get(key) ?? (entry.status === '?' ? untrackedDiffs.get(entry.path) : undefined)
   }, [allDiffsMap, untrackedDiffs])
 
-  const selectedDiff = useMemo(() => {
+  const normalDiff = useMemo(() => {
     if (!selectedFile) return null
     const entry = flatEntries.find((f) => f.path === selectedFile.path && f.source === selectedFile.source)
     if (!entry) return null
     return getDiffForEntry(entry) ?? null
   }, [selectedFile, flatEntries, getDiffForEntry])
+
+  // Full-file diff: fetched per-file only when toggle is on
+  const [fullFileDiff, setFullFileDiff] = useState<FileDiffType | null>(null)
+  const fullFileFetchKey = showFullFile && selectedFile ? `${selectedFile.source}:${selectedFile.path}` : null
+  useEffect(() => {
+    setFullFileDiff(null)
+    if (!fullFileFetchKey || !targetPath || !selectedFile || !normalDiff) {
+      return
+    }
+    let cancelled = false
+    window.api.git.getFileDiff(targetPath, selectedFile.path, selectedFile.source === 'staged', {
+      contextLines: 'all',
+      ignoreWhitespace: diffIgnoreWhitespace,
+    }).then((patch) => {
+      if (cancelled) return
+      const parsed = parseUnifiedDiff(patch)
+      setFullFileDiff(parsed.find((d) => d.path === selectedFile.path) ?? parsed[0] ?? null)
+    }).catch(() => {
+      if (!cancelled) setFullFileDiff(null)
+    })
+    return () => { cancelled = true }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fullFileFetchKey, targetPath, diffIgnoreWhitespace, normalDiff])
+
+  const selectedDiff = showFullFile && fullFileDiff ? fullFileDiff : normalDiff
 
   // Eagerly fetch diffs for untracked files (for counts + preview)
   const prevUntrackedRef = useRef<string[]>([])
@@ -648,7 +674,7 @@ export const GitDiffPanel = forwardRef<GitDiffPanelHandle, GitDiffPanelProps>(fu
             {stagedEntries.length > 0 && (
               <div>
                 <div
-                  className="px-3 py-1.5 text-[11px] font-medium text-muted-foreground uppercase tracking-wide bg-muted border-b sticky top-0 z-10 flex items-center justify-between cursor-pointer select-none"
+                  className="h-[30px] px-3 text-[11px] font-medium text-muted-foreground uppercase tracking-wide bg-muted border-b sticky top-0 z-10 flex items-center justify-between cursor-pointer select-none"
                   onClick={() => setStagedCollapsed((v) => !v)}
                 >
                   <span className="flex items-center gap-1">
@@ -686,7 +712,7 @@ export const GitDiffPanel = forwardRef<GitDiffPanelHandle, GitDiffPanelProps>(fu
             {unstagedEntries.length > 0 && (
               <div>
                 <div
-                  className="px-3 py-1.5 text-[11px] font-medium text-muted-foreground uppercase tracking-wide bg-muted border-b sticky top-0 z-10 flex items-center justify-between cursor-pointer select-none"
+                  className="h-[30px] px-3 text-[11px] font-medium text-muted-foreground uppercase tracking-wide bg-muted border-b sticky top-0 z-10 flex items-center justify-between cursor-pointer select-none"
                   onClick={() => setUnstagedCollapsed((v) => !v)}
                 >
                   <span className="flex items-center gap-1">
@@ -775,9 +801,9 @@ export const GitDiffPanel = forwardRef<GitDiffPanelHandle, GitDiffPanelProps>(fu
           <HorizontalResizeHandle onDrag={handleResize} />
 
           {/* Right: diff viewer */}
-          <div className="flex-1 min-w-0 min-h-0 overflow-auto">
+          <div className="flex-1 min-w-0 min-h-0 flex flex-col">
             {!selectedFile && (
-              <div className="h-full flex items-center justify-center p-6">
+              <div className="flex-1 flex items-center justify-center p-6">
                 <div className="flex flex-col items-center gap-3 text-muted-foreground">
                   <FileDiff className="size-10 opacity-30" />
                   <div className="text-center">
@@ -788,7 +814,7 @@ export const GitDiffPanel = forwardRef<GitDiffPanelHandle, GitDiffPanelProps>(fu
               </div>
             )}
             {selectedFile && !selectedDiff && (
-              <div className="h-full flex items-center justify-center p-6">
+              <div className="flex-1 flex items-center justify-center p-6">
                 <p className="text-xs text-muted-foreground">
                   {flatEntries.find((f) => f.path === selectedFile.path && f.source === selectedFile.source)?.status === '?'
                     ? 'Loading...'
@@ -796,7 +822,29 @@ export const GitDiffPanel = forwardRef<GitDiffPanelHandle, GitDiffPanelProps>(fu
                 </p>
               </div>
             )}
-            {selectedFile && selectedDiff && <DiffView diff={selectedDiff} />}
+            {selectedFile && selectedDiff && (
+              <>
+                <div className="shrink-0 h-[30px] px-3 text-[11px] font-medium text-muted-foreground uppercase tracking-wide bg-muted border-b sticky top-0 z-10 flex items-center justify-between select-none">
+                  <span className="truncate">{selectedFile.path}</span>
+                  <button
+                    className={cn(
+                      'flex items-center gap-1 px-1.5 rounded text-[11px] transition-colors',
+                      showFullFile
+                        ? 'bg-primary/15 text-primary'
+                        : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+                    )}
+                    onClick={() => setShowFullFile((v) => !v)}
+                    title={showFullFile ? 'Show diff only' : 'Show full file'}
+                  >
+                    <FileText className="size-3" />
+                    Full file
+                  </button>
+                </div>
+                <div className="flex-1 min-h-0 overflow-auto">
+                  <DiffView diff={selectedDiff} />
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}

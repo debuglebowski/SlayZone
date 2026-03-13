@@ -548,6 +548,27 @@ export async function getUntrackedFileDiff(repoPath: string, filePath: string): 
   }
 }
 
+export async function getFileDiff(
+  repoPath: string,
+  filePath: string,
+  staged: boolean,
+  opts?: { contextLines?: string; ignoreWhitespace?: boolean }
+): Promise<string> {
+  const extraFlags: string[] = ['--no-ext-diff']
+  if (opts?.contextLines === 'all') {
+    extraFlags.push('-U99999')
+  } else if (opts?.contextLines && ['0', '3', '5'].includes(opts.contextLines)) {
+    extraFlags.push(`-U${opts.contextLines}`)
+  }
+  if (opts?.ignoreWhitespace) extraFlags.push('-w')
+
+  const diffCmd = staged
+    ? ['diff', '--cached', ...extraFlags, '--', filePath]
+    : ['diff', ...extraFlags, '--', filePath]
+
+  return execGit(diffCmd, { cwd: repoPath })
+}
+
 export async function getWorkingDiff(repoPath: string, opts?: { contextLines?: string; ignoreWhitespace?: boolean }): Promise<GitDiffSnapshot> {
   await execGit(['rev-parse', '--git-dir'], { cwd: repoPath }).catch(() => {
     throw new Error(`Not a git repository: ${repoPath}`)
@@ -556,7 +577,9 @@ export async function getWorkingDiff(repoPath: string, opts?: { contextLines?: s
   // Build extra flags from diff settings
   const extraFlags: string[] = []
   const validContextLines = ['0', '3', '5']
-  if (opts?.contextLines && opts.contextLines !== 'all' && validContextLines.includes(opts.contextLines)) {
+  if (opts?.contextLines === 'all') {
+    extraFlags.push('-U99999')
+  } else if (opts?.contextLines && validContextLines.includes(opts.contextLines)) {
     extraFlags.push(`-U${opts.contextLines}`)
   }
   if (opts?.ignoreWhitespace) {
