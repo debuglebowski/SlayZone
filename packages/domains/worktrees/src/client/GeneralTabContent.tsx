@@ -1,17 +1,12 @@
 /**
- * Consolidated General tab (Option B: Status-first, graph below)
- *
- * Top: header (branch pill + PR/worktree buttons, blue when worktree)
- * Middle: status chips + rebase/merge + pull/push
- * Bottom (worktree): fork graph
- * Bottom (no worktree): recent commits
+ * Task General tab: header, status chips, commit graph (BranchesTab DAG)
  */
 import { useState, useCallback } from 'react'
-import { Loader2, GitBranch, FolderOpen, ArrowLeft, Cloud, CloudOff } from 'lucide-react'
+import { GitBranch, FolderOpen, ArrowLeft, Cloud, CloudOff } from 'lucide-react'
 import { Button, toast } from '@slayzone/ui'
 import type { Task, UpdateTaskInput } from '@slayzone/task/shared'
 import { useConsolidatedGeneralData } from './useConsolidatedGeneralData'
-import { CommitGraph } from './CommitGraph'
+import { useBranchGraph, BranchGraphToolbar, BranchGraphCard } from './BranchesTab'
 import { RemoteSection } from './RemoteSection'
 import { CopyFilesDialog } from './CopyFilesDialog'
 import { CreatePrDialog, LinkPrDialog } from './PullRequestTab'
@@ -26,7 +21,6 @@ import {
   PrStatusChip,
   PrButtons,
   RebaseMergeButtons,
-  StaleNudge,
   Section,
 } from './general-tab-shared'
 
@@ -46,6 +40,7 @@ export function GeneralTabContent({
   hasGithubRemote, onUpdateTask, onTaskUpdated, onSwitchTab
 }: GeneralTabContentProps) {
   const data = useConsolidatedGeneralData(task, projectPath, visible, pollIntervalMs, onUpdateTask)
+  const branchGraph = useBranchGraph(data.targetPath, visible, data.parentBranch ?? undefined)
   const [createPrOpen, setCreatePrOpen] = useState(false)
   const [linkPrOpen, setLinkPrOpen] = useState(false)
   const [linkError, setLinkError] = useState<string | null>(null)
@@ -163,57 +158,19 @@ export function GeneralTabContent({
         </Section>
       </div>
 
-      {data.hasWorktree && data.parentBranch ? (
-        /* Scrollable: worktree section with graph */
-        <div className="flex-1 min-h-0 overflow-y-auto p-4 pt-4 space-y-3">
-          {/* Worktree section header */}
-          <div className="flex items-baseline gap-2">
-            <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Worktree</div>
-            <div className="flex items-center gap-2 text-xs text-muted-foreground">
-              vs {data.parentBranch}
-              {data.featureCount > 0 && <span className="text-green-500">↑{data.featureCount}</span>}
-              {data.baseCount > 0 && <span className="text-yellow-500">↓{data.baseCount}</span>}
-            </div>
-            {data.diffStats && data.diffStats.filesChanged > 0 && (
-              <div className="text-[11px] text-muted-foreground ml-auto">
-                {data.diffStats.filesChanged} file{data.diffStats.filesChanged !== 1 ? 's' : ''}
-                {data.diffStats.insertions > 0 && <span className="text-green-500 ml-1">+{data.diffStats.insertions}</span>}
-                {data.diffStats.deletions > 0 && <span className="text-red-500 ml-1">-{data.diffStats.deletions}</span>}
-              </div>
-            )}
+      {/* Commit graph */}
+      <div className="flex-1 min-h-0 flex flex-col">
+        <div className="shrink-0 px-4 pt-4 flex items-center">
+          <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Commits</div>
+          <div className="flex-1" />
+          <div className="flex items-center gap-0.5">
+            <BranchGraphToolbar state={branchGraph} />
           </div>
-
-          <StaleNudge data={data} />
-
-          {/* Graph */}
-          {data.branchLoading ? (
-            <div className="flex items-center justify-center h-32">
-              <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-            </div>
-          ) : data.worktreeGraph ? (
-            <div className="rounded-lg border bg-muted/30 p-2">
-              <CommitGraph graph={data.worktreeGraph} />
-            </div>
-          ) : (
-            <div className="flex items-center justify-center h-20 text-xs text-muted-foreground">
-              No divergence — branches are identical
-            </div>
-          )}
-
         </div>
-      ) : (
-        /* No worktree — commit graph (local vs remote when diverged, or single-column recent) */
-        <div className="flex-1 min-h-0 flex flex-col">
-          {data.upstreamGraph && data.upstreamGraph.commits.length > 0 && (
-            <div className="flex-1 min-h-[200px] flex flex-col p-4 pt-4">
-              <div className="shrink-0 text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">Recent Commits</div>
-              <div className="min-h-0 overflow-y-auto rounded-lg border bg-muted/30 p-2">
-                <CommitGraph graph={data.upstreamGraph} />
-              </div>
-            </div>
-          )}
+        <div className="flex-1 min-h-0 p-3">
+          <BranchGraphCard state={branchGraph} />
         </div>
-      )}
+      </div>
 
       <CopyFilesDialog
         open={data.copyFilesDialog.open}

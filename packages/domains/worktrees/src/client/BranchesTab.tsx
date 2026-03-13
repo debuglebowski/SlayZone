@@ -1,11 +1,9 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
-import { RefreshCw, Search, Loader2, Settings2, X, Info, List } from 'lucide-react'
+import { RefreshCw, Search, Loader2, SlidersHorizontal, Info, List, Layers } from 'lucide-react'
 import {
   IconButton, Input, Switch, cn, toast,
   Popover, PopoverTrigger, PopoverContent,
-  Select, SelectTrigger, SelectValue, SelectContent, SelectItem,
   Label,
-  Tooltip, TooltipTrigger, TooltipContent,
 } from '@slayzone/ui'
 import type { CommitGraphConfig, ResolvedGraph } from '../shared/types'
 import { CommitGraph } from './CommitGraph'
@@ -14,80 +12,71 @@ const FETCH_LIMIT = 2000   // fetch more for accurate branch topology
 const RENDER_LIMIT = 500   // cap DOM nodes for performance
 
 const DEFAULT_CONFIG: CommitGraphConfig = {
-  baseBranch: '',  // resolved at runtime to current branch
-  forcedBranches: [],
-  includeChildrenOf: [],
-  showMergedBranches: false,
-  collapsed: false
+  baseBranch: '',  // resolved at runtime
+  collapsed: false,
+  includeChildBranches: true,
+  includeDeletedBranches: false,
+  includeTags: true,
 }
 
-interface BranchesTabProps {
-  projectPath: string | null
-  visible: boolean
+// --- Shared hook: all branch graph state + data fetching ---
+
+export interface BranchGraphState {
+  dagGraph: ResolvedGraph | null
+  loading: boolean
+  filter: string
+  setFilter: (v: string) => void
+  config: CommitGraphConfig
+  setConfig: React.Dispatch<React.SetStateAction<CommitGraphConfig>>
+  effectiveBaseBranch: string
+  fetching: boolean
+  handleFetch: () => Promise<void>
 }
 
-export function BranchesTab({ projectPath, visible }: BranchesTabProps) {
+export function useBranchGraph(
+  projectPath: string | null,
+  visible: boolean,
+  defaultBaseBranch?: string,
+): BranchGraphState {
   const [dagGraph, setDagGraph] = useState<ResolvedGraph | null>(null)
   const [filter, setFilter] = useState('')
   const [loading, setLoading] = useState(false)
   const [fetching, setFetching] = useState(false)
   const initialLoad = useRef(false)
 
-  // Branch metadata
   const [currentBranch, setCurrentBranch] = useState<string>('')
-  const [allBranches, setAllBranches] = useState<string[]>([])
-
-  // Graph config
   const [config, setConfig] = useState<CommitGraphConfig>(DEFAULT_CONFIG)
 
-  // Resolve effective config (fill in runtime defaults)
-  const effectiveConfig = useMemo((): CommitGraphConfig => ({
-    ...config,
-    baseBranch: config.baseBranch || currentBranch || 'main',
-    includeChildrenOf: config.includeChildrenOf.length > 0
-      ? config.includeChildrenOf
-      : [config.baseBranch || currentBranch || 'main']
-  }), [config, currentBranch])
+  const effectiveBaseBranch = useMemo(
+    () => config.baseBranch || defaultBaseBranch || currentBranch || 'main',
+    [config.baseBranch, defaultBaseBranch, currentBranch]
+  )
 
   const fetchData = useCallback(async () => {
     if (!projectPath) return
     try {
-      const [branch, branches] = await Promise.all([
-        window.api.git.getCurrentBranch(projectPath),
-        window.api.git.listBranches(projectPath)
-      ])
+      const branch = await window.api.git.getCurrentBranch(projectPath)
       if (branch) setCurrentBranch(branch)
-      setAllBranches(branches)
 
-      // Resolve effective base
-      const baseBranch = config.baseBranch || branch || 'main'
-      const includeChildren = config.includeChildrenOf.length > 0
-        ? config.includeChildrenOf
-        : [baseBranch]
+      const baseBranch = config.baseBranch || defaultBaseBranch || branch || 'main'
 
-      // Resolve child branches via backend
-      const childResults = await Promise.all(
-        includeChildren.map(b => window.api.git.resolveChildBranches(projectPath, b))
-      )
+      const branchSet = new Set<string>([baseBranch])
 
-      // Build the set of branches to show
-      const branchSet = new Set<string>([baseBranch, ...config.forcedBranches])
-      for (const result of childResults) {
+      if (config.includeChildBranches) {
+        const result = await window.api.git.resolveChildBranches(projectPath, baseBranch)
         for (const child of result.children) branchSet.add(child)
-        if (config.showMergedBranches) {
+        if (config.includeDeletedBranches) {
           for (const merged of result.merged) branchSet.add(merged)
         }
       }
 
-      // Fetch resolved DAG for only the resolved branches
       const graph = await window.api.git.getResolvedCommitDag(
         projectPath, FETCH_LIMIT, [...branchSet], baseBranch
       )
       setDagGraph(graph)
     } catch { /* polling error */ }
-  }, [projectPath, config])
+  }, [projectPath, config, defaultBaseBranch])
 
-  // Reset on project change
   useEffect(() => {
     initialLoad.current = false
     setConfig(DEFAULT_CONFIG)
@@ -119,201 +108,202 @@ export function BranchesTab({ projectPath, visible }: BranchesTabProps) {
     }
   }, [projectPath, fetchData])
 
+  return { dagGraph, loading, filter, setFilter, config, setConfig, effectiveBaseBranch, fetching, handleFetch }
+}
+
+// --- Toolbar buttons (display, info, fetch) ---
+
+export function BranchGraphToolbar({ state }: { state: BranchGraphState }) {
+  return (
+    <>
+      <DisplayPopover config={state.config} effectiveBaseBranch={state.effectiveBaseBranch} onChange={state.setConfig} />
+      <GraphInfoPopover />
+      <IconButton
+        aria-label="Fetch"
+        variant="ghost"
+        className="h-7 w-7"
+        title="Fetch from remote"
+        onClick={state.handleFetch}
+        disabled={state.fetching}
+      >
+        <RefreshCw className={cn('h-3.5 w-3.5', state.fetching && 'animate-spin')} />
+      </IconButton>
+    </>
+  )
+}
+
+// --- Full standalone BranchesTab ---
+
+interface BranchesTabProps {
+  projectPath: string | null
+  visible: boolean
+  defaultBaseBranch?: string
+  /** Standalone (false/undefined): toolbar above card. Embedded (true): toolbar inside card. */
+  embedded?: boolean
+}
+
+export function BranchesTab({ projectPath, visible, defaultBaseBranch, embedded }: BranchesTabProps) {
+  const state = useBranchGraph(projectPath, visible, defaultBaseBranch)
+
   if (!projectPath) {
     return <div className="p-4 text-xs text-muted-foreground">Set a project path to use Git features</div>
   }
 
-  if (loading) {
+  if (state.loading) {
     return <div className="h-full flex items-center justify-center"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
+  }
+
+  const toolbar = (
+    <div className="flex items-center gap-2">
+      <div className="relative max-w-48">
+        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+        <Input
+          value={state.filter}
+          onChange={(e) => state.setFilter(e.target.value)}
+          placeholder="Filter..."
+          className="h-7 text-xs pl-8"
+        />
+      </div>
+      <div className="flex-1" />
+      <BranchGraphToolbar state={state} />
+    </div>
+  )
+
+  const graphContent = state.dagGraph && state.dagGraph.commits.length > 0 ? (
+    <CommitGraph
+      graph={state.dagGraph}
+      filterQuery={state.filter || undefined}
+      tipsOnly={state.config.collapsed}
+      includeTags={state.config.includeTags}
+      renderLimit={RENDER_LIMIT}
+    />
+  ) : (
+    <div className="flex items-center justify-center h-32 text-xs text-muted-foreground">
+      {state.filter ? 'No matches' : 'No branches'}
+    </div>
+  )
+
+  if (embedded) {
+    return (
+      <div className="h-full flex flex-col p-3">
+        <div className="flex-1 min-h-0 rounded-lg border bg-muted/30 p-2 flex flex-col">
+          <div className="shrink-0 pb-2">{toolbar}</div>
+          <div className="flex-1 min-h-0 overflow-y-auto">{graphContent}</div>
+        </div>
+      </div>
+    )
   }
 
   return (
     <div className="h-full flex flex-col">
-      {/* Toolbar */}
-      <div className="shrink-0 p-3 pb-0">
-        <div className="flex items-center gap-2">
-          {/* Filter */}
-          <div className="relative max-w-48">
-            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-            <Input
-              value={filter}
-              onChange={(e) => setFilter(e.target.value)}
-              placeholder="Filter..."
-              className="h-7 text-xs pl-8"
-            />
-          </div>
-
-          <div className="flex-1" />
-
-          {/* Show all commits toggle */}
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <IconButton
-                aria-label="All commits"
-                variant="ghost"
-                className={cn('h-7 w-7', !config.collapsed && 'bg-accent')}
-                onClick={() => setConfig(c => ({ ...c, collapsed: !c.collapsed }))}
-              >
-                <List className="h-3.5 w-3.5" />
-              </IconButton>
-            </TooltipTrigger>
-            <TooltipContent side="bottom">All commits</TooltipContent>
-          </Tooltip>
-
-          {/* Graph config */}
-          <GraphConfigPopover
-            config={config}
-            effectiveConfig={effectiveConfig}
-            currentBranch={currentBranch}
-            allBranches={allBranches}
-            onChange={setConfig}
-          />
-
-          {/* Info */}
-          <GraphInfoPopover />
-
-          {/* Fetch */}
-          <IconButton
-            aria-label="Fetch"
-            variant="ghost"
-            className="h-7 w-7"
-            title="Fetch from remote"
-            onClick={handleFetch}
-            disabled={fetching}
-          >
-            <RefreshCw className={cn('h-3.5 w-3.5', fetching && 'animate-spin')} />
-          </IconButton>
-        </div>
-      </div>
-
-      {/* Graph */}
+      <div className="shrink-0 p-3 pb-0">{toolbar}</div>
       <div className="flex-1 min-h-0 p-3">
-        {dagGraph && dagGraph.commits.length > 0 ? (
-          <div className="rounded-lg border bg-muted/30 p-2 h-full overflow-y-auto">
-            <CommitGraph
-              graph={dagGraph}
-              filterQuery={filter || undefined}
-              tipsOnly={config.collapsed}
-              renderLimit={RENDER_LIMIT}
-            />
-          </div>
-        ) : (
-          <div className="flex items-center justify-center h-32 text-xs text-muted-foreground">
-            {filter ? 'No matches' : 'No branches'}
-          </div>
-        )}
+        <div className="rounded-lg border bg-muted/30 p-2 h-full overflow-y-auto">
+          {graphContent}
+        </div>
       </div>
     </div>
   )
 }
 
-// --- Graph config popover ---
+// --- Headless graph card (for external toolbar placement) ---
 
-function GraphConfigPopover({ config, effectiveConfig, currentBranch, allBranches, onChange }: {
+export function BranchGraphCard({ state, className }: { state: BranchGraphState; className?: string }) {
+  if (state.loading) {
+    return <div className="h-full flex items-center justify-center"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
+  }
+
+  const graphContent = state.dagGraph && state.dagGraph.commits.length > 0 ? (
+    <CommitGraph
+      graph={state.dagGraph}
+      filterQuery={state.filter || undefined}
+      tipsOnly={state.config.collapsed}
+      includeTags={state.config.includeTags}
+      renderLimit={RENDER_LIMIT}
+    />
+  ) : (
+    <div className="flex items-center justify-center h-32 text-xs text-muted-foreground">
+      No branches
+    </div>
+  )
+
+  return (
+    <div className={cn('rounded-lg border bg-muted/30 p-2 h-full overflow-y-auto', className)}>
+      {graphContent}
+    </div>
+  )
+}
+
+// --- Display popover (matches kanban pattern) ---
+
+function DisplayPopover({ config, effectiveBaseBranch, onChange }: {
   config: CommitGraphConfig
-  effectiveConfig: CommitGraphConfig
-  currentBranch: string
-  allBranches: string[]
-  onChange: (config: CommitGraphConfig) => void
+  effectiveBaseBranch: string
+  onChange: React.Dispatch<React.SetStateAction<CommitGraphConfig>>
 }) {
   return (
     <Popover>
       <PopoverTrigger asChild>
         <IconButton
-          aria-label="Graph settings"
+          aria-label="Display settings"
           variant="ghost"
           className="h-7 w-7"
-          title="Graph settings"
+          title="Display settings"
         >
-          <Settings2 className="h-3.5 w-3.5" />
+          <SlidersHorizontal className="h-3.5 w-3.5" />
         </IconButton>
       </PopoverTrigger>
-      <PopoverContent className="w-72 p-3 space-y-3" align="end">
-        <div className="text-xs font-medium">Graph settings</div>
-
-        {/* Base branch */}
-        <div className="space-y-1">
-          <Label className="text-[10px] text-muted-foreground">Base branch</Label>
-          <Select
-            value={config.baseBranch || '__current__'}
-            onValueChange={(v) => onChange({ ...config, baseBranch: v === '__current__' ? '' : v })}
-          >
-            <SelectTrigger className="h-7 text-xs">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="__current__">
-                Current ({currentBranch || 'none'})
-              </SelectItem>
-              {allBranches.map(b => (
-                <SelectItem key={b} value={b}>{b}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-
-        {/* Include children */}
-        <div className="space-y-1">
-          <label className="flex items-center gap-1.5 text-[10px] text-muted-foreground cursor-pointer select-none">
-            <Switch
-              checked={effectiveConfig.includeChildrenOf.length > 0}
-              onCheckedChange={(v) => onChange({
-                ...config,
-                includeChildrenOf: v ? [effectiveConfig.baseBranch] : []
-              })}
-              className="scale-75"
-            />
-            Show child branches
-          </label>
-        </div>
-
-        {/* Show merged */}
-        <div className="space-y-1">
-          <label className="flex items-center gap-1.5 text-[10px] text-muted-foreground cursor-pointer select-none">
-            <Switch
-              checked={config.showMergedBranches}
-              onCheckedChange={(v) => onChange({ ...config, showMergedBranches: v })}
-              className="scale-75"
-            />
-            Show merged branches
-          </label>
-        </div>
-
-        {/* Forced branches */}
-        <div className="space-y-1.5">
-          <Label className="text-[10px] text-muted-foreground">Always show</Label>
-          <div className="flex flex-wrap gap-1">
-            {config.forcedBranches.map(b => (
-              <span key={b} className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] bg-muted border">
-                {b}
+      <PopoverContent className="w-72 p-3" align="end">
+        <div className="space-y-3">
+          {/* View mode toggle */}
+          <div className="grid grid-cols-2 rounded-md border border-border/50 p-0.5 gap-0.5">
+            {([
+              { value: false, icon: List, label: 'All commits' },
+              { value: true, icon: Layers, label: 'Collapsed' }
+            ] as const).map(({ value, icon: Icon, label }) => {
+              const isActive = config.collapsed === value
+              return (
                 <button
-                  className="hover:text-destructive"
-                  onClick={() => onChange({ ...config, forcedBranches: config.forcedBranches.filter(x => x !== b) })}
+                  key={label}
+                  className={`flex flex-col items-center justify-center gap-1 py-3 text-[10px] font-medium rounded transition-colors ${
+                    isActive
+                      ? 'bg-foreground text-background'
+                      : 'text-muted-foreground hover:text-foreground hover:bg-accent'
+                  }`}
+                  onClick={() => onChange(c => ({ ...c, collapsed: value }))}
                 >
-                  <X className="h-2.5 w-2.5" />
+                  <Icon className="size-5" />
+                  {label}
                 </button>
-              </span>
-            ))}
+              )
+            })}
           </div>
-          <Select
-            value=""
-            onValueChange={(v) => {
-              if (v && !config.forcedBranches.includes(v)) {
-                onChange({ ...config, forcedBranches: [...config.forcedBranches, v] })
-              }
-            }}
-          >
-            <SelectTrigger className="h-7 text-xs">
-              <SelectValue placeholder="Add branch..." />
-            </SelectTrigger>
-            <SelectContent>
-              {allBranches
-                .filter(b => !config.forcedBranches.includes(b))
-                .map(b => (
-                  <SelectItem key={b} value={b}>{b}</SelectItem>
-                ))}
-            </SelectContent>
-          </Select>
+
+          {/* Base branch (read-only) */}
+          <div className="flex items-center justify-between">
+            <Label className="text-sm">Base branch</Label>
+            <span className="text-xs font-mono text-muted-foreground px-1.5 py-0.5 rounded bg-muted border">
+              {effectiveBaseBranch}
+            </span>
+          </div>
+
+          <div className="h-px bg-border" />
+
+          {/* Toggle switches */}
+          <div className="flex items-center justify-between">
+            <Label htmlFor="display-child-branches" className="text-sm cursor-pointer">Include child branches</Label>
+            <Switch id="display-child-branches" checked={config.includeChildBranches} onCheckedChange={(v) => onChange(c => ({ ...c, includeChildBranches: v }))} />
+          </div>
+          <div className="flex items-center justify-between">
+            <Label htmlFor="display-deleted-branches" className="text-sm cursor-pointer">Include deleted branches</Label>
+            <Switch id="display-deleted-branches" checked={config.includeDeletedBranches} onCheckedChange={(v) => onChange(c => ({ ...c, includeDeletedBranches: v }))} />
+          </div>
+          {config.collapsed && (
+            <div className="flex items-center justify-between">
+              <Label htmlFor="display-tags" className="text-sm cursor-pointer">Include tags</Label>
+              <Switch id="display-tags" checked={config.includeTags} onCheckedChange={(v) => onChange(c => ({ ...c, includeTags: v }))} />
+            </div>
+          )}
         </div>
       </PopoverContent>
     </Popover>
