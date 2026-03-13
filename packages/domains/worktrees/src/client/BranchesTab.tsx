@@ -339,11 +339,6 @@ function GraphInfoPopover() {
         </div>
 
         <div className="flex items-start gap-2">
-          <svg width="28" height="28" className="shrink-0"><line x1="14" y1="0" x2="14" y2="7" stroke="#e2e2e2" strokeWidth="2" opacity="0.35" /><circle cx="14" cy="14" r="7" fill="#e2e2e2" opacity="0.15" /><circle cx="14" cy="14" r="4" fill="#e2e2e2" /><line x1="14" y1="21" x2="14" y2="28" stroke="#e2e2e2" strokeWidth="2" opacity="0.35" /></svg>
-          <div><span className="font-medium">Branch tip</span><p className="text-muted-foreground mt-0.5">The latest commit on a branch — where the branch head points.</p></div>
-        </div>
-
-        <div className="flex items-start gap-2">
           <svg width="28" height="28" className="shrink-0"><line x1="14" y1="0" x2="14" y2="9" stroke="#e2e2e2" strokeWidth="2" opacity="0.35" /><circle cx="14" cy="14" r="5" fill="none" stroke="#e2e2e2" strokeWidth="2" /><line x1="14" y1="19" x2="14" y2="28" stroke="#e2e2e2" strokeWidth="2" opacity="0.35" /></svg>
           <div><span className="font-medium">Merge commit</span><p className="text-muted-foreground mt-0.5">A commit where two branches were joined together.</p></div>
         </div>

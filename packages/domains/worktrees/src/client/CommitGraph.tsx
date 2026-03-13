@@ -377,220 +377,108 @@ export function computeDagLayout(commits: ResolvedCommit[], baseBranch: string):
   return { nodes, edges, maxColumn }
 }
 
-// --- Collapsed layout: branch labels + commit count groups ---
+// --- Collapsed DAG: same graph topology, non-head commits grouped ---
 
-type CollapsedNodeKind = 'branch' | 'group'
-
-interface CollapsedNode {
-  kind: CollapsedNodeKind
-  label: string         // branch name(s) or "N commits"
-  column: number
+interface CollapsedGroup {
   row: number
-  color: string
-  id: string            // for React key
-  refs?: string[]       // for branch nodes
-  commitCount?: number  // for group nodes
+  count: number
+  columns: Array<{ col: number; colorIndex: number }>
 }
 
-interface CollapsedLayout {
-  nodes: CollapsedNode[]
+interface CollapsedDag {
+  nodes: LayoutNode[]
   edges: LayoutEdge[]
+  groups: CollapsedGroup[]
   maxColumn: number
+  totalRows: number
+  rowOffsets: Map<number, number>
 }
 
-function computeCollapsedLayout(commits: ResolvedCommit[], fullLayout: DagLayout): CollapsedLayout {
-  if (commits.length === 0) return { nodes: [], edges: [], maxColumn: 0 }
+function computeCollapsedDag(fullLayout: DagLayout): CollapsedDag {
+  const { nodes, edges, maxColumn } = fullLayout
+  if (nodes.length === 0) return { nodes: [], edges: [], groups: [], maxColumn: 0, totalRows: 0, rowOffsets: new Map() }
 
-  // Build children map: parent hash → child hashes
-  const childrenOf = new Map<string, string[]>()
-  for (const c of commits) {
-    for (const p of c.parents) {
-      const arr = childrenOf.get(p) || []
-      arr.push(c.hash)
-      childrenOf.set(p, arr)
+  // Identify head rows (nodes with branchRefs or synthetic branches)
+  const headRows = new Set<number>()
+  for (const n of nodes) {
+    if (n.commit.branchRefs.length > 0 || n.syntheticBranch || n.commit.tags.length > 0) headRows.add(n.row)
+  }
+
+  // Build segments: consecutive head or non-head rows
+  type Segment = { type: 'head'; row: number } | { type: 'group'; rows: number[] }
+  const segments: Segment[] = []
+  let currentGroup: number[] = []
+
+  const maxRow = Math.max(...nodes.map(n => n.row))
+  for (let row = 0; row <= maxRow; row++) {
+    if (headRows.has(row)) {
+      if (currentGroup.length > 0) {
+        segments.push({ type: 'group', rows: [...currentGroup] })
+        currentGroup = []
+      }
+      segments.push({ type: 'head', row })
+    } else {
+      currentGroup.push(row)
     }
   }
-
-  // Build hash→column from full layout
-  const hashToCol = new Map<string, number>()
-  for (const n of fullLayout.nodes) {
-    hashToCol.set(n.commit.hash, n.column)
+  if (currentGroup.length > 0) {
+    segments.push({ type: 'group', rows: currentGroup })
   }
 
-  function isForkPoint(hash: string): boolean {
-    const children = childrenOf.get(hash) || []
-    if (children.length < 2) return false
-    const cols = new Set(children.map(ch => hashToCol.get(ch)).filter(c => c !== undefined))
-    return cols.size > 1
-  }
+  // Build row mapping: original row → collapsed row
+  const rowMap = new Map<number, number>()
+  let collapsedRow = 0
+  const resultNodes: LayoutNode[] = []
+  const groups: CollapsedGroup[] = []
 
-  // Group commits by column, in order
-  const columnNodes = new Map<number, LayoutNode[]>()
-  for (const n of fullLayout.nodes) {
-    const arr = columnNodes.get(n.column) || []
-    arr.push(n)
-    columnNodes.set(n.column, arr)
-  }
-
-  const collapsedNodes: CollapsedNode[] = []
-  const collapsedEdges: LayoutEdge[] = []
-  let nextRow = 0
-
-  const emittedForks = new Set<string>()
-  const hashToCollapsedRow = new Map<string, number>()
-
-  function mapHashes(hashes: string[], row: number) {
-    for (const h of hashes) hashToCollapsedRow.set(h, row)
-  }
-
-  const sortedCols = [...columnNodes.keys()].sort((a, b) => a - b)
-
-  for (const col of sortedCols) {
-    const nodes = columnNodes.get(col)!
-
-    let segmentStart = 0
-
-    while (segmentStart < nodes.length) {
-      const node = nodes[segmentStart]
-      const color = getColor(node.colorIndex)
-      const hasRefs = node.commit.branchRefs.length > 0
-      const isFork = isForkPoint(node.commit.hash)
-
-      if (hasRefs) {
-        const branchRow = nextRow++
-        collapsedNodes.push({
-          kind: 'branch',
-          label: node.commit.branchRefs.join(', '),
-          column: col,
-          row: branchRow,
-          color,
-          id: `branch-${node.commit.hash}`,
-          refs: node.commit.branchRefs
-        })
-        hashToCollapsedRow.set(node.commit.hash, branchRow)
-        segmentStart++
-
-        const groupHashes: string[] = []
-        while (segmentStart < nodes.length) {
-          const n = nodes[segmentStart]
-          if (n.commit.branchRefs.length > 0) break
-          if (isForkPoint(n.commit.hash)) {
-            groupHashes.push(n.commit.hash)
-            emittedForks.add(n.commit.hash)
-            segmentStart++
-            break
-          }
-          groupHashes.push(n.commit.hash)
-          segmentStart++
-        }
-
-        if (groupHashes.length > 0) {
-          const groupRow = nextRow++
-          collapsedNodes.push({
-            kind: 'group',
-            label: `${groupHashes.length} commit${groupHashes.length > 1 ? 's' : ''}`,
-            column: col,
-            row: groupRow,
-            color,
-            id: `group-${col}-${branchRow}`,
-            commitCount: groupHashes.length
-          })
-          collapsedEdges.push({
-            fromRow: branchRow, fromCol: col, toRow: groupRow, toCol: col,
-            color, type: 'straight'
-          })
-          mapHashes(groupHashes, groupRow)
-        }
-      } else if (isFork && !emittedForks.has(node.commit.hash)) {
-        segmentStart++
-        const groupHashes = [node.commit.hash]
-        emittedForks.add(node.commit.hash)
-
-        while (segmentStart < nodes.length) {
-          const n = nodes[segmentStart]
-          if (n.commit.branchRefs.length > 0 || isForkPoint(n.commit.hash)) break
-          groupHashes.push(n.commit.hash)
-          segmentStart++
-        }
-
-        const groupRow = nextRow++
-        collapsedNodes.push({
-          kind: 'group',
-          label: `${groupHashes.length} commit${groupHashes.length > 1 ? 's' : ''}`,
-          column: col,
-          row: groupRow,
-          color,
-          id: `group-${col}-${node.commit.hash}`,
-          commitCount: groupHashes.length
-        })
-        mapHashes(groupHashes, groupRow)
-      } else {
-        segmentStart++
-        const groupHashes = [node.commit.hash]
-
-        while (segmentStart < nodes.length) {
-          const n = nodes[segmentStart]
-          if (n.commit.branchRefs.length > 0 || isForkPoint(n.commit.hash)) break
-          groupHashes.push(n.commit.hash)
-          segmentStart++
-        }
-
-        if (groupHashes.length > 0) {
-          const groupRow = nextRow++
-          collapsedNodes.push({
-            kind: 'group',
-            label: `${groupHashes.length} commit${groupHashes.length > 1 ? 's' : ''}`,
-            column: col,
-            row: groupRow,
-            color,
-            id: `group-${col}-${node.commit.hash}`,
-            commitCount: groupHashes.length
-          })
-          mapHashes(groupHashes, groupRow)
+  for (const seg of segments) {
+    if (seg.type === 'head') {
+      rowMap.set(seg.row, collapsedRow)
+      const node = nodes.find(n => n.row === seg.row)!
+      resultNodes.push({ ...node, row: collapsedRow })
+      collapsedRow++
+    } else {
+      for (const r of seg.rows) {
+        rowMap.set(r, collapsedRow)
+      }
+      // Gather columns present in this group
+      const columns: CollapsedGroup['columns'] = []
+      const seenCols = new Set<number>()
+      for (const r of seg.rows) {
+        const node = nodes.find(n => n.row === r)
+        if (node && !seenCols.has(node.column)) {
+          seenCols.add(node.column)
+          columns.push({ col: node.column, colorIndex: node.colorIndex })
         }
       }
-    }
-
-    // Connect consecutive collapsed nodes in this column
-    const colCollapsed = collapsedNodes.filter(n => n.column === col)
-    for (let i = 0; i < colCollapsed.length - 1; i++) {
-      const from = colCollapsed[i]
-      const to = colCollapsed[i + 1]
-      const exists = collapsedEdges.some(
-        e => e.fromRow === from.row && e.toRow === to.row && e.fromCol === col && e.toCol === col
-      )
-      if (!exists) {
-        collapsedEdges.push({
-          fromRow: from.row, fromCol: col, toRow: to.row, toCol: col,
-          color: from.color, type: 'straight'
-        })
-      }
+      groups.push({ row: collapsedRow, count: seg.rows.length, columns })
+      collapsedRow++
     }
   }
 
-  // Cross-column fork edges
-  const addedForkEdges = new Set<string>()
-  for (const node of fullLayout.nodes) {
-    if (node.commit.parents.length === 0) continue
-    const firstParent = node.commit.parents[0]
-    const parentCol = hashToCol.get(firstParent)
-    if (parentCol === undefined || parentCol === node.column) continue
+  // Remap edges, dedup
+  const resultEdges: LayoutEdge[] = []
+  const edgeKeys = new Set<string>()
+  for (const edge of edges) {
+    const fromRow = rowMap.get(edge.fromRow)
+    const toRow = rowMap.get(edge.toRow)
+    if (fromRow === undefined || toRow === undefined) continue
+    if (fromRow === toRow) continue // collapsed into same row
+    const key = `${fromRow},${edge.fromCol},${toRow},${edge.toCol}`
+    if (edgeKeys.has(key)) continue
+    edgeKeys.add(key)
+    resultEdges.push({ ...edge, fromRow, toRow })
+  }
 
-    const fromRow = hashToCollapsedRow.get(firstParent)
-    const toRow = hashToCollapsedRow.get(node.commit.hash)
-    if (fromRow !== undefined && toRow !== undefined) {
-      const key = `${fromRow},${parentCol},${toRow},${node.column}`
-      if (!addedForkEdges.has(key)) {
-        addedForkEdges.add(key)
-        collapsedEdges.push({
-          fromRow, fromCol: parentCol, toRow, toCol: node.column,
-          color: getColor(node.colorIndex), type: 'curve'
-        })
-      }
+  // Carry over rowOffsets (for synthetic branch x-shifts)
+  const newRowOffsets = new Map<number, number>()
+  for (const node of resultNodes) {
+    if (node.syntheticBranch) {
+      newRowOffsets.set(node.row, MERGED_DOT_OFFSET)
     }
   }
 
-  return { nodes: collapsedNodes, edges: collapsedEdges, maxColumn: fullLayout.maxColumn }
+  return { nodes: resultNodes, edges: resultEdges, groups, maxColumn, totalRows: collapsedRow, rowOffsets: newRowOffsets }
 }
 
 // --- Copy hash hook ---
@@ -646,21 +534,13 @@ function SvgCurveEdge({ edge, rowOffsets }: { edge: LayoutEdge; rowOffsets?: Map
   return <path d={d} stroke={edge.color} strokeWidth={2} fill="none" opacity={0.35} strokeDasharray={dash} />
 }
 
-function SvgDot({ cx, cy, color, type, dimmed }: { cx: number; cy: number; color: string; type: 'tip' | 'merge' | 'regular'; dimmed?: boolean }) {
+function SvgDot({ cx, cy, color, type, dimmed }: { cx: number; cy: number; color: string; type: 'merge' | 'regular'; dimmed?: boolean }) {
   const opacity = dimmed ? 0.2 : undefined
   if (type === 'merge') {
     return (
       <g opacity={opacity}>
         <circle cx={cx} cy={cy} r={MERGE_DOT_OUTER} fill="none" stroke={color} strokeWidth={2} />
         <circle cx={cx} cy={cy} r={MERGE_DOT_INNER} fill="var(--background, #1a1a1a)" />
-      </g>
-    )
-  }
-  if (type === 'tip') {
-    return (
-      <g opacity={opacity}>
-        <circle cx={cx} cy={cy} r={DOT_RADIUS + 1} fill={color} />
-        <circle cx={cx} cy={cy} r={DOT_RADIUS + 4} fill={color} opacity={0.15} />
       </g>
     )
   }
@@ -751,20 +631,6 @@ function CommitRow({
   )
 }
 
-function BranchLabelRow({ refs, color, gutterWidth }: {
-  refs: string[]; color: string; gutterWidth: number
-}) {
-  return (
-    <div className="flex items-center" style={{ height: ROW_HEIGHT, paddingLeft: gutterWidth }}>
-      <div className="flex items-center gap-1.5">
-        {refs.map(ref => (
-          <span key={ref} className="inline-block px-2 py-0.5 rounded-md text-[11px] font-semibold"
-            style={{ backgroundColor: `${color}25`, color, border: `1px solid ${color}40` }}>{ref}</span>
-        ))}
-      </div>
-    </div>
-  )
-}
 
 function CommitGroupRow({ count, color, gutterWidth }: {
   count: number; color: string; gutterWidth: number
@@ -792,8 +658,8 @@ export function CommitGraph({ graph, filterQuery, tipsOnly, renderLimit, classNa
     [graph, hasTopology]
   )
   const collapsed = useMemo(
-    () => tipsOnly ? computeCollapsedLayout(graph.commits, fullLayout) : null,
-    [graph, fullLayout, tipsOnly]
+    () => tipsOnly ? computeCollapsedDag(fullLayout) : null,
+    [fullLayout, tipsOnly]
   )
 
   // Map colorIndex → branch name for tooltip overlays
@@ -832,17 +698,35 @@ export function CommitGraph({ graph, filterQuery, tipsOnly, renderLimit, classNa
     return map
   }, [fullLayout])
 
-  if (collapsed) {
-    return <CollapsedGraph layout={collapsed} className={className} />
-  }
-
+  // Choose layout: collapsed or full
+  const layout = collapsed ?? fullLayout
+  const activeRowOffsets = collapsed ? collapsed.rowOffsets : rowOffsets
+  const groups = collapsed?.groups ?? []
   // Layout uses all commits for accurate topology; rendering is capped
-  const maxRow = renderLimit != null ? renderLimit : fullLayout.nodes.length
-  const visibleNodes = fullLayout.nodes.filter(n => n.row < maxRow)
-  const visibleEdges = fullLayout.edges.filter(e => e.toRow !== -1 && e.fromRow < maxRow)
+  const maxRow = renderLimit != null ? renderLimit : layout.nodes.length + groups.length
+  const visibleNodes = layout.nodes.filter(n => n.row < maxRow)
+  const visibleGroups = groups.filter(g => g.row < maxRow)
+  const visibleEdges = layout.edges.filter(e => e.toRow !== -1 && e.fromRow < maxRow)
 
-  const gutterWidth = (fullLayout.maxColumn + 1) * COLUMN_WIDTH + GUTTER_PAD
-  const totalHeight = visibleNodes.length * ROW_HEIGHT
+  const gutterWidth = (layout.maxColumn + 1) * COLUMN_WIDTH + GUTTER_PAD
+  const totalRowCount = collapsed ? collapsed.totalRows : visibleNodes.length
+  const totalHeight = totalRowCount * ROW_HEIGHT
+
+  // Build ordered list of rows for rendering content (commits + groups interleaved)
+  const rowItems = useMemo(() => {
+    const items: Array<{ type: 'commit'; node: LayoutNode } | { type: 'group'; group: CollapsedGroup }> = []
+    const nodesByRow = new Map<number, LayoutNode>()
+    for (const n of visibleNodes) nodesByRow.set(n.row, n)
+    const groupsByRow = new Map<number, CollapsedGroup>()
+    for (const g of visibleGroups) groupsByRow.set(g.row, g)
+    for (let r = 0; r < totalRowCount; r++) {
+      const node = nodesByRow.get(r)
+      const group = groupsByRow.get(r)
+      if (node) items.push({ type: 'commit', node })
+      else if (group) items.push({ type: 'group', group })
+    }
+    return items
+  }, [visibleNodes, visibleGroups, totalRowCount])
 
   return (
     <div className={cn('relative', className)}>
@@ -852,22 +736,21 @@ export function CommitGraph({ graph, filterQuery, tipsOnly, renderLimit, classNa
             ? { ...edge, toRow: maxRow - 1 }
             : edge
           return clampedEdge.type === 'straight'
-            ? <SvgStraightEdge key={`e-${i}`} edge={clampedEdge} rowOffsets={rowOffsets} />
-            : <SvgCurveEdge key={`e-${i}`} edge={clampedEdge} rowOffsets={rowOffsets} />
+            ? <SvgStraightEdge key={`e-${i}`} edge={clampedEdge} rowOffsets={activeRowOffsets} />
+            : <SvgCurveEdge key={`e-${i}`} edge={clampedEdge} rowOffsets={activeRowOffsets} />
         })}
         {visibleNodes.map((node) => {
-          const offset = rowOffsets.get(node.row) ?? 0
+          const offset = activeRowOffsets.get(node.row) ?? 0
           const cx = colX(node.column) + (node.column === 0 ? offset : 0)
           const cy = rowY(node.row)
           const color = getColor(node.colorIndex)
-          const dotType = node.isBranchTip ? 'tip' : node.isMerge ? 'merge' : 'regular'
+          const dotType = node.isMerge ? 'merge' : 'regular'
           const dimmed = matchSet !== null && !matchSet.has(node.commit.hash)
           return <g key={node.commit.hash}>
             <SvgDot cx={cx} cy={cy} color={color} type={dotType} dimmed={dimmed} />
             {node.syntheticBranch && (() => {
-              const bx = cx + MERGED_DOT_OFFSET + 12 // branch dot to the right of main dot
+              const bx = cx + MERGED_DOT_OFFSET + 12
               const sc = getColor(node.syntheticBranch.colorIndex)
-              // Straight horizontal line from branch dot into main dot
               return <g opacity={dimmed ? 0.2 : undefined}>
                 <line x1={bx} y1={cy} x2={cx + DOT_RADIUS} y2={cy} stroke={sc} strokeWidth={2} opacity={0.35} />
                 <circle cx={bx} cy={cy} r={DOT_RADIUS} fill={sc} />
@@ -875,32 +758,47 @@ export function CommitGraph({ graph, filterQuery, tipsOnly, renderLimit, classNa
             })()}
           </g>
         })}
+        {/* Dots for collapsed group rows */}
+        {visibleGroups.map((group) => {
+          const cy = rowY(group.row)
+          return <g key={`grp-${group.row}`}>
+            {group.columns.map(({ col, colorIndex }) => (
+              <SvgDot key={col} cx={colX(col)} cy={cy} color={getColor(colorIndex)} type="regular" dimmed />
+            ))}
+          </g>
+        })}
       </svg>
       <DotOverlays items={[
         ...visibleNodes.map(node => ({
           key: node.commit.hash, row: node.row, column: node.column,
           color: getColor(node.colorIndex), branchName: colorBranch.get(node.colorIndex),
-          xOffset: node.column === 0 ? (rowOffsets.get(node.row) ?? 0) : 0
+          xOffset: node.column === 0 ? (activeRowOffsets.get(node.row) ?? 0) : 0
         })),
         ...visibleNodes.filter(n => n.syntheticBranch).map(node => ({
           key: `${node.commit.hash}-synth`, row: node.row, column: node.column,
           color: getColor(node.syntheticBranch!.colorIndex), branchName: node.syntheticBranch!.branchName,
-          xOffset: (rowOffsets.get(node.row) ?? 0) + MERGED_DOT_OFFSET + 12,
+          xOffset: (activeRowOffsets.get(node.row) ?? 0) + MERGED_DOT_OFFSET + 12,
           isSynthetic: true
         }))
       ]} />
-      {visibleNodes.map((node) => {
-        const dimmed = matchSet !== null && !matchSet.has(node.commit.hash)
-        const refs = [...node.commit.branchRefs, ...node.commit.tags.map(t => `🏷 ${t}`)]
-        return (
-          <CommitRow key={node.commit.hash}
-            shortHash={node.commit.shortHash} message={node.commit.message}
-            author={node.commit.author} relativeDate={node.commit.relativeDate}
-            refs={refs.length > 0 ? refs : undefined}
-            mergedFrom={node.commit.mergedFrom}
-            color={getColor(node.colorIndex)} gutterWidth={gutterWidth}
-            copiedHash={copiedHash} onCopy={handleCopy} dimmed={dimmed} />
-        )
+      {rowItems.map((item) => {
+        if (item.type === 'commit') {
+          const node = item.node
+          const dimmed = matchSet !== null && !matchSet.has(node.commit.hash)
+          const refs = [...node.commit.branchRefs, ...node.commit.tags.map(t => `🏷 ${t}`)]
+          return (
+            <CommitRow key={node.commit.hash}
+              shortHash={node.commit.shortHash} message={node.commit.message}
+              author={node.commit.author} relativeDate={node.commit.relativeDate}
+              refs={refs.length > 0 ? refs : undefined}
+              mergedFrom={node.commit.mergedFrom}
+              color={getColor(node.colorIndex)} gutterWidth={gutterWidth}
+              copiedHash={copiedHash} onCopy={handleCopy} dimmed={dimmed} />
+          )
+        }
+        const group = item.group
+        const primaryColor = group.columns[0] ? getColor(group.columns[0].colorIndex) : getColor(0)
+        return <CommitGroupRow key={`grp-${group.row}`} count={group.count} color={primaryColor} gutterWidth={gutterWidth} />
       })}
       {/* Fade-out at bottom */}
       <div className="h-8 pointer-events-none" style={{
@@ -910,34 +808,3 @@ export function CommitGraph({ graph, filterQuery, tipsOnly, renderLimit, classNa
   )
 }
 
-// --- Collapsed graph renderer ---
-
-function CollapsedGraph({ layout, className }: { layout: CollapsedLayout; className?: string }) {
-  const gutterWidth = (layout.maxColumn + 1) * COLUMN_WIDTH + GUTTER_PAD
-  const totalHeight = layout.nodes.length * ROW_HEIGHT
-
-  return (
-    <div className={cn('relative', className)}>
-      <svg className="absolute top-0 left-0 pointer-events-none" width={gutterWidth} height={totalHeight} style={{ zIndex: 0 }}>
-        {layout.edges.map((edge, i) => (
-          edge.type === 'straight'
-            ? <SvgStraightEdge key={`e-${i}`} edge={edge} />
-            : <SvgCurveEdge key={`e-${i}`} edge={edge} />
-        ))}
-        {layout.nodes.map((node) => {
-          const cx = colX(node.column), cy = rowY(node.row)
-          if (node.kind === 'branch') {
-            return <SvgDot key={node.id} cx={cx} cy={cy} color={node.color} type="tip" />
-          }
-          return <SvgDot key={node.id} cx={cx} cy={cy} color={node.color} type="regular" />
-        })}
-      </svg>
-      {layout.nodes.map((node) => {
-        if (node.kind === 'branch') {
-          return <BranchLabelRow key={node.id} refs={node.refs!} color={node.color} gutterWidth={gutterWidth} />
-        }
-        return <CommitGroupRow key={node.id} count={node.commitCount!} color={node.color} gutterWidth={gutterWidth} />
-      })}
-    </div>
-  )
-}
