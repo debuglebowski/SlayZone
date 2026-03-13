@@ -143,6 +143,8 @@ export interface LayoutNode {
   isMerge: boolean
   isBranchTip: boolean
   colorIndex: number
+  /** Synthetic branch indicator — extra dot on a side column */
+  syntheticBranch?: { column: number; colorIndex: number; branchName: string }
 }
 
 export interface LayoutEdge {
@@ -177,7 +179,6 @@ export function computeDagLayout(commits: ResolvedCommit[], baseBranch: string):
 
   // Branch ownership is already resolved — just read commit.branch
   function getCommitColorIndex(commit: ResolvedCommit): number {
-    if (commit.mergedFrom) return hashBranchColor(commit.mergedFrom)
     if (commit.branch === baseBranch) return BASE_BRANCH_COLOR_INDEX
     if (commit.branch) return hashBranchColor(commit.branch)
     return nextFallbackColor++
@@ -213,8 +214,7 @@ export function computeDagLayout(commits: ResolvedCommit[], baseBranch: string):
 
     if (col !== null) {
       // Base branch commits should always stay in column 0
-      // Exception: merge second-parents (mergedFrom) stay on their reserved side column
-      const isBase = commit.branch === baseBranch && !commit.mergedFrom
+      const isBase = commit.branch === baseBranch
       if (isBase && col !== 0) {
         if (activeColumns[0] === commit.hash) {
           // Column 0 also reserved for this commit — just pick column 0
@@ -344,6 +344,16 @@ export function computeDagLayout(commits: ResolvedCommit[], baseBranch: string):
     }
   }
 
+  // Add synthetic branch indicators for mergedFrom commits.
+  // Add synthetic branch indicators for mergedFrom commits.
+  // These are on col 0 (main) but get a decorative side dot rendered in-row.
+  const synthCol = Math.max(1, ...nodes.map(n => n.column)) + 1
+  for (const node of nodes) {
+    if (!node.commit.mergedFrom) continue
+    const sci = hashBranchColor(node.commit.mergedFrom)
+    node.syntheticBranch = { column: synthCol, colorIndex: sci, branchName: node.commit.mergedFrom }
+  }
+
   // Mark edges from local-only commits as dashed.
   // A commit is "local only" if it's above the origin/ ref on its column.
   const originRowByCol = new Map<number, number>()
@@ -363,7 +373,7 @@ export function computeDagLayout(commits: ResolvedCommit[], baseBranch: string):
     }
   }
 
-  const maxColumn = Math.max(0, ...nodes.map(n => n.column))
+  const maxColumn = Math.max(0, ...nodes.map(n => n.syntheticBranch?.column ?? n.column))
   return { nodes, edges, maxColumn }
 }
 
@@ -601,20 +611,30 @@ function useCopyHash() {
 
 // --- SVG rendering helpers ---
 
-function SvgStraightEdge({ edge }: { edge: LayoutEdge }) {
+const MERGED_DOT_OFFSET = 12
+
+function SvgStraightEdge({ edge, rowOffsets }: { edge: LayoutEdge; rowOffsets?: Map<number, number> }) {
+  const x1 = colX(edge.fromCol) + (edge.fromCol === 0 ? (rowOffsets?.get(edge.fromRow) ?? 0) : 0)
+  const x2 = colX(edge.toCol) + (edge.toCol === 0 ? (rowOffsets?.get(edge.toRow) ?? 0) : 0)
+  const y1 = rowY(edge.fromRow), y2 = rowY(edge.toRow)
+  const dash = edge.dashed ? '4 3' : undefined
+  if (x1 !== x2) {
+    // Smooth bezier jog between shifted and unshifted positions
+    const dy = y2 - y1
+    const d = `M${x1},${y1} C${x1},${y1 + dy * 0.4} ${x2},${y2 - dy * 0.4} ${x2},${y2}`
+    return <path d={d} stroke={edge.color} strokeWidth={2} fill="none" opacity={0.35} strokeDasharray={dash} />
+  }
   return (
-    <line
-      x1={colX(edge.fromCol)} y1={rowY(edge.fromRow)}
-      x2={colX(edge.toCol)} y2={rowY(edge.toRow)}
-      stroke={edge.color} strokeWidth={2} opacity={0.35}
-      strokeDasharray={edge.dashed ? '4 3' : undefined}
-    />
+    <line x1={x1} y1={y1} x2={x2} y2={y2}
+      stroke={edge.color} strokeWidth={2} opacity={0.35} strokeDasharray={dash} />
   )
 }
 
-function SvgCurveEdge({ edge }: { edge: LayoutEdge }) {
-  const x1 = colX(edge.fromCol), y1 = rowY(edge.fromRow)
-  const x2 = colX(edge.toCol), y2 = rowY(edge.toRow)
+function SvgCurveEdge({ edge, rowOffsets }: { edge: LayoutEdge; rowOffsets?: Map<number, number> }) {
+  const x1 = colX(edge.fromCol) + (edge.fromCol === 0 ? (rowOffsets?.get(edge.fromRow) ?? 0) : 0)
+  const y1 = rowY(edge.fromRow)
+  const x2 = colX(edge.toCol) + (edge.toCol === 0 ? (rowOffsets?.get(edge.toRow) ?? 0) : 0)
+  const y2 = rowY(edge.toRow)
   const dash = edge.dashed ? '4 3' : undefined
 
   if (edge.fromRow === edge.toRow) {
@@ -651,13 +671,13 @@ function SvgDot({ cx, cy, color, type, dimmed }: { cx: number; cy: number; color
 
 const DOT_HIT_SIZE = 18
 
-function DotOverlays({ items }: { items: Array<{ key: string; row: number; column: number; color: string; branchName?: string }> }) {
+function DotOverlays({ items }: { items: Array<{ key: string; row: number; column: number; color: string; branchName?: string; xOffset?: number; yOffset?: number }> }) {
   return (
     <>
-      {items.map(({ key, row, column, color, branchName }) => {
+      {items.map(({ key, row, column, color, branchName, xOffset, yOffset }) => {
         if (!branchName) return null
-        const cx = colX(column)
-        const cy = rowY(row)
+        const cx = colX(column) + (xOffset ?? 0)
+        const cy = rowY(row) + (yOffset ?? 0)
         return (
           <Tooltip key={key}>
             <TooltipTrigger asChild>
@@ -805,6 +825,15 @@ export function CommitGraph({ graph, filterQuery, tipsOnly, renderLimit, classNa
   const visibleNodes = fullLayout.nodes.filter(n => n.row < maxRow)
   const visibleEdges = fullLayout.edges.filter(e => e.toRow !== -1 && e.fromRow < maxRow)
 
+  // Build row x-offsets for merged commits (shift main dot right)
+  const rowOffsets = useMemo(() => {
+    const map = new Map<number, number>()
+    for (const node of fullLayout.nodes) {
+      if (node.syntheticBranch) map.set(node.row, MERGED_DOT_OFFSET)
+    }
+    return map
+  }, [fullLayout])
+
   const gutterWidth = (fullLayout.maxColumn + 1) * COLUMN_WIDTH + GUTTER_PAD
   const totalHeight = visibleNodes.length * ROW_HEIGHT
 
@@ -816,21 +845,42 @@ export function CommitGraph({ graph, filterQuery, tipsOnly, renderLimit, classNa
             ? { ...edge, toRow: maxRow - 1 }
             : edge
           return clampedEdge.type === 'straight'
-            ? <SvgStraightEdge key={`e-${i}`} edge={clampedEdge} />
-            : <SvgCurveEdge key={`e-${i}`} edge={clampedEdge} />
+            ? <SvgStraightEdge key={`e-${i}`} edge={clampedEdge} rowOffsets={rowOffsets} />
+            : <SvgCurveEdge key={`e-${i}`} edge={clampedEdge} rowOffsets={rowOffsets} />
         })}
         {visibleNodes.map((node) => {
-          const cx = colX(node.column), cy = rowY(node.row)
+          const offset = rowOffsets.get(node.row) ?? 0
+          const cx = colX(node.column) + (node.column === 0 ? offset : 0)
+          const cy = rowY(node.row)
           const color = getColor(node.colorIndex)
           const dotType = node.isBranchTip ? 'tip' : node.isMerge ? 'merge' : 'regular'
           const dimmed = matchSet !== null && !matchSet.has(node.commit.hash)
-          return <SvgDot key={node.commit.hash} cx={cx} cy={cy} color={color} type={dotType} dimmed={dimmed} />
+          return <g key={node.commit.hash}>
+            <SvgDot cx={cx} cy={cy} color={color} type={dotType} dimmed={dimmed} />
+            {node.syntheticBranch && (() => {
+              const bx = cx + MERGED_DOT_OFFSET + 12 // branch dot to the right of main dot
+              const sc = getColor(node.syntheticBranch.colorIndex)
+              // Straight horizontal line from branch dot into main dot
+              return <g opacity={dimmed ? 0.2 : undefined}>
+                <line x1={bx} y1={cy} x2={cx + DOT_RADIUS} y2={cy} stroke={sc} strokeWidth={2} opacity={0.35} />
+                <circle cx={bx} cy={cy} r={DOT_RADIUS} fill={sc} />
+              </g>
+            })()}
+          </g>
         })}
       </svg>
-      <DotOverlays items={visibleNodes.map(node => ({
-        key: node.commit.hash, row: node.row, column: node.column,
-        color: getColor(node.colorIndex), branchName: colorBranch.get(node.colorIndex)
-      }))} />
+      <DotOverlays items={[
+        ...visibleNodes.map(node => ({
+          key: node.commit.hash, row: node.row, column: node.column,
+          color: getColor(node.colorIndex), branchName: colorBranch.get(node.colorIndex),
+          xOffset: node.column === 0 ? (rowOffsets.get(node.row) ?? 0) : 0
+        })),
+        ...visibleNodes.filter(n => n.syntheticBranch).map(node => ({
+          key: `${node.commit.hash}-synth`, row: node.row, column: node.column,
+          color: getColor(node.syntheticBranch!.colorIndex), branchName: node.syntheticBranch!.branchName,
+          xOffset: (rowOffsets.get(node.row) ?? 0) + MERGED_DOT_OFFSET + 12
+        }))
+      ]} />
       {visibleNodes.map((node) => {
         const dimmed = matchSet !== null && !matchSet.has(node.commit.hash)
         const refs = [...node.commit.branchRefs, ...node.commit.tags.map(t => `🏷 ${t}`)]

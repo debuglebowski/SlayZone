@@ -1249,8 +1249,10 @@ export function resolveCommitGraph(commits: DagCommit[], baseBranch: string, req
       const parentHash = c.parents[p]
       if (!commitBranchName.has(parentHash)) {
         mergedFromMap.set(parentHash, mergeMatch[1])
-        // No parents — the dot is a dead-end, no downward edge
-        mergedFromParentOverride.set(parentHash, [])
+        // mergedFrom commit → merge's first parent (stays on main track)
+        mergedFromParentOverride.set(parentHash, [c.parents[0]])
+        // merge commit → mergedFrom commit (no bypassing edge)
+        mergedFromParentOverride.set(c.hash, [parentHash])
       }
     }
   }

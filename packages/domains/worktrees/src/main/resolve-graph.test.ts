@@ -641,9 +641,9 @@ describe('resolveCommitGraph — PR merge synthetic name preserved', () => {
     expect(g.commits).toHaveLength(5)
   })
 
-  test('merge commit still has 2 parents', () => {
+  test('merge commit parents go through mergedFrom commit (no bypass)', () => {
     const mergeCommit = g.commits.find(c => c.hash === mergeHash)!
-    expect(mergeCommit.parents).toHaveLength(2)
+    expect(mergeCommit.parents).toEqual([parent2])
   })
 })
 
@@ -1069,13 +1069,13 @@ describe('real-world: PR merge second parents get synthetic branch names', () =>
     expect(c7d1.mergedFrom).toBe('terminal-copy-paste-linux')
   })
 
-  test('merge commits still have 2 parents', () => {
+  test('merge commits parents go through mergedFrom (no bypass)', () => {
     const merge30 = g.commits.find(c => c.hash === 'a4be17b')!
     const merge27 = g.commits.find(c => c.hash === '3037874')!
     const merge31 = g.commits.find(c => c.hash === 'ad1c3b7')!
-    expect(merge30.parents).toHaveLength(2)
-    expect(merge27.parents).toHaveLength(2)
-    expect(merge31.parents).toHaveLength(2)
+    expect(merge30.parents).toEqual(['935968d'])
+    expect(merge27.parents).toEqual(['81eefa1'])
+    expect(merge31.parents).toEqual(['7d1ff27'])
   })
 
   test('worktree-test ref NOT in output (filtered by requestedBranches)', () => {
@@ -1137,8 +1137,8 @@ describe('real git history: resolveCommitGraph + computeDagLayout', () => {
     const c = g.commits.find(c => c.hash === '935968d')!
     expect(c.branch).toBe('main')
     expect(c.mergedFrom).toBe('worktree-remove-missing-path')
-    // Parents empty — dead-end dot, no downward edge
-    expect(c.parents).toEqual([])
+    // Parents overridden to merge's first parent (stays on main track)
+    expect(c.parents).toEqual(['caa4377'])
   })
 
   test('81eefa1 stays on main with mergedFrom from merge #27', () => {
@@ -1162,52 +1162,40 @@ describe('real git history: resolveCommitGraph + computeDagLayout', () => {
     expect(m31.branch).toBe('main')
   })
 
-  test('935968d is on a side column (blob for merged branch)', () => {
-    const node = layout.nodes.find(n => n.commit.hash === '935968d')
-    expect(node !== undefined).toBe(true)
-    expect(node!.column > 0).toBe(true)
+  test('935968d is on col 0 (main track) with synthetic branch dot', () => {
+    const node = layout.nodes.find(n => n.commit.hash === '935968d')!
+    expect(node.column).toBe(0)
+    expect(node.syntheticBranch !== undefined).toBe(true)
+    expect(node.syntheticBranch!.branchName).toBe('worktree-remove-missing-path')
+    expect(node.syntheticBranch!.column > 0).toBe(true)
   })
 
-  test('7d1ff27 is on a side column (blob for merged branch)', () => {
-    const node = layout.nodes.find(n => n.commit.hash === '7d1ff27')
-    expect(node !== undefined).toBe(true)
-    expect(node!.column > 0).toBe(true)
+  test('7d1ff27 is on col 0 (main track) with synthetic branch dot', () => {
+    const node = layout.nodes.find(n => n.commit.hash === '7d1ff27')!
+    expect(node.column).toBe(0)
+    expect(node.syntheticBranch !== undefined).toBe(true)
+    expect(node.syntheticBranch!.branchName).toBe('terminal-copy-paste-linux')
   })
 
-  test('935968d has an edge from merge a4be17b', () => {
-    const mergeRow = layout.nodes.findIndex(n => n.commit.hash === 'a4be17b')
-    const targetCol = layout.nodes.find(n => n.commit.hash === '935968d')!.column
-    const edge = layout.edges.find(e =>
-      e.fromRow === mergeRow && e.toCol === targetCol
+  test('synthetic branch is decorative only — no layout edges to/from side dot', () => {
+    const synthNode = layout.nodes.find(n => n.commit.hash === '935968d')!
+    const synthCol = synthNode.syntheticBranch!.column
+    const synthEdges = layout.edges.filter(e =>
+      e.fromCol === synthCol || e.toCol === synthCol
     )
-    expect(edge !== undefined).toBe(true)
+    expect(synthEdges.length).toBe(0)
   })
 
-  test('935968d has no downward edge (dead-end dot)', () => {
-    const srcRow = layout.nodes.findIndex(n => n.commit.hash === '935968d')
-    const srcCol = layout.nodes.find(n => n.commit.hash === '935968d')!.column
-    const outEdges = layout.edges.filter(e => e.fromRow === srcRow && e.fromCol === srcCol)
-    expect(outEdges.length).toBe(0)
+  test('935968d has main branch colorIndex (on main track)', () => {
+    const mainNode = layout.nodes.find(n => n.commit.hash === '512265a')!
+    const prNode = layout.nodes.find(n => n.commit.hash === '935968d')!
+    expect(prNode.colorIndex).toBe(mainNode.colorIndex)
   })
 
   test('no commit has empty/undefined branch', () => {
     for (const c of g.commits) {
       expect(c.branch !== '' && c.branch !== undefined).toBe(true)
     }
-  })
-
-  test('935968d has different colorIndex than main (colored by mergedFrom)', () => {
-    const mainNode = layout.nodes.find(n => n.commit.hash === '512265a')
-    const prNode = layout.nodes.find(n => n.commit.hash === '935968d')
-    if (!mainNode || !prNode) throw new Error(`mainNode=${!!mainNode} prNode=${!!prNode} total=${layout.nodes.length}`)
-    expect(prNode.colorIndex !== mainNode.colorIndex).toBe(true)
-  })
-
-  test('7d1ff27 has different colorIndex than main (colored by mergedFrom)', () => {
-    const mainNode = layout.nodes.find(n => n.commit.hash === '512265a')
-    const prNode = layout.nodes.find(n => n.commit.hash === '7d1ff27')
-    if (!mainNode || !prNode) throw new Error(`mainNode=${!!mainNode} prNode=${!!prNode} total=${layout.nodes.length}`)
-    expect(prNode.colorIndex !== mainNode.colorIndex).toBe(true)
   })
 
   // Print layout for visual inspection
