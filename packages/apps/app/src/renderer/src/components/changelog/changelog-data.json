@@ -1,5 +1,72 @@
 [
   {
+    "version": "0.3.1",
+    "date": "2026-03-13",
+    "tagline": "Polish & feedback loop",
+    "items": [
+      {
+        "category": "feature",
+        "title": "In-app feedback dialog",
+        "description": "Send feedback directly from the app with Discord forum integration."
+      },
+      {
+        "category": "feature",
+        "title": "Full-file diff toggle",
+        "description": "View entire files in the diff viewer instead of just changed hunks."
+      },
+      {
+        "category": "feature",
+        "title": "Process stop action",
+        "description": "Stop running processes directly from the process panel."
+      },
+      {
+        "category": "feature",
+        "title": "Configurable commit graph",
+        "description": "Branch-focused commit graph with legend, tooltips, and tag support."
+      },
+      {
+        "category": "feature",
+        "title": "Leaderboard",
+        "description": "Track AI coding agent activity across tasks."
+      },
+      {
+        "category": "improvement",
+        "title": "Git-ignored file copying",
+        "description": "Automatically copy git-ignored files when creating worktrees, configurable per project."
+      },
+      {
+        "category": "improvement",
+        "title": "Persistent home panel state",
+        "description": "Home panel visibility and git tab selection saved per project."
+      },
+      {
+        "category": "improvement",
+        "title": "Active tab styling",
+        "description": "Active task tab is now more visually prominent."
+      },
+      {
+        "category": "improvement",
+        "title": "Scrollable sidebar",
+        "description": "Project list in sidebar now scrolls when overflowing."
+      },
+      {
+        "category": "fix",
+        "title": "Terminal bottom clipping",
+        "description": "Fixed bottom content being clipped by FitAddon padding mismatch."
+      },
+      {
+        "category": "fix",
+        "title": "Shell startup flags",
+        "description": "Removed persisted shell override that caused incorrect startup flags."
+      },
+      {
+        "category": "fix",
+        "title": "Webview surface clipping",
+        "description": "Fixed browser panel clipping under CSS transforms."
+      }
+    ]
+  },
+  {
     "version": "0.3.0",
     "date": "2026-03-10",
     "tagline": "Git hub command center",

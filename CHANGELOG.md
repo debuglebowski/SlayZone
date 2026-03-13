@@ -1,6 +1,88 @@
 # Changelog
 
 
+## v0.3.1
+
+[compare changes](https://github.com/debuglebowski/slayzone/compare/v0.3.0...v0.3.1)
+
+### 🚀 Enhancements
+
+- **worktrees:** Redesign git general tab — merge sections, add PR actions ([e188380](https://github.com/debuglebowski/slayzone/commit/e188380))
+- **worktrees:** Always show visual fork in branch tab, parent as main track ([e4370a7](https://github.com/debuglebowski/slayzone/commit/e4370a7))
+- **ui:** Make active task tab more visually prominent ([73dec5e](https://github.com/debuglebowski/slayzone/commit/73dec5e))
+- **worktrees:** Copy git-ignored files when creating worktrees ([4a1c252](https://github.com/debuglebowski/slayzone/commit/4a1c252))
+- **worktrees:** Per-project copy behavior for git-ignored files ([77db895](https://github.com/debuglebowski/slayzone/commit/77db895))
+- **release:** Discord notification on publish ([c90b451](https://github.com/debuglebowski/slayzone/commit/c90b451))
+- Persist home panel visibility + git tab per project ([77d97e4](https://github.com/debuglebowski/slayzone/commit/77d97e4))
+- **worktrees:** Configurable branch-focused commit graph ([f806641](https://github.com/debuglebowski/slayzone/commit/f806641))
+- Add leaderboard item to getting started checklist ([796b478](https://github.com/debuglebowski/slayzone/commit/796b478))
+- Make leaderboard tab generally available ([45b82bb](https://github.com/debuglebowski/slayzone/commit/45b82bb))
+- Move context manager, integrations, tests panel to Labs settings ([3754986](https://github.com/debuglebowski/slayzone/commit/3754986))
+- **settings:** Add leaderboard toggle in General settings ([18eae8b](https://github.com/debuglebowski/slayzone/commit/18eae8b))
+- **processes:** Add stop action to process panel ([cf91b04](https://github.com/debuglebowski/slayzone/commit/cf91b04))
+- **processes:** Wire stop action through preload and types ([f85b92a](https://github.com/debuglebowski/slayzone/commit/f85b92a))
+- **website:** Add WCAG 2.1 AA accessibility support ([018d828](https://github.com/debuglebowski/slayzone/commit/018d828))
+- Add inline feedback dialog with Discord forum integration ([ffa77e2](https://github.com/debuglebowski/slayzone/commit/ffa77e2))
+- **feedback:** Add delete thread with Discord notification ([83faa11](https://github.com/debuglebowski/slayzone/commit/83faa11))
+- **feedback:** Move delete to sidebar items, add privacy warning ([b8f4591](https://github.com/debuglebowski/slayzone/commit/b8f4591))
+- **website:** Add sitemap.xml and robots.txt ([b4d47b8](https://github.com/debuglebowski/slayzone/commit/b4d47b8))
+- **worktrees:** Add graph legend popover, synthetic branch tooltips ([4b04410](https://github.com/debuglebowski/slayzone/commit/4b04410))
+- **worktrees:** Add full-file toggle to diff viewer ([fe9dd4d](https://github.com/debuglebowski/slayzone/commit/fe9dd4d))
+
+### 🩹 Fixes
+
+- **release:** Regenerate changelog with post-rebase commit hashes ([bc186af](https://github.com/debuglebowski/slayzone/commit/bc186af))
+- **release:** Generate changelog after push to avoid stale hashes ([f972762](https://github.com/debuglebowski/slayzone/commit/f972762))
+- **website:** Update head title to "Desktop Kanban for AI Coding Agents" ([7ee4f70](https://github.com/debuglebowski/slayzone/commit/7ee4f70))
+- **e2e:** Prevent worktree tests from leaking branches into main repo ([b80a3b4](https://github.com/debuglebowski/slayzone/commit/b80a3b4))
+- **website:** Download button URLs match actual release asset names ([cb66a8d](https://github.com/debuglebowski/slayzone/commit/cb66a8d))
+- **ui:** Make sidebar project list scrollable when overflowing ([35a41a3](https://github.com/debuglebowski/slayzone/commit/35a41a3))
+- **worktrees:** Lazy-resolve gh path in spawnGh to avoid "gh CLI not found" ([ffd0fc9](https://github.com/debuglebowski/slayzone/commit/ffd0fc9))
+- **worktrees:** Use FolderTree icon for worktree button ([f056081](https://github.com/debuglebowski/slayzone/commit/f056081))
+- **worktrees:** Move View diff button inline with Pull/Push ([7897516](https://github.com/debuglebowski/slayzone/commit/7897516))
+- **worktrees:** Remove fake "Up to date" nodes from commit graph + increase row spacing ([00a0d16](https://github.com/debuglebowski/slayzone/commit/00a0d16))
+- Hardcode Discord invite + X URLs, remove unused env vars ([e15ef21](https://github.com/debuglebowski/slayzone/commit/e15ef21))
+- **release:** Duplicate releaseDate key in latest-mac.yml ([a4d326a](https://github.com/debuglebowski/slayzone/commit/a4d326a))
+- **terminal:** Bottom content clipped by FitAddon padding mismatch ([89b1e2f](https://github.com/debuglebowski/slayzone/commit/89b1e2f))
+- **browser:** Use auto width w/ max-w-[50vw] for import URL dropdown ([62eac72](https://github.com/debuglebowski/slayzone/commit/62eac72))
+- **website:** Match FAQ content width to docs page ([25fa944](https://github.com/debuglebowski/slayzone/commit/25fa944))
+- **terminal:** Remove persisted shell override, fix bare name startup flags ([43396b9](https://github.com/debuglebowski/slayzone/commit/43396b9))
+- **cli:** Use node:http for app notification, fix resetApp MCP port wipe ([33c6e59](https://github.com/debuglebowski/slayzone/commit/33c6e59))
+- **worktrees:** Synthetic branches as dead-end dots, show origin/ refs, dashed local edges ([bb8e9fd](https://github.com/debuglebowski/slayzone/commit/bb8e9fd))
+- **worktrees:** Synthetic branches as inline indicators on main track ([436a653](https://github.com/debuglebowski/slayzone/commit/436a653))
+- **worktrees:** Header refactor, hooks ordering, dedup keys, infinity borderRadius ([df1c03b](https://github.com/debuglebowski/slayzone/commit/df1c03b))
+- **task-browser:** Fix webview surface clipping under CSS transform ([4bd79d8](https://github.com/debuglebowski/slayzone/commit/4bd79d8))
+- **task-browser:** Add dark background to multi-device grid ([6bc9a73](https://github.com/debuglebowski/slayzone/commit/6bc9a73))
+
+### 💅 Refactors
+
+- **worktrees:** Move status section above actions in general tab ([88d2ec7](https://github.com/debuglebowski/slayzone/commit/88d2ec7))
+- **worktrees:** Simplify general tab — replace worktree card with "View worktree" button ([66b59cd](https://github.com/debuglebowski/slayzone/commit/66b59cd))
+- **worktrees:** Consolidate General + Branch tabs into unified General tab ([0e3abde](https://github.com/debuglebowski/slayzone/commit/0e3abde))
+- **worktrees:** Clean up General tab shared components ([c310608](https://github.com/debuglebowski/slayzone/commit/c310608))
+- **worktrees:** Unify commit graph rendering + add local vs remote divergence ([1a84bdc](https://github.com/debuglebowski/slayzone/commit/1a84bdc))
+- **settings:** Extract tab state from App.tsx into zustand store ([0e8958a](https://github.com/debuglebowski/slayzone/commit/0e8958a))
+- **worktrees:** Convert PR create/link from tab views to dialogs ([c486d20](https://github.com/debuglebowski/slayzone/commit/c486d20))
+- **settings:** Extract worktree settings into dedicated tab ([13b101d](https://github.com/debuglebowski/slayzone/commit/13b101d))
+- **worktrees:** Move git-ref resolution to main process, fix branch column layout ([8480fb4](https://github.com/debuglebowski/slayzone/commit/8480fb4))
+- **worktrees:** Rewrite collapsed view to preserve DAG topology, remove branch tips ([0a84cbb](https://github.com/debuglebowski/slayzone/commit/0a84cbb))
+- **worktrees:** Extract useBranchGraph hook, move toolbar to title row ([f8f8e64](https://github.com/debuglebowski/slayzone/commit/f8f8e64))
+- **worktrees:** Remove CommitTimeline component and rebase progress tracking ([f5fbb6f](https://github.com/debuglebowski/slayzone/commit/f5fbb6f))
+- **worktrees:** Remove graph fetching from useConsolidatedGeneralData ([2bd7c5c](https://github.com/debuglebowski/slayzone/commit/2bd7c5c))
+- **worktrees:** Simplify CommitGraphConfig, add includeTags prop ([7fefc98](https://github.com/debuglebowski/slayzone/commit/7fefc98))
+
+### 🏡 Chore
+
+- **task-browser:** Remove unused executeJavaScript from WebviewElement ([95b64d9](https://github.com/debuglebowski/slayzone/commit/95b64d9))
+
+### ✅ Tests
+
+- Update test fixtures for db param + new project fields ([799350f](https://github.com/debuglebowski/slayzone/commit/799350f))
+
+### ❤️ Contributors
+
+- Debuglebowski
+
 ## v0.3.0
 
 [compare changes](https://github.com/debuglebowski/slayzone/compare/v0.2.6...v0.3.0)
