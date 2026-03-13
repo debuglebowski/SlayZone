@@ -1,10 +1,11 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
-import { RefreshCw, Search, Loader2, Settings2, X, Info } from 'lucide-react'
+import { RefreshCw, Search, Loader2, Settings2, X, Info, List } from 'lucide-react'
 import {
   IconButton, Input, Switch, cn, toast,
   Popover, PopoverTrigger, PopoverContent,
   Select, SelectTrigger, SelectValue, SelectContent, SelectItem,
-  Label
+  Label,
+  Tooltip, TooltipTrigger, TooltipContent,
 } from '@slayzone/ui'
 import type { CommitGraphConfig, ResolvedGraph } from '../shared/types'
 import { CommitGraph } from './CommitGraph'
@@ -131,18 +132,8 @@ export function BranchesTab({ projectPath, visible }: BranchesTabProps) {
       {/* Toolbar */}
       <div className="shrink-0 p-3 pb-0">
         <div className="flex items-center gap-2">
-          {/* Show all commits toggle */}
-          <label className="flex items-center gap-1.5 text-[10px] text-muted-foreground cursor-pointer select-none">
-            <Switch
-              checked={!config.collapsed}
-              onCheckedChange={(v) => setConfig(c => ({ ...c, collapsed: !v }))}
-              className="scale-75"
-            />
-            All commits
-          </label>
-
           {/* Filter */}
-          <div className="flex-1 relative">
+          <div className="relative max-w-48">
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
             <Input
               value={filter}
@@ -151,6 +142,23 @@ export function BranchesTab({ projectPath, visible }: BranchesTabProps) {
               className="h-7 text-xs pl-8"
             />
           </div>
+
+          <div className="flex-1" />
+
+          {/* Show all commits toggle */}
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <IconButton
+                aria-label="All commits"
+                variant="ghost"
+                className={cn('h-7 w-7', !config.collapsed && 'bg-accent')}
+                onClick={() => setConfig(c => ({ ...c, collapsed: !c.collapsed }))}
+              >
+                <List className="h-3.5 w-3.5" />
+              </IconButton>
+            </TooltipTrigger>
+            <TooltipContent side="bottom">All commits</TooltipContent>
+          </Tooltip>
 
           {/* Graph config */}
           <GraphConfigPopover

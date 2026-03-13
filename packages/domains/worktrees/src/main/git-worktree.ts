@@ -1214,10 +1214,12 @@ export function resolveCommitGraph(commits: DagCommit[], baseBranch: string, req
         tags.push(parsed.name)
       }
     }
+    // Deduplicate (multiple remotes can map to same display name)
+    const uniqueRefs = [...new Set(branchRefs)]
     // Filter out branch refs not in the requested set (git %D shows ALL refs)
     const filteredRefs = requestedBranches
-      ? branchRefs.filter(r => requestedBranches.includes(r) || requestedBranches.includes(r.replace(/^origin\//, '')))
-      : branchRefs
+      ? uniqueRefs.filter(r => requestedBranches.includes(r) || requestedBranches.includes(r.replace(/^origin\//, '')))
+      : uniqueRefs
     commitParsedRefs.set(c.hash, { branchRefs: filteredRefs, tags, isHead })
   }
 

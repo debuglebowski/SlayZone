@@ -823,15 +823,6 @@ export function CommitGraph({ graph, filterQuery, tipsOnly, renderLimit, classNa
     return set
   }, [graph.commits, filterQuery])
 
-  if (collapsed) {
-    return <CollapsedGraph layout={collapsed} className={className} />
-  }
-
-  // Layout uses all commits for accurate topology; rendering is capped
-  const maxRow = renderLimit != null ? renderLimit : fullLayout.nodes.length
-  const visibleNodes = fullLayout.nodes.filter(n => n.row < maxRow)
-  const visibleEdges = fullLayout.edges.filter(e => e.toRow !== -1 && e.fromRow < maxRow)
-
   // Build row x-offsets for merged commits (shift main dot right)
   const rowOffsets = useMemo(() => {
     const map = new Map<number, number>()
@@ -840,6 +831,15 @@ export function CommitGraph({ graph, filterQuery, tipsOnly, renderLimit, classNa
     }
     return map
   }, [fullLayout])
+
+  if (collapsed) {
+    return <CollapsedGraph layout={collapsed} className={className} />
+  }
+
+  // Layout uses all commits for accurate topology; rendering is capped
+  const maxRow = renderLimit != null ? renderLimit : fullLayout.nodes.length
+  const visibleNodes = fullLayout.nodes.filter(n => n.row < maxRow)
+  const visibleEdges = fullLayout.edges.filter(e => e.toRow !== -1 && e.fromRow < maxRow)
 
   const gutterWidth = (fullLayout.maxColumn + 1) * COLUMN_WIDTH + GUTTER_PAD
   const totalHeight = visibleNodes.length * ROW_HEIGHT
