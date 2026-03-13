@@ -1,4 +1,5 @@
 import { DatabaseSync } from 'node:sqlite'
+import http from 'node:http'
 import fs from 'fs'
 import path from 'path'
 import os from 'os'
@@ -42,13 +43,20 @@ export function getMcpPort(): number {
   }
 }
 
-export async function notifyApp(): Promise<void> {
+export function notifyApp(): Promise<void> {
   const port = getMcpPort()
-  try {
-    await fetch(`http://127.0.0.1:${port}/api/notify`, { method: 'POST' })
-  } catch {
-    // app not running — silent fail
-  }
+  return new Promise<void>((resolve) => {
+    const req = http.request(
+      { hostname: '127.0.0.1', port, path: '/api/notify', method: 'POST' },
+      (res) => {
+        res.resume() // drain response so socket closes cleanly
+        res.on('end', resolve)
+      },
+    )
+    req.on('error', () => resolve()) // app not running — silent fail
+    req.setTimeout(3000, () => { req.destroy(); resolve() })
+    req.end()
+  })
 }
 
 export function openDb(): SlayDb {

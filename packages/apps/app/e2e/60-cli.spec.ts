@@ -113,6 +113,20 @@ test.describe('CLI: slay', () => {
       await expect(mainWindow.getByText(title)).toBeVisible({ timeout: 10_000 })
     })
 
+    test('UI updates when CLI discovers port from DB (production path)', async ({ mainWindow }) => {
+      const title = `CLI prod-path ${Date.now()}`
+      // No SLAYZONE_MCP_PORT — CLI must read port from settings table (like production)
+      const { SLAYZONE_MCP_PORT: _, ...envWithoutPort } = process.env
+      const r = spawnSync('node', [SLAY_JS, 'tasks', 'create', title, '--project', 'cli test'], {
+        env: { ...envWithoutPort, SLAYZONE_DB_PATH: dbPath },
+        encoding: 'utf8',
+      })
+      expect(r.status).toBe(0)
+
+      // CLI must discover port from DB and POST /api/notify on its own
+      await expect(mainWindow.getByText(title)).toBeVisible({ timeout: 10_000 })
+    })
+
     test('exits non-zero and mentions --project when flag is missing', () => {
       const r = runCli('tasks', 'create', 'No project task')
       expect(r.status).not.toBe(0)

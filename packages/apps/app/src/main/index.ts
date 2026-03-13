@@ -1694,18 +1694,10 @@ app.whenReady().then(async () => {
       if (linearSyncPoller) { clearInterval(linearSyncPoller); linearSyncPoller = null }
       if (discoveryPoller) { clearInterval(discoveryPoller); discoveryPoller = null }
 
-      // 3. Stop + restart MCP (CLI tests need it running)
+      // 3. Stop MCP server (restarted after table drop so port persists)
       mcpCleanup?.()
       mcpCleanup = null
       ;(globalThis as Record<string, unknown>).__mcpPort = undefined
-      const mcpMod = await import('./mcp-server')
-      mcpMod.startMcpServer(db, 0)
-      mcpCleanup = () => mcpMod.stopMcpServer()
-      // Wait for server to be listening (listen callback sets __mcpPort)
-      await new Promise<void>((resolve) => {
-        const check = () => (globalThis as Record<string, unknown>).__mcpPort ? resolve() : setTimeout(check, 10)
-        check()
-      })
 
       // 4. Close file watchers
       closeAllWatchers()
@@ -1734,7 +1726,17 @@ app.whenReady().then(async () => {
       // 7b. Seed post-onboarding baseline so tests skip the onboarding wizard
       db.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('onboarding_completed', 'true')").run()
 
-      // 8. Re-init process manager
+      // 8. Restart MCP (after table drop so port is persisted to fresh settings table)
+      const mcpMod = await import('./mcp-server')
+      mcpMod.startMcpServer(db, 0)
+      mcpCleanup = () => mcpMod.stopMcpServer()
+      // Wait for server to be listening (listen callback sets __mcpPort)
+      await new Promise<void>((resolve) => {
+        const check = () => (globalThis as Record<string, unknown>).__mcpPort ? resolve() : setTimeout(check, 10)
+        check()
+      })
+
+      // 9. Re-init process manager
       initProcessManager(db)
       return { ok: true }
     })
