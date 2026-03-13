@@ -31,10 +31,8 @@ export function DeviceWebview({ url, preset, partition, isResizing, reloadTrigge
   const webviewRef = useRef<WebviewElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const [webviewReady, setWebviewReady] = useState(false)
-  const [webviewKey, setWebviewKey] = useState(0)
   const [containerSize, setContainerSize] = useState<{ width: number; height: number } | null>(null)
   const prevEmulationRef = useRef<{ w: number; h: number; dpr: number; mobile: boolean; ua?: string } | null>(null)
-  const hasRemountedRef = useRef(false)
 
   const [initialSrc] = useState(() => (url || 'about:blank').replace(/^file:\/\//, 'slz-file://'))
   const loadedUrlRef = useRef(url)
@@ -54,16 +52,16 @@ export function DeviceWebview({ url, preset, partition, isResizing, reloadTrigge
   useEffect(() => {
     const wv = webviewRef.current
     if (!wv) return
-    const handleDomReady = () => {
-      setWebviewReady(true)
-    }
+    const handleDomReady = () => setWebviewReady(true)
     wv.addEventListener('dom-ready', handleDomReady)
     return () => wv.removeEventListener('dom-ready', handleDomReady)
   }, [containerSize !== null])
 
   const widthScale = containerSize ? Math.min(1, containerSize.width / preset.width) : 1
 
-  // Apply device emulation when preset changes
+  // Apply device emulation — viewSize {0,0} means no viewport override.
+  // The viewport comes naturally from the CSS layout size of the webview element.
+  // We only use emulation for DPR, screen dimensions, mobile flag, and user agent.
   useEffect(() => {
     const wv = webviewRef.current
     if (!wv || !webviewReady) return
@@ -78,22 +76,12 @@ export function DeviceWebview({ url, preset, partition, isResizing, reloadTrigge
     const wcId = wv.getWebContentsId()
     window.api.webview?.enableDeviceEmulation(wcId, {
       screenSize: { width: preset.width, height: preset.height },
-      viewSize: { width: preset.width, height: preset.height },
+      viewSize: { width: 0, height: 0 },
       deviceScaleFactor: preset.deviceScaleFactor,
       screenPosition: preset.mobile ? 'mobile' : 'desktop',
       userAgent: preset.userAgent,
     }).then(() => {
       if (preset.userAgent !== prevUa) wv.reload()
-
-      // Force one-time webview remount to fix Chromium BrowserPlugin surface clipping under CSS transform
-      if (!prev && !hasRemountedRef.current) {
-        hasRemountedRef.current = true
-        setTimeout(() => {
-          prevEmulationRef.current = null
-          setWebviewKey(k => k + 1)
-          setWebviewReady(false)
-        }, 100)
-      }
     })
   }, [preset, webviewReady])
 
@@ -128,14 +116,14 @@ export function DeviceWebview({ url, preset, partition, isResizing, reloadTrigge
   useEffect(() => {
     return () => {
       const wv = webviewRef.current
-      if (wv && webviewReady) {
+      if (wv) {
         try {
           const wcId = wv.getWebContentsId()
           window.api.webview?.disableDeviceEmulation(wcId)
         } catch { /* webview may be destroyed */ }
       }
     }
-  }, [webviewReady])
+  }, [])
 
   const scaledHeight = preset.height * widthScale
   const topOffset = containerSize ? Math.max(0, (containerSize.height - scaledHeight) / 2) : 0
@@ -164,7 +152,6 @@ export function DeviceWebview({ url, preset, partition, isResizing, reloadTrigge
       >
         {containerSize && (
           <webview
-            key={webviewKey}
             ref={webviewRef}
             src={initialSrc}
             partition={partition}
