@@ -982,7 +982,8 @@ app.whenReady().then(async () => {
   const mcpPort = (() => {
     if (isPlaywright) return 0
     const row = db.prepare('SELECT value FROM settings WHERE key = ?').get('mcp_server_port') as { value: string } | undefined
-    return parseInt(row?.value || '45678', 10) || 45678
+    const defaultPort = is.dev ? 45679 : 45678 // keep in sync with packages/apps/cli/src/db.ts
+    return parseInt(row?.value || String(defaultPort), 10) || defaultPort
   })()
   import('./mcp-server').then((mod) => {
     mod.startMcpServer(db, mcpPort)

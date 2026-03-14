@@ -573,7 +573,9 @@ export function startMcpServer(db: Database, port: number): void {
     }
   })
 
-  httpServer = app.listen(port, '127.0.0.1', () => {
+  httpServer = app.listen(port, '127.0.0.1')
+  httpServer.on('error', (err) => console.error(`[MCP] Server error:`, err))
+  httpServer.on('listening', () => {
     const addr = httpServer!.address()
     const actualPort = typeof addr === 'object' && addr ? addr.port : port
     ;(globalThis as Record<string, unknown>).__mcpPort = actualPort

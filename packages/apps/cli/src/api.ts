@@ -1,19 +1,7 @@
-import { openDb } from './db'
-
-export function getPort(): number {
-  if (process.env.SLAYZONE_MCP_PORT) return parseInt(process.env.SLAYZONE_MCP_PORT, 10) || 45678
-  try {
-    const db = openDb()
-    const row = db.query<{ value: string }>(`SELECT value FROM settings WHERE key = 'mcp_server_port' LIMIT 1`)
-    db.close()
-    return parseInt(row[0]?.value ?? '45678', 10) || 45678
-  } catch {
-    return 45678
-  }
-}
+import { getMcpPort } from './db'
 
 function baseUrl(): string {
-  return `http://127.0.0.1:${getPort()}`
+  return `http://127.0.0.1:${getMcpPort()}`
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {

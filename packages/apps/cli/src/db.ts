@@ -4,6 +4,11 @@ import fs from 'fs'
 import path from 'path'
 import os from 'os'
 
+// keep in sync with packages/apps/app/src/main/index.ts
+function defaultPort(): number {
+  return (process.env.SLAYZONE_DEV === '1') ? 45679 : 45678
+}
+
 function defaultDir(): string {
   switch (process.platform) {
     case 'darwin':
@@ -32,14 +37,15 @@ export interface SlayDb {
 }
 
 export function getMcpPort(): number {
-  if (process.env.SLAYZONE_MCP_PORT) return parseInt(process.env.SLAYZONE_MCP_PORT, 10) || 45678
+  const fallback = defaultPort()
+  if (process.env.SLAYZONE_MCP_PORT) return parseInt(process.env.SLAYZONE_MCP_PORT, 10) || fallback
   try {
     const db = openDb()
     const row = db.query<{ value: string }>(`SELECT value FROM settings WHERE key = 'mcp_server_port' LIMIT 1`)
     db.close()
-    return parseInt(row[0]?.value ?? '45678', 10) || 45678
+    return parseInt(row[0]?.value ?? String(fallback), 10) || fallback
   } catch {
-    return 45678
+    return fallback
   }
 }
 
