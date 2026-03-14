@@ -55,7 +55,7 @@ export default defineConfig(({ mode }) => {
           'posthog-js': 'posthog-js/dist/module.no-external.js'
         }
       },
-      plugins: [react(), tailwindcss()],
+      plugins: [react({ babel: { plugins: ['babel-plugin-react-compiler'] } }), tailwindcss()],
       optimizeDeps: {
         exclude: slayzoneDeps
       }
