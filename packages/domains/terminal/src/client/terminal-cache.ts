@@ -12,6 +12,7 @@ export interface CachedTerminal {
   element: HTMLElement
   serializedState?: string
   mode?: TerminalMode
+  lastRenderedSeq?: number
 }
 
 // Module-level cache for terminal instances

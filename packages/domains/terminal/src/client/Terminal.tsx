@@ -255,6 +255,9 @@ export const Terminal = forwardRef<TerminalHandle, TerminalProps>(function Termi
           fitAddonRef.current = cached.fitAddon
           serializeAddonRef.current = cached.serializeAddon
           searchAddonRef.current = cached.searchAddon
+          if (cached.lastRenderedSeq !== undefined) {
+            lastRenderedSeqRef.current = cached.lastRenderedSeq
+          }
 
           // Re-attach key handler (old closure captured stale setSearchOpen)
           cached.terminal.attachCustomKeyEventHandler(handleTerminalKeyEvent)
@@ -491,7 +494,8 @@ export const Terminal = forwardRef<TerminalHandle, TerminalProps>(function Termi
             searchAddon: searchAddonRef.current,
             element,
             serializedState,
-            mode
+            mode,
+            lastRenderedSeq: lastRenderedSeqRef.current
           })
         }
       }
