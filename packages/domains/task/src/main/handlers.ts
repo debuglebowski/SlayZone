@@ -417,6 +417,10 @@ export function registerTaskHandlers(ipcMain: IpcMain, db: Database): void {
   if (stale.length > 0) {
     const placeholders = stale.map(() => '?').join(',')
     db.prepare(`DELETE FROM tasks WHERE id IN (${placeholders})`).run(...stale.map((r) => r.id))
+    // Clean up per-task commit graph settings
+    for (const { id } of stale) {
+      db.prepare(`DELETE FROM settings WHERE key = ?`).run(`commit_graph:task:${id}`)
+    }
     console.log(`Purged ${stale.length} soft-deleted task(s)`)
   }
 

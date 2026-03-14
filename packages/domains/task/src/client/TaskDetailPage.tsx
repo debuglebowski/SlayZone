@@ -1928,6 +1928,7 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
             <UnifiedGitPanel
               ref={gitPanelRef}
               task={task}
+              projectId={task.project_id}
               projectPath={project?.path ?? null}
               completedStatus={completedStatus}
               visible={panelVisibility.diff}

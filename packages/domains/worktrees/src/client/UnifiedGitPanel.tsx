@@ -18,6 +18,7 @@ const gitDiffShortcut = isMac ? '⌘⇧G' : 'Ctrl+Shift+G'
 
 type UnifiedGitPanelProps = {
   task?: Task | null
+  projectId: string
   projectPath: string | null
   completedStatus?: string
   visible: boolean
@@ -68,6 +69,7 @@ export function useGitPanelContext() {
 
 export const UnifiedGitPanel = forwardRef<UnifiedGitPanelHandle, UnifiedGitPanelProps>(function UnifiedGitPanel({
   task,
+  projectId,
   projectPath,
   completedStatus = 'done',
   visible,
@@ -287,6 +289,7 @@ export const UnifiedGitPanel = forwardRef<UnifiedGitPanelHandle, UnifiedGitPanel
             />
           ) : (
             <ProjectGeneralTab
+              projectId={projectId}
               projectPath={projectPath}
               visible={visible && activeTab === 'general'}
               onSwitchToDiff={() => setActiveTab('changes')}

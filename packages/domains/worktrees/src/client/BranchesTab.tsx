@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
-import { RefreshCw, Search, Loader2, SlidersHorizontal, Info, List, Layers } from 'lucide-react'
+import { RefreshCw, Loader2, SlidersHorizontal, Info, List, Layers } from 'lucide-react'
 import {
-  IconButton, Input, Switch, cn, toast,
+  IconButton, Switch, cn, toast,
   Popover, PopoverTrigger, PopoverContent,
   Label,
 } from '@slayzone/ui'
@@ -28,6 +28,7 @@ export interface BranchGraphState {
   setFilter: (v: string) => void
   config: CommitGraphConfig
   setConfig: React.Dispatch<React.SetStateAction<CommitGraphConfig>>
+  resetConfig: () => void
   effectiveBaseBranch: string
   fetching: boolean
   handleFetch: () => Promise<void>
@@ -37,6 +38,8 @@ export function useBranchGraph(
   projectPath: string | null,
   visible: boolean,
   defaultBaseBranch?: string,
+  /** Unique key for persisting this instance's display config (e.g. 'task:123', 'project:/path') */
+  configKey?: string,
 ): BranchGraphState {
   const [dagGraph, setDagGraph] = useState<ResolvedGraph | null>(null)
   const [filter, setFilter] = useState('')
@@ -46,6 +49,49 @@ export function useBranchGraph(
 
   const [currentBranch, setCurrentBranch] = useState<string>('')
   const [config, setConfig] = useState<CommitGraphConfig>(DEFAULT_CONFIG)
+
+  // Load per-instance config (if saved), otherwise global defaults
+  useEffect(() => {
+    const load = async () => {
+      const instanceJson = configKey ? await window.api.settings.get(`commit_graph:${configKey}`) : null
+      if (instanceJson) {
+        setConfig({ ...JSON.parse(instanceJson), baseBranch: '' })
+        return
+      }
+      const globalJson = await window.api.settings.get('commit_graph_config')
+      if (globalJson) {
+        setConfig({ ...DEFAULT_CONFIG, ...JSON.parse(globalJson), baseBranch: '' })
+      } else {
+        setConfig(DEFAULT_CONFIG)
+      }
+    }
+    load()
+  }, [configKey])
+
+  // Save full config to this instance
+  const updateConfig = useCallback((updater: React.SetStateAction<CommitGraphConfig>) => {
+    setConfig(prev => {
+      const next = typeof updater === 'function' ? updater(prev) : updater
+      if (configKey) {
+        const { baseBranch: _, ...persisted } = next
+        window.api.settings.set(`commit_graph:${configKey}`, JSON.stringify(persisted))
+      }
+      return next
+    })
+  }, [configKey])
+
+  // Reset to global defaults (clear per-instance config)
+  const resetConfig = useCallback(async () => {
+    if (configKey) {
+      await window.api.settings.set(`commit_graph:${configKey}`, '')
+    }
+    const globalJson = await window.api.settings.get('commit_graph_config')
+    if (globalJson) {
+      setConfig({ ...DEFAULT_CONFIG, ...JSON.parse(globalJson), baseBranch: '' })
+    } else {
+      setConfig(DEFAULT_CONFIG)
+    }
+  }, [configKey])
 
   const effectiveBaseBranch = useMemo(
     () => config.baseBranch || defaultBaseBranch || currentBranch || 'main',
@@ -77,7 +123,6 @@ export function useBranchGraph(
 
   useEffect(() => {
     initialLoad.current = false
-    setConfig(DEFAULT_CONFIG)
   }, [projectPath])
 
   useEffect(() => {
@@ -106,7 +151,7 @@ export function useBranchGraph(
     }
   }, [projectPath, fetchData])
 
-  return { dagGraph, loading, filter, setFilter, config, setConfig, effectiveBaseBranch, fetching, handleFetch }
+  return { dagGraph, loading, filter, setFilter, config, setConfig: updateConfig, resetConfig, effectiveBaseBranch, fetching, handleFetch }
 }
 
 // --- Toolbar buttons (display, info, fetch) ---
@@ -114,7 +159,7 @@ export function useBranchGraph(
 export function BranchGraphToolbar({ state }: { state: BranchGraphState }) {
   return (
     <>
-      <DisplayPopover config={state.config} effectiveBaseBranch={state.effectiveBaseBranch} onChange={state.setConfig} />
+      <DisplayPopover config={state.config} effectiveBaseBranch={state.effectiveBaseBranch} onChange={state.setConfig} onReset={state.resetConfig} />
       <GraphInfoPopover />
       <IconButton
         aria-label="Fetch"
@@ -127,81 +172,6 @@ export function BranchGraphToolbar({ state }: { state: BranchGraphState }) {
         <RefreshCw className={cn('h-3.5 w-3.5', state.fetching && 'animate-spin')} />
       </IconButton>
     </>
-  )
-}
-
-// --- Full standalone BranchesTab ---
-
-interface BranchesTabProps {
-  projectPath: string | null
-  visible: boolean
-  defaultBaseBranch?: string
-  /** Standalone (false/undefined): toolbar above card. Embedded (true): toolbar inside card. */
-  embedded?: boolean
-}
-
-export function BranchesTab({ projectPath, visible, defaultBaseBranch, embedded }: BranchesTabProps) {
-  const state = useBranchGraph(projectPath, visible, defaultBaseBranch)
-
-  if (!projectPath) {
-    return <div className="p-4 text-xs text-muted-foreground">Set a project path to use Git features</div>
-  }
-
-  if (state.loading) {
-    return <div className="h-full flex items-center justify-center"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
-  }
-
-  const toolbar = (
-    <div className="flex items-center gap-2">
-      <div className="relative max-w-48">
-        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-        <Input
-          value={state.filter}
-          onChange={(e) => state.setFilter(e.target.value)}
-          placeholder="Filter..."
-          className="h-7 text-xs pl-8"
-        />
-      </div>
-      <div className="flex-1" />
-      <BranchGraphToolbar state={state} />
-    </div>
-  )
-
-  const graphContent = state.dagGraph && state.dagGraph.commits.length > 0 ? (
-    <CommitGraph
-      graph={state.dagGraph}
-      filterQuery={state.filter || undefined}
-      tipsOnly={state.config.collapsed}
-      includeTags={state.config.breakOnTags}
-            breakOnMerges={state.config.breakOnMerges}
-      renderLimit={RENDER_LIMIT}
-    />
-  ) : (
-    <div className="flex items-center justify-center h-32 text-xs text-muted-foreground">
-      {state.filter ? 'No matches' : 'No branches'}
-    </div>
-  )
-
-  if (embedded) {
-    return (
-      <div className="h-full flex flex-col p-3">
-        <div className="flex-1 min-h-0 rounded-lg border bg-muted/30 p-2 flex flex-col">
-          <div className="shrink-0 pb-2">{toolbar}</div>
-          <div className="flex-1 min-h-0">{graphContent}</div>
-        </div>
-      </div>
-    )
-  }
-
-  return (
-    <div className="h-full flex flex-col">
-      <div className="shrink-0 p-3 pb-0">{toolbar}</div>
-      <div className="flex-1 min-h-0 p-3">
-        <div className="rounded-lg border bg-muted/30 p-2 h-full">
-          {graphContent}
-        </div>
-      </div>
-    </div>
   )
 }
 
@@ -236,10 +206,11 @@ export function BranchGraphCard({ state, className }: { state: BranchGraphState;
 
 // --- Display popover (matches kanban pattern) ---
 
-function DisplayPopover({ config, effectiveBaseBranch, onChange }: {
+function DisplayPopover({ config, effectiveBaseBranch, onChange, onReset }: {
   config: CommitGraphConfig
   effectiveBaseBranch: string
   onChange: React.Dispatch<React.SetStateAction<CommitGraphConfig>>
+  onReset?: () => void
 }) {
   return (
     <Popover>
@@ -303,6 +274,12 @@ function DisplayPopover({ config, effectiveBaseBranch, onChange }: {
               <Label htmlFor="break-on-merges" className="text-sm cursor-pointer">Break on merges</Label>
               <Switch id="break-on-merges" checked={config.breakOnMerges} onCheckedChange={(v) => onChange(c => ({ ...c, breakOnMerges: v }))} />
             </div>
+          </>)}
+          {onReset && (<>
+            <div className="h-px bg-border" />
+            <button type="button" className="text-xs text-muted-foreground hover:text-foreground transition-colors" onClick={onReset}>
+              Reset to defaults
+            </button>
           </>)}
         </div>
       </PopoverContent>

@@ -6,12 +6,13 @@ import { RemoteSection } from './RemoteSection'
 import { useBranchGraph, BranchGraphToolbar, BranchGraphCard } from './BranchesTab'
 
 interface ProjectGeneralTabProps {
+  projectId: string
   projectPath: string | null
   visible: boolean
   onSwitchToDiff: () => void
 }
 
-export function ProjectGeneralTab({ projectPath, visible, onSwitchToDiff }: ProjectGeneralTabProps) {
+export function ProjectGeneralTab({ projectId, projectPath, visible, onSwitchToDiff }: ProjectGeneralTabProps) {
   const [isGitRepo, setIsGitRepo] = useState<boolean | null>(null)
   const [currentBranch, setCurrentBranch] = useState<string | null>(null)
   const [statusSummary, setStatusSummary] = useState<StatusSummary | null>(null)
@@ -28,7 +29,7 @@ export function ProjectGeneralTab({ projectPath, visible, onSwitchToDiff }: Proj
   const [switching, setSwitching] = useState(false)
   const [branchError, setBranchError] = useState<string | null>(null)
 
-  const branchGraph = useBranchGraph(projectPath, visible && isGitRepo === true)
+  const branchGraph = useBranchGraph(projectPath, visible && isGitRepo === true, undefined, `project:${projectId}`)
 
   const fetchGitData = useCallback(async () => {
     if (!projectPath) return

@@ -1511,6 +1511,7 @@ function App(): React.JSX.Element {
                                       {id === 'git' && (
                                         <UnifiedGitPanel
                                           ref={homeGitPanelRef}
+                                          projectId={selectedProjectId}
                                           projectPath={projectPath}
                                           visible={true}
                                           defaultTab={homeGitDefaultTab}

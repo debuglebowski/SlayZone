@@ -40,7 +40,7 @@ export function GeneralTabContent({
   hasGithubRemote, onUpdateTask, onTaskUpdated, onSwitchTab
 }: GeneralTabContentProps) {
   const data = useConsolidatedGeneralData(task, projectPath, visible, pollIntervalMs, onUpdateTask)
-  const branchGraph = useBranchGraph(data.targetPath, visible, data.parentBranch ?? undefined)
+  const branchGraph = useBranchGraph(data.targetPath, visible, data.parentBranch ?? undefined, `task:${task.id}`)
   const [createPrOpen, setCreatePrOpen] = useState(false)
   const [linkPrOpen, setLinkPrOpen] = useState(false)
   const [linkError, setLinkError] = useState<string | null>(null)

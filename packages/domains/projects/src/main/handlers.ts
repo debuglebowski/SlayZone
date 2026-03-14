@@ -233,6 +233,7 @@ export function registerProjectHandlers(ipcMain: IpcMain, db: Database): void {
 
   ipcMain.handle('db:projects:delete', (_, id: string) => {
     const result = db.prepare('DELETE FROM projects WHERE id = ?').run(id)
+    db.prepare('DELETE FROM settings WHERE key = ?').run(`commit_graph:project:${id}`)
     return result.changes > 0
   })
 }
