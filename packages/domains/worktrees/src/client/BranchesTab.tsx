@@ -15,7 +15,8 @@ const DEFAULT_CONFIG: CommitGraphConfig = {
   baseBranch: '',  // resolved at runtime
   collapsed: false,
   showBranches: true,
-  showTags: true,
+  breakOnTags: true,
+  breakOnMerges: true,
 }
 
 // --- Shared hook: all branch graph state + data fetching ---
@@ -171,7 +172,8 @@ export function BranchesTab({ projectPath, visible, defaultBaseBranch, embedded 
       graph={state.dagGraph}
       filterQuery={state.filter || undefined}
       tipsOnly={state.config.collapsed}
-      includeTags={state.config.showTags}
+      includeTags={state.config.breakOnTags}
+            breakOnMerges={state.config.breakOnMerges}
       renderLimit={RENDER_LIMIT}
     />
   ) : (
@@ -215,7 +217,8 @@ export function BranchGraphCard({ state, className }: { state: BranchGraphState;
       graph={state.dagGraph}
       filterQuery={state.filter || undefined}
       tipsOnly={state.config.collapsed}
-      includeTags={state.config.showTags}
+      includeTags={state.config.breakOnTags}
+            breakOnMerges={state.config.breakOnMerges}
       renderLimit={RENDER_LIMIT}
     />
   ) : (
@@ -291,12 +294,16 @@ function DisplayPopover({ config, effectiveBaseBranch, onChange }: {
             <Label htmlFor="display-branches" className="text-sm cursor-pointer">Show branches</Label>
             <Switch id="display-branches" checked={config.showBranches} onCheckedChange={(v) => onChange(c => ({ ...c, showBranches: v }))} />
           </div>
-          {config.collapsed && (
+          {config.collapsed && (<>
             <div className="flex items-center justify-between">
-              <Label htmlFor="display-tags" className="text-sm cursor-pointer">Show tags</Label>
-              <Switch id="display-tags" checked={config.showTags} onCheckedChange={(v) => onChange(c => ({ ...c, showTags: v }))} />
+              <Label htmlFor="break-on-tags" className="text-sm cursor-pointer">Break on tags</Label>
+              <Switch id="break-on-tags" checked={config.breakOnTags} onCheckedChange={(v) => onChange(c => ({ ...c, breakOnTags: v }))} />
             </div>
-          )}
+            <div className="flex items-center justify-between">
+              <Label htmlFor="break-on-merges" className="text-sm cursor-pointer">Break on merges</Label>
+              <Switch id="break-on-merges" checked={config.breakOnMerges} onCheckedChange={(v) => onChange(c => ({ ...c, breakOnMerges: v }))} />
+            </div>
+          </>)}
         </div>
       </PopoverContent>
     </Popover>

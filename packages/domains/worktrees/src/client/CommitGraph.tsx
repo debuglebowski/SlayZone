@@ -10,8 +10,10 @@ interface CommitGraphProps {
   graph: ResolvedGraph
   filterQuery?: string
   tipsOnly?: boolean
-  /** When tipsOnly, also break collapse chain at tagged commits */
+  /** When tipsOnly, break collapse chain at tagged commits */
   includeTags?: boolean
+  /** When tipsOnly, break collapse chain at merged PR commits (syntheticBranch) */
+  breakOnMerges?: boolean
   /** Max rows to render (layout uses all commits for accurate topology) */
   renderLimit?: number
   className?: string
@@ -512,14 +514,14 @@ interface CollapsedDag {
   rowOffsets: Map<number, number>
 }
 
-function computeCollapsedDag(fullLayout: DagLayout, includeTags = true): CollapsedDag {
+function computeCollapsedDag(fullLayout: DagLayout, includeTags = true, breakOnMerges = true): CollapsedDag {
   const { nodes, edges, maxColumn } = fullLayout
   if (nodes.length === 0) return { nodes: [], edges: [], groups: [], maxColumn: 0, totalRows: 0, rowOffsets: new Map() }
 
-  // Identify head rows (nodes with branchRefs or synthetic branches)
+  // Identify head rows (nodes with branchRefs, optionally synthetic branches and tags)
   const headRows = new Set<number>()
   for (const n of nodes) {
-    if (n.commit.branchRefs.length > 0 || n.syntheticBranch || (includeTags && n.commit.tags.length > 0)) headRows.add(n.row)
+    if (n.commit.branchRefs.length > 0 || (breakOnMerges && n.syntheticBranch) || (includeTags && n.commit.tags.length > 0)) headRows.add(n.row)
   }
 
   // Build segments: consecutive head or non-head rows
@@ -767,7 +769,7 @@ function CommitGroupRow({ count, color, gutterWidth }: {
 
 const OVERSCAN = 10
 
-export function CommitGraph({ graph, filterQuery, tipsOnly, includeTags, renderLimit, className }: CommitGraphProps) {
+export function CommitGraph({ graph, filterQuery, tipsOnly, includeTags, breakOnMerges, renderLimit, className }: CommitGraphProps) {
   const { copiedHash, handleCopy } = useCopyHash()
   const scrollContainerRef = useRef<HTMLDivElement>(null)
 
@@ -779,8 +781,8 @@ export function CommitGraph({ graph, filterQuery, tipsOnly, includeTags, renderL
     [graph, hasTopology]
   )
   const collapsed = useMemo(
-    () => tipsOnly ? computeCollapsedDag(fullLayout, includeTags) : null,
-    [fullLayout, tipsOnly, includeTags]
+    () => tipsOnly ? computeCollapsedDag(fullLayout, includeTags, breakOnMerges) : null,
+    [fullLayout, tipsOnly, includeTags, breakOnMerges]
   )
 
   // Map colorIndex → branch name for tooltip overlays

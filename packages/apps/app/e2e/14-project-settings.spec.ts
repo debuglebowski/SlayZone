@@ -400,13 +400,13 @@ test.describe('Project settings & context menu', () => {
     }
 
     await openProjectSettingsIntegrations(mainWindow, 'github_projects', false)
-    await clickSyncButton('github-project-check-diffs', 'Local ahead: 1')
+    await clickSyncButton('project-check-diffs', 'Local ahead: 1')
     await expect(mainWindow.getByText('Remote ahead: 1')).toBeVisible({ timeout: 3_000 })
 
-    await clickSyncButton('github-project-push-local-ahead', 'Push complete: 1 pushed, 0 skipped')
+    await clickSyncButton('project-push-local-ahead', 'Push complete: 1 pushed, 0 skipped')
 
-    await clickSyncButton('github-project-check-diffs', 'Remote ahead: 1')
-    await clickSyncButton('github-project-pull-remote-ahead')
+    await clickSyncButton('project-check-diffs', 'Remote ahead: 1')
+    await clickSyncButton('project-pull-remote-ahead')
     await expect.poll(async () => {
       const tasks = await seed(mainWindow).getTasks() as Array<{ project_id: string; title: string }>
       return tasks.some((task) =>

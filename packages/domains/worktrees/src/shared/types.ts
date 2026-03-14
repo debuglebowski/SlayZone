@@ -212,12 +212,12 @@ export interface CommitGraphConfig {
   baseBranch: string
   /** Show individual commits vs collapsed summaries */
   collapsed: boolean
-  /** Show child branches of base branch */
-  includeChildBranches: boolean
-  /** Show branches already merged into base */
-  includeMergedBranches: boolean
-  /** Collapsed only: break collapse chain at tagged commits */
-  includeTags: boolean
+  /** Show branches forked from or behind base branch */
+  showBranches: boolean
+  /** Collapsed only: break collapse groups at tagged commits */
+  breakOnTags: boolean
+  /** Collapsed only: break collapse groups at merged PR commits */
+  breakOnMerges: boolean
 }
 
 // --- DAG graph data ---
