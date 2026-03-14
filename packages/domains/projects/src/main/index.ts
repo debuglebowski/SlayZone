@@ -1,1 +1,1 @@
-export { registerProjectHandlers } from './handlers'
+export { registerProjectHandlers, parseProject } from './handlers'

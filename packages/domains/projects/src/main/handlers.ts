@@ -14,7 +14,7 @@ import {
   validateColumns
 } from '@slayzone/projects/shared'
 
-function parseProject(row: Record<string, unknown> | undefined): Record<string, unknown> | null {
+export function parseProject(row: Record<string, unknown> | undefined): Record<string, unknown> | null {
   if (!row) return null
   return {
     ...row,

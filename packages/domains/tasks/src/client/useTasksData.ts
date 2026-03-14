@@ -52,18 +52,12 @@ export function useTasksData(): UseTasksDataReturn {
       if (inFlight) { pending = true; return }
       inFlight = true
       pending = false
-      Promise.all([
-        window.api.db.getTasks(),
-        window.api.db.getProjects(),
-        window.api.tags.getTags(),
-        window.api.taskTags.getAll(),
-        window.api.taskDependencies.getAllBlockedTaskIds()
-      ]).then(([t, p, tg, allTagMap, allBlockedIds]) => {
-        setTasks(t as Task[])
-        setProjects(p as Project[])
-        setTags(tg as Tag[])
-        setTaskTags(new Map(Object.entries(allTagMap as Record<string, string[]>)))
-        setBlockedTaskIds(new Set(allBlockedIds as string[]))
+      window.api.db.loadBoardData().then((data) => {
+        setTasks(data.tasks as Task[])
+        setProjects(data.projects as Project[])
+        setTags(data.tags as Tag[])
+        setTaskTags(new Map(Object.entries(data.taskTags)))
+        setBlockedTaskIds(new Set(data.blockedTaskIds))
       }).finally(() => {
         if (firstLoad) {
           firstLoad = false

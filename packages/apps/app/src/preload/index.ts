@@ -27,6 +27,7 @@ const api: ElectronAPI = {
 
     // Tasks
     getTasks: () => ipcRenderer.invoke('db:tasks:getAll'),
+    loadBoardData: () => ipcRenderer.invoke('db:loadBoardData'),
     getTasksByProject: (projectId) => ipcRenderer.invoke('db:tasks:getByProject', projectId),
     getTask: (id) => ipcRenderer.invoke('db:tasks:get', id),
     getSubTasks: (parentId) => ipcRenderer.invoke('db:tasks:getSubTasks', parentId),

@@ -204,6 +204,13 @@ export interface ElectronAPI {
 
     // Tasks
     getTasks: () => Promise<Task[]>
+    loadBoardData: () => Promise<{
+      tasks: Task[]
+      projects: Project[]
+      tags: Tag[]
+      taskTags: Record<string, string[]>
+      blockedTaskIds: string[]
+    }>
     getTasksByProject: (projectId: string) => Promise<Task[]>
     getTask: (id: string) => Promise<Task | null>
     getSubTasks: (parentId: string) => Promise<Task[]>

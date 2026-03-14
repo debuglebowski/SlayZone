@@ -3,6 +3,7 @@ import type { Database } from 'better-sqlite3'
 import type { CreateTaskInput, UpdateTaskInput, Task, ProviderConfig } from '@slayzone/task/shared'
 import type { ColumnConfig } from '@slayzone/projects/shared'
 import { getDefaultStatus, isKnownStatus, isTerminalStatus, parseColumnsConfig } from '@slayzone/projects/shared'
+import { parseProject } from '@slayzone/projects/main'
 import { DEFAULT_TERMINAL_MODES } from '@slayzone/terminal/shared'
 import path from 'path'
 import { removeWorktree, createWorktree, runWorktreeSetupScript, getCurrentBranch, isGitRepo, copyIgnoredFiles, resolveCopyBehavior } from '@slayzone/worktrees/main'
@@ -683,4 +684,38 @@ export function registerTaskHandlers(ipcMain: IpcMain, db: Database): void {
       })()
     }
   )
+
+  // Batched load for board data — single IPC round-trip instead of 5
+  ipcMain.handle('db:loadBoardData', () => {
+    const taskRows = db
+      .prepare(`SELECT t.*, el.external_url AS linear_url
+        FROM tasks t
+        LEFT JOIN external_links el ON el.task_id = t.id AND el.provider = 'linear'
+        WHERE t.deleted_at IS NULL
+        ORDER BY t."order" ASC, t.created_at DESC`)
+      .all() as Record<string, unknown>[]
+
+    const projectRows = db.prepare('SELECT * FROM projects ORDER BY name').all() as Record<string, unknown>[]
+
+    const tagRows = db.prepare('SELECT * FROM tags ORDER BY name').all()
+
+    const taskTagRows = db.prepare('SELECT task_id, tag_id FROM task_tags').all() as { task_id: string; tag_id: string }[]
+    const taskTagMap: Record<string, string[]> = {}
+    for (const row of taskTagRows) {
+      if (!taskTagMap[row.task_id]) taskTagMap[row.task_id] = []
+      taskTagMap[row.task_id].push(row.tag_id)
+    }
+
+    const blockedRows = db
+      .prepare('SELECT DISTINCT blocks_task_id FROM task_dependencies')
+      .all() as { blocks_task_id: string }[]
+
+    return {
+      tasks: parseTasks(taskRows),
+      projects: projectRows.map((row) => parseProject(row)!),
+      tags: tagRows,
+      taskTags: taskTagMap,
+      blockedTaskIds: blockedRows.map((r) => r.blocks_task_id)
+    }
+  })
 }
