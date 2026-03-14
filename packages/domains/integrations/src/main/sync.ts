@@ -7,8 +7,8 @@ import type {
   SyncNowInput,
   SyncNowResult
 } from '../shared'
-import { getIssuesBatch, updateIssue, createIssue as createLinearIssue, listIssues as listLinearIssues } from './linear-client'
-import { getIssuesBatch as getGithubIssuesBatch, updateIssue as updateGithubIssue, createIssue as createGithubIssue, listIssues as listGithubIssues } from './github-client'
+import { getIssuesBatch, getIssue as getLinearIssue, updateIssue, createIssue as createLinearIssue, listIssues as listLinearIssues } from './linear-client'
+import { getIssuesBatch as getGithubIssuesBatch, getIssue as getGithubIssue, updateIssue as updateGithubIssue, createIssue as createGithubIssue, listIssues as listGithubIssues } from './github-client'
 import { readCredential } from './credentials'
 import { htmlToMarkdown, markdownToHtml } from './markdown'
 import {
@@ -276,14 +276,29 @@ export async function runSyncNow(db: Database, input: SyncNowInput): Promise<Syn
       result.scanned += 1
 
       try {
-        const remoteIssue = issueMap.get(link.external_id)
+        let remoteIssue = issueMap.get(link.external_id)
+
+        // Batch fetch may exclude archived issues — retry with single fetch to confirm
         if (!remoteIssue) {
-          db.prepare(`
-            UPDATE external_links
-            SET sync_state = 'error', last_error = ?, updated_at = datetime('now')
-            WHERE id = ?
-          `).run('Remote issue not found', link.id)
-          result.errors.push(`Issue missing: ${link.external_key}`)
+          const task = loadTask(db, link.task_id)
+          // Skip retry if task is already archived (avoids repeated API calls)
+          if (task?.archived_at) {
+            markLinkSynced(db, link)
+            continue
+          }
+          try {
+            remoteIssue = (await getLinearIssue(apiKey, link.external_id)) ?? undefined
+          } catch {
+            // Single fetch also failed — treat as genuinely missing
+          }
+        }
+
+        if (!remoteIssue) {
+          // Issue is truly gone (archived/deleted) — archive local task
+          db.prepare("UPDATE tasks SET archived_at = datetime('now') WHERE id = ? AND archived_at IS NULL")
+            .run(link.task_id)
+          markLinkSynced(db, link)
+          result.pulled += 1
           continue
         }
 
@@ -435,14 +450,32 @@ export async function runGithubSyncNow(db: Database, input: SyncNowInput): Promi
       result.scanned += 1
 
       try {
-        const remoteIssue = issueMap.get(link.external_id)
+        let remoteIssue = issueMap.get(link.external_id)
+
+        // Batch fetch may miss issues — retry with single fetch to confirm
         if (!remoteIssue) {
-          db.prepare(`
-            UPDATE external_links
-            SET sync_state = 'error', last_error = ?, updated_at = datetime('now')
-            WHERE id = ?
-          `).run('Remote issue not found', link.id)
-          result.errors.push(`Issue missing: ${link.external_key}`)
+          const task = loadTask(db, link.task_id)
+          // Skip retry if task is already archived
+          if (task?.archived_at) {
+            markLinkSynced(db, link)
+            continue
+          }
+          const key = keyByExternalId.get(link.external_id)
+          if (key) {
+            try {
+              remoteIssue = (await getGithubIssue(token, key)) ?? undefined
+            } catch {
+              // Single fetch also failed
+            }
+          }
+        }
+
+        if (!remoteIssue) {
+          // Issue is truly gone (deleted) — archive local task
+          db.prepare("UPDATE tasks SET archived_at = datetime('now') WHERE id = ? AND archived_at IS NULL")
+            .run(link.task_id)
+          markLinkSynced(db, link)
+          result.pulled += 1
           continue
         }
 
