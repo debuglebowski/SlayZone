@@ -5,7 +5,7 @@ import { FitAddon } from '@xterm/addon-fit'
 // import { WebLinksAddon } from '@xterm/addon-web-links' // Disabled - causes persistent underlines
 import { SerializeAddon } from '@xterm/addon-serialize'
 import { SearchAddon } from '@xterm/addon-search'
-// import { WebglAddon } from '@xterm/addon-webgl' // Disabled - bypasses CSS underline fix
+import { WebglAddon } from '@xterm/addon-webgl'
 import '@xterm/xterm/css/xterm.css'
 
 // Override xterm underline styles - Claude Code outputs these and they persist incorrectly
@@ -25,6 +25,7 @@ import { useTheme, useAppearance } from '@slayzone/settings/client'
 import { getTerminalThemeById, terminalThemes } from './terminal-themes'
 import { TerminalSearchBar } from './TerminalSearchBar'
 import type { TerminalMode, TerminalState } from '@slayzone/terminal/shared'
+import { stripUnderlineCodes } from '@slayzone/terminal/shared'
 
 // Wait for container to have non-zero dimensions before opening terminal
 function waitForDimensions(
@@ -321,17 +322,18 @@ export const Terminal = forwardRef<TerminalHandle, TerminalProps>(function Termi
       terminal.loadAddon(serializeAddon)
       terminal.loadAddon(searchAddon)
 
-      // WebGL addon DISABLED - renders underlines directly to canvas, bypassing CSS override
-      // Canvas 2D renderer uses DOM elements that respect our .xterm-underline-* CSS fix
-      // try {
-      //   const webglAddon = new WebglAddon()
-      //   webglAddon.onContextLoss(() => {
-      //     webglAddon.dispose()
-      //   })
-      //   terminal.loadAddon(webglAddon)
-      // } catch {
-      //   // WebGL not available, continue with canvas renderer
-      // }
+      // WebGL renderer — 5-10x faster than Canvas 2D.
+      // Safe because filterBufferData() strips SGR 4 (underline) codes server-side
+      // before data reaches the renderer. CSS override kept as safety net.
+      try {
+        const webglAddon = new WebglAddon()
+        webglAddon.onContextLoss(() => {
+          webglAddon.dispose()
+        })
+        terminal.loadAddon(webglAddon)
+      } catch {
+        // WebGL not available, continue with canvas renderer
+      }
 
       terminalRef.current = terminal
       fitAddonRef.current = fitAddon
@@ -512,7 +514,10 @@ export const Terminal = forwardRef<TerminalHandle, TerminalProps>(function Termi
       rafId = null
       if (pendingChunks.length === 0) return
       if (terminalRef.current && isActiveRef.current) {
-        terminalRef.current.write(pendingChunks.join(''))
+        // Second-pass underline strip — catches split sequences across chunks
+        // (now joined) and any codes the server filter missed.
+        // Required for WebGL renderer which ignores CSS overrides.
+        terminalRef.current.write(stripUnderlineCodes(pendingChunks.join('')))
         lastRenderedSeqRef.current = pendingSeq
       }
       pendingChunks = []

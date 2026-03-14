@@ -165,22 +165,8 @@ function hexToOscRgb(hex: string): string {
   return `rgb:${r}${r}/${g}${g}/${b}${b}`
 }
 
-// Filter out terminal escape sequences that cause issues
-function filterBufferData(data: string): string {
-  return data
-    // Strip title-setting (0,1,2) and clipboard (52) OSC sequences
-    .replace(/\x1b\](?:[012]|52)[;][^\x07\x1b]*(?:\x07|\x1b\\)/g, '')
-    // Filter underline from ANY SGR sequence (handles combined codes like ESC[1;4m)
-    // Claude Code outputs these and they persist incorrectly in xterm.js
-    .replace(/\x1b\[([0-9;:]*)m/g, (_match, params) => {
-      if (!params) return '\x1b[m'
-      // Split only by semicolon - colon is subparameter separator (4:3 = curly underline)
-      const filtered = params.split(';')
-        .filter((p: string) => p !== '4' && !p.startsWith('4:'))
-        .join(';')
-      return filtered ? `\x1b[${filtered}m` : ''
-    })
-}
+import { filterBufferData } from './filter-buffer-data'
+export { filterBufferData }
 
 // Intercept timing-critical terminal queries synchronously in the PTY onData handler.
 // CPR/DA/DSR must be answered before the program proceeds to readline mode.
