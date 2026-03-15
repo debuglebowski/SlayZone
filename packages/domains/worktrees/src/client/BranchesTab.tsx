@@ -225,7 +225,15 @@ function DisplayPopover({ config, effectiveBaseBranch, onChange, onReset }: {
         </IconButton>
       </PopoverTrigger>
       <PopoverContent className="w-72 p-3" align="end">
-        <div className="space-y-3">
+        <div className="space-y-8">
+          {/* Base branch */}
+          <div className="flex items-center justify-between">
+            <Label className="text-xs text-muted-foreground">Base branch</Label>
+            <span className="text-xs font-mono text-muted-foreground">
+              {effectiveBaseBranch}
+            </span>
+          </div>
+
           {/* View mode toggle */}
           <div className="grid grid-cols-2 rounded-md border border-border/50 p-0.5 gap-0.5">
             {([
@@ -250,37 +258,31 @@ function DisplayPopover({ config, effectiveBaseBranch, onChange, onReset }: {
             })}
           </div>
 
-          {/* Base branch (read-only) */}
-          <div className="flex items-center justify-between">
-            <Label className="text-sm">Base branch</Label>
-            <span className="text-xs font-mono text-muted-foreground px-1.5 py-0.5 rounded bg-muted border">
-              {effectiveBaseBranch}
-            </span>
-          </div>
-
-          <div className="h-px bg-border" />
-
-          {/* Toggle switches */}
-          <div className="flex items-center justify-between">
-            <Label htmlFor="display-branches" className="text-sm cursor-pointer">Show branches</Label>
-            <Switch id="display-branches" checked={config.showBranches} onCheckedChange={(v) => onChange(c => ({ ...c, showBranches: v }))} />
-          </div>
-          {config.collapsed && (<>
+          {/* Settings section */}
+          <div className="space-y-3">
             <div className="flex items-center justify-between">
-              <Label htmlFor="break-on-tags" className="text-sm cursor-pointer">Break on tags</Label>
-              <Switch id="break-on-tags" checked={config.breakOnTags} onCheckedChange={(v) => onChange(c => ({ ...c, breakOnTags: v }))} />
+              <span className="text-xs text-muted-foreground">Settings</span>
+              {onReset && (
+                <button type="button" className="text-[10px] text-muted-foreground hover:text-foreground transition-colors" onClick={onReset}>
+                  Reset defaults
+                </button>
+              )}
             </div>
             <div className="flex items-center justify-between">
-              <Label htmlFor="break-on-merges" className="text-sm cursor-pointer">Break on merges</Label>
-              <Switch id="break-on-merges" checked={config.breakOnMerges} onCheckedChange={(v) => onChange(c => ({ ...c, breakOnMerges: v }))} />
+              <Label htmlFor="display-branches" className="text-sm cursor-pointer">Show branches</Label>
+              <Switch id="display-branches" checked={config.showBranches} onCheckedChange={(v) => onChange(c => ({ ...c, showBranches: v }))} />
             </div>
-          </>)}
-          {onReset && (<>
-            <div className="h-px bg-border" />
-            <button type="button" className="text-xs text-muted-foreground hover:text-foreground transition-colors" onClick={onReset}>
-              Reset to defaults
-            </button>
-          </>)}
+            {config.collapsed && (<>
+              <div className="flex items-center justify-between">
+                <Label htmlFor="break-on-tags" className="text-sm cursor-pointer">Break on tags</Label>
+                <Switch id="break-on-tags" checked={config.breakOnTags} onCheckedChange={(v) => onChange(c => ({ ...c, breakOnTags: v }))} />
+              </div>
+              <div className="flex items-center justify-between">
+                <Label htmlFor="break-on-merges" className="text-sm cursor-pointer">Break on merges</Label>
+                <Switch id="break-on-merges" checked={config.breakOnMerges} onCheckedChange={(v) => onChange(c => ({ ...c, breakOnMerges: v }))} />
+              </div>
+            </>)}
+          </div>
         </div>
       </PopoverContent>
     </Popover>

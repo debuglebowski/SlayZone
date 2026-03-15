@@ -916,13 +916,13 @@ export function CommitGraph({ graph, filterQuery, tipsOnly, includeTags, breakOn
     }
     return max
   }, [layout, maxRow])
-  // Add extra pixel space for synthetic dots if any are visible
-  const hasSyntheticDots = useMemo(() =>
-    layout.nodes.some(n => n.row < maxRow && n.syntheticBranch),
+  // Add extra pixel space for synthetic/behind branch dots if any are visible
+  const hasBranchIndicators = useMemo(() =>
+    layout.nodes.some(n => n.row < maxRow && (n.syntheticBranch || n.behindBranch)),
     [layout.nodes, maxRow]
   )
   const gutterWidth = (visibleMaxColumn + 1) * COLUMN_WIDTH + GUTTER_PAD
-    + (hasSyntheticDots ? MERGED_DOT_OFFSET + 12 + DOT_RADIUS * 2 : 0)
+    + (hasBranchIndicators ? MERGED_DOT_OFFSET + 12 + 6 + DOT_RADIUS * 2 : 0)
   const totalRowCount = Math.min(
     collapsed ? collapsed.totalRows : layout.nodes.length,
     maxRow
