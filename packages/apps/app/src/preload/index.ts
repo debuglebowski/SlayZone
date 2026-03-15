@@ -15,9 +15,6 @@ window.addEventListener('drop', (e) => {
 
 // Custom APIs for renderer
 const api: ElectronAPI = {
-  ai: {
-    generateDescription: (title, mode) => ipcRenderer.invoke('ai:generate-description', title, mode)
-  },
   db: {
     // Projects
     getProjects: () => ipcRenderer.invoke('db:projects:getAll'),

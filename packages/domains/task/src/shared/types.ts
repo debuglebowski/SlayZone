@@ -255,10 +255,3 @@ export interface UpdateTaskInput {
   // Legacy
   claudeSessionId?: string | null
 }
-
-// AI description generation result
-export interface GenerateDescriptionResult {
-  success: boolean
-  description?: string
-  error?: string
-}

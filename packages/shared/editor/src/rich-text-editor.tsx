@@ -1,11 +1,13 @@
-import { useEditor, EditorContent } from '@tiptap/react'
+import { useEditor, EditorContent, type Editor } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import Placeholder from '@tiptap/extension-placeholder'
 import Link from '@tiptap/extension-link'
 import TaskList from '@tiptap/extension-task-list'
 import TaskItem from '@tiptap/extension-task-item'
-import { useEffect } from 'react'
+import { useEffect, type MutableRefObject } from 'react'
 import { cn } from '@slayzone/ui'
+
+export type { Editor }
 
 interface RichTextEditorProps {
   value: string
@@ -16,6 +18,9 @@ interface RichTextEditorProps {
   minHeight?: string
   maxHeight?: string
   testId?: string
+  autoFocus?: boolean
+  editorRef?: MutableRefObject<Editor | null>
+  onReady?: (editor: Editor) => void
 }
 
 export function RichTextEditor({
@@ -26,7 +31,10 @@ export function RichTextEditor({
   className,
   minHeight,
   maxHeight,
-  testId
+  testId,
+  autoFocus,
+  editorRef,
+  onReady
 }: RichTextEditorProps) {
   const editor = useEditor({
     extensions: [
@@ -48,6 +56,10 @@ export function RichTextEditor({
       })
     ],
     content: value,
+    autofocus: autoFocus ? 'end' : false,
+    onCreate: ({ editor }) => {
+      onReady?.(editor)
+    },
     onUpdate: ({ editor }) => {
       onChange(editor.getHTML())
     },
@@ -67,6 +79,11 @@ export function RichTextEditor({
       }
     }
   })
+
+  // Expose editor instance
+  useEffect(() => {
+    if (editorRef) editorRef.current = editor
+  }, [editor, editorRef])
 
   // Sync external value changes
   useEffect(() => {

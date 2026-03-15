@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
-import { MoreHorizontal, Archive, Trash2, AlertTriangle, Sparkles, Loader2, Terminal as TerminalIcon, Globe, Settings2, GitBranch, FileCode, ChevronRight, Plus, GripVertical, Camera, X, Info, CheckCircle2, XCircle, Stethoscope, Cpu } from 'lucide-react'
+import { MoreHorizontal, Archive, Trash2, AlertTriangle, Loader2, Terminal as TerminalIcon, Globe, Settings2, GitBranch, FileCode, ChevronRight, Plus, GripVertical, Camera, X, Info, CheckCircle2, XCircle, Stethoscope, Cpu, Maximize2 } from 'lucide-react'
+import { DescriptionDialog } from './DescriptionDialog'
 import { DndContext, PointerSensor, useSensors, useSensor, closestCenter, type DragEndEvent } from '@dnd-kit/core'
 import { SortableContext, useSortable, verticalListSortingStrategy, arrayMove } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
@@ -221,6 +222,9 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [archiveDialogOpen, setArchiveDialogOpen] = useState(false)
 
+  // Description fullscreen dialog
+  const [descriptionFullscreen, setDescriptionFullscreen] = useState(false)
+
   // Doctor dialog state
   const [doctorDialogOpen, setDoctorDialogOpen] = useState(false)
   const [doctorResults, setDoctorResults] = useState<ValidationResult[] | null>(null)
@@ -230,7 +234,6 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
 
   // Description editing state
   const [descriptionValue, setDescriptionValue] = useState('')
-  const [generatingDescription, setGeneratingDescription] = useState(false)
 
   // Terminal restart key (changing this forces remount)
   const [terminalKey, setTerminalKey] = useState(0)
@@ -386,7 +389,6 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
     setLoading(true)
     setDetectedSessionId(null)
     setEditingTitle(false)
-    setGeneratingDescription(false)
 
     const loadData = async (): Promise<void> => {
       const checkProjectPathExists = async (path: string): Promise<boolean> => {
@@ -696,6 +698,7 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
     await new Promise(r => setTimeout(r, 50))
     const result = await window.api.screenshot.captureRegion(rect)
     if (!result.success || !result.path) return
+    track('screenshot_captured')
     const escaped = result.path.includes(' ') ? `"${result.path}"` : result.path
     await terminalApiRef.current?.write(escaped)
   }, [])
@@ -837,6 +840,7 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
   const handleModeChange = useCallback(
     async (mode: TerminalMode) => {
       if (!task) return
+      const oldMode = task.terminal_mode
       // Main tab session ID format: ${taskId}:${taskId}
       const mainSessionId = `${task.id}:${task.id}`
       // Reset state FIRST to ignore any in-flight data
@@ -858,6 +862,7 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
       // Remount terminal (mark skip to prevent cleanup from re-caching old content)
       markSkipCache(mainSessionId)
       setTerminalKey((k) => k + 1)
+      track('terminal_mode_switched', { from: oldMode, to: mode })
     },
     [task, onTaskUpdated, resetTaskState]
   )
@@ -1084,31 +1089,6 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
     onTaskUpdated(updated)
   }
 
-  const handleGenerateDescription = async (): Promise<void> => {
-    if (!task || generatingDescription) return
-    setGeneratingDescription(true)
-    try {
-      const result = await window.api.ai.generateDescription(
-        task.title,
-        task.terminal_mode
-      )
-      if (result.success && result.description) {
-        setDescriptionValue(result.description)
-        const updated = await window.api.db.updateTask({
-          id: task.id,
-          description: result.description
-        })
-        setTask(updated)
-        onTaskUpdated(updated)
-      } else if (result.error) {
-        console.error('[generate] Error:', result.error)
-      }
-    } catch (err) {
-      console.error('[generate] Exception:', err)
-    } finally {
-      setGeneratingDescription(false)
-    }
-  }
 
   const handleCreateSubTask = async (): Promise<void> => {
     if (!task || !subTaskTitle.trim()) return
@@ -1118,7 +1098,10 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
       parentId: task.id,
       status: getDefaultStatus(project?.columns_config)
     })
-    if (sub) setSubTasks(prev => [...prev, sub])
+    if (sub) {
+      setSubTasks(prev => [...prev, sub])
+      track('subtask_created')
+    }
     setSubTaskTitle('')
     setAddingSubTask(false)
   }
@@ -1975,20 +1958,14 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
               testId="task-description-editor"
             />
             <IconButton
-                data-testid="generate-description-button"
-                type="button"
-                variant="ghost"
-                aria-label="Generate description"
-                className="absolute bottom-1 right-1 size-6 text-muted-foreground hover:text-foreground"
-                onClick={() => handleGenerateDescription()}
-                disabled={generatingDescription || !task.title}
-              >
-                {generatingDescription ? (
-                  <Loader2 className="size-3 animate-spin" />
-                ) : (
-                  <Sparkles className="size-3" />
-                )}
-              </IconButton>
+              type="button"
+              variant="ghost"
+              aria-label="Fullscreen description"
+              className="absolute bottom-1 right-1 size-6 text-muted-foreground hover:text-foreground"
+              onClick={() => setDescriptionFullscreen(true)}
+            >
+              <Maximize2 className="size-3" />
+            </IconButton>
           </div>
 
           {/* Sub-tasks (only for top-level tasks) */}
@@ -2183,6 +2160,14 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
           </div>
         </DialogContent>
       </Dialog>
+
+      <DescriptionDialog
+        open={descriptionFullscreen}
+        onOpenChange={setDescriptionFullscreen}
+        value={descriptionValue}
+        onChange={setDescriptionValue}
+        onSave={handleDescriptionSave}
+      />
 
     </div>
   )

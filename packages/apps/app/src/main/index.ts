@@ -44,7 +44,7 @@ import { normalizeProjectStatusData } from './db/status-normalization'
 import { registerBackupHandlers, startAutoBackup, stopAutoBackup } from './backup'
 // Domain handlers
 import { registerProjectHandlers } from '@slayzone/projects/main'
-import { configureTaskRuntimeAdapters, registerTaskHandlers, registerAiHandlers, registerFilesHandlers } from '@slayzone/task/main'
+import { configureTaskRuntimeAdapters, registerTaskHandlers, registerFilesHandlers } from '@slayzone/task/main'
 import { registerTagHandlers } from '@slayzone/tags/main'
 import { registerSettingsHandlers, registerThemeHandlers } from '@slayzone/settings/main'
 import { registerPtyHandlers, registerUsageHandlers, killAllPtys, killPtysByTaskId, startIdleChecker, stopIdleChecker, dismissAllNotifications, syncTerminalModes } from '@slayzone/terminal/main'
@@ -917,7 +917,6 @@ app.whenReady().then(async () => {
   // Register domain handlers (inject ipcMain and db)
   registerProjectHandlers(ipcMain, db)
   registerTaskHandlers(ipcMain, db)
-  registerAiHandlers(ipcMain)
   registerTagHandlers(ipcMain, db)
   registerSettingsHandlers(ipcMain, db)
 

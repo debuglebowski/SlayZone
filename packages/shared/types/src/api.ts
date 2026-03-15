@@ -1,5 +1,5 @@
 import type { Project, CreateProjectInput, UpdateProjectInput, ExecutionContext } from '@slayzone/projects/shared'
-import type { Task, CreateTaskInput, UpdateTaskInput, GenerateDescriptionResult, DesktopHandoffPolicy } from '@slayzone/task/shared'
+import type { Task, CreateTaskInput, UpdateTaskInput, DesktopHandoffPolicy } from '@slayzone/task/shared'
 import type { Tag, CreateTagInput, UpdateTagInput } from '@slayzone/tags/shared'
 import type {
   TerminalMode,
@@ -195,9 +195,6 @@ export interface PtyCreateOptions {
 
 // ElectronAPI interface - the IPC contract between renderer and main
 export interface ElectronAPI {
-  ai: {
-    generateDescription: (title: string, mode: TerminalMode) => Promise<GenerateDescriptionResult>
-  }
   db: {
     // Projects
     getProjects: () => Promise<Project[]>
