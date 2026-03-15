@@ -1237,9 +1237,12 @@ export function resolveCommitGraph(commits: DagCommit[], baseBranch: string, req
         branchRefs.push(parsed.name)
       } else if (parsed.type === 'remote') {
         const parts = parsed.name.split('/')
+        const remoteName = parts[0]
         const localName = parts.slice(1).join('/')
         if (localName === 'HEAD') {
           // Skip origin/HEAD — it's not a real branch
+        } else if (remoteName !== 'origin') {
+          // Skip non-origin remotes (forks) — they clutter the graph
         } else if (!localBranchNames.has(localName)) {
           // No local branch — show as the local name
           branchRefs.push(localName)
