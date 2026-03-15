@@ -805,8 +805,6 @@ export async function runDiscovery(db: Database): Promise<number> {
     WHERE pm.status_setup_complete = 1
   `).all() as Array<IntegrationProjectMapping & { credential_ref: string }>
 
-  console.log(`[discovery] found ${mappings.length} active mappings`)
-
   let totalDiscovered = 0
   for (const mapping of mappings) {
     try {
