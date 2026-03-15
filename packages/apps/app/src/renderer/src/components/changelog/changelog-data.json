@@ -1,5 +1,57 @@
 [
   {
+    "version": "0.4.0",
+    "date": "2026-03-15",
+    "tagline": "Speed & sync",
+    "items": [
+      {
+        "category": "feature",
+        "title": "Integrations in beta",
+        "description": "Sync tasks with Linear and GitHub from one place, with easy discovery of unlinked tasks."
+      },
+      {
+        "category": "feature",
+        "title": "Git panel settings",
+        "description": "Customize commit graph defaults and save display preferences per project."
+      },
+      {
+        "category": "improvement",
+        "title": "Faster app startup",
+        "description": "The app loads significantly faster thanks to smaller bundles and smarter loading."
+      },
+      {
+        "category": "improvement",
+        "title": "Smoother board loading",
+        "description": "Kanban boards now load in a single step instead of multiple sequential fetches."
+      },
+      {
+        "category": "improvement",
+        "title": "Snappier commit graph",
+        "description": "Commit graph handles large repos much better with less memory usage."
+      },
+      {
+        "category": "improvement",
+        "title": "Faster terminal rendering",
+        "description": "Terminals feel more responsive with hardware-accelerated rendering and reduced overhead."
+      },
+      {
+        "category": "fix",
+        "title": "Commit graph display",
+        "description": "Fixed various visual glitches in the commit graph layout."
+      },
+      {
+        "category": "fix",
+        "title": "Terminal reconnection",
+        "description": "Switching back to a terminal no longer replays its entire history."
+      },
+      {
+        "category": "fix",
+        "title": "Sync reliability",
+        "description": "Tasks now properly archive when deleted or archived in Linear/GitHub."
+      }
+    ]
+  },
+  {
     "version": "0.3.1",
     "date": "2026-03-13",
     "tagline": "Polish & feedback loop",

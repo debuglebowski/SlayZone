@@ -1,6 +1,72 @@
 # Changelog
 
 
+## v0.4.0
+
+[compare changes](https://github.com/debuglebowski/slayzone/compare/v0.3.1...v0.4.0)
+
+### 🚀 Enhancements
+
+- Enable React Compiler for auto-memoization ([28408af](https://github.com/debuglebowski/slayzone/commit/28408af))
+- Unify sync UI for Linear/GitHub + surface unlinked tasks ([5a8793e](https://github.com/debuglebowski/slayzone/commit/5a8793e))
+- **worktrees:** Persist commit graph display config per instance ([8651d88](https://github.com/debuglebowski/slayzone/commit/8651d88))
+- **settings:** Add Git panel settings with commit graph defaults ([f1e8406](https://github.com/debuglebowski/slayzone/commit/f1e8406))
+
+### 🔥 Performance
+
+- Batch 5 IPC calls into single loadBoardData handler ([a26c52a](https://github.com/debuglebowski/slayzone/commit/a26c52a))
+- **worktrees:** Virtualize commit graph — 56% DOM reduction ([920a2ce](https://github.com/debuglebowski/slayzone/commit/920a2ce))
+- Code splitting — main bundle 8.5MB → 5.7MB (-33%) ([60394ae](https://github.com/debuglebowski/slayzone/commit/60394ae))
+- **db:** Add SQLite pragma tuning for WAL mode ([ee594c3](https://github.com/debuglebowski/slayzone/commit/ee594c3))
+- **terminal:** Disable cursor blink on hidden terminals ([93e2055](https://github.com/debuglebowski/slayzone/commit/93e2055))
+- **terminal:** Batch PTY writes with requestAnimationFrame ([f183710](https://github.com/debuglebowski/slayzone/commit/f183710))
+- **terminal:** Enable WebGL renderer + harden underline filtering ([f0fc088](https://github.com/debuglebowski/slayzone/commit/f0fc088))
+- Auto-discover domain entries for Vite dep pre-bundling ([ba4036b](https://github.com/debuglebowski/slayzone/commit/ba4036b))
+- **diagnostics:** Defer retention sweep on startup ([004427c](https://github.com/debuglebowski/slayzone/commit/004427c))
+
+### 🩹 Fixes
+
+- **nix:** Correct AppImage artifact name in update-nix-sources ([90cec76](https://github.com/debuglebowski/slayzone/commit/90cec76))
+- **ui:** Prevent xterm scrollbar punch-through on hidden tabs ([d76f161](https://github.com/debuglebowski/slayzone/commit/d76f161))
+- **worktrees:** Rewrite commit graph column layout + fix slash branch parsing ([e5d619a](https://github.com/debuglebowski/slayzone/commit/e5d619a))
+- Use separate MCP ports for dev/prod to prevent notification collision ([1473fe3](https://github.com/debuglebowski/slayzone/commit/1473fe3))
+- Always use mode-based port, don't read stale value from DB ([3db9215](https://github.com/debuglebowski/slayzone/commit/3db9215))
+- **worktrees:** Always show first/last base commit in collapsed mode + card padding ([5ddef98](https://github.com/debuglebowski/slayzone/commit/5ddef98))
+- Sync-now dispatches to both Linear and GitHub, extend push/pull to support Linear ([a8f643e](https://github.com/debuglebowski/slayzone/commit/a8f643e))
+- Notify renderer after sync/discovery changes ([88f2119](https://github.com/debuglebowski/slayzone/commit/88f2119))
+- **terminal:** Prevent full buffer replay on cached terminal reattach ([2bcf218](https://github.com/debuglebowski/slayzone/commit/2bcf218))
+- Archive local task when remote issue is gone ([772f81f](https://github.com/debuglebowski/slayzone/commit/772f81f))
+- Batch sync status fetch, clean project connections, guard notify ([8ed09cd](https://github.com/debuglebowski/slayzone/commit/8ed09cd))
+- Archive local task when Linear issue is archived (not just completed) ([12ab94d](https://github.com/debuglebowski/slayzone/commit/12ab94d))
+- **worktrees:** Rewrite collapsed graph, fix phantom edges and merge-into reparenting ([fb038d2](https://github.com/debuglebowski/slayzone/commit/fb038d2))
+- **worktrees:** Polish graph indicators and display popover layout ([1979015](https://github.com/debuglebowski/slayzone/commit/1979015))
+- **worktrees:** Match commit graph header spacing with home tab ([7f7bbd5](https://github.com/debuglebowski/slayzone/commit/7f7bbd5))
+- **worktrees:** Add missing entries to graph legend popover ([d3a3d8c](https://github.com/debuglebowski/slayzone/commit/d3a3d8c))
+- **worktrees:** Skip non-origin remotes in commit graph ([9640281](https://github.com/debuglebowski/slayzone/commit/9640281))
+- **worktrees:** Refresh commit graph on push/pull ([001a00c](https://github.com/debuglebowski/slayzone/commit/001a00c))
+
+### 💅 Refactors
+
+- **worktrees:** Merge Branches tab into General, remove bottom shadow ([cb0bbef](https://github.com/debuglebowski/slayzone/commit/cb0bbef))
+- **worktrees:** Simplify commit graph settings ([abe50fb](https://github.com/debuglebowski/slayzone/commit/abe50fb))
+- **tasks:** Clean up kanban display popover layout ([60d9c07](https://github.com/debuglebowski/slayzone/commit/60d9c07))
+
+### 🏡 Chore
+
+- Update perf status, clean up stale working notes ([aadf213](https://github.com/debuglebowski/slayzone/commit/aadf213))
+- Remove performance working notes, gitignore bundle-report ([8c91d71](https://github.com/debuglebowski/slayzone/commit/8c91d71))
+
+### ✅ Tests
+
+- Real-API integration tests for Linear and GitHub ([4428d30](https://github.com/debuglebowski/slayzone/commit/4428d30))
+- Harden integration tests — push/pull, unlinked, pagination, errors ([9f159fc](https://github.com/debuglebowski/slayzone/commit/9f159fc))
+- Fill remaining coverage gaps — guards, resync, status mapping, batch ([0081cb5](https://github.com/debuglebowski/slayzone/commit/0081cb5))
+- Complete handler coverage — connect, list, connection mgmt, disconnect ([7e7c9b8](https://github.com/debuglebowski/slayzone/commit/7e7c9b8))
+
+### ❤️ Contributors
+
+- Debuglebowski
+
 ## v0.3.1
 
 [compare changes](https://github.com/debuglebowski/slayzone/compare/v0.3.0...v0.3.1)
