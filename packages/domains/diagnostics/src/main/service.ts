@@ -573,7 +573,7 @@ export function registerDiagnosticsHandlers(ipcMain: IpcMain, db: Database, even
   cachedConfig = null
 
   instrumentIpcMain(ipcMain)
-  enforceRetention()
+  setTimeout(enforceRetention, 5_000)
 
   if (retentionTimer) clearInterval(retentionTimer)
   retentionTimer = setInterval(enforceRetention, RETENTION_SWEEP_MS)
