@@ -1,6 +1,6 @@
 import { createContext, useState, useEffect, useCallback, useRef, type ReactNode } from 'react'
 import type { TelemetryTier } from '../shared/types'
-import { initTelemetry, setTelemetryTier as setTelemetryTierInternal, track, startHeartbeat, stopHeartbeat, getPosthogInstance } from './telemetry'
+import { initTelemetry, setTelemetryTier as setTelemetryTierInternal, track, startHeartbeat, stopHeartbeat, startIpcTelemetryBridge, stopIpcTelemetryBridge, getPosthogInstance } from './telemetry'
 
 const SETTINGS_KEY = 'telemetry_tier'
 
@@ -31,6 +31,7 @@ export function TelemetryProvider({ children }: { children: ReactNode }) {
       setTier(t)
       await initTelemetry(t)
       startHeartbeat()
+      startIpcTelemetryBridge()
 
       const ph = await getPosthogInstance()
       if (ph) {
@@ -45,7 +46,7 @@ export function TelemetryProvider({ children }: { children: ReactNode }) {
       }
     })
 
-    return () => stopHeartbeat()
+    return () => { stopHeartbeat(); stopIpcTelemetryBridge() }
   }, [])
 
   const changeTier = useCallback((newTier: TelemetryTier) => {

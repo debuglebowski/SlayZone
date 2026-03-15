@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
+import { track } from '@slayzone/telemetry/client'
 import { Search, ALargeSmall, Regex, Loader2, ChevronRight, ChevronDown } from 'lucide-react'
 import type { FileSearchResult } from '../shared'
 import { FileIcon } from './FileIcon'
@@ -37,6 +38,7 @@ export function SearchPanel({ projectPath, onOpenFile }: SearchPanelProps) {
         const res = await window.api.fs.searchFiles(projectPath, query, { matchCase, regex: useRegex })
         setResults(res)
         setCollapsed(new Set())
+        track('file_search_used', { had_results: res.length > 0 })
       } catch {
         setResults([])
       } finally {

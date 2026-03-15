@@ -37,8 +37,9 @@ export function DataSettingsTab() {
             onClick={async () => {
               const result = await window.api.exportImport.exportProject(exportProjectId)
               if (result.canceled) return
-              if (result.success) toast.success(`Exported to ${result.path}`)
-              else toast.error(`Export failed: ${result.error}`)
+              if (result.success) {
+                toast.success(`Exported to ${result.path}`)
+              } else toast.error(`Export failed: ${result.error}`)
             }}
           >
             Export Project

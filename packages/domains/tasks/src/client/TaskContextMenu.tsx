@@ -25,6 +25,7 @@ import {
 import type { Task, TaskStatus } from '@slayzone/task/shared'
 import type { Project } from '@slayzone/projects/shared'
 import type { ColumnConfig } from '@slayzone/projects/shared'
+import { track } from '@slayzone/telemetry/client'
 
 interface TaskContextMenuProps {
   task: Task
@@ -58,22 +59,27 @@ export function TaskContextMenu({
   const statusOptions = buildStatusOptions(columns)
 
   const handleStatusChange = (status: string): void => {
+    track('task_status_changed', { from: task.status, to: status })
     onUpdateTask(task.id, { status: status as TaskStatus })
   }
 
   const handlePriorityChange = (priority: string): void => {
+    track('task_priority_changed', { priority })
     onUpdateTask(task.id, { priority: parseInt(priority, 10) })
   }
 
   const handleProjectChange = (projectId: string): void => {
+    track('task_moved_to_project')
     onUpdateTask(task.id, { project_id: projectId })
   }
 
   const handleCopyTitle = async (): Promise<void> => {
+    track('copy_title')
     await navigator.clipboard.writeText(task.title)
   }
 
   const handleCopyLink = async (): Promise<void> => {
+    track('copy_link')
     await navigator.clipboard.writeText(`slayzone://task/${task.id}`)
   }
 
@@ -83,6 +89,7 @@ export function TaskContextMenu({
   }
 
   const handleDeleteConfirm = (): void => {
+    track('task_deleted', { was_temporary: Boolean(task.is_temporary) })
     onDeleteTask(task.id)
     setDeleteDialogOpen(false)
   }

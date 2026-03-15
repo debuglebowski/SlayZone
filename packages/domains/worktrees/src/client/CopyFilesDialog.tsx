@@ -5,7 +5,6 @@ import {
   Button, Checkbox
 } from '@slayzone/ui'
 import { cn } from '@slayzone/ui'
-import { track } from '@slayzone/telemetry/client'
 import type { IgnoredFileNode } from '../shared/types'
 
 export type CopyChoice =
@@ -148,7 +147,6 @@ export function CopyFilesDialog({ open, onOpenChange, repoPath, onConfirm }: Cop
     const choice: CopyChoice = mode === 'custom'
       ? { mode: 'custom', paths: [...selected] }
       : { mode }
-    track('worktree_files_copied')
     onConfirm(choice, remember)
   }
 

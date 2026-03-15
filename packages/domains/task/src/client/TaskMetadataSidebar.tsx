@@ -23,6 +23,7 @@ import {
   cn
 } from '@slayzone/ui'
 import { toast } from '@slayzone/ui'
+import { track } from '@slayzone/telemetry/client'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@slayzone/ui'
 import { ProjectSelect } from '@slayzone/projects'
 
@@ -81,27 +82,35 @@ export function TaskMetadataSidebar({
   const statusOptions = buildStatusOptions(selectedProject?.columns_config)
 
   const handleStatusChange = async (status: string): Promise<void> => {
+    track('task_status_changed', { from: task.status, to: status })
+    if (isTerminalStatus(status, selectedProject?.columns_config)) {
+      track('task_completed', { provider: task.terminal_mode ?? 'terminal', had_worktree: Boolean(task.worktree_path) })
+    }
     const updated = await window.api.db.updateTask({ id: task.id, status })
     onUpdate(updated)
   }
 
   const handleProjectChange = async (projectId: string): Promise<void> => {
+    track('task_moved_to_project')
     const updated = await window.api.db.updateTask({ id: task.id, projectId })
     onUpdate(updated)
   }
 
   const handlePriorityChange = async (priority: number): Promise<void> => {
+    track('task_priority_changed', { priority: String(priority) })
     const updated = await window.api.db.updateTask({ id: task.id, priority })
     onUpdate(updated)
   }
 
   const handleDueDateChange = async (date: Date | undefined): Promise<void> => {
+    track('due_date_set')
     const dueDate = date ? format(date, 'yyyy-MM-dd') : undefined
     const updated = await window.api.db.updateTask({ id: task.id, dueDate })
     onUpdate(updated)
   }
 
   const handleTagToggle = async (tagId: string, checked: boolean): Promise<void> => {
+    if (checked) track('tag_assigned')
     const newTagIds = checked ? [...taskTagIds, tagId] : taskTagIds.filter((id) => id !== tagId)
     await window.api.taskTags.setTagsForTask(task.id, newTagIds)
     onTagsChange(newTagIds)

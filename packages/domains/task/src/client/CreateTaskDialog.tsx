@@ -8,6 +8,7 @@ import type { Tag } from '@slayzone/tags/shared'
 import type { Project } from '@slayzone/projects/shared'
 import { getDefaultStatus } from '@slayzone/projects/shared'
 import { SuccessToast } from '@slayzone/ui'
+import { track } from '@slayzone/telemetry/client'
 import {
   createTaskSchema,
   type CreateTaskFormData,
@@ -148,6 +149,9 @@ export function CreateTaskDialog({
       window.alert('Task created, but worktree auto-create failed. You can add one from the Git panel.')
     }
 
+    if (shouldAutoCreateWorktree && task.worktree_path) {
+      track('worktree_created', { auto_vs_manual: 'auto' })
+    }
     if (opts?.andOpen && onCreatedAndOpen) {
       onCreatedAndOpen(task)
     } else {
@@ -383,6 +387,7 @@ export function CreateTaskDialog({
                                   name: newTagName.trim(),
                                   color: '#6366f1'
                                 })
+                                track('tag_created')
                                 onTagCreated?.(tag)
                                 field.onChange([...field.value, tag.id])
                                 setNewTagName('')

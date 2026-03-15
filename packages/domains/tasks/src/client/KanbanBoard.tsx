@@ -25,6 +25,7 @@ import { KanbanCard } from './KanbanCard'
 import { KanbanPicker } from './KanbanPicker'
 import { useKanbanKeyboard } from './useKanbanKeyboard'
 import { useAppearance } from '@slayzone/settings/client'
+import { track } from '@slayzone/telemetry/client'
 
 interface KanbanBoardProps {
   tasks: Task[]
@@ -172,6 +173,8 @@ export function KanbanBoard({
     if (targetColumn.id === '__unknown__') return
 
     const isSameColumn = currentColumn.id === targetColumn.id
+
+    track('kanban_drag_drop')
 
     if (isSameColumn) {
       if (sortBy === 'priority') {

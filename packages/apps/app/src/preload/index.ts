@@ -254,6 +254,11 @@ const api: ElectronAPI = {
       ipcRenderer.on('pty:dev-server-detected', handler)
       return () => ipcRenderer.removeListener('pty:dev-server-detected', handler)
     },
+    onStats: (cb) => {
+      const handler = (_event: unknown, stats: Record<string, import('@slayzone/types').ProcessStats>) => cb(stats)
+      ipcRenderer.on('pty:stats', handler)
+      return () => ipcRenderer.removeListener('pty:stats', handler)
+    },
     getState: (sessionId: string) => ipcRenderer.invoke('pty:getState', sessionId),
     validate: (mode: string) => ipcRenderer.invoke('pty:validate', mode)
   },
@@ -364,6 +369,13 @@ const api: ElectronAPI = {
     export: (request) => ipcRenderer.invoke('diagnostics:export', request),
     recordClientError: (input) => ipcRenderer.invoke('diagnostics:recordClientError', input),
     recordClientEvent: (input) => ipcRenderer.invoke('diagnostics:recordClientEvent', input)
+  },
+  telemetry: {
+    onIpcEvent: (callback: (event: string, props: Record<string, unknown>) => void) => {
+      const handler = (_: unknown, event: string, props: Record<string, unknown>) => callback(event, props)
+      ipcRenderer.on('telemetry:ipc-event', handler)
+      return () => ipcRenderer.removeListener('telemetry:ipc-event', handler)
+    }
   },
   aiConfig: {
     listItems: (input) => ipcRenderer.invoke('ai-config:list-items', input),

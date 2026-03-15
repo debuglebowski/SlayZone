@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
 import type { Theme, ThemePreference } from '@slayzone/settings/shared'
+import { track } from '@slayzone/telemetry/client'
 import { applyTheme } from './apply-theme'
 
 interface ThemeContextValue {
@@ -52,6 +53,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     setPreferenceState(nextPreference)
     setTheme(effective)
     applyTheme(effective)
+    track('theme_changed', { mode: nextPreference as 'light' | 'dark' | 'system' })
   }
 
   const value = useMemo<ThemeContextValue>(() => ({

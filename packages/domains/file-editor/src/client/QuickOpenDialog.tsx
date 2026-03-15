@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
+import { track } from '@slayzone/telemetry/client'
 import {
   Command,
   CommandEmpty,
@@ -89,6 +90,7 @@ export function QuickOpenDialog({ open, onOpenChange, projectPath, onOpenFile, r
                     key={filePath}
                     value={filePath}
                     onSelect={() => {
+                      track('quick_open_used')
                       onOpenFile(filePath)
                       onOpenChange(false)
                     }}

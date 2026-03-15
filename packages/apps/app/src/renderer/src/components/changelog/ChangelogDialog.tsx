@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import * as Collapsible from '@radix-ui/react-collapsible'
 import {
@@ -9,6 +10,7 @@ import {
   cn,
 } from '@slayzone/ui'
 import { Sparkles, Zap, Bug, ChevronRight } from 'lucide-react'
+import { track } from '@slayzone/telemetry/client'
 import { CHANGELOG, type ChangelogEntry, type ChangeCategory } from './changelog-data'
 
 interface Props {
@@ -23,6 +25,7 @@ const categoryConfig: Record<ChangeCategory, { label: string; icon: typeof Spark
 }
 
 export function ChangelogDialog({ open, onOpenChange }: Props) {
+  useEffect(() => { if (open) track('changelog_viewed') }, [open])
   const entries = CHANGELOG.slice(0, 6)
 
   return (

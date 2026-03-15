@@ -4,5 +4,7 @@ export {
   stopDiagnostics,
   recordDiagnosticEvent,
   getDiagnosticsConfig,
+  setIpcSuccessHook,
+  type IpcSuccessHook,
   type DiagnosticsEventRow
 } from './service'

@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useCallback, forwardRef, useImperativeHandle } from 'react'
+import { track } from '@slayzone/telemetry/client'
 import { ArrowLeft, ArrowRight, RotateCw, X, Plus, Import, Smartphone, Monitor, Tablet, LayoutGrid, ChevronDown, Crosshair, Bug, Sun, Moon, PaintbrushVertical } from 'lucide-react'
 import type { BrowserTabTheme } from '../shared'
 import {
@@ -172,6 +173,7 @@ export const BrowserPanel = forwardRef<BrowserPanelHandle, BrowserPanelProps>(fu
     if (!activeTab) return
     const entering = !multiDeviceMode
     if (!entering) setWebviewReady(false) // reset — single webview will remount
+    track('browser_multidevice_toggled')
     updateActiveTab({
       multiDeviceMode: entering,
       ...(entering && !activeTab.multiDeviceConfig ? { multiDeviceConfig: defaultMultiDeviceConfig(browserDeviceDefaults) } : {}),
@@ -232,6 +234,7 @@ export const BrowserPanel = forwardRef<BrowserPanelHandle, BrowserPanelProps>(fu
       tabs: [...tabs.tabs, newTab],
       activeTabId: newTab.id
     })
+    track('web_panel_tab_added', { predefined_vs_custom: 'custom' })
   }, [tabs, onTabsChange, newTabUrl])
 
   const closeTab = useCallback((tabId: string) => {
@@ -243,12 +246,14 @@ export const BrowserPanel = forwardRef<BrowserPanelHandle, BrowserPanelProps>(fu
       if (newTabs.length === 0) {
         const newTab: BrowserTab = { id: generateTabId(), url: newTabUrl, title: newTabUrl === 'about:blank' ? 'New Tab' : newTabUrl }
         onTabsChange({ tabs: [newTab], activeTabId: newTab.id })
+        track('browser_tab_closed')
         return
       }
       newActiveId = newTabs[Math.min(idx, newTabs.length - 1)]?.id || null
     }
 
     onTabsChange({ tabs: newTabs, activeTabId: newActiveId })
+    track('browser_tab_closed')
   }, [tabs, onTabsChange, newTabUrl])
 
   const switchToTab = useCallback((tabId: string) => {
@@ -588,6 +593,7 @@ export const BrowserPanel = forwardRef<BrowserPanelHandle, BrowserPanelProps>(fu
       setDevToolsStatus('No active webview')
       return
     }
+    track('browser_devtools_toggled')
 
     void (async () => {
       try {
@@ -795,7 +801,7 @@ export const BrowserPanel = forwardRef<BrowserPanelHandle, BrowserPanelProps>(fu
         <Tooltip>
           <TooltipTrigger asChild>
             <span>
-              <IconButton aria-label="Back" variant="ghost" size="icon-sm" disabled={!canGoBack || multiDeviceMode} onClick={() => webviewRef.current?.goBack()}>
+              <IconButton aria-label="Back" variant="ghost" size="icon-sm" disabled={!canGoBack || multiDeviceMode} onClick={() => { webviewRef.current?.goBack(); track('browser_navigated') }}>
                 <ArrowLeft className="size-4" />
               </IconButton>
             </span>
@@ -805,7 +811,7 @@ export const BrowserPanel = forwardRef<BrowserPanelHandle, BrowserPanelProps>(fu
         <Tooltip>
           <TooltipTrigger asChild>
             <span>
-              <IconButton aria-label="Forward" variant="ghost" size="icon-sm" disabled={!canGoForward || multiDeviceMode} onClick={() => webviewRef.current?.goForward()}>
+              <IconButton aria-label="Forward" variant="ghost" size="icon-sm" disabled={!canGoForward || multiDeviceMode} onClick={() => { webviewRef.current?.goForward(); track('browser_navigated') }}>
                 <ArrowRight className="size-4" />
               </IconButton>
             </span>
@@ -832,6 +838,7 @@ export const BrowserPanel = forwardRef<BrowserPanelHandle, BrowserPanelProps>(fu
                       } else {
                         webviewRef.current?.reload()
                       }
+                      track('browser_navigated')
                     }}
                   >
                     {isLoading && !multiDeviceMode ? <X className="size-4" /> : <RotateCw className="size-4" />}

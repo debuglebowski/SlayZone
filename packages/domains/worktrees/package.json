@@ -18,6 +18,7 @@
     "@codemirror/lang-javascript": "^6.2.3",
     "@codemirror/state": "^6.5.2",
     "@slayzone/diagnostics": "workspace:*",
+    "@slayzone/telemetry": "workspace:*",
     "@slayzone/projects": "workspace:*",
     "@slayzone/settings": "workspace:*",
     "@slayzone/task": "workspace:*",

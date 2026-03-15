@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { AlertTriangle, CheckCheck, Github, Lock, LogOut, RefreshCw, Sparkles } from 'lucide-react'
 import { Button, IconButton, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@slayzone/ui'
 import { useMutation, useQuery } from 'convex/react'
 import { useLeaderboardAuth } from '@/lib/convexAuth'
+import { track } from '@slayzone/telemetry/client'
 import { api } from 'convex/_generated/api'
 
 type Period = 'daily' | 'weekly' | 'monthly' | 'all-time'
@@ -72,6 +73,8 @@ function hasResolvedGithubIdentity(viewer: ViewerProfile | null): boolean {
 }
 
 export function LeaderboardPage(): React.JSX.Element {
+  const tracked = useRef(false)
+  useEffect(() => { if (!tracked.current) { tracked.current = true; track('leaderboard_viewed') } }, [])
   const auth = useLeaderboardAuth()
   if (!auth.configured) {
     return (

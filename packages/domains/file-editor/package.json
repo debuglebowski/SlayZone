@@ -28,6 +28,7 @@
     "@codemirror/theme-one-dark": "^6.1.2",
     "@codemirror/view": "^6.36.5",
     "@slayzone/settings": "workspace:*",
+    "@slayzone/telemetry": "workspace:*",
     "@slayzone/ui": "workspace:*",
     "codemirror": "^6.0.1",
     "highlight.js": "^11.11.1",

@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
+import { track } from '@slayzone/telemetry/client'
 import {
   FilePlus,
   FolderPlus,
@@ -119,8 +120,10 @@ export function EditorFileTree({ projectPath, onOpenFile, onFileRenamed, activeF
       try {
         if (creating.type === 'file') {
           await window.api.fs.createFile(projectPath, newPath)
+          track('file_created')
         } else {
           await window.api.fs.createDir(projectPath, newPath)
+          track('folder_created')
         }
         await loadDir(creating.parentPath)
         if (creating.type === 'file') {
@@ -144,6 +147,7 @@ export function EditorFileTree({ projectPath, onOpenFile, onFileRenamed, activeF
       const newPath = parentDir ? `${parentDir}/${newName.trim()}` : newName.trim()
       try {
         await window.api.fs.rename(projectPath, oldPath, newPath)
+        track('file_renamed')
         onFileRenamed?.(oldPath, newPath)
         await loadDir(parentDir)
       } catch (err) {
@@ -158,6 +162,7 @@ export function EditorFileTree({ projectPath, onOpenFile, onFileRenamed, activeF
     async (entry: DirEntry) => {
       try {
         await window.api.fs.delete(projectPath, entry.path)
+        track('file_deleted')
         const parentDir = entry.path.includes('/') ? entry.path.slice(0, entry.path.lastIndexOf('/')) : ''
         await loadDir(parentDir)
       } catch (err) {

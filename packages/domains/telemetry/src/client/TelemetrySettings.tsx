@@ -1,6 +1,7 @@
 import { Label } from '@slayzone/ui'
 import { Switch } from '@slayzone/ui'
 import type { TelemetryTier } from '../shared/types'
+import { track } from './telemetry'
 
 interface TelemetrySettingsProps {
   tier: TelemetryTier
@@ -31,7 +32,11 @@ export function TelemetrySettings({ tier, onTierChange }: TelemetrySettingsProps
           <Switch
             id="telemetry-opt-in"
             checked={isOptedIn}
-            onCheckedChange={(checked: boolean) => onTierChange(checked ? 'opted_in' : 'anonymous')}
+            onCheckedChange={(checked: boolean) => {
+              const newTier = checked ? 'opted_in' : 'anonymous'
+              track('telemetry_tier_changed', { tier: newTier })
+              onTierChange(newTier)
+            }}
           />
           <label htmlFor="telemetry-opt-in" className="text-sm cursor-pointer">
             Help improve SlayZone

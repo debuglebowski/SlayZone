@@ -4,7 +4,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@slayzone/ui'
 import { Button, IconButton } from '@slayzone/ui'
 import { Input } from '@slayzone/ui'
 import { Label } from '@slayzone/ui'
-
 interface CreateWorktreeDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void

@@ -26,6 +26,7 @@ import { getTerminalThemeById, terminalThemes } from './terminal-themes'
 import { TerminalSearchBar } from './TerminalSearchBar'
 import type { TerminalMode, TerminalState } from '@slayzone/terminal/shared'
 import { stripUnderlineCodes } from '@slayzone/terminal/shared'
+import { track } from '@slayzone/telemetry/client'
 
 // Wait for container to have non-zero dimensions before opening terminal
 function waitForDimensions(
@@ -191,6 +192,7 @@ export const Terminal = forwardRef<TerminalHandle, TerminalProps>(function Termi
     if (e.ctrlKey && e.key === 'Tab') return false
     if ((e.metaKey || e.ctrlKey) && e.key === 'f' && e.type === 'keydown') {
       setSearchOpen(true)
+      track('terminal_search_used')
       return false
     }
     if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === 'k' && e.type === 'keydown') {

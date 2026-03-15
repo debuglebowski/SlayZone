@@ -7,6 +7,7 @@ import { Switch } from '@slayzone/ui'
 import { Label } from '@slayzone/ui'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@slayzone/ui'
 import { ListFilter, SlidersHorizontal, LayoutList, Kanban } from 'lucide-react'
+import { track } from '@slayzone/telemetry/client'
 
 interface FilterBarBProps {
   filter: FilterState
@@ -100,7 +101,10 @@ export function FilterBarB({ filter, onChange, tags }: FilterBarBProps): React.J
                             ? 'bg-foreground text-background'
                             : 'border border-border/50 text-muted-foreground hover:text-foreground hover:bg-accent'
                         }`}
-                        onClick={() => onChange({ ...filter, priority: isActive ? null : parseInt(opt.value, 10) })}
+                        onClick={() => {
+                          track('filter_applied', { type: 'priority' })
+                          onChange({ ...filter, priority: isActive ? null : parseInt(opt.value, 10) })
+                        }}
                       >
                         {opt.label}
                       </button>
@@ -123,7 +127,10 @@ export function FilterBarB({ filter, onChange, tags }: FilterBarBProps): React.J
                             ? 'bg-foreground text-background'
                             : 'border border-border/50 text-muted-foreground hover:text-foreground hover:bg-accent'
                         }`}
-                        onClick={() => onChange({ ...filter, dueDateRange: isActive ? 'all' : opt.value })}
+                        onClick={() => {
+                          track('filter_applied', { type: 'due_date' })
+                          onChange({ ...filter, dueDateRange: isActive ? 'all' : opt.value })
+                        }}
                       >
                         {opt.label}
                       </button>
@@ -148,6 +155,7 @@ export function FilterBarB({ filter, onChange, tags }: FilterBarBProps): React.J
                               : 'border border-border/50 text-muted-foreground hover:text-foreground hover:bg-accent'
                           }`}
                           onClick={() => {
+                            track('filter_applied', { type: 'tag' })
                             const tagIds = isActive
                               ? filter.tagIds.filter((id) => id !== tag.id)
                               : [...filter.tagIds, tag.id]

@@ -1,4 +1,5 @@
 import { useState, useCallback, useRef, useEffect } from 'react'
+import { track } from '@slayzone/telemetry/client'
 import type { EditorOpenFilesState } from '@slayzone/file-editor/shared'
 
 export interface OpenFile {
@@ -149,7 +150,7 @@ export function useFileEditor(
   }, [reloadFile])
 
   // --- Open / close / save ---
-  const openFile = useCallback(async (filePath: string) => {
+  const openFile = useCallback(async (filePath: string, from: 'sidebar' | 'keybind' | 'link' | 'terminal' = 'sidebar') => {
     // Already open — just focus
     const existing = openFiles.find((f) => f.path === filePath)
     if (existing) {
@@ -168,6 +169,7 @@ export function useFileEditor(
           return [...prev, { path: filePath, content: null, originalContent: null, binary: true }]
         })
         setActiveFilePath(filePath)
+        track('editor_file_opened', { from })
         return
       }
 
@@ -178,6 +180,7 @@ export function useFileEditor(
           return [...prev, { path: filePath, content: null, originalContent: null, tooLarge: true, sizeBytes: result.sizeBytes }]
         })
         setActiveFilePath(filePath)
+        track('editor_file_opened', { from })
         return
       }
       setOpenFiles((prev) => {
@@ -185,6 +188,7 @@ export function useFileEditor(
         return [...prev, { path: filePath, content: result.content, originalContent: result.content }]
       })
       setActiveFilePath(filePath)
+      track('editor_file_opened', { from })
     } finally {
       pendingOpen.current = null
     }

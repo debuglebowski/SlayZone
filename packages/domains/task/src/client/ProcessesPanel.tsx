@@ -1,8 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { Play, Square, RotateCcw, Plus, Trash2, ArrowLeft, Cpu, Pencil, FileText, MoreHorizontal, CornerDownLeft, Info } from 'lucide-react'
 import { cn, DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, Tooltip, TooltipTrigger, TooltipContent } from '@slayzone/ui'
-import { track } from '@slayzone/telemetry/client'
-
 type ProcessStatus = 'running' | 'stopped' | 'completed' | 'error'
 
 function Tip({ label, children }: { label: string; children: React.ReactNode }) {
@@ -401,7 +399,6 @@ export function ProcessesPanel({ taskId, projectId, cwd, terminalSessionId }: { 
         await window.api.processes.update(editingId, { label: form.label.trim(), command: form.command.trim(), autoRestart: form.autoRestart, taskId: tid, projectId: pid })
       } else {
         await window.api.processes.create(pid, tid, form.label.trim(), form.command.trim(), cwd ?? '', form.autoRestart)
-        track('process_created')
       }
       await refreshList()
       setEditingId(null)
@@ -449,7 +446,6 @@ export function ProcessesPanel({ taskId, projectId, cwd, terminalSessionId }: { 
   }, [])
 
   const handleStop = useCallback(async (id: string) => {
-    track('process_stopped')
     await window.api.processes.stop(id)
   }, [])
 

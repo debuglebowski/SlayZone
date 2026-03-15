@@ -313,6 +313,14 @@ function buildTraceId(channel: string, tsMs: number): string {
   return `${channel}:${tsMs}:${Math.random().toString(36).slice(2, 8)}`
 }
 
+export type IpcSuccessHook = (channel: string, args: unknown[], result: unknown) => void
+
+let ipcSuccessHook: IpcSuccessHook | null = null
+
+export function setIpcSuccessHook(hook: IpcSuccessHook): void {
+  ipcSuccessHook = hook
+}
+
 function instrumentIpcMain(ipcMain: IpcMain): void {
   if (isIpcInstrumented) return
   isIpcInstrumented = true
@@ -359,6 +367,8 @@ function instrumentIpcMain(ipcMain: IpcMain): void {
             ...dbMutationEvent
           })
         }
+
+        ipcSuccessHook?.(channel, args, result)
 
         return result
       } catch (error) {

@@ -108,6 +108,7 @@ export function OnboardingDialog({
 
   const handleNext = (): void => {
     if (step === 2) {
+      track('onboarding_provider_selected', { provider: selectedProvider })
       window.api.settings.set('default_terminal_mode', selectedProvider)
     }
     if (step < STEP_COUNT - 1) {

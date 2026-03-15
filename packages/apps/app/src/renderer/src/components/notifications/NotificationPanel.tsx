@@ -1,6 +1,7 @@
 import { useMemo } from 'react'
 import { X } from 'lucide-react'
 import { IconButton, cn, Tooltip, TooltipTrigger, TooltipContent } from '@slayzone/ui'
+import { track } from '@slayzone/telemetry/client'
 import type { AttentionTask } from './useAttentionTasks'
 import type { Project } from '@slayzone/projects/shared'
 import { groupAttentionTasksByStatus } from './grouping'
@@ -88,7 +89,10 @@ export function NotificationPanel({
                   <div
                     key={task.id}
                     className="rounded-lg border bg-card p-3 shadow-sm hover:bg-accent/50 transition-colors cursor-pointer"
-                    onClick={() => onNavigate(task.id)}
+                    onClick={() => {
+                      track('notification_clicked')
+                      onNavigate(task.id)
+                    }}
                   >
                     <div className="flex items-start gap-2">
                       {!filterCurrentProject && (

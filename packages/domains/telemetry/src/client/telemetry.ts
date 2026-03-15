@@ -201,12 +201,32 @@ export async function initTelemetry(tier: TelemetryTier): Promise<void> {
   initialized = true
 }
 
+let ipcCleanup: (() => void) | null = null
+
+export function startIpcTelemetryBridge(): void {
+  if (ipcCleanup) return
+  if (typeof window === 'undefined' || !window.api?.telemetry?.onIpcEvent) return
+  ipcCleanup = window.api.telemetry.onIpcEvent((event, props) => {
+    if (!initialized || !ph) return
+    ph.capture(event, props)
+  })
+}
+
+export function stopIpcTelemetryBridge(): void {
+  ipcCleanup?.()
+  ipcCleanup = null
+}
+
 export function track<E extends TelemetryEventName>(
   event: E,
   ...args: TelemetryEventProps[E] extends Record<string, never> ? [] : [TelemetryEventProps[E]]
 ): void {
   if (!initialized || !ph) return
   ph.capture(event, args[0] as Record<string, unknown> | undefined)
+}
+
+export function trackShortcut(key: string): void {
+  track('keyboard_shortcut_used', { key })
 }
 
 export function setTelemetryTier(tier: TelemetryTier): void {

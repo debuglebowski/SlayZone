@@ -47,16 +47,19 @@ import { registerProjectHandlers } from '@slayzone/projects/main'
 import { configureTaskRuntimeAdapters, registerTaskHandlers, registerFilesHandlers } from '@slayzone/task/main'
 import { registerTagHandlers } from '@slayzone/tags/main'
 import { registerSettingsHandlers, registerThemeHandlers } from '@slayzone/settings/main'
-import { registerPtyHandlers, registerUsageHandlers, killAllPtys, killPtysByTaskId, startIdleChecker, stopIdleChecker, dismissAllNotifications, syncTerminalModes } from '@slayzone/terminal/main'
+import { registerPtyHandlers, registerUsageHandlers, killAllPtys, killPtysByTaskId, startIdleChecker, stopIdleChecker, dismissAllNotifications, syncTerminalModes, getPtyPids } from '@slayzone/terminal/main'
 import { registerTerminalTabsHandlers } from '@slayzone/task-terminals/main'
 import { registerWorktreeHandlers } from '@slayzone/worktrees/main'
-import { registerDiagnosticsHandlers, registerProcessDiagnostics, recordDiagnosticEvent, stopDiagnostics } from '@slayzone/diagnostics/main'
+import { registerDiagnosticsHandlers, registerProcessDiagnostics, recordDiagnosticEvent, stopDiagnostics, setIpcSuccessHook } from '@slayzone/diagnostics/main'
+import { IPC_TELEMETRY_MAP } from '@slayzone/telemetry/shared'
 import { registerAiConfigHandlers } from '@slayzone/ai-config/main'
 import { registerIntegrationHandlers, ensureIntegrationSchema, startSyncPoller, pushTaskAfterEdit, pushNewTaskToProviders, pushArchiveToProviders, pushUnarchiveToProviders, startDiscoveryPoller, resetSyncFlags } from '@slayzone/integrations/main'
 import { registerFileEditorHandlers, closeAllWatchers } from '@slayzone/file-editor/main'
 import { registerTestPanelHandlers } from '@slayzone/test-panel/main'
+import { registerUsageAnalyticsHandlers } from '@slayzone/usage-analytics/main'
 import { registerScreenshotHandlers } from './screenshot'
 import { setProcessManagerWindow, initProcessManager, createProcess, spawnProcess, updateProcess, stopProcess, killProcess, restartProcess, listForTask, listAllProcesses, killTaskProcesses, killAllProcesses } from './process-manager'
+import { createStatsPoller } from './pid-stats'
 import { registerExportImportHandlers } from './export-import'
 import { registerLeaderboardHandlers } from './leaderboard'
 import { initAutoUpdater, checkForUpdates, restartForUpdate } from './auto-updater'
@@ -905,6 +908,13 @@ app.whenReady().then(async () => {
 
   // Register diagnostics first so IPC handlers below are instrumented.
   registerDiagnosticsHandlers(ipcMain, db, diagDb)
+  setIpcSuccessHook((channel, args, result) => {
+    const entry = IPC_TELEMETRY_MAP[channel]
+    if (!entry) return
+    const props = entry.props(args, result)
+    if (props === undefined) return
+    mainWindow?.webContents.send('telemetry:ipc-event', entry.event, props)
+  })
   logBoot('diagnostics IPC registered')
 
   configureTaskRuntimeAdapters({
@@ -990,6 +1000,7 @@ app.whenReady().then(async () => {
   registerExportImportHandlers(ipcMain, db, isPlaywright)
   registerLeaderboardHandlers(ipcMain, db)
   registerTestPanelHandlers(ipcMain, db)
+  registerUsageAnalyticsHandlers(ipcMain, db)
   registerBackupHandlers(ipcMain, db)
   startAutoBackup(db)
   logBoot('domain IPC handlers registered')
@@ -1763,6 +1774,13 @@ app.whenReady().then(async () => {
   createWindow()
   logBoot('windows created')
   if (mainWindow) setProcessManagerWindow(mainWindow)
+
+  // PTY stats poller — polls CPU/memory for active terminal sessions
+  const ptyStatsPoller = createStatsPoller(
+    () => getPtyPids(),
+    (stats) => { mainWindow?.webContents.send('pty:stats', stats) }
+  )
+  ptyStatsPoller.start()
 
   // Register process IPC handlers (dev only — no-ops in production via import.meta.env.DEV gate on renderer side)
   ipcMain.handle('processes:create', (_event, projectId: string | null, taskId: string | null, label: string, command: string, cwd: string, autoRestart: boolean) => {

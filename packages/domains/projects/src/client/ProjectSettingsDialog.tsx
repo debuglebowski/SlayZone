@@ -4,6 +4,7 @@ import { SettingsLayout } from '@slayzone/ui'
 import type { Project } from '@slayzone/projects/shared'
 import type { IntegrationProvider } from '@slayzone/integrations/shared'
 import type { GlobalContextManagerSection } from '../../../ai-config/src/client/ContextManagerSettings'
+import { track } from '@slayzone/telemetry/client'
 import { GeneralTab } from './GeneralTab'
 import { EnvironmentTab } from './EnvironmentTab'
 import { ColumnsTab } from './ColumnsTab'
@@ -108,7 +109,11 @@ export function ProjectSettingsDialog({
         <SettingsLayout
           items={navItems}
           activeKey={activeTab}
-          onSelect={(key) => setActiveTab(key as typeof activeTab)}
+          onSelect={(key) => {
+            const tab = key as typeof activeTab
+            track('project_settings_tab_viewed', { tab })
+            setActiveTab(tab)
+          }}
         >
           {activeTab === 'general' && project && (
             <GeneralTab

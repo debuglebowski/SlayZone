@@ -9,6 +9,7 @@ import {
   TooltipContent
 } from '@slayzone/ui'
 import type { GroupKey } from './FilterState'
+import { track } from '@slayzone/telemetry/client'
 
 interface GroupBySelectProps {
   value: GroupKey
@@ -25,7 +26,10 @@ export function GroupBySelect({ value, onChange }: GroupBySelectProps): React.JS
   return (
     <Tooltip>
       <TooltipTrigger asChild>
-        <Select value={value} onValueChange={(v) => onChange(v as GroupKey)}>
+        <Select value={value} onValueChange={(v) => {
+          track('group_by_changed', { field: v })
+          onChange(v as GroupKey)
+        }}>
           <SelectTrigger className="w-[120px]" size="sm">
             <SelectValue placeholder="Group by" />
           </SelectTrigger>

@@ -364,6 +364,7 @@ export interface ElectronAPI {
     onPrompt: (callback: (sessionId: string, prompt: PromptInfo) => void) => () => void
     onSessionDetected: (callback: (sessionId: string, conversationId: string) => void) => () => void
     onDevServerDetected: (callback: (sessionId: string, url: string) => void) => () => void
+    onStats: (cb: (stats: Record<string, ProcessStats>) => void) => () => void
     getState: (sessionId: string) => Promise<TerminalState | null>
     validate: (mode: TerminalMode) => Promise<ValidationResult[]>
     setTheme: (theme: { foreground: string; background: string; cursor: string }) => Promise<void>
@@ -475,6 +476,9 @@ export interface ElectronAPI {
     export: (request: DiagnosticsExportRequest) => Promise<DiagnosticsExportResult>
     recordClientError: (input: ClientErrorEventInput) => Promise<void>
     recordClientEvent: (input: ClientDiagnosticEventInput) => Promise<void>
+  }
+  telemetry: {
+    onIpcEvent: (callback: (event: string, props: Record<string, unknown>) => void) => () => void
   }
   aiConfig: {
     listItems: (input: ListAiConfigItemsInput) => Promise<AiConfigItem[]>

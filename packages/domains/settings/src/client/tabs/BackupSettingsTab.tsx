@@ -26,6 +26,7 @@ import {
   toast
 } from '@slayzone/ui'
 import type { BackupInfo, BackupSettings } from '@slayzone/types'
+import { track } from '@slayzone/telemetry/client'
 import { SettingsTabIntro } from './SettingsTabIntro'
 
 const INTERVAL_OPTIONS = [
@@ -155,7 +156,10 @@ export function BackupSettingsTab() {
           <div className="flex items-center gap-3">
             <Switch
               checked={settings.autoEnabled}
-              onCheckedChange={(checked) => updateSettings({ autoEnabled: checked })}
+              onCheckedChange={(checked) => {
+                track('auto_backup_toggled')
+                updateSettings({ autoEnabled: checked })
+              }}
             />
             <span className="text-sm">Enable automatic backups</span>
           </div>

@@ -31,7 +31,7 @@ import {
 import { useTabStore, AppearanceProvider, type Tab } from '@slayzone/settings'
 import { OnboardingDialog } from '@slayzone/onboarding'
 import { TestPanel } from '@slayzone/test-panel'
-import { track } from '@slayzone/telemetry/client'
+import { track, trackShortcut } from '@slayzone/telemetry/client'
 import { usePty } from '@slayzone/terminal/client'
 import type { TerminalState } from '@slayzone/terminal/shared'
 // Shared
@@ -59,6 +59,7 @@ import { ChangelogDialog } from '@/components/changelog/ChangelogDialog'
 import { useChangelogAutoOpen } from '@/components/changelog/useChangelogAutoOpen'
 import { TabBar } from '@/components/tabs/TabBar'
 import { LeaderboardPage } from '@/components/leaderboard/LeaderboardPage'
+import { UsageAnalyticsPage } from '@slayzone/usage-analytics/client'
 import { recordDiagnosticsTimeline, updateDiagnosticsContext } from '@/lib/diagnosticsClient'
 import {
   DesktopNotificationToggle,
@@ -727,6 +728,7 @@ function App(): React.JSX.Element {
   useHotkeys('mod+n', (e) => {
     if (projects.length > 0) {
       e.preventDefault()
+      trackShortcut('mod+n')
       setCreateOpen(true)
     }
   }, { enableOnFormTags: true })
@@ -734,6 +736,7 @@ function App(): React.JSX.Element {
 
   useHotkeys('mod+k', (e) => {
     e.preventDefault()
+    trackShortcut('mod+k')
     setSearchOpen(true)
   }, { enableOnFormTags: true })
 
@@ -744,7 +747,7 @@ function App(): React.JSX.Element {
     if (el.closest?.('.cm-editor') || el.closest?.('.xterm')) return
     e.preventDefault()
     const label = await undo()
-    if (label) toast(`Undid: ${label}`)
+    if (label) { track('undo_used'); toast(`Undid: ${label}`) }
   }, { enableOnFormTags: true })
 
   useHotkeys('mod+shift+z', async (e) => {
@@ -753,7 +756,7 @@ function App(): React.JSX.Element {
     if (el.closest?.('.cm-editor') || el.closest?.('.xterm')) return
     e.preventDefault()
     const label = await redo()
-    if (label) toast(`Redid: ${label}`)
+    if (label) { track('redo_used'); toast(`Redid: ${label}`) }
   }, { enableOnFormTags: true })
 
   // Stable refs so IPC listeners don't need to re-subscribe on every render
@@ -876,6 +879,7 @@ function App(): React.JSX.Element {
 
   useHotkeys('mod+shift+t', (e) => {
     e.preventDefault()
+    track('tab_reopened')
     reopenClosedTab()
   }, { enableOnFormTags: true })
 
@@ -889,12 +893,18 @@ function App(): React.JSX.Element {
 
   useHotkeys('mod+j', (e) => {
     e.preventDefault()
+    track('zen_mode_toggled')
+    trackShortcut('mod+j')
     setZenMode(prev => !prev)
   }, { enableOnFormTags: true })
 
   useHotkeys('mod+shift+e', (e) => {
     e.preventDefault()
-    if (openTaskIds.length >= 2) setExplodeMode(prev => !prev)
+    if (openTaskIds.length >= 2) {
+      track('explode_mode_toggled')
+      trackShortcut('mod+shift+e')
+      setExplodeMode(prev => !prev)
+    }
   }, { enableOnFormTags: true })
 
   useHotkeys('escape', () => {
@@ -1011,6 +1021,7 @@ function App(): React.JSX.Element {
       status,
       isTemporary: true
     })
+    track('temporary_task_created')
     setTasks((prev) => [task, ...prev])
     setTerminalFocusRequests((prev) => ({ ...prev, [task.id]: (prev[task.id] ?? 0) + 1 }))
     // Eagerly sync new task into lookup so openTask can resolve title + worktree position
@@ -1235,6 +1246,7 @@ function App(): React.JSX.Element {
   }
 
   const handleSidebarSelectProject = (projectId: string): void => {
+    track('project_switched')
     setSelectedProjectId(projectId)
     setActiveTabIndex(0)
   }
@@ -1280,6 +1292,17 @@ function App(): React.JSX.Element {
           onProjectDelete={setDeletingProject}
           onSettings={handleOpenSettings}
           onChangelog={() => setChangelogOpen(true)}
+          onUsageAnalytics={() => {
+            const store = useTabStore.getState()
+            const existing = store.tabs.findIndex((t) => t.type === 'usage-analytics')
+            if (existing >= 0) {
+              setActiveTabIndex(existing)
+            } else {
+              const newTabs = [...store.tabs, { type: 'usage-analytics' as const, title: 'Usage' }]
+              store.setTabs(newTabs)
+              setActiveTabIndex(newTabs.length - 1)
+            }
+          }}
           onTaskClick={openTask}
           zenMode={zenMode}
           onboardingChecklist={onboardingChecklist}
@@ -1386,7 +1409,7 @@ function App(): React.JSX.Element {
                     if (explodeMode && tab.type !== 'task') return null
                     return (
                     <div
-                      key={tab.type === 'home' ? 'home' : tab.type === 'leaderboard' ? 'leaderboard' : tab.taskId}
+                      key={tab.type === 'home' ? 'home' : tab.type === 'leaderboard' ? 'leaderboard' : tab.type === 'usage-analytics' ? 'usage-analytics' : tab.taskId}
                       className={
                         explodeMode
                           ? "rounded overflow-hidden border border-border min-h-0 relative"
@@ -1539,6 +1562,8 @@ function App(): React.JSX.Element {
                         </div>
                         ) : tab.type === 'leaderboard' ? (
                         <LeaderboardPage />
+                        ) : tab.type === 'usage-analytics' ? (
+                        <UsageAnalyticsPage onTaskClick={openTask} />
                         ) : (
                         <Suspense fallback={<div className="flex items-center justify-center h-full text-muted-foreground text-sm">Loading...</div>}>
                         <div className={explodeMode ? "absolute inset-0" : "h-full"}>
