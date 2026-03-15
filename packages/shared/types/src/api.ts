@@ -117,6 +117,11 @@ export interface LocalLeaderboardStats {
 
 export type ProcessStatus = 'running' | 'stopped' | 'completed' | 'error'
 
+export interface ProcessStats {
+  cpu: number   // % of one core
+  rss: number   // kilobytes
+}
+
 export interface ProcessInfo {
   id: string
   taskId: string | null
@@ -130,6 +135,8 @@ export interface ProcessInfo {
   exitCode: number | null
   logBuffer: string[]
   startedAt: string
+  restartCount: number
+  spawnedAt: string | null
 }
 
 export interface DiagnosticsConfig {
@@ -439,7 +446,7 @@ export interface ElectronAPI {
     resolveChildBranches: (path: string, baseBranch: string) => Promise<{ children: string[]; merged: string[] }>
     resolveCopyBehavior: (projectId?: string) => Promise<{ behavior: string; customPaths: string[] }>
     getIgnoredFileTree: (repoPath: string) => Promise<IgnoredFileNode[]>
-    copyIgnoredFiles: (repoPath: string, worktreePath: string, paths: string[]) => Promise<void>
+    copyIgnoredFiles: (repoPath: string, worktreePath: string, paths: string[], mode?: 'all' | 'custom') => Promise<void>
     // GitHub CLI (gh)
     checkGhInstalled: () => Promise<boolean>
     hasGithubRemote: (repoPath: string) => Promise<boolean>
@@ -637,6 +644,7 @@ export interface ElectronAPI {
     killTask: (taskId: string) => Promise<void>
     onLog: (cb: (processId: string, line: string) => void) => () => void
     onStatus: (cb: (processId: string, status: ProcessStatus) => void) => () => void
+    onStats: (cb: (stats: Record<string, ProcessStats>) => void) => () => void
   }
   backup: {
     list: () => Promise<BackupInfo[]>
@@ -667,5 +675,15 @@ export interface ElectronAPI {
     toggleFileLabel: (projectId: string, filePath: string, labelId: string) => Promise<void>
     getFileNotes: (projectId: string) => Promise<TestFileNote[]>
     setFileNote: (projectId: string, filePath: string, note: string) => Promise<void>
+  }
+
+  usageAnalytics: {
+    query: (range: import('@slayzone/usage-analytics/shared').DateRange) => Promise<import('@slayzone/usage-analytics/shared').AnalyticsSummary>
+    refresh: (range: import('@slayzone/usage-analytics/shared').DateRange) => Promise<import('@slayzone/usage-analytics/shared').AnalyticsSummary>
+    taskCost: (taskId: string) => Promise<{
+      costUSD: number
+      totalTokens: number
+      byProvider: Array<{ provider: string; model: string; costUSD: number; totalTokens: number; sessions: number }>
+    }>
   }
 }

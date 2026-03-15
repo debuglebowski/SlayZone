@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { Play, Square, RotateCcw, Plus, Trash2, ArrowLeft, Cpu, Pencil, FileText, MoreHorizontal, CornerDownLeft, Info } from 'lucide-react'
 import { cn, DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, Tooltip, TooltipTrigger, TooltipContent } from '@slayzone/ui'
+import { track } from '@slayzone/telemetry/client'
 
 type ProcessStatus = 'running' | 'stopped' | 'completed' | 'error'
 
@@ -26,6 +27,20 @@ interface ProcessEntry {
   exitCode: number | null
   logBuffer: string[]
   startedAt: string
+  restartCount: number
+  spawnedAt: string | null
+}
+
+function Duration({ since }: { since: string }) {
+  const [, tick] = useState(0)
+  useEffect(() => {
+    const id = setInterval(() => tick(t => t + 1), 1000)
+    return () => clearInterval(id)
+  }, [])
+  const s = Math.floor((Date.now() - new Date(since).getTime()) / 1000)
+  if (s < 60) return <>{s}s</>
+  if (s < 3600) return <>{Math.floor(s / 60)}m {s % 60}s</>
+  return <>{Math.floor(s / 3600)}h {Math.floor((s % 3600) / 60)}m</>
 }
 
 interface AddFormState {
@@ -110,6 +125,7 @@ const EMPTY_FORM: AddFormState = { label: '', command: '', autoRestart: false, s
 function ProcessRow({
   proc,
   expanded,
+  stats,
   onToggleLog,
   onRestart,
   onStop,
@@ -120,6 +136,7 @@ function ProcessRow({
 }: {
   proc: ProcessEntry
   expanded: boolean
+  stats?: { cpu: number; rss: number }
   onToggleLog: () => void
   onRestart: () => void
   onStop: () => void
@@ -147,8 +164,22 @@ function ProcessRow({
           {proc.status === 'error' && proc.exitCode !== null && (
             <span className="text-[10px] text-red-400/70 font-mono">exit {proc.exitCode}</span>
           )}
-          {proc.status === 'running' && proc.pid && (
-            <span className="text-[10px] text-muted-foreground/30 font-mono">pid {proc.pid}</span>
+          {proc.status === 'running' && (
+            <span className="text-[10px] text-muted-foreground/30 font-mono flex items-center gap-1.5">
+              {proc.pid && <span>pid {proc.pid}</span>}
+              {proc.spawnedAt && <><span className="text-muted-foreground/15">·</span><Duration since={proc.spawnedAt} /></>}
+              {stats && (
+                <>
+                  <span className="text-muted-foreground/15">·</span>
+                  <span>{stats.cpu.toFixed(1)}%</span>
+                  <span className="text-muted-foreground/15">·</span>
+                  <span>{stats.rss >= 1024 ? `${(stats.rss / 1024).toFixed(0)} MB` : `${stats.rss} KB`}</span>
+                </>
+              )}
+              {proc.restartCount > 0 && (
+                <><span className="text-muted-foreground/15">·</span><span>↺{proc.restartCount}</span></>
+              )}
+            </span>
           )}
           <StatusBadge status={proc.status} />
         </div>
@@ -266,6 +297,7 @@ export function ProcessesPanel({ taskId, projectId, cwd, terminalSessionId }: { 
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
   const [pkgScripts, setPkgScripts] = useState<SuggestionItem[]>([])
+  const [stats, setStats] = useState<Record<string, { cpu: number; rss: number }>>({})
   const logEndRefs = useRef<Record<string, HTMLDivElement | null>>({})
   const labelRef = useRef<HTMLInputElement>(null)
 
@@ -322,6 +354,11 @@ export function ProcessesPanel({ taskId, projectId, cwd, terminalSessionId }: { 
   }, [])
 
   useEffect(() => {
+    const unsub = window.api.processes.onStats((s) => setStats(s))
+    return unsub
+  }, [])
+
+  useEffect(() => {
     const unsub = window.api.app.onCloseTask((closedTaskId) => {
       if (taskId && closedTaskId === taskId) window.api.processes.killTask(taskId)
     })
@@ -364,6 +401,7 @@ export function ProcessesPanel({ taskId, projectId, cwd, terminalSessionId }: { 
         await window.api.processes.update(editingId, { label: form.label.trim(), command: form.command.trim(), autoRestart: form.autoRestart, taskId: tid, projectId: pid })
       } else {
         await window.api.processes.create(pid, tid, form.label.trim(), form.command.trim(), cwd ?? '', form.autoRestart)
+        track('process_created')
       }
       await refreshList()
       setEditingId(null)
@@ -411,6 +449,7 @@ export function ProcessesPanel({ taskId, projectId, cwd, terminalSessionId }: { 
   }, [])
 
   const handleStop = useCallback(async (id: string) => {
+    track('process_stopped')
     await window.api.processes.stop(id)
   }, [])
 
@@ -516,6 +555,7 @@ export function ProcessesPanel({ taskId, projectId, cwd, terminalSessionId }: { 
                       key={proc.id}
                       proc={proc}
                       expanded={expandedLogs.has(proc.id)}
+                      stats={stats[proc.id]}
                       onToggleLog={() => toggleLog(proc.id)}
                       onRestart={() => void handleRestart(proc.id)}
                       onStop={() => void handleStop(proc.id)}
@@ -535,6 +575,7 @@ export function ProcessesPanel({ taskId, projectId, cwd, terminalSessionId }: { 
                       key={proc.id}
                       proc={proc}
                       expanded={expandedLogs.has(proc.id)}
+                      stats={stats[proc.id]}
                       onToggleLog={() => toggleLog(proc.id)}
                       onRestart={() => void handleRestart(proc.id)}
                       onStop={() => void handleStop(proc.id)}

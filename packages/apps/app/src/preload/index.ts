@@ -336,7 +336,7 @@ const api: ElectronAPI = {
     resolveChildBranches: (path, baseBranch) => ipcRenderer.invoke('git:resolveChildBranches', path, baseBranch),
     resolveCopyBehavior: (projectId?) => ipcRenderer.invoke('git:resolveCopyBehavior', projectId),
     getIgnoredFileTree: (repoPath) => ipcRenderer.invoke('git:getIgnoredFileTree', repoPath),
-    copyIgnoredFiles: (repoPath, worktreePath, paths) => ipcRenderer.invoke('git:copyIgnoredFiles', repoPath, worktreePath, paths),
+    copyIgnoredFiles: (repoPath, worktreePath, paths, mode?) => ipcRenderer.invoke('git:copyIgnoredFiles', repoPath, worktreePath, paths, mode),
     checkGhInstalled: () => ipcRenderer.invoke('git:checkGhInstalled'),
     hasGithubRemote: (repoPath) => ipcRenderer.invoke('git:hasGithubRemote', repoPath),
     listOpenPrs: (repoPath) => ipcRenderer.invoke('git:listOpenPrs', repoPath),
@@ -528,6 +528,11 @@ const api: ElectronAPI = {
       const handler = (_event: unknown, processId: string, status: import('@slayzone/types').ProcessStatus) => cb(processId, status)
       ipcRenderer.on('processes:status', handler)
       return () => ipcRenderer.removeListener('processes:status', handler)
+    },
+    onStats: (cb) => {
+      const handler = (_event: unknown, stats: Record<string, import('@slayzone/types').ProcessStats>) => cb(stats)
+      ipcRenderer.on('processes:stats', handler)
+      return () => ipcRenderer.removeListener('processes:stats', handler)
     }
   },
   integrations: {
@@ -601,6 +606,12 @@ const api: ElectronAPI = {
     toggleFileLabel: (projectId, filePath, labelId) => ipcRenderer.invoke('db:testPanel:toggleFileLabel', projectId, filePath, labelId),
     getFileNotes: (projectId) => ipcRenderer.invoke('db:testPanel:getFileNotes', projectId),
     setFileNote: (projectId, filePath, note) => ipcRenderer.invoke('db:testPanel:setFileNote', projectId, filePath, note)
+  },
+
+  usageAnalytics: {
+    query: (range) => ipcRenderer.invoke('usage-analytics:query', range),
+    refresh: (range) => ipcRenderer.invoke('usage-analytics:refresh', range),
+    taskCost: (taskId) => ipcRenderer.invoke('usage-analytics:task-cost', taskId)
   }
 }
 
