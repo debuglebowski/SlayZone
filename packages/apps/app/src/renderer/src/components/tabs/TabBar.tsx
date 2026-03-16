@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react'
-import { Home, Trophy, X } from 'lucide-react'
+import { Home, Trophy, X, BarChart3 } from 'lucide-react'
 import { cn, Tooltip, TooltipTrigger, TooltipContent, getTerminalStateStyle, projectColorBg } from '@slayzone/ui'
 import type { TerminalState } from '@slayzone/terminal/shared'
 import { useQuery } from 'convex/react'
@@ -25,6 +25,7 @@ import { CSS } from '@dnd-kit/utilities'
 export type Tab =
   | { type: 'home' }
   | { type: 'leaderboard'; title: string }
+  | { type: 'usage-analytics'; title: string }
   | { type: 'task'; taskId: string; title: string; terminalState?: TerminalState; isSubTask?: boolean; isTemporary?: boolean }
 
 interface TabBarProps {
@@ -252,6 +253,7 @@ export function TabBar({
   const activeTab = activeId ? taskTabs.find((t) => t.taskId === activeId) : null
   const homeIndex = tabs.findIndex((t) => t.type === 'home')
   const leaderboardIndex = tabs.findIndex((t) => t.type === 'leaderboard')
+  const usageAnalyticsIndex = tabs.findIndex((t) => t.type === 'usage-analytics')
 
   // Compute group position for each task tab based on consecutive worktree colors
   const groupPositions = useMemo(() => {
@@ -320,6 +322,24 @@ export function TabBar({
         >
           <Home className="h-4 w-4" />
         </div>
+
+        {/* Usage analytics tab */}
+        {usageAnalyticsIndex >= 0 && (
+          <div
+            className={cn(
+              'ml-1 flex items-center gap-1.5 h-7 px-3 rounded-md cursor-pointer transition-colors select-none flex-shrink-0 window-no-drag',
+              'bg-neutral-100 dark:bg-neutral-800/50 hover:bg-neutral-200/80 dark:hover:bg-neutral-700/50',
+              'border',
+              activeIndex === usageAnalyticsIndex
+                ? 'bg-neutral-200 dark:bg-neutral-700 border-neutral-300 dark:border-neutral-600'
+                : 'border-transparent text-neutral-500 dark:text-neutral-400'
+            )}
+            onClick={() => onTabClick(usageAnalyticsIndex)}
+          >
+            <BarChart3 className="h-4 w-4" />
+            <span className="text-xs">Usage</span>
+          </div>
+        )}
 
         {/* Task tabs - sortable, flat DOM for dnd-kit compatibility */}
         <DndContext

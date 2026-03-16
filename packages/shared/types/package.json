@@ -23,6 +23,7 @@
     "@slayzone/task-terminals": "workspace:*",
     "@slayzone/terminal": "workspace:*",
     "@slayzone/test-panel": "workspace:*",
+    "@slayzone/usage-analytics": "workspace:*",
     "@slayzone/worktrees": "workspace:*"
   },
   "devDependencies": {

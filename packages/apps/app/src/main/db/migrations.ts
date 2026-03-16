@@ -1305,6 +1305,47 @@ const migrations: Migration[] = [
     up: (db) => {
       db.exec(`DELETE FROM settings WHERE key = 'shell'`)
     }
+  },
+  {
+    version: 75,
+    up: (db) => {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS usage_records (
+          id TEXT PRIMARY KEY,
+          provider TEXT NOT NULL,
+          model TEXT NOT NULL,
+          session_id TEXT,
+          timestamp TEXT NOT NULL,
+          input_tokens INTEGER NOT NULL DEFAULT 0,
+          output_tokens INTEGER NOT NULL DEFAULT 0,
+          cache_read_tokens INTEGER NOT NULL DEFAULT 0,
+          cache_write_tokens INTEGER NOT NULL DEFAULT 0,
+          reasoning_tokens INTEGER NOT NULL DEFAULT 0,
+          cost_usd REAL,
+          cwd TEXT,
+          task_id TEXT,
+          source_file TEXT NOT NULL,
+          source_offset INTEGER NOT NULL DEFAULT 0
+        );
+        CREATE INDEX IF NOT EXISTS idx_usage_records_timestamp ON usage_records(timestamp);
+        CREATE INDEX IF NOT EXISTS idx_usage_records_task_id ON usage_records(task_id);
+        CREATE INDEX IF NOT EXISTS idx_usage_records_provider ON usage_records(provider);
+
+        CREATE TABLE IF NOT EXISTS usage_parse_state (
+          file_path TEXT PRIMARY KEY,
+          last_offset INTEGER NOT NULL DEFAULT 0,
+          last_modified_ms INTEGER NOT NULL DEFAULT 0
+        );
+      `)
+    }
+  },
+  {
+    version: 76,
+    up: (db) => {
+      // Fix: Codex parser was using cumulative totals instead of per-turn deltas.
+      // Wipe cached data so it re-parses correctly.
+      db.exec(`DELETE FROM usage_records; DELETE FROM usage_parse_state;`)
+    }
   }
 ]
 

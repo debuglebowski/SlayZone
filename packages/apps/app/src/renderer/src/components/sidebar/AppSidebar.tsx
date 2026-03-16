@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Settings, Keyboard, ChevronDown, Megaphone, Check, CheckCheck } from 'lucide-react'
+import { Settings, Keyboard, ChevronDown, Megaphone, Check, CheckCheck, BarChart3 } from 'lucide-react'
 import { isConvexConfigured } from '@/lib/convexAuth'
 import { FeedbackDialog } from '../feedback/FeedbackDialog'
 import { FaRegHandshake } from 'react-icons/fa'
@@ -39,6 +39,7 @@ interface AppSidebarProps {
   onProjectDelete: (project: Project) => void
   onSettings: () => void
   onChangelog: () => void
+  onUsageAnalytics: () => void
   onTaskClick?: (taskId: string) => void
   zenMode?: boolean
   onboardingChecklist: OnboardingChecklistState
@@ -98,6 +99,7 @@ export function AppSidebar({
   onProjectDelete,
   onSettings,
   onChangelog,
+  onUsageAnalytics,
   onTaskClick,
   zenMode,
   onboardingChecklist,
@@ -306,6 +308,20 @@ export function AppSidebar({
                 </div>
               </DialogContent>
             </Dialog>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <IconButton
+                  aria-label="Usage Analytics"
+                  variant="ghost"
+                  size="icon-lg"
+                  onClick={onUsageAnalytics}
+                  className="rounded-lg text-muted-foreground"
+                >
+                  <BarChart3 className="size-5" />
+                </IconButton>
+              </TooltipTrigger>
+              <TooltipContent side="right">Usage</TooltipContent>
+            </Tooltip>
             <Tooltip>
               <TooltipTrigger asChild>
                 <IconButton

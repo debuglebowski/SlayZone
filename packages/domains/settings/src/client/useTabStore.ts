@@ -7,6 +7,7 @@ import type { TaskStatus } from '@slayzone/task/shared'
 export type Tab =
   | { type: 'home' }
   | { type: 'leaderboard'; title: string }
+  | { type: 'usage-analytics'; title: string }
   | { type: 'task'; taskId: string; title: string; status?: TaskStatus; isSubTask?: boolean; isTemporary?: boolean }
 
 type TaskTab = Extract<Tab, { type: 'task' }>

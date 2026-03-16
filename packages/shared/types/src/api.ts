@@ -685,9 +685,8 @@ export interface ElectronAPI {
     query: (range: import('@slayzone/usage-analytics/shared').DateRange) => Promise<import('@slayzone/usage-analytics/shared').AnalyticsSummary>
     refresh: (range: import('@slayzone/usage-analytics/shared').DateRange) => Promise<import('@slayzone/usage-analytics/shared').AnalyticsSummary>
     taskCost: (taskId: string) => Promise<{
-      costUSD: number
       totalTokens: number
-      byProvider: Array<{ provider: string; model: string; costUSD: number; totalTokens: number; sessions: number }>
+      byProvider: Array<{ provider: string; model: string; totalTokens: number; sessions: number }>
     }>
   }
 }

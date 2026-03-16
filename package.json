@@ -9,7 +9,8 @@
       "node-pty"
     ],
     "overrides": {
-      "zod": "^4"
+      "zod": "^4",
+      "d3-shape>d3-path": "^3.1.0"
     }
   },
   "scripts": {
