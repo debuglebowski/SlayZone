@@ -2,7 +2,11 @@ import { useEffect, useRef, useCallback, useState, forwardRef, useImperativeHand
 import { CheckCircle2, XCircle, Loader2 } from 'lucide-react'
 import { Terminal as XTerm } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
+import { toast } from '@slayzone/ui'
 import { WebLinkProvider, FileLinkProvider } from './web-link-provider'
+
+let shownUrlToast = false
+let shownFileToast = false
 import { SerializeAddon } from '@xterm/addon-serialize'
 import { SearchAddon } from '@xterm/addon-search'
 import { WebglAddon } from '@xterm/addon-webgl'
@@ -337,30 +341,38 @@ export const Terminal = forwardRef<TerminalHandle, TerminalProps>(function Termi
 
       // Clickable URLs — pointer cursor on hover, no underline decoration.
       // Underline disabled to avoid persistent-underline bugs with WebGL LinkRenderLayer.
-      // Click → browser panel, Shift+Click → external browser
+      // Click → browser panel, Cmd+Shift+Click → external browser
       const linkProvider = new WebLinkProvider(terminal, (event, uri) => {
-        if (event.shiftKey) {
+        if (event.metaKey && event.shiftKey) {
           void window.api.shell.openExternal(uri)
         } else if (onOpenUrlRef.current) {
           onOpenUrlRef.current(uri)
+          if (!shownUrlToast) {
+            shownUrlToast = true
+            toast('⌘⇧+Click to open in external browser')
+          }
         } else {
           void window.api.shell.openExternal(uri)
         }
       })
       terminal.registerLinkProvider(linkProvider)
 
-      // Clickable file paths — Click → editor panel, Shift+Click → external editor
+      // Clickable file paths — Click → editor panel, Cmd+Shift+Click → external editor
       // Files outside the project path always open externally.
       terminal.registerLinkProvider(new FileLinkProvider(terminal, (event, filePath, _line, _col) => {
         // Resolve relative paths against terminal cwd
         const resolved = filePath.startsWith('/') ? filePath : `${cwd}/${filePath}`
         const isInProject = resolved.startsWith(cwd + '/') || resolved === cwd
-        if (event.shiftKey || !isInProject) {
+        if ((event.metaKey && event.shiftKey) || !isInProject) {
           void window.api.git.revealInFinder(resolved)
         } else if (onOpenFileRef.current) {
           // Pass relative path to editor panel
           const relative = resolved.startsWith(cwd + '/') ? resolved.slice(cwd.length + 1) : filePath
           onOpenFileRef.current(relative)
+          if (!shownFileToast) {
+            shownFileToast = true
+            toast('⌘⇧+Click to open in external editor')
+          }
         } else {
           void window.api.git.revealInFinder(resolved)
         }

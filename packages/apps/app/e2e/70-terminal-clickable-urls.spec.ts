@@ -115,7 +115,7 @@ test.describe('Terminal clickable URLs', () => {
           provider.provideLinks(line, (result) => {
             const match = result?.find((l) => l.text === url)
             if (match) {
-              match.activate(new MouseEvent('click', { shiftKey: true }), match.text)
+              match.activate(new MouseEvent('click', { metaKey: true, shiftKey: true }), match.text)
               resolve(true)
             } else {
               resolve(false)
