@@ -129,7 +129,7 @@ function UsageConfigSection({
 
             {/* Auth Type */}
             <div className="grid grid-cols-[140px_minmax(0,1fr)] items-center gap-4">
-              <FieldLabel label="Auth Type" tip={<><strong>None</strong> — no auth header sent.<br /><strong>Env Variable</strong> — reads a token from an environment variable.<br /><strong>JSON File</strong> — reads a token from a JSON file on disk (e.g. ~/.my-cli/auth.json).</>} />
+              <FieldLabel label="Auth Type" tip={<><strong>None</strong> — no auth header sent.<br /><strong>Env Variable</strong> — reads a token from an environment variable.<br /><strong>JSON File</strong> — reads a token from a JSON file on disk (e.g. ~/.my-cli/auth.json).<br /><strong>Keychain</strong> — reads a token from the macOS Keychain (e.g. CCS profiles).</>} />
               <Select value={config.authType} onValueChange={(v) => update({ authType: v as UsageProviderConfig['authType'] })}>
                 <SelectTrigger size="sm" className="w-full">
                   <SelectValue />
@@ -138,6 +138,7 @@ function UsageConfigSection({
                   <SelectItem value="none">None</SelectItem>
                   <SelectItem value="bearer-env">Env Variable</SelectItem>
                   <SelectItem value="file-json">JSON File</SelectItem>
+                  <SelectItem value="keychain">Keychain</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -182,6 +183,30 @@ function UsageConfigSection({
               </>
             )}
 
+            {/* Auth: Keychain */}
+            {config.authType === 'keychain' && (
+              <>
+                <div className="grid grid-cols-[140px_minmax(0,1fr)] items-center gap-4">
+                  <FieldLabel label="Service Name" tip="The macOS Keychain service name. For CCS profiles, use Claude Code-credentials-<suffix> where <suffix> is the SHA-256 hash prefix of the instance path." />
+                  <DebouncedInput
+                    className="font-mono text-xs"
+                    placeholder="Claude Code-credentials-9f09856a"
+                    value={config.authKeychainService ?? ''}
+                    onValueCommit={(v) => update({ authKeychainService: v })}
+                  />
+                </div>
+                <div className="grid grid-cols-[140px_minmax(0,1fr)] items-center gap-4">
+                  <FieldLabel label="Token Path" tip={<>Dot-path to the token inside the Keychain JSON value. For Claude OAuth, use <code className="text-[10px] px-0.5 bg-white/20 rounded font-mono">claudeAiOauth.accessToken</code>. Leave empty if the value is the token itself.</>} />
+                  <DebouncedInput
+                    className="font-mono text-xs"
+                    placeholder="claudeAiOauth.accessToken"
+                    value={config.authKeychainTokenPath ?? ''}
+                    onValueCommit={(v) => update({ authKeychainTokenPath: v })}
+                  />
+                </div>
+              </>
+            )}
+
             {/* Auth Header (shown for env + file) */}
             {config.authType !== 'none' && (
               <>
@@ -204,6 +229,26 @@ function UsageConfigSection({
                   />
                 </div>
               </>
+            )}
+
+            {/* Extra Headers */}
+            {config.authType !== 'none' && (
+              <div className="grid grid-cols-[140px_minmax(0,1fr)] items-center gap-4">
+                <FieldLabel label="Extra Headers" tip={<>Additional HTTP headers as <code className="text-[10px] px-0.5 bg-white/20 rounded font-mono">key: value</code> pairs, one per line. Example: <code className="text-[10px] px-0.5 bg-white/20 rounded font-mono">anthropic-beta: oauth-2025-04-20</code></>} />
+                <DebouncedInput
+                  className="font-mono text-xs"
+                  placeholder="anthropic-beta: oauth-2025-04-20"
+                  value={config.extraHeaders ? Object.entries(config.extraHeaders).map(([k, v]) => `${k}: ${v}`).join('\n') : ''}
+                  onValueCommit={(v) => {
+                    const headers: Record<string, string> = {}
+                    for (const line of v.split('\n')) {
+                      const idx = line.indexOf(':')
+                      if (idx > 0) headers[line.slice(0, idx).trim()] = line.slice(idx + 1).trim()
+                    }
+                    update({ extraHeaders: Object.keys(headers).length > 0 ? headers : undefined })
+                  }}
+                />
+              </div>
             )}
 
             {/* Response Mapping */}

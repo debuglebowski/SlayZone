@@ -166,10 +166,12 @@ export interface UsageProviderConfig {
   enabled: boolean
   url: string
   method?: 'GET' | 'POST'
-  authType: 'none' | 'bearer-env' | 'file-json'
+  authType: 'none' | 'bearer-env' | 'file-json' | 'keychain'
   authEnvVar?: string
   authFilePath?: string
   authFileTokenPath?: string | string[]  // single path or fallback chain
+  authKeychainService?: string           // macOS Keychain service name
+  authKeychainTokenPath?: string         // dot-path into parsed JSON value, e.g. "claudeAiOauth.accessToken"
   authHeaderName?: string
   authHeaderTemplate?: string
   extraHeaders?: Record<string, string>

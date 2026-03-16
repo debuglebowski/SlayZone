@@ -67,11 +67,11 @@ function getByPath(obj: any, path: string): any {
 
 // ── Claude (Anthropic OAuth API) ─────────────────────────────────────
 
-function getKeychainToken(): Promise<string | null> {
+function getKeychainValue(service: string): Promise<string | null> {
   return new Promise((resolve) => {
     const proc = spawn('security', [
       'find-generic-password',
-      '-s', 'Claude Code-credentials',
+      '-s', service,
       '-w'
     ])
 
@@ -79,16 +79,22 @@ function getKeychainToken(): Promise<string | null> {
     proc.stdout?.on('data', (d) => { out += d.toString() })
     proc.on('close', (code) => {
       if (code !== 0 || !out.trim()) return resolve(null)
-      try {
-        const parsed = JSON.parse(out.trim())
-        resolve(parsed?.claudeAiOauth?.accessToken ?? null)
-      } catch {
-        resolve(null)
-      }
+      resolve(out.trim())
     })
     proc.on('error', () => resolve(null))
 
     setTimeout(() => { proc.kill(); resolve(null) }, TIMEOUT_MS)
+  })
+}
+
+function getKeychainToken(): Promise<string | null> {
+  return getKeychainValue('Claude Code-credentials').then((raw) => {
+    if (!raw) return null
+    try {
+      return JSON.parse(raw)?.claudeAiOauth?.accessToken ?? null
+    } catch {
+      return null
+    }
   })
 }
 
@@ -200,6 +206,25 @@ async function resolveAuth(config: UsageProviderConfig): Promise<Record<string, 
       if (token) break
     }
     if (!token) throw new Error(`Token not found at path: ${paths.join(' | ')}`)
+    const name = config.authHeaderName || 'Authorization'
+    const template = config.authHeaderTemplate || 'Bearer {token}'
+    headers[name] = template.replace('{token}', String(token))
+  }
+
+  if (config.authType === 'keychain' && config.authKeychainService) {
+    const raw = await getKeychainValue(config.authKeychainService)
+    if (!raw) throw new Error(`Keychain entry "${config.authKeychainService}" not found`)
+    let token: string = raw
+    if (config.authKeychainTokenPath) {
+      try {
+        const parsed = JSON.parse(raw)
+        token = getByPath(parsed, config.authKeychainTokenPath) ?? null
+        if (!token) throw new Error(`Token not found at path: ${config.authKeychainTokenPath}`)
+      } catch (e) {
+        if (e instanceof SyntaxError) throw new Error('Keychain value is not valid JSON')
+        throw e
+      }
+    }
     const name = config.authHeaderName || 'Authorization'
     const template = config.authHeaderTemplate || 'Bearer {token}'
     headers[name] = template.replace('{token}', String(token))
