@@ -1,8 +1,9 @@
-import { spawn, execFile } from 'child_process'
+import { spawn } from 'child_process'
 import type { ChildProcess } from 'child_process'
 import { randomUUID } from 'crypto'
 import type { BrowserWindow } from 'electron'
 import type { Database } from 'better-sqlite3'
+import { createStatsPoller } from './pid-stats'
 
 export type ProcessStatus = 'running' | 'stopped' | 'completed' | 'error'
 
@@ -121,7 +122,6 @@ function doSpawn(proc: ManagedProcess): void {
       }, 1000)
     } else {
       setStatus(proc, code === 0 ? 'completed' : 'error')
-      maybeStopStatsPolling()
     }
   })
 }
@@ -197,7 +197,6 @@ export function stopProcess(id: string): boolean {
   proc.spawnedAt = null
   child?.kill()
   setStatus(proc, 'stopped')
-  maybeStopStatsPolling()
   return true
 }
 
@@ -241,90 +240,21 @@ export function listAllProcesses(): ProcessInfo[] {
   return Array.from(processes.values()).map(({ child: _, ...info }) => info)
 }
 
-let statsInterval: ReturnType<typeof setInterval> | null = null
-
-/** Resolve actual child PIDs (shell: true means proc.pid is the shell wrapper). */
-function resolveChildPids(shellPids: number[], cb: (pidMap: Map<number, number[]>) => void): void {
-  execFile('pgrep', ['-P', shellPids.join(',')], (err, stdout) => {
-    const map = new Map<number, number[]>()
-    if (err || !stdout.trim()) {
-      // No children found — fall back to shell PIDs
-      for (const pid of shellPids) map.set(pid, [pid])
-      return cb(map)
+const statsPoller = createStatsPoller(
+  () => {
+    const pidMap = new Map<string, number>()
+    for (const proc of processes.values()) {
+      if (proc.pid != null) pidMap.set(proc.id, proc.pid)
     }
-    // pgrep returns one PID per line; need to map child → parent via ps
-    const childPids = stdout.trim().split('\n').map(s => s.trim()).filter(Boolean)
-    execFile('ps', ['-o', 'pid=,ppid=', '-p', childPids.join(',')], (err2, stdout2) => {
-      if (err2) {
-        for (const pid of shellPids) map.set(pid, [pid])
-        return cb(map)
-      }
-      for (const line of stdout2.trim().split('\n')) {
-        const parts = line.trim().split(/\s+/)
-        if (parts.length < 2) continue
-        const [childStr, parentStr] = parts
-        const parent = Number(parentStr)
-        const child = Number(childStr)
-        if (!map.has(parent)) map.set(parent, [])
-        map.get(parent)!.push(child)
-      }
-      // Shell PIDs with no children resolved → fall back to self
-      for (const pid of shellPids) {
-        if (!map.has(pid)) map.set(pid, [pid])
-      }
-      cb(map)
-    })
-  })
-}
+    return pidMap
+  },
+  (stats) => { win?.webContents.send('processes:stats', stats) }
+)
 
-function startStatsPolling(): void {
-  if (statsInterval) return
-  statsInterval = setInterval(() => {
-    const running = Array.from(processes.values()).filter(p => p.pid != null)
-    if (running.length === 0 || !win) return
-    const shellPids = running.map(p => p.pid!)
-    resolveChildPids(shellPids, (pidMap) => {
-      const allPids = Array.from(new Set(Array.from(pidMap.values()).flat()))
-      if (allPids.length === 0) return
-      execFile('ps', ['-o', 'pid=,%cpu=,rss=', '-p', allPids.join(',')], (err, stdout) => {
-        if (err || !win) return
-        // Parse ps output into per-PID stats
-        const pidStats = new Map<number, { cpu: number; rss: number }>()
-        for (const line of stdout.trim().split('\n')) {
-          const parts = line.trim().split(/\s+/)
-          if (parts.length < 3) continue
-          pidStats.set(Number(parts[0]), { cpu: parseFloat(parts[1]), rss: parseInt(parts[2], 10) })
-        }
-        // Aggregate child stats per managed process
-        const stats: Record<string, { cpu: number; rss: number }> = {}
-        for (const proc of running) {
-          const children = pidMap.get(proc.pid!) ?? [proc.pid!]
-          let cpu = 0, rss = 0
-          for (const cpid of children) {
-            const s = pidStats.get(cpid)
-            if (s) { cpu += s.cpu; rss += s.rss }
-          }
-          stats[proc.id] = { cpu, rss }
-        }
-        if (Object.keys(stats).length > 0) {
-          win?.webContents.send('processes:stats', stats)
-        }
-      })
-    })
-  }, 3000)
-}
-
-function stopStatsPolling(): void {
-  if (statsInterval) { clearInterval(statsInterval); statsInterval = null }
-}
-
-function maybeStopStatsPolling(): void {
-  const hasRunning = Array.from(processes.values()).some(p => p.pid != null)
-  if (!hasRunning) stopStatsPolling()
-}
+function startStatsPolling(): void { statsPoller.ensureStarted() }
 
 export function killAllProcesses(): void {
-  stopStatsPolling()
+  statsPoller.stop()
   for (const proc of processes.values()) {
     proc.autoRestart = false
     proc.child?.kill()

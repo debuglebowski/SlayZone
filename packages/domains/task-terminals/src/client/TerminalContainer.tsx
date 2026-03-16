@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef, useMemo, forwardRef, useImperativeHandle } from 'react'
+import { useEffect, useCallback, useRef, useMemo, forwardRef, useImperativeHandle } from 'react'
 import { usePty } from '@slayzone/terminal'
 import type { TerminalMode } from '@slayzone/terminal/shared'
 import { useTaskTerminals } from './useTaskTerminals'
@@ -70,7 +70,6 @@ export const TerminalContainer = forwardRef<TerminalContainerHandle, TerminalCon
   } = useTaskTerminals(taskId, defaultMode)
 
   const { subscribePrompt } = usePty()
-  const [ptyStats, setPtyStats] = useState<Record<string, { cpu: number; rss: number }>>({})
   const splitGroupRef = useRef<TerminalSplitGroupHandle | null>(null)
   const pendingFocusRef = useRef(isActive)
   const terminalApiRef = useRef<{
@@ -84,24 +83,6 @@ export const TerminalContainer = forwardRef<TerminalContainerHandle, TerminalCon
   // Get active group
   const activeGroup = groups.find(g => g.id === activeGroupId)
   const mainGroupId = groups.find((group) => group.tabs.some((tab) => tab.isMain))?.id ?? null
-
-  useEffect(() => {
-    const unsub = window.api.pty.onStats((stats) => setPtyStats(stats))
-    return unsub
-  }, [])
-
-  // Build tabStats: map tab.id → stats by resolving sessionId
-  const tabStats = useMemo(() => {
-    const result: Record<string, { cpu: number; rss: number; createdAt: number }> = {}
-    for (const tab of tabs) {
-      const sessionId = getSessionId(tab.id)
-      const stats = ptyStats[sessionId]
-      if (stats) {
-        result[tab.id] = { ...stats, createdAt: new Date(tab.createdAt).getTime() }
-      }
-    }
-    return result
-  }, [tabs, ptyStats, getSessionId])
 
   // Notify parent when main tab active state changes
   useEffect(() => {
@@ -305,7 +286,6 @@ export const TerminalContainer = forwardRef<TerminalContainerHandle, TerminalCon
         onPaneClose={closeTab}
         onPaneMove={movePane}
         onGroupRename={renameTab}
-        tabStats={tabStats}
         rightContent={rightContent}
       />
       <div className="flex-1 min-h-0">

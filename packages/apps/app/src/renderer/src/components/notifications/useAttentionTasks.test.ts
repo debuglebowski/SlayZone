@@ -87,6 +87,8 @@ function makePty(sessionId: string, taskId: string, lastOutputTime: number): Pty
     sessionId,
     taskId,
     lastOutputTime,
+    createdAt: Date.now(),
+    mode: 'claude-code',
     state: 'attention'
   }
 }

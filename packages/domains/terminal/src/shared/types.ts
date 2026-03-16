@@ -105,6 +105,8 @@ export interface PtyInfo {
   sessionId: string
   taskId: string
   lastOutputTime: number
+  createdAt: number
+  mode: TerminalMode
   state: TerminalState
 }
 

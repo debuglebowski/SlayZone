@@ -98,6 +98,7 @@ interface PtySession {
   checkingForSessionError?: boolean
   buffer: RingBuffer
   lastOutputTime: number
+  createdAt: number
   state: TerminalState
   // CLI state tracking
   activity: ActivityState
@@ -117,6 +118,17 @@ interface PtySession {
 export type { PtyInfo }
 
 const sessions = new Map<string, PtySession>()
+const sessionChangeListeners = new Set<() => void>()
+
+/** Register a callback for session create/destroy events. Returns unsubscribe function. */
+export function onSessionChange(cb: () => void): () => void {
+  sessionChangeListeners.add(cb)
+  return () => sessionChangeListeners.delete(cb)
+}
+
+function notifySessionChange(): void {
+  for (const cb of sessionChangeListeners) cb()
+}
 const stateMachine = new StateMachine((sessionId, newState, oldState) => {
   const session = sessions.get(sessionId)
   if (!session) return
@@ -607,6 +619,7 @@ export async function createPty(opts: CreatePtyOptions): Promise<{ success: bool
       checkingForSessionError: resuming,
       buffer: new RingBuffer(MAX_BUFFER_SIZE),
       lastOutputTime: Date.now(),
+      createdAt: Date.now(),
       state: 'starting',
       // CLI state tracking
       activity: 'unknown',
@@ -619,6 +632,7 @@ export async function createPty(opts: CreatePtyOptions): Promise<{ success: bool
       detectedDevUrls: new Set(),
       syncQueryPending: ''
     })
+    notifySessionChange()
     stateMachine.register(sessionId, 'starting')
     let firstOutputTs: number | null = null
     let commandDispatchedTs: number | null = null
@@ -661,6 +675,7 @@ export async function createPty(opts: CreatePtyOptions): Promise<{ success: bool
       // can still be processed and forwarded to the renderer before we drop the session.
       setTimeout(() => {
         sessions.delete(sessionId)
+        notifySessionChange()
       }, 100)
       if (!win.isDestroyed()) {
         try {
@@ -1170,6 +1185,7 @@ export function killPty(sessionId: string): boolean {
   dismissNotification(sessionId)
   // Delete from map FIRST so onData handlers exit early during kill
   sessions.delete(sessionId)
+  notifySessionChange()
   // Use SIGKILL (9) to forcefully terminate - SIGTERM may not kill child processes
   session.pty.kill('SIGKILL')
   return true
@@ -1209,10 +1225,23 @@ export function listPtys(): PtyInfo[] {
       sessionId,
       taskId: session.taskId,
       lastOutputTime: session.lastOutputTime,
+      createdAt: session.createdAt,
+      mode: session.mode,
       state: session.state
     })
   }
   return result
+}
+
+/** Returns a map of sessionId → PID for all alive sessions. Used for stats polling. */
+export function getPtyPids(): Map<string, number> {
+  const pids = new Map<string, number>()
+  for (const [sessionId, session] of sessions) {
+    if (session.state !== 'dead') {
+      pids.set(sessionId, session.pty.pid)
+    }
+  }
+  return pids
 }
 
 export function getState(sessionId: string): TerminalState | null {

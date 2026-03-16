@@ -17,7 +17,9 @@ interface TerminalStatusPopoverProps {
 
 export function TerminalStatusPopover({ tasks, onTaskClick }: TerminalStatusPopoverProps) {
   const [ptys, setPtys] = useState<PtyInfo[]>([])
+  const [stats, setStats] = useState<Record<string, { cpu: number; rss: number }>>({})
   const [open, setOpen] = useState(false)
+  const [, tick] = useState(0)
 
   const refreshPtys = useCallback(async () => {
     const list = await window.api.pty.list()
@@ -28,9 +30,10 @@ export function TerminalStatusPopover({ tasks, onTaskClick }: TerminalStatusPopo
   useEffect(() => {
     if (open) {
       refreshPtys()
-      // Refresh every 5 seconds while open
-      const interval = setInterval(refreshPtys, 5000)
-      return () => clearInterval(interval)
+      const refreshInterval = setInterval(refreshPtys, 5000)
+      // Tick every second for live duration display
+      const tickInterval = setInterval(() => tick(t => t + 1), 1000)
+      return () => { clearInterval(refreshInterval); clearInterval(tickInterval) }
     }
     return undefined
   }, [open, refreshPtys])
@@ -42,6 +45,12 @@ export function TerminalStatusPopover({ tasks, onTaskClick }: TerminalStatusPopo
     })
     return unsub
   }, [refreshPtys])
+
+  // Subscribe to stats
+  useEffect(() => {
+    const unsub = window.api.pty.onStats((s) => setStats(s))
+    return unsub
+  }, [])
 
   // Initial load
   useEffect(() => {
@@ -64,13 +73,15 @@ export function TerminalStatusPopover({ tasks, onTaskClick }: TerminalStatusPopo
     return task?.title || 'Unknown Task'
   }
 
-  const formatIdleTime = (lastOutputTime: number): string => {
-    const seconds = Math.floor((Date.now() - lastOutputTime) / 1000)
-    if (seconds < 60) return `${seconds}s ago`
-    const minutes = Math.floor(seconds / 60)
-    if (minutes < 60) return `${minutes}m ago`
-    const hours = Math.floor(minutes / 60)
-    return `${hours}h ago`
+  const formatDuration = (createdAt: number): string => {
+    const s = Math.floor((Date.now() - createdAt) / 1000)
+    if (s < 60) return `${s}s`
+    if (s < 3600) return `${Math.floor(s / 60)}m ${s % 60}s`
+    return `${Math.floor(s / 3600)}h ${Math.floor((s % 3600) / 60)}m`
+  }
+
+  const formatMemory = (rss: number): string => {
+    return rss >= 1024 ? `${(rss / 1024).toFixed(0)} MB` : `${rss} KB`
   }
 
   const count = ptys.length
@@ -99,13 +110,13 @@ export function TerminalStatusPopover({ tasks, onTaskClick }: TerminalStatusPopo
         </TooltipTrigger>
         <TooltipContent side="right">Active Terminals</TooltipContent>
       </Tooltip>
-      <PopoverContent side="right" align="end" className="w-80">
-        <div className="space-y-3">
-          <div className="flex items-center justify-between">
+      <PopoverContent side="right" align="end" className="w-fit max-w-[20vw] max-h-[80vh] flex flex-col">
+        <div className="space-y-3 min-h-0 flex flex-col">
+          <div className="flex items-center justify-between shrink-0">
             <h4 className="font-medium text-sm">Active Terminals</h4>
             <span className="text-xs text-muted-foreground">{count} running</span>
           </div>
-          <div className="space-y-2 max-h-64 overflow-y-auto">
+          <div className="space-y-2 min-h-0 overflow-y-auto">
             {ptys.map((pty) => (
               <div
                 key={pty.sessionId}
@@ -117,14 +128,29 @@ export function TerminalStatusPopover({ tasks, onTaskClick }: TerminalStatusPopo
               >
                 <div className="flex-1 min-w-0 mr-2">
                   <p className="text-sm font-medium truncate">{getTaskName(pty.sessionId)}</p>
-                  <p className="text-xs text-muted-foreground">
+                  <div className="flex items-center gap-1 mt-2 flex-wrap">
                     {(() => {
                       const style = getTerminalStateStyle(pty.state)
-                      return style && <span className={style.textColor}>{style.label}</span>
+                      return style && (
+                        <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${style.textColor} bg-current/10 w-16 text-center`}>
+                          {style.label}
+                        </span>
+                      )
                     })()}
-                    {' · '}
-                    {formatIdleTime(pty.lastOutputTime)}
-                  </p>
+                    <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full text-muted-foreground bg-muted w-16 text-center">
+                      {formatDuration(pty.createdAt)}
+                    </span>
+                    {stats[pty.sessionId] && (
+                      <>
+                        <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full text-muted-foreground bg-muted w-14 text-center">
+                          {stats[pty.sessionId].cpu.toFixed(1)}%
+                        </span>
+                        <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full text-muted-foreground bg-muted w-14 text-center">
+                          {formatMemory(stats[pty.sessionId].rss)}
+                        </span>
+                      </>
+                    )}
+                  </div>
                 </div>
                 <IconButton
                   aria-label="Terminate terminal"
