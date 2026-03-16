@@ -48,6 +48,25 @@ function getColor(index: number): string {
   return COLUMN_COLORS[((index % len) + len) % len]
 }
 
+/** Mix a hex color toward gray by a factor (0 = original, 1 = fully gray) */
+function desaturate(hex: string, factor: number): string {
+  const r = parseInt(hex.slice(1, 3), 16)
+  const g = parseInt(hex.slice(3, 5), 16)
+  const b = parseInt(hex.slice(5, 7), 16)
+  const gray = Math.round(r * 0.299 + g * 0.587 + b * 0.114)
+  const mix = (c: number) => Math.round(c + (gray - c) * factor)
+  return `#${[mix(r), mix(g), mix(b)].map(c => c.toString(16).padStart(2, '0')).join('')}`
+}
+
+/** Get color for a branch, with subtle desaturation for origin/ variants.
+ *  colorIndex is used to detect base-branch commits (always white). */
+function getBranchColor(branch: string, colorIndex?: number): string {
+  const isOrigin = branch.startsWith('origin/')
+  const index = colorIndex ?? (isOrigin ? hashBranchColor(branch.slice(7)) : hashBranchColor(branch))
+  const color = getColor(index)
+  return isOrigin ? desaturate(color, 0.4) : color
+}
+
 /** Deterministic hash of a branch name to a color index (skips 0, reserved for base branch) */
 function hashBranchColor(name: string): number {
   let h = 0
@@ -110,7 +129,7 @@ function computeTipsLayout(commits: ResolvedCommit[], baseBranch: string): DagLa
     if (prevRow !== undefined) {
       edges.push({
         fromRow: prevRow, fromCol: col, toRow: row, toCol: col,
-        color: getColor(colorIndex), type: 'straight'
+        color: getBranchColor(commit.branch, colorIndex), type: 'straight'
       })
     }
     lastRowInCol.set(col, row)
@@ -130,7 +149,7 @@ function computeTipsLayout(commits: ResolvedCommit[], baseBranch: string): DagLa
       edges.push({
         fromRow: other.row, fromCol: other.column,
         toRow: bottom.row, toCol: bottom.column,
-        color: getColor(other.colorIndex), type: 'curve'
+        color: getBranchColor(other.commit.branch, other.colorIndex), type: 'curve'
       })
     }
   }
@@ -210,15 +229,29 @@ export function computeDagLayout(commits: ResolvedCommit[], baseBranch: string):
     }
   }
 
-  // Detect "behind" branches: their tip sits on the base branch's first-parent chain
+  // When origin/<baseBranch> diverged, it's the canonical trunk.
+  const originBaseBranch = `origin/${baseBranch}`
+  const originBaseDiverged = branchRowRange.has(originBaseBranch)
+  const trunkBranch = originBaseDiverged ? originBaseBranch : baseBranch
+
+  // Detect "behind" branches: their tip sits on the trunk's first-parent chain
   const baseFirstParentChain = new Set<string>()
   const hashToCommit = new Map<string, ResolvedCommit>()
   for (const c of commits) hashToCommit.set(c.hash, c)
   {
-    let current = commits.find(c => c.branch === baseBranch && c.isBranchTip)
+    // Walk trunk's first-parent chain
+    let current = commits.find(c => c.branch === trunkBranch && c.isBranchTip)
     while (current) {
       baseFirstParentChain.add(current.hash)
       current = current.parents.length > 0 ? hashToCommit.get(current.parents[0]) : undefined
+    }
+    // When diverged, also include local baseBranch's chain so behind branches on it are detected
+    if (originBaseDiverged) {
+      current = commits.find(c => c.branch === baseBranch && c.isBranchTip)
+      while (current) {
+        baseFirstParentChain.add(current.hash)
+        current = current.parents.length > 0 ? hashToCommit.get(current.parents[0]) : undefined
+      }
     }
   }
   const branchTipHash = new Map<string, string>()
@@ -240,13 +273,13 @@ export function computeDagLayout(commits: ResolvedCommit[], baseBranch: string):
     columnOccupied[col].push(range)
   }
 
-  // BFS from base branch to assign columns (lowest free column > parent)
+  // BFS from trunk to assign columns (lowest free column > parent).
   const behindBranches = new Set<string>()
   const branchCol = new Map<string, number>()
-  branchCol.set(baseBranch, 0)
-  const baseRange = branchRowRange.get(baseBranch)
+  branchCol.set(trunkBranch, 0)
+  const baseRange = branchRowRange.get(trunkBranch)
   if (baseRange) occupyColumn(0, baseRange)
-  const queue = [baseBranch]
+  const queue = [trunkBranch]
   while (queue.length > 0) {
     const parent = queue.shift()!
     const parentCol = branchCol.get(parent)!
@@ -256,9 +289,10 @@ export function computeDagLayout(commits: ResolvedCommit[], baseBranch: string):
     }
     children.sort((a, b) => (branchFirstRow.get(a) ?? 0) - (branchFirstRow.get(b) ?? 0))
     for (const child of children) {
-      // Behind branches (tip is on base branch's first-parent chain) share base column
+      // Behind branches (tip is on base branch's first-parent chain) share base column.
+      // When diverged, local baseBranch itself is NOT behind — it's a diverged branch.
       const childTip = branchTipHash.get(child)
-      if (childTip && baseFirstParentChain.has(childTip)) {
+      if (childTip && baseFirstParentChain.has(childTip) && !(originBaseDiverged && child === baseBranch)) {
         branchCol.set(child, 0)
         behindBranches.add(child)
       } else {
@@ -271,6 +305,8 @@ export function computeDagLayout(commits: ResolvedCommit[], baseBranch: string):
       queue.push(child)
     }
   }
+
+  // No swap needed — BFS root already places the canonical trunk on col 0.
 
   const hashToRow = new Map<string, number>()
   const hashToCol = new Map<string, number>()
@@ -285,10 +321,12 @@ export function computeDagLayout(commits: ResolvedCommit[], baseBranch: string):
   const columnBranch: (string | null)[] = [baseBranch]
   let nextFallbackColor = 0
 
-  // Branch ownership is already resolved — just read commit.branch
+  // Branch ownership is already resolved — just read commit.branch.
+  // origin/<X> gets the same color index as <X> so they share the same hue.
   function getCommitColorIndex(commit: ResolvedCommit): number {
-    if (commit.branch === baseBranch) return BASE_BRANCH_COLOR_INDEX
-    if (commit.branch) return hashBranchColor(commit.branch)
+    const branch = commit.branch.startsWith('origin/') ? commit.branch.slice(7) : commit.branch
+    if (branch === baseBranch) return BASE_BRANCH_COLOR_INDEX
+    if (branch) return hashBranchColor(branch)
     return nextFallbackColor++
   }
 
@@ -375,6 +413,16 @@ export function computeDagLayout(commits: ResolvedCommit[], baseBranch: string):
     if (isBranchTip && isBehind) {
       node.behindBranch = { colorIndex: hashBranchColor(commit.branch), branchName: commit.branch }
     }
+    // Also check if this commit has branchRefs from a behind branch (tip owned by another branch)
+    if (!node.behindBranch) {
+      for (const ref of commit.branchRefs) {
+        if (ref.startsWith('origin/')) continue
+        if (behindBranches.has(ref) && ref !== commit.branch) {
+          node.behindBranch = { colorIndex: hashBranchColor(ref), branchName: ref }
+          break
+        }
+      }
+    }
     nodes.push(node)
 
     if (commit.parents.length === 0) {
@@ -449,7 +497,7 @@ export function computeDagLayout(commits: ResolvedCommit[], baseBranch: string):
   for (let row = 0; row < commits.length; row++) {
     const commit = commits[row]
     const col = hashToCol.get(commit.hash)!
-    const color = getColor(hashToColorIndex.get(commit.hash) ?? col)
+    const color = getBranchColor(commit.branch, hashToColorIndex.get(commit.hash))
     for (const parentHash of commit.parents) {
       const parentRow = hashToRow.get(parentHash)
       if (parentRow === undefined) continue
@@ -486,7 +534,18 @@ export function computeDagLayout(commits: ResolvedCommit[], baseBranch: string):
       if (prev === undefined || node.row < prev) originRowByCol.set(node.column, node.row)
     }
   }
+  // Detect diverged columns: local branch columns where origin/<branch> exists on a different column.
+  // All commits on these columns are unpushed (diverged from origin).
+  const divergedCols = new Set<number>()
+  for (const [branch, col] of branchCol) {
+    if (branch.startsWith('origin/')) continue
+    const originCol = branchCol.get(`origin/${branch}`)
+    if (originCol !== undefined && originCol !== col) {
+      divergedCols.add(col)
+    }
+  }
   const isLocalOnly = (row: number, col: number) => {
+    if (divergedCols.has(col)) return true
     const originRow = originRowByCol.get(col)
     return originRow !== undefined && row < originRow
   }
@@ -994,7 +1053,7 @@ export function CommitGraph({ graph, filterQuery, tipsOnly, includeTags, breakOn
             const offset = activeRowOffsets.get(node.row) ?? 0
             const cx = colX(node.column) + (node.column === 0 ? offset : 0)
             const cy = rowY(node.row)
-            const color = getColor(node.colorIndex)
+            const color = getBranchColor(node.commit.branch, node.colorIndex)
             const dotType = node.isMerge ? 'merge' : 'regular'
             const dimmed = matchSet !== null && !matchSet.has(node.commit.hash)
             return <g key={node.commit.hash}>
@@ -1035,7 +1094,7 @@ export function CommitGraph({ graph, filterQuery, tipsOnly, includeTags, breakOn
         <DotOverlays items={[
           ...visibleNodes.map(node => ({
             key: node.commit.hash, row: node.row, column: node.column,
-            color: getColor(node.colorIndex), branchName: colorBranch.get(node.colorIndex),
+            color: getBranchColor(node.commit.branch, node.colorIndex), branchName: colorBranch.get(node.colorIndex),
             xOffset: node.column === 0 ? (activeRowOffsets.get(node.row) ?? 0) : 0
           })),
           ...visibleNodes.filter(n => n.syntheticBranch).map(node => ({
@@ -1090,7 +1149,7 @@ export function CommitGraph({ graph, filterQuery, tipsOnly, includeTags, breakOn
                 author={node.commit.author} relativeDate={node.commit.relativeDate}
                 refs={refs.length > 0 ? refs : undefined}
                 mergedFrom={node.commit.mergedFrom}
-                color={getColor(node.colorIndex)} gutterWidth={gutterWidth}
+                color={getBranchColor(node.commit.branch, node.colorIndex)} gutterWidth={gutterWidth}
                 copiedHash={copiedHash} onCopy={handleCopy} dimmed={dimmed} />
             </div>
           )

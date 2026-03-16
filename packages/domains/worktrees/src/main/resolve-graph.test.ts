@@ -2144,6 +2144,373 @@ describe('computeCollapsedDag — many branches interleaving, zero phantoms', ()
   })
 })
 
+// ─── Local/remote divergence: origin/X as separate branch ──────
+
+describe('resolveCommitGraph — diverged local/remote → origin/ becomes separate branch', () => {
+  // Topology:
+  //   local main:  L1 → L2 → base
+  //   origin/main: R1 → R2 → base
+  // Both diverged from base — origin/main should become its own branch
+  const baseHash = makeHash()
+  const l2Hash = makeHash()
+  const l1Hash = makeHash()
+  const r2Hash = makeHash()
+  const r1Hash = makeHash()
+
+  const commits: DagCommit[] = [
+    dag({ hash: l1Hash, message: 'local work 1', refs: ['HEAD -> refs/heads/main'], parents: [l2Hash] }),
+    dag({ hash: l2Hash, message: 'local work 2', refs: [], parents: [baseHash] }),
+    dag({ hash: r1Hash, message: 'remote work 1', refs: ['refs/remotes/origin/main'], parents: [r2Hash] }),
+    dag({ hash: r2Hash, message: 'remote work 2', refs: [], parents: [baseHash] }),
+    dag({ hash: baseHash, message: 'shared base', refs: [], parents: [] }),
+  ]
+
+  const g = resolveCommitGraph(commits, 'main')
+
+  test('origin/main is a separate branch (not just a display ref)', () => {
+    expect(g.branches).toContain('origin/main')
+  })
+
+  test('local main commits owned by main', () => {
+    expect(g.commits[0].branch).toBe('main')
+    expect(g.commits[1].branch).toBe('main')
+  })
+
+  test('remote-only commits owned by origin/main', () => {
+    const r1 = g.commits.find(c => c.hash === r1Hash)!
+    const r2 = g.commits.find(c => c.hash === r2Hash)!
+    expect(r1.branch).toBe('origin/main')
+    expect(r2.branch).toBe('origin/main')
+  })
+
+  test('origin/main is a branch tip', () => {
+    const r1 = g.commits.find(c => c.hash === r1Hash)!
+    expect(r1.isBranchTip).toBe(true)
+  })
+
+  test('base commit owned by origin/main (canonical trunk when diverged)', () => {
+    const base = g.commits.find(c => c.hash === baseHash)!
+    expect(base.branch).toBe('origin/main')
+  })
+})
+
+describe('computeDagLayout — diverged local/remote get separate columns', () => {
+  const baseHash = makeHash()
+  const l1Hash = makeHash()
+  const r1Hash = makeHash()
+  const r2Hash = makeHash()
+
+  const commits: ResolvedCommit[] = [
+    resolved({ hash: l1Hash, message: 'local', branch: 'main', parents: [baseHash], branchRefs: ['main'], isBranchTip: true, isHead: true }),
+    resolved({ hash: r1Hash, message: 'remote 1', branch: 'origin/main', parents: [r2Hash], branchRefs: ['origin/main'], isBranchTip: true }),
+    resolved({ hash: r2Hash, message: 'remote 2', branch: 'origin/main', parents: [baseHash] }),
+    resolved({ hash: baseHash, message: 'shared', branch: 'origin/main', parents: [] }),
+  ]
+
+  const layout = computeDagLayout(commits, 'main')
+
+  test('origin/main on col 0 (canonical trunk)', () => {
+    const node = layout.nodes.find(n => n.commit.hash === r1Hash)!
+    expect(node.column).toBe(0)
+  })
+
+  test('local main on separate column (> 0)', () => {
+    const node = layout.nodes.find(n => n.commit.hash === l1Hash)!
+    expect(node.column > 0).toBe(true)
+  })
+
+  test('both origin/main commits on same column', () => {
+    const n1 = layout.nodes.find(n => n.commit.hash === r1Hash)!
+    const n2 = layout.nodes.find(n => n.commit.hash === r2Hash)!
+    expect(n1.column).toBe(n2.column)
+  })
+
+  test('shared base on col 0 (same as origin/main)', () => {
+    const baseNode = layout.nodes.find(n => n.commit.hash === baseHash)!
+    expect(baseNode.column).toBe(0)
+  })
+})
+
+describe('resolveCommitGraph — remote-only ahead (no local divergence) stays same branch', () => {
+  // Topology: origin/main → R1 → R2 → local main tip → base
+  // origin is ahead, local has no unique commits — should NOT split
+  const baseHash = makeHash()
+  const localTip = makeHash()
+  const r2Hash = makeHash()
+  const r1Hash = makeHash()
+
+  const commits: DagCommit[] = [
+    dag({ hash: r1Hash, message: 'remote 1', refs: ['refs/remotes/origin/main'], parents: [r2Hash] }),
+    dag({ hash: r2Hash, message: 'remote 2', refs: [], parents: [localTip] }),
+    dag({ hash: localTip, message: 'local tip', refs: ['HEAD -> refs/heads/main'], parents: [baseHash] }),
+    dag({ hash: baseHash, message: 'base', refs: [], parents: [] }),
+  ]
+
+  const g = resolveCommitGraph(commits, 'main')
+
+  test('origin/main is NOT a separate branch (just a display ref)', () => {
+    expect(g.branches.includes('origin/main')).toBe(false)
+  })
+
+  test('all commits owned by main', () => {
+    for (const c of g.commits) {
+      expect(c.branch).toBe('main')
+    }
+  })
+
+  test('origin/main appears as display ref on its commit', () => {
+    const r1 = g.commits.find(c => c.hash === r1Hash)!
+    expect(r1.branchRefs).toContain('origin/main')
+  })
+})
+
+describe('computeDagLayout — local-only ahead edges are dashed (existing behavior)', () => {
+  const baseHash = makeHash()
+  const localHash = makeHash()
+
+  const commits: ResolvedCommit[] = [
+    resolved({ hash: localHash, message: 'local unpushed', branch: 'main', parents: [baseHash], branchRefs: ['main'], isBranchTip: true, isHead: true }),
+    resolved({ hash: baseHash, message: 'pushed', branch: 'main', parents: [], branchRefs: ['origin/main'] }),
+  ]
+
+  const layout = computeDagLayout(commits, 'main')
+
+  test('edge from unpushed commit is dashed', () => {
+    const localNode = layout.nodes.find(n => n.commit.hash === localHash)!
+    const dashedEdge = layout.edges.find(e => e.fromRow === localNode.row)
+    expect(dashedEdge !== undefined).toBe(true)
+    expect(dashedEdge!.dashed).toBe(true)
+  })
+})
+
+// ─── Feature branch diverged from origin ────────────────────────
+
+describe('resolveCommitGraph — diverged feature branch + origin/feature', () => {
+  // main: M1 → base
+  // feature: F1 → base  (local)
+  // origin/feature: R1 → base  (remote, diverged)
+  const baseHash = makeHash()
+  const m1Hash = makeHash()
+  const f1Hash = makeHash()
+  const r1Hash = makeHash()
+
+  const commits: DagCommit[] = [
+    dag({ hash: m1Hash, message: 'main tip', refs: ['HEAD -> refs/heads/main'], parents: [baseHash] }),
+    dag({ hash: f1Hash, message: 'local feat', refs: ['refs/heads/feature'], parents: [baseHash] }),
+    dag({ hash: r1Hash, message: 'remote feat', refs: ['refs/remotes/origin/feature'], parents: [baseHash] }),
+    dag({ hash: baseHash, message: 'shared base', refs: [], parents: [] }),
+  ]
+
+  const g = resolveCommitGraph(commits, 'main')
+
+  test('origin/feature becomes a separate branch', () => {
+    expect(g.branches).toContain('origin/feature')
+  })
+
+  test('local feature commits owned by feature', () => {
+    const f1 = g.commits.find(c => c.hash === f1Hash)!
+    expect(f1.branch).toBe('feature')
+  })
+
+  test('remote-only commit owned by origin/feature', () => {
+    const r1 = g.commits.find(c => c.hash === r1Hash)!
+    expect(r1.branch).toBe('origin/feature')
+  })
+
+  test('origin/feature is a branch tip', () => {
+    const r1 = g.commits.find(c => c.hash === r1Hash)!
+    expect(r1.isBranchTip).toBe(true)
+  })
+})
+
+// ─── Mixed state: diverged + ahead + behind in same graph ───────
+
+describe('resolveCommitGraph — mixed: main diverged, feature ahead-only', () => {
+  // main diverged: local L1 → base, origin R1 → base
+  // feature ahead-only: origin/feature → F2 → F1 (F1 = local tip)
+  const baseHash = makeHash()
+  const l1Hash = makeHash()
+  const r1Hash = makeHash()
+  const f1Hash = makeHash()
+  const f2Hash = makeHash()
+  const rf1Hash = makeHash()
+
+  const commits: DagCommit[] = [
+    dag({ hash: l1Hash, message: 'local main', refs: ['HEAD -> refs/heads/main'], parents: [baseHash] }),
+    dag({ hash: r1Hash, message: 'remote main', refs: ['refs/remotes/origin/main'], parents: [baseHash] }),
+    dag({ hash: rf1Hash, message: 'remote feat ahead', refs: ['refs/remotes/origin/feature'], parents: [f2Hash] }),
+    dag({ hash: f2Hash, message: 'feat shared 2', refs: [], parents: [f1Hash] }),
+    dag({ hash: f1Hash, message: 'feat tip', refs: ['refs/heads/feature'], parents: [baseHash] }),
+    dag({ hash: baseHash, message: 'shared base', refs: [], parents: [] }),
+  ]
+
+  const g = resolveCommitGraph(commits, 'main')
+
+  test('main diverged → origin/main is separate branch', () => {
+    expect(g.branches).toContain('origin/main')
+    const r1 = g.commits.find(c => c.hash === r1Hash)!
+    expect(r1.branch).toBe('origin/main')
+  })
+
+  test('feature not diverged → origin/feature NOT a separate branch', () => {
+    expect(g.branches.includes('origin/feature')).toBe(false)
+  })
+
+  test('feature remote-ahead commits stay owned by feature', () => {
+    const rf = g.commits.find(c => c.hash === rf1Hash)!
+    expect(rf.branch).toBe('feature')
+  })
+})
+
+// ─── Divergence propagation: intermediate commits get origin/ ───
+
+describe('resolveCommitGraph — origin/ branch propagates to intermediate commits', () => {
+  // local main: L1 → base
+  // origin/main: R1 → R2 → R3 → base
+  const baseHash = makeHash()
+  const l1Hash = makeHash()
+  const r3Hash = makeHash()
+  const r2Hash = makeHash()
+  const r1Hash = makeHash()
+
+  const commits: DagCommit[] = [
+    dag({ hash: l1Hash, message: 'local', refs: ['HEAD -> refs/heads/main'], parents: [baseHash] }),
+    dag({ hash: r1Hash, message: 'remote 1', refs: ['refs/remotes/origin/main'], parents: [r2Hash] }),
+    dag({ hash: r2Hash, message: 'remote 2', refs: [], parents: [r3Hash] }),
+    dag({ hash: r3Hash, message: 'remote 3', refs: [], parents: [baseHash] }),
+    dag({ hash: baseHash, message: 'shared base', refs: [], parents: [] }),
+  ]
+
+  const g = resolveCommitGraph(commits, 'main')
+
+  test('all three remote commits owned by origin/main', () => {
+    expect(g.commits.find(c => c.hash === r1Hash)!.branch).toBe('origin/main')
+    expect(g.commits.find(c => c.hash === r2Hash)!.branch).toBe('origin/main')
+    expect(g.commits.find(c => c.hash === r3Hash)!.branch).toBe('origin/main')
+  })
+
+  test('base commit owned by origin/main (canonical trunk when diverged)', () => {
+    expect(g.commits.find(c => c.hash === baseHash)!.branch).toBe('origin/main')
+  })
+})
+
+// ─── Local and origin at same commit (not diverged) ─────────────
+
+describe('resolveCommitGraph — local and origin at same commit', () => {
+  const tipHash = makeHash()
+  const parentHash = makeHash()
+
+  const commits: DagCommit[] = [
+    dag({ hash: tipHash, message: 'synced tip', refs: ['HEAD -> refs/heads/main', 'refs/remotes/origin/main'], parents: [parentHash] }),
+    dag({ hash: parentHash, message: 'parent', refs: [], parents: [] }),
+  ]
+
+  const g = resolveCommitGraph(commits, 'main')
+
+  test('origin/main is NOT a separate branch', () => {
+    expect(g.branches.includes('origin/main')).toBe(false)
+  })
+
+  test('all commits owned by main', () => {
+    for (const c of g.commits) {
+      expect(c.branch).toBe('main')
+    }
+  })
+
+  test('origin/main appears as display ref', () => {
+    expect(g.commits[0].branchRefs).toContain('origin/main')
+  })
+
+  test('no edges are dashed', () => {
+    const layout = computeDagLayout(g.commits, g.baseBranch)
+    for (const e of layout.edges) {
+      expect(e.dashed ?? false).toBe(false)
+    }
+  })
+})
+
+// ─── Dashed edges with multi-branch layout ──────────────────────
+
+describe('computeDagLayout — dashed edges on main with feature branch present', () => {
+  const baseHash = makeHash()
+  const m2Hash = makeHash()
+  const m1Hash = makeHash()
+  const f1Hash = makeHash()
+
+  const commits: ResolvedCommit[] = [
+    resolved({ hash: m1Hash, message: 'main unpushed', branch: 'main', parents: [m2Hash], branchRefs: ['main'], isBranchTip: true, isHead: true }),
+    resolved({ hash: m2Hash, message: 'main pushed', branch: 'main', parents: [baseHash], branchRefs: ['origin/main'] }),
+    resolved({ hash: f1Hash, message: 'feat local', branch: 'feature', parents: [baseHash], branchRefs: ['feature'], isBranchTip: true }),
+    resolved({ hash: baseHash, message: 'base', branch: 'main', parents: [] }),
+  ]
+
+  const layout = computeDagLayout(commits, 'main')
+
+  test('main column has dashed edge (unpushed M1)', () => {
+    const m1Node = layout.nodes.find(n => n.commit.hash === m1Hash)!
+    const dashedEdge = layout.edges.find(e => e.fromRow === m1Node.row && e.fromCol === m1Node.column)
+    expect(dashedEdge !== undefined).toBe(true)
+    expect(dashedEdge!.dashed).toBe(true)
+  })
+
+  test('feature local tip edge is NOT dashed', () => {
+    const f1Node = layout.nodes.find(n => n.commit.hash === f1Hash)!
+    const f1Edge = layout.edges.find(e => e.fromRow === f1Node.row && e.fromCol === f1Node.column)
+    if (f1Edge) expect(f1Edge.dashed ?? false).toBe(false)
+  })
+})
+
+// ─── Diverged layout: separate columns + fork edge ──────────────
+
+describe('computeDagLayout — diverged branches connect at fork point', () => {
+  const baseHash = makeHash()
+  const l1Hash = makeHash()
+  const l2Hash = makeHash()
+  const r1Hash = makeHash()
+  const r2Hash = makeHash()
+
+  const commits: ResolvedCommit[] = [
+    resolved({ hash: l1Hash, message: 'local 1', branch: 'main', parents: [l2Hash], branchRefs: ['main'], isBranchTip: true, isHead: true }),
+    resolved({ hash: l2Hash, message: 'local 2', branch: 'main', parents: [baseHash] }),
+    resolved({ hash: r1Hash, message: 'remote 1', branch: 'origin/main', parents: [r2Hash], branchRefs: ['origin/main'], isBranchTip: true }),
+    resolved({ hash: r2Hash, message: 'remote 2', branch: 'origin/main', parents: [baseHash] }),
+    resolved({ hash: baseHash, message: 'shared', branch: 'origin/main', parents: [] }),
+  ]
+
+  const layout = computeDagLayout(commits, 'main')
+
+  test('edge exists from local main to shared base', () => {
+    const l2Node = layout.nodes.find(n => n.commit.hash === l2Hash)!
+    const baseNode = layout.nodes.find(n => n.commit.hash === baseHash)!
+    const crossEdge = layout.edges.find(e =>
+      e.fromCol === l2Node.column && e.toCol === baseNode.column &&
+      e.toRow === baseNode.row
+    )
+    expect(crossEdge !== undefined).toBe(true)
+  })
+
+  test('no orphan nodes (every node reachable via edges)', () => {
+    assertNoOrphans(layout, commits)
+  })
+
+  test('local diverged main edges are dashed', () => {
+    const l1Node = layout.nodes.find(n => n.commit.hash === l1Hash)!
+    const localEdges = layout.edges.filter(e => e.fromCol === l1Node.column)
+    expect(localEdges.length > 0).toBe(true)
+    for (const e of localEdges) {
+      expect(e.dashed).toBe(true)
+    }
+  })
+
+  test('origin/main edges are NOT dashed', () => {
+    const r1Node = layout.nodes.find(n => n.commit.hash === r1Hash)!
+    const originEdges = layout.edges.filter(e => e.fromCol === r1Node.column && e.toCol === r1Node.column)
+    for (const e of originEdges) {
+      expect(e.dashed ?? false).toBe(false)
+    }
+  })
+})
+
 // ─── Summary ───────────────────────────────────────────────────
 
 console.log(`\n${passed} passed, ${failed} failed`)

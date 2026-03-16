@@ -1318,8 +1318,9 @@ export function resolveCommitGraph(commits: DagCommit[], baseBranch: string, req
       }
     }
   }
-  const hashToRawCommit = new Map<string, DagCommit>()
-  for (const c of commits) hashToRawCommit.set(c.hash, c)
+  const hashToCommit = new Map<string, DagCommit>()
+  for (const c of commits) hashToCommit.set(c.hash, c)
+  let originBaseDiverged = false
   for (const c of commits) {
     const parsed = commitParsedRefs.get(c.hash)!
     for (const ref of parsed.branchRefs) {
@@ -1328,19 +1329,20 @@ export function resolveCommitGraph(commits: DagCommit[], baseBranch: string, req
       const localTipHash = localTipHashes.get(localName)
       if (!localTipHash) continue
       let localReachesOrigin = false
-      let walker: DagCommit | undefined = hashToRawCommit.get(localTipHash)
+      let walker: DagCommit | undefined = hashToCommit.get(localTipHash)
       while (walker) {
         if (walker.hash === c.hash) { localReachesOrigin = true; break }
-        walker = walker.parents.length > 0 ? hashToRawCommit.get(walker.parents[0]) : undefined
+        walker = walker.parents.length > 0 ? hashToCommit.get(walker.parents[0]) : undefined
       }
       let originReachesLocal = false
-      walker = hashToRawCommit.get(c.hash)
+      walker = hashToCommit.get(c.hash)
       while (walker) {
         if (walker.hash === localTipHash) { originReachesLocal = true; break }
-        walker = walker.parents.length > 0 ? hashToRawCommit.get(walker.parents[0]) : undefined
+        walker = walker.parents.length > 0 ? hashToCommit.get(walker.parents[0]) : undefined
       }
       if (!localReachesOrigin && !originReachesLocal) {
         commitBranchName.set(c.hash, ref)
+        if (localName === baseBranch) originBaseDiverged = true
       } else if (originReachesLocal && !localReachesOrigin) {
         if (!commitBranchName.has(c.hash)) {
           commitBranchName.set(c.hash, localName)
@@ -1353,8 +1355,6 @@ export function resolveCommitGraph(commits: DagCommit[], baseBranch: string, req
   // These are NOT real branches — just metadata for the commit row label.
   // mergedFrom commits get their parents overridden to the merge's first parent
   // so they render as a simple bump (merge → side dot → back to main) with no long edges.
-  const hashToCommit = new Map<string, DagCommit>()
-  for (const c of commits) hashToCommit.set(c.hash, c)
   const mergedFromMap = new Map<string, string>()
   const mergedFromParentOverride = new Map<string, string[]>()
   for (const c of commits) {
@@ -1376,11 +1376,13 @@ export function resolveCommitGraph(commits: DagCommit[], baseBranch: string, req
   }
 
   // Pass 3: propagate branch name down through first-parent chain
-  // Base branch gets priority: it skips past other branch tips to claim shared ancestry
+  // Base branch gets priority: it skips past other branch tips to claim shared ancestry.
+  // When diverged, origin/<baseBranch> acts as the canonical trunk for shared commits.
+  const originBaseName = `origin/${baseBranch}`
   for (const c of commits) {
     if (!commitBranchName.has(c.hash)) continue
     const name = commitBranchName.get(c.hash)!
-    const isBase = name === baseBranch
+    const isBase = name === baseBranch || (originBaseDiverged && name === originBaseName)
     let current = c
     while (current.parents.length > 0) {
       const parent = hashToCommit.get(current.parents[0])
