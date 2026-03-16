@@ -7,7 +7,6 @@ interface UseTaskTerminalsResult {
   tabs: TerminalTab[]
   groups: TerminalGroup[]
   activeGroupId: string
-  isLoading: boolean
   setActiveGroupId: (id: string) => void
   createTab: (mode?: TerminalMode) => Promise<TerminalTab>
   splitTab: (tabId: string) => Promise<TerminalTab | null>
@@ -51,7 +50,6 @@ function computeGroups(tabs: TerminalTab[]): TerminalGroup[] {
 export function useTaskTerminals(taskId: string, defaultMode: TerminalMode): UseTaskTerminalsResult {
   const [tabs, setTabs] = useState<TerminalTab[]>([])
   const [activeGroupId, setActiveGroupId] = useState<string>(taskId) // Main group id = taskId
-  const [isLoading, setIsLoading] = useState(true)
   const closingTabIdsRef = useRef<Set<string>>(new Set())
   const { subscribeExit } = usePty()
 
@@ -60,7 +58,6 @@ export function useTaskTerminals(taskId: string, defaultMode: TerminalMode): Use
   // Load tabs on mount
   useEffect(() => {
     const loadTabs = async () => {
-      setIsLoading(true)
       try {
         await window.api.tabs.ensureMain(taskId, defaultMode)
         const loadedTabs = await window.api.tabs.list(taskId)
@@ -73,8 +70,6 @@ export function useTaskTerminals(taskId: string, defaultMode: TerminalMode): Use
         }
       } catch (err) {
         console.error('[useTaskTerminals] Failed to load tabs:', err)
-      } finally {
-        setIsLoading(false)
       }
     }
     loadTabs()
@@ -151,13 +146,12 @@ export function useTaskTerminals(taskId: string, defaultMode: TerminalMode): Use
 
   // Correct activeGroupId if the active group no longer exists
   useEffect(() => {
-    if (isLoading) return
     const activeGroup = groups.find(g => g.id === activeGroupId)
     if (!activeGroup && groups.length > 0) {
       const mainGroup = groups.find(g => g.isMain)
       setActiveGroupId(mainGroup?.id ?? groups[0].id)
     }
-  }, [groups, activeGroupId, isLoading])
+  }, [groups, activeGroupId])
 
   // Move a pane to a different group (null = new standalone group)
   const movePane = useCallback(async (tabId: string, targetGroupId: string | null): Promise<void> => {
@@ -182,7 +176,6 @@ export function useTaskTerminals(taskId: string, defaultMode: TerminalMode): Use
     tabs,
     groups,
     activeGroupId,
-    isLoading,
     setActiveGroupId,
     createTab,
     splitTab,

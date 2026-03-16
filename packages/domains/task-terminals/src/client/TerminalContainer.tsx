@@ -59,7 +59,6 @@ export const TerminalContainer = forwardRef<TerminalContainerHandle, TerminalCon
     tabs,
     groups,
     activeGroupId,
-    isLoading,
     setActiveGroupId,
     createTab,
     splitTab,
@@ -265,14 +264,6 @@ export const TerminalContainer = forwardRef<TerminalContainerHandle, TerminalCon
       onRetry: tab.isMain ? onRetry : undefined
     }))
   }, [activeGroup, getSessionId, cwd, conversationId, existingConversationId, initialPrompt, providerFlags, executionContext, handleConversationCreated, onSessionInvalid, handleTerminalReady, onFirstInput, onRetry])
-
-  if (isLoading || !activeGroup) {
-    return (
-      <div className="h-full flex items-center justify-center bg-white dark:bg-[#0a0a0a]">
-        <div className="text-neutral-500 text-sm">Loading terminal...</div>
-      </div>
-    )
-  }
 
   return (
     <div className="h-full flex flex-col">
