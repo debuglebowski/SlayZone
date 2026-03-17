@@ -355,8 +355,11 @@ export const BrowserPanel = forwardRef<BrowserPanelHandle, BrowserPanelProps>(fu
     }
 
     const handleNewWindow = (e: Event) => {
-      const url = (e as CustomEvent).detail?.url
+      const detail = (e as CustomEvent).detail
+      const url = detail?.url
       if (!url || (!url.startsWith('http://') && !url.startsWith('https://'))) return
+      // Skip tab creation for popups that opened as real windows (OAuth, etc.)
+      if (detail?.disposition === 'new-window') return
       createNewTabRef.current(url)
     }
 

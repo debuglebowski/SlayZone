@@ -100,8 +100,11 @@ export function WebPanelView({
     }
 
     const onNewWindow = (e: Event) => {
-      const popupUrl = (e as CustomEvent).detail?.url ?? ''
+      const detail = (e as CustomEvent).detail
+      const popupUrl = detail?.url ?? ''
       if (!popupUrl.startsWith('http://') && !popupUrl.startsWith('https://')) return
+      // Popups from webviews without desktop handoff open as real BrowserWindows — skip.
+      if (detail?.disposition === 'new-window' && !desktopHandoffPolicy) return
 
       if (desktopHandoffPolicy) {
         if (isLoopbackUrl(popupUrl)) return
