@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef, useEffect, useMemo, useImperativeHandle, forwardRef } from 'react'
-import { Code, Columns2, Eye, FileCode, Files, Search } from 'lucide-react'
+import { Code, Columns2, Eye, FileCode, Files, RefreshCw, Search } from 'lucide-react'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -51,6 +51,7 @@ export const FileEditorView = forwardRef<FileEditorViewHandle, FileEditorViewPro
     isFileDiskChanged,
     renameOpenFile,
     isRestoring,
+    refreshTree,
     treeRefreshKey,
     fileVersions
   } = useFileEditor(projectPath, initialEditorState)
@@ -259,6 +260,15 @@ export const FileEditorView = forwardRef<FileEditorViewHandle, FileEditorViewPro
             <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide mr-auto">
               {sidebarMode === 'search' ? 'Search' : 'Files'}
             </span>
+            {sidebarMode === 'tree' && (
+              <button
+                className="size-7 flex items-center justify-center rounded transition-colors text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                onClick={refreshTree}
+                title="Refresh file tree"
+              >
+                <RefreshCw className="size-3.5" />
+              </button>
+            )}
             {([
               { mode: 'tree' as const, icon: Files, title: 'Explorer' },
               { mode: 'search' as const, icon: Search, title: 'Search' }

@@ -296,6 +296,10 @@ export function useFileEditor(
 
   const activeFile = openFiles.find((f) => f.path === activeFilePath) ?? null
 
+  const refreshTree = useCallback(() => {
+    setTreeRefreshKey((k) => k + 1)
+  }, [])
+
   return {
     openFiles,
     activeFile,
@@ -310,6 +314,7 @@ export function useFileEditor(
     hasDirtyFiles,
     isFileDiskChanged,
     renameOpenFile,
+    refreshTree,
     isRestoring,
     treeRefreshKey,
     fileVersions
