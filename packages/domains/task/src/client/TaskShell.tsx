@@ -1,7 +1,13 @@
+import { useEffect } from 'react'
 import { Skeleton } from '@slayzone/ui'
 
 /** Skeleton fallback for TaskDetailPage Suspense boundary. Matches the task layout structure. */
 export function TaskShell(): React.JSX.Element {
+  useEffect(() => {
+    performance.mark('sz:suspense:taskShell:mount')
+    return () => { performance.mark('sz:suspense:taskShell:unmount') }
+  }, [])
+
   return (
     <div className="flex flex-col h-full">
       {/* Toolbar skeleton */}

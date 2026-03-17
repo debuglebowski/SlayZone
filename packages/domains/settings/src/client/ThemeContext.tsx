@@ -17,6 +17,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let disposed = false
+    performance.mark('sz:theme:start')
 
     const initialize = async () => {
       const [effective, source] = await Promise.all([
@@ -27,6 +28,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       setTheme(effective)
       setPreferenceState(source)
       applyTheme(effective)
+      performance.mark('sz:theme:end')
     }
 
     initialize().catch(() => {
@@ -34,6 +36,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       setTheme('dark')
       setPreferenceState('dark')
       applyTheme('dark')
+      performance.mark('sz:theme:end')
     })
 
     const unsubscribe = window.api.theme.onChange((effective) => {

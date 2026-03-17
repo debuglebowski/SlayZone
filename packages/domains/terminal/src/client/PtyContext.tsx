@@ -133,6 +133,7 @@ export function PtyProvider({ children }: { children: ReactNode }) {
 
   // Seed from existing PTYs on mount
   useEffect(() => {
+    performance.mark('sz:pty:start')
     window.api.pty.list().then((ptys) => {
       for (const p of ptys) {
         if (ALIVE_STATES.has(p.state)) {
@@ -146,6 +147,7 @@ export function PtyProvider({ children }: { children: ReactNode }) {
         }
       }
       refreshActiveTaskIds()
+      performance.mark('sz:pty:end')
     })
   }, [refreshActiveTaskIds])
 

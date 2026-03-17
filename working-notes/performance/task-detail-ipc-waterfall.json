@@ -1,0 +1,28 @@
+{
+  "timestamp": "2026-03-16T22:17:06.486Z",
+  "taskId": "a01a9c1d-1e38-45a3-aea1-16c5ca808c6f",
+  "timings": [
+    {
+      "name": "db.getTask",
+      "durationMs": 0.6
+    },
+    {
+      "name": "tags.getTags",
+      "durationMs": 0.6
+    },
+    {
+      "name": "taskTags.getTagsForTask",
+      "durationMs": 0.8
+    },
+    {
+      "name": "db.getProjects",
+      "durationMs": 1
+    },
+    {
+      "name": "db.getSubTasks",
+      "durationMs": 1.1
+    }
+  ],
+  "totalMs": 1.2,
+  "parallelBatchMs": 1.1
+}

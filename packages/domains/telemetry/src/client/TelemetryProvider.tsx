@@ -18,18 +18,18 @@ export const TelemetryContext = createContext<TelemetryContextValue>({
 
 export function TelemetryProvider({ children }: { children: ReactNode }) {
   const [tier, setTier] = useState<TelemetryTier>('anonymous')
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const [posthogProvider, setPosthogProvider] = useState<{ Provider: React.ComponentType<any>; client: unknown } | null>(null)
   const initializedRef = useRef(false)
 
   useEffect(() => {
     if (initializedRef.current) return
     initializedRef.current = true
 
+    performance.mark('sz:telemetry:start')
     window.api.settings.get(SETTINGS_KEY).then(async (stored) => {
       const t: TelemetryTier = stored === 'opted_in' ? 'opted_in' : 'anonymous'
       setTier(t)
       await initTelemetry(t)
+      performance.mark('sz:telemetry:end')
       startHeartbeat()
       startIpcTelemetryBridge()
 
@@ -39,10 +39,6 @@ export function TelemetryProvider({ children }: { children: ReactNode }) {
           ph.register({ app_version: version })
           track('app_opened', { version })
         })
-
-        // Lazy-load PostHogProvider wrapper
-        const { PostHogProvider } = await import('@posthog/react')
-        setPosthogProvider({ Provider: PostHogProvider, client: ph })
       }
     })
 
@@ -55,13 +51,9 @@ export function TelemetryProvider({ children }: { children: ReactNode }) {
     window.api.settings.set(SETTINGS_KEY, newTier)
   }, [])
 
-  const inner = posthogProvider
-    ? <posthogProvider.Provider client={posthogProvider.client}>{children}</posthogProvider.Provider>
-    : children
-
   return (
     <TelemetryContext.Provider value={{ tier, setTier: changeTier, track }}>
-      {inner}
+      {children}
     </TelemetryContext.Provider>
   )
 }

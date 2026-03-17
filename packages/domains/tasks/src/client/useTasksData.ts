@@ -52,6 +52,7 @@ export function useTasksData(): UseTasksDataReturn {
       if (inFlight) { pending = true; return }
       inFlight = true
       pending = false
+      if (firstLoad) performance.mark('sz:loadBoardData:start')
       window.api.db.loadBoardData().then((data) => {
         setTasks(data.tasks as Task[])
         setProjects(data.projects as Project[])
@@ -60,7 +61,9 @@ export function useTasksData(): UseTasksDataReturn {
         setBlockedTaskIds(new Set(data.blockedTaskIds))
       }).finally(() => {
         if (firstLoad) {
+          performance.mark('sz:loadBoardData:end')
           firstLoad = false
+          performance.mark('sz:dataReady')
           window.api.app.dataReady()
         }
         inFlight = false

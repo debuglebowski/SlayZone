@@ -22,6 +22,7 @@ export function AppearanceProvider({
   const [settings, setSettings] = useState<AppearanceSettings>(appearanceDefaults)
 
   useEffect(() => {
+    performance.mark('sz:appearance:start')
     Promise.all([
       window.api.settings.get('terminal_font_size'),
       window.api.settings.get('editor_font_size'),
@@ -52,6 +53,7 @@ export function AppearanceProvider({
       termThemeFollow, termThemeDark, termThemeLight,
     ]) => {
       const d = appearanceDefaults
+      performance.mark('sz:appearance:end')
       setSettings({
         terminalFontSize: termSize ? parseInt(termSize, 10) : d.terminalFontSize,
         editorFontSize: editorSize ? parseInt(editorSize, 10) : d.editorFontSize,

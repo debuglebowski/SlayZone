@@ -1,0 +1,12 @@
+{
+  "jsHeapUsedBefore": 33,
+  "jsHeapUsedAfter": 50,
+  "domNodes": 2327,
+  "jsEventListeners": 2740,
+  "layoutCount": 0,
+  "recalcStyleCount": 0,
+  "layoutDuration": 0,
+  "recalcStyleDuration": 0,
+  "scriptDuration": 35,
+  "taskDuration": 38
+}

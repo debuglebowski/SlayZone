@@ -88,6 +88,7 @@ const COMMUNITY_DISCORD_URL = 'https://discord.gg/g7xPHXaU98'
 const COMMUNITY_X_URL = 'https://x.com/debuglebowski'
 
 function App(): React.JSX.Element {
+  performance.mark('sz:app:render')
   // Core data from domain hook
   const {
     tasks, projects, tags, taskTags, blockedTaskIds,
@@ -203,6 +204,8 @@ function App(): React.JSX.Element {
     onJoinCommunity: handleChecklistJoinCommunity,
     onFollowOnX: handleChecklistFollowOnX
   })
+
+  useEffect(() => { performance.mark('sz:app:mounted') }, [])
 
   useEffect(() => {
     Promise.all([

@@ -219,10 +219,10 @@ export const useTabStore = create<TabState>()(
 // Eagerly load persisted state at module scope — runs before any component mounts,
 // eliminating race conditions between store hydration and React effects.
 export const tabStoreReady: Promise<void> = (typeof window !== 'undefined' && window.api?.settings
-  ? Promise.all([
+  ? (performance.mark('sz:tabStore:start'), Promise.all([
     window.api.settings.get('viewState'),
     window.api.settings.get('leaderboard_enabled')
-  ]).then(([value, lbVal]) => {
+  ])).then(([value, lbVal]) => {
     const leaderboardEnabled = lbVal !== '0'
     if (value) {
       try {
@@ -239,6 +239,8 @@ export const tabStoreReady: Promise<void> = (typeof window !== 'undefined' && wi
   }).catch(() => {
     // IPC failure — render with default state rather than permanent white screen
     useTabStore.setState({ isLoaded: true })
+  }).finally(() => {
+    performance.mark('sz:tabStore:end')
   })
   : Promise.resolve()
 )
