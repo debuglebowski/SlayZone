@@ -1,6 +1,79 @@
 # Changelog
 
 
+## v0.5.0
+
+[compare changes](https://github.com/debuglebowski/slayzone/compare/v0.4.0...v0.5.0)
+
+### 🚀 Enhancements
+
+- **task:** Add fullscreen description dialog, remove AI generation ([4c0f3a4](https://github.com/debuglebowski/slayzone/commit/4c0f3a4))
+- **processes:** Add per-process stats (duration, CPU, memory, restart count) ([aa84716](https://github.com/debuglebowski/slayzone/commit/aa84716))
+- **telemetry:** Add 87 feature usage analytics events via hybrid IPC+inline approach ([508bc43](https://github.com/debuglebowski/slayzone/commit/508bc43))
+- **terminal:** Add CPU/memory/duration stats to Active Terminals popover ([c84e895](https://github.com/debuglebowski/slayzone/commit/c84e895))
+- **terminal:** Add pulse grid loading animation ([5342e75](https://github.com/debuglebowski/slayzone/commit/5342e75))
+- **task:** Replace manual loading state with React Suspense ([9989bdb](https://github.com/debuglebowski/slayzone/commit/9989bdb))
+- **usage-analytics:** Add usage analytics domain with token tracking ([c41948b](https://github.com/debuglebowski/slayzone/commit/c41948b))
+- **worktrees:** Handle diverged local/remote branches in commit graph ([354aabd](https://github.com/debuglebowski/slayzone/commit/354aabd))
+- **sidebar:** Move leaderboard + usage buttons to sidebar footer ([b77b1a7](https://github.com/debuglebowski/slayzone/commit/b77b1a7))
+- **telemetry:** Add exception autocapture for opted-in users ([63b24ef](https://github.com/debuglebowski/slayzone/commit/63b24ef))
+- **tasks:** Support dropping tasks into empty list-view groups ([b5ca241](https://github.com/debuglebowski/slayzone/commit/b5ca241))
+- **terminal:** Add clickable URLs via inline link provider ([d46b794](https://github.com/debuglebowski/slayzone/commit/d46b794))
+- **terminal:** Add clickable file paths + modifier key routing ([87b6061](https://github.com/debuglebowski/slayzone/commit/87b6061))
+- **terminal:** Add one-time toast hints for Cmd+Shift+Click ([48d4c0a](https://github.com/debuglebowski/slayzone/commit/48d4c0a))
+- **usage:** Add keychain auth type for custom usage providers ([7e224cf](https://github.com/debuglebowski/slayzone/commit/7e224cf))
+- **terminal:** Detect soft-wrapped URLs across non-wrapped lines ([9d6209f](https://github.com/debuglebowski/slayzone/commit/9d6209f))
+- **website:** Add cookieless PostHog analytics via managed proxy ([7516e93](https://github.com/debuglebowski/slayzone/commit/7516e93))
+- **worktrees:** Replace rebase/merge buttons with sync dropdown and merge-to-parent ([2a47f80](https://github.com/debuglebowski/slayzone/commit/2a47f80))
+- **perf:** Startup performance marks, suspense cache prefetch, drop PostHogProvider ([7cf9444](https://github.com/debuglebowski/slayzone/commit/7cf9444))
+- **website:** Track download and GitHub button clicks ([3b2d91f](https://github.com/debuglebowski/slayzone/commit/3b2d91f))
+- **worktrees:** Add "Use existing branch" option to worktree creation dropdown ([b232ceb](https://github.com/debuglebowski/slayzone/commit/b232ceb))
+- **terminal:** Add Cmd+Up/Down shortcuts to scroll to top/bottom ([ef238a1](https://github.com/debuglebowski/slayzone/commit/ef238a1))
+
+### 🩹 Fixes
+
+- **worktrees:** Return empty array when repo has no git remotes ([72e6db6](https://github.com/debuglebowski/slayzone/commit/72e6db6))
+- Guard webContents.send() against disposed render frames ([3619c26](https://github.com/debuglebowski/slayzone/commit/3619c26))
+- **worktrees:** Exclude OS/editor artifacts from worktree file copy ([70aaba4](https://github.com/debuglebowski/slayzone/commit/70aaba4))
+- **task:** Equalize task detail padding ([3e0bf79](https://github.com/debuglebowski/slayzone/commit/3e0bf79))
+- **terminal:** Show loading state during buffer replay on tab activation ([1951314](https://github.com/debuglebowski/slayzone/commit/1951314))
+- **mcp:** Use dynamic port allocation to prevent EADDRINUSE on restart ([1015e2a](https://github.com/debuglebowski/slayzone/commit/1015e2a))
+- **nix:** Glob .desktop file in AppImage extraction ([eba2127](https://github.com/debuglebowski/slayzone/commit/eba2127))
+- **browser:** Improve CAPTCHA compatibility in webview ([bd160ab](https://github.com/debuglebowski/slayzone/commit/bd160ab))
+- **browser:** Guard disposed frames, allow OAuth popups, remove stale chrome API fakes ([0406b34](https://github.com/debuglebowski/slayzone/commit/0406b34))
+- **browser:** Skip tab creation for new-window popup disposition ([d729325](https://github.com/debuglebowski/slayzone/commit/d729325))
+- **browser:** Spoof navigator.userAgentData, skip hardening in OAuth popups ([f5e8cad](https://github.com/debuglebowski/slayzone/commit/f5e8cad))
+- **browser:** Drop webPreferences override from OAuth popup options ([4c342e8](https://github.com/debuglebowski/slayzone/commit/4c342e8))
+- **worktrees:** Use async fs ops in copyIgnoredFiles to prevent UI freeze ([4b89c04](https://github.com/debuglebowski/slayzone/commit/4b89c04))
+- **tutorial:** Scale scene animation to fit smaller viewports ([3ef15bd](https://github.com/debuglebowski/slayzone/commit/3ef15bd))
+- **worktrees:** Correct graph layout for diverged branches ([470099c](https://github.com/debuglebowski/slayzone/commit/470099c))
+
+### 💅 Refactors
+
+- **worktrees:** Redesign copy-files dialog with card-based mode picker ([cdf496c](https://github.com/debuglebowski/slayzone/commit/cdf496c))
+- **task-terminals:** Remove redundant loading state from TerminalContainer ([cfd3181](https://github.com/debuglebowski/slayzone/commit/cfd3181))
+- **terminal:** Remove unused useCallback import ([f95c1ee](https://github.com/debuglebowski/slayzone/commit/f95c1ee))
+- **app:** Extract 5 self-contained hooks from App.tsx ([a5f8876](https://github.com/debuglebowski/slayzone/commit/a5f8876))
+- **app:** Extract dialog state from App.tsx into zustand store ([de13d6e](https://github.com/debuglebowski/slayzone/commit/de13d6e))
+
+### 📖 Documentation
+
+- Add webauthn-passkeys research notes ([051c982](https://github.com/debuglebowski/slayzone/commit/051c982))
+
+### 🏡 Chore
+
+- **nix:** Update sources to 0.4.0 ([4327416](https://github.com/debuglebowski/slayzone/commit/4327416))
+- **integrations:** Remove noisy discovery log ([b642d8b](https://github.com/debuglebowski/slayzone/commit/b642d8b))
+- Add graph-visual-report.html to gitignore ([2236803](https://github.com/debuglebowski/slayzone/commit/2236803))
+
+### ✅ Tests
+
+- **worktrees:** Add diverged-branch layout tests and visual test runner ([962dbe4](https://github.com/debuglebowski/slayzone/commit/962dbe4))
+
+### ❤️ Contributors
+
+- Debuglebowski
+
 ## v0.4.0
 
 [compare changes](https://github.com/debuglebowski/slayzone/compare/v0.3.1...v0.4.0)

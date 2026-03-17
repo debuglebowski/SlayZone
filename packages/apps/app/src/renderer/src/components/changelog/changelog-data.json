@@ -1,5 +1,57 @@
 [
   {
+    "version": "0.5.0",
+    "date": "2026-03-17",
+    "tagline": "Click & connect",
+    "items": [
+      {
+        "category": "feature",
+        "title": "Clickable terminal links",
+        "description": "URLs and file paths in terminals are now clickable — Cmd+Click opens files, Cmd+Shift+Click opens in default app."
+      },
+      {
+        "category": "feature",
+        "title": "Worktree sync & merge",
+        "description": "New sync dropdown with merge-to-parent and use-existing-branch options."
+      },
+      {
+        "category": "improvement",
+        "title": "Fullscreen task descriptions",
+        "description": "Task descriptions open in a distraction-free fullscreen dialog."
+      },
+      {
+        "category": "improvement",
+        "title": "Process stats",
+        "description": "Active terminals and processes now show CPU, memory, duration, and restart count."
+      },
+      {
+        "category": "improvement",
+        "title": "Sidebar reorganized",
+        "description": "Leaderboard and usage buttons moved to the sidebar footer for cleaner navigation."
+      },
+      {
+        "category": "improvement",
+        "title": "Drag to empty groups",
+        "description": "Tasks can now be dropped into empty list-view groups."
+      },
+      {
+        "category": "fix",
+        "title": "Browser logins",
+        "description": "CAPTCHAs and OAuth popups now work reliably in the browser panel."
+      },
+      {
+        "category": "fix",
+        "title": "Worktree file copying",
+        "description": "Creating worktrees no longer freezes the UI, and junk files are excluded."
+      },
+      {
+        "category": "fix",
+        "title": "Diverged branch graph",
+        "description": "Commit graph now correctly renders diverged local/remote branches."
+      }
+    ]
+  },
+  {
     "version": "0.4.0",
     "date": "2026-03-15",
     "tagline": "Speed & sync",
