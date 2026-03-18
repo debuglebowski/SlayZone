@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useMemo, useCallback } from 'react'
 import { Settings, Keyboard, ChevronDown, Megaphone, Check, CheckCheck, Trophy, BarChart3 } from 'lucide-react'
 import { isConvexConfigured } from '@/lib/convexAuth'
 import { FeedbackDialog } from '../feedback/FeedbackDialog'
@@ -25,10 +25,13 @@ import {
 import { ProjectItem } from './ProjectItem'
 import { TerminalStatusPopover } from '@slayzone/terminal'
 import { cn, useAppearance } from '@slayzone/ui'
+import { shortcutDefinitions, formatKeysForDisplay, type ShortcutDefinition } from '@slayzone/ui'
 import { useTabStore, useDialogStore } from '@slayzone/settings'
 import type { Task } from '@slayzone/task/shared'
 import type { Project } from '@slayzone/projects/shared'
 import type { OnboardingChecklistState } from '@/hooks/useOnboardingChecklist'
+import { useShortcutStore } from '@/hooks/useShortcutStore'
+import { KeyRecorder } from '@/components/KeyRecorder'
 
 interface AppSidebarProps {
   projects: Project[]
@@ -45,48 +48,99 @@ interface AppSidebarProps {
   attentionByProject: Map<string, number>
 }
 
-const isMac = navigator.platform.startsWith('Mac')
+function ShortcutRow({
+  def,
+  effectiveKeys,
+  isCustomized,
+  isRecordingThis,
+  onStartRecording,
+  onCancelRecording,
+  conflictAction,
+  onConfirmReassign,
+  onCancelConflict,
+}: {
+  def: ShortcutDefinition
+  effectiveKeys: string
+  isCustomized: boolean
+  isRecordingThis: boolean
+  onStartRecording: () => void
+  onCancelRecording: () => void
+  conflictAction: ShortcutDefinition | null
+  onConfirmReassign: () => void
+  onCancelConflict: () => void
+}) {
+  const customizable = def.customizable !== false
 
-const shortcutGroups = [
-  { heading: 'General', items: [
-    { label: 'New Task', keys: isMac ? '⌘ N' : 'Ctrl N' },
-    { label: 'Search', keys: isMac ? '⌘ K' : 'Ctrl K' },
-    { label: 'Complete & Close Tab', keys: isMac ? '⌘ ⇧ D' : 'Ctrl ⇧ D' },
-    { label: 'Zen Mode', keys: isMac ? '⌘ J' : 'Ctrl J' },
-    { label: 'Explode Mode', keys: isMac ? '⌘ ⇧ E' : 'Ctrl ⇧ E' },
-    { label: 'Exit Zen / Explode', keys: 'Esc' },
-    { label: 'Global Settings', keys: isMac ? '⌘ ,' : 'Ctrl ,' },
-    { label: 'Project Settings', keys: isMac ? '⌘ ⇧ ,' : 'Ctrl ⇧ ,' },
-    ...(isMac ? [{ label: 'Go Home', keys: '⌘ §' }] : []),
-  ]},
-  { heading: 'Tabs', items: [
-    { label: 'Close Sub-panel / Tab', keys: isMac ? '⌘ W' : 'Ctrl W' },
-    { label: 'Close Task', keys: isMac ? '⌘ ⇧ W' : 'Ctrl ⇧ W' },
-    { label: 'Switch Tab 1–9', keys: isMac ? '⌘ 1–9' : 'Ctrl 1–9' },
-    { label: 'Next Tab', keys: '^ Tab' },
-    { label: 'Previous Tab', keys: '^ ⇧ Tab' },
-    { label: 'Reopen Closed Tab', keys: isMac ? '⌘ ⇧ T' : 'Ctrl ⇧ T' },
-    { label: 'New Temporary Task', keys: isMac ? '⌘ ⇧ N' : 'Ctrl ⇧ N' },
-  ]},
-  { heading: 'Task Panels', items: [
-    { label: 'Terminal', keys: '⌘ T' },
-    { label: 'Browser', keys: '⌘ B' },
-    { label: 'Editor', keys: '⌘ E' },
-    { label: 'Quick Open File', keys: '⌘ P' },
-    { label: 'Git', keys: '⌘ G' },
-    { label: 'Git Diff', keys: '⌘ ⇧ G' },
-    { label: 'Settings', keys: '⌘ S' },
-  ]},
-  { heading: 'Terminal', items: [
-    { label: 'Inject Title', keys: '⌘ I' },
-    { label: 'Inject Description', keys: '⌘ ⇧ I' },
-    { label: 'Screenshot', keys: '⌘ ⇧ S' },
-    { label: 'Search', keys: '⌘ F' },
-    { label: 'Clear Buffer', keys: '⌘ ⇧ K' },
-    { label: 'New Group', keys: '⌘ T' },
-    { label: 'Split', keys: '⌘ D' },
-  ]},
-]
+  return (
+    <div>
+      <div className="flex items-center justify-between px-3 py-2">
+        <span className="text-sm">{def.label}</span>
+        {isRecordingThis ? (
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-muted-foreground bg-primary/10 border border-primary/30 px-2.5 py-0.5 rounded-md font-[system-ui] animate-pulse">
+              Press keys...
+            </span>
+            <button
+              type="button"
+              onClick={onCancelRecording}
+              className="text-xs text-muted-foreground hover:text-foreground"
+            >
+              ✕
+            </button>
+          </div>
+        ) : (
+          <div className="flex items-center gap-1.5 group">
+            <span
+              className={cn(
+                'text-base text-muted-foreground bg-muted border px-2.5 py-0.5 rounded-md font-[system-ui] shadow-[0_1px_0_0_rgba(0,0,0,0.05)]',
+                isCustomized && 'border-green-500/30 bg-green-500/10 text-green-400',
+                customizable && 'cursor-pointer'
+              )}
+              onClick={customizable ? onStartRecording : undefined}
+            >
+              {formatKeysForDisplay(effectiveKeys)}
+            </span>
+            {isCustomized && (
+              <span className="text-[10px] text-muted-foreground">(custom)</span>
+            )}
+            {customizable && (
+              <button
+                type="button"
+                onClick={onStartRecording}
+                className="text-xs text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity"
+              >
+                ✎
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+      {conflictAction && (
+        <div className="flex items-center justify-between px-3 pb-2 gap-2">
+          <span className="text-xs text-amber-400">
+            ⚠ Already bound to <strong>{conflictAction.label}</strong> — it will be unbound
+          </span>
+          <div className="flex gap-1.5 shrink-0">
+            <button
+              type="button"
+              onClick={onCancelConflict}
+              className="text-xs px-2 py-0.5 rounded border border-border bg-muted text-muted-foreground hover:text-foreground"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={onConfirmReassign}
+              className="text-xs px-2 py-0.5 rounded bg-primary text-primary-foreground hover:bg-primary/90"
+            >
+              Reassign
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
 
 export function AppSidebar({
   projects,
@@ -104,8 +158,62 @@ export function AppSidebar({
 }: AppSidebarProps) {
   const [shortcutsOpen, setShortcutsOpen] = useState(false)
   const [checklistOpen, setChecklistOpen] = useState(false)
+  const [recordingId, setRecordingId] = useState<string | null>(null)
+  const [pendingKeys, setPendingKeys] = useState<string | null>(null)
+  const [pendingConflict, setPendingConflict] = useState<ShortcutDefinition | null>(null)
   const { sidebarBadgeMode } = useAppearance()
   const activeView = useTabStore((s) => s.activeView)
+
+  const { getKeys, isCustomized: isCustomizedFn, findConflict, setOverride, removeOverride, resetAll, setRecording } = useShortcutStore()
+
+  const shortcutGroups = useMemo(() => {
+    const groups: { heading: string; items: ShortcutDefinition[] }[] = []
+    for (const def of shortcutDefinitions) {
+      let group = groups.find(g => g.heading === def.group)
+      if (!group) {
+        group = { heading: def.group, items: [] }
+        groups.push(group)
+      }
+      group.items.push(def)
+    }
+    return groups
+  }, [])
+
+  const handleCapture = useCallback((keys: string) => {
+    if (!recordingId) return
+    const def = shortcutDefinitions.find(d => d.id === recordingId)
+    if (!def) return
+
+    const conflict = findConflict(keys, def.scope)
+    if (conflict && conflict.id !== recordingId) {
+      setPendingKeys(keys)
+      setPendingConflict(conflict)
+      return
+    }
+
+    setOverride(recordingId, keys)
+    setRecordingId(null)
+    setRecording(false)
+    setPendingKeys(null)
+    setPendingConflict(null)
+  }, [recordingId, findConflict, setOverride, setRecording])
+
+  const handleCancelRecording = useCallback(() => {
+    setRecordingId(null)
+    setRecording(false)
+    setPendingKeys(null)
+    setPendingConflict(null)
+  }, [setRecording])
+
+  const handleConfirmReassign = useCallback(async () => {
+    if (!recordingId || !pendingKeys || !pendingConflict) return
+    await removeOverride(pendingConflict.id)
+    await setOverride(recordingId, pendingKeys)
+    setRecordingId(null)
+    setRecording(false)
+    setPendingKeys(null)
+    setPendingConflict(null)
+  }, [recordingId, pendingKeys, pendingConflict, removeOverride, setOverride, setRecording])
 
   return (
     <Sidebar collapsible="none" className={zenMode ? "!w-0 h-svh overflow-hidden" : "w-18 h-svh"}>
@@ -309,12 +417,20 @@ export function AppSidebar({
               <TooltipContent side="right">Keyboard Shortcuts</TooltipContent>
             </Tooltip>
             {isConvexConfigured && <FeedbackDialog />}
-            <Dialog open={shortcutsOpen} onOpenChange={setShortcutsOpen}>
+            <Dialog open={shortcutsOpen} onOpenChange={(open) => {
+              setShortcutsOpen(open)
+              if (!open) handleCancelRecording()
+            }}>
               <DialogContent className="max-h-[80vh] flex flex-col">
                 <DialogHeader>
                   <DialogTitle>Keyboard Shortcuts</DialogTitle>
                   <DialogDescription className="sr-only">List of keyboard shortcuts</DialogDescription>
                 </DialogHeader>
+                <KeyRecorder
+                  active={recordingId !== null && !pendingConflict}
+                  onCapture={handleCapture}
+                  onCancel={handleCancelRecording}
+                />
                 <div className="space-y-1 overflow-y-auto scrollbar-thin">
                   {shortcutGroups.map((group, i) => (
                     <Collapsible.Root key={group.heading} defaultOpen={i === 0}>
@@ -324,16 +440,37 @@ export function AppSidebar({
                       </Collapsible.Trigger>
                       <Collapsible.Content className="data-[state=closed]:hidden">
                         <div className="rounded-lg border divide-y mb-3">
-                          {group.items.map((s) => (
-                            <div key={s.label} className="flex items-center justify-between px-3 py-2">
-                              <span className="text-sm">{s.label}</span>
-                              <span className="text-base text-muted-foreground bg-muted border px-2.5 py-0.5 rounded-md font-[system-ui] shadow-[0_1px_0_0_rgba(0,0,0,0.05)]">{s.keys}</span>
-                            </div>
+                          {group.items.map((def) => (
+                            <ShortcutRow
+                              key={def.id}
+                              def={def}
+                              effectiveKeys={getKeys(def.id)}
+                              isCustomized={isCustomizedFn(def.id)}
+                              isRecordingThis={recordingId === def.id}
+                              onStartRecording={() => {
+                                handleCancelRecording()
+                                setRecordingId(def.id)
+                                setRecording(true)
+                              }}
+                              onCancelRecording={handleCancelRecording}
+                              conflictAction={recordingId === def.id ? pendingConflict : null}
+                              onConfirmReassign={handleConfirmReassign}
+                              onCancelConflict={handleCancelRecording}
+                            />
                           ))}
                         </div>
                       </Collapsible.Content>
                     </Collapsible.Root>
                   ))}
+                </div>
+                <div className="flex justify-center pt-2 pb-1">
+                  <button
+                    type="button"
+                    onClick={resetAll}
+                    className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    Reset All to Defaults
+                  </button>
                 </div>
               </DialogContent>
             </Dialog>
