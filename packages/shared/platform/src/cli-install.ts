@@ -55,6 +55,9 @@ export function installCli(cliSrcPath: string): CliInstallResult {
 }
 
 function installUnix(cliSrcPath: string, target: string, binDir: string): CliInstallResult {
+  if (!fs.existsSync(cliSrcPath)) {
+    return { ok: false, error: `CLI source not found: ${cliSrcPath}` }
+  }
   if (fs.existsSync(target)) fs.unlinkSync(target)
   fs.symlinkSync(cliSrcPath, target)
   const notInPath = !isBinDirInPath(binDir)
