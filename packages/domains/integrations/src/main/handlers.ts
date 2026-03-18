@@ -58,7 +58,8 @@ import type {
   BatchTaskSyncStatusItem,
   ListProviderIssuesInput,
   ImportProviderIssuesInput,
-  ImportProviderIssuesResult
+  ImportProviderIssuesResult,
+  ConnectJiraInput
 } from '../shared'
 import { runProviderSync, pushNewTaskToProviders, getDesiredRemoteStatusId, resolveLocalStatus, resolveStatusByCategory } from './sync'
 import { providerStatusesToColumns, computeStatusDiff } from './status-sync'
@@ -1178,6 +1179,63 @@ export function registerIntegrationHandlers(
     }
 
     return toPublicConnection(getConnection(db, id))
+  })
+
+  ipcMain.handle('integrations:connect-jira', async (_event, input: ConnectJiraInput) => {
+    const domain = input.cloudDomain.trim()
+    const email = input.email.trim()
+    const apiToken = input.apiToken.trim()
+    if (!domain || !email || !apiToken) throw new Error('Cloud domain, email, and API token are required')
+
+    const { buildJiraCredential } = await import('./jira-client')
+    const credential = buildJiraCredential(email, apiToken, domain)
+
+    const adapter = getAdapter('jira')
+    await adapter.validateCredential(credential)
+
+    const credentialRef = crypto.randomUUID()
+    storeCredential(db, credentialRef, credential)
+    const currentProjectConnectionId = input.projectId
+      ? getProjectConnectionId(db, input.projectId, 'jira')
+      : null
+
+    if (currentProjectConnectionId) {
+      const existing = getConnection(db, currentProjectConnectionId)
+      deleteCredential(db, existing.credential_ref)
+      db.prepare(`
+        UPDATE integration_connections
+        SET credential_ref = ?, enabled = 1, updated_at = datetime('now')
+        WHERE id = ?
+      `).run(credentialRef, existing.id)
+      if (input.projectId) {
+        setProjectConnection(db, { projectId: input.projectId, provider: 'jira', connectionId: existing.id })
+      }
+      return toPublicConnection(getConnection(db, existing.id))
+    }
+
+    const id = crypto.randomUUID()
+    db.prepare(`
+      INSERT INTO integration_connections (
+        id, provider, credential_ref, enabled, created_at, updated_at, last_synced_at
+      ) VALUES (?, 'jira', ?, 1, datetime('now'), datetime('now'), NULL)
+    `).run(id, credentialRef)
+
+    if (input.projectId) {
+      setProjectConnection(db, { projectId: input.projectId, provider: 'jira', connectionId: id })
+    }
+    return toPublicConnection(getConnection(db, id))
+  })
+
+  ipcMain.handle('integrations:get-jira-transitions', async (_event, taskId: string) => {
+    const link = db.prepare(`
+      SELECT * FROM external_links WHERE task_id = ? AND provider = 'jira'
+    `).get(taskId) as ExternalLink | undefined
+    if (!link) throw new Error('Task is not linked to Jira')
+
+    const connection = getConnection(db, link.connection_id)
+    const credential = readCredential(db, connection.credential_ref)
+    const { getTransitions } = await import('./jira-client')
+    return getTransitions(credential, link.external_key)
   })
 
   ipcMain.handle('integrations:update-connection', async (_event, input: UpdateIntegrationConnectionInput) => {

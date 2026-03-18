@@ -304,7 +304,8 @@ interface ExternalSyncCardProps {
 
 const PROVIDER_LABELS: Record<ExternalLink['provider'], string> = {
   linear: 'Linear',
-  github: 'GitHub'
+  github: 'GitHub',
+  jira: 'Jira'
 }
 
 const SYNC_STATE_META: Record<TaskSyncStatus['state'], { label: string; className: string }> = {

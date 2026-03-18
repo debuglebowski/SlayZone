@@ -59,6 +59,13 @@ export const PROVIDER_CONFIG: Record<IntegrationProvider, ProviderUiConfig> = {
     scopeLabel: 'Project',
     hasScopes: true,
     supportsTwoWay: false
+  },
+  jira: {
+    displayName: 'Jira',
+    groupLabel: 'Project',
+    scopeLabel: '',
+    hasScopes: false,
+    supportsTwoWay: true
   }
 }
 

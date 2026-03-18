@@ -20,15 +20,21 @@ interface ProjectIntegrationConnectionModalProps {
 }
 
 function providerLabel(provider: IntegrationProvider): string {
-  return provider === 'github' ? 'GitHub' : 'Linear'
+  if (provider === 'github') return 'GitHub'
+  if (provider === 'jira') return 'Jira'
+  return 'Linear'
 }
 
 function credentialLabel(provider: IntegrationProvider): string {
-  return provider === 'github' ? 'Personal access token' : 'Personal API key'
+  if (provider === 'github') return 'Personal access token'
+  if (provider === 'jira') return 'API token'
+  return 'Personal API key'
 }
 
 function credentialPlaceholder(provider: IntegrationProvider): string {
-  return provider === 'github' ? 'github_pat_***' : 'lin_api_***'
+  if (provider === 'github') return 'github_pat_***'
+  if (provider === 'jira') return 'Your Jira API token'
+  return 'lin_api_***'
 }
 
 function credentialGuide(provider: IntegrationProvider): { title: string; steps: string[] } {
@@ -40,6 +46,19 @@ function credentialGuide(provider: IntegrationProvider): { title: string; steps:
         'Go to Developer settings -> Personal access tokens -> Fine-grained tokens.',
         'Create a token with access to the repositories/projects you want to sync.',
         'Copy the token and paste it here (starts with github_pat_).'
+      ]
+    }
+  }
+
+  if (provider === 'jira') {
+    return {
+      title: 'How to connect Jira Cloud',
+      steps: [
+        'Go to id.atlassian.com/manage-profile/security/api-tokens.',
+        'Create a new API token and copy it.',
+        'Enter your Jira Cloud domain (e.g. company.atlassian.net).',
+        'Enter the email address associated with your Atlassian account.',
+        'Paste the API token below.'
       ]
     }
   }
@@ -65,6 +84,8 @@ export function ProjectIntegrationConnectionModal({
   onConnectionsChanged
 }: ProjectIntegrationConnectionModalProps): React.JSX.Element {
   const [credential, setCredential] = useState('')
+  const [jiraDomain, setJiraDomain] = useState('')
+  const [jiraEmail, setJiraEmail] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [errorMessage, setErrorMessage] = useState('')
 
@@ -74,19 +95,35 @@ export function ProjectIntegrationConnectionModal({
   useEffect(() => {
     if (!open) return
     setCredential('')
+    setJiraDomain('')
+    setJiraEmail('')
     setErrorMessage('')
   }, [open, provider, mode])
 
+  const canSubmit = provider === 'jira'
+    ? Boolean(credential.trim() && jiraDomain.trim() && jiraEmail.trim())
+    : Boolean(credential.trim())
+
   const handleSubmit = async () => {
-    if (!credential.trim()) return
+    if (!canSubmit) return
 
     setSubmitting(true)
     setErrorMessage('')
     try {
       if (mode === 'connect') {
-        const nextConnection = provider === 'github'
-          ? await window.api.integrations.connectGithub({ token: credential.trim(), projectId })
-          : await window.api.integrations.connectLinear({ apiKey: credential.trim(), projectId })
+        let nextConnection
+        if (provider === 'github') {
+          nextConnection = await window.api.integrations.connectGithub({ token: credential.trim(), projectId })
+        } else if (provider === 'jira') {
+          nextConnection = await window.api.integrations.connectJira({
+            cloudDomain: jiraDomain.trim(),
+            email: jiraEmail.trim(),
+            apiToken: credential.trim(),
+            projectId
+          })
+        } else {
+          nextConnection = await window.api.integrations.connectLinear({ apiKey: credential.trim(), projectId })
+        }
 
         await window.api.integrations.setProjectConnection({
           projectId,
@@ -135,6 +172,49 @@ export function ProjectIntegrationConnectionModal({
         </DialogHeader>
 
         <div className="space-y-3">
+          {provider === 'jira' && mode === 'connect' ? (
+            <div className="space-y-2">
+              <div className="space-y-1">
+                <p className="text-xs text-muted-foreground">Cloud domain</p>
+                <Input
+                  id={`project-${provider}-${mode}-domain`}
+                  value={jiraDomain}
+                  onChange={(event) => setJiraDomain(event.target.value)}
+                  placeholder="company.atlassian.net"
+                />
+              </div>
+              <div className="space-y-1">
+                <p className="text-xs text-muted-foreground">Email</p>
+                <Input
+                  id={`project-${provider}-${mode}-email`}
+                  type="email"
+                  value={jiraEmail}
+                  onChange={(event) => setJiraEmail(event.target.value)}
+                  placeholder="you@company.com"
+                />
+              </div>
+              <div className="space-y-1">
+                <p className="text-xs text-muted-foreground">{credentialLabel(provider)}</p>
+                <div className="flex items-center gap-2">
+                  <Input
+                    id={`project-${provider}-${mode}-credential`}
+                    type="password"
+                    value={credential}
+                    onChange={(event) => setCredential(event.target.value)}
+                    placeholder={credentialPlaceholder(provider)}
+                  />
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={() => void handleSubmit()}
+                    disabled={!canSubmit || submitting}
+                  >
+                    {submitting ? 'Connecting...' : 'Connect'}
+                  </Button>
+                </div>
+              </div>
+            </div>
+          ) : (
           <div className="space-y-1">
             <p className="text-xs text-muted-foreground">
               {mode === 'edit' ? `New ${credentialLabel(provider)}` : credentialLabel(provider)}
@@ -151,7 +231,7 @@ export function ProjectIntegrationConnectionModal({
                 type="button"
                 size="sm"
                 onClick={() => void handleSubmit()}
-                disabled={!credential.trim() || submitting}
+                disabled={!canSubmit || submitting}
               >
                 {submitting
                   ? mode === 'edit' ? 'Saving...' : 'Connecting...'
@@ -159,6 +239,7 @@ export function ProjectIntegrationConnectionModal({
               </Button>
             </div>
           </div>
+          )}
 
           {errorMessage ? (
             <p className="text-xs text-destructive">{errorMessage}</p>

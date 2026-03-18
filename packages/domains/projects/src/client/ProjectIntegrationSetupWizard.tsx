@@ -18,7 +18,7 @@ import {
   type ProviderStatus
 } from '@slayzone/integrations/shared'
 
-export type ProjectIntegrationProvider = 'linear' | 'github'
+export type ProjectIntegrationProvider = 'linear' | 'github' | 'jira'
 type WizardSyncMode = 'one_way_import' | 'one_way_export' | 'two_way' | 'manual'
 
 interface ProjectIntegrationSetupWizardProps {
@@ -61,7 +61,7 @@ const SYNC_MODE_OPTIONS: Array<{
     value: 'two_way',
     label: 'Two-way sync',
     description: 'Changes can flow in both directions.',
-    enabled: (provider) => provider === 'linear'
+    enabled: (provider) => provider === 'linear' || provider === 'jira'
   },
   {
     value: 'manual',

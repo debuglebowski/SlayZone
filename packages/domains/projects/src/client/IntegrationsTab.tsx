@@ -57,7 +57,7 @@ type ProjectSyncSummary = {
   checkedAt: string
 }
 
-type IntegrationSetupEntry = 'github_projects' | 'linear' | 'github_issues'
+type IntegrationSetupEntry = 'github_projects' | 'linear' | 'github_issues' | 'jira'
 type ImportIssueSort = 'updated_desc' | 'updated_asc' | 'title_asc' | 'title_desc'
 
 function summarizeSyncRows(rows: TaskSyncRow[]): ProjectSyncSummary {
@@ -191,11 +191,13 @@ export function IntegrationsTab({
   const [syncStep, setSyncStep] = useState<1 | 2 | 3>(1)
   const [syncStepEditing, setSyncStepEditing] = useState<1 | 2 | 3 | null>(null)
   const [loadingSyncStatuses, setLoadingSyncStatuses] = useState(false)
+  const [jiraEnabled, setJiraEnabled] = useState(window.api.app.isJiraIntegrationEnabledSync)
 
   useEffect(() => {
     if (open) {
       setSelectedIntegrationEntry(null)
       setSelectedIntegrationMode(null)
+      window.api.app.isJiraIntegrationEnabled().then(setJiraEnabled)
     }
   }, [open, project.id])
 
@@ -843,7 +845,9 @@ export function IntegrationsTab({
     ? 'linear'
     : selectedIntegrationEntry === 'github_projects'
       ? 'github'
-      : null
+      : selectedIntegrationEntry === 'jira'
+        ? 'jira'
+        : null
 
   const collectSyncRows = useCallback(async (): Promise<TaskSyncRow[]> => {
     const provider = syncSetupProvider
@@ -993,6 +997,8 @@ export function IntegrationsTab({
   const isGithubImportView = selectedIntegrationEntry === 'github_issues' && selectedIntegrationMode === 'import'
   const isLinearContinuousView = selectedIntegrationEntry === 'linear' && selectedIntegrationMode === 'continuous'
   const isLinearImportView = selectedIntegrationEntry === 'linear' && selectedIntegrationMode === 'import'
+  const isJiraContinuousView = selectedIntegrationEntry === 'jira' && selectedIntegrationMode === 'continuous'
+  const isJiraImportView = selectedIntegrationEntry === 'jira' && selectedIntegrationMode === 'import'
   const activeSyncProvider: IntegrationProvider | null = linearMappingSource
     ? 'linear'
     : githubMappingSource
@@ -1145,7 +1151,31 @@ export function IntegrationsTab({
           testId: 'project-integration-provider-linear-import'
         }
       ]
-    }
+    },
+    ...(jiraEnabled ? [{
+      provider: 'jira' as const,
+      title: 'Jira',
+      items: [
+        {
+          key: 'jira-continuous-sync',
+          entry: 'jira' as IntegrationSetupEntry,
+          mode: 'continuous' as const,
+          label: 'Continuous sync',
+          description: 'Sync with a Jira Cloud project.',
+          disabled: switchingProvider,
+          testId: 'project-integration-provider-jira'
+        },
+        {
+          key: 'jira-one-time-import',
+          entry: 'jira' as IntegrationSetupEntry,
+          mode: 'import' as const,
+          label: 'One-time import',
+          description: 'Import Jira issues once.',
+          disabled: switchingProvider,
+          testId: 'project-integration-provider-jira-import'
+        }
+      ]
+    }] : [])
   ]
   const selectedIntegrationViewMeta = (() => {
     if (isGithubContinuousView) {
@@ -1170,6 +1200,18 @@ export function IntegrationsTab({
       return {
         title: 'Linear - One-time import',
         description: 'Import Linear issues once into this project.'
+      }
+    }
+    if (isJiraContinuousView) {
+      return {
+        title: 'Jira - Continuous sync',
+        description: 'Set up and run continuous sync with a Jira Cloud project.'
+      }
+    }
+    if (isJiraImportView) {
+      return {
+        title: 'Jira - One-time import',
+        description: 'Import Jira issues once into this project.'
       }
     }
     return {

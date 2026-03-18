@@ -91,7 +91,9 @@ import type {
   ImportProviderIssuesResult,
   NormalizedIssue,
   ExternalGroup,
-  ExternalScope
+  ExternalScope,
+  ConnectJiraInput,
+  JiraTransition
 } from '@slayzone/integrations/shared'
 
 export type { ExecutionContext } from '@slayzone/projects/shared'
@@ -316,6 +318,8 @@ export interface ElectronAPI {
     isIntegrationsEnabledSync: boolean
     isTestsPanelEnabled: () => Promise<boolean>
     isTestsPanelEnabledSync: boolean
+    isJiraIntegrationEnabled: () => Promise<boolean>
+    isJiraIntegrationEnabledSync: boolean
     isPlaywright: boolean
     onGoHome: (callback: () => void) => () => void
     onOpenSettings: (callback: () => void) => () => void
@@ -600,6 +604,8 @@ export interface ElectronAPI {
   integrations: {
     connectGithub: (input: ConnectGithubInput) => Promise<IntegrationConnectionPublic>
     connectLinear: (input: ConnectLinearInput) => Promise<IntegrationConnectionPublic>
+    connectJira: (input: ConnectJiraInput) => Promise<IntegrationConnectionPublic>
+    getJiraTransitions: (taskId: string) => Promise<JiraTransition[]>
     updateConnection: (input: UpdateIntegrationConnectionInput) => Promise<IntegrationConnectionPublic>
     listConnections: (provider?: IntegrationProvider) => Promise<IntegrationConnectionPublic[]>
     getConnectionUsage: (connectionId: string) => Promise<IntegrationConnectionUsage>

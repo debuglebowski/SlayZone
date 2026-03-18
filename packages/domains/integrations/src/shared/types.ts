@@ -1,4 +1,4 @@
-export type IntegrationProvider = 'linear' | 'github'
+export type IntegrationProvider = 'linear' | 'github' | 'jira'
 export type ExternalType = 'issue'
 export type SyncState = 'active' | 'error' | 'paused'
 export type IntegrationSyncMode = 'one_way' | 'two_way'
@@ -459,4 +459,19 @@ export interface PushUnlinkedTasksInput {
 export interface PushUnlinkedTasksResult {
   pushed: number
   errors: string[]
+}
+
+// --- Jira ---
+
+export interface ConnectJiraInput {
+  cloudDomain: string
+  email: string
+  apiToken: string
+  projectId?: string
+}
+
+export interface JiraTransition {
+  id: string
+  name: string
+  to: { id: string; name: string; categoryKey: string }
 }

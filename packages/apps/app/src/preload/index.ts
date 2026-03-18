@@ -109,6 +109,8 @@ const api: ElectronAPI = {
     isIntegrationsEnabledSync: ipcRenderer.sendSync('app:is-integrations-enabled-sync') as boolean,
     isTestsPanelEnabled: () => ipcRenderer.invoke('app:is-tests-panel-enabled'),
     isTestsPanelEnabledSync: ipcRenderer.sendSync('app:is-tests-panel-enabled-sync') as boolean,
+    isJiraIntegrationEnabled: () => ipcRenderer.invoke('app:is-jira-integration-enabled'),
+    isJiraIntegrationEnabledSync: ipcRenderer.sendSync('app:is-jira-integration-enabled-sync') as boolean,
     isPlaywright: process.env.PLAYWRIGHT === '1',
     onGoHome: (callback: () => void) => {
       const handler = () => callback()
@@ -562,6 +564,8 @@ const api: ElectronAPI = {
   integrations: {
     connectGithub: (input) => ipcRenderer.invoke('integrations:connect-github', input),
     connectLinear: (input) => ipcRenderer.invoke('integrations:connect-linear', input),
+    connectJira: (input) => ipcRenderer.invoke('integrations:connect-jira', input),
+    getJiraTransitions: (taskId) => ipcRenderer.invoke('integrations:get-jira-transitions', taskId),
     updateConnection: (input) => ipcRenderer.invoke('integrations:update-connection', input),
     listConnections: (provider) => ipcRenderer.invoke('integrations:list-connections', provider),
     getConnectionUsage: (connectionId) => ipcRenderer.invoke('integrations:get-connection-usage', connectionId),
