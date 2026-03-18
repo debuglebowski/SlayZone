@@ -22,10 +22,8 @@ interface ShortcutState {
   loaded: boolean
   load: () => Promise<void>
   getKeys: (id: string) => string
-  isCustomized: (id: string) => boolean
   findConflict: (keys: string, scope: ShortcutScope) => ShortcutDefinition | undefined
   setOverride: (id: string, keys: string) => Promise<void>
-  removeOverride: (id: string) => Promise<void>
   resetAll: () => Promise<void>
   setRecording: (recording: boolean) => void
 }
@@ -55,10 +53,6 @@ export const useShortcutStore = create<ShortcutState>((set, get) => ({
     return def?.defaultKeys ?? ''
   },
 
-  isCustomized: (id: string) => {
-    return id in get().overrides
-  },
-
   findConflict: (keys: string, scope: ShortcutScope) => {
     const { overrides } = get()
     return shortcutDefinitions.find((d) => {
@@ -72,14 +66,6 @@ export const useShortcutStore = create<ShortcutState>((set, get) => ({
     const newOverrides = { ...get().overrides, [id]: keys }
     set({ overrides: newOverrides })
     await api().settings.set(SETTINGS_KEY, JSON.stringify(newOverrides))
-    api().shortcuts.changed()
-  },
-
-  removeOverride: async (id: string) => {
-    const { [id]: _, ...rest } = get().overrides
-    set({ overrides: rest })
-    const value = Object.keys(rest).length === 0 ? '{}' : JSON.stringify(rest)
-    await api().settings.set(SETTINGS_KEY, value)
     api().shortcuts.changed()
   },
 
