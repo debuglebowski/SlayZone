@@ -344,6 +344,69 @@ export interface ImportGithubRepositoryIssuesResult {
   nextCursor: string | null
 }
 
+// --- Adapter types (shared for IPC contracts) ---
+
+export interface NormalizedIssue {
+  id: string
+  /** Display key: "ENG-123", "owner/repo#42", "PROJ-123" */
+  key: string
+  title: string
+  /** Markdown (NOT html) */
+  description: string | null
+  status: { id: string; name: string; type: string }
+  updatedAt: string
+  url: string
+  isArchived: boolean
+  assignee: { id: string; name: string } | null
+  /** Provider-specific fields */
+  extras: Record<string, unknown>
+  /** Linked task ID (annotated by handler, not from provider) */
+  linkedTaskId?: string | null
+}
+
+/** Top-level organizational unit: Linear team, GitHub repo, JIRA project */
+export interface ExternalGroup {
+  id: string
+  key: string
+  name: string
+}
+
+/** Sub-scope within a group: Linear project, GitHub ProjectV2, JIRA board */
+export interface ExternalScope {
+  id: string
+  name: string
+}
+
+// --- Generic Provider IPC ---
+
+export interface ListProviderIssuesInput {
+  connectionId: string
+  projectId?: string
+  groupId?: string
+  scopeId?: string
+  limit?: number
+  cursor?: string | null
+}
+
+export interface ImportProviderIssuesInput {
+  projectId: string
+  connectionId: string
+  groupId?: string
+  scopeId?: string
+  selectedIssueIds?: string[]
+  limit?: number
+  cursor?: string | null
+}
+
+export interface ImportProviderIssuesResult {
+  imported: number
+  linked: number
+  created: number
+  updated: number
+  skippedAlreadyLinked: number
+  nextCursor: string | null
+}
+
 // --- Status Sync ---
 
 export function slugifyStatusName(name: string): string {

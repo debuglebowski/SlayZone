@@ -1,34 +1,9 @@
 import type { IntegrationProvider, ProviderStatus } from '../../shared'
 import type { WorkflowCategory } from '@slayzone/workflow'
 
-export interface NormalizedIssue {
-  id: string
-  /** Display key: "ENG-123", "owner/repo#42", "PROJ-123" */
-  key: string
-  title: string
-  /** Markdown (NOT html) */
-  description: string | null
-  status: { id: string; name: string; type: string }
-  updatedAt: string
-  url: string
-  isArchived: boolean
-  assignee: { id: string; name: string } | null
-  /** Provider-specific fields (Linear: { priority: number }, GitHub: { labels: ... }) */
-  extras: Record<string, unknown>
-}
-
-/** Top-level organizational unit: Linear team, GitHub repo, JIRA project */
-export interface ExternalGroup {
-  id: string
-  key: string
-  name: string
-}
-
-/** Sub-scope within a group: Linear project, GitHub ProjectV2, JIRA board */
-export interface ExternalScope {
-  id: string
-  name: string
-}
+// Re-export shared types so existing adapter consumers don't break
+export type { NormalizedIssue, ExternalGroup, ExternalScope } from '../../shared'
+import type { NormalizedIssue, ExternalGroup, ExternalScope } from '../../shared'
 
 /** Opaque context parsed from an external_key (e.g. GitHub: { owner, repo, number }) */
 export type ExternalKeyContext = Record<string, unknown>

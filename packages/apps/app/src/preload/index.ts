@@ -280,6 +280,7 @@ const api: ElectronAPI = {
   },
   git: {
     isGitRepo: (path) => ipcRenderer.invoke('git:isGitRepo', path),
+    detectChildRepos: (projectPath) => ipcRenderer.invoke('git:detectChildRepos', projectPath),
     detectWorktrees: (repoPath) => ipcRenderer.invoke('git:detectWorktrees', repoPath),
     createWorktree: (opts) =>
       ipcRenderer.invoke('git:createWorktree', opts),
@@ -598,7 +599,12 @@ const api: ElectronAPI = {
     pushUnlinkedTasks: (input) => ipcRenderer.invoke('integrations:push-unlinked-tasks', input),
     fetchProviderStatuses: (input) => ipcRenderer.invoke('integrations:fetch-provider-statuses', input),
     applyStatusSync: (input) => ipcRenderer.invoke('integrations:apply-status-sync', input),
-    resyncProviderStatuses: (input) => ipcRenderer.invoke('integrations:resync-provider-statuses', input)
+    resyncProviderStatuses: (input) => ipcRenderer.invoke('integrations:resync-provider-statuses', input),
+    // Generic provider-dispatched
+    listProviderGroups: (connectionId) => ipcRenderer.invoke('integrations:list-provider-groups', connectionId),
+    listProviderScopes: (connectionId, groupId) => ipcRenderer.invoke('integrations:list-provider-scopes', connectionId, groupId),
+    listProviderIssues: (input) => ipcRenderer.invoke('integrations:list-provider-issues', input),
+    importProviderIssues: (input) => ipcRenderer.invoke('integrations:import-provider-issues', input)
   },
   backup: {
     list: () => ipcRenderer.invoke('backup:list'),

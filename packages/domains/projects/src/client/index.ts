@@ -3,3 +3,6 @@ export type { ProjectCreationContext, ProjectStartMode } from './CreateProjectDi
 export { ProjectSettingsDialog } from './ProjectSettingsDialog'
 export { DeleteProjectDialog } from './DeleteProjectDialog'
 export { ProjectSelect } from './ProjectSelect'
+export { useDetectedRepos } from './useDetectedRepos'
+export { useProviderData } from './useProviderData'
+export { PROVIDER_CONFIG, type ProviderUiConfig } from './project-settings-shared'

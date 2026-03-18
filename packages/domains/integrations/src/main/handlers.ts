@@ -55,7 +55,10 @@ import type {
   StatusResyncPreview,
   PushUnlinkedTasksInput,
   PushUnlinkedTasksResult,
-  BatchTaskSyncStatusItem
+  BatchTaskSyncStatusItem,
+  ListProviderIssuesInput,
+  ImportProviderIssuesInput,
+  ImportProviderIssuesResult
 } from '../shared'
 import { runProviderSync, pushNewTaskToProviders, getDesiredRemoteStatusId, resolveLocalStatus, resolveStatusByCategory } from './sync'
 import { providerStatusesToColumns, computeStatusDiff } from './status-sync'
@@ -655,6 +658,102 @@ function upsertTaskFromGitHubIssue(
     outcome: 'created',
     taskId: id
   }
+}
+
+type GenericUpsertResult = {
+  outcome: 'created' | 'updated' | 'skipped_already_linked'
+  taskId: string
+}
+
+function upsertTaskFromNormalizedIssue(
+  db: Database,
+  adapter: ProviderAdapter,
+  localProjectId: string,
+  issue: NormalizedIssue,
+  projectColumns: ColumnConfig[] | null
+): GenericUpsertResult {
+  const byLink = db.prepare(`
+    SELECT l.task_id, t.project_id
+    FROM external_links l
+    LEFT JOIN tasks t ON t.id = l.task_id
+    WHERE l.provider = ? AND l.external_id = ?
+  `).get(adapter.provider, issue.id) as { task_id: string; project_id: string | null } | undefined
+
+  const descHtml = issue.description ? markdownToHtml(issue.description) : null
+  const category = adapter.remoteStatusToCategory({ id: issue.status.id, name: issue.status.name, color: '', type: issue.status.type })
+  const localStatus = resolveStatusByCategory(category, projectColumns)
+
+  if (byLink) {
+    if (byLink.project_id && byLink.project_id !== localProjectId) {
+      return { outcome: 'skipped_already_linked', taskId: byLink.task_id }
+    }
+    db.prepare(`
+      UPDATE tasks
+      SET title = ?, description = ?, status = ?, assignee = ?, updated_at = ?
+      WHERE id = ?
+    `).run(
+      issue.title,
+      descHtml,
+      localStatus,
+      issue.assignee?.name ?? null,
+      issue.updatedAt,
+      byLink.task_id
+    )
+    return { outcome: 'updated', taskId: byLink.task_id }
+  }
+
+  const id = crypto.randomUUID()
+  db.prepare(`
+    INSERT INTO tasks (
+      id, project_id, title, description, status, priority, assignee,
+      terminal_mode, provider_config, claude_flags, codex_flags, created_at, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, 'claude-code',
+      '{"claude-code":{"flags":"--allow-dangerously-skip-permissions"},"codex":{"flags":"--full-auto --search"},"cursor-agent":{"flags":"--force"},"gemini":{"flags":"--yolo"},"opencode":{"flags":""}}',
+      '--allow-dangerously-skip-permissions', '--full-auto --search', datetime('now'), ?)
+  `).run(
+    id,
+    localProjectId,
+    issue.title,
+    descHtml,
+    localStatus,
+    3, // default priority
+    issue.assignee?.name ?? null,
+    issue.updatedAt
+  )
+  return { outcome: 'created', taskId: id }
+}
+
+function upsertLinkForNormalizedIssue(
+  db: Database,
+  provider: IntegrationProvider,
+  connectionId: string,
+  issue: NormalizedIssue,
+  adapter: ProviderAdapter,
+  taskId: string
+): ExternalLink {
+  const existing = db.prepare(
+    `SELECT * FROM external_links WHERE provider = ? AND connection_id = ? AND external_id = ?`
+  ).get(provider, connectionId, issue.id) as ExternalLink | undefined
+
+  const externalKey = adapter.buildExternalKey(issue)
+  if (existing) {
+    db.prepare(`
+      UPDATE external_links
+      SET task_id = ?, external_key = ?, external_url = ?, sync_state = 'active',
+          last_error = NULL, updated_at = datetime('now')
+      WHERE id = ?
+    `).run(taskId, externalKey, issue.url, existing.id)
+    return db.prepare('SELECT * FROM external_links WHERE id = ?').get(existing.id) as ExternalLink
+  }
+
+  const id = crypto.randomUUID()
+  db.prepare(`
+    INSERT INTO external_links (
+      id, provider, connection_id, external_type, external_id, external_key,
+      external_url, task_id, sync_state, last_sync_at, last_error, created_at, updated_at
+    ) VALUES (?, ?, ?, 'issue', ?, ?, ?, ?, 'active', datetime('now'), NULL, datetime('now'), datetime('now'))
+  `).run(id, provider, connectionId, issue.id, externalKey, issue.url, taskId)
+  return db.prepare('SELECT * FROM external_links WHERE id = ?').get(id) as ExternalLink
 }
 
 function getConnection(db: Database, id: string): IntegrationConnection {
@@ -1589,6 +1688,129 @@ export function registerIntegrationHandlers(
     }
 
     return result
+  })
+
+  // --- Generic provider-dispatched handlers ---
+
+  ipcMain.handle('integrations:list-provider-groups', async (_event, connectionId: string) => {
+    const connection = getConnection(db, connectionId)
+    const adapter = getAdapter(connection.provider)
+    const credential = readCredential(db, connection.credential_ref)
+    return adapter.listGroups(credential)
+  })
+
+  ipcMain.handle('integrations:list-provider-scopes', async (_event, connectionId: string, groupId: string) => {
+    const connection = getConnection(db, connectionId)
+    const adapter = getAdapter(connection.provider)
+    const credential = readCredential(db, connection.credential_ref)
+    return adapter.listScopes(credential, groupId)
+  })
+
+  ipcMain.handle('integrations:list-provider-issues', async (_event, input: ListProviderIssuesInput) => {
+    const connection = getConnection(db, input.connectionId)
+    const adapter = getAdapter(connection.provider)
+    const credential = readCredential(db, connection.credential_ref)
+
+    const mapping = input.projectId
+      ? db.prepare(`
+          SELECT * FROM integration_project_mappings
+          WHERE project_id = ? AND provider = ?
+        `).get(input.projectId, connection.provider) as IntegrationProjectMapping | undefined
+      : undefined
+
+    const groupId = input.groupId ?? mapping?.external_team_id
+    if (!groupId) {
+      throw new Error('No group specified and project has no mapping')
+    }
+
+    const data = await adapter.listIssues(credential, {
+      groupId,
+      scopeId: input.scopeId ?? mapping?.external_project_id ?? undefined,
+      limit: input.limit ?? 50,
+      cursor: input.cursor ?? null
+    })
+
+    // Annotate with linked task IDs
+    if (data.issues.length > 0) {
+      const externalIds = data.issues.map((i) => i.id)
+      const placeholders = externalIds.map(() => '?').join(',')
+      const links = db.prepare(`
+        SELECT external_id, task_id FROM external_links
+        WHERE provider = ? AND external_id IN (${placeholders})
+      `).all(connection.provider, ...externalIds) as Array<{ external_id: string; task_id: string }>
+      const linkMap = new Map(links.map((l) => [l.external_id, l.task_id]))
+      for (const issue of data.issues) {
+        (issue as { linkedTaskId?: string | null }).linkedTaskId = linkMap.get(issue.id) ?? null
+      }
+    }
+
+    return data
+  })
+
+  ipcMain.handle('integrations:import-provider-issues', async (_event, input: ImportProviderIssuesInput) => {
+    const connection = getConnection(db, input.connectionId)
+    const adapter = getAdapter(connection.provider)
+    const credential = readCredential(db, connection.credential_ref)
+
+    const mapping = db.prepare(`
+      SELECT * FROM integration_project_mappings
+      WHERE project_id = ? AND provider = ?
+    `).get(input.projectId, connection.provider) as IntegrationProjectMapping | undefined
+
+    if (mapping && !mapping.status_setup_complete) {
+      throw new Error('Status setup must be completed before importing issues')
+    }
+
+    const groupId = input.groupId ?? mapping?.external_team_id
+    if (!groupId) {
+      throw new Error('No group specified and project has no mapping')
+    }
+
+    const data = await adapter.listIssues(credential, {
+      groupId,
+      scopeId: input.scopeId ?? mapping?.external_project_id ?? undefined,
+      limit: input.limit ?? 50,
+      cursor: input.cursor ?? null
+    })
+
+    const projectColumns = getProjectColumns(db, input.projectId)
+    const selectedIds = input.selectedIssueIds?.length
+      ? new Set(input.selectedIssueIds)
+      : null
+
+    let imported = 0
+    let linked = 0
+    let created = 0
+    let updated = 0
+    let skippedAlreadyLinked = 0
+
+    for (const issue of data.issues) {
+      if (selectedIds && !selectedIds.has(issue.id)) continue
+
+      const result = upsertTaskFromNormalizedIssue(db, adapter, input.projectId, issue, projectColumns)
+      if (result.outcome === 'skipped_already_linked') {
+        skippedAlreadyLinked += 1
+        continue
+      }
+
+      const link = upsertLinkForNormalizedIssue(db, connection.provider, input.connectionId, issue, adapter, result.taskId)
+      const task = getTaskById(db, result.taskId)
+      persistNormalizedBaseline(db, link.id, task, issue)
+
+      imported += 1
+      linked += 1
+      if (result.outcome === 'created') created += 1
+      if (result.outcome === 'updated') updated += 1
+    }
+
+    return {
+      imported,
+      linked,
+      created,
+      updated,
+      skippedAlreadyLinked,
+      nextCursor: data.nextCursor
+    } satisfies ImportProviderIssuesResult
   })
 
   ipcMain.handle('integrations:get-task-sync-status', async (_event, taskId: string, provider: IntegrationProvider) => {

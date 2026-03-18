@@ -355,20 +355,15 @@ export function ProjectIntegrationSetupWizard({
     setPreviewLoading(true)
     setPreviewLoaded(false)
 
-    const request = provider === 'linear'
-      ? window.api.integrations.listLinearIssues({
-          connectionId,
-          projectId: project.id,
-          teamId,
-          linearProjectId: linearProjectId || undefined,
-          limit: 50
-        })
-      : window.api.integrations.listGithubIssues({
-          connectionId,
-          projectId: project.id,
-          githubProjectId: selectedGitHubProject?.id,
-          limit: 50
-        })
+    const request = window.api.integrations.listProviderIssues({
+      connectionId,
+      projectId: project.id,
+      groupId: provider === 'linear' ? teamId : undefined,
+      scopeId: provider === 'linear'
+        ? (linearProjectId || undefined)
+        : selectedGitHubProject?.id,
+      limit: 50
+    })
 
     void request
       .then((result) => {
@@ -432,24 +427,16 @@ export function ProjectIntegrationSetupWizard({
       const mapping = await persistMapping()
       let imported = 0
       if (runImport) {
-        if (provider === 'linear') {
-          const result = await window.api.integrations.importLinearIssues({
-            projectId: project.id,
-            connectionId,
-            teamId,
-            linearProjectId: linearProjectId || undefined,
-            limit: 50
-          })
-          imported = result.imported
-        } else if (selectedGitHubProject) {
-          const result = await window.api.integrations.importGithubIssues({
-            projectId: project.id,
-            connectionId,
-            githubProjectId: selectedGitHubProject.id,
-            limit: 50
-          })
-          imported = result.imported
-        }
+        const result = await window.api.integrations.importProviderIssues({
+          projectId: project.id,
+          connectionId,
+          groupId: provider === 'linear' ? teamId : undefined,
+          scopeId: provider === 'linear'
+            ? (linearProjectId || undefined)
+            : selectedGitHubProject?.id,
+          limit: 50
+        })
+        imported = result.imported
       }
       onCompleted({ provider, mapping, imported })
     } catch (error) {

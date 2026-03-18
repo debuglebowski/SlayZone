@@ -85,7 +85,13 @@ import type {
   StatusResyncPreview,
   PushUnlinkedTasksInput,
   PushUnlinkedTasksResult,
-  BatchTaskSyncStatusItem
+  BatchTaskSyncStatusItem,
+  ListProviderIssuesInput,
+  ImportProviderIssuesInput,
+  ImportProviderIssuesResult,
+  NormalizedIssue,
+  ExternalGroup,
+  ExternalScope
 } from '@slayzone/integrations/shared'
 
 export type { ExecutionContext } from '@slayzone/projects/shared'
@@ -384,6 +390,7 @@ export interface ElectronAPI {
   }
   git: {
     isGitRepo: (path: string) => Promise<boolean>
+    detectChildRepos: (projectPath: string) => Promise<{ name: string; path: string }[]>
     detectWorktrees: (repoPath: string) => Promise<DetectedWorktree[]>
     createWorktree: (opts: CreateWorktreeOpts) => Promise<{ setupResult: { ran: boolean; success?: boolean; output?: string } }>
     removeWorktree: (repoPath: string, worktreePath: string) => Promise<void>
@@ -632,6 +639,13 @@ export interface ElectronAPI {
     fetchProviderStatuses: (input: FetchProviderStatusesInput) => Promise<ProviderStatus[]>
     applyStatusSync: (input: ApplyStatusSyncInput) => Promise<Project>
     resyncProviderStatuses: (input: { projectId: string; provider: IntegrationProvider }) => Promise<StatusResyncPreview>
+    // Generic provider-dispatched methods
+    listProviderGroups: (connectionId: string) => Promise<ExternalGroup[]>
+    listProviderScopes: (connectionId: string, groupId: string) => Promise<ExternalScope[]>
+    listProviderIssues: (
+      input: ListProviderIssuesInput
+    ) => Promise<{ issues: NormalizedIssue[]; nextCursor: string | null }>
+    importProviderIssues: (input: ImportProviderIssuesInput) => Promise<ImportProviderIssuesResult>
   }
   exportImport: {
     exportAll: () => Promise<{ success: boolean; canceled?: boolean; path?: string; error?: string }>
