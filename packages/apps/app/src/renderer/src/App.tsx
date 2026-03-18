@@ -76,6 +76,7 @@ import { useTerminalStateTracking } from '@/hooks/useTerminalStateTracking'
 import { useTabLifecycle } from '@/hooks/useTabLifecycle'
 import { useTabColors } from '@/hooks/useTabColors'
 import { useDiagnosticsSync } from '@/hooks/useDiagnosticsSync'
+import { useShortcutStore } from '@/hooks/useShortcutStore'
 
 // Lazy-loaded: heavy components not needed for first paint
 const TaskDetailDataLoader = lazy(() => import('@slayzone/task/client/TaskDetailDataLoader').then(m => ({ default: m.TaskDetailDataLoader })))
@@ -301,12 +302,19 @@ function App(): React.JSX.Element {
   // Diagnostics (extracted — fire-and-forget side effects)
   useDiagnosticsSync({ tabs, activeTabIndex, activeView, selectedProjectId, projects, tasks, displayTaskCount: displayTasks.length, notificationState, projectPathMissing })
 
-  // Keyboard shortcuts
-  useHotkeys('mod+n', (e) => {
-    if (projects.length > 0) { e.preventDefault(); trackShortcut('mod+n'); useDialogStore.getState().openCreateTask() }
-  }, { enableOnFormTags: true })
+  // Shortcut store (dynamic hotkey bindings)
+  const getKeys = useShortcutStore((s) => s.getKeys)
+  const isRecording = useShortcutStore((s) => s.isRecording)
+  useEffect(() => {
+    useShortcutStore.getState().load()
+  }, [])
 
-  useHotkeys('mod+k', (e) => { e.preventDefault(); trackShortcut('mod+k'); useDialogStore.getState().openSearch() }, { enableOnFormTags: true })
+  // Keyboard shortcuts
+  useHotkeys(getKeys('new-task'), (e) => {
+    if (projects.length > 0) { e.preventDefault(); trackShortcut('mod+n'); useDialogStore.getState().openCreateTask() }
+  }, { enableOnFormTags: true, enabled: !isRecording })
+
+  useHotkeys(getKeys('search'), (e) => { e.preventDefault(); trackShortcut('mod+k'); useDialogStore.getState().openSearch() }, { enableOnFormTags: true, enabled: !isRecording })
 
   useHotkeys('mod+z', async (e) => {
     const el = e.target as HTMLElement
@@ -315,7 +323,7 @@ function App(): React.JSX.Element {
     e.preventDefault()
     const label = await undo()
     if (label) { track('undo_used'); toast(`Undid: ${label}`) }
-  }, { enableOnFormTags: true })
+  }, { enableOnFormTags: true, enabled: !isRecording })
 
   useHotkeys('mod+shift+z', async (e) => {
     const el = e.target as HTMLElement
@@ -324,7 +332,7 @@ function App(): React.JSX.Element {
     e.preventDefault()
     const label = await redo()
     if (label) { track('redo_used'); toast(`Redid: ${label}`) }
-  }, { enableOnFormTags: true })
+  }, { enableOnFormTags: true, enabled: !isRecording })
 
   // Stable refs for IPC listeners
   const closeActiveTaskRef = useRef<() => void>(() => {})
@@ -379,44 +387,44 @@ function App(): React.JSX.Element {
     e.preventDefault()
     const num = parseInt(e.key, 10)
     if (num < tabs.length) setActiveTabIndex(num)
-  }, { enableOnFormTags: true })
+  }, { enableOnFormTags: true, enabled: !isRecording })
 
   useHotkeys('mod+shift+1,mod+shift+2,mod+shift+3,mod+shift+4,mod+shift+5,mod+shift+6,mod+shift+7,mod+shift+8,mod+shift+9', (e) => {
     e.preventDefault()
     const num = parseInt(e.code.replace('Digit', ''), 10)
     if (num > 0 && num <= projects.length) { setSelectedProjectId(projects[num - 1].id); setActiveTabIndex(0) }
-  }, { enableOnFormTags: true })
+  }, { enableOnFormTags: true, enabled: !isRecording })
 
-  useHotkeys('ctrl+tab', (e) => {
+  useHotkeys(getKeys('next-tab'), (e) => {
     e.preventDefault()
     if (tabCycleOrder.length === 0) return
     const pos = tabCycleOrder.indexOf(useTabStore.getState().activeTabIndex)
     setActiveTabIndex(tabCycleOrder[((pos >= 0 ? pos : 0) + 1) % tabCycleOrder.length])
-  }, { enableOnFormTags: true })
+  }, { enableOnFormTags: true, enabled: !isRecording })
 
-  useHotkeys('ctrl+shift+tab', (e) => {
+  useHotkeys(getKeys('prev-tab'), (e) => {
     e.preventDefault()
     if (tabCycleOrder.length === 0) return
     const pos = tabCycleOrder.indexOf(useTabStore.getState().activeTabIndex)
     const current = pos >= 0 ? pos : 0
     setActiveTabIndex(tabCycleOrder[(current - 1 + tabCycleOrder.length) % tabCycleOrder.length])
-  }, { enableOnFormTags: true })
+  }, { enableOnFormTags: true, enabled: !isRecording })
 
-  useHotkeys('mod+shift+t', (e) => { e.preventDefault(); track('tab_reopened'); reopenClosedTab() }, { enableOnFormTags: true })
+  useHotkeys(getKeys('reopen-closed-tab'), (e) => { e.preventDefault(); track('tab_reopened'); reopenClosedTab() }, { enableOnFormTags: true, enabled: !isRecording })
 
-  useHotkeys('mod+shift+d', (e) => {
+  useHotkeys(getKeys('complete-close-tab'), (e) => {
     e.preventDefault()
     if (tabs[activeTabIndex].type === 'task') useDialogStore.getState().openCompleteTaskDialog()
-  }, { enableOnFormTags: true })
+  }, { enableOnFormTags: true, enabled: !isRecording })
 
-  useHotkeys('mod+j', (e) => { e.preventDefault(); track('zen_mode_toggled'); trackShortcut('mod+j'); setZenMode(prev => !prev) }, { enableOnFormTags: true })
+  useHotkeys(getKeys('zen-mode'), (e) => { e.preventDefault(); track('zen_mode_toggled'); trackShortcut('mod+j'); setZenMode(prev => !prev) }, { enableOnFormTags: true, enabled: !isRecording })
 
-  useHotkeys('mod+shift+e', (e) => {
+  useHotkeys(getKeys('explode-mode'), (e) => {
     e.preventDefault()
     if (openTaskIds.length >= 2) { track('explode_mode_toggled'); trackShortcut('mod+shift+e'); setExplodeMode(prev => !prev) }
-  }, { enableOnFormTags: true })
+  }, { enableOnFormTags: true, enabled: !isRecording })
 
-  useHotkeys('escape', () => { if (explodeMode) setExplodeMode(false); else if (zenMode) setZenMode(false) }, { enableOnFormTags: true })
+  useHotkeys(getKeys('exit-zen-explode'), () => { if (explodeMode) setExplodeMode(false); else if (zenMode) setZenMode(false) }, { enableOnFormTags: true, enabled: !isRecording })
 
   // Home tab panel shortcuts
   useEffect(() => {
