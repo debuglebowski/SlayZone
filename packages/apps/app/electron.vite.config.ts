@@ -71,10 +71,9 @@ export default defineConfig(({ mode }) => {
     renderer: {
       envDir: root,
       define: {
-        __POSTHOG_API_KEY__: JSON.stringify(env.POSTHOG_API_KEY ?? ''),
-        __POSTHOG_HOST__: JSON.stringify(env.POSTHOG_HOST ?? ''),
-        __DEV__: JSON.stringify(mode !== 'production'),
-        __POSTHOG_DEV_ENABLED__: JSON.stringify(env.POSTHOG_DEV_ENABLED === '1')
+        __POSTHOG_API_KEY__: JSON.stringify(env.POSTHOG_DISABLED === '1' ? '' : (env.POSTHOG_API_KEY ?? 'phc_b66nL6IJ3JhzrOEh98Tdk857rRYuoqWMmQmWShSnstV')),
+        __POSTHOG_HOST__: JSON.stringify(env.POSTHOG_HOST ?? 'https://eu.i.posthog.com'),
+        __DEV__: JSON.stringify(mode !== 'production')
       },
       resolve: {
         alias: {

@@ -3,13 +3,11 @@ import type { TelemetryTier, TelemetryEventName, TelemetryEventProps } from '../
 declare const __POSTHOG_API_KEY__: string
 declare const __POSTHOG_HOST__: string
 declare const __DEV__: boolean
-declare const __POSTHOG_DEV_ENABLED__: boolean
 
 const POSTHOG_KEY = typeof __POSTHOG_API_KEY__ !== 'undefined' ? __POSTHOG_API_KEY__ : ''
 const POSTHOG_HOST = typeof __POSTHOG_HOST__ !== 'undefined' ? __POSTHOG_HOST__ : ''
 const IS_DEV = typeof __DEV__ !== 'undefined' ? __DEV__ : true
-const DEV_ENABLED = typeof __POSTHOG_DEV_ENABLED__ !== 'undefined' ? __POSTHOG_DEV_ENABLED__ : false
-const ENABLED = POSTHOG_KEY && POSTHOG_HOST && (!IS_DEV || DEV_ENABLED)
+const ENABLED = !!(POSTHOG_KEY && POSTHOG_HOST)
 
 const HEARTBEAT_INTERVAL = 10 * 60 * 1000 // 10 minutes
 const ACTIVITY_THROTTLE = 1000 // 1 second
