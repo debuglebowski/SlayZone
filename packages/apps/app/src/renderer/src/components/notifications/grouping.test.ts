@@ -44,6 +44,7 @@ const projectA: Project = {
     { id: 'finished', label: 'Finished', color: 'green', position: 1, category: 'completed' }
   ],
   execution_context: null,
+  selected_repo: null,
   created_at: '',
   updated_at: ''
 }
@@ -62,6 +63,7 @@ const projectB: Project = {
     { id: 'finished', label: 'Done', color: 'green', position: 1, category: 'completed' }
   ],
   execution_context: null,
+  selected_repo: null,
   created_at: '',
   updated_at: ''
 }

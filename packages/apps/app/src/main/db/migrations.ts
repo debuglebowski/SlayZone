@@ -1346,6 +1346,15 @@ const migrations: Migration[] = [
       // Wipe cached data so it re-parses correctly.
       db.exec(`DELETE FROM usage_records; DELETE FROM usage_parse_state;`)
     }
+  },
+  {
+    version: 77,
+    up: (db) => {
+      db.exec(`
+        ALTER TABLE projects ADD COLUMN selected_repo TEXT;
+        ALTER TABLE tasks ADD COLUMN repo_name TEXT;
+      `)
+    }
   }
 ]
 

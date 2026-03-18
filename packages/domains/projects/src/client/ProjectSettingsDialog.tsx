@@ -12,12 +12,14 @@ import { IntegrationsTab } from './IntegrationsTab'
 import { AiConfigTab } from './AiConfigTab'
 import { TestsTab } from '@slayzone/test-panel/client'
 import { WorktreesTab } from './WorktreesTab'
+import { ReposTab } from './ReposTab'
+import { useDetectedRepos } from './useDetectedRepos'
 
 interface ProjectSettingsDialogProps {
   project: Project | null
   open: boolean
   onOpenChange: (open: boolean) => void
-  initialTab?: 'general' | 'environment' | 'columns' | 'worktrees' | 'integrations' | 'ai-config' | 'tests'
+  initialTab?: 'general' | 'environment' | 'columns' | 'worktrees' | 'repos' | 'integrations' | 'ai-config' | 'tests'
   groupBy?: 'none' | 'path' | 'label'
   onGroupByChange?: (value: 'none' | 'path' | 'label') => void
   integrationOnboardingProvider?: IntegrationProvider | null
@@ -39,7 +41,8 @@ export function ProjectSettingsDialog({
   onUpdated
 }: ProjectSettingsDialogProps) {
   const [integrationsEnabled, setIntegrationsEnabled] = useState(window.api.app.isIntegrationsEnabledSync)
-  const [activeTab, setActiveTab] = useState<'general' | 'environment' | 'columns' | 'worktrees' | 'integrations' | 'ai-config' | 'tests'>('general')
+  const [activeTab, setActiveTab] = useState<'general' | 'environment' | 'columns' | 'worktrees' | 'repos' | 'integrations' | 'ai-config' | 'tests'>('general')
+  const detectedRepos = useDetectedRepos(open ? project?.path ?? null : null)
   const [contextManagerEnabled, setContextManagerEnabled] = useState(window.api.app.isContextManagerEnabledSync)
   const [lockedByProvider, setLockedByProvider] = useState<string | null>(null)
 
@@ -93,6 +96,7 @@ export function ProjectSettingsDialog({
     { key: 'environment', label: 'Environment' },
     { key: 'columns', label: 'Task statuses' },
     { key: 'worktrees', label: 'Worktrees' },
+    ...(detectedRepos.length > 0 ? [{ key: 'repos' as const, label: 'Repositories' }] : []),
     { key: 'tests', label: 'Tests' },
     ...(integrationsEnabled ? [{ key: 'integrations' as const, label: 'Integrations' }] : []),
   ]
@@ -136,6 +140,14 @@ export function ProjectSettingsDialog({
               project={project}
               onUpdated={onUpdated}
               onClose={() => onOpenChange(false)}
+            />
+          )}
+
+          {activeTab === 'repos' && project && (
+            <ReposTab
+              project={project}
+              repos={detectedRepos}
+              onUpdated={onUpdated}
             />
           )}
 

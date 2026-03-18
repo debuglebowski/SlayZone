@@ -180,6 +180,8 @@ export interface Task {
   is_temporary: boolean
   // Pull request
   pr_url: string | null
+  // Multi-repo: folder name of the child repo this task is scoped to
+  repo_name: string | null
   // External link (populated via JOIN)
   linear_url: string | null
   created_at: string
@@ -207,6 +209,7 @@ export interface CreateTaskInput {
   opencodeFlags?: string
   parentId?: string
   isTemporary?: boolean
+  repoName?: string | null
 }
 
 export interface UpdateTaskInput {
@@ -252,6 +255,8 @@ export interface UpdateTaskInput {
   prUrl?: string | null
   // Temporary task
   isTemporary?: boolean
+  // Multi-repo
+  repoName?: string | null
   // Legacy
   claudeSessionId?: string | null
 }

@@ -201,6 +201,10 @@ export function registerProjectHandlers(ipcMain: IpcMain, db: Database): void {
       fields.push('execution_context = ?')
       values.push(data.executionContext ? JSON.stringify(data.executionContext) : null)
     }
+    if (data.selectedRepo !== undefined) {
+      fields.push('selected_repo = ?')
+      values.push(data.selectedRepo)
+    }
     if (data.columnsConfig !== undefined) {
       fields.push('columns_config = ?')
       if (data.columnsConfig === null) {

@@ -192,7 +192,8 @@ async function maybeAutoCreateWorktree(
   db: Database,
   taskId: string,
   projectId: string,
-  taskTitle: string
+  taskTitle: string,
+  repoName?: string | null
 ): Promise<void> {
   if (!isAutoCreateWorktreeEnabled(db, projectId)) return
 
@@ -211,7 +212,16 @@ async function maybeAutoCreateWorktree(
     return
   }
 
-  if (!(await isGitRepo(projectRow.path))) {
+  // Resolve effective repo path (child repo if multi-repo, otherwise project.path)
+  let repoPath = projectRow.path
+  if (repoName) {
+    const childPath = path.join(projectRow.path, repoName)
+    if (await isGitRepo(childPath)) {
+      repoPath = childPath
+    }
+  }
+
+  if (!(await isGitRepo(repoPath))) {
     runtimeAdapters.recordDiagnosticEvent({
       level: 'info',
       source: 'task',
@@ -219,7 +229,7 @@ async function maybeAutoCreateWorktree(
       taskId,
       projectId,
       message: 'Project path is not a git repository',
-      payload: { projectPath: projectRow.path }
+      payload: { projectPath: repoPath }
     })
     return
   }
@@ -227,24 +237,24 @@ async function maybeAutoCreateWorktree(
   const baseTemplate =
     (db.prepare("SELECT value FROM settings WHERE key = 'worktree_base_path'")
       .get() as { value: string } | undefined)?.value || DEFAULT_WORKTREE_BASE_PATH_TEMPLATE
-  const basePath = resolveWorktreeBasePathTemplate(baseTemplate, projectRow.path)
+  const basePath = resolveWorktreeBasePathTemplate(baseTemplate, repoPath)
   const branch = slugify(taskTitle) || `task-${taskId.slice(0, 8)}`
   const worktreePath = path.join(basePath, branch)
-  const parentBranch = await getCurrentBranch(projectRow.path)
+  const parentBranch = await getCurrentBranch(repoPath)
 
   const sourceBranch = projectRow.worktree_source_branch ?? undefined
 
   try {
-    await createWorktree(projectRow.path, worktreePath, branch, sourceBranch)
+    await createWorktree(repoPath, worktreePath, branch, sourceBranch)
 
     // Copy ignored files based on settings ('ask' skipped — auto-create can't prompt)
     const { behavior: copyBehavior, customPaths } = resolveCopyBehavior(db, projectId)
     if (copyBehavior === 'all' || copyBehavior === 'custom') {
-      await copyIgnoredFiles(projectRow.path, worktreePath, copyBehavior, customPaths)
+      await copyIgnoredFiles(repoPath, worktreePath, copyBehavior, customPaths)
     }
 
     // Fire-and-forget: don't block task creation on setup script
-    void runWorktreeSetupScript(worktreePath, projectRow.path, sourceBranch)
+    void runWorktreeSetupScript(worktreePath, repoPath, sourceBranch)
     db.prepare(`
       UPDATE tasks
       SET worktree_path = ?, worktree_parent_branch = ?, updated_at = datetime('now')
@@ -311,7 +321,11 @@ export function updateTask(db: Database, data: UpdateTaskInput): Task | null {
   if (data.assignee !== undefined) { fields.push('assignee = ?'); values.push(data.assignee) }
   if (data.priority !== undefined) { fields.push('priority = ?'); values.push(data.priority) }
   if (data.dueDate !== undefined) { fields.push('due_date = ?'); values.push(data.dueDate) }
-  if (data.projectId !== undefined) { fields.push('project_id = ?'); values.push(data.projectId) }
+  if (data.projectId !== undefined) {
+    fields.push('project_id = ?'); values.push(data.projectId)
+    // Clear repo_name when moving to a different project — child repos may differ
+    if (data.repoName === undefined) { fields.push('repo_name = ?'); values.push(null) }
+  }
   if (data.claudeSessionId !== undefined) { fields.push('claude_session_id = ?'); values.push(data.claudeSessionId) }
   if (data.terminalMode !== undefined) { fields.push('terminal_mode = ?'); values.push(data.terminalMode) }
   if (data.terminalShell !== undefined) { fields.push('terminal_shell = ?'); values.push(data.terminalShell) }
@@ -382,6 +396,7 @@ export function updateTask(db: Database, data: UpdateTaskInput): Task | null {
   if (data.mergeState !== undefined) { fields.push('merge_state = ?'); values.push(data.mergeState) }
   if (data.mergeContext !== undefined) { fields.push('merge_context = ?'); values.push(data.mergeContext ? JSON.stringify(data.mergeContext) : null) }
   if (data.isTemporary !== undefined) { fields.push('is_temporary = ?'); values.push(data.isTemporary ? 1 : 0) }
+  if (data.repoName !== undefined) { fields.push('repo_name = ?'); values.push(data.repoName) }
 
   if (fields.length === 0) {
     const row = db.prepare('SELECT * FROM tasks WHERE id = ?').get(data.id) as Record<string, unknown> | undefined
@@ -490,8 +505,8 @@ export function registerTaskHandlers(ipcMain: IpcMain, db: Database): void {
         id, project_id, parent_id, title, description, assignee,
         status, priority, due_date, terminal_mode, provider_config,
         claude_flags, codex_flags, cursor_flags, gemini_flags, opencode_flags,
-        is_temporary, ccs_profile
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        is_temporary, ccs_profile, repo_name
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `)
     stmt.run(
       id, data.projectId, data.parentId ?? null,
@@ -504,9 +519,10 @@ export function registerTaskHandlers(ipcMain: IpcMain, db: Database): void {
       providerConfig['gemini']?.flags ?? '',
       providerConfig['opencode']?.flags ?? '',
       data.isTemporary ? 1 : 0,
-      ccsDefaultProfile
+      ccsDefaultProfile,
+      data.repoName ?? null
     )
-    void maybeAutoCreateWorktree(db, id, data.projectId, data.title)
+    void maybeAutoCreateWorktree(db, id, data.projectId, data.title, data.repoName)
     const row = db.prepare('SELECT * FROM tasks WHERE id = ?').get(id) as Record<string, unknown> | undefined
     const task = parseTask(row)
     if (task) {

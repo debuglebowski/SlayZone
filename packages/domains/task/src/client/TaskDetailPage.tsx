@@ -10,7 +10,8 @@ import { BUILTIN_PANEL_IDS, getProviderConversationId, getProviderFlags, setProv
 import type { BrowserTabsState } from '@slayzone/task-browser/shared'
 import type { Tag } from '@slayzone/tags/shared'
 import type { Project } from '@slayzone/projects/shared'
-import { getDefaultStatus, getDoneStatus, getStatusByCategory, isTerminalStatus } from '@slayzone/projects/shared'
+import { getDefaultStatus, getDoneStatus, getStatusByCategory, isTerminalStatus, resolveRepoPath } from '@slayzone/projects/shared'
+import { useDetectedRepos } from '@slayzone/projects'
 import { DEV_SERVER_URL_PATTERN, SESSION_ID_COMMANDS, SESSION_ID_UNAVAILABLE } from '@slayzone/terminal/shared'
 import type { TerminalMode, ValidationResult } from '@slayzone/terminal/shared'
 import { Button, IconButton, PanelToggle, DevServerToast, Collapsible, CollapsibleTrigger, CollapsibleContent } from '@slayzone/ui'
@@ -209,6 +210,22 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
 
   // Project path validation
   const [projectPathMissing, setProjectPathMissing] = useState(initialData?.projectPathMissing ?? false)
+
+  // Multi-repo detection
+  const detectedRepos = useDetectedRepos(project?.path ?? null)
+  const resolvedRepo = useMemo(
+    () => resolveRepoPath(project?.path ?? null, detectedRepos, task?.repo_name ?? null),
+    [project?.path, detectedRepos, task?.repo_name]
+  )
+  // Effective repo path (worktree > resolved child repo > project path)
+  const effectiveRepoPath = task?.worktree_path ?? resolvedRepo.path
+  const handleRepoChange = useCallback((repoName: string) => {
+    if (!task) return
+    window.api.db.updateTask({ id: task.id, repoName }).then((updated) => {
+      setTask(updated)
+      onTaskUpdated(updated)
+    })
+  }, [task?.id, onTaskUpdated])
 
   // PTY context for buffer management
   const { resetTaskState, subscribeSessionDetected, subscribeDevServer, getQuickRunPrompt, clearQuickRunPrompt } = usePty()
@@ -912,8 +929,7 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
 
       if (e.metaKey && !e.shiftKey) {
         // Cmd+P: quick open — works even inside CodeMirror
-        const editorProjectPath = task?.worktree_path || project?.path
-        if (e.key === 'p' && isBuiltinEnabled('editor', 'task') && editorProjectPath) {
+        if (e.key === 'p' && isBuiltinEnabled('editor', 'task') && effectiveRepoPath) {
           e.preventDefault()
           setQuickOpenVisible(true)
           return
@@ -1479,13 +1495,13 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
           <div className="flex-1 min-h-0 overflow-hidden">
               {isResizing ? (
                 <div className="h-full bg-black" />
-              ) : project?.id === task.project_id && project.path && !projectPathMissing ? (
+              ) : project?.id === task.project_id && (effectiveRepoPath || project.path) && !projectPathMissing ? (
                 <TerminalContainer
                   ref={terminalContainerRef}
-                  key={`${terminalKey}-${task.project_id}-${project?.path || ''}-${task.worktree_path || ''}`}
+                  key={`${terminalKey}-${task.project_id}-${effectiveRepoPath || ''}-${task.worktree_path || ''}`}
                   taskId={task.id}
                   isActive={isActive}
-                  cwd={task.worktree_path || project.path}
+                  cwd={effectiveRepoPath || project.path!}
                   defaultMode={task.terminal_mode}
                   conversationId={getConversationIdForMode(task) || undefined}
                   existingConversationId={getConversationIdForMode(task) || undefined}
@@ -1770,11 +1786,11 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
         )}
 
         {/* File Editor Panel */}
-        {!compact && panelVisibility.editor && project?.path && (
+        {!compact && panelVisibility.editor && effectiveRepoPath && (
           <div data-panel-id="editor" className={cn("shrink-0 overflow-hidden rounded-md bg-surface-2 border border-border transition-shadow duration-200", multipleVisiblePanels && focusedPanel === 'editor' && "shadow-[0_0_18px_rgba(255,255,255,0.25)]")} style={{ width: resolvedWidths.editor }}>
             <FileEditorView
               ref={fileEditorRefCallback}
-              projectPath={task.worktree_path || project.path}
+              projectPath={effectiveRepoPath}
               initialEditorState={task.editor_open_files}
               onEditorStateChange={handleEditorStateChange}
             />
@@ -1836,13 +1852,17 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
               ref={gitPanelRef}
               task={task}
               projectId={task.project_id}
-              projectPath={project?.path ?? null}
+              projectPath={resolvedRepo.path}
               completedStatus={completedStatus}
               visible={panelVisibility.diff}
               defaultTab={gitDefaultTab}
               pollIntervalMs={5000}
               onUpdateTask={updateTaskAndNotify}
               onTaskUpdated={handleTaskUpdate}
+              detectedRepos={detectedRepos}
+              selectedRepoName={task.repo_name}
+              isRepoStale={resolvedRepo.stale}
+              onRepoChange={handleRepoChange}
             />
           </div>
         )}
@@ -1994,16 +2014,16 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
         {/* Processes Panel — dev mode only */}
         {import.meta.env.DEV && !compact && panelVisibility.processes && (
           <div data-panel-id="processes" className={cn("shrink-0 rounded-md bg-surface-2 border border-border overflow-hidden flex flex-col transition-shadow duration-200", multipleVisiblePanels && focusedPanel === 'processes' && "shadow-[0_0_18px_rgba(255,255,255,0.25)]")} style={{ width: resolvedWidths.processes }}>
-            <ProcessesPanel taskId={task.id} projectId={project?.id ?? null} cwd={task.worktree_path || project?.path} terminalSessionId={getMainSessionId(task.id)} />
+            <ProcessesPanel taskId={task.id} projectId={project?.id ?? null} cwd={effectiveRepoPath || project?.path} terminalSessionId={getMainSessionId(task.id)} />
           </div>
         )}
       </div>
 
-      {project?.path && (
+      {effectiveRepoPath && (
         <QuickOpenDialog
           open={quickOpenVisible}
           onOpenChange={setQuickOpenVisible}
-          projectPath={task.worktree_path || project.path}
+          projectPath={effectiveRepoPath}
           onOpenFile={handleQuickOpenFile}
         />
       )}

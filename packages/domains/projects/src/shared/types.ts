@@ -26,8 +26,15 @@ export interface Project {
   worktree_copy_paths: string | null
   columns_config: ColumnConfig[] | null
   execution_context: ExecutionContext | null
+  /** Folder name of the default child repo (for multi-repo projects) */
+  selected_repo: string | null
   created_at: string
   updated_at: string
+}
+
+export interface DetectedRepo {
+  name: string
+  path: string
 }
 
 export interface CreateProjectInput {
@@ -48,4 +55,5 @@ export interface UpdateProjectInput {
   worktreeCopyPaths?: string | null
   columnsConfig?: ColumnConfig[] | null
   executionContext?: ExecutionContext | null
+  selectedRepo?: string | null
 }

@@ -1,9 +1,9 @@
 import { createContext, forwardRef, useCallback, useContext, useEffect, useImperativeHandle, useRef, useState } from 'react'
 import { Check, X, SkipForward, AlertTriangle, RefreshCw, Plus } from 'lucide-react'
-import { Button, Checkbox, IconButton, cn } from '@slayzone/ui'
+import { Button, Checkbox, IconButton, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, cn } from '@slayzone/ui'
 import type { Task, UpdateTaskInput, MergeContext } from '@slayzone/task/shared'
 import type { FilterState } from '@slayzone/tasks'
-import type { Project } from '@slayzone/projects/shared'
+import type { Project, DetectedRepo } from '@slayzone/projects/shared'
 import { GitDiffPanel, type GitDiffPanelHandle } from './GitDiffPanel'
 import { ConflictFileView } from './ConflictFileView'
 import { GeneralTabContent } from './GeneralTabContent'
@@ -31,6 +31,10 @@ type UnifiedGitPanelProps = {
   onTaskClick?: (task: Task) => void
   onUpdateTask?: (data: UpdateTaskInput) => Promise<Task>
   onTaskUpdated?: (task: Task) => void
+  detectedRepos?: DetectedRepo[]
+  selectedRepoName?: string | null
+  isRepoStale?: boolean
+  onRepoChange?: (repoName: string) => void
 }
 
 interface ConflictToolbarData {
@@ -79,7 +83,11 @@ export const UnifiedGitPanel = forwardRef<UnifiedGitPanelHandle, UnifiedGitPanel
   tasks = [],
   filter,
   projects = [],
-  onTaskClick
+  onTaskClick,
+  detectedRepos = [],
+  selectedRepoName,
+  isRepoStale,
+  onRepoChange
 }, ref) {
   const [activeTab, setActiveTabRaw] = useState<GitTabId>(defaultTab)
   const setActiveTab = useCallback((tab: GitTabId) => {
@@ -230,6 +238,29 @@ export const UnifiedGitPanel = forwardRef<UnifiedGitPanelHandle, UnifiedGitPanel
 
         {/* Right-aligned actions */}
         <div className="flex-1" />
+        {detectedRepos.length > 0 && onRepoChange && (
+          <Select
+            value={selectedRepoName ?? detectedRepos[0]?.name ?? ''}
+            onValueChange={onRepoChange}
+          >
+            <SelectTrigger
+              className={cn(
+                'h-7 w-auto max-w-[160px] text-xs gap-1 px-2',
+                isRepoStale && 'border-amber-500/60 text-amber-500'
+              )}
+              data-size="sm"
+            >
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {detectedRepos.map((repo) => (
+                <SelectItem key={repo.name} value={repo.name} className="text-xs">
+                  {repo.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
         {activeTab === 'changes' && (
           <IconButton
             aria-label="Refresh"

@@ -3,7 +3,7 @@ import { useHotkeys } from 'react-hotkeys-hook'
 import { AlertTriangle, LayoutGrid, TerminalSquare, GitBranch, FileCode, Cpu, Kanban, FlaskConical } from 'lucide-react'
 import type { Task } from '@slayzone/task/shared'
 import type { Project } from '@slayzone/projects/shared'
-import { getDefaultStatus, getDoneStatus } from '@slayzone/projects/shared'
+import { getDefaultStatus, getDoneStatus, resolveRepoPath } from '@slayzone/projects/shared'
 import type { Tag } from '@slayzone/tags/shared'
 // Domains
 import {
@@ -23,6 +23,7 @@ import {
   CreateProjectDialog,
   ProjectSettingsDialog,
   DeleteProjectDialog,
+  useDetectedRepos,
   type ProjectCreationContext,
   type ProjectStartMode
 } from '@slayzone/projects'
@@ -155,6 +156,20 @@ function App(): React.JSX.Element {
 
   // Home panel state (extracted — owns its own state fully)
   const homePanel = useHomePanel(selectedProjectId, panelSizes)
+
+  // Multi-repo detection for home tab
+  const homeSelectedProject = useMemo(() => projects.find(p => p.id === selectedProjectId), [projects, selectedProjectId])
+  const homeDetectedRepos = useDetectedRepos(homeSelectedProject?.path ?? null)
+  const homeResolvedRepo = useMemo(
+    () => resolveRepoPath(homeSelectedProject?.path ?? null, homeDetectedRepos, homeSelectedProject?.selected_repo ?? null),
+    [homeSelectedProject?.path, homeDetectedRepos, homeSelectedProject?.selected_repo]
+  )
+  const handleHomeRepoChange = useCallback((repoName: string) => {
+    if (!homeSelectedProject) return
+    window.api.db.updateProject({ id: homeSelectedProject.id, selectedRepo: repoName }).then((updated) => {
+      updateProject(updated)
+    })
+  }, [homeSelectedProject?.id, updateProject])
 
   // Project path validation
   const [projectPathMissing, setProjectPathMissing] = useState(false)
@@ -733,7 +748,7 @@ function App(): React.JSX.Element {
                       ) : (
                         <div ref={homePanel.homeContainerRef} className="flex-1 min-h-0 flex">
                           {HOME_PANEL_ORDER.filter(id => homePanel.homePanelVisibility[id]).map((id, i) => {
-                            const projectPath = projects.find(p => p.id === selectedProjectId)?.path ?? null
+                            const projectPath = homeResolvedRepo.path ?? (projects.find(p => p.id === selectedProjectId)?.path ?? null)
                             const w = homePanel.homeResolvedWidths[id] ?? 400
                             return (
                               <React.Fragment key={id}>
@@ -755,7 +770,11 @@ function App(): React.JSX.Element {
                                     <UnifiedGitPanel ref={homePanel.homeGitPanelRef} projectId={selectedProjectId} projectPath={projectPath} visible={true}
                                       defaultTab={homePanel.homeGitDefaultTab} onTabChange={homePanel.setHomeGitDefaultTab} tasks={tasks} filter={filter} projects={projects}
                                       onTaskClick={(t) => handleTaskClick(t, { metaKey: false })}
-                                      onUpdateTask={(data) => window.api.db.updateTask(data).then(t => { updateTask(t); return t })} />
+                                      onUpdateTask={(data) => window.api.db.updateTask(data).then(t => { updateTask(t); return t })}
+                                      detectedRepos={homeDetectedRepos}
+                                      selectedRepoName={homeSelectedProject?.selected_repo}
+                                      isRepoStale={homeResolvedRepo.stale}
+                                      onRepoChange={handleHomeRepoChange} />
                                   )}
                                   {id === 'editor' && <Suspense><FileEditorView ref={homePanel.homeEditorRefCallback} projectPath={projectPath ?? ''} /></Suspense>}
                                   {id === 'processes' && <ProcessesPanel taskId={null} projectId={selectedProjectId} cwd={projectPath} />}
