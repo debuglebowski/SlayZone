@@ -782,6 +782,8 @@ app.whenReady().then(async () => {
     'close-task': 'mod+shift+w',
   }
 
+  // Duplicated from @slayzone/ui/shortcut-definitions — can't import that package
+  // here because it depends on React and browser globals (navigator).
   function toElectronAccelerator(keys: string): string {
     return keys.split('+').map(part => {
       if (part === 'mod') return 'CmdOrCtrl'

@@ -164,7 +164,7 @@ export function AppSidebar({
   const { sidebarBadgeMode } = useAppearance()
   const activeView = useTabStore((s) => s.activeView)
 
-  const { getKeys, isCustomized: isCustomizedFn, findConflict, setOverride, removeOverride, resetAll, setRecording } = useShortcutStore()
+  const { getKeys, isCustomized: isCustomizedFn, findConflict, setOverride, resetAll, setRecording } = useShortcutStore()
 
   const shortcutGroups = useMemo(() => {
     const groups: { heading: string; items: ShortcutDefinition[] }[] = []
@@ -207,13 +207,15 @@ export function AppSidebar({
 
   const handleConfirmReassign = useCallback(async () => {
     if (!recordingId || !pendingKeys || !pendingConflict) return
-    await removeOverride(pendingConflict.id)
+    // Swap: give the conflicted shortcut whatever keys the recording shortcut had
+    const previousKeys = getKeys(recordingId)
+    await setOverride(pendingConflict.id, previousKeys)
     await setOverride(recordingId, pendingKeys)
     setRecordingId(null)
     setRecording(false)
     setPendingKeys(null)
     setPendingConflict(null)
-  }, [recordingId, pendingKeys, pendingConflict, removeOverride, setOverride, setRecording])
+  }, [recordingId, pendingKeys, pendingConflict, getKeys, setOverride, setRecording])
 
   return (
     <Sidebar collapsible="none" className={zenMode ? "!w-0 h-svh overflow-hidden" : "w-18 h-svh"}>
