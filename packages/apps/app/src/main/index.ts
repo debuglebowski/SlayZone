@@ -797,7 +797,19 @@ app.whenReady().then(async () => {
 
   // Migrate CLI symlink from /usr/local/bin to ~/.local/bin on Linux
   if (process.platform === 'linux') {
-    migrateCliBinIfNeeded(getCliSrc())
+    const cliMigration = migrateCliBinIfNeeded(getCliSrc())
+    if (cliMigration.status === 'migrated-old-kept') {
+      const shown = db.prepare('SELECT value FROM settings WHERE key = ?').get('cli_migration_dialog_shown') as { value: string } | undefined
+      if (!shown) {
+        db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)').run('cli_migration_dialog_shown', '1')
+        dialog.showMessageBox({
+          type: 'info',
+          title: 'CLI symlink migrated',
+          message: `The slay CLI was installed at ${cliMigration.newPath}, but the old symlink at ${cliMigration.oldPath} couldn't be removed.`,
+          detail: `Run: sudo rm ${cliMigration.oldPath}`,
+        })
+      }
+    }
   }
 
   // Load and apply persisted theme BEFORE creating window to prevent flash

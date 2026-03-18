@@ -121,14 +121,6 @@ function addToWindowsPath(binDir: string): void {
 
     const newPath = currentPath ? `${currentPath};${binDir}` : binDir
     execSync(`reg add "HKCU\\Environment" /v Path /t REG_EXPAND_SZ /d "${newPath}" /f`, { encoding: 'utf8' })
-
-    // Broadcast WM_SETTINGCHANGE so new terminals pick up the change
-    try {
-      execSync('setx SLAYZONE_PATH_UPDATED 1 >nul 2>&1', { encoding: 'utf8' })
-      execSync('reg delete "HKCU\\Environment" /v SLAYZONE_PATH_UPDATED /f >nul 2>&1', { encoding: 'utf8' })
-    } catch {
-      // Best effort — WM_SETTINGCHANGE is also triggered by reg add
-    }
   } catch {
     // Non-fatal — user can add to PATH manually
   }
