@@ -30,7 +30,7 @@ export function EditorTabBar({ files, activeFilePath, onSelect, onClose, isDirty
           {treeVisible ? <PanelLeftClose className="size-4" /> : <PanelLeft className="size-4" />}
         </button>
       )}
-      <div className="flex items-center gap-1 overflow-x-auto flex-1 min-w-0">
+      <div className="flex items-center gap-1 overflow-x-auto flex-1 min-w-0 scrollbar-hide">
       {files.map((file) => {
         const active = file.path === activeFilePath
         const dirty = isDirty(file.path)
