@@ -31,7 +31,7 @@ export function ProjectSelect({
         <SelectValue placeholder="Select project" />
       </SelectTrigger>
       <SelectContent>
-        {projects.map((project) => (
+        {[...projects].sort((a, b) => a.name.localeCompare(b.name)).map((project) => (
           <SelectItem key={project.id} value={project.id}>
             <span className="flex items-center gap-2">
               <span className="h-2 w-2 rounded-full" style={{ backgroundColor: project.color }} />

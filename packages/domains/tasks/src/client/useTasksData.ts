@@ -32,6 +32,7 @@ interface UseTasksDataReturn {
 
   // Project handlers
   updateProject: (project: Project) => void
+  reorderProjects: (projectIds: string[]) => void
   deleteProject: (projectId: string, selectedProjectId: string, setSelectedProjectId: (id: string) => void) => void
 }
 
@@ -195,6 +196,26 @@ export function useTasksData(): UseTasksDataReturn {
     }
   }, [tasks])
 
+  // Reorder projects
+  const reorderProjects = useCallback((projectIds: string[]) => {
+    setProjects((prev) => {
+      const previousProjects = prev
+      const byId = new Map(prev.map((p) => [p.id, p]))
+      const reordered = projectIds
+        .map((id, index) => {
+          const p = byId.get(id)
+          return p ? { ...p, sort_order: index } : null
+        })
+        .filter((p): p is Project => p !== null)
+
+      window.api.db.reorderProjects(projectIds).catch(() => {
+        setProjects(previousProjects)
+      })
+
+      return reordered
+    })
+  }, [])
+
   // Update project in state
   const updateProject = useCallback((project: Project) => {
     setProjects((prev) => prev.map((p) => (p.id === project.id ? project : p)))
@@ -233,6 +254,7 @@ export function useTasksData(): UseTasksDataReturn {
     deleteTask,
     contextMenuUpdate,
     updateProject,
+    reorderProjects,
     deleteProject
   }
 }

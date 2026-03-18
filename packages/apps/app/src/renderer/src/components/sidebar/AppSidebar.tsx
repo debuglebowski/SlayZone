@@ -1,4 +1,13 @@
 import { useState, useMemo, useCallback } from 'react'
+import {
+  DndContext,
+  PointerSensor,
+  useSensors,
+  useSensor,
+  closestCenter,
+  type DragEndEvent
+} from '@dnd-kit/core'
+import { SortableContext, arrayMove, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { Settings, Keyboard, ChevronDown, Megaphone, Check, CheckCheck, Trophy, BarChart3 } from 'lucide-react'
 import { isConvexConfigured } from '@/lib/convexAuth'
 import { FeedbackDialog } from '../feedback/FeedbackDialog'
@@ -44,6 +53,7 @@ interface AppSidebarProps {
   zenMode?: boolean
   onboardingChecklist: OnboardingChecklistState
   attentionByProject: Map<string, number>
+  onReorderProjects: (projectIds: string[]) => void
 }
 
 function ShortcutRow({
@@ -154,6 +164,7 @@ export function AppSidebar({
   zenMode,
   onboardingChecklist,
   attentionByProject,
+  onReorderProjects,
 }: AppSidebarProps) {
   const [shortcutsOpen, setShortcutsOpen] = useState(false)
   const [checklistOpen, setChecklistOpen] = useState(false)
@@ -161,6 +172,20 @@ export function AppSidebar({
   const [pendingKeys, setPendingKeys] = useState<string | null>(null)
   const [pendingConflict, setPendingConflict] = useState<ShortcutDefinition | null>(null)
   const [shadowWarning, setShadowWarning] = useState<{ defId: string; shadow: ShortcutDefinition } | null>(null)
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
+  )
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event
+    if (!over || active.id === over.id) return
+    const oldIndex = projects.findIndex((p) => p.id === active.id)
+    const newIndex = projects.findIndex((p) => p.id === over.id)
+    if (oldIndex === -1 || newIndex === -1) return
+    const newOrder = arrayMove(projects, oldIndex, newIndex)
+    onReorderProjects(newOrder.map((p) => p.id))
+  }
   const { sidebarBadgeMode } = useAppearance()
   const activeView = useTabStore((s) => s.activeView)
 
@@ -247,19 +272,23 @@ export function AppSidebar({
           <SidebarGroupContent>
             <SidebarMenu className="flex flex-col items-center gap-2">
               {/* Project blobs */}
-              {projects.map((project) => (
-                <SidebarMenuItem key={project.id}>
-                  <ProjectItem
-                    project={project}
-                    selected={selectedProjectId === project.id}
-                    onClick={() => onSelectProject(project.id)}
-                    onSettings={() => onProjectSettings(project)}
-                    onDelete={() => useDialogStore.getState().openDeleteProject(project)}
-                    attentionCount={attentionByProject.get(project.id) ?? 0}
-                    badgeMode={sidebarBadgeMode}
-                  />
-                </SidebarMenuItem>
-              ))}
+              <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+                <SortableContext items={projects.map((p) => p.id)} strategy={verticalListSortingStrategy}>
+                  {projects.map((project) => (
+                    <SidebarMenuItem key={project.id}>
+                      <ProjectItem
+                        project={project}
+                        selected={selectedProjectId === project.id}
+                        onClick={() => onSelectProject(project.id)}
+                        onSettings={() => onProjectSettings(project)}
+                        onDelete={() => useDialogStore.getState().openDeleteProject(project)}
+                        attentionCount={attentionByProject.get(project.id) ?? 0}
+                        badgeMode={sidebarBadgeMode}
+                      />
+                    </SidebarMenuItem>
+                  ))}
+                </SortableContext>
+              </DndContext>
 
               {/* Add project button */}
               <SidebarMenuItem>

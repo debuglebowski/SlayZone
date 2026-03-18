@@ -97,7 +97,7 @@ function App(): React.JSX.Element {
     updateTask, moveTask, reorderTasks,
     archiveTask: rawArchiveTask, archiveTasks: rawArchiveTasks,
     deleteTask: rawDeleteTask, contextMenuUpdate: rawContextMenuUpdate,
-    updateProject, deleteProject
+    updateProject, reorderProjects, deleteProject
   } = useTasksData()
 
   // Undo/redo stack
@@ -710,7 +710,7 @@ function App(): React.JSX.Element {
           onSettings={handleOpenSettings}
           onLeaderboard={() => { useTabStore.getState().setActiveView('leaderboard') }}
           onUsageAnalytics={() => { useTabStore.getState().setActiveView('usage-analytics') }}
-          onTaskClick={openTask} zenMode={zenMode} onboardingChecklist={onboardingChecklist} attentionByProject={attentionByProject}
+          onTaskClick={openTask} zenMode={zenMode} onboardingChecklist={onboardingChecklist} attentionByProject={attentionByProject} onReorderProjects={reorderProjects}
         />
 
         <div id="right-column" className={`flex-1 flex flex-col min-w-0 bg-surface-1 pb-2 pr-2 ${zenMode ? 'pl-2' : ''}`}>
