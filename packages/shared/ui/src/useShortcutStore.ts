@@ -23,6 +23,7 @@ interface ShortcutState {
   load: () => Promise<void>
   getKeys: (id: string) => string
   findConflict: (keys: string, scope: ShortcutScope) => ShortcutDefinition | undefined
+  findShadow: (keys: string, scope: ShortcutScope) => ShortcutDefinition | undefined
   setOverride: (id: string, keys: string) => Promise<void>
   resetAll: () => Promise<void>
   setRecording: (recording: boolean) => void
@@ -57,6 +58,19 @@ export const useShortcutStore = create<ShortcutState>((set, get) => ({
     const { overrides } = get()
     return shortcutDefinitions.find((d) => {
       if (d.scope !== scope) return false
+      const effective = overrides[d.id] ?? d.defaultKeys
+      return effective === keys
+    })
+  },
+
+  // Find a shortcut in a different scope that would be shadowed by this binding.
+  // Global shortcuts shadow everything; scoped shortcuts are shadowed by global.
+  findShadow: (keys: string, scope: ShortcutScope) => {
+    const { overrides } = get()
+    return shortcutDefinitions.find((d) => {
+      if (d.scope === scope) return false // same-scope is handled by findConflict
+      // Only warn about global <-> scoped interactions
+      if (scope !== 'global' && d.scope !== 'global') return false
       const effective = overrides[d.id] ?? d.defaultKeys
       return effective === keys
     })

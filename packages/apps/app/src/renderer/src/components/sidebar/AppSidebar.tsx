@@ -53,8 +53,10 @@ function ShortcutRow({
   onStartRecording,
   onCancelRecording,
   conflictAction,
+  shadowAction,
   onConfirmReassign,
   onCancelConflict,
+  onDismissShadow,
 }: {
   def: ShortcutDefinition
   effectiveKeys: string
@@ -62,8 +64,10 @@ function ShortcutRow({
   onStartRecording: () => void
   onCancelRecording: () => void
   conflictAction: ShortcutDefinition | null
+  shadowAction: ShortcutDefinition | null
   onConfirmReassign: () => void
   onCancelConflict: () => void
+  onDismissShadow: () => void
 }) {
   const customizable = def.customizable !== false
 
@@ -99,7 +103,7 @@ function ShortcutRow({
       {conflictAction && (
         <div className="flex items-center justify-between px-3 pb-2 gap-2">
           <span className="text-xs text-amber-400">
-            ⚠ Already bound to <strong>{conflictAction.label}</strong> — it will be unbound
+            Already bound to <strong>{conflictAction.label}</strong> — it will be swapped
           </span>
           <div className="flex gap-1.5 shrink-0">
             <button
@@ -117,6 +121,20 @@ function ShortcutRow({
               Reassign
             </button>
           </div>
+        </div>
+      )}
+      {shadowAction && !conflictAction && (
+        <div className="flex items-center justify-between px-3 pb-2 gap-2">
+          <span className="text-xs text-muted-foreground">
+            Also used by <strong>{shadowAction.label}</strong> ({shadowAction.group})
+          </span>
+          <button
+            type="button"
+            onClick={onDismissShadow}
+            className="text-xs px-2 py-0.5 rounded border border-border bg-muted text-muted-foreground hover:text-foreground shrink-0"
+          >
+            OK
+          </button>
         </div>
       )}
     </div>
@@ -142,11 +160,12 @@ export function AppSidebar({
   const [recordingId, setRecordingId] = useState<string | null>(null)
   const [pendingKeys, setPendingKeys] = useState<string | null>(null)
   const [pendingConflict, setPendingConflict] = useState<ShortcutDefinition | null>(null)
+  const [shadowWarning, setShadowWarning] = useState<{ defId: string; shadow: ShortcutDefinition } | null>(null)
   const { sidebarBadgeMode } = useAppearance()
   const activeView = useTabStore((s) => s.activeView)
 
   const overrides = useShortcutStore((s) => s.overrides)
-  const { getKeys, findConflict, setOverride, resetAll, setRecording } = useShortcutStore()
+  const { getKeys, findConflict, findShadow, setOverride, resetAll, setRecording } = useShortcutStore()
 
   // Derive effective keys from overrides so React re-renders when they change
   const effectiveKeysMap = useMemo(() => {
@@ -182,18 +201,30 @@ export function AppSidebar({
       return
     }
 
+    // Check for cross-scope shadow
+    const shadow = findShadow(keys, def.scope)
+
     setOverride(recordingId, keys)
-    setRecordingId(null)
     setRecording(false)
     setPendingKeys(null)
     setPendingConflict(null)
-  }, [recordingId, findConflict, setOverride, setRecording])
+
+    if (shadow && shadow.id !== recordingId) {
+      setShadowWarning({ defId: recordingId, shadow })
+      // Keep recordingId briefly so the warning shows on the right row,
+      // but recording is already off
+      setRecordingId(null)
+    } else {
+      setRecordingId(null)
+    }
+  }, [recordingId, findConflict, findShadow, setOverride, setRecording])
 
   const handleCancelRecording = useCallback(() => {
     setRecordingId(null)
     setRecording(false)
     setPendingKeys(null)
     setPendingConflict(null)
+    setShadowWarning(null)
   }, [setRecording])
 
   const handleConfirmReassign = useCallback(async () => {
@@ -446,8 +477,10 @@ export function AppSidebar({
                               }}
                               onCancelRecording={handleCancelRecording}
                               conflictAction={recordingId === def.id ? pendingConflict : null}
+                              shadowAction={shadowWarning?.defId === def.id ? shadowWarning.shadow : null}
                               onConfirmReassign={handleConfirmReassign}
                               onCancelConflict={handleCancelRecording}
+                              onDismissShadow={() => setShadowWarning(null)}
                             />
                           ))}
                         </div>
