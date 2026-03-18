@@ -272,6 +272,9 @@ export interface ElectronAPI {
     set: (key: string, value: string) => Promise<void>
     getAll: () => Promise<Record<string, string>>
   }
+  shortcuts: {
+    changed: () => void
+  }
   theme: {
     getEffective: () => Promise<Theme>
     getSource: () => Promise<ThemePreference>
