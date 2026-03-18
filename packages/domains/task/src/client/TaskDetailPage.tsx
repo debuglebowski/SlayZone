@@ -968,7 +968,7 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
         } else if (e.key === 's' && isBuiltinEnabled('settings', 'task')) {
           e.preventDefault()
           handlePanelToggle('settings', !panelVisibility.settings)
-        } else if (e.key === 'o' && import.meta.env.DEV && isBuiltinEnabled('processes', 'task')) {
+        } else if (e.key === 'o' && isBuiltinEnabled('processes', 'task')) {
           e.preventDefault()
           handlePanelToggle('processes', !panelVisibility.processes)
         } else {
@@ -1355,7 +1355,7 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
                     { id: 'browser', icon: Globe, label: 'Browser', shortcut: '⌘B' },
                     { id: 'editor', icon: FileCode, label: 'Editor', shortcut: '⌘E' },
                     { id: 'diff', icon: GitBranch, label: 'Git', shortcut: '⌘G' },
-                    ...(import.meta.env.DEV ? [{ id: 'processes', icon: Cpu, label: 'Processes', shortcut: '⌘O' }] : []),
+                    { id: 'processes', icon: Cpu, label: 'Processes', shortcut: '⌘O' },
                     { id: 'settings', icon: Settings2, label: 'Settings', shortcut: '⌘S' },
                   ].filter(p => isBuiltinEnabled(p.id, 'task') && !(task.is_temporary && p.id === 'settings'))
 
@@ -1887,7 +1887,7 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
           </div>
 
           {/* External sync links */}
-          {import.meta.env.DEV && <ExternalSyncCard taskId={task.id} onUpdate={handleTaskUpdate} />}
+          <ExternalSyncCard taskId={task.id} onUpdate={handleTaskUpdate} />
 
           {/* Description */}
           <div className="flex flex-col min-h-0 relative">
@@ -2000,7 +2000,7 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
         )}
 
         {/* Resize handle: ... | Processes */}
-        {import.meta.env.DEV && !compact && panelVisibility.processes && (panelVisibility.terminal || panelVisibility.browser || panelVisibility.editor || panelVisibility.diff || panelVisibility.settings || enabledWebPanels.some(wp => panelVisibility[wp.id])) && (
+        {!compact && panelVisibility.processes && (panelVisibility.terminal || panelVisibility.browser || panelVisibility.editor || panelVisibility.diff || panelVisibility.settings || enabledWebPanels.some(wp => panelVisibility[wp.id])) && (
           <ResizeHandle
             width={resolvedWidths.processes ?? 300}
             minWidth={200}
@@ -2011,8 +2011,8 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
           />
         )}
 
-        {/* Processes Panel — dev mode only */}
-        {import.meta.env.DEV && !compact && panelVisibility.processes && (
+        {/* Processes Panel */}
+        {!compact && panelVisibility.processes && (
           <div data-panel-id="processes" className={cn("shrink-0 rounded-md bg-surface-2 border border-border overflow-hidden flex flex-col transition-shadow duration-200", multipleVisiblePanels && focusedPanel === 'processes' && "shadow-[0_0_18px_rgba(255,255,255,0.25)]")} style={{ width: resolvedWidths.processes }}>
             <ProcessesPanel taskId={task.id} projectId={project?.id ?? null} cwd={effectiveRepoPath || project?.path} terminalSessionId={getMainSessionId(task.id)} />
           </div>

@@ -1273,12 +1273,8 @@ app.whenReady().then(async () => {
   ipcMain.handle('app:getVersion', () => app.getVersion())
   ipcMain.handle('app:is-context-manager-enabled', () => isLabEnabled('labs_context_manager'))
   ipcMain.on('app:is-context-manager-enabled-sync', (event) => { event.returnValue = isLabEnabled('labs_context_manager') })
-  ipcMain.handle('app:is-integrations-enabled', () => isLabEnabled('labs_integrations'))
-  ipcMain.on('app:is-integrations-enabled-sync', (event) => { event.returnValue = isLabEnabled('labs_integrations') })
   ipcMain.handle('app:is-tests-panel-enabled', () => isLabEnabled('labs_tests_panel'))
   ipcMain.on('app:is-tests-panel-enabled-sync', (event) => { event.returnValue = isLabEnabled('labs_tests_panel') })
-  ipcMain.handle('app:is-jira-integration-enabled', () => isLabEnabled('labs_jira_integration'))
-  ipcMain.on('app:is-jira-integration-enabled-sync', (event) => { event.returnValue = isLabEnabled('labs_jira_integration') })
   ipcMain.handle('app:get-protocol-client-status', () => protocolClientStatus)
   ipcMain.handle('app:restart-for-update', () => restartForUpdate())
   ipcMain.handle('app:check-for-updates', () => checkForUpdates())
@@ -1785,7 +1781,7 @@ app.whenReady().then(async () => {
   )
   onSessionChange(() => ptyStatsPoller.ensureStarted())
 
-  // Register process IPC handlers (dev only — no-ops in production via import.meta.env.DEV gate on renderer side)
+  // Register process IPC handlers
   ipcMain.handle('processes:create', (_event, projectId: string | null, taskId: string | null, label: string, command: string, cwd: string, autoRestart: boolean) => {
     return createProcess(projectId, taskId, label, command, cwd, autoRestart)
   })

@@ -40,7 +40,6 @@ export function ProjectSettingsDialog({
   onOpenGlobalAiConfig,
   onUpdated
 }: ProjectSettingsDialogProps) {
-  const [integrationsEnabled, setIntegrationsEnabled] = useState(window.api.app.isIntegrationsEnabledSync)
   const [activeTab, setActiveTab] = useState<'general' | 'environment' | 'columns' | 'worktrees' | 'repos' | 'integrations' | 'ai-config' | 'tests'>('general')
   const detectedRepos = useDetectedRepos(open ? project?.path ?? null : null)
   const [contextManagerEnabled, setContextManagerEnabled] = useState(window.api.app.isContextManagerEnabledSync)
@@ -49,11 +48,10 @@ export function ProjectSettingsDialog({
   useEffect(() => {
     if (!open) return
     window.api.app.isContextManagerEnabled().then(setContextManagerEnabled)
-    window.api.app.isIntegrationsEnabled().then(setIntegrationsEnabled)
   }, [open])
 
   const checkIntegrationLock = useCallback(async () => {
-    if (!project || !integrationsEnabled || window.api.app.isPlaywright) {
+    if (!project || window.api.app.isPlaywright) {
       setLockedByProvider(null)
       return
     }
@@ -68,7 +66,7 @@ export function ProjectSettingsDialog({
     } catch {
       setLockedByProvider(null)
     }
-  }, [project, integrationsEnabled])
+  }, [project])
 
   useEffect(() => {
     if (open) void checkIntegrationLock()
@@ -76,19 +74,15 @@ export function ProjectSettingsDialog({
 
   useEffect(() => {
     if (open) {
-      const resolvedInitialTab = !integrationsEnabled && initialTab === 'integrations'
-        ? 'general'
-        : initialTab
-      setActiveTab(resolvedInitialTab)
+      setActiveTab(initialTab)
     }
-  }, [open, project?.id, initialTab, integrationsEnabled])
+  }, [open, project?.id, initialTab])
 
   useEffect(() => {
-    if (!integrationsEnabled) return
     if (!open) return
     if (!integrationOnboardingProvider) return
     setActiveTab('integrations')
-  }, [open, integrationOnboardingProvider, integrationsEnabled])
+  }, [open, integrationOnboardingProvider])
 
 
   const navItems: Array<{ key: typeof activeTab; label: string }> = [
@@ -98,7 +92,7 @@ export function ProjectSettingsDialog({
     { key: 'worktrees', label: 'Worktrees' },
     ...(detectedRepos.length > 0 ? [{ key: 'repos' as const, label: 'Repositories' }] : []),
     { key: 'tests', label: 'Tests' },
-    ...(integrationsEnabled ? [{ key: 'integrations' as const, label: 'Integrations' }] : []),
+    { key: 'integrations' as const, label: 'Integrations' },
   ]
   if (contextManagerEnabled) {
     navItems.push({ key: 'ai-config', label: 'Context Manager' })
@@ -159,7 +153,7 @@ export function ProjectSettingsDialog({
             />
           )}
 
-          {integrationsEnabled && activeTab === 'integrations' && project && (
+          {activeTab === 'integrations' && project && (
             <IntegrationsTab
               project={project}
               open={open}

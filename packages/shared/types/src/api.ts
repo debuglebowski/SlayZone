@@ -314,12 +314,8 @@ export interface ElectronAPI {
     getVersion: () => Promise<string>
     isContextManagerEnabled: () => Promise<boolean>
     isContextManagerEnabledSync: boolean
-    isIntegrationsEnabled: () => Promise<boolean>
-    isIntegrationsEnabledSync: boolean
     isTestsPanelEnabled: () => Promise<boolean>
     isTestsPanelEnabledSync: boolean
-    isJiraIntegrationEnabled: () => Promise<boolean>
-    isJiraIntegrationEnabledSync: boolean
     isPlaywright: boolean
     onGoHome: (callback: () => void) => () => void
     onOpenSettings: (callback: () => void) => () => void

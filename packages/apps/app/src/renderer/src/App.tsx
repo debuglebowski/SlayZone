@@ -460,7 +460,7 @@ function App(): React.JSX.Element {
       } else if (e.key === 'e' && isHomePanelEnabled('editor', 'home')) {
         e.preventDefault()
         homePanel.setHomePanelVisibility(prev => ({ ...prev, editor: !prev.editor }))
-      } else if (e.key === 'o' && import.meta.env.DEV && isHomePanelEnabled('processes', 'home')) {
+      } else if (e.key === 'o' && isHomePanelEnabled('processes', 'home')) {
         e.preventDefault()
         homePanel.setHomePanelVisibility(prev => ({ ...prev, processes: !prev.processes }))
       } else if (e.key === 'u' && testsPanelEnabled && isHomePanelEnabled('tests', 'home')) {
@@ -724,7 +724,7 @@ function App(): React.JSX.Element {
                                 { id: 'kanban', icon: Kanban, label: 'Kanban', active: homePanel.homePanelVisibility.kanban, disabled: !selectedProjectId },
                                 { id: 'git', icon: GitBranch, label: 'Git', shortcut: '⌘G', active: homePanel.homePanelVisibility.git, disabled: !selectedProjectId },
                                 { id: 'editor', icon: FileCode, label: 'Editor', shortcut: '⌘E', active: homePanel.homePanelVisibility.editor, disabled: !selectedProjectId },
-                                ...(import.meta.env.DEV ? [{ id: 'processes', icon: Cpu, label: 'Processes', shortcut: '⌘O', active: homePanel.homePanelVisibility.processes, disabled: !selectedProjectId }] : [{ id: 'processes', icon: Cpu, label: 'Processes', active: homePanel.homePanelVisibility.processes, disabled: !selectedProjectId }]),
+                                { id: 'processes', icon: Cpu, label: 'Processes', shortcut: '⌘O', active: homePanel.homePanelVisibility.processes, disabled: !selectedProjectId },
                                 ...(testsPanelEnabled ? [{ id: 'tests', icon: FlaskConical, label: 'Tests', shortcut: '⌘U', active: homePanel.homePanelVisibility.tests, disabled: !selectedProjectId }] : []),
                               ].filter(p => p.id === 'kanban' || isHomePanelEnabled(p.id, 'home'))}
                               onChange={(id, active) => homePanel.setHomePanelVisibility(prev => ({ ...prev, [id]: active }))}

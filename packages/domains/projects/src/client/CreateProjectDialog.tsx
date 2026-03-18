@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { FolderOpen } from 'lucide-react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@slayzone/ui'
 import { Button, IconButton } from '@slayzone/ui'
@@ -48,15 +48,7 @@ export function CreateProjectDialog({ open, onOpenChange, onCreated }: CreatePro
   const [path, setPath] = useState('')
   const [startMode, setStartMode] = useState<ProjectStartMode>('scratch')
   const [loading, setLoading] = useState(false)
-  const [integrationsEnabled, setIntegrationsEnabled] = useState(window.api.app.isIntegrationsEnabledSync)
-
-  useEffect(() => {
-    if (!open) return
-    window.api.app.isIntegrationsEnabled().then(setIntegrationsEnabled)
-  }, [open])
-  const visibleStartOptions = integrationsEnabled
-    ? START_OPTIONS
-    : START_OPTIONS.filter((option) => option.mode === 'scratch')
+  const visibleStartOptions = START_OPTIONS
 
   const handleBrowse = async () => {
     const result = await window.api.dialog.showOpenDialog({
@@ -84,7 +76,7 @@ export function CreateProjectDialog({ open, onOpenChange, onCreated }: CreatePro
         color,
         path: path || undefined
       })
-      onCreated(project, { startMode: integrationsEnabled ? startMode : 'scratch' })
+      onCreated(project, { startMode })
       setName('')
       setPath('')
       setStartMode('scratch')
@@ -159,7 +151,7 @@ export function CreateProjectDialog({ open, onOpenChange, onCreated }: CreatePro
               Cancel
             </Button>
             <Button type="submit" disabled={!name.trim() || loading}>
-              {(!integrationsEnabled || startMode === 'scratch') ? 'Create' : 'Create and continue'}
+              {startMode === 'scratch' ? 'Create' : 'Create and continue'}
             </Button>
           </div>
         </form>

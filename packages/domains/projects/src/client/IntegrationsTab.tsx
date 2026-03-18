@@ -191,13 +191,11 @@ export function IntegrationsTab({
   const [syncStep, setSyncStep] = useState<1 | 2 | 3>(1)
   const [syncStepEditing, setSyncStepEditing] = useState<1 | 2 | 3 | null>(null)
   const [loadingSyncStatuses, setLoadingSyncStatuses] = useState(false)
-  const [jiraEnabled, setJiraEnabled] = useState(window.api.app.isJiraIntegrationEnabledSync)
 
   useEffect(() => {
     if (open) {
       setSelectedIntegrationEntry(null)
       setSelectedIntegrationMode(null)
-      window.api.app.isJiraIntegrationEnabled().then(setJiraEnabled)
     }
   }, [open, project.id])
 
@@ -1152,7 +1150,7 @@ export function IntegrationsTab({
         }
       ]
     },
-    ...(jiraEnabled ? [{
+    {
       provider: 'jira' as const,
       title: 'Jira',
       items: [
@@ -1175,7 +1173,7 @@ export function IntegrationsTab({
           testId: 'project-integration-provider-jira-import'
         }
       ]
-    }] : [])
+    }
   ]
   const selectedIntegrationViewMeta = (() => {
     if (isGithubContinuousView) {

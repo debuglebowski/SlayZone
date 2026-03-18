@@ -4,9 +4,7 @@ import { SettingsTabIntro } from './SettingsTabIntro'
 
 const LABS_FEATURES = [
   { key: 'labs_context_manager', label: 'Context Manager', description: 'Manage global and per-project instructions, skills, and MCP servers', loader: () => window.api.app.isContextManagerEnabled() },
-  { key: 'labs_integrations', label: 'Integrations', description: 'Sync tasks with GitHub Issues and Linear', loader: () => window.api.app.isIntegrationsEnabled() },
   { key: 'labs_tests_panel', label: 'Tests Panel', description: 'Show test runner panel in the home tab', loader: () => window.api.app.isTestsPanelEnabled() },
-  { key: 'labs_jira_integration', label: 'Jira Integration', description: 'Sync tasks with Jira Cloud issues', loader: () => window.api.app.isJiraIntegrationEnabled() },
 ] as const
 
 export function LabsSettingsTab() {
