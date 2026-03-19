@@ -21,7 +21,7 @@ import type { TerminalState } from '@slayzone/terminal/shared'
 import { groupTasksBy, columnToCreateTaskDefaults, PRIORITY_LABELS, todayISO, type Column } from './kanban'
 import type { ViewConfig, CardProperties } from './FilterState'
 import { TaskContextMenu } from './TaskContextMenu'
-import { cn, getTerminalStateStyle, Tooltip, TooltipContent, TooltipTrigger } from '@slayzone/ui'
+import { cn, getColumnStatusStyle, getTerminalStateStyle, Tooltip, TooltipContent, TooltipTrigger } from '@slayzone/ui'
 import { IconButton } from '@slayzone/ui'
 import { ChevronDown, Plus, AlertCircle, Check, GitMerge, Link2 } from 'lucide-react'
 import { usePty, useActiveTaskIds } from '@slayzone/terminal'
@@ -317,6 +317,12 @@ function GroupSection({
             <span className="flex items-center justify-center w-[14px] shrink-0">
               <ChevronDown className={cn('size-3.5 text-muted-foreground transition-transform', collapsed && '-rotate-90')} />
             </span>
+            {(() => {
+              const style = getColumnStatusStyle(column.id, columns)
+              if (!style) return null
+              const Icon = style.icon
+              return <Icon className={cn('size-4', style.iconClass)} strokeWidth={2.5} />
+            })()}
             <span className="text-base font-semibold text-muted-foreground">{column.title}</span>
             <span className="text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded">{column.tasks.length}</span>
           </button>

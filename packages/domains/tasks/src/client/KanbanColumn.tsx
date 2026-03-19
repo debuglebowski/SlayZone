@@ -19,7 +19,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger
 } from '@slayzone/ui'
-import { cn } from '@slayzone/ui'
+import { cn, getColumnStatusStyle } from '@slayzone/ui'
 
 interface SortableKanbanCardProps {
   task: Task
@@ -181,6 +181,12 @@ export function KanbanColumn({
     <div className="flex w-72 shrink-0 flex-col h-full">
       <div className="mb-2 flex items-center justify-between px-2 select-none">
         <div className="flex items-center gap-2">
+          {(() => {
+            const style = getColumnStatusStyle(column.id, columns)
+            if (!style) return null
+            const Icon = style.icon
+            return <Icon className={cn('size-4', style.iconClass)} strokeWidth={2.5} />
+          })()}
           <h3 className="text-sm font-semibold text-muted-foreground">{column.title}</h3>
           <span className="text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
             {column.tasks.length}
