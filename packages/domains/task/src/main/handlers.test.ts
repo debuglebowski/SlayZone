@@ -322,6 +322,42 @@ describe('db:tasks:update', () => {
     expect(updated.worktree_path).toBe('/tmp/wt')
     expect(updated.worktree_parent_branch).toBe('main')
   })
+
+  test('clears conversation IDs when worktreePath changes', () => {
+    const t = createTask('SessionReset', { terminalMode: 'codex' })
+    // Set a conversation ID
+    const withSession = h.invoke('db:tasks:update', {
+      id: t.id,
+      providerConfig: { codex: { conversationId: 'stale-session-123' } }
+    }) as Task
+    expect(withSession.provider_config.codex?.conversationId).toBe('stale-session-123')
+
+    // Change worktree path — should clear conversation IDs
+    const afterWorktreeChange = h.invoke('db:tasks:update', {
+      id: withSession.id,
+      worktreePath: '/tmp/new-worktree'
+    }) as Task
+    expect(afterWorktreeChange.worktree_path).toBe('/tmp/new-worktree')
+    expect(afterWorktreeChange.provider_config.codex?.conversationId).toBeNull()
+    // Flags should survive
+    expect(afterWorktreeChange.provider_config.codex?.flags).toBeTruthy()
+  })
+
+  test('does not clear conversation IDs when worktreePath and providerConfig both update', () => {
+    const t = createTask('SessionKeep')
+    const withSession = h.invoke('db:tasks:update', {
+      id: t.id,
+      providerConfig: { 'claude-code': { conversationId: 'keep-me' } }
+    }) as Task
+
+    // Simultaneous worktree + providerConfig update — explicit config wins
+    const updated = h.invoke('db:tasks:update', {
+      id: withSession.id,
+      worktreePath: '/tmp/other-wt',
+      providerConfig: { 'claude-code': { conversationId: 'new-session' } }
+    }) as Task
+    expect(updated.provider_config['claude-code']?.conversationId).toBe('new-session')
+  })
 })
 
 // --- Archive ---

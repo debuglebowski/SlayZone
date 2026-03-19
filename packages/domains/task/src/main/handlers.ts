@@ -340,13 +340,22 @@ export function updateTask(db: Database, data: UpdateTaskInput): Task | null {
       { mode: 'opencode', col: 'opencode', convId: data.opencodeConversationId, flags: data.opencodeFlags, hasConvId: data.opencodeConversationId !== undefined, hasFlags: data.opencodeFlags !== undefined },
     ]
     const hasLegacyUpdate = legacyMappings.some(m => m.hasConvId || m.hasFlags)
+    const shouldResetConversationIds = data.worktreePath !== undefined && data.providerConfig === undefined && !hasLegacyUpdate
 
-    if (data.providerConfig !== undefined || hasLegacyUpdate || data.terminalMode !== undefined) {
+    if (data.providerConfig !== undefined || hasLegacyUpdate || data.terminalMode !== undefined || shouldResetConversationIds) {
       // Read current provider_config
       const currentRow = db.prepare('SELECT provider_config FROM tasks WHERE id = ?').get(data.id) as { provider_config: string } | undefined
       const current: ProviderConfig = (safeJsonParse(currentRow?.provider_config) as ProviderConfig) ?? {}
       // Deep merge: per-mode entry merge so partial updates don't clobber existing fields
       const merged: ProviderConfig = { ...current }
+
+      // Clear stale conversation IDs when worktree changes
+      if (shouldResetConversationIds) {
+        for (const mode of Object.keys(merged)) {
+          merged[mode] = { ...merged[mode], conversationId: null }
+        }
+      }
+
       if (data.providerConfig !== undefined) {
         for (const [mode, entry] of Object.entries(data.providerConfig)) {
           merged[mode] = { ...current[mode], ...entry }
@@ -376,7 +385,7 @@ export function updateTask(db: Database, data: UpdateTaskInput): Task | null {
       for (const m of legacyMappings) {
         const entry = merged[m.mode]
         if (!entry) continue
-        if (m.hasConvId || data.providerConfig !== undefined) {
+        if (m.hasConvId || data.providerConfig !== undefined || shouldResetConversationIds) {
           fields.push(`${m.col}_conversation_id = ?`); values.push(entry.conversationId ?? null)
         }
         if (m.hasFlags || data.providerConfig !== undefined) {

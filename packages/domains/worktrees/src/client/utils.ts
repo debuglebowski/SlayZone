@@ -19,8 +19,25 @@ export const DEFAULT_WORKTREE_BASE_PATH_TEMPLATE = '{project}/..'
  * "{project}/.." with "/repo/slayzone" -> "/repo"
  */
 export function resolveWorktreeBasePathTemplate(template: string, projectPath: string): string {
-  const resolved = template.replaceAll('{project}', projectPath.replace(/[\\/]+$/, ''))
-  return normalizePath(resolved)
+  const normalizedProject = projectPath.replace(/[\\/]+$/, '')
+  const resolved = template.replaceAll('{project}', normalizedProject)
+  const normalized = normalizePath(resolved)
+
+  // Relative templates are treated as project-relative
+  if (normalized && !isAbsolutePath(normalized)) {
+    const sep = normalizedProject.includes('\\') ? '\\' : '/'
+    return normalizePath(`${normalizedProject}${sep}${normalized}`)
+  }
+
+  return normalized
+}
+
+function isAbsolutePath(input: string): boolean {
+  if (!input) return false
+  if (input.startsWith('/')) return true
+  if (/^[A-Za-z]:[\\/]/.test(input)) return true
+  if (input.startsWith('\\\\')) return true
+  return false
 }
 
 /**

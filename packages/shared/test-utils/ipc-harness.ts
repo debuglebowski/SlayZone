@@ -17,6 +17,7 @@ type Handler = (event: unknown, ...args: unknown[]) => unknown
 export interface MockIpcMain {
   handle(channel: string, handler: Handler): void
   on(channel: string, handler: Handler): void
+  emit(...args: unknown[]): void
   handlers: Map<string, Handler>
 }
 
@@ -52,6 +53,7 @@ export async function createTestHarness(): Promise<TestHarness> {
     on(channel: string, handler: Handler) {
       handlers.set(channel, handler)
     },
+    emit() { /* no-op for tests */ },
     handlers
   }
 

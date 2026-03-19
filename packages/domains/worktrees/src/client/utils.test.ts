@@ -113,6 +113,14 @@ test('normalizes explicit dot segments', () => {
   expect(resolveWorktreeBasePathTemplate('/tmp/worktrees/../wt', '/ignored')).toBe('/tmp/wt')
 })
 
+test('resolves relative template against project path (posix)', () => {
+  expect(resolveWorktreeBasePathTemplate('../worktrees', '/home/user/dev/myapp')).toBe('/home/user/dev/worktrees')
+})
+
+test('resolves relative template against project path (windows)', () => {
+  expect(resolveWorktreeBasePathTemplate('..\\worktrees', 'C:\\Users\\user\\dev\\myapp')).toBe('C:\\Users\\user\\dev\\worktrees')
+})
+
 test('joins worktree path with posix separator', () => {
   expect(joinWorktreePath('/tmp/wt', 'feature-1')).toBe('/tmp/wt/feature-1')
 })
