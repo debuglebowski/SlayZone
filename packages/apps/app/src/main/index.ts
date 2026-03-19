@@ -217,6 +217,7 @@ const oauthCallbackQueue: OAuthCallbackPayload[] = []
 const oauthCallbackWaiters = new Set<(payload: OAuthCallbackPayload) => void>()
 let mainWindowReady = false
 let rendererDataReady = false
+let rendererReloading = false
 const APP_PROTOCOL_SCHEME = 'slayzone'
 // Avoid stealing the global slayzone:// handler from packaged builds during local dev.
 const SHOULD_REGISTER_PROTOCOL_CLIENT = !is.dev || process.env.SLAYZONE_REGISTER_DEV_PROTOCOL === '1'
@@ -673,17 +674,28 @@ function createMainWindow(): void {
     mainWindow = null
   })
 
-  // Recover from renderer crashes (black screen) by reloading the page.
+  // Recover from renderer crashes (black screen) by forcing a fresh navigation.
+  // webContents.reload() fails silently after render-process-gone (stale frame handle),
+  // so we use loadURL/loadFile which creates a new frame.
   mainWindow.webContents.on('render-process-gone', (_event, details) => {
     console.error('[renderer] process gone:', details.reason, details.exitCode)
-    if (mainWindow && !mainWindow.isDestroyed()) {
-      // Small delay to let things settle before reload
-      setTimeout(() => {
-        if (mainWindow && !mainWindow.isDestroyed()) {
-          console.log('[renderer] reloading after crash...')
-          mainWindow.webContents.reload()
-        }
-      }, 500)
+    rendererReloading = true
+    if (!mainWindow || mainWindow.isDestroyed()) return
+    setTimeout(() => {
+      if (!mainWindow || mainWindow.isDestroyed()) return
+      console.log('[renderer] reloading after crash...')
+      if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
+        mainWindow.loadURL(process.env['ELECTRON_RENDERER_URL'])
+      } else {
+        mainWindow.loadFile(join(__dirname, '../renderer/index.html'))
+      }
+    }, 500)
+  })
+
+  mainWindow.webContents.on('did-finish-load', () => {
+    if (rendererReloading) {
+      console.log('[renderer] reload complete')
+      rendererReloading = false
     }
   })
 
@@ -756,6 +768,7 @@ function createWindow(): void {
 app.on('browser-window-created', (_event, win) => {
   const originalSend = win.webContents.send.bind(win.webContents)
   win.webContents.send = (channel: string, ...args: unknown[]) => {
+    if (rendererReloading) return
     // Check frame is alive before calling — avoids Electron's internal console warning
     // that fires even when the thrown error is caught in JS.
     try { if (win.isDestroyed() || !win.webContents.mainFrame) return } catch { return }

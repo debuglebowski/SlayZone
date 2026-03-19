@@ -399,6 +399,7 @@ export const Terminal = forwardRef<TerminalHandle, TerminalProps>(function Termi
       try {
         const webglAddon = new WebglAddon()
         webglAddon.onContextLoss(() => {
+          console.warn('[terminal] WebGL context lost, falling back to DOM renderer')
           webglAddon.dispose()
         })
         terminal.loadAddon(webglAddon)

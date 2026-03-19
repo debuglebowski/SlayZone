@@ -607,7 +607,18 @@ export function registerDiagnosticsHandlers(ipcMain: IpcMain, db: Database, even
   })
 }
 
+const CONSOLE_RING_SIZE = 50
+const consoleRing: Array<{ ts: number; level: string; message: string; sourceId: string; line: number }> = []
+
 export function registerProcessDiagnostics(electronApp: App): void {
+  // Capture renderer console output in a rolling buffer — flushed into crash diagnostics
+  electronApp.on('web-contents-created', (_event, webContents) => {
+    webContents.on('console-message', ({ level, message, lineNumber, sourceId }) => {
+      if (consoleRing.length >= CONSOLE_RING_SIZE) consoleRing.shift()
+      consoleRing.push({ ts: Date.now(), level, message: message.slice(0, 500), sourceId, line: lineNumber })
+    })
+  })
+
   process.on('uncaughtException', (error) => {
     recordDiagnosticEvent({
       level: 'error',
@@ -628,7 +639,13 @@ export function registerProcessDiagnostics(electronApp: App): void {
     })
   })
 
-  electronApp.on('render-process-gone', (_, webContents, details) => {
+  electronApp.on('render-process-gone', async (_, webContents, details) => {
+    let gpuInfo: unknown = null
+    try { gpuInfo = await electronApp.getGPUInfo('basic') } catch { /* GPU info unavailable */ }
+
+    let memoryInfo: unknown = null
+    try { memoryInfo = process.memoryUsage() } catch { /* ignore */ }
+
     recordDiagnosticEvent({
       level: 'error',
       source: 'main',
@@ -637,12 +654,22 @@ export function registerProcessDiagnostics(electronApp: App): void {
       payload: {
         webContentsId: webContents.id,
         reason: details.reason,
-        exitCode: details.exitCode
+        exitCode: details.exitCode,
+        consoleRing: [...consoleRing],
+        gpuInfo,
+        memoryInfo
       }
     })
+
+    consoleRing.length = 0
   })
 
-  electronApp.on('child-process-gone', (_, details) => {
+  electronApp.on('child-process-gone', async (_, details) => {
+    let gpuInfo: unknown = null
+    if (details.type === 'GPU') {
+      try { gpuInfo = await electronApp.getGPUInfo('basic') } catch { /* ignore */ }
+    }
+
     recordDiagnosticEvent({
       level: 'error',
       source: 'main',
@@ -653,7 +680,8 @@ export function registerProcessDiagnostics(electronApp: App): void {
         reason: details.reason,
         exitCode: details.exitCode,
         serviceName: details.serviceName,
-        name: details.name
+        name: details.name,
+        ...(gpuInfo ? { gpuInfo } : {})
       }
     })
   })
