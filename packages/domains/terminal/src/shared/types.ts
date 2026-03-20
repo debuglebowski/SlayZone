@@ -7,6 +7,7 @@ export const BuiltinTerminalMode = {
   Gemini: 'gemini',
   CursorAgent: 'cursor-agent',
   OpenCode: 'opencode',
+  QwenCode: 'qwen-code',
 } as const
 
 export interface TerminalModeInfo {
@@ -66,6 +67,7 @@ export const DETECTION_ENGINES: DetectionEngine[] = [
   { type: 'gemini', label: 'Gemini' },
   { type: 'cursor-agent', label: 'Cursor' },
   { type: 'opencode', label: 'OpenCode' },
+  { type: 'qwen-code', label: 'Qwen Code' },
 ]
 
 export const DEFAULT_TERMINAL_MODES: TerminalModeInfo[] = [
@@ -74,7 +76,8 @@ export const DEFAULT_TERMINAL_MODES: TerminalModeInfo[] = [
   { id: BuiltinTerminalMode.Gemini, label: 'Gemini', type: 'gemini', initialCommand: 'gemini {flags}', resumeCommand: 'gemini --resume latest {flags}', defaultFlags: '--yolo', enabled: true, isBuiltin: true, order: 2 },
   { id: BuiltinTerminalMode.CursorAgent, label: 'Cursor', type: 'cursor-agent', initialCommand: 'cursor-agent {flags}', resumeCommand: 'cursor-agent --resume {id} {flags}', defaultFlags: '--force', enabled: true, isBuiltin: true, order: 3 },
   { id: BuiltinTerminalMode.OpenCode, label: 'OpenCode', type: 'opencode', initialCommand: 'opencode {flags}', resumeCommand: 'opencode --session {id} {flags}', defaultFlags: '', enabled: true, isBuiltin: true, order: 4 },
-  { id: 'terminal', label: 'Terminal', type: 'terminal', initialCommand: null, resumeCommand: null, defaultFlags: null, enabled: true, isBuiltin: true, order: 5 },
+  { id: BuiltinTerminalMode.QwenCode, label: 'Qwen', type: 'qwen-code', initialCommand: 'qwen --session-id {id} {flags}', resumeCommand: 'qwen --resume {id} {flags}', defaultFlags: '--yolo', enabled: true, isBuiltin: true, order: 5 },
+  { id: 'terminal', label: 'Terminal', type: 'terminal', initialCommand: null, resumeCommand: null, defaultFlags: null, enabled: true, isBuiltin: true, order: 6 },
 ]
 
 // Duplicated from @slayzone/projects/shared — neither domain can depend on the
