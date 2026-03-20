@@ -1,0 +1,1407 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SlayZone — Features</title>
+<meta name="description" content="Every feature in SlayZone. Kanban, terminals, git, browser panels, usage tracking, and more.">
+<meta property="og:title" content="SlayZone — All Features">
+<meta property="og:description" content="Every feature in SlayZone. Kanban, terminals, git, browser panels, usage tracking, and more.">
+<meta property="og:image" content="https://slay.zone/assets/og-preview.jpg">
+<link rel="canonical" href="https://slay.zone/features">
+<meta property="og:url" content="https://slay.zone/features.html">
+<meta property="og:type" content="website">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="SlayZone — All Features">
+<meta name="twitter:description" content="Every feature in SlayZone. Kanban, terminals, git, browser panels, and more.">
+<meta name="twitter:image" content="https://slay.zone/assets/og-preview.jpg">
+{{head-common}}
+<style>
+{{css-vars}}
+  body { background: #ffffff; color: #1a1a2e; font-family: 'Outfit', sans-serif; font-weight: 300; line-height: 1.6; margin: 0; overflow-x: hidden; }
+  .container { max-width: 960px; margin: 0 auto; padding: 0 24px; min-height: 100vh; display: flex; flex-direction: column; }
+
+  nav { padding: 28px 0; display: flex; align-items: center; justify-content: space-between; position: relative; }
+  .logo { font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 18px; letter-spacing: -0.5px; display: flex; align-items: center; gap: 10px; text-decoration: none; color: #1a1a2e; white-space: nowrap; }
+  .logo .slash { color: var(--accent); }
+  .nav-right { display: flex; align-items: center; gap: 40px; }
+  .nav-links { display: flex; gap: 28px; list-style: none; }
+  .nav-links a { color: #888; text-decoration: none; font-size: 14px; font-weight: 500; transition: color 0.2s; }
+  .nav-links a:hover { color: #1a1a2e; }
+  .social-links { display: flex; gap: 20px; align-items: center; }
+  .social-links a { display: inline-flex; align-items: center; justify-content: center; color: #1a1a2e; text-decoration: none; transition: color 0.2s; }
+  .social-links a:hover { color: var(--accent); }
+  .social-links svg { display: block; width: 16px; height: 16px; }
+
+  .page-header { text-align: center; margin: 60px 0 80px; }
+  .page-header h1 { font-size: 36px; font-weight: 700; letter-spacing: -1.5px; margin: 0 0 8px; }
+  .page-header p { color: #888; font-size: 16px; margin: 0; }
+
+  /* Feature sections */
+  .feature-section { display: grid; grid-template-columns: 1fr 1fr; gap: 48px; align-items: center; padding: 60px 0; }
+  .feature-section + .feature-section { border-top: 1px solid #f0f0f4; }
+  .feature-section:nth-child(even) .feature-text { order: -1; }
+  .feature-text h2 { font-size: 28px; font-weight: 700; letter-spacing: -1px; margin: 0 0 12px; line-height: 1.15; }
+  .feature-text p { font-size: 16px; color: #555; margin: 0; line-height: 1.6; }
+  .feature-text code { font-family: 'JetBrains Mono', monospace; font-size: 14px; background: #f4f4f8; padding: 2px 6px; border-radius: 4px; }
+
+  .feature-visual { aspect-ratio: 4/3; border-radius: 16px; background: #f0f0f4; overflow: hidden; position: relative; }
+  .feature-visual:has(.scale-wrap) { aspect-ratio: unset; }
+  .feature-visual .scale-wrap { width: 720px; height: 540px; transform-origin: top left; position: absolute; top: 0; left: 0; }
+
+  /* Scroll animation */
+  .feature-section { opacity: 0; transform: translateY(32px); transition: opacity 0.6s ease, transform 0.6s ease; }
+  .feature-section.visible { opacity: 1; transform: translateY(0); }
+
+  /* ═══════ SHARED APP FRAME ═══════ */
+  .app-frame { background: var(--surface); border-radius: 8px; overflow: hidden; width: 100%; height: 100%; display: flex; flex-direction: column; box-shadow: 0 12px 40px rgba(0,0,0,0.25), 0 0 0 1px rgba(255,255,255,0.05); }
+  .app-bar { display: flex; align-items: center; padding: 12px 18px; gap: 8px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+  .app-dot { width: 11px; height: 11px; border-radius: 50%; }
+  .app-dot.r { background: var(--red); opacity: 0.7; }
+  .app-dot.y { background: var(--amber); opacity: 0.7; }
+  .app-dot.g { background: var(--green); opacity: 0.7; }
+  .app-bar-title { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--text-dim); margin-left: 8px; }
+  .app-body { flex: 1; overflow: hidden; position: relative; }
+
+  /* Shared: tab bar */
+  .tab-bar { display: flex; align-items: center; gap: 2px; padding: 6px 8px; border-bottom: 1px solid var(--border); background: rgba(0,0,0,0.15); overflow: hidden; flex-shrink: 0; }
+  .tab-bar-home { width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; color: var(--text-dim); font-size: 12px; flex-shrink: 0; margin-right: 4px; }
+  .tab-item { display: flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 4px; font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--text-dim); white-space: nowrap; flex-shrink: 0; max-width: 180px; overflow: hidden; text-overflow: ellipsis; }
+  .tab-item.active { background: var(--surface); color: var(--text); }
+  .tab-item .tab-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+  .tab-item .tab-x { font-size: 9px; opacity: 0.4; margin-left: auto; }
+
+  /* Shared: task toolbar */
+  .task-bar { display: flex; align-items: center; justify-content: space-between; padding: 8px 16px; border-bottom: 1px solid var(--border); }
+  .task-bar-left { display: flex; align-items: center; gap: 10px; }
+  .task-name { font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 700; color: var(--text); }
+  .task-branch { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--text-dim); background: var(--bg); padding: 2px 8px; border-radius: 4px; }
+  .task-bar-right { display: flex; gap: 6px; }
+  .tb-btn { background: none; border: 1px solid var(--border); color: var(--text-dim); font-family: 'JetBrains Mono', monospace; font-size: 10px; padding: 3px 10px; border-radius: 4px; cursor: default; transition: all 0.2s; }
+  .tb-btn.active { color: var(--accent); border-color: rgba(244,104,23,0.3); background: var(--accent-dim); }
+
+  /* Shared: pane header */
+  .pane-hd { display: flex; align-items: center; gap: 8px; padding: 8px 16px; border-bottom: 1px solid var(--border); font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--text-dim); background: rgba(0,0,0,0.15); }
+  .pane-dot { width: 6px; height: 6px; border-radius: 50%; }
+  .pane-dot.green { background: var(--green); }
+  .pane-dot.amber { background: var(--amber); animation: pulse 2s ease infinite; }
+  .pane-dot.red { background: var(--red); }
+
+  /* Shared: terminal styling */
+  .term { padding: 14px 16px; font-family: 'JetBrains Mono', monospace; font-size: 12px; line-height: 1.7; background: var(--bg); overflow: hidden; border-radius: 8px; border: 1px solid var(--border); height: 100%; box-sizing: border-box; }
+  .t-prompt { color: var(--accent); }
+  .t-cmd { color: var(--text); }
+  .t-out { color: var(--text-dim); }
+  .t-blue { color: var(--blue); }
+  .t-green { color: var(--green); }
+  .t-amber { color: var(--amber); }
+  .t-red { color: var(--red); }
+  .t-file { color: var(--amber); }
+  .t-muted { color: #4a4e6a; }
+  .t-sep { color: #2a2e4a; }
+  .tl { opacity: 0; transform: translateY(3px); transition: opacity 0.25s ease, transform 0.25s ease; }
+  .tl.vis { opacity: 1; transform: translateY(0); }
+  .tl.instant { opacity: 1; transform: none; }
+  .cursor-blink { display: inline-block; width: 7px; height: 14px; background: var(--accent); vertical-align: text-bottom; animation: blink 1s step-end infinite; }
+  @keyframes blink { 50% { opacity: 0; } }
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
+
+  /* Shared: diff lines */
+  .dl { padding: 2px 12px; font-family: 'JetBrains Mono', monospace; font-size: 11px; line-height: 1.6; border-bottom: 1px solid rgba(255,255,255,0.02); white-space: nowrap; }
+  .dl.add { background: rgba(77,255,136,0.06); color: var(--green); }
+  .dl.del { background: rgba(255,77,106,0.06); color: var(--red); }
+  .dl.ctx { color: #4a4e6a; }
+  .dl.hunk { color: var(--blue); background: rgba(77,166,255,0.05); font-size: 10px; }
+  .dl.file-hd { background: #0f1328; color: var(--text); font-weight: 700; font-size: 11px; border-bottom: 1px solid var(--border); }
+  .dl .ln { display: inline-block; width: 24px; color: #2a2e4a; text-align: right; margin-right: 10px; user-select: none; }
+  .dl .stat-add { color: var(--green); float: right; }
+  .dl .stat-del { color: var(--red); float: right; margin-left: 4px; }
+
+  /* Shared: bar meter */
+  .bar-track { height: 8px; background: var(--surface2); border-radius: 4px; overflow: hidden; flex: 1; }
+  .bar-fill { height: 100%; border-radius: 4px; transition: width 1s cubic-bezier(0.22,1,0.36,1); width: 0; }
+  .bar-fill.orange { background: var(--accent); }
+  .bar-fill.blue { background: var(--blue); }
+  .bar-fill.green { background: var(--green); }
+  .bar-fill.amber { background: var(--amber); }
+  .bar-fill.red { background: var(--red); }
+
+  /* ═══════ FEAT 1: KANBAN ═══════ */
+  .fk-layout { flex: 1; display: flex; overflow: hidden; }
+  /* Sidebar — dots sit on top of projects */
+  .fk-sidebar { width: 56px; border-right: 1px solid var(--border); display: flex; flex-direction: column; align-items: center; padding: 0 0 10px; gap: 6px; flex-shrink: 0; }
+  .fk-sidebar-dots { display: flex; align-items: center; justify-content: center; gap: 5px; padding: 10px 0; width: 36px; }
+  .fk-sidebar-dots .app-dot { width: 8px; height: 8px; }
+  .fk-proj { width: 36px; height: 36px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 700; color: #fff; flex-shrink: 0; position: relative; }
+  .fk-proj { transition: outline-color 0.3s, outline-offset 0.3s, outline-width 0.3s; outline: 2px solid transparent; outline-offset: 2px; }
+  .fk-proj.active { outline-color: var(--accent); }
+  .fk-proj .fk-proj-dot { position: absolute; top: -1px; right: -1px; width: 8px; height: 8px; border-radius: 50%; border: 2px solid var(--surface); }
+  .fk-sb-spacer { flex: 1; }
+  .fk-sb-icon { width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; color: var(--text-dim); font-size: 14px; position: relative; }
+  .fk-sb-badge { position: absolute; top: 2px; right: 2px; background: var(--accent); color: #fff; font-size: 8px; font-weight: 700; width: 14px; height: 14px; border-radius: 50%; display: flex; align-items: center; justify-content: center; }
+  /* Main area */
+  .fk-main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+  .fk-topbar { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px 8px; }
+  .fk-topbar-title { font-size: 18px; font-weight: 700; color: var(--text); }
+  .fk-topbar-right { display: flex; gap: 8px; align-items: center; }
+  .fk-topbar-btn { font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--text-dim); padding: 4px 10px; border-radius: 4px; cursor: default; }
+  .fk-panel-tabs { display: flex; gap: 2px; background: var(--surface2); border-radius: 6px; padding: 2px; }
+  .fk-panel-tab { font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--text-dim); padding: 4px 10px; border-radius: 4px; cursor: default; }
+  .fk-panel-tab.active { background: var(--surface); color: var(--text); }
+  /* Board */
+  .fk-board { flex: 1; display: grid; grid-template-columns: repeat(6,1fr); gap: 0; padding: 8px 8px; overflow: hidden; }
+  .fk-col { padding: 0 4px; }
+  .fk-col-head { font-family: 'Outfit', sans-serif; font-size: 12px; font-weight: 500; color: var(--text); padding: 4px 6px 10px; display: flex; align-items: center; gap: 8px; }
+  .fk-col-head .cnt { background: var(--surface2); border-radius: 4px; padding: 1px 6px; font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--text-dim); }
+  .fk-col-head .fk-plus { margin-left: auto; color: var(--text-dim); font-size: 14px; }
+  .fk-board { transition: opacity 0.25s ease; }
+  .fk-board.fade { opacity: 0; }
+  /* Cursor */
+  .fk-cursor { position: absolute; width: 18px; height: 18px; z-index: 50; pointer-events: none; opacity: 0; transition: opacity 0.3s ease, left 0.6s cubic-bezier(0.4,0,0.2,1), top 0.6s cubic-bezier(0.4,0,0.2,1); filter: drop-shadow(0 1px 3px rgba(0,0,0,0.5)); }
+  .fk-cursor.vis { opacity: 1; }
+  .fk-cursor svg { width: 18px; height: 18px; }
+  .fk-click-ripple { position: absolute; width: 24px; height: 24px; border-radius: 50%; background: rgba(244,104,23,0.3); transform: translate(-50%,-50%) scale(0); pointer-events: none; z-index: 49; }
+  .fk-click-ripple.go { animation: fk-ripple 0.4s ease forwards; }
+  @keyframes fk-ripple { 0% { transform: translate(-50%,-50%) scale(0); opacity: 1; } 100% { transform: translate(-50%,-50%) scale(2.5); opacity: 0; } }
+  .fk-card { background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; padding: 12px 10px; margin-bottom: 6px; transition: all 0.4s ease; display: flex; align-items: flex-start; gap: 8px; }
+  .fk-card-icon { color: var(--accent); font-size: 12px; flex-shrink: 0; margin-top: 1px; }
+  .fk-card-body { flex: 1; min-width: 0; }
+  .fk-card-title { font-size: 12px; font-weight: 500; color: var(--text); line-height: 1.4; }
+  .fk-card-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; margin-top: 4px; }
+  .fk-card-dot.attention { background: var(--amber); animation: pulse 2s ease infinite; }
+  .fk-card-dot.idle { background: var(--text-dim); opacity: 0.4; }
+  .fk-card-dot.working { background: var(--green); }
+  .fk-card.dragging { border-color: rgba(244,104,23,0.5); box-shadow: 0 6px 20px rgba(0,0,0,0.4); transform: rotate(-1.5deg) scale(1.04); z-index: 10; position: relative; }
+  .fk-card.ghost { opacity: 0.25; }
+  .fk-card.landed { animation: fk-land 0.3s ease; }
+  @keyframes fk-land { 0% { transform: rotate(-1.5deg) scale(1.04); } 60% { transform: scale(0.98); } 100% { transform: scale(1); } }
+
+  /* ═══════ FEAT 2: TERMINAL ═══════ */
+  .feat-term-wrap { flex: 1; padding: 10px; min-height: 0; }
+  .f2-view { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+
+  /* ═══════ FEAT 3: BROWSER ═══════ */
+  .feat-split { flex: 1; display: flex; gap: 10px; padding: 10px; overflow: hidden; }
+  .feat-split-left { flex: 1; min-width: 0; transition: flex 0.5s ease; background: var(--bg); border-radius: 8px; border: 1px solid var(--border); overflow: hidden; }
+  .feat-split-left .term { margin: 0; border: none; border-radius: 0; height: 100%; }
+  .feat-split-right { flex: 0; width: 0; overflow: hidden; display: flex; flex-direction: column; border-radius: 8px; border: 1px solid var(--border); transition: flex 0.5s ease, width 0.5s ease, opacity 0.3s ease; opacity: 0; }
+  .feat-split-right.open { flex: 1; width: auto; opacity: 1; }
+  .browser-bar { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-bottom: 1px solid var(--border); background: rgba(0,0,0,0.15); }
+  .browser-url { flex: 1; background: var(--bg); border: 1px solid var(--border); border-radius: 4px; padding: 4px 10px; font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--text-dim); }
+  .browser-url .lock { color: var(--green); font-size: 9px; }
+  .browser-page { padding: 16px; opacity: 0; transition: opacity 0.5s ease 0.3s; }
+  .feat-split-right.open .browser-page { opacity: 1; }
+  .bp-topbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+  .bp-logo { font-family: 'Outfit', sans-serif; font-size: 13px; font-weight: 700; color: #e8e8ed; }
+  .bp-cards { display: grid; grid-template-columns: repeat(3,1fr); gap: 8px; margin-bottom: 12px; }
+  .bp-card { background: #101528; border: 1px solid #1a2040; border-radius: 6px; padding: 10px; }
+  .bp-card-label { font-size: 8px; color: #4a4e6a; text-transform: uppercase; letter-spacing: 0.5px; font-family: 'JetBrains Mono', monospace; margin-bottom: 4px; }
+  .bp-card-val { font-size: 16px; font-weight: 700; font-family: 'Outfit', sans-serif; }
+
+  /* ═══════ FEAT 4: WORKTREES ═══════ */
+  .feat-wt { flex: 1; padding: 20px; display: flex; flex-direction: column; gap: 12px; }
+  .wt-lane { display: flex; align-items: center; gap: 12px; background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; padding: 14px 16px; opacity: 0; transform: translateX(-20px); transition: all 0.4s ease; }
+  .wt-lane.vis { opacity: 1; transform: translateX(0); }
+  .wt-icon { font-size: 18px; flex-shrink: 0; }
+  .wt-info { flex: 1; }
+  .wt-task { font-size: 13px; font-weight: 500; color: var(--text); margin-bottom: 4px; }
+  .wt-path { font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--text-dim); }
+  .wt-branch { font-family: 'JetBrains Mono', monospace; font-size: 10px; padding: 2px 8px; border-radius: 4px; background: rgba(77,166,255,0.1); color: var(--blue); }
+  .wt-status { font-family: 'JetBrains Mono', monospace; font-size: 10px; padding: 3px 8px; border-radius: 4px; }
+  .wt-status.active { background: rgba(77,255,136,0.1); color: var(--green); }
+  .wt-status.idle { background: var(--surface2); color: var(--text-dim); }
+
+  /* ═══════ FEAT 5: GIT PANEL ═══════ */
+  .feat-git { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+  .git-files { flex: 1; padding: 8px 0; overflow: hidden; }
+  .gf-row { display: flex; align-items: center; gap: 10px; padding: 6px 16px; font-family: 'JetBrains Mono', monospace; font-size: 11px; transition: background 0.2s; }
+  .gf-row:hover { background: rgba(255,255,255,0.02); }
+  .gf-check { width: 14px; height: 14px; border-radius: 3px; border: 1px solid var(--border); display: flex; align-items: center; justify-content: center; font-size: 9px; transition: all 0.2s; flex-shrink: 0; }
+  .gf-check.on { border-color: var(--green); color: var(--green); background: rgba(77,255,136,0.1); }
+  .gf-badge { width: 18px; text-align: center; font-weight: 700; font-size: 10px; flex-shrink: 0; }
+  .gf-badge.m { color: var(--amber); }
+  .gf-badge.a { color: var(--green); }
+  .gf-badge.d { color: var(--red); }
+  .gf-badge.q { color: var(--text-dim); }
+  .gf-name { color: var(--text); flex: 1; }
+  .git-commit { padding: 12px 16px; border-top: 1px solid var(--border); }
+  .gc-input { background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 8px 12px; font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--text); width: 100%; box-sizing: border-box; margin-bottom: 8px; }
+  .gc-btn { background: var(--accent); color: #fff; border: none; border-radius: 6px; padding: 6px 16px; font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 700; cursor: default; opacity: 0.5; transition: all 0.3s; }
+  .gc-btn.ready { opacity: 1; box-shadow: 0 2px 8px rgba(244,104,23,0.3); }
+
+  /* ═══════ FEAT 7: COMMIT GRAPH ═══════ */
+  .feat-graph { flex: 1; padding: 16px; overflow: hidden; }
+  .cg-row { display: flex; align-items: center; gap: 12px; padding: 4px 0; font-family: 'JetBrains Mono', monospace; font-size: 11px; }
+  .cg-graph { width: 80px; height: 24px; flex-shrink: 0; position: relative; }
+  .cg-dot { width: 10px; height: 10px; border-radius: 50%; position: absolute; top: 7px; }
+  .cg-dot.main { background: var(--accent); }
+  .cg-dot.feat { background: var(--blue); }
+  .cg-dot.fix { background: var(--green); }
+  .cg-line { position: absolute; top: 12px; height: 2px; }
+  .cg-line.main { background: var(--accent); }
+  .cg-line.feat { background: var(--blue); }
+  .cg-line.fix { background: var(--green); }
+  .cg-hash { color: var(--text-dim); width: 56px; flex-shrink: 0; }
+  .cg-msg { color: var(--text); flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .cg-tag { font-size: 9px; padding: 1px 6px; border-radius: 3px; background: rgba(244,104,23,0.12); color: var(--accent); }
+  .cg-author { color: var(--text-dim); font-size: 10px; }
+
+  /* ═══════ FEAT 8: PR ═══════ */
+  .feat-pr { flex: 1; padding: 20px; overflow: hidden; display: flex; flex-direction: column; }
+  .pr-header { margin-bottom: 16px; }
+  .pr-title { font-size: 16px; font-weight: 700; color: var(--text); margin-bottom: 6px; }
+  .pr-meta { font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--text-dim); display: flex; align-items: center; gap: 8px; }
+  .pr-badge { padding: 2px 8px; border-radius: 10px; font-size: 10px; font-weight: 700; transition: all 0.5s; }
+  .pr-badge.open { background: rgba(77,255,136,0.15); color: var(--green); }
+  .pr-badge.merged { background: rgba(160,100,255,0.15); color: #a064ff; }
+  .pr-comments { flex: 1; display: flex; flex-direction: column; gap: 10px; overflow: hidden; }
+  .pr-comment { background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; }
+  .pr-comment-head { font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--text-dim); margin-bottom: 4px; }
+  .pr-comment-body { font-size: 12px; color: var(--text); line-height: 1.5; }
+  .pr-actions { margin-top: 12px; display: flex; gap: 8px; align-items: center; }
+  .pr-merge-btn { background: var(--green); color: #fff; border: none; border-radius: 6px; padding: 6px 16px; font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 700; cursor: default; transition: all 0.3s; opacity: 0.5; }
+  .pr-merge-btn.ready { opacity: 1; box-shadow: 0 2px 8px rgba(77,255,136,0.3); }
+  .pr-merge-btn.merged { background: #a064ff; }
+  .pr-strategy { font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--text-dim); padding: 4px 10px; background: var(--surface2); border-radius: 4px; }
+
+  /* ═══════ FEAT 9: EDITOR ═══════ */
+  .feat-editor { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+  .ed-toolbar { display: flex; align-items: center; gap: 4px; padding: 8px 16px; border-bottom: 1px solid var(--border); }
+  .ed-btn { width: 28px; height: 26px; display: flex; align-items: center; justify-content: center; border-radius: 4px; font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--text-dim); cursor: default; transition: all 0.2s; background: none; border: none; }
+  .ed-btn.active { color: var(--accent); background: var(--accent-dim); }
+  .ed-sep { width: 1px; height: 18px; background: var(--border); margin: 0 4px; }
+  .ed-content { flex: 1; padding: 20px 24px; font-size: 13px; color: var(--text); line-height: 1.7; overflow: hidden; }
+  .ed-h1 { font-size: 20px; font-weight: 700; margin-bottom: 8px; }
+  .ed-p { color: var(--text-dim); margin-bottom: 12px; }
+  .ed-check { display: flex; align-items: center; gap: 8px; padding: 3px 0; font-size: 12px; }
+  .ed-check-box { width: 14px; height: 14px; border-radius: 3px; border: 1px solid var(--border); display: flex; align-items: center; justify-content: center; font-size: 9px; transition: all 0.2s; flex-shrink: 0; }
+  .ed-check-box.on { border-color: var(--green); color: var(--green); background: rgba(77,255,136,0.1); }
+  .ed-check.done span { text-decoration: line-through; opacity: 0.5; }
+
+  /* ═══════ FEAT 10: PROCESSES ═══════ */
+  .feat-proc { flex: 1; padding: 8px 0; overflow: hidden; }
+  .proc-row { display: flex; align-items: center; gap: 12px; padding: 10px 16px; border-bottom: 1px solid rgba(255,255,255,0.03); font-family: 'JetBrains Mono', monospace; font-size: 11px; }
+  .proc-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .proc-name { color: var(--text); width: 120px; flex-shrink: 0; }
+  .proc-pid { color: var(--text-dim); width: 50px; font-size: 10px; }
+  .proc-bars { flex: 1; display: flex; gap: 8px; align-items: center; }
+  .proc-bar-label { font-size: 9px; color: var(--text-dim); width: 28px; }
+  .proc-uptime { color: var(--text-dim); font-size: 10px; width: 50px; text-align: right; }
+
+  /* ═══════ FEAT 11: TOKEN BURN ═══════ */
+  .feat-burn { flex: 1; padding: 20px; display: flex; flex-direction: column; gap: 16px; }
+  .burn-row { display: flex; align-items: center; gap: 12px; }
+  .burn-label { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--text-dim); width: 70px; flex-shrink: 0; }
+  .burn-val { font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 700; width: 70px; text-align: right; flex-shrink: 0; }
+  .burn-val.orange { color: var(--accent); }
+  .burn-val.blue { color: var(--blue); }
+  .burn-val.green { color: var(--green); }
+  .burn-session { padding: 12px 16px; background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--text-dim); }
+  .burn-session .burn-total { font-size: 20px; font-weight: 700; color: var(--text); margin-top: 4px; }
+  .burn-cache { display: flex; align-items: center; gap: 8px; font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--text-dim); }
+  .burn-cache-pct { color: var(--green); font-weight: 700; }
+
+  /* ═══════ FEAT 12: USAGE STATS ═══════ */
+  .feat-usage { flex: 1; padding: 16px; overflow: hidden; display: flex; flex-direction: column; }
+  .usage-chart { display: flex; align-items: flex-end; gap: 6px; height: 100px; margin-bottom: 16px; padding: 0 8px; }
+  .usage-bar-wrap { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; }
+  .usage-bar { width: 100%; border-radius: 4px 4px 0 0; transition: height 1s cubic-bezier(0.22,1,0.36,1); background: var(--accent); }
+  .usage-bar.secondary { background: var(--blue); }
+  .usage-day { font-family: 'JetBrains Mono', monospace; font-size: 8px; color: var(--text-dim); }
+  .usage-table { flex: 1; }
+  .usage-table-hd { display: flex; gap: 8px; padding: 6px 8px; font-family: 'JetBrains Mono', monospace; font-size: 9px; color: #3a3e5a; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid var(--border); }
+  .usage-table-hd span { flex: 1; }
+  .usage-table-hd span:first-child { flex: 2; }
+  .usage-table-row { display: flex; gap: 8px; padding: 6px 8px; font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--text-dim); border-bottom: 1px solid rgba(255,255,255,0.02); }
+  .usage-table-row span { flex: 1; }
+  .usage-table-row span:first-child { flex: 2; color: var(--text); }
+
+  /* ═══════ FEAT 13: INTEGRATIONS ═══════ */
+  .feat-int { flex: 1; padding: 20px; display: flex; flex-direction: column; justify-content: center; gap: 12px; }
+  .int-row { display: flex; align-items: center; gap: 12px; background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; padding: 12px 16px; }
+  .int-logo { font-size: 20px; width: 32px; text-align: center; flex-shrink: 0; }
+  .int-name { font-family: 'JetBrains Mono', monospace; font-size: 12px; font-weight: 700; color: var(--text); width: 80px; }
+  .int-arrow { flex: 1; display: flex; align-items: center; justify-content: center; }
+  .int-arrow svg { width: 60px; height: 12px; }
+  .int-arrow .arrow-line { stroke: var(--accent); stroke-width: 2; stroke-dasharray: 6 4; animation: dash-scroll 1s linear infinite; }
+  @keyframes dash-scroll { to { stroke-dashoffset: -10; } }
+  .int-status { font-family: 'JetBrains Mono', monospace; font-size: 9px; padding: 2px 8px; border-radius: 4px; }
+  .int-status.synced { background: rgba(77,255,136,0.1); color: var(--green); }
+  .int-status.pending { background: rgba(247,168,37,0.1); color: var(--amber); animation: pulse 2s ease infinite; }
+
+  /* ═══════ FEAT 14: EXPLODE ═══════ */
+  .feat-explode { flex: 1; display: flex; overflow: hidden; }
+  .explode-sidebar { width: 48px; border-right: 1px solid var(--border); display: flex; flex-direction: column; align-items: center; padding: 8px 0; gap: 6px; transition: width 0.5s ease, opacity 0.3s ease, padding 0.5s ease; overflow: hidden; flex-shrink: 0; }
+  .explode-sidebar.gone { width: 0; padding: 0; opacity: 0; border-right-width: 0; }
+  .explode-tab-icon { width: 28px; height: 28px; border-radius: 6px; background: var(--surface2); display: flex; align-items: center; justify-content: center; font-family: 'JetBrains Mono', monospace; font-size: 9px; color: var(--text-dim); flex-shrink: 0; }
+  .explode-tabs { flex: 1; display: flex; gap: 1px; overflow: hidden; }
+  .explode-pane { flex: 1; display: flex; flex-direction: column; border-right: 1px solid var(--border); overflow: hidden; }
+  .explode-pane:last-child { border-right: none; }
+  .explode-pane-hd { padding: 6px 10px; border-bottom: 1px solid var(--border); font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--text-dim); display: flex; align-items: center; gap: 6px; background: rgba(0,0,0,0.15); }
+  .explode-pane-body { flex: 1; background: var(--bg); padding: 8px 10px; font-family: 'JetBrains Mono', monospace; font-size: 9px; color: var(--text-dim); line-height: 1.6; }
+  .explode-shortcut { position: absolute; top: 12px; right: 12px; font-family: 'JetBrains Mono', monospace; font-size: 9px; color: var(--text-dim); background: var(--surface2); padding: 2px 8px; border-radius: 4px; opacity: 0; transition: opacity 0.3s; }
+  .explode-shortcut.vis { opacity: 1; }
+
+  /* ═══════ FEAT 15: ATTENTION ═══════ */
+  .feat-attn { flex: 1; display: flex; overflow: hidden; }
+  .attn-main { flex: 1; padding: 12px; display: flex; flex-direction: column; gap: 6px; }
+  .attn-card { background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; display: flex; align-items: center; gap: 10px; }
+  .attn-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; transition: background 0.5s; }
+  .attn-name { font-size: 12px; font-weight: 500; color: var(--text); flex: 1; }
+  .attn-time { font-family: 'JetBrains Mono', monospace; font-size: 9px; color: var(--text-dim); }
+  .attn-panel { width: 0; overflow: hidden; border-left: 0 solid var(--border); background: var(--surface2); transition: width 0.4s ease, border-left-width 0.15s ease 0.2s; display: flex; flex-direction: column; }
+  .attn-panel.open { width: 200px; border-left-width: 1px; }
+  .attn-panel-hd { padding: 10px 12px; border-bottom: 1px solid var(--border); font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--text); font-weight: 700; display: flex; align-items: center; justify-content: space-between; white-space: nowrap; }
+  .attn-badge { background: var(--amber); color: #000; font-size: 9px; font-weight: 700; padding: 1px 6px; border-radius: 8px; min-width: 16px; text-align: center; transition: all 0.3s; }
+  .attn-panel-item { padding: 8px 12px; border-bottom: 1px solid rgba(255,255,255,0.03); font-size: 11px; display: flex; align-items: center; gap: 8px; white-space: nowrap; }
+  .attn-panel-item .attn-dot { width: 6px; height: 6px; }
+
+  /* ═══════ FEAT 16: CLI ═══════ */
+  .feat-cli { flex: 1; display: flex; overflow: hidden; }
+  .cli-term { flex: 1; display: flex; flex-direction: column; }
+  .cli-kanban { width: 240px; border-left: 1px solid var(--border); padding: 12px; display: flex; flex-direction: column; gap: 8px; flex-shrink: 0; }
+  .cli-card { background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; padding: 10px; transition: all 0.4s; }
+  .cli-card-title { font-size: 12px; font-weight: 500; color: var(--text); margin-bottom: 4px; }
+  .cli-card-status { font-family: 'JetBrains Mono', monospace; font-size: 9px; transition: color 0.3s; }
+  .cli-card.highlight { border-color: rgba(244,104,23,0.4); box-shadow: 0 0 0 1px rgba(244,104,23,0.15); }
+
+  footer { padding: 40px 0; border-top: 1px solid #e0e0e8; display: flex; justify-content: space-between; align-items: center; margin-top: auto; }
+  footer .left { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: #999; }
+  footer .social-links a { color: #1a1a2e; }
+  footer .social-links a:hover { color: var(--accent); }
+
+  @media (max-width: 700px) {
+    .feature-section { grid-template-columns: 1fr; gap: 24px; padding: 40px 0; }
+    .feature-section:nth-child(even) .feature-text { order: 0; }
+    .feature-visual { order: -1; }
+    .feature-text h2 { font-size: 22px; }
+    .page-header { margin: 40px 0 48px; }
+    .page-header h1 { font-size: 28px; }
+    footer { flex-direction: column; gap: 12px; text-align: center; }
+    footer .left { font-size: 12px; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <nav>
+    <a href="index.html" class="logo">Slay<span class="slash">/</span>Zone</a>
+    <div class="nav-right">
+      <ul class="nav-links">
+        <li><a href="faq.html">FAQ</a></li>
+        <li><a href="docs.html">Docs</a></li>
+      </ul>
+      <div class="social-links social-links-header">
+{{social-links}}
+    </div>
+  </nav>
+
+  <div class="page-header">
+    <h1>All features</h1>
+    <p>Everything a card hides. And then some.</p>
+  </div>
+
+  <div class="features-list">
+
+    <!-- ═══════ 1. KANBAN ═══════ -->
+    <div class="feature-section" id="feat-1">
+      <div class="feature-visual">
+        <div class="scale-wrap">
+        <div class="app-frame" style="flex-direction:row;position:relative;">
+          <div class="fk-cursor" id="fk-cursor"><svg viewBox="0 0 24 24" fill="none"><path d="M5 3l14 8.5L12 14l-2 7L5 3z" fill="white" stroke="black" stroke-width="1.5" stroke-linejoin="round"/></svg></div>
+          <div class="fk-click-ripple" id="fk-ripple"></div>
+          <div class="fk-layout">
+            <!-- Sidebar -->
+            <div class="fk-sidebar">
+              <div class="fk-sidebar-dots"><span class="app-dot r"></span><span class="app-dot y"></span><span class="app-dot g"></span></div>
+              <div class="fk-proj" id="fk-p-sz" style="background:#4466ff;">SZ<div class="fk-proj-dot" style="background:var(--green)"></div></div>
+              <div class="fk-proj active" id="fk-p-wd" style="background:#ee8833;">WD</div>
+              <div class="fk-proj" id="fk-p-hc" style="background:#44bb55;">HC</div>
+              <div style="width:36px;height:36px;border-radius:10px;border:1px dashed var(--border);display:flex;align-items:center;justify-content:center;color:var(--text-dim);font-size:16px;">+</div>
+            </div>
+            <!-- Main -->
+            <div class="fk-main">
+              <div class="fk-topbar">
+                <div class="fk-topbar-title" id="fk-title">World Domination</div>
+                <div class="fk-topbar-right">
+                  <span class="fk-topbar-btn">≡ Filter</span>
+                  <span class="fk-topbar-btn">◫ Display</span>
+                </div>
+              </div>
+              <div class="fk-board" style="grid-template-columns:repeat(4,1fr);" id="fk-board">
+                <div class="fk-col">
+                  <div class="fk-col-head">Backlog <span class="cnt">3</span><span class="fk-plus">+</span></div>
+                  <div class="fk-card"><span class="fk-card-icon">⫸</span><div class="fk-card-body"><div class="fk-card-title">Rewrite everything in Rust</div></div></div>
+                  <div class="fk-card"><span class="fk-card-icon">⫸</span><div class="fk-card-body"><div class="fk-card-title">Delete node_modules (again)</div></div></div>
+                  <div class="fk-card"><span class="fk-card-icon">⫸</span><div class="fk-card-body"><div class="fk-card-title">Convince PM that "done" means done</div></div></div>
+                </div>
+                <div class="fk-col" id="fk-col-todo">
+                  <div class="fk-col-head">Todo <span class="cnt" id="fk-cnt-todo">3</span><span class="fk-plus">+</span></div>
+                  <div class="fk-card" id="fk-drag-card"><span class="fk-card-icon">⫸</span><div class="fk-card-body"><div class="fk-card-title">Fix "quick fix" from Friday</div></div><div class="fk-card-dot attention"></div></div>
+                  <div class="fk-card"><span class="fk-card-icon">⫸</span><div class="fk-card-body"><div class="fk-card-title">Pretend to understand the codebase</div></div><div class="fk-card-dot attention"></div></div>
+                  <div class="fk-card"><span class="fk-card-icon">⫸</span><div class="fk-card-body"><div class="fk-card-title">Add auth (for real this time)</div></div></div>
+                </div>
+                <div class="fk-col" id="fk-col-progress">
+                  <div class="fk-col-head">In Progress <span class="cnt" id="fk-cnt-progress">2</span><span class="fk-plus">+</span></div>
+                  <div class="fk-card"><span class="fk-card-icon">⫸</span><div class="fk-card-body"><div class="fk-card-title">Mass-assign tasks to Claude</div></div><div class="fk-card-dot working"></div></div>
+                  <div class="fk-card"><span class="fk-card-icon">⫸</span><div class="fk-card-body"><div class="fk-card-title">Take credit in standup</div></div><div class="fk-card-dot idle"></div></div>
+                </div>
+                <div class="fk-col">
+                  <div class="fk-col-head">Done <span class="cnt">2</span></div>
+                  <div class="fk-card" style="opacity:0.6;"><span class="fk-card-icon">⫸</span><div class="fk-card-body"><div class="fk-card-title">Google "how to exit vim"</div></div></div>
+                  <div class="fk-card" style="opacity:0.6;"><span class="fk-card-icon">⫸</span><div class="fk-card-body"><div class="fk-card-title">Install SlayZone</div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        </div>
+      </div>
+      <div class="feature-text">
+        <h2>The Board</h2>
+        <p>Drag-and-drop columns, tags, sub-tasks, dependencies, due dates, search. All the things you swore you'd never build again after Jira.</p>
+      </div>
+    </div>
+
+    <!-- ═══════ 2. TERMINAL ═══════ -->
+    <div class="feature-section" id="feat-2">
+      <div class="feature-visual"><div class="scale-wrap">
+        <div class="app-frame" style="flex-direction:row;">
+          <div class="fk-sidebar">
+            <div class="fk-sidebar-dots"><span class="app-dot r"></span><span class="app-dot y"></span><span class="app-dot g"></span></div>
+            <div class="fk-proj" style="background:#4466ff;">SZ<div class="fk-proj-dot" style="background:var(--green)"></div></div>
+            <div class="fk-proj active" style="background:#ee8833;">WD</div>
+            <div class="fk-proj" style="background:#44bb55;">HC</div>
+          </div>
+          <div style="flex:1;display:flex;flex-direction:column;overflow:hidden;">
+          <div class="tab-bar" id="f2-tabs">
+            <div class="tab-bar-home">🏠</div>
+            <div class="tab-item" data-tab="0"><span class="tab-dot" style="background:var(--amber)"></span> PR#24 <span class="tab-x">×</span></div>
+            <div class="tab-item active" data-tab="1"><span class="tab-dot" style="background:var(--green)"></span> Auth refactor <span class="tab-x">×</span></div>
+            <div class="tab-item" data-tab="2"><span class="tab-dot" style="background:var(--green)"></span> Search endpoint <span class="tab-x">×</span></div>
+            <div class="tab-item" data-tab="3"><span class="tab-dot" style="background:var(--amber)"></span> Rate limiting <span class="tab-x">×</span></div>
+          </div>
+          <!-- Task view: Auth refactor -->
+          <div class="f2-view" id="f2-view-1">
+          <div class="task-bar"><div class="task-bar-left"><span class="task-name">Auth refactor</span><span class="task-branch">⎇ feat/auth</span></div><div class="task-bar-right"><span class="tb-btn active">▸_ Terminal</span><span class="tb-btn">◧ Browser</span><span class="tb-btn">± Diff</span></div></div>
+          <div class="feat-term-wrap">
+            <div class="term" id="f2-term">
+              <div class="tl instant"><div style="display:flex;gap:16px;align-items:flex-start;"><div style="white-space:pre;line-height:1.4;"><span style="color:#e8946a;"> ▐▛███▜▌</span><br><span style="color:#e8946a;">▝▜█████▛▘</span><br><span style="color:#e8946a;">  ▘▘ ▝▝</span></div><div style="line-height:1.7;"><span class="t-out">Claude Code</span> <span class="t-muted">v2.1.42</span><br><span class="t-muted">Opus 4.6 · Claude Team</span><br><span class="t-muted">~/dev/projects/api-v2</span></div></div></div>
+              <div class="tl instant"><span class="t-sep">────────────────────────────────────────────────────────────</span></div>
+              <div class="tl instant"><span class="t-muted">❯ Try "edit auth.ts to..."</span></div>
+              <div class="tl instant"><span class="t-sep">────────────────────────────────────────────────────────────</span></div>
+              <div class="tl instant"><span class="t-muted">  ? for shortcuts</span></div>
+              <div class="tl instant"><br></div>
+              <div class="tl" data-d="600"><span class="t-prompt">❯</span> <span class="t-cmd">refactor auth middleware to use JWT validation</span></div>
+              <div class="tl" data-d="1200"><br></div>
+              <div class="tl" data-d="1400"><span class="t-blue">Claude</span> <span class="t-out">I'll refactor the auth middleware. Examining current code...</span></div>
+              <div class="tl" data-d="2000"><br></div>
+              <div class="tl" data-d="2200"><span class="t-file">  src/middleware/auth.ts</span> <span class="t-out">— rewriting</span></div>
+              <div class="tl" data-d="2500"><span class="t-file">  src/utils/jwt.ts</span> <span class="t-out">— created</span></div>
+              <div class="tl" data-d="2800"><span class="t-file">  src/types/auth.d.ts</span> <span class="t-out">— updated</span></div>
+              <div class="tl" data-d="3400"><br></div>
+              <div class="tl" data-d="3600"><span class="t-green">✓</span> <span class="t-out">JWT middleware replacing session-based auth</span></div>
+              <div class="tl" data-d="3900"><span class="t-green">✓</span> <span class="t-out">Token refresh + expiry handling added</span></div>
+              <div class="tl" data-d="4200"><span class="t-out">Running tests...</span> <span class="t-green">14 passed</span></div>
+              <div class="tl" data-d="4800"><br></div>
+              <div class="tl" data-d="5000"><span class="t-prompt">❯</span> <span class="cursor-blink"></span></div>
+            </div>
+          </div>
+          </div>
+          <!-- Task view: Search endpoint -->
+          <div class="f2-view" id="f2-view-2" style="display:none;">
+          <div class="task-bar"><div class="task-bar-left"><span class="task-name">Search endpoint</span><span class="task-branch">⎇ feat/search</span></div><div class="task-bar-right"><span class="tb-btn active">▸_ Terminal</span><span class="tb-btn">◧ Browser</span><span class="tb-btn">± Diff</span></div></div>
+          <div class="feat-term-wrap">
+            <div class="term" id="f2-term-2">
+              <div class="tl instant"><div style="display:flex;gap:16px;align-items:flex-start;"><div style="white-space:pre;line-height:1.4;font-size:16px;">🟢</div><div style="line-height:1.7;"><span class="t-out">OpenAI Codex</span> <span class="t-muted">v0.1.0</span><br><span class="t-muted">~/dev/projects/api-v2</span></div></div></div>
+              <div class="tl instant"><span class="t-sep">────────────────────────────────────────────────────────────</span></div>
+              <div class="tl instant"><br></div>
+              <div class="tl" data-d="600"><span class="t-prompt">❯</span> <span class="t-cmd">add full-text search to /api/v2/search</span></div>
+              <div class="tl" data-d="1200"><br></div>
+              <div class="tl" data-d="1400"><span class="t-green">Codex</span> <span class="t-out">Indexing schema and building search handler...</span></div>
+              <div class="tl" data-d="2000"><br></div>
+              <div class="tl" data-d="2200"><span class="t-file">  src/routes/search.ts</span> <span class="t-out">— created</span></div>
+              <div class="tl" data-d="2500"><span class="t-file">  src/utils/indexer.ts</span> <span class="t-out">— created</span></div>
+              <div class="tl" data-d="3000"><br></div>
+              <div class="tl" data-d="3200"><span class="t-green">✓</span> <span class="t-out">Full-text search with trigram index</span></div>
+              <div class="tl" data-d="3500"><span class="t-out">Running tests...</span> <span class="t-green">8 passed</span></div>
+              <div class="tl" data-d="4000"><br></div>
+              <div class="tl" data-d="4200"><span class="t-prompt">❯</span> <span class="cursor-blink"></span></div>
+            </div>
+          </div>
+          </div>
+          </div>
+        </div>
+      </div></div>
+      <div class="feature-text">
+        <h2>Every card hides a terminal</h2>
+        <p>Real PTY sessions for Claude Code, Codex, Gemini, OpenCode, Cursor. Split panes, multiple groups. Not a chat widget with a "copy to clipboard" button.</p>
+      </div>
+    </div>
+
+    <!-- ═══════ 3. BROWSER ═══════ -->
+    <div class="feature-section" id="feat-3">
+      <div class="feature-visual"><div class="scale-wrap">
+        <div class="app-frame">
+          <div class="app-bar"><span class="app-dot r"></span><span class="app-dot y"></span><span class="app-dot g"></span><span class="app-bar-title">Auth refactor — ⎇ feat/auth-refactor</span></div>
+          <div class="task-bar"><div class="task-bar-left"><span class="task-name">Auth refactor</span></div><div class="task-bar-right"><span class="tb-btn active">▸_ Terminal</span><span class="tb-btn" id="f3-browser-btn">◧ Browser</span><span class="tb-btn">± Diff</span></div></div>
+          <div class="feat-split">
+            <div class="feat-split-left">
+              <div class="term" style="font-size:11px;">
+                <div style="color:var(--text-dim)"><span class="t-green">✓</span> JWT middleware deployed<br><span class="t-green">✓</span> Token refresh added<br><span class="t-out">Running tests...</span> <span class="t-green">14 passed</span><br><br><span class="t-prompt">❯</span> <span class="cursor-blink"></span></div>
+              </div>
+            </div>
+            <div class="feat-split-right" id="f3-browser">
+              <div class="browser-bar">
+                <div class="browser-url">localhost:3000/dashboard</div>
+              </div>
+              <div style="flex:1;background:#ffffff;overflow:hidden;">
+                <div class="browser-page" style="padding:0;opacity:1;">
+                  <!-- Fake white website -->
+                  <div style="background:#fff;height:100%;color:#1a1a2e;font-family:'Outfit',sans-serif;">
+                    <!-- Nav -->
+                    <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 16px;border-bottom:1px solid #e8e8f0;">
+                      <div style="font-weight:700;font-size:13px;display:flex;align-items:center;gap:6px;"><span style="color:var(--accent);">●</span> ApiDash</div>
+                      <div style="display:flex;gap:14px;font-size:9px;color:#888;font-family:'JetBrains Mono',monospace;"><span style="color:#1a1a2e;">Overview</span><span>Endpoints</span><span>Logs</span><span>Settings</span></div>
+                      <div style="width:20px;height:20px;border-radius:50%;background:linear-gradient(135deg,var(--accent),var(--blue));"></div>
+                    </div>
+                    <!-- Hero -->
+                    <div style="padding:14px 16px 10px;">
+                      <div style="font-size:14px;font-weight:700;margin-bottom:2px;">API v2 — Auth Refactor Preview</div>
+                      <div style="font-size:9px;color:#888;">JWT validation active · 3 endpoints updated · all tests passing</div>
+                    </div>
+                    <!-- Stat cards -->
+                    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;padding:0 16px 10px;">
+                      <div style="background:#f8f8fc;border:1px solid #e8e8f0;border-radius:6px;padding:8px 10px;"><div style="font-size:7px;color:#888;text-transform:uppercase;letter-spacing:0.5px;font-family:'JetBrains Mono',monospace;margin-bottom:2px;">Requests/min</div><div style="font-size:18px;font-weight:700;color:#22c55e;">1,247</div></div>
+                      <div style="background:#f8f8fc;border:1px solid #e8e8f0;border-radius:6px;padding:8px 10px;"><div style="font-size:7px;color:#888;text-transform:uppercase;letter-spacing:0.5px;font-family:'JetBrains Mono',monospace;margin-bottom:2px;">Avg latency</div><div style="font-size:18px;font-weight:700;color:#f59e0b;">42ms</div></div>
+                      <div style="background:#f8f8fc;border:1px solid #e8e8f0;border-radius:6px;padding:8px 10px;"><div style="font-size:7px;color:#888;text-transform:uppercase;letter-spacing:0.5px;font-family:'JetBrains Mono',monospace;margin-bottom:2px;">Auth success</div><div style="font-size:18px;font-weight:700;color:#3b82f6;">99.2%</div></div>
+                    </div>
+                    <!-- Table -->
+                    <div style="padding:0 16px;">
+                      <div style="display:flex;padding:6px 8px;font-size:8px;color:#aaa;text-transform:uppercase;letter-spacing:0.5px;font-family:'JetBrains Mono',monospace;border-bottom:1px solid #e8e8f0;"><span style="flex:2;">Endpoint</span><span style="flex:1;">Method</span><span style="flex:1;">Status</span><span style="flex:1;">Time</span></div>
+                      <div style="display:flex;padding:6px 8px;font-size:9px;font-family:'JetBrains Mono',monospace;border-bottom:1px solid #f0f0f4;color:#666;"><span style="flex:2;color:#1a1a2e;">/api/v2/auth/token</span><span style="flex:1;color:#3b82f6;">POST</span><span style="flex:1;color:#22c55e;">200</span><span style="flex:1;">12ms</span></div>
+                      <div style="display:flex;padding:6px 8px;font-size:9px;font-family:'JetBrains Mono',monospace;border-bottom:1px solid #f0f0f4;color:#666;"><span style="flex:2;color:#1a1a2e;">/api/v2/users/me</span><span style="flex:1;color:#22c55e;">GET</span><span style="flex:1;color:#22c55e;">200</span><span style="flex:1;">8ms</span></div>
+                      <div style="display:flex;padding:6px 8px;font-size:9px;font-family:'JetBrains Mono',monospace;color:#666;"><span style="flex:2;color:#1a1a2e;">/api/v2/auth/refresh</span><span style="flex:1;color:#3b82f6;">POST</span><span style="flex:1;color:#22c55e;">200</span><span style="flex:1;">15ms</span></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div></div>
+      <div class="feature-text">
+        <h2>Browser, but inside</h2>
+        <p>Docs, PRs, localhost, Figma, Notion — embedded per task, resizable alongside your terminals. Alt-tab is a skill you can now unlearn.</p>
+      </div>
+    </div>
+
+    <div style="display:none"> <!-- HIDDEN: sections 4-16 while implementing -->
+    <!-- ═══════ 4. WORKTREES ═══════ -->
+    <div class="feature-section" id="feat-4">
+      <div class="feature-visual"><div class="scale-wrap">
+        <div class="app-frame">
+          <div class="app-bar"><span class="app-dot r"></span><span class="app-dot y"></span><span class="app-dot g"></span><span class="app-bar-title">slayzone — worktrees</span></div>
+          <div class="feat-wt" id="f4-wt">
+            <div class="wt-lane" data-d="0"><div class="wt-icon">📂</div><div class="wt-info"><div class="wt-task">Auth refactor</div><div class="wt-path">~/dev/api-v2-worktrees/auth-refactor/</div></div><div class="wt-branch">⎇ feat/auth</div><div class="wt-status active">active</div></div>
+            <div class="wt-lane" data-d="200"><div class="wt-icon">📂</div><div class="wt-info"><div class="wt-task">Search endpoint</div><div class="wt-path">~/dev/api-v2-worktrees/search-endpoint/</div></div><div class="wt-branch">⎇ feat/search</div><div class="wt-status active">active</div></div>
+            <div class="wt-lane" data-d="400"><div class="wt-icon">📂</div><div class="wt-info"><div class="wt-task">Rate limiting</div><div class="wt-path">~/dev/api-v2-worktrees/rate-limiting/</div></div><div class="wt-branch">⎇ feat/rate-limit</div><div class="wt-status idle">idle</div></div>
+            <div style="text-align:center;padding:12px;font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text-dim);">Each task runs in its own physical directory. No stashing. No conflicts.</div>
+          </div>
+        </div>
+      </div></div>
+      <div class="feature-text">
+        <h2>One branch, one folder, zero stashing</h2>
+        <p>Each task gets its own git worktree. Your agents work in physically isolated directories. Merge conflicts between tasks become structurally impossible.</p>
+      </div>
+    </div>
+
+    <!-- ═══════ 5. GIT PANEL ═══════ -->
+    <div class="feature-section" id="feat-5">
+      <div class="feature-visual"><div class="scale-wrap">
+        <div class="app-frame">
+          <div class="app-bar"><span class="app-dot r"></span><span class="app-dot y"></span><span class="app-dot g"></span><span class="app-bar-title">Auth refactor — git</span></div>
+          <div class="pane-hd"><span class="pane-dot green"></span> Changes — 5 files</div>
+          <div class="feat-git">
+            <div class="git-files" id="f5-files">
+              <div class="gf-row"><div class="gf-check" id="f5-c1"></div><div class="gf-badge m">M</div><div class="gf-name">src/middleware/auth.ts</div></div>
+              <div class="gf-row"><div class="gf-check" id="f5-c2"></div><div class="gf-badge a">A</div><div class="gf-name">src/utils/jwt.ts</div></div>
+              <div class="gf-row"><div class="gf-check" id="f5-c3"></div><div class="gf-badge m">M</div><div class="gf-name">src/types/auth.d.ts</div></div>
+              <div class="gf-row"><div class="gf-check" id="f5-c4"></div><div class="gf-badge d">D</div><div class="gf-name">src/utils/session.ts</div></div>
+              <div class="gf-row"><div class="gf-check" id="f5-c5"></div><div class="gf-badge m">M</div><div class="gf-name">tests/auth.test.ts</div></div>
+            </div>
+            <div class="git-commit">
+              <div class="gc-input" id="f5-msg">refactor: replace session auth with JWT validation</div>
+              <div class="gc-btn" id="f5-btn">Commit</div>
+            </div>
+          </div>
+        </div>
+      </div></div>
+      <div class="feature-text">
+        <h2>Stage, commit, ship</h2>
+        <p>Full git workflow inside each task card. Stage, unstage, discard, commit. No <code>git add -p</code> in a separate terminal like some kind of animal.</p>
+      </div>
+    </div>
+
+    <!-- ═══════ 6. DIFF ═══════ -->
+    <div class="feature-section" id="feat-6">
+      <div class="feature-visual"><div class="scale-wrap">
+        <div class="app-frame">
+          <div class="app-bar"><span class="app-dot r"></span><span class="app-dot y"></span><span class="app-dot g"></span><span class="app-bar-title">Auth refactor — diff</span></div>
+          <div class="pane-hd"><span class="pane-dot green"></span> ± 3 files changed</div>
+          <div class="app-body" style="overflow-y:auto;font-size:11px;">
+            <div class="dl file-hd">src/middleware/auth.ts <span class="stat-del">−23</span><span class="stat-add">+47</span></div>
+            <div class="dl hunk">@@ -1,12 +1,18 @@</div>
+            <div class="dl ctx"><span class="ln">1</span> import { Request, Response, Next } from 'express';</div>
+            <div class="dl del"><span class="ln">2</span>-import { getSession } from '../utils/session';</div>
+            <div class="dl del"><span class="ln">3</span>-import { SessionStore } from '../types/session';</div>
+            <div class="dl add"><span class="ln">2</span>+import { verifyToken, TokenPayload } from '../utils/jwt';</div>
+            <div class="dl add"><span class="ln">3</span>+import { AuthError } from '../types/auth';</div>
+            <div class="dl ctx"><span class="ln">4</span></div>
+            <div class="dl del"><span class="ln">5</span>-export async function authMiddleware(req, res, next) {</div>
+            <div class="dl del"><span class="ln">6</span>-  const session = await getSession(req.cookies.sid);</div>
+            <div class="dl del"><span class="ln">7</span>-  if (!session) return res.status(401).end();</div>
+            <div class="dl add"><span class="ln">5</span>+export async function authMiddleware(</div>
+            <div class="dl add"><span class="ln">6</span>+  req: Request, res: Response, next: Next</div>
+            <div class="dl add"><span class="ln">7</span>+) {</div>
+            <div class="dl add"><span class="ln">8</span>+  const token = req.headers.authorization?.split(' ')[1];</div>
+            <div class="dl add"><span class="ln">9</span>+  if (!token) throw new AuthError('NO_TOKEN');</div>
+            <div class="dl add"><span class="ln">10</span>+  const payload = await verifyToken(token);</div>
+            <div class="dl add"><span class="ln">11</span>+  req.user = payload.user;</div>
+            <div class="dl ctx"><span class="ln">12</span>   next();</div>
+            <div class="dl ctx"><span class="ln">13</span> }</div>
+            <div class="dl file-hd">src/utils/jwt.ts <span class="stat-add">+32</span></div>
+            <div class="dl hunk">@@ -0,0 +1,32 @@</div>
+            <div class="dl add"><span class="ln">1</span>+import jwt from 'jsonwebtoken';</div>
+            <div class="dl add"><span class="ln">2</span>+import { TokenPayload } from '../types/auth';</div>
+            <div class="dl add"><span class="ln">3</span>+</div>
+            <div class="dl add"><span class="ln">4</span>+export function verifyToken(token: string): TokenPayload {</div>
+            <div class="dl add"><span class="ln">5</span>+  return jwt.verify(token, process.env.JWT_SECRET);</div>
+            <div class="dl add"><span class="ln">6</span>+}</div>
+          </div>
+        </div>
+      </div></div>
+      <div class="feature-text">
+        <h2>The diff you deserve</h2>
+        <p>Unified diff viewer with file status badges, staged/unstaged split, and full-file toggle. You'll still stare at diffs for 20 minutes, but now they're pretty.</p>
+      </div>
+    </div>
+
+    <!-- ═══════ 7. COMMIT GRAPH ═══════ -->
+    <div class="feature-section" id="feat-7">
+      <div class="feature-visual"><div class="scale-wrap">
+        <div class="app-frame">
+          <div class="app-bar"><span class="app-dot r"></span><span class="app-dot y"></span><span class="app-dot g"></span><span class="app-bar-title">api-v2 — commit graph</span></div>
+          <div class="pane-hd"><span class="pane-dot green"></span> Commit history — main + 2 branches</div>
+          <div class="feat-graph">
+            <div class="cg-row"><div class="cg-graph"><div class="cg-dot main" style="left:10px"></div><div class="cg-line main" style="left:16px;width:60px"></div></div><div class="cg-hash">a3f8c21</div><div class="cg-msg">Merge feat/auth into main</div><div class="cg-tag">v2.1.0</div></div>
+            <div class="cg-row"><div class="cg-graph"><div class="cg-dot feat" style="left:30px"></div><div class="cg-line feat" style="left:36px;width:40px"></div></div><div class="cg-hash">b72e9f4</div><div class="cg-msg">add token refresh + expiry handling</div><div class="cg-author">debuglebowski</div></div>
+            <div class="cg-row"><div class="cg-graph"><div class="cg-dot feat" style="left:30px"></div><div class="cg-line feat" style="left:36px;width:40px"></div></div><div class="cg-hash">c91d3a8</div><div class="cg-msg">replace session auth with JWT validation</div><div class="cg-author">debuglebowski</div></div>
+            <div class="cg-row"><div class="cg-graph"><div class="cg-dot main" style="left:10px"></div><div class="cg-line main" style="left:16px;width:60px"></div></div><div class="cg-hash">d45b1e7</div><div class="cg-msg">fix: pagination offset for empty results</div><div class="cg-author">debuglebowski</div></div>
+            <div class="cg-row"><div class="cg-graph"><div class="cg-dot main" style="left:10px"></div><div class="cg-dot fix" style="left:50px"></div><div class="cg-line main" style="left:16px;width:30px"></div><div class="cg-line fix" style="left:56px;width:20px"></div></div><div class="cg-hash">e88a2c3</div><div class="cg-msg">Merge fix/rate-limit into main</div><div class="cg-author">debuglebowski</div></div>
+            <div class="cg-row"><div class="cg-graph"><div class="cg-dot fix" style="left:50px"></div></div><div class="cg-hash">f12d5b9</div><div class="cg-msg">add sliding window rate limiter</div><div class="cg-author">debuglebowski</div></div>
+            <div class="cg-row"><div class="cg-graph"><div class="cg-dot fix" style="left:50px"></div></div><div class="cg-hash">g67e8a1</div><div class="cg-msg">rate limit config from env vars</div><div class="cg-author">debuglebowski</div></div>
+            <div class="cg-row"><div class="cg-graph"><div class="cg-dot main" style="left:10px"></div><div class="cg-line main" style="left:16px;width:60px"></div></div><div class="cg-hash">h34c9d2</div><div class="cg-msg">chore: upgrade express to v5</div><div class="cg-author">debuglebowski</div></div>
+            <div class="cg-row"><div class="cg-graph"><div class="cg-dot main" style="left:10px"></div></div><div class="cg-hash">i90f1b5</div><div class="cg-msg">initial commit</div><div class="cg-tag">v2.0.0</div></div>
+          </div>
+        </div>
+      </div></div>
+      <div class="feature-text">
+        <h2>The branch spaghetti viewer</h2>
+        <p>Interactive DAG of your commit history. Branch topology, merge paths, tags. Virtualized, so your 14,000-commit monorepo won't kill it.</p>
+      </div>
+    </div>
+
+    <!-- ═══════ 8. PR ═══════ -->
+    <div class="feature-section" id="feat-8">
+      <div class="feature-visual"><div class="scale-wrap">
+        <div class="app-frame">
+          <div class="app-bar"><span class="app-dot r"></span><span class="app-dot y"></span><span class="app-dot g"></span><span class="app-bar-title">Auth refactor — pull request</span></div>
+          <div class="feat-pr">
+            <div class="pr-header">
+              <div class="pr-title">refactor: replace session auth with JWT #142</div>
+              <div class="pr-meta"><span class="pr-badge open" id="f8-badge">Open</span> <span>feat/auth → main</span> <span>· 3 files · +47 −23</span></div>
+            </div>
+            <div class="pr-comments">
+              <div class="pr-comment"><div class="pr-comment-head">@debuglebowski · 2 min ago</div><div class="pr-comment-body">JWT validation replaces session-based auth. Token refresh and expiry handling included. All tests pass.</div></div>
+              <div class="pr-comment"><div class="pr-comment-head">@reviewer · just now</div><div class="pr-comment-body">Looks good! One nit: consider adding rate limiting on the refresh endpoint. Approving.</div></div>
+            </div>
+            <div class="pr-actions">
+              <div class="pr-merge-btn" id="f8-merge">Squash and merge</div>
+              <div class="pr-strategy">squash ▾</div>
+            </div>
+          </div>
+        </div>
+      </div></div>
+      <div class="feature-text">
+        <h2>PRs without the browser</h2>
+        <p>Create, review, comment, merge — squash, rebase, auto-merge, branch cleanup. The entire PR lifecycle without opening GitHub once. Almost.</p>
+      </div>
+    </div>
+
+    <!-- ═══════ 9. EDITOR ═══════ -->
+    <div class="feature-section" id="feat-9">
+      <div class="feature-visual"><div class="scale-wrap">
+        <div class="app-frame">
+          <div class="app-bar"><span class="app-dot r"></span><span class="app-dot y"></span><span class="app-dot g"></span><span class="app-bar-title">Auth refactor — editor</span></div>
+          <div class="feat-editor">
+            <div class="ed-toolbar">
+              <button class="ed-btn" style="font-weight:700;">B</button>
+              <button class="ed-btn" style="font-style:italic;">I</button>
+              <button class="ed-btn">S̲</button>
+              <div class="ed-sep"></div>
+              <button class="ed-btn">H1</button>
+              <button class="ed-btn">H2</button>
+              <div class="ed-sep"></div>
+              <button class="ed-btn">☐</button>
+              <button class="ed-btn">—</button>
+              <button class="ed-btn">&lt;&gt;</button>
+            </div>
+            <div class="ed-content" id="f9-editor">
+              <div class="ed-h1">Auth Refactor Plan</div>
+              <div class="ed-p">Replace session-based authentication with JWT tokens. This affects the middleware layer, token utilities, and all auth-dependent routes.</div>
+              <div style="font-size:14px;font-weight:700;margin-bottom:8px;color:var(--text);">Checklist</div>
+              <div class="ed-check done"><div class="ed-check-box on">✓</div><span>Implement JWT verify utility</span></div>
+              <div class="ed-check done"><div class="ed-check-box on">✓</div><span>Rewrite auth middleware</span></div>
+              <div class="ed-check" id="f9-check3"><div class="ed-check-box" id="f9-box3"></div><span id="f9-label3">Update integration tests</span></div>
+              <div class="ed-check"><div class="ed-check-box"></div><span>Remove session store dependency</span></div>
+              <div class="ed-check"><div class="ed-check-box"></div><span>Update API documentation</span></div>
+            </div>
+          </div>
+        </div>
+      </div></div>
+      <div class="feature-text">
+        <h2>Notes that aren't a sticky</h2>
+        <p>TipTap rich text editor per task. Markdown, nested checklists, code blocks. For when "TODO: figure this out" needs more than a terminal comment.</p>
+      </div>
+    </div>
+
+    <!-- ═══════ 10. PROCESSES ═══════ -->
+    <div class="feature-section" id="feat-10">
+      <div class="feature-visual"><div class="scale-wrap">
+        <div class="app-frame">
+          <div class="app-bar"><span class="app-dot r"></span><span class="app-dot y"></span><span class="app-dot g"></span><span class="app-bar-title">Auth refactor — processes</span></div>
+          <div class="pane-hd"><span class="pane-dot green"></span> Processes — 3 running</div>
+          <div class="feat-proc" id="f10-proc">
+            <div class="proc-row"><div class="proc-dot" style="background:var(--green)"></div><div class="proc-name">vite dev</div><div class="proc-pid">PID 4821</div><div class="proc-bars"><span class="proc-bar-label">CPU</span><div class="bar-track"><div class="bar-fill green" data-w="35"></div></div><span class="proc-bar-label">MEM</span><div class="bar-track"><div class="bar-fill blue" data-w="52"></div></div></div><div class="proc-uptime">2h 14m</div></div>
+            <div class="proc-row"><div class="proc-dot" style="background:var(--green)"></div><div class="proc-name">tsc --watch</div><div class="proc-pid">PID 4822</div><div class="proc-bars"><span class="proc-bar-label">CPU</span><div class="bar-track"><div class="bar-fill green" data-w="12"></div></div><span class="proc-bar-label">MEM</span><div class="bar-track"><div class="bar-fill blue" data-w="28"></div></div></div><div class="proc-uptime">2h 14m</div></div>
+            <div class="proc-row"><div class="proc-dot" style="background:var(--amber);animation:pulse 2s ease infinite"></div><div class="proc-name">jest --watch</div><div class="proc-pid">PID 4830</div><div class="proc-bars"><span class="proc-bar-label">CPU</span><div class="bar-track"><div class="bar-fill amber" data-w="68"></div></div><span class="proc-bar-label">MEM</span><div class="bar-track"><div class="bar-fill blue" data-w="41"></div></div></div><div class="proc-uptime">0h 03m</div></div>
+            <div class="proc-row" style="opacity:0.4;"><div class="proc-dot" style="background:var(--text-dim)"></div><div class="proc-name">eslint</div><div class="proc-pid">—</div><div class="proc-bars"><span class="proc-bar-label">CPU</span><div class="bar-track"><div class="bar-fill" data-w="0"></div></div><span class="proc-bar-label">MEM</span><div class="bar-track"><div class="bar-fill" data-w="0"></div></div></div><div class="proc-uptime">stopped</div></div>
+          </div>
+        </div>
+      </div></div>
+      <div class="feature-text">
+        <h2>Dev servers, managed</h2>
+        <p>Run watchers, servers, and services at task or project scope. Real-time CPU/memory, logs, auto-restart. Inject process output straight into your agent's terminal.</p>
+      </div>
+    </div>
+
+    <!-- ═══════ 11. TOKEN BURN ═══════ -->
+    <div class="feature-section" id="feat-11">
+      <div class="feature-visual"><div class="scale-wrap">
+        <div class="app-frame">
+          <div class="app-bar"><span class="app-dot r"></span><span class="app-dot y"></span><span class="app-dot g"></span><span class="app-bar-title">Auth refactor — usage</span></div>
+          <div class="feat-burn" id="f11-burn">
+            <div class="burn-session">Current session · claude code<div class="burn-total" id="f11-total">0 tokens</div></div>
+            <div class="burn-row"><div class="burn-label">Input</div><div class="bar-track"><div class="bar-fill orange" id="f11-input" data-w="65"></div></div><div class="burn-val orange" id="f11-input-val">0</div></div>
+            <div class="burn-row"><div class="burn-label">Output</div><div class="bar-track"><div class="bar-fill blue" id="f11-output" data-w="35"></div></div><div class="burn-val blue" id="f11-output-val">0</div></div>
+            <div class="burn-row"><div class="burn-label">Cache read</div><div class="bar-track"><div class="bar-fill green" id="f11-cache" data-w="82"></div></div><div class="burn-val green" id="f11-cache-val">0</div></div>
+            <div class="burn-cache">Cache hit rate: <span class="burn-cache-pct" id="f11-pct">0%</span></div>
+          </div>
+        </div>
+      </div></div>
+      <div class="feature-text">
+        <h2>Token burn rate</h2>
+        <p>Live consumption meters per session. Input/output split, cache hit rates. Watch your money evaporate in real time instead of finding out on the invoice.</p>
+      </div>
+    </div>
+
+    <!-- ═══════ 12. USAGE STATS ═══════ -->
+    <div class="feature-section" id="feat-12">
+      <div class="feature-visual"><div class="scale-wrap">
+        <div class="app-frame">
+          <div class="app-bar"><span class="app-dot r"></span><span class="app-dot y"></span><span class="app-dot g"></span><span class="app-bar-title">slayzone — usage analytics</span></div>
+          <div class="feat-usage" id="f12-usage">
+            <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-dim);padding:0 8px 8px;">Daily token usage — last 7 days</div>
+            <div class="usage-chart" id="f12-chart">
+              <div class="usage-bar-wrap"><div class="usage-bar" data-h="40"></div><div class="usage-day">Mon</div></div>
+              <div class="usage-bar-wrap"><div class="usage-bar" data-h="65"></div><div class="usage-day">Tue</div></div>
+              <div class="usage-bar-wrap"><div class="usage-bar" data-h="35"></div><div class="usage-day">Wed</div></div>
+              <div class="usage-bar-wrap"><div class="usage-bar" data-h="80"></div><div class="usage-day">Thu</div></div>
+              <div class="usage-bar-wrap"><div class="usage-bar secondary" data-h="55"></div><div class="usage-day">Fri</div></div>
+              <div class="usage-bar-wrap"><div class="usage-bar" data-h="20"></div><div class="usage-day">Sat</div></div>
+              <div class="usage-bar-wrap"><div class="usage-bar secondary" data-h="70"></div><div class="usage-day">Sun</div></div>
+            </div>
+            <div class="usage-table">
+              <div class="usage-table-hd"><span>Provider</span><span>Tokens</span><span>Cost</span><span>Tasks</span></div>
+              <div class="usage-table-row"><span>Claude Code</span><span>847K</span><span>$12.40</span><span>6</span></div>
+              <div class="usage-table-row"><span>Codex</span><span>234K</span><span>$3.80</span><span>3</span></div>
+              <div class="usage-table-row"><span>Gemini</span><span>156K</span><span>$1.20</span><span>2</span></div>
+            </div>
+          </div>
+        </div>
+      </div></div>
+      <div class="feature-text">
+        <h2>The invoice prepper</h2>
+        <p>Daily token charts, provider breakdown, model-specific metrics, per-task tables, date filtering. Know exactly which task burned $47 on a one-line fix.</p>
+      </div>
+    </div>
+
+    <!-- ═══════ 13. INTEGRATIONS ═══════ -->
+    <div class="feature-section" id="feat-13">
+      <div class="feature-visual"><div class="scale-wrap">
+        <div class="app-frame">
+          <div class="app-bar"><span class="app-dot r"></span><span class="app-dot y"></span><span class="app-dot g"></span><span class="app-bar-title">slayzone — integrations</span></div>
+          <div class="feat-int">
+            <div class="int-row"><div class="int-logo">◆</div><div class="int-name">Linear</div><div class="int-arrow"><svg viewBox="0 0 60 12"><line class="arrow-line" x1="0" y1="4" x2="60" y2="4"/><line class="arrow-line" x1="0" y1="8" x2="60" y2="8"/></svg></div><div class="int-status synced">synced</div></div>
+            <div class="int-row"><div class="int-logo">◉</div><div class="int-name">GitHub</div><div class="int-arrow"><svg viewBox="0 0 60 12"><line class="arrow-line" x1="0" y1="4" x2="60" y2="4"/><line class="arrow-line" x1="0" y1="8" x2="60" y2="8"/></svg></div><div class="int-status synced">synced</div></div>
+            <div class="int-row"><div class="int-logo">▲</div><div class="int-name">Jira</div><div class="int-arrow"><svg viewBox="0 0 60 12"><line class="arrow-line" x1="0" y1="4" x2="60" y2="4"/><line class="arrow-line" x1="0" y1="8" x2="60" y2="8"/></svg></div><div class="int-status pending">syncing…</div></div>
+            <div style="text-align:center;padding:16px;font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text-dim);">Import tasks, sync statuses, track links. Two-way.</div>
+          </div>
+        </div>
+      </div></div>
+      <div class="feature-text">
+        <h2>Two-way sync with the outside world</h2>
+        <p>Linear, GitHub Issues, Jira. Import tasks, sync statuses, track links. Your PM keeps their tool, you keep yours. Everybody lies about velocity in peace.</p>
+      </div>
+    </div>
+
+    <!-- ═══════ 14. EXPLODE ═══════ -->
+    <div class="feature-section" id="feat-14">
+      <div class="feature-visual"><div class="scale-wrap">
+        <div class="app-frame" style="position:relative;">
+          <div class="app-bar"><span class="app-dot r"></span><span class="app-dot y"></span><span class="app-dot g"></span><span class="app-bar-title">slayzone — explode mode</span></div>
+          <div class="feat-explode">
+            <div class="explode-sidebar" id="f14-sidebar">
+              <div class="explode-tab-icon">▦</div>
+              <div class="explode-tab-icon">A1</div>
+              <div class="explode-tab-icon">S2</div>
+              <div class="explode-tab-icon">R3</div>
+            </div>
+            <div class="explode-tabs">
+              <div class="explode-pane"><div class="explode-pane-hd"><span class="pane-dot green"></span> Auth refactor</div><div class="explode-pane-body"><span class="t-prompt">❯</span> refactor auth to JWT<br><span class="t-blue">Claude</span> Working on it...<br><span class="t-green">✓</span> middleware rewritten</div></div>
+              <div class="explode-pane"><div class="explode-pane-hd"><span class="pane-dot green"></span> Search endpoint</div><div class="explode-pane-body"><span class="t-prompt">❯</span> add full-text search<br><span class="t-blue">Claude</span> Indexing schema...<br><span class="t-file">search.ts</span> — created</div></div>
+              <div class="explode-pane"><div class="explode-pane-hd"><span class="pane-dot amber"></span> Rate limiting</div><div class="explode-pane-body"><span class="t-prompt">❯</span> implement rate limiter<br><span class="t-amber">⚠</span> Which strategy?<br><span class="cursor-blink"></span></div></div>
+            </div>
+          </div>
+          <div class="explode-shortcut" id="f14-shortcut">⌘⇧E</div>
+        </div>
+      </div></div>
+      <div class="feature-text">
+        <h2>Explode mode</h2>
+        <p>Cmd+Shift+E. Everything disappears except your open tasks at full width. For when you have six agents running and zero patience for chrome.</p>
+      </div>
+    </div>
+
+    <!-- ═══════ 15. ATTENTION ═══════ -->
+    <div class="feature-section" id="feat-15">
+      <div class="feature-visual"><div class="scale-wrap">
+        <div class="app-frame">
+          <div class="app-bar"><span class="app-dot r"></span><span class="app-dot y"></span><span class="app-dot g"></span><span class="app-bar-title">slayzone — 3 tasks need attention</span></div>
+          <div class="feat-attn">
+            <div class="attn-main">
+              <div class="attn-card"><div class="attn-dot" id="f15-d1" style="background:var(--green)"></div><div class="attn-name">Auth refactor</div><div class="attn-time">working · 14m</div></div>
+              <div class="attn-card"><div class="attn-dot" id="f15-d2" style="background:var(--amber)"></div><div class="attn-name">Search endpoint</div><div class="attn-time">attention · 3m</div></div>
+              <div class="attn-card"><div class="attn-dot" id="f15-d3" style="background:var(--green)"></div><div class="attn-name">Rate limiting</div><div class="attn-time">working · 8m</div></div>
+              <div class="attn-card"><div class="attn-dot" style="background:var(--text-dim)"></div><div class="attn-name">DB migration</div><div class="attn-time">idle · 1h</div></div>
+              <div class="attn-card"><div class="attn-dot" id="f15-d5" style="background:var(--amber)"></div><div class="attn-name">Pagination</div><div class="attn-time">attention · 1m</div></div>
+            </div>
+            <div class="attn-panel" id="f15-panel">
+              <div class="attn-panel-hd">Needs attention <span class="attn-badge" id="f15-badge">2</span></div>
+              <div class="attn-panel-item"><div class="attn-dot" style="background:var(--amber)"></div> Search endpoint <span style="margin-left:auto;font-size:9px;color:var(--text-dim)">3m</span></div>
+              <div class="attn-panel-item"><div class="attn-dot" style="background:var(--amber)"></div> Pagination <span style="margin-left:auto;font-size:9px;color:var(--text-dim)">1m</span></div>
+            </div>
+          </div>
+        </div>
+      </div></div>
+      <div class="feature-text">
+        <h2>"Hey, I need you"</h2>
+        <p>Terminal state machine detects idle, working, and attention states automatically. Tasks needing human input surface in a notification panel. Desktop alerts included.</p>
+      </div>
+    </div>
+
+    <!-- ═══════ 16. CLI ═══════ -->
+    <div class="feature-section" id="feat-16">
+      <div class="feature-visual"><div class="scale-wrap">
+        <div class="app-frame">
+          <div class="app-bar"><span class="app-dot r"></span><span class="app-dot y"></span><span class="app-dot g"></span><span class="app-bar-title">slayzone — CLI + MCP</span></div>
+          <div class="feat-cli">
+            <div class="cli-term">
+              <div class="pane-hd"><span class="pane-dot green"></span> terminal — claude code</div>
+              <div class="term" id="f16-term">
+                <div class="tl instant"><span class="t-muted"># Agent reads task context via MCP</span></div>
+                <div class="tl" data-d="600"><span class="t-prompt">❯</span> <span class="t-out">Reading task context from SlayZone...</span></div>
+                <div class="tl" data-d="1200"><span class="t-green">✓</span> <span class="t-out">Task: Auth refactor</span></div>
+                <div class="tl" data-d="1500"><span class="t-green">✓</span> <span class="t-out">Subtasks: 3 (2 done, 1 remaining)</span></div>
+                <div class="tl" data-d="2200"><br></div>
+                <div class="tl" data-d="2400"><span class="t-muted"># Agent completes work and updates board</span></div>
+                <div class="tl" data-d="3000"><span class="t-prompt">❯</span> <span class="t-out">Updating task status...</span></div>
+                <div class="tl" data-d="3600"><span class="t-green">✓</span> <span class="t-out">Subtask "Update tests" → done</span></div>
+                <div class="tl" data-d="4200"><span class="t-green">✓</span> <span class="t-out">Task status → review</span></div>
+                <div class="tl" data-d="4800"><br></div>
+                <div class="tl" data-d="5000"><span class="t-prompt">❯</span> <span class="cursor-blink"></span></div>
+              </div>
+            </div>
+            <div class="cli-kanban">
+              <div style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text-dim);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;">In Progress</div>
+              <div class="cli-card" id="f16-card"><div class="cli-card-title">Auth refactor</div><div class="cli-card-status" id="f16-status" style="color:var(--green)">working</div></div>
+              <div class="cli-card"><div class="cli-card-title">Search endpoint</div><div class="cli-card-status" style="color:var(--green)">working</div></div>
+              <div style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text-dim);text-transform:uppercase;letter-spacing:1px;margin:8px 0 4px;">Review</div>
+              <div class="cli-card" style="opacity:0.5;"><div class="cli-card-title">Pagination</div><div class="cli-card-status" style="color:var(--text-dim)">review</div></div>
+            </div>
+          </div>
+        </div>
+      </div></div>
+      <div class="feature-text">
+        <h2>Agents that read the board</h2>
+        <p>MCP server lets agents and CLI tools read task context, update statuses, and complete subtasks from the terminal. Your kanban isn't just for humans anymore.</p>
+      </div>
+    </div>
+    </div> <!-- END HIDDEN sections 2-16 -->
+
+  </div>
+
+{{footer}}
+</div>
+
+<script>
+  // ═══════ SCALE WRAPS ═══════
+  function updateScales() {
+    document.querySelectorAll('.feature-visual .scale-wrap').forEach(wrap => {
+      const c = wrap.parentElement;
+      const s = c.offsetWidth / 720;
+      wrap.style.transform = 'scale(' + s + ')';
+      c.style.height = (540 * s) + 'px';
+    });
+  }
+  updateScales();
+  window.addEventListener('resize', updateScales);
+
+  // ═══════ SCROLL REVEAL ═══════
+  const sections = document.querySelectorAll('.feature-section');
+  const revealObs = new IntersectionObserver((entries) => {
+    entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add('visible'); revealObs.unobserve(e.target); } });
+  }, { threshold: 0.15 });
+  sections.forEach(s => revealObs.observe(s));
+
+  // ═══════ HELPERS ═══════
+  function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+  function loopOnVisible(el, fn, threshold) {
+    let timer = null, running = false;
+    const obs = new IntersectionObserver((entries) => {
+      entries.forEach(e => {
+        if (e.isIntersecting) {
+          function go() { if (running) return; running = true; fn().then(() => { running = false; timer = setTimeout(go, 1000); }); }
+          go();
+        } else {
+          if (timer) { clearTimeout(timer); timer = null; }
+          running = false;
+        }
+      });
+    }, { threshold: threshold || 0.2 });
+    obs.observe(el);
+  }
+
+  // Reveal terminal lines with data-d delays
+  function revealLines(container) {
+    const lines = container.querySelectorAll('.tl:not(.instant)');
+    lines.forEach(l => l.classList.remove('vis'));
+    return new Promise(resolve => {
+      let max = 0;
+      lines.forEach(l => {
+        const d = parseInt(l.dataset.d) || 0;
+        if (d > max) max = d;
+        setTimeout(() => l.classList.add('vis'), d);
+      });
+      setTimeout(resolve, max + 600);
+    });
+  }
+
+  function resetLines(container) {
+    container.querySelectorAll('.tl:not(.instant)').forEach(l => l.classList.remove('vis'));
+  }
+
+  // ═══════ FEAT 1: KANBAN ═══════
+  (function() {
+    var boardWD = '<div class="fk-col"><div class="fk-col-head">Backlog <span class="cnt">3</span><span class="fk-plus">+</span></div><div class="fk-card"><span class="fk-card-icon">⫸</span><div class="fk-card-body"><div class="fk-card-title">Rewrite everything in Rust</div></div></div><div class="fk-card"><span class="fk-card-icon">⫸</span><div class="fk-card-body"><div class="fk-card-title">Delete node_modules (again)</div></div></div><div class="fk-card"><span class="fk-card-icon">⫸</span><div class="fk-card-body"><div class="fk-card-title">Convince PM that "done" means done</div></div></div></div><div class="fk-col" id="fk-col-todo"><div class="fk-col-head">Todo <span class="cnt" id="fk-cnt-todo">3</span><span class="fk-plus">+</span></div><div class="fk-card" id="fk-drag-card"><span class="fk-card-icon">⫸</span><div class="fk-card-body"><div class="fk-card-title">Fix "quick fix" from Friday</div></div><div class="fk-card-dot attention"></div></div><div class="fk-card"><span class="fk-card-icon">⫸</span><div class="fk-card-body"><div class="fk-card-title">Pretend to understand the codebase</div></div><div class="fk-card-dot attention"></div></div><div class="fk-card"><span class="fk-card-icon">⫸</span><div class="fk-card-body"><div class="fk-card-title">Add auth (for real this time)</div></div></div></div><div class="fk-col" id="fk-col-progress"><div class="fk-col-head">In Progress <span class="cnt" id="fk-cnt-progress">2</span><span class="fk-plus">+</span></div><div class="fk-card"><span class="fk-card-icon">⫸</span><div class="fk-card-body"><div class="fk-card-title">Mass-assign tasks to Claude</div></div><div class="fk-card-dot working"></div></div><div class="fk-card"><span class="fk-card-icon">⫸</span><div class="fk-card-body"><div class="fk-card-title">Take credit in standup</div></div><div class="fk-card-dot idle"></div></div></div><div class="fk-col"><div class="fk-col-head">Done <span class="cnt">2</span></div><div class="fk-card" style="opacity:0.6;"><span class="fk-card-icon">⫸</span><div class="fk-card-body"><div class="fk-card-title">Google "how to exit vim"</div></div></div><div class="fk-card" style="opacity:0.6;"><span class="fk-card-icon">⫸</span><div class="fk-card-body"><div class="fk-card-title">Install SlayZone</div></div></div></div>';
+
+    var boardSZ = '<div class="fk-col"><div class="fk-col-head">Backlog <span class="cnt">2</span><span class="fk-plus">+</span></div><div class="fk-card"><span class="fk-card-icon">⫸</span><div class="fk-card-body"><div class="fk-card-title">Dark mode for dark mode</div></div></div><div class="fk-card"><span class="fk-card-icon">⫸</span><div class="fk-card-body"><div class="fk-card-title">Add more testimonials (make them up)</div></div></div></div><div class="fk-col"><div class="fk-col-head">Todo <span class="cnt">2</span><span class="fk-plus">+</span></div><div class="fk-card"><span class="fk-card-icon">⫸</span><div class="fk-card-body"><div class="fk-card-title">Features page animations</div></div><div class="fk-card-dot working"></div></div><div class="fk-card"><span class="fk-card-icon">⫸</span><div class="fk-card-body"><div class="fk-card-title">Ship before heat death of universe</div></div></div></div><div class="fk-col"><div class="fk-col-head">In Progress <span class="cnt">1</span><span class="fk-plus">+</span></div><div class="fk-card"><span class="fk-card-icon">⫸</span><div class="fk-card-body"><div class="fk-card-title">Impress one (1) person on HN</div></div><div class="fk-card-dot attention"></div></div></div><div class="fk-col"><div class="fk-col-head">Done <span class="cnt">1</span></div><div class="fk-card" style="opacity:0.6;"><span class="fk-card-icon">⫸</span><div class="fk-card-body"><div class="fk-card-title">Exist</div></div></div></div>';
+
+    var projects = [
+      { id: 'fk-p-wd', title: 'World Domination', board: boardWD },
+      { id: 'fk-p-sz', title: 'SlayZone', board: boardSZ }
+    ];
+
+    var currentProject = 0;
+
+    function setActiveProject(idx) {
+      document.querySelectorAll('.fk-sidebar .fk-proj').forEach(function(p) { p.classList.remove('active'); });
+      document.getElementById(projects[idx].id).classList.add('active');
+      document.getElementById('fk-title').textContent = projects[idx].title;
+    }
+
+    async function switchProject(idx) {
+      var board = document.getElementById('fk-board');
+      board.classList.add('fade');
+      await sleep(250);
+      setActiveProject(idx);
+      board.innerHTML = projects[idx].board;
+      board.classList.remove('fade');
+      currentProject = idx;
+    }
+
+    var cursor = document.getElementById('fk-cursor');
+    var ripple = document.getElementById('fk-ripple');
+    var frame = cursor.parentElement;
+
+    function moveTo(x, y) {
+      cursor.style.left = x + 'px';
+      cursor.style.top = y + 'px';
+    }
+
+    function showCursor(x, y) {
+      cursor.style.transition = 'opacity 0.3s ease';
+      moveTo(x, y);
+      cursor.classList.add('vis');
+    }
+
+    function hideCursor() { cursor.classList.remove('vis'); }
+
+    async function animateMoveTo(x, y) {
+      cursor.style.transition = 'opacity 0.3s ease, left 0.6s cubic-bezier(0.4,0,0.2,1), top 0.6s cubic-bezier(0.4,0,0.2,1)';
+      moveTo(x, y);
+      await sleep(650);
+    }
+
+    function click(x, y) {
+      ripple.style.left = x + 'px';
+      ripple.style.top = y + 'px';
+      ripple.classList.remove('go');
+      void ripple.offsetWidth;
+      ripple.classList.add('go');
+    }
+
+    function getPos(el) {
+      var r = el.getBoundingClientRect();
+      var fr = frame.getBoundingClientRect();
+      // Cursor tip is at top-left of SVG, so no offset needed — just point at element center
+      var scaleWrap = frame.closest('.scale-wrap');
+      var s = scaleWrap ? scaleWrap.getBoundingClientRect().width / 720 : 1;
+      return { x: (r.left - fr.left + r.width / 2) / s, y: (r.top - fr.top + r.height / 2) / s };
+    }
+
+    loopOnVisible(document.getElementById('feat-1'), async function() {
+      hideCursor();
+      await switchProject(0);
+      await sleep(600);
+
+      var dragCard = document.getElementById('fk-drag-card');
+      var colProgress = document.getElementById('fk-col-progress');
+      var cntTodo = document.getElementById('fk-cnt-todo');
+      var cntProgress = document.getElementById('fk-cnt-progress');
+
+      // Cursor appears on the drag card
+      var cardPos = getPos(dragCard);
+      showCursor(cardPos.x, cardPos.y);
+      await sleep(500);
+
+      // "Pick up" card — make it absolutely positioned and follow cursor
+      click(cardPos.x, cardPos.y);
+      await sleep(200);
+      var cardRect = dragCard.getBoundingClientRect();
+      var frameRect = frame.getBoundingClientRect();
+      var scaleWrap = frame.closest('.scale-wrap');
+      var s = scaleWrap ? scaleWrap.getBoundingClientRect().width / 720 : 1;
+      var startX = (cardRect.left - frameRect.left) / s;
+      var startY = (cardRect.top - frameRect.top) / s;
+      var cardW = cardRect.width / s;
+      var cardH = cardRect.height / s;
+
+      // Ghost placeholder stays in flow
+      dragCard.classList.add('ghost');
+
+      // Floating card that follows cursor — anchored to cursor position
+      var floater = document.createElement('div');
+      floater.className = 'fk-card dragging';
+      floater.style.cssText = 'position:absolute;z-index:10;width:' + cardW + 'px;margin:0;pointer-events:none;';
+      floater.innerHTML = dragCard.innerHTML;
+      frame.appendChild(floater);
+
+      // Offset: card hangs from cursor at the grab point
+      var grabOffsetX = cardPos.x - startX;
+      var grabOffsetY = cardPos.y - startY;
+
+      function syncFloater() {
+        var cx = parseFloat(cursor.style.left) || 0;
+        var cy = parseFloat(cursor.style.top) || 0;
+        floater.style.left = (cx - grabOffsetX) + 'px';
+        floater.style.top = (cy - grabOffsetY) + 'px';
+      }
+
+      // Use same transition as cursor so they stay in sync
+      floater.style.transition = 'left 0.6s cubic-bezier(0.4,0,0.2,1), top 0.6s cubic-bezier(0.4,0,0.2,1)';
+      syncFloater();
+      await sleep(100);
+
+      // Move cursor — floater follows via same transition timing
+      var lastCard = colProgress.querySelectorAll('.fk-card');
+      var dropTarget = lastCard[lastCard.length - 1];
+      var dropPos = getPos(dropTarget);
+      var dropCardRect = dropTarget.getBoundingClientRect();
+      var dropY = (dropCardRect.bottom - frameRect.top) / s + 8;
+
+      // Move both together — set floater destination, then animate cursor
+      floater.style.left = (dropPos.x - grabOffsetX) + 'px';
+      floater.style.top = (dropY - grabOffsetY) + 'px';
+      await animateMoveTo(dropPos.x, dropY);
+
+      // Drop — remove floater, insert real card
+      frame.removeChild(floater);
+      var clone = document.createElement('div');
+      clone.className = 'fk-card fk-card-moved landed';
+      clone.innerHTML = '<span class="fk-card-icon">⫸</span><div class="fk-card-body"><div class="fk-card-title">Fix "quick fix" from Friday</div></div><div class="fk-card-dot attention" style="animation:pulse 2s ease infinite"></div>';
+      colProgress.appendChild(clone);
+      click(dropPos.x, dropY);
+      cntTodo.textContent = '2'; cntProgress.textContent = '3';
+      await sleep(1200);
+
+      // Move cursor to SZ project in sidebar
+      var szProj = document.getElementById('fk-p-sz');
+      var szPos = getPos(szProj);
+      await animateMoveTo(szPos.x, szPos.y);
+      await sleep(200);
+      click(szPos.x, szPos.y);
+      await sleep(200);
+
+      // Switch project
+      await switchProject(1);
+      hideCursor();
+      await sleep(3500);
+    });
+  })();
+
+  // ═══════ FEAT 2: TERMINAL ═══════
+  (function() {
+    function switchF2Tab(idx) {
+      var tabs = document.querySelectorAll('#f2-tabs .tab-item');
+      tabs.forEach(function(t) { t.classList.remove('active'); });
+      tabs[idx].classList.add('active');
+      document.getElementById('f2-view-1').style.display = idx === 1 ? '' : 'none';
+      document.getElementById('f2-view-2').style.display = idx === 2 ? '' : 'none';
+    }
+
+    loopOnVisible(document.getElementById('feat-2'), async function() {
+      // Start on Auth refactor
+      switchF2Tab(1);
+      var c1 = document.getElementById('f2-term');
+      resetLines(c1);
+      await sleep(400);
+      await revealLines(c1);
+      await sleep(1500);
+
+      // Switch to Search endpoint
+      switchF2Tab(2);
+      var c2 = document.getElementById('f2-term-2');
+      resetLines(c2);
+      await sleep(400);
+      await revealLines(c2);
+      await sleep(1500);
+
+      // Switch back to Auth
+      switchF2Tab(1);
+      await sleep(2000);
+    });
+  })();
+
+  // ═══════ FEAT 3: BROWSER ═══════
+  loopOnVisible(document.getElementById('feat-3'), async function() {
+    const b = document.getElementById('f3-browser');
+    const btn = document.getElementById('f3-browser-btn');
+    b.classList.remove('open');
+    btn.classList.remove('active');
+    await sleep(1200);
+    btn.classList.add('active');
+    b.classList.add('open');
+    await sleep(3500);
+    btn.classList.remove('active');
+    b.classList.remove('open');
+    await sleep(800);
+  });
+
+  // ═══════ FEAT 4: WORKTREES ═══════
+  loopOnVisible(document.getElementById('feat-4'), async function() {
+    const lanes = document.querySelectorAll('#f4-wt .wt-lane');
+    lanes.forEach(l => l.classList.remove('vis'));
+    await sleep(400);
+    for (const l of lanes) {
+      const d = parseInt(l.dataset.d) || 0;
+      await sleep(d || 300);
+      l.classList.add('vis');
+    }
+    await sleep(3000);
+  });
+
+  // ═══════ FEAT 5: GIT PANEL ═══════
+  loopOnVisible(document.getElementById('feat-5'), async function() {
+    const checks = [document.getElementById('f5-c1'), document.getElementById('f5-c2'), document.getElementById('f5-c3'), document.getElementById('f5-c4'), document.getElementById('f5-c5')];
+    const btn = document.getElementById('f5-btn');
+    checks.forEach(c => { c.classList.remove('on'); c.textContent = ''; });
+    btn.classList.remove('ready');
+    await sleep(600);
+    for (const c of checks) {
+      c.classList.add('on'); c.textContent = '✓';
+      await sleep(400);
+    }
+    await sleep(300);
+    btn.classList.add('ready');
+    await sleep(2500);
+  });
+
+  // ═══════ FEAT 8: PR ═══════
+  loopOnVisible(document.getElementById('feat-8'), async function() {
+    const badge = document.getElementById('f8-badge');
+    const merge = document.getElementById('f8-merge');
+    badge.className = 'pr-badge open'; badge.textContent = 'Open';
+    merge.className = 'pr-merge-btn'; merge.textContent = 'Squash and merge';
+    await sleep(1500);
+    merge.classList.add('ready');
+    await sleep(1500);
+    badge.className = 'pr-badge merged'; badge.textContent = 'Merged';
+    merge.className = 'pr-merge-btn merged'; merge.textContent = '✓ Merged';
+    await sleep(3000);
+  });
+
+  // ═══════ FEAT 9: EDITOR ═══════
+  loopOnVisible(document.getElementById('feat-9'), async function() {
+    const box = document.getElementById('f9-box3');
+    const label = document.getElementById('f9-label3');
+    const check = document.getElementById('f9-check3');
+    box.classList.remove('on'); box.textContent = '';
+    check.classList.remove('done');
+    label.style.textDecoration = ''; label.style.opacity = '';
+    await sleep(2000);
+    box.classList.add('on'); box.textContent = '✓';
+    check.classList.add('done');
+    label.style.textDecoration = 'line-through'; label.style.opacity = '0.5';
+    await sleep(3000);
+  });
+
+  // ═══════ FEAT 10: PROCESSES (bar animation) ═══════
+  (function() {
+    const el = document.getElementById('feat-10');
+    const obs = new IntersectionObserver((entries) => {
+      entries.forEach(e => {
+        if (e.isIntersecting) {
+          el.querySelectorAll('.bar-fill[data-w]').forEach(b => { b.style.width = b.dataset.w + '%'; });
+          obs.unobserve(el);
+        }
+      });
+    }, { threshold: 0.2 });
+    obs.observe(el);
+  })();
+
+  // ═══════ FEAT 11: TOKEN BURN ═══════
+  loopOnVisible(document.getElementById('feat-11'), async function() {
+    const input = document.getElementById('f11-input');
+    const output = document.getElementById('f11-output');
+    const cache = document.getElementById('f11-cache');
+    const inputVal = document.getElementById('f11-input-val');
+    const outputVal = document.getElementById('f11-output-val');
+    const cacheVal = document.getElementById('f11-cache-val');
+    const total = document.getElementById('f11-total');
+    const pct = document.getElementById('f11-pct');
+
+    input.style.width = '0'; output.style.width = '0'; cache.style.width = '0';
+    inputVal.textContent = '0'; outputVal.textContent = '0'; cacheVal.textContent = '0';
+    total.textContent = '0 tokens'; pct.textContent = '0%';
+    await sleep(400);
+
+    input.style.width = input.dataset.w + '%';
+    output.style.width = output.dataset.w + '%';
+    cache.style.width = cache.dataset.w + '%';
+
+    const steps = 20;
+    for (let i = 1; i <= steps; i++) {
+      const p = i / steps;
+      inputVal.textContent = Math.round(24800 * p).toLocaleString();
+      outputVal.textContent = Math.round(8200 * p).toLocaleString();
+      cacheVal.textContent = Math.round(42100 * p).toLocaleString();
+      total.textContent = Math.round(75100 * p).toLocaleString() + ' tokens';
+      pct.textContent = Math.round(82 * p) + '%';
+      await sleep(50);
+    }
+    await sleep(3000);
+  });
+
+  // ═══════ FEAT 12: USAGE STATS (bar animation) ═══════
+  (function() {
+    const el = document.getElementById('feat-12');
+    const obs = new IntersectionObserver((entries) => {
+      entries.forEach(e => {
+        if (e.isIntersecting) {
+          el.querySelectorAll('.usage-bar[data-h]').forEach(b => { b.style.height = b.dataset.h + 'px'; });
+          obs.unobserve(el);
+        }
+      });
+    }, { threshold: 0.2 });
+    obs.observe(el);
+  })();
+
+  // ═══════ FEAT 14: EXPLODE ═══════
+  loopOnVisible(document.getElementById('feat-14'), async function() {
+    const sidebar = document.getElementById('f14-sidebar');
+    const shortcut = document.getElementById('f14-shortcut');
+    sidebar.classList.remove('gone');
+    shortcut.classList.remove('vis');
+    await sleep(1500);
+    shortcut.classList.add('vis');
+    await sleep(600);
+    sidebar.classList.add('gone');
+    shortcut.classList.remove('vis');
+    await sleep(3500);
+    sidebar.classList.remove('gone');
+    await sleep(800);
+  });
+
+  // ═══════ FEAT 15: ATTENTION ═══════
+  loopOnVisible(document.getElementById('feat-15'), async function() {
+    const panel = document.getElementById('f15-panel');
+    const d1 = document.getElementById('f15-d1');
+    const d3 = document.getElementById('f15-d3');
+    const badge = document.getElementById('f15-badge');
+    panel.classList.remove('open');
+    d1.style.background = 'var(--green)';
+    d3.style.background = 'var(--green)';
+    badge.textContent = '2';
+    await sleep(1200);
+    panel.classList.add('open');
+    await sleep(1500);
+    // d3 turns amber
+    d3.style.background = 'var(--amber)';
+    badge.textContent = '3';
+    await sleep(2500);
+    d1.style.background = 'var(--green)';
+    d3.style.background = 'var(--green)';
+    badge.textContent = '2';
+    panel.classList.remove('open');
+    await sleep(800);
+  });
+
+  // ═══════ FEAT 16: CLI ═══════
+  loopOnVisible(document.getElementById('feat-16'), async function() {
+    const term = document.getElementById('f16-term');
+    const card = document.getElementById('f16-card');
+    const status = document.getElementById('f16-status');
+    resetLines(term);
+    card.classList.remove('highlight');
+    status.textContent = 'working'; status.style.color = 'var(--green)';
+    await sleep(400);
+    await revealLines(term);
+    card.classList.add('highlight');
+    status.textContent = 'review'; status.style.color = 'var(--text-dim)';
+    await sleep(3000);
+  });
+</script>
+</body>
+</html>
