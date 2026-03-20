@@ -12,6 +12,7 @@ export const PROVIDER_USAGE_SUPPORT: Record<string, { label: string; supported: 
   'claude-code': { label: 'Claude', supported: true },
   codex: { label: 'Codex', supported: true },
   opencode: { label: 'OpenCode', supported: true },
+  'qwen-code': { label: 'Qwen', supported: true },
   gemini: { label: 'Gemini', supported: false },
   'cursor-agent': { label: 'Cursor', supported: false },
 }

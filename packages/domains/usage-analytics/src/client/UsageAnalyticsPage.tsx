@@ -50,7 +50,7 @@ export function UsageAnalyticsPage({ onTaskClick }: Props) {
         {!providerSupported ? (
           <div className="rounded-lg border bg-card p-8 text-center">
             <p className="text-sm text-muted-foreground">
-              {providerLabel} does not store usage data locally. Usage tracking is only available for Claude, Codex, and OpenCode.
+              {providerLabel} does not store usage data locally. Usage tracking is only available for Claude, Codex, OpenCode, and Qwen.
             </p>
           </div>
         ) : (
