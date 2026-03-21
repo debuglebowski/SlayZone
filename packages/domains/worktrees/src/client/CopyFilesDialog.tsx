@@ -17,7 +17,7 @@ interface CopyFilesDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   repoPath: string
-  onConfirm: (choice: CopyChoice, remember: boolean) => void
+  onConfirm: (choice: CopyChoice) => void
 }
 
 function flattenTree(nodes: IgnoredFileNode[]): string[] {
@@ -115,14 +115,12 @@ export function CopyFilesDialog({ open, onOpenChange, repoPath, onConfirm }: Cop
   const [tree, setTree] = useState<IgnoredFileNode[]>([])
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
-  const [remember, setRemember] = useState(false)
   const [loading, setLoading] = useState(false)
   const [treeLoaded, setTreeLoaded] = useState(false)
 
   // Load presets + file tree on open
   useEffect(() => {
     if (!open) return
-    setRemember(false)
     setExpanded(new Set())
     setTree([])
     setTreeLoaded(false)
@@ -189,14 +187,14 @@ export function CopyFilesDialog({ open, onOpenChange, repoPath, onConfirm }: Cop
 
   const handleConfirm = () => {
     if (selected.size === 0) {
-      onConfirm({ mode: 'none' }, remember)
+      onConfirm({ mode: 'none' })
     } else {
-      onConfirm({ mode: 'custom', paths: [...selected] }, remember)
+      onConfirm({ mode: 'custom', paths: [...selected] })
     }
   }
 
   const handleSkip = () => {
-    onConfirm({ mode: 'none' }, remember)
+    onConfirm({ mode: 'none' })
   }
 
   return (
@@ -281,17 +279,11 @@ export function CopyFilesDialog({ open, onOpenChange, repoPath, onConfirm }: Cop
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-between pt-2">
-          <label className="flex items-center gap-2 text-xs text-muted-foreground">
-            <Checkbox checked={remember} onCheckedChange={(v) => setRemember(v === true)} />
-            Remember for project
-          </label>
-          <div className="flex gap-2">
-            <Button variant="outline" size="sm" onClick={handleSkip}>Skip</Button>
-            <Button size="sm" onClick={handleConfirm} disabled={selected.size === 0}>
-              Copy {selected.size} item{selected.size !== 1 ? 's' : ''}
-            </Button>
-          </div>
+        <div className="flex justify-end gap-2 pt-2">
+          <Button variant="outline" size="sm" onClick={handleSkip}>Skip</Button>
+          <Button size="sm" onClick={handleConfirm} disabled={selected.size === 0}>
+            Copy {selected.size} item{selected.size !== 1 ? 's' : ''}
+          </Button>
         </div>
       </DialogContent>
     </Dialog>

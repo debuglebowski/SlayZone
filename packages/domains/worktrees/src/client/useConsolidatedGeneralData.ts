@@ -60,7 +60,7 @@ export interface ConsolidatedGeneralData {
   handleInitGit: () => Promise<void>
   handleAction: (action: string) => Promise<void>
   handleConfirmedAction: (action: string, label: string) => void
-  handleCopyFilesConfirm: (choice: import('./CopyFilesDialog').CopyChoice, remember: boolean) => Promise<void>
+  handleCopyFilesConfirm: (choice: import('./CopyFilesDialog').CopyChoice) => Promise<void>
   handleCopyFilesCancel: () => void
   handleMergeToParent: (deleteWorktree: boolean) => Promise<void>
   confirmMergeToParent: () => void
@@ -346,7 +346,7 @@ export function useConsolidatedGeneralData(
     }
   }, [projectPath, task.id, task.project_id, currentBranch, onUpdateTask])
 
-  const handleCopyFilesConfirm = useCallback(async (choice: import('./CopyFilesDialog').CopyChoice, remember: boolean) => {
+  const handleCopyFilesConfirm = useCallback(async (choice: import('./CopyFilesDialog').CopyChoice) => {
     const pending = copyFilesDialogRef.current
     setCopyFilesDialog(prev => ({ ...prev, open: false }))
 
@@ -364,22 +364,7 @@ export function useConsolidatedGeneralData(
     } finally {
       setCreating(false)
     }
-
-    // Persist selection if "remember" checked
-    if (remember && task.project_id) {
-      try {
-        if (choice.mode === 'custom') {
-          await window.api.db.updateProject({
-            id: task.project_id,
-            worktreeCopyBehavior: 'custom',
-            worktreeCopyPaths: choice.paths.join(', ')
-          })
-        } else {
-          await window.api.db.updateProject({ id: task.project_id, worktreeCopyBehavior: choice.mode })
-        }
-      } catch { /* best-effort */ }
-    }
-  }, [task.project_id, createWorktreeAndLink])
+  }, [createWorktreeAndLink])
 
   const handleCopyFilesCancel = useCallback(() => {
     setCopyFilesDialog(prev => ({ ...prev, open: false }))
