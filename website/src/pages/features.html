@@ -701,6 +701,17 @@
                   <div class="gp-stats"><span class="gp-stat-staged">1 staged</span><span class="gp-stat-modified">3 modified</span><span style="margin-left:auto;display:flex;gap:6px;"><span class="gp-action-btn">↓ Pull</span><span class="gp-action-btn">↑ Push</span></span></div>
                 </div>
                 <div class="gp-card">
+                  <div class="gp-section-title">Diff · src/auth/jwt.ts</div>
+                  <div class="gp-diff">
+                    <div class="gp-diff-line gp-diff-ctx"> import { verify } from 'jsonwebtoken'</div>
+                    <div class="gp-diff-line gp-diff-del">-export function auth(req) {</div>
+                    <div class="gp-diff-line gp-diff-add">+export function auth(req, res) {</div>
+                    <div class="gp-diff-line gp-diff-ctx">   const token = req.headers.auth</div>
+                    <div class="gp-diff-line gp-diff-add">+  if (!token) return res.status(401)</div>
+                    <div class="gp-diff-line gp-diff-ctx">   const payload = verify(token)</div>
+                  </div>
+                </div>
+                <div class="gp-card">
                   <div class="gp-section-title">Commits</div>
                   <div class="gp-commits">
                   <svg width="44" height="160">
@@ -721,17 +732,6 @@
                   <div class="gp-commit"><div class="gp-commit-msg">replace session auth with JWT</div><div class="gp-commit-meta"><span class="gp-commit-hash">c91d3a8</span> · 2h</div></div>
                   <div class="gp-commit"><div class="gp-commit-msg">fix: pagination offset</div><div class="gp-commit-meta"><span class="gp-commit-hash">d45b1e7</span> · 3h</div></div>
                   <div class="gp-commit"><div class="gp-commit-msg">chore: upgrade express to v5</div><div class="gp-commit-meta"><span class="gp-commit-hash">e88a2c3</span> · 5h</div></div>
-                  </div>
-                </div>
-                <div class="gp-card">
-                  <div class="gp-section-title">Diff · src/auth/jwt.ts</div>
-                  <div class="gp-diff">
-                    <div class="gp-diff-line gp-diff-ctx"> import { verify } from 'jsonwebtoken'</div>
-                    <div class="gp-diff-line gp-diff-del">-export function auth(req) {</div>
-                    <div class="gp-diff-line gp-diff-add">+export function auth(req, res) {</div>
-                    <div class="gp-diff-line gp-diff-ctx">   const token = req.headers.auth</div>
-                    <div class="gp-diff-line gp-diff-add">+  if (!token) return res.status(401)</div>
-                    <div class="gp-diff-line gp-diff-ctx">   const payload = verify(token)</div>
                   </div>
                 </div>
               </div>
@@ -1378,10 +1378,10 @@
     await sleep(1200);
     btn.classList.add('active');
     panel.classList.add('open');
-    await sleep(4300);
+    await sleep(8000);
     btn.classList.remove('active');
     panel.classList.remove('open');
-    await sleep(800);
+    await sleep(1200);
   });
 
   // ═══════ FEAT 8: PR ═══════
