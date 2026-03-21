@@ -567,6 +567,7 @@ export interface ElectronAPI {
   }
   webview: {
     registerShortcuts: (webviewId: number) => Promise<void>
+    setKeyboardPassthrough: (webviewId: number, enabled: boolean) => Promise<void>
     setDesktopHandoffPolicy: (webviewId: number, policy: DesktopHandoffPolicy | null) => Promise<boolean>
     onShortcut: (callback: (payload: { key: string; shift?: boolean; webviewId?: number }) => void) => () => void
     openDevToolsBottom: (webviewId: number) => Promise<boolean>

@@ -237,6 +237,72 @@ test.describe('Browser panel', () => {
     await expect(urlInput(mainWindow)).not.toBeVisible()
   })
 
+  const keyboardPassthroughBtn = (page: import('@playwright/test').Page) =>
+    page.getByTestId('browser-keyboard-passthrough').first()
+
+  test('capture shortcuts button visible and off by default', async ({ mainWindow }) => {
+    await ensureBrowserPanelVisible(mainWindow)
+    const btn = keyboardPassthroughBtn(mainWindow)
+    await expect(btn).toBeVisible()
+    // Off by default — shortcuts pass through to web page
+    await expect(btn).not.toHaveClass(/text-green/)
+  })
+
+  test('capture shortcuts toggle activates and deactivates', async ({ mainWindow }) => {
+    await ensureBrowserPanelVisible(mainWindow)
+    const btn = keyboardPassthroughBtn(mainWindow)
+
+    // Enable capture
+    await btn.click()
+    await expect(btn).toHaveClass(/text-green/)
+
+    // Disable capture
+    await btn.click()
+    await expect(btn).not.toHaveClass(/text-green/)
+  })
+
+  test('Cmd+T passes through by default, captured when active', async ({ mainWindow }) => {
+    await ensureBrowserPanelVisible(mainWindow)
+    const btn = keyboardPassthroughBtn(mainWindow)
+
+    // Ensure capture is off (default)
+    if (await btn.evaluate(el => el.className.includes('text-green'))) {
+      await btn.click()
+    }
+
+    // Focus browser panel, press Cmd+T — should NOT create a tab (passes through)
+    await mainWindow.locator('[data-browser-panel="true"]').first().click()
+    const countBefore = await tabEntries(mainWindow).count()
+    await mainWindow.keyboard.press('Meta+t')
+    expect(await tabEntries(mainWindow).count()).toBe(countBefore)
+
+    // Enable capture, press Cmd+T — should create a new browser tab
+    await btn.click()
+    await expect(btn).toHaveClass(/text-green/)
+    await mainWindow.locator('[data-browser-panel="true"]').first().click()
+    const countWithCapture = await tabEntries(mainWindow).count()
+    await mainWindow.keyboard.press('Meta+t')
+    await expect(tabEntries(mainWindow)).toHaveCount(countWithCapture + 1)
+
+    // Clean up extra tab
+    const count = await tabEntries(mainWindow).count()
+    await tabEntries(mainWindow).nth(count - 1).locator('.lucide-x').click({ force: true })
+    await expect(tabEntries(mainWindow)).toHaveCount(count - 1)
+
+    // Disable capture for subsequent tests
+    await btn.click()
+  })
+
+  test('keyboard passthrough IPC syncs to main process', async ({ mainWindow }) => {
+    await ensureBrowserPanelVisible(mainWindow)
+    const webviewId = await activeBrowserWebviewId(mainWindow)
+
+    // Enable passthrough via IPC directly and verify no error
+    await testInvoke(mainWindow, 'webview:set-keyboard-passthrough', webviewId, true)
+    // Disable it
+    await testInvoke(mainWindow, 'webview:set-keyboard-passthrough', webviewId, false)
+  })
+
   test('browser panel visibility persists across navigation', async ({ mainWindow }) => {
     await ensureBrowserPanelVisible(mainWindow)
 

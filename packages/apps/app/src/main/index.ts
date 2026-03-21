@@ -1388,6 +1388,7 @@ div{text-align:center}h1{font-size:14px;font-weight:500;color:#aaa}p{font-size:1
 
   // Webview shortcut interception
   const registeredWebviews = new Set<number>()
+  const keyboardPassthroughWebviews = new Set<number>()
 
   ipcMain.handle('webview:register-shortcuts', (event, webviewId: number) => {
     if (registeredWebviews.has(webviewId)) return
@@ -1398,6 +1399,7 @@ div{text-align:center}h1{font-size:14px;font-weight:500;color:#aaa}p{font-size:1
     registeredWebviews.add(webviewId)
 
     wc.on('before-input-event', (e, input) => {
+      if (keyboardPassthroughWebviews.has(webviewId)) return
       if (input.type !== 'keyDown') return
       if (!(input.control || input.meta)) return
 
@@ -1412,7 +1414,15 @@ div{text-align:center}h1{font-size:14px;font-weight:500;color:#aaa}p{font-size:1
       }
     })
 
-    wc.on('destroyed', () => registeredWebviews.delete(webviewId))
+    wc.on('destroyed', () => {
+      registeredWebviews.delete(webviewId)
+      keyboardPassthroughWebviews.delete(webviewId)
+    })
+  })
+
+  ipcMain.handle('webview:set-keyboard-passthrough', (_event, webviewId: number, enabled: boolean) => {
+    if (enabled) keyboardPassthroughWebviews.add(webviewId)
+    else keyboardPassthroughWebviews.delete(webviewId)
   })
 
   ipcMain.handle('webview:set-desktop-handoff-policy', (_, webviewId: number, policy: DesktopHandoffPolicy | null) => {

@@ -490,6 +490,8 @@ const api: ElectronAPI = {
   webview: {
     registerShortcuts: (webviewId) =>
       ipcRenderer.invoke('webview:register-shortcuts', webviewId),
+    setKeyboardPassthrough: (webviewId, enabled) =>
+      ipcRenderer.invoke('webview:set-keyboard-passthrough', webviewId, enabled),
     setDesktopHandoffPolicy: (webviewId, policy) =>
       ipcRenderer.invoke('webview:set-desktop-handoff-policy', webviewId, policy),
     onShortcut: (callback) => {

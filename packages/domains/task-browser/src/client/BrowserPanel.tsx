@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback, forwardRef, useImperativeHandle } from 'react'
 import { track } from '@slayzone/telemetry/client'
-import { ArrowLeft, ArrowRight, RotateCw, X, Plus, Import, Smartphone, Monitor, Tablet, LayoutGrid, ChevronDown, Crosshair, Bug, Sun, Moon, PaintbrushVertical } from 'lucide-react'
+import { ArrowLeft, ArrowRight, RotateCw, X, Plus, Import, Smartphone, Monitor, Tablet, LayoutGrid, ChevronDown, Crosshair, Bug, Sun, Moon, PaintbrushVertical, Keyboard } from 'lucide-react'
 import type { BrowserTabTheme } from '../shared'
 import {
   Button,
@@ -120,6 +120,7 @@ export const BrowserPanel = forwardRef<BrowserPanelHandle, BrowserPanelProps>(fu
   const [inlineDevToolsHeight, setInlineDevToolsHeight] = useState(300)
   const [isDraggingInlineDevTools, setIsDraggingInlineDevTools] = useState(false)
   const [isPickingElement, setIsPickingElement] = useState(false)
+  const [captureShortcuts, setCaptureShortcuts] = useState(false)
   const [pickError, setPickError] = useState<string | null>(null)
   const webviewRef = useRef<WebviewElement>(null)
   const inlineDevToolsPanelRef = useRef<HTMLDivElement>(null)
@@ -134,6 +135,12 @@ export const BrowserPanel = forwardRef<BrowserPanelHandle, BrowserPanelProps>(fu
     void window.api.webview.registerBrowserPanel(taskId, webviewId)
     return () => { void window.api.webview.unregisterBrowserPanel(taskId) }
   }, [taskId, webviewId, isFirstTabActive])
+
+  // Sync keyboard passthrough to main process — passthrough when NOT capturing
+  useEffect(() => {
+    if (webviewId == null) return
+    void window.api.webview.setKeyboardPassthrough(webviewId, !captureShortcuts)
+  }, [webviewId, captureShortcuts])
 
   // Fetch URLs from other tasks when dropdown opens
   useEffect(() => {
@@ -194,6 +201,10 @@ export const BrowserPanel = forwardRef<BrowserPanelHandle, BrowserPanelProps>(fu
       const css = mode === 'system' ? null : THEME_CSS[mode]
       if (css) darkModeCSSKeyRef.current = await wv.insertCSS(css).catch(() => null)
     })()
+  }, [])
+
+  const toggleCaptureShortcuts = useCallback(() => {
+    setCaptureShortcuts(prev => !prev)
   }, [])
 
   const cycleTheme = useCallback(() => {
@@ -565,7 +576,7 @@ export const BrowserPanel = forwardRef<BrowserPanelHandle, BrowserPanelProps>(fu
     if (!container) return
 
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (!isFocused) return
+      if (!isFocused || !captureShortcuts) return
       if (e.metaKey && e.key === 't') { e.preventDefault(); createNewTab() }
       if (e.metaKey && e.key === 'w') { e.preventDefault(); if (tabs.activeTabId) closeTab(tabs.activeTabId) }
       if (e.ctrlKey && e.key === 'Tab' && !e.shiftKey) { e.preventDefault(); switchToNextTab() }
@@ -574,7 +585,7 @@ export const BrowserPanel = forwardRef<BrowserPanelHandle, BrowserPanelProps>(fu
 
     container.addEventListener('keydown', handleKeyDown)
     return () => container.removeEventListener('keydown', handleKeyDown)
-  }, [isFocused, tabs, createNewTab, closeTab, switchToNextTab, switchToPrevTab])
+  }, [isFocused, captureShortcuts, tabs, createNewTab, closeTab, switchToNextTab, switchToPrevTab])
 
   const handleNavigate = () => {
     if (!inputUrl.trim()) return
@@ -1039,6 +1050,27 @@ export const BrowserPanel = forwardRef<BrowserPanelHandle, BrowserPanelProps>(fu
             </Tooltip>
           )
         })()}
+
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <span>
+              <IconButton
+                aria-label="Keyboard passthrough"
+                data-testid="browser-keyboard-passthrough"
+                variant="ghost"
+                size="icon-sm"
+                disabled={multiDeviceMode || !webviewReady}
+                className={cn(captureShortcuts && 'text-green-500 bg-green-500/10')}
+                onClick={toggleCaptureShortcuts}
+              >
+                <Keyboard className="size-4" />
+              </IconButton>
+            </span>
+          </TooltipTrigger>
+          <TooltipContent>
+            {captureShortcuts ? 'Webpage shortcuts disabled' : 'Webpage shortcuts enabled'}
+          </TooltipContent>
+        </Tooltip>
       </div>
 
       {pickError && !multiDeviceMode && (
