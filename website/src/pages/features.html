@@ -277,11 +277,18 @@
   .pr-strategy { font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--text-dim); padding: 4px 10px; background: var(--surface2); border-radius: 4px; }
 
   /* ═══════ FEAT 9: EDITOR ═══════ */
-  .feat-editor { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
-  .ed-toolbar { display: flex; align-items: center; gap: 4px; padding: 8px 16px; border-bottom: 1px solid var(--border); }
-  .ed-btn { width: 28px; height: 26px; display: flex; align-items: center; justify-content: center; border-radius: 4px; font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--text-dim); cursor: default; transition: all 0.2s; background: none; border: none; }
-  .ed-btn.active { color: var(--accent); background: var(--accent-dim); }
-  .ed-sep { width: 1px; height: 18px; background: var(--border); margin: 0 4px; }
+  .feat-editor { flex: 1; display: flex; overflow: hidden; }
+  .ed-filetree { width: 120px; flex-shrink: 0; border-right: 1px solid var(--border); padding: 8px 0; font-family: 'JetBrains Mono', monospace; font-size: 9px; overflow: hidden; transition: width 0.3s ease, padding 0.3s ease, opacity 0.2s ease; opacity: 1; }
+  .ed-filetree.collapsed { width: 0; padding: 0; opacity: 0; border-right: none; }
+  .ed-file { padding: 3px 10px; color: var(--text-dim); cursor: default; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .ed-file.active { color: var(--text); background: rgba(255,255,255,0.04); }
+  .ed-file.dir { color: var(--amber); }
+  .ed-main { flex: 1; display: flex; flex-direction: column; overflow: hidden; min-width: 0; }
+  .ed-topbar { display: flex; align-items: center; padding: 0 8px; border-bottom: 1px solid var(--border); gap: 2px; }
+  .ed-tab { font-family: 'JetBrains Mono', monospace; font-size: 9px; color: var(--text-dim); padding: 6px 8px; cursor: default; border-bottom: 2px solid transparent; }
+  .ed-tab.active { color: var(--text); border-bottom-color: var(--accent); }
+  .ed-tree-toggle { width: 24px; height: 22px; display: flex; align-items: center; justify-content: center; border-radius: 4px; font-size: 11px; color: var(--text-dim); cursor: default; background: none; border: none; transition: color 0.2s; }
+  .ed-tree-toggle.active { color: var(--text); background: rgba(255,255,255,0.06); }
   .ed-content { flex: 1; padding: 20px 24px; font-size: 13px; color: var(--text); line-height: 1.7; overflow: hidden; }
   .ed-h1 { font-size: 20px; font-weight: 700; margin-bottom: 8px; }
   .ed-p { color: var(--text-dim); margin-bottom: 12px; }
@@ -947,35 +954,64 @@
       </div>
     </div>
 
-    <div style="display:none"> <!-- HIDDEN: sections 9-16 while implementing -->
     <!-- ═══════ 9. EDITOR ═══════ -->
     <div class="feature-section" id="feat-9">
       <div class="feature-visual"><div class="scale-wrap">
-        <div class="app-frame">
-          <div class="app-bar"><span class="app-dot r"></span><span class="app-dot y"></span><span class="app-dot g"></span><span class="app-bar-title">Auth refactor — editor</span></div>
-          <div class="feat-editor">
-            <div class="ed-toolbar">
-              <button class="ed-btn" style="font-weight:700;">B</button>
-              <button class="ed-btn" style="font-style:italic;">I</button>
-              <button class="ed-btn">S̲</button>
-              <div class="ed-sep"></div>
-              <button class="ed-btn">H1</button>
-              <button class="ed-btn">H2</button>
-              <div class="ed-sep"></div>
-              <button class="ed-btn">☐</button>
-              <button class="ed-btn">—</button>
-              <button class="ed-btn">&lt;&gt;</button>
+        <div class="app-frame" style="flex-direction:row;">
+          <div class="fk-sidebar">
+            <div class="fk-sidebar-dots"><span class="app-dot r"></span><span class="app-dot y"></span><span class="app-dot g"></span></div>
+            <div class="fk-proj" style="background:#4466ff;">SZ<div class="fk-proj-dot" style="background:var(--green)"></div></div>
+            <div class="fk-proj active" style="background:#ee8833;">WD</div>
+            <div class="fk-proj" style="background:#44bb55;">HC</div>
+          </div>
+          <div style="flex:1;display:flex;flex-direction:column;overflow:hidden;">
+          <div class="tab-bar">
+            <div class="tab-bar-home">🏠</div>
+            <div class="tab-item"><span class="tab-dot" style="background:var(--amber)"></span> PR#24 <span class="tab-x">×</span></div>
+            <div class="tab-item active"><span class="tab-dot" style="background:var(--green)"></span> Auth refactor <span class="tab-x">×</span></div>
+            <div class="tab-item"><span class="tab-dot" style="background:var(--green)"></span> Search endpoint <span class="tab-x">×</span></div>
+            <div class="tab-item"><span class="tab-dot" style="background:var(--amber)"></span> Rate limiting <span class="tab-x">×</span></div>
+          </div>
+          <div class="task-bar"><div class="task-bar-left"><span class="task-name">Auth refactor</span></div><div class="task-bar-right"><span class="tb-btn active">▸_ Terminal</span><span class="tb-btn">◧ Browser</span><span class="tb-btn active" id="f9-editor-btn">✎ Editor</span><span class="tb-btn">⎇ Git</span></div></div>
+          <div class="feat-git-split">
+            <div class="feat-git-left">
+              <div style="color:var(--text-dim)"><span class="t-green">✓</span> JWT middleware rewritten<br><span class="t-green">✓</span> Token refresh added<br><span class="t-file">  src/types/auth.d.ts</span> — updated<br><br><span class="t-out">Running tests...</span> <span class="t-green">14 passed</span><br><br><span class="t-prompt">❯</span> <span class="cursor-blink"></span></div>
             </div>
-            <div class="ed-content" id="f9-editor">
-              <div class="ed-h1">Auth Refactor Plan</div>
-              <div class="ed-p">Replace session-based authentication with JWT tokens. This affects the middleware layer, token utilities, and all auth-dependent routes.</div>
-              <div style="font-size:14px;font-weight:700;margin-bottom:8px;color:var(--text);">Checklist</div>
-              <div class="ed-check done"><div class="ed-check-box on">✓</div><span>Implement JWT verify utility</span></div>
-              <div class="ed-check done"><div class="ed-check-box on">✓</div><span>Rewrite auth middleware</span></div>
-              <div class="ed-check" id="f9-check3"><div class="ed-check-box" id="f9-box3"></div><span id="f9-label3">Update integration tests</span></div>
-              <div class="ed-check"><div class="ed-check-box"></div><span>Remove session store dependency</span></div>
-              <div class="ed-check"><div class="ed-check-box"></div><span>Update API documentation</span></div>
+            <div class="feat-git-right" id="f9-panel">
+              <div class="feat-editor">
+                <div class="ed-filetree collapsed" id="f9-filetree">
+                  <div class="ed-file dir">▾ src/</div>
+                  <div class="ed-file" style="padding-left:18px;">middleware/</div>
+                  <div class="ed-file" style="padding-left:26px;">auth.ts</div>
+                  <div class="ed-file" style="padding-left:18px;">utils/</div>
+                  <div class="ed-file" style="padding-left:26px;">jwt.ts</div>
+                  <div class="ed-file" style="padding-left:18px;">types/</div>
+                  <div class="ed-file" style="padding-left:26px;">auth.d.ts</div>
+                  <div class="ed-file dir">▾ notes/</div>
+                  <div class="ed-file active" style="padding-left:18px;">plan.md</div>
+                  <div class="ed-file" style="padding-left:18px;">todo.md</div>
+                </div>
+                <div class="ed-main">
+                <div class="ed-topbar">
+                  <button class="ed-tree-toggle active" id="f9-tree-toggle">☰</button>
+                  <span class="ed-tab active">plan.md</span>
+                  <span class="ed-tab">auth.ts</span>
+                  <span class="ed-tab">jwt.ts</span>
+                </div>
+                <div class="ed-content" id="f9-editor">
+                  <div class="ed-h1">Auth Refactor Plan</div>
+                  <div class="ed-p">Replace session-based authentication with JWT tokens. This affects the middleware layer, token utilities, and all auth-dependent routes.</div>
+                  <div style="font-size:14px;font-weight:700;margin-bottom:8px;color:var(--text);">Checklist</div>
+                  <div class="ed-check done"><div class="ed-check-box on">✓</div><span>Implement JWT verify utility</span></div>
+                  <div class="ed-check done"><div class="ed-check-box on">✓</div><span>Rewrite auth middleware</span></div>
+                  <div class="ed-check" id="f9-check3"><div class="ed-check-box" id="f9-box3"></div><span id="f9-label3">Update integration tests</span></div>
+                  <div class="ed-check"><div class="ed-check-box"></div><span>Remove session store dependency</span></div>
+                  <div class="ed-check"><div class="ed-check-box"></div><span>Update API documentation</span></div>
+                </div>
+                </div>
+              </div>
             </div>
+          </div>
           </div>
         </div>
       </div></div>
@@ -985,6 +1021,7 @@
       </div>
     </div>
 
+    <div style="display:none"> <!-- HIDDEN: sections 10-16 while implementing -->
     <!-- ═══════ 10. PROCESSES ═══════ -->
     <div class="feature-section" id="feat-10">
       <div class="feature-visual"><div class="scale-wrap">
@@ -1534,17 +1571,37 @@
 
   // ═══════ FEAT 9: EDITOR ═══════
   loopOnVisible(document.getElementById('feat-9'), async function() {
+    var panel = document.getElementById('f9-panel');
+    var btn = document.getElementById('f9-editor-btn');
+    var tree = document.getElementById('f9-filetree');
+    var toggle = document.getElementById('f9-tree-toggle');
     const box = document.getElementById('f9-box3');
     const label = document.getElementById('f9-label3');
     const check = document.getElementById('f9-check3');
+    panel.classList.remove('open');
+    btn.classList.remove('active');
+    tree.classList.add('collapsed');
+    toggle.classList.remove('active');
     box.classList.remove('on'); box.textContent = '';
     check.classList.remove('done');
     label.style.textDecoration = ''; label.style.opacity = '';
+    await sleep(1200);
+    btn.classList.add('active');
+    panel.classList.add('open');
+    await sleep(1500);
+    toggle.classList.add('active');
+    tree.classList.remove('collapsed');
     await sleep(2000);
     box.classList.add('on'); box.textContent = '✓';
     check.classList.add('done');
     label.style.textDecoration = 'line-through'; label.style.opacity = '0.5';
     await sleep(3000);
+    toggle.classList.remove('active');
+    tree.classList.add('collapsed');
+    await sleep(2000);
+    btn.classList.remove('active');
+    panel.classList.remove('open');
+    await sleep(1200);
   });
 
   // ═══════ FEAT 10: PROCESSES (bar animation) ═══════
