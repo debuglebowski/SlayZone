@@ -701,17 +701,6 @@
                   <div class="gp-stats"><span class="gp-stat-staged">1 staged</span><span class="gp-stat-modified">3 modified</span><span style="margin-left:auto;display:flex;gap:6px;"><span class="gp-action-btn">↓ Pull</span><span class="gp-action-btn">↑ Push</span></span></div>
                 </div>
                 <div class="gp-card">
-                  <div class="gp-section-title">Diff · src/auth/jwt.ts</div>
-                  <div class="gp-diff">
-                    <div class="gp-diff-line gp-diff-ctx"> import { verify } from 'jsonwebtoken'</div>
-                    <div class="gp-diff-line gp-diff-del">-export function auth(req) {</div>
-                    <div class="gp-diff-line gp-diff-add">+export function auth(req, res) {</div>
-                    <div class="gp-diff-line gp-diff-ctx">   const token = req.headers.auth</div>
-                    <div class="gp-diff-line gp-diff-add">+  if (!token) return res.status(401)</div>
-                    <div class="gp-diff-line gp-diff-ctx">   const payload = verify(token)</div>
-                  </div>
-                </div>
-                <div class="gp-card">
                   <div class="gp-section-title">Commits</div>
                   <div class="gp-commits">
                   <svg width="44" height="160">
@@ -746,42 +735,62 @@
       </div>
     </div>
 
-    <div style="display:none"> <!-- HIDDEN: sections 6-16 while implementing -->
     <!-- ═══════ 6. DIFF ═══════ -->
     <div class="feature-section" id="feat-6">
       <div class="feature-visual"><div class="scale-wrap">
-        <div class="app-frame">
-          <div class="app-bar"><span class="app-dot r"></span><span class="app-dot y"></span><span class="app-dot g"></span><span class="app-bar-title">Auth refactor — diff</span></div>
-          <div class="pane-hd"><span class="pane-dot green"></span> ± 3 files changed</div>
-          <div class="app-body" style="overflow-y:auto;font-size:11px;">
-            <div class="dl file-hd">src/middleware/auth.ts <span class="stat-del">−23</span><span class="stat-add">+47</span></div>
-            <div class="dl hunk">@@ -1,12 +1,18 @@</div>
-            <div class="dl ctx"><span class="ln">1</span> import { Request, Response, Next } from 'express';</div>
-            <div class="dl del"><span class="ln">2</span>-import { getSession } from '../utils/session';</div>
-            <div class="dl del"><span class="ln">3</span>-import { SessionStore } from '../types/session';</div>
-            <div class="dl add"><span class="ln">2</span>+import { verifyToken, TokenPayload } from '../utils/jwt';</div>
-            <div class="dl add"><span class="ln">3</span>+import { AuthError } from '../types/auth';</div>
-            <div class="dl ctx"><span class="ln">4</span></div>
-            <div class="dl del"><span class="ln">5</span>-export async function authMiddleware(req, res, next) {</div>
-            <div class="dl del"><span class="ln">6</span>-  const session = await getSession(req.cookies.sid);</div>
-            <div class="dl del"><span class="ln">7</span>-  if (!session) return res.status(401).end();</div>
-            <div class="dl add"><span class="ln">5</span>+export async function authMiddleware(</div>
-            <div class="dl add"><span class="ln">6</span>+  req: Request, res: Response, next: Next</div>
-            <div class="dl add"><span class="ln">7</span>+) {</div>
-            <div class="dl add"><span class="ln">8</span>+  const token = req.headers.authorization?.split(' ')[1];</div>
-            <div class="dl add"><span class="ln">9</span>+  if (!token) throw new AuthError('NO_TOKEN');</div>
-            <div class="dl add"><span class="ln">10</span>+  const payload = await verifyToken(token);</div>
-            <div class="dl add"><span class="ln">11</span>+  req.user = payload.user;</div>
-            <div class="dl ctx"><span class="ln">12</span>   next();</div>
-            <div class="dl ctx"><span class="ln">13</span> }</div>
-            <div class="dl file-hd">src/utils/jwt.ts <span class="stat-add">+32</span></div>
-            <div class="dl hunk">@@ -0,0 +1,32 @@</div>
-            <div class="dl add"><span class="ln">1</span>+import jwt from 'jsonwebtoken';</div>
-            <div class="dl add"><span class="ln">2</span>+import { TokenPayload } from '../types/auth';</div>
-            <div class="dl add"><span class="ln">3</span>+</div>
-            <div class="dl add"><span class="ln">4</span>+export function verifyToken(token: string): TokenPayload {</div>
-            <div class="dl add"><span class="ln">5</span>+  return jwt.verify(token, process.env.JWT_SECRET);</div>
-            <div class="dl add"><span class="ln">6</span>+}</div>
+        <div class="app-frame" style="flex-direction:row;">
+          <div class="fk-sidebar">
+            <div class="fk-sidebar-dots"><span class="app-dot r"></span><span class="app-dot y"></span><span class="app-dot g"></span></div>
+            <div class="fk-proj" style="background:#4466ff;">SZ<div class="fk-proj-dot" style="background:var(--green)"></div></div>
+            <div class="fk-proj active" style="background:#ee8833;">WD</div>
+            <div class="fk-proj" style="background:#44bb55;">HC</div>
+          </div>
+          <div style="flex:1;display:flex;flex-direction:column;overflow:hidden;">
+          <div class="tab-bar">
+            <div class="tab-bar-home">🏠</div>
+            <div class="tab-item"><span class="tab-dot" style="background:var(--amber)"></span> PR#24 <span class="tab-x">×</span></div>
+            <div class="tab-item active"><span class="tab-dot" style="background:var(--green)"></span> Auth refactor <span class="tab-x">×</span></div>
+            <div class="tab-item"><span class="tab-dot" style="background:var(--green)"></span> Search endpoint <span class="tab-x">×</span></div>
+            <div class="tab-item"><span class="tab-dot" style="background:var(--amber)"></span> Rate limiting <span class="tab-x">×</span></div>
+          </div>
+          <div class="task-bar"><div class="task-bar-left"><span class="task-name">Auth refactor</span></div><div class="task-bar-right"><span class="tb-btn active">▸_ Terminal</span><span class="tb-btn">◧ Browser</span><span class="tb-btn active" id="f6-diff-btn">± Diff</span><span class="tb-btn">⎇ Git</span></div></div>
+          <div class="feat-git-split">
+            <div class="feat-git-left">
+              <div style="color:var(--text-dim)"><span class="t-green">✓</span> JWT middleware rewritten<br><span class="t-green">✓</span> Token refresh added<br><span class="t-file">  src/types/auth.d.ts</span> — updated<br><br><span class="t-out">Running tests...</span> <span class="t-green">14 passed</span><br><br><span class="t-prompt">❯</span> <span class="cursor-blink"></span></div>
+            </div>
+            <div class="feat-git-right" id="f6-panel">
+              <div style="flex:1;overflow-y:auto;font-size:11px;">
+                <div class="dl file-hd">src/middleware/auth.ts <span class="stat-del">−23</span><span class="stat-add">+47</span></div>
+                <div class="dl hunk">@@ -1,12 +1,18 @@</div>
+                <div class="dl ctx"><span class="ln">1</span> import { Request, Response, Next } from 'express';</div>
+                <div class="dl del"><span class="ln">2</span>-import { getSession } from '../utils/session';</div>
+                <div class="dl del"><span class="ln">3</span>-import { SessionStore } from '../types/session';</div>
+                <div class="dl add"><span class="ln">2</span>+import { verifyToken, TokenPayload } from '../utils/jwt';</div>
+                <div class="dl add"><span class="ln">3</span>+import { AuthError } from '../types/auth';</div>
+                <div class="dl ctx"><span class="ln">4</span></div>
+                <div class="dl del"><span class="ln">5</span>-export async function authMiddleware(req, res, next) {</div>
+                <div class="dl del"><span class="ln">6</span>-  const session = await getSession(req.cookies.sid);</div>
+                <div class="dl del"><span class="ln">7</span>-  if (!session) return res.status(401).end();</div>
+                <div class="dl add"><span class="ln">5</span>+export async function authMiddleware(</div>
+                <div class="dl add"><span class="ln">6</span>+  req: Request, res: Response, next: Next</div>
+                <div class="dl add"><span class="ln">7</span>+) {</div>
+                <div class="dl add"><span class="ln">8</span>+  const token = req.headers.authorization?.split(' ')[1];</div>
+                <div class="dl add"><span class="ln">9</span>+  if (!token) throw new AuthError('NO_TOKEN');</div>
+                <div class="dl add"><span class="ln">10</span>+  const payload = await verifyToken(token);</div>
+                <div class="dl add"><span class="ln">11</span>+  req.user = payload.user;</div>
+                <div class="dl ctx"><span class="ln">12</span>   next();</div>
+                <div class="dl ctx"><span class="ln">13</span> }</div>
+                <div class="dl file-hd">src/utils/jwt.ts <span class="stat-add">+32</span></div>
+                <div class="dl hunk">@@ -0,0 +1,32 @@</div>
+                <div class="dl add"><span class="ln">1</span>+import jwt from 'jsonwebtoken';</div>
+                <div class="dl add"><span class="ln">2</span>+import { TokenPayload } from '../types/auth';</div>
+                <div class="dl add"><span class="ln">3</span>+</div>
+                <div class="dl add"><span class="ln">4</span>+export function verifyToken(token: string): TokenPayload {</div>
+                <div class="dl add"><span class="ln">5</span>+  return jwt.verify(token, process.env.JWT_SECRET);</div>
+                <div class="dl add"><span class="ln">6</span>+}</div>
+              </div>
+            </div>
+          </div>
           </div>
         </div>
       </div></div>
@@ -791,6 +800,7 @@
       </div>
     </div>
 
+    <div style="display:none"> <!-- HIDDEN: sections 7-16 while implementing -->
     <!-- ═══════ 7. COMMIT GRAPH ═══════ -->
     <div class="feature-section" id="feat-7">
       <div class="feature-visual"><div class="scale-wrap">
@@ -1373,6 +1383,21 @@
   loopOnVisible(document.getElementById('feat-5'), async function() {
     var panel = document.getElementById('f5-panel');
     var btn = document.getElementById('f5-git-btn');
+    panel.classList.remove('open');
+    btn.classList.remove('active');
+    await sleep(1200);
+    btn.classList.add('active');
+    panel.classList.add('open');
+    await sleep(8000);
+    btn.classList.remove('active');
+    panel.classList.remove('open');
+    await sleep(1200);
+  });
+
+  // ═══════ FEAT 6: DIFF ═══════
+  loopOnVisible(document.getElementById('feat-6'), async function() {
+    var panel = document.getElementById('f6-panel');
+    var btn = document.getElementById('f6-diff-btn');
     panel.classList.remove('open');
     btn.classList.remove('active');
     await sleep(1200);
