@@ -264,6 +264,7 @@ jobs:
 
           pnpm --filter @slayzone/app exec electron-builder ${{ matrix.build_args }} $EXTRA_ARGS -c.electronVersion=${{ env.ELECTRON_VERSION }} --publish never
         env:
+          NODE_OPTIONS: "--max-old-space-size=8192"
           CSC_IDENTITY_AUTO_DISCOVERY: ${{ needs.resolve.outputs.mode == 'dry-run' && 'false' || '' }}
           WIN_CSC_LINK: ${{ needs.resolve.outputs.mode == 'publish' && secrets.WIN_CSC_LINK || '' }}
           WIN_CSC_KEY_PASSWORD: ${{ needs.resolve.outputs.mode == 'publish' && secrets.WIN_CSC_KEY_PASSWORD || '' }}
