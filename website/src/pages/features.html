@@ -314,17 +314,20 @@
   .proc-card-actions { display: flex; gap: 6px; color: var(--text-dim); font-size: 11px; }
 
   /* ═══════ FEAT 11: TOKEN BURN ═══════ */
-  .feat-burn { flex: 1; padding: 20px; display: flex; flex-direction: column; gap: 16px; }
-  .burn-row { display: flex; align-items: center; gap: 12px; }
-  .burn-label { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--text-dim); width: 70px; flex-shrink: 0; }
-  .burn-val { font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 700; width: 70px; text-align: right; flex-shrink: 0; }
-  .burn-val.orange { color: var(--accent); }
-  .burn-val.blue { color: var(--blue); }
-  .burn-val.green { color: var(--green); }
-  .burn-session { padding: 12px 16px; background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--text-dim); }
-  .burn-session .burn-total { font-size: 20px; font-weight: 700; color: var(--text); margin-top: 4px; }
-  .burn-cache { display: flex; align-items: center; gap: 8px; font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--text-dim); }
-  .burn-cache-pct { color: var(--green); font-weight: 700; }
+  .feat-burn { flex: 1; position: relative; }
+  .usage-popover { position: absolute; top: 8px; right: 8px; width: 280px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; font-family: 'JetBrains Mono', monospace; box-shadow: 0 8px 30px rgba(0,0,0,0.4); opacity: 0; transform: translateY(-8px); transition: opacity 0.3s ease, transform 0.3s ease; z-index: 1; }
+  .usage-popover.vis { opacity: 1; transform: translateY(0); }
+  .usage-badge { display: inline-block; padding: 4px 14px; border-radius: 14px; background: var(--accent); color: #fff; font-size: 11px; font-weight: 700; margin-bottom: 14px; }
+  .usage-provider { font-size: 12px; font-weight: 700; color: var(--text); margin-bottom: 2px; }
+  .usage-warn { font-size: 9px; color: var(--amber); margin-bottom: 12px; }
+  .usage-provider-section { margin-bottom: 10px; }
+  .usage-limit-header { display: flex; justify-content: space-between; font-size: 9px; color: var(--text-dim); margin-bottom: 6px; }
+  .usage-limit-row { display: flex; align-items: center; gap: 8px; margin-bottom: 5px; font-size: 10px; }
+  .usage-limit-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+  .usage-limit-label { width: 20px; color: var(--text-dim); }
+  .usage-limit-pct { width: 28px; text-align: right; color: var(--text-dim); }
+  .usage-limit-time { font-size: 9px; color: var(--text-dim); }
+  .usage-footer { display: flex; justify-content: space-between; align-items: center; font-size: 9px; color: var(--text-dim); margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border); }
 
   /* ═══════ FEAT 12: USAGE STATS ═══════ */
   .feat-usage { flex: 1; padding: 16px; overflow: hidden; display: flex; flex-direction: column; }
@@ -1080,18 +1083,52 @@
       </div>
     </div>
 
-    <div style="display:none"> <!-- HIDDEN: sections 11-16 while implementing -->
     <!-- ═══════ 11. TOKEN BURN ═══════ -->
     <div class="feature-section" id="feat-11">
       <div class="feature-visual"><div class="scale-wrap">
-        <div class="app-frame">
-          <div class="app-bar"><span class="app-dot r"></span><span class="app-dot y"></span><span class="app-dot g"></span><span class="app-bar-title">Auth refactor — usage</span></div>
-          <div class="feat-burn" id="f11-burn">
-            <div class="burn-session">Current session · claude code<div class="burn-total" id="f11-total">0 tokens</div></div>
-            <div class="burn-row"><div class="burn-label">Input</div><div class="bar-track"><div class="bar-fill orange" id="f11-input" data-w="65"></div></div><div class="burn-val orange" id="f11-input-val">0</div></div>
-            <div class="burn-row"><div class="burn-label">Output</div><div class="bar-track"><div class="bar-fill blue" id="f11-output" data-w="35"></div></div><div class="burn-val blue" id="f11-output-val">0</div></div>
-            <div class="burn-row"><div class="burn-label">Cache read</div><div class="bar-track"><div class="bar-fill green" id="f11-cache" data-w="82"></div></div><div class="burn-val green" id="f11-cache-val">0</div></div>
-            <div class="burn-cache">Cache hit rate: <span class="burn-cache-pct" id="f11-pct">0%</span></div>
+        <div class="app-frame" style="flex-direction:row;">
+          <div class="fk-sidebar">
+            <div class="fk-sidebar-dots"><span class="app-dot r"></span><span class="app-dot y"></span><span class="app-dot g"></span></div>
+            <div class="fk-proj" style="background:#4466ff;">SZ<div class="fk-proj-dot" style="background:var(--green)"></div></div>
+            <div class="fk-proj active" style="background:#ee8833;">WD</div>
+            <div class="fk-proj" style="background:#44bb55;">HC</div>
+          </div>
+          <div style="flex:1;display:flex;flex-direction:column;overflow:hidden;">
+          <div class="tab-bar">
+            <div class="tab-bar-home">🏠</div>
+            <div class="tab-item active"><span class="tab-dot" style="background:var(--green)"></span> Auth refactor <span class="tab-x">×</span></div>
+            <div style="margin-left:auto;display:flex;align-items:center;gap:8px;padding-right:10px;">
+              <span id="f11-trigger" style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--text-dim);padding:3px 8px;border-radius:4px;cursor:default;">Claude 5h</span>
+              <span style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--text-dim);padding:3px 8px;border-radius:4px;">Codex 7h</span>
+            </div>
+          </div>
+          <div class="feat-burn">
+            <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:80%;filter:blur(2px);opacity:0.35;pointer-events:none;font-family:'JetBrains Mono',monospace;font-size:11px;line-height:1.8;color:var(--text-dim);padding:20px;">
+              <span style="color:var(--green)">✓</span> JWT middleware rewritten<br>
+              <span style="color:var(--green)">✓</span> Token refresh added<br>
+              <span style="color:var(--amber)">  src/types/auth.d.ts</span> — updated<br><br>
+              <span>Running tests...</span> <span style="color:var(--green)">14 passed</span><br><br>
+              <span style="color:var(--text-dim)">❯</span> git push origin feat/auth<br>
+              <span>Enumerating objects: 12, done.</span><br>
+              <span>Counting objects: 100% (12/12), done.</span><br>
+              <span>Writing objects: 100% (7/7), 2.14 KiB</span>
+            </div>
+            <div class="fk-cursor" id="f11-cursor" style="top:50%;left:50%;"><svg viewBox="0 0 24 24" fill="none"><path d="M5 3l14 8.5L12 14l-2 7L5 3z" fill="white" stroke="black" stroke-width="1.5" stroke-linejoin="round"/></svg></div>
+            <div class="usage-popover" id="f11-popover">
+              <div class="usage-provider-section">
+                <div class="usage-provider">Claude</div>
+                <div class="usage-limit-header"><span></span><span>Resets in</span></div>
+                <div class="usage-limit-row"><div class="usage-limit-dot" style="background:var(--text-dim)"></div><span class="usage-limit-label">5h</span><div class="bar-track"><div class="bar-fill orange" id="f11-claude-5h" data-w="72"></div></div><span class="usage-limit-pct" id="f11-claude-5h-pct">0%</span><span class="usage-limit-time">3h 14m</span></div>
+                <div class="usage-limit-row"><div class="usage-limit-dot" style="background:var(--text-dim);opacity:0.4"></div><span class="usage-limit-label">7d</span><div class="bar-track"><div class="bar-fill orange" id="f11-claude-7d" data-w="38"></div></div><span class="usage-limit-pct" id="f11-claude-7d-pct">0%</span><span class="usage-limit-time">6d 11h</span></div>
+              </div>
+              <div class="usage-provider-section">
+                <div class="usage-provider">Codex</div>
+                <div class="usage-limit-row"><div class="usage-limit-dot" style="background:var(--text-dim)"></div><span class="usage-limit-label">5h</span><div class="bar-track"><div class="bar-fill blue" id="f11-codex-5h" data-w="45"></div></div><span class="usage-limit-pct" id="f11-codex-5h-pct">0%</span><span class="usage-limit-time">4h 56m</span></div>
+                <div class="usage-limit-row"><div class="usage-limit-dot" style="background:var(--text-dim);opacity:0.4"></div><span class="usage-limit-label">7d</span><div class="bar-track"><div class="bar-fill blue" id="f11-codex-7d" data-w="21"></div></div><span class="usage-limit-pct" id="f11-codex-7d-pct">0%</span><span class="usage-limit-time">6d 23h</span></div>
+              </div>
+              <div class="usage-footer"><span>Updated 0m ago</span><span>↻</span></div>
+            </div>
+          </div>
           </div>
         </div>
       </div></div>
@@ -1101,6 +1138,7 @@
       </div>
     </div>
 
+    <div style="display:none"> <!-- HIDDEN: sections 12-16 while implementing -->
     <!-- ═══════ 12. USAGE STATS ═══════ -->
     <div class="feature-section" id="feat-12">
       <div class="feature-visual"><div class="scale-wrap">
@@ -1656,35 +1694,50 @@
 
   // ═══════ FEAT 11: TOKEN BURN ═══════
   loopOnVisible(document.getElementById('feat-11'), async function() {
-    const input = document.getElementById('f11-input');
-    const output = document.getElementById('f11-output');
-    const cache = document.getElementById('f11-cache');
-    const inputVal = document.getElementById('f11-input-val');
-    const outputVal = document.getElementById('f11-output-val');
-    const cacheVal = document.getElementById('f11-cache-val');
-    const total = document.getElementById('f11-total');
-    const pct = document.getElementById('f11-pct');
-
-    input.style.width = '0'; output.style.width = '0'; cache.style.width = '0';
-    inputVal.textContent = '0'; outputVal.textContent = '0'; cacheVal.textContent = '0';
-    total.textContent = '0 tokens'; pct.textContent = '0%';
+    var pop = document.getElementById('f11-popover');
+    var cursor = document.getElementById('f11-cursor');
+    var trigger = document.getElementById('f11-trigger');
+    var bars = [
+      { el: document.getElementById('f11-claude-5h'), pct: document.getElementById('f11-claude-5h-pct'), target: 72 },
+      { el: document.getElementById('f11-claude-7d'), pct: document.getElementById('f11-claude-7d-pct'), target: 38 },
+      { el: document.getElementById('f11-codex-5h'), pct: document.getElementById('f11-codex-5h-pct'), target: 45 },
+      { el: document.getElementById('f11-codex-7d'), pct: document.getElementById('f11-codex-7d-pct'), target: 21 }
+    ];
+    // Reset
+    var burn = document.getElementById('f11-popover').closest('.feat-burn');
+    var w = burn.offsetWidth;
+    pop.classList.remove('vis');
+    cursor.classList.remove('vis');
+    cursor.style.transition = 'none';
+    cursor.style.top = '50%'; cursor.style.left = '50%';
+    bars.forEach(function(b) { b.el.style.width = '0'; b.pct.textContent = '0%'; });
+    await sleep(800);
+    // Show cursor in center
+    cursor.classList.add('vis');
     await sleep(400);
-
-    input.style.width = input.dataset.w + '%';
-    output.style.width = output.dataset.w + '%';
-    cache.style.width = cache.dataset.w + '%';
-
-    const steps = 20;
-    for (let i = 1; i <= steps; i++) {
-      const p = i / steps;
-      inputVal.textContent = Math.round(24800 * p).toLocaleString();
-      outputVal.textContent = Math.round(8200 * p).toLocaleString();
-      cacheVal.textContent = Math.round(42100 * p).toLocaleString();
-      total.textContent = Math.round(75100 * p).toLocaleString() + ' tokens';
-      pct.textContent = Math.round(82 * p) + '%';
-      await sleep(50);
+    // Move cursor to trigger
+    cursor.style.transition = '';
+    cursor.style.top = '-18px'; cursor.style.left = (w - 90) + 'px';
+    await sleep(800);
+    // Click — show popover
+    pop.classList.add('vis');
+    await sleep(600);
+    // Animate bars
+    bars.forEach(function(b) { b.el.style.width = b.target + '%'; });
+    var steps = 15;
+    for (var i = 1; i <= steps; i++) {
+      var p = i / steps;
+      bars.forEach(function(b) { b.pct.textContent = Math.round(b.target * p) + '%'; });
+      await sleep(60);
     }
-    await sleep(3000);
+    // Move cursor away
+    await sleep(1000);
+    cursor.style.top = '40%'; cursor.style.left = '50%';
+    await sleep(600);
+    cursor.classList.remove('vis');
+    await sleep(4000);
+    pop.classList.remove('vis');
+    await sleep(1200);
   });
 
   // ═══════ FEAT 12: USAGE STATS (bar animation) ═══════
