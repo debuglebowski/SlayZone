@@ -137,8 +137,10 @@ export function DeviceWebview({ url, preset, partition, isResizing, reloadTrigge
     }
   }, [])
 
+  const scaledWidth = preset.width * widthScale
   const scaledHeight = preset.height * widthScale
   const topOffset = containerSize ? Math.max(0, (containerSize.height - scaledHeight) / 2) : 0
+  const leftOffset = containerSize ? Math.max(0, (containerSize.width - scaledWidth) / 2) : 0
 
   const onLayoutRef = useRef(onLayout)
   onLayoutRef.current = onLayout
@@ -159,7 +161,7 @@ export function DeviceWebview({ url, preset, partition, isResizing, reloadTrigge
           outline: `${1 / widthScale}px solid rgba(255, 255, 255, 0.7)`,
           transform: widthScale < 1 ? `scale(${widthScale})` : undefined,
           top: topOffset,
-          left: 0,
+          left: leftOffset,
         }}
       >
         {containerSize && (

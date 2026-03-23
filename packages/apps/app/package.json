@@ -57,6 +57,8 @@
     "clsx": "^2.1.1",
     "convex": "^1.32.0",
     "date-fns": "^4.1.0",
+    "electron-chrome-extensions": "^4.9.0",
+    "electron-chrome-web-store": "^0.13.0",
     "electron-updater": "^6.7.3",
     "express": "^5.2.1",
     "framer-motion": "^12.15.0",

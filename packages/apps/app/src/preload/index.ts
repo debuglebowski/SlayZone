@@ -160,6 +160,11 @@ const api: ElectronAPI = {
       ipcRenderer.on('app:reload-browser', handler)
       return () => ipcRenderer.removeListener('app:reload-browser', handler)
     },
+    onReloadApp: (callback: () => void) => {
+      const handler = () => callback()
+      ipcRenderer.on('app:reload-app', handler)
+      return () => ipcRenderer.removeListener('app:reload-app', handler)
+    },
     onCloseActiveTask: (callback: () => void) => {
       const handler = () => callback()
       ipcRenderer.on('app:close-active-task', handler)
@@ -502,12 +507,6 @@ const api: ElectronAPI = {
     },
     openDevToolsBottom: (webviewId) =>
       ipcRenderer.invoke('webview:open-devtools-bottom', webviewId),
-    openDevToolsInline: (targetWebviewId, bounds) =>
-      ipcRenderer.invoke('webview:open-devtools-inline', targetWebviewId, bounds),
-    updateDevToolsInlineBounds: (bounds) =>
-      ipcRenderer.invoke('webview:update-devtools-inline-bounds', bounds),
-    closeDevToolsInline: (targetWebviewId) =>
-      ipcRenderer.invoke('webview:close-devtools-inline', targetWebviewId),
     openDevToolsDetached: (webviewId) =>
       ipcRenderer.invoke('webview:open-devtools-detached', webviewId),
     closeDevTools: (webviewId) =>
@@ -522,6 +521,46 @@ const api: ElectronAPI = {
       ipcRenderer.invoke('webview:register-browser-panel', taskId, webContentsId),
     unregisterBrowserPanel: (taskId) =>
       ipcRenderer.invoke('webview:unregister-browser-panel', taskId),
+  },
+  browser: {
+    createView: (opts) => ipcRenderer.invoke('browser:create-view', opts),
+    destroyView: (viewId) => ipcRenderer.invoke('browser:destroy-view', viewId),
+    destroyAllForTask: (taskId) => ipcRenderer.invoke('browser:destroy-all-for-task', taskId),
+    setBounds: (viewId, bounds) => ipcRenderer.invoke('browser:set-bounds', viewId, bounds),
+    setVisible: (viewId, visible) => ipcRenderer.invoke('browser:set-visible', viewId, visible),
+    hideAll: () => ipcRenderer.invoke('browser:hide-all'),
+    showAll: () => ipcRenderer.invoke('browser:show-all'),
+    navigate: (viewId, url) => ipcRenderer.invoke('browser:navigate', viewId, url),
+    goBack: (viewId) => ipcRenderer.invoke('browser:go-back', viewId),
+    goForward: (viewId) => ipcRenderer.invoke('browser:go-forward', viewId),
+    reload: (viewId, ignoreCache) => ipcRenderer.invoke('browser:reload', viewId, ignoreCache),
+    stop: (viewId) => ipcRenderer.invoke('browser:stop', viewId),
+    executeJs: (viewId, code) => ipcRenderer.invoke('browser:execute-js', viewId, code),
+    insertCss: (viewId, css) => ipcRenderer.invoke('browser:insert-css', viewId, css),
+    removeCss: (viewId, key) => ipcRenderer.invoke('browser:remove-css', viewId, key),
+    setZoom: (viewId, factor) => ipcRenderer.invoke('browser:set-zoom', viewId, factor),
+    focus: (viewId) => ipcRenderer.invoke('browser:focus', viewId),
+    getWebContentsId: (viewId) => ipcRenderer.invoke('browser:get-web-contents-id', viewId),
+    setKeyboardPassthrough: (viewId, enabled) => ipcRenderer.invoke('browser:set-keyboard-passthrough', viewId, enabled),
+    onBrowserViewShortcut: (cb) => {
+      const handler = (_event: unknown, data: { viewId: string; key: string; shift: boolean; alt: boolean; meta: boolean; control: boolean }) => cb(data)
+      ipcRenderer.on('browser-view:shortcut', handler)
+      return () => ipcRenderer.removeListener('browser-view:shortcut', handler)
+    },
+    openDevTools: (viewId, mode) => ipcRenderer.invoke('browser:open-devtools', viewId, mode),
+    closeDevTools: (viewId) => ipcRenderer.invoke('browser:close-devtools', viewId),
+    isDevToolsOpen: (viewId) => ipcRenderer.invoke('browser:is-devtools-open', viewId),
+    getExtensions: () => ipcRenderer.invoke('browser:get-extensions'),
+    loadExtension: () => ipcRenderer.invoke('browser:load-extension'),
+    removeExtension: (extensionId) => ipcRenderer.invoke('browser:remove-extension', extensionId),
+    discoverBrowserExtensions: () => ipcRenderer.invoke('browser:discover-browser-extensions'),
+    importExtension: (path) => ipcRenderer.invoke('browser:import-extension', path),
+    activateExtension: (extensionId) => ipcRenderer.invoke('browser:activate-extension', extensionId),
+    onEvent: (cb) => {
+      const handler = (_event: unknown, data: { viewId: string; type: string; [key: string]: unknown }) => cb(data)
+      ipcRenderer.on('browser:event', handler)
+      return () => ipcRenderer.removeListener('browser:event', handler)
+    },
   },
   exportImport: {
     exportAll: () => ipcRenderer.invoke('export-import:export-all'),

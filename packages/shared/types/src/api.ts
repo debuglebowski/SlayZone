@@ -330,6 +330,7 @@ export interface ElectronAPI {
     onUpdateStatus: (callback: (status: UpdateStatus) => void) => () => void
     onCloseCurrent: (callback: () => void) => () => void
     onReloadBrowser: (callback: () => void) => () => void
+    onReloadApp: (callback: () => void) => () => void
     onCloseActiveTask: (callback: () => void) => () => void
     dataReady: () => void
     restartForUpdate: () => Promise<void>
@@ -571,18 +572,6 @@ export interface ElectronAPI {
     setDesktopHandoffPolicy: (webviewId: number, policy: DesktopHandoffPolicy | null) => Promise<boolean>
     onShortcut: (callback: (payload: { key: string; shift?: boolean; webviewId?: number }) => void) => () => void
     openDevToolsBottom: (webviewId: number) => Promise<boolean>
-    openDevToolsInline: (targetWebviewId: number, bounds: { x: number; y: number; width: number; height: number }) => Promise<{
-      ok: boolean
-      reason: string
-      targetType?: string
-      hostType?: string
-      mode?: 'right' | 'bottom'
-      deviceToolbar?: string
-      attempts?: string[]
-      error?: string
-    }>
-    updateDevToolsInlineBounds: (bounds: { x: number; y: number; width: number; height: number }) => Promise<boolean>
-    closeDevToolsInline: (targetWebviewId?: number) => Promise<boolean>
     openDevToolsDetached: (webviewId: number) => Promise<boolean>
     closeDevTools: (webviewId: number) => Promise<boolean>
     isDevToolsOpened: (webviewId: number) => Promise<boolean>
@@ -599,6 +588,73 @@ export interface ElectronAPI {
     disableDeviceEmulation: (webviewId: number) => Promise<boolean>
     registerBrowserPanel: (taskId: string, webContentsId: number) => Promise<void>
     unregisterBrowserPanel: (taskId: string) => Promise<void>
+  }
+  browser: {
+    // Lifecycle
+    createView: (opts: {
+      taskId: string
+      tabId: string
+      partition?: string
+      url: string
+      bounds: { x: number; y: number; width: number; height: number }
+    }) => Promise<string>
+    destroyView: (viewId: string) => Promise<void>
+    destroyAllForTask: (taskId: string) => Promise<void>
+
+    // Bounds & visibility
+    setBounds: (viewId: string, bounds: { x: number; y: number; width: number; height: number }) => Promise<void>
+    setVisible: (viewId: string, visible: boolean) => Promise<void>
+    hideAll: () => Promise<void>
+    showAll: () => Promise<void>
+
+    // Navigation
+    navigate: (viewId: string, url: string) => Promise<void>
+    goBack: (viewId: string) => Promise<void>
+    goForward: (viewId: string) => Promise<void>
+    reload: (viewId: string, ignoreCache?: boolean) => Promise<void>
+    stop: (viewId: string) => Promise<void>
+
+    // Content
+    executeJs: (viewId: string, code: string) => Promise<unknown>
+    insertCss: (viewId: string, css: string) => Promise<string>
+    removeCss: (viewId: string, key: string) => Promise<void>
+    setZoom: (viewId: string, factor: number) => Promise<void>
+    focus: (viewId: string) => Promise<void>
+    getWebContentsId: (viewId: string) => Promise<number | null>
+    setKeyboardPassthrough: (viewId: string, enabled: boolean) => Promise<void>
+
+    // Events (M→R)
+    onBrowserViewShortcut: (cb: (payload: {
+      viewId: string
+      key: string
+      shift: boolean
+      alt: boolean
+      meta: boolean
+      control: boolean
+    }) => void) => () => void
+
+    // DevTools
+    openDevTools: (viewId: string, mode: 'bottom' | 'right' | 'undocked' | 'detach') => Promise<void>
+    closeDevTools: (viewId: string) => Promise<void>
+    isDevToolsOpen: (viewId: string) => Promise<boolean>
+
+    // Chrome extensions (R→M)
+    getExtensions: () => Promise<{ id: string; name: string; version?: string; icon?: string; manifestVersion?: number }[]>
+    loadExtension: () => Promise<{ id: string; name: string } | { error: string } | null>
+    removeExtension: (extensionId: string) => Promise<void>
+    discoverBrowserExtensions: () => Promise<{
+      name: string
+      extensions: { id: string; name: string; version: string; path: string; alreadyImported: boolean; manifestVersion?: number }[]
+    }[]>
+    importExtension: (path: string) => Promise<{ id: string; name: string } | { error: string }>
+    activateExtension: (extensionId: string) => Promise<boolean>
+
+    // Events (M→R)
+    onEvent: (cb: (event: {
+      viewId: string
+      type: string
+      [key: string]: unknown
+    }) => void) => () => void
   }
   integrations: {
     connectGithub: (input: ConnectGithubInput) => Promise<IntegrationConnectionPublic>

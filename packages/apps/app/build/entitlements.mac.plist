@@ -10,5 +10,9 @@
     <true/>
     <key>com.apple.security.network.client</key>
     <true/>
+    <key>com.apple.developer.web-browser</key>
+    <true/>
+    <key>com.apple.developer.web-browser.public-key-credential</key>
+    <true/>
   </dict>
 </plist>

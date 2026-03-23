@@ -471,13 +471,40 @@ function App(): React.JSX.Element {
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [tabs, activeTabIndex, selectedProjectId, homePanel.homePanelVisibility])
 
-  // Cmd+R: reload browser webview if focused, else reload app
+  // Cmd+R: reload the active browser view (WebContentsView or webview fallback)
   useEffect(() => {
     return window.api.app.onReloadBrowser(() => {
-      const el = document.activeElement as HTMLElement | null
-      const webview = el?.closest('[data-browser-panel]')?.querySelector('webview') as any
+      // Find visible WebContentsView placeholder and reload via IPC
+      const placeholder = document.querySelector('[data-browser-panel][data-view-id]') as HTMLElement | null
+      const viewId = placeholder?.dataset.viewId
+      if (viewId) {
+        void window.api.browser.reload(viewId)
+        return
+      }
+      // Fallback: webview (multi-device grid)
+      const webview = document.querySelector('[data-browser-panel] webview') as any
       if (webview?.reload) webview.reload()
-      else window.location.reload()
+    })
+  }, [])
+
+  // Cmd+Shift+R: reload the app
+  useEffect(() => {
+    return window.api.app.onReloadApp?.(() => {
+      window.location.reload()
+    })
+  }, [])
+
+  // Forward keyboard shortcuts from WebContentsView back into the DOM
+  useEffect(() => {
+    return window.api.browser.onBrowserViewShortcut((payload) => {
+      window.dispatchEvent(new KeyboardEvent('keydown', {
+        key: payload.key,
+        shiftKey: payload.shift,
+        metaKey: payload.meta,
+        ctrlKey: payload.control,
+        altKey: payload.alt,
+        bubbles: true,
+      }))
     })
   }, [])
 

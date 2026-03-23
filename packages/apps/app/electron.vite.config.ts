@@ -49,6 +49,9 @@ export default defineConfig(({ mode }) => {
       plugins: [externalizeDepsPlugin({ exclude: slayzoneDeps })],
       build: {
         rollupOptions: {
+          input: {
+            index: resolve('src/main/index.ts'),
+          },
           external: ['better-sqlite3', 'node-pty']
         }
       }
@@ -60,6 +63,7 @@ export default defineConfig(({ mode }) => {
           input: {
             index: resolve('src/preload/index.ts'),
             'webview-preload': resolve('src/preload/webview-preload.ts'),
+            'browser-chrome-preload': resolve('src/preload/browser-chrome-preload.ts'),
           },
           output: {
             format: 'cjs',

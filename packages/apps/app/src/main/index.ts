@@ -1,10 +1,13 @@
 
-import { app, shell, BrowserWindow, BrowserView, ipcMain, nativeTheme, session, webContents, dialog, Menu, protocol } from 'electron'
+import { app, shell, BrowserWindow, ipcMain, nativeTheme, session, webContents, dialog, Menu, protocol } from 'electron'
 import { join, extname, normalize, sep, resolve } from 'path'
 import { homedir } from 'os'
 import { readFileSync, promises as fsp, mkdirSync } from 'fs'
 import { electronApp, is } from '@electron-toolkit/utils'
+import { ElectronChromeExtensions } from 'electron-chrome-extensions'
+import { installChromeWebStore } from 'electron-chrome-web-store'
 import { registerBrowserPanel, unregisterBrowserPanel, clearBrowserRegistry } from './browser-registry'
+import { BrowserViewManager, type CreateViewOpts, type ViewBounds } from './browser-view-manager'
 import {
   BLOCKED_EXTERNAL_PROTOCOLS,
   inferHostScopeFromUrl,
@@ -31,6 +34,20 @@ protocol.registerSchemesAsPrivileged([
 // Use consistent app name for userData path (paired with legacy DB migration)
 app.name = 'slayzone'
 const isPlaywright = process.env.PLAYWRIGHT === '1'
+
+// Strip Electron/app tokens from the global UA fallback so ALL sessions, popups, and
+// subrequests present as vanilla Chromium — not just the explicitly-configured sessions.
+app.userAgentFallback = app.userAgentFallback
+  .replace(/\s*Electron\/\S+/i, '')
+  .replace(/\s*slayzone\/\S+/i, '')
+
+// Use macOS/system CA for TLS instead of Chromium's bundled CA.
+// This makes the TLS fingerprint match system browsers more closely.
+app.commandLine.appendSwitch('tls-use-system-ca')
+
+// Prevent navigator.webdriver=true — Electron sets this by default which is
+// the #1 signal BotGuard uses to block Google sign-in.
+app.commandLine.appendSwitch('disable-blink-features', 'AutomationControlled')
 
 // Enable remote debugging in dev (port 0 = OS-assigned, avoids conflicts with other dev instances)
 if (is.dev && !isPlaywright) {
@@ -206,9 +223,8 @@ const splashHTML = (version: string) => `
 
 let splashWindow: BrowserWindow | null = null
 let mainWindow: BrowserWindow | null = null
-let inlineDevToolsView: BrowserView | null = null
-let inlineDevToolsViewAttached = false
-let inlineDeviceToolbarDisableTimers: NodeJS.Timeout[] = []
+const browserViewManager = new BrowserViewManager()
+// Inline DevTools BrowserView system removed — using native docked DevTools via WebContentsView
 let linearSyncPoller: NodeJS.Timeout | null = null
 let discoveryPoller: NodeJS.Timeout | null = null
 let mcpCleanup: (() => void) | null = null
@@ -256,118 +272,10 @@ function tryShowMainWindow(): void {
   }
 }
 
-interface InlineDevToolsBounds {
-  x: number
-  y: number
-  width: number
-  height: number
-}
+// InlineDevToolsBounds, normalizeInlineDevToolsBounds, ensureInlineDevToolsView, removeInlineDevToolsView removed
+// DevTools now docked natively inside WebContentsView via browser-view-manager
 
-const INLINE_DEVTOOLS_LEFT_TRIM = 0
-
-function normalizeInlineDevToolsBounds(bounds: InlineDevToolsBounds): InlineDevToolsBounds {
-  const normalized = {
-    x: Math.max(0, Math.floor(bounds.x)),
-    y: Math.max(0, Math.floor(bounds.y)),
-    width: Math.max(1, Math.floor(bounds.width)),
-    height: Math.max(1, Math.floor(bounds.height))
-  }
-  if (normalized.width <= INLINE_DEVTOOLS_LEFT_TRIM + 120) return normalized
-  return {
-    x: normalized.x + INLINE_DEVTOOLS_LEFT_TRIM,
-    y: normalized.y,
-    width: normalized.width - INLINE_DEVTOOLS_LEFT_TRIM,
-    height: normalized.height
-  }
-}
-
-function ensureInlineDevToolsView(win: BrowserWindow): BrowserView {
-  if (!inlineDevToolsView || inlineDevToolsView.webContents.isDestroyed()) {
-    inlineDevToolsView = new BrowserView({
-      webPreferences: {
-        sandbox: true,
-        contextIsolation: true,
-        nodeIntegration: false
-      }
-    })
-  }
-  if (!inlineDevToolsViewAttached) {
-    win.addBrowserView(inlineDevToolsView)
-    inlineDevToolsViewAttached = true
-  }
-  win.setTopBrowserView(inlineDevToolsView)
-  return inlineDevToolsView
-}
-
-function removeInlineDevToolsView(win: BrowserWindow | null): void {
-  if (!inlineDevToolsView || !inlineDevToolsViewAttached || !win) return
-  try {
-    win.removeBrowserView(inlineDevToolsView)
-  } catch {
-    // ignore removal errors
-  } finally {
-    inlineDevToolsViewAttached = false
-    for (const timer of inlineDeviceToolbarDisableTimers) clearTimeout(timer)
-    inlineDeviceToolbarDisableTimers = []
-  }
-}
-
-async function tuneInlineDevToolsFrontend(devtoolsContents: Electron.WebContents): Promise<string> {
-  if (devtoolsContents.isDestroyed()) return 'destroyed'
-  // Runs once after the DevTools frontend has fully navigated (did-navigate fires when ready).
-  // forceUndocked removed — openDevTools({ mode: 'undocked' }) already handles dock state.
-  const script = `
-    (() => {
-      const ui = globalThis.UI
-      const common = globalThis.Common
-      const settings = common?.Settings?.Settings?.instance?.()
-
-      // Cancel inspect-element mode if active (can activate automatically on open)
-      try {
-        const registry = ui?.actionRegistry?.instance?.()
-        const inspectAction = registry?.action?.('elements.inspect-element')
-        if (inspectAction?.toggled?.()) inspectAction.execute?.()
-      } catch {}
-
-      // Disable device emulation if it was left on from a previous session
-      const deviceModeSetting = settings?.moduleSetting?.('emulation.showDeviceMode')
-      if (deviceModeSetting?.get?.() === true) {
-        deviceModeSetting.set(false)
-        return 'disabled-device-mode-via-setting'
-      }
-      const registry = ui?.actionRegistry?.instance?.()
-      const deviceAction = registry?.action?.('emulation.toggle-device-mode')
-      if (deviceAction?.toggled?.() === true) {
-        void deviceAction.execute?.()
-        return 'disabled-device-mode-via-action'
-      }
-      return 'ok'
-    })();
-  `
-  try {
-    const result = await devtoolsContents.executeJavaScript(script, true)
-    console.log('[webview:inline-devtools] tune', { result })
-    return String(result)
-  } catch (err) {
-    console.warn('[webview:inline-devtools] tune-failed', {
-      err: err instanceof Error ? err.message : String(err)
-    })
-    return `error:${err instanceof Error ? err.message : String(err)}`
-  }
-}
-
-function scheduleDisableDevToolsDeviceToolbar(devtoolsContents: Electron.WebContents): void {
-  for (const timer of inlineDeviceToolbarDisableTimers) clearTimeout(timer)
-  inlineDeviceToolbarDisableTimers = []
-  // Single deferred call after did-navigate has fired — DevTools modules are ready by then.
-  // The caller (openDevToolsInline) already awaits tuneInlineDevToolsFrontend once on open;
-  // this handles the case where the user navigates the DevTools itself (rare but possible).
-  const timer = setTimeout(() => {
-    if (devtoolsContents.isDestroyed()) return
-    void tuneInlineDevToolsFrontend(devtoolsContents)
-  }, 500)
-  inlineDeviceToolbarDisableTimers.push(timer)
-}
+// tuneInlineDevToolsFrontend and scheduleDisableDevToolsDeviceToolbar removed
 
 function emitOAuthCallback(payload: { code?: string; error?: string }): void {
   if (mainWindow) {
@@ -653,6 +561,8 @@ function createMainWindow(): void {
     }
   })
 
+  browserViewManager.setMainWindow(mainWindow)
+
   mainWindow.on('ready-to-show', () => {
     if (mainWindow) startIdleChecker(mainWindow)
     mainWindowReady = true
@@ -668,9 +578,6 @@ function createMainWindow(): void {
   })
 
   mainWindow.on('closed', () => {
-    removeInlineDevToolsView(mainWindow)
-    inlineDevToolsView = null
-    inlineDevToolsViewAttached = false
     mainWindow = null
   })
 
@@ -680,6 +587,7 @@ function createMainWindow(): void {
   mainWindow.webContents.on('render-process-gone', (_event, details) => {
     console.error('[renderer] process gone:', details.reason, details.exitCode)
     rendererReloading = true
+    browserViewManager.reset()
     if (!mainWindow || mainWindow.isDestroyed()) return
     setTimeout(() => {
       if (!mainWindow || mainWindow.isDestroyed()) return
@@ -693,6 +601,8 @@ function createMainWindow(): void {
   })
 
   mainWindow.webContents.on('did-finish-load', () => {
+    // Clean up orphaned WebContentsViews from previous renderer session
+    browserViewManager.reset()
     if (rendererReloading) {
       console.log('[renderer] reload complete')
       rendererReloading = false
@@ -732,10 +642,16 @@ function createMainWindow(): void {
       mainWindow?.webContents.send('app:screenshot-trigger')
     }
 
-    // Cmd+R: send to renderer (browser panel reload or app reload)
+    // Cmd+R: reload browser view (if any open)
     if (input.type === 'keyDown' && input.key.toLowerCase() === 'r' && input.meta && !input.shift && !input.alt) {
       event.preventDefault()
       mainWindow?.webContents.send('app:reload-browser')
+    }
+
+    // Cmd+Shift+R: reload the app (renderer)
+    if (input.type === 'keyDown' && input.key.toLowerCase() === 'r' && input.meta && input.shift && !input.alt) {
+      event.preventDefault()
+      mainWindow?.webContents.send('app:reload-app')
     }
   })
 
@@ -925,12 +841,17 @@ app.whenReady().then(async () => {
         label: 'View',
         submenu: [
           {
-            label: 'Reload',
+            label: 'Reload Browser',
             accelerator: 'CmdOrCtrl+R',
             registerAccelerator: false,
             click: () => mainWindow?.webContents.send('app:reload-browser')
           },
-          { role: 'forceReload' },
+          {
+            label: 'Reload App',
+            accelerator: 'CmdOrCtrl+Shift+R',
+            registerAccelerator: false,
+            click: () => mainWindow?.webContents.send('app:reload-app')
+          },
           { role: 'toggleDevTools' },
           { type: 'separator' },
           { role: 'resetZoom' },
@@ -1167,20 +1088,25 @@ div{text-align:center}h1{font-size:14px;font-weight:500;color:#aaa}p{font-size:1
   // Block external protocol navigation from inside webview pages (e.g. window.location = 'figma://...')
   // session.protocol.handle only intercepts loadURL from the main process — page-initiated
   // navigation bypasses it. A session preload patches window.open/location before page JS runs.
+  // Register preload only for web-panels session (old webview-based panels).
+  // Browser-tabs session (WebContentsView) uses applySpoofing() per-view instead,
+  // which skips Google domains. The preload injects navigator patches that BotGuard detects.
   const webviewPreload = join(__dirname, '../preload/webview-preload.js')
-  browserSession.registerPreloadScript({ type: 'frame', filePath: webviewPreload, id: 'webview-preload' })
   webPanelSession.registerPreloadScript({ type: 'frame', filePath: webviewPreload, id: 'webview-preload-wp' })
 
-  // Override Sec-CH-UA header to include "Google Chrome" brand.
-  // This is synchronous (fires before each request) so it's reliable even if CDP hasn't finished.
-  const secChUa = `"Google Chrome";v="${_chromiumVersion}", "Chromium";v="${_chromiumVersion}", "Not_A Brand";v="8"`
-  const overrideSecChUa = (details: Electron.OnBeforeSendHeadersListenerDetails, cb: (resp: Electron.BeforeSendResponse) => void) => {
-    details.requestHeaders['Sec-CH-UA'] = secChUa
-    details.requestHeaders['Sec-CH-UA-Full-Version-List'] = `"Google Chrome";v="${_chromiumVersion}.0.0.0", "Chromium";v="${_chromiumVersion}.0.0.0", "Not_A Brand";v="8.0.0.0"`
+  // Strawberry-style: strip Electron from UA header on every request (belt-and-suspenders
+  // alongside session.setUserAgent). No Sec-CH-UA override — let Chromium send native brands.
+  const stripElectronFromHeaders = (details: Electron.OnBeforeSendHeadersListenerDetails, cb: (resp: Electron.BeforeSendResponse) => void) => {
+    const uaKey = Object.keys(details.requestHeaders).find(k => k.toLowerCase() === 'user-agent')
+    if (uaKey) {
+      const ua = details.requestHeaders[uaKey]
+      const cleaned = ua.replace(/\s*Electron\/\S+/i, '').replace(/\s*slayzone\/\S+/i, '')
+      if (ua !== cleaned) details.requestHeaders[uaKey] = cleaned
+    }
     cb({ requestHeaders: details.requestHeaders })
   }
-  browserSession.webRequest.onBeforeSendHeaders(overrideSecChUa)
-  webPanelSession.webRequest.onBeforeSendHeaders(overrideSecChUa)
+  browserSession.webRequest.onBeforeSendHeaders(stripElectronFromHeaders)
+  webPanelSession.webRequest.onBeforeSendHeaders(stripElectronFromHeaders)
 
   const shouldCancelLoopbackHandoffRequest = (
     details: Electron.OnBeforeRequestListenerDetails
@@ -1242,9 +1168,13 @@ div{text-align:center}h1{font-size:14px;font-weight:500;color:#aaa}p{font-size:1
   }
 
   browserSession.setPermissionRequestHandler((_webContents, permission, callback) => {
-    const allowedPermissions = ['hid', 'usb', 'clipboard-read', 'clipboard-write']
-    callback(allowedPermissions.includes(permission) || permission === 'unknown')
+    const deniedPermissions = ['geolocation', 'notifications']
+    callback(!deniedPermissions.includes(permission))
   })
+
+  // Allow all permission checks (Strawberry-style). Without this, Chromium's default
+  // behavior may deny checks that BotGuard relies on to validate the environment.
+  browserSession.setPermissionCheckHandler(() => true)
 
   browserSession.setDevicePermissionHandler((details) => {
     if (details.deviceType === 'hid' || details.deviceType === 'usb') {
@@ -1252,6 +1182,55 @@ div{text-align:center}h1{font-size:14px;font-weight:500;color:#aaa}p{font-size:1
     }
     return false
   })
+
+  // Initialize Chrome Web Store support for service worker lifecycle management.
+  const extensionsPath = join(app.getPath('userData'), 'Extensions')
+  await installChromeWebStore({
+    session: browserSession,
+    extensionsPath,
+    loadExtensions: true,
+    allowUnpackedExtensions: true,
+  })
+
+  // Initialize Chrome extension API support for the browser panel session.
+  const chromeExtensions = new ElectronChromeExtensions({
+    license: 'GPL-3.0',
+    session: browserSession,
+  })
+  ElectronChromeExtensions.handleCRXProtocol(browserSession)
+  browserViewManager.setChromeExtensions(chromeExtensions)
+
+  // When an extension popup is created (e.g. 1Password vault), add it to the main window
+  chromeExtensions.on('browser-action-popup-created', (popup: { browserWindow: Electron.BrowserWindow }) => {
+    if (popup.browserWindow && mainWindow && !mainWindow.isDestroyed()) {
+      popup.browserWindow.setParentWindow(mainWindow)
+    }
+  })
+
+  // Extension persistence — save/restore imported extension paths
+  // (installChromeWebStore handles its own extensions, but we also support
+  // importing from other browsers via loadExtension)
+  const extensionsJsonPath = join(app.getPath('userData'), 'browser-extensions.json')
+  const saveExtensionPaths = () => {
+    try {
+      const exts = browserSession.getAllExtensions().map(e => e.path)
+      fsp.writeFile(extensionsJsonPath, JSON.stringify(exts))
+    } catch { /* best effort */ }
+  }
+  const loadSavedExtensions = async () => {
+    try {
+      const data = await fsp.readFile(extensionsJsonPath, 'utf-8')
+      const paths: string[] = JSON.parse(data)
+      for (const extPath of paths) {
+        try {
+          await browserSession.loadExtension(extPath)
+        } catch (err) {
+          console.warn('[extensions] Failed to reload extension:', extPath, err)
+        }
+      }
+    } catch { /* no saved extensions or file doesn't exist */ }
+  }
+  void loadSavedExtensions()
 
   // Set app user model id for windows
   electronApp.setAppUserModelId('com.slayzone.app')
@@ -1604,150 +1583,7 @@ div{text-align:center}h1{font-size:14px;font-weight:500;color:#aaa}p{font-size:1
     }
   })
 
-  ipcMain.handle('webview:open-devtools-inline', async (_, targetWebviewId: number, bounds: InlineDevToolsBounds) => {
-    const target = webContents.fromId(targetWebviewId)
-    if (!target || target.isDestroyed()) {
-      console.warn('[webview:open-devtools-inline] missing target', { targetWebviewId })
-      return { ok: false as const, reason: 'missing-target' as const }
-    }
-    if (!mainWindow || mainWindow.isDestroyed()) {
-      console.warn('[webview:open-devtools-inline] missing main window', { targetWebviewId })
-      return { ok: false as const, reason: 'missing-main-window' as const }
-    }
-    const view = ensureInlineDevToolsView(mainWindow)
-    view.setBounds(normalizeInlineDevToolsBounds(bounds))
-    const host = view.webContents
-
-    // devtools-opened event and isDevToolsOpened() don't fire/return true in Electron 39+
-    // when using setDevToolsWebContents — the native window never fully opens.
-    // Detect success by watching the host WebContents URL navigate to devtools://.
-    const waitForHostDevTools = (timeoutMs = 6000) =>
-      new Promise<boolean>((resolve) => {
-        let settled = false
-        const settle = (result: boolean) => {
-          if (settled) return
-          settled = true
-          clearTimeout(timer)
-          host.off('did-navigate', onNavigate)
-          resolve(result)
-        }
-        const timer = setTimeout(() => settle(false), timeoutMs)
-        const isDevToolsUrl = (url: string) => url.startsWith('devtools://') || url.includes('chrome-devtools://')
-        const onNavigate = (_: unknown, url: string) => { if (isDevToolsUrl(url)) settle(true) }
-        host.on('did-navigate', onNavigate)
-        // Check if already loaded
-        const current = host.getURL()
-        if (isDevToolsUrl(current)) settle(true)
-      })
-
-    try {
-      if (target.isDevToolsOpened()) target.closeDevTools()
-      target.setDevToolsWebContents(host)
-
-      if (!target.isDestroyed()) {
-        if (target.isDevToolsOpened()) target.closeDevTools()
-        const hostDevToolsPromise = waitForHostDevTools()
-        // Intercept the native DevTools popup window that undocked mode creates.
-        // Register BEFORE openDevTools() so we catch the window at creation time,
-        // before Electron calls Show() on it.
-        let popupCaught = false
-        const suppressPopup = (_: unknown, win: Electron.BrowserWindow) => {
-          popupCaught = true
-          if (win.isDestroyed()) return
-          win.setOpacity(0)
-          win.setBounds({ x: -32000, y: -32000, width: 1, height: 1 })
-          const hide = () => { if (!win.isDestroyed()) { win.setOpacity(0); win.setBounds({ x: -32000, y: -32000, width: 1, height: 1 }); win.hide() } }
-          win.on('ready-to-show', hide)
-          win.on('show', hide)
-        }
-        app.once('browser-window-created', suppressPopup)
-        target.openDevTools({ mode: 'undocked', activate: false })
-        // Clean up listener if openDevTools didn't create a window (e.g. already opened).
-        // Only wait if the popup hasn't been caught yet — avoids unnecessary 500ms delay
-        // on the common (pre-warm already attached) path.
-        const cleanupSuppressListener = () => app.off('browser-window-created', suppressPopup)
-        const hostLoaded = await hostDevToolsPromise
-        if (!popupCaught) await new Promise(resolve => setTimeout(resolve, 500))
-        cleanupSuppressListener()
-        if (hostLoaded) {
-          view.setBounds(normalizeInlineDevToolsBounds(bounds))
-          let deviceToolbarResult: string | undefined
-          // Tune after did-navigate so DevTools modules (UI, Common) are fully loaded.
-          // If already navigated (pre-warm path), call immediately; otherwise wait for nav.
-          const isDevToolsUrl = (url: string) => url.startsWith('devtools://') || url.includes('chrome-devtools://')
-          const runTune = async () => {
-            deviceToolbarResult = await tuneInlineDevToolsFrontend(host)
-            scheduleDisableDevToolsDeviceToolbar(host)
-          }
-          if (isDevToolsUrl(host.getURL())) {
-            await runTune()
-          } else {
-            host.once('did-navigate', (_, url) => { if (isDevToolsUrl(url)) void runTune() })
-          }
-          console.log('[webview:open-devtools-inline] opened', {
-            targetWebviewId,
-            targetType: target.getType(),
-            hostType: host.getType(),
-            deviceToolbarResult,
-          })
-          return {
-            ok: true as const,
-            reason: 'opened' as const,
-            targetType: target.getType(),
-            hostType: host.getType(),
-            mode: 'undocked' as const,
-            deviceToolbar: deviceToolbarResult,
-          }
-        }
-      }
-
-      console.warn('[webview:open-devtools-inline] failed', {
-        targetWebviewId,
-        targetType: target.getType(),
-        hostType: host.getType(),
-      })
-      return {
-        ok: false as const,
-        reason: 'no-variant-opened' as const,
-        targetType: target.getType(),
-        hostType: host.getType(),
-      }
-    } catch (err) {
-      console.warn('[webview:open-devtools-inline] failed', {
-        targetWebviewId,
-        targetType: target.getType(),
-        hostType: host.getType(),
-        err: err instanceof Error ? err.message : String(err)
-      })
-      return {
-        ok: false as const,
-        reason: 'exception' as const,
-        targetType: target.getType(),
-        hostType: host.getType(),
-        error: err instanceof Error ? err.message : String(err)
-      }
-    }
-  })
-
-  ipcMain.handle('webview:update-devtools-inline-bounds', (_, bounds: InlineDevToolsBounds) => {
-    if (!mainWindow || mainWindow.isDestroyed()) return false
-    if (!inlineDevToolsView || inlineDevToolsView.webContents.isDestroyed()) return false
-    if (!inlineDevToolsViewAttached) return false
-    mainWindow.setTopBrowserView(inlineDevToolsView)
-    inlineDevToolsView.setBounds(normalizeInlineDevToolsBounds(bounds))
-    return true
-  })
-
-  ipcMain.handle('webview:close-devtools-inline', (_, targetWebviewId?: number) => {
-    if (typeof targetWebviewId === 'number') {
-      const target = webContents.fromId(targetWebviewId)
-      if (target && !target.isDestroyed() && target.isDevToolsOpened()) {
-        target.closeDevTools()
-      }
-    }
-    removeInlineDevToolsView(mainWindow)
-    return true
-  })
+  // Inline DevTools IPC handlers removed — DevTools now docked natively via browser-view-manager
 
   ipcMain.handle('webview:is-devtools-opened', (_, webviewId: number) => {
     const wc = webContents.fromId(webviewId)
@@ -1790,6 +1626,177 @@ div{text-align:center}h1{font-size:14px;font-weight:500;color:#aaa}p{font-size:1
     return true
   })
 
+  // --- Browser View Manager (WebContentsView) ---
+  // Lifecycle
+  ipcMain.handle('browser:create-view', (_, opts: CreateViewOpts) => browserViewManager.createView(opts))
+  ipcMain.handle('browser:destroy-view', (_, viewId: string) => browserViewManager.destroyView(viewId))
+  ipcMain.handle('browser:destroy-all-for-task', (_, taskId: string) => browserViewManager.destroyAllForTask(taskId))
+
+  // Bounds & visibility
+  ipcMain.handle('browser:set-bounds', (_, viewId: string, bounds: ViewBounds) => browserViewManager.setBounds(viewId, bounds))
+  ipcMain.handle('browser:set-visible', (_, viewId: string, visible: boolean) => browserViewManager.setVisible(viewId, visible))
+  ipcMain.handle('browser:hide-all', () => browserViewManager.hideAll())
+  ipcMain.handle('browser:show-all', () => browserViewManager.showAll())
+
+  // Navigation
+  ipcMain.handle('browser:navigate', (_, viewId: string, url: string) => browserViewManager.navigate(viewId, url))
+  ipcMain.handle('browser:go-back', (_, viewId: string) => browserViewManager.goBack(viewId))
+  ipcMain.handle('browser:go-forward', (_, viewId: string) => browserViewManager.goForward(viewId))
+  ipcMain.handle('browser:reload', (_, viewId: string, ignoreCache?: boolean) => browserViewManager.reload(viewId, ignoreCache))
+  ipcMain.handle('browser:stop', (_, viewId: string) => browserViewManager.stop(viewId))
+
+  // Content
+  ipcMain.handle('browser:execute-js', (_, viewId: string, code: string) => browserViewManager.executeJs(viewId, code))
+  ipcMain.handle('browser:insert-css', (_, viewId: string, css: string) => browserViewManager.insertCss(viewId, css))
+  ipcMain.handle('browser:remove-css', (_, viewId: string, key: string) => browserViewManager.removeCss(viewId, key))
+  ipcMain.handle('browser:set-zoom', (_, viewId: string, factor: number) => browserViewManager.setZoom(viewId, factor))
+  ipcMain.handle('browser:focus', (_, viewId: string) => browserViewManager.focus(viewId))
+  ipcMain.handle('browser:set-keyboard-passthrough', (_, viewId: string, enabled: boolean) => browserViewManager.setKeyboardPassthrough(viewId, enabled))
+
+  // DevTools
+  ipcMain.handle('browser:open-devtools', (_, viewId: string, mode: 'bottom' | 'right' | 'undocked' | 'detach') => browserViewManager.openDevTools(viewId, mode))
+  ipcMain.handle('browser:close-devtools', (_, viewId: string) => browserViewManager.closeDevTools(viewId))
+  ipcMain.handle('browser:is-devtools-open', (_, viewId: string) => browserViewManager.isDevToolsOpen(viewId))
+
+  // Chrome extension management
+  ipcMain.handle('browser:get-extensions', () => {
+    return browserSession.getAllExtensions().map(ext => ({
+      id: ext.id,
+      name: ext.name,
+      version: ext.manifest.version,
+      manifestVersion: typeof ext.manifest.manifest_version === 'number' ? ext.manifest.manifest_version : undefined,
+      icon: ext.manifest.icons
+        ? `crx://extension-icon/${ext.id}/${Object.values(ext.manifest.icons).pop()}`
+        : undefined,
+    }))
+  })
+  ipcMain.handle('browser:load-extension', async () => {
+    if (!mainWindow) return null
+    const result = await dialog.showOpenDialog(mainWindow, {
+      properties: ['openDirectory'],
+      title: 'Select Chrome Extension Directory',
+    })
+    if (result.canceled || !result.filePaths[0]) return null
+    try {
+      const ext = await browserSession.loadExtension(result.filePaths[0])
+      saveExtensionPaths()
+      return { id: ext.id, name: ext.name }
+    } catch (err) {
+      return { error: String(err) }
+    }
+  })
+  ipcMain.handle('browser:remove-extension', (_, extensionId: string) => {
+    browserSession.removeExtension(extensionId)
+    saveExtensionPaths()
+  })
+  ipcMain.handle('browser:discover-browser-extensions', async () => {
+    const appSupport = join(homedir(), 'Library', 'Application Support')
+    const knownBrowsers = [
+      { name: 'Chrome', dir: 'Google/Chrome/Default/Extensions' },
+      { name: 'Arc', dir: 'Arc/User Data/Default/Extensions' },
+      { name: 'Brave', dir: 'BraveSoftware/Brave-Browser/Default/Extensions' },
+      { name: 'Edge', dir: 'Microsoft Edge/Default/Extensions' },
+      { name: 'Chromium', dir: 'Chromium/Default/Extensions' },
+      { name: 'Vivaldi', dir: 'Vivaldi/Default/Extensions' },
+    ]
+    const alreadyLoaded = new Set(browserSession.getAllExtensions().map(e => e.id))
+    const results: { name: string; extensions: { id: string; name: string; version: string; path: string; alreadyImported: boolean; manifestVersion?: number }[] }[] = []
+
+    for (const browser of knownBrowsers) {
+      const extDir = join(appSupport, browser.dir)
+      let entries: string[]
+      try { entries = await fsp.readdir(extDir) } catch { continue }
+
+      const extensions: typeof results[0]['extensions'] = []
+      for (const id of entries) {
+        if (id === 'Temp' || id.startsWith('.')) continue
+        const idDir = join(extDir, id)
+        let versions: string[]
+        try { versions = await fsp.readdir(idDir) } catch { continue }
+        const ver = versions.sort().pop()
+        if (!ver) continue
+        const extPath = join(idDir, ver)
+        try {
+          const manifest = JSON.parse(await fsp.readFile(join(extPath, 'manifest.json'), 'utf-8'))
+          let name: string = manifest.name || id
+          if (name.startsWith('__MSG_')) {
+            const key = name.slice(6, -2)
+            for (const lang of ['en', 'en_US', 'en_GB']) {
+              try {
+                const msgs = JSON.parse(await fsp.readFile(join(extPath, '_locales', lang, 'messages.json'), 'utf-8'))
+                if (msgs[key]?.message) { name = msgs[key].message; break }
+              } catch { /* try next lang */ }
+            }
+          }
+          extensions.push({
+            id,
+            name,
+            version: manifest.version || '?',
+            path: extPath,
+            alreadyImported: alreadyLoaded.has(id),
+            manifestVersion: typeof manifest.manifest_version === 'number' ? manifest.manifest_version : undefined,
+          })
+        } catch { /* skip unreadable extensions */ }
+      }
+      if (extensions.length > 0) {
+        results.push({ name: browser.name, extensions })
+      }
+    }
+    return results
+  })
+  ipcMain.handle('browser:import-extension', async (_, extPath: string) => {
+    try {
+      const ext = await browserSession.loadExtension(extPath)
+      saveExtensionPaths()
+      return { id: ext.id, name: ext.name }
+    } catch (err) {
+      return { error: String(err) }
+    }
+  })
+  ipcMain.handle('browser:activate-extension', (_, extensionId: string) => {
+    // Trigger the extension's browser action by accessing the library's internal API.
+    // The public API doesn't expose activate(), so we reach into the context's router.
+    try {
+      const ext = browserSession.getExtension(extensionId)
+      if (!ext) return false
+      const activeWc = browserViewManager.getActiveWebContents()
+      if (!activeWc) return false
+      // Access internal browser action API through the context
+      const api = (chromeExtensions as any).api
+      if (api?.browserAction?.activate) {
+        api.browserAction.activate({ type: 'click' }, { extensionId, tabId: activeWc.id })
+        return true
+      }
+      // Fallback: invoke via the internal handle system
+      const ctx = (chromeExtensions as any).ctx
+      if (ctx?.router) {
+        ctx.router.invoke(activeWc, 'browserAction.activate', { eventType: 'click', extensionId })
+        return true
+      }
+      return false
+    } catch (err) {
+      console.warn('[browser:activate-extension] Failed:', err)
+      return false
+    }
+  })
+
+  // Non-test handle: needed by CLI browser registry
+  ipcMain.handle('browser:get-web-contents-id', (_, viewId: string) => browserViewManager.getWebContentsId(viewId))
+
+  // Test-only handles
+  if (isPlaywright) {
+    ipcMain.handle('browser:get-url', (_, viewId: string) => browserViewManager.getUrl(viewId))
+    ipcMain.handle('browser:get-bounds', (_, viewId: string) => browserViewManager.getBounds(viewId))
+    ipcMain.handle('browser:get-all-view-ids', () => browserViewManager.getAllViewIds())
+    ipcMain.handle('browser:get-views-for-task', (_, taskId: string) => browserViewManager.getViewsForTask(taskId))
+    ipcMain.handle('browser:is-focused', (_, viewId: string) => browserViewManager.isFocused(viewId))
+    ipcMain.handle('browser:get-actual-native-bounds', (_, viewId: string) => browserViewManager.getActualNativeBounds(viewId))
+    ipcMain.handle('browser:is-all-hidden', () => browserViewManager.isAllHidden())
+    ipcMain.handle('browser:get-view-visible', (_, viewId: string) => browserViewManager.getViewVisible(viewId))
+    ipcMain.handle('browser:is-view-natively-visible', (_, viewId: string) => browserViewManager.isViewNativelyVisible(viewId))
+    ipcMain.handle('browser:get-partition', (_, viewId: string) => browserViewManager.getPartition(viewId))
+    ipcMain.handle('browser:get-native-child-view-count', () => browserViewManager.getNativeChildViewCount())
+  }
 
   initProcessManager(db)
   logBoot('process manager initialized')
@@ -1816,9 +1823,10 @@ div{text-align:center}h1{font-size:14px;font-weight:500;color:#aaa}p{font-size:1
       // 4. Close file watchers
       closeAllWatchers()
 
-      // 5. Clear registries + flags
+      // 5. Clear registries + flags + browser view manager
       clearBrowserRegistry()
       resetSyncFlags()
+      browserViewManager.reset()
 
       // 6. Clear oauth state
       oauthCallbackQueue.length = 0

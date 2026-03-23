@@ -105,6 +105,56 @@ export const WEBVIEW_DESKTOP_HANDOFF_SCRIPT = `
     };
   }
 
+  // --- Spoof navigator.plugins / mimeTypes (empty in Electron, PDF Viewer in real Chrome) ---
+  if (!navigator.plugins || navigator.plugins.length === 0) {
+    var pdfPlugin = { name: 'PDF Viewer', filename: 'internal-pdf-viewer', description: 'Portable Document Format', length: 1 };
+    var pdfMime = { type: 'application/pdf', suffixes: 'pdf', description: 'Portable Document Format', enabledPlugin: pdfPlugin };
+    pdfPlugin[0] = pdfMime;
+    Object.defineProperty(navigator, 'plugins', {
+      get: function() {
+        var p = [pdfPlugin];
+        p.item = function(i) { return this[i] || null; };
+        p.namedItem = function(n) { return n === 'PDF Viewer' ? pdfPlugin : null; };
+        p.refresh = function() {};
+        return p;
+      },
+      configurable: true, enumerable: true,
+    });
+    Object.defineProperty(navigator, 'mimeTypes', {
+      get: function() {
+        var m = [pdfMime];
+        m.item = function(i) { return this[i] || null; };
+        m.namedItem = function(n) { return n === 'application/pdf' ? pdfMime : null; };
+        return m;
+      },
+      configurable: true, enumerable: true,
+    });
+  }
+
+  // --- Fake chrome.csi and chrome.loadTimes (Google checks these Chrome-only APIs) ---
+  if (!window.chrome) window.chrome = {};
+  if (!window.chrome.csi) {
+    window.chrome.csi = function() {
+      return { startE: Date.now(), onloadT: 0, pageT: performance.now(), tran: 15 };
+    };
+  }
+  if (!window.chrome.loadTimes) {
+    window.chrome.loadTimes = function() {
+      return {
+        commitLoadTime: Date.now() / 1000,
+        connectionInfo: 'h2',
+        finishDocumentLoadTime: 0, finishLoadTime: 0,
+        firstPaintAfterLoadTime: 0, firstPaintTime: 0,
+        navigationType: 'Other',
+        npnNegotiatedProtocol: 'h2',
+        requestTime: Date.now() / 1000 - 0.16,
+        startLoadTime: Date.now() / 1000 - 0.16,
+        wasAlternateProtocolAvailable: false,
+        wasFetchedViaSpdy: true, wasNpnNegotiated: true,
+      };
+    };
+  }
+
   // --- Block external protocol navigation ---
   var isExternal = function(url) {
     if (typeof url !== 'string') return false;
