@@ -3,7 +3,7 @@ import { useHotkeys } from 'react-hotkeys-hook'
 import { AlertTriangle, LayoutGrid, TerminalSquare, GitBranch, FileCode, Cpu, Kanban, FlaskConical } from 'lucide-react'
 import type { Task } from '@slayzone/task/shared'
 import type { Project } from '@slayzone/projects/shared'
-import { getDefaultStatus, getDoneStatus, resolveRepoPath } from '@slayzone/projects/shared'
+import { getDefaultStatus, getDoneStatus, getStatusByCategory, resolveRepoPath } from '@slayzone/projects/shared'
 import type { Tag } from '@slayzone/tags/shared'
 // Domains
 import {
@@ -594,7 +594,7 @@ function App(): React.JSX.Element {
 
   const handleConvertTask = useCallback(async (task: Task): Promise<Task> => {
     const project = useTabStore.getState()._taskLookup.projects.find((item) => item.id === task.project_id)
-    const converted = await window.api.db.updateTask({ id: task.id, title: 'Untitled task', status: getDefaultStatus(project?.columns_config), isTemporary: false })
+    const converted = await window.api.db.updateTask({ id: task.id, title: 'Untitled task', status: getStatusByCategory('started', project?.columns_config) ?? getDefaultStatus(project?.columns_config), isTemporary: false })
     updateTask(converted); return converted
   }, [updateTask])
 
