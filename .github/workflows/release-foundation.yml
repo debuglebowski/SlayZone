@@ -219,7 +219,7 @@ jobs:
           CI_SKIP_POSTINSTALL: '1'
 
       - name: Import macOS certificate
-        if: runner.os == 'macOS' && needs.resolve.outputs.mode == 'publish'
+        if: runner.os == 'macOS'
         env:
           MACOS_CERTIFICATE: ${{ secrets.MACOS_CERTIFICATE }}
           MACOS_CERTIFICATE_PWD: ${{ secrets.MACOS_CERTIFICATE_PWD }}
@@ -279,21 +279,15 @@ jobs:
         run: |
           set -euo pipefail
 
-          EXTRA_ARGS=""
-          if [ "${{ needs.resolve.outputs.mode }}" = "dry-run" ] && [ "${{ runner.os }}" = "macOS" ]; then
-            EXTRA_ARGS="-c.mac.notarize=false"
-          fi
-
           ELECTRON_BUILDER="$(node -e "console.log(require.resolve('electron-builder/out/cli/cli.js',{paths:['${{ github.workspace }}/packages/apps/app']}))")"
-          node "$ELECTRON_BUILDER" ${{ matrix.build_args }} $EXTRA_ARGS -c.electronVersion=${{ env.ELECTRON_VERSION }} --publish never
+          node "$ELECTRON_BUILDER" ${{ matrix.build_args }} -c.electronVersion=${{ env.ELECTRON_VERSION }} --publish never
         env:
           NODE_OPTIONS: "--max-old-space-size=8192"
-          CSC_IDENTITY_AUTO_DISCOVERY: ${{ needs.resolve.outputs.mode == 'dry-run' && 'false' || '' }}
-          WIN_CSC_LINK: ${{ needs.resolve.outputs.mode == 'publish' && secrets.WIN_CSC_LINK || '' }}
-          WIN_CSC_KEY_PASSWORD: ${{ needs.resolve.outputs.mode == 'publish' && secrets.WIN_CSC_KEY_PASSWORD || '' }}
-          APPLE_ID: ${{ needs.resolve.outputs.mode == 'publish' && secrets.APPLE_ID || '' }}
-          APPLE_APP_SPECIFIC_PASSWORD: ${{ needs.resolve.outputs.mode == 'publish' && secrets.APPLE_APP_SPECIFIC_PASSWORD || '' }}
-          APPLE_TEAM_ID: ${{ needs.resolve.outputs.mode == 'publish' && secrets.APPLE_TEAM_ID || '' }}
+          WIN_CSC_LINK: ${{ secrets.WIN_CSC_LINK }}
+          WIN_CSC_KEY_PASSWORD: ${{ secrets.WIN_CSC_KEY_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
 
       - name: Collect release assets
         shell: bash
