@@ -259,7 +259,7 @@ jobs:
         run: |
           set -euo pipefail
           DEPLOY_DIR="${{ runner.temp }}/app-deploy"
-          pnpm --filter @slayzone/app deploy "$DEPLOY_DIR"
+          pnpm --filter @slayzone/app deploy --legacy "$DEPLOY_DIR"
           # Copy build output (electron-vite bundles) into deployed dir
           cp -r packages/apps/app/out "$DEPLOY_DIR/out"
           cp -r packages/apps/app/build "$DEPLOY_DIR/build"
