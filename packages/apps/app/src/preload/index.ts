@@ -73,6 +73,9 @@ const api: ElectronAPI = {
     set: (key, value) => ipcRenderer.invoke('db:settings:set', key, value),
     getAll: () => ipcRenderer.invoke('db:settings:getAll')
   },
+  shortcuts: {
+    changed: () => ipcRenderer.send('shortcuts:changed'),
+  },
   theme: {
     getEffective: () => ipcRenderer.invoke('theme:get-effective'),
     getSource: () => ipcRenderer.invoke('theme:get-source'),
