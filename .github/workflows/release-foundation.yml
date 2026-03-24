@@ -196,7 +196,7 @@ jobs:
     runs-on: ${{ matrix.os }}
 
     permissions:
-      contents: read
+      contents: write
 
     steps:
       - uses: actions/checkout@v5
@@ -322,6 +322,22 @@ jobs:
           path: ${{ runner.temp }}/release-assets/${{ matrix.name }}
           if-no-files-found: error
           retention-days: 90
+
+      - name: Upload to draft release for quick download
+        if: needs.resolve.outputs.mode == 'dry-run'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          TAG="dry-run-${{ needs.resolve.outputs.release_tag }}"
+          # Create draft release if it doesn't exist
+          gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 || \
+            gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --title "Dry Run ${{ needs.resolve.outputs.release_tag }}" --notes "Test build — not a real release" --draft
+          # Upload all assets for this platform
+          for file in "${{ runner.temp }}/release-assets/${{ matrix.name }}"/*; do
+            [ -f "$file" ] && gh release upload "$TAG" "$file" --repo "$GITHUB_REPOSITORY" --clobber
+          done
 
   bundle:
     runs-on: ubuntu-latest
