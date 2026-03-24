@@ -259,50 +259,13 @@ jobs:
       - name: Strip workspace deps (bundled by electron-vite)
         run: node -e "const fs=require('fs'),p='packages/apps/app/package.json',pkg=JSON.parse(fs.readFileSync(p));Object.keys(pkg.dependencies).filter(k=>k.startsWith('@slayzone/')).forEach(k=>delete pkg.dependencies[k]);fs.writeFileSync(p,JSON.stringify(pkg,null,2)+'\n')"
 
-      - name: Deploy app to standalone directory
-        shell: bash
-        run: |
-          set -euo pipefail
-          DEPLOY_DIR="${{ runner.temp }}/app-deploy"
-          # pnpm deploy may exit non-zero on Windows due to chmod failures on .bin stubs — these are harmless
-          pnpm --filter @slayzone/app deploy --legacy "$DEPLOY_DIR" || true
-          # Verify deploy actually created node_modules
-          test -d "$DEPLOY_DIR/node_modules" || { echo "pnpm deploy failed to create node_modules"; exit 1; }
-          # Copy build output (electron-vite bundles) into deployed dir
-          cp -r packages/apps/app/out "$DEPLOY_DIR/out"
-          cp -r packages/apps/app/build "$DEPLOY_DIR/build"
-          cp packages/apps/app/electron-builder.yml "$DEPLOY_DIR/electron-builder.yml"
-          # Copy CLI artifacts and fix extraResources paths (../cli → ./cli in deploy dir)
-          mkdir -p "$DEPLOY_DIR/cli/dist" "$DEPLOY_DIR/cli/bin"
-          cp packages/apps/cli/dist/slay.js "$DEPLOY_DIR/cli/dist/slay.js"
-          cp packages/apps/cli/bin/slay "$DEPLOY_DIR/cli/bin/slay"
-          export DEPLOY_DIR
-          node -e "const p=require('path'),f=p.join(process.env.DEPLOY_DIR,'electron-builder.yml');require('fs').writeFileSync(f,require('fs').readFileSync(f,'utf8').replace(/\.\.\/cli\//g,'./cli/'))"
-          echo "DEPLOY_DIR=$DEPLOY_DIR" >> "$GITHUB_ENV"
-
-      - name: Rebuild native modules for Electron
-        shell: bash
-        working-directory: ${{ env.DEPLOY_DIR }}
-        run: |
-          set -euo pipefail
-          REBUILD_CLI="$(node -e "const p=require('path'); console.log(p.join(p.dirname(require.resolve('@electron/rebuild', {paths: ['${{ github.workspace }}/packages/apps/app']})), 'cli.js'))")"
-          node "$REBUILD_CLI" \
-            --version "${{ env.ELECTRON_VERSION }}" \
-            --module-dir . \
-            --only better-sqlite3,node-pty \
-            --arch ${{ matrix.arch }} \
-            --build-from-source \
-            --force
-
       - name: Package
         shell: bash
-        timeout-minutes: 90
-        working-directory: ${{ env.DEPLOY_DIR }}
+        timeout-minutes: 180
         run: |
           set -euo pipefail
 
-          ELECTRON_BUILDER="$(node -e "console.log(require.resolve('electron-builder/out/cli/cli.js',{paths:['${{ github.workspace }}/packages/apps/app']}))")"
-          node "$ELECTRON_BUILDER" ${{ matrix.build_args }} -c.electronVersion=${{ env.ELECTRON_VERSION }} --publish never
+          pnpm --filter @slayzone/app exec electron-builder ${{ matrix.build_args }} -c.electronVersion=${{ env.ELECTRON_VERSION }} --publish never
         env:
           NODE_OPTIONS: "--max-old-space-size=8192"
           WIN_CSC_LINK: ${{ secrets.WIN_CSC_LINK }}
@@ -315,7 +278,7 @@ jobs:
         shell: bash
         run: |
           node scripts/release/collect-release-assets.mjs \
-            --input "${{ env.DEPLOY_DIR }}/dist" \
+            --input packages/apps/app/dist \
             --output "${{ runner.temp }}/release-assets/${{ matrix.name }}"
 
       - name: Upload build assets

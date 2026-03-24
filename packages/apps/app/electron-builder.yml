@@ -53,6 +53,7 @@ extraResources:
     to: "bin/slay.js"
   - from: "../cli/bin/slay"
     to: "bin/slay"
-npmRebuild: false
+npmRebuild: true
+nativeRebuilder: sequential
 publish:
   provider: github
