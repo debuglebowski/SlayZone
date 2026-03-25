@@ -262,8 +262,9 @@ export const Terminal = forwardRef<TerminalHandle, TerminalProps>(function Termi
       if (!containerRef.current || initializedRef.current || signal.aborted) return
 
       // Don't initialize if container still has 0 dimensions (not visible).
-      // Keep isInitializing=true so spinner stays visible — ResizeObserver will
-      // retry initTerminal when the container becomes visible.
+      // Keep isInitializing=true so spinner stays visible. The ResizeObserver
+      // in the resize effect (below, ~line 733) retries initTerminal when the
+      // container becomes visible and gets non-zero dimensions.
       if (rect.width === 0 || rect.height === 0) {
         return
       }
@@ -533,7 +534,7 @@ export const Terminal = forwardRef<TerminalHandle, TerminalProps>(function Termi
       setInitError(message)
       setPtyState('error')
     } finally {
-      if (!signal.aborted && didInit) {
+      if (didInit) {
         setIsInitializing(false)
       }
     }
@@ -687,7 +688,11 @@ export const Terminal = forwardRef<TerminalHandle, TerminalProps>(function Termi
 
   // Subscribe to PTY state changes for loading indicator
   useEffect(() => {
-    setPtyState(getState(sessionId))
+    setPtyState(prev => {
+      // Don't regress from a terminal state (dead/error) back to starting
+      if (prev !== 'starting') return prev
+      return getState(sessionId)
+    })
     return subscribeState(sessionId, (newState) => setPtyState(newState))
   }, [sessionId, getState, subscribeState])
 
