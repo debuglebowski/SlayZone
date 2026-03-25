@@ -1714,6 +1714,7 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
                               </DropdownMenuItem>
                               <DropdownMenuItem onClick={handleRestartTerminal}>
                                 Restart terminal
+                                <span className="ml-auto pl-4 text-xs text-muted-foreground">⌘⌥R</span>
                               </DropdownMenuItem>
                               <DropdownMenuItem onClick={handleResetTerminal}>
                                 Reset terminal
