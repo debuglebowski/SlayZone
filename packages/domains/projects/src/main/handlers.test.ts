@@ -224,13 +224,11 @@ describe('db:projects:reorder', () => {
     expect(after[1].sort_order).toBe(1)
   })
 
-  test('reorders single project', () => {
-    const all = h.invoke('db:projects:getAll') as { id: string; sort_order: number }[]
-    const first = all[0]
-    h.invoke('db:projects:reorder', [first.id])
+  test('rejects partial list', () => {
+    const before = h.invoke('db:projects:getAll') as { id: string; sort_order: number }[]
+    h.invoke('db:projects:reorder', [before[0].id])
     const after = h.invoke('db:projects:getAll') as { id: string; sort_order: number }[]
-    const updated = after.find((p) => p.id === first.id)!
-    expect(updated.sort_order).toBe(0)
+    expect(after.map((p) => p.sort_order)).toEqual(before.map((p) => p.sort_order))
   })
 
   test('no-ops on empty array', () => {

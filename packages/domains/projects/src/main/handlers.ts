@@ -249,6 +249,8 @@ export function registerProjectHandlers(ipcMain: IpcMain, db: Database): void {
 
   ipcMain.handle('db:projects:reorder', (_, projectIds: string[]) => {
     if (!Array.isArray(projectIds) || projectIds.length === 0) return
+    const { count } = db.prepare('SELECT COUNT(*) AS count FROM projects').get() as { count: number }
+    if (projectIds.length !== count) return
     const update = db.prepare("UPDATE projects SET sort_order = ?, updated_at = datetime('now') WHERE id = ?")
     db.transaction(() => {
       projectIds.forEach((id, index) => update.run(index, id))

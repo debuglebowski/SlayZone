@@ -47,7 +47,7 @@ export function ProjectItem({
   }
 
   return (
-    <div ref={setNodeRef} style={style} {...attributes} {...listeners} className="relative">
+    <div ref={setNodeRef} style={style} className="relative">
       <Tooltip>
         <ContextMenu>
           <TooltipTrigger asChild>
@@ -60,6 +60,8 @@ export function ProjectItem({
                   selected && 'ring-2 ring-primary ring-offset-2 ring-offset-background'
                 )}
                 style={{ backgroundColor: project.color }}
+                {...attributes}
+                {...listeners}
               >
                 {abbrev}
               </button>
