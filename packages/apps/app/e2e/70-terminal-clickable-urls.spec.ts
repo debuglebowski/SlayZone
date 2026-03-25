@@ -1,10 +1,11 @@
 /**
  * Terminal clickable URLs — verifies that URLs in terminal output are detected
- * and that clicking them opens the URL via shell.openExternal.
+ * and that clicking them triggers the correct action (browser panel or external).
  *
- * Strategy: We can't click precise character positions in xterm's WebGL canvas,
- * so we exercise the full chain programmatically: WebLinkProvider.provideLinks →
- * link.activate → shell.openExternal (mocked).
+ * Test strategies:
+ * 1. Programmatic: provideLinks → activate (tests our link provider + callback logic)
+ * 2. Playwright mouse: native mouse API with held modifier keys (tests xterm Linkifier
+ *    hover → click → activate chain through Chromium's input pipeline)
  */
 import { test, expect, seed, resetApp, TEST_PROJECT_PATH } from './fixtures/electron'
 import {
@@ -70,16 +71,8 @@ test.describe('Terminal clickable URLs', () => {
     })
   })
 
-  test('detects URL in terminal output and activates it via shell.openExternal', async ({ electronApp, mainWindow }) => {
-    const testUrl = `https://example.com/test-${Date.now()}`
-
-    await openTaskTerminal(mainWindow, { projectAbbrev, taskTitle: 'URL click test' })
-    await waitForPtySession(mainWindow, sessionId)
-    await runCommand(mainWindow, sessionId, `echo "${testUrl}"`)
-    await waitForBufferContains(mainWindow, sessionId, testUrl)
-
-    // Wait for the URL to appear in xterm's frontend buffer (not just the backend PTY buffer).
-    // Data flows: PTY → IPC → rAF batching → xterm.write, so there's a small delay.
+  /** Wait for URL to appear in xterm's frontend buffer */
+  async function waitForUrlInFrontendBuffer(mainWindow: import('@playwright/test').Page, sid: string, needle: string) {
     await expect.poll(async () => {
       return mainWindow.evaluate(({ sessionId, needle }) => {
         const w = window as unknown as Record<string, unknown>
@@ -94,12 +87,25 @@ test.describe('Terminal clickable URLs', () => {
           if (line?.translateToString(true).includes(needle)) return true
         }
         return false
-      }, { sessionId, needle: 'example.com' })
+      }, { sessionId, needle })
     }, { timeout: 10_000, message: 'URL never appeared in xterm frontend buffer' }).toBe(true)
+  }
 
-    // Use the exposed WebLinkProvider to find and activate the link.
-    // This exercises the full chain: provideLinks → regex match → activate → shell.openExternal
-    const result = await mainWindow.evaluate(async ({ sessionId, url }) => {
+  /** Clear the mock call log */
+  async function clearExternalCalls(electronApp: import('playwright').ElectronApplication) {
+    await electronApp.evaluate(() => {
+      (globalThis as Record<string, unknown>).__urlTestCalls = []
+    })
+  }
+
+  /** Find & activate a link programmatically via provideLinks */
+  async function activateLinkProgrammatically(
+    mainWindow: import('@playwright/test').Page,
+    sid: string,
+    url: string,
+    opts: { metaKey: boolean; shiftKey: boolean }
+  ) {
+    return mainWindow.evaluate(async ({ sessionId, url, metaKey, shiftKey }) => {
       const w = window as unknown as Record<string, unknown>
       const links = w.__slayzone_terminalLinks as
         Record<string, { _terminal: { buffer: { active: { length: number } } }; provideLinks(y: number, cb: (links: Array<{ text: string; activate: (e: MouseEvent, text: string) => void }> | undefined) => void): void }>
@@ -109,13 +115,12 @@ test.describe('Terminal clickable URLs', () => {
       if (!provider) return { found: false, error: 'no link provider for session' }
 
       const bufferLength = provider._terminal.buffer.active.length
-
       for (let line = 1; line <= bufferLength; line++) {
         const found = await new Promise<boolean>((resolve) => {
           provider.provideLinks(line, (result) => {
             const match = result?.find((l) => l.text === url)
             if (match) {
-              match.activate(new MouseEvent('click', { metaKey: true, shiftKey: true }), match.text)
+              match.activate(new MouseEvent('click', { metaKey, shiftKey }), match.text)
               resolve(true)
             } else {
               resolve(false)
@@ -125,14 +130,188 @@ test.describe('Terminal clickable URLs', () => {
         if (found) return { found: true, error: null }
       }
       return { found: false, error: `URL not found in ${bufferLength} buffer lines` }
-    }, { sessionId, url: testUrl })
+    }, { sessionId, url, ...opts })
+  }
 
+  /** Get pixel coords of URL in terminal for mouse interaction */
+  async function getUrlPixelCoords(
+    mainWindow: import('@playwright/test').Page,
+    sid: string,
+    url: string,
+  ) {
+    return mainWindow.evaluate(({ sessionId, url }) => {
+      const w = window as unknown as Record<string, unknown>
+      const links = w.__slayzone_terminalLinks as
+        Record<string, {
+          _terminal: {
+            element: HTMLElement
+            buffer: { active: { length: number; getLine(i: number): { translateToString(trimRight?: boolean): string } | undefined } }
+            _core: {
+              _charSizeService: { width: number; height: number }
+              _bufferService: { buffer: { ydisp: number } }
+            }
+          }
+        }>
+        | undefined
+
+      const provider = links?.[sessionId]
+      if (!provider) return null
+
+      const terminal = provider._terminal
+      const buf = terminal.buffer.active
+      const charWidth = terminal._core._charSizeService.width
+      const charHeight = terminal._core._charSizeService.height
+      const ydisp = terminal._core._bufferService.buffer.ydisp
+
+      for (let i = 0; i < buf.length; i++) {
+        const text = buf.getLine(i)?.translateToString(true) ?? ''
+        const idx = text.indexOf(url)
+        if (idx !== -1) {
+          const screenEl = terminal.element?.querySelector('.xterm-screen')
+          if (!screenEl) return null
+          const rect = screenEl.getBoundingClientRect()
+          const viewportLine = i - ydisp
+          const targetCol = idx + Math.floor(url.length / 2)
+          return {
+            x: rect.left + (targetCol + 0.5) * charWidth,
+            y: rect.top + (viewportLine + 0.5) * charHeight,
+          }
+        }
+      }
+      return null
+    }, { sessionId, url })
+  }
+
+  test('Cmd+Shift+Click opens URL externally (programmatic)', async ({ electronApp, mainWindow }) => {
+    const testUrl = `https://example.com/test-${Date.now()}`
+
+    await openTaskTerminal(mainWindow, { projectAbbrev, taskTitle: 'URL click test' })
+    await waitForPtySession(mainWindow, sessionId)
+    await runCommand(mainWindow, sessionId, `echo "${testUrl}"`)
+    await waitForBufferContains(mainWindow, sessionId, testUrl)
+    await waitForUrlInFrontendBuffer(mainWindow, sessionId, 'example.com')
+
+    const result = await activateLinkProgrammatically(mainWindow, sessionId, testUrl, { metaKey: true, shiftKey: true })
     expect(result.found, result.error ?? 'Link not found').toBe(true)
 
-    // Verify shell.openExternal was called with our URL
     const calls = await electronApp.evaluate(() => {
       return (globalThis as Record<string, unknown>).__urlTestCalls as string[]
     })
     expect(calls).toContain(testUrl)
+  })
+
+  test('Cmd+Shift+Click opens URL externally (Playwright mouse)', async ({ electronApp, mainWindow }) => {
+    await clearExternalCalls(electronApp)
+    const testUrl = `https://example.com/playwright-${Date.now()}`
+
+    await runCommand(mainWindow, sessionId, `echo "${testUrl}"`)
+    await waitForBufferContains(mainWindow, sessionId, testUrl)
+    await waitForUrlInFrontendBuffer(mainWindow, sessionId, testUrl)
+
+    const coords = await getUrlPixelCoords(mainWindow, sessionId, testUrl)
+    expect(coords, 'Could not find URL coordinates').not.toBeNull()
+
+    // Hold modifier keys BEFORE clicking — page.mouse.click({ modifiers }) doesn't
+    // propagate meta/shift into MouseEvent properties in Electron.
+    await mainWindow.mouse.move(coords!.x, coords!.y)
+    await mainWindow.waitForTimeout(100)
+    await mainWindow.keyboard.down('Meta')
+    await mainWindow.keyboard.down('Shift')
+    await mainWindow.mouse.click(coords!.x, coords!.y)
+    await mainWindow.keyboard.up('Shift')
+    await mainWindow.keyboard.up('Meta')
+    await mainWindow.waitForTimeout(200)
+
+    const calls = await electronApp.evaluate(() => {
+      return (globalThis as Record<string, unknown>).__urlTestCalls as string[]
+    })
+    expect(calls).toContain(testUrl)
+  })
+
+  test('OSC 8 hyperlink opens externally on Cmd+Shift+Click (Playwright mouse)', async ({ electronApp, mainWindow }) => {
+    await clearExternalCalls(electronApp)
+    const testUrl = `https://example.com/osc8-${Date.now()}`
+    const linkText = 'click-here-osc8'
+
+    // Write an OSC 8 hyperlink: visible text is "click-here-osc8", URL is hidden in escape sequence
+    await runCommand(mainWindow, sessionId, `printf '\\e]8;;${testUrl}\\e\\\\${linkText}\\e]8;;\\e\\\\'`)
+    await waitForBufferContains(mainWindow, sessionId, linkText)
+    await waitForUrlInFrontendBuffer(mainWindow, sessionId, linkText)
+
+    // getUrlPixelCoords finds the first occurrence — which is the command prompt line
+    // (literal text, not an OSC 8 link). The actual OSC 8 output is on a LATER line.
+    // Search for the LAST occurrence of the link text to find the output line.
+    const coords = await mainWindow.evaluate(({ sessionId, linkText }) => {
+      const w = window as unknown as Record<string, unknown>
+      const links = w.__slayzone_terminalLinks as
+        Record<string, {
+          _terminal: {
+            element: HTMLElement
+            buffer: { active: { length: number; getLine(i: number): { translateToString(trimRight?: boolean): string } | undefined } }
+            _core: {
+              _charSizeService: { width: number; height: number }
+              _bufferService: { buffer: { ydisp: number } }
+            }
+          }
+        }> | undefined
+
+      const terminal = links?.[sessionId]?._terminal
+      if (!terminal) return null
+
+      const buf = terminal.buffer.active
+      const charWidth = terminal._core._charSizeService.width
+      const charHeight = terminal._core._charSizeService.height
+      const ydisp = terminal._core._bufferService.buffer.ydisp
+
+      // Find the LAST line containing the link text (the output, not the command prompt)
+      let lastLine = -1, lastCol = -1
+      for (let i = 0; i < buf.length; i++) {
+        const text = buf.getLine(i)?.translateToString(true) ?? ''
+        const idx = text.indexOf(linkText)
+        if (idx !== -1) { lastLine = i; lastCol = idx }
+      }
+      if (lastLine === -1) return null
+
+      const screenEl = terminal.element?.querySelector('.xterm-screen')
+      if (!screenEl) return null
+      const rect = screenEl.getBoundingClientRect()
+      const viewportLine = lastLine - ydisp
+      const targetCol = lastCol + Math.floor(linkText.length / 2)
+      return {
+        x: rect.left + (targetCol + 0.5) * charWidth,
+        y: rect.top + (viewportLine + 0.5) * charHeight,
+        line: lastLine,
+      }
+    }, { sessionId, linkText })
+    expect(coords, 'Could not find OSC 8 link output coordinates').not.toBeNull()
+
+    // Cmd+Shift+Click — OSC 8 links should open externally
+    await mainWindow.mouse.move(coords!.x, coords!.y)
+    await mainWindow.waitForTimeout(100)
+    await mainWindow.keyboard.down('Meta')
+    await mainWindow.keyboard.down('Shift')
+    await mainWindow.mouse.click(coords!.x, coords!.y)
+    await mainWindow.keyboard.up('Shift')
+    await mainWindow.keyboard.up('Meta')
+    await mainWindow.waitForTimeout(200)
+
+    const calls = await electronApp.evaluate(() => {
+      return (globalThis as Record<string, unknown>).__urlTestCalls as string[]
+    })
+    expect(calls, `OSC 8 Cmd+Shift+Click did not trigger openExternal (line ${coords!.line})`).toContain(testUrl)
+  })
+
+  // This test opens a browser panel — keep it LAST to avoid breaking subsequent tests
+  test('Cmd+Click opens URL in browser panel (programmatic)', async ({ mainWindow }) => {
+    const testUrl = `https://example.com/internal-${Date.now()}`
+
+    await runCommand(mainWindow, sessionId, `echo "${testUrl}"`)
+    await waitForBufferContains(mainWindow, sessionId, testUrl)
+    await waitForUrlInFrontendBuffer(mainWindow, sessionId, testUrl)
+
+    const result = await activateLinkProgrammatically(mainWindow, sessionId, testUrl, { metaKey: true, shiftKey: false })
+    expect(result.found, result.error ?? 'Link not found').toBe(true)
+
+    await expect(mainWindow.locator('[data-browser-panel]:visible').first()).toBeVisible({ timeout: 5_000 })
   })
 })

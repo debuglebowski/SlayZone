@@ -75,7 +75,9 @@ export const FILE_REGEX = /(?<![:/\w.])(?:\.{1,2}\/[\w./-]+|[a-zA-Z][\w./-]*\/[\
 export class FileLinkProvider implements ILinkProvider {
   constructor(
     private _terminal: Terminal,
-    private _activate: (event: MouseEvent, filePath: string, line?: number, col?: number) => void
+    private _activate: (event: MouseEvent, filePath: string, line?: number, col?: number) => void,
+    private _hover?: (event: MouseEvent, text: string) => void,
+    private _leave?: (event: MouseEvent, text: string) => void,
   ) {}
 
   provideLinks(bufferLineNumber: number, callback: (links: ILink[] | undefined) => void): void {
@@ -105,8 +107,10 @@ export class FileLinkProvider implements ILinkProvider {
           end: { x: startX + fullMatch.length + 1, y: bufferLineNumber }
         },
         text: fullMatch,
-        decorations: { underline: false, pointerCursor: false },
-        activate: (event: MouseEvent) => this._activate(event, filePath, lineNum, colNum)
+        decorations: { underline: false, pointerCursor: true },
+        activate: (event: MouseEvent) => this._activate(event, filePath, lineNum, colNum),
+        hover: this._hover ? (event: MouseEvent, text: string) => this._hover!(event, text) : undefined,
+        leave: this._leave ? (event: MouseEvent, text: string) => this._leave!(event, text) : undefined,
       })
     }
 
@@ -117,7 +121,9 @@ export class FileLinkProvider implements ILinkProvider {
 export class WebLinkProvider implements ILinkProvider {
   constructor(
     private _terminal: Terminal,
-    private _activate: (event: MouseEvent, uri: string) => void
+    private _activate: (event: MouseEvent, uri: string) => void,
+    private _hover?: (event: MouseEvent, uri: string) => void,
+    private _leave?: (event: MouseEvent, uri: string) => void,
   ) {}
 
   provideLinks(bufferLineNumber: number, callback: (links: ILink[] | undefined) => void): void {
@@ -153,8 +159,10 @@ export class WebLinkProvider implements ILinkProvider {
           end: { x: endX, y: endY + 1 }
         },
         text: uri,
-        decorations: { underline: false, pointerCursor: false },
-        activate: (event: MouseEvent) => this._activate(event, uri)
+        decorations: { underline: false, pointerCursor: true },
+        activate: (event: MouseEvent) => this._activate(event, uri),
+        hover: this._hover ? (event: MouseEvent, text: string) => this._hover!(event, text) : undefined,
+        leave: this._leave ? (event: MouseEvent, text: string) => this._leave!(event, text) : undefined,
       })
     }
 
@@ -171,8 +179,10 @@ export class WebLinkProvider implements ILinkProvider {
             end: { x: offset + trimmed.length + 1, y: bufferLineNumber }
           },
           text: fullUri,
-          decorations: { underline: false, pointerCursor: false },
-          activate: (event: MouseEvent) => this._activate(event, fullUri)
+          decorations: { underline: false, pointerCursor: true },
+          activate: (event: MouseEvent) => this._activate(event, fullUri),
+          hover: this._hover ? (event: MouseEvent, text: string) => this._hover!(event, text) : undefined,
+          leave: this._leave ? (event: MouseEvent, text: string) => this._leave!(event, text) : undefined,
         })
       }
     }

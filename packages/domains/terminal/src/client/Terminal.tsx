@@ -341,6 +341,36 @@ export const Terminal = forwardRef<TerminalHandle, TerminalProps>(function Termi
         }
       }
 
+      // Link tooltip — shown on hover for all link types (URLs, files, OSC 8).
+      // Uses xterm-hover class so mouse events don't fall through to other links.
+      // Positioned at initial hover point (doesn't follow cursor).
+      let tooltipEl: HTMLDivElement | null = null
+      const getTooltip = () => {
+        if (!tooltipEl) {
+          tooltipEl = document.createElement('div')
+          tooltipEl.className = 'xterm-hover'
+          tooltipEl.style.cssText = 'display:none;position:fixed;z-index:50;padding:2px 6px;border-radius:3px;font-size:11px;line-height:1.3;max-width:400px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;pointer-events:none;opacity:0.85;background:#1e1e1e;color:#aaa;border:1px solid #333'
+        }
+        return tooltipEl
+      }
+      let tooltipShown = false
+      const showTooltip = (event: MouseEvent, text: string, hint: string) => {
+        if (tooltipShown) return // Don't reposition on subsequent mousemove events
+        tooltipShown = true
+        const el = getTooltip()
+        if (!el.parentNode && terminalRef.current?.element) {
+          terminalRef.current.element.appendChild(el)
+        }
+        el.textContent = `${text}  ${hint}`
+        el.style.display = 'block'
+        el.style.left = `${event.clientX}px`
+        el.style.top = `${event.clientY - el.offsetHeight - 2}px`
+      }
+      const hideTooltip = () => { tooltipShown = false; if (tooltipEl) tooltipEl.style.display = 'none' }
+
+      const urlHint = '— ⌘+Click open · ⌘⇧+Click external'
+      const fileHint = '— ⌘+Click open'
+
       // Create new terminal
       const terminal = new XTerm({
         allowProposedApi: true,
@@ -349,7 +379,23 @@ export const Terminal = forwardRef<TerminalHandle, TerminalProps>(function Termi
         fontFamily: terminalFontFamily,
         scrollback: terminalScrollback,
         theme: resolvedTerminalTheme,
-        minimumContrastRatio: resolvedTerminalVariant === 'light' ? 4.5 : 1
+        minimumContrastRatio: resolvedTerminalVariant === 'light' ? 4.5 : 1,
+        // OSC 8 hyperlinks — explicit links from CLI tools (gh, cargo, ls --hyperlink).
+        // Same Cmd+Click routing as WebLinkProvider. Without this, xterm shows
+        // a confirm() dialog + window.open().
+        linkHandler: {
+          activate: (event: MouseEvent, uri: string) => {
+            if (event.metaKey && event.shiftKey) {
+              void window.api.shell.openExternal(uri)
+            } else if (event.metaKey && onOpenUrlRef.current) {
+              onOpenUrlRef.current(uri)
+            } else if (event.metaKey) {
+              void window.api.shell.openExternal(uri)
+            }
+          },
+          hover: (e: MouseEvent, text: string) => showTooltip(e, text, urlHint),
+          leave: () => hideTooltip(),
+        }
       })
 
       const fitAddon = new FitAddon()
@@ -371,17 +417,17 @@ export const Terminal = forwardRef<TerminalHandle, TerminalProps>(function Termi
         } else if (event.metaKey) {
           void window.api.shell.openExternal(uri)
         }
-      })
+      }, (e, text) => showTooltip(e, text, urlHint), hideTooltip)
       terminal.registerLinkProvider(linkProvider)
 
-      // Clickable file paths — Cmd+Click → editor panel, Cmd+Shift+Click → Finder
-      // Files outside the project path always open externally.
+      // Clickable file paths — Cmd+Click → editor (in-project) or Finder (external).
+      // Shift+Click is consumed by xterm for text selection, so no Shift variant.
       terminal.registerLinkProvider(new FileLinkProvider(terminal, (event, filePath, _line, _col) => {
         if (!event.metaKey) return
         // Resolve relative paths against terminal cwd
         const resolved = filePath.startsWith('/') ? filePath : `${cwd}/${filePath}`
         const isInProject = resolved.startsWith(cwd + '/') || resolved === cwd
-        if (event.shiftKey || !isInProject) {
+        if (!isInProject) {
           void window.api.git.revealInFinder(resolved)
         } else if (onOpenFileRef.current) {
           // Pass relative path to editor panel
@@ -390,7 +436,7 @@ export const Terminal = forwardRef<TerminalHandle, TerminalProps>(function Termi
         } else {
           void window.api.git.revealInFinder(resolved)
         }
-      }))
+      }, (e, text) => showTooltip(e, text, fileHint), hideTooltip))
 
       // Test helper — allows e2e tests to trigger link activation without mouse coordinates
       const w = window as unknown as Record<string, unknown>
