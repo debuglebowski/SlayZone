@@ -1346,19 +1346,24 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
                   </Popover>
                 )
               })()}
-              <input
-                ref={titleInputRef}
-                value={titleValue}
-                onChange={(e) => setTitleValue(e.target.value)}
-                onBlur={handleTitleSave}
-                onKeyDown={handleTitleKeyDown}
-                onClick={() => setEditingTitle(true)}
-                readOnly={!editingTitle}
-                className={cn(
-                  'text-2xl font-bold bg-transparent border-none outline-none flex-1',
-                  !editingTitle && 'cursor-pointer'
-                )}
-              />
+              <div className="inline-grid items-center min-w-[2ch]">
+                <span className="invisible col-start-1 row-start-1 text-2xl font-bold whitespace-pre">
+                  {titleValue || ' '}
+                </span>
+                <input
+                  ref={titleInputRef}
+                  value={titleValue}
+                  onChange={(e) => setTitleValue(e.target.value)}
+                  onBlur={handleTitleSave}
+                  onKeyDown={handleTitleKeyDown}
+                  onClick={() => setEditingTitle(true)}
+                  readOnly={!editingTitle}
+                  className={cn(
+                    'col-start-1 row-start-1 text-2xl font-bold bg-transparent border-none outline-none w-full',
+                    !editingTitle && 'cursor-pointer'
+                  )}
+                />
+              </div>
             </div>)}
 
             {task.linear_url && (
