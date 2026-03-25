@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import { shortcutDefinitions, type ShortcutDefinition, type ShortcutScope } from './shortcut-definitions'
+import { shortcutDefinitions, type ShortcutDefinition, type ShortcutScope } from '@slayzone/shortcuts'
 
 // Typed accessor for the Electron preload API. The full type lives in @slayzone/types
 // and is augmented onto Window by the preload. We use a minimal cast here so this
@@ -25,6 +25,7 @@ interface ShortcutState {
   findConflict: (keys: string, scope: ShortcutScope) => ShortcutDefinition | undefined
   findShadow: (keys: string, scope: ShortcutScope) => ShortcutDefinition | undefined
   setOverride: (id: string, keys: string) => Promise<void>
+  batchSetOverrides: (entries: Record<string, string>) => Promise<void>
   resetAll: () => Promise<void>
   setRecording: (recording: boolean) => void
 }
@@ -78,6 +79,13 @@ export const useShortcutStore = create<ShortcutState>((set, get) => ({
 
   setOverride: async (id: string, keys: string) => {
     const newOverrides = { ...get().overrides, [id]: keys }
+    set({ overrides: newOverrides })
+    await api().settings.set(SETTINGS_KEY, JSON.stringify(newOverrides))
+    api().shortcuts.changed()
+  },
+
+  batchSetOverrides: async (entries: Record<string, string>) => {
+    const newOverrides = { ...get().overrides, ...entries }
     set({ overrides: newOverrides })
     await api().settings.set(SETTINGS_KEY, JSON.stringify(newOverrides))
     api().shortcuts.changed()

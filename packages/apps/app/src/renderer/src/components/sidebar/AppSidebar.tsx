@@ -165,7 +165,7 @@ export function AppSidebar({
   const activeView = useTabStore((s) => s.activeView)
 
   const overrides = useShortcutStore((s) => s.overrides)
-  const { getKeys, findConflict, findShadow, setOverride, resetAll, setRecording } = useShortcutStore()
+  const { getKeys, findConflict, findShadow, setOverride, batchSetOverrides, resetAll, setRecording } = useShortcutStore()
 
   // Derive effective keys from overrides so React re-renders when they change
   const effectiveKeysMap = useMemo(() => {
@@ -231,13 +231,12 @@ export function AppSidebar({
     if (!recordingId || !pendingKeys || !pendingConflict) return
     // Swap: give the conflicted shortcut whatever keys the recording shortcut had
     const previousKeys = getKeys(recordingId)
-    await setOverride(pendingConflict.id, previousKeys)
-    await setOverride(recordingId, pendingKeys)
+    await batchSetOverrides({ [pendingConflict.id]: previousKeys, [recordingId]: pendingKeys })
     setRecordingId(null)
     setRecording(false)
     setPendingKeys(null)
     setPendingConflict(null)
-  }, [recordingId, pendingKeys, pendingConflict, getKeys, setOverride, setRecording])
+  }, [recordingId, pendingKeys, pendingConflict, getKeys, batchSetOverrides, setRecording])
 
   return (
     <Sidebar collapsible="none" className={zenMode ? "!w-0 h-svh overflow-hidden" : "w-18 h-svh"}>

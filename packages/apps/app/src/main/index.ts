@@ -21,6 +21,18 @@ import {
   normalizeDesktopProtocol,
   type DesktopHandoffPolicy,
 } from '@slayzone/task/shared'
+import { toElectronAccelerator, matchesElectronInput, shortcutDefinitions, MENU_SHORTCUT_DEFAULTS, type ElectronInput } from '@slayzone/shortcuts'
+
+// Mutable shortcut overrides — updated from DB when shortcuts change.
+// Module-scope so both createMainWindow (before-input-event) and app.whenReady (menu) can access.
+let currentOverrides: Record<string, string> = {}
+
+/** Resolve effective keys for a shortcut ID, checking overrides then defaults. */
+function getEffectiveKeys(id: string, overrides: Record<string, string>): string {
+  if (overrides[id]) return overrides[id]
+  const def = shortcutDefinitions.find(d => d.id === id)
+  return def?.defaultKeys ?? ''
+}
 
 // Custom protocol for serving local files in browser panel webviews
 // (must be registered before app ready — Chromium blocks file:// in webviews)
@@ -617,38 +629,40 @@ function createMainWindow(): void {
     console.log('[renderer] responsive again')
   })
 
-  // Intercept Cmd+§ at Electron level (react-hotkeys-hook doesn't recognize §)
   mainWindow.webContents.on('before-input-event', (event, input) => {
-    if (input.type === 'keyDown' && input.key === '§' && input.meta) {
+    const ei = input as unknown as ElectronInput
+
+    if (matchesElectronInput(ei, getEffectiveKeys('go-home', currentOverrides))) {
       event.preventDefault()
       mainWindow?.webContents.send('app:go-home')
       return
     }
 
-    if (input.type === 'keyDown' && input.key === ',' && input.meta && input.shift) {
+    // Check project-settings before global-settings (shift variant first)
+    if (matchesElectronInput(ei, getEffectiveKeys('project-settings', currentOverrides))) {
       event.preventDefault()
       emitOpenProjectSettings()
       return
     }
 
-    if (input.type === 'keyDown' && input.key === ',' && input.meta) {
+    if (matchesElectronInput(ei, getEffectiveKeys('global-settings', currentOverrides))) {
       event.preventDefault()
       emitOpenSettings()
       return
     }
 
-    if (input.type === 'keyDown' && input.key.toLowerCase() === 's' && input.meta && input.shift) {
+    if (matchesElectronInput(ei, getEffectiveKeys('terminal-screenshot', currentOverrides))) {
       event.preventDefault()
       mainWindow?.webContents.send('app:screenshot-trigger')
     }
 
-    // Cmd+R: reload browser view (if any open)
+    // Cmd+R: reload browser view (not customizable)
     if (input.type === 'keyDown' && input.key.toLowerCase() === 'r' && input.meta && !input.shift && !input.alt) {
       event.preventDefault()
       mainWindow?.webContents.send('app:reload-browser')
     }
 
-    // Cmd+Shift+R: reload the app (renderer)
+    // Cmd+Shift+R: reload the app (not customizable)
     if (input.type === 'keyDown' && input.key.toLowerCase() === 'r' && input.meta && input.shift && !input.alt) {
       event.preventDefault()
       mainWindow?.webContents.send('app:reload-app')
@@ -773,27 +787,6 @@ app.whenReady().then(async () => {
   const savedTheme = row?.value as 'light' | 'dark' | 'system' | undefined
   nativeTheme.themeSource = savedTheme ?? 'dark'
 
-  // Default keys for menu-driven shortcuts (main process only)
-  const MENU_SHORTCUT_DEFAULTS: Record<string, string> = {
-    'global-settings': 'mod+,',
-    'project-settings': 'mod+shift+,',
-    'new-temp-task': 'mod+shift+n',
-    'close-tab': 'mod+w',
-    'close-task': 'mod+shift+w',
-  }
-
-  // Duplicated from @slayzone/ui/shortcut-definitions — can't import that package
-  // here because it depends on React and browser globals (navigator).
-  function toElectronAccelerator(keys: string): string {
-    return keys.split('+').map(part => {
-      if (part === 'mod') return 'CmdOrCtrl'
-      if (part === 'shift') return 'Shift'
-      if (part === 'alt') return 'Alt'
-      if (part === 'ctrl') return 'Ctrl'
-      return part.length === 1 ? part.toUpperCase() : part.charAt(0).toUpperCase() + part.slice(1)
-    }).join('+')
-  }
-
   function getMenuAccelerator(id: string, overrides: Record<string, string>): string {
     const keys = overrides[id] ?? MENU_SHORTCUT_DEFAULTS[id] ?? ''
     return toElectronAccelerator(keys)
@@ -916,16 +909,18 @@ app.whenReady().then(async () => {
     app.dock?.setIcon(icon)
   }
 
-  // Build initial menu with saved shortcut overrides
-  const raw = db.prepare('SELECT value FROM settings WHERE key = ?').get('custom_shortcuts') as { value: string } | undefined
-  const initialOverrides: Record<string, string> = raw?.value ? JSON.parse(raw.value) : {}
-  buildAppMenu(initialOverrides)
-
-  // Rebuild menu whenever shortcuts change
-  ipcMain.on('shortcuts:changed', () => {
+  function loadShortcutOverrides(): Record<string, string> {
     const raw = db.prepare('SELECT value FROM settings WHERE key = ?').get('custom_shortcuts') as { value: string } | undefined
-    const overrides: Record<string, string> = raw?.value ? JSON.parse(raw.value) : {}
-    buildAppMenu(overrides)
+    return raw?.value ? JSON.parse(raw.value) : {}
+  }
+
+  currentOverrides = loadShortcutOverrides()
+  buildAppMenu(currentOverrides)
+
+  // Rebuild menu + update overrides cache whenever shortcuts change
+  ipcMain.on('shortcuts:changed', () => {
+    currentOverrides = loadShortcutOverrides()
+    buildAppMenu(currentOverrides)
   })
 
   // Register diagnostics first so IPC handlers below are instrumented.

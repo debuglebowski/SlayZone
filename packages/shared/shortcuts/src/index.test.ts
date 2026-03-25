@@ -1,0 +1,199 @@
+import { describe, it, expect } from 'vitest'
+import {
+  toElectronAccelerator,
+  matchesShortcut,
+  matchesElectronInput,
+  formatKeysForDisplay,
+  shortcutDefinitions,
+  MENU_SHORTCUT_DEFAULTS,
+  detectPlatform,
+  type ElectronInput,
+} from './index'
+
+describe('toElectronAccelerator', () => {
+  it('converts mod+n', () => {
+    expect(toElectronAccelerator('mod+n')).toBe('CmdOrCtrl+N')
+  })
+
+  it('converts mod+shift+d', () => {
+    expect(toElectronAccelerator('mod+shift+d')).toBe('CmdOrCtrl+Shift+D')
+  })
+
+  it('converts mod+,', () => {
+    expect(toElectronAccelerator('mod+,')).toBe('CmdOrCtrl+,')
+  })
+
+  it('converts alt+shift+k', () => {
+    expect(toElectronAccelerator('alt+shift+k')).toBe('Alt+Shift+K')
+  })
+
+  it('converts escape', () => {
+    expect(toElectronAccelerator('escape')).toBe('Escape')
+  })
+
+  it('converts ctrl+tab', () => {
+    expect(toElectronAccelerator('ctrl+tab')).toBe('Ctrl+Tab')
+  })
+
+  it('converts mod+shift+n', () => {
+    expect(toElectronAccelerator('mod+shift+n')).toBe('CmdOrCtrl+Shift+N')
+  })
+})
+
+describe('matchesShortcut', () => {
+  function makeKeyEvent(overrides: Partial<KeyboardEvent>): KeyboardEvent {
+    return {
+      key: '',
+      metaKey: false,
+      ctrlKey: false,
+      shiftKey: false,
+      altKey: false,
+      ...overrides,
+    } as KeyboardEvent
+  }
+
+  it('matches mod+k on macOS (metaKey)', () => {
+    expect(matchesShortcut(makeKeyEvent({ key: 'k', metaKey: true }), 'mod+k')).toBe(true)
+  })
+
+  it('does not match mod+k without modifier', () => {
+    expect(matchesShortcut(makeKeyEvent({ key: 'k' }), 'mod+k')).toBe(false)
+  })
+
+  it('matches mod+shift+d', () => {
+    expect(matchesShortcut(makeKeyEvent({ key: 'd', metaKey: true, shiftKey: true }), 'mod+shift+d')).toBe(true)
+  })
+
+  it('does not match mod+shift+d without shift', () => {
+    expect(matchesShortcut(makeKeyEvent({ key: 'd', metaKey: true }), 'mod+shift+d')).toBe(false)
+  })
+
+  it('matches escape without modifiers', () => {
+    expect(matchesShortcut(makeKeyEvent({ key: 'Escape' }), 'escape')).toBe(true)
+  })
+
+  it('does not match escape when shift is held', () => {
+    expect(matchesShortcut(makeKeyEvent({ key: 'Escape', shiftKey: true }), 'escape')).toBe(false)
+  })
+
+  it('key comparison is case-insensitive', () => {
+    expect(matchesShortcut(makeKeyEvent({ key: 'K', metaKey: true }), 'mod+k')).toBe(true)
+  })
+
+  it('does not match mod+k when extra modifiers pressed', () => {
+    expect(matchesShortcut(makeKeyEvent({ key: 'k', metaKey: true, shiftKey: true }), 'mod+k')).toBe(false)
+  })
+})
+
+describe('shortcutDefinitions', () => {
+  it('always contains go-home shortcut', () => {
+    const goHome = shortcutDefinitions.find(d => d.id === 'go-home')
+    expect(goHome).toBeDefined()
+    expect(goHome!.platform).toBe('mac')
+  })
+
+  it('every definition has required fields', () => {
+    for (const def of shortcutDefinitions) {
+      expect(def.id).toBeTruthy()
+      expect(def.label).toBeTruthy()
+      expect(def.group).toBeTruthy()
+      expect(def.defaultKeys).toBeTruthy()
+      expect(def.scope).toBeTruthy()
+    }
+  })
+
+  it('has no duplicate ids', () => {
+    const ids = shortcutDefinitions.map(d => d.id)
+    expect(new Set(ids).size).toBe(ids.length)
+  })
+})
+
+describe('formatKeysForDisplay', () => {
+  it('formats mod+n (includes key name)', () => {
+    expect(formatKeysForDisplay('mod+n')).toContain('N')
+  })
+
+  it('formats mod+shift+d (includes key name)', () => {
+    expect(formatKeysForDisplay('mod+shift+d')).toContain('D')
+  })
+
+  it('formats escape as Escape', () => {
+    expect(formatKeysForDisplay('escape')).toBe('Escape')
+  })
+
+  it('formats ctrl+tab (includes Tab)', () => {
+    expect(formatKeysForDisplay('ctrl+tab')).toContain('Tab')
+  })
+
+  it('accepts explicit platform override', () => {
+    expect(formatKeysForDisplay('mod+n', 'mac')).toBe('⌘ N')
+    expect(formatKeysForDisplay('mod+n', 'other')).toBe('Ctrl N')
+  })
+})
+
+describe('MENU_SHORTCUT_DEFAULTS', () => {
+  it('is derived from shortcutDefinitions (no duplication)', () => {
+    for (const [id, keys] of Object.entries(MENU_SHORTCUT_DEFAULTS)) {
+      const def = shortcutDefinitions.find(d => d.id === id)
+      expect(def).toBeDefined()
+      expect(def!.defaultKeys).toBe(keys)
+    }
+  })
+})
+
+describe('matchesElectronInput', () => {
+  function makeInput(overrides: Partial<ElectronInput>): ElectronInput {
+    return {
+      type: 'keyDown',
+      key: '',
+      meta: false,
+      control: false,
+      shift: false,
+      alt: false,
+      ...overrides,
+    }
+  }
+
+  it('matches mod+, on macOS (meta)', () => {
+    expect(matchesElectronInput(makeInput({ key: ',', meta: true }), 'mod+,')).toBe(true)
+  })
+
+  it('does not match on keyUp', () => {
+    expect(matchesElectronInput(makeInput({ type: 'keyUp', key: ',', meta: true }), 'mod+,')).toBe(false)
+  })
+
+  it('matches mod+shift+, (project settings)', () => {
+    expect(matchesElectronInput(makeInput({ key: ',', meta: true, shift: true }), 'mod+shift+,')).toBe(true)
+  })
+
+  it('does not match mod+shift+, when only meta pressed', () => {
+    expect(matchesElectronInput(makeInput({ key: ',', meta: true }), 'mod+shift+,')).toBe(false)
+  })
+
+  it('matches mod+§ (go home)', () => {
+    expect(matchesElectronInput(makeInput({ key: '§', meta: true }), 'mod+§')).toBe(true)
+  })
+
+  it('matches escape without modifiers', () => {
+    expect(matchesElectronInput(makeInput({ key: 'Escape' }), 'escape')).toBe(true)
+  })
+
+  it('does not match when extra modifiers pressed', () => {
+    expect(matchesElectronInput(makeInput({ key: 'k', meta: true, shift: true }), 'mod+k')).toBe(false)
+  })
+
+  it('matches mod+shift+s (screenshot)', () => {
+    expect(matchesElectronInput(makeInput({ key: 's', meta: true, shift: true }), 'mod+shift+s')).toBe(true)
+  })
+
+  it('key comparison is case-insensitive', () => {
+    expect(matchesElectronInput(makeInput({ key: 'S', meta: true, shift: true }), 'mod+shift+s')).toBe(true)
+  })
+})
+
+describe('detectPlatform', () => {
+  it('returns mac or other', () => {
+    const result = detectPlatform()
+    expect(['mac', 'other']).toContain(result)
+  })
+})
