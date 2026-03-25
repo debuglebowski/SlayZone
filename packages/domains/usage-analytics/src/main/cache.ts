@@ -3,6 +3,7 @@ import type { UsageRecord, AnalyticsSummary, DateRange } from '../shared/types'
 import { parseClaudeFiles } from './parsers/claude'
 import { parseCodexFiles } from './parsers/codex'
 import { parseOpenCodeFiles } from './parsers/opencode'
+import { parseQwenFiles } from './parsers/qwen'
 
 interface ParseState {
   file_path: string
@@ -69,7 +70,8 @@ export async function refreshUsageData(db: Database.Database): Promise<void> {
   const allResults = await Promise.all([
     parseClaudeFiles(getOffset),
     parseCodexFiles(getOffset),
-    parseOpenCodeFiles(getOffset)
+    parseOpenCodeFiles(getOffset),
+    parseQwenFiles(getOffset)
   ])
 
   let totalInserted = 0

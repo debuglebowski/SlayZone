@@ -7,6 +7,7 @@ import { CodexAdapter } from './codex-adapter'
 import { CursorAdapter } from './cursor-adapter'
 import { GeminiAdapter } from './gemini-adapter'
 import { OpencodeAdapter } from './opencode-adapter'
+import { QwenAdapter } from './qwen-adapter'
 import { ShellAdapter } from './shell-adapter'
 
 const BUILTIN_ADAPTERS: Record<string, new () => TerminalAdapter> = {
@@ -16,6 +17,7 @@ const BUILTIN_ADAPTERS: Record<string, new () => TerminalAdapter> = {
   'cursor-agent': CursorAdapter,
   'gemini': GeminiAdapter,
   'opencode': OpencodeAdapter,
+  'qwen-code': QwenAdapter,
   'terminal': ShellAdapter
 }
 

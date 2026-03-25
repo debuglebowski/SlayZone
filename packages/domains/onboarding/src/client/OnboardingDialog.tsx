@@ -14,7 +14,8 @@ const PROVIDERS = [
   { mode: 'codex', label: 'Codex' },
   { mode: 'cursor-agent', label: 'Cursor' },
   { mode: 'gemini', label: 'Gemini' },
-  { mode: 'opencode', label: 'OpenCode' }
+  { mode: 'opencode', label: 'OpenCode' },
+  { mode: 'qwen-code', label: 'Qwen Code' },
 ]
 
 const TRACKED_EVENTS = [

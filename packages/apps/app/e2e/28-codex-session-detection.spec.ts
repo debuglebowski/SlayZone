@@ -153,7 +153,7 @@ test.describe('Session ID banners', () => {
 
     await expect(mainWindow.getByText(/Session ID detection not available/)).toBeVisible()
     await expect(mainWindow.getByText(/don't close the tab/)).toBeVisible()
-    await expect(mainWindow.getByText(/Claude Code, Codex, Gemini/)).toBeVisible()
+    await expect(mainWindow.getByText(/Claude Code, Codex, Gemini, Qwen/)).toBeVisible()
     // No detect button
     await expect(mainWindow.getByRole('button', { name: /Run \/status/ })).not.toBeVisible()
   })

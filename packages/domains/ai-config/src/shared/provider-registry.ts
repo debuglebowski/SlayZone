@@ -21,6 +21,10 @@ export const PROVIDER_PATHS: Record<CliProvider, ProviderPathMapping> = {
     rootInstructions: 'OPENCODE.md',
     skillsDir: 'skill',
   },
+  qwen: {
+    rootInstructions: 'QWEN.md',
+    skillsDir: '.qwen/skills',
+  },
 }
 
 export interface GlobalProviderPaths {
@@ -35,6 +39,7 @@ export const GLOBAL_PROVIDER_PATHS: Record<string, GlobalProviderPaths> = {
   codex:    { label: 'Codex',       baseDir: '.codex',  instructions: 'AGENTS.md' },
   gemini:   { label: 'Gemini',      baseDir: '.gemini', instructions: 'GEMINI.md', skillsDir: 'skills' },
   opencode: { label: 'OpenCode',    baseDir: '.config/opencode', instructions: 'AGENTS.md', skillsDir: 'skills' },
+  qwen:     { label: 'Qwen Code',   baseDir: '.qwen',   instructions: 'QWEN.md',   skillsDir: 'skills' },
 }
 
 export const PROVIDER_LABELS: Record<CliProvider, string> = {
@@ -43,6 +48,7 @@ export const PROVIDER_LABELS: Record<CliProvider, string> = {
   cursor: 'Cursor Agent',
   gemini: 'Gemini',
   opencode: 'OpenCode',
+  qwen: 'Qwen Code',
 }
 
 export interface ProviderCapabilities {
@@ -57,6 +63,7 @@ export const PROVIDER_CAPABILITIES: Record<CliProvider, ProviderCapabilities> = 
   cursor: { configurable: true, mcpReadable: true, mcpWritable: true },
   gemini: { configurable: true, mcpReadable: true, mcpWritable: false },
   opencode: { configurable: true, mcpReadable: true, mcpWritable: false },
+  qwen: { configurable: true, mcpReadable: true, mcpWritable: true },
 }
 
 export interface McpTargetCapabilities {
@@ -70,9 +77,10 @@ export const MCP_TARGET_CAPABILITIES: Record<McpTarget, McpTargetCapabilities> =
   cursor: { configurable: PROVIDER_CAPABILITIES.cursor.mcpReadable, writable: PROVIDER_CAPABILITIES.cursor.mcpWritable },
   gemini: { configurable: PROVIDER_CAPABILITIES.gemini.mcpReadable, writable: PROVIDER_CAPABILITIES.gemini.mcpWritable },
   opencode: { configurable: PROVIDER_CAPABILITIES.opencode.mcpReadable, writable: PROVIDER_CAPABILITIES.opencode.mcpWritable },
+  qwen: { configurable: PROVIDER_CAPABILITIES.qwen.mcpReadable, writable: PROVIDER_CAPABILITIES.qwen.mcpWritable },
 }
 
-const MCP_TARGET_ORDER: McpTarget[] = ['claude', 'codex', 'cursor', 'gemini', 'opencode']
+const MCP_TARGET_ORDER: McpTarget[] = ['claude', 'codex', 'cursor', 'gemini', 'opencode', 'qwen']
 
 export function isConfigurableCliProvider(provider: string): provider is CliProvider {
   if (!Object.hasOwn(PROVIDER_CAPABILITIES, provider)) return false
