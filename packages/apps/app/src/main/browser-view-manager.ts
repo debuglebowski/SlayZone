@@ -3,6 +3,9 @@ import { join } from 'path'
 import type { ElectronChromeExtensions } from 'electron-chrome-extensions'
 import { WEBVIEW_DESKTOP_HANDOFF_SCRIPT } from '../shared/webview-desktop-handoff-script'
 
+/** Cmd+key combos that should pass through to the webpage (clipboard, undo, select-all). */
+const NATIVE_EDIT_KEYS = new Set(['c', 'v', 'x', 'a', 'z'])
+
 export interface CreateViewOpts {
   taskId: string
   tabId: string
@@ -502,11 +505,17 @@ export class BrowserViewManager {
       if (input.type !== 'keyDown') return
       if (!(input.control || input.meta)) return
 
+      const key = input.key.toLowerCase()
+
+      // Let native edit shortcuts (copy, paste, cut, select-all, undo, redo)
+      // pass through to the webpage so clipboard/edit operations work.
+      const nativeEditKeys = NATIVE_EDIT_KEYS
+      if (nativeEditKeys.has(key) && input.meta && !input.alt) return
+
       const win = this.mainWindow
       if (!win || win.isDestroyed()) return
 
       e.preventDefault()
-      const key = input.key.toLowerCase()
 
       // Cmd+R: reload THIS browser view directly
       if (key === 'r' && input.meta && !input.shift && !input.alt) {
