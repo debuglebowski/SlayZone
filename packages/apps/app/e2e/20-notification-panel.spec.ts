@@ -57,6 +57,17 @@ test.describe('Notification panel', () => {
     await expect(panel).not.toBeVisible({ timeout: 5_000 })
   })
 
+  test('Cmd+Shift+A toggles notification panel', async ({ mainWindow }) => {
+    // Open via shortcut
+    await mainWindow.keyboard.press('Meta+Shift+A')
+    const panel = mainWindow.locator('div.border-l.bg-background').last()
+    await expect(panel).toBeVisible({ timeout: 5_000 })
+
+    // Close via shortcut
+    await mainWindow.keyboard.press('Meta+Shift+A')
+    await expect(panel).not.toBeVisible({ timeout: 5_000 })
+  })
+
   test('notification panel state persists to settings', async ({ mainWindow }) => {
     // Open panel
     await clickBell(mainWindow)

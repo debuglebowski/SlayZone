@@ -18,6 +18,7 @@ export const shortcutDefinitions: ShortcutDefinition[] = [
   { id: 'zen-mode', label: 'Zen Mode', group: 'General', defaultKeys: 'mod+j', scope: 'global' },
   { id: 'explode-mode', label: 'Explode Mode', group: 'General', defaultKeys: 'mod+shift+e', scope: 'global' },
   { id: 'exit-zen-explode', label: 'Exit Zen / Explode', group: 'General', defaultKeys: 'escape', scope: 'global' },
+  { id: 'attention-panel', label: 'Attention Panel', group: 'General', defaultKeys: 'mod+shift+a', scope: 'global' },
   { id: 'global-settings', label: 'Global Settings', group: 'General', defaultKeys: 'mod+,', scope: 'global' },
   { id: 'project-settings', label: 'Project Settings', group: 'General', defaultKeys: 'mod+shift+,', scope: 'global' },
   { id: 'go-home', label: 'Go Home', group: 'General', defaultKeys: 'mod+§', scope: 'global', platform: 'mac' },
