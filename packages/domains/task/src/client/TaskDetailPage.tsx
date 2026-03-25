@@ -62,7 +62,7 @@ import { RichTextEditor } from '@slayzone/editor'
 import { markSkipCache, usePty, useTerminalModes, getVisibleModes, getModeLabel, groupTerminalModes } from '@slayzone/terminal'
 import { TerminalContainer, type TerminalContainerHandle } from '@slayzone/task-terminals'
 import { UnifiedGitPanel, type UnifiedGitPanelHandle, type GitTabId } from '@slayzone/worktrees'
-import { buildStatusOptions, cn, getColumnStatusStyle, projectColorBg, useAppearance, matchesShortcut, useShortcutStore, useShortcutDisplay } from '@slayzone/ui'
+import { buildStatusOptions, cn, getColumnStatusStyle, projectColorBg, useAppearance, matchesShortcut, useShortcutStore, useShortcutDisplay, isModalDialogOpen } from '@slayzone/ui'
 import { BrowserPanel, type BrowserPanelHandle } from '@slayzone/task-browser'
 import { FileEditorView, type FileEditorViewHandle } from '@slayzone/file-editor/client'
 import { QuickOpenDialog } from '@slayzone/file-editor/client/QuickOpenDialog'
@@ -674,6 +674,7 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
     const handleKeyDown = (e: KeyboardEvent): void => {
       if (!isActive) return
       if (useShortcutStore.getState().isRecording) return
+      if (isModalDialogOpen()) return
       if (matchesShortcut(e, useShortcutStore.getState().getKeys('terminal-inject-desc'))) {
         if (!isTerminalFocused()) return
         e.preventDefault()
@@ -889,6 +890,7 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
       if (!isActive) return
       // Cmd+Shift+G: git diff tab toggle
       if (useShortcutStore.getState().isRecording) return
+      if (isModalDialogOpen()) return
       const keys = (id: string) => useShortcutStore.getState().getKeys(id)
 
       if (matchesShortcut(e, keys('editor-search')) && isBuiltinEnabled('editor', 'task')) {
@@ -1346,19 +1348,24 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
                   </Popover>
                 )
               })()}
-              <input
-                ref={titleInputRef}
-                value={titleValue}
-                onChange={(e) => setTitleValue(e.target.value)}
-                onBlur={handleTitleSave}
-                onKeyDown={handleTitleKeyDown}
-                onClick={() => setEditingTitle(true)}
-                readOnly={!editingTitle}
-                className={cn(
-                  'text-2xl font-bold bg-transparent border-none outline-none flex-1',
-                  !editingTitle && 'cursor-pointer'
-                )}
-              />
+              <div className="inline-grid items-center min-w-[2ch]">
+                <span className="invisible col-start-1 row-start-1 text-2xl font-bold whitespace-pre">
+                  {titleValue || ' '}
+                </span>
+                <input
+                  ref={titleInputRef}
+                  value={titleValue}
+                  onChange={(e) => setTitleValue(e.target.value)}
+                  onBlur={handleTitleSave}
+                  onKeyDown={handleTitleKeyDown}
+                  onClick={() => setEditingTitle(true)}
+                  readOnly={!editingTitle}
+                  className={cn(
+                    'col-start-1 row-start-1 text-2xl font-bold bg-transparent border-none outline-none w-full',
+                    !editingTitle && 'cursor-pointer'
+                  )}
+                />
+              </div>
             </div>)}
 
             {task.linear_url && (
