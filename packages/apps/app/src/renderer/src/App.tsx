@@ -51,7 +51,7 @@ import {
   toast,
   UpdateToast
 } from '@slayzone/ui'
-import { SidebarProvider, cn, PanelToggle, projectColorBg, useUndo, matchesShortcut, useShortcutStore, shortcutDefinitions, useShortcutDisplay } from '@slayzone/ui'
+import { SidebarProvider, cn, PanelToggle, projectColorBg, useUndo, matchesShortcut, useShortcutStore, shortcutDefinitions, useShortcutDisplay, isModalDialogOpen } from '@slayzone/ui'
 import { AppSidebar } from '@/components/sidebar/AppSidebar'
 import { ChangelogDialog } from '@/components/changelog/ChangelogDialog'
 import { useChangelogAutoOpen } from '@/components/changelog/useChangelogAutoOpen'
@@ -325,12 +325,14 @@ function App(): React.JSX.Element {
 
   // Keyboard shortcuts
   useHotkeys(getKeys('new-task'), (e) => {
+    if (isModalDialogOpen()) return
     if (projects.length > 0) { e.preventDefault(); trackShortcut('mod+n'); useDialogStore.getState().openCreateTask() }
   }, { enableOnFormTags: true, enabled: !isRecording })
 
-  useHotkeys(getKeys('search'), (e) => { e.preventDefault(); trackShortcut('mod+k'); useDialogStore.getState().openSearch() }, { enableOnFormTags: true, enabled: !isRecording })
+  useHotkeys(getKeys('search'), (e) => { if (isModalDialogOpen()) return; e.preventDefault(); trackShortcut('mod+k'); useDialogStore.getState().openSearch() }, { enableOnFormTags: true, enabled: !isRecording })
 
   useHotkeys('mod+z', async (e) => {
+    if (isModalDialogOpen()) return
     const el = e.target as HTMLElement
     if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable) return
     if (el.closest?.('.cm-editor') || el.closest?.('.xterm')) return
@@ -340,6 +342,7 @@ function App(): React.JSX.Element {
   }, { enableOnFormTags: true, enabled: !isRecording })
 
   useHotkeys('mod+shift+z', async (e) => {
+    if (isModalDialogOpen()) return
     const el = e.target as HTMLElement
     if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable) return
     if (el.closest?.('.cm-editor') || el.closest?.('.xterm')) return
@@ -398,18 +401,21 @@ function App(): React.JSX.Element {
   }, [])
 
   useHotkeys('mod+1,mod+2,mod+3,mod+4,mod+5,mod+6,mod+7,mod+8,mod+9', (e) => {
+    if (isModalDialogOpen()) return
     e.preventDefault()
     const num = parseInt(e.key, 10)
     if (num < tabs.length) setActiveTabIndex(num)
   }, { enableOnFormTags: true, enabled: !isRecording })
 
   useHotkeys('mod+shift+1,mod+shift+2,mod+shift+3,mod+shift+4,mod+shift+5,mod+shift+6,mod+shift+7,mod+shift+8,mod+shift+9', (e) => {
+    if (isModalDialogOpen()) return
     e.preventDefault()
     const num = parseInt(e.code.replace('Digit', ''), 10)
     if (num > 0 && num <= projects.length) { setSelectedProjectId(projects[num - 1].id); setActiveTabIndex(0) }
   }, { enableOnFormTags: true, enabled: !isRecording })
 
   useHotkeys(getKeys('next-tab'), (e) => {
+    if (isModalDialogOpen()) return
     e.preventDefault()
     if (tabCycleOrder.length === 0) return
     const pos = tabCycleOrder.indexOf(useTabStore.getState().activeTabIndex)
@@ -417,6 +423,7 @@ function App(): React.JSX.Element {
   }, { enableOnFormTags: true, enabled: !isRecording })
 
   useHotkeys(getKeys('prev-tab'), (e) => {
+    if (isModalDialogOpen()) return
     e.preventDefault()
     if (tabCycleOrder.length === 0) return
     const pos = tabCycleOrder.indexOf(useTabStore.getState().activeTabIndex)
@@ -424,21 +431,23 @@ function App(): React.JSX.Element {
     setActiveTabIndex(tabCycleOrder[(current - 1 + tabCycleOrder.length) % tabCycleOrder.length])
   }, { enableOnFormTags: true, enabled: !isRecording })
 
-  useHotkeys(getKeys('reopen-closed-tab'), (e) => { e.preventDefault(); track('tab_reopened'); reopenClosedTab() }, { enableOnFormTags: true, enabled: !isRecording })
+  useHotkeys(getKeys('reopen-closed-tab'), (e) => { if (isModalDialogOpen()) return; e.preventDefault(); track('tab_reopened'); reopenClosedTab() }, { enableOnFormTags: true, enabled: !isRecording })
 
   useHotkeys(getKeys('complete-close-tab'), (e) => {
+    if (isModalDialogOpen()) return
     e.preventDefault()
     if (tabs[activeTabIndex].type === 'task') useDialogStore.getState().openCompleteTaskDialog()
   }, { enableOnFormTags: true, enabled: !isRecording })
 
-  useHotkeys(getKeys('zen-mode'), (e) => { e.preventDefault(); track('zen_mode_toggled'); trackShortcut('mod+j'); setZenMode(prev => !prev) }, { enableOnFormTags: true, enabled: !isRecording })
+  useHotkeys(getKeys('zen-mode'), (e) => { if (isModalDialogOpen()) return; e.preventDefault(); track('zen_mode_toggled'); trackShortcut('mod+j'); setZenMode(prev => !prev) }, { enableOnFormTags: true, enabled: !isRecording })
 
   useHotkeys(getKeys('explode-mode'), (e) => {
+    if (isModalDialogOpen()) return
     e.preventDefault()
     if (openTaskIds.length >= 2) { track('explode_mode_toggled'); trackShortcut('mod+shift+e'); setExplodeMode(prev => !prev) }
   }, { enableOnFormTags: true, enabled: !isRecording })
 
-  useHotkeys(getKeys('exit-zen-explode'), () => { if (explodeMode) setExplodeMode(false); else if (zenMode) setZenMode(false) }, { enableOnFormTags: true, enabled: !isRecording })
+  useHotkeys(getKeys('exit-zen-explode'), () => { if (isModalDialogOpen()) return; if (explodeMode) setExplodeMode(false); else if (zenMode) setZenMode(false) }, { enableOnFormTags: true, enabled: !isRecording })
 
   useHotkeys(getKeys('attention-panel'), (e) => { e.preventDefault(); trackShortcut('mod+shift+a'); setNotificationState({ isLocked: !notificationState.isLocked }) }, { enableOnFormTags: true, enabled: !isRecording })
 
@@ -449,6 +458,7 @@ function App(): React.JSX.Element {
       if (!selectedProjectId) return
       if ((e.target as HTMLElement)?.closest?.('.cm-editor')) return
       if (isRecording) return
+      if (isModalDialogOpen()) return
 
       if (matchesShortcut(e, getKeys('editor-search')) && isHomePanelEnabled('editor', 'home')) {
         e.preventDefault()

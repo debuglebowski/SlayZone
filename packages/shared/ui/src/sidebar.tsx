@@ -6,6 +6,7 @@ import { cva, type VariantProps } from 'class-variance-authority'
 import { PanelLeftIcon } from 'lucide-react'
 
 import { useIsMobile } from './use-mobile'
+import { isModalDialogOpen } from './is-modal-dialog-open'
 import { cn } from './utils'
 import { Button } from './button'
 import { Input } from './input'
@@ -92,6 +93,7 @@ function SidebarProvider({
   React.useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === SIDEBAR_KEYBOARD_SHORTCUT && (event.metaKey || event.ctrlKey)) {
+        if (isModalDialogOpen()) return
         event.preventDefault()
         toggleSidebar()
       }

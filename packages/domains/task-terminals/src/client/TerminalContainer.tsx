@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo, forwardRef, useImperativeHandle } from 'react'
 import { usePty } from '@slayzone/terminal'
 import type { TerminalMode } from '@slayzone/terminal/shared'
-import { matchesShortcut, useShortcutStore } from '@slayzone/ui'
+import { matchesShortcut, useShortcutStore, isModalDialogOpen } from '@slayzone/ui'
 import { useTaskTerminals } from './useTaskTerminals'
 import { TerminalTabBar } from './TerminalTabBar'
 import { TerminalSplitGroup, type TerminalSplitGroupHandle } from './TerminalSplitGroup'
@@ -133,6 +133,7 @@ export const TerminalContainer = forwardRef<TerminalContainerHandle, TerminalCon
 
     const handleKeyDown = (e: KeyboardEvent) => {
       if (useShortcutStore.getState().isRecording) return
+      if (isModalDialogOpen()) return
       // New group
       if (matchesShortcut(e, useShortcutStore.getState().getKeys('terminal-new-group'))) {
         e.preventDefault()

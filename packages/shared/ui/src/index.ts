@@ -1,5 +1,6 @@
 // Utilities
 export { cn } from './utils'
+export { isModalDialogOpen } from './is-modal-dialog-open'
 export {
   shortcutDefinitions,
   formatKeysForDisplay,
