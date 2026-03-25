@@ -41,11 +41,11 @@ export class QwenAdapter implements TerminalAdapter {
   }
 
   detectError(data: string): ErrorInfo | null {
-    if (/No conversation found with session ID:/.test(data)) {
+    const s = QwenAdapter.stripAnsi(data)
+
+    if (/No conversation found with session ID:/.test(s)) {
       return { code: 'SESSION_NOT_FOUND', message: 'Session not found', recoverable: false }
     }
-
-    const s = QwenAdapter.stripAnsi(data)
 
     if (/authentication.*failed|not authenticated|please.*log in/i.test(s)) {
       return {

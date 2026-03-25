@@ -70,7 +70,10 @@ export async function parseQwenFiles(
         const stream = createReadStream(filePath, { start: startOffset, encoding: 'utf-8' })
         const rl = createInterface({ input: stream, crlfDelay: Infinity })
 
+        let lineIndex = 0
+
         rl.on('line', (line) => {
+          lineIndex++
 
           let entry: QwenAssistantEntry
           try {
@@ -86,7 +89,7 @@ export async function parseQwenFiles(
           const baseKey = `qwen:${entry.uuid ?? ''}:${entry.sessionId ?? ''}:${entry.timestamp ?? ''}`
           const idKey = (entry.uuid || entry.sessionId || entry.timestamp)
             ? baseKey
-            : `qwen:fallback:${filePath}:${startOffset + stream.bytesRead}:${line}`
+            : `qwen:fallback:${filePath}:${lineIndex}:${line}`
           const id = createHash('md5').update(idKey).digest('hex')
 
           records.push({
