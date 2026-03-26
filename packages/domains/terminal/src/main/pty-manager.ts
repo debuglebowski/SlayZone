@@ -124,6 +124,14 @@ export type { PtyInfo }
 
 const sessions = new Map<string, PtySession>()
 const sessionChangeListeners = new Set<() => void>()
+const dataListeners = new Map<string, Set<(data: string) => void>>()
+
+/** Subscribe to live PTY output. Returns unsubscribe function. */
+export function subscribeToPtyData(sessionId: string, cb: (data: string) => void): () => void {
+  if (!dataListeners.has(sessionId)) dataListeners.set(sessionId, new Set())
+  dataListeners.get(sessionId)!.add(cb)
+  return () => { dataListeners.get(sessionId)?.delete(cb) }
+}
 
 /** Register a callback for session create/destroy events. Returns unsubscribe function. */
 export function onSessionChange(cb: () => void): () => void {
@@ -715,6 +723,7 @@ export async function createPty(opts: CreatePtyOptions): Promise<{ success: bool
       // Delay session cleanup so any trailing onData events (buffered in the PTY fd)
       // can still be processed and forwarded to the renderer before we drop the session.
       setTimeout(() => {
+        dataListeners.delete(sessionId)
         sessions.delete(sessionId)
         notifySessionChange()
       }, 100)
@@ -857,6 +866,9 @@ export async function createPty(opts: CreatePtyOptions): Promise<{ success: bool
         // Append to buffer for history restoration (filter problematic sequences)
         const cleanData = filterBufferData(data)
         const seq = session.buffer.append(cleanData)
+        // Notify external data subscribers (REST API follow endpoints)
+        const listeners = dataListeners.get(sessionId)
+        if (listeners) for (const cb of listeners) cb(cleanData)
         // Track current seq for IPC emission
         const currentSeq = seq
 
@@ -1308,6 +1320,7 @@ export function killPty(sessionId: string): boolean {
   // Dismiss any lingering desktop notification
   dismissNotification(sessionId)
   // Delete from map FIRST so onData handlers exit early during kill
+  dataListeners.delete(sessionId)
   sessions.delete(sessionId)
   notifySessionChange()
   // Use SIGKILL (9) to forcefully terminate - SIGTERM may not kill child processes

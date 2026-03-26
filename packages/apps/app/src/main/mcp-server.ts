@@ -12,6 +12,7 @@ import type { ProviderConfig } from '@slayzone/task/shared'
 import type { ColumnConfig } from '@slayzone/projects/shared'
 import { getDefaultStatus, isKnownStatus, parseColumnsConfig } from '@slayzone/projects/shared'
 import { listAllProcesses, killProcess, subscribeToProcessLogs } from './process-manager'
+import { listPtys, getBuffer, writePty, killPty, hasPty, subscribeToPtyData, onSessionChange } from '@slayzone/terminal/main'
 import { getBrowserWebContents, waitForBrowserRegistration } from './browser-registry'
 import { app as electronApp } from 'electron'
 import { join } from 'node:path'
@@ -414,6 +415,64 @@ export function startMcpServer(db: Database): void {
     })
 
     req.on('close', unsub)
+  })
+
+  // PTY control API for CLI (`slay pty *`)
+
+  app.get('/api/pty', (_req, res) => {
+    res.json(listPtys())
+  })
+
+  app.get('/api/pty/:id/buffer', (req, res) => {
+    const buffer = getBuffer(req.params.id)
+    if (buffer === null) { res.status(404).json({ error: 'PTY session not found' }); return }
+    res.setHeader('Content-Type', 'text/plain')
+    res.end(buffer)
+  })
+
+  app.get('/api/pty/:id/follow', (req, res) => {
+    const id = req.params.id
+    if (!hasPty(id)) { res.status(404).json({ error: 'PTY session not found' }); return }
+
+    res.setHeader('Content-Type', 'text/event-stream')
+    res.setHeader('Cache-Control', 'no-cache')
+    res.flushHeaders()
+
+    // Subscribe first (sync) — no data can arrive until next tick
+    const unsubData = subscribeToPtyData(id, (chunk) => {
+      if (!res.writableEnded) res.write(`data: ${JSON.stringify(chunk)}\n\n`)
+    })
+
+    // Replay existing buffer if requested (sync, same tick — no race)
+    if (req.query.full === 'true') {
+      const buffer = getBuffer(id)
+      if (buffer) res.write(`data: ${JSON.stringify(buffer)}\n\n`)
+    }
+
+    // Detect session death
+    const unsubSession = onSessionChange(() => {
+      if (!hasPty(id) && !res.writableEnded) {
+        res.write(`event: exit\ndata: {}\n\n`)
+        res.end()
+      }
+    })
+
+    req.on('close', () => {
+      unsubData()
+      unsubSession()
+    })
+  })
+
+  app.post('/api/pty/:id/write', (req, res) => {
+    const ok = writePty(req.params.id, req.body.data)
+    if (!ok) { res.status(404).json({ error: 'PTY session not found' }); return }
+    res.json({ ok: true })
+  })
+
+  app.delete('/api/pty/:id', (req, res) => {
+    const ok = killPty(req.params.id)
+    if (!ok) { res.status(404).json({ error: 'PTY session not found' }); return }
+    res.json({ ok: true })
   })
 
   // Browser control API for CLI (`slay browser *`)
