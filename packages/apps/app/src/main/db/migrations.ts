@@ -1462,6 +1462,17 @@ const migrations: Migration[] = [
       db.prepare(`INSERT OR IGNORE INTO ai_config_sources (id, name, kind, enabled, status) VALUES (?, ?, ?, ?, ?)`)
         .run('provider-qwen', 'Qwen Code', 'qwen', 0, 'active')
     }
+  },
+  {
+    version: 80,
+    up: (db) => {
+      db.exec(`ALTER TABLE projects ADD COLUMN sort_order INTEGER NOT NULL DEFAULT 0`)
+      const rows = db.prepare('SELECT id FROM projects ORDER BY name').all() as { id: string }[]
+      const update = db.prepare('UPDATE projects SET sort_order = ? WHERE id = ?')
+      for (let i = 0; i < rows.length; i++) {
+        update.run(i, rows[i].id)
+      }
+    }
   }
 ]
 

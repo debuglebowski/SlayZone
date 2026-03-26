@@ -45,6 +45,7 @@ const projectA: Project = {
   ],
   execution_context: null,
   selected_repo: null,
+  sort_order: 0,
   created_at: '',
   updated_at: ''
 }
@@ -64,6 +65,7 @@ const projectB: Project = {
   ],
   execution_context: null,
   selected_repo: null,
+  sort_order: 1,
   created_at: '',
   updated_at: ''
 }

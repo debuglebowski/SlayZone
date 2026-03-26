@@ -128,19 +128,31 @@ export function projectsCommand(): Command {
       const db = openDb()
       let project: CreatedProjectRow | undefined
       try {
-        db.run(
-          `INSERT INTO projects (id, name, color, path, columns_config, created_at, updated_at)
-           VALUES (:id, :name, :color, :path, :columnsConfig, :createdAt, :updatedAt)`,
-          {
-            ':id': prepared.id,
-            ':name': prepared.name,
-            ':color': prepared.color,
-            ':path': prepared.path,
-            ':columnsConfig': prepared.columnsConfigJson,
-            ':createdAt': prepared.createdAt,
-            ':updatedAt': prepared.updatedAt,
-          }
-        )
+        db.run('BEGIN')
+        try {
+          const { sort_order: nextOrder } = db.query<{ sort_order: number }>(
+            'SELECT COALESCE(MAX(sort_order), -1) + 1 AS sort_order FROM projects'
+          )[0] ?? { sort_order: 0 }
+
+          db.run(
+            `INSERT INTO projects (id, name, color, path, columns_config, sort_order, created_at, updated_at)
+             VALUES (:id, :name, :color, :path, :columnsConfig, :sortOrder, :createdAt, :updatedAt)`,
+            {
+              ':id': prepared.id,
+              ':name': prepared.name,
+              ':color': prepared.color,
+              ':path': prepared.path,
+              ':columnsConfig': prepared.columnsConfigJson,
+              ':sortOrder': nextOrder,
+              ':createdAt': prepared.createdAt,
+              ':updatedAt': prepared.updatedAt,
+            }
+          )
+          db.run('COMMIT')
+        } catch (e) {
+          db.run('ROLLBACK')
+          throw e
+        }
 
         project = db.query<CreatedProjectRow>(
           `SELECT id, name, color, path, created_at, updated_at

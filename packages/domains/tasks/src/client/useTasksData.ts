@@ -32,6 +32,7 @@ interface UseTasksDataReturn {
 
   // Project handlers
   updateProject: (project: Project) => void
+  reorderProjects: (projectIds: string[]) => void
   deleteProject: (projectId: string, selectedProjectId: string, setSelectedProjectId: (id: string) => void) => void
 }
 
@@ -99,18 +100,22 @@ export function useTasksData(): UseTasksDataReturn {
         ? { status: newColumnId as TaskStatus }
         : { priority: parseInt(newColumnId.slice(1), 10) }
 
+    let snapshot: Task[] = []
+    let newColumnTaskIds: string[] = []
+
     setTasks((prevTasks) => {
+      snapshot = prevTasks
+
       const targetColumnTasks = prevTasks.filter((t) => {
         if (t.id === taskId) return false
         if (groupBy === 'status') return t.status === newColumnId
         return t.priority === parseInt(newColumnId.slice(1), 10)
       })
 
-      const newColumnTaskIds = [...targetColumnTasks.map((t) => t.id)]
+      newColumnTaskIds = [...targetColumnTasks.map((t) => t.id)]
       newColumnTaskIds.splice(targetIndex, 0, taskId)
 
-      const previousTasks = prevTasks
-      const updatedTasks = prevTasks.map((t) => {
+      return prevTasks.map((t) => {
         if (t.id === taskId) {
           return { ...t, ...fieldUpdate, order: targetIndex }
         }
@@ -120,41 +125,38 @@ export function useTasksData(): UseTasksDataReturn {
         }
         return t
       })
+    })
 
-      // Async DB call
-      const updatePayload =
-        groupBy === 'status'
-          ? { id: taskId, status: newColumnId as TaskStatus }
-          : { id: taskId, priority: parseInt(newColumnId.slice(1), 10) }
+    const updatePayload =
+      groupBy === 'status'
+        ? { id: taskId, status: newColumnId as TaskStatus }
+        : { id: taskId, priority: parseInt(newColumnId.slice(1), 10) }
 
-      Promise.all([
-        window.api.db.updateTask(updatePayload),
-        window.api.db.reorderTasks(newColumnTaskIds)
-      ]).catch(() => {
-        setTasks(previousTasks)
-      })
-
-      return updatedTasks
+    Promise.all([
+      window.api.db.updateTask(updatePayload),
+      window.api.db.reorderTasks(newColumnTaskIds)
+    ]).catch(() => {
+      setTasks(snapshot)
     })
   }, [])
 
   // Reorder tasks within column
   const reorderTasks = useCallback((taskIds: string[]) => {
+    let snapshot: Task[] = []
+
     setTasks((prevTasks) => {
-      const previousTasks = prevTasks
-      const updatedTasks = prevTasks.map((t) => {
+      snapshot = prevTasks
+      return prevTasks.map((t) => {
         const newOrder = taskIds.indexOf(t.id)
         if (newOrder >= 0) {
           return { ...t, order: newOrder }
         }
         return t
       })
+    })
 
-      window.api.db.reorderTasks(taskIds).catch(() => {
-        setTasks(previousTasks)
-      })
-
-      return updatedTasks
+    window.api.db.reorderTasks(taskIds).catch(() => {
+      setTasks(snapshot)
     })
   }, [])
 
@@ -195,6 +197,29 @@ export function useTasksData(): UseTasksDataReturn {
     }
   }, [tasks])
 
+  // Reorder projects
+  const reorderProjects = useCallback((projectIds: string[]) => {
+    let snapshot: Project[] = []
+
+    setProjects((prev) => {
+      snapshot = prev
+      const byId = new Map(prev.map((p) => [p.id, p]))
+      const reordered = projectIds
+        .map((id, index) => {
+          const p = byId.get(id)
+          return p ? { ...p, sort_order: index } : null
+        })
+        .filter((p): p is Project => p !== null)
+      const seen = new Set(projectIds)
+      const rest = prev.filter((p) => !seen.has(p.id))
+      return [...reordered, ...rest]
+    })
+
+    window.api.db.reorderProjects(projectIds).catch(() => {
+      setProjects(snapshot)
+    })
+  }, [])
+
   // Update project in state
   const updateProject = useCallback((project: Project) => {
     setProjects((prev) => prev.map((p) => (p.id === project.id ? project : p)))
@@ -233,6 +258,7 @@ export function useTasksData(): UseTasksDataReturn {
     deleteTask,
     contextMenuUpdate,
     updateProject,
+    reorderProjects,
     deleteProject
   }
 }

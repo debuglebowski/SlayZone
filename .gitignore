@@ -22,6 +22,9 @@ convex/.env.local
 # Local Claude settings
 .claude/settings.local.json
 
+# Superpowers specs and plans (local only)
+docs/superpowers/
+
 # Generated icon intermediates
 packages/apps/app/build/icon.iconset/
 

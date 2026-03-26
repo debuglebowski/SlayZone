@@ -1,4 +1,3 @@
-import { motion } from 'framer-motion'
 import { cn } from '@slayzone/ui'
 import {
   ContextMenu,
@@ -8,6 +7,8 @@ import {
   ContextMenuTrigger
 } from '@slayzone/ui'
 import { Tooltip, TooltipTrigger, TooltipContent } from '@slayzone/ui'
+import { useSortable } from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
 import type { Project } from '@slayzone/projects/shared'
 
 interface ProjectItemProps {
@@ -30,14 +31,28 @@ export function ProjectItem({
   badgeMode
 }: ProjectItemProps) {
   const abbrev = project.name.slice(0, 2).toUpperCase()
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging
+  } = useSortable({ id: project.id })
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : undefined
+  }
 
   return (
-    <div className="relative">
+    <div ref={setNodeRef} style={style} className="relative">
       <Tooltip>
         <ContextMenu>
           <TooltipTrigger asChild>
             <ContextMenuTrigger asChild>
-              <motion.button
+              <button
                 onClick={onClick}
                 className={cn(
                   'w-10 h-10 rounded-lg flex items-center justify-center',
@@ -45,12 +60,11 @@ export function ProjectItem({
                   selected && 'ring-2 ring-primary ring-offset-2 ring-offset-background'
                 )}
                 style={{ backgroundColor: project.color }}
-                whileTap={{ scale: 0.95 }}
-                animate={{ scale: 1 }}
-                transition={{ type: 'spring', stiffness: 1800, damping: 50 }}
+                {...attributes}
+                {...listeners}
               >
                 {abbrev}
-              </motion.button>
+              </button>
             </ContextMenuTrigger>
           </TooltipTrigger>
           <ContextMenuContent>
