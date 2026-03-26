@@ -190,3 +190,24 @@ export async function waitForBufferContains(
     }, { timeout: timeoutMs })
     .toBe(true)
 }
+
+/** Read xterm cursor position and visible buffer lines via the terminal links hook */
+export async function getTerminalState(page: Page, sessionId: string): Promise<{
+  cursorY: number
+  cursorX: number
+  lines: string[]
+} | null> {
+  return page.evaluate(({ sid }) => {
+    const links = (window as any).__slayzone_terminalLinks as
+      Record<string, { _terminal: any }> | undefined
+    const terminal = links?.[sid]?._terminal
+    if (!terminal) return null
+    const buf = terminal.buffer.active
+    const lines: string[] = []
+    for (let i = 0; i < buf.length; i++) {
+      const line = buf.getLine(i)
+      if (line) lines.push(line.translateToString(true))
+    }
+    return { cursorY: buf.cursorY, cursorX: buf.cursorX, lines }
+  }, { sid: sessionId })
+}

@@ -477,6 +477,8 @@ export const Terminal = forwardRef<TerminalHandle, TerminalProps>(function Termi
       // Check if PTY already exists (e.g., from idle hibernation)
       const exists = await window.api.pty.exists(sessionId)
       if (signal.aborted) return // Don't continue if unmounted
+      let createCols = terminal.cols
+      let createRows = terminal.rows
       if (exists) {
         // Sync state from main process (fixes stuck loading spinner)
         const actualState = await window.api.pty.getState(sessionId)
@@ -508,11 +510,16 @@ export const Terminal = forwardRef<TerminalHandle, TerminalProps>(function Termi
         const isAiMode = mode !== 'terminal'
         const effectiveConversationId = isAiMode ? newConversationId : undefined
         const effectiveExistingConversationId = isAiMode ? existingConversationId : undefined
+        // Capture dims before async gap so PTY starts at correct size
+        createCols = terminal.cols
+        createRows = terminal.rows
         const result = await window.api.pty.create({
           sessionId, cwd,
           conversationId: effectiveConversationId,
           existingConversationId: effectiveExistingConversationId,
-          mode, providerFlags, executionContext
+          mode, providerFlags, executionContext,
+          cols: createCols,
+          rows: createRows,
         })
         if (!result.success) {
           const message = result.error || 'Failed to create terminal process'
@@ -542,9 +549,15 @@ export const Terminal = forwardRef<TerminalHandle, TerminalProps>(function Termi
         window.api.pty.resize(sessionId, cols, rows)
       })
 
-      // Initial resize
+      // Sync PTY dimensions. For new PTYs (created with correct dims above),
+      // only resize if the container changed during the async gap. For existing
+      // PTYs (hibernation resume), always sync since we don't know their state.
       const { cols, rows } = terminal
-      window.api.pty.resize(sessionId, cols, rows)
+      if (!exists && cols === createCols && rows === createRows) {
+        // PTY was just created with these exact dims — skip redundant SIGWINCH
+      } else {
+        window.api.pty.resize(sessionId, cols, rows)
+      }
 
       // Helper to inject text char-by-char
       const injectText = async (text: string): Promise<void> => {

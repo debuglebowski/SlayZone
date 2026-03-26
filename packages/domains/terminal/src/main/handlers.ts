@@ -22,6 +22,8 @@ interface PtyCreateOpts {
   initialPrompt?: string | null
   providerFlags?: string | null
   executionContext?: ExecutionContext | null
+  cols?: number
+  rows?: number
 }
 
 function mapModeRow(row: any): TerminalModeInfo {
@@ -252,6 +254,8 @@ export function registerPtyHandlers(ipcMain: IpcMain, db: Database): void {
         patternAttention: modeInfo?.patternAttention,
         patternWorking: modeInfo?.patternWorking,
         patternError: modeInfo?.patternError,
+        cols: opts.cols,
+        rows: opts.rows,
       })
     }
   )

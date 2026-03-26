@@ -478,6 +478,8 @@ export interface CreatePtyOptions {
   patternAttention?: string | null
   patternWorking?: string | null
   patternError?: string | null
+  cols?: number
+  rows?: number
 }
 
 export async function createPty(opts: CreatePtyOptions): Promise<{ success: boolean; error?: string }> {
@@ -594,8 +596,8 @@ export async function createPty(opts: CreatePtyOptions): Promise<{ success: bool
 
     const spawnOptions = {
       name: 'xterm-256color',
-      cols: 80,
-      rows: 24,
+      cols: opts.cols ?? 80,
+      rows: opts.rows ?? 24,
       cwd: transport ? transport.cwd : (cwd || homedir()),
       env: transport ? transport.env : {
         ...baseEnv,

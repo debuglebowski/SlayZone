@@ -207,6 +207,8 @@ export interface PtyCreateOptions {
   initialPrompt?: string | null
   providerFlags?: string | null
   executionContext?: ExecutionContext | null
+  cols?: number
+  rows?: number
 }
 
 // ElectronAPI interface - the IPC contract between renderer and main
