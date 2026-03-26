@@ -224,11 +224,9 @@ describe('db:projects:reorder', () => {
     expect(after[1].sort_order).toBe(1)
   })
 
-  test('rejects partial list', () => {
-    const before = h.invoke('db:projects:getAll') as { id: string; sort_order: number }[]
-    h.invoke('db:projects:reorder', [before[0].id])
-    const after = h.invoke('db:projects:getAll') as { id: string; sort_order: number }[]
-    expect(after.map((p) => p.sort_order)).toEqual(before.map((p) => p.sort_order))
+  test('throws on partial list', () => {
+    const before = h.invoke('db:projects:getAll') as { id: string }[]
+    expect(() => h.invoke('db:projects:reorder', [before[0].id])).toThrow()
   })
 
   test('no-ops on empty array', () => {
