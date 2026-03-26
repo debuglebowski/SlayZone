@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
-import { MoreHorizontal, Archive, Trash2, AlertTriangle, Loader2, Terminal as TerminalIcon, Globe, Settings2, GitBranch, FileCode, ChevronRight, Plus, GripVertical, X, Info, CheckCircle2, XCircle, Stethoscope, Cpu, Maximize2, Circle } from 'lucide-react'
+import { MoreHorizontal, Archive, Trash2, AlertTriangle, Loader2, Terminal as TerminalIcon, Globe, Settings2, GitBranch, FileCode, ChevronRight, ChevronDown, ChevronUp, Plus, GripVertical, X, Info, CheckCircle2, XCircle, Stethoscope, Cpu, Maximize2, Circle } from 'lucide-react'
 import { DescriptionDialog } from './DescriptionDialog'
 import { DndContext, PointerSensor, useSensors, useSensor, closestCenter, type DragEndEvent } from '@dnd-kit/core'
 import { SortableContext, useSortable, verticalListSortingStrategy, arrayMove } from '@dnd-kit/sortable'
@@ -252,6 +252,7 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
 
   // Description fullscreen dialog
   const [descriptionFullscreen, setDescriptionFullscreen] = useState(false)
+  const [descriptionExpanded, setDescriptionExpanded] = useState(false)
 
   // Doctor dialog state
   const [doctorDialogOpen, setDoctorDialogOpen] = useState(false)
@@ -1901,30 +1902,41 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
           <ExternalSyncCard taskId={task.id} onUpdate={handleTaskUpdate} />
 
           {/* Description */}
-          <div className="flex flex-col min-h-0 relative">
+          <div className={cn("flex flex-col min-h-0 relative", descriptionExpanded && "flex-1")}>
             <RichTextEditor
               value={descriptionValue}
               onChange={setDescriptionValue}
               onBlur={handleDescriptionSave}
               placeholder="Add description..."
-              minHeight="150px"
-              maxHeight="300px"
+              minHeight={descriptionExpanded ? undefined : "150px"}
+              maxHeight={descriptionExpanded ? undefined : "300px"}
               className="rounded-md border border-input bg-transparent p-3"
               testId="task-description-editor"
             />
-            <IconButton
-              type="button"
-              variant="ghost"
-              aria-label="Fullscreen description"
-              className="absolute bottom-1 right-1 size-6 text-muted-foreground hover:text-foreground"
-              onClick={() => setDescriptionFullscreen(true)}
-            >
-              <Maximize2 className="size-3" />
-            </IconButton>
+            <div className="absolute bottom-1 right-1 flex items-center gap-0.5">
+              <IconButton
+                type="button"
+                variant="ghost"
+                aria-label={descriptionExpanded ? "Collapse description" : "Expand description"}
+                className="size-6 text-muted-foreground hover:text-foreground"
+                onClick={() => setDescriptionExpanded((v) => !v)}
+              >
+                {descriptionExpanded ? <ChevronUp className="size-3" /> : <ChevronDown className="size-3" />}
+              </IconButton>
+              <IconButton
+                type="button"
+                variant="ghost"
+                aria-label="Fullscreen description"
+                className="size-6 text-muted-foreground hover:text-foreground"
+                onClick={() => setDescriptionFullscreen(true)}
+              >
+                <Maximize2 className="size-3" />
+              </IconButton>
+            </div>
           </div>
 
           {/* Sub-tasks (only for top-level tasks) */}
-          {!parentTask && <Collapsible defaultOpen>
+          {!descriptionExpanded && !parentTask && <Collapsible defaultOpen>
             <CollapsibleTrigger className="flex w-full items-center gap-1.5 rounded-md border border-border bg-muted/50 px-2.5 py-1.5 text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground transition-colors [&[data-state=open]>svg:first-child]:rotate-90">
               <ChevronRight className="size-3 transition-transform" />
               Sub-tasks
@@ -1980,6 +1992,7 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
             </CollapsibleContent>
           </Collapsible>}
 
+          {!descriptionExpanded && <>
           {/* Spacer — pushes remaining groups to bottom */}
           <div className="flex-1" />
 
@@ -2006,6 +2019,7 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
             </Button>
             </div>
           </div>
+          </>}
 
         </div>
         )}
