@@ -1,4 +1,4 @@
-import { Extension, type Editor } from '@tiptap/react'
+import { Extension, type Editor } from '@tiptap/core'
 import { Fragment } from '@tiptap/pm/model'
 import { TextSelection } from '@tiptap/pm/state'
 
@@ -45,7 +45,8 @@ function moveListItem(editor: Editor, direction: 'up' | 'down'): boolean {
   const currentNode = parent.child(itemIndex)
   const targetNode = parent.child(targetIndex)
 
-  // Build swapped fragment
+  // 'up': rangeFrom = target (above), so currentNode first moves it up
+  // 'down': rangeFrom = current, so targetNode first moves current down
   const swapped =
     direction === 'up'
       ? Fragment.from([currentNode, targetNode])
@@ -57,7 +58,7 @@ function moveListItem(editor: Editor, direction: 'up' | 'down'): boolean {
   // Restore cursor position inside the moved item
   const offsetInItem = $from.pos - currentPos.from
   const newItemStart = direction === 'up' ? rangeFrom : rangeFrom + targetNode.nodeSize
-  const newPos = Math.min(newItemStart + offsetInItem, tr.doc.content.size - 1)
+  const newPos = Math.min(newItemStart + offsetInItem, newItemStart + currentNode.nodeSize - 1)
   tr.setSelection(TextSelection.create(tr.doc, newPos))
 
   editor.view.dispatch(tr)

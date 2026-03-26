@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@slayzone/ui": "workspace:*",
+    "@tiptap/core": "^3.15.3",
     "@tiptap/extension-link": "^3.15.3",
     "@tiptap/extension-placeholder": "^3.15.3",
     "@tiptap/extension-task-item": "^3.15.3",

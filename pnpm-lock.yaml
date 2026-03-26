@@ -965,6 +965,9 @@ importers:
       '@slayzone/ui':
         specifier: workspace:*
         version: link:../ui
+      '@tiptap/core':
+        specifier: ^3.15.3
+        version: 3.17.1(@tiptap/pm@3.17.1)
       '@tiptap/extension-link':
         specifier: ^3.15.3
         version: 3.17.1(@tiptap/core@3.17.1(@tiptap/pm@3.17.1))(@tiptap/pm@3.17.1)
