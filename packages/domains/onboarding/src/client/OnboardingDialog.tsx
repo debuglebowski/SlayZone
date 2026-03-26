@@ -16,6 +16,7 @@ const PROVIDERS = [
   { mode: 'gemini', label: 'Gemini' },
   { mode: 'opencode', label: 'OpenCode' },
   { mode: 'qwen-code', label: 'Qwen Code' },
+  { mode: 'copilot', label: 'Copilot' }
 ]
 
 const TRACKED_EVENTS = [
