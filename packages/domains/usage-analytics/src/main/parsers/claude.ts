@@ -24,9 +24,15 @@ interface ClaudeAssistantEntry {
   }
 }
 
-function getClaudeProjectsDir(): string {
-  const configDir = process.env.CLAUDE_CONFIG_DIR || join(homedir(), '.claude')
-  return join(configDir, 'projects')
+function getClaudeProjectsDirs(): string[] {
+  if (process.env.CLAUDE_CONFIG_DIR) {
+    return process.env.CLAUDE_CONFIG_DIR.split(',').map((d) => join(d.trim(), 'projects'))
+  }
+  const dirs = [join(homedir(), '.claude', 'projects')]
+  const xdg = process.env.XDG_CONFIG_HOME || join(homedir(), '.config')
+  const xdgDir = join(xdg, 'claude', 'projects')
+  if (xdgDir !== dirs[0]) dirs.push(xdgDir)
+  return dirs
 }
 
 function dedupId(messageId: string | undefined, requestId: string | undefined): string {
@@ -44,78 +50,82 @@ export interface ParseResult {
 export async function parseClaudeFiles(
   getLastOffset: (filePath: string) => { offset: number; modifiedMs: number } | undefined
 ): Promise<ParseResult[]> {
-  const projectsDir = getClaudeProjectsDir()
   const results: ParseResult[] = []
+  const seen = new Set<string>()
 
-  let projectDirs: string[]
-  try {
-    projectDirs = await readdir(projectsDir)
-  } catch {
-    return results
-  }
-
-  for (const dir of projectDirs) {
-    const dirPath = join(projectsDir, dir)
-    const dirStat = await stat(dirPath).catch(() => null)
-    if (!dirStat?.isDirectory()) continue
-
-    let files: string[]
+  for (const projectsDir of getClaudeProjectsDirs()) {
+    let projectDirs: string[]
     try {
-      files = (await readdir(dirPath)).filter((f) => f.endsWith('.jsonl'))
+      projectDirs = await readdir(projectsDir)
     } catch {
       continue
     }
 
-    for (const file of files) {
-      const filePath = join(dirPath, file)
-      const fileStat = await stat(filePath).catch(() => null)
-      if (!fileStat) continue
+    for (const dir of projectDirs) {
+      const dirPath = join(projectsDir, dir)
+      const dirStat = await stat(dirPath).catch(() => null)
+      if (!dirStat?.isDirectory()) continue
 
-      const lastState = getLastOffset(filePath)
-      if (lastState && fileStat.mtimeMs <= lastState.modifiedMs) continue
+      let files: string[]
+      try {
+        files = (await readdir(dirPath)).filter((f) => f.endsWith('.jsonl'))
+      } catch {
+        continue
+      }
 
-      const records: UsageRecord[] = []
-      const startOffset = lastState?.offset ?? 0
+      for (const file of files) {
+        const filePath = join(dirPath, file)
+        if (seen.has(filePath)) continue
+        seen.add(filePath)
+        const fileStat = await stat(filePath).catch(() => null)
+        if (!fileStat) continue
 
-      const endOffset = await new Promise<number>((resolve, reject) => {
-        const stream = createReadStream(filePath, { start: startOffset, encoding: 'utf-8' })
-        const rl = createInterface({ input: stream, crlfDelay: Infinity })
+        const lastState = getLastOffset(filePath)
+        if (lastState && fileStat.mtimeMs <= lastState.modifiedMs) continue
 
-        rl.on('line', (line) => {
+        const records: UsageRecord[] = []
+        const startOffset = lastState?.offset ?? 0
 
-          let entry: ClaudeAssistantEntry
-          try {
-            entry = JSON.parse(line)
-          } catch {
-            return
-          }
+        const endOffset = await new Promise<number>((resolve, reject) => {
+          const stream = createReadStream(filePath, { start: startOffset, encoding: 'utf-8' })
+          const rl = createInterface({ input: stream, crlfDelay: Infinity })
 
-          if (entry.type !== 'assistant') return
-          const usage = entry.message?.usage
-          if (!usage) return
+          rl.on('line', (line) => {
 
-          records.push({
-            id: dedupId(entry.message?.id, entry.requestId),
-            provider: 'claude-code',
-            model: entry.message?.model ?? 'unknown',
-            sessionId: entry.sessionId ?? null,
-            timestamp: entry.timestamp ?? new Date().toISOString(),
-            inputTokens: usage.input_tokens ?? 0,
-            outputTokens: usage.output_tokens ?? 0,
-            cacheReadTokens: usage.cache_read_input_tokens ?? 0,
-            cacheWriteTokens: usage.cache_creation_input_tokens ?? 0,
-            reasoningTokens: 0,
-            cwd: entry.cwd ?? null,
-            taskId: null
+            let entry: ClaudeAssistantEntry
+            try {
+              entry = JSON.parse(line)
+            } catch {
+              return
+            }
+
+            if (entry.type !== 'assistant') return
+            const usage = entry.message?.usage
+            if (!usage) return
+
+            records.push({
+              id: dedupId(entry.message?.id, entry.requestId),
+              provider: 'claude-code',
+              model: entry.message?.model ?? 'unknown',
+              sessionId: entry.sessionId ?? null,
+              timestamp: entry.timestamp ?? new Date().toISOString(),
+              inputTokens: usage.input_tokens ?? 0,
+              outputTokens: usage.output_tokens ?? 0,
+              cacheReadTokens: usage.cache_read_input_tokens ?? 0,
+              cacheWriteTokens: usage.cache_creation_input_tokens ?? 0,
+              reasoningTokens: 0,
+              cwd: entry.cwd ?? null,
+              taskId: null
+            })
           })
+
+          rl.on('close', () => resolve(startOffset + stream.bytesRead))
+          rl.on('error', reject)
+          stream.on('error', reject)
         })
 
-        rl.on('close', () => resolve(startOffset + stream.bytesRead))
-        rl.on('error', reject)
-        stream.on('error', reject)
-      })
-
-      results.push({ records, sourceFile: filePath, fileMtimeMs: fileStat.mtimeMs, endOffset })
+        results.push({ records, sourceFile: filePath, fileMtimeMs: fileStat.mtimeMs, endOffset })
+      }
     }
   }
 
