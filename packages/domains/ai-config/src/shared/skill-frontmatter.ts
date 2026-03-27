@@ -132,6 +132,15 @@ export function validateSkillFrontmatter(
     })
   }
 
+  if (!parsedFrontmatter.frontmatter.description?.trim()) {
+    issues.push({
+      code: 'frontmatter_description_missing',
+      severity: 'error',
+      message: 'Skill frontmatter must include a "description" field.',
+      line: null
+    })
+  }
+
   const hasErrors = issues.some((issue) => issue.severity === 'error')
   const hasWarnings = issues.some((issue) => issue.severity === 'warning')
   return {
@@ -183,7 +192,7 @@ export function buildDefaultSkillContent(slug: string, body = ''): string {
   const normalizedBody = body.replace(/\r\n/g, '\n').replace(/^\n+/, '')
   const rendered = renderSkillFrontmatter({
     name: slug,
-    description: '',
+    description: slug,
     trigger: 'auto'
   })
   return normalizedBody ? `${rendered}\n${normalizedBody}` : `${rendered}\n`
@@ -196,7 +205,7 @@ export function repairSkillFrontmatter(slug: string, content: string): string {
     ...(parsed?.frontmatter ?? {})
   }
   frontmatter.name = slug
-  if (!Object.hasOwn(frontmatter, 'description')) frontmatter.description = ''
+  if (!frontmatter.description?.trim()) frontmatter.description = slug
   if (!Object.hasOwn(frontmatter, 'trigger')) frontmatter.trigger = 'auto'
 
   const body = (() => {

@@ -41,9 +41,18 @@ test('valid frontmatter content is valid', () => {
   const validation = getSkillValidation({
     type: 'skill',
     slug: 'x',
-    content: '---\nname: x\n---\n# body\n',
+    content: '---\nname: x\ndescription: "a skill"\n---\n# body\n',
   })
   expect(validation?.status).toBe('valid')
+})
+
+test('missing description is invalid', () => {
+  const validation = getSkillValidation({
+    type: 'skill',
+    slug: 'x',
+    content: '---\nname: x\n---\n# body\n',
+  })
+  expect(validation?.status).toBe('invalid')
 })
 
 test('malformed frontmatter content is invalid', () => {
@@ -59,7 +68,7 @@ test('name mismatch produces a warning', () => {
   const validation = getSkillValidation({
     type: 'skill',
     slug: 'expected-slug',
-    content: '---\nname: different-slug\n---\n# body\n',
+    content: '---\nname: different-slug\ndescription: "a skill"\n---\n# body\n',
   })
   expect(validation?.status).toBe('warning')
 })

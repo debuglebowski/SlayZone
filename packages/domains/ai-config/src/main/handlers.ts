@@ -197,13 +197,14 @@ function writeSkillValidationMetadata(metadataJson: string, validation: SkillVal
 }
 
 function ensureSkillValidationForSync(itemSlug: string, itemContent: string, _itemMetadataJson: string): void {
-  const validation = deriveSkillValidation(itemSlug, itemContent)
-  if (validation?.status !== 'invalid') return
-
-  const firstError = validation.issues.find((issue) => issue.severity === 'error')
-  const lineHint = firstError?.line ? ` (line ${firstError.line})` : ''
-  const message = firstError?.message ?? 'Frontmatter is invalid.'
-  throw new Error(`Cannot sync skill "${itemSlug}" because frontmatter is invalid${lineHint}: ${message}`)
+  const parsed = parseSkillFrontmatter(itemContent)
+  if (!parsed) {
+    throw new Error(`Cannot sync skill "${itemSlug}" because frontmatter is missing.`)
+  }
+  const parseError = parsed.issues.find((issue) => issue.severity === 'error')
+  if (!parseError) return
+  const lineHint = parseError.line ? ` (line ${parseError.line})` : ''
+  throw new Error(`Cannot sync skill "${itemSlug}" because frontmatter is invalid${lineHint}: ${parseError.message}`)
 }
 
 function normalizeSkillForPersistence(
