@@ -88,15 +88,30 @@ function getKeychainValue(service: string): Promise<string | null> {
   })
 }
 
-function getKeychainToken(): Promise<string | null> {
-  return getKeychainValue('Claude Code-credentials').then((raw) => {
-    if (!raw) return null
-    try {
-      return JSON.parse(raw)?.claudeAiOauth?.accessToken ?? null
-    } catch {
-      return null
-    }
-  })
+async function getFileToken(): Promise<string | null> {
+  try {
+    const raw = await readFile(join(homedir(), '.claude', '.credentials.json'), 'utf-8')
+    return JSON.parse(raw)?.claudeAiOauth?.accessToken ?? null
+  } catch {
+    return null
+  }
+}
+
+function getClaudeToken(): Promise<string | null> {
+  if (process.platform === 'darwin') {
+    return getKeychainValue('Claude Code-credentials').then((raw) => {
+      if (!raw) return null
+      try {
+        return JSON.parse(raw)?.claudeAiOauth?.accessToken ?? null
+      } catch {
+        return null
+      }
+    })
+  }
+  // Linux: confirmed ~/.claude/.credentials.json (see #51)
+  // Windows: unverified — assumed same file-based storage. May need
+  // Windows Credential Manager support if this doesn't work.
+  return getFileToken()
 }
 
 function mapWindow(key: string, label: string, w: { utilization: number; resets_at: string } | null): UsageWindow | null {
@@ -105,7 +120,7 @@ function mapWindow(key: string, label: string, w: { utilization: number; resets_
 }
 
 async function fetchClaudeUsage(): Promise<ProviderUsage> {
-  const token = await getKeychainToken()
+  const token = await getClaudeToken()
   if (!token) return usageError(CLAUDE, `Not logged in — run \`${CLAUDE.cli}\` to authenticate`)
 
   const res = await fetch('https://api.anthropic.com/api/oauth/usage', {
