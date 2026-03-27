@@ -718,7 +718,8 @@ async function discoverIssues(
       scopeId: mapping.external_project_id ?? undefined,
       limit: mapping.provider === 'github' ? 100 : 50,
       cursor,
-      updatedAfter: mapping.last_discovery_at
+      updatedAfter: mapping.last_discovery_at,
+      assignedToMe: Boolean(mapping.assigned_to_me)
     })
 
     for (const issue of issues) {

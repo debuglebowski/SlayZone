@@ -3,6 +3,7 @@ import {
   ArrowLeft,
   ChevronRight,
   ExternalLink as ExternalLinkIcon,
+  Info,
   Loader2,
   Pencil,
   Check
@@ -16,6 +17,7 @@ import { Checkbox } from '@slayzone/ui'
 import { Card, CardContent, CardHeader, CardTitle } from '@slayzone/ui'
 import { Switch } from '@slayzone/ui'
 import { cn } from '@slayzone/ui'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@slayzone/ui'
 import {
   resolveColumns,
   type Project
@@ -137,6 +139,7 @@ export function IntegrationsTab({
   const [importMessage, setImportMessage] = useState('')
   const [issueOptions, setIssueOptions] = useState<LinearIssueSummary[]>([])
   const [linearImportSort, setLinearImportSort] = useState<ImportIssueSort>('updated_desc')
+  const [linearAssignedToMe, setLinearAssignedToMe] = useState(false)
   const [selectedIssueIds, setSelectedIssueIds] = useState<Set<string>>(new Set())
   const [loadingIssues, setLoadingIssues] = useState(false)
   const [githubRepoIssueOptions, setGithubRepoIssueOptions] = useState<GithubIssueSummary[]>([])
@@ -173,6 +176,7 @@ export function IntegrationsTab({
   const [loadingLinearSyncTeams, setLoadingLinearSyncTeams] = useState(false)
   const [loadingLinearSyncProjects, setLoadingLinearSyncProjects] = useState(false)
   const [linearSyncMode, setLinearSyncMode] = useState<IntegrationSyncMode>('one_way')
+  const [linearSyncAssignedToMe, setLinearSyncAssignedToMe] = useState(false)
   const [syncSettingsMessage, setSyncSettingsMessage] = useState('')
   const [savingSyncProvider, setSavingSyncProvider] = useState<IntegrationProvider | null>(null)
   const [linearImportTeamId, setLinearImportTeamId] = useState('')
@@ -260,6 +264,7 @@ export function IntegrationsTab({
     setLinearSyncTeamId(loadedMapping?.external_team_id ?? '')
     setLinearSyncProjectId(loadedMapping?.external_project_id ?? '')
     setLinearSyncMode(loadedMapping?.sync_mode ?? 'one_way')
+    setLinearSyncAssignedToMe(Boolean(loadedMapping?.assigned_to_me))
     setSyncSettingsMessage('')
     setLinearImportTeamId('')
     setLinearImportProjectId('')
@@ -605,7 +610,8 @@ export function IntegrationsTab({
         externalTeamId: selectedTeam.id,
         externalTeamKey: selectedTeam.key,
         externalProjectId: linearSyncProjectId || null,
-        syncMode: linearSyncMode
+        syncMode: linearSyncMode,
+        assignedToMe: linearSyncAssignedToMe
       })
       setMapping(saved)
       setLinearProjectConnectionId(saved.connection_id)
@@ -738,6 +744,7 @@ export function IntegrationsTab({
         projectId: project.id,
         teamId,
         linearProjectId,
+        assignedToMe: linearAssignedToMe || undefined,
         limit: 50
       })
       setIssueOptions(result.issues)
@@ -1592,6 +1599,24 @@ export function IntegrationsTab({
                                   </SelectContent>
                                 </Select>
                               </div>
+                              <div className="grid grid-cols-[180px_minmax(0,1fr)] items-center gap-3">
+                                <div className="flex items-center gap-1.5">
+                                  <Label htmlFor="linear-sync-assigned" className="text-sm">
+                                    Assigned to me
+                                  </Label>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <Info className="size-3.5 text-muted-foreground" />
+                                    </TooltipTrigger>
+                                    <TooltipContent>Only discover issues assigned to the API key owner</TooltipContent>
+                                  </Tooltip>
+                                </div>
+                                <Checkbox
+                                  id="linear-sync-assigned"
+                                  checked={linearSyncAssignedToMe}
+                                  onCheckedChange={(checked) => setLinearSyncAssignedToMe(checked === true)}
+                                />
+                              </div>
                             </>
                           )}
                           {syncSettingsMessage ? (
@@ -2089,6 +2114,25 @@ export function IntegrationsTab({
                           <SelectItem value="title_desc">Title Z-A</SelectItem>
                         </SelectContent>
                       </Select>
+                    </div>
+
+                    <div className="grid grid-cols-[220px_minmax(0,1fr)] items-center gap-4">
+                      <div className="flex items-center gap-1.5">
+                        <Label htmlFor="linear-import-assigned" className="text-sm">
+                          Assigned to me
+                        </Label>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Info className="size-3.5 text-muted-foreground" />
+                          </TooltipTrigger>
+                          <TooltipContent>Only show issues assigned to the API key owner</TooltipContent>
+                        </Tooltip>
+                      </div>
+                      <Checkbox
+                        id="linear-import-assigned"
+                        checked={linearAssignedToMe}
+                        onCheckedChange={(checked) => setLinearAssignedToMe(checked === true)}
+                      />
                     </div>
 
                     <div className="flex flex-wrap items-center justify-between gap-2">

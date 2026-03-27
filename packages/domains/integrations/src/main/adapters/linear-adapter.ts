@@ -117,7 +117,8 @@ export const linearAdapter: ProviderAdapter = {
       projectId: params.scopeId,
       first: params.limit,
       after: params.cursor ?? null,
-      updatedAfter: params.updatedAfter ?? null
+      updatedAfter: params.updatedAfter ?? null,
+      assignedToMe: params.assignedToMe
     })
     return {
       issues: data.issues.map(normalizeIssue),

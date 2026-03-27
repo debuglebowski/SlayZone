@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { CheckCircle2, Circle, Loader2 } from 'lucide-react'
+import { CheckCircle2, Circle, Info, Loader2 } from 'lucide-react'
 import { Button, Card, CardContent, CardHeader, CardTitle } from '@slayzone/ui'
+import { Checkbox } from '@slayzone/ui'
 import { Label } from '@slayzone/ui'
 import { Input } from '@slayzone/ui'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@slayzone/ui'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@slayzone/ui'
 import { cn } from '@slayzone/ui'
 import { resolveColumns, type Project } from '@slayzone/projects/shared'
 import { WORKFLOW_CATEGORIES, type WorkflowCategory } from '@slayzone/workflow'
@@ -29,6 +31,7 @@ interface ProjectIntegrationSetupWizardProps {
   initialTeamId?: string
   initialLinearProjectId?: string
   initialSyncMode?: IntegrationSyncMode
+  initialAssignedToMe?: boolean
   onCancel: () => void
   onCompleted: (result: {
     provider: ProjectIntegrationProvider
@@ -103,6 +106,7 @@ export function ProjectIntegrationSetupWizard({
   initialTeamId,
   initialLinearProjectId,
   initialSyncMode,
+  initialAssignedToMe,
   onCancel,
   onCompleted
 }: ProjectIntegrationSetupWizardProps): React.JSX.Element {
@@ -126,6 +130,7 @@ export function ProjectIntegrationSetupWizard({
   const [linearProjectId, setLinearProjectId] = useState(initialLinearProjectId ?? '')
   const [githubProjectId, setGithubProjectId] = useState('')
   const [syncMode, setSyncMode] = useState<WizardSyncMode>(toWizardSyncMode(initialSyncMode))
+  const [assignedToMe, setAssignedToMe] = useState(initialAssignedToMe ?? false)
   const [conflictPolicy, setConflictPolicy] = useState<'external' | 'local' | 'latest' | 'manual'>('external')
   const [previewLoading, setPreviewLoading] = useState(false)
   const [previewLoaded, setPreviewLoaded] = useState(false)
@@ -209,6 +214,7 @@ export function ProjectIntegrationSetupWizard({
     setLinearProjectId(initialLinearProjectId ?? '')
     setGithubProjectId('')
     setSyncMode(toWizardSyncMode(initialSyncMode))
+    setAssignedToMe(initialAssignedToMe ?? false)
     setConflictPolicy('external')
     setPreviewLoading(false)
     setPreviewLoaded(false)
@@ -220,7 +226,7 @@ export function ProjectIntegrationSetupWizard({
     setCategoryOverrides({})
     setTaskRemapping({})
     setStatusSetupComplete(false)
-  }, [provider, initialConnectionId, initialTeamId, initialLinearProjectId, initialSyncMode, project.id])
+  }, [provider, initialConnectionId, initialTeamId, initialLinearProjectId, initialSyncMode, initialAssignedToMe, project.id])
 
   useEffect(() => {
     void loadConnections()
@@ -403,7 +409,8 @@ export function ProjectIntegrationSetupWizard({
         externalTeamId: teamId,
         externalTeamKey: team?.key ?? '',
         externalProjectId: linearProjectId || null,
-        syncMode: toPersistedSyncMode(syncMode)
+        syncMode: toPersistedSyncMode(syncMode),
+        assignedToMe
       })
     }
 
@@ -616,6 +623,22 @@ export function ProjectIntegrationSetupWizard({
                   ))}
                 </SelectContent>
               </Select>
+            </div>
+            <div className="flex items-center gap-2">
+              <Checkbox
+                id="wizard-assigned-to-me"
+                checked={assignedToMe}
+                onCheckedChange={(checked) => setAssignedToMe(checked === true)}
+              />
+              <Label htmlFor="wizard-assigned-to-me" className="text-sm">
+                Assigned to me
+              </Label>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Info className="size-3.5 text-muted-foreground" />
+                </TooltipTrigger>
+                <TooltipContent>Only discover issues assigned to the API key owner</TooltipContent>
+              </Tooltip>
             </div>
           </div>
         ) : null}

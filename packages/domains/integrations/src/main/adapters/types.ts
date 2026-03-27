@@ -19,6 +19,7 @@ export interface ListIssuesParams {
   limit: number
   cursor?: string | null
   updatedAfter?: string | null
+  assignedToMe?: boolean
 }
 
 export interface CreateIssueParams {

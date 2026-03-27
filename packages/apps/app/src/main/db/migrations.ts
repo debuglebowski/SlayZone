@@ -1480,6 +1480,12 @@ const migrations: Migration[] = [
       const stmt = db.prepare(`INSERT OR IGNORE INTO ai_config_sources (id, name, kind, enabled, status) VALUES (?, ?, ?, ?, ?)`)
       stmt.run('provider-copilot', 'Copilot', 'copilot', 0, 'active')
     }
+  },
+  {
+    version: 82,
+    up: (db) => {
+      db.exec(`ALTER TABLE integration_project_mappings ADD COLUMN assigned_to_me INTEGER DEFAULT 0`)
+    }
   }
 ]
 

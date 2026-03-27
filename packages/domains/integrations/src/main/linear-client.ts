@@ -221,16 +221,17 @@ export async function listWorkflowStates(
 
 export async function listIssues(
   apiKey: string,
-  input: { teamId?: string; projectId?: string; first: number; after?: string | null; updatedAfter?: string | null }
+  input: { teamId?: string; projectId?: string; first: number; after?: string | null; updatedAfter?: string | null; assignedToMe?: boolean }
 ): Promise<{ issues: LinearIssueSummary[]; nextCursor: string | null }> {
   const variables: Record<string, unknown> = {
     first: input.first,
     after: input.after ?? null
   }
 
-  const updatedAtFilter = input.updatedAfter
-    ? `, filter: { updatedAt: { gte: "${input.updatedAfter}" } }`
-    : ''
+  const filterParts: string[] = []
+  if (input.updatedAfter) filterParts.push(`updatedAt: { gte: "${input.updatedAfter}" }`)
+  if (input.assignedToMe) filterParts.push(`assignee: { isMe: { eq: true } }`)
+  const filterArg = filterParts.length > 0 ? `, filter: { ${filterParts.join(', ')} }` : ''
 
   if (input.projectId) {
     variables.projectId = input.projectId
@@ -239,7 +240,7 @@ export async function listIssues(
       apiKey,
       `query ProjectIssues($projectId: String!, $first: Int!, $after: String) {
       project(id: $projectId) {
-        issues(first: $first, after: $after${updatedAtFilter}, orderBy: updatedAt) {
+        issues(first: $first, after: $after${filterArg}, orderBy: updatedAt) {
           pageInfo { hasNextPage endCursor }
           nodes {
             id identifier title description priority updatedAt archivedAt url
@@ -272,7 +273,7 @@ export async function listIssues(
       apiKey,
       `query TeamIssues($teamId: String!, $first: Int!, $after: String) {
       team(id: $teamId) {
-        issues(first: $first, after: $after${updatedAtFilter}, orderBy: updatedAt) {
+        issues(first: $first, after: $after${filterArg}, orderBy: updatedAt) {
           pageInfo { hasNextPage endCursor }
           nodes {
             id identifier title description priority updatedAt archivedAt url
@@ -301,7 +302,7 @@ export async function listIssues(
   const data = await requestLinear<IssuesQuery>(
     apiKey,
     `query Issues($first: Int!, $after: String) {
-      issues(first: $first, after: $after${updatedAtFilter}, orderBy: updatedAt) {
+      issues(first: $first, after: $after${filterArg}, orderBy: updatedAt) {
         pageInfo { hasNextPage endCursor }
         nodes {
           id identifier title description priority updatedAt archivedAt url

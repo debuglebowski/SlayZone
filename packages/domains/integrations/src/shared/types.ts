@@ -47,6 +47,7 @@ export interface IntegrationProjectMapping {
   external_project_id: string | null
   sync_mode: IntegrationSyncMode
   status_setup_complete: number
+  assigned_to_me: number
   external_repo_owner: string | null
   external_repo_name: string | null
   last_discovery_at: string | null
@@ -119,6 +120,7 @@ export interface SetProjectMappingInput {
   // Linear: optional project scope id. GitHub: ProjectV2 node id.
   externalProjectId?: string | null
   syncMode?: IntegrationSyncMode
+  assignedToMe?: boolean
   // GitHub only: repo for issue discovery
   externalRepoOwner?: string | null
   externalRepoName?: string | null
@@ -139,6 +141,7 @@ export interface ListLinearIssuesInput {
   projectId?: string
   teamId?: string
   linearProjectId?: string
+  assignedToMe?: boolean
   limit?: number
   cursor?: string | null
 }

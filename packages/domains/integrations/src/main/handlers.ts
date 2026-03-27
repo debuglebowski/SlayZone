@@ -1443,14 +1443,15 @@ export function registerIntegrationHandlers(
       })
       db.prepare(`
         INSERT INTO integration_project_mappings (
-          id, project_id, provider, connection_id, external_team_id, external_team_key, external_project_id, sync_mode, external_repo_owner, external_repo_name, created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
+          id, project_id, provider, connection_id, external_team_id, external_team_key, external_project_id, sync_mode, assigned_to_me, external_repo_owner, external_repo_name, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
         ON CONFLICT(project_id, provider) DO UPDATE SET
           connection_id = excluded.connection_id,
           external_team_id = excluded.external_team_id,
           external_team_key = excluded.external_team_key,
           external_project_id = excluded.external_project_id,
           sync_mode = excluded.sync_mode,
+          assigned_to_me = excluded.assigned_to_me,
           external_repo_owner = excluded.external_repo_owner,
           external_repo_name = excluded.external_repo_name,
           updated_at = datetime('now')
@@ -1463,6 +1464,7 @@ export function registerIntegrationHandlers(
         input.externalTeamKey,
         input.externalProjectId ?? null,
         input.syncMode ?? 'one_way',
+        input.assignedToMe ? 1 : 0,
         input.externalRepoOwner ?? null,
         input.externalRepoName ?? null
       )
@@ -1554,7 +1556,8 @@ export function registerIntegrationHandlers(
       teamId: input.teamId ?? mapping?.external_team_id,
       projectId: input.linearProjectId ?? mapping?.external_project_id ?? undefined,
       first: input.limit ?? 50,
-      after: input.cursor ?? null
+      after: input.cursor ?? null,
+      assignedToMe: input.assignedToMe
     })
 
     const externalIds = data.issues.map((i) => i.id)
