@@ -736,6 +736,23 @@ export const BrowserPanel = forwardRef<BrowserPanelHandle, BrowserPanelProps>(fu
     })
   }, [activeViewState.favicon])
 
+  // Handle new-tab-request events from main process (Cmd+Click / middle-click on links)
+  useEffect(() => {
+    if (!taskId) return
+    const unsubscribe = window.api.browser.onEvent((event) => {
+      if (event.type !== 'new-tab-request' || event.taskId !== taskId) return
+      const tabUrl = event.url as string
+      if (event.background) {
+        const newTab: BrowserTab = { id: generateTabId(), url: tabUrl, title: tabUrl }
+        const t = tabsRef.current
+        commitTabsUpdate({ tabs: [...t.tabs, newTab], activeTabId: t.activeTabId })
+      } else {
+        createNewTabRef.current(tabUrl)
+      }
+    })
+    return unsubscribe
+  }, [taskId, commitTabsUpdate])
+
   // Apply default zoom when view is ready
   useEffect(() => {
     if (!webviewReady || !activeActions) return

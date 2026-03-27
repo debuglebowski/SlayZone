@@ -496,6 +496,42 @@ export class BrowserViewManager {
       }
     }
 
+    // Intercept link clicks that would open new windows.
+    // Cmd+Click → 'foreground-tab', Middle-click → 'background-tab', window.open() → 'new-window'
+    wc.setWindowOpenHandler((details) => {
+      if (details.disposition === 'foreground-tab' || details.disposition === 'background-tab') {
+        if (/^https?:\/\//i.test(details.url)) {
+          send({
+            viewId,
+            type: 'new-tab-request',
+            url: details.url,
+            background: details.disposition === 'background-tab',
+            taskId: entry.taskId,
+          })
+        }
+        return { action: 'deny' }
+      }
+      // OAuth popups (window.open w/ features) → real BrowserWindow
+      if (details.disposition === 'new-window' && /^https?:\/\//i.test(details.url)) {
+        return { action: 'allow', overrideBrowserWindowOptions: { autoHideMenuBar: true } }
+      }
+      return { action: 'deny' }
+    })
+
+    // Track child popup windows (OAuth) for cleanup when view is destroyed
+    const childWindows = new Set<Electron.BrowserWindow>()
+    wc.on('did-create-window', (childWindow) => {
+      childWindow.webContents.setWindowOpenHandler(() => ({ action: 'deny' }))
+      childWindows.add(childWindow)
+      childWindow.on('closed', () => childWindows.delete(childWindow))
+    })
+    wc.once('destroyed', () => {
+      for (const w of childWindows) {
+        if (!w.isDestroyed()) w.close()
+      }
+      childWindows.clear()
+    })
+
     // Intercept keyboard shortcuts before the page gets them.
     // When passthrough is OFF (default), Cmd/Ctrl shortcuts are forwarded to
     // the main renderer as synthetic KeyboardEvents so app shortcuts (Cmd+B, etc.) work.
