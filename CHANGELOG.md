@@ -1,6 +1,65 @@
 # Changelog
 
 
+## v0.11.0
+
+[compare changes](https://github.com/debuglebowski/slayzone/compare/v0.10.0...v0.11.0)
+
+### 🚀 Enhancements
+
+- **projects:** Add drag-and-drop reordering to sidebar project list ([#44](https://github.com/debuglebowski/slayzone/pull/44))
+- **task:** Add vertical expand/collapse for description editor ([78e0b6c2](https://github.com/debuglebowski/slayzone/commit/78e0b6c2))
+- **editor:** Add Alt+Up/Down shortcuts to move list items ([#47](https://github.com/debuglebowski/slayzone/pull/47))
+- **terminal:** Expose PTY sessions via REST API and CLI ([0a742cea](https://github.com/debuglebowski/slayzone/commit/0a742cea))
+- **providers:** Add GitHub Copilot CLI integration ([767cc008](https://github.com/debuglebowski/slayzone/commit/767cc008))
+- **editor:** Add notes editor settings and formatting toolbar ([#50](https://github.com/debuglebowski/slayzone/pull/50))
+- **ai-config:** Validate missing description in skill frontmatter ([2915d5d7](https://github.com/debuglebowski/slayzone/commit/2915d5d7))
+- **browser:** Open Cmd+Click and middle-click links as new tabs ([71c196e2](https://github.com/debuglebowski/slayzone/commit/71c196e2))
+- **integrations:** Filter Linear import and sync by assignee ([e74bb09a](https://github.com/debuglebowski/slayzone/commit/e74bb09a))
+
+### 🩹 Fixes
+
+- **task:** Await worktree auto-create before returning task ([e5466355](https://github.com/debuglebowski/slayzone/commit/e5466355))
+- **leaderboard:** Use built-in usage analytics instead of external ccusage CLI ([d09a6bdc](https://github.com/debuglebowski/slayzone/commit/d09a6bdc))
+- **usage-analytics:** Search XDG_CONFIG_HOME for Claude Code logs ([3382e214](https://github.com/debuglebowski/slayzone/commit/3382e214))
+- **terminal:** Pass actual dims to PTY creation instead of hardcoded 80x24 ([6b0fbeb2](https://github.com/debuglebowski/slayzone/commit/6b0fbeb2))
+- **editor:** Clean up list-item-move from PR #47 review ([#47](https://github.com/debuglebowski/slayzone/issues/47))
+- Improve error detection and terminal tab distinction ([b765b1a1](https://github.com/debuglebowski/slayzone/commit/b765b1a1))
+- Narrow session regex and derive supported-provider list from registry ([6dd14d8f](https://github.com/debuglebowski/slayzone/commit/6dd14d8f))
+- **editor:** React import, spellcheck reactivity, rename settings label ([f88800fa](https://github.com/debuglebowski/slayzone/commit/f88800fa))
+- **editor:** Align task list checkbox with text vertically ([7fad6600](https://github.com/debuglebowski/slayzone/commit/7fad6600))
+- **terminal:** Write PTY data to xterm even when tab is inactive ([5110fd1f](https://github.com/debuglebowski/slayzone/commit/5110fd1f))
+- **terminal:** Read Claude credentials from file on Linux/Windows ([#51](https://github.com/debuglebowski/slayzone/pull/51))
+- **worktrees:** Link task to worktree before post-creation steps ([3a3065fc](https://github.com/debuglebowski/slayzone/commit/3a3065fc))
+- **editor:** Tighten task list checkbox alignment and spacing ([b0cccacc](https://github.com/debuglebowski/slayzone/commit/b0cccacc))
+- **editor:** Move spellcheck to wrapper div to avoid TipTap view race ([503da8e8](https://github.com/debuglebowski/slayzone/commit/503da8e8))
+- **processes:** Kill entire process tree on stop, not just shell wrapper ([bd2daf91](https://github.com/debuglebowski/slayzone/commit/bd2daf91))
+- **task:** Match sub-tasks header height to description header ([43967717](https://github.com/debuglebowski/slayzone/commit/43967717))
+- **terminal:** Stop unnecessary detach-reattach cycles on parent re-render ([663fc253](https://github.com/debuglebowski/slayzone/commit/663fc253))
+
+### 💅 Refactors
+
+- **task:** Rework description/sub-tasks into collapsible card pattern ([8544ab7a](https://github.com/debuglebowski/slayzone/commit/8544ab7a))
+
+### 📖 Documentation
+
+- **comparison:** Establish canon structure and skills ([352cfaf2](https://github.com/debuglebowski/slayzone/commit/352cfaf2))
+- **comparison:** Migrate Conductor to canonical record ([d7748f54](https://github.com/debuglebowski/slayzone/commit/d7748f54))
+- **skill:** Add screenshot rules to competitor-research ([4cce3e2c](https://github.com/debuglebowski/slayzone/commit/4cce3e2c))
+
+### 🏡 Chore
+
+- **nix:** Update sources to 0.10.0 ([37767ee7](https://github.com/debuglebowski/slayzone/commit/37767ee7))
+- **skills:** Sync comparison skills across providers ([74c8f009](https://github.com/debuglebowski/slayzone/commit/74c8f009))
+
+### ❤️ Contributors
+
+- Debuglebowski
+- Sfarestam
+- Stefan Farestam
+- Kdrapel ([@kdrapel](https://github.com/kdrapel))
+- Adam Scott ([@adamsco](https://github.com/adamsco))
+
 ## v0.10.0
 
 [compare changes](https://github.com/debuglebowski/slayzone/compare/v0.9.0...v0.10.0)

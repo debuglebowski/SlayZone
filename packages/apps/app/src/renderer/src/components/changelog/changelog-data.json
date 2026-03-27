@@ -1,5 +1,72 @@
 [
   {
+    "version": "0.11.0",
+    "date": "2026-03-27",
+    "tagline": "Copilot & editor polish",
+    "items": [
+      {
+        "category": "feature",
+        "title": "GitHub Copilot support",
+        "description": "Use GitHub Copilot as an AI coding assistant directly inside SlayZone."
+      },
+      {
+        "category": "feature",
+        "title": "Drag-and-drop project reordering",
+        "description": "Rearrange projects in the sidebar by dragging them into your preferred order."
+      },
+      {
+        "category": "feature",
+        "title": "Notes formatting toolbar",
+        "description": "A new toolbar makes it easy to format your task notes with bold, lists, and more."
+      },
+      {
+        "category": "improvement",
+        "title": "Move list items with keyboard",
+        "description": "Rearrange list items in notes using Alt+Up/Down shortcuts."
+      },
+      {
+        "category": "improvement",
+        "title": "Open links in new browser tabs",
+        "description": "Cmd+Click or middle-click links in the browser to open them in a new tab."
+      },
+      {
+        "category": "feature",
+        "title": "Linear assignee filtering",
+        "description": "Only import and sync Linear issues that are assigned to you."
+      },
+      {
+        "category": "improvement",
+        "title": "Collapsible task description",
+        "description": "Collapse the task description to free up space when you don't need it."
+      },
+      {
+        "category": "fix",
+        "title": "Background terminal output",
+        "description": "Terminals now keep receiving output even when their tab isn't visible."
+      },
+      {
+        "category": "fix",
+        "title": "Terminal sizing",
+        "description": "New terminals now match the actual panel size instead of starting too small."
+      },
+      {
+        "category": "fix",
+        "title": "Stopping processes",
+        "description": "Stopping a process now fully shuts down all related sub-processes."
+      },
+      {
+        "category": "fix",
+        "title": "Terminal flickering",
+        "description": "Fixed terminals sometimes flickering when switching between panels."
+      },
+      {
+        "category": "fix",
+        "title": "Claude Code on Linux & Windows",
+        "description": "Fixed Claude Code authentication not being detected on Linux and Windows."
+      }
+    ]
+  },
+  {
     "version": "0.10.0",
     "date": "2026-03-25",
     "tagline": "Qwen Code & browser upgrades",
