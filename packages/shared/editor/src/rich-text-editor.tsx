@@ -81,7 +81,6 @@ export function RichTextEditor({
     editorProps: {
       attributes: {
         class: 'prose prose-sm dark:prose-invert max-w-none focus:outline-none',
-        spellcheck: spellcheck === false ? 'false' : 'true',
       },
       handleKeyDown: (view, event) => {
         if (event.key === 'Escape') {
@@ -97,13 +96,6 @@ export function RichTextEditor({
   useEffect(() => {
     if (editorRef) editorRef.current = editor
   }, [editor, editorRef])
-
-  // Sync spellcheck attribute reactively
-  useEffect(() => {
-    if (editor?.view?.dom) {
-      (editor.view.dom as HTMLElement).spellcheck = spellcheck !== false
-    }
-  }, [editor, spellcheck])
 
   // Sync external value changes
   useEffect(() => {
@@ -123,6 +115,7 @@ export function RichTextEditor({
         className
       )}
       style={{ minHeight, maxHeight }}
+      spellCheck={spellcheck !== false}
     >
       {showToolbar && editor && <EditorToolbar editor={editor} />}
       <EditorContent editor={editor} className="flex-1 overflow-y-auto" />
