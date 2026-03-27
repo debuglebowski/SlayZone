@@ -657,7 +657,7 @@ export const Terminal = forwardRef<TerminalHandle, TerminalProps>(function Termi
     const flush = () => {
       rafId = null
       if (pendingChunks.length === 0) return
-      if (terminalRef.current && isActiveRef.current) {
+      if (terminalRef.current) {
         // Second-pass underline strip — catches split sequences across chunks
         // (now joined) and any codes the server filter missed.
         // Required for WebGL renderer which ignores CSS overrides.
@@ -671,7 +671,7 @@ export const Terminal = forwardRef<TerminalHandle, TerminalProps>(function Termi
     const unsubData = subscribe(sessionId, (data, seq) => {
       const cutoff = clearedSeqRef.current
       if (cutoff !== null && seq <= cutoff) return
-      if (!terminalRef.current || !isActiveRef.current) return
+      if (!terminalRef.current) return
       pendingChunks.push(data)
       pendingSeq = seq
       if (rafId === null) {
