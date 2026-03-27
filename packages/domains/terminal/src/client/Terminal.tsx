@@ -181,6 +181,21 @@ export const Terminal = forwardRef<TerminalHandle, TerminalProps>(function Termi
   onOpenFileRef.current = onOpenFile
   const hasCalledFirstInputRef = useRef(false)
 
+  // Refs for creation-only props — these are only read during PTY creation (the
+  // !exists branch), never during reattach. Using refs avoids recreating initTerminal
+  // (and triggering a detach→reattach cycle + SIGWINCH) when the parent re-renders
+  // with new object references (e.g. executionContext from JSON.parse on every loadData).
+  const conversationIdRef = useRef(conversationId)
+  conversationIdRef.current = conversationId
+  const existingConversationIdRef = useRef(existingConversationId)
+  existingConversationIdRef.current = existingConversationId
+  const initialPromptRef = useRef(initialPrompt)
+  initialPromptRef.current = initialPrompt
+  const providerFlagsRef = useRef(providerFlags)
+  providerFlagsRef.current = providerFlags
+  const executionContextRef = useRef(executionContext)
+  executionContextRef.current = executionContext
+
   const { subscribe, subscribeExit, subscribeSessionInvalid, subscribeAttention, subscribeState, getState, getCrashOutput, resetTaskState, cleanupTask } = usePty()
   const { theme } = useTheme()
   const { terminalFontSize, terminalFontFamily, terminalScrollback, terminalThemeFollowApp, terminalThemeDark, terminalThemeLight } = useAppearance()
@@ -300,8 +315,13 @@ export const Terminal = forwardRef<TerminalHandle, TerminalProps>(function Termi
           cached.terminal.attachCustomKeyEventHandler(handleTerminalKeyEvent)
 
           // Simple fit - container is guaranteed to have dimensions
+          const prevCols = cached.terminal.cols
+          const prevRows = cached.terminal.rows
           cached.fitAddon.fit()
-          window.api.pty.resize(sessionId, cached.terminal.cols, cached.terminal.rows)
+          // Only resize PTY if dimensions actually changed (avoids spurious SIGWINCH)
+          if (cached.terminal.cols !== prevCols || cached.terminal.rows !== prevRows) {
+            window.api.pty.resize(sessionId, cached.terminal.cols, cached.terminal.rows)
+          }
           cached.terminal.write('\x1b[0m') // Reset ANSI state on reattach
 
           // Sync state from backend (fixes stuck loading spinner on reattach)
@@ -499,8 +519,8 @@ export const Terminal = forwardRef<TerminalHandle, TerminalProps>(function Termi
       } else {
 
         // Generate conversation ID for AI modes (used as {id} in templates)
-        let newConversationId = conversationId
-        if (mode !== 'terminal' && !newConversationId && !existingConversationId) {
+        let newConversationId = conversationIdRef.current
+        if (mode !== 'terminal' && !newConversationId && !existingConversationIdRef.current) {
           newConversationId = crypto.randomUUID()
           onConversationCreatedRef.current?.(newConversationId)
         }
@@ -509,7 +529,7 @@ export const Terminal = forwardRef<TerminalHandle, TerminalProps>(function Termi
         // Note: Don't pass initialPrompt - we'll inject it after terminal is ready
         const isAiMode = mode !== 'terminal'
         const effectiveConversationId = isAiMode ? newConversationId : undefined
-        const effectiveExistingConversationId = isAiMode ? existingConversationId : undefined
+        const effectiveExistingConversationId = isAiMode ? existingConversationIdRef.current : undefined
         // Capture dims before async gap so PTY starts at correct size
         createCols = terminal.cols
         createRows = terminal.rows
@@ -517,7 +537,7 @@ export const Terminal = forwardRef<TerminalHandle, TerminalProps>(function Termi
           sessionId, cwd,
           conversationId: effectiveConversationId,
           existingConversationId: effectiveExistingConversationId,
-          mode, providerFlags, executionContext,
+          mode, providerFlags: providerFlagsRef.current, executionContext: executionContextRef.current,
           cols: createCols,
           rows: createRows,
         })
@@ -575,12 +595,12 @@ export const Terminal = forwardRef<TerminalHandle, TerminalProps>(function Termi
         clearBuffer: clearBufferWithoutRestart
       })
       // Inject initial prompt if provided (after a delay for terminal to be ready)
-      if (initialPrompt) {
+      if (initialPromptRef.current) {
         setTimeout(async () => {
           if (signal.aborted) return // Don't inject if unmounted
           try {
             // For plan mode, prefix with /plan
-            const textToInject = initialPrompt
+            const textToInject = initialPromptRef.current!
             await injectText(textToInject)
           } catch {
             // Terminal may have been disposed, ignore
@@ -597,7 +617,7 @@ export const Terminal = forwardRef<TerminalHandle, TerminalProps>(function Termi
         setIsInitializing(false)
       }
     }
-  }, [sessionId, cwd, mode, conversationId, existingConversationId, initialPrompt, providerFlags, executionContext, resetTaskState, handleTerminalKeyEvent, clearBufferWithoutRestart])
+  }, [sessionId, cwd, mode, resetTaskState, handleTerminalKeyEvent, clearBufferWithoutRestart])
 
   // Initialize terminal
   useEffect(() => {
