@@ -699,7 +699,10 @@ export async function createPty(opts: CreatePtyOptions): Promise<{ success: bool
       earlyExitWatchdog = undefined
     }
 
+    let finalized = false
     const finalizeSessionExit = (exitCode: number): void => {
+      if (finalized) return
+      finalized = true
       clearStartupTimeout()
       clearEarlyExitWatchdog()
       // Clear pending timers
@@ -762,6 +765,21 @@ export async function createPty(opts: CreatePtyOptions): Promise<{ success: bool
         } catch {
           // ignore
         }
+        // Safety net: if onExit doesn't fire within 2s after SIGKILL,
+        // finalize directly to prevent zombie 'starting' sessions
+        setTimeout(() => {
+          const stillLive = sessions.get(sessionId)
+          if (!stillLive || stillLive.pty !== target) return
+          recordDiagnosticEvent({
+            level: 'error',
+            source: 'pty',
+            event: 'pty.startup_timeout_missed_exit',
+            sessionId,
+            taskId: taskIdFromSessionId(sessionId),
+            payload: { timeoutMs: STARTUP_TIMEOUT_MS }
+          })
+          finalizeSessionExit(-1)
+        }, 2000)
       }, STARTUP_TIMEOUT_MS)
     }
 

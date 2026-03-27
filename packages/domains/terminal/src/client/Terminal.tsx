@@ -775,6 +775,27 @@ export const Terminal = forwardRef<TerminalHandle, TerminalProps>(function Termi
     return subscribeState(sessionId, (newState) => setPtyState(newState))
   }, [sessionId, getState, subscribeState])
 
+  // Safety net: prevent permanent 'starting' state after init completes.
+  // If the backend dies or IPC events are lost, this watchdog transitions
+  // to 'dead' so the user sees the retry overlay instead of infinite loading.
+  useEffect(() => {
+    if (isInitializing || initError || ptyState !== 'starting') return
+    const timer = setTimeout(async () => {
+      const exists = await window.api.pty.exists(sessionId)
+      const actual = await window.api.pty.getState(sessionId)
+      if (actual && actual !== 'starting' && actual !== 'dead') {
+        setPtyState(actual)
+        return
+      }
+      if (!exists || !actual || actual === 'starting') {
+        console.warn(`[terminal] watchdog: ${sessionId} stuck in 'starting' for 20s, transitioning to dead`)
+        setPtyState('dead')
+        setDeadExitCode(-1)
+      }
+    }, 20_000)
+    return () => clearTimeout(timer)
+  }, [isInitializing, initError, ptyState, sessionId])
+
   // Sync terminal theme with app theme / terminal theme settings
   useEffect(() => {
     const contrastRatio = resolvedTerminalVariant === 'light' ? 4.5 : 1
