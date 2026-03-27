@@ -195,7 +195,7 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
   // Main tab session ID format used by TerminalContainer/useTaskTerminals.
   const getMainSessionId = useCallback((id: string) => `${id}:${id}`, [])
 
-  const [tags] = useState<Tag[]>(initialData?.tags ?? [])
+  const [tags, setTags] = useState<Tag[]>(initialData?.tags ?? [])
   const { tagIds: taskTagIds, setTagIds: setTaskTagIds } = useTaskTagIds(task?.id, initialData?.taskTagIds)
   const statusOptions = useMemo(() => buildStatusOptions(project?.columns_config), [project?.columns_config])
   const completedStatus = useMemo(() => getDoneStatus(project?.columns_config), [project?.columns_config])
@@ -218,7 +218,7 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
     [project?.path, detectedRepos, task?.repo_name]
   )
   // Effective repo path (worktree > resolved child repo > project path)
-  const effectiveRepoPath = task?.worktree_path ?? resolvedRepo.path
+  const effectiveRepoPath = task?.worktree_path ?? task?.base_dir ?? resolvedRepo.path
   const handleRepoChange = useCallback((repoName: string) => {
     if (!task) return
     window.api.db.updateTask({ id: task.id, repoName }).then((updated) => {
@@ -1037,9 +1037,15 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
   }
 
   // Wrapper for GitPanel that calls API and notifies parent
-  const updateTaskAndNotify = async (data: { id: string; worktreePath?: string | null; worktreeParentBranch?: string | null; browserUrl?: string | null; status?: Task['status'] }): Promise<Task> => {
-    // If worktreePath is changing, kill old PTY first so terminal restarts with new cwd
-    if (data.worktreePath !== undefined) {
+  const updateTaskAndNotify = async (data: { id: string; worktreePath?: string | null; worktreeParentBranch?: string | null; baseDir?: string | null; browserUrl?: string | null; status?: Task['status'] }): Promise<Task> => {
+    // Only reset PTY when the effective working directory actually changes
+    const oldEffective = task?.worktree_path ?? task?.base_dir ?? resolvedRepo.path
+    const newWorktree = data.worktreePath !== undefined ? data.worktreePath : task?.worktree_path
+    const newBaseDir = data.baseDir !== undefined ? data.baseDir : task?.base_dir
+    const newEffective = newWorktree ?? newBaseDir ?? resolvedRepo.path
+    const cwdChanged = oldEffective !== newEffective
+
+    if (cwdChanged) {
       const mainSessionId = `${data.id}:${data.id}`
       resetTaskState(mainSessionId)
       await window.api.pty.kill(mainSessionId)
@@ -1049,8 +1055,8 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
     const updated = await window.api.db.updateTask(data)
     handleTaskUpdate(updated)
 
-    // Force terminal remount if worktreePath changed
-    if (data.worktreePath !== undefined) {
+    // Force terminal remount if effective cwd changed
+    if (cwdChanged) {
       setTerminalKey(k => k + 1)
     }
 
@@ -1493,7 +1499,7 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
               ) : (effectiveRepoPath || project?.path) && !projectPathMissing ? (
                 <TerminalContainer
                   ref={terminalContainerRef}
-                  key={`${terminalKey}-${task.project_id}-${effectiveRepoPath || ''}-${task.worktree_path || ''}`}
+                  key={`${terminalKey}-${task.project_id}-${effectiveRepoPath || ''}-${task.worktree_path || ''}-${task.base_dir || ''}`}
                   taskId={task.id}
                   isActive={isActive}
                   cwd={effectiveRepoPath || project?.path || ''}
@@ -1512,6 +1518,7 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
                   onMainTabActiveChange={setIsMainTabActive}
                   onOpenUrl={openDevServerInBrowser}
                   onOpenFile={handleQuickOpenFile}
+                  onMainReset={handleResetTerminal}
                   rightContent={
                     <Tooltip open={!isMainTabActive && !task.is_temporary ? undefined : false}>
                       <TooltipTrigger asChild>
@@ -1990,7 +1997,71 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
             taskTagIds={taskTagIds}
             onUpdate={handleTaskUpdate}
             onTagsChange={handleTagsChange}
+            onTagCreated={(tag) => setTags((prev) => [...prev, tag])}
           />
+
+          <div className="flex flex-col gap-3 mt-5">
+
+          {/* Working directory */}
+          <div className="flex flex-col gap-2">
+            <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-1">
+              Working directory
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Info className="size-3 text-muted-foreground/60 cursor-help" />
+                </TooltipTrigger>
+                <TooltipContent side="top" className="max-w-72 text-xs">
+                  <p>Override the project directory for this task.</p>
+                  <p className="mt-1.5">Priority (highest first):</p>
+                  <ol className="mt-0.5 list-decimal list-inside">
+                    <li>Worktree</li>
+                    <li>Custom directory</li>
+                    <li>Project path</li>
+                  </ol>
+                </TooltipContent>
+              </Tooltip>
+            </span>
+            <div className="flex items-center gap-1">
+              <div className="flex-1 min-w-0 text-xs text-muted-foreground truncate px-2 py-1.5 rounded border border-border bg-muted/30" title={effectiveRepoPath ?? 'No directory set'}>
+                {effectiveRepoPath ?? 'No directory set'}
+                {task.worktree_path && <span className="ml-1 text-[10px] opacity-60">(worktree)</span>}
+                {!task.worktree_path && task.base_dir && <span className="ml-1 text-[10px] opacity-60">(custom)</span>}
+              </div>
+              <button
+                className="shrink-0 h-7 w-7 flex items-center justify-center rounded hover:bg-muted"
+                title="Change working directory"
+                onClick={async () => {
+                  const result = await window.api.dialog.showOpenDialog({
+                    title: 'Select Working Directory',
+                    defaultPath: task.base_dir ?? effectiveRepoPath ?? undefined,
+                    properties: ['openDirectory']
+                  })
+                  if (result.canceled || !result.filePaths[0]) return
+                  await updateTaskAndNotify({ id: task.id, baseDir: result.filePaths[0] })
+                }}
+              >
+                <FileCode className="size-3.5 text-muted-foreground" />
+              </button>
+              {task.base_dir && (
+                <button
+                  className="shrink-0 h-7 w-7 flex items-center justify-center rounded hover:bg-muted"
+                  title="Clear custom directory"
+                  onClick={() => { void updateTaskAndNotify({ id: task.id, baseDir: null }) }}
+                >
+                  <X className="size-3.5 text-muted-foreground" />
+                </button>
+              )}
+            </div>
+            {task.worktree_path && (
+              <Button variant="outline" size="sm" className="text-xs w-full justify-start" onClick={() => { void updateTaskAndNotify({ id: task.id, worktreePath: null, worktreeParentBranch: null }) }}>
+                <GitBranch className="mr-1.5 size-3" />
+                Detach worktree
+              </Button>
+            )}
+            {task.worktree_path && task.base_dir && (
+              <span className="text-[10px] text-amber-400/80">Worktree active — custom dir overridden</span>
+            )}
+          </div>
 
           {/* Danger zone */}
           <div className="flex flex-col gap-2">
@@ -2005,6 +2076,8 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
               Delete
             </Button>
             </div>
+          </div>
+
           </div>
 
         </div>

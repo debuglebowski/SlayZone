@@ -92,7 +92,7 @@ export function useConsolidatedGeneralData(
   onUpdateTask: (data: UpdateTaskInput) => Promise<Task>
 ): ConsolidatedGeneralData {
   const hasWorktree = !!task.worktree_path
-  const targetPath = task.worktree_path ?? projectPath
+  const targetPath = task.worktree_path ?? task.base_dir ?? projectPath
   const parentBranch = task.worktree_parent_branch
 
   // General state

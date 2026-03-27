@@ -1486,6 +1486,57 @@ const migrations: Migration[] = [
     up: (db) => {
       db.exec(`ALTER TABLE integration_project_mappings ADD COLUMN assigned_to_me INTEGER DEFAULT 0`)
     }
+  },
+  {
+    version: 83,
+    up: (db) => {
+      db.exec(`ALTER TABLE tasks ADD COLUMN base_dir TEXT DEFAULT NULL`)
+    }
+  },
+  {
+    version: 84,
+    up: (db) => {
+      // Scope tags to projects + add sort_order
+      const firstProject = db.prepare('SELECT id FROM projects ORDER BY sort_order LIMIT 1').get() as { id: string } | undefined
+      const fallbackProjectId = firstProject?.id ?? ''
+
+      db.exec(`
+        CREATE TABLE tags_new (
+          id TEXT PRIMARY KEY,
+          project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+          name TEXT NOT NULL,
+          color TEXT NOT NULL DEFAULT '#6b7280',
+          sort_order INTEGER NOT NULL DEFAULT 0,
+          created_at TEXT NOT NULL DEFAULT (datetime('now')),
+          UNIQUE(project_id, name)
+        )
+      `)
+
+      // Migrate existing tags with alphabetical sort_order
+      const existingTags = db.prepare('SELECT * FROM tags ORDER BY name').all() as { id: string; name: string; color: string; created_at: string }[]
+      const insertTag = db.prepare('INSERT INTO tags_new (id, project_id, name, color, sort_order, created_at) VALUES (?, ?, ?, ?, ?, ?)')
+      for (let i = 0; i < existingTags.length; i++) {
+        const t = existingTags[i]
+        insertTag.run(t.id, fallbackProjectId, t.name, t.color, i, t.created_at)
+      }
+
+      // Recreate task_tags with FK to new tags table
+      db.exec(`
+        CREATE TABLE task_tags_new (
+          task_id TEXT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+          tag_id TEXT NOT NULL REFERENCES tags_new(id) ON DELETE CASCADE,
+          PRIMARY KEY (task_id, tag_id)
+        )
+      `)
+      db.exec(`INSERT INTO task_tags_new SELECT * FROM task_tags`)
+
+      db.exec(`DROP TABLE task_tags`)
+      db.exec(`DROP TABLE tags`)
+      db.exec(`ALTER TABLE tags_new RENAME TO tags`)
+      db.exec(`ALTER TABLE task_tags_new RENAME TO task_tags`)
+      db.exec(`CREATE INDEX idx_task_tags_task ON task_tags(task_id)`)
+      db.exec(`CREATE INDEX idx_task_tags_tag ON task_tags(tag_id)`)
+    }
   }
 ]
 

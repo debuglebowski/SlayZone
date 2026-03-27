@@ -348,10 +348,11 @@ export function updateTask(db: Database, data: UpdateTaskInput): Task | null {
   if (data.projectId !== undefined) {
     fields.push('project_id = ?'); values.push(data.projectId)
     if (projectChanged) {
-      // Clear repo/worktree fields — child repos and worktrees may differ across projects
+      // Clear repo/worktree/base_dir fields — child repos and worktrees may differ across projects
       if (data.repoName === undefined) { fields.push('repo_name = ?'); values.push(null) }
       if (data.worktreePath === undefined) { fields.push('worktree_path = ?'); values.push(null) }
       if (data.worktreeParentBranch === undefined) { fields.push('worktree_parent_branch = ?'); values.push(null) }
+      if (data.baseDir === undefined) { fields.push('base_dir = ?'); values.push(null) }
     }
   }
   if (data.claudeSessionId !== undefined) { fields.push('claude_session_id = ?'); values.push(data.claudeSessionId) }
@@ -368,7 +369,7 @@ export function updateTask(db: Database, data: UpdateTaskInput): Task | null {
       { mode: 'opencode', col: 'opencode', convId: data.opencodeConversationId, flags: data.opencodeFlags, hasConvId: data.opencodeConversationId !== undefined, hasFlags: data.opencodeFlags !== undefined },
     ]
     const hasLegacyUpdate = legacyMappings.some(m => m.hasConvId || m.hasFlags)
-    const shouldResetConversationIds = (data.worktreePath !== undefined || projectChanged) && data.providerConfig === undefined && !hasLegacyUpdate
+    const shouldResetConversationIds = (data.worktreePath !== undefined || data.baseDir !== undefined || projectChanged) && data.providerConfig === undefined && !hasLegacyUpdate
 
     if (data.providerConfig !== undefined || hasLegacyUpdate || data.terminalMode !== undefined || shouldResetConversationIds) {
       // Read current provider_config
@@ -426,6 +427,7 @@ export function updateTask(db: Database, data: UpdateTaskInput): Task | null {
   // Note: these also get cleared to null on project change (see projectChanged block above)
   if (data.worktreePath !== undefined) { fields.push('worktree_path = ?'); values.push(data.worktreePath) }
   if (data.worktreeParentBranch !== undefined) { fields.push('worktree_parent_branch = ?'); values.push(data.worktreeParentBranch) }
+  if (data.baseDir !== undefined) { fields.push('base_dir = ?'); values.push(data.baseDir) }
   if (data.browserUrl !== undefined) { fields.push('browser_url = ?'); values.push(data.browserUrl) }
   if (data.prUrl !== undefined) { fields.push('pr_url = ?'); values.push(data.prUrl) }
   if (data.browserTabs !== undefined) { fields.push('browser_tabs = ?'); values.push(data.browserTabs ? JSON.stringify(data.browserTabs) : null) }
@@ -623,7 +625,7 @@ export function registerTaskHandlers(ipcMain: IpcMain, db: Database): void {
     const childIds = (db.prepare('SELECT id FROM tasks WHERE parent_id = ? AND archived_at IS NULL').all(id) as { id: string }[]).map(r => r.id)
     for (const childId of childIds) { await cleanupTaskFull(db, childId) }
     db.prepare(`
-      UPDATE tasks SET archived_at = datetime('now'), worktree_path = NULL, updated_at = datetime('now')
+      UPDATE tasks SET archived_at = datetime('now'), worktree_path = NULL, base_dir = NULL, updated_at = datetime('now')
       WHERE id = ? OR parent_id = ?
     `).run(id, id)
     ipcMain.emit('db:tasks:archive:done', null, id)
@@ -643,7 +645,7 @@ export function registerTaskHandlers(ipcMain: IpcMain, db: Database): void {
     const allIds = [...ids, ...childIds]
     const placeholders = allIds.map(() => '?').join(',')
     db.prepare(`
-      UPDATE tasks SET archived_at = datetime('now'), worktree_path = NULL, updated_at = datetime('now')
+      UPDATE tasks SET archived_at = datetime('now'), worktree_path = NULL, base_dir = NULL, updated_at = datetime('now')
       WHERE id IN (${placeholders})
     `).run(...allIds)
     for (const id of allIds) {
@@ -755,7 +757,7 @@ export function registerTaskHandlers(ipcMain: IpcMain, db: Database): void {
 
     const projectRows = db.prepare('SELECT * FROM projects ORDER BY sort_order').all() as Record<string, unknown>[]
 
-    const tagRows = db.prepare('SELECT * FROM tags ORDER BY name').all()
+    const tagRows = db.prepare('SELECT * FROM tags ORDER BY sort_order, name').all()
 
     const taskTagRows = db.prepare('SELECT task_id, tag_id FROM task_tags').all() as { task_id: string; tag_id: string }[]
     const taskTagMap: Record<string, string[]> = {}

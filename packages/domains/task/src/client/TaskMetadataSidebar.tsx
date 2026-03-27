@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react'
 import { format } from 'date-fns'
-import { ArrowDownToLineIcon, ArrowUpToLineIcon, CalendarIcon, Loader2, X } from 'lucide-react'
+import { ArrowDownToLineIcon, ArrowUpToLineIcon, CalendarIcon, Loader2, Plus, X } from 'lucide-react'
 import type { Task } from '@slayzone/task/shared'
 import { priorityOptions } from '@slayzone/task/shared'
 import type { Project } from '@slayzone/projects/shared'
 import { isTerminalStatus } from '@slayzone/projects/shared'
 import type { Tag } from '@slayzone/tags/shared'
+import { CreateTagDialog } from '@slayzone/tags/client'
 import type { ExternalLink, TaskSyncStatus } from '@slayzone/integrations/shared'
 import {
   Select,
@@ -33,6 +34,7 @@ interface TaskMetadataSidebarProps {
   taskTagIds: string[]
   onUpdate: (task: Task) => void
   onTagsChange: (tagIds: string[]) => void
+  onTagCreated?: (tag: Tag) => void
 }
 
 export function TaskMetadataSidebar({
@@ -40,7 +42,8 @@ export function TaskMetadataSidebar({
   tags,
   taskTagIds,
   onUpdate,
-  onTagsChange
+  onTagsChange,
+  onTagCreated
 }: TaskMetadataSidebarProps): React.JSX.Element {
   const [allTasks, setAllTasks] = useState<Task[]>([])
   const [blockers, setBlockers] = useState<Task[]>([])
@@ -109,6 +112,16 @@ export function TaskMetadataSidebar({
     onUpdate(updated)
   }
 
+  const [createTagOpen, setCreateTagOpen] = useState(false)
+
+  const handleTagCreated = async (tag: Tag): Promise<void> => {
+    onTagCreated?.(tag)
+    // Auto-assign to current task
+    const newTagIds = [...taskTagIds, tag.id]
+    await window.api.taskTags.setTagsForTask(task.id, newTagIds)
+    onTagsChange(newTagIds)
+  }
+
   const handleTagToggle = async (tagId: string, checked: boolean): Promise<void> => {
     if (checked) track('tag_assigned')
     const newTagIds = checked ? [...taskTagIds, tagId] : taskTagIds.filter((id) => id !== tagId)
@@ -120,73 +133,82 @@ export function TaskMetadataSidebar({
 
   return (
     <div className="space-y-2">
-      {/* Project */}
-      <div>
-        <label className="mb-1 block text-sm text-muted-foreground">Project</label>
-        <ProjectSelect value={task.project_id} onChange={handleProjectChange} />
+      {/* Project & Status */}
+      <div className="grid grid-cols-2 gap-2">
+        <div>
+          <label className="mb-1 block text-sm text-muted-foreground">Project</label>
+          <ProjectSelect value={task.project_id} onChange={handleProjectChange} />
+        </div>
+        <div>
+          <label className="mb-1 block text-sm text-muted-foreground">Status</label>
+          <Select value={task.status} onValueChange={handleStatusChange}>
+            <SelectTrigger className="w-full">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {statusOptions.map((opt) => (
+                <SelectItem key={opt.value} value={opt.value}>
+                  {opt.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
-      {/* Status */}
-      <div>
-        <label className="mb-1 block text-sm text-muted-foreground">Status</label>
-        <Select value={task.status} onValueChange={handleStatusChange}>
-          <SelectTrigger className="w-full">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {statusOptions.map((opt) => (
-              <SelectItem key={opt.value} value={opt.value}>
-                {opt.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-
-      {/* Priority */}
-      <div>
-        <label className="mb-1 block text-sm text-muted-foreground">Priority</label>
-        <Select
-          value={String(task.priority)}
-          onValueChange={(v) => handlePriorityChange(Number(v))}
-        >
-          <SelectTrigger className="w-full">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {priorityOptions.map((opt) => (
-              <SelectItem key={opt.value} value={String(opt.value)}>
-                {opt.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-
-      {/* Due Date */}
-      <div>
-        <label className="mb-1 block text-sm text-muted-foreground">Due Date</label>
-        <Popover>
-          <PopoverTrigger asChild>
-            <Button
-              variant="outline"
-              className={cn(
-                'w-full justify-start text-left font-normal',
-                !task.due_date && 'text-muted-foreground'
-              )}
-            >
-              <CalendarIcon className="mr-2 size-4" />
-              {task.due_date ? format(new Date(task.due_date), 'MMM d, yyyy') : 'No date'}
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent className="w-auto p-0" align="start">
-            <Calendar
-              mode="single"
-              selected={task.due_date ? new Date(task.due_date) : undefined}
-              onSelect={handleDueDateChange}
-            />
-          </PopoverContent>
-        </Popover>
+      {/* Priority & Due Date */}
+      <div className="grid grid-cols-2 gap-2">
+        <div>
+          <label className="mb-1 block text-sm text-muted-foreground">Priority</label>
+          <Select
+            value={String(task.priority)}
+            onValueChange={(v) => handlePriorityChange(Number(v))}
+          >
+            <SelectTrigger className="w-full">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {priorityOptions.map((opt) => (
+                <SelectItem key={opt.value} value={String(opt.value)}>
+                  <span className="flex items-center gap-1.5">
+                    <span className={cn('size-2 rounded-full', {
+                      'bg-red-500': opt.value === 1,
+                      'bg-orange-500': opt.value === 2,
+                      'bg-yellow-500': opt.value === 3,
+                      'bg-blue-400': opt.value === 4,
+                      'bg-neutral-400': opt.value === 5,
+                    })} />
+                    {opt.label}
+                  </span>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div>
+          <label className="mb-1 block text-sm text-muted-foreground">Due Date</label>
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button
+                variant="outline"
+                className={cn(
+                  'w-full justify-start text-left font-normal',
+                  !task.due_date && 'text-muted-foreground'
+                )}
+              >
+                <CalendarIcon className="mr-2 size-4" />
+                {task.due_date ? format(new Date(task.due_date), 'MMM d, yyyy') : 'No date'}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="start">
+              <Calendar
+                mode="single"
+                selected={task.due_date ? new Date(task.due_date) : undefined}
+                onSelect={handleDueDateChange}
+              />
+            </PopoverContent>
+          </Popover>
+        </div>
       </div>
 
       {/* Tags */}
@@ -202,7 +224,7 @@ export function TaskMetadataSidebar({
                   {selectedTags.slice(0, 3).map((tag) => (
                     <span
                       key={tag.id}
-                      className="rounded px-1.5 py-0.5 text-xs"
+                      className="rounded px-2 py-1 text-sm font-medium"
                       style={{ backgroundColor: tag.color + '30', color: tag.color }}
                     >
                       {tag.name}
@@ -217,19 +239,17 @@ export function TaskMetadataSidebar({
               )}
             </Button>
           </PopoverTrigger>
-          <PopoverContent className="w-[200px] p-2">
-            {tags.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No tags created</p>
-            ) : (
-              <div className="space-y-2">
+          <PopoverContent className="w-[200px] p-1.5">
+            {tags.length > 0 && (
+              <div className="space-y-0.5">
                 {tags.map((tag) => (
-                  <label key={tag.id} className="flex cursor-pointer items-center gap-2">
+                  <label key={tag.id} className="flex cursor-pointer items-center gap-2 rounded px-1.5 py-1 hover:bg-muted/50">
                     <Checkbox
                       checked={taskTagIds.includes(tag.id)}
                       onCheckedChange={(checked) => handleTagToggle(tag.id, checked === true)}
                     />
                     <span
-                      className="rounded px-1.5 py-0.5 text-sm"
+                      className="rounded px-2 py-1 text-sm font-medium"
                       style={{ backgroundColor: tag.color + '30', color: tag.color }}
                     >
                       {tag.name}
@@ -238,8 +258,25 @@ export function TaskMetadataSidebar({
                 ))}
               </div>
             )}
+            <div className={tags.length > 0 ? 'border-t mt-1.5 pt-1' : ''}>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="w-full justify-start text-muted-foreground h-7 px-1.5"
+                onClick={() => setCreateTagOpen(true)}
+              >
+                <Plus className="h-3.5 w-3.5 mr-1.5" />
+                New tag
+              </Button>
+            </div>
           </PopoverContent>
         </Popover>
+        <CreateTagDialog
+          open={createTagOpen}
+          onOpenChange={setCreateTagOpen}
+          projectId={task.project_id}
+          onCreated={handleTagCreated}
+        />
       </div>
 
       {/* Blocked By */}
