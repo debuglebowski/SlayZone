@@ -32,7 +32,7 @@ It exists because this is a long-term effort. We cannot migrate, normalize, and 
 
 | Competitor | Segment | Priority | Status | Freshness | Next step |
 | --- | --- | --- | --- | --- | --- |
-| Claude Code | CLI agent | core | legacy-flat | date not normalized | Migrate existing file into canonical folder. |
+| Claude Code | CLI agent | core | publish-ready | 2026-03-27 | Done. |
 | OpenAI Codex | CLI agent | core | legacy-flat | date not normalized | Migrate existing file into canonical folder. |
 | Codex Monitor | Codex orchestration app | core | publish-ready | 2026-03-27 | Done. |
 | Jean | Desktop environment | core | canon-reviewed | 2026-03-27 | Capture product screenshot for publish-ready. |
