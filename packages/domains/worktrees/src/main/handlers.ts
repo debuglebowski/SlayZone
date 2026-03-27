@@ -106,16 +106,19 @@ function evictStaleRepoCache(): void {
 
 export function resolveCopyBehavior(db: Database, projectId?: string): { behavior: WorktreeCopyBehavior; customPaths: string[] } {
   // Check project-level override first (null = inherit from global)
+  // Wrapped in try-catch: columns added in migration v70 may not exist on stale DBs
   if (projectId) {
-    const row = db.prepare('SELECT worktree_copy_behavior, worktree_copy_paths FROM projects WHERE id = ?')
-      .get(projectId) as { worktree_copy_behavior: string | null; worktree_copy_paths: string | null } | undefined
-    if (row?.worktree_copy_behavior) {
-      const behavior = row.worktree_copy_behavior as WorktreeCopyBehavior
-      const customPaths = behavior === 'custom' && row.worktree_copy_paths
-        ? row.worktree_copy_paths.split(',').map(p => p.trim()).filter(Boolean)
-        : []
-      return { behavior, customPaths }
-    }
+    try {
+      const row = db.prepare('SELECT worktree_copy_behavior, worktree_copy_paths FROM projects WHERE id = ?')
+        .get(projectId) as { worktree_copy_behavior: string | null; worktree_copy_paths: string | null } | undefined
+      if (row?.worktree_copy_behavior) {
+        const behavior = row.worktree_copy_behavior as WorktreeCopyBehavior
+        const customPaths = behavior === 'custom' && row.worktree_copy_paths
+          ? row.worktree_copy_paths.split(',').map(p => p.trim()).filter(Boolean)
+          : []
+        return { behavior, customPaths }
+      }
+    } catch { /* fall through to global setting */ }
   }
 
   // Fall back to global setting

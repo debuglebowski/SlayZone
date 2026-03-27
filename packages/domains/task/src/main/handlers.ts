@@ -6,6 +6,7 @@ import { getDefaultStatus, isKnownStatus, isTerminalStatus, parseColumnsConfig }
 import { parseProject } from '@slayzone/projects/main'
 import { DEFAULT_TERMINAL_MODES } from '@slayzone/terminal/shared'
 import path from 'path'
+import { existsSync } from 'fs'
 import { removeWorktree, createWorktree, runWorktreeSetupScript, getCurrentBranch, isGitRepo, copyIgnoredFiles, resolveCopyBehavior } from '@slayzone/worktrees/main'
 
 type DiagnosticLevel = 'debug' | 'info' | 'warn' | 'error'
@@ -244,53 +245,76 @@ async function maybeAutoCreateWorktree(
 
   const sourceBranch = projectRow.worktree_source_branch ?? undefined
 
+  // Block A: Create worktree and link to task immediately
   try {
     await createWorktree(repoPath, worktreePath, branch, sourceBranch)
+  } catch (err) {
+    // Git may exit non-zero after creating the worktree (e.g. post-checkout hook failure).
+    // If the dir exists, still link it — better than orphaning a worktree the user can see.
+    if (existsSync(worktreePath)) {
+      db.prepare(`
+        UPDATE tasks
+        SET worktree_path = ?, worktree_parent_branch = ?, updated_at = datetime('now')
+        WHERE id = ?
+      `).run(worktreePath, parentBranch, taskId)
+      runtimeAdapters.recordDiagnosticEvent({
+        level: 'warn',
+        source: 'task',
+        event: 'task.auto_worktree_recovered',
+        taskId,
+        projectId,
+        message: err instanceof Error ? err.message : String(err),
+        payload: { projectPath: projectRow.path, worktreePath, branch, parentBranch, sourceBranch }
+      })
+    } else {
+      runtimeAdapters.recordDiagnosticEvent({
+        level: 'error',
+        source: 'task',
+        event: 'task.auto_worktree_create_failed',
+        taskId,
+        projectId,
+        message: err instanceof Error ? err.message : String(err),
+        payload: { projectPath: projectRow.path, baseTemplate, basePath, branch, worktreePath }
+      })
+    }
+    return
+  }
 
-    // Copy ignored files based on settings ('ask' skipped — auto-create can't prompt)
+  // Worktree created — link to task before any post-creation steps
+  db.prepare(`
+    UPDATE tasks
+    SET worktree_path = ?, worktree_parent_branch = ?, updated_at = datetime('now')
+    WHERE id = ?
+  `).run(worktreePath, parentBranch, taskId)
+  runtimeAdapters.recordDiagnosticEvent({
+    level: 'info',
+    source: 'task',
+    event: 'task.auto_worktree_created',
+    taskId,
+    projectId,
+    payload: { projectPath: projectRow.path, worktreePath, branch, parentBranch, sourceBranch }
+  })
+
+  // Block B: Post-creation extras (non-critical, won't affect linkage)
+  try {
     const { behavior: copyBehavior, customPaths } = resolveCopyBehavior(db, projectId)
     if (copyBehavior === 'all' || copyBehavior === 'custom') {
       await copyIgnoredFiles(repoPath, worktreePath, copyBehavior, customPaths)
     }
-
-    // Fire-and-forget: don't block task creation on setup script
-    void runWorktreeSetupScript(worktreePath, repoPath, sourceBranch)
-    db.prepare(`
-      UPDATE tasks
-      SET worktree_path = ?, worktree_parent_branch = ?, updated_at = datetime('now')
-      WHERE id = ?
-    `).run(worktreePath, parentBranch, taskId)
+  } catch (copyErr) {
     runtimeAdapters.recordDiagnosticEvent({
-      level: 'info',
+      level: 'warn',
       source: 'task',
-      event: 'task.auto_worktree_created',
+      event: 'task.auto_worktree_copy_failed',
       taskId,
       projectId,
-      payload: {
-        projectPath: projectRow.path,
-        worktreePath,
-        branch,
-        parentBranch,
-        sourceBranch
-      }
-    })
-  } catch (err) {
-    runtimeAdapters.recordDiagnosticEvent({
-      level: 'error',
-      source: 'task',
-      event: 'task.auto_worktree_create_failed',
-      taskId,
-      projectId,
-      message: err instanceof Error ? err.message : String(err),
-      payload: {
-        projectPath: projectRow.path,
-        baseTemplate,
-        basePath,
-        branch,
-        worktreePath
-      }
+      message: copyErr instanceof Error ? copyErr.message : String(copyErr),
+      payload: { worktreePath }
     })
   }
+
+  // Fire-and-forget: don't block task creation on setup script
+  void runWorktreeSetupScript(worktreePath, repoPath, sourceBranch)
 }
 
 export function updateTask(db: Database, data: UpdateTaskInput): Task | null {

@@ -88,7 +88,7 @@ function prepareSetupScript(worktreePath: string): string | null {
   try {
     accessSync(scriptPath, fsConstants.X_OK)
   } catch {
-    chmodSync(scriptPath, 0o755)
+    try { chmodSync(scriptPath, 0o755) } catch { return null }
   }
   return scriptPath
 }
