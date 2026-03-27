@@ -35,6 +35,17 @@ interface ManagedProcess extends ProcessInfo {
 
 const LOG_BUFFER_MAX = 500
 
+/** Kill the entire process tree rooted at `child` (must be spawned with `detached: true` on POSIX). */
+function killProcessTree(child: ChildProcess, signal: NodeJS.Signals = 'SIGTERM'): void {
+  const pid = child.pid
+  if (pid == null) return
+  if (process.platform === 'win32') {
+    try { execFileSync('taskkill', ['/T', '/F', '/PID', String(pid)]) } catch {}
+  } else {
+    try { process.kill(-pid, signal) } catch {}
+  }
+}
+
 let win: BrowserWindow | null = null
 let db: Database | null = null
 const processes = new Map<string, ManagedProcess>()
@@ -169,7 +180,7 @@ function doSpawn(proc: ManagedProcess): void {
   const shellArgs = isWin ? ['/c', proc.command] : [...(isFish ? ['-i', '-l'] : ['-l']), '-c', proc.command]
   const env: Record<string, string | undefined> = { ...process.env }
   if (enrichedPath) env.PATH = enrichedPath
-  const child = spawn(shell, shellArgs, { cwd: proc.cwd, env })
+  const child = spawn(shell, shellArgs, { cwd: proc.cwd, env, detached: !isWin })
 
   proc.child = child
   proc.pid = child.pid ?? null
@@ -275,7 +286,7 @@ export function stopProcess(id: string): boolean {
   proc.child = null
   proc.pid = null
   proc.spawnedAt = null
-  child?.kill()
+  if (child) killProcessTree(child)
   setStatus(proc, 'stopped')
   return true
 }
@@ -285,7 +296,7 @@ export function killProcess(id: string): boolean {
   if (!proc) return false
   stopTitlePolling(proc)
   proc.autoRestart = false
-  proc.child?.kill()
+  if (proc.child) killProcessTree(proc.child)
   proc.child = null
   processes.delete(id)
   db?.prepare('DELETE FROM processes WHERE id = ?').run(id)
@@ -296,7 +307,7 @@ export function restartProcess(id: string): boolean {
   const proc = processes.get(id)
   if (!proc) return false
   stopTitlePolling(proc)
-  proc.child?.kill()
+  if (proc.child) killProcessTree(proc.child)
   proc.child = null
   proc.logBuffer.push('[restarting...]')
   setStatus(proc, 'running')
@@ -340,7 +351,7 @@ export function killAllProcesses(): void {
   for (const proc of processes.values()) {
     stopTitlePolling(proc)
     proc.autoRestart = false
-    proc.child?.kill()
+    if (proc.child) killProcessTree(proc.child)
     proc.child = null
   }
   processes.clear()
