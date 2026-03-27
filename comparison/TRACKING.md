@@ -36,7 +36,7 @@ It exists because this is a long-term effort. We cannot migrate, normalize, and 
 | OpenAI Codex | CLI agent | core | legacy-flat | date not normalized | Migrate existing file into canonical folder. |
 | Codex Monitor | Codex orchestration app | core | missing | none | Create new canonical folder from scratch. |
 | Jean | Desktop environment | core | missing | none | Create new canonical folder from scratch. |
-| Conductor | Agent orchestrator | core | legacy-flat | 2026-02-28 in legacy file | Migrate existing detailed profile first-wave. |
+| Conductor | Agent orchestrator | core | publish-ready | 2026-03-27 | Done. |
 | VibeKanban | Agent orchestrator | core | legacy-flat | 2026-02-28 in legacy file | Migrate existing detailed profile first-wave. |
 | Superset.sh | Agent orchestrator | core | legacy-flat | 2026-02-28 in legacy file | Migrate existing detailed profile first-wave. |
 | AutoClaude | Agent orchestrator | core | legacy-flat | 2026-02-28 in legacy file | Migrate existing detailed profile first-wave. |
