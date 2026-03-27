@@ -38,7 +38,7 @@ It exists because this is a long-term effort. We cannot migrate, normalize, and 
 | Jean | Desktop environment | core | publish-ready | 2026-03-27 | Done. |
 | Conductor | Agent orchestrator | core | publish-ready | 2026-03-27 | Done. |
 | VibeKanban | Agent orchestrator | core | publish-ready | 2026-03-27 | Done. |
-| Superset.sh | Agent orchestrator | core | legacy-flat | 2026-02-28 in legacy file | Migrate existing detailed profile first-wave. |
+| Superset.sh | Agent orchestrator | core | publish-ready | 2026-03-27 | Done. |
 | AutoClaude | Agent orchestrator | core | legacy-flat | 2026-02-28 in legacy file | Migrate existing detailed profile first-wave. |
 | Maestro | Agent orchestrator | core | legacy-flat | 2026-02-28 in legacy file | Migrate existing detailed profile first-wave. |
 | Cursor | AI IDE | core | legacy-flat | 2026-02-28 in legacy file | Migrate existing detailed profile first-wave. |
