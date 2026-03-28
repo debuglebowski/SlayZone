@@ -34,6 +34,7 @@ It exists because this is a long-term effort. We cannot migrate, normalize, and 
 | --- | --- | --- | --- | --- | --- |
 | Claude Code | CLI agent | core | publish-ready | 2026-03-27 | Done. |
 | OpenAI Codex | CLI agent | core | publish-ready | 2026-03-27 | Done. |
+| OpenAI Codex App | Desktop agent orchestrator | core | publish-ready | 2026-03-28 | Done. |
 | Codex Monitor | Codex orchestration app | core | publish-ready | 2026-03-27 | Done. |
 | Jean | Desktop environment | core | publish-ready | 2026-03-27 | Done. |
 | Conductor | Agent orchestrator | core | publish-ready | 2026-03-27 | Done. |
