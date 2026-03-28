@@ -1537,6 +1537,22 @@ const migrations: Migration[] = [
       db.exec(`CREATE INDEX idx_task_tags_task ON task_tags(task_id)`)
       db.exec(`CREATE INDEX idx_task_tags_tag ON task_tags(tag_id)`)
     }
+  },
+  {
+    version: 85,
+    up: (db) => {
+      db.exec(`ALTER TABLE tags ADD COLUMN text_color TEXT NOT NULL DEFAULT '#ffffff'`)
+      // Compute text_color for existing tags based on luminance
+      const tags = db.prepare('SELECT id, color FROM tags').all() as { id: string; color: string }[]
+      const update = db.prepare('UPDATE tags SET text_color = ? WHERE id = ?')
+      for (const tag of tags) {
+        const r = parseInt(tag.color.slice(1, 3), 16)
+        const g = parseInt(tag.color.slice(3, 5), 16)
+        const b = parseInt(tag.color.slice(5, 7), 16)
+        const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255
+        update.run(luminance > 0.55 ? '#000000' : '#ffffff', tag.id)
+      }
+    }
   }
 ]
 

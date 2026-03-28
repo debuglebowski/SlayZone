@@ -339,7 +339,7 @@ export function CreateTaskDialog({
                                 <span
                                   key={tag.id}
                                   className="rounded px-2 py-1 text-sm font-medium"
-                                  style={{ backgroundColor: tag.color + '30', color: tag.color }}
+                                  style={{ backgroundColor: tag.color, color: tag.text_color }}
                                 >
                                   {tag.name}
                                 </span>
@@ -370,7 +370,7 @@ export function CreateTaskDialog({
                               />
                               <span
                                 className="rounded px-2 py-1 text-sm font-medium"
-                                style={{ backgroundColor: tag.color + '30', color: tag.color }}
+                                style={{ backgroundColor: tag.color, color: tag.text_color }}
                               >
                                 {tag.name}
                               </span>

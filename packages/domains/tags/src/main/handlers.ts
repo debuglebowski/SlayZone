@@ -12,11 +12,12 @@ export function registerTagHandlers(ipcMain: IpcMain, db: Database): void {
   ipcMain.handle('db:tags:create', (_, data: CreateTagInput) => {
     const id = crypto.randomUUID()
     const maxOrder = db.prepare('SELECT COALESCE(MAX(sort_order), -1) as m FROM tags WHERE project_id = ?').get(data.projectId) as { m: number }
-    db.prepare('INSERT INTO tags (id, project_id, name, color, sort_order) VALUES (?, ?, ?, ?, ?)').run(
+    db.prepare('INSERT INTO tags (id, project_id, name, color, text_color, sort_order) VALUES (?, ?, ?, ?, ?, ?)').run(
       id,
       data.projectId,
       data.name,
-      data.color ?? '#6b7280',
+      data.color ?? '#6366f1',
+      data.textColor ?? '#ffffff',
       maxOrder.m + 1
     )
     return db.prepare('SELECT * FROM tags WHERE id = ?').get(id)
@@ -33,6 +34,10 @@ export function registerTagHandlers(ipcMain: IpcMain, db: Database): void {
     if (data.color !== undefined) {
       fields.push('color = ?')
       values.push(data.color)
+    }
+    if (data.textColor !== undefined) {
+      fields.push('text_color = ?')
+      values.push(data.textColor)
     }
     if (data.sort_order !== undefined) {
       fields.push('sort_order = ?')

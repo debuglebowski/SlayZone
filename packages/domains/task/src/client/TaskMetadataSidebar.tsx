@@ -226,7 +226,7 @@ export function TaskMetadataSidebar({
                     <span
                       key={tag.id}
                       className="rounded px-1.5 py-1 text-xs font-medium h-full"
-                      style={{ backgroundColor: tag.color + '30', color: tag.color }}
+                      style={{ backgroundColor: tag.color, color: tag.text_color }}
                     >
                       {tag.name}
                     </span>
@@ -251,13 +251,13 @@ export function TaskMetadataSidebar({
                     />
                     <span
                       className="flex-1 rounded px-2 py-1 text-sm font-medium inline-flex items-center justify-between gap-1"
-                      style={{ backgroundColor: tag.color + '30', color: tag.color }}
+                      style={{ backgroundColor: tag.color, color: tag.text_color }}
                     >
                       {tag.name}
                       <button
                         type="button"
                         className="opacity-0 group-hover:opacity-100 transition-opacity"
-                        onClick={(e) => { e.preventDefault(); setEditingTag(tag); setTagDialogOpen(true) }}
+                        onClick={(e) => { e.preventDefault(); e.stopPropagation(); setEditingTag(tag); setTagDialogOpen(true) }}
                       >
                         <Pencil className="h-3 w-3" />
                       </button>
@@ -281,13 +281,11 @@ export function TaskMetadataSidebar({
         </Popover>
         <CreateTagDialog
           open={tagDialogOpen}
-          onOpenChange={(open) => { setTagDialogOpen(open); if (!open) setEditingTag(null) }}
+          onOpenChange={setTagDialogOpen}
           projectId={task.project_id}
           tag={editingTag}
           onCreated={handleTagCreated}
-          onUpdated={(updated) => {
-            onTagCreated?.(updated)
-          }}
+          onUpdated={() => {}}
         />
       </div>
 

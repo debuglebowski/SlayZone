@@ -203,7 +203,7 @@ export function KanbanCard({
                   <span
                     key={tag.id}
                     className="rounded px-1 py-0 text-[9px] leading-tight"
-                    style={{ backgroundColor: tag.color + '30', color: tag.color }}
+                    style={{ backgroundColor: tag.color, color: tag.text_color }}
                   >
                     {tag.name}
                   </span>

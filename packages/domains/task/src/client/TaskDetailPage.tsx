@@ -196,6 +196,14 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
   const getMainSessionId = useCallback((id: string) => `${id}:${id}`, [])
 
   const [tags, setTags] = useState<Tag[]>(initialData?.tags ?? [])
+  useEffect(() => {
+    const handleTagUpdated = (e: Event) => {
+      const tag = (e as CustomEvent).detail as Tag
+      setTags((prev) => prev.map((t) => t.id === tag.id ? tag : t))
+    }
+    window.addEventListener('slayzone:tag-updated', handleTagUpdated)
+    return () => window.removeEventListener('slayzone:tag-updated', handleTagUpdated)
+  }, [])
   const { tagIds: taskTagIds, setTagIds: setTaskTagIds } = useTaskTagIds(task?.id, initialData?.taskTagIds)
   const statusOptions = useMemo(() => buildStatusOptions(project?.columns_config), [project?.columns_config])
   const completedStatus = useMemo(() => getDoneStatus(project?.columns_config), [project?.columns_config])

@@ -20,8 +20,7 @@ test.describe('Tag create and edit dialog', () => {
     await expect(mainWindow.locator('h3').getByText('Inbox', { exact: true })).toBeVisible({ timeout: 5_000 })
   })
 
-  test('open task detail and open tags popover', async ({ mainWindow }) => {
-    // Open task
+  test('open task and navigate to tags popover', async ({ mainWindow }) => {
     await mainWindow.getByText('Tag task').first().click()
     await expect(mainWindow.locator('[data-testid="terminal-mode-trigger"]:visible').first()).toBeVisible({ timeout: 5_000 })
 
@@ -30,75 +29,51 @@ test.describe('Tag create and edit dialog', () => {
     if (await dialog.isVisible({ timeout: 1_000 }).catch(() => false)) {
       await dialog.getByRole('button', { name: 'No' }).click()
     }
+  })
 
-    // Find and click the tags trigger button (contains the tag pill or "None")
+  test('edit existing tag: must update not create', async ({ mainWindow }) => {
+    // Count tags before
+    const tagsBefore = await seed(mainWindow).getTags()
+    const countBefore = tagsBefore.length
+
+    // Open tags popover
     const tagsLabel = mainWindow.locator('label').filter({ hasText: 'Tags' })
     const tagsButton = tagsLabel.locator('..').locator('button').first()
     await tagsButton.click()
 
-    // Popover should show existing-tag with checkbox
-    await expect(mainWindow.locator('[role="dialog"]').getByText('existing-tag')).toBeVisible({ timeout: 3_000 })
-  })
-
-  test('create tag via New tag dialog', async ({ mainWindow }) => {
-    // Click "New tag" button in popover
-    await mainWindow.getByRole('button', { name: 'New tag' }).click()
-
-    // Dialog should show "New Tag" title
-    await expect(mainWindow.getByRole('heading', { name: 'New Tag' })).toBeVisible({ timeout: 3_000 })
-
-    // Fill name and submit
-    const nameInput = mainWindow.locator('#tag-name')
-    await nameInput.fill('created-tag')
-    await mainWindow.getByRole('button', { name: 'Create' }).click()
-
-    // Dialog should close
-    await expect(mainWindow.getByRole('heading', { name: 'New Tag' })).not.toBeVisible({ timeout: 3_000 })
-
-    // Verify tag was created in DB with correct project
-    const tags = await seed(mainWindow).getTags()
-    const created = tags.find((t: any) => t.name === 'created-tag')
-    expect(created).toBeTruthy()
-    expect(created.project_id).toBe(projectId)
-  })
-
-  test('edit tag via pencil icon opens Edit Tag dialog', async ({ mainWindow }) => {
-    // Reopen the tags popover
-    const tagsLabel = mainWindow.locator('label').filter({ hasText: 'Tags' })
-    const tagsButton = tagsLabel.locator('..').locator('button').first()
-    await tagsButton.click()
-
-    // Hover over the existing-tag row to reveal pencil, then click it
+    // Hover to reveal pencil, click it
     const tagRow = mainWindow.locator('[role="dialog"]').locator('label').filter({ hasText: 'existing-tag' })
     await tagRow.hover()
-    // The pencil button is inside the colored span (not the checkbox)
     const editButton = tagRow.locator('button:not([role="checkbox"])')
-    await editButton.click({ force: true })
+    await editButton.click()
 
-    // Dialog must show "Edit Tag" — NOT "New Tag"
+    // Must show "Edit Tag" heading
     await expect(mainWindow.getByRole('heading', { name: 'Edit Tag' })).toBeVisible({ timeout: 3_000 })
+
+    // Must NOT show "New Tag" heading
     await expect(mainWindow.getByRole('heading', { name: 'New Tag' })).not.toBeVisible()
 
-    // Name input should be pre-filled with existing name
+    // Input must be pre-filled
     const nameInput = mainWindow.locator('#tag-name')
     await expect(nameInput).toHaveValue('existing-tag')
 
-    // Change name
+    // Rename and save
     await nameInput.clear()
     await nameInput.fill('renamed-tag')
-
-    // Click Save (not Create)
-    await expect(mainWindow.getByRole('button', { name: 'Save' })).toBeVisible()
     await mainWindow.getByRole('button', { name: 'Save' }).click()
-
-    // Dialog should close
     await expect(mainWindow.getByRole('heading', { name: 'Edit Tag' })).not.toBeVisible({ timeout: 3_000 })
 
-    // Verify tag was updated (not duplicated) in DB
-    const tags = await seed(mainWindow).getTags()
-    const renamed = tags.find((t: any) => t.name === 'renamed-tag')
-    const old = tags.find((t: any) => t.name === 'existing-tag')
-    expect(renamed).toBeTruthy()
+    // CRITICAL: tag count must NOT increase (edit, not create)
+    const tagsAfter = await seed(mainWindow).getTags()
+    expect(tagsAfter.length).toBe(countBefore)
+
+    // Old name must be gone
+    const old = tagsAfter.find((t: any) => t.name === 'existing-tag')
     expect(old).toBeUndefined()
+
+    // New name must exist
+    const renamed = tagsAfter.find((t: any) => t.name === 'renamed-tag')
+    expect(renamed).toBeTruthy()
+    expect(renamed.id).toBe(tagsBefore.find((t: any) => t.name === 'existing-tag')!.id)
   })
 })

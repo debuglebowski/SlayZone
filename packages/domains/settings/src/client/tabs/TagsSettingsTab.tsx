@@ -106,7 +106,7 @@ export function TagsSettingsTab() {
                     </div>
                     <span
                       className="rounded px-2 py-1 text-sm font-medium"
-                      style={{ backgroundColor: tag.color + '30', color: tag.color }}
+                      style={{ backgroundColor: tag.color, color: tag.text_color }}
                     >
                       {tag.name}
                     </span>

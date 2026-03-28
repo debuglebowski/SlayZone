@@ -3,6 +3,7 @@ export interface Tag {
   project_id: string
   name: string
   color: string
+  text_color: string
   sort_order: number
   created_at: string
 }
@@ -10,6 +11,7 @@ export interface Tag {
 export interface CreateTagInput {
   name: string
   color?: string
+  textColor?: string
   projectId: string
 }
 
@@ -17,6 +19,7 @@ export interface UpdateTagInput {
   id: string
   name?: string
   color?: string
+  textColor?: string
   sort_order?: number
 }
 
