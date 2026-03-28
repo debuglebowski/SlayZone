@@ -12,7 +12,7 @@ export function PriorityIcon({ priority, className }: PriorityIconProps) {
   if (priority === 1) {
     return (
       <svg viewBox="0 0 16 16" fill="none" className={cn(size, className)}>
-        <path d="M9.5 1.5L4 9h4l-1.5 5.5L13 7H9l.5-5.5z" fill="#f97316" />
+        <path d="M9.5 1.5L4 9h4l-1.5 5.5L13 7H9l.5-5.5z" fill="#ef4444" />
       </svg>
     )
   }

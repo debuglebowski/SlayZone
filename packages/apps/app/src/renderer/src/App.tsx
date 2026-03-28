@@ -829,7 +829,8 @@ function App(): React.JSX.Element {
                                     <KanbanListView tasks={displayTasks} columns={selectedProject?.columns_config} viewConfig={getViewConfig(filter)}
                                       onTaskMove={handleTaskMove} onTaskReorder={reorderTasks} onTaskClick={handleTaskClick}
                                       projectsMap={projectsMap} showProjectDot={false} cardProperties={filter.cardProperties} blockedTaskIds={blockedTaskIds}
-                                      allProjects={projects} onUpdateTask={contextMenuUpdate} onArchiveTask={archiveTask} onDeleteTask={deleteTask} />
+                                      allProjects={projects} onUpdateTask={contextMenuUpdate} onArchiveTask={archiveTask} onDeleteTask={deleteTask}
+                                      tags={projectTags} taskTags={taskTags} onTaskTagsChange={handleTaskTagsChange} />
                                   )}
                                   {id === 'git' && (
                                     <UnifiedGitPanel ref={homePanel.homeGitPanelRef} projectId={selectedProjectId} projectPath={projectPath} visible={true}

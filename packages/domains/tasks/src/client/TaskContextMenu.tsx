@@ -3,6 +3,7 @@ import {
   ContextMenu,
   ContextMenuContent,
   ContextMenuItem,
+  ContextMenuCheckboxItem,
   ContextMenuSeparator,
   ContextMenuSub,
   ContextMenuSubContent,
@@ -25,15 +26,22 @@ import {
 import type { Task, TaskStatus } from '@slayzone/task/shared'
 import type { Project } from '@slayzone/projects/shared'
 import type { ColumnConfig } from '@slayzone/projects/shared'
+import type { Tag } from '@slayzone/tags/shared'
+import { CreateTagDialog } from '@slayzone/tags/client'
+import { Plus } from 'lucide-react'
 import { track } from '@slayzone/telemetry/client'
 
 interface TaskContextMenuProps {
   task: Task
   projects: Project[]
   columns?: ColumnConfig[] | null
+  tags?: Tag[]
+  taskTagIds?: string[]
   onUpdateTask: (taskId: string, updates: Partial<Task>) => void
   onArchiveTask: (taskId: string) => void
   onDeleteTask: (taskId: string) => void
+  onTaskTagsChange?: (taskId: string, tagIds: string[]) => void
+  onTagCreated?: (tag: Tag) => void
   children: React.ReactNode
 }
 
@@ -49,13 +57,18 @@ export function TaskContextMenu({
   task,
   projects,
   columns,
+  tags,
+  taskTagIds,
   onUpdateTask,
   onArchiveTask,
   onDeleteTask,
+  onTaskTagsChange,
+  onTagCreated,
   children
 }: TaskContextMenuProps): React.JSX.Element {
   const [archiveDialogOpen, setArchiveDialogOpen] = useState(false)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [tagDialogOpen, setTagDialogOpen] = useState(false)
   const statusOptions = buildStatusOptions(columns)
 
   const handleStatusChange = (status: string): void => {
@@ -66,6 +79,13 @@ export function TaskContextMenu({
   const handlePriorityChange = (priority: string): void => {
     track('task_priority_changed', { priority })
     onUpdateTask(task.id, { priority: parseInt(priority, 10) })
+  }
+
+  const handleTagToggle = (tagId: string, checked: boolean): void => {
+    if (!onTaskTagsChange) return
+    const current = taskTagIds ?? []
+    const next = checked ? [...current, tagId] : current.filter((id) => id !== tagId)
+    onTaskTagsChange(task.id, next)
   }
 
   const handleProjectChange = (projectId: string): void => {
@@ -129,6 +149,35 @@ export function TaskContextMenu({
               </ContextMenuRadioGroup>
             </ContextMenuSubContent>
           </ContextMenuSub>
+
+          {/* Tags submenu */}
+          {tags && onTaskTagsChange && (
+            <ContextMenuSub>
+              <ContextMenuSubTrigger>Tags</ContextMenuSubTrigger>
+              <ContextMenuSubContent>
+                {tags.map((tag) => (
+                  <ContextMenuCheckboxItem
+                    key={tag.id}
+                    checked={taskTagIds?.includes(tag.id) ?? false}
+                    onCheckedChange={(checked) => handleTagToggle(tag.id, checked === true)}
+                    onSelect={(e) => e.preventDefault()}
+                  >
+                    <span
+                      className="rounded px-1.5 py-0.5 text-xs font-medium"
+                      style={{ backgroundColor: tag.color, color: tag.text_color }}
+                    >
+                      {tag.name}
+                    </span>
+                  </ContextMenuCheckboxItem>
+                ))}
+                {tags.length > 0 && <ContextMenuSeparator />}
+                <ContextMenuItem onSelect={() => setTagDialogOpen(true)}>
+                  <Plus className="h-3.5 w-3.5 mr-1.5" />
+                  New tag
+                </ContextMenuItem>
+              </ContextMenuSubContent>
+            </ContextMenuSub>
+          )}
 
           <ContextMenuSeparator />
 
@@ -205,6 +254,22 @@ export function TaskContextMenu({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Create tag dialog */}
+      {tags && (
+        <CreateTagDialog
+          open={tagDialogOpen}
+          onOpenChange={setTagDialogOpen}
+          projectId={task.project_id}
+          tag={null}
+          existingTags={tags}
+          onCreated={(tag) => {
+            onTagCreated?.(tag)
+            handleTagToggle(tag.id, true)
+          }}
+          onUpdated={() => {}}
+        />
+      )}
     </>
   )
 }

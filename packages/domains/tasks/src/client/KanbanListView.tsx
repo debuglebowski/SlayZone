@@ -18,6 +18,7 @@ import type { Project } from '@slayzone/projects/shared'
 import type { ColumnConfig } from '@slayzone/projects/shared'
 import { isTerminalStatus } from '@slayzone/projects/shared'
 import type { TerminalState } from '@slayzone/terminal/shared'
+import type { Tag } from '@slayzone/tags/shared'
 import { groupTasksBy, columnToCreateTaskDefaults, PRIORITY_LABELS, todayISO, type Column } from './kanban'
 import type { ViewConfig, CardProperties } from './FilterState'
 import { TaskContextMenu } from './TaskContextMenu'
@@ -45,6 +46,9 @@ interface KanbanListViewProps {
   onUpdateTask?: (taskId: string, updates: Partial<Task>) => void
   onArchiveTask?: (taskId: string) => void
   onDeleteTask?: (taskId: string) => void
+  tags?: Tag[]
+  taskTags?: Map<string, string[]>
+  onTaskTagsChange?: (taskId: string, tagIds: string[]) => void
 }
 
 function PriorityBar({ priority }: { priority: number }): React.JSX.Element {
@@ -100,6 +104,9 @@ interface ListRowProps {
   onUpdateTask?: (taskId: string, updates: Partial<Task>) => void
   onArchiveTask?: (taskId: string) => void
   onDeleteTask?: (taskId: string) => void
+  tags?: Tag[]
+  taskTagIds?: string[]
+  onTaskTagsChange?: (taskId: string, tagIds: string[]) => void
 }
 
 function SortableListRow(props: ListRowProps): React.JSX.Element {
@@ -123,9 +130,12 @@ function SortableListRow(props: ListRowProps): React.JSX.Element {
       task={task}
       projects={props.allProjects}
       columns={props.columns}
+      tags={props.tags}
+      taskTagIds={props.taskTagIds}
       onUpdateTask={props.onUpdateTask}
       onArchiveTask={props.onArchiveTask}
       onDeleteTask={props.onDeleteTask}
+      onTaskTagsChange={props.onTaskTagsChange}
     >
       <div ref={setNodeRef} style={style} {...dragProps}>
         {row}
@@ -265,6 +275,9 @@ interface GroupSectionProps {
   onUpdateTask?: (taskId: string, updates: Partial<Task>) => void
   onArchiveTask?: (taskId: string) => void
   onDeleteTask?: (taskId: string) => void
+  tags?: Tag[]
+  taskTags?: Map<string, string[]>
+  onTaskTagsChange?: (taskId: string, tagIds: string[]) => void
 }
 
 function GroupSection({
@@ -285,7 +298,10 @@ function GroupSection({
   allProjects,
   onUpdateTask,
   onArchiveTask,
-  onDeleteTask
+  onDeleteTask,
+  tags,
+  taskTags,
+  onTaskTagsChange
 }: GroupSectionProps): React.JSX.Element {
   return (
     <div>
@@ -339,6 +355,9 @@ function GroupSection({
                   onUpdateTask={onUpdateTask}
                   onArchiveTask={onArchiveTask}
                   onDeleteTask={onDeleteTask}
+                  tags={tags}
+                  taskTagIds={taskTags?.get(task.id)}
+                  onTaskTagsChange={onTaskTagsChange}
                 />
               ))}
             </div>
@@ -365,7 +384,10 @@ export function KanbanListView({
   allProjects,
   onUpdateTask,
   onArchiveTask,
-  onDeleteTask
+  onDeleteTask,
+  tags,
+  taskTags,
+  onTaskTagsChange
 }: KanbanListViewProps): React.JSX.Element {
   const { groupBy, sortBy, showEmptyColumns } = viewConfig
 
@@ -510,6 +532,9 @@ export function KanbanListView({
             onUpdateTask={onUpdateTask}
             onArchiveTask={onArchiveTask}
             onDeleteTask={onDeleteTask}
+            tags={tags}
+            taskTags={taskTags}
+            onTaskTagsChange={onTaskTagsChange}
           />
         ))}
       </div>

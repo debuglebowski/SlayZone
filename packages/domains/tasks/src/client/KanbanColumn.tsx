@@ -117,9 +117,12 @@ function SortableKanbanCard({
         task={task}
         projects={allProjects}
         columns={columns}
+        tags={tags}
+        taskTagIds={taskTagIds}
         onUpdateTask={onUpdateTask}
         onArchiveTask={onArchiveTask}
         onDeleteTask={onDeleteTask}
+        onTaskTagsChange={onTaskTagsChange}
       >
         {card}
       </TaskContextMenu>
