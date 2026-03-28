@@ -13,7 +13,10 @@
     "./client/TaskDetailPage": "./src/client/TaskDetailPage.tsx",
     "./client/TaskDetailDataLoader": "./src/client/TaskDetailDataLoader.tsx",
     "./client/taskDetailCache": "./src/client/taskDetailCache.ts",
-    "./client/TaskShell": "./src/client/TaskShell.tsx"
+    "./client/TaskShell": "./src/client/TaskShell.tsx",
+    "./client/ResizeHandle": "./src/client/ResizeHandle.tsx",
+    "./client/usePanelSizes": "./src/client/usePanelSizes.ts",
+    "./client/usePanelConfig": "./src/client/usePanelConfig.ts"
   },
   "scripts": {
     "typecheck": "tsgo --noEmit"

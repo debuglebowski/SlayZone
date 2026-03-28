@@ -205,8 +205,13 @@ export const useTabStore = create<TabState>()(
       if (validTabs.length === 0 || validTabs[0]?.type !== 'home') {
         validTabs.unshift({ type: 'home' })
       }
-      const clampedIndex = Math.max(0, Math.min(state.activeTabIndex ?? 0, validTabs.length - 1))
-      const activeView: ActiveView = state.activeView === 'leaderboard' || state.activeView === 'usage-analytics' ? state.activeView : 'tabs'
+      // Fresh app launch → kanban; Cmd+Shift+R reload → restore last tab
+      const isReload = typeof sessionStorage !== 'undefined' && sessionStorage.getItem('sz:session') === '1'
+      if (!isReload && typeof sessionStorage !== 'undefined') sessionStorage.setItem('sz:session', '1')
+      const clampedIndex = isReload ? Math.max(0, Math.min(state.activeTabIndex ?? 0, validTabs.length - 1)) : 0
+      const activeView: ActiveView = isReload
+        ? (state.activeView === 'leaderboard' || state.activeView === 'usage-analytics' ? state.activeView : 'tabs')
+        : 'tabs'
       set({
         tabs: validTabs,
         activeTabIndex: clampedIndex,

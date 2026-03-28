@@ -16,24 +16,15 @@ import {
   applyFilters,
   getViewConfig
 } from '@slayzone/tasks'
-import { CreateTaskDialog, EditTaskDialog, DeleteTaskDialog, ProcessesPanel, ResizeHandle, usePanelSizes, usePanelConfig } from '@slayzone/task'
-import { UnifiedGitPanel } from '@slayzone/worktrees'
-import { QuickOpenDialog } from '@slayzone/file-editor/client/QuickOpenDialog'
-import {
-  CreateProjectDialog,
-  ProjectSettingsDialog,
-  DeleteProjectDialog,
-  useDetectedRepos,
-  type ProjectCreationContext,
-  type ProjectStartMode
-} from '@slayzone/projects'
+import { ResizeHandle } from '@slayzone/task/client/ResizeHandle'
+import { usePanelSizes } from '@slayzone/task/client/usePanelSizes'
+import { usePanelConfig } from '@slayzone/task/client/usePanelConfig'
+import { useDetectedRepos } from '@slayzone/projects/client/useDetectedRepos'
+import type { ProjectCreationContext, ProjectStartMode } from '@slayzone/projects'
 import { useTabStore, useDialogStore, AppearanceProvider } from '@slayzone/settings'
-import { OnboardingDialog } from '@slayzone/onboarding'
-import { TestPanel } from '@slayzone/test-panel'
 import { track, trackShortcut } from '@slayzone/telemetry/client'
 import { usePty } from '@slayzone/terminal/client'
 // Shared
-import { SearchDialog } from '@/components/dialogs/SearchDialog'
 import {
   Button,
   AlertDialog,
@@ -53,11 +44,8 @@ import {
 } from '@slayzone/ui'
 import { SidebarProvider, cn, PanelToggle, projectColorBg, useUndo, matchesShortcut, useShortcutStore, shortcutDefinitions, useShortcutDisplay, withModalGuard } from '@slayzone/ui'
 import { AppSidebar } from '@/components/sidebar/AppSidebar'
-import { ChangelogDialog } from '@/components/changelog/ChangelogDialog'
 import { useChangelogAutoOpen } from '@/components/changelog/useChangelogAutoOpen'
 import { TabBar } from '@/components/tabs/TabBar'
-import { LeaderboardPage } from '@/components/leaderboard/LeaderboardPage'
-import { UsageAnalyticsPage } from '@slayzone/usage-analytics/client'
 import {
   DesktopNotificationToggle,
   NotificationButton,
@@ -81,6 +69,25 @@ const TaskDetailDataLoader = lazy(() => import('@slayzone/task/client/TaskDetail
 const FileEditorView = lazy(() => import('@slayzone/file-editor/client/FileEditorView').then(m => ({ default: m.FileEditorView })))
 const UserSettingsDialog = lazy(() => import('@slayzone/settings/client/UserSettingsDialog').then(m => ({ default: m.UserSettingsDialog })))
 const TutorialAnimationModal = lazy(() => import('@/components/tutorial/TutorialAnimationModal').then(m => ({ default: m.TutorialAnimationModal })))
+// Home panels
+const UnifiedGitPanel = lazy(() => import('@slayzone/worktrees').then(m => ({ default: m.UnifiedGitPanel })))
+const TestPanel = lazy(() => import('@slayzone/test-panel').then(m => ({ default: m.TestPanel })))
+const ProcessesPanel = lazy(() => import('@slayzone/task').then(m => ({ default: m.ProcessesPanel })))
+// Overlay pages
+const LeaderboardPage = lazy(() => import('@/components/leaderboard/LeaderboardPage').then(m => ({ default: m.LeaderboardPage })))
+const UsageAnalyticsPage = lazy(() => import('@slayzone/usage-analytics/client').then(m => ({ default: m.UsageAnalyticsPage })))
+// Dialogs
+const CreateTaskDialog = lazy(() => import('@slayzone/task').then(m => ({ default: m.CreateTaskDialog })))
+const EditTaskDialog = lazy(() => import('@slayzone/task').then(m => ({ default: m.EditTaskDialog })))
+const DeleteTaskDialog = lazy(() => import('@slayzone/task').then(m => ({ default: m.DeleteTaskDialog })))
+const TemplatesSettingsTab = lazy(() => import('@slayzone/task').then(m => ({ default: m.TemplatesSettingsTab })))
+const CreateProjectDialog = lazy(() => import('@slayzone/projects').then(m => ({ default: m.CreateProjectDialog })))
+const ProjectSettingsDialog = lazy(() => import('@slayzone/projects').then(m => ({ default: m.ProjectSettingsDialog })))
+const DeleteProjectDialog = lazy(() => import('@slayzone/projects').then(m => ({ default: m.DeleteProjectDialog })))
+const OnboardingDialog = lazy(() => import('@slayzone/onboarding').then(m => ({ default: m.OnboardingDialog })))
+const SearchDialog = lazy(() => import('@/components/dialogs/SearchDialog').then(m => ({ default: m.SearchDialog })))
+const QuickOpenDialog = lazy(() => import('@slayzone/file-editor/client/QuickOpenDialog').then(m => ({ default: m.QuickOpenDialog })))
+const ChangelogDialog = lazy(() => import('@/components/changelog/ChangelogDialog').then(m => ({ default: m.ChangelogDialog })))
 
 type ProjectSettingsTab = 'general' | 'environment' | 'columns' | 'integrations' | 'ai-config' | 'tests'
 type ProjectIntegrationOnboardingProvider = Exclude<ProjectStartMode, 'scratch'>
@@ -88,8 +95,15 @@ type GlobalAiConfigSection = 'providers' | 'instructions' | 'skill' | 'mcp' | 'f
 const COMMUNITY_DISCORD_URL = 'https://discord.gg/g7xPHXaU98'
 const COMMUNITY_X_URL = 'https://x.com/debuglebowski'
 
+// Lazy-mount: first trigger loads the chunk + mounts; stays mounted after so close/reopen animations work.
+function useLazyMounted() {
+  const set = useRef(new Set<string>())
+  return (key: string, open: boolean) => { if (open) set.current.add(key); return set.current.has(key) }
+}
+
 function App(): React.JSX.Element {
   performance.mark('sz:app:render')
+  const shouldMount = useLazyMounted()
   // Core data from domain hook
   const {
     tasks, projects, tags, taskTags, blockedTaskIds,
@@ -833,6 +847,7 @@ function App(): React.JSX.Element {
                                       tags={projectTags} taskTags={taskTags} onTaskTagsChange={handleTaskTagsChange} />
                                   )}
                                   {id === 'git' && (
+                                    <Suspense fallback={<div className="h-full animate-pulse bg-muted/30 rounded" />}>
                                     <UnifiedGitPanel ref={homePanel.homeGitPanelRef} projectId={selectedProjectId} projectPath={projectPath} visible={true}
                                       defaultTab={homePanel.homeGitDefaultTab} onTabChange={homePanel.setHomeGitDefaultTab} tasks={tasks} filter={filter} projects={projects}
                                       onTaskClick={(t) => handleTaskClick(t, { metaKey: false })}
@@ -841,10 +856,11 @@ function App(): React.JSX.Element {
                                       selectedRepoName={homeSelectedProject?.selected_repo}
                                       isRepoStale={homeResolvedRepo.stale}
                                       onRepoChange={handleHomeRepoChange} />
+                                    </Suspense>
                                   )}
                                   {id === 'editor' && <Suspense><FileEditorView ref={homePanel.homeEditorRefCallback} projectPath={projectPath ?? ''} /></Suspense>}
-                                  {id === 'processes' && <ProcessesPanel taskId={null} projectId={selectedProjectId} cwd={projectPath} />}
-                                  {id === 'tests' && <TestPanel projectId={selectedProjectId} projectPath={projectPath} groupBy={testGroupBy} onOpenSettings={() => { if (selectedProject) openProjectSettings(selectedProject, { initialTab: 'tests' }) }} />}
+                                  {id === 'processes' && <Suspense fallback={<div className="h-full animate-pulse bg-muted/30 rounded" />}><ProcessesPanel taskId={null} projectId={selectedProjectId} cwd={projectPath} /></Suspense>}
+                                  {id === 'tests' && <Suspense fallback={<div className="h-full animate-pulse bg-muted/30 rounded" />}><TestPanel projectId={selectedProjectId} projectPath={projectPath} groupBy={testGroupBy} onOpenSettings={() => { if (selectedProject) openProjectSettings(selectedProject, { initialTab: 'tests' }) }} /></Suspense>}
                                 </div>
                               </React.Fragment>
                             )
@@ -869,12 +885,12 @@ function App(): React.JSX.Element {
               })}
               {activeView === 'leaderboard' && (
                 <div className="absolute inset-0 z-20">
-                  <LeaderboardPage />
+                  <Suspense fallback={null}><LeaderboardPage /></Suspense>
                 </div>
               )}
               {activeView === 'usage-analytics' && (
                 <div className="absolute inset-0 z-20">
-                  <UsageAnalyticsPage onTaskClick={openTask} />
+                  <Suspense fallback={null}><UsageAnalyticsPage onTaskClick={openTask} /></Suspense>
                 </div>
               )}
             </div>
@@ -889,38 +905,39 @@ function App(): React.JSX.Element {
           </div>
         </div>
 
-        {/* Dialogs */}
-        <QuickOpenDialog open={homePanel.homeQuickOpenVisible} onOpenChange={homePanel.setHomeQuickOpenVisible}
+        {/* Dialogs — lazy-mounted on first trigger, stay mounted for close/reopen animations */}
+        {shouldMount('quickOpen', homePanel.homeQuickOpenVisible) && <Suspense fallback={null}><QuickOpenDialog open={homePanel.homeQuickOpenVisible} onOpenChange={homePanel.setHomeQuickOpenVisible}
           projectPath={projects.find(p => p.id === selectedProjectId)?.path ?? ''}
           onOpenFile={(filePath) => {
             if (homePanel.homeEditorRef.current) {
               if (!homePanel.homePanelVisibility.editor) homePanel.setHomePanelVisibility(prev => ({ ...prev, editor: true }))
               homePanel.homeEditorRef.current.openFile(filePath)
             } else { homePanel.pendingHomeEditorFileRef.current = filePath; homePanel.setHomePanelVisibility(prev => ({ ...prev, editor: true })) }
-          }} />
-        <CreateTaskDialog open={createTaskOpen} onOpenChange={(open) => { if (!open) useDialogStore.getState().closeCreateTask() }} onCreated={handleTaskCreated} onCreatedAndOpen={handleTaskCreatedAndOpen}
+          }} /></Suspense>}
+        {shouldMount('createTask', createTaskOpen) && <Suspense fallback={null}><CreateTaskDialog open={createTaskOpen} onOpenChange={(open) => { if (!open) useDialogStore.getState().closeCreateTask() }} onCreated={handleTaskCreated} onCreatedAndOpen={handleTaskCreatedAndOpen}
           defaultProjectId={selectedProjectId || projects[0]?.id} defaultStatus={createTaskDefaults.status}
           defaultPriority={createTaskDefaults.priority} defaultDueDate={createTaskDefaults.dueDate}
-          tags={projectTags} onTagCreated={(tag: Tag) => setTags((prev) => [...prev, tag])} />
-        <EditTaskDialog task={editingTask} open={!!editingTask} onOpenChange={(open) => { if (!open) useDialogStore.getState().closeEditTask() }} onUpdated={handleTaskUpdated} />
-        <DeleteTaskDialog task={deletingTask} open={!!deletingTask} onOpenChange={(open) => { if (!open) useDialogStore.getState().closeDeleteTask() }} onDeleted={handleTaskDeleted} />
-        <CreateProjectDialog open={createProjectOpen} onOpenChange={(open) => { if (!open) useDialogStore.getState().closeCreateProject() }} onCreated={handleProjectCreated} />
-        <ProjectSettingsDialog project={editingProject} open={!!editingProject} onOpenChange={(open) => !open && closeProjectSettings()}
+          tags={projectTags} onTagCreated={(tag: Tag) => setTags((prev) => [...prev, tag])} /></Suspense>}
+        {shouldMount('editTask', !!editingTask) && <Suspense fallback={null}><EditTaskDialog task={editingTask} open={!!editingTask} onOpenChange={(open) => { if (!open) useDialogStore.getState().closeEditTask() }} onUpdated={handleTaskUpdated} /></Suspense>}
+        {shouldMount('deleteTask', !!deletingTask) && <Suspense fallback={null}><DeleteTaskDialog task={deletingTask} open={!!deletingTask} onOpenChange={(open) => { if (!open) useDialogStore.getState().closeDeleteTask() }} onDeleted={handleTaskDeleted} /></Suspense>}
+        {shouldMount('createProject', createProjectOpen) && <Suspense fallback={null}><CreateProjectDialog open={createProjectOpen} onOpenChange={(open) => { if (!open) useDialogStore.getState().closeCreateProject() }} onCreated={handleProjectCreated} /></Suspense>}
+        {shouldMount('projectSettings', !!editingProject) && <Suspense fallback={null}><ProjectSettingsDialog project={editingProject} open={!!editingProject} onOpenChange={(open) => !open && closeProjectSettings()}
           initialTab={projectSettingsInitialTab} groupBy={testGroupBy} onGroupByChange={setTestGroupBy}
           integrationOnboardingProvider={projectSettingsOnboardingProvider} onIntegrationOnboardingHandled={() => setProjectSettingsOnboardingProvider(null)}
-          onOpenGlobalAiConfig={openGlobalAiConfigFromProject} onUpdated={handleProjectUpdated} />
-        <DeleteProjectDialog project={deletingProject} open={!!deletingProject} onOpenChange={(open) => { if (!open) useDialogStore.getState().closeDeleteProject() }} onDeleted={handleProjectDeleted} />
-        <Suspense><UserSettingsDialog open={settingsOpen} onOpenChange={(open) => { setSettingsOpen(open); if (!open) { setSettingsRevision((r) => r + 1); setSettingsInitialAiConfigSection(null) } }}
-          initialTab={settingsInitialTab} initialAiConfigSection={settingsInitialAiConfigSection} onTabChange={setSettingsInitialTab} /></Suspense>
-        <SearchDialog open={searchOpen} onOpenChange={(open) => { if (!open) useDialogStore.getState().closeSearch() }} tasks={tasks} projects={projects} onSelectTask={openTask} onSelectProject={setSelectedProjectId} />
-        <OnboardingDialog externalOpen={onboardingOpen} onExternalClose={async () => {
+          onOpenGlobalAiConfig={openGlobalAiConfigFromProject} onUpdated={handleProjectUpdated}
+          renderTemplatesTab={(projectId) => <TemplatesSettingsTab projectId={projectId} />} /></Suspense>}
+        {shouldMount('deleteProject', !!deletingProject) && <Suspense fallback={null}><DeleteProjectDialog project={deletingProject} open={!!deletingProject} onOpenChange={(open) => { if (!open) useDialogStore.getState().closeDeleteProject() }} onDeleted={handleProjectDeleted} /></Suspense>}
+        {shouldMount('settings', settingsOpen) && <Suspense fallback={null}><UserSettingsDialog open={settingsOpen} onOpenChange={(open) => { setSettingsOpen(open); if (!open) { setSettingsRevision((r) => r + 1); setSettingsInitialAiConfigSection(null) } }}
+          initialTab={settingsInitialTab} initialAiConfigSection={settingsInitialAiConfigSection} onTabChange={setSettingsInitialTab} /></Suspense>}
+        {shouldMount('search', searchOpen) && <Suspense fallback={null}><SearchDialog open={searchOpen} onOpenChange={(open) => { if (!open) useDialogStore.getState().closeSearch() }} tasks={tasks} projects={projects} onSelectTask={openTask} onSelectProject={setSelectedProjectId} /></Suspense>}
+        {shouldMount('onboarding', onboardingOpen) && <Suspense fallback={null}><OnboardingDialog externalOpen={onboardingOpen} onExternalClose={async () => {
           useDialogStore.getState().closeOnboarding()
           const [onboardingCompleted, prompted] = await Promise.all([window.api.settings.get('onboarding_completed'), window.api.settings.get('tutorial_prompted')])
           if (onboardingCompleted === 'true') markSetupGuideCompleted()
           if (!prompted) { void window.api.settings.set('tutorial_prompted', 'true'); toast('Want a quick tour?', { duration: 8000, action: { label: 'Take the tour', onClick: startTour } }) }
-        }} />
-        <Suspense><TutorialAnimationModal open={showAnimatedTour} onClose={() => useDialogStore.getState().closeAnimatedTour()} /></Suspense>
-        <ChangelogDialog open={changelogOpen || autoChangelogOpen} onOpenChange={(open) => { if (!open) { useDialogStore.getState().closeChangelog(); dismissAutoChangelog() } }} lastSeenVersion={autoChangelogOpen ? lastSeenVersion : null} />
+        }} /></Suspense>}
+        {shouldMount('tutorial', showAnimatedTour) && <Suspense fallback={null}><TutorialAnimationModal open={showAnimatedTour} onClose={() => useDialogStore.getState().closeAnimatedTour()} /></Suspense>}
+        {shouldMount('changelog', changelogOpen || autoChangelogOpen) && <Suspense fallback={null}><ChangelogDialog open={changelogOpen || autoChangelogOpen} onOpenChange={(open) => { if (!open) { useDialogStore.getState().closeChangelog(); dismissAutoChangelog() } }} lastSeenVersion={autoChangelogOpen ? lastSeenVersion : null} /></Suspense>}
         <AlertDialog open={completeTaskDialogOpen} onOpenChange={(open) => { if (!open) useDialogStore.getState().closeCompleteTaskDialog() }}>
           <AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Complete Task</AlertDialogTitle><AlertDialogDescription>Mark as complete and close tab?</AlertDialogDescription></AlertDialogHeader>
           <AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction autoFocus onClick={handleCompleteTaskConfirm}>Complete</AlertDialogAction></AlertDialogFooter></AlertDialogContent>
