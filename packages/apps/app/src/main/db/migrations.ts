@@ -1553,6 +1553,35 @@ const migrations: Migration[] = [
         update.run(luminance > 0.55 ? '#000000' : '#ffffff', tag.id)
       }
     }
+  },
+  {
+    version: 86,
+    up: (db) => {
+      db.exec(`
+        CREATE TABLE task_templates (
+          id TEXT PRIMARY KEY,
+          project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+          name TEXT NOT NULL,
+          description TEXT,
+          terminal_mode TEXT,
+          provider_config TEXT,
+          panel_visibility TEXT,
+          browser_tabs TEXT,
+          web_panel_urls TEXT,
+          dangerously_skip_permissions INTEGER,
+          ccs_profile TEXT,
+          default_status TEXT,
+          default_priority INTEGER,
+          is_default INTEGER NOT NULL DEFAULT 0,
+          sort_order INTEGER NOT NULL DEFAULT 0,
+          created_at TEXT NOT NULL DEFAULT (datetime('now')),
+          updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+        );
+
+        CREATE UNIQUE INDEX idx_task_templates_default
+          ON task_templates(project_id) WHERE is_default = 1;
+      `)
+    }
   }
 ]
 

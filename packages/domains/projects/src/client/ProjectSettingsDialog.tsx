@@ -20,13 +20,14 @@ interface ProjectSettingsDialogProps {
   project: Project | null
   open: boolean
   onOpenChange: (open: boolean) => void
-  initialTab?: 'general' | 'environment' | 'columns' | 'worktrees' | 'repos' | 'integrations' | 'ai-config' | 'tests' | 'tags'
+  initialTab?: 'general' | 'environment' | 'columns' | 'worktrees' | 'repos' | 'integrations' | 'ai-config' | 'tests' | 'tags' | 'templates'
   groupBy?: 'none' | 'path' | 'label'
   onGroupByChange?: (value: 'none' | 'path' | 'label') => void
   integrationOnboardingProvider?: IntegrationProvider | null
   onIntegrationOnboardingHandled?: () => void
   onOpenGlobalAiConfig?: (section: GlobalContextManagerSection) => void
   onUpdated: (project: Project) => void
+  renderTemplatesTab?: (projectId: string) => React.ReactNode
 }
 
 export function ProjectSettingsDialog({
@@ -39,9 +40,10 @@ export function ProjectSettingsDialog({
   integrationOnboardingProvider = null,
   onIntegrationOnboardingHandled,
   onOpenGlobalAiConfig,
-  onUpdated
+  onUpdated,
+  renderTemplatesTab
 }: ProjectSettingsDialogProps) {
-  const [activeTab, setActiveTab] = useState<'general' | 'environment' | 'columns' | 'worktrees' | 'repos' | 'tags' | 'integrations' | 'ai-config' | 'tests'>('general')
+  const [activeTab, setActiveTab] = useState<'general' | 'environment' | 'columns' | 'worktrees' | 'repos' | 'tags' | 'templates' | 'integrations' | 'ai-config' | 'tests'>('general')
   const detectedRepos = useDetectedRepos(open ? project?.path ?? null : null)
   const [contextManagerEnabled, setContextManagerEnabled] = useState(window.api.app.isContextManagerEnabledSync)
   const [lockedByProvider, setLockedByProvider] = useState<string | null>(null)
@@ -93,6 +95,7 @@ export function ProjectSettingsDialog({
     { key: 'worktrees', label: 'Worktrees' },
     ...(detectedRepos.length > 0 ? [{ key: 'repos' as const, label: 'Repositories' }] : []),
     { key: 'tags', label: 'Tags' },
+    ...(renderTemplatesTab ? [{ key: 'templates' as const, label: 'Templates' }] : []),
     { key: 'tests', label: 'Tests' },
     { key: 'integrations' as const, label: 'Integrations' },
   ]
@@ -168,6 +171,8 @@ export function ProjectSettingsDialog({
           {activeTab === 'tags' && project && (
             <TagsSettingsTab projectId={project.id} />
           )}
+
+          {activeTab === 'templates' && project && renderTemplatesTab?.(project.id)}
 
           {activeTab === 'tests' && project && (
             <TestsTab

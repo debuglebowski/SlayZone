@@ -5,6 +5,7 @@ import type { ColumnConfig } from '@slayzone/projects/shared'
 import { getDefaultStatus, isKnownStatus, isTerminalStatus, parseColumnsConfig } from '@slayzone/projects/shared'
 import { parseProject } from '@slayzone/projects/main'
 import { DEFAULT_TERMINAL_MODES } from '@slayzone/terminal/shared'
+import { getTemplateForTask } from './template-handlers'
 import path from 'path'
 import { existsSync } from 'fs'
 import { removeWorktree, createWorktree, runWorktreeSetupScript, getCurrentBranch, isGitRepo, copyIgnoredFiles, resolveCopyBehavior } from '@slayzone/worktrees/main'
@@ -517,16 +518,23 @@ export function registerTaskHandlers(ipcMain: IpcMain, db: Database, onMutation?
   ipcMain.handle('db:tasks:create', async (_, data: CreateTaskInput) => {
     const id = crypto.randomUUID()
     const projectColumns = getProjectColumns(db, data.projectId)
+
+    // Resolve template (explicit > project default > none)
+    const template = data.isTemporary ? null : getTemplateForTask(db, data.projectId, data.templateId)
+
     const initialStatus =
       data.status && isKnownStatus(data.status, projectColumns)
         ? data.status
-        : getDefaultStatus(projectColumns)
+        : (template?.default_status && isKnownStatus(template.default_status, projectColumns))
+          ? template.default_status
+          : getDefaultStatus(projectColumns)
     const terminalMode = data.terminalMode
+      ?? template?.terminal_mode
       ?? (db.prepare("SELECT value FROM settings WHERE key = 'default_terminal_mode'")
           .get() as { value: string } | undefined)?.value
       ?? 'claude-code'
 
-    // Build provider_config from terminal_modes defaults + overrides
+    // Build provider_config from terminal_modes defaults + template + overrides
     const providerConfig: ProviderConfig = {}
     const legacyOverrides: Record<string, string | undefined> = {
       'claude-code': data.claudeFlags, 'codex': data.codexFlags,
@@ -534,24 +542,36 @@ export function registerTaskHandlers(ipcMain: IpcMain, db: Database, onMutation?
     }
     const allModes = getEnabledModeDefaults(db)
     for (const row of allModes) {
-      providerConfig[row.id] = { flags: legacyOverrides[row.id] ?? row.default_flags ?? '' }
+      providerConfig[row.id] = {
+        flags: legacyOverrides[row.id]
+          ?? template?.provider_config?.[row.id]?.flags
+          ?? row.default_flags ?? ''
+      }
     }
 
-    const ccsDefaultProfile = (db.prepare('SELECT value FROM settings WHERE key = ?')
-      .get('ccs_default_profile') as { value: string } | undefined)?.value ?? null
+    const ccsDefaultProfile = template?.ccs_profile
+      ?? (db.prepare('SELECT value FROM settings WHERE key = ?')
+        .get('ccs_default_profile') as { value: string } | undefined)?.value ?? null
+
+    const priority = data.priority ?? template?.default_priority ?? 3
+    const dangerouslySkipPerms = template?.dangerously_skip_permissions ? 1 : 0
+    const panelVisibility = template?.panel_visibility ? JSON.stringify(template.panel_visibility) : null
+    const browserTabs = template?.browser_tabs ? JSON.stringify(template.browser_tabs) : null
+    const webPanelUrls = template?.web_panel_urls ? JSON.stringify(template.web_panel_urls) : null
 
     const stmt = db.prepare(`
       INSERT INTO tasks (
         id, project_id, parent_id, title, description, assignee,
         status, priority, due_date, terminal_mode, provider_config,
         claude_flags, codex_flags, cursor_flags, gemini_flags, opencode_flags,
-        is_temporary, ccs_profile, repo_name
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        is_temporary, ccs_profile, repo_name,
+        dangerously_skip_permissions, panel_visibility, browser_tabs, web_panel_urls
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `)
     stmt.run(
       id, data.projectId, data.parentId ?? null,
       data.title, data.description ?? null, data.assignee ?? null,
-      initialStatus, data.priority ?? 3, data.dueDate ?? null,
+      initialStatus, priority, data.dueDate ?? null,
       terminalMode, JSON.stringify(providerConfig),
       providerConfig['claude-code']?.flags ?? '',
       providerConfig['codex']?.flags ?? '',
@@ -560,7 +580,8 @@ export function registerTaskHandlers(ipcMain: IpcMain, db: Database, onMutation?
       providerConfig['opencode']?.flags ?? '',
       data.isTemporary ? 1 : 0,
       ccsDefaultProfile,
-      data.repoName ?? null
+      data.repoName ?? null,
+      dangerouslySkipPerms, panelVisibility, browserTabs, webPanelUrls
     )
     await maybeAutoCreateWorktree(db, id, data.projectId, data.title, data.repoName)
     const row = db.prepare('SELECT * FROM tasks WHERE id = ?').get(id) as Record<string, unknown> | undefined

@@ -87,7 +87,7 @@ import { normalizeProjectStatusData } from './db/status-normalization'
 import { registerBackupHandlers, startAutoBackup, stopAutoBackup, createPreMigrationBackup } from './backup'
 // Domain handlers
 import { registerProjectHandlers } from '@slayzone/projects/main'
-import { configureTaskRuntimeAdapters, registerTaskHandlers, registerFilesHandlers } from '@slayzone/task/main'
+import { configureTaskRuntimeAdapters, registerTaskHandlers, registerTaskTemplateHandlers, registerFilesHandlers } from '@slayzone/task/main'
 import { registerTagHandlers } from '@slayzone/tags/main'
 import { registerSettingsHandlers, registerThemeHandlers } from '@slayzone/settings/main'
 import { registerPtyHandlers, registerUsageHandlers, killAllPtys, killPtysByTaskId, startIdleChecker, stopIdleChecker, dismissAllNotifications, syncTerminalModes, getPtyPids, onSessionChange } from '@slayzone/terminal/main'
@@ -943,6 +943,7 @@ app.whenReady().then(async () => {
   const notifyTasksChanged = (): void => { mainWindow?.webContents.send('tasks:changed') }
   registerProjectHandlers(ipcMain, db)
   registerTaskHandlers(ipcMain, db, notifyTasksChanged)
+  registerTaskTemplateHandlers(ipcMain, db)
   registerTagHandlers(ipcMain, db)
   registerSettingsHandlers(ipcMain, db)
 

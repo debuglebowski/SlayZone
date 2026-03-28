@@ -1,5 +1,5 @@
 import type { Project, CreateProjectInput, UpdateProjectInput, ExecutionContext } from '@slayzone/projects/shared'
-import type { Task, CreateTaskInput, UpdateTaskInput, DesktopHandoffPolicy } from '@slayzone/task/shared'
+import type { Task, CreateTaskInput, UpdateTaskInput, DesktopHandoffPolicy, TaskTemplate, CreateTaskTemplateInput, UpdateTaskTemplateInput } from '@slayzone/task/shared'
 import type { Tag, CreateTagInput, UpdateTagInput } from '@slayzone/tags/shared'
 import type {
   TerminalMode,
@@ -254,6 +254,14 @@ export interface ElectronAPI {
     getAll: () => Promise<Record<string, string[]>>
     getTagsForTask: (taskId: string) => Promise<Tag[]>
     setTagsForTask: (taskId: string, tagIds: string[]) => Promise<void>
+  }
+  taskTemplates: {
+    getByProject: (projectId: string) => Promise<TaskTemplate[]>
+    get: (id: string) => Promise<TaskTemplate | null>
+    create: (data: CreateTaskTemplateInput) => Promise<TaskTemplate>
+    update: (data: UpdateTaskTemplateInput) => Promise<TaskTemplate | null>
+    delete: (id: string) => Promise<boolean>
+    setDefault: (projectId: string, templateId: string | null) => Promise<void>
   }
   taskDependencies: {
     getAllBlockedTaskIds: () => Promise<string[]>

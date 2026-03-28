@@ -51,6 +51,14 @@ const api: ElectronAPI = {
     getTagsForTask: (taskId) => ipcRenderer.invoke('db:taskTags:getForTask', taskId),
     setTagsForTask: (taskId, tagIds) => ipcRenderer.invoke('db:taskTags:setForTask', taskId, tagIds)
   },
+  taskTemplates: {
+    getByProject: (projectId) => ipcRenderer.invoke('db:taskTemplates:getByProject', projectId),
+    get: (id) => ipcRenderer.invoke('db:taskTemplates:get', id),
+    create: (data) => ipcRenderer.invoke('db:taskTemplates:create', data),
+    update: (data) => ipcRenderer.invoke('db:taskTemplates:update', data),
+    delete: (id) => ipcRenderer.invoke('db:taskTemplates:delete', id),
+    setDefault: (projectId, templateId) => ipcRenderer.invoke('db:taskTemplates:setDefault', projectId, templateId),
+  },
   taskDependencies: {
     getAllBlockedTaskIds: () => ipcRenderer.invoke('db:taskDependencies:getAllBlockedTaskIds'),
     getBlockers: (taskId) => ipcRenderer.invoke('db:taskDependencies:getBlockers', taskId),

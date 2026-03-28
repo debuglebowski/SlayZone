@@ -3,7 +3,7 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { format } from 'date-fns'
 import { CalendarIcon, Plus } from 'lucide-react'
-import type { Task } from '@slayzone/task/shared'
+import type { Task, TaskTemplate } from '@slayzone/task/shared'
 import type { Tag } from '@slayzone/tags/shared'
 import { CreateTagDialog } from '@slayzone/tags/client'
 import type { Project } from '@slayzone/projects/shared'
@@ -68,6 +68,8 @@ export function CreateTaskDialog({
   const [createTagOpen, setCreateTagOpen] = useState(false)
   const [showSuccess, setShowSuccess] = useState(false)
   const [projects, setProjects] = useState<Project[]>([])
+  const [templates, setTemplates] = useState<TaskTemplate[]>([])
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string>('__none__')
   const form = useForm<CreateTaskFormData>({
     resolver: zodResolver(createTaskSchema),
     defaultValues: {
@@ -105,6 +107,32 @@ export function CreateTaskDialog({
   const selectedProject = projects.find((project) => project.id === selectedProjectId)
   const projectStatusOptions = buildStatusOptions(selectedProject?.columns_config)
 
+  // Fetch templates when project changes
+  useEffect(() => {
+    if (!open || !selectedProjectId) {
+      setTemplates([])
+      setSelectedTemplateId('__none__')
+      return
+    }
+    window.api.taskTemplates.getByProject(selectedProjectId).then((list) => {
+      setTemplates(list)
+      const def = list.find((t) => t.is_default)
+      setSelectedTemplateId(def?.id ?? '__none__')
+    })
+  }, [open, selectedProjectId])
+
+  // Apply template values to form when template changes
+  useEffect(() => {
+    const tmpl = templates.find((t) => t.id === selectedTemplateId)
+    if (!tmpl) return
+    if (tmpl.default_status && projectStatusOptions.some((o) => o.value === tmpl.default_status)) {
+      form.setValue('status', tmpl.default_status)
+    }
+    if (tmpl.default_priority != null) {
+      form.setValue('priority', tmpl.default_priority)
+    }
+  }, [selectedTemplateId]) // eslint-disable-line react-hooks/exhaustive-deps
+
   useEffect(() => {
     const currentStatus = form.getValues('status')
     if (!projectStatusOptions.some((option) => option.value === currentStatus)) {
@@ -141,7 +169,8 @@ export function CreateTaskDialog({
       description: data.description || undefined,
       status: opts?.statusOverride ?? data.status,
       priority: data.priority,
-      dueDate: data.dueDate ?? undefined
+      dueDate: data.dueDate ?? undefined,
+      templateId: selectedTemplateId === '__none__' ? undefined : selectedTemplateId
     })
     if (data.tagIds.length > 0) {
       await window.api.taskTags.setTagsForTask(task.id, data.tagIds)
@@ -202,6 +231,25 @@ export function CreateTaskDialog({
             }}
             className="space-y-4"
           >
+            {templates.length > 0 && (
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium">Template</label>
+                <Select value={selectedTemplateId} onValueChange={setSelectedTemplateId}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="None" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">None</SelectItem>
+                    {templates.map((t) => (
+                      <SelectItem key={t.id} value={t.id}>
+                        {t.name}{t.is_default ? ' (default)' : ''}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
             <FormField
               control={form.control}
               name="title"

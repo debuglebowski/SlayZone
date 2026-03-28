@@ -212,6 +212,7 @@ export interface CreateTaskInput {
   parentId?: string
   isTemporary?: boolean
   repoName?: string | null
+  templateId?: string
 }
 
 export interface UpdateTaskInput {
