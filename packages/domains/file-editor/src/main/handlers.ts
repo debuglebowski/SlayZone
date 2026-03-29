@@ -93,14 +93,21 @@ export function registerFileEditorHandlers(ipcMain: IpcMain): void {
       .filter((e) => !ALWAYS_IGNORED.has(e.name))
       .map((e) => {
         const relPath = dirPath ? `${dirPath}/${e.name}` : e.name
-        const ignored = isIgnored(rootPath, relPath, e.isDirectory())
+        const symlink = e.isSymbolicLink()
+        let isDir = e.isDirectory()
+        if (symlink) {
+          try { isDir = fs.statSync(path.join(abs, e.name)).isDirectory() } catch { return null }
+        }
+        const ignored = isIgnored(rootPath, relPath, isDir)
         return {
           name: e.name,
           path: relPath,
-          type: e.isDirectory() ? 'directory' as const : 'file' as const,
-          ...(ignored && { ignored: true })
+          type: isDir ? 'directory' as const : 'file' as const,
+          ...(ignored && { ignored: true }),
+          ...(symlink && { isSymlink: true })
         }
       })
+      .filter((e): e is NonNullable<typeof e> => e !== null)
       .sort((a, b) => {
         if (a.type !== b.type) return a.type === 'directory' ? -1 : 1
         return a.name.localeCompare(b.name)
@@ -243,6 +250,18 @@ export function registerFileEditorHandlers(ipcMain: IpcMain): void {
     }
     fs.copyFileSync(srcResolved, dest)
     return relPath
+  })
+
+  ipcMain.handle('fs:copy', (_event, rootPath: string, srcPath: string, destPath: string): void => {
+    const absSrc = assertWithinRoot(rootPath, srcPath)
+    const absDest = assertWithinRoot(rootPath, destPath)
+    fs.cpSync(absSrc, absDest, { recursive: true })
+  })
+
+  ipcMain.handle('fs:showInFinder', (_event, rootPath: string, targetPath: string): void => {
+    const abs = targetPath ? assertWithinRoot(rootPath, targetPath) : path.resolve(rootPath)
+    const { shell } = require('electron') as typeof import('electron')
+    shell.showItemInFolder(abs)
   })
 
   ipcMain.handle('fs:searchFiles', (_event, rootPath: string, query: string, options?: SearchFilesOptions): FileSearchResult[] => {

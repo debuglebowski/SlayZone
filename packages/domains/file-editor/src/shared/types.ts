@@ -5,6 +5,8 @@ export interface DirEntry {
   type: 'file' | 'directory'
   /** True if matched by .gitignore */
   ignored?: boolean
+  /** True if this entry is a symbolic link */
+  isSymlink?: boolean
 }
 
 export interface ReadFileResult {

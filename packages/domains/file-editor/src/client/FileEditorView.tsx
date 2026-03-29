@@ -9,11 +9,18 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  Button
+  Button,
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+  getThemeChrome,
+  getChromeStyleOverrides,
 } from '@slayzone/ui'
+import { useTheme } from '@slayzone/settings/client'
 import type { EditorOpenFilesState } from '@slayzone/file-editor/shared'
 import { useFileEditor } from './useFileEditor'
-import { EditorFileTree } from './EditorFileTree'
+import { EditorFileTree, type EditorFileTreeHandle } from './EditorFileTree'
 import { EditorTabBar } from './EditorTabBar'
 import { CodeEditor } from './CodeEditor'
 import { MarkdownFileEditor } from './MarkdownFileEditor'
@@ -56,12 +63,19 @@ export const FileEditorView = forwardRef<FileEditorViewHandle, FileEditorViewPro
     fileVersions
   } = useFileEditor(projectPath, initialEditorState)
 
+  const { editorOverrideThemeId, contentVariant } = useTheme()
+  const editorPanelStyle = useMemo(() => {
+    if (!editorOverrideThemeId) return undefined
+    return getChromeStyleOverrides(getThemeChrome(editorOverrideThemeId, contentVariant))
+  }, [editorOverrideThemeId, contentVariant])
+
   const [treeWidth, setTreeWidth] = useState(initialEditorState?.treeWidth ?? 250)
   const [treeVisible, setTreeVisible] = useState(initialEditorState?.treeVisible ?? true)
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(
     () => new Set(initialEditorState?.expandedFolders ?? [])
   )
   const isDragging = useRef(false)
+  const treeRef = useRef<EditorFileTreeHandle>(null)
   const [confirmClose, setConfirmClose] = useState<string | null>(null)
   const [viewMode, setViewMode] = useState<'code' | 'rich'>('rich')
   const [sidebarMode, setSidebarMode] = useState<'tree' | 'search'>('tree')
@@ -85,6 +99,23 @@ export const FileEditorView = forwardRef<FileEditorViewHandle, FileEditorViewPro
       expandedFolders: [...expandedFolders]
     })
   }, [filePathsKey, activeFilePath, treeWidth, treeVisible, expandedFolders, isRestoring])
+
+  // Auto-reveal active file in tree when it changes
+  useEffect(() => {
+    if (!activeFilePath || isRestoring) return
+    const parts = activeFilePath.split('/')
+    if (parts.length > 1) {
+      const ancestors = parts.slice(0, -1).reduce<string[]>((acc, part, i) => {
+        acc.push(i === 0 ? part : `${acc[i - 1]}/${part}`)
+        return acc
+      }, [])
+      setExpandedFolders(prev => {
+        if (ancestors.every(a => prev.has(a))) return prev
+        return new Set([...prev, ...ancestors])
+      })
+    }
+    requestAnimationFrame(() => treeRef.current?.scrollToPath(activeFilePath))
+  }, [activeFilePath, isRestoring])
 
   const isMarkdown = useMemo(() => {
     const ext = activeFilePath?.split('.').pop()?.toLowerCase()
@@ -204,6 +235,7 @@ export const FileEditorView = forwardRef<FileEditorViewHandle, FileEditorViewPro
   return (
     <div
       className="h-full flex bg-background relative"
+      style={editorPanelStyle as React.CSSProperties | undefined}
       onDragOver={handleFileDragOver}
       onDragEnter={handleFileDragEnter}
       onDragLeave={handleFileDragLeave}
@@ -213,33 +245,42 @@ export const FileEditorView = forwardRef<FileEditorViewHandle, FileEditorViewPro
       {treeVisible && (
         <div className="shrink-0 border-r overflow-hidden flex flex-col" style={{ width: treeWidth }}>
           {/* Sidebar tab header */}
-          <div className="flex items-center gap-1 px-2 h-10 border-b border-border shrink-0 bg-surface-1">
-            <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide mr-auto">
-              {sidebarMode === 'search' ? 'Search' : 'Files'}
-            </span>
-            {sidebarMode === 'tree' && (
-              <button
-                className="size-7 flex items-center justify-center rounded transition-colors text-muted-foreground hover:text-foreground hover:bg-muted/50"
-                onClick={refreshTree}
-                title="Refresh file tree"
-              >
-                <RefreshCw className="size-3.5" />
-              </button>
-            )}
-            {([
-              { mode: 'tree' as const, icon: Files, title: 'Explorer' },
-              { mode: 'search' as const, icon: Search, title: 'Search' }
-            ]).map(({ mode, icon: Icon, title }) => (
-              <button
-                key={mode}
-                className={`size-7 flex items-center justify-center rounded transition-colors ${sidebarMode === mode ? 'text-foreground bg-muted' : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'}`}
-                onClick={() => setSidebarMode(mode)}
-                title={title}
-              >
-                <Icon className="size-4" />
-              </button>
-            ))}
-          </div>
+          <TooltipProvider delayDuration={400}>
+            <div className="flex items-center gap-1 px-2 h-10 border-b border-border shrink-0 bg-surface-1">
+              <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide mr-auto">
+                {sidebarMode === 'search' ? 'Search' : 'Files'}
+              </span>
+              {sidebarMode === 'tree' && (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      className="size-7 flex items-center justify-center rounded transition-colors text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                      onClick={refreshTree}
+                    >
+                      <RefreshCw className="size-3.5" />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom">Refresh</TooltipContent>
+                </Tooltip>
+              )}
+              {([
+                { mode: 'tree' as const, icon: Files, label: 'Explorer' },
+                { mode: 'search' as const, icon: Search, label: 'Search' }
+              ]).map(({ mode, icon: Icon, label }) => (
+                <Tooltip key={mode}>
+                  <TooltipTrigger asChild>
+                    <button
+                      className={`size-7 flex items-center justify-center rounded transition-colors ${sidebarMode === mode ? 'text-foreground bg-muted' : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'}`}
+                      onClick={() => setSidebarMode(mode)}
+                    >
+                      <Icon className="size-4" />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom">{label}</TooltipContent>
+                </Tooltip>
+              ))}
+            </div>
+          </TooltipProvider>
           {/* Sidebar content */}
           <div className="flex-1 min-w-0 min-h-0">
             {sidebarMode === 'search' ? (
@@ -249,6 +290,7 @@ export const FileEditorView = forwardRef<FileEditorViewHandle, FileEditorViewPro
               />
             ) : (
               <EditorFileTree
+                ref={treeRef}
                 projectPath={projectPath}
                 onOpenFile={openFile}
                 onFileRenamed={renameOpenFile}
@@ -283,7 +325,7 @@ export const FileEditorView = forwardRef<FileEditorViewHandle, FileEditorViewPro
             onToggleTree={() => setTreeVisible((v) => !v)}
           />
           {isMarkdown && activeFile?.content != null && (
-            <div className="flex items-center shrink-0 mr-2 bg-surface-2 rounded-md p-0.5 gap-0.5">
+            <div className="flex items-center shrink-0 mr-2 bg-surface-1 rounded-md p-0.5 gap-0.5">
               {([
                 { mode: 'rich' as const, icon: Eye, title: 'Rich text' },
                 { mode: 'code' as const, icon: Code, title: 'Source code' }

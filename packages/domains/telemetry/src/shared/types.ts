@@ -75,6 +75,11 @@ export type TelemetryEventName =
   | 'file_renamed'
   | 'file_deleted'
   | 'folder_created'
+  | 'file_copied'
+  | 'file_cut'
+  | 'file_pasted'
+  | 'file_duplicated'
+  | 'path_copied'
   | 'file_search_used'
   | 'quick_open_used'
   | 'reveal_in_finder'
@@ -193,6 +198,11 @@ export interface TelemetryEventProps {
   file_renamed: Record<string, never>
   file_deleted: Record<string, never>
   folder_created: Record<string, never>
+  file_copied: Record<string, never>
+  file_cut: Record<string, never>
+  file_pasted: Record<string, never>
+  file_duplicated: Record<string, never>
+  path_copied: Record<string, never>
   file_search_used: { had_results: boolean }
   quick_open_used: Record<string, never>
   reveal_in_finder: Record<string, never>

@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useRef } from 'react'
+import { useState, useCallback, useEffect, useRef, useMemo, forwardRef, useImperativeHandle } from 'react'
 import { track } from '@slayzone/telemetry/client'
 import {
   FilePlus,
@@ -6,14 +6,30 @@ import {
   Folder,
   FolderOpen,
   Pencil,
-  Trash2
+  Trash2,
+  Scissors,
+  Copy,
+  CopyPlus,
+  ClipboardPaste,
+  FolderSearch,
+  ArrowUpRight,
+  Link2
 } from 'lucide-react'
 import {
   cn,
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
   ContextMenu,
   ContextMenuContent,
   ContextMenuItem,
   ContextMenuSeparator,
+  ContextMenuShortcut,
   ContextMenuTrigger,
   Input
 } from '@slayzone/ui'
@@ -35,7 +51,11 @@ interface EditorFileTreeProps {
   onExpandedFoldersChange?: (folders: Set<string>) => void
 }
 
-export function EditorFileTree({ projectPath, onOpenFile, onFileRenamed, activeFilePath, refreshKey, expandedFolders: controlledExpanded, onExpandedFoldersChange }: EditorFileTreeProps) {
+export interface EditorFileTreeHandle {
+  scrollToPath: (path: string) => void
+}
+
+export const EditorFileTree = forwardRef<EditorFileTreeHandle, EditorFileTreeProps>(function EditorFileTree({ projectPath, onOpenFile, onFileRenamed, activeFilePath, refreshKey, expandedFolders: controlledExpanded, onExpandedFoldersChange }, ref) {
   // Map of dirPath -> children entries (lazy loaded)
   const [dirContents, setDirContents] = useState<Map<string, DirEntry[]>>(new Map())
   const [internalExpanded, setInternalExpanded] = useState<Set<string>>(new Set())
@@ -49,7 +69,6 @@ export function EditorFileTree({ projectPath, onOpenFile, onFileRenamed, activeF
       return next
     }
     if (controlledRef.current) {
-      // Controlled mode — compute and emit, parent owns state
       update(controlledRef.current)
     } else {
       setInternalExpanded(update)
@@ -66,6 +85,34 @@ export function EditorFileTree({ projectPath, onOpenFile, onFileRenamed, activeF
   const dragTypeRef = useRef<'file' | 'directory' | null>(null)
   const [dropTarget, setDropTarget] = useState<string | null>(null)
   const dropCounterRef = useRef<Map<string, number>>(new Map())
+
+  // --- Multi-select state ---
+  const [selectedPaths, setSelectedPaths] = useState<Set<string>>(new Set())
+  const lastClickedRef = useRef<string | null>(null)
+  const [confirmDelete, setConfirmDelete] = useState<string[] | null>(null)
+
+  // --- Focus state for keyboard navigation ---
+  const [focusedPath, setFocusedPath] = useState<string | null>(null)
+  const treeContainerRef = useRef<HTMLDivElement>(null)
+
+  // --- Internal clipboard for copy/cut ---
+  const [clipboard, setClipboard] = useState<{ paths: string[]; mode: 'copy' | 'cut' } | null>(null)
+
+  // --- Flat visible entries for keyboard nav + shift-click ---
+  const visibleEntries = useMemo(() => {
+    const result: Array<{ entry: DirEntry; depth: number }> = []
+    function walk(dirPath: string, depth: number) {
+      const children = dirContents.get(dirPath) ?? []
+      for (const child of children) {
+        result.push({ entry: child, depth })
+        if (child.type === 'directory' && expandedFolders.has(child.path)) {
+          walk(child.path, depth + 1)
+        }
+      }
+    }
+    walk('', 0)
+    return result
+  }, [dirContents, expandedFolders])
 
   const loadDir = useCallback(
     async (dirPath: string) => {
@@ -91,7 +138,6 @@ export function EditorFileTree({ projectPath, onOpenFile, onFileRenamed, activeF
     if (!refreshKey) return
     loadDir('')
     expandedFolders.forEach((dir) => loadDir(dir))
-    // Clear cache for collapsed folders so next expand fetches fresh data
     setDirContents((prev) => {
       const keep = new Set(['', ...expandedFolders])
       let changed = false
@@ -108,6 +154,14 @@ export function EditorFileTree({ projectPath, onOpenFile, onFileRenamed, activeF
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [refreshKey])
+
+  // --- Imperative handle for scroll-to-path ---
+  useImperativeHandle(ref, () => ({
+    scrollToPath: (filePath: string) => {
+      const el = treeContainerRef.current?.querySelector(`[data-path="${CSS.escape(filePath)}"]`)
+      el?.scrollIntoView({ block: 'nearest' })
+    }
+  }), [])
 
   const handleToggleFolder = useCallback(
     (folderPath: string) => {
@@ -175,18 +229,36 @@ export function EditorFileTree({ projectPath, onOpenFile, onFileRenamed, activeF
     [renaming, projectPath, loadDir, onFileRenamed]
   )
 
-  const handleDelete = useCallback(
-    async (entry: DirEntry) => {
-      try {
-        await window.api.fs.delete(projectPath, entry.path)
-        track('file_deleted')
-        const parentDir = entry.path.includes('/') ? entry.path.slice(0, entry.path.lastIndexOf('/')) : ''
-        await loadDir(parentDir)
-      } catch (err) {
-        console.error('Delete failed:', err)
+  const executeDelete = useCallback(
+    async (paths: string[]) => {
+      const dirsToReload = new Set<string>()
+      for (const p of paths) {
+        try {
+          await window.api.fs.delete(projectPath, p)
+          track('file_deleted')
+          dirsToReload.add(p.includes('/') ? p.slice(0, p.lastIndexOf('/')) : '')
+        } catch (err) {
+          console.error('Delete failed:', err)
+        }
       }
+      setSelectedPaths(new Set())
+      for (const dir of dirsToReload) await loadDir(dir)
     },
     [projectPath, loadDir]
+  )
+
+  const handleDeleteSelected = useCallback(
+    (entry: DirEntry) => {
+      const paths = selectedPaths.has(entry.path) && selectedPaths.size > 1
+        ? [...selectedPaths]
+        : [entry.path]
+      if (paths.length > 1) {
+        setConfirmDelete(paths)
+      } else {
+        executeDelete(paths)
+      }
+    },
+    [selectedPaths, executeDelete]
   )
 
   const startCreate = useCallback((parentPath: string, type: 'file' | 'directory') => {
@@ -209,15 +281,151 @@ export function EditorFileTree({ projectPath, onOpenFile, onFileRenamed, activeF
     if (renaming) renameInputRef.current?.focus()
   }, [renaming])
 
+  // --- Auto-scroll focused entry into view ---
+  useEffect(() => {
+    if (!focusedPath) return
+    const el = treeContainerRef.current?.querySelector(`[data-path="${CSS.escape(focusedPath)}"]`)
+    el?.scrollIntoView({ block: 'nearest' })
+  }, [focusedPath])
+
+  // --- Clipboard operations ---
+  const getEffectiveSelection = useCallback((entry: DirEntry): string[] => {
+    if (selectedPaths.has(entry.path) && selectedPaths.size > 1) return [...selectedPaths]
+    return [entry.path]
+  }, [selectedPaths])
+
+  const handleCopy = useCallback((paths: string[]) => {
+    setClipboard({ paths, mode: 'copy' })
+    track('file_copied')
+  }, [])
+
+  const handleCut = useCallback((paths: string[]) => {
+    setClipboard({ paths, mode: 'cut' })
+    track('file_cut')
+  }, [])
+
+  const resolveCollision = useCallback((basePath: string, parentDir: string): string => {
+    const siblings = dirContents.get(parentDir) ?? []
+    const names = new Set(siblings.map(s => s.name))
+    const name = basePath.includes('/') ? basePath.slice(basePath.lastIndexOf('/') + 1) : basePath
+    if (!names.has(name)) return basePath
+
+    const ext = name.includes('.') ? name.slice(name.lastIndexOf('.')) : ''
+    const stem = name.includes('.') ? name.slice(0, name.lastIndexOf('.')) : name
+    for (let i = 1; ; i++) {
+      const candidate = `${stem} (${i})${ext}`
+      if (!names.has(candidate)) return parentDir ? `${parentDir}/${candidate}` : candidate
+    }
+  }, [dirContents])
+
+  const handlePaste = useCallback(async (targetDir: string) => {
+    if (!clipboard) return
+    // Ensure target dir is loaded
+    if (!dirContents.has(targetDir)) await loadDir(targetDir)
+    const dirsToReload = new Set<string>([targetDir])
+    for (const srcPath of clipboard.paths) {
+      const name = srcPath.includes('/') ? srcPath.slice(srcPath.lastIndexOf('/') + 1) : srcPath
+      const rawDest = targetDir ? `${targetDir}/${name}` : name
+      const destPath = resolveCollision(rawDest, targetDir)
+      try {
+        if (clipboard.mode === 'copy') {
+          await window.api.fs.copy(projectPath, srcPath, destPath)
+        } else {
+          await window.api.fs.rename(projectPath, srcPath, destPath)
+          onFileRenamed?.(srcPath, destPath)
+          const srcParent = srcPath.includes('/') ? srcPath.slice(0, srcPath.lastIndexOf('/')) : ''
+          dirsToReload.add(srcParent)
+        }
+      } catch (err) {
+        console.error('Paste failed:', err)
+      }
+    }
+    if (clipboard.mode === 'cut') setClipboard(null)
+    track('file_pasted')
+    for (const dir of dirsToReload) await loadDir(dir)
+  }, [clipboard, projectPath, loadDir, resolveCollision, onFileRenamed, dirContents])
+
+  const handleDuplicate = useCallback(async (entries: DirEntry[]) => {
+    const dirsToReload = new Set<string>()
+    for (const entry of entries) {
+      const parentDir = entry.path.includes('/') ? entry.path.slice(0, entry.path.lastIndexOf('/')) : ''
+      const ext = entry.name.includes('.') ? entry.name.slice(entry.name.lastIndexOf('.')) : ''
+      const stem = entry.name.includes('.') ? entry.name.slice(0, entry.name.lastIndexOf('.')) : entry.name
+      const siblings = dirContents.get(parentDir) ?? []
+      const names = new Set(siblings.map(s => s.name))
+      let destName = `${stem} (copy)${ext}`
+      if (names.has(destName)) {
+        for (let i = 2; ; i++) {
+          destName = `${stem} (copy ${i})${ext}`
+          if (!names.has(destName)) break
+        }
+      }
+      const destPath = parentDir ? `${parentDir}/${destName}` : destName
+      try {
+        await window.api.fs.copy(projectPath, entry.path, destPath)
+        dirsToReload.add(parentDir)
+      } catch (err) {
+        console.error('Duplicate failed:', err)
+      }
+    }
+    track('file_duplicated')
+    for (const dir of dirsToReload) await loadDir(dir)
+  }, [projectPath, dirContents, loadDir])
+
+  const handleCopyPath = useCallback((entry: DirEntry, absolute: boolean) => {
+    const text = absolute ? `${projectPath}/${entry.path}` : entry.path
+    navigator.clipboard.writeText(text)
+    track('path_copied')
+  }, [projectPath])
+
+  const handleRevealInFinder = useCallback((entry: DirEntry) => {
+    window.api.fs.showInFinder(projectPath, entry.path)
+    track('reveal_in_finder')
+  }, [projectPath])
+
+  // --- Click handler with modifier support ---
+  const handleEntryClick = useCallback((e: React.MouseEvent, entry: DirEntry) => {
+    const isMeta = e.metaKey || e.ctrlKey
+    const isShift = e.shiftKey
+
+    if (isMeta) {
+      setSelectedPaths(prev => {
+        const next = new Set(prev)
+        if (next.has(entry.path)) next.delete(entry.path)
+        else next.add(entry.path)
+        return next
+      })
+      lastClickedRef.current = entry.path
+    } else if (isShift && lastClickedRef.current) {
+      const startIdx = visibleEntries.findIndex(v => v.entry.path === lastClickedRef.current)
+      const endIdx = visibleEntries.findIndex(v => v.entry.path === entry.path)
+      if (startIdx >= 0 && endIdx >= 0) {
+        const [lo, hi] = startIdx < endIdx ? [startIdx, endIdx] : [endIdx, startIdx]
+        const range = new Set(visibleEntries.slice(lo, hi + 1).map(v => v.entry.path))
+        setSelectedPaths(range)
+      }
+    } else {
+      setSelectedPaths(new Set([entry.path]))
+      lastClickedRef.current = entry.path
+      if (entry.type === 'file') onOpenFile(entry.path)
+      else handleToggleFolder(entry.path)
+    }
+    setFocusedPath(entry.path)
+  }, [visibleEntries, onOpenFile, handleToggleFolder])
+
   // --- Drag and drop handlers ---
   const handleDragStart = useCallback((e: React.DragEvent, entry: DirEntry) => {
     dragPathRef.current = entry.path
     dragTypeRef.current = entry.type
     if (e.dataTransfer) {
       e.dataTransfer.effectAllowed = 'move'
-      e.dataTransfer.setData('application/x-slayzone-tree', entry.path)
+      // If entry is in selection, encode all selected paths
+      const paths = selectedPaths.has(entry.path) && selectedPaths.size > 1
+        ? [...selectedPaths]
+        : [entry.path]
+      e.dataTransfer.setData('application/x-slayzone-tree', JSON.stringify(paths))
     }
-  }, [])
+  }, [selectedPaths])
 
   const handleDragEnd = useCallback(() => {
     dragPathRef.current = null
@@ -274,7 +482,6 @@ export function EditorFileTree({ projectPath, onOpenFile, onFileRenamed, activeF
     setDropTarget(null)
     dropCounterRef.current.clear()
 
-    // Save refs BEFORE clearing — isValidDropTarget reads them
     const srcPath = dragPathRef.current
     if (!srcPath || !isValidDropTarget(targetDir)) {
       dragPathRef.current = null
@@ -292,7 +499,6 @@ export function EditorFileTree({ projectPath, onOpenFile, onFileRenamed, activeF
       await window.api.fs.rename(projectPath, srcPath, newPath)
       onFileRenamed?.(srcPath, newPath)
 
-      // Remap expanded folder paths for moved directories
       const srcPrefix = srcPath + '/'
       setExpandedFolders((prev) => {
         let changed = false
@@ -308,7 +514,6 @@ export function EditorFileTree({ projectPath, onOpenFile, onFileRenamed, activeF
             next.add(p)
           }
         }
-        // Also expand target so the moved item is visible
         if (!next.has(targetDir) && targetDir) {
           next.add(targetDir)
           changed = true
@@ -322,8 +527,208 @@ export function EditorFileTree({ projectPath, onOpenFile, onFileRenamed, activeF
     }
   }, [projectPath, loadDir, isValidDropTarget, onFileRenamed])
 
+  // --- Keyboard navigation ---
+  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
+    // Don't intercept when inside an input (create/rename)
+    if ((e.target as HTMLElement).tagName === 'INPUT') return
+
+    const meta = e.metaKey || e.ctrlKey
+
+    if (meta && e.key === 'ArrowLeft') {
+      e.preventDefault()
+      setExpandedFolders(new Set())
+      return
+    }
+
+    if (meta && e.key === 'c') {
+      e.preventDefault()
+      const paths = selectedPaths.size > 0 ? [...selectedPaths] : focusedPath ? [focusedPath] : []
+      if (paths.length) handleCopy(paths)
+      return
+    }
+
+    if (meta && e.key === 'x') {
+      e.preventDefault()
+      const paths = selectedPaths.size > 0 ? [...selectedPaths] : focusedPath ? [focusedPath] : []
+      if (paths.length) handleCut(paths)
+      return
+    }
+
+    if (meta && e.key === 'v') {
+      e.preventDefault()
+      if (!clipboard) return
+      let targetDir = ''
+      if (focusedPath) {
+        const focused = visibleEntries.find(v => v.entry.path === focusedPath)
+        if (focused) {
+          targetDir = focused.entry.type === 'directory'
+            ? focused.entry.path
+            : focused.entry.path.includes('/') ? focused.entry.path.slice(0, focused.entry.path.lastIndexOf('/')) : ''
+        }
+      }
+      handlePaste(targetDir)
+      return
+    }
+
+    if (e.key === 'Backspace' || e.key === 'Delete') {
+      e.preventDefault()
+      const paths = selectedPaths.size > 0 ? [...selectedPaths] : focusedPath ? [focusedPath] : []
+      if (!paths.length) return
+      if (paths.length > 1) {
+        setConfirmDelete(paths)
+      } else {
+        executeDelete(paths).then(() => setFocusedPath(null))
+      }
+      return
+    }
+
+    if (e.key === 'Escape') {
+      e.preventDefault()
+      setFocusedPath(null)
+      setSelectedPaths(new Set())
+      if (clipboard?.mode === 'cut') setClipboard(null)
+      treeContainerRef.current?.blur()
+      return
+    }
+
+    const currentIdx = focusedPath
+      ? visibleEntries.findIndex(v => v.entry.path === focusedPath)
+      : -1
+
+    if (e.key === 'ArrowDown') {
+      e.preventDefault()
+      const nextIdx = currentIdx + 1
+      if (nextIdx < visibleEntries.length) {
+        setFocusedPath(visibleEntries[nextIdx].entry.path)
+        if (!e.shiftKey) setSelectedPaths(new Set([visibleEntries[nextIdx].entry.path]))
+      }
+      return
+    }
+
+    if (e.key === 'ArrowUp') {
+      e.preventDefault()
+      const prevIdx = currentIdx <= 0 ? 0 : currentIdx - 1
+      if (visibleEntries.length > 0) {
+        setFocusedPath(visibleEntries[prevIdx].entry.path)
+        if (!e.shiftKey) setSelectedPaths(new Set([visibleEntries[prevIdx].entry.path]))
+      }
+      return
+    }
+
+    if (e.key === 'ArrowRight') {
+      e.preventDefault()
+      if (currentIdx < 0) return
+      const entry = visibleEntries[currentIdx].entry
+      if (entry.type === 'directory') {
+        if (!expandedFolders.has(entry.path)) {
+          handleToggleFolder(entry.path)
+        } else {
+          // Move focus to first child
+          if (currentIdx + 1 < visibleEntries.length) {
+            const nextEntry = visibleEntries[currentIdx + 1]
+            // Verify it's actually a child
+            if (nextEntry.entry.path.startsWith(entry.path + '/')) {
+              setFocusedPath(nextEntry.entry.path)
+              setSelectedPaths(new Set([nextEntry.entry.path]))
+            }
+          }
+        }
+      }
+      return
+    }
+
+    if (e.key === 'ArrowLeft') {
+      e.preventDefault()
+      if (currentIdx < 0) return
+      const entry = visibleEntries[currentIdx].entry
+      if (entry.type === 'directory' && expandedFolders.has(entry.path)) {
+        handleToggleFolder(entry.path)
+      } else {
+        // Move focus to parent
+        const parentPath = entry.path.includes('/') ? entry.path.slice(0, entry.path.lastIndexOf('/')) : ''
+        if (parentPath) {
+          setFocusedPath(parentPath)
+          setSelectedPaths(new Set([parentPath]))
+        }
+      }
+      return
+    }
+
+    if (e.key === 'Enter') {
+      e.preventDefault()
+      if (currentIdx < 0) return
+      const entry = visibleEntries[currentIdx].entry
+      if (entry.type === 'file') onOpenFile(entry.path)
+      else handleToggleFolder(entry.path)
+      return
+    }
+  }, [focusedPath, selectedPaths, visibleEntries, expandedFolders, clipboard,
+    handleToggleFolder, onOpenFile, handleCopy, handleCut, handlePaste, executeDelete])
+
+  // --- Context menu items builder ---
+  const renderContextMenuItems = useCallback((entry: DirEntry, isFolder: boolean) => {
+    const effectivePaths = getEffectiveSelection(entry)
+    const effectiveEntries = effectivePaths.map(p => visibleEntries.find(v => v.entry.path === p)?.entry).filter((e): e is DirEntry => !!e)
+    const parentDir = entry.path.includes('/') ? entry.path.slice(0, entry.path.lastIndexOf('/')) : ''
+
+    return (
+      <>
+        {isFolder && (
+          <>
+            <ContextMenuItem onSelect={() => startCreate(entry.path, 'file')}>
+              <FilePlus className="size-3 mr-2" /> New file
+            </ContextMenuItem>
+            <ContextMenuItem onSelect={() => startCreate(entry.path, 'directory')}>
+              <FolderPlus className="size-3 mr-2" /> New folder
+            </ContextMenuItem>
+            <ContextMenuSeparator />
+          </>
+        )}
+        <ContextMenuItem onSelect={() => handleCut(effectivePaths)}>
+          <Scissors className="size-3 mr-2" /> Cut
+          <ContextMenuShortcut>⌘X</ContextMenuShortcut>
+        </ContextMenuItem>
+        <ContextMenuItem onSelect={() => handleCopy(effectivePaths)}>
+          <Copy className="size-3 mr-2" /> Copy
+          <ContextMenuShortcut>⌘C</ContextMenuShortcut>
+        </ContextMenuItem>
+        {clipboard && (
+          <ContextMenuItem onSelect={() => handlePaste(isFolder ? entry.path : parentDir)}>
+            <ClipboardPaste className="size-3 mr-2" /> Paste
+            <ContextMenuShortcut>⌘V</ContextMenuShortcut>
+          </ContextMenuItem>
+        )}
+        <ContextMenuItem onSelect={() => handleDuplicate(effectiveEntries.length > 0 ? effectiveEntries : [entry])}>
+          <CopyPlus className="size-3 mr-2" /> Duplicate
+        </ContextMenuItem>
+        <ContextMenuSeparator />
+        <ContextMenuItem onSelect={() => startRename(entry)}>
+          <Pencil className="size-3 mr-2" /> Rename
+        </ContextMenuItem>
+        <ContextMenuSeparator />
+        <ContextMenuItem onSelect={() => handleCopyPath(entry, false)}>
+          <Link2 className="size-3 mr-2" /> Copy Relative Path
+        </ContextMenuItem>
+        <ContextMenuItem onSelect={() => handleCopyPath(entry, true)}>
+          <Copy className="size-3 mr-2" /> Copy Path
+        </ContextMenuItem>
+        <ContextMenuSeparator />
+        <ContextMenuItem onSelect={() => handleRevealInFinder(entry)}>
+          <FolderSearch className="size-3 mr-2" /> Reveal in Finder
+        </ContextMenuItem>
+        <ContextMenuSeparator />
+        <ContextMenuItem variant="destructive" onSelect={() => handleDeleteSelected(entry)}>
+          <Trash2 className="size-3 mr-2" /> Delete
+        </ContextMenuItem>
+      </>
+    )
+  }, [getEffectiveSelection, visibleEntries, clipboard, handleCut, handleCopy, handlePaste, handleDuplicate, handleCopyPath, handleRevealInFinder, handleDeleteSelected, startCreate, startRename])
+
   const renderEntry = (entry: DirEntry, depth: number) => {
     const pad = depth * INDENT_PX + BASE_PAD
+    const isSelected = selectedPaths.has(entry.path)
+    const isFocused = focusedPath === entry.path
+    const isCut = clipboard?.mode === 'cut' && clipboard.paths.includes(entry.path)
 
     if (entry.type === 'directory') {
       const expanded = expandedFolders.has(entry.path)
@@ -344,34 +749,28 @@ export function EditorFileTree({ projectPath, onOpenFile, onFileRenamed, activeF
                 draggable
                 onDragStart={(e) => handleDragStart(e, entry)}
                 onDragEnd={handleDragEnd}
+                data-path={entry.path}
                 className={cn(
                   'group/folder flex w-full select-none items-center gap-1.5 rounded px-1 py-1 text-xs hover:bg-muted/50',
+                  isSelected && 'bg-primary/15',
+                  isFocused && 'ring-1 ring-primary/40',
+                  isCut && 'opacity-40',
                   entry.ignored && 'opacity-40'
                 )}
                 style={{ paddingLeft: pad }}
-                onClick={() => handleToggleFolder(entry.path)}
+                onClick={(e) => handleEntryClick(e, entry)}
               >
                 {expanded
                   ? <FolderOpen className="size-4 shrink-0 text-amber-400" />
                   : <Folder className="size-4 shrink-0 text-amber-500/80" />}
                 <span className="truncate font-mono">{entry.name}</span>
+                {entry.isSymlink && (
+                  <span title="Symbolic link"><ArrowUpRight className="size-3 shrink-0 text-muted-foreground/60" /></span>
+                )}
               </button>
             </ContextMenuTrigger>
             <ContextMenuContent>
-              <ContextMenuItem onSelect={() => startCreate(entry.path, 'file')}>
-                <FilePlus className="size-3 mr-2" /> New file
-              </ContextMenuItem>
-              <ContextMenuItem onSelect={() => startCreate(entry.path, 'directory')}>
-                <FolderPlus className="size-3 mr-2" /> New folder
-              </ContextMenuItem>
-              <ContextMenuSeparator />
-              <ContextMenuItem onSelect={() => startRename(entry)}>
-                <Pencil className="size-3 mr-2" /> Rename
-              </ContextMenuItem>
-              <ContextMenuSeparator />
-              <ContextMenuItem variant="destructive" onSelect={() => handleDelete(entry)}>
-                <Trash2 className="size-3 mr-2" /> Delete
-              </ContextMenuItem>
+              {renderContextMenuItems(entry, true)}
             </ContextMenuContent>
           </ContextMenu>
 
@@ -423,26 +822,27 @@ export function EditorFileTree({ projectPath, onOpenFile, onFileRenamed, activeF
               draggable
               onDragStart={(e) => handleDragStart(e, entry)}
               onDragEnd={handleDragEnd}
+              data-path={entry.path}
               className={cn(
                 'flex w-full items-center gap-1.5 rounded px-1 py-1 text-xs hover:bg-muted/50',
-                entry.path === activeFilePath && 'bg-muted text-foreground',
+                isSelected && 'bg-primary/15',
+                entry.path === activeFilePath && !isSelected && 'bg-muted text-foreground',
+                isFocused && 'ring-1 ring-primary/40',
+                isCut && 'opacity-40',
                 entry.ignored && 'opacity-40'
               )}
               style={{ paddingLeft: pad }}
-              onClick={() => onOpenFile(entry.path)}
+              onClick={(e) => handleEntryClick(e, entry)}
             >
               <FileIcon fileName={entry.name} className="size-4 shrink-0 flex items-center [&>svg]:size-full" />
               <span className="truncate font-mono">{entry.name}</span>
+              {entry.isSymlink && (
+                <span title="Symbolic link"><ArrowUpRight className="size-3 shrink-0 text-muted-foreground/60" /></span>
+              )}
             </button>
           </ContextMenuTrigger>
           <ContextMenuContent>
-            <ContextMenuItem onSelect={() => startRename(entry)}>
-              <Pencil className="size-3 mr-2" /> Rename
-            </ContextMenuItem>
-            <ContextMenuSeparator />
-            <ContextMenuItem variant="destructive" onSelect={() => handleDelete(entry)}>
-              <Trash2 className="size-3 mr-2" /> Delete
-            </ContextMenuItem>
+            {renderContextMenuItems(entry, false)}
           </ContextMenuContent>
         </ContextMenu>
       </div>
@@ -456,8 +856,11 @@ export function EditorFileTree({ projectPath, onOpenFile, onFileRenamed, activeF
     <ContextMenu>
       <ContextMenuTrigger asChild>
         <div
+        ref={treeContainerRef}
+        tabIndex={0}
+        onKeyDown={handleKeyDown}
         className={cn(
-          'h-full overflow-auto py-1 select-none text-sm bg-surface-1',
+          'h-full overflow-auto py-1 select-none text-sm bg-surface-1 outline-none',
           isRootDropHover && 'bg-primary/5 ring-1 ring-inset ring-primary/20 rounded'
         )}
         onDragOver={(e) => {
@@ -509,7 +912,34 @@ export function EditorFileTree({ projectPath, onOpenFile, onFileRenamed, activeF
         <ContextMenuItem onSelect={() => startCreate('', 'directory')}>
           <FolderPlus className="size-3 mr-2" /> New folder
         </ContextMenuItem>
+        {clipboard && (
+          <>
+            <ContextMenuSeparator />
+            <ContextMenuItem onSelect={() => handlePaste('')}>
+              <ClipboardPaste className="size-3 mr-2" /> Paste
+              <ContextMenuShortcut>⌘V</ContextMenuShortcut>
+            </ContextMenuItem>
+          </>
+        )}
       </ContextMenuContent>
+
+      {/* Multi-delete confirmation */}
+      <AlertDialog open={!!confirmDelete} onOpenChange={(open) => { if (!open) setConfirmDelete(null) }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete {confirmDelete?.length} items?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete the selected files and folders.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={() => { if (confirmDelete) { executeDelete(confirmDelete); setConfirmDelete(null) } }}>
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </ContextMenu>
   )
-}
+})

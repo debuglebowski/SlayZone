@@ -564,7 +564,9 @@ export interface ElectronAPI {
     createDir: (rootPath: string, dirPath: string) => Promise<void>
     rename: (rootPath: string, oldPath: string, newPath: string) => Promise<void>
     delete: (rootPath: string, targetPath: string) => Promise<void>
+    copy: (rootPath: string, srcPath: string, destPath: string) => Promise<void>
     copyIn: (rootPath: string, absoluteSrc: string) => Promise<string>
+    showInFinder: (rootPath: string, targetPath: string) => Promise<void>
     listAllFiles: (rootPath: string) => Promise<string[]>
     searchFiles: (rootPath: string, query: string, options?: SearchFilesOptions) => Promise<FileSearchResult[]>
     watch: (rootPath: string) => Promise<void>
