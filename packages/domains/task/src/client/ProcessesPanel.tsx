@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
-import { Play, Square, RotateCcw, Plus, Trash2, ArrowLeft, Cpu, Pencil, FileText, MoreHorizontal, CornerDownLeft, Info } from 'lucide-react'
+import { Play, Square, RotateCcw, Plus, Trash2, Cpu, Pencil, FileText, MoreHorizontal, CornerDownLeft, Info } from 'lucide-react'
 import { cn, DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, Tooltip, TooltipTrigger, TooltipContent } from '@slayzone/ui'
+import { ProcessDialog } from './ProcessDialog'
 type ProcessStatus = 'running' | 'stopped' | 'completed' | 'error'
 
 function Tip({ label, children }: { label: string; children: React.ReactNode }) {
@@ -12,7 +13,7 @@ function Tip({ label, children }: { label: string; children: React.ReactNode }) 
   )
 }
 
-interface ProcessEntry {
+export interface ProcessEntry {
   id: string
   taskId: string | null
   projectId: string | null
@@ -29,62 +30,6 @@ interface ProcessEntry {
   spawnedAt: string | null
   processTitle: string | null
 }
-
-
-interface AddFormState {
-  label: string
-  command: string
-  autoRestart: boolean
-  scope: 'task' | 'project'
-}
-
-interface SuggestionItem {
-  name: string
-  command: string
-}
-
-interface SuggestionGroup {
-  category: string
-  items: SuggestionItem[]
-}
-
-const STATIC_SUGGESTIONS: SuggestionGroup[] = [
-  {
-    category: 'Dev servers',
-    items: [
-      { name: 'Vite', command: 'vite' },
-      { name: 'Next.js', command: 'next dev' },
-      { name: 'Rails', command: 'rails server' },
-      { name: 'Django', command: 'python manage.py runserver' },
-      { name: 'Laravel', command: 'php artisan serve' },
-      { name: 'Express', command: 'node server.js' },
-    ]
-  },
-  {
-    category: 'Watchers',
-    items: [
-      { name: 'TypeScript', command: 'tsc --watch' },
-      { name: 'Vitest', command: 'vitest --watch' },
-      { name: 'Jest', command: 'jest --watch' },
-    ]
-  },
-  {
-    category: 'Services',
-    items: [
-      { name: 'Redis', command: 'redis-server' },
-      { name: 'Docker Compose', command: 'docker compose up' },
-      { name: 'PostgreSQL', command: 'pg_ctl start' },
-    ]
-  },
-  {
-    category: 'Tunnels & tools',
-    items: [
-      { name: 'ngrok', command: 'ngrok http 3000' },
-      { name: 'Stripe CLI', command: 'stripe listen --forward-to localhost:3000' },
-      { name: 'Cloudflare Tunnel', command: 'cloudflared tunnel run' },
-    ]
-  },
-]
 
 const STATUS_CONFIG: Record<ProcessStatus, { label: string; dot: string; badge: string }> = {
   running:   { label: 'Running',   dot: 'bg-green-500',              badge: 'text-green-500 bg-green-500/10 border-green-500/20' },
@@ -107,8 +52,6 @@ function StatusBadge({ status }: { status: ProcessStatus }) {
     </span>
   )
 }
-
-const EMPTY_FORM: AddFormState = { label: '', command: '', autoRestart: false, scope: 'project' }
 
 function ProcessRow({
   proc,
@@ -282,51 +225,14 @@ function SectionHeader({ label }: { label: string }) {
 export function ProcessesPanel({ taskId, projectId, cwd, terminalSessionId }: { taskId: string | null; projectId: string | null; cwd?: string | null; terminalSessionId?: string }) {
   const [processes, setProcesses] = useState<ProcessEntry[]>([])
   const [expandedLogs, setExpandedLogs] = useState<Set<string>>(new Set())
-  const [view, setView] = useState<'list' | 'new'>('list')
-  const [form, setForm] = useState<AddFormState>(EMPTY_FORM)
-  const [editingId, setEditingId] = useState<string | null>(null)
-  const [saving, setSaving] = useState(false)
-  const [saveError, setSaveError] = useState<string | null>(null)
-  const [pkgScripts, setPkgScripts] = useState<SuggestionItem[]>([])
+  const [dialogOpen, setDialogOpen] = useState(false)
+  const [editingProcess, setEditingProcess] = useState<ProcessEntry | null>(null)
   const [stats, setStats] = useState<Record<string, { cpu: number; rss: number }>>({})
   const logEndRefs = useRef<Record<string, HTMLDivElement | null>>({})
-  const labelRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     window.api.processes.listForTask(taskId, projectId).then((list) => setProcesses(list as ProcessEntry[]))
   }, [taskId, projectId])
-
-  useEffect(() => {
-    if (!cwd) return
-    window.api.fs.readFile(cwd, 'package.json').then(async (result) => {
-      if (!result.content) return
-      try {
-        const pkg = JSON.parse(result.content) as { scripts?: Record<string, string>; packageManager?: string }
-
-        // Detect package manager: packageManager field → lock file → npm
-        let pm = 'npm'
-        if (pkg.packageManager) {
-          if (pkg.packageManager.startsWith('pnpm')) pm = 'pnpm'
-          else if (pkg.packageManager.startsWith('yarn')) pm = 'yarn'
-          else if (pkg.packageManager.startsWith('bun')) pm = 'bun'
-        } else {
-          const hasPnpm = await window.api.fs.readFile(cwd, 'pnpm-lock.yaml').then(r => !!r.content).catch(() => false)
-          if (hasPnpm) pm = 'pnpm'
-          else {
-            const hasYarn = await window.api.fs.readFile(cwd, 'yarn.lock').then(r => !!r.content).catch(() => false)
-            if (hasYarn) pm = 'yarn'
-            else {
-              const hasBun = await window.api.fs.readFile(cwd, 'bun.lockb').then(r => !!r.content).catch(() => false)
-              if (hasBun) pm = 'bun'
-            }
-          }
-        }
-
-        const prefix = pm === 'yarn' ? 'yarn' : `${pm} run`
-        setPkgScripts(Object.entries(pkg.scripts ?? {}).map(([name]) => ({ name, command: `${prefix} ${name}` })))
-      } catch { /* no-op */ }
-    }).catch(() => { /* no package.json */ })
-  }, [cwd])
 
   useEffect(() => {
     const unsub = window.api.processes.onLog((processId, line) => {
@@ -369,10 +275,6 @@ export function ProcessesPanel({ taskId, projectId, cwd, terminalSessionId }: { 
     }
   }, [processes, expandedLogs])
 
-  useEffect(() => {
-    if (view === 'new') setTimeout(() => labelRef.current?.focus(), 50)
-  }, [view])
-
   const refreshList = useCallback(async () => {
     const list = await window.api.processes.listForTask(taskId, projectId)
     setProcesses(list as ProcessEntry[])
@@ -386,58 +288,6 @@ export function ProcessesPanel({ taskId, projectId, cwd, terminalSessionId }: { 
       return next
     })
   }, [])
-
-  const handleCreate = useCallback(async () => {
-    if (!form.label.trim() || !form.command.trim()) return
-    setSaving(true)
-    setSaveError(null)
-    try {
-      const isProject = form.scope === 'project'
-      const tid = isProject ? null : taskId
-      const pid = isProject ? projectId : null
-      if (editingId) {
-        await window.api.processes.update(editingId, { label: form.label.trim(), command: form.command.trim(), autoRestart: form.autoRestart, taskId: tid, projectId: pid })
-      } else {
-        await window.api.processes.create(pid, tid, form.label.trim(), form.command.trim(), cwd ?? '', form.autoRestart)
-      }
-      await refreshList()
-      setEditingId(null)
-      setView('list')
-      setForm(EMPTY_FORM)
-    } catch (err) {
-      setSaveError(err instanceof Error ? err.message : String(err))
-    } finally {
-      setSaving(false)
-    }
-  }, [taskId, projectId, cwd, form, editingId, refreshList])
-
-  const handleSpawn = useCallback(async () => {
-    if (!form.label.trim() || !form.command.trim()) return
-    setSaving(true)
-    setSaveError(null)
-    try {
-      const isProject = form.scope === 'project'
-      const tid = isProject ? null : taskId
-      const pid = isProject ? projectId : null
-      if (editingId) {
-        await window.api.processes.update(editingId, { label: form.label.trim(), command: form.command.trim(), autoRestart: form.autoRestart, taskId: tid, projectId: pid })
-        await window.api.processes.restart(editingId)
-        await refreshList()
-        setExpandedLogs(prev => new Set(prev).add(editingId))
-      } else {
-        const id = await window.api.processes.spawn(pid, tid, form.label.trim(), form.command.trim(), cwd ?? '', form.autoRestart)
-        await refreshList()
-        setExpandedLogs(prev => new Set(prev).add(id))
-      }
-      setEditingId(null)
-      setView('list')
-      setForm(EMPTY_FORM)
-    } catch (err) {
-      setSaveError(err instanceof Error ? err.message : String(err))
-    } finally {
-      setSaving(false)
-    }
-  }, [taskId, projectId, cwd, form, editingId, refreshList])
 
   const handleKill = useCallback(async (id: string) => {
     await window.api.processes.kill(id)
@@ -459,26 +309,27 @@ export function ProcessesPanel({ taskId, projectId, cwd, terminalSessionId }: { 
     void window.api.pty.write(terminalSessionId ?? `${taskId}:${taskId}`, output)
   }, [taskId, terminalSessionId])
 
-  const applySuggestion = useCallback((item: SuggestionItem) => {
-    setForm(f => ({ ...f, label: f.label || item.name, command: item.command }))
-    labelRef.current?.focus()
+  const openNewDialog = useCallback(() => {
+    setEditingProcess(null)
+    setDialogOpen(true)
   }, [])
 
-  const goToNew = useCallback(() => { setEditingId(null); setForm(EMPTY_FORM); setView('new') }, [])
-  const goToEdit = useCallback((proc: ProcessEntry) => {
-    setEditingId(proc.id)
-    setForm({ label: proc.label, command: proc.command, autoRestart: proc.autoRestart, scope: proc.taskId === null ? 'project' : 'task' })
-    setView('new')
+  const openEditDialog = useCallback((proc: ProcessEntry) => {
+    setEditingProcess(proc)
+    setDialogOpen(true)
   }, [])
-  const goToList = useCallback(() => { setView('list'); setEditingId(null); setForm(EMPTY_FORM) }, [])
+
+  const handleDialogSaved = useCallback(() => {
+    void refreshList()
+  }, [refreshList])
+
+  const handleDialogSpawned = useCallback((id: string) => {
+    void refreshList()
+    setExpandedLogs(prev => new Set(prev).add(id))
+  }, [refreshList])
 
   const projectProcesses = useMemo(() => processes.filter(p => p.taskId === null), [processes])
   const taskProcesses = useMemo(() => taskId ? processes.filter(p => p.taskId === taskId) : [], [processes, taskId])
-
-  const allSuggestions: SuggestionGroup[] = [
-    ...(pkgScripts.length > 0 ? [{ category: 'package.json', items: pkgScripts }] : []),
-    ...STATIC_SUGGESTIONS,
-  ]
 
   const isEmpty = processes.length === 0
 
@@ -486,227 +337,104 @@ export function ProcessesPanel({ taskId, projectId, cwd, terminalSessionId }: { 
     <div className="flex flex-col h-full min-h-0 bg-surface-1">
       {/* Header */}
       <div className="shrink-0 h-10 px-2 border-b border-border bg-surface-1 flex items-center gap-1">
-        {view === 'list' ? (
-          <>
-            <span className="text-xs font-medium text-muted-foreground px-1">Processes</span>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Info className="size-3 text-muted-foreground/50 hover:text-muted-foreground transition-colors cursor-default shrink-0" />
-              </TooltipTrigger>
-              <TooltipContent side="bottom" className="max-w-64">
-                Background processes (dev servers, watchers, etc.) that run alongside your task. Task-scoped processes stop with the task; project processes are shared across all tasks in the project.
-              </TooltipContent>
-            </Tooltip>
-            <div className="flex-1" />
+        <span className="text-xs font-medium text-muted-foreground px-1">Processes</span>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Info className="size-3 text-muted-foreground/50 hover:text-muted-foreground transition-colors cursor-default shrink-0" />
+          </TooltipTrigger>
+          <TooltipContent side="bottom" className="max-w-64">
+            Background processes (dev servers, watchers, etc.) that run alongside your task. Task-scoped processes stop with the task; project processes are shared across all tasks in the project.
+          </TooltipContent>
+        </Tooltip>
+        <div className="flex-1" />
+        <button
+          onClick={openNewDialog}
+          className="flex items-center gap-1 h-7 px-2 rounded-md text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+        >
+          <Plus className="size-3.5" />
+          New process
+        </button>
+      </div>
+
+      {/* List */}
+      <div className="flex-1 min-h-0 overflow-y-auto">
+        {isEmpty ? (
+          <div className="h-full flex flex-col items-center justify-center gap-5 p-8">
+            <div className="flex flex-col items-center gap-3">
+              <div className="size-12 rounded-xl bg-muted/50 flex items-center justify-center">
+                <Cpu className="size-6 text-muted-foreground" />
+              </div>
+              <div className="flex flex-col items-center gap-1.5">
+                <p className="text-sm font-semibold">No processes</p>
+                <p className="text-xs text-foreground/60 text-center leading-relaxed max-w-72" style={{ textWrap: 'balance' }}>
+                  Run dev servers, watchers, or any background command alongside your task
+                </p>
+              </div>
+            </div>
             <button
-              onClick={goToNew}
-              className="flex items-center gap-1 h-7 px-2 rounded-md text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+              onClick={openNewDialog}
+              className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-primary text-primary-foreground text-xs font-medium hover:opacity-90 transition-opacity"
             >
               <Plus className="size-3.5" />
               New process
             </button>
-          </>
+          </div>
         ) : (
-          <button
-            onClick={goToList}
-            className="flex items-center gap-1.5 h-7 px-2 rounded-md text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-          >
-            <ArrowLeft className="size-3.5" />
-            {editingId ? 'Edit process' : 'New process'}
-          </button>
+          <div className="flex flex-col gap-2 p-3">
+            {projectProcesses.length > 0 && (
+              <>
+                <SectionHeader label="Project" />
+                {projectProcesses.map(proc => (
+                  <ProcessRow
+                    key={proc.id}
+                    proc={proc}
+                    expanded={expandedLogs.has(proc.id)}
+                    stats={stats[proc.id]}
+                    onToggleLog={() => toggleLog(proc.id)}
+                    onRestart={() => void handleRestart(proc.id)}
+                    onStop={() => void handleStop(proc.id)}
+                    onKill={() => void handleKill(proc.id)}
+                    onEdit={() => openEditDialog(proc)}
+                    onInject={() => handleInject(proc)}
+                    logEndRef={el => { logEndRefs.current[proc.id] = el }}
+                  />
+                ))}
+              </>
+            )}
+            {taskProcesses.length > 0 && (
+              <>
+                <SectionHeader label="This task" />
+                {taskProcesses.map(proc => (
+                  <ProcessRow
+                    key={proc.id}
+                    proc={proc}
+                    expanded={expandedLogs.has(proc.id)}
+                    stats={stats[proc.id]}
+                    onToggleLog={() => toggleLog(proc.id)}
+                    onRestart={() => void handleRestart(proc.id)}
+                    onStop={() => void handleStop(proc.id)}
+                    onKill={() => void handleKill(proc.id)}
+                    onEdit={() => openEditDialog(proc)}
+                    onInject={() => handleInject(proc)}
+                    logEndRef={el => { logEndRefs.current[proc.id] = el }}
+                  />
+                ))}
+              </>
+            )}
+          </div>
         )}
       </div>
 
-      {/* List view */}
-      {view === 'list' && (
-        <div className="flex-1 min-h-0 overflow-y-auto">
-          {isEmpty ? (
-            <div className="h-full flex flex-col items-center justify-center gap-5 p-8">
-              <div className="flex flex-col items-center gap-3">
-                <div className="size-12 rounded-xl bg-muted/50 flex items-center justify-center">
-                  <Cpu className="size-6 text-muted-foreground" />
-                </div>
-                <div className="flex flex-col items-center gap-1.5">
-                  <p className="text-sm font-semibold">No processes</p>
-                  <p className="text-xs text-foreground/60 text-center leading-relaxed max-w-72" style={{ textWrap: 'balance' }}>
-                    Run dev servers, watchers, or any background command alongside your task
-                  </p>
-                </div>
-              </div>
-              <button
-                onClick={goToNew}
-                className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-primary text-primary-foreground text-xs font-medium hover:opacity-90 transition-opacity"
-              >
-                <Plus className="size-3.5" />
-                New process
-              </button>
-            </div>
-          ) : (
-            <div className="flex flex-col gap-2 p-3">
-              {projectProcesses.length > 0 && (
-                <>
-                  <SectionHeader label="Project" />
-                  {projectProcesses.map(proc => (
-                    <ProcessRow
-                      key={proc.id}
-                      proc={proc}
-                      expanded={expandedLogs.has(proc.id)}
-                      stats={stats[proc.id]}
-                      onToggleLog={() => toggleLog(proc.id)}
-                      onRestart={() => void handleRestart(proc.id)}
-                      onStop={() => void handleStop(proc.id)}
-                      onKill={() => void handleKill(proc.id)}
-                      onEdit={() => goToEdit(proc)}
-                      onInject={() => handleInject(proc)}
-                      logEndRef={el => { logEndRefs.current[proc.id] = el }}
-                    />
-                  ))}
-                </>
-              )}
-              {taskProcesses.length > 0 && (
-                <>
-                  <SectionHeader label="This task" />
-                  {taskProcesses.map(proc => (
-                    <ProcessRow
-                      key={proc.id}
-                      proc={proc}
-                      expanded={expandedLogs.has(proc.id)}
-                      stats={stats[proc.id]}
-                      onToggleLog={() => toggleLog(proc.id)}
-                      onRestart={() => void handleRestart(proc.id)}
-                      onStop={() => void handleStop(proc.id)}
-                      onKill={() => void handleKill(proc.id)}
-                      onEdit={() => goToEdit(proc)}
-                      onInject={() => handleInject(proc)}
-                      logEndRef={el => { logEndRefs.current[proc.id] = el }}
-                    />
-                  ))}
-                </>
-              )}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* New process view */}
-      {view === 'new' && (
-        <div className="flex-1 min-h-0 overflow-y-auto">
-          <div className="px-4 pt-5 pb-5 flex flex-col gap-4">
-
-            {/* Scope toggle */}
-            <div className="flex flex-col gap-1.5">
-              <label className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-                Scope
-              </label>
-              <div className="flex gap-1 p-0.5 rounded-lg bg-muted/50 border border-border w-fit">
-                {(['project', 'task'] as const).map(s => (
-                  <button
-                    key={s}
-                    onClick={() => setForm(f => ({ ...f, scope: s }))}
-                    className={cn(
-                      'px-3 py-1 rounded-md text-xs font-medium transition-colors',
-                      form.scope === s
-                        ? 'bg-background text-foreground shadow-sm'
-                        : 'text-muted-foreground hover:text-foreground'
-                    )}
-                  >
-                    {s === 'task' ? 'This task' : 'Project'}
-                  </button>
-                ))}
-              </div>
-              <p className="text-[10px] text-muted-foreground/60 leading-relaxed">
-                {form.scope === 'task'
-                  ? 'Stopped when this task is closed or deleted.'
-                  : 'Shared across all tasks in this project.'}
-              </p>
-            </div>
-
-            <div className="flex flex-col gap-1.5">
-              <label className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-                Label
-              </label>
-              <input
-                ref={labelRef}
-                placeholder="e.g. Frontend"
-                value={form.label}
-                onChange={e => setForm(f => ({ ...f, label: e.target.value }))}
-                className="w-full rounded-md border border-input bg-surface-2 px-3 py-2 text-sm outline-none focus:border-ring transition-colors"
-              />
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <label className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-                Command
-              </label>
-              <input
-                placeholder="e.g. npm run dev"
-                value={form.command}
-                onChange={e => setForm(f => ({ ...f, command: e.target.value }))}
-                onKeyDown={e => { if (e.key === 'Enter') void handleSpawn() }}
-                className="w-full rounded-md border border-input bg-surface-2 px-3 py-2 text-sm font-mono outline-none focus:border-ring transition-colors"
-              />
-            </div>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <label className="flex items-center gap-2.5 text-xs text-muted-foreground cursor-pointer select-none w-fit">
-                  <input
-                    type="checkbox"
-                    checked={form.autoRestart}
-                    onChange={e => setForm(f => ({ ...f, autoRestart: e.target.checked }))}
-                    className="size-3.5 rounded"
-                  />
-                  Auto-restart on crash
-                </label>
-              </TooltipTrigger>
-              <TooltipContent side="right" className="max-w-64">
-                Automatically restarts the process if it exits with a non-zero code. Won't restart if you stop it manually.
-              </TooltipContent>
-            </Tooltip>
-            {saveError && (
-              <p className="text-[11px] text-red-500 bg-red-500/10 border border-red-500/20 rounded-md px-3 py-2">{saveError}</p>
-            )}
-            <div className="flex gap-2 pt-1">
-              <button
-                onClick={() => void handleCreate()}
-                disabled={saving || !form.label.trim() || !form.command.trim()}
-                className="flex-1 py-2 rounded-md border border-border bg-surface-2 text-sm font-medium text-foreground disabled:opacity-40 hover:bg-muted/50 transition-colors"
-              >
-                {saving ? '…' : editingId ? 'Update' : 'Save'}
-              </button>
-              <button
-                onClick={() => void handleSpawn()}
-                disabled={saving || !form.label.trim() || !form.command.trim()}
-                className="flex-1 py-2 rounded-md bg-primary text-primary-foreground text-sm font-medium disabled:opacity-40 hover:opacity-90 transition-opacity"
-              >
-                {saving ? '…' : editingId ? 'Update & run' : 'Run'}
-              </button>
-            </div>
-          </div>
-
-          {/* Suggestions */}
-          {!editingId && <div className="border-t border-border px-4 pt-4 pb-6 flex flex-col gap-5">
-            {allSuggestions.map(group => (
-              <div key={group.category} className="flex flex-col gap-2">
-                <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/50">
-                  {group.category}
-                </span>
-                <div className="flex flex-wrap gap-1.5">
-                  {group.items.map(item => (
-                    <button
-                      key={item.command}
-                      onClick={() => applySuggestion(item)}
-                      title={item.command}
-                      className="px-2.5 py-1 rounded border border-border bg-surface-2 text-[11px] text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
-                    >
-                      {item.name}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            ))}
-          </div>}
-        </div>
-      )}
-
+      <ProcessDialog
+        open={dialogOpen}
+        onOpenChange={setDialogOpen}
+        process={editingProcess}
+        taskId={taskId}
+        projectId={projectId}
+        cwd={cwd ?? null}
+        onSaved={handleDialogSaved}
+        onSpawned={handleDialogSpawned}
+      />
     </div>
   )
 }
