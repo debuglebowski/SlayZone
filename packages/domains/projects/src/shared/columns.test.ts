@@ -13,6 +13,7 @@ import {
   normalizeStatusOrDefault,
   parseColumnsConfig,
   resolveColumns,
+  resolveStatusId,
   validateColumns,
 } from './columns.js'
 
@@ -101,6 +102,46 @@ describe('status helpers', () => {
     expect(isKnownStatus('not_real', customColumns)).toBe(false)
     expect(normalizeStatusOrDefault('not_real', customColumns)).toBe('queue')
     expect(normalizeStatusOrDefault('blocked', customColumns)).toBe('blocked')
+  })
+})
+
+describe('resolveStatusId', () => {
+  test('matches by exact ID', () => {
+    expect(resolveStatusId('in_progress', null)).toBe('in_progress')
+    expect(resolveStatusId('blocked', customColumns)).toBe('blocked')
+  })
+
+  test('matches by case-insensitive label', () => {
+    expect(resolveStatusId('In Progress', null)).toBe('in_progress')
+    expect(resolveStatusId('in progress', null)).toBe('in_progress')
+    expect(resolveStatusId('IN PROGRESS', null)).toBe('in_progress')
+    expect(resolveStatusId('Blocked', customColumns)).toBe('blocked')
+  })
+
+  test('matches by slugified label', () => {
+    expect(resolveStatusId('in-progress', null)).toBe('in_progress')
+    expect(resolveStatusId('In-Progress', null)).toBe('in_progress')
+  })
+
+  test('matches underscore input via slug', () => {
+    const cols: ColumnConfig[] = [
+      { id: 'status-1', label: 'Code Review', color: 'purple', position: 0, category: 'started' },
+      { id: 'status-2', label: 'Done', color: 'green', position: 1, category: 'completed' },
+    ]
+    expect(resolveStatusId('code_review', cols)).toBe('status-1')
+  })
+
+  test('exact ID takes priority over label match', () => {
+    const cols: ColumnConfig[] = [
+      { id: 'my-status', label: 'My Status', color: 'blue', position: 0, category: 'unstarted' },
+      { id: 'other', label: 'my-status', color: 'green', position: 1, category: 'completed' },
+    ]
+    expect(resolveStatusId('my-status', cols)).toBe('my-status')
+  })
+
+  test('returns null for unknown input', () => {
+    expect(resolveStatusId('nonexistent', null)).toBeNull()
+    expect(resolveStatusId('nope', customColumns)).toBeNull()
   })
 })
 

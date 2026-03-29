@@ -167,3 +167,23 @@ export function isKnownStatus(statusId: string, columns: ColumnConfig[] | null |
 export function normalizeStatusOrDefault(statusId: string, columns: ColumnConfig[] | null | undefined): string {
   return isKnownStatus(statusId, columns) ? statusId : getDefaultStatus(columns)
 }
+
+function slugify(value: string): string {
+  return value.toLowerCase().replace(/[\s_]+/g, '-')
+}
+
+export function resolveStatusId(
+  input: string,
+  columns: ColumnConfig[] | null | undefined
+): string | null {
+  const resolved = resolveColumns(columns)
+  const byId = resolved.find((col) => col.id === input)
+  if (byId) return byId.id
+  const lower = input.toLowerCase()
+  const byLabel = resolved.find((col) => col.label.toLowerCase() === lower)
+  if (byLabel) return byLabel.id
+  const slug = slugify(input)
+  const bySlug = resolved.find((col) => slugify(col.label) === slug)
+  if (bySlug) return bySlug.id
+  return null
+}

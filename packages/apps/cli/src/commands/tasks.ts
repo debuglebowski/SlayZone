@@ -6,8 +6,9 @@ import {
   getDefaultStatus,
   getDoneStatus,
   isCompletedStatus,
-  isKnownStatus,
   parseColumnsConfig,
+  resolveStatusId,
+  type ColumnConfig,
 } from '@slayzone/projects/shared'
 import { DEFAULT_TERMINAL_MODES } from '@slayzone/terminal/shared'
 
@@ -91,7 +92,18 @@ export function tasksCommand(): Command {
 
       const limit = parseInt(opts.limit, 10)
       const doneFilter = Boolean(opts.done)
-      const status = doneFilter ? undefined : opts.status
+      let status = doneFilter ? undefined : opts.status
+
+      if (status) {
+        let listColumns: ColumnConfig[] | null = null
+        if (opts.project) {
+          const row = db.query<{ id: string }>(`SELECT id FROM projects WHERE id = :proj OR LOWER(name) LIKE :projLike LIMIT 1`, {
+            ':proj': opts.project, ':projLike': `%${opts.project.toLowerCase()}%`
+          })[0]
+          if (row) listColumns = getProjectColumnsConfig(db, row.id)
+        }
+        status = resolveStatusId(status, listColumns) ?? status
+      }
 
       const conditions: string[] = ['t.archived_at IS NULL', 't.is_temporary = 0']
       const params: Record<string, string | number | null> = {}
@@ -172,11 +184,11 @@ export function tasksCommand(): Command {
         process.exit(1)
       }
       const projectColumns = getProjectColumnsConfig(db, project.id)
-      if (opts.status && !isKnownStatus(opts.status, projectColumns)) {
+      const status = opts.status ? resolveStatusId(opts.status, projectColumns) : getDefaultStatus(projectColumns)
+      if (opts.status && !status) {
         console.error(`Unknown status "${opts.status}" for project "${project.name}".`)
         process.exit(1)
       }
-      const status = opts.status ?? getDefaultStatus(projectColumns)
 
       const terminalMode =
         db.query<{ value: string }>(`SELECT value FROM settings WHERE key = 'default_terminal_mode' LIMIT 1`)[0]?.value
@@ -321,9 +333,11 @@ export function tasksCommand(): Command {
       }
 
       const task = tasks[0]
+      let resolvedStatus: string | undefined
       if (opts.status) {
         const taskColumns = getProjectColumnsConfig(db, task.project_id)
-        if (!isKnownStatus(opts.status, taskColumns)) {
+        resolvedStatus = resolveStatusId(opts.status, taskColumns) ?? undefined
+        if (!resolvedStatus) {
           console.error(`Unknown status "${opts.status}" for this task's project.`)
           process.exit(1)
         }
@@ -333,7 +347,7 @@ export function tasksCommand(): Command {
 
       if (opts.title)       { sets.push('title = :title');             params[':title'] = opts.title }
       if (opts.description !== undefined) { sets.push('description = :description'); params[':description'] = opts.description || null }
-      if (opts.status)      { sets.push('status = :status');           params[':status'] = opts.status }
+      if (resolvedStatus)   { sets.push('status = :status');           params[':status'] = resolvedStatus }
       if (opts.priority)    { sets.push('priority = :priority');       params[':priority'] = parseInt(opts.priority, 10) }
 
       db.run(`UPDATE tasks SET ${sets.join(', ')} WHERE id = :id`, params)
@@ -497,11 +511,11 @@ export function tasksCommand(): Command {
         process.exit(1)
       }
       const parentColumns = getProjectColumnsConfig(db, parent.project_id)
-      if (opts.status && !isKnownStatus(opts.status, parentColumns)) {
+      const status = opts.status ? resolveStatusId(opts.status, parentColumns) : getDefaultStatus(parentColumns)
+      if (opts.status && !status) {
         console.error(`Unknown status "${opts.status}" for parent task's project.`)
         process.exit(1)
       }
-      const status = opts.status ?? getDefaultStatus(parentColumns)
 
       const terminalMode = parent.terminal_mode
         ?? (db.query<{ value: string }>(`SELECT value FROM settings WHERE key = 'default_terminal_mode' LIMIT 1`)[0]?.value)
