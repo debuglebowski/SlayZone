@@ -134,6 +134,16 @@ export interface PromptInfo {
   position: number
 }
 
+// Loop mode configuration (stored as JSON in tasks.loop_config)
+export type CriteriaType = 'contains' | 'not-contains' | 'regex'
+
+export interface LoopConfig {
+  prompt: string
+  criteriaType: CriteriaType
+  criteriaPattern: string
+  maxIterations: number
+}
+
 export interface ValidationResult {
   check: string
   ok: boolean

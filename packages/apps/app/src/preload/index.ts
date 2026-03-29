@@ -122,6 +122,10 @@ const api: ElectronAPI = {
     isTestsPanelEnabledSync: ipcRenderer.sendSync('app:is-tests-panel-enabled-sync') as boolean,
     isJiraIntegrationEnabled: () => ipcRenderer.invoke('app:is-jira-integration-enabled'),
     isJiraIntegrationEnabledSync: ipcRenderer.sendSync('app:is-jira-integration-enabled-sync') as boolean,
+    isLoopModeEnabled: () => ipcRenderer.invoke('app:is-loop-mode-enabled'),
+    isLoopModeEnabledSync: ipcRenderer.sendSync('app:is-loop-mode-enabled-sync') as boolean,
+    isAutomationsEnabled: () => ipcRenderer.invoke('app:is-automations-enabled'),
+    isAutomationsEnabledSync: ipcRenderer.sendSync('app:is-automations-enabled-sync') as boolean,
     isPlaywright: process.env.PLAYWRIGHT === '1',
     onGoHome: (callback: () => void) => {
       const handler = () => callback()

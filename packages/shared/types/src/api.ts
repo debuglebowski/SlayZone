@@ -333,6 +333,10 @@ export interface ElectronAPI {
     isTestsPanelEnabledSync: boolean
     isJiraIntegrationEnabled: () => Promise<boolean>
     isJiraIntegrationEnabledSync: boolean
+    isLoopModeEnabled: () => Promise<boolean>
+    isLoopModeEnabledSync: boolean
+    isAutomationsEnabled: () => Promise<boolean>
+    isAutomationsEnabledSync: boolean
     isPlaywright: boolean
     onGoHome: (callback: () => void) => () => void
     onOpenSettings: (callback: () => void) => () => void

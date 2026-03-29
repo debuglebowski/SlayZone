@@ -72,6 +72,7 @@ function parseTask(row: Record<string, unknown> | undefined): Task | null {
     web_panel_urls: safeJsonParse(row.web_panel_urls),
     editor_open_files: safeJsonParse(row.editor_open_files),
     merge_context: safeJsonParse(row.merge_context),
+    loop_config: safeJsonParse(row.loop_config),
     is_temporary: Boolean(row.is_temporary)
   } as Task
 }
@@ -436,6 +437,7 @@ export function updateTask(db: Database, data: UpdateTaskInput): Task | null {
   if (data.editorOpenFiles !== undefined) { fields.push('editor_open_files = ?'); values.push(data.editorOpenFiles ? JSON.stringify(data.editorOpenFiles) : null) }
   if (data.mergeState !== undefined) { fields.push('merge_state = ?'); values.push(data.mergeState) }
   if (data.mergeContext !== undefined) { fields.push('merge_context = ?'); values.push(data.mergeContext ? JSON.stringify(data.mergeContext) : null) }
+  if (data.loopConfig !== undefined) { fields.push('loop_config = ?'); values.push(data.loopConfig ? JSON.stringify(data.loopConfig) : null) }
   if (data.isTemporary !== undefined) { fields.push('is_temporary = ?'); values.push(data.isTemporary ? 1 : 0) }
   if (data.repoName !== undefined) { fields.push('repo_name = ?'); values.push(data.repoName) }
 
@@ -607,9 +609,10 @@ export function registerTaskHandlers(ipcMain: IpcMain, db: Database, onMutation?
   })
 
   ipcMain.handle('db:tasks:update', (_, data: UpdateTaskInput) => {
+    const oldRow = db.prepare('SELECT status FROM tasks WHERE id = ?').get(data.id) as { status: string } | undefined
     const result = updateTask(db, data)
     if (result) {
-      ipcMain.emit('db:tasks:update:done', null, data.id)
+      ipcMain.emit('db:tasks:update:done', null, data.id, { oldStatus: oldRow?.status })
       onMutation?.()
     }
     return result

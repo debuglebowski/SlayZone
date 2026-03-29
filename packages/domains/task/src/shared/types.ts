@@ -1,4 +1,4 @@
-import type { TerminalMode } from '@slayzone/terminal/shared'
+import type { TerminalMode, LoopConfig } from '@slayzone/terminal/shared'
 import type { BrowserTabsState } from '@slayzone/task-browser/shared'
 import type { EditorOpenFilesState } from '@slayzone/file-editor/shared'
 
@@ -118,7 +118,7 @@ export const PREDEFINED_WEB_PANELS: WebPanelDefinition[] = [
 
 export const DEFAULT_PANEL_CONFIG: PanelConfig = {
   viewEnabled: {
-    home: { git: true, editor: true, processes: true, tests: true },
+    home: { git: true, editor: true, processes: true, tests: true, automations: true },
     task: {
       ...Object.fromEntries(BUILTIN_PANEL_IDS.map(id => [id, true])),
       ...Object.fromEntries(PREDEFINED_WEB_PANELS.map(wp => [wp.id, false]))
@@ -178,6 +178,8 @@ export interface Task {
   merge_context: MergeContext | null
   // CCS (Claude Code Switch) profile name
   ccs_profile: string | null
+  // Loop mode configuration (JSON)
+  loop_config: LoopConfig | null
   // Temporary task (ephemeral terminal tab, deleted on close)
   is_temporary: boolean
   // Pull request
@@ -256,6 +258,8 @@ export interface UpdateTaskInput {
   // Merge mode
   mergeState?: MergeState | null
   mergeContext?: MergeContext | null
+  // Loop mode
+  loopConfig?: LoopConfig | null
   // Pull request
   prUrl?: string | null
   // Temporary task

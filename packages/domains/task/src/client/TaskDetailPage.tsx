@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
-import { MoreHorizontal, Archive, Trash2, AlertTriangle, Loader2, Terminal as TerminalIcon, Globe, Settings2, GitBranch, FileCode, ChevronRight, Plus, GripVertical, X, Info, CheckCircle2, XCircle, Stethoscope, Cpu, Circle } from 'lucide-react'
+import { MoreHorizontal, Archive, Trash2, AlertTriangle, Loader2, Terminal as TerminalIcon, Globe, Settings2, GitBranch, FileCode, ChevronRight, Plus, GripVertical, X, Info, CheckCircle2, XCircle, Stethoscope, Cpu, Circle, Repeat } from 'lucide-react'
 import { IconArrowsVertical, IconArrowsMaximize } from '@tabler/icons-react'
 import { DescriptionDialog } from './DescriptionDialog'
 import { DndContext, PointerSensor, useSensors, useSensor, closestCenter } from '@dnd-kit/core'
@@ -59,12 +59,13 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@slayzone/ui'
 import { Tooltip, TooltipTrigger, TooltipContent } from '@slayzone/ui'
 import { Popover, PopoverContent, PopoverTrigger } from '@slayzone/ui'
 import { TaskMetadataSidebar, ExternalSyncCard } from './TaskMetadataSidebar'
-import { RichTextEditor, getEditorThemeById, type EditorThemeColors } from '@slayzone/editor'
+import { RichTextEditor } from '@slayzone/editor'
 import { useTheme } from '@slayzone/settings/client'
-import { markSkipCache, usePty, useTerminalModes, getVisibleModes, getModeLabel, groupTerminalModes } from '@slayzone/terminal'
+import { markSkipCache, usePty, useTerminalModes, getVisibleModes, getModeLabel, groupTerminalModes, useLoopMode, LoopModeBanner, LoopModeDialog } from '@slayzone/terminal'
+import type { LoopConfig } from '@slayzone/terminal/shared'
 import { TerminalContainer, type TerminalContainerHandle } from '@slayzone/task-terminals'
 import { UnifiedGitPanel, type UnifiedGitPanelHandle, type GitTabId } from '@slayzone/worktrees'
-import { buildStatusOptions, cn, getColumnStatusStyle, projectColorBg, useAppearance, matchesShortcut, useShortcutStore, useShortcutDisplay, withModalGuard } from '@slayzone/ui'
+import { buildStatusOptions, cn, getColumnStatusStyle, projectColorBg, useAppearance, matchesShortcut, useShortcutStore, useShortcutDisplay, withModalGuard, getThemeEditorColors, type EditorThemeColors } from '@slayzone/ui'
 import { BrowserPanel, type BrowserPanelHandle } from '@slayzone/task-browser'
 import { FileEditorView, type FileEditorViewHandle } from '@slayzone/file-editor/client'
 import { QuickOpenDialog } from '@slayzone/file-editor/client/QuickOpenDialog'
@@ -192,14 +193,11 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
 }: TaskDetailPageProps): React.JSX.Element {
   const { modes } = useTerminalModes()
 
-  const { theme } = useTheme()
-  const { colorTintsEnabled, notesFontFamily, notesLineSpacing, notesCheckedHighlight, notesShowToolbar, notesSpellcheck, contentThemeFollowApp, contentThemeDark, contentThemeLight } = useAppearance()
-  const resolvedEditorThemeId = contentThemeFollowApp
-    ? (theme === 'dark' ? contentThemeDark : contentThemeLight)
-    : contentThemeDark
+  const { editorThemeId, contentVariant } = useTheme()
+  const { colorTintsEnabled, notesFontFamily, notesLineSpacing, notesCheckedHighlight, notesShowToolbar, notesSpellcheck } = useAppearance()
   const notesThemeColors: EditorThemeColors = useMemo(
-    () => getEditorThemeById(resolvedEditorThemeId),
-    [resolvedEditorThemeId]
+    () => getThemeEditorColors(editorThemeId, contentVariant),
+    [editorThemeId, contentVariant]
   )
   // Main tab session ID format used by TerminalContainer/useTaskTerminals.
   const getMainSessionId = useCallback((id: string) => `${id}:${id}`, [])
@@ -355,6 +353,27 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
     focus: () => void
     clearBuffer: () => Promise<void>
   } | null>(null)
+
+  // Loop mode (labs feature)
+  const [loopModeAvailable, setLoopModeAvailable] = useState(false)
+  const [loopDialogOpen, setLoopDialogOpen] = useState(false)
+  const loopConfigured = task?.loop_config != null && !!(task.loop_config.prompt.trim() && task.loop_config.criteriaPattern.trim())
+  const loopModeOpen = loopConfigured
+  useEffect(() => {
+    window.api.app.isLoopModeEnabled().then(setLoopModeAvailable)
+  }, [])
+  const mainSessionId = task ? getMainSessionId(task.id) : ''
+  const handleLoopConfigChange = useCallback((cfg: LoopConfig | null) => {
+    if (!task) return
+    window.api.db.updateTask({ id: task.id, loopConfig: cfg }).then((updated) => {
+      if (updated) onTaskUpdated(updated)
+    })
+  }, [task?.id, onTaskUpdated])
+  const { loopState, startLoop, pauseLoop, resumeLoop, stopLoop, updateConfig: updateLoopConfig } = useLoopMode({
+    sessionId: mainSessionId,
+    config: task?.loop_config ?? null,
+    onConfigChange: handleLoopConfigChange
+  })
 
   // Subscribe to session detected events
   useEffect(() => {
@@ -1448,7 +1467,7 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
           data-panel-id="terminal"
           className={cn(
             "min-w-0 shrink-0 overflow-hidden flex flex-col transition-shadow duration-200",
-            !compact && "rounded-md bg-surface-2 border border-border",
+            !compact && "rounded-md bg-surface-1 border border-border",
             !compact && multipleVisiblePanels && focusedPanel === 'terminal' && "shadow-[0_0_18px_rgba(255,255,255,0.25)]"
           )}
           style={compact ? { flex: 1 } : containerWidth > 0 ? { width: resolvedWidths.terminal } : { flex: 1 }}
@@ -1549,6 +1568,16 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
                   onOpenUrl={openDevServerInBrowser}
                   onOpenFile={handleQuickOpenFile}
                   onMainReset={handleResetTerminal}
+                  overlay={loopModeOpen ? (
+                    <LoopModeBanner
+                      loopState={loopState}
+                      onStart={startLoop}
+                      onPause={pauseLoop}
+                      onResume={resumeLoop}
+                      onStop={stopLoop}
+                      onEditConfig={() => setLoopDialogOpen(true)}
+                    />
+                  ) : undefined}
                   rightContent={
                     <Tooltip open={!isMainTabActive && !task.is_temporary ? undefined : false}>
                       <TooltipTrigger asChild>
@@ -1706,6 +1735,29 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
                             )
                           )}
 
+                          {loopModeAvailable && task.terminal_mode !== 'terminal' && (
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <IconButton
+                                  variant={loopModeOpen ? 'default' : 'ghost'}
+                                  className="size-7"
+                                  aria-label="Loop command"
+                                  onClick={() => {
+                                    if (loopState.active) stopLoop()
+                                    if (loopModeOpen) {
+                                      handleLoopConfigChange(null)
+                                    } else {
+                                      setLoopDialogOpen(true)
+                                    }
+                                  }}
+                                >
+                                  <Repeat className="size-3.5" />
+                                </IconButton>
+                              </TooltipTrigger>
+                              <TooltipContent side="bottom">Loop command</TooltipContent>
+                            </Tooltip>
+                          )}
+
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
                               <IconButton data-testid="terminal-menu-trigger" variant="ghost" aria-label="Terminal menu" className="size-7">
@@ -1781,7 +1833,7 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
 
         {/* Browser Panel */}
         {!compact && panelVisibility.browser && (
-          <div data-panel-id="browser" className={cn("shrink-0 rounded-md bg-surface-2 border border-border overflow-hidden transition-shadow duration-200", multipleVisiblePanels && focusedPanel === 'browser' && "shadow-[0_0_18px_rgba(255,255,255,0.25)]")} style={{ width: resolvedWidths.browser }}>
+          <div data-panel-id="browser" className={cn("shrink-0 rounded-md bg-surface-1 border border-border overflow-hidden transition-shadow duration-200", multipleVisiblePanels && focusedPanel === 'browser' && "shadow-[0_0_18px_rgba(255,255,255,0.25)]")} style={{ width: resolvedWidths.browser }}>
             <BrowserPanel
               ref={browserPanelRef}
               className="h-full"
@@ -1811,7 +1863,7 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
 
         {/* File Editor Panel */}
         {!compact && panelVisibility.editor && effectiveRepoPath && (
-          <div data-panel-id="editor" className={cn("shrink-0 overflow-hidden rounded-md bg-surface-2 border border-border transition-shadow duration-200", multipleVisiblePanels && focusedPanel === 'editor' && "shadow-[0_0_18px_rgba(255,255,255,0.25)]")} style={{ width: resolvedWidths.editor }}>
+          <div data-panel-id="editor" className={cn("shrink-0 overflow-hidden rounded-md bg-surface-1 border border-border transition-shadow duration-200", multipleVisiblePanels && focusedPanel === 'editor' && "shadow-[0_0_18px_rgba(255,255,255,0.25)]")} style={{ width: resolvedWidths.editor }}>
             <FileEditorView
               ref={fileEditorRefCallback}
               projectPath={effectiveRepoPath}
@@ -1839,7 +1891,7 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
                   onReset={resetAllPanels}
                 />
               )}
-              <div data-panel-id={wp.id} className={cn("shrink-0 rounded-md bg-surface-2 border border-border overflow-hidden transition-shadow duration-200", multipleVisiblePanels && focusedPanel === wp.id && "shadow-[0_0_18px_rgba(255,255,255,0.25)]")} style={{ width: resolvedWidths[wp.id] }}>
+              <div data-panel-id={wp.id} className={cn("shrink-0 rounded-md bg-surface-1 border border-border overflow-hidden transition-shadow duration-200", multipleVisiblePanels && focusedPanel === wp.id && "shadow-[0_0_18px_rgba(255,255,255,0.25)]")} style={{ width: resolvedWidths[wp.id] }}>
                 <WebPanelView
                   panelId={wp.id}
                   url={task.web_panel_urls?.[wp.id] || wp.baseUrl}
@@ -1871,7 +1923,7 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
 
         {/* Git Panel */}
         {!compact && panelVisibility.diff && (
-          <div data-panel-id="diff" data-testid="task-git-panel" className={cn("shrink-0 rounded-md bg-surface-2 border border-border overflow-hidden flex flex-col transition-shadow duration-200", multipleVisiblePanels && focusedPanel === 'diff' && "shadow-[0_0_18px_rgba(255,255,255,0.25)]")} style={{ width: resolvedWidths.diff }}>
+          <div data-panel-id="diff" data-testid="task-git-panel" className={cn("shrink-0 rounded-md bg-surface-1 border border-border overflow-hidden flex flex-col transition-shadow duration-200", multipleVisiblePanels && focusedPanel === 'diff' && "shadow-[0_0_18px_rgba(255,255,255,0.25)]")} style={{ width: resolvedWidths.diff }}>
             <UnifiedGitPanel
               ref={gitPanelRef}
               task={task}
@@ -1905,7 +1957,7 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
 
         {/* Settings Panel */}
         {!compact && panelVisibility.settings && (
-        <div data-panel-id="settings" data-testid="task-settings-panel" className={cn("shrink-0 rounded-md bg-surface-2 border border-border p-3 flex flex-col gap-4 overflow-y-auto transition-shadow duration-200", multipleVisiblePanels && focusedPanel === 'settings' && "shadow-[0_0_18px_rgba(255,255,255,0.25)]")} style={{ width: resolvedWidths.settings }}>
+        <div data-panel-id="settings" data-testid="task-settings-panel" className={cn("shrink-0 rounded-md bg-surface-1 border border-border p-3 flex flex-col gap-4 overflow-y-auto transition-shadow duration-200", multipleVisiblePanels && focusedPanel === 'settings' && "shadow-[0_0_18px_rgba(255,255,255,0.25)]")} style={{ width: resolvedWidths.settings }}>
           <div className="shrink-0 h-10 px-2 -mx-3 -mt-3 border-b border-border bg-surface-1 flex items-center">
             <span className="text-sm font-medium">Settings</span>
           </div>
@@ -2128,7 +2180,7 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
 
         {/* Processes Panel */}
         {!compact && panelVisibility.processes && (
-          <div data-panel-id="processes" className={cn("shrink-0 rounded-md bg-surface-2 border border-border overflow-hidden flex flex-col transition-shadow duration-200", multipleVisiblePanels && focusedPanel === 'processes' && "shadow-[0_0_18px_rgba(255,255,255,0.25)]")} style={{ width: resolvedWidths.processes }}>
+          <div data-panel-id="processes" className={cn("shrink-0 rounded-md bg-surface-1 border border-border overflow-hidden flex flex-col transition-shadow duration-200", multipleVisiblePanels && focusedPanel === 'processes' && "shadow-[0_0_18px_rgba(255,255,255,0.25)]")} style={{ width: resolvedWidths.processes }}>
             <ProcessesPanel taskId={task.id} projectId={project?.id ?? null} cwd={effectiveRepoPath || project?.path} terminalSessionId={getMainSessionId(task.id)} />
           </div>
         )}
@@ -2142,6 +2194,13 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
           onOpenFile={handleQuickOpenFile}
         />
       )}
+
+      <LoopModeDialog
+        open={loopDialogOpen}
+        onOpenChange={(open) => { setLoopDialogOpen(open) }}
+        config={task.loop_config ?? { prompt: '', criteriaType: 'contains', criteriaPattern: '', maxIterations: 50 }}
+        onSave={(cfg) => { handleLoopConfigChange(cfg); setLoopDialogOpen(false) }}
+      />
 
       <DeleteTaskDialog
         task={task}

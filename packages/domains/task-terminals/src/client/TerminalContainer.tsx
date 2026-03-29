@@ -37,6 +37,7 @@ interface TerminalContainerProps {
   onOpenFile?: (filePath: string) => void
   onMainReset?: () => void
   rightContent?: React.ReactNode
+  overlay?: React.ReactNode
 }
 
 export const TerminalContainer = forwardRef<TerminalContainerHandle, TerminalContainerProps>(function TerminalContainer({
@@ -60,7 +61,8 @@ export const TerminalContainer = forwardRef<TerminalContainerHandle, TerminalCon
   onOpenUrl,
   onOpenFile,
   onMainReset,
-  rightContent
+  rightContent,
+  overlay
 }: TerminalContainerProps, ref) {
   const {
     tabs,
@@ -313,7 +315,7 @@ export const TerminalContainer = forwardRef<TerminalContainerHandle, TerminalCon
         onMainReset={onMainReset}
         rightContent={rightContent}
       />
-      <div className="flex-1 min-h-0">
+      <div className="flex-1 min-h-0 relative">
         <TerminalSplitGroup
           ref={splitGroupRef}
           key={activeGroupId}
@@ -323,6 +325,7 @@ export const TerminalContainer = forwardRef<TerminalContainerHandle, TerminalCon
           onOpenUrl={onOpenUrl}
           onOpenFile={onOpenFile}
         />
+        {overlay}
       </div>
     </div>
   )
