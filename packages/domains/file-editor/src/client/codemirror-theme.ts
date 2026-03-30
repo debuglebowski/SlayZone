@@ -16,8 +16,12 @@ export function buildCodeMirrorTheme(colors: EditorThemeColors, isDark: boolean)
     '.cm-cursor, .cm-dropCursor': {
       borderLeftColor: colors.cursor,
     },
-    '&.cm-focused > .cm-scroller > .cm-selectionLayer .cm-selectionBackground, .cm-selectionBackground, .cm-content ::selection': {
+    '&.cm-focused > .cm-scroller > .cm-selectionLayer .cm-selectionBackground, .cm-selectionBackground': {
       backgroundColor: colors.selection,
+    },
+    '.cm-content ::selection': {
+      backgroundColor: colors.selection,
+      color: 'inherit',
     },
     '.cm-gutters': {
       backgroundColor: colors.gutterBackground,
@@ -25,7 +29,7 @@ export function buildCodeMirrorTheme(colors: EditorThemeColors, isDark: boolean)
       border: 'none',
     },
     '.cm-activeLine': {
-      backgroundColor: colors.lineHighlight,
+      backgroundColor: 'transparent',
     },
     '.cm-activeLineGutter': {
       backgroundColor: colors.lineHighlight,
