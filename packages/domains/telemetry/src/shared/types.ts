@@ -30,6 +30,8 @@ export type TelemetryEventName =
   | 'task_dependency_added'
   | 'temporary_task_created'
   | 'task_moved_to_project'
+  | 'task_snoozed'
+  | 'task_unsnoozed'
   | 'due_date_set'
   | 'copy_title'
   | 'copy_link'
@@ -153,6 +155,8 @@ export interface TelemetryEventProps {
   task_dependency_added: Record<string, never>
   temporary_task_created: Record<string, never>
   task_moved_to_project: Record<string, never>
+  task_snoozed: Record<string, never>
+  task_unsnoozed: Record<string, never>
   due_date_set: Record<string, never>
   copy_title: Record<string, never>
   copy_link: Record<string, never>

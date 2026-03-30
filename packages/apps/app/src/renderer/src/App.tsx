@@ -14,7 +14,8 @@ import {
   useUndoableTaskActions,
   useFilterState,
   applyFilters,
-  getViewConfig
+  getViewConfig,
+  useSnoozeWakeUp
 } from '@slayzone/tasks'
 import { ResizeHandle } from '@slayzone/task/client/ResizeHandle'
 import { usePanelSizes } from '@slayzone/task/client/usePanelSizes'
@@ -113,6 +114,9 @@ function App(): React.JSX.Element {
     deleteTask: rawDeleteTask, contextMenuUpdate: rawContextMenuUpdate,
     updateProject, reorderProjects, deleteProject
   } = useTasksData()
+
+  // Snooze wake-up timer — clears snooze + notifies when expiry passes
+  useSnoozeWakeUp(tasks)
 
   // Undo/redo stack
   const { push: pushUndo, undo, redo } = useUndo()

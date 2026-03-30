@@ -203,7 +203,8 @@ export function useTasksData(): UseTasksDataReturn {
         id: taskId,
         status: updates.status,
         priority: updates.priority,
-        projectId: updates.project_id
+        projectId: updates.project_id,
+        snoozedUntil: updates.snoozed_until
       })
     } catch {
       setTasks(previousTasks)

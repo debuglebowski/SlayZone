@@ -75,6 +75,8 @@ function makeTask(id: string, projectId: string, title: string): Task {
     merge_state: null,
     merge_context: null,
     ccs_profile: null,
+    loop_config: null,
+    snoozed_until: null,
     is_temporary: false,
     pr_url: null,
     repo_name: null,

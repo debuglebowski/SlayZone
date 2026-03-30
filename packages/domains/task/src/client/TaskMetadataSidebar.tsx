@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { format } from 'date-fns'
-import { ArrowDownToLineIcon, ArrowUpToLineIcon, CalendarIcon, Loader2, X } from 'lucide-react'
+import { ArrowDownToLineIcon, ArrowUpToLineIcon, CalendarIcon, Loader2, X, AlarmClock } from 'lucide-react'
 import type { Task } from '@slayzone/task/shared'
 import { priorityOptions } from '@slayzone/task/shared'
 import type { Project } from '@slayzone/projects/shared'
@@ -27,6 +27,7 @@ import { toast } from '@slayzone/ui'
 import { track } from '@slayzone/telemetry/client'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@slayzone/ui'
 import { ProjectSelect } from '@slayzone/projects'
+import { SnoozePicker } from './SnoozePicker'
 
 interface TaskMetadataSidebarProps {
   task: Task
@@ -111,6 +112,20 @@ export function TaskMetadataSidebar({
     const updated = await window.api.db.updateTask({ id: task.id, dueDate })
     onUpdate(updated)
   }
+
+  const handleSnooze = async (until: string): Promise<void> => {
+    track('task_snoozed')
+    const updated = await window.api.db.updateTask({ id: task.id, snoozedUntil: until })
+    onUpdate(updated)
+  }
+
+  const handleUnsnooze = async (): Promise<void> => {
+    track('task_unsnoozed')
+    const updated = await window.api.db.updateTask({ id: task.id, snoozedUntil: null })
+    onUpdate(updated)
+  }
+
+  const isSnoozed = task.snoozed_until && new Date(task.snoozed_until) > new Date()
 
   const handleTagToggle = async (tagId: string, checked: boolean): Promise<void> => {
     if (checked) track('tag_assigned')
@@ -218,6 +233,32 @@ export function TaskMetadataSidebar({
             </PopoverContent>
           </Popover>
         </div>
+      </div>
+
+      {/* Snooze */}
+      <div>
+        <label className="mb-1 block text-sm text-muted-foreground">Snooze</label>
+        {isSnoozed ? (
+          <div className="flex items-center gap-2 rounded-md border border-input bg-background px-3 py-2 text-sm">
+            <AlarmClock className="size-3.5 text-muted-foreground" />
+            <span className="flex-1">{format(new Date(task.snoozed_until!), 'EEE, MMM d · h:mm a')}</span>
+            <button onClick={handleUnsnooze} className="text-muted-foreground hover:text-foreground">
+              <X className="size-3.5" />
+            </button>
+          </div>
+        ) : (
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="outline" className="w-full justify-start text-muted-foreground">
+                <AlarmClock className="mr-2 size-4" />
+                Not snoozed
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="start">
+              <SnoozePicker onSnooze={handleSnooze} />
+            </PopoverContent>
+          </Popover>
+        )}
       </div>
 
       {/* Tags */}

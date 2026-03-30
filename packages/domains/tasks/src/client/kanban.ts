@@ -225,6 +225,11 @@ export function applyFilters(
       return false
     }
 
+    // Hide snoozed tasks (snoozed_until is in the future)
+    if (task.snoozed_until && new Date(task.snoozed_until) > new Date()) {
+      return false
+    }
+
     return true
   })
 }

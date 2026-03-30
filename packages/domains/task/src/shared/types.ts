@@ -3,7 +3,7 @@ import type { BrowserTabsState } from '@slayzone/task-browser/shared'
 import type { EditorOpenFilesState } from '@slayzone/file-editor/shared'
 
 // Built-in starter statuses used as defaults for new projects.
-export const BUILTIN_STATUSES = ['inbox', 'backlog', 'todo', 'in_progress', 'review', 'done', 'canceled'] as const
+export const BUILTIN_STATUSES = ['inbox', 'backlog', 'snoozed', 'todo', 'in_progress', 'review', 'blocked', 'done', 'canceled'] as const
 export const TASK_STATUSES = BUILTIN_STATUSES
 export type TaskStatus = string
 export type MergeState = 'uncommitted' | 'conflicts' | 'rebase-conflicts'
@@ -180,6 +180,8 @@ export interface Task {
   ccs_profile: string | null
   // Loop mode configuration (JSON)
   loop_config: LoopConfig | null
+  // Snooze — task hidden from board until this datetime (ISO 8601)
+  snoozed_until: string | null
   // Temporary task (ephemeral terminal tab, deleted on close)
   is_temporary: boolean
   // Pull request
@@ -260,6 +262,8 @@ export interface UpdateTaskInput {
   mergeContext?: MergeContext | null
   // Loop mode
   loopConfig?: LoopConfig | null
+  // Snooze
+  snoozedUntil?: string | null
   // Pull request
   prUrl?: string | null
   // Temporary task

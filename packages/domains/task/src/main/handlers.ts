@@ -438,6 +438,7 @@ export function updateTask(db: Database, data: UpdateTaskInput): Task | null {
   if (data.mergeState !== undefined) { fields.push('merge_state = ?'); values.push(data.mergeState) }
   if (data.mergeContext !== undefined) { fields.push('merge_context = ?'); values.push(data.mergeContext ? JSON.stringify(data.mergeContext) : null) }
   if (data.loopConfig !== undefined) { fields.push('loop_config = ?'); values.push(data.loopConfig ? JSON.stringify(data.loopConfig) : null) }
+  if (data.snoozedUntil !== undefined) { fields.push('snoozed_until = ?'); values.push(data.snoozedUntil) }
   if (data.isTemporary !== undefined) { fields.push('is_temporary = ?'); values.push(data.isTemporary ? 1 : 0) }
   if (data.repoName !== undefined) { fields.push('repo_name = ?'); values.push(data.repoName) }
 
@@ -455,6 +456,10 @@ export function updateTask(db: Database, data: UpdateTaskInput): Task | null {
   const reachedTerminal = effectiveStatus !== undefined && isTerminalStatus(effectiveStatus, targetColumns)
   if (reachedTerminal || projectChanged) {
     runtimeAdapters.killPtysByTaskId(data.id)
+  }
+  // Clear snooze when task reaches terminal status
+  if (reachedTerminal && !fields.some((f) => f.startsWith('snoozed_until'))) {
+    db.prepare('UPDATE tasks SET snoozed_until = NULL WHERE id = ? AND snoozed_until IS NOT NULL').run(data.id)
   }
 
   const row = db.prepare('SELECT * FROM tasks WHERE id = ?').get(data.id) as Record<string, unknown> | undefined

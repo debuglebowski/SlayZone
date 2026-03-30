@@ -1625,6 +1625,12 @@ const migrations: Migration[] = [
     up: (db) => {
       db.exec(`ALTER TABLE tasks ADD COLUMN loop_config TEXT DEFAULT NULL;`)
     }
+  },
+  {
+    version: 89,
+    up: (db) => {
+      db.exec(`ALTER TABLE tasks ADD COLUMN snoozed_until TEXT DEFAULT NULL;`)
+    }
   }
 ]
 

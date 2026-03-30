@@ -28,8 +28,9 @@ import type { Project } from '@slayzone/projects/shared'
 import type { ColumnConfig } from '@slayzone/projects/shared'
 import type { Tag } from '@slayzone/tags/shared'
 import { CreateTagDialog } from '@slayzone/tags/client'
-import { Plus } from 'lucide-react'
+import { Plus, AlarmClock, X, Sun, Moon, Calendar as CalendarIcon } from 'lucide-react'
 import { track } from '@slayzone/telemetry/client'
+import { setHours, setMinutes, addHours, addDays, nextMonday, isAfter, format } from 'date-fns'
 
 interface TaskContextMenuProps {
   task: Task
@@ -92,6 +93,33 @@ export function TaskContextMenu({
     track('task_moved_to_project')
     onUpdateTask(task.id, { project_id: projectId })
   }
+
+  const handleSnooze = (date: Date): void => {
+    track('task_snoozed')
+    onUpdateTask(task.id, { snoozed_until: date.toISOString() } as Partial<Task>)
+  }
+
+  const handleUnsnooze = (): void => {
+    track('task_unsnoozed')
+    onUpdateTask(task.id, { snoozed_until: null } as Partial<Task>)
+  }
+
+  const isSnoozed = task.snoozed_until && new Date(task.snoozed_until) > new Date()
+
+  const snoozePresets = (() => {
+    const now = new Date()
+    const laterToday = (() => {
+      const fourPm = setMinutes(setHours(now, 16), 0)
+      return isAfter(fourPm, addHours(now, 1)) ? fourPm : addHours(now, 3)
+    })()
+    const tomorrow = setMinutes(setHours(addDays(now, 1), 9), 0)
+    const nextWeek = setMinutes(setHours(nextMonday(now), 9), 0)
+    return [
+      { label: 'Later today', icon: <Sun className="mr-2 size-3.5" />, date: laterToday },
+      { label: 'Tomorrow', icon: <Moon className="mr-2 size-3.5" />, date: tomorrow },
+      { label: 'Next week', icon: <CalendarIcon className="mr-2 size-3.5" />, date: nextWeek }
+    ]
+  })()
 
   const handleCopyTitle = async (): Promise<void> => {
     track('copy_title')
@@ -178,6 +206,32 @@ export function TaskContextMenu({
               </ContextMenuSubContent>
             </ContextMenuSub>
           )}
+
+          {/* Snooze submenu */}
+          <ContextMenuSub>
+            <ContextMenuSubTrigger>
+              <AlarmClock className="mr-2 size-3.5" />
+              {isSnoozed ? 'Snoozed' : 'Snooze'}
+            </ContextMenuSubTrigger>
+            <ContextMenuSubContent>
+              {isSnoozed && (
+                <>
+                  <ContextMenuItem onSelect={handleUnsnooze}>
+                    <X className="mr-2 size-3.5" />
+                    Unsnooze
+                  </ContextMenuItem>
+                  <ContextMenuSeparator />
+                </>
+              )}
+              {snoozePresets.map((preset) => (
+                <ContextMenuItem key={preset.label} onSelect={() => handleSnooze(preset.date)}>
+                  {preset.icon}
+                  <span className="flex-1">{preset.label}</span>
+                  <span className="ml-4 text-xs text-muted-foreground">{format(preset.date, 'EEE, MMM d')}</span>
+                </ContextMenuItem>
+              ))}
+            </ContextMenuSubContent>
+          </ContextMenuSub>
 
           <ContextMenuSeparator />
 
