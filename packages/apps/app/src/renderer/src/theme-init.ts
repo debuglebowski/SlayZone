@@ -1,7 +1,10 @@
 import { applyTheme } from '@slayzone/settings/client'
 
-// Default dark, then resolve persisted preference.
+// Default dark with CSS fallback, then resolve persisted preference + theme.
 applyTheme('dark')
-void window.api.theme.getEffective().then((effective) => {
-  applyTheme(effective === 'light' ? 'light' : 'dark')
+void Promise.all([
+  window.api.theme.getEffective(),
+  window.api.settings.get('app_theme_id'),
+]).then(([effective, themeId]) => {
+  applyTheme(effective === 'light' ? 'light' : 'dark', themeId ?? undefined)
 }).catch(() => {})

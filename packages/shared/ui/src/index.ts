@@ -61,6 +61,24 @@ export * from './tooltip'
 // Toast
 export { Toaster, toast } from 'sonner'
 
+// Themes
+export {
+  unifiedThemes,
+  getUnifiedTheme,
+  getThemeVariant,
+  getThemeChrome,
+  getThemeTerminalColors,
+  getThemeEditorColors,
+  applyChromeColors,
+  clearChromeColors,
+  getChromeStyleOverrides,
+  type UnifiedThemeDefinition,
+  type UnifiedThemeVariant,
+  type ChromeColors,
+  type TerminalThemeColors,
+} from './themes'
+export type { EditorThemeColors } from './theme-types'
+
 // Animations
 export * from './AnimatedPage'
 export * from './SuccessToast'

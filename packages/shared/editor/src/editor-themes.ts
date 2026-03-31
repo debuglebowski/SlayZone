@@ -1,27 +1,8 @@
+import type { EditorThemeColors } from '@slayzone/ui'
+
 type Theme = 'light' | 'dark'
 
-export interface EditorThemeColors {
-  // Chrome
-  background: string
-  foreground: string
-  selection: string
-  cursor: string
-  gutterBackground: string
-  gutterForeground: string
-  lineHighlight: string
-  // Syntax tokens
-  keyword: string
-  string: string
-  comment: string
-  number: string
-  function: string
-  type: string
-  operator: string
-  variable: string
-  property: string
-  link: string
-  heading: string
-}
+export type { EditorThemeColors }
 
 export interface EditorThemeDefinition {
   id: string

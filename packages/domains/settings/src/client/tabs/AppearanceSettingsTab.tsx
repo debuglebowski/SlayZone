@@ -1,8 +1,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import { Info } from 'lucide-react'
-import { Card, CardHeader, CardTitle, CardContent, Select, SelectTrigger, SelectValue, SelectContent, SelectItem, Switch, Tooltip, TooltipTrigger, TooltipContent } from '@slayzone/ui'
-import { darkThemes, lightThemes } from '@slayzone/terminal/client'
-import { editorThemes } from '@slayzone/editor'
+import { Card, CardHeader, CardTitle, CardContent, Select, SelectTrigger, SelectValue, SelectContent, SelectItem, Switch, Tooltip, TooltipTrigger, TooltipContent, unifiedThemes, getThemeVariant } from '@slayzone/ui'
+import { useTheme } from '../ThemeContext'
 import { SettingsTabIntro } from './SettingsTabIntro'
 
 function SettingLabel({ children, tip }: { children: React.ReactNode; tip: string }) {
@@ -21,15 +20,35 @@ function SettingLabel({ children, tip }: { children: React.ReactNode; tip: strin
   )
 }
 
-interface AppearanceSettingsTabProps {
-  preference: 'light' | 'dark' | 'system'
-  setPreference: (val: 'light' | 'dark' | 'system') => void
+function ThemeSelect({ value, onChange }: { value: string; onChange: (id: string) => void }) {
+  return (
+    <div className="flex items-center gap-2">
+      <Select value={value} onValueChange={onChange}>
+        <SelectTrigger className="w-48">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent position="popper" side="bottom" className="max-h-none">
+          {unifiedThemes.map(t => (
+            <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+      <ThemePreview themeId={value} />
+    </div>
+  )
 }
 
-export function AppearanceSettingsTab({
-  preference,
-  setPreference,
-}: AppearanceSettingsTabProps) {
+export function AppearanceSettingsTab() {
+  const {
+    preference, setPreference,
+    themeId, setThemeId,
+    splitThemes, setSplitThemes,
+    themeIdDark, setThemeIdDark,
+    themeIdLight, setThemeIdLight,
+    terminalOverrideThemeId, setTerminalOverrideThemeId,
+    editorOverrideThemeId, setEditorOverrideThemeId,
+  } = useTheme()
+
   const [projectColorTints, setProjectColorTints] = useState(true)
   const [terminalFontSize, setTerminalFontSize] = useState('13')
   const [editorFontSize, setEditorFontSize] = useState('13')
@@ -40,9 +59,6 @@ export function AppearanceSettingsTab({
   const [notesCheckedHighlight, setNotesCheckedHighlight] = useState(false)
   const [notesShowToolbar, setNotesShowToolbar] = useState(false)
   const [notesSpellcheck, setNotesSpellcheck] = useState(true)
-  const [contentThemeFollowApp, setContentThemeFollowApp] = useState(true)
-  const [contentThemeDark, setContentThemeDark] = useState('slay')
-  const [contentThemeLight, setContentThemeLight] = useState('slay-light')
 
   useEffect(() => {
     window.api.settings.get('project_color_tints_enabled').then(val => setProjectColorTints(val !== '0'))
@@ -50,9 +66,6 @@ export function AppearanceSettingsTab({
     window.api.settings.get('editor_font_size').then(val => setEditorFontSize(val ?? '13'))
     window.api.settings.get('reduce_motion').then(val => setReduceMotion(val === '1'))
     window.api.settings.get('sidebar_badge_mode').then(val => setSidebarBadgeMode((val === 'none' || val === 'count') ? val : 'blob'))
-    window.api.settings.get('content_theme_follow_app').then(v => v ?? window.api.settings.get('terminal_theme_follow_app')).then(val => setContentThemeFollowApp(val !== '0'))
-    window.api.settings.get('content_theme_dark').then(v => v ?? window.api.settings.get('terminal_theme_dark')).then(val => { if (val) setContentThemeDark(val) })
-    window.api.settings.get('content_theme_light').then(v => v ?? window.api.settings.get('terminal_theme_light')).then(val => { if (val) setContentThemeLight(val) })
     window.api.settings.get('notes_font_family').then(val => setNotesFontFamily(val === 'mono' ? 'mono' : 'sans'))
     window.api.settings.get('notes_line_spacing').then(val => setNotesLineSpacing(val === 'compact' ? 'compact' : 'normal'))
     window.api.settings.get('notes_checked_highlight').then(val => setNotesCheckedHighlight(val === '1'))
@@ -74,75 +87,39 @@ export function AppearanceSettingsTab({
         </CardHeader>
         <CardContent className="space-y-3">
           <div className="grid grid-cols-[220px_minmax(0,1fr)] items-center gap-4">
-            <SettingLabel tip="Choose between dark, light, or system-matched color scheme">Theme</SettingLabel>
+            <SettingLabel tip="Choose between dark, light, or system-matched color scheme">Mode</SettingLabel>
             <Select value={preference} onValueChange={(v) => setPreference(v as 'light' | 'dark' | 'system')}>
               <SelectTrigger className="w-48">
                 <SelectValue />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent position="popper" side="bottom" className="max-h-none">
                 <SelectItem value="dark">Dark</SelectItem>
                 <SelectItem value="light">Light (Beta)</SelectItem>
                 <SelectItem value="system">System (Beta)</SelectItem>
               </SelectContent>
             </Select>
           </div>
+          {!splitThemes && (
+            <div className="grid grid-cols-[220px_minmax(0,1fr)] items-center gap-4">
+              <SettingLabel tip="Color theme for the entire app — terminal, editor, and chrome">Color theme</SettingLabel>
+              <ThemeSelect value={themeId} onChange={setThemeId} />
+            </div>
+          )}
           <div className="grid grid-cols-[220px_minmax(0,1fr)] items-center gap-4">
-            <SettingLabel tip="Automatically switch content colors when the app theme changes">Follow application theme</SettingLabel>
-            <Switch
-              checked={contentThemeFollowApp}
-              onCheckedChange={(checked) => {
-                setContentThemeFollowApp(checked)
-                window.api.settings.set('content_theme_follow_app', checked ? '1' : '0')
-              }}
-            />
+            <SettingLabel tip="Choose different themes for dark and light mode">Separate dark/light themes</SettingLabel>
+            <Switch checked={splitThemes} onCheckedChange={setSplitThemes} />
           </div>
-          {contentThemeFollowApp ? (
+          {splitThemes && (
             <>
               <div className="grid grid-cols-[220px_minmax(0,1fr)] items-center gap-4">
-                <SettingLabel tip="Color scheme for terminal and editors in dark mode">Dark content theme</SettingLabel>
-                <div className="flex items-center gap-2">
-                  <Select value={contentThemeDark} onValueChange={(v) => { setContentThemeDark(v); window.api.settings.set('content_theme_dark', v) }}>
-                    <SelectTrigger className="w-48">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {darkThemes.map(t => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                  <ContentThemePreview themeId={contentThemeDark} />
-                </div>
+                <SettingLabel tip="Theme used when in dark mode">Dark theme</SettingLabel>
+                <ThemeSelect value={themeIdDark} onChange={setThemeIdDark} />
               </div>
               <div className="grid grid-cols-[220px_minmax(0,1fr)] items-center gap-4">
-                <SettingLabel tip="Color scheme for terminal and editors in light mode">Light content theme</SettingLabel>
-                <div className="flex items-center gap-2">
-                  <Select value={contentThemeLight} onValueChange={(v) => { setContentThemeLight(v); window.api.settings.set('content_theme_light', v) }}>
-                    <SelectTrigger className="w-48">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {lightThemes.map(t => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                  <ContentThemePreview themeId={contentThemeLight} />
-                </div>
+                <SettingLabel tip="Theme used when in light mode">Light theme</SettingLabel>
+                <ThemeSelect value={themeIdLight} onChange={setThemeIdLight} />
               </div>
             </>
-          ) : (
-            <div className="grid grid-cols-[220px_minmax(0,1fr)] items-center gap-4">
-              <SettingLabel tip="Color scheme for terminal and editors">Content theme</SettingLabel>
-              <div className="flex items-center gap-2">
-                <Select value={contentThemeDark} onValueChange={(v) => { setContentThemeDark(v); window.api.settings.set('content_theme_dark', v) }}>
-                  <SelectTrigger className="w-48">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {darkThemes.map(t => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}
-                    {lightThemes.map(t => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-                <ContentThemePreview themeId={contentThemeDark} />
-              </div>
-            </div>
           )}
         </CardContent>
       </Card>
@@ -159,12 +136,16 @@ export function AppearanceSettingsTab({
               <SelectTrigger className="w-24">
                 <SelectValue />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent position="popper" side="bottom" className="max-h-none">
                 {[10, 11, 12, 13, 14, 15, 16, 18, 20].map((s) => (
                   <SelectItem key={s} value={String(s)}>{s}px</SelectItem>
                 ))}
               </SelectContent>
             </Select>
+          </div>
+          <div className="grid grid-cols-[220px_minmax(0,1fr)] items-center gap-4">
+            <SettingLabel tip="Color theme for terminal panels — defaults to the application theme">Terminal theme</SettingLabel>
+            <OverrideThemeSelect value={terminalOverrideThemeId} onChange={setTerminalOverrideThemeId} />
           </div>
         </CardContent>
       </Card>
@@ -181,7 +162,7 @@ export function AppearanceSettingsTab({
               <SelectTrigger className="w-24">
                 <SelectValue />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent position="popper" side="bottom" className="max-h-none">
                 {[10, 11, 12, 13, 14, 15, 16, 18, 20].map((s) => (
                   <SelectItem key={s} value={String(s)}>{s}px</SelectItem>
                 ))}
@@ -189,12 +170,16 @@ export function AppearanceSettingsTab({
             </Select>
           </div>
           <div className="grid grid-cols-[220px_minmax(0,1fr)] items-center gap-4">
+            <SettingLabel tip="Color theme for code and notes editors — defaults to the application theme">Editor theme</SettingLabel>
+            <OverrideThemeSelect value={editorOverrideThemeId} onChange={setEditorOverrideThemeId} />
+          </div>
+          <div className="grid grid-cols-[220px_minmax(0,1fr)] items-center gap-4">
             <SettingLabel tip="Typeface used in the notes editor">Font family</SettingLabel>
             <Select value={notesFontFamily} onValueChange={(v) => { setNotesFontFamily(v as 'sans' | 'mono'); window.api.settings.set('notes_font_family', v) }}>
               <SelectTrigger className="w-48">
                 <SelectValue />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent position="popper" side="bottom" className="max-h-none">
                 <SelectItem value="sans">Sans-serif</SelectItem>
                 <SelectItem value="mono">Monospace</SelectItem>
               </SelectContent>
@@ -206,7 +191,7 @@ export function AppearanceSettingsTab({
               <SelectTrigger className="w-48">
                 <SelectValue />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent position="popper" side="bottom" className="max-h-none">
                 <SelectItem value="normal">Normal</SelectItem>
                 <SelectItem value="compact">Compact</SelectItem>
               </SelectContent>
@@ -257,7 +242,7 @@ export function AppearanceSettingsTab({
               <SelectTrigger className="w-48">
                 <SelectValue />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent position="popper" side="bottom" className="max-h-none">
                 <SelectItem value="none">None</SelectItem>
                 <SelectItem value="blob">Blob</SelectItem>
                 <SelectItem value="count">Count</SelectItem>
@@ -290,19 +275,30 @@ export function AppearanceSettingsTab({
   )
 }
 
-function ContentThemePreview({ themeId }: { themeId: string }) {
-  const termTheme = useMemo(() => [...darkThemes, ...lightThemes].find(t => t.id === themeId), [themeId])
-  const editorTheme = useMemo(() => editorThemes.find(t => t.id === themeId), [themeId])
-  const bg = termTheme?.colors.background ?? editorTheme?.colors.background ?? '#000'
-  const dots: string[] = []
-  if (termTheme) {
-    const c = termTheme.colors
-    dots.push(c.red ?? '#888', c.green ?? '#888', c.yellow ?? '#888', c.blue ?? '#888', c.magenta ?? '#888', c.cyan ?? '#888')
-  } else if (editorTheme) {
-    const c = editorTheme.colors
-    dots.push(c.keyword, c.string, c.function, c.type, c.comment, c.number)
-  }
-  if (!dots.length) return null
+function OverrideThemeSelect({ value, onChange }: { value: string; onChange: (id: string) => void }) {
+  return (
+    <div className="flex items-center gap-2">
+      <Select value={value || '_app'} onValueChange={(v) => onChange(v === '_app' ? '' : v)}>
+        <SelectTrigger className="w-48">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent position="popper" side="bottom" className="max-h-none">
+          <SelectItem value="_app">Inherit</SelectItem>
+          {unifiedThemes.map(t => (
+            <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+      {value && <ThemePreview themeId={value} />}
+    </div>
+  )
+}
+
+function ThemePreview({ themeId }: { themeId: string }) {
+  const variant = useMemo(() => getThemeVariant(themeId, 'dark'), [themeId])
+  const bg = variant.terminal.background
+  const t = variant.terminal
+  const dots = [t.red, t.green, t.yellow, t.blue, t.magenta, t.cyan]
   return (
     <div
       className="flex items-center gap-px rounded px-1.5 py-1 border"
