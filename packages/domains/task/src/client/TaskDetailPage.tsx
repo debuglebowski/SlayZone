@@ -1121,6 +1121,10 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
     const updated = await window.api.db.updateTask(updates)
     handleTaskUpdate(updated)
 
+    if (template.panel_visibility) setPanelVisibility(template.panel_visibility)
+    if (template.browser_tabs) setBrowserTabs(template.browser_tabs)
+    if (template.web_panel_urls) webPanelUrlsRef.current = { ...template.web_panel_urls }
+
     if (modeChanged) {
       setTerminalKey(k => k + 1)
     }
