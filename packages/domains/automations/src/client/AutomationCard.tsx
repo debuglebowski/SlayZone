@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Switch, Button, DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from '@slayzone/ui'
-import { MoreHorizontal, Play, Trash2, Copy, ChevronDown, ChevronRight, CheckCircle2, XCircle, Clock } from 'lucide-react'
+import { MoreHorizontal, Play, Trash2, Copy, Pencil, ChevronDown, ChevronRight, CheckCircle2, XCircle, Clock } from 'lucide-react'
 import type { Automation, AutomationRun } from '@slayzone/automations/shared'
 
 function describeTrigger(automation: Automation): string {
@@ -111,7 +111,9 @@ export function AutomationCard({ automation, onToggle, onEdit, onDelete, onDupli
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => onEdit(automation)}>Edit</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => onEdit(automation)}>
+                <Pencil className="w-3.5 h-3.5 mr-2" /> Edit
+              </DropdownMenuItem>
               <DropdownMenuItem onClick={() => onDuplicate(automation)}>
                 <Copy className="w-3.5 h-3.5 mr-2" /> Duplicate
               </DropdownMenuItem>
