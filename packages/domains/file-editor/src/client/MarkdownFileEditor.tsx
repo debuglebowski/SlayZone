@@ -7,9 +7,8 @@ import { indent } from '@milkdown/plugin-indent'
 import { listener, listenerCtx } from '@milkdown/plugin-listener'
 import { replaceAll } from '@milkdown/utils'
 import { remarkFrontmatterPlugin, frontmatterSchema, frontmatterView } from './milkdown-frontmatter'
-import { useAppearance } from '@slayzone/settings/client'
 import { useTheme } from '@slayzone/settings/client'
-import { getEditorThemeById, editorThemes } from '@slayzone/editor'
+import { getThemeEditorColors } from '@slayzone/ui'
 
 // --- Component ---
 
@@ -23,13 +22,9 @@ interface MarkdownFileEditorProps {
 }
 
 export function MarkdownFileEditor({ filePath, content, onChange, onSave, version }: MarkdownFileEditorProps) {
-  const { theme } = useTheme()
-  const { contentThemeFollowApp, contentThemeDark, contentThemeLight } = useAppearance()
-  const resolvedThemeId = contentThemeFollowApp
-    ? (theme === 'dark' ? contentThemeDark : contentThemeLight)
-    : contentThemeDark
-  const themeColors = useMemo(() => getEditorThemeById(resolvedThemeId), [resolvedThemeId])
-  const resolvedVariant = editorThemes.find(t => t.id === resolvedThemeId)?.variant ?? 'dark'
+  const { editorThemeId, contentVariant } = useTheme()
+  const themeColors = useMemo(() => getThemeEditorColors(editorThemeId, contentVariant), [editorThemeId, contentVariant])
+  const resolvedVariant = contentVariant
 
   const containerRef = useRef<HTMLDivElement>(null)
   const editorRef = useRef<Editor | null>(null)

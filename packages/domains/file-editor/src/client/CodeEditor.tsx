@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useRef } from 'react'
 import { useAppearance } from '@slayzone/settings/client'
 import { useTheme } from '@slayzone/settings/client'
-import { getEditorThemeById, editorThemes } from '@slayzone/editor'
+import { getThemeEditorColors } from '@slayzone/ui'
 import { EditorView, basicSetup } from 'codemirror'
 import { EditorState, Compartment } from '@codemirror/state'
 import { keymap, highlightWhitespace } from '@codemirror/view'
-import { indentWithTab } from '@codemirror/commands'
+import { indentMore, indentLess } from '@codemirror/commands'
 import { indentUnit } from '@codemirror/language'
 import { javascript } from '@codemirror/lang-javascript'
 import { json } from '@codemirror/lang-json'
@@ -54,19 +54,15 @@ interface CodeEditorProps {
 }
 
 export function CodeEditor({ filePath, content, onChange, onSave, version }: CodeEditorProps) {
-  const { theme } = useTheme()
+  const { editorThemeId, contentVariant } = useTheme()
   const {
     editorFontSize, editorWordWrap, editorTabSize, editorIndentTabs, editorRenderWhitespace,
-    contentThemeFollowApp, contentThemeDark, contentThemeLight
   } = useAppearance()
 
-  const resolvedThemeId = contentThemeFollowApp
-    ? (theme === 'dark' ? contentThemeDark : contentThemeLight)
-    : contentThemeDark
-  const resolvedVariant = editorThemes.find(t => t.id === resolvedThemeId)?.variant ?? 'dark'
+  const resolvedEditorColors = getThemeEditorColors(editorThemeId, contentVariant)
   const cmThemeExt = useMemo(
-    () => buildCodeMirrorTheme(getEditorThemeById(resolvedThemeId), resolvedVariant === 'dark'),
-    [resolvedThemeId, resolvedVariant]
+    () => buildCodeMirrorTheme(resolvedEditorColors, contentVariant === 'dark'),
+    [editorThemeId, contentVariant]
   )
 
   const sizeTheme = useMemo(() => EditorView.theme({
@@ -101,7 +97,17 @@ export function CodeEditor({ filePath, content, onChange, onSave, version }: Cod
       sizeTheme,
       themeComp.current.of(cmThemeExt),
       keymap.of([
-        indentWithTab,
+        {
+          key: 'Tab',
+          run: (view) => {
+            if (view.state.selection.ranges.some(r => !r.empty))
+              return indentMore(view)
+            const unit = view.state.facet(indentUnit)
+            view.dispatch(view.state.update(view.state.replaceSelection(unit), { scrollIntoView: true, userEvent: 'input' }))
+            return true
+          },
+        },
+        { key: 'Shift-Tab', run: indentLess },
         {
           key: 'Mod-s',
           run: () => {
