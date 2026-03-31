@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
-import { MoreHorizontal, Archive, Trash2, AlertTriangle, Loader2, Terminal as TerminalIcon, Globe, Settings2, GitBranch, FileCode, ChevronRight, Plus, GripVertical, X, Info, CheckCircle2, XCircle, Stethoscope, Cpu, Circle, Repeat, Zap } from 'lucide-react'
+import { MoreHorizontal, Archive, Trash2, AlertTriangle, Loader2, Terminal as TerminalIcon, Globe, Settings2, GitBranch, FileCode, ChevronRight, Plus, GripVertical, X, Info, CheckCircle2, XCircle, Stethoscope, Cpu, Circle, Repeat, Zap, LayoutTemplate } from 'lucide-react'
 import { IconArrowsVertical, IconArrowsMaximize } from '@tabler/icons-react'
 import { DescriptionDialog } from './DescriptionDialog'
 import { DndContext, PointerSensor, useSensors, useSensor, closestCenter } from '@dnd-kit/core'
@@ -1349,22 +1349,6 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
                       <TooltipContent>Auto-deletes on terminal exit or tab close</TooltipContent>
                     </Tooltip>
                     <span className="text-2xl italic text-muted-foreground">Temporary task</span>
-                    {templates.length > 0 && (
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="outline" size="sm" className="h-7 px-2.5 shrink-0">
-                            Apply template
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="start">
-                          {templates.map(t => (
-                            <DropdownMenuItem key={t.id} onClick={() => applyTemplate(t)}>
-                              {t.name}{t.is_default ? ' \u2666' : ''}
-                            </DropdownMenuItem>
-                          ))}
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    )}
                     <Button
                       variant="outline"
                       size="sm"
@@ -1379,6 +1363,28 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
                     >
                       Turn into task
                     </Button>
+                    {templates.length > 0 && (
+                      <DropdownMenu>
+                        <Tooltip>
+                          <DropdownMenuTrigger asChild>
+                            <TooltipTrigger asChild>
+                              <Button variant="outline" size="icon" className="size-7 shrink-0">
+                                <LayoutTemplate className="size-4" />
+                              </Button>
+                            </TooltipTrigger>
+                          </DropdownMenuTrigger>
+                          <TooltipContent>Apply template</TooltipContent>
+                        </Tooltip>
+                        <DropdownMenuContent align="start" className="min-w-0">
+                          {templates.map((t, i) => (
+                            <DropdownMenuItem key={t.id} className="items-baseline gap-2.5" onClick={() => applyTemplate(t)}>
+                              <span className="text-[11px] text-muted-foreground tabular-nums">{i + 1}</span>
+                              {t.name}{t.is_default ? ' ♦' : ''}
+                            </DropdownMenuItem>
+                          ))}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    )}
                   </div>
                 </div>
               </div>
