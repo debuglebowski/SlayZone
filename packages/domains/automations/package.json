@@ -1,0 +1,30 @@
+{
+  "name": "@slayzone/automations",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./shared": "./src/shared/index.ts",
+    "./main": "./src/main/index.ts",
+    "./client": "./src/client/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsgo --noEmit"
+  },
+  "dependencies": {
+    "@slayzone/tags": "workspace:*",
+    "@slayzone/telemetry": "workspace:*",
+    "@slayzone/ui": "workspace:*"
+  },
+  "peerDependencies": {
+    "electron": "^41.0.0",
+    "react": "^19.0.0"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.13",
+    "typescript": "^5.9.3"
+  }
+}
