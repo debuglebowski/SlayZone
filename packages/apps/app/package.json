@@ -32,6 +32,7 @@
     "@modelcontextprotocol/sdk": "^1.26.0",
     "@radix-ui/react-collapsible": "^1.1.12",
     "@slayzone/ai-config": "workspace:*",
+    "@slayzone/automations": "workspace:*",
     "@slayzone/diagnostics": "workspace:*",
     "@slayzone/file-editor": "workspace:*",
     "@slayzone/icons": "workspace:*",

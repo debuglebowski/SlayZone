@@ -778,6 +778,20 @@ export interface ElectronAPI {
     setFileNote: (projectId: string, filePath: string, note: string) => Promise<void>
   }
 
+  automations: {
+    getByProject: (projectId: string) => Promise<Automation[]>
+    get: (id: string) => Promise<Automation | null>
+    create: (data: CreateAutomationInput) => Promise<Automation>
+    update: (data: UpdateAutomationInput) => Promise<Automation>
+    delete: (id: string) => Promise<boolean>
+    toggle: (id: string, enabled: boolean) => Promise<Automation>
+    reorder: (ids: string[]) => Promise<void>
+    getRuns: (automationId: string, limit?: number) => Promise<AutomationRun[]>
+    runManual: (id: string) => Promise<AutomationRun>
+    clearRuns: (automationId: string) => Promise<void>
+    onChanged: (callback: () => void) => () => void
+  }
+
   usageAnalytics: {
     query: (range: import('@slayzone/usage-analytics/shared').DateRange) => Promise<import('@slayzone/usage-analytics/shared').AnalyticsSummary>
     refresh: (range: import('@slayzone/usage-analytics/shared').DateRange) => Promise<import('@slayzone/usage-analytics/shared').AnalyticsSummary>

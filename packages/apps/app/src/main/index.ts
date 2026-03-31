@@ -99,6 +99,7 @@ import { registerAiConfigHandlers } from '@slayzone/ai-config/main'
 import { registerIntegrationHandlers, ensureIntegrationSchema, startSyncPoller, pushTaskAfterEdit, pushNewTaskToProviders, pushArchiveToProviders, pushUnarchiveToProviders, startDiscoveryPoller, resetSyncFlags } from '@slayzone/integrations/main'
 import { registerFileEditorHandlers, closeAllWatchers } from '@slayzone/file-editor/main'
 import { registerTestPanelHandlers } from '@slayzone/test-panel/main'
+import { registerAutomationHandlers, AutomationEngine } from '@slayzone/automations/main'
 import { registerUsageAnalyticsHandlers } from '@slayzone/usage-analytics/main'
 import { registerScreenshotHandlers } from './screenshot'
 import { setProcessManagerWindow, initProcessManager, createProcess, spawnProcess, updateProcess, stopProcess, killProcess, restartProcess, listForTask, listAllProcesses, killTaskProcesses, killAllProcesses } from './process-manager'
@@ -1017,6 +1018,13 @@ app.whenReady().then(async () => {
   registerExportImportHandlers(ipcMain, db, isPlaywright)
   registerLeaderboardHandlers(ipcMain, db)
   registerTestPanelHandlers(ipcMain, db)
+  const notifyAutomationsChanged = (): void => {
+    mainWindow?.webContents.send('automations:changed')
+    notifyTasksChanged()
+  }
+  const automationEngine = new AutomationEngine(db, notifyAutomationsChanged)
+  registerAutomationHandlers(ipcMain, db, automationEngine)
+  automationEngine.start(ipcMain)
   registerUsageAnalyticsHandlers(ipcMain, db)
   registerBackupHandlers(ipcMain, db)
   startAutoBackup(db)

@@ -1,6 +1,6 @@
 import React, { Suspense, lazy, useState, useEffect, useRef, useMemo, useCallback, useTransition } from 'react'
 import { useGuardedHotkeys } from '@slayzone/ui'
-import { AlertTriangle, LayoutGrid, TerminalSquare, GitBranch, FileCode, Cpu, Kanban, FlaskConical } from 'lucide-react'
+import { AlertTriangle, LayoutGrid, TerminalSquare, GitBranch, FileCode, Cpu, Kanban, FlaskConical, Zap } from 'lucide-react'
 import type { Task } from '@slayzone/task/shared'
 import type { Project } from '@slayzone/projects/shared'
 import { getDefaultStatus, getDoneStatus, getStatusByCategory, resolveRepoPath } from '@slayzone/projects/shared'
@@ -74,6 +74,7 @@ const TutorialAnimationModal = lazy(() => import('@/components/tutorial/Tutorial
 const UnifiedGitPanel = lazy(() => import('@slayzone/worktrees').then(m => ({ default: m.UnifiedGitPanel })))
 const TestPanel = lazy(() => import('@slayzone/test-panel').then(m => ({ default: m.TestPanel })))
 const ProcessesPanel = lazy(() => import('@slayzone/task').then(m => ({ default: m.ProcessesPanel })))
+const AutomationsPanel = lazy(() => import('@slayzone/automations').then(m => ({ default: m.AutomationsPanel })))
 // Overlay pages
 const LeaderboardPage = lazy(() => import('@/components/leaderboard/LeaderboardPage').then(m => ({ default: m.LeaderboardPage })))
 const UsageAnalyticsPage = lazy(() => import('@slayzone/usage-analytics/client').then(m => ({ default: m.UsageAnalyticsPage })))
@@ -158,6 +159,7 @@ function App(): React.JSX.Element {
   const [settingsRevision, setSettingsRevision] = useState(0)
   const [colorTintsEnabled, setColorTintsEnabled] = useState(true)
   const [testsPanelEnabled, setTestsPanelEnabled] = useState(false)
+  const [automationsPanelEnabled, setAutomationsPanelEnabled] = useState(false)
   const [settingsInitialTab, setSettingsInitialTab] = useState<string>('general')
   const [settingsInitialAiConfigSection, setSettingsInitialAiConfigSection] = useState<GlobalAiConfigSection | null>(null)
   const onboardingOpen = useDialogStore((s) => s.onboardingOpen)
@@ -291,6 +293,7 @@ function App(): React.JSX.Element {
   useEffect(() => {
     window.api.settings.get('project_color_tints_enabled').then((v) => setColorTintsEnabled(v !== '0'))
     window.api.app.isTestsPanelEnabled().then(setTestsPanelEnabled)
+    window.api.app.isAutomationsEnabled().then(setAutomationsPanelEnabled)
   }, [settingsRevision])
 
   useEffect(() => {
@@ -788,7 +791,7 @@ function App(): React.JSX.Element {
                   inert={!explodeMode && !isViewActive ? true : undefined}
                 >
                     {tab.type === 'home' ? (
-                    <div className="flex flex-col flex-1 p-6 pt-4 h-full" style={{ backgroundColor: colorTintsEnabled ? projectColorBg(selectedProject?.color) : undefined }}>
+                    <div className="flex flex-col flex-1 p-6 pt-4 h-full bg-surface-0" style={colorTintsEnabled && projectColorBg(selectedProject?.color) ? { backgroundImage: `linear-gradient(${projectColorBg(selectedProject.color)}, ${projectColorBg(selectedProject.color)})` } : undefined}>
                       <header className="mb-4 window-no-drag space-y-2">
                         <div className="flex items-center gap-4">
                           <div className="flex-shrink-0">
@@ -809,6 +812,7 @@ function App(): React.JSX.Element {
                                 { id: 'editor', icon: FileCode, label: 'Editor', shortcut: panelEditorShortcut, active: homePanel.homePanelVisibility.editor, disabled: !selectedProjectId },
                                 { id: 'processes', icon: Cpu, label: 'Processes', shortcut: panelProcessesShortcut, active: homePanel.homePanelVisibility.processes, disabled: !selectedProjectId },
                                 ...(testsPanelEnabled ? [{ id: 'tests', icon: FlaskConical, label: 'Tests', shortcut: panelTestsShortcut, active: homePanel.homePanelVisibility.tests, disabled: !selectedProjectId }] : []),
+                                ...(automationsPanelEnabled ? [{ id: 'automations', icon: Zap, label: 'Automations', active: homePanel.homePanelVisibility.automations, disabled: !selectedProjectId }] : []),
                               ].filter(p => p.id === 'kanban' || isHomePanelEnabled(p.id, 'home'))}
                               onChange={(id, active) => homePanel.setHomePanelVisibility(prev => ({ ...prev, [id]: active }))}
                             />
@@ -865,6 +869,7 @@ function App(): React.JSX.Element {
                                   {id === 'editor' && <Suspense><FileEditorView ref={homePanel.homeEditorRefCallback} projectPath={projectPath ?? ''} /></Suspense>}
                                   {id === 'processes' && <Suspense fallback={<div className="h-full animate-pulse bg-muted/30 rounded" />}><ProcessesPanel taskId={null} projectId={selectedProjectId} cwd={projectPath} /></Suspense>}
                                   {id === 'tests' && <Suspense fallback={<div className="h-full animate-pulse bg-muted/30 rounded" />}><TestPanel projectId={selectedProjectId} projectPath={projectPath} groupBy={testGroupBy} onOpenSettings={() => { if (selectedProject) openProjectSettings(selectedProject, { initialTab: 'tests' }) }} /></Suspense>}
+                                  {id === 'automations' && <Suspense fallback={<div className="h-full animate-pulse bg-muted/30 rounded" />}><AutomationsPanel projectId={selectedProjectId} /></Suspense>}
                                 </div>
                               </React.Fragment>
                             )

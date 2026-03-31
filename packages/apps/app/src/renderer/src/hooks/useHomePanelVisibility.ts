@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 
-type HomePanel = 'kanban' | 'git' | 'editor' | 'processes' | 'tests'
+type HomePanel = 'kanban' | 'git' | 'editor' | 'processes' | 'tests' | 'automations'
 
 export interface HomePanelState {
   visibility: Record<HomePanel, boolean>
@@ -8,7 +8,7 @@ export interface HomePanelState {
 }
 
 const DEFAULTS: HomePanelState = {
-  visibility: { kanban: true, git: false, editor: false, processes: false, tests: false },
+  visibility: { kanban: true, git: false, editor: false, processes: false, tests: false, automations: false },
   gitTab: 'general'
 }
 
