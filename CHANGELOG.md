@@ -1,6 +1,93 @@
 # Changelog
 
 
+## v0.12.0
+
+[compare changes](https://github.com/debuglebowski/slayzone/compare/v0.11.0...v0.12.0)
+
+### 🚀 Enhancements
+
+- **projects:** Enable folder creation in directory picker dialogs ([6066ff54](https://github.com/debuglebowski/slayzone/commit/6066ff54))
+- **task:** Add custom working directory and sidebar layout improvements ([202e976a](https://github.com/debuglebowski/slayzone/commit/202e976a))
+- **tags:** Project-scoped tags, card display, create/edit dialog, ordering ([51c6dbc5](https://github.com/debuglebowski/slayzone/commit/51c6dbc5))
+- **tags:** Preset color swatches, text_color column, edit dialog fix ([5972e9a0](https://github.com/debuglebowski/slayzone/commit/5972e9a0))
+- **tags:** Card layout redesign, grouped tag dots, responsive overflow ([307bd6bd](https://github.com/debuglebowski/slayzone/commit/307bd6bd))
+- **file-editor:** Milkdown WYSIWYG for markdown files ([d5bdf3ee](https://github.com/debuglebowski/slayzone/commit/d5bdf3ee))
+- **settings:** Appearance tab card layout, setting tooltips, tooltip width fix ([e085863e](https://github.com/debuglebowski/slayzone/commit/e085863e))
+- **cards:** Linear-style priority icons, interactive card popovers, shared TagSelector ([dcb72f4e](https://github.com/debuglebowski/slayzone/commit/dcb72f4e))
+- **tasks:** Tag editing in context menu, red lightning prio icon ([ba60e27f](https://github.com/debuglebowski/slayzone/commit/ba60e27f))
+- **editor:** Unified content theme system for terminal + editors ([290681c4](https://github.com/debuglebowski/slayzone/commit/290681c4))
+- **leaderboard:** Background stats sync every 12 hours ([95db2ca6](https://github.com/debuglebowski/slayzone/commit/95db2ca6))
+- **task:** Project-scoped task templates ([1396e96f](https://github.com/debuglebowski/slayzone/commit/1396e96f))
+- **terminal:** Loop command — repeat prompt until acceptance criteria met ([fe79da91](https://github.com/debuglebowski/slayzone/commit/fe79da91))
+- **cli:** Resolve --status by label or slug, not just exact ID ([19159f69](https://github.com/debuglebowski/slayzone/commit/19159f69))
+- **file-editor:** Add file tree power features — multi-select, copy/paste, keyboard nav, symlinks ([a127dd94](https://github.com/debuglebowski/slayzone/commit/a127dd94))
+- **file-editor:** Git status colors + compact folders in file tree ([2d708190](https://github.com/debuglebowski/slayzone/commit/2d708190))
+- **task:** Apply task templates to temporary tasks ([5bf7ed0f](https://github.com/debuglebowski/slayzone/commit/5bf7ed0f))
+- **task:** Snooze tasks — hide from board until a future time ([815f7bdc](https://github.com/debuglebowski/slayzone/commit/815f7bdc))
+- **task:** Snooze UX — icons, more presets, custom dialog ([bee12ebb](https://github.com/debuglebowski/slayzone/commit/bee12ebb))
+- **tasks:** Blocked & snoozed virtual kanban columns ([6c6d5b64](https://github.com/debuglebowski/slayzone/commit/6c6d5b64))
+- **task-terminals:** Right-click context menu for terminal panes ([e03afbf7](https://github.com/debuglebowski/slayzone/commit/e03afbf7))
+- **editor:** Migrate task description editor from TipTap to Milkdown ([685761a0](https://github.com/debuglebowski/slayzone/commit/685761a0))
+- **cli:** Add `slay init` command for agent configuration templates ([e618faa7](https://github.com/debuglebowski/slayzone/commit/e618faa7))
+- **automations:** Add beta pill to panel header ([d2d4ab3b](https://github.com/debuglebowski/slayzone/commit/d2d4ab3b))
+- **settings:** Unified theme system with per-section overrides ([06811dba](https://github.com/debuglebowski/slayzone/commit/06811dba))
+- **automations:** Add automations domain package ([ca6befbc](https://github.com/debuglebowski/slayzone/commit/ca6befbc))
+- **app:** Integrate automations domain + wire IPC ([89577b9d](https://github.com/debuglebowski/slayzone/commit/89577b9d))
+- **settings:** Add unified theme definitions + clean up settings dialog ([31273061](https://github.com/debuglebowski/slayzone/commit/31273061))
+
+### 🔥 Performance
+
+- **renderer:** Code-split bundle 7.3MB→3.3MB, always open to kanban ([04d98b68](https://github.com/debuglebowski/slayzone/commit/04d98b68))
+
+### 🩹 Fixes
+
+- **terminal:** Prevent permanent loading state when PTY dies silently ([9ccffe6f](https://github.com/debuglebowski/slayzone/commit/9ccffe6f))
+- **worktrees:** Handle unicode filenames and null paths in git diff ([174f6520](https://github.com/debuglebowski/slayzone/commit/174f6520))
+- **task:** Notify renderer on all task mutations for cross-view sync ([9ea041ad](https://github.com/debuglebowski/slayzone/commit/9ea041ad))
+- **cli:** Populate provider_config and default flags on task/subtask creation ([ca6219d5](https://github.com/debuglebowski/slayzone/commit/ca6219d5))
+- **shortcuts:** Let app shortcuts fire inside contenteditable editors ([eb335692](https://github.com/debuglebowski/slayzone/commit/eb335692))
+- **terminal:** Restore focus after image paste/drop ([c837c894](https://github.com/debuglebowski/slayzone/commit/c837c894))
+- **automations:** Use correct task column names in template context query ([977fd8c9](https://github.com/debuglebowski/slayzone/commit/977fd8c9))
+- **ui:** Remove fixed max-width from tooltips for dynamic sizing ([0ef832c9](https://github.com/debuglebowski/slayzone/commit/0ef832c9))
+- **terminal:** Extend link range through soft-continuation URL lines ([319db2d2](https://github.com/debuglebowski/slayzone/commit/319db2d2))
+- **task-browser:** Dropdown/context menus hidden behind WebContentsView ([21943a6f](https://github.com/debuglebowski/slayzone/commit/21943a6f))
+- **file-editor:** Selection invisible on active line in code editor ([3f9bf71c](https://github.com/debuglebowski/slayzone/commit/3f9bf71c))
+
+### 💅 Refactors
+
+- **task:** Extract subtask/tag state into dedicated hooks with external refresh ([66ed2673](https://github.com/debuglebowski/slayzone/commit/66ed2673))
+- **tags:** Move tags settings to project level, card layout ([f796b391](https://github.com/debuglebowski/slayzone/commit/f796b391))
+- **terminal:** Simplify loop command — remove redundant state, fix tab linger ([514d4943](https://github.com/debuglebowski/slayzone/commit/514d4943))
+- **task:** Extract process config into modal dialog ([349fecbb](https://github.com/debuglebowski/slayzone/commit/349fecbb))
+- **file-editor:** Use unified theme context ([8f862cd8](https://github.com/debuglebowski/slayzone/commit/8f862cd8))
+
+### 📖 Documentation
+
+- **skill:** Add plain-language writing guidelines to release skill ([370109fd](https://github.com/debuglebowski/slayzone/commit/370109fd))
+- **comparison:** Add Codex Monitor, Jean, Polyscope, VibeKanban canonical records ([f35dd8bf](https://github.com/debuglebowski/slayzone/commit/f35dd8bf))
+- **comparison:** Add Claude Code canonical competitor record ([65bb6384](https://github.com/debuglebowski/slayzone/commit/65bb6384))
+- **comparison:** Add Jean product screenshot for publish-ready ([cf0815a0](https://github.com/debuglebowski/slayzone/commit/cf0815a0))
+- **comparison:** Add OpenAI Codex CLI canonical record ([a0355824](https://github.com/debuglebowski/slayzone/commit/a0355824))
+- **comparison:** Migrate Superset.sh to canonical publish-ready record ([5a404213](https://github.com/debuglebowski/slayzone/commit/5a404213))
+- **comparison:** Migrate AutoClaude to canonical publish-ready record ([73f04419](https://github.com/debuglebowski/slayzone/commit/73f04419))
+- **comparison:** Add OpenAI Codex App analysis ([9b6d6266](https://github.com/debuglebowski/slayzone/commit/9b6d6266))
+
+### 🏡 Chore
+
+- **nix:** Update sources to 0.11.0 ([b492b1d1](https://github.com/debuglebowski/slayzone/commit/b492b1d1))
+- Update commit-changes skill ([079cde1e](https://github.com/debuglebowski/slayzone/commit/079cde1e))
+- Supporting updates for theme + automations ([13e7416f](https://github.com/debuglebowski/slayzone/commit/13e7416f))
+
+### ✅ Tests
+
+- **cli:** Verify provider_config populated on create and subtask-add ([911911c3](https://github.com/debuglebowski/slayzone/commit/911911c3))
+- **automations:** Add missing engine and handler tests ([96483c8c](https://github.com/debuglebowski/slayzone/commit/96483c8c))
+
+### ❤️ Contributors
+
+- Debuglebowski
+
 ## v0.11.0
 
 [compare changes](https://github.com/debuglebowski/slayzone/compare/v0.10.0...v0.11.0)

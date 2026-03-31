@@ -1,5 +1,77 @@
 [
   {
+    "version": "0.12.0",
+    "date": "2026-03-31",
+    "tagline": "Organize & automate",
+    "items": [
+      {
+        "category": "feature",
+        "title": "Project-scoped tags",
+        "description": "Tag tasks with custom colored labels — each project gets its own set."
+      },
+      {
+        "category": "feature",
+        "title": "Task templates",
+        "description": "Create reusable templates per project and apply them to new tasks instantly."
+      },
+      {
+        "category": "feature",
+        "title": "Snooze tasks",
+        "description": "Temporarily hide tasks from the board until a time you choose."
+      },
+      {
+        "category": "feature",
+        "title": "Automations (beta)",
+        "description": "Set up rules to automate repetitive task workflows."
+      },
+      {
+        "category": "feature",
+        "title": "Rich markdown editing",
+        "description": "Edit markdown files with a visual toolbar — no raw syntax needed."
+      },
+      {
+        "category": "feature",
+        "title": "Loop command",
+        "description": "Repeat an AI prompt automatically until your acceptance criteria are met."
+      },
+      {
+        "category": "feature",
+        "title": "Terminal context menu",
+        "description": "Right-click terminal panes for quick actions like split, close, and restart."
+      },
+      {
+        "category": "feature",
+        "title": "Custom working directory",
+        "description": "Override the working directory for individual tasks."
+      },
+      {
+        "category": "improvement",
+        "title": "File tree upgrades",
+        "description": "Multi-select, keyboard navigation, git status colors, and compact folders in the file tree."
+      },
+      {
+        "category": "improvement",
+        "title": "Unified theme system",
+        "description": "Terminal and editor colors now follow one consistent theme with per-section overrides."
+      },
+      {
+        "category": "fix",
+        "title": "Stuck terminal loading",
+        "description": "Terminals no longer get stuck loading when a session ends unexpectedly."
+      },
+      {
+        "category": "fix",
+        "title": "Shortcuts in editors",
+        "description": "App keyboard shortcuts now work while editing text in notes and editors."
+      },
+      {
+        "category": "fix",
+        "title": "Menus behind browser",
+        "description": "Dropdown menus no longer hide behind the browser panel."
+      },
+    ]
+  },
+  {
     "version": "0.11.0",
     "date": "2026-03-27",
     "tagline": "Copilot & editor polish",
