@@ -1,5 +1,5 @@
 
-import { app, shell, BrowserWindow, ipcMain, nativeTheme, session, webContents, dialog, Menu, protocol } from 'electron'
+import { app, shell, BrowserWindow, ipcMain, nativeTheme, session, webContents, dialog, Menu, protocol, screen } from 'electron'
 import { join, extname, normalize, sep, resolve } from 'path'
 import { homedir } from 'os'
 import { readFileSync, promises as fsp, mkdirSync } from 'fs'
@@ -264,6 +264,10 @@ let protocolClientStatus: ProtocolClientStatus = {
   registered: false,
   reason: SHOULD_REGISTER_PROTOCOL_CLIENT ? 'registration-failed' : 'dev-skipped'
 }
+type AppZoomCommand = 'in' | 'out' | 'reset'
+const APP_ZOOM_LEVEL_STEP = 0.5
+const APP_ZOOM_LEVEL_MIN = -8
+const APP_ZOOM_LEVEL_MAX = 9
 const SUPPORTED_PROTOCOL_SCHEMES = new Set([APP_PROTOCOL_SCHEME])
 const OAUTH_DEEP_LINK_REDIRECT_URI = `${APP_PROTOCOL_SCHEME}://auth/callback`
 const OAUTH_CALLBACK_TIMEOUT_MS = 120_000
@@ -272,6 +276,26 @@ function logBoot(step: string): void {
   if (is.dev && process.env.SLAYZONE_DEBUG_BOOT === '1') {
     console.log(`[boot] ${step}`)
   }
+}
+
+function applyAppZoom(command: AppZoomCommand): number {
+  if (!mainWindow || mainWindow.isDestroyed()) return 1
+
+  const wc = mainWindow.webContents
+  const nextLevel = command === 'reset'
+    ? 0
+    : Math.max(
+        APP_ZOOM_LEVEL_MIN,
+        Math.min(
+          APP_ZOOM_LEVEL_MAX,
+          wc.zoomLevel + (command === 'in' ? APP_ZOOM_LEVEL_STEP : -APP_ZOOM_LEVEL_STEP)
+        )
+      )
+
+  wc.zoomLevel = nextLevel
+  const zoomFactor = wc.zoomFactor
+  wc.send('app:zoom-factor-changed', zoomFactor)
+  return zoomFactor
 }
 
 function tryShowMainWindow(): void {
@@ -872,9 +896,24 @@ app.whenReady().then(async () => {
           },
           { role: 'toggleDevTools' },
           { type: 'separator' },
-          { role: 'resetZoom' },
-          { role: 'zoomIn' },
-          { role: 'zoomOut' },
+          {
+            label: 'Actual Size',
+            accelerator: 'CmdOrCtrl+0',
+            registerAccelerator: false,
+            click: () => applyAppZoom('reset')
+          },
+          {
+            label: 'Zoom In',
+            accelerator: 'CmdOrCtrl+Plus',
+            registerAccelerator: false,
+            click: () => applyAppZoom('in')
+          },
+          {
+            label: 'Zoom Out',
+            accelerator: 'CmdOrCtrl+-',
+            registerAccelerator: false,
+            click: () => applyAppZoom('out')
+          },
           { type: 'separator' },
           { role: 'togglefullscreen' }
         ]
@@ -1381,6 +1420,8 @@ div{text-align:center}h1{font-size:14px;font-weight:500;color:#aaa}p{font-size:1
   ipcMain.handle('app:is-automations-enabled', () => isLabEnabled('labs_automations'))
   ipcMain.on('app:is-automations-enabled-sync', (event) => { event.returnValue = isLabEnabled('labs_automations') })
   ipcMain.handle('app:get-protocol-client-status', () => protocolClientStatus)
+  ipcMain.handle('app:get-zoom-factor', () => mainWindow?.webContents.zoomFactor ?? 1)
+  ipcMain.handle('app:adjust-zoom', (_event, command: AppZoomCommand) => applyAppZoom(command))
   ipcMain.handle('app:restart-for-update', () => restartForUpdate())
   ipcMain.handle('app:check-for-updates', () => checkForUpdates())
   ipcMain.handle('app:cli-status', () => checkCliInstalled())
@@ -1835,8 +1876,15 @@ div{text-align:center}h1{font-size:14px;font-weight:500;color:#aaa}p{font-size:1
 
   // Test-only handles
   if (isPlaywright) {
+    ipcMain.handle('app:get-renderer-zoom-factor', () => mainWindow?.webContents.zoomFactor ?? null)
+    ipcMain.handle('window:get-content-bounds', () => mainWindow?.getContentBounds() ?? null)
+    ipcMain.handle('window:get-display-scale-factor', () => {
+      if (!mainWindow || mainWindow.isDestroyed()) return null
+      return screen.getDisplayMatching(mainWindow.getBounds()).scaleFactor
+    })
     ipcMain.handle('browser:get-url', (_, viewId: string) => browserViewManager.getUrl(viewId))
     ipcMain.handle('browser:get-bounds', (_, viewId: string) => browserViewManager.getBounds(viewId))
+    ipcMain.handle('browser:get-zoom-factor', (_, viewId: string) => browserViewManager.getZoomFactor(viewId))
     ipcMain.handle('browser:get-all-view-ids', () => browserViewManager.getAllViewIds())
     ipcMain.handle('browser:get-views-for-task', (_, taskId: string) => browserViewManager.getViewsForTask(taskId))
     ipcMain.handle('browser:is-focused', (_, viewId: string) => browserViewManager.isFocused(viewId))
@@ -1877,6 +1925,10 @@ div{text-align:center}h1{font-size:14px;font-weight:500;color:#aaa}p{font-size:1
       clearBrowserRegistry()
       resetSyncFlags()
       browserViewManager.reset()
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.zoomLevel = 0
+        mainWindow.webContents.send('app:zoom-factor-changed', mainWindow.webContents.zoomFactor)
+      }
 
       // 6. Clear oauth state
       oauthCallbackQueue.length = 0

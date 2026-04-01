@@ -12,15 +12,39 @@ export function useBrowserViewBounds(
 ): { placeholderRef: (el: HTMLDivElement | null) => void; hiddenByOverlay: boolean } {
   const { visible, hidden, isResizing } = opts
   const effectivelyVisible = visible && !hidden && !isResizing
+  const [appZoomFactor, setAppZoomFactor] = useState(1)
 
   const elementRef = useRef<HTMLDivElement | null>(null)
   const rafRef = useRef<number>(0)
   const lastBoundsRef = useRef<{ x: number; y: number; width: number; height: number } | null>(null)
   const viewIdRef = useRef(viewId)
   const effectivelyVisibleRef = useRef(effectivelyVisible)
+  const appZoomFactorRef = useRef(appZoomFactor)
 
   viewIdRef.current = viewId
   effectivelyVisibleRef.current = effectivelyVisible
+  appZoomFactorRef.current = appZoomFactor
+
+  useEffect(() => {
+    let cancelled = false
+
+    void window.api.app.getZoomFactor().then((factor) => {
+      if (!cancelled) setAppZoomFactor(factor)
+    })
+
+    const unsubscribe = window.api.app.onZoomFactorChanged((factor) => {
+      setAppZoomFactor((current) => {
+        if (Math.abs(current - factor) < 0.0001) return current
+        lastBoundsRef.current = null
+        return factor
+      })
+    })
+
+    return () => {
+      cancelled = true
+      unsubscribe()
+    }
+  }, [])
 
   // Sync visibility changes
   useEffect(() => {
@@ -71,10 +95,14 @@ export function useBrowserViewBounds(
 
       // Only sync bounds when not hidden by overlay
       if (!hiddenByOverlayRef.current) {
-        const x = Math.round(viewRect.left)
-        const y = Math.round(viewRect.top)
-        const width = Math.round(viewRect.width)
-        const height = Math.round(viewRect.height)
+        const zoomFactor = appZoomFactorRef.current
+        // DOM rects are reported in the renderer's CSS-space, while the native
+        // WebContentsView expects window-space coordinates. App zoom changes the
+        // mapping between those spaces, so we apply the current zoom factor here.
+        const x = Math.round(viewRect.left * zoomFactor)
+        const y = Math.round(viewRect.top * zoomFactor)
+        const width = Math.round(viewRect.width * zoomFactor)
+        const height = Math.round(viewRect.height * zoomFactor)
 
         const last = lastBoundsRef.current
         if (!last || last.x !== x || last.y !== y || last.width !== width || last.height !== height) {
@@ -108,7 +136,7 @@ export function useBrowserViewBounds(
       stopLoop()
     }
     return stopLoop
-  }, [viewId, effectivelyVisible, startLoop, stopLoop])
+  }, [viewId, effectivelyVisible, startLoop, stopLoop, appZoomFactor])
 
   // Focus bridge: mousedown on placeholder focuses the view
   const handleMouseDown = useCallback(() => {

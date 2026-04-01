@@ -753,11 +753,11 @@ export const BrowserPanel = forwardRef<BrowserPanelHandle, BrowserPanelProps>(fu
     return unsubscribe
   }, [taskId, commitTabsUpdate])
 
-  // Apply default zoom when view is ready
+  // Apply the browser's own baseline zoom without tying it to app-level UI zoom.
   useEffect(() => {
-    if (!webviewReady || !activeActions) return
+    if (!activeActions || !webviewReady) return
     activeActions.setZoom(browserDefaultZoom / 100)
-  }, [webviewReady, browserDefaultZoom, activeActions])
+  }, [browserDefaultZoom, activeActions, activeViewState.url, webviewReady])
 
   // Inline DevTools system removed — using native docked DevTools via WebContentsView
 

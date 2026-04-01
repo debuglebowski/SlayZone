@@ -2,7 +2,7 @@ import { test, expect, seed, resetApp, TEST_PROJECT_PATH } from './fixtures/elec
 import {
   testInvoke,
   ensureBrowserPanelVisible,
-  openTaskViaSearch, getAllViewIds, getActiveViewId,
+  openTaskViaSearch, getAllViewIds, getActiveViewId, getViewsForTask,
 } from './fixtures/browser-view'
 
 test.describe('Browser view z-ordering (NativeViewLayer)', () => {
@@ -29,10 +29,15 @@ test.describe('Browser view z-ordering (NativeViewLayer)', () => {
     await ensureBrowserPanelVisible(mainWindow)
     const viewId = await getActiveViewId(mainWindow, taskId)
 
+    await testInvoke(mainWindow, 'browser:navigate', viewId, 'https://example.com')
+    await expect.poll(async () => {
+      return (await testInvoke(mainWindow, 'browser:get-url', viewId)) as string
+    }, { timeout: 15000 }).toContain('example.com')
+
     // View should be visible before dialog
     await expect.poll(async () => {
-      return await testInvoke(mainWindow, 'browser:get-view-visible', viewId) as boolean
-    }, { timeout: 3000 }).toBe(true)
+      return await testInvoke(mainWindow, 'browser:is-view-natively-visible', viewId) as boolean
+    }, { timeout: 5000 }).toBe(true)
 
     // Open a dialog by clicking sidebar plus button
     const createBtn = mainWindow.locator('[data-slot="sidebar"] button:has(.lucide-plus)').first()
@@ -45,19 +50,19 @@ test.describe('Browser view z-ordering (NativeViewLayer)', () => {
     const overlay = mainWindow.locator('[data-slot="dialog-overlay"]')
     await overlay.waitFor({ state: 'visible', timeout: 5000 })
 
-    // CRITICAL: rAF loop detects overlay → calls hideAll
+    // The browser view should hide while the dialog overlay is open.
     await expect.poll(async () => {
-      return await testInvoke(mainWindow, 'browser:is-all-hidden') as boolean
-    }, { timeout: 3000 }).toBe(true)
+      return await testInvoke(mainWindow, 'browser:is-view-natively-visible', viewId) as boolean
+    }, { timeout: 3000 }).toBe(false)
 
     // Close dialog
     await mainWindow.keyboard.press('Escape')
     await overlay.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {})
 
-    // rAF loop detects no overlay → calls showAll
+    // The browser view should restore after the dialog closes.
     await expect.poll(async () => {
-      return await testInvoke(mainWindow, 'browser:is-all-hidden') as boolean
-    }, { timeout: 3000 }).toBe(false)
+      return await testInvoke(mainWindow, 'browser:is-view-natively-visible', viewId) as boolean
+    }, { timeout: 3000 }).toBe(true)
   })
 
   test('views survive hideAll/showAll cycle', async ({ mainWindow }) => {

@@ -22,23 +22,24 @@ test.describe('Browser view bounds (WebContentsView)', () => {
     await ensureBrowserPanelVisible(mainWindow)
     const viewId = await getActiveViewId(mainWindow, taskId)
 
-    // Let rAF loop sync bounds
-    await mainWindow.waitForTimeout(1000)
+    await testInvoke(mainWindow, 'browser:navigate', viewId, 'https://example.com')
+    await expect.poll(async () => {
+      return (await testInvoke(mainWindow, 'browser:get-url', viewId)) as string
+    }, { timeout: 15000 }).toContain('example.com')
 
-    // Check the ACTUAL native view position — what Electron is rendering
-    // This is entry.view.getBounds(), NOT entry.bounds (bookkeeping)
-    const nativeBounds = await testInvoke(mainWindow, 'browser:get-actual-native-bounds', viewId) as { x: number; y: number; width: number; height: number } | null
-    expect(nativeBounds).toBeTruthy()
+    await expect.poll(async () => {
+      const bounds = await testInvoke(mainWindow, 'browser:get-actual-native-bounds', viewId) as { x: number; y: number; width: number; height: number } | null
+      return bounds ? bounds.width > 50 && bounds.height > 50 && bounds.x >= 0 && bounds.y >= 0 : false
+    }, { timeout: 10000 }).toBe(true)
 
+    const nativeBounds = await testInvoke(mainWindow, 'browser:get-actual-native-bounds', viewId) as { x: number; y: number; width: number; height: number }
     const allHidden = await testInvoke(mainWindow, 'browser:is-all-hidden') as boolean
     const viewVisible = await testInvoke(mainWindow, 'browser:get-view-visible', viewId) as boolean
 
-    // Must NOT be offscreen (OFFSCREEN_BOUNDS = {x:-10000})
-    expect(nativeBounds!.x).toBeGreaterThanOrEqual(0)
-    expect(nativeBounds!.y).toBeGreaterThanOrEqual(0)
-    // Must NOT be the initial 1x1 placeholder bounds
-    expect(nativeBounds!.width).toBeGreaterThan(50)
-    expect(nativeBounds!.height).toBeGreaterThan(50)
+    expect(nativeBounds.x).toBeGreaterThanOrEqual(0)
+    expect(nativeBounds.y).toBeGreaterThanOrEqual(0)
+    expect(nativeBounds.width).toBeGreaterThan(50)
+    expect(nativeBounds.height).toBeGreaterThan(50)
 
     // Verify manager state
     expect(allHidden).toBe(false)

@@ -562,6 +562,33 @@ function App(): React.JSX.Element {
     })
   }, [])
 
+  // Keep app zoom on an explicit IPC path instead of relying on Electron's default zoom roles.
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((!(e.metaKey || e.ctrlKey)) || e.altKey) return
+
+      if (e.key === '=' || e.key === '+') {
+        e.preventDefault()
+        void window.api.app.adjustZoom('in')
+        return
+      }
+
+      if (e.key === '-') {
+        e.preventDefault()
+        void window.api.app.adjustZoom('out')
+        return
+      }
+
+      if (e.key === '0') {
+        e.preventDefault()
+        void window.api.app.adjustZoom('reset')
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [])
+
   // Forward keyboard shortcuts from WebContentsView back into the DOM
   useEffect(() => {
     return window.api.browser.onBrowserViewShortcut((payload) => {

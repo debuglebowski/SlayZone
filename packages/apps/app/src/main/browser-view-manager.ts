@@ -397,6 +397,11 @@ export class BrowserViewManager {
     return wc?.id ?? null
   }
 
+  getZoomFactor(viewId: string): number | null {
+    const wc = this.getWebContents(viewId)
+    return wc?.zoomFactor ?? null
+  }
+
   // --- Internal ---
 
   private applySpoofing(wc: Electron.WebContents): void {

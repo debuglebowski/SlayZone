@@ -343,6 +343,8 @@ export interface ElectronAPI {
     isLoopModeEnabledSync: boolean
     isAutomationsEnabled: () => Promise<boolean>
     isAutomationsEnabledSync: boolean
+    getZoomFactor: () => Promise<number>
+    adjustZoom: (command: 'in' | 'out' | 'reset') => Promise<number>
     isPlaywright: boolean
     onGoHome: (callback: () => void) => () => void
     onOpenSettings: (callback: () => void) => () => void
@@ -357,6 +359,7 @@ export interface ElectronAPI {
     onCloseCurrent: (callback: () => void) => () => void
     onReloadBrowser: (callback: () => void) => () => void
     onReloadApp: (callback: () => void) => () => void
+    onZoomFactorChanged: (callback: (factor: number) => void) => () => void
     onCloseActiveTask: (callback: () => void) => () => void
     dataReady: () => void
     restartForUpdate: () => Promise<void>

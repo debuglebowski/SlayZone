@@ -130,6 +130,8 @@ const api: ElectronAPI = {
     isLoopModeEnabledSync: ipcRenderer.sendSync('app:is-loop-mode-enabled-sync') as boolean,
     isAutomationsEnabled: () => ipcRenderer.invoke('app:is-automations-enabled'),
     isAutomationsEnabledSync: ipcRenderer.sendSync('app:is-automations-enabled-sync') as boolean,
+    getZoomFactor: () => ipcRenderer.invoke('app:get-zoom-factor'),
+    adjustZoom: (command: 'in' | 'out' | 'reset') => ipcRenderer.invoke('app:adjust-zoom', command) as Promise<number>,
     isPlaywright: process.env.PLAYWRIGHT === '1',
     onGoHome: (callback: () => void) => {
       const handler = () => callback()
@@ -190,6 +192,11 @@ const api: ElectronAPI = {
       const handler = () => callback()
       ipcRenderer.on('app:reload-app', handler)
       return () => ipcRenderer.removeListener('app:reload-app', handler)
+    },
+    onZoomFactorChanged: (callback: (factor: number) => void) => {
+      const handler = (_: unknown, factor: number) => callback(factor)
+      ipcRenderer.on('app:zoom-factor-changed', handler)
+      return () => ipcRenderer.removeListener('app:zoom-factor-changed', handler)
     },
     onCloseActiveTask: (callback: () => void) => {
       const handler = () => callback()
