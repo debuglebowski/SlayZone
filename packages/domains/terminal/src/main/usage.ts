@@ -405,10 +405,16 @@ export function registerUsageHandlers(ipcMain: IpcMain, db: Database.Database): 
       `SELECT id, label, usage_config FROM terminal_modes WHERE usage_config IS NOT NULL AND enabled = 1`
     ).all() as { id: string; label: string; usage_config: string }[]
 
-    const fetchers: Promise<ProviderUsage>[] = [
-      fetchProvider(CLAUDE, fetchClaudeUsage),
-      fetchProvider(CODEX, fetchCodexUsage),
-    ]
+    // Check enabled status for built-in providers
+    const builtinEnabled = new Map(
+      (db.prepare(
+        `SELECT id, enabled FROM terminal_modes WHERE id IN ('claude-code', 'codex')`
+      ).all() as { id: string; enabled: number }[]).map(r => [r.id, r.enabled === 1])
+    )
+
+    const fetchers: Promise<ProviderUsage>[] = []
+    if (builtinEnabled.get('claude-code') !== false) fetchers.push(fetchProvider(CLAUDE, fetchClaudeUsage))
+    if (builtinEnabled.get('codex') !== false) fetchers.push(fetchProvider(CODEX, fetchCodexUsage))
 
     for (const row of customRows) {
       if (BUILTIN_USAGE_IDS.has(row.id)) continue
