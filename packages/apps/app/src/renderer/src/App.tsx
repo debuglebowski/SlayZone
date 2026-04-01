@@ -88,6 +88,7 @@ const ProjectSettingsDialog = lazy(() => import('@slayzone/projects').then(m => 
 const DeleteProjectDialog = lazy(() => import('@slayzone/projects').then(m => ({ default: m.DeleteProjectDialog })))
 const OnboardingDialog = lazy(() => import('@slayzone/onboarding').then(m => ({ default: m.OnboardingDialog })))
 const SearchDialog = lazy(() => import('@/components/dialogs/SearchDialog').then(m => ({ default: m.SearchDialog })))
+const CliInstallDialog = lazy(() => import('@/components/dialogs/CliInstallDialog').then(m => ({ default: m.CliInstallDialog })))
 const QuickOpenDialog = lazy(() => import('@slayzone/file-editor/client/QuickOpenDialog').then(m => ({ default: m.QuickOpenDialog })))
 const ChangelogDialog = lazy(() => import('@/components/changelog/ChangelogDialog').then(m => ({ default: m.ChangelogDialog })))
 
@@ -949,6 +950,7 @@ function App(): React.JSX.Element {
           if (onboardingCompleted === 'true') markSetupGuideCompleted()
           if (!prompted) { void window.api.settings.set('tutorial_prompted', 'true'); toast('Want a quick tour?', { duration: 8000, action: { label: 'Take the tour', onClick: startTour } }) }
         }} /></Suspense>}
+        <Suspense fallback={null}><CliInstallDialog /></Suspense>
         {shouldMount('tutorial', showAnimatedTour) && <Suspense fallback={null}><TutorialAnimationModal open={showAnimatedTour} onClose={() => useDialogStore.getState().closeAnimatedTour()} /></Suspense>}
         {shouldMount('changelog', changelogOpen || autoChangelogOpen) && <Suspense fallback={null}><ChangelogDialog open={changelogOpen || autoChangelogOpen} onOpenChange={(open) => { if (!open) { useDialogStore.getState().closeChangelog(); dismissAutoChangelog() } }} lastSeenVersion={autoChangelogOpen ? lastSeenVersion : null} /></Suspense>}
         <AlertDialog open={completeTaskDialogOpen} onOpenChange={(open) => { if (!open) useDialogStore.getState().closeCompleteTaskDialog() }}>
