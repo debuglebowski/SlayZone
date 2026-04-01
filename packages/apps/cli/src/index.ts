@@ -1,3 +1,5 @@
+declare const __APP_VERSION__: string
+
 import { Command } from 'commander'
 import { tasksCommand } from './commands/tasks'
 import { projectsCommand } from './commands/projects'
@@ -13,7 +15,7 @@ import { panelsCommand } from './commands/panels'
 const program = new Command()
   .name('slay')
   .description('SlayZone CLI')
-  .version('0.1.0')
+  .version(__APP_VERSION__)
   .option('--dev', 'Use development database (slayzone.dev.sqlite)')
   .hook('preAction', (thisCommand) => {
     const root = thisCommand.parent ?? thisCommand
