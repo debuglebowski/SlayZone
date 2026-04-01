@@ -177,8 +177,8 @@ export interface TaskDetailPageProps {
 
 export const TaskDetailPage = React.memo(function TaskDetailPage({
   taskId,
-  task,
-  project,
+  task: taskProp,
+  project: projectProp,
   isActive,
   compact,
   onBack,
@@ -193,6 +193,10 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
   onTerminalFocusRequestHandled,
   initialData,
 }: TaskDetailPageProps): React.JSX.Element {
+  // Prefer live global state; fall back to suspense-cached data for subtask race window
+  const task = taskProp ?? initialData?.task ?? null
+  const project = projectProp ?? initialData?.project ?? null
+
   const { modes } = useTerminalModes()
 
   const { editorThemeId, contentVariant } = useTheme()
@@ -282,6 +286,7 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
   const [descriptionExpanded, setDescriptionExpanded] = useState(false)
   const [descriptionOpen, setDescriptionOpen] = useState(true)
   const [subTasksOpen, setSubTasksOpen] = useState(true)
+  const [detailsOpen, setDetailsOpen] = useState(true)
 
   // Doctor dialog state
   const [doctorDialogOpen, setDoctorDialogOpen] = useState(false)
@@ -2057,7 +2062,7 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
               <div className="ml-auto flex items-center gap-0.5">
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <IconButton type="button" variant="ghost" aria-label={descriptionExpanded ? "Default height" : "Full height"} className={cn("size-5 hover:text-foreground", descriptionExpanded ? "text-foreground bg-muted" : "text-muted-foreground")} onClick={() => setDescriptionExpanded((v) => !v)}>
+                    <IconButton type="button" variant="ghost" aria-label={descriptionExpanded ? "Default height" : "Full height"} className={cn("size-5 hover:text-foreground", descriptionExpanded ? "text-foreground bg-muted" : "text-muted-foreground")} onClick={() => setDescriptionExpanded((v) => { if (!v) { setDetailsOpen(false); setSubTasksOpen(false) } else { setDetailsOpen(true); setSubTasksOpen(true) } return !v })}>
                       <IconArrowsVertical size={12} />
                     </IconButton>
                   </TooltipTrigger>
@@ -2094,7 +2099,7 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
           </Collapsible>
 
           {/* Sub-tasks (only for top-level tasks) */}
-          {!(descriptionExpanded && descriptionOpen) && !parentTask && <Collapsible open={subTasksOpen} onOpenChange={setSubTasksOpen} className="group/sub rounded-md border border-border overflow-hidden">
+          {!parentTask && <Collapsible open={subTasksOpen} onOpenChange={setSubTasksOpen} className="group/sub rounded-md border border-border overflow-hidden">
             <div className="flex w-full items-center gap-1.5 bg-muted/50 px-2.5 py-1.5 min-h-8 text-xs font-medium text-muted-foreground group-data-[state=open]/sub:border-b border-border">
               <CollapsibleTrigger className="flex items-center gap-1.5 hover:text-foreground transition-colors [&[data-state=open]>svg:first-child]:rotate-90">
                 <ChevronRight className="size-3 transition-transform" />
@@ -2156,15 +2161,22 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
           {!(descriptionExpanded && descriptionOpen) && <div className="flex-1" />}
 
           {/* Details */}
-          {!(descriptionExpanded && descriptionOpen) && <>
-          <TaskMetadataSidebar
-            task={task}
-            tags={tags}
-            taskTagIds={taskTagIds}
-            onUpdate={handleTaskUpdate}
-            onTagsChange={handleTagsChange}
-            onTagCreated={(tag) => setTags((prev) => [...prev, tag])}
-          />
+          <Collapsible open={detailsOpen} onOpenChange={setDetailsOpen} className="-mb-3">
+            <div className="-mx-3 flex items-center gap-1.5 bg-muted/50 px-2.5 py-1.5 min-h-8 text-xs font-medium text-muted-foreground border-t border-border" style={{ width: 'calc(100% + 1.5rem)', borderBottom: detailsOpen ? '1px solid var(--border)' : 'none' }}>
+              <CollapsibleTrigger className="flex items-center gap-1.5 hover:text-foreground transition-colors [&[data-state=open]>svg:first-child]:rotate-90">
+                <ChevronRight className="size-3 transition-transform" />
+                Details
+              </CollapsibleTrigger>
+            </div>
+            <CollapsibleContent className="pt-1">
+              <TaskMetadataSidebar
+                task={task}
+                tags={tags}
+                taskTagIds={taskTagIds}
+                onUpdate={handleTaskUpdate}
+                onTagsChange={handleTagsChange}
+                onTagCreated={(tag) => setTags((prev) => [...prev, tag])}
+              />
 
           <div className="flex flex-col gap-3 mt-5">
 
@@ -2245,7 +2257,8 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
           </div>
 
           </div>
-          </>}
+            </CollapsibleContent>
+          </Collapsible>
               </>
             )}
           />
