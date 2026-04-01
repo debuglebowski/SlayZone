@@ -93,10 +93,15 @@ export function useTasksData(): UseTasksDataReturn {
     }
   }, [])
 
-  // Update a single task in state
+  // Update (or insert) a single task in state — upsert handles the race window
+  // where a subtask exists in DB but loadBoardData hasn't refreshed yet
   const updateTask = useCallback((task: Task | null | undefined) => {
     if (!hasTaskIdentity(task)) return
-    setTasks((prev) => prev.map((t) => (t.id === task.id ? task : t)))
+    setTasks((prev) => {
+      const idx = prev.findIndex((t) => t.id === task.id)
+      if (idx >= 0) return prev.map((t) => (t.id === task.id ? task : t))
+      return [...prev, task]
+    })
   }, [])
 
   // Move task between columns (status/priority)
