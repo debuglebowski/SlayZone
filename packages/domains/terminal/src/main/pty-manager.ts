@@ -10,6 +10,7 @@ import { getDiagnosticsConfig, recordDiagnosticEvent } from '@slayzone/diagnosti
 import { RingBuffer, type BufferChunk } from './ring-buffer'
 import { getAdapter, type TerminalMode, type TerminalAdapter, type SpawnConfig, type ActivityState, type ErrorInfo, type ExecutionContext } from './adapters'
 import { interpolateTemplate } from './adapters/template-interpolation'
+import { parseShellArgs } from './adapters/flag-parser'
 import { StateMachine, activityToTerminalState } from './state-machine'
 import { quoteForShell, buildExecCommand, resolveUserShell, getShellStartupArgs } from './shell-env'
 import { shouldShellFallback, shouldNotifySessionNotFound, buildRecoveryMessage } from './pty-exit-strategy'
@@ -550,7 +551,7 @@ export async function createPty(opts: CreatePtyOptions): Promise<{ success: bool
       const binary = interpolateTemplate({
         template,
         conversationId: effectiveConversationId || undefined,
-        flags: providerArgs ?? [],
+        flags: (providerArgs && providerArgs.length > 0) ? providerArgs : parseShellArgs(defaultFlags),
         initialPrompt: initialPrompt || undefined
       })
       const allArgs = [...binary.args]
