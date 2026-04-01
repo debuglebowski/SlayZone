@@ -80,7 +80,6 @@ export function TaskMetadataSidebar({
   const [allTasks, setAllTasks] = useState<Task[]>([])
   const [blockers, setBlockers] = useState<Task[]>([])
   const [projects, setProjects] = useState<Project[]>([])
-  const [blockerSearch, setBlockerSearch] = useState('')
   const [addBlockerSearch, setAddBlockerSearch] = useState('')
 
   // Load all tasks and current blockers
@@ -94,7 +93,6 @@ export function TaskMetadataSidebar({
       setAllTasks(tasks.filter((t) => t.id !== task.id))
       setBlockers(currentBlockers)
       setProjects(allProjects)
-      setBlockerSearch('')
       setAddBlockerSearch('')
     }
     loadData()
@@ -118,7 +116,6 @@ export function TaskMetadataSidebar({
   const availableBlockers = allTasks.filter((t) => (
     !blockers.some((b) => b.id === t.id) && !isTerminalStatus(t.status, columnsByProject.get(t.project_id))
   ))
-  const filteredBlockers = blockers.filter((blocker) => matchesTaskSearch(blocker, blockerSearch))
   const filteredAvailableBlockers = availableBlockers.filter((blocker) => matchesTaskSearch(blocker, addBlockerSearch))
   const selectedProject = projects.find((project) => project.id === task.project_id)
   const statusOptions = buildStatusOptions(selectedProject?.columns_config)
@@ -365,39 +362,23 @@ export function TaskMetadataSidebar({
       <div>
         <label className="mb-1 block text-sm text-muted-foreground">Blocked By</label>
         {blockers.length > 0 && (
-          <>
-            <div className="relative mb-2">
-              <SearchIcon className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                value={blockerSearch}
-                onChange={(e) => setBlockerSearch(e.target.value)}
-                aria-label="Search blockers"
-                placeholder="Search blockers..."
-                className="h-8 pl-8 text-sm"
-              />
-            </div>
-            {filteredBlockers.length === 0 ? (
-              <p className="mb-2 text-sm text-muted-foreground">No blockers match your search</p>
-            ) : (
-              <div className="mb-2 space-y-1">
-                {filteredBlockers.map((blocker) => (
-                  <div
-                    key={blocker.id}
-                    className="flex items-center gap-2 rounded bg-muted/50 px-2 py-1 text-sm"
-                  >
-                    <BlockerStatusIcon task={blocker} columns={columnsByProject.get(blocker.project_id)} />
-                    <span className="flex-1 truncate">{blocker.title}</span>
-                    <button
-                      onClick={() => handleRemoveBlocker(blocker.id)}
-                      className="text-muted-foreground hover:text-foreground"
-                    >
-                      <X className="h-3 w-3" />
-                    </button>
-                  </div>
-                ))}
+          <div className="mb-2 space-y-1">
+            {blockers.map((blocker) => (
+              <div
+                key={blocker.id}
+                className="flex items-center gap-2 rounded bg-muted/50 px-2 py-1 text-sm"
+              >
+                <BlockerStatusIcon task={blocker} columns={columnsByProject.get(blocker.project_id)} />
+                <span className="flex-1 truncate">{blocker.title}</span>
+                <button
+                  onClick={() => handleRemoveBlocker(blocker.id)}
+                  className="text-muted-foreground hover:text-foreground"
+                >
+                  <X className="h-3 w-3" />
+                </button>
               </div>
-            )}
-          </>
+            ))}
+          </div>
         )}
         <Popover>
           <PopoverTrigger asChild>

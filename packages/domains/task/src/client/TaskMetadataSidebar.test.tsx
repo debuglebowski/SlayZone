@@ -182,24 +182,11 @@ describe('TaskMetadataSidebar', () => {
 
     await screen.findByText('Fix API')
 
+    expect(screen.queryByLabelText('Search blockers')).toBeNull()
     expect(screen.getByTitle('Doing')).toBeDefined()
     expect(screen.getByTitle('Triage')).toBeDefined()
     expect(screen.getByTitle('Waiting')).toBeDefined()
     expect(screen.queryByText('Already done')).toBeNull()
-  })
-
-  it('filters the current blocker list and shows an empty state when there are no matches', async () => {
-    renderSidebar()
-
-    const search = await screen.findByLabelText('Search blockers')
-    fireEvent.change(search, { target: { value: 'auth' } })
-
-    expect(within(search.parentElement?.nextElementSibling as HTMLElement).queryByText('Fix API')).toBeNull()
-    expect(within(search.parentElement?.nextElementSibling as HTMLElement).getByText('Refactor auth')).toBeDefined()
-
-    fireEvent.change(search, { target: { value: 'zzz' } })
-
-    expect((search.parentElement?.nextElementSibling as HTMLElement).textContent).toContain('No blockers match your search')
   })
 
   it('filters the add-blocker list independently and adds the selected blocker', async () => {
@@ -224,10 +211,9 @@ describe('TaskMetadataSidebar', () => {
   it('removes a blocker from the filtered list', async () => {
     renderSidebar()
 
-    const search = await screen.findByLabelText('Search blockers')
-    fireEvent.change(search, { target: { value: 'api' } })
+    await screen.findByText('Fix API')
 
-    const blockerResults = search.parentElement?.nextElementSibling as HTMLElement
+    const blockerResults = screen.getByText('Fix API').closest('div')?.parentElement as HTMLElement
     const row = within(blockerResults).getByText('Fix API').closest('div')
     expect(row).not.toBeNull()
 
@@ -237,6 +223,6 @@ describe('TaskMetadataSidebar', () => {
       expect(window.api.taskDependencies.removeBlocker).toHaveBeenCalledWith('task-1', 'blocker-1')
     })
 
-    expect((search.parentElement?.nextElementSibling as HTMLElement).textContent).toContain('No blockers match your search')
+    expect(within(blockerResults).queryByText('Fix API')).toBeNull()
   })
 })
