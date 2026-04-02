@@ -14,7 +14,7 @@ import {
   Copy, ClipboardPaste, TextSelect, Eraser, Search,
   Columns2, Plus, X, PenLine,
   ZoomIn, ZoomOut, RotateCw, ArrowDownToLine,
-  Hash, Power
+  Hash, Power, Terminal
 } from 'lucide-react'
 import type { TerminalHandle } from '@slayzone/terminal/client/Terminal'
 
@@ -90,6 +90,10 @@ export function TerminalContextMenu({
   const handleScrollToBottom = useCallback(() => {
     terminalRef.current?.scrollToBottom()
   }, [terminalRef])
+
+  const handleCopySessionId = useCallback(() => {
+    void navigator.clipboard.writeText(sessionId)
+  }, [sessionId])
 
   const handleCopyConversationId = useCallback(() => {
     if (conversationId) void navigator.clipboard.writeText(conversationId)
@@ -181,6 +185,13 @@ export function TerminalContextMenu({
         <ContextMenuItem onSelect={handleScrollToBottom}>
           <ArrowDownToLine className="size-4" />
           Scroll to Bottom
+        </ContextMenuItem>
+
+        <ContextMenuSeparator />
+
+        <ContextMenuItem onSelect={handleCopySessionId}>
+          <Terminal className="size-4" />
+          Copy Session ID
         </ContextMenuItem>
 
         {/* AI-specific */}
