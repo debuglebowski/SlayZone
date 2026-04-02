@@ -95,7 +95,9 @@ function LeaderboardPageInner({ auth }: { auth: ReturnType<typeof useLeaderboard
   const [resolvedGithubUrl, setResolvedGithubUrl] = useState<string | null>(null)
   const [devProtocolBanner, setDevProtocolBanner] = useState<string | null>(null)
   const syncViewerProfile = useMutation(api.leaderboard.syncViewerProfile)
+  const syncDailyStats = useMutation(api.leaderboard.syncDailyStats)
   const forgetMeMutation = useMutation(api.leaderboard.forgetMe)
+  const [syncing, setSyncing] = useState(false)
   const myTotals = useQuery(api.leaderboard.getMyTotals, auth.isAuthenticated ? {} : 'skip')
   const topTokens = useQuery(api.leaderboard.topByTotalTokens, auth.configured ? { period, limit: 25 } : 'skip')
   const topTasks = useQuery(api.leaderboard.topByCompletedTasks, auth.configured ? { period, limit: 25 } : 'skip')
@@ -174,6 +176,16 @@ function LeaderboardPageInner({ auth }: { auth: ReturnType<typeof useLeaderboard
     }
   }, [])
 
+  async function syncStats(): Promise<void> {
+    setSyncing(true)
+    try {
+      const stats = await window.api.leaderboard?.getLocalStats()
+      if (stats?.days.length) await syncDailyStats({ days: stats.days })
+    } catch { /* best-effort */ } finally {
+      setSyncing(false)
+    }
+  }
+
   async function runAuthAction(type: 'signin' | 'signout' | 'forget'): Promise<void> {
     setAuthBusy(true)
     try {
@@ -215,6 +227,17 @@ function LeaderboardPageInner({ auth }: { auth: ReturnType<typeof useLeaderboard
                     </Button>
                   ))}
                 </div>
+                {canParticipate && (
+                  <IconButton
+                    aria-label="Sync stats"
+                    variant="outline"
+                    disabled={syncing}
+                    onClick={() => void syncStats()}
+                    title="Sync stats now"
+                  >
+                    <RefreshCw className={`size-4 ${syncing ? 'animate-spin' : ''}`} />
+                  </IconButton>
+                )}
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <IconButton
