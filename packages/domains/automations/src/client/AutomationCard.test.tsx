@@ -54,7 +54,7 @@ beforeEach(() => {
 })
 
 describe('AutomationCard', () => {
-  it('renders a structured summary with status and configuration metadata', () => {
+  it('renders the current collapsed card controls', () => {
     render(
       <AutomationCard
         automation={automation}
@@ -67,12 +67,10 @@ describe('AutomationCard', () => {
       />
     )
 
-    expect(screen.getByText('Auto close stale tasks')).toBeDefined()
-    expect(screen.getByText('Active')).toBeDefined()
-    expect(screen.getByText('Task status')).toBeDefined()
-    expect(screen.getByText('Run command')).toBeDefined()
-    expect(screen.getByText('3 runs')).toBeDefined()
-    expect(screen.getByText('Closes tasks that have been sitting in review for too long.')).toBeDefined()
+    expect(screen.getByRole('button', { name: 'Expand automation details' })).toBeDefined()
+    expect(screen.getByRole('button', { name: 'Auto close stale tasks' })).toBeDefined()
+    expect(screen.getByRole('switch')).toBeDefined()
+    expect(screen.queryByText('Succeeded')).toBeNull()
   })
 
   it('expands recent runs and loads action details for a run item', async () => {

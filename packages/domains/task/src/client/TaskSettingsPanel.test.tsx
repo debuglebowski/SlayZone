@@ -8,7 +8,7 @@ import { TaskSettingsPanel } from './TaskSettingsPanel'
 afterEach(cleanup)
 
 describe('TaskSettingsPanel', () => {
-  it('switches to history and back from the header action', () => {
+  it('switches to activity and back from the header action', () => {
     render(
       <TaskSettingsPanel
         taskId="task-1"
@@ -17,14 +17,14 @@ describe('TaskSettingsPanel', () => {
       />
     )
 
-    expect(screen.getByText('View history')).toBeDefined()
-    fireEvent.click(screen.getByText('View history'))
-    expect(screen.queryByText('View history')).toBeNull()
+    expect(screen.getByText('View activity')).toBeDefined()
+    fireEvent.click(screen.getByText('View activity'))
+    expect(screen.queryByText('View activity')).toBeNull()
     expect(screen.getByText('Back to settings')).toBeDefined()
     expect(screen.getByText('History body')).toBeDefined()
 
     fireEvent.click(screen.getByRole('button', { name: 'Back to settings' }))
-    expect(screen.getByText('View history')).toBeDefined()
+    expect(screen.getByText('View activity')).toBeDefined()
   })
 
   it('resets to default view when the task changes', () => {
@@ -36,7 +36,7 @@ describe('TaskSettingsPanel', () => {
       />
     )
 
-    fireEvent.click(screen.getByText('View history'))
+    fireEvent.click(screen.getByText('View activity'))
     expect(screen.getByText('History body')).toBeDefined()
 
     rerender(
@@ -47,7 +47,7 @@ describe('TaskSettingsPanel', () => {
       />
     )
 
-    expect(screen.getByText('View history')).toBeDefined()
+    expect(screen.getByText('View activity')).toBeDefined()
     expect(screen.queryByText('History body')).toBeNull()
   })
 
@@ -61,8 +61,8 @@ describe('TaskSettingsPanel', () => {
     )
 
     expect(screen.getByText('Settings body')).toBeDefined()
-    expect(screen.getByRole('button', { name: 'View history' })).toBeDefined()
-    fireEvent.click(screen.getByRole('button', { name: 'View history' }))
+    expect(screen.getByRole('button', { name: 'View activity' })).toBeDefined()
+    fireEvent.click(screen.getByRole('button', { name: 'View activity' }))
     expect(screen.getByRole('button', { name: 'Back to settings' })).toBeDefined()
   })
 })
