@@ -30,7 +30,9 @@ import type {
   SyncResult,
   UpdateAiConfigItemInput,
   WriteMcpServerInput,
-  RemoveMcpServerInput
+  RemoveMcpServerInput,
+  WriteGlobalMcpServerInput,
+  RemoveGlobalMcpServerInput,
 } from '../shared'
 import {
   parseSkillFrontmatter,
@@ -45,7 +47,10 @@ import {
   filterConfigurableCliProviders,
   isConfigurableMcpTarget,
   getConfigurableMcpTargets,
+  PROJECT_MCP_SPECS,
+  GLOBAL_MCP_SPECS,
 } from '../shared/provider-registry'
+import type { McpConfigSpec } from '../shared/provider-registry'
 import type { GlobalFileEntry } from '../shared'
 
 const KNOWN_CONTEXT_FILES: Array<{ relative: string; name: string; category: ContextFileCategory }> = [
@@ -559,20 +564,32 @@ export function registerAiConfigHandlers(ipcMain: IpcMain, db: Database): void {
         })
       }
 
-      // Skills directory
+      // Skills directory — supports both flat (slug.md) and directory (slug/SKILL.md) formats
       if (spec.skillsDir) {
         const dir = path.join(baseDir, spec.skillsDir)
         if (fs.existsSync(dir)) {
           try {
-            for (const file of fs.readdirSync(dir)) {
-              if (!file.endsWith('.md')) continue
-              entries.push({
-                path: path.join(dir, file),
-                name: `~/${spec.baseDir}/${spec.skillsDir}/${file}`,
-                provider,
-                category: 'skill',
-                exists: true
-              })
+            for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+              if (entry.isFile() && entry.name.endsWith('.md')) {
+                entries.push({
+                  path: path.join(dir, entry.name),
+                  name: `~/${spec.baseDir}/${spec.skillsDir}/${entry.name}`,
+                  provider,
+                  category: 'skill',
+                  exists: true
+                })
+              } else if (entry.isDirectory()) {
+                const skillFile = path.join(dir, entry.name, 'SKILL.md')
+                if (fs.existsSync(skillFile)) {
+                  entries.push({
+                    path: skillFile,
+                    name: `~/${spec.baseDir}/${spec.skillsDir}/${entry.name}/SKILL.md`,
+                    provider,
+                    category: 'skill',
+                    exists: true
+                  })
+                }
+              }
             }
           } catch { /* ignore permission errors */ }
         }
@@ -633,6 +650,23 @@ export function registerAiConfigHandlers(ipcMain: IpcMain, db: Database): void {
       category,
       exists: true
     }
+  })
+
+  ipcMain.handle('ai-config:write-global-skill', (
+    _event,
+    provider: CliProvider,
+    slug: string,
+    content: string,
+  ) => {
+    if (!isConfigurableCliProvider(provider)) throw new Error(`Provider ${provider} is not configurable`)
+    const spec = GLOBAL_PROVIDER_PATHS[provider]
+    if (!spec?.skillsDir) throw new Error(`${provider} does not support global skills`)
+    const home = app.getPath('home')
+    const normalizedSlug = normalizeSlug(slug)
+    const filePath = path.join(home, spec.baseDir, spec.skillsDir, normalizedSlug, 'SKILL.md')
+    if (!isPathAllowed(filePath, null)) throw new Error('Path not allowed')
+    fs.mkdirSync(path.dirname(filePath), { recursive: true })
+    fs.writeFileSync(filePath, content, 'utf-8')
   })
 
   ipcMain.handle('ai-config:get-context-tree', (_event, projectPath: string, projectId: string) => {
@@ -1060,16 +1094,29 @@ export function registerAiConfigHandlers(ipcMain: IpcMain, db: Database): void {
     return recomputeInstructionsResult(projectId, projectPath)
   })
 
-  ipcMain.handle('ai-config:get-global-instructions', () => {
+  ipcMain.handle('ai-config:get-global-instructions', (_event, variantId?: string) => {
+    if (variantId) {
+      const item = db.prepare(
+        "SELECT * FROM ai_config_items WHERE id = ? AND type = 'root_instructions' AND scope = 'global'"
+      ).get(variantId) as AiConfigItem | undefined
+      return item?.content ?? ''
+    }
+    // Legacy: return first (default) variant
     const item = db.prepare(
-      "SELECT * FROM ai_config_items WHERE type = 'root_instructions' AND scope = 'global'"
+      "SELECT * FROM ai_config_items WHERE type = 'root_instructions' AND scope = 'global' ORDER BY created_at ASC LIMIT 1"
     ).get() as AiConfigItem | undefined
     return item?.content ?? ''
   })
 
-  ipcMain.handle('ai-config:save-global-instructions', (_event, content: string) => {
+  ipcMain.handle('ai-config:save-global-instructions', (_event, content: string, variantId?: string) => {
+    if (variantId) {
+      db.prepare("UPDATE ai_config_items SET content = ?, updated_at = datetime('now') WHERE id = ? AND type = 'root_instructions' AND scope = 'global'")
+        .run(content, variantId)
+      return
+    }
+    // Legacy: upsert the default variant
     const existing = db.prepare(
-      "SELECT id FROM ai_config_items WHERE type = 'root_instructions' AND scope = 'global'"
+      "SELECT id FROM ai_config_items WHERE type = 'root_instructions' AND scope = 'global' ORDER BY created_at ASC LIMIT 1"
     ).get() as { id: string } | undefined
 
     if (existing) {
@@ -1080,6 +1127,32 @@ export function registerAiConfigHandlers(ipcMain: IpcMain, db: Database): void {
         INSERT INTO ai_config_items (id, type, scope, project_id, name, slug, content, metadata_json, created_at, updated_at)
         VALUES (?, 'root_instructions', 'global', NULL, 'root_instructions', 'root_instructions', ?, '{}', datetime('now'), datetime('now'))
       `).run(crypto.randomUUID(), content)
+    }
+  })
+
+  // Instruction variants
+  ipcMain.handle('ai-config:list-instruction-variants', (): AiConfigItem[] => {
+    return db.prepare(
+      "SELECT * FROM ai_config_items WHERE type = 'root_instructions' AND scope = 'global' ORDER BY updated_at DESC"
+    ).all() as AiConfigItem[]
+  })
+
+  ipcMain.handle('ai-config:get-project-instruction-variant', (_event, projectId: string): AiConfigItem | null => {
+    const row = db.prepare("SELECT value FROM settings WHERE key = ?")
+      .get(`ai_instruction_variant:${projectId}`) as { value: string } | undefined
+    if (!row) return null
+    const item = db.prepare(
+      "SELECT * FROM ai_config_items WHERE id = ? AND type = 'root_instructions' AND scope = 'global'"
+    ).get(row.value) as AiConfigItem | undefined
+    return item ?? null
+  })
+
+  ipcMain.handle('ai-config:set-project-instruction-variant', (_event, projectId: string, variantItemId: string | null) => {
+    if (variantItemId === null) {
+      db.prepare("DELETE FROM settings WHERE key = ?").run(`ai_instruction_variant:${projectId}`)
+    } else {
+      db.prepare('INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value')
+        .run(`ai_instruction_variant:${projectId}`, variantItemId)
     }
   })
 
@@ -1676,7 +1749,7 @@ export function registerAiConfigHandlers(ipcMain: IpcMain, db: Database): void {
       // Prune unmanaged MCP config files:
       // - remove provider MCP configs for disabled providers
       // - remove empty MCP configs for enabled providers
-      for (const [target, spec] of Object.entries(MCP_CONFIG_SPECS) as Array<[McpTarget, typeof MCP_CONFIG_SPECS[McpTarget]]>) {
+      for (const [target, spec] of Object.entries(PROJECT_MCP_SPECS) as Array<[McpTarget, McpConfigSpec | undefined]>) {
         if (!spec) continue
         if (!isConfigurableCliProvider(target)) continue
 
@@ -1752,127 +1825,91 @@ export function registerAiConfigHandlers(ipcMain: IpcMain, db: Database): void {
     return conflicts
   })
 
-  // MCP config discovery + management — adapter pattern for different file formats
-  // Writable: dedicated MCP files (claude, cursor)
-  // Read-only: shared config files (gemini settings.json, opencode opencode.json)
-  interface McpConfigSpec {
-    relativePath: string
-    writable: boolean
-    read(content: string): Record<string, McpServerConfig>
-    write(existing: string | null, servers: Record<string, McpServerConfig>): string
-  }
+  // MCP config discovery + management
+  // Specs are imported from provider-registry (PROJECT_MCP_SPECS, GLOBAL_MCP_SPECS)
 
-  function jsonSpec(relativePath: string, serversKey: string, opts?: { extraFields?: Partial<McpServerConfig>; writable?: boolean }): McpConfigSpec {
-    return {
-      relativePath,
-      writable: opts?.writable ?? true,
-      read(content) {
-        const data = JSON.parse(content)
-        return (data[serversKey] ?? {}) as Record<string, McpServerConfig>
-      },
-      write(existing, servers) {
-        let data: Record<string, unknown> = {}
-        if (existing) try { data = JSON.parse(existing) } catch { /* start fresh */ }
-        if (opts?.extraFields) {
-          for (const [k, v] of Object.entries(servers)) {
-            servers[k] = { ...v, ...opts.extraFields }
-          }
-        }
-        data[serversKey] = servers
-        return JSON.stringify(data, null, 2) + '\n'
-      }
-    }
-  }
-
-  const opencodeSpec: McpConfigSpec = {
-    relativePath: 'opencode.json',
-    writable: false,
-    read(content) {
-      const data = JSON.parse(content)
-      const raw = data['mcp'] as Record<string, unknown> | undefined
-      if (!raw) return {}
-      const result: Record<string, McpServerConfig> = {}
-      for (const [key, val] of Object.entries(raw)) {
-        if (val && typeof val === 'object') {
-          const v = val as Record<string, unknown>
-          result[key] = {
-            command: String(v['command'] ?? ''),
-            args: Array.isArray(v['args']) ? v['args'].map(String) : [],
-            ...(v['env'] ? { env: v['env'] as Record<string, string> } : {})
-          }
-        }
-      }
-      return result
-    },
-    write(existing, servers) {
-      let data: Record<string, unknown> = {}
-      if (existing) try { data = JSON.parse(existing) } catch { /* start fresh */ }
-      const mcp: Record<string, unknown> = {}
-      for (const [k, v] of Object.entries(servers)) {
-        mcp[k] = { type: 'local', command: v.command, args: v.args, ...(v.env ? { env: v.env } : {}) }
-      }
-      data['mcp'] = mcp
-      return JSON.stringify(data, null, 2) + '\n'
-    }
-  }
-
-  const MCP_CONFIG_SPECS: Partial<Record<McpTarget, McpConfigSpec>> = {
-    claude:   jsonSpec('.mcp.json', 'mcpServers'),
-    cursor:   jsonSpec('.cursor/mcp.json', 'mcpServers'),
-    gemini:   jsonSpec('.agents/settings.json', 'mcpServers', { writable: false }),
-    opencode: opencodeSpec,
-    copilot:  jsonSpec('.copilot/mcp-config.json', 'mcpServers', { writable: false }),
-  }
-
-  ipcMain.handle('ai-config:discover-mcp-configs', (_event, projectPath: string): McpConfigFileResult[] => {
-    const resolvedProject = path.resolve(projectPath)
+  function discoverMcpConfigsFromSpecs(
+    baseDir: string,
+    specs: Partial<Record<McpTarget, McpConfigSpec>>,
+  ): McpConfigFileResult[] {
     const results: McpConfigFileResult[] = []
     for (const provider of getConfigurableMcpTargets()) {
-      const spec = MCP_CONFIG_SPECS[provider]
+      const spec = specs[provider]
       if (!spec) continue
-      const filePath = path.join(resolvedProject, spec.relativePath)
+      const filePath = path.join(baseDir, spec.relativePath)
       const exists = fs.existsSync(filePath)
       let servers: Record<string, McpServerConfig> = {}
       if (exists) {
-        try {
-          servers = spec.read(fs.readFileSync(filePath, 'utf-8'))
-        } catch { /* ignore parse errors */ }
+        try { servers = spec.read(fs.readFileSync(filePath, 'utf-8')) } catch { /* ignore */ }
       }
       results.push({ provider, exists, writable: spec.writable, servers })
     }
     return results
-  })
+  }
 
-  ipcMain.handle('ai-config:write-mcp-server', (_event, input: WriteMcpServerInput) => {
-    if (!isConfigurableMcpTarget(input.provider)) throw new Error(`MCP config for ${input.provider} is disabled`)
-    const spec = MCP_CONFIG_SPECS[input.provider]
-    if (!spec) throw new Error(`MCP config for ${input.provider} is not supported`)
-    if (!spec.writable) throw new Error(`MCP config for ${input.provider} is read-only`)
-    const resolvedProject = path.resolve(input.projectPath)
-    const filePath = path.join(resolvedProject, spec.relativePath)
-
+  function writeMcpServerToSpecs(
+    baseDir: string,
+    specs: Partial<Record<McpTarget, McpConfigSpec>>,
+    provider: McpTarget,
+    serverKey: string,
+    config: McpServerConfig,
+  ): void {
+    if (!isConfigurableMcpTarget(provider)) throw new Error(`MCP config for ${provider} is disabled`)
+    const spec = specs[provider]
+    if (!spec) throw new Error(`MCP config for ${provider} is not supported`)
+    if (!spec.writable) throw new Error(`MCP config for ${provider} is read-only`)
+    const filePath = path.join(baseDir, spec.relativePath)
     const existing = fs.existsSync(filePath) ? fs.readFileSync(filePath, 'utf-8') : null
     const servers = existing ? (() => { try { return spec.read(existing) } catch { return {} } })() : {}
-    servers[input.serverKey] = { ...input.config }
-
+    servers[serverKey] = { ...config }
     const dir = path.dirname(filePath)
     if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true })
     fs.writeFileSync(filePath, spec.write(existing, servers), 'utf-8')
-  })
+  }
 
-  ipcMain.handle('ai-config:remove-mcp-server', (_event, input: RemoveMcpServerInput) => {
-    if (!isConfigurableMcpTarget(input.provider)) throw new Error(`MCP config for ${input.provider} is disabled`)
-    const spec = MCP_CONFIG_SPECS[input.provider]
-    if (!spec) throw new Error(`MCP config for ${input.provider} is not supported`)
-    if (!spec.writable) throw new Error(`MCP config for ${input.provider} is read-only`)
-    const resolvedProject = path.resolve(input.projectPath)
-    const filePath = path.join(resolvedProject, spec.relativePath)
-
+  function removeMcpServerFromSpecs(
+    baseDir: string,
+    specs: Partial<Record<McpTarget, McpConfigSpec>>,
+    provider: McpTarget,
+    serverKey: string,
+  ): void {
+    if (!isConfigurableMcpTarget(provider)) throw new Error(`MCP config for ${provider} is disabled`)
+    const spec = specs[provider]
+    if (!spec) throw new Error(`MCP config for ${provider} is not supported`)
+    if (!spec.writable) throw new Error(`MCP config for ${provider} is read-only`)
+    const filePath = path.join(baseDir, spec.relativePath)
     if (!fs.existsSync(filePath)) return
     let servers: Record<string, McpServerConfig>
     try { servers = spec.read(fs.readFileSync(filePath, 'utf-8')) } catch { return }
-    delete servers[input.serverKey]
-
+    delete servers[serverKey]
     fs.writeFileSync(filePath, spec.write(fs.readFileSync(filePath, 'utf-8'), servers), 'utf-8')
+  }
+
+  // Project-level MCP handlers
+  ipcMain.handle('ai-config:discover-mcp-configs', (_event, projectPath: string): McpConfigFileResult[] => {
+    return discoverMcpConfigsFromSpecs(path.resolve(projectPath), PROJECT_MCP_SPECS)
+  })
+
+  ipcMain.handle('ai-config:write-mcp-server', (_event, input: WriteMcpServerInput) => {
+    writeMcpServerToSpecs(path.resolve(input.projectPath), PROJECT_MCP_SPECS, input.provider, input.serverKey, input.config)
+  })
+
+  ipcMain.handle('ai-config:remove-mcp-server', (_event, input: RemoveMcpServerInput) => {
+    removeMcpServerFromSpecs(path.resolve(input.projectPath), PROJECT_MCP_SPECS, input.provider, input.serverKey)
+  })
+
+  // Global (computer-level) MCP handlers
+  const homeDir = app.getPath('home')
+
+  ipcMain.handle('ai-config:discover-global-mcp-configs', (): McpConfigFileResult[] => {
+    return discoverMcpConfigsFromSpecs(homeDir, GLOBAL_MCP_SPECS)
+  })
+
+  ipcMain.handle('ai-config:write-global-mcp-server', (_event, input: WriteGlobalMcpServerInput) => {
+    writeMcpServerToSpecs(homeDir, GLOBAL_MCP_SPECS, input.provider, input.serverKey, input.config)
+  })
+
+  ipcMain.handle('ai-config:remove-global-mcp-server', (_event, input: RemoveGlobalMcpServerInput) => {
+    removeMcpServerFromSpecs(homeDir, GLOBAL_MCP_SPECS, input.provider, input.serverKey)
   })
 }

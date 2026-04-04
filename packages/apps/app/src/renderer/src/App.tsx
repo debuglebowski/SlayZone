@@ -97,7 +97,7 @@ const ChangelogDialog = lazy(() => import('@/components/changelog/ChangelogDialo
 
 type ProjectSettingsTab = 'general' | 'environment' | 'columns' | 'integrations' | 'ai-config' | 'tests'
 type ProjectIntegrationOnboardingProvider = Exclude<ProjectStartMode, 'scratch'>
-type GlobalAiConfigSection = 'providers' | 'instructions' | 'skill' | 'mcp' | 'files'
+type GlobalAiConfigSection = 'providers' | 'instructions' | 'skill' | 'mcp' | 'files' | 'provider-sync' | 'skills' | 'mcps'
 const COMMUNITY_DISCORD_URL = 'https://discord.gg/g7xPHXaU98'
 const COMMUNITY_X_URL = 'https://x.com/debuglebowski'
 

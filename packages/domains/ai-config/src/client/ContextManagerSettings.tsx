@@ -20,7 +20,7 @@ import { ProjectInstructions } from './ProjectInstructions'
 import { SkillHelpCard } from './SkillHelpCard'
 import { getSkillValidation } from './skill-validation'
 
-export type GlobalContextManagerSection = 'providers' | 'instructions' | 'skill' | 'mcp' | 'files'
+export type GlobalContextManagerSection = 'providers' | 'instructions' | 'skill' | 'mcp' | 'files' | 'provider-sync' | 'skills' | 'mcps'
 type Section = GlobalContextManagerSection
 
 interface ContextManagerSettingsProps {
@@ -391,7 +391,7 @@ function GlobalContextManager({ initialSection }: { initialSection: GlobalContex
             className="flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
           >
             <ArrowLeft className="size-3.5" />
-            {{ providers: 'Providers', instructions: 'Instructions', skill: 'Skills', mcp: 'MCP Servers', files: 'Files' }[section]}
+            {{ 'providers': 'Providers', 'provider-sync': 'Providers', 'instructions': 'Instructions', 'skill': 'Skills', 'skills': 'Skills', 'mcp': 'MCP Servers', 'mcps': 'MCP Servers', 'files': 'Files' }[section]}
           </button>
 
           <span className="flex-1 text-right text-xs text-muted-foreground">

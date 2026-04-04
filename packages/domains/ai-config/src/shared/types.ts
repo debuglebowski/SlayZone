@@ -1,5 +1,6 @@
 export type AiConfigItemType = 'skill' | 'doc' | 'root_instructions'
 export type AiConfigScope = 'global' | 'project'
+export type ConfigLevel = 'computer' | 'project' | 'library'
 
 export interface AiConfigItem {
   id: string
@@ -203,6 +204,18 @@ export interface WriteMcpServerInput {
 
 export interface RemoveMcpServerInput {
   projectPath: string
+  provider: McpTarget
+  serverKey: string
+}
+
+// Global (computer-level) MCP management
+export interface WriteGlobalMcpServerInput {
+  provider: McpTarget
+  serverKey: string
+  config: McpServerConfig
+}
+
+export interface RemoveGlobalMcpServerInput {
   provider: McpTarget
   serverKey: string
 }

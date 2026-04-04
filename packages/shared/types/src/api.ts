@@ -40,6 +40,8 @@ import type {
   UpdateAiConfigItemInput,
   WriteMcpServerInput,
   RemoveMcpServerInput,
+  WriteGlobalMcpServerInput,
+  RemoveGlobalMcpServerInput,
   GlobalFileEntry
 } from '@slayzone/ai-config/shared'
 import type { DirEntry, ReadFileResult, FileSearchResult, SearchFilesOptions, GitStatusMap } from '@slayzone/file-editor/shared'
@@ -552,9 +554,13 @@ export interface ElectronAPI {
     deleteContextFile: (filePath: string, projectPath: string, projectId: string) => Promise<void>
     deleteGlobalFile: (filePath: string) => Promise<void>
     createGlobalFile: (provider: CliProvider, category: 'skill', slug: string) => Promise<GlobalFileEntry>
+    writeGlobalSkill: (provider: CliProvider, slug: string, content: string) => Promise<void>
     discoverMcpConfigs: (projectPath: string) => Promise<McpConfigFileResult[]>
     writeMcpServer: (input: WriteMcpServerInput) => Promise<void>
     removeMcpServer: (input: RemoveMcpServerInput) => Promise<void>
+    discoverGlobalMcpConfigs: () => Promise<McpConfigFileResult[]>
+    writeGlobalMcpServer: (input: WriteGlobalMcpServerInput) => Promise<void>
+    removeGlobalMcpServer: (input: RemoveGlobalMcpServerInput) => Promise<void>
     listProviders: () => Promise<CliProviderInfo[]>
     toggleProvider: (id: string, enabled: boolean) => Promise<void>
     getProjectProviders: (projectId: string) => Promise<CliProvider[]>
@@ -562,8 +568,11 @@ export interface ElectronAPI {
     needsSync: (projectId: string, projectPath: string) => Promise<boolean>
     syncAll: (input: SyncAllInput) => Promise<SyncResult>
     checkSyncStatus: (projectId: string, projectPath: string) => Promise<SyncConflict[]>
-    getGlobalInstructions: () => Promise<string>
-    saveGlobalInstructions: (content: string) => Promise<void>
+    getGlobalInstructions: (variantId?: string) => Promise<string>
+    saveGlobalInstructions: (content: string, variantId?: string) => Promise<void>
+    listInstructionVariants: () => Promise<AiConfigItem[]>
+    getProjectInstructionVariant: (projectId: string) => Promise<AiConfigItem | null>
+    setProjectInstructionVariant: (projectId: string, variantItemId: string | null) => Promise<void>
     getRootInstructions: (projectId: string, projectPath: string) => Promise<RootInstructionsResult>
     saveInstructionsContent: (projectId: string, projectPath: string, content: string) => Promise<RootInstructionsResult>
     saveRootInstructions: (projectId: string, projectPath: string, content: string) => Promise<RootInstructionsResult>

@@ -1,4 +1,4 @@
-import type { CliProvider, McpTarget, ProviderPathMapping } from './types'
+import type { CliProvider, McpTarget, McpServerConfig, ProviderPathMapping } from './types'
 
 export const PROVIDER_PATHS: Record<CliProvider, ProviderPathMapping> = {
   claude: {
@@ -39,7 +39,7 @@ export interface GlobalProviderPaths {
 }
 
 export const GLOBAL_PROVIDER_PATHS: Record<string, GlobalProviderPaths> = {
-  claude:   { label: 'Claude Code', baseDir: '.claude', instructions: 'CLAUDE.md' },
+  claude:   { label: 'Claude Code', baseDir: '.claude', instructions: 'CLAUDE.md', skillsDir: 'skills' },
   codex:    { label: 'Codex',       baseDir: '.codex',  instructions: 'AGENTS.md' },
   gemini:   { label: 'Gemini',      baseDir: '.agents', instructions: 'AGENTS.md', skillsDir: 'skills' },
   opencode: { label: 'OpenCode',    baseDir: '.config/opencode', instructions: 'AGENTS.md', skillsDir: 'skills' },
@@ -117,4 +117,76 @@ export function getConfigurableMcpTargets(opts?: { writableOnly?: boolean }): Mc
     if (writableOnly && !cap.writable) return false
     return true
   })
+}
+
+// MCP config spec — shared adapter interface for reading/writing MCP config files
+export interface McpConfigSpec {
+  relativePath: string
+  writable: boolean
+  read(content: string): Record<string, McpServerConfig>
+  write(existing: string | null, servers: Record<string, McpServerConfig>): string
+}
+
+function jsonMcpSpec(relativePath: string, serversKey: string, opts?: { writable?: boolean }): McpConfigSpec {
+  return {
+    relativePath,
+    writable: opts?.writable ?? true,
+    read(content) {
+      try {
+        const parsed = JSON.parse(content)
+        return (parsed?.[serversKey] as Record<string, McpServerConfig>) ?? {}
+      } catch { return {} }
+    },
+    write(existing, servers) {
+      let doc: Record<string, unknown> = {}
+      if (existing) { try { doc = JSON.parse(existing) } catch { /* ignore */ } }
+      doc[serversKey] = servers
+      return JSON.stringify(doc, null, 2) + '\n'
+    },
+  }
+}
+
+const opencodeMcpSpec: McpConfigSpec = {
+  relativePath: 'opencode.json',
+  writable: false,
+  read(content) {
+    try {
+      const parsed = JSON.parse(content)
+      const raw = parsed?.mcp as Record<string, McpServerConfig & { type?: string }> | undefined
+      if (!raw) return {}
+      const out: Record<string, McpServerConfig> = {}
+      for (const [k, v] of Object.entries(raw)) {
+        out[k] = { command: v.command, args: v.args ?? [], env: v.env }
+      }
+      return out
+    } catch { return {} }
+  },
+  write(existing, servers) {
+    let doc: Record<string, unknown> = {}
+    if (existing) { try { doc = JSON.parse(existing) } catch { /* ignore */ } }
+    const mcp: Record<string, McpServerConfig & { type: string }> = {}
+    for (const [k, v] of Object.entries(servers)) {
+      mcp[k] = { type: 'local', command: v.command, args: v.args, env: v.env }
+    }
+    doc.mcp = mcp
+    return JSON.stringify(doc, null, 2) + '\n'
+  },
+}
+
+// Project-level MCP config specs (relative to project root)
+export const PROJECT_MCP_SPECS: Partial<Record<McpTarget, McpConfigSpec>> = {
+  claude:   jsonMcpSpec('.mcp.json', 'mcpServers'),
+  cursor:   jsonMcpSpec('.cursor/mcp.json', 'mcpServers'),
+  gemini:   jsonMcpSpec('.agents/settings.json', 'mcpServers', { writable: false }),
+  opencode: opencodeMcpSpec,
+  copilot:  jsonMcpSpec('.copilot/mcp-config.json', 'mcpServers', { writable: false }),
+}
+
+// Global (computer-level) MCP config specs (relative to $HOME)
+export const GLOBAL_MCP_SPECS: Partial<Record<McpTarget, McpConfigSpec>> = {
+  claude:   jsonMcpSpec('.claude/.mcp.json', 'mcpServers'),
+  cursor:   jsonMcpSpec('.cursor/mcp.json', 'mcpServers'),
+  gemini:   jsonMcpSpec('.agents/settings.json', 'mcpServers', { writable: false }),
+  opencode: { ...opencodeMcpSpec, relativePath: '.config/opencode/opencode.json' },
+  copilot:  jsonMcpSpec('.copilot/mcp-config.json', 'mcpServers', { writable: false }),
 }

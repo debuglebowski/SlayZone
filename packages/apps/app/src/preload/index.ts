@@ -455,12 +455,20 @@ const api: ElectronAPI = {
       ipcRenderer.invoke('ai-config:delete-global-file', filePath),
     createGlobalFile: (provider, category, slug) =>
       ipcRenderer.invoke('ai-config:create-global-file', provider, category, slug),
+    writeGlobalSkill: (provider, slug, content) =>
+      ipcRenderer.invoke('ai-config:write-global-skill', provider, slug, content),
     discoverMcpConfigs: (projectPath) =>
       ipcRenderer.invoke('ai-config:discover-mcp-configs', projectPath),
     writeMcpServer: (input) =>
       ipcRenderer.invoke('ai-config:write-mcp-server', input),
     removeMcpServer: (input) =>
       ipcRenderer.invoke('ai-config:remove-mcp-server', input),
+    discoverGlobalMcpConfigs: () =>
+      ipcRenderer.invoke('ai-config:discover-global-mcp-configs'),
+    writeGlobalMcpServer: (input) =>
+      ipcRenderer.invoke('ai-config:write-global-mcp-server', input),
+    removeGlobalMcpServer: (input) =>
+      ipcRenderer.invoke('ai-config:remove-global-mcp-server', input),
     listProviders: () =>
       ipcRenderer.invoke('ai-config:list-providers'),
     toggleProvider: (id, enabled) =>
@@ -475,10 +483,16 @@ const api: ElectronAPI = {
       ipcRenderer.invoke('ai-config:sync-all', input),
     checkSyncStatus: (projectId, projectPath) =>
       ipcRenderer.invoke('ai-config:check-sync-status', projectId, projectPath),
-    getGlobalInstructions: () =>
-      ipcRenderer.invoke('ai-config:get-global-instructions'),
-    saveGlobalInstructions: (content) =>
-      ipcRenderer.invoke('ai-config:save-global-instructions', content),
+    getGlobalInstructions: (variantId?) =>
+      ipcRenderer.invoke('ai-config:get-global-instructions', variantId),
+    saveGlobalInstructions: (content, variantId?) =>
+      ipcRenderer.invoke('ai-config:save-global-instructions', content, variantId),
+    listInstructionVariants: () =>
+      ipcRenderer.invoke('ai-config:list-instruction-variants'),
+    getProjectInstructionVariant: (projectId) =>
+      ipcRenderer.invoke('ai-config:get-project-instruction-variant', projectId),
+    setProjectInstructionVariant: (projectId, variantItemId) =>
+      ipcRenderer.invoke('ai-config:set-project-instruction-variant', projectId, variantItemId),
     getRootInstructions: (projectId, projectPath) =>
       ipcRenderer.invoke('ai-config:get-root-instructions', projectId, projectPath),
     saveInstructionsContent: (projectId, projectPath, content) =>

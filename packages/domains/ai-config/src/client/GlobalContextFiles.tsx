@@ -4,7 +4,11 @@ import { Button, Input, Label, Textarea, cn } from '@slayzone/ui'
 import type { CliProvider, GlobalFileEntry } from '../shared'
 import { GLOBAL_PROVIDER_PATHS, isConfigurableCliProvider } from '../shared/provider-registry'
 
-export function GlobalContextFiles() {
+interface GlobalContextFilesProps {
+  filter?: 'instructions' | 'skill'
+}
+
+export function GlobalContextFiles({ filter }: GlobalContextFilesProps = {}) {
   const [entries, setEntries] = useState<GlobalFileEntry[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedPath, setSelectedPath] = useState<string | null>(null)
@@ -137,6 +141,7 @@ export function GlobalContextFiles() {
           {providerSections.map(({ provider, spec }) => {
             const files = entries
               .filter((entry) => entry.provider === provider)
+              .filter((entry) => !filter || entry.category === filter)
               .sort((a, b) => a.name.localeCompare(b.name))
             const instructions = files.filter((f) => f.category === 'instructions')
             const skills = files.filter((f) => f.category === 'skill')
