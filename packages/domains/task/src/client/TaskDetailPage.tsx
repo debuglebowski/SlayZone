@@ -393,12 +393,6 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
     onConfigChange: handleLoopConfigChange
   })
 
-  // Subscribe to session detected events
-  useEffect(() => {
-    if (!task) return
-    return subscribeSessionDetected(getMainSessionId(task.id), setDetectedSessionId)
-  }, [task?.id, subscribeSessionDetected, getMainSessionId])
-
   // Dev server URL detection
   const [detectedDevUrl, setDetectedDevUrl] = useState<string | null>(null)
   const devUrlDismissedRef = useRef<Set<string>>(new Set())
@@ -556,13 +550,20 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
     await window.api.pty.write(sid, sessionIdCommand + '\r')
   }, [task, sessionIdCommand, getMainSessionId])
 
-  // Get current conversation ID for mode (with claude_session_id legacy fallback)
   const getConversationIdForMode = useCallback((t: Task): string | null => {
-    const id = getProviderConversationId(t.provider_config, t.terminal_mode)
-    if (id) return id
-    if (t.terminal_mode === 'claude-code') return t.claude_session_id || null
-    return null
+    return getProviderConversationId(t.provider_config, t.terminal_mode)
   }, [])
+
+  // Subscribe to session detected events
+  useEffect(() => {
+    if (!task) return
+    return subscribeSessionDetected(getMainSessionId(task.id), (id) => {
+      const current = getConversationIdForMode(task)
+      if (id !== current) {
+        setDetectedSessionId(id)
+      }
+    })
+  }, [task, subscribeSessionDetected, getMainSessionId, getConversationIdForMode])
 
   // Update DB with detected session ID
   const handleUpdateSessionId = useCallback(async () => {
@@ -834,8 +835,7 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
       const updated = await window.api.db.updateTask({
         id: task.id,
         terminalMode: mode,
-        providerConfig: clearAllConversationIds(task.provider_config),
-        claudeSessionId: null
+        providerConfig: clearAllConversationIds(task.provider_config)
       })
       if (!updated) return
       onTaskUpdated(updated)
@@ -923,6 +923,10 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
       if (active) resetPanelSize(panelId)
       const newVisibility = { ...panelVisibility, [panelId]: active }
       setPanelVisibility(newVisibility)
+      // Auto-focus panel content so scope tracker detects the right scope
+      if (panelId === 'browser' && active) {
+        requestAnimationFrame(() => browserPanelRef.current?.focus())
+      }
       // Persist to DB
       const updated = await window.api.db.updateTask({
         id: task.id,
@@ -1641,6 +1645,7 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
                   defaultMode={task.terminal_mode}
                   conversationId={getConversationIdForMode(task) || undefined}
                   existingConversationId={getConversationIdForMode(task) || undefined}
+                  supportsSessionId={modes.find(m => m.id === task.terminal_mode)?.initialCommand?.includes('{id}') ?? false}
                   initialPrompt={getQuickRunPrompt(task.id)}
                   providerFlags={getProviderFlagsForMode(task)}
                   executionContext={project?.execution_context}

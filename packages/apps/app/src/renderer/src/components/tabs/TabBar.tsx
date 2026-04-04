@@ -26,6 +26,7 @@ export type Tab =
 interface TabBarProps {
   tabs: Tab[]
   activeIndex: number
+  activeView?: string
   terminalStates?: Map<string, TerminalState>
   projectColors?: Map<string, string>
   worktreeColors?: Map<string, string>
@@ -33,6 +34,7 @@ interface TabBarProps {
   onTabClose: (index: number) => void
   onTabReorder: (fromIndex: number, toIndex: number) => void
   rightContent?: React.ReactNode
+  leftContent?: React.ReactNode
 }
 
 interface TabContentProps {
@@ -188,13 +190,15 @@ function SortableTab({
 export function TabBar({
   tabs,
   activeIndex,
+  activeView,
   terminalStates,
   projectColors,
   worktreeColors,
   onTabClick,
   onTabClose,
   onTabReorder,
-  rightContent
+  rightContent,
+  leftContent
 }: TabBarProps): React.JSX.Element {
   const [activeId, setActiveId] = useState<string | null>(null)
 
@@ -252,15 +256,17 @@ export function TabBar({
   return (
     /* window-drag-region: all interactive children MUST have window-no-drag */
     <div className="flex items-center h-11 pr-2 gap-1 bg-sidebar window-drag-region">
-      {/* Scrollable tabs area */}
-      <div className="flex items-center overflow-x-auto scrollbar-hide flex-1 min-w-0">
-        {/* Home tab - not draggable */}
+      {/* Fixed static tabs (Context Manager + Home) — not affected by scroll */}
+      <div className="flex items-center flex-shrink-0">
+        {leftContent && (
+          <div className="flex items-center self-center window-no-drag">{leftContent}</div>
+        )}
         <div
           className={cn(
             'ml-1 flex items-center gap-1.5 h-7 px-3 rounded-md cursor-pointer transition-colors select-none flex-shrink-0 window-no-drag',
-            'bg-neutral-100 dark:bg-neutral-800/50 hover:bg-neutral-200/80 dark:hover:bg-neutral-700/50',
+            'hover:bg-neutral-200/80 dark:hover:bg-neutral-700/50',
             'border',
-            activeIndex === homeIndex
+            activeIndex === homeIndex && activeView !== 'context'
               ? 'bg-neutral-200 dark:bg-neutral-700 border-neutral-300 dark:border-neutral-600'
               : 'border-transparent text-neutral-500 dark:text-neutral-400'
           )}
@@ -268,7 +274,10 @@ export function TabBar({
         >
           <Home className="h-4 w-4" />
         </div>
+      </div>
 
+      {/* Scrollable task tabs area */}
+      <div className="flex items-center overflow-x-auto scrollbar-hide flex-1 min-w-0">
         {/* Task tabs - sortable, flat DOM for dnd-kit compatibility */}
         <DndContext
           sensors={sensors}

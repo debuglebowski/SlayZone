@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 
-type HomePanel = 'kanban' | 'git' | 'editor' | 'processes' | 'tests' | 'automations'
+type HomePanel = 'context' | 'kanban' | 'git' | 'editor' | 'processes' | 'tests' | 'automations'
 
 export interface HomePanelState {
   visibility: Record<HomePanel, boolean>
@@ -8,7 +8,7 @@ export interface HomePanelState {
 }
 
 const DEFAULTS: HomePanelState = {
-  visibility: { kanban: true, git: false, editor: false, processes: false, tests: false, automations: false },
+  visibility: { context: false, kanban: true, git: false, editor: false, processes: false, tests: false, automations: false },
   gitTab: 'general'
 }
 
@@ -32,6 +32,8 @@ export function useHomePanelState(
   projectId: string
 ): [HomePanelState, (updater: (prev: HomePanelState) => HomePanelState) => void] {
   const [state, setState] = useState<HomePanelState>(DEFAULTS)
+  const stateRef = useRef(state)
+  stateRef.current = state
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const pendingRef = useRef<HomePanelState | null>(null)
 
@@ -66,16 +68,14 @@ export function useHomePanelState(
   }, [flushSave])
 
   const update = useCallback((updater: (prev: HomePanelState) => HomePanelState) => {
-    let captured: HomePanelState | undefined
-    setState(prev => {
-      captured = updater(prev)
-      return captured
-    })
-    pendingRef.current = captured!
+    const next = updater(stateRef.current)
+    stateRef.current = next
+    setState(next)
+    pendingRef.current = next
     if (debounceRef.current) clearTimeout(debounceRef.current)
     debounceRef.current = setTimeout(() => {
       pendingRef.current = null
-      window.api.settings.set(getKey(projectId), JSON.stringify(captured!))
+      window.api.settings.set(getKey(projectId), JSON.stringify(next))
     }, 500)
   }, [projectId])
 

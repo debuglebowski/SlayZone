@@ -3,7 +3,7 @@ import { subscribeWithSelector } from 'zustand/middleware'
 import { shallow } from 'zustand/shallow'
 import type { TaskStatus } from '@slayzone/task/shared'
 
-export type ActiveView = 'tabs' | 'leaderboard' | 'usage-analytics'
+export type ActiveView = 'tabs' | 'leaderboard' | 'usage-analytics' | 'context'
 
 // Tab type (matches TabBar.tsx in app)
 export type Tab =
@@ -210,7 +210,7 @@ export const useTabStore = create<TabState>()(
       if (!isReload && typeof sessionStorage !== 'undefined') sessionStorage.setItem('sz:session', '1')
       const clampedIndex = isReload ? Math.max(0, Math.min(state.activeTabIndex ?? 0, validTabs.length - 1)) : 0
       const activeView: ActiveView = isReload
-        ? (state.activeView === 'leaderboard' || state.activeView === 'usage-analytics' ? state.activeView : 'tabs')
+        ? (state.activeView === 'leaderboard' || state.activeView === 'usage-analytics' || state.activeView === 'context' ? state.activeView : 'tabs')
         : 'tabs'
       set({
         tabs: validTabs,

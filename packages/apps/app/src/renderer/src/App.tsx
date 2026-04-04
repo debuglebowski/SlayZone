@@ -143,6 +143,7 @@ function App(): React.JSX.Element {
 
   // Expose tab store for e2e tests
   if (!(window as any).__slayzone_tabStore) (window as any).__slayzone_tabStore = useTabStore
+  if (!(window as any).__slayzone_dialogStore) (window as any).__slayzone_dialogStore = useDialogStore
 
   // Filter state (persisted per project)
   const [filter, setFilter] = useFilterState(selectedProjectId)
@@ -168,6 +169,7 @@ function App(): React.JSX.Element {
   const [settingsInitialTab, setSettingsInitialTab] = useState<string>('general')
   const [settingsInitialAiConfigSection, setSettingsInitialAiConfigSection] = useState<GlobalAiConfigSection | null>(null)
   const onboardingOpen = useDialogStore((s) => s.onboardingOpen)
+  const [shouldMountOnboarding, setShouldMountOnboarding] = useState(onboardingOpen)
   const changelogOpen = useDialogStore((s) => s.changelogOpen)
   const [autoChangelogOpen, lastSeenVersion, dismissAutoChangelog] = useChangelogAutoOpen()
   const searchOpen = useDialogStore((s) => s.searchOpen)
@@ -258,6 +260,25 @@ function App(): React.JSX.Element {
       }
     })
   }, [startTour])
+
+  useEffect(() => {
+    if (onboardingOpen) {
+      setShouldMountOnboarding(true)
+      return
+    }
+
+    let cancelled = false
+
+    window.api.settings.get('onboarding_completed').then((value) => {
+      if (!cancelled && value !== 'true') {
+        setShouldMountOnboarding(true)
+      }
+    })
+
+    return () => {
+      cancelled = true
+    }
+  }, [onboardingOpen])
 
   // Usage & notification state
   const { data: usageData, refresh: refreshUsage } = useUsage()
@@ -712,6 +733,13 @@ function App(): React.JSX.Element {
     openTask(task.id)
   }, [selectedProjectId, selectedProject, tasks, setTasks, openTask])
 
+  useEffect(() => {
+    ;(window as { __slayzone_createScratchTerminal?: () => Promise<void> }).__slayzone_createScratchTerminal = handleCreateScratchTerminal
+    return () => {
+      delete (window as { __slayzone_createScratchTerminal?: () => Promise<void> }).__slayzone_createScratchTerminal
+    }
+  }, [handleCreateScratchTerminal])
+
   useEffect(() => { return window.api.app.onNewTemporaryTask(() => { handleCreateScratchTerminal() }) }, [handleCreateScratchTerminal])
 
   // Task handlers
@@ -1053,7 +1081,7 @@ function App(): React.JSX.Element {
         {shouldMount('settings', settingsOpen) && <Suspense fallback={null}><UserSettingsDialog open={settingsOpen} onOpenChange={(open) => { setSettingsOpen(open); if (!open) { setSettingsRevision((r) => r + 1); setSettingsInitialAiConfigSection(null) } }}
           initialTab={settingsInitialTab} initialAiConfigSection={settingsInitialAiConfigSection} onTabChange={setSettingsInitialTab} /></Suspense>}
         {shouldMount('search', searchOpen) && <Suspense fallback={null}><SearchDialog open={searchOpen} onOpenChange={(open) => { if (!open) useDialogStore.getState().closeSearch() }} tasks={tasks} projects={projects} onSelectTask={openTask} onSelectProject={setSelectedProjectId} /></Suspense>}
-        {shouldMount('onboarding', onboardingOpen) && <Suspense fallback={null}><OnboardingDialog externalOpen={onboardingOpen} onExternalClose={async () => {
+        {shouldMount('onboarding', shouldMountOnboarding) && <Suspense fallback={null}><OnboardingDialog externalOpen={onboardingOpen} onExternalClose={async () => {
           useDialogStore.getState().closeOnboarding()
           const [onboardingCompleted, prompted] = await Promise.all([window.api.settings.get('onboarding_completed'), window.api.settings.get('tutorial_prompted')])
           if (onboardingCompleted === 'true') markSetupGuideCompleted()
