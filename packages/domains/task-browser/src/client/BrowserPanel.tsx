@@ -29,6 +29,7 @@ import {
   ContextMenuItem,
   ContextMenuShortcut,
   useShortcutDisplay,
+  useShortcutAction,
 } from '@slayzone/ui'
 import { useAppearance } from '@slayzone/settings/client'
 import type { BrowserTab, BrowserTabsState, MultiDeviceConfig, GridLayout, DeviceSlot } from '../shared'
@@ -98,6 +99,7 @@ interface BrowserPanelProps {
 }
 
 export interface BrowserPanelHandle {
+  focus: () => void
   pickElement: () => void
   reload: () => void
   focusUrlBar: () => void
@@ -765,6 +767,19 @@ export const BrowserPanel = forwardRef<BrowserPanelHandle, BrowserPanelProps>(fu
 
   // Inline DevTools system removed — using native docked DevTools via WebContentsView
 
+  // Forward Cmd+Arrow to webpage via scope-aware shortcut system.
+  // Only fires when browser scope is active (panel or WebContentsView focused).
+  useShortcutAction('browser-scroll-top', () => {
+    if (!activeViewId) return false // decline — let event propagate
+    void window.api.browser.sendInputEvent(activeViewId, { type: 'keyDown', keyCode: 'Up', modifiers: ['meta'] })
+    return undefined
+  })
+  useShortcutAction('browser-scroll-bottom', () => {
+    if (!activeViewId) return false
+    void window.api.browser.sendInputEvent(activeViewId, { type: 'keyDown', keyCode: 'Down', modifiers: ['meta'] })
+    return undefined
+  })
+
   // Keyboard shortcuts when focused
   useEffect(() => {
     const container = containerRef.current
@@ -981,6 +996,7 @@ export const BrowserPanel = forwardRef<BrowserPanelHandle, BrowserPanelProps>(fu
   }, [findMode, openFindMode, findNext])
 
   useImperativeHandle(ref, () => ({
+    focus: () => containerRef.current?.focus(),
     pickElement: () => {
       handlePickElement()
     },

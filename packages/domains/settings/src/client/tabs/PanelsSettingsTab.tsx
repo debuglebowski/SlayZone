@@ -120,6 +120,13 @@ export function PanelsSettingsTab({ activeTab, navigateTo, modes }: PanelsSettin
         } catch { /* ignore */ }
       }
     })
+
+    const cleanupIpc = window.api?.app?.onSettingsChanged?.(() => {
+      window.api.settings.get('panel_config').then(pc => {
+        if (pc) setPanelConfig(mergePredefinedWebPanels(JSON.parse(pc) as PanelConfig))
+      })
+    })
+    return () => { cleanupIpc?.() }
   }, [])
 
   useEffect(() => {

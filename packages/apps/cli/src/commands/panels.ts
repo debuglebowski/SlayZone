@@ -1,7 +1,7 @@
 import { Command } from 'commander'
 import { openDb, notifyApp } from '../db'
 import type { PanelConfig, WebPanelDefinition } from '@slayzone/task/shared/types'
-import { DEFAULT_PANEL_CONFIG } from '@slayzone/task/shared/types'
+import { DEFAULT_PANEL_CONFIG, isPanelEnabled } from '@slayzone/task/shared/types'
 import { mergePredefinedWebPanels, validatePanelShortcut } from '@slayzone/task/shared/panel-config'
 import { normalizeDesktopProtocol, inferProtocolFromUrl, inferHostScopeFromUrl } from '@slayzone/task/shared/handoff'
 import type { SlayDb } from '../db'
@@ -20,6 +20,12 @@ function savePanelConfig(db: SlayDb, config: PanelConfig): void {
   db.run(
     `INSERT OR REPLACE INTO settings (key, value) VALUES (:key, :value)`,
     { ':key': 'panel_config', ':value': JSON.stringify(config) }
+  )
+}
+
+function findPanel(config: PanelConfig, idOrName: string): WebPanelDefinition | undefined {
+  return config.webPanels.find(p =>
+    p.id === idOrName || p.name.toLowerCase() === idOrName.toLowerCase()
   )
 }
 
@@ -49,14 +55,15 @@ export function panelsCommand(): Command {
       const idW = 12
       const nameW = 20
       const urlW = 35
-      console.log(`${'ID'.padEnd(idW)}  ${'NAME'.padEnd(nameW)}  ${'URL'.padEnd(urlW)}  SHORTCUT`)
-      console.log(`${'-'.repeat(idW)}  ${'-'.repeat(nameW)}  ${'-'.repeat(urlW)}  ${'-'.repeat(8)}`)
+      console.log(`${'ID'.padEnd(idW)}  ${'NAME'.padEnd(nameW)}  ${'URL'.padEnd(urlW)}  ${'KEY'.padEnd(4)}  ON`)
+      console.log(`${'-'.repeat(idW)}  ${'-'.repeat(nameW)}  ${'-'.repeat(urlW)}  ${'-'.repeat(4)}  ${'-'.repeat(2)}`)
       for (const wp of config.webPanels) {
         const id = wp.id.slice(0, 12).padEnd(idW)
         const name = wp.name.slice(0, nameW).padEnd(nameW)
         const url = wp.baseUrl.slice(0, urlW).padEnd(urlW)
-        const shortcut = wp.shortcut ? wp.shortcut.toUpperCase() : ''
-        console.log(`${id}  ${name}  ${url}  ${shortcut}`)
+        const shortcut = (wp.shortcut ? wp.shortcut.toUpperCase() : '').padEnd(4)
+        const enabled = isPanelEnabled(config, wp.id, 'task') ? '✓' : '✗'
+        console.log(`${id}  ${name}  ${url}  ${shortcut}  ${enabled}`)
       }
     })
 
@@ -122,6 +129,75 @@ export function panelsCommand(): Command {
       db.close()
       await notifyApp()
       console.log(`Created panel: ${newPanel.id}  ${newPanel.name}  ${newPanel.baseUrl}`)
+    })
+
+  // slay panels delete
+  cmd
+    .command('delete <id-or-name>')
+    .description('Delete a web panel')
+    .action(async (idOrName: string) => {
+      const db = openDb()
+      const config = loadPanelConfig(db)
+      const wp = findPanel(config, idOrName)
+      if (!wp) {
+        db.close()
+        console.error(`Panel not found: ${idOrName}`)
+        process.exit(1)
+      }
+
+      const next: PanelConfig = { ...config, webPanels: config.webPanels.filter(p => p.id !== wp.id) }
+      if (wp.predefined) next.deletedPredefined = [...(config.deletedPredefined ?? []), wp.id]
+
+      savePanelConfig(db, next)
+      db.close()
+      await notifyApp()
+      console.log(`Deleted panel: ${wp.id}  ${wp.name}`)
+    })
+
+  // slay panels enable
+  cmd
+    .command('enable <id-or-name>')
+    .description('Enable a web panel in task view')
+    .action(async (idOrName: string) => {
+      const db = openDb()
+      const config = loadPanelConfig(db)
+      const wp = findPanel(config, idOrName)
+      if (!wp) {
+        db.close()
+        console.error(`Panel not found: ${idOrName}`)
+        process.exit(1)
+      }
+
+      savePanelConfig(db, {
+        ...config,
+        viewEnabled: { ...config.viewEnabled, task: { ...config.viewEnabled?.task, [wp.id]: true } },
+      })
+      db.close()
+      await notifyApp()
+      console.log(`Enabled panel: ${wp.id}  ${wp.name}`)
+    })
+
+  // slay panels disable
+  cmd
+    .command('disable <id-or-name>')
+    .description('Disable a web panel in task view')
+    .action(async (idOrName: string) => {
+      const db = openDb()
+      const config = loadPanelConfig(db)
+      const wp = findPanel(config, idOrName)
+      if (!wp) {
+        db.close()
+        console.error(`Panel not found: ${idOrName}`)
+        process.exit(1)
+      }
+
+      savePanelConfig(db, {
+        ...config,
+        viewEnabled: { ...config.viewEnabled, task: { ...config.viewEnabled?.task, [wp.id]: false } },
+      })
+      db.close()
+      await notifyApp()
+      console.log(`Disabled panel: ${wp.id}  ${wp.name}`)
     })
 
   return cmd

@@ -30,7 +30,11 @@ export function usePanelConfig(): {
 
     const onChanged = () => { void loadConfig().then(setConfig) }
     window.addEventListener(CHANGE_EVENT, onChanged)
-    return () => window.removeEventListener(CHANGE_EVENT, onChanged)
+    const cleanupIpc = window.api?.app?.onSettingsChanged?.(onChanged)
+    return () => {
+      window.removeEventListener(CHANGE_EVENT, onChanged)
+      cleanupIpc?.()
+    }
   }, [])
 
   const updateConfig = useCallback(async (next: PanelConfig) => {

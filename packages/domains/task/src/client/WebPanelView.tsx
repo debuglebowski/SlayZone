@@ -1,6 +1,6 @@
 import { useRef, useEffect, useCallback, useMemo, useState } from 'react'
-import { RotateCw, X, Globe, Copy, Check } from 'lucide-react'
-import { IconButton } from '@slayzone/ui'
+import { RotateCw, X, Globe, Copy, Check, RotateCcw } from 'lucide-react'
+import { IconButton, Tooltip, TooltipTrigger, TooltipContent } from '@slayzone/ui'
 import {
   inferHostScopeFromUrl,
   inferProtocolFromUrl,
@@ -216,33 +216,70 @@ export function WebPanelView({
         <Globe className="size-3.5 text-muted-foreground shrink-0" />
         <span className="text-xs font-medium text-muted-foreground flex-1">{name}</span>
 
-        <IconButton
-          variant="ghost"
-          size="icon-sm"
-          aria-label="Copy URL"
-          onClick={() => {
-            const currentUrl = webviewRef.current?.getURL() ?? url
-            navigator.clipboard.writeText(currentUrl)
-            setCopied(true)
-            setTimeout(() => setCopied(false), 1500)
-          }}
-        >
-          {copied ? <Check className="size-3.5 text-green-500" /> : <Copy className="size-3.5" />}
-        </IconButton>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <span>
+              <IconButton
+                variant="ghost"
+                size="icon-sm"
+                aria-label="Copy URL"
+                onClick={() => {
+                  const currentUrl = webviewRef.current?.getURL() ?? url
+                  navigator.clipboard.writeText(currentUrl)
+                  setCopied(true)
+                  setTimeout(() => setCopied(false), 1500)
+                }}
+              >
+                {copied ? <Check className="size-3.5 text-green-500" /> : <Copy className="size-3.5" />}
+              </IconButton>
+            </span>
+          </TooltipTrigger>
+          <TooltipContent>{copied ? 'Copied!' : 'Copy URL'}</TooltipContent>
+        </Tooltip>
 
-        <IconButton
-          variant="ghost"
-          size="icon-sm"
-          aria-label={isLoading ? 'Stop loading' : 'Reload'}
-          onClick={() => {
-            const wv = webviewRef.current
-            if (!wv) return
-            if (isLoading) wv.stop()
-            else wv.reload()
-          }}
-        >
-          {isLoading ? <X className="size-3.5" /> : <RotateCw className="size-3.5" />}
-        </IconButton>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <span>
+              <IconButton
+                variant="ghost"
+                size="icon-sm"
+                aria-label="Reset to original URL"
+                onClick={() => {
+                  const wv = webviewRef.current
+                  if (!wv) return
+                  setLoadError(null)
+                  loadedUrlRef.current = baseUrl
+                  onUrlChange(panelId, baseUrl)
+                  wv.loadURL(baseUrl.replace(/^file:\/\//, 'slz-file://'))
+                }}
+              >
+                <RotateCcw className="size-3.5" />
+              </IconButton>
+            </span>
+          </TooltipTrigger>
+          <TooltipContent>Reset to original URL</TooltipContent>
+        </Tooltip>
+
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <span>
+              <IconButton
+                variant="ghost"
+                size="icon-sm"
+                aria-label={isLoading ? 'Stop loading' : 'Reload'}
+                onClick={() => {
+                  const wv = webviewRef.current
+                  if (!wv) return
+                  if (isLoading) wv.stop()
+                  else wv.reload()
+                }}
+              >
+                {isLoading ? <X className="size-3.5" /> : <RotateCw className="size-3.5" />}
+              </IconButton>
+            </span>
+          </TooltipTrigger>
+          <TooltipContent>{isLoading ? 'Stop loading' : 'Reload'}</TooltipContent>
+        </Tooltip>
       </div>
 
       {/* Webview */}

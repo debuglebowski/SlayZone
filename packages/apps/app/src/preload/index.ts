@@ -158,6 +158,11 @@ const api: ElectronAPI = {
       ipcRenderer.on('tasks:changed', handler)
       return () => ipcRenderer.removeListener('tasks:changed', handler)
     },
+    onSettingsChanged: (callback: () => void) => {
+      const handler = () => callback()
+      ipcRenderer.on('settings:changed', handler)
+      return () => ipcRenderer.removeListener('settings:changed', handler)
+    },
     onCloseTask: (callback: (taskId: string) => void) => {
       const handler = (_: unknown, taskId: string) => callback(taskId)
       ipcRenderer.on('app:close-task', handler)
@@ -580,10 +585,16 @@ const api: ElectronAPI = {
     stopFindInPage: (viewId, action) => ipcRenderer.invoke('browser:stop-find-in-page', viewId, action),
     getWebContentsId: (viewId) => ipcRenderer.invoke('browser:get-web-contents-id', viewId),
     setKeyboardPassthrough: (viewId, enabled) => ipcRenderer.invoke('browser:set-keyboard-passthrough', viewId, enabled),
+    sendInputEvent: (viewId, input) => ipcRenderer.invoke('browser:send-input-event', viewId, input),
     onBrowserViewShortcut: (cb) => {
       const handler = (_event: unknown, data: { viewId: string; key: string; shift: boolean; alt: boolean; meta: boolean; control: boolean }) => cb(data)
       ipcRenderer.on('browser-view:shortcut', handler)
       return () => ipcRenderer.removeListener('browser-view:shortcut', handler)
+    },
+    onBrowserViewFocused: (cb) => {
+      const handler = (_event: unknown, data: { viewId: string }) => cb(data)
+      ipcRenderer.on('browser-view:focused', handler)
+      return () => ipcRenderer.removeListener('browser-view:focused', handler)
     },
     openDevTools: (viewId, mode) => ipcRenderer.invoke('browser:open-devtools', viewId, mode),
     closeDevTools: (viewId) => ipcRenderer.invoke('browser:close-devtools', viewId),
@@ -758,6 +769,10 @@ if (process.contextIsolated) {
     if (process.env.PLAYWRIGHT === '1') {
       contextBridge.exposeInMainWorld('__testInvoke', (channel: string, ...args: unknown[]) =>
         ipcRenderer.invoke(channel, ...args)
+      )
+      // Test-only: simulate main→renderer IPC events (e.g. browser-view:shortcut)
+      contextBridge.exposeInMainWorld('__testEmit', (channel: string, data: unknown) =>
+        ipcRenderer.emit(channel, {}, data)
       )
     }
   } catch (error) {

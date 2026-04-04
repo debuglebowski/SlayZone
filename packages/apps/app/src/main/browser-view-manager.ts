@@ -359,6 +359,12 @@ export class BrowserViewManager {
     if (entry) entry.keyboardPassthrough = enabled
   }
 
+  sendInputEvent(viewId: string, input: Electron.KeyboardInputEvent): void {
+    const wc = this.getWebContents(viewId)
+    if (!wc) return
+    wc.sendInputEvent(input)
+  }
+
   openDevTools(viewId: string, mode: 'bottom' | 'right' | 'undocked' | 'detach'): void {
     const wc = this.getWebContents(viewId)
     if (!wc) return
@@ -796,8 +802,7 @@ export class BrowserViewManager {
 
       // Let native edit shortcuts (copy, paste, cut, select-all, undo, redo)
       // pass through to the webpage so clipboard/edit operations work.
-      const nativeEditKeys = NATIVE_EDIT_KEYS
-      if (nativeEditKeys.has(key) && input.meta && !input.alt) return
+      if (BROWSER_DEFAULT_PASSTHROUGH.has(key) && input.meta && !input.alt) return
 
       const win = this.mainWindow
       if (!win || win.isDestroyed()) return
@@ -840,6 +845,15 @@ export class BrowserViewManager {
         meta: Boolean(input.meta),
         control: Boolean(input.control),
       })
+    })
+
+    // Notify renderer when WebContentsView gains focus so it can
+    // show the glow and update focus tracking (focusin never fires
+    // in the renderer DOM when a separate web contents has focus).
+    wc.on('focus', () => {
+      const win = this.mainWindow
+      if (!win || win.isDestroyed()) return
+      win.webContents.send('browser-view:focused', { viewId })
     })
 
     wc.on('did-navigate', (_e, url) => {

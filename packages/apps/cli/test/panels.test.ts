@@ -5,7 +5,7 @@
 import { createTestHarness, test, expect, describe } from '../../../shared/test-utils/ipc-harness.js'
 import { createSlayDbAdapter, captureAllAsync } from './test-harness.js'
 import type { PanelConfig, WebPanelDefinition } from '../../../domains/task/src/shared/types.js'
-import { DEFAULT_PANEL_CONFIG, PREDEFINED_WEB_PANELS } from '../../../domains/task/src/shared/types.js'
+import { DEFAULT_PANEL_CONFIG, PREDEFINED_WEB_PANELS, isPanelEnabled } from '../../../domains/task/src/shared/types.js'
 import { mergePredefinedWebPanels, validatePanelShortcut } from '../../../domains/task/src/shared/panel-config.js'
 import { normalizeDesktopProtocol, inferProtocolFromUrl, inferHostScopeFromUrl } from '../../../domains/task/src/shared/handoff.js'
 
@@ -161,6 +161,110 @@ describe('panels list', () => {
     const ids = config.webPanels.map(p => p.id)
     expect(ids).toContain('web:figma')
     expect(ids).toContain('web:notion')
+  })
+})
+
+// --- helpers for delete/enable/disable ---
+
+function deletePanel(config: PanelConfig, idOrName: string): PanelConfig | null {
+  const wp = config.webPanels.find(p => p.id === idOrName || p.name.toLowerCase() === idOrName.toLowerCase())
+  if (!wp) return null
+  const next: PanelConfig = { ...config, webPanels: config.webPanels.filter(p => p.id !== wp.id) }
+  if (wp.predefined) next.deletedPredefined = [...(config.deletedPredefined ?? []), wp.id]
+  return next
+}
+
+function togglePanel(config: PanelConfig, idOrName: string, enabled: boolean): PanelConfig | null {
+  const wp = config.webPanels.find(p => p.id === idOrName || p.name.toLowerCase() === idOrName.toLowerCase())
+  if (!wp) return null
+  return {
+    ...config,
+    viewEnabled: { ...config.viewEnabled, task: { ...config.viewEnabled?.task, [wp.id]: enabled } },
+  }
+}
+
+// --- panels delete ---
+
+describe('panels delete', () => {
+  test('deletes custom panel by id', () => {
+    const panel = createPanel('DeleteMe', 'https://delete.test')
+    const config = loadPanelConfig()
+    expect(config.webPanels.some(p => p.id === panel.id)).toBeTruthy()
+
+    const next = deletePanel(config, panel.id)!
+    savePanelConfig(next)
+    const after = loadPanelConfig()
+    expect(after.webPanels.some(p => p.id === panel.id)).toBe(false)
+  })
+
+  test('deletes custom panel by name (case-insensitive)', () => {
+    const panel = createPanel('CaseTest', 'https://case.test')
+    const config = loadPanelConfig()
+
+    const next = deletePanel(config, 'casetest')!
+    savePanelConfig(next)
+    const after = loadPanelConfig()
+    expect(after.webPanels.some(p => p.id === panel.id)).toBe(false)
+  })
+
+  test('deletes predefined panel and adds to deletedPredefined', () => {
+    const config = loadPanelConfig()
+    expect(config.webPanels.some(p => p.id === 'web:excalidraw')).toBeTruthy()
+
+    const next = deletePanel(config, 'web:excalidraw')!
+    savePanelConfig(next)
+    const after = loadPanelConfig()
+    expect(after.deletedPredefined).toContain('web:excalidraw')
+    // mergePredefinedWebPanels should NOT re-add it
+    expect(after.webPanels.some(p => p.id === 'web:excalidraw')).toBe(false)
+  })
+
+  test('returns null for unknown panel', () => {
+    const config = loadPanelConfig()
+    expect(deletePanel(config, 'nonexistent')).toBe(null)
+  })
+})
+
+// --- panels enable/disable ---
+
+describe('panels enable/disable', () => {
+  test('disable sets viewEnabled.task to false', () => {
+    const panel = createPanel('ToggleTest', 'https://toggle.test')
+    const config = loadPanelConfig()
+    expect(isPanelEnabled(config, panel.id, 'task')).toBe(true)
+
+    const next = togglePanel(config, panel.id, false)!
+    savePanelConfig(next)
+    const after = loadPanelConfig()
+    expect(isPanelEnabled(after, panel.id, 'task')).toBe(false)
+  })
+
+  test('enable sets viewEnabled.task to true', () => {
+    const panel = createPanel('EnableTest', 'https://enable.test')
+    // First disable
+    let config = loadPanelConfig()
+    savePanelConfig(togglePanel(config, panel.id, false)!)
+    config = loadPanelConfig()
+    expect(isPanelEnabled(config, panel.id, 'task')).toBe(false)
+
+    // Then enable
+    savePanelConfig(togglePanel(config, panel.id, true)!)
+    const after = loadPanelConfig()
+    expect(isPanelEnabled(after, panel.id, 'task')).toBe(true)
+  })
+
+  test('lookup by name works', () => {
+    const panel = createPanel('NameLookup', 'https://name.test')
+    const config = loadPanelConfig()
+    const next = togglePanel(config, 'namelookup', false)
+    expect(next !== null).toBeTruthy()
+    savePanelConfig(next!)
+    expect(isPanelEnabled(loadPanelConfig(), panel.id, 'task')).toBe(false)
+  })
+
+  test('returns null for unknown panel', () => {
+    const config = loadPanelConfig()
+    expect(togglePanel(config, 'nonexistent', false)).toBe(null)
   })
 })
 

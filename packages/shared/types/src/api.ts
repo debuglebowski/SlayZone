@@ -361,6 +361,7 @@ export interface ElectronAPI {
     onOpenProjectSettings: (callback: () => void) => () => void
     onNewTemporaryTask: (callback: () => void) => () => void
     onTasksChanged: (callback: () => void) => () => void
+    onSettingsChanged: (callback: () => void) => () => void
     onCloseTask: (callback: (taskId: string) => void) => () => void
     onBrowserEnsurePanelOpen: (callback: (taskId: string, url?: string) => void) => () => void
     onOpenTask: (callback: (taskId: string) => void) => () => void
@@ -661,6 +662,7 @@ export interface ElectronAPI {
     stopFindInPage: (viewId: string, action: 'clearSelection' | 'keepSelection' | 'activateSelection') => Promise<void>
     getWebContentsId: (viewId: string) => Promise<number | null>
     setKeyboardPassthrough: (viewId: string, enabled: boolean) => Promise<void>
+    sendInputEvent: (viewId: string, input: { type: 'keyDown' | 'keyUp' | 'char'; keyCode: string; modifiers?: string[] }) => Promise<void>
 
     // Events (M→R)
     onBrowserViewShortcut: (cb: (payload: {
@@ -671,6 +673,8 @@ export interface ElectronAPI {
       meta: boolean
       control: boolean
     }) => void) => () => void
+
+    onBrowserViewFocused: (cb: (payload: { viewId: string }) => void) => () => void
 
     // DevTools
     openDevTools: (viewId: string, mode: 'bottom' | 'right' | 'undocked' | 'detach') => Promise<void>
