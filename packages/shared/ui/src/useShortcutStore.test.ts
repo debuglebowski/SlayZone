@@ -67,7 +67,7 @@ describe('findConflict', () => {
   })
 
   it('ignores cross-scope shortcuts', () => {
-    // mod+t is default for panel-terminal (task-panel scope)
+    // mod+t is default for panel-terminal (task scope)
     const conflict = useShortcutStore.getState().findConflict('mod+t', 'global')
     expect(conflict).toBeUndefined()
   })
@@ -107,11 +107,17 @@ describe('findShadow', () => {
     expect(shadow).toBeUndefined()
   })
 
-  it('ignores terminal <-> task-panel (no shadow relationship)', () => {
-    // mod+t exists in both task-panel and terminal scope
-    const shadow = useShortcutStore.getState().findShadow('mod+t', 'terminal')
-    // Should not find task-panel shortcuts — only global shadows
-    expect(shadow === undefined || shadow.scope === 'global').toBe(true)
+  it('ignores component scope <-> component scope (no shadow relationship)', () => {
+    // mod+f exists in both terminal and browser scope — same priority, no shadow
+    const shadow = useShortcutStore.getState().findShadow('mod+f', 'terminal')
+    expect(shadow === undefined || shadow.scope === 'global' || shadow.scope === 'task').toBe(true)
+  })
+
+  it('finds task scope shadowed by component scope', () => {
+    // mod+s is task scope (panel-settings) and editor scope (editor-save)
+    const shadow = useShortcutStore.getState().findShadow('mod+s', 'task')
+    expect(shadow).toBeDefined()
+    expect(shadow!.scope).toBe('editor')
   })
 })
 

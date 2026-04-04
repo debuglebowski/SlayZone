@@ -1,4 +1,4 @@
-export type ShortcutScope = 'global' | 'task-panel' | 'terminal'
+import type { ShortcutScope } from './scope'
 
 export type ShortcutDefinition = {
   id: string
@@ -9,6 +9,8 @@ export type ShortcutDefinition = {
   platform?: 'mac'
   customizable?: boolean // defaults to true
 }
+
+export type { ShortcutScope }
 
 export const shortcutDefinitions: ShortcutDefinition[] = [
   // General (global scope)
@@ -37,19 +39,19 @@ export const shortcutDefinitions: ShortcutDefinition[] = [
   { id: 'new-temp-task', label: 'New Temporary Task', group: 'Tabs', defaultKeys: 'mod+shift+n', scope: 'global' },
   { id: 'switch-project-1-9', label: 'Switch Project 1–9', group: 'Tabs', defaultKeys: 'mod+shift+1-9', scope: 'global', customizable: false },
 
-  // Task Panels (task-panel scope)
-  { id: 'panel-terminal', label: 'Terminal', group: 'Task Panels', defaultKeys: 'mod+t', scope: 'task-panel' },
-  { id: 'panel-browser', label: 'Browser', group: 'Task Panels', defaultKeys: 'mod+b', scope: 'task-panel' },
-  { id: 'panel-editor', label: 'Editor', group: 'Task Panels', defaultKeys: 'mod+e', scope: 'task-panel' },
-  { id: 'panel-quick-open', label: 'Quick Open File', group: 'Task Panels', defaultKeys: 'mod+p', scope: 'task-panel' },
-  { id: 'panel-git', label: 'Git', group: 'Task Panels', defaultKeys: 'mod+g', scope: 'task-panel' },
-  { id: 'panel-git-diff', label: 'Git Diff', group: 'Task Panels', defaultKeys: 'mod+shift+g', scope: 'task-panel' },
-  { id: 'panel-settings', label: 'Settings', group: 'Task Panels', defaultKeys: 'mod+s', scope: 'task-panel' },
-  { id: 'panel-processes', label: 'Processes', group: 'Task Panels', defaultKeys: 'mod+o', scope: 'task-panel' },
-  { id: 'panel-tests', label: 'Tests', group: 'Task Panels', defaultKeys: 'mod+u', scope: 'task-panel' },
-  { id: 'panel-automations', label: 'Automations', group: 'Task Panels', defaultKeys: 'mod+y', scope: 'task-panel' },
-  { id: 'editor-search', label: 'Editor Search', group: 'Task Panels', defaultKeys: 'mod+shift+f', scope: 'task-panel' },
-  { id: 'browser-element-picker', label: 'Element Picker', group: 'Task Panels', defaultKeys: 'mod+shift+l', scope: 'task-panel' },
+  // Task Panels (task scope)
+  { id: 'panel-terminal', label: 'Terminal', group: 'Task Panels', defaultKeys: 'mod+t', scope: 'task' },
+  { id: 'panel-browser', label: 'Browser', group: 'Task Panels', defaultKeys: 'mod+b', scope: 'task' },
+  { id: 'panel-editor', label: 'Editor', group: 'Task Panels', defaultKeys: 'mod+e', scope: 'task' },
+  { id: 'panel-quick-open', label: 'Quick Open File', group: 'Task Panels', defaultKeys: 'mod+p', scope: 'task' },
+  { id: 'panel-git', label: 'Git', group: 'Task Panels', defaultKeys: 'mod+g', scope: 'task' },
+  { id: 'panel-git-diff', label: 'Git Diff', group: 'Task Panels', defaultKeys: 'mod+shift+g', scope: 'task' },
+  { id: 'panel-settings', label: 'Settings', group: 'Task Panels', defaultKeys: 'mod+s', scope: 'task' },
+  { id: 'panel-processes', label: 'Processes', group: 'Task Panels', defaultKeys: 'mod+o', scope: 'task' },
+  { id: 'panel-tests', label: 'Tests', group: 'Task Panels', defaultKeys: 'mod+u', scope: 'task' },
+  { id: 'panel-automations', label: 'Automations', group: 'Task Panels', defaultKeys: 'mod+y', scope: 'task' },
+  { id: 'editor-search', label: 'Editor Search', group: 'Task Panels', defaultKeys: 'mod+shift+f', scope: 'task' },
+  { id: 'browser-element-picker', label: 'Element Picker', group: 'Task Panels', defaultKeys: 'mod+shift+l', scope: 'task' },
 
   // Terminal (terminal scope)
   { id: 'terminal-inject-title', label: 'Inject Title', group: 'Terminal', defaultKeys: 'mod+i', scope: 'terminal' },
@@ -61,8 +63,22 @@ export const shortcutDefinitions: ShortcutDefinition[] = [
   { id: 'terminal-split', label: 'Split', group: 'Terminal', defaultKeys: 'mod+d', scope: 'terminal' },
   { id: 'terminal-restart', label: 'Restart', group: 'Terminal', defaultKeys: 'mod+alt+r', scope: 'terminal' },
 
-  // Browser (task-panel scope)
-  { id: 'browser-focus-url', label: 'Focus URL Bar', group: 'Task Panels', defaultKeys: 'mod+l', scope: 'task-panel' },
+  // Browser (task scope)
+  { id: 'browser-focus-url', label: 'Focus URL Bar', group: 'Task Panels', defaultKeys: 'mod+l', scope: 'task' },
+
+  // Editor (editor scope — beats task-scope Cmd+S)
+  { id: 'editor-save', label: 'Save File', group: 'Editor', defaultKeys: 'mod+s', scope: 'editor' },
+
+  // Browser (browser scope — beats task-scope Cmd+G/F)
+  { id: 'browser-find', label: 'Find in Page', group: 'Browser', defaultKeys: 'mod+f', scope: 'browser' },
+  { id: 'browser-find-next', label: 'Find Next', group: 'Browser', defaultKeys: 'mod+g', scope: 'browser' },
+  { id: 'browser-find-prev', label: 'Find Previous', group: 'Browser', defaultKeys: 'mod+shift+g', scope: 'browser' },
+  { id: 'browser-escape', label: 'Cancel / Close Find', group: 'Browser', defaultKeys: 'escape', scope: 'browser' },
+  { id: 'browser-scroll-top', label: 'Scroll to Top', group: 'Browser', defaultKeys: 'mod+arrowup', scope: 'browser' },
+  { id: 'browser-scroll-bottom', label: 'Scroll to Bottom', group: 'Browser', defaultKeys: 'mod+arrowdown', scope: 'browser' },
+
+  // Terminal additions (terminal scope)
+  { id: 'terminal-search-close', label: 'Close Search', group: 'Terminal', defaultKeys: 'escape', scope: 'terminal' },
 ]
 
 /** Shortcut IDs that are driven by Electron native menu accelerators. */

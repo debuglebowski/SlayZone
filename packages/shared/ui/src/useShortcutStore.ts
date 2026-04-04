@@ -65,13 +65,16 @@ export const useShortcutStore = create<ShortcutState>((set, get) => ({
   },
 
   // Find a shortcut in a different scope that would be shadowed by this binding.
-  // Global shortcuts shadow everything; scoped shortcuts are shadowed by global.
+  // Higher-priority scopes shadow lower ones. Same-priority component scopes
+  // (editor/terminal/browser) don't shadow each other — only one has focus.
   findShadow: (keys: string, scope: ShortcutScope) => {
     const { overrides } = get()
+    const componentScopes: ShortcutScope[] = ['editor', 'terminal', 'browser']
     return shortcutDefinitions.find((d) => {
       if (d.scope === scope) return false // same-scope is handled by findConflict
-      // Only warn about global <-> scoped interactions
-      if (scope !== 'global' && d.scope !== 'global') return false
+      // Component scopes at same priority don't shadow each other
+      if (componentScopes.includes(scope) && componentScopes.includes(d.scope)) return false
+      // Only warn when one scope can shadow the other (different priority levels)
       const effective = overrides[d.id] ?? d.defaultKeys
       return effective === keys
     })

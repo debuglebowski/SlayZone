@@ -1,8 +1,11 @@
 export { detectPlatform, type Platform } from './platform'
+export { type ShortcutScope, SCOPE_PRIORITY } from './scope'
 export {
   shortcutDefinitions,
   MENU_SHORTCUT_DEFAULTS,
   type ShortcutDefinition,
-  type ShortcutScope,
 } from './definitions'
 export { toElectronAccelerator, matchesShortcut, matchesElectronInput, formatKeysForDisplay, type ElectronInput } from './accelerator'
+export { registry, ShortcutRegistry, type HandlerEntry } from './registry'
+export { scopeTracker, ScopeTracker } from './scope-tracker'
+export { getBlockedWebPanelKeys } from './blocked-keys'
