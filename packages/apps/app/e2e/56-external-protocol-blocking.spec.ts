@@ -9,23 +9,9 @@
  */
 import { test, expect, seed, resetApp} from './fixtures/electron'
 import { TEST_PROJECT_PATH } from './fixtures/electron'
+import { ensureBrowserPanelVisible, openTaskViaSearch } from './fixtures/browser-view'
 
 test.describe('External protocol blocking', () => {
-  const urlInput = (page: import('@playwright/test').Page) =>
-    page.locator('input[placeholder="Enter URL..."]:visible').first()
-
-  const tabEntries = (page: import('@playwright/test').Page) =>
-    page.locator('.h-10.overflow-x-auto:visible').first()
-      .locator('[role="button"]:not(:has(.lucide-plus))')
-
-  const ensureBrowserPanel = async (page: import('@playwright/test').Page) => {
-    if (!(await urlInput(page).isVisible().catch(() => false))) {
-      await page.locator('#root').click({ position: { x: 12, y: 12 } }).catch(() => {})
-      await page.keyboard.press('Meta+b')
-      await expect(urlInput(page)).toBeVisible()
-    }
-  }
-
   const getWebview = (s: string) => `
     const wv = document.querySelector('[data-browser-panel] webview');
     if (!wv) return 'no-webview';
@@ -38,19 +24,14 @@ test.describe('External protocol blocking', () => {
     const t = await s.createTask({ projectId: p.id, title: 'Protocol blocking task', status: 'todo' })
     await s.refreshData()
 
-    await mainWindow.keyboard.press('Meta+k')
-    const input = mainWindow.getByPlaceholder('Search tasks and projects...')
-    await expect(input).toBeVisible()
-    await input.fill('Protocol blocking task')
-    await mainWindow.keyboard.press('Enter')
-    await expect(input).not.toBeVisible()
+    await openTaskViaSearch(mainWindow, 'Protocol blocking task')
   })
 
   const schemes = ['figma', 'notion', 'slack', 'linear', 'vscode', 'cursor'] as const
 
   for (const scheme of schemes) {
     test(`blocks ${scheme}:// via window.open`, async ({ mainWindow }) => {
-      await ensureBrowserPanel(mainWindow)
+      await ensureBrowserPanelVisible(mainWindow)
 
       const result = await mainWindow.evaluate((s) => {
         const wv = document.querySelector('[data-browser-panel] webview') as HTMLElement & {
@@ -79,7 +60,7 @@ test.describe('External protocol blocking', () => {
     })
 
     test(`blocks ${scheme}:// via anchor click`, async ({ mainWindow }) => {
-      await ensureBrowserPanel(mainWindow)
+      await ensureBrowserPanelVisible(mainWindow)
 
       const result = await mainWindow.evaluate((s) => {
         const wv = document.querySelector('[data-browser-panel] webview') as HTMLElement & {
@@ -102,7 +83,7 @@ test.describe('External protocol blocking', () => {
     })
 
     test(`blocks ${scheme}:// via window.location`, async ({ mainWindow }) => {
-      await ensureBrowserPanel(mainWindow)
+      await ensureBrowserPanelVisible(mainWindow)
 
       const currentHref = await mainWindow.evaluate((s) => {
         const wv = document.querySelector(`[data-browser-panel] webview`) as HTMLElement & {
@@ -119,7 +100,7 @@ test.describe('External protocol blocking', () => {
     })
 
     test(`blocks ${scheme}:// via hidden iframe`, async ({ mainWindow }) => {
-      await ensureBrowserPanel(mainWindow)
+      await ensureBrowserPanelVisible(mainWindow)
 
       const result = await mainWindow.evaluate((s) => {
         const wv = document.querySelector('[data-browser-panel] webview') as HTMLElement & {
