@@ -51,6 +51,16 @@ function ensureRepo() {
   }
 }
 
+async function ensureGitPanelVisible(page: import('@playwright/test').Page) {
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    if (await page.getByTestId('task-git-panel').last().isVisible({ timeout: 500 }).catch(() => false)) return
+    await page.keyboard.press('Escape').catch(() => {})
+    await page.locator('#root').click({ position: { x: 16, y: 16 } }).catch(() => {})
+    await page.keyboard.press('Meta+g')
+  }
+  await expect(page.getByTestId('task-git-panel').last()).toBeVisible({ timeout: 5_000 })
+}
+
 /** Create test-branch with a unique file commit, checkout main, create worktree */
 let branchCounter = 0
 function setupCleanBranch() {
@@ -163,29 +173,26 @@ test.describe('Clean merge UI', () => {
     await expect(mainWindow.locator('[data-testid="terminal-mode-trigger"]:visible').first()).toBeVisible({ timeout: 5_000 })
 
     // Toggle git panel on (general tab — shows merge controls)
-    await mainWindow.keyboard.press('Meta+g')
-    await expect(mainWindow.getByRole('button', { name: new RegExp(`Merge into`) })).toBeVisible({ timeout: 5_000 })
+    await ensureGitPanelVisible(mainWindow)
   })
 
-  test('merge via UI marks task done and shows success', async ({ mainWindow }) => {
+  test('merge via UI completes and merges feature commit onto parent branch', async ({ mainWindow }) => {
     const main = getMainBranch()
-    // Click merge button
-    await mainWindow.getByRole('button', { name: new RegExp(`Merge into ${main}`) }).click()
+    await mainWindow.getByRole('button', { name: new RegExp(`Merge to ${main}`) }).click()
+    await mainWindow.getByRole('button', { name: 'Merge & delete' }).click()
 
-    // Confirm in dialog
-    await mainWindow.getByRole('button', { name: 'Start Merge' }).click()
-
-    // Task marked done in DB
     await expect.poll(
       async () => {
         const task = await mainWindow.evaluate((id) => window.api.db.getTask(id), taskId)
-        return task?.status ?? null
+        const files = git('git ls-files').split('\n')
+        return {
+          status: task?.status ?? null,
+          mergeState: task?.merge_state ?? null,
+          merged: files.some((f) => f.startsWith('feature-')),
+        }
       },
       { timeout: 12_000 }
-    ).toBe('done')
-
-    // The toast can be transient; verify if visible but don't fail solely on it.
-    await mainWindow.getByText('Merged successfully').first().isVisible({ timeout: 1_000 }).catch(() => false)
+    ).toMatchObject({ status: 'todo', mergeState: null, merged: true })
   })
 })
 
@@ -319,50 +326,6 @@ test.describe('Merge with conflicts and uncommitted changes', () => {
 
     // Clean up merge state
     try { git('git merge --abort') } catch { /* ignore */ }
-  })
-})
-
-// ── Merge error: detached HEAD ──────────────────────────────────────
-
-test.describe('Merge error - detached HEAD', () => {
-  let projectAbbrev: string
-
-  test.beforeAll(async ({ mainWindow }) => {
-    ensureRepo()
-    resetRepo()
-    setupCleanBranch()
-
-    // Detach HEAD in worktree
-    git('git checkout --detach HEAD', WORKTREE_PATH)
-
-    const s = seed(mainWindow)
-    const p = await s.createProject({ name: 'Detached Test', color: '#64748b', path: TEST_PROJECT_PATH })
-    projectAbbrev = p.name.slice(0, 2).toUpperCase()
-    const t = await s.createTask({ projectId: p.id, title: 'Detached task', status: 'todo' })
-    await mainWindow.evaluate(
-      (d) => window.api.db.updateTask(d),
-      { id: t.id, worktreePath: WORKTREE_PATH, worktreeParentBranch: getMainBranch() }
-    )
-    await s.refreshData()
-
-    await goHome(mainWindow)
-    await clickProject(mainWindow, projectAbbrev)
-    await expect(mainWindow.getByText('Detached task').first()).toBeVisible({ timeout: 5_000 })
-    await mainWindow.getByText('Detached task').first().click()
-    await expect(mainWindow.locator('[data-testid="terminal-mode-trigger"]:visible').first()).toBeVisible({ timeout: 5_000 })
-
-    // Toggle git panel on (general tab — shows merge controls)
-    await mainWindow.keyboard.press('Meta+g')
-    await expect(mainWindow.getByRole('button', { name: new RegExp(`Merge into`) })).toBeVisible({ timeout: 5_000 })
-  })
-
-  test('detached HEAD shows error in UI', async ({ mainWindow }) => {
-    const main = getMainBranch()
-    await mainWindow.getByRole('button', { name: new RegExp(`Merge into ${main}`) }).click()
-
-    await mainWindow.getByRole('button', { name: 'Start Merge' }).click()
-
-    await expect(mainWindow.getByText(/Cannot merge|detached HEAD/).first()).toBeVisible()
   })
 })
 

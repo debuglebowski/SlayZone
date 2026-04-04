@@ -8,9 +8,9 @@ import {
 } from './fixtures/terminal'
 
 test.describe('Terminal shell fallback on CLI crash', () => {
+  const customModeId = 'shell-fallback-e2e'
   let projectAbbrev: string
   let taskId: string
-  let customModeId: string
 
   test.beforeAll(async ({ mainWindow }) => {
     await resetApp(mainWindow)
@@ -19,8 +19,9 @@ test.describe('Terminal shell fallback on CLI crash', () => {
     projectAbbrev = p.name.slice(0, 2).toUpperCase()
 
     // Create a custom terminal mode whose command always exits with code 1
-    const mode = await mainWindow.evaluate(() => {
+    await mainWindow.evaluate((id) => {
       return window.api.terminalModes.create({
+        id,
         label: 'Failing CLI',
         type: 'custom',
         initialCommand: 'false',
@@ -28,8 +29,7 @@ test.describe('Terminal shell fallback on CLI crash', () => {
         defaultFlags: '',
         enabled: true,
       })
-    })
-    customModeId = (mode as { id: string }).id
+    }, customModeId)
 
     const t = await s.createTask({ projectId: p.id, title: 'Crash recovery task', status: 'in_progress' })
     taskId = t.id

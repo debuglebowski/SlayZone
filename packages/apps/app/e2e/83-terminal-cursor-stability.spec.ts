@@ -8,22 +8,15 @@ import {
   getMainSessionId,
   waitForPtySession,
   getTerminalState,
-  binaryOnPath,
 } from './fixtures/terminal'
 
-const hasClaude = binaryOnPath('claude')
-
 test.describe('Temporary task cursor stability', () => {
-  test.skip(!hasClaude, 'claude binary not found')
-
-  let projectId: string
   let projectAbbrev: string
 
   test.beforeAll(async ({ mainWindow }) => {
     await resetApp(mainWindow)
     const s = seed(mainWindow)
     const p = await s.createProject({ name: 'Cursor Stab', color: '#f97316', path: TEST_PROJECT_PATH })
-    projectId = p.id
     projectAbbrev = p.name.slice(0, 2).toUpperCase()
     await s.refreshData()
   })
@@ -32,26 +25,29 @@ test.describe('Temporary task cursor stability', () => {
     // Select the project first (required for temp task creation)
     await clickProject(mainWindow, projectAbbrev)
 
-    // Create temporary task the same way the UI does
-    const task = await mainWindow.evaluate(async (pId) => {
-      return window.api.db.createTask({
-        projectId: pId,
-        title: 'Terminal 1',
-        status: 'in_progress',
-        isTemporary: true,
+    await mainWindow.evaluate(async () => {
+      const createScratch = (window as { __slayzone_createScratchTerminal?: () => Promise<void> }).__slayzone_createScratchTerminal
+      if (!createScratch) throw new Error('scratch terminal helper not exposed')
+      await createScratch()
+    })
+
+    await expect.poll(async () => {
+      return mainWindow.evaluate(() => {
+        const store = (window as any).__slayzone_tabStore
+        if (!store) return null
+        const { tabs, activeTabIndex } = store.getState()
+        const activeTab = tabs[activeTabIndex]
+        return activeTab?.type === 'task' ? activeTab.taskId : null
       })
-    }, projectId)
+    }, { timeout: 10_000 }).not.toBeNull()
 
-    // Open it via the tab store (mirrors handleCreateScratchTerminal)
-    await mainWindow.evaluate((taskId) => {
+    const taskId = await mainWindow.evaluate(() => {
       const store = (window as any).__slayzone_tabStore
-      if (!store) throw new Error('tabStore not exposed')
-      const lookup = store.getState()._taskLookup
-      store.setState({ _taskLookup: { ...lookup, tasks: [{ id: taskId, title: 'Terminal 1', is_temporary: true }, ...lookup.tasks] } })
-      store.getState().openTask(taskId)
-    }, task.id)
+      const { tabs, activeTabIndex } = store.getState()
+      return tabs[activeTabIndex].taskId as string
+    })
 
-    const sessionId = getMainSessionId(task.id)
+    const sessionId = getMainSessionId(taskId)
     await waitForPtySession(mainWindow, sessionId, 30_000)
 
     // Wait for Claude Code prompt (❯ character)

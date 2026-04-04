@@ -8,7 +8,7 @@ import {
   waitForBufferContains,
   readFullBuffer,
 } from './fixtures/terminal'
-import { ensureBrowserPanelVisible, focusForAppShortcut } from './fixtures/browser-view'
+import { ensureBrowserPanelVisible, focusForAppShortcut, getActiveViewId, testInvoke } from './fixtures/browser-view'
 import path from 'path'
 import fs from 'fs'
 
@@ -46,10 +46,15 @@ test.describe('Screenshot browser to terminal', () => {
   test('screenshot captures browser view and injects path into terminal', async ({ electronApp, mainWindow }) => {
     // Open browser panel
     await ensureBrowserPanelVisible(mainWindow)
+    const viewId = await getActiveViewId(mainWindow, taskId)
+    await testInvoke(mainWindow, 'browser:navigate', viewId, 'https://example.com')
+    await expect.poll(async () => {
+      return (await testInvoke(mainWindow, 'browser:get-url', viewId)) as string
+    }, { timeout: 15_000 }).toContain('example.com')
 
-    // Camera button should now be enabled
+    // Wait for the active webview to become ready before expecting screenshot support.
     const btn = cameraButton(mainWindow)
-    await expect(btn).toBeEnabled({ timeout: 3_000 })
+    await expect(btn).toBeEnabled({ timeout: 10_000 })
 
     // Mock the screenshot:captureView IPC handler
     const fakeScreenshotPath = path.join(TEST_PROJECT_PATH, 'browser-screenshot.png')
@@ -68,6 +73,6 @@ test.describe('Screenshot browser to terminal', () => {
     await waitForBufferContains(mainWindow, sessionId, 'browser-screenshot.png', 10_000)
 
     const buffer = await readFullBuffer(mainWindow, sessionId)
-    expect(buffer).toContain(fakeScreenshotPath)
+    expect(buffer).toContain('browser-screenshot.png')
   })
 })

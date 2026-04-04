@@ -72,8 +72,7 @@ async function mcpInit(): Promise<string> {
   return sessionId!
 }
 
-// Skipped: MCP server port binding is racy — ECONNREFUSED on first connect
-test.describe.skip('MCP Server', () => {
+test.describe('MCP Server', () => {
   let projectId: string
   let taskId: string
 

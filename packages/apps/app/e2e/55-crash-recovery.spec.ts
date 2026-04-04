@@ -1,45 +1,42 @@
 /**
  * Terminal crash recovery — overlay UI + Doctor validation.
  *
- * Crash overlay tests use a mode whose binary is NOT installed so the PTY
- * exits immediately (exitCode ≠ 0) and the dead overlay appears.
- * We prefer `cursor-agent` since it's the least likely to be installed.
- * If it IS installed, we fall back to `gemini`, then skip if both present.
+ * Crash overlay tests use a custom AI-labelled mode with no initial command.
+ * The PTY starts as a plain shell, then the test explicitly exits that shell
+ * non-zero to drive the renderer into the dead-overlay state.
  *
  * Doctor-menu tests use `claude-code` (binary must be installed).
  */
 import { test, expect, seed, resetApp} from './fixtures/electron'
 import { TEST_PROJECT_PATH, goHome, clickProject } from './fixtures/electron'
 import {
+  getMainSessionId,
   openTaskTerminal,
-  binaryOnPath,
+  runCommand,
   switchTerminalMode,
+  waitForPtySession,
 } from './fixtures/terminal'
-import type { TerminalMode } from '@slayzone/terminal/shared'
-
-// Pick a mode whose binary is guaranteed absent — overlay can then be tested.
-function pickAbsentMode(): TerminalMode | null {
-  if (!binaryOnPath('cursor-agent')) return 'cursor-agent'
-  if (!binaryOnPath('gemini')) return 'gemini'
-  if (!binaryOnPath('opencode')) return 'opencode'
-  return null
-}
-
-const absentMode = pickAbsentMode()
-const hasClaude = binaryOnPath('claude')
+const crashModeId = 'crash-overlay-e2e'
 
 // ─── Crash overlay ────────────────────────────────────────────────────────────
 
 test.describe('Terminal crash overlay', () => {
-  // Environment-gated: crash-overlay tests only run when at least one AI mode binary is absent.
-  test.skip(!absentMode, 'All AI mode binaries are installed — cannot test crash overlay')
-
   let projectAbbrev: string
   let taskId: string
-  const mode = absentMode! // narrowed by skip above
+  let sessionId: string
 
   test.beforeAll(async ({ mainWindow }) => {
     await resetApp(mainWindow)
+    await mainWindow.evaluate((id) => window.api.terminalModes.create({
+      id,
+      label: 'Crash Overlay E2E',
+      type: 'claude-code',
+      initialCommand: null,
+      resumeCommand: null,
+      defaultFlags: '',
+      enabled: true,
+      order: 999,
+    }), crashModeId)
     const s = seed(mainWindow)
     const p = await s.createProject({
       name: 'CrashRec',
@@ -54,28 +51,47 @@ test.describe('Terminal crash overlay', () => {
       status: 'in_progress',
     })
     taskId = t.id
+    sessionId = getMainSessionId(taskId)
 
-    // Set the task to a mode whose binary is absent
+    // Set the task to the custom mode and open its terminal.
     await mainWindow.evaluate(
       ({ id, m }) => window.api.db.updateTask({ id, terminalMode: m }),
-      { id: taskId, m: mode }
+      { id: taskId, m: crashModeId }
     )
     await s.refreshData()
 
     await openTaskTerminal(mainWindow, { projectAbbrev, taskTitle: 'Crash overlay task' })
+    await waitForPtySession(mainWindow, sessionId)
   })
 
+  test.afterAll(async ({ mainWindow }) => {
+    await mainWindow.evaluate((id) => window.api.terminalModes.delete(id), crashModeId)
+  })
+
+  const ensureLiveTerminal = async (mainWindow: import('@playwright/test').Page) => {
+    const retryButton = mainWindow.getByRole('button', { name: 'Retry' }).last()
+    if (await retryButton.isVisible({ timeout: 500 }).catch(() => false)) {
+      await retryButton.click()
+      await expect(retryButton).not.toBeVisible({ timeout: 3_000 })
+    }
+    await waitForPtySession(mainWindow, sessionId)
+  }
+
+  const crashTerminal = async (mainWindow: import('@playwright/test').Page) => {
+    await ensureLiveTerminal(mainWindow)
+    await runCommand(mainWindow, sessionId, 'exit 7')
+  }
+
   test('overlay appears after terminal crash', async ({ mainWindow }) => {
-    // The overlay text is the most reliable signal — it renders when
-    // ptyState === 'dead' in the renderer (frontend PtyContext state).
-    // We don't poll window.api.pty.getState because the backend session
-    // is deleted ~200ms after exit, making the 'dead' window very narrow.
+    await crashTerminal(mainWindow)
     await expect(
       mainWindow.getByText(/Process exited with code/i).last()
     ).toBeVisible({ timeout: 10_000 })
   })
 
   test('overlay shows Retry and Doctor buttons', async ({ mainWindow }) => {
+    await crashTerminal(mainWindow)
+
     await expect(
       mainWindow.getByRole('button', { name: 'Retry' }).last()
     ).toBeVisible({ timeout: 3_000 })
@@ -86,20 +102,22 @@ test.describe('Terminal crash overlay', () => {
   })
 
   test('Doctor from overlay shows validation results', async ({ mainWindow }) => {
+    await crashTerminal(mainWindow)
     await mainWindow.getByRole('button', { name: 'Doctor' }).last().click()
 
-    // Results should appear inline in the overlay — binary not found
+    // Results should appear inline in the overlay.
     await expect(
-      mainWindow.getByText(/not found in PATH/i).last()
+      mainWindow.locator('text=/Binary found|Shell detected/i').first()
     ).toBeVisible({ timeout: 8_000 })
 
-    // Fix instructions (font-mono install command) should be visible
+    // Doctor cards render structured check output.
     await expect(
-      mainWindow.locator('.font-mono:visible').last()
+      mainWindow.locator('.rounded-lg.border:visible').first()
     ).toBeVisible({ timeout: 3_000 })
   })
 
   test('Retry clears overlay then it reappears after re-crash', async ({ mainWindow }) => {
+    await crashTerminal(mainWindow)
     const exitText = mainWindow.getByText(/Process exited with code/i).last()
     await expect(exitText).toBeVisible()
 
@@ -108,7 +126,10 @@ test.describe('Terminal crash overlay', () => {
     // Overlay clears immediately after Retry
     await expect(exitText).not.toBeVisible({ timeout: 3_000 })
 
-    // Terminal respawns → crashes again → overlay reappears
+    await waitForPtySession(mainWindow, sessionId)
+    await crashTerminal(mainWindow)
+
+    // Terminal respawns, then we force a second crash and the overlay reappears.
     await expect(
       mainWindow.getByText(/Process exited with code/i).last()
     ).toBeVisible({ timeout: 10_000 })
@@ -118,9 +139,6 @@ test.describe('Terminal crash overlay', () => {
 // ─── Doctor from three-dots menu ─────────────────────────────────────────────
 
 test.describe('Doctor from terminal menu', () => {
-  // Environment-gated: doctor menu test requires claude to be installed.
-  test.skip(!hasClaude, 'claude binary not found — skipping doctor menu test')
-
   let projectAbbrev: string
   let taskId: string
   const terminalMenuButton = (mainWindow: import('@playwright/test').Page) =>

@@ -1,7 +1,9 @@
 import { test, expect, seed, resetApp, TEST_PROJECT_PATH } from './fixtures/electron'
 import {
   testInvoke,
+  testEmit,
   ensureBrowserPanelVisible,
+  focusForAppShortcut,
   openTaskViaSearch, getActiveViewId,
 } from './fixtures/browser-view'
 
@@ -55,5 +57,49 @@ test.describe('Browser view focus (WebContentsView)', () => {
 
     const wcId = await testInvoke(mainWindow, 'browser:get-web-contents-id', viewId) as number | null
     expect(wcId).toBeGreaterThan(0)
+  })
+
+  test('shortcuts via IPC bridge reach renderer handlers', async ({ mainWindow }) => {
+    await openTaskViaSearch(mainWindow, 'Focus task')
+    await ensureBrowserPanelVisible(mainWindow)
+
+    // Close any open dialogs
+    await mainWindow.keyboard.press('Escape').catch(() => {})
+    await mainWindow.waitForTimeout(200)
+
+    // Verify search dialog is not open
+    const searchInput = mainWindow.getByPlaceholder('Search tasks and projects...')
+    await expect(searchInput).not.toBeVisible({ timeout: 2_000 })
+
+    // Simulate Cmd+K arriving via the IPC bridge (as if pressed in WebContentsView)
+    await testEmit(mainWindow, 'browser-view:shortcut', {
+      viewId: 'test',
+      key: 'k',
+      shift: false,
+      alt: false,
+      meta: true,
+      control: false,
+    })
+
+    // Search dialog should open — this proves the IPC bridge dispatches events
+    // that react-hotkeys-hook can handle
+    await expect(searchInput).toBeVisible({ timeout: 3_000 })
+  })
+
+  test('glow shows on browser panel when WebContentsView gains focus', async ({ mainWindow }) => {
+    await openTaskViaSearch(mainWindow, 'Focus task')
+    await ensureBrowserPanelVisible(mainWindow)
+
+    const browserPanel = mainWindow.locator('[data-panel-id="browser"]:visible').first()
+
+    // Clear glow by focusing something else
+    await focusForAppShortcut(mainWindow)
+    await mainWindow.waitForTimeout(200)
+
+    // Simulate WebContentsView gaining focus via IPC
+    await testEmit(mainWindow, 'browser-view:focused', { viewId: 'test' })
+
+    // Glow should show on the browser panel
+    await expect(browserPanel).toHaveClass(/shadow-\[0_0_18px/, { timeout: 3_000 })
   })
 })

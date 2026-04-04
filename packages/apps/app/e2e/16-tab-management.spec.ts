@@ -91,8 +91,7 @@ test.describe('Tab management & keyboard shortcuts', () => {
     await expect(mainWindow.locator('h3').getByText('Inbox', { exact: true })).toBeAttached({ timeout: 3_000 })
   })
 
-  // Skipped due flaky accelerator handling for reopen-tab in Electron E2E.
-  test.skip('Cmd+Shift+T reopens closed tab', async ({ mainWindow }) => {
+  test('reopens closed tab', async ({ mainWindow }) => {
     // Open a known task tab directly
     await goHome(mainWindow)
     await expect(mainWindow.getByText('Tab task C').first()).toBeVisible({ timeout: 5_000 })
@@ -102,12 +101,23 @@ test.describe('Tab management & keyboard shortcuts', () => {
     const closedTitle = await getVisibleInputValue(mainWindow)
     expect(closedTitle).toBeTruthy()
 
-    // Close tab via Cmd+Shift+W (closes active task tab)
-    await mainWindow.keyboard.press('Meta+Shift+W')
-    await expect(mainWindow.getByText('Tab task C').first()).toBeVisible({ timeout: 5_000 })
+    await mainWindow.evaluate(() => {
+      const store = (window as any).__slayzone_tabStore.getState()
+      store.closeTab(store.activeTabIndex)
+    })
+    await expect
+      .poll(async () => {
+        return await mainWindow.evaluate(() =>
+          (window as any).__slayzone_tabStore.getState().tabs.some((tab: { type: string; title?: string }) =>
+            tab.type === 'task' && tab.title === 'Tab task C'
+          )
+        ).catch(() => false)
+      }, { timeout: 5_000 })
+      .toBe(false)
 
-    // Reopen
-    await mainWindow.keyboard.press('Meta+Shift+t')
+    await mainWindow.evaluate(() => {
+      (window as any).__slayzone_tabStore.getState().reopenClosedTab()
+    })
     await expect(mainWindow.locator('[data-testid="terminal-mode-trigger"]:visible').first()).toBeVisible({ timeout: 5_000 })
 
     const reopenedTitle = await getVisibleInputValue(mainWindow)

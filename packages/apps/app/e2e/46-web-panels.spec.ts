@@ -1,9 +1,18 @@
 import { test, expect, seed, clickSettings, clickProject, goHome, resetApp} from './fixtures/electron'
 import { TEST_PROJECT_PATH } from './fixtures/electron'
+import { spawnSync } from 'child_process'
+import path from 'path'
+import { fileURLToPath } from 'url'
+import fs from 'fs'
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url))
+const SLAY_JS = path.resolve(__dirname, '..', '..', 'cli', 'dist', 'slay.js')
 
 test.describe('Web panels', () => {
   let projectAbbrev: string
   let figmaPanelName = 'Figma'
+  let dbPath = ''
+  let mcpPort = 0
 
   const settingsDialog = (page: import('@playwright/test').Page) =>
     page.locator('[role="dialog"][aria-label="Settings"]').last()
@@ -56,8 +65,29 @@ test.describe('Web panels', () => {
     await expect(page.locator('[data-testid="terminal-mode-trigger"]:visible').first()).toBeVisible({ timeout: 5_000 })
   }
 
-  test.beforeAll(async ({ mainWindow }) => {
+  const runCli = (...args: string[]) =>
+    spawnSync('node', [SLAY_JS, ...args], {
+      env: { ...process.env, SLAYZONE_DB_PATH: dbPath, SLAYZONE_MCP_PORT: String(mcpPort) },
+      encoding: 'utf8',
+    })
+
+  test.beforeAll(async ({ electronApp, mainWindow }) => {
     await resetApp(mainWindow)
+
+    // CLI setup (same pattern as 60-cli.spec.ts)
+    if (fs.existsSync(SLAY_JS)) {
+      const dbDir = await electronApp.evaluate(() => process.env.SLAYZONE_DB_DIR!)
+      dbPath = path.join(dbDir, 'slayzone.dev.sqlite')
+      mcpPort = await electronApp.evaluate(async () => {
+        for (let i = 0; i < 20; i++) {
+          const p = (globalThis as Record<string, unknown>).__mcpPort
+          if (p) return p as number
+          await new Promise((r) => setTimeout(r, 250))
+        }
+        return 0
+      })
+    }
+
     const s = seed(mainWindow)
     await s.setSetting('panel_config', '')
 
@@ -292,6 +322,172 @@ test.describe('Web panels', () => {
     await openPanelsTab(mainWindow)
     await findCard(settingsDialog(mainWindow), 'Editor').getByRole('switch').last().click()
     await closePanelsTab(mainWindow)
+  })
+
+  // ── CLI panel creation → auto UI update ──
+
+  test('CLI-created panel appears in task detail panel bar', async ({ mainWindow }) => {
+    await openTaskViaSearch(mainWindow, 'WP test task')
+
+    const r = runCli('--dev', 'panels', 'create', 'CLITaskPanel', 'https://cli-task.example.com')
+    expect(r.status).toBe(0)
+
+    // settings:changed IPC → usePanelConfig reloads → PanelToggle re-renders
+    await expect(mainWindow.getByRole('button', { name: 'CLITaskPanel' })).toBeVisible({ timeout: 10_000 })
+  })
+
+  test('CLI-created panel appears in settings without reopen', async ({ mainWindow }) => {
+    await openPanelsTab(mainWindow)
+    const dialog = settingsDialog(mainWindow)
+
+    const r = runCli('--dev', 'panels', 'create', 'CLISettingsPanel', 'https://cli-settings.example.com')
+    expect(r.status).toBe(0)
+
+    // settings:changed IPC → PanelsSettingsTab reloads panel_config
+    await expect(findCard(dialog, 'CLISettingsPanel')).toBeVisible({ timeout: 10_000 })
+    await closePanelsTab(mainWindow)
+  })
+
+  test('CLI disable removes panel from task detail, enable restores it', async ({ mainWindow }) => {
+    await openTaskViaSearch(mainWindow, 'WP test task')
+    const panelBtn = mainWindow.getByRole('button', { name: 'CLITaskPanel' })
+    await expect(panelBtn).toBeVisible({ timeout: 5_000 })
+
+    const r1 = runCli('--dev', 'panels', 'disable', 'CLITaskPanel')
+    expect(r1.status).toBe(0)
+    await expect(panelBtn).not.toBeVisible({ timeout: 10_000 })
+
+    const r2 = runCli('--dev', 'panels', 'enable', 'CLITaskPanel')
+    expect(r2.status).toBe(0)
+    await expect(panelBtn).toBeVisible({ timeout: 10_000 })
+  })
+
+  test('CLI delete removes panel from task detail', async ({ mainWindow }) => {
+    const panelBtn = mainWindow.getByRole('button', { name: 'CLITaskPanel' })
+    await expect(panelBtn).toBeVisible({ timeout: 5_000 })
+
+    const r = runCli('--dev', 'panels', 'delete', 'CLITaskPanel')
+    expect(r.status).toBe(0)
+    await expect(panelBtn).not.toBeVisible({ timeout: 10_000 })
+  })
+
+  // ── CLI round-trip: create → list → disable → list → enable → list → delete → list ──
+
+  test('CLI create appears in CLI list', async () => {
+    const r = runCli('--dev', 'panels', 'create', 'RoundTrip', 'https://roundtrip.example.com', '-s', 'l')
+    expect(r.status).toBe(0)
+
+    const list = runCli('--dev', 'panels', 'list', '--json')
+    expect(list.status).toBe(0)
+    const panels = JSON.parse(list.stdout) as { id: string; name: string; baseUrl: string; shortcut?: string }[]
+    const found = panels.find(p => p.name === 'RoundTrip')
+    expect(found).toBeTruthy()
+    expect(found!.baseUrl).toBe('https://roundtrip.example.com')
+    expect(found!.shortcut).toBe('l')
+  })
+
+  test('CLI disable shows disabled in CLI list', async () => {
+    const r = runCli('--dev', 'panels', 'disable', 'RoundTrip')
+    expect(r.status).toBe(0)
+
+    const list = runCli('--dev', 'panels', 'list')
+    expect(list.status).toBe(0)
+    // Table output: RoundTrip row should show ✗ (disabled)
+    const line = list.stdout.split('\n').find(l => l.includes('RoundTrip'))
+    expect(line).toBeTruthy()
+    expect(line).toContain('✗')
+  })
+
+  test('CLI enable shows enabled in CLI list', async () => {
+    const r = runCli('--dev', 'panels', 'enable', 'RoundTrip')
+    expect(r.status).toBe(0)
+
+    const list = runCli('--dev', 'panels', 'list')
+    expect(list.status).toBe(0)
+    const line = list.stdout.split('\n').find(l => l.includes('RoundTrip'))
+    expect(line).toBeTruthy()
+    expect(line).toContain('✓')
+  })
+
+  test('CLI delete removes panel from CLI list', async () => {
+    const r = runCli('--dev', 'panels', 'delete', 'RoundTrip')
+    expect(r.status).toBe(0)
+
+    const list = runCli('--dev', 'panels', 'list', '--json')
+    expect(list.status).toBe(0)
+    const panels = JSON.parse(list.stdout) as { name: string }[]
+    expect(panels.find(p => p.name === 'RoundTrip')).toBeFalsy()
+  })
+
+  test('CLI delete by name is case-insensitive', async () => {
+    const cr = runCli('--dev', 'panels', 'create', 'CaseTest', 'https://case.example.com')
+    expect(cr.status).toBe(0)
+
+    const del = runCli('--dev', 'panels', 'delete', 'casetest')
+    expect(del.status).toBe(0)
+
+    const list = runCli('--dev', 'panels', 'list', '--json')
+    expect(list.status).toBe(0)
+    const panels = JSON.parse(list.stdout) as { name: string }[]
+    expect(panels.find(p => p.name === 'CaseTest')).toBeFalsy()
+  })
+
+  test('CLI delete nonexistent panel fails', async () => {
+    const r = runCli('--dev', 'panels', 'delete', 'NoSuchPanel')
+    expect(r.status).not.toBe(0)
+    expect(r.stderr).toContain('Panel not found')
+  })
+
+  test('CLI create rejects reserved shortcut', async () => {
+    const r = runCli('--dev', 'panels', 'create', 'BadKey', 'https://badkey.example.com', '-s', 't')
+    expect(r.status).not.toBe(0)
+    expect(r.stderr).toContain('reserved')
+  })
+
+  test('CLI create rejects duplicate shortcut', async () => {
+    // Create first panel with shortcut 'l'
+    const cr = runCli('--dev', 'panels', 'create', 'DupKey1', 'https://dup1.example.com', '-s', 'l')
+    expect(cr.status).toBe(0)
+
+    // Second panel with same shortcut should fail
+    const dup = runCli('--dev', 'panels', 'create', 'DupKey2', 'https://dup2.example.com', '-s', 'l')
+    expect(dup.status).not.toBe(0)
+    expect(dup.stderr).toContain('already used')
+
+    // Cleanup
+    runCli('--dev', 'panels', 'delete', 'DupKey1')
+  })
+
+  // ── CLI + UI: delete reflects in both ──
+
+  test('CLI delete removes panel from both CLI list and settings', async ({ mainWindow }) => {
+    // Create via CLI
+    const cr = runCli('--dev', 'panels', 'create', 'BothTest', 'https://both.example.com')
+    expect(cr.status).toBe(0)
+
+    // Verify in settings
+    await openPanelsTab(mainWindow)
+    const dialog = settingsDialog(mainWindow)
+    await expect(findCard(dialog, 'BothTest')).toBeVisible({ timeout: 10_000 })
+
+    // Delete via CLI
+    const del = runCli('--dev', 'panels', 'delete', 'BothTest')
+    expect(del.status).toBe(0)
+
+    // Gone from settings
+    await expect(findCard(dialog, 'BothTest')).not.toBeVisible({ timeout: 10_000 })
+
+    // Gone from CLI list
+    const list = runCli('--dev', 'panels', 'list', '--json')
+    const panels = JSON.parse(list.stdout) as { name: string }[]
+    expect(panels.find(p => p.name === 'BothTest')).toBeFalsy()
+
+    await closePanelsTab(mainWindow)
+  })
+
+  // Cleanup leftover CLISettingsPanel from earlier test
+  test('cleanup: delete CLISettingsPanel', async () => {
+    runCli('--dev', 'panels', 'delete', 'CLISettingsPanel')
   })
 
   test('cleanup: go home', async ({ mainWindow }) => {

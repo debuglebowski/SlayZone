@@ -18,6 +18,15 @@ export async function testInvoke(page: Page, channel: string, ...args: unknown[]
   }, { c: channel, a: args })
 }
 
+/** Simulate a main→renderer IPC event via the renderer's __testEmit bridge. */
+export async function testEmit(page: Page, channel: string, data: unknown): Promise<void> {
+  await page.evaluate(({ c, d }) => {
+    const emit = (window as unknown as { __testEmit?: (ch: string, data: unknown) => void }).__testEmit
+    if (!emit) throw new Error('__testEmit unavailable in e2e')
+    emit(c, d)
+  }, { c: channel, d: data })
+}
+
 // ── Locator helpers ─────────────────────────────────────────────────
 
 export const urlInput = (page: Page) =>

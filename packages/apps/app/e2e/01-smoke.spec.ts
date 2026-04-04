@@ -1,8 +1,12 @@
-import { test, expect } from './fixtures/electron'
+import { test, expect, resetApp } from './fixtures/electron'
 
 test.describe('App launch', () => {
+  test.beforeEach(async ({ mainWindow }) => {
+    await resetApp(mainWindow)
+  })
+
   test('shows main window with empty state', async ({ mainWindow }) => {
-    await expect(mainWindow.getByText('create a project')).toBeVisible({ timeout: 10_000 })
+    await expect(mainWindow.getByText(/create a project/i)).toBeVisible({ timeout: 10_000 })
   })
 
   test('main process has correct app name', async ({ electronApp }) => {

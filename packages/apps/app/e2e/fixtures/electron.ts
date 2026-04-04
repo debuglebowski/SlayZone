@@ -221,7 +221,12 @@ async function launchElectronWithRetry(args: {
       app = await electron.launch({
         args: [MAIN_JS],
         executablePath: args.executablePath,
-        env: { ...launchEnv, PLAYWRIGHT: '1', SLAYZONE_DB_DIR: args.userDataDir },
+        env: {
+          ...launchEnv,
+          PLAYWRIGHT: '1',
+          SLAYZONE_DB_DIR: args.userDataDir,
+          SLAYZONE_USER_DATA_DIR: args.userDataDir,
+        },
       })
 
       stopAttemptLogCapture = startProcessLogCapture(
@@ -379,8 +384,14 @@ export function seed(page: Page) {
 
     archiveTasks: (ids: string[]) => page.evaluate((i) => window.api.db.archiveTasks(i), ids),
 
-    createTag: (data: { name: string; color?: string; textColor?: string; projectId: string }) =>
-      page.evaluate((d) => window.api.tags.createTag(d), data),
+    createTag: (data: { name: string; color?: string; textColor?: string; projectId?: string }) =>
+      page.evaluate(async (d) => {
+        const projectId = d.projectId ?? (await window.api.db.getProjects())[0]?.id
+        if (!projectId) {
+          throw new Error('Cannot create tag without a project')
+        }
+        return window.api.tags.createTag({ ...d, projectId })
+      }, data),
 
     updateTag: (data: { id: string; name?: string; color?: string; textColor?: string }) =>
       page.evaluate((d) => window.api.tags.updateTag(d), data),

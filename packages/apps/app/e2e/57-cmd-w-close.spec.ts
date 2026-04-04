@@ -1,6 +1,8 @@
 import { test, expect, seed, goHome, clickProject, resetApp} from './fixtures/electron'
 import { TEST_PROJECT_PATH } from './fixtures/electron'
 import type { Page } from '@playwright/test'
+import fs from 'fs'
+import path from 'path'
 
 // Simulate the menu accelerator click by sending IPC directly from the main process.
 // This is more reliable than keyboard.press for native menu accelerators in Playwright.
@@ -18,6 +20,7 @@ async function sendIPC(electronApp: any, channel: string): Promise<void> {
 
 test.describe('Cmd+W / Cmd+Shift+W context-sensitive close', () => {
   let projectAbbrev: string
+  const editorFixtureFile = 'cmdw-editor.ts'
 
   /** All terminal group tabs in the visible terminal tab bar */
   const terminalGroupTabs = (page: Page) =>
@@ -100,6 +103,7 @@ test.describe('Cmd+W / Cmd+Shift+W context-sensitive close', () => {
 
   test.beforeAll(async ({ mainWindow }) => {
     await resetApp(mainWindow)
+    fs.writeFileSync(path.join(TEST_PROJECT_PATH, editorFixtureFile), 'export const cmdwEditor = true\n')
     const s = seed(mainWindow)
     const p = await s.createProject({ name: 'CmdW Test', color: '#6366f1', path: TEST_PROJECT_PATH })
     projectAbbrev = p.name.slice(0, 2).toUpperCase()
@@ -140,40 +144,41 @@ test.describe('Cmd+W / Cmd+Shift+W context-sensitive close', () => {
     }, { timeout: 8_000 }).toBe(1)
   })
 
-  // Skipped while main-group close protection is flaky under focus-sensitive accelerator dispatch.
-  test.skip('Cmd+W does not close the main (only) terminal group', async ({ mainWindow, electronApp }) => {
+  test('Cmd+W closes the task tab when only the main terminal group remains', async ({ mainWindow, electronApp }) => {
     await expect(terminalGroupTabs(mainWindow)).toHaveCount(1, { timeout: 2_000 })
 
     await focusTerminal(mainWindow)
     await sendIPC(electronApp, 'app:close-current-focus')
 
-    // Still 1 group — main group is protected
-    await expect(terminalGroupTabs(mainWindow)).toHaveCount(1, { timeout: 2_000 })
+    await expect(mainWindow.locator('[data-testid="terminal-mode-trigger"]:visible')).toHaveCount(0, { timeout: 2_000 })
+    await expect(mainWindow.locator('input[value="CmdW task"]:visible')).toHaveCount(0, { timeout: 2_000 })
   })
 
   // ── Editor file tabs ─────────────────────────────────────────────────────
 
-  // Skipped pending deterministic focus routing for Cmd+W when CodeMirror is active.
-  test.skip('Cmd+W closes active editor file when editor is focused', async ({ mainWindow, electronApp }) => {
+  test('Cmd+W closes active editor file when editor is focused', async ({ mainWindow, electronApp }) => {
     await closeOpenDialogs(mainWindow)
+    await goHome(mainWindow)
+    await clickProject(mainWindow, projectAbbrev)
+    await openTaskViaSearch(mainWindow, 'CmdW task')
     // Open editor panel
     await mainWindow.keyboard.press('Meta+e')
     const editorPanel = mainWindow.locator('[data-panel-id="editor"]:visible').filter({ hasText: 'Files' })
     if (!(await editorPanel.isVisible({ timeout: 5_000 }).catch(() => false))) return
 
     // Open a file
-    await openEditorFile(mainWindow, 'index.ts')
+    await openEditorFile(mainWindow, editorFixtureFile)
     await expect(mainWindow.locator('.cm-editor:visible').first()).toBeVisible({ timeout: 5_000 })
 
     // Focus the CodeMirror editor
     await mainWindow.locator('.cm-editor:visible .cm-content').click()
-    const hadVisibleTab = await editorTab(mainWindow, 'index.ts').isVisible({ timeout: 500 }).catch(() => false)
+    const hadVisibleTab = await editorTab(mainWindow, editorFixtureFile).isVisible({ timeout: 500 }).catch(() => false)
 
     if (hadVisibleTab) {
       await expect.poll(async () => {
         await sendIPC(electronApp, 'app:close-current-focus')
         await mainWindow.waitForTimeout(80)
-        return await editorTab(mainWindow, 'index.ts').isVisible({ timeout: 200 }).catch(() => false)
+        return await editorTab(mainWindow, editorFixtureFile).isVisible({ timeout: 200 }).catch(() => false)
       }, { timeout: 8_000 }).toBe(false)
     } else {
       await sendIPC(electronApp, 'app:close-current-focus')

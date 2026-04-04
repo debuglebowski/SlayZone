@@ -26,7 +26,7 @@ test.describe('Terminal error handling', () => {
     await mainWindow.evaluate(() => window.api.pty.setShellOverride(null))
   })
 
-  test('shows startup error for invalid shell and recovers after shell reset', async ({ mainWindow }) => {
+  test('invalid shell override falls back to the user shell and still allows recreation after reset', async ({ mainWindow }) => {
     const sessionId = getMainSessionId(taskId)
 
     await mainWindow.evaluate(() => window.api.pty.setShellOverride('/definitely/not/a/real/shell'))
@@ -35,7 +35,8 @@ test.describe('Terminal error handling', () => {
 
     await expect
       .poll(async () => mainWindow.evaluate((id) => window.api.pty.exists(id), sessionId))
-      .toBe(false)
+      .toBe(true)
+    await expect(mainWindow.getByText(/Failed to start terminal:/)).toHaveCount(0)
 
     await mainWindow.evaluate(() => window.api.pty.setShellOverride(null))
     const createResult = await mainWindow.evaluate(

@@ -2,6 +2,8 @@ import { test, expect, seed, goHome, clickProject, resetApp} from './fixtures/el
 import { TEST_PROJECT_PATH } from './fixtures/electron'
 
 test.describe('Kanban interactions', () => {
+  let overdueDate: string
+
   test.beforeAll(async ({ mainWindow }) => {
     await resetApp(mainWindow)
     const s = seed(mainWindow)
@@ -17,11 +19,12 @@ test.describe('Kanban interactions', () => {
     // Seed overdue task
     const pastDate = new Date()
     pastDate.setDate(pastDate.getDate() - 3)
+    overdueDate = pastDate.toISOString().split('T')[0]
     await s.createTask({
       projectId: p.id,
       title: 'Overdue kanban task',
       status: 'in_progress',
-      dueDate: pastDate.toISOString().split('T')[0]
+      dueDate: overdueDate
     })
 
     // Seed tasks for drag-drop
@@ -75,19 +78,18 @@ test.describe('Kanban interactions', () => {
   })
 
   test('overdue task shows visual indicator', async ({ mainWindow }) => {
-    // Overdue tasks have red border or AlertCircle icon
     const overdueCard = mainWindow.getByText('Overdue kanban task').first()
     await expect(overdueCard).toBeVisible({ timeout: 5_000 })
 
-    // Check for the overdue indicator (AlertCircle icon near the card)
-    const cardParent = overdueCard.locator('..')
-    const hasOverdueIndicator = await cardParent.locator('.lucide-alert-circle, .lucide-circle-alert').isVisible().catch(() => false)
-    // Also check for red border class on the card container
-    const hasRedBorder = await cardParent.evaluate((el) =>
-      el.className.includes('border-red') || el.className.includes('border-destructive')
+    const cardContainer = overdueCard.locator('..').locator('..')
+    const overduePill = cardContainer.getByText(overdueDate, { exact: true }).last()
+    await expect(overduePill).toBeVisible({ timeout: 5_000 })
+
+    const hasOverdueStyling = await overduePill.evaluate((el) =>
+      el.className.includes('text-destructive') || el.className.includes('ring-destructive')
     ).catch(() => false)
 
-    expect(hasOverdueIndicator || hasRedBorder).toBe(true)
+    expect(hasOverdueStyling).toBe(true)
   })
 
   test('blocked task shows link indicator', async ({ mainWindow }) => {

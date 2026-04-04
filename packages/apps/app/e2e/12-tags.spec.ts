@@ -1,45 +1,31 @@
-import { test, expect, seed, goHome, clickProject, clickSettings, resetApp} from './fixtures/electron'
+import { test, expect, seed, goHome, clickProject, resetApp} from './fixtures/electron'
 import { TEST_PROJECT_PATH } from './fixtures/electron'
 
 test.describe('Tag management', () => {
   let projectAbbrev: string
+  let projectId: string
   const tagA = `e2e-tag-${Date.now().toString().slice(-6)}`
   const tagB = `e2e-tag-2-${Date.now().toString().slice(-6)}`
 
-  const settingsDialog = (mainWindow: import('@playwright/test').Page) =>
-    mainWindow.locator('[role="dialog"][aria-label="Settings"]').last()
-
-  const openSettingsDialog = async (mainWindow: import('@playwright/test').Page) => {
-    for (let attempt = 0; attempt < 4; attempt++) {
-      const dialog = settingsDialog(mainWindow)
-      if (await dialog.isVisible({ timeout: 500 }).catch(() => false)) {
-        return
-      }
-
-      await clickSettings(mainWindow)
-      if (await dialog.isVisible({ timeout: 2_000 }).catch(() => false)) {
-        return
-      }
-      await mainWindow.keyboard.press('Escape').catch(() => {})
-      await mainWindow.waitForTimeout(120)
-    }
-    await expect(settingsDialog(mainWindow)).toBeVisible({ timeout: 5_000 })
-  }
+  const projectSettingsDialog = (mainWindow: import('@playwright/test').Page) =>
+    mainWindow.getByRole('dialog').filter({ hasText: 'Project Settings' }).last()
 
   const openTagsSection = async (mainWindow: import('@playwright/test').Page) => {
-    for (let attempt = 0; attempt < 3; attempt += 1) {
-      await openSettingsDialog(mainWindow)
-      const dialog = settingsDialog(mainWindow)
-      await dialog.getByTestId('settings-tab-tags').click({ force: true }).catch(() => {})
-      if (await dialog.locator('#new-tag').isVisible({ timeout: 1_500 }).catch(() => false)) return
-    }
-    await expect(settingsDialog(mainWindow).locator('#new-tag')).toBeVisible({ timeout: 5_000 })
+    await mainWindow.evaluate((id) => {
+      window.dispatchEvent(new CustomEvent('open-project-settings', {
+        detail: { projectId: id, tab: 'tags' }
+      }))
+    }, projectId)
+    const dialog = projectSettingsDialog(mainWindow)
+    await expect(dialog).toBeVisible({ timeout: 5_000 })
+    await expect(dialog.getByRole('button', { name: 'New tag' })).toBeVisible({ timeout: 5_000 })
   }
 
   test.beforeAll(async ({ mainWindow }) => {
     await resetApp(mainWindow)
     const s = seed(mainWindow)
     const p = await s.createProject({ name: 'Tag Test', color: '#3b82f6', path: TEST_PROJECT_PATH })
+    projectId = p.id
     projectAbbrev = p.name.slice(0, 2).toUpperCase()
     await s.createTask({ projectId: p.id, title: 'Tag test task', status: 'todo' })
     await s.refreshData()
@@ -48,25 +34,26 @@ test.describe('Tag management', () => {
   test('create tag in settings dialog', async ({ mainWindow }) => {
     await openTagsSection(mainWindow)
 
-    // Fill tag name
-    const tagInput = settingsDialog(mainWindow).locator('#new-tag')
-    await tagInput.fill(tagA)
-    await settingsDialog(mainWindow).getByRole('button', { name: 'Add' }).click()
+    await projectSettingsDialog(mainWindow).getByRole('button', { name: 'New tag' }).click()
+    const createDialog = mainWindow.getByRole('dialog').filter({ hasText: 'New Tag' }).last()
+    await createDialog.locator('#tag-name').fill(tagA)
+    await createDialog.getByRole('button', { name: 'Create' }).click()
 
     // Verify tag appears in list
-    await expect(settingsDialog(mainWindow).getByText(tagA)).toBeVisible({ timeout: 3_000 })
+    await expect(projectSettingsDialog(mainWindow).getByText(tagA)).toBeVisible({ timeout: 3_000 })
   })
 
   test('create second tag', async ({ mainWindow }) => {
     await openTagsSection(mainWindow)
-    const tagInput = settingsDialog(mainWindow).locator('#new-tag')
-    await tagInput.fill(tagB)
-    await settingsDialog(mainWindow).getByRole('button', { name: 'Add' }).click()
-    await expect(settingsDialog(mainWindow).getByText(tagB)).toBeVisible({ timeout: 3_000 })
+    await projectSettingsDialog(mainWindow).getByRole('button', { name: 'New tag' }).click()
+    const createDialog = mainWindow.getByRole('dialog').filter({ hasText: 'New Tag' }).last()
+    await createDialog.locator('#tag-name').fill(tagB)
+    await createDialog.getByRole('button', { name: 'Create' }).click()
+    await expect(projectSettingsDialog(mainWindow).getByText(tagB)).toBeVisible({ timeout: 3_000 })
 
     // Close settings
     await mainWindow.keyboard.press('Escape')
-    await expect(settingsDialog(mainWindow)).not.toBeVisible({ timeout: 3_000 })
+    await expect(projectSettingsDialog(mainWindow)).not.toBeVisible({ timeout: 3_000 })
   })
 
   test('assign tag to task via API', async ({ mainWindow }) => {
