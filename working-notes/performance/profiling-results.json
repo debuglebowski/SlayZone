@@ -1,3 +1,58 @@
 {
-  "timestamp": "2026-04-04T13:06:49.564Z"
+  "timestamp": "2026-04-04T15:24:52.939Z",
+  "memory": {
+    "usedMB": 82,
+    "totalMB": 202,
+    "limitMB": 3586
+  },
+  "dom": {
+    "totalNodes": 477,
+    "divs": 169,
+    "svgs": 49,
+    "svgChildren": 158,
+    "svgPctOfDOM": 33,
+    "canvases": 0,
+    "styleElements": 2
+  },
+  "paint": {
+    "firstPaint": 68,
+    "firstContentfulPaint": 108
+  },
+  "resources": {
+    "count": 4,
+    "slowest": [
+      {
+        "name": "?v=2&config=true&ip=0&_=1775316293080&ver=1.347.2&compressio",
+        "durationMs": 58
+      },
+      {
+        "name": "?ip=0&_=1775316296081&ver=1.347.2&compression=gzip-js",
+        "durationMs": 53
+      },
+      {
+        "name": "config?ip=0&_=1775316293080&ver=1.347.2",
+        "durationMs": 52
+      },
+      {
+        "name": "?ip=0&_=1775316296084&ver=1.347.2&compression=gzip-js",
+        "durationMs": 51
+      }
+    ]
+  },
+  "ipc": {
+    "loadBoardDataMs": 1,
+    "createTaskMs": 2,
+    "getProjectsMs": 1
+  },
+  "interaction": {
+    "tabSwitchMs": 77,
+    "taskOpenMs": 0,
+    "refreshDataMs": 0
+  },
+  "scaling": {
+    "taskCount": 100,
+    "domNodesAtScale": 2050,
+    "memoryAtScaleMB": 82,
+    "loadBoardDataAtScaleMs": 4
+  }
 }
