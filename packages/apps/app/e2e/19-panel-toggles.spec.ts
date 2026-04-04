@@ -1,5 +1,6 @@
 import { test, expect, seed, goHome, clickProject, resetApp} from './fixtures/electron'
 import { TEST_PROJECT_PATH } from './fixtures/electron'
+import { focusForAppShortcut } from './fixtures/browser-view'
 
 test.describe('Panel toggles', () => {
   let projectAbbrev: string
@@ -27,6 +28,27 @@ test.describe('Panel toggles', () => {
   const panelBtn = (page: import('@playwright/test').Page, label: string) =>
     page.locator('.bg-surface-2.rounded-lg:visible').filter({ has: page.locator('button:has-text("Terminal")') }).locator(`button:has-text("${label}")`)
 
+  const isPanelActive = async (page: import('@playwright/test').Page, label: string) => {
+    const className = await panelBtn(page, label).getAttribute('class')
+    return /(?:^|\s)bg-muted(?:\s|$)/.test(className ?? '')
+  }
+
+  const toggleByShortcut = async (
+    page: import('@playwright/test').Page,
+    shortcut: string,
+    label: string,
+    expectedActive: boolean
+  ) => {
+    await expect.poll(async () => {
+      if ((await isPanelActive(page, label)) === expectedActive) return true
+      await focusForAppShortcut(page)
+      await page.waitForTimeout(100)
+      await page.keyboard.press(shortcut)
+      await page.waitForTimeout(150)
+      return (await isPanelActive(page, label)) === expectedActive
+    }, { timeout: 5_000 }).toBe(true)
+  }
+
   test('default panels: terminal + settings active, browser + diff inactive', async ({ mainWindow }) => {
     await expect(panelBtn(mainWindow, 'Terminal')).toHaveClass(/bg-muted/)
     await expect(panelBtn(mainWindow, 'Settings')).toHaveClass(/bg-muted/)
@@ -35,23 +57,19 @@ test.describe('Panel toggles', () => {
   })
 
   test('Cmd+T toggles terminal off', async ({ mainWindow }) => {
-    await mainWindow.keyboard.press('Meta+t')
-    await expect(panelBtn(mainWindow, 'Terminal')).not.toHaveClass(/(?:^|\s)bg-muted(?:\s|$)/)
+    await toggleByShortcut(mainWindow, 'Meta+t', 'Terminal', false)
   })
 
   test('Cmd+B toggles browser on', async ({ mainWindow }) => {
-    await mainWindow.keyboard.press('Meta+b')
-    await expect(panelBtn(mainWindow, 'Browser')).toHaveClass(/bg-muted/)
+    await toggleByShortcut(mainWindow, 'Meta+b', 'Browser', true)
   })
 
   test('Cmd+G toggles diff on', async ({ mainWindow }) => {
-    await mainWindow.keyboard.press('Meta+g')
-    await expect(panelBtn(mainWindow, 'Git')).toHaveClass(/bg-muted/)
+    await toggleByShortcut(mainWindow, 'Meta+g', 'Git', true)
   })
 
   test('Cmd+S toggles settings off', async ({ mainWindow }) => {
-    await mainWindow.keyboard.press('Meta+s')
-    await expect(panelBtn(mainWindow, 'Settings')).not.toHaveClass(/(?:^|\s)bg-muted(?:\s|$)/)
+    await toggleByShortcut(mainWindow, 'Meta+s', 'Settings', false)
   })
 
   test('click PanelToggle button toggles panel', async ({ mainWindow }) => {

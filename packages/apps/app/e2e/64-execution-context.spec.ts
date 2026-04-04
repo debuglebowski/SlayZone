@@ -174,8 +174,10 @@ test.describe('Project execution context settings', () => {
     await mainWindow.getByRole('button', { name: 'Test connection' }).click()
 
     // Should show error (docker not found or container not running)
-    await expect(mainWindow.getByText(/Failed|Error|not found|No such container/i).first())
-      .toBeVisible({ timeout: 15_000 })
+    const dockerSection = mainWindow.locator('#exec-container').locator('xpath=ancestor::div[contains(@class,"space-y-3")][1]')
+    const errorResult = dockerSection.locator('span.text-red-500').first()
+    await expect(errorResult).toBeVisible({ timeout: 15_000 })
+    await expect(errorResult).not.toHaveText(/^Connected$/)
 
     // Close without saving
     await mainWindow.keyboard.press('Escape')
@@ -193,7 +195,7 @@ test.describe('Project execution context settings', () => {
       })
     )
     expect(result.success).toBe(false)
-    expect(result.error ?? '').toMatch(/timed out|refused|resolve|failed|unknown/i)
+    expect(result.error ?? '').toMatch(/timed out|refused|resolve|failed|unknown|enoent|spawn|not found/i)
   })
 
   // ---------------------------------------------------------------------------

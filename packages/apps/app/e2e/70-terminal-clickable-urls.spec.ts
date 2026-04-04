@@ -145,12 +145,16 @@ test.describe('Terminal clickable URLs', () => {
         Record<string, {
           _terminal: {
             element: HTMLElement
-            buffer: { active: { length: number; getLine(i: number): { translateToString(trimRight?: boolean): string } | undefined } }
+            buffer: { active: { length: number } }
             _core: {
               _charSizeService: { width: number; height: number }
               _bufferService: { buffer: { ydisp: number } }
             }
           }
+          provideLinks(
+            y: number,
+            cb: (links: Array<{ text: string; range: { start: { x: number; y: number }; end: { x: number; y: number } } }> | undefined) => void
+          ): void
         }>
         | undefined
 
@@ -158,27 +162,32 @@ test.describe('Terminal clickable URLs', () => {
       if (!provider) return null
 
       const terminal = provider._terminal
-      const buf = terminal.buffer.active
       const charWidth = terminal._core._charSizeService.width
       const charHeight = terminal._core._charSizeService.height
       const ydisp = terminal._core._bufferService.buffer.ydisp
+      const matches: Array<{ text: string; range: { start: { x: number; y: number }; end: { x: number; y: number } } }> = []
 
-      for (let i = 0; i < buf.length; i++) {
-        const text = buf.getLine(i)?.translateToString(true) ?? ''
-        const idx = text.indexOf(url)
-        if (idx !== -1) {
-          const screenEl = terminal.element?.querySelector('.xterm-screen')
-          if (!screenEl) return null
-          const rect = screenEl.getBoundingClientRect()
-          const viewportLine = i - ydisp
-          const targetCol = idx + Math.floor(url.length / 2)
-          return {
-            x: rect.left + (targetCol + 0.5) * charWidth,
-            y: rect.top + (viewportLine + 0.5) * charHeight,
+      for (let line = 1; line <= terminal.buffer.active.length; line++) {
+        provider.provideLinks(line, (result) => {
+          for (const link of result ?? []) {
+            if (link.text === url) matches.push(link)
           }
-        }
+        })
       }
-      return null
+      if (matches.length === 0) return null
+
+      const match = matches[matches.length - 1]
+      const screenEl = terminal.element?.querySelector('.xterm-screen')
+      if (!screenEl) return null
+      const rect = screenEl.getBoundingClientRect()
+      const targetLine = match.range.start.y - 1
+      const viewportLine = targetLine - ydisp
+      const spanWidth = Math.max(1, match.range.end.x - match.range.start.x)
+      const targetCol = (match.range.start.x - 1) + Math.floor(spanWidth / 2)
+      return {
+        x: rect.left + (targetCol + 0.5) * charWidth,
+        y: rect.top + (viewportLine + 0.5) * charHeight,
+      }
     }, { sessionId, url })
   }
 
@@ -204,6 +213,8 @@ test.describe('Terminal clickable URLs', () => {
     await clearExternalCalls(electronApp)
     const testUrl = `https://example.com/playwright-${Date.now()}`
 
+    await openTaskTerminal(mainWindow, { projectAbbrev, taskTitle: 'URL click test' })
+    await waitForPtySession(mainWindow, sessionId)
     await runCommand(mainWindow, sessionId, `echo "${testUrl}"`)
     await waitForBufferContains(mainWindow, sessionId, testUrl)
     await waitForUrlInFrontendBuffer(mainWindow, sessionId, testUrl)

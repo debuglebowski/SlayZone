@@ -2,6 +2,7 @@ import { test, expect, seed, resetApp, TEST_PROJECT_PATH } from './fixtures/elec
 import {
   testInvoke,
   ensureBrowserPanelVisible,
+  ensureBrowserPanelHidden,
   openTaskViaSearch, getActiveViewId,
 } from './fixtures/browser-view'
 
@@ -107,6 +108,7 @@ test.describe('Browser view DevTools (WebContentsView)', () => {
     expect(isOpen).toBe(false)
 
     // Restore panel
+    await ensureBrowserPanelHidden(mainWindow)
     await ensureBrowserPanelVisible(mainWindow)
   })
 
@@ -119,6 +121,7 @@ test.describe('Browser view DevTools (WebContentsView)', () => {
     await testInvoke(mainWindow, 'browser:open-devtools', viewId, 'bottom')
 
     // Restore panel
+    await ensureBrowserPanelHidden(mainWindow)
     await ensureBrowserPanelVisible(mainWindow)
   })
 })

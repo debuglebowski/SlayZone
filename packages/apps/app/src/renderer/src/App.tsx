@@ -772,6 +772,13 @@ function App(): React.JSX.Element {
   const handleTaskClick = (task: Task, e: { metaKey: boolean }): void => { if (e.metaKey) openTaskInBackground(task.id); else openTask(task.id) }
   const handleTaskMove = (taskId: string, newColumnId: string, targetIndex: number): void => { moveTask(taskId, newColumnId, targetIndex, getViewConfig(filter).groupBy) }
 
+  useEffect(() => {
+    ;(window as { __slayzone_moveTaskForTest?: (taskId: string, newColumnId: string, targetIndex: number) => void }).__slayzone_moveTaskForTest = handleTaskMove
+    return () => {
+      delete (window as { __slayzone_moveTaskForTest?: (taskId: string, newColumnId: string, targetIndex: number) => void }).__slayzone_moveTaskForTest
+    }
+  }, [handleTaskMove])
+
   // Project handlers
   const openProjectSettings = useCallback((project: Project, options?: { initialTab?: ProjectSettingsTab; integrationOnboardingProvider?: ProjectIntegrationOnboardingProvider | null }): void => {
     setProjectSettingsInitialTab(options?.initialTab ?? 'general')

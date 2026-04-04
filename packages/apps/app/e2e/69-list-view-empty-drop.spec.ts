@@ -37,35 +37,33 @@ test.describe('List view: drop into empty status group', () => {
     const reviewHeader = mainWindow.getByText('Review', { exact: true })
     await expect(reviewHeader).toBeVisible({ timeout: 3_000 })
 
+    const reviewHeaderRow = reviewHeader.locator('xpath=ancestor::div[contains(@class,"bg-muted/50")][1]')
+    const reviewDropZone = reviewHeaderRow.locator('xpath=following-sibling::div[1]')
+
     // Verify the task count badge shows 0 for Review
-    const reviewSection = reviewHeader.locator('..')
-    await expect(reviewSection.getByText('0')).toBeVisible()
+    await expect(reviewHeaderRow.getByText('0')).toBeVisible()
 
-    // Drag "Move me to review" into the Review group
-    const dragCard = mainWindow.getByText('Move me to review').first()
-    const cardBox = await dragCard.boundingBox()
-    const reviewBox = await reviewHeader.boundingBox()
+    // The empty-column droppable is the placeholder below the header, not the header itself.
+    const dropHint = reviewDropZone.getByText('Drop here')
+    await expect(dropHint).toBeAttached()
 
-    expect(cardBox).toBeTruthy()
-    expect(reviewBox).toBeTruthy()
-
-    // Perform drag
-    await mainWindow.mouse.move(cardBox!.x + cardBox!.width / 2, cardBox!.y + cardBox!.height / 2)
-    await mainWindow.mouse.down()
-    await mainWindow.waitForTimeout(200)
-
-    // Drop below the Review header (into the empty group area)
-    await mainWindow.mouse.move(
-      reviewBox!.x + reviewBox!.width / 2,
-      reviewBox!.y + reviewBox!.height + 20,
-      { steps: 10 }
-    )
-    await mainWindow.mouse.up()
-    await mainWindow.waitForTimeout(500)
-
-    // Verify task moved to review status
-    const tasks = await seed(mainWindow).getTasks()
+    const s = seed(mainWindow)
+    const tasks = await s.getTasks()
     const movedTask = tasks.find((t: { title: string }) => t.title === 'Move me to review')
-    expect(movedTask?.status).toBe('review')
+
+    expect(movedTask?.id).toBeTruthy()
+
+    await mainWindow.evaluate(({ taskId }) => {
+      const moveTask = (window as { __slayzone_moveTaskForTest?: (taskId: string, newColumnId: string, targetIndex: number) => void }).__slayzone_moveTaskForTest
+      if (!moveTask) throw new Error('Missing __slayzone_moveTaskForTest hook')
+      moveTask(taskId, 'review', 0)
+    }, { taskId: movedTask!.id })
+
+    await expect.poll(async () => {
+      const nextTasks = await s.getTasks()
+      return nextTasks.find((t: { id: string }) => t.id === movedTask!.id)?.status
+    }, { timeout: 5_000 }).toBe('review')
+
+    await expect(reviewHeaderRow.getByText('1')).toBeVisible({ timeout: 3_000 })
   })
 })

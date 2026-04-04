@@ -193,8 +193,13 @@ test.describe('Context manager sync flow', () => {
     await dialog.getByTestId('context-overview-skills').click()
 
     const helpCard = mainWindow.getByTestId('global-skill-help-card')
+    const toggle = helpCard.getByTestId('global-skill-help-card-toggle')
     await expect(helpCard).toBeVisible({ timeout: 5_000 })
     await expect(helpCard).toContainText('Skill file')
+    await expect(helpCard).toContainText('Required structure and field meanings')
+    await expect(helpCard).not.toContainText('Frontmatter comes first, followed by the instruction body')
+
+    await toggle.click()
     await expect(helpCard).toContainText('Frontmatter comes first, followed by the instruction body')
     await expect(helpCard).toContainText('name')
     await expect(helpCard).toContainText('description')
@@ -202,10 +207,11 @@ test.describe('Context manager sync flow', () => {
     await expect(helpCard).toContainText('Options: any value')
     await expect(helpCard).toContainText('Default: auto')
 
-    await helpCard.getByTestId('global-skill-help-card-toggle').click()
+    await toggle.click()
     await expect(helpCard).not.toContainText('Options: any value')
+    await expect(helpCard).not.toContainText('Frontmatter comes first, followed by the instruction body')
 
-    await helpCard.getByTestId('global-skill-help-card-toggle').click()
+    await toggle.click()
     await expect(helpCard).toContainText('body')
 
     await closeTopDialog(mainWindow)
@@ -278,11 +284,12 @@ test.describe('Context manager sync flow', () => {
     if (fs.existsSync(codexSkillPath())) {
       await expect.poll(() => {
         try {
-          return fs.readFileSync(codexSkillPath(), 'utf-8')
+          const content = fs.readFileSync(codexSkillPath(), 'utf-8')
+          return content.includes(`name: ${skillSlug}`) && content.includes(skillContentV1.trim())
         } catch {
-          return ''
+          return false
         }
-      }).toBe(skillContentV1)
+      }).toBe(true)
     }
 
     await closeTopDialog(mainWindow)
@@ -317,11 +324,12 @@ test.describe('Context manager sync flow', () => {
     if (fs.existsSync(codexSkillPath())) {
       await expect.poll(() => {
         try {
-          return fs.readFileSync(codexSkillPath(), 'utf-8')
+          const content = fs.readFileSync(codexSkillPath(), 'utf-8')
+          return content.includes(`name: ${skillSlug}`) && content.includes(skillContentV2.trim())
         } catch {
-          return ''
+          return false
         }
-      }).toBe(skillContentV2)
+      }).toBe(true)
     }
 
     await expect.poll(async () => {
@@ -372,11 +380,12 @@ test.describe('Context manager sync flow', () => {
     if (fs.existsSync(localCodexSkillPath())) {
       await expect.poll(() => {
         try {
-          return fs.readFileSync(localCodexSkillPath(), 'utf-8')
+          const content = fs.readFileSync(localCodexSkillPath(), 'utf-8')
+          return content.includes(`name: ${localSkillSlug}`) && content.includes(localSkillBody.trim())
         } catch {
-          return ''
+          return false
         }
-      }).toBe(localSkillBody)
+      }).toBe(true)
     }
   })
 

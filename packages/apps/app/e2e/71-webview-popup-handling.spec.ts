@@ -9,6 +9,15 @@
  */
 import { test, expect, seed, resetApp } from './fixtures/electron'
 import { TEST_PROJECT_PATH } from './fixtures/electron'
+import {
+  ensureBrowserPanelVisible,
+  focusForAppShortcut,
+  openTaskViaSearch,
+  getActiveViewId,
+  testInvoke,
+  tabEntries,
+  urlInput,
+} from './fixtures/browser-view'
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -49,15 +58,11 @@ const closeNewWindows = async (electronApp: ElectronApp, baselineIds: number[]) 
   if (newIds.length > 0) await closeWindowsByIds(electronApp, newIds)
 }
 
-/** Execute JavaScript inside the browser panel's <webview>. */
-const execInBrowserWebview = async (mainWindow: Page, code: string) =>
-  mainWindow.evaluate((c) => {
-    const wv = document.querySelector('[data-browser-panel] webview') as
-      | (HTMLElement & { executeJavaScript: (code: string) => Promise<unknown> })
-      | null
-    if (!wv) return 'no-webview'
-    return wv.executeJavaScript(c)
-  }, code)
+/** Execute JavaScript inside the active browser view for a task. */
+const execInBrowserWebview = async (mainWindow: Page, taskId: string, code: string) => {
+  const viewId = await getActiveViewId(mainWindow, taskId)
+  return testInvoke(mainWindow, 'browser:execute-js', viewId, code)
+}
 
 /** Execute JavaScript inside the web panel's <webview>. */
 const execInWebPanelWebview = async (mainWindow: Page, code: string) =>
@@ -70,33 +75,9 @@ const execInWebPanelWebview = async (mainWindow: Page, code: string) =>
   }, code)
 
 /** Count visible browser panel tabs (exclude the "+" button). */
-const getBrowserTabCount = async (mainWindow: Page) =>
-  mainWindow.evaluate(() => {
-    const bar = document.querySelector('.h-10.overflow-x-auto:visible') as HTMLElement | null
-    if (!bar) return 0
-    return bar.querySelectorAll('[role="button"]:not(:has(.lucide-plus))').length
-  })
+const getBrowserTabCount = async (mainWindow: Page) => tabEntries(mainWindow).count()
 
-/** Ensure browser panel is visible (toggle with Meta+B if needed). */
-const ensureBrowserPanel = async (page: Page) => {
-  const urlInput = page.locator('input[placeholder="Enter URL..."]:visible').first()
-  if (!(await urlInput.isVisible().catch(() => false))) {
-    await focusForAppShortcut(page)
-    await page.keyboard.press('Meta+b')
-    await expect(urlInput).toBeVisible({ timeout: 5_000 })
-  }
-}
-
-/** Focus away from rich-text editor so Meta+B doesn't trigger bold. */
-const focusForAppShortcut = async (page: Page) => {
-  await page.keyboard.press('Escape').catch(() => {})
-  const sidebar = page.locator('[data-slot="sidebar"]').first()
-  if (await sidebar.isVisible().catch(() => false)) {
-    await sidebar.click({ position: { x: 12, y: 12 } }).catch(() => {})
-  } else {
-    await page.locator('#root').click({ position: { x: 12, y: 12 } }).catch(() => {})
-  }
-}
+const ensureBrowserPanel = ensureBrowserPanelVisible
 
 // ---------------------------------------------------------------------------
 // Web panel helpers (pattern from 61-web-panel-handoff-routing)
@@ -201,16 +182,6 @@ const restoreOpenExternal = async (electronApp: ElectronApp) => {
   })
 }
 
-/** Open task via search dialog. */
-const openTaskViaSearch = async (page: Page, title: string) => {
-  await page.keyboard.press('Meta+k')
-  const input = page.getByPlaceholder('Search tasks and projects...')
-  await expect(input).toBeVisible()
-  await input.fill(title)
-  await page.keyboard.press('Enter')
-  await expect(input).not.toBeVisible()
-}
-
 /** Navigate to task + open a web panel by shortcut. */
 const openWebPanel = async (
   mainWindow: Page,
@@ -239,6 +210,7 @@ const openWebPanel = async (
 // ===========================================================================
 
 test.describe.serial('Webview popup handling — Browser panel', () => {
+  let taskId: string
   let baselineWindowIds: number[]
 
   test.beforeAll(async ({ electronApp, mainWindow }) => {
@@ -249,11 +221,21 @@ test.describe.serial('Webview popup handling — Browser panel', () => {
       color: '#8b5cf6',
       path: TEST_PROJECT_PATH,
     })
-    await s.createTask({ projectId: p.id, title: 'Popup handling task', status: 'todo' })
+    const task = await s.createTask({ projectId: p.id, title: 'Popup handling task', status: 'todo' })
+    taskId = task.id
     await s.refreshData()
 
     await openTaskViaSearch(mainWindow, 'Popup handling task')
     await ensureBrowserPanel(mainWindow)
+
+    const viewId = await getActiveViewId(mainWindow, taskId)
+    await testInvoke(mainWindow, 'browser:navigate', viewId, 'https://example.com')
+    await expect.poll(async () => {
+      return (await testInvoke(mainWindow, 'browser:get-url', viewId)) as string
+    }, { timeout: 10_000 }).toContain('example.com')
+    await expect.poll(async () => {
+      return await testInvoke(mainWindow, 'browser:execute-js', viewId, 'document.readyState') as string
+    }, { timeout: 10_000 }).toBe('complete')
 
     baselineWindowIds = await getWindowIds(electronApp)
   })
@@ -268,6 +250,7 @@ test.describe.serial('Webview popup handling — Browser panel', () => {
   }) => {
     const result = await execInBrowserWebview(
       mainWindow,
+      taskId,
       `new Promise((resolve) => {
         const popup = window.open('https://example.com/oauth', 'auth', 'width=500,height=600')
         resolve(JSON.stringify({ popupIsNull: popup === null }))
@@ -289,6 +272,7 @@ test.describe.serial('Webview popup handling — Browser panel', () => {
 
     await execInBrowserWebview(
       mainWindow,
+      taskId,
       `window.open('https://example.com/oauth2', 'auth2', 'width=500,height=600')`
     )
 
@@ -310,6 +294,7 @@ test.describe.serial('Webview popup handling — Browser panel', () => {
 
     await execInBrowserWebview(
       mainWindow,
+      taskId,
       `new Promise((resolve) => {
         const a = document.createElement('a')
         a.href = 'https://example.com/linked-page'
@@ -337,7 +322,7 @@ test.describe.serial('Webview popup handling — Browser panel', () => {
   }) => {
     const baselineTabs = await getBrowserTabCount(mainWindow)
 
-    await execInBrowserWebview(mainWindow, `window.open('https://example.com/no-features')`)
+    await execInBrowserWebview(mainWindow, taskId, `window.open('https://example.com/no-features')`)
 
     await expect
       .poll(() => getBrowserTabCount(mainWindow), { timeout: 5_000 })
@@ -350,6 +335,7 @@ test.describe.serial('Webview popup handling — Browser panel', () => {
   test('window.open() with blocked scheme returns null', async ({ electronApp, mainWindow }) => {
     const result = await execInBrowserWebview(
       mainWindow,
+      taskId,
       `new Promise((resolve) => {
         const popup = window.open('figma://blocked-test', 'x', 'width=500,height=600')
         resolve(JSON.stringify({ popupIsNull: popup === null }))
@@ -369,6 +355,7 @@ test.describe.serial('Webview popup handling — Browser panel', () => {
   }) => {
     await execInBrowserWebview(
       mainWindow,
+      taskId,
       `window.open('https://example.com/parent-popup', 'parent', 'width=500,height=600')`
     )
     await expect
@@ -405,6 +392,7 @@ test.describe.serial('Webview popup handling — Browser panel', () => {
   }) => {
     await execInBrowserWebview(
       mainWindow,
+      taskId,
       `window.open('https://example.com/session-test', 'sess', 'width=500,height=600')`
     )
     await expect
@@ -433,6 +421,7 @@ test.describe.serial('Webview popup handling — Browser panel', () => {
 
     await execInBrowserWebview(
       mainWindow,
+      taskId,
       `window.open('https://example.com/destroy-test', 'dest', 'width=500,height=600')`
     )
     await expect
@@ -452,7 +441,7 @@ test.describe.serial('Webview popup handling — Browser panel', () => {
     await focusForAppShortcut(mainWindow)
     await mainWindow.keyboard.press('Meta+b')
     await expect(
-      mainWindow.locator('input[placeholder="Enter URL..."]:visible').first()
+      urlInput(mainWindow)
     ).toBeVisible({ timeout: 5_000 })
   })
 })

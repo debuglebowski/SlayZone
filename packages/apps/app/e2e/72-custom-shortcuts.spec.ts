@@ -147,23 +147,37 @@ test.describe.serial('Custom keyboard shortcuts', () => {
   // ─── Conflict swap ───
 
   test('rebinding to conflicting key swaps both shortcuts', async ({ mainWindow }) => {
-    await rebindShortcut(mainWindow, 'New Task', 'Meta+k')
-
-    const reassignBtn = mainWindow.getByRole('dialog').getByText('Reassign')
-    if (await reassignBtn.isVisible({ timeout: 2_000 }).catch(() => false)) {
-      await reassignBtn.click()
-      await closeDialog(mainWindow)
+    await openShortcutsDialog(mainWindow)
+    const groups = mainWindow.getByRole('dialog').locator('button[data-state]')
+    for (let i = 0; i < await groups.count(); i++) {
+      const group = groups.nth(i)
+      if (await group.getAttribute('data-state') === 'closed') {
+        await group.click()
+      }
     }
 
-    // mod+k should now open create task (not search)
+    const newTaskRow = mainWindow.getByRole('dialog').locator(`span.text-sm:text-is("New Task")`).first()
+    await newTaskRow.locator('..').locator('span.cursor-pointer').click()
+    await expect(mainWindow.getByText('Press keys...')).toBeVisible({ timeout: 2_000 })
     await mainWindow.keyboard.press('Meta+k')
-    await mainWindow.waitForTimeout(500)
-    const createDialog = mainWindow.getByRole('dialog')
-    const hasCreate = await createDialog.getByText('Create Task').isVisible().catch(() => false)
+
+    const conflictNotice = mainWindow.getByText('Already bound to')
+    await expect(conflictNotice).toBeVisible({ timeout: 2_000 })
+    await expect(conflictNotice).toContainText('Search')
+    await mainWindow.getByRole('dialog').getByText('Reassign').click()
+    await closeDialog(mainWindow)
+
+    // mod+k should now open create task instead of search
+    await mainWindow.keyboard.press('Meta+k')
+    await expect(mainWindow.getByRole('dialog').getByText('Create Task')).toBeVisible({ timeout: 3_000 })
+    await mainWindow.keyboard.press('Escape')
+
+    // The old New Task binding should be swapped onto Search.
+    await mainWindow.keyboard.press('Meta+n')
+    await expect(mainWindow.getByPlaceholder('Search tasks and projects...')).toBeVisible({ timeout: 3_000 })
     await mainWindow.keyboard.press('Escape')
 
     await resetShortcuts(mainWindow)
-    expect(hasCreate).toBe(true)
   })
 
   // ─── Recording mode ───

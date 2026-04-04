@@ -5,12 +5,24 @@ import {
   getMainSessionId,
   waitForPtySession,
 } from './fixtures/terminal'
-import { goHome } from './fixtures/electron'
+import {
+  ensureBrowserPanelVisible,
+  getActiveViewId,
+  openTaskViaSearch,
+  testInvoke,
+} from './fixtures/browser-view'
 
 test.describe('DOM picker to terminal', () => {
   const projectName = 'ZZDomPickerTest'
   let taskId: string
   let sessionId: string
+  let viewId: string
+
+  const pickerButton = (page: import('@playwright/test').Page) =>
+    page.locator('[data-testid="browser-pick-element"]:visible').first()
+
+  const activeOverlay = (page: import('@playwright/test').Page) =>
+    page.locator('[data-testid="browser-picker-active-overlay"]:visible').first()
 
   test.beforeAll(async ({ mainWindow }) => {
     await resetApp(mainWindow)
@@ -21,83 +33,90 @@ test.describe('DOM picker to terminal', () => {
     sessionId = getMainSessionId(taskId)
     await s.refreshData()
 
-    await goHome(mainWindow)
-    await mainWindow.keyboard.press('Meta+k')
-    const searchInput = mainWindow.getByPlaceholder('Search tasks and projects...')
-    await expect(searchInput).toBeVisible({ timeout: 5_000 })
-    await searchInput.fill('DOM picker task')
-    const dialog = mainWindow.locator('[role="dialog"]:visible').last()
-    await dialog.getByText('DOM picker task').first().click()
-
+    await openTaskViaSearch(mainWindow, 'DOM picker task')
     await expect(mainWindow.locator('[data-testid="terminal-mode-trigger"]:visible').first()).toBeVisible({ timeout: 5_000 })
     await expect(mainWindow.locator('[data-testid="terminal-tabbar"]:visible').first()).toBeVisible({ timeout: 5_000 })
     await switchTerminalMode(mainWindow, 'terminal')
     await waitForPtySession(mainWindow, sessionId)
 
-    const browserPanel = mainWindow.locator('[data-browser-panel="true"]:visible').first()
-    if (await browserPanel.count() === 0) {
-      await mainWindow.keyboard.press('Meta+b')
-    }
+    await ensureBrowserPanelVisible(mainWindow)
     await expect(mainWindow.locator('[data-browser-panel="true"]:visible').first()).toBeVisible({ timeout: 5_000 })
+    viewId = await getActiveViewId(mainWindow, taskId)
+  })
+
+  test.beforeEach(async ({ mainWindow }) => {
+    await ensureBrowserPanelVisible(mainWindow)
+
+    await testInvoke(mainWindow, 'browser:navigate', viewId, 'https://example.com')
+    await expect.poll(async () => {
+      return String(await testInvoke(mainWindow, 'browser:get-url', viewId) ?? '')
+    }, { timeout: 15_000 }).toContain('example.com')
+
+    await expect(pickerButton(mainWindow)).toBeEnabled({ timeout: 10_000 })
+
+    if (await activeOverlay(mainWindow).isVisible().catch(() => false)) {
+      await pickerButton(mainWindow).click()
+      await expect(activeOverlay(mainWindow)).not.toBeVisible({ timeout: 3_000 })
+    }
   })
 
   test('picker button enables selection mode', async ({ mainWindow }) => {
-    const pickButton = mainWindow.locator('[data-testid="browser-pick-element"]:visible').first()
-    const activeOverlay = mainWindow.locator('[data-testid="browser-picker-active-overlay"]:visible').first()
+    const pickButton = pickerButton(mainWindow)
+    const overlay = activeOverlay(mainWindow)
 
     await expect(pickButton).toBeVisible({ timeout: 5_000 })
-    if (await activeOverlay.isVisible().catch(() => false)) {
+    if (await overlay.isVisible().catch(() => false)) {
       await pickButton.click()
-      await expect(activeOverlay).not.toBeVisible({ timeout: 3_000 })
+      await expect(overlay).not.toBeVisible({ timeout: 3_000 })
     }
-    await expect(activeOverlay).not.toBeVisible()
+    await expect(overlay).not.toBeVisible()
     await pickButton.click()
 
-    await expect(activeOverlay).toBeVisible({ timeout: 3_000 })
+    await expect(overlay).toBeVisible({ timeout: 3_000 })
   })
 
   test('clicking picker button again toggles selection mode off', async ({ mainWindow }) => {
-    const pickButton = mainWindow.locator('[data-testid="browser-pick-element"]:visible').first()
-    const activeOverlay = mainWindow.locator('[data-testid="browser-picker-active-overlay"]:visible').first()
+    const pickButton = pickerButton(mainWindow)
+    const overlay = activeOverlay(mainWindow)
 
-    if (!(await activeOverlay.isVisible().catch(() => false))) {
+    if (!(await overlay.isVisible().catch(() => false))) {
       await pickButton.click()
     }
-    await expect(activeOverlay).toBeVisible({ timeout: 3_000 })
+    await expect(overlay).toBeVisible({ timeout: 3_000 })
 
     await pickButton.click()
-    await expect(activeOverlay).not.toBeVisible({ timeout: 3_000 })
+    await expect(overlay).not.toBeVisible({ timeout: 3_000 })
   })
 
   test('Cmd+Shift+L enables picker without browser focus', async ({ mainWindow }) => {
-    const pickButton = mainWindow.locator('[data-testid="browser-pick-element"]:visible').first()
-    const activeOverlay = mainWindow.locator('[data-testid="browser-picker-active-overlay"]:visible').first()
-    if (await activeOverlay.isVisible().catch(() => false)) {
+    const pickButton = pickerButton(mainWindow)
+    const overlay = activeOverlay(mainWindow)
+    if (await overlay.isVisible().catch(() => false)) {
       await pickButton.click()
-      await expect(activeOverlay).not.toBeVisible({ timeout: 3_000 })
+      await expect(overlay).not.toBeVisible({ timeout: 3_000 })
     }
 
     // Focus terminal to prove task-level shortcut works cross-panel.
     await mainWindow.locator('.xterm-screen:visible').first().click()
     await mainWindow.keyboard.press('Meta+Shift+L')
 
-    await expect(activeOverlay).toBeVisible({ timeout: 3_000 })
+    await expect(overlay).toBeVisible({ timeout: 3_000 })
 
     // Use button toggle for deterministic shutdown.
     await pickButton.click()
-    await expect(activeOverlay).not.toBeVisible({ timeout: 3_000 })
+    await expect(overlay).not.toBeVisible({ timeout: 3_000 })
   })
 
   test('Escape exits picker mode', async ({ mainWindow }) => {
-    const pickButton = mainWindow.locator('[data-testid="browser-pick-element"]:visible').first()
-    const activeOverlay = mainWindow.locator('[data-testid="browser-picker-active-overlay"]:visible').first()
+    const pickButton = pickerButton(mainWindow)
+    const overlay = activeOverlay(mainWindow)
 
-    if (!(await activeOverlay.isVisible().catch(() => false))) {
+    if (!(await overlay.isVisible().catch(() => false))) {
       await pickButton.click()
     }
-    await expect(activeOverlay).toBeVisible({ timeout: 3_000 })
+    await expect(overlay).toBeVisible({ timeout: 3_000 })
 
     await mainWindow.keyboard.press('Escape')
-    await expect(activeOverlay).not.toBeVisible({ timeout: 3_000 })
+    await expect(overlay).not.toBeVisible({ timeout: 3_000 })
   })
 })

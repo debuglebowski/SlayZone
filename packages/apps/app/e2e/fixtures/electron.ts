@@ -568,19 +568,30 @@ export async function openProjectSettings(page: Page, abbrev: string): Promise<L
     await goHome(page)
     await clickProject(page, abbrev)
     const blob = projectBlob(page, abbrev)
-    await expect(blob).toBeVisible({ timeout: 5_000 })
-    await blob.scrollIntoViewIfNeeded().catch(() => {})
+    if (await blob.isVisible({ timeout: 1_000 }).catch(() => false)) {
+      await blob.scrollIntoViewIfNeeded().catch(() => {})
 
-    // Right-click → Settings via evaluate (fast, avoids Playwright actionability overhead)
-    await blob.evaluate((node) => {
-      node.dispatchEvent(new MouseEvent('contextmenu', {
-        bubbles: true, cancelable: true, button: 2, buttons: 2,
-      }))
-    }).catch(() => {})
+      // Right-click → Settings via evaluate (fast, avoids Playwright actionability overhead)
+      await blob.evaluate((node) => {
+        node.dispatchEvent(new MouseEvent('contextmenu', {
+          bubbles: true, cancelable: true, button: 2, buttons: 2,
+        }))
+      }).catch(() => {})
 
-    const settingsItem = page.getByRole('menuitem', { name: 'Settings' }).first()
-    if (await settingsItem.isVisible({ timeout: 1_000 }).catch(() => false)) {
-      await settingsItem.click({ force: true }).catch(() => {})
+      const settingsItem = page.getByRole('menuitem', { name: 'Settings' }).first()
+      if (await settingsItem.isVisible({ timeout: 1_000 }).catch(() => false)) {
+        await settingsItem.click({ force: true }).catch(() => {})
+      }
+    } else {
+      const projectId = await page.evaluate((projectAbbrev) => {
+        return window.api.db.getProjects()
+          .then((projects) => projects.find((project) => project.name.slice(0, 2).toUpperCase() === projectAbbrev)?.id ?? null)
+      }, abbrev)
+      if (projectId) {
+        await page.evaluate((id) => {
+          window.dispatchEvent(new CustomEvent('open-project-settings', { detail: { projectId: id } }))
+        }, projectId).catch(() => {})
+      }
     }
 
     if (await dialog.isVisible({ timeout: 1_500 }).catch(() => false)) break

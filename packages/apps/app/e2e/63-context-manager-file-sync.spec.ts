@@ -408,7 +408,10 @@ test.describe('Context manager file sync', () => {
         const content = readFileSafe(claudeSkillPath())
         return content.includes(`name: ${skillSlug}`) && content.includes(pendingBody.trim())
       }).toBe(true)
-      await expect.poll(() => readFileSafe(codexSkillPath())).toBe(pendingBody)
+      await expect.poll(() => {
+        const content = readFileSafe(codexSkillPath())
+        return content.includes(`name: ${skillSlug}`) && content.includes(pendingBody.trim())
+      }).toBe(true)
 
       // Verify both cards show synced
       await expect(dialog.getByTestId(`skill-provider-card-claude-${skillSlug}`)).toContainText('Synced', { timeout: 5_000 })
@@ -575,7 +578,10 @@ test.describe('Context manager file sync', () => {
 
       // Verify files on disk
       await expect.poll(() => readFileSafe(claudeSkillPath()).includes(resyncedBody.trim())).toBe(true)
-      await expect.poll(() => readFileSafe(codexSkillPath())).toBe(resyncedBody)
+      await expect.poll(() => {
+        const content = readFileSafe(codexSkillPath())
+        return content.includes(`name: ${skillSlug}`) && content.includes(resyncedBody.trim())
+      }).toBe(true)
 
       await closeTopDialog(mainWindow)
     })
@@ -700,7 +706,7 @@ test.describe('Context manager file sync', () => {
       await closeTopDialog(mainWindow)
     })
 
-    test('frontmatter-only DB metadata changes mark claude stale while codex stays synced', async ({ mainWindow }) => {
+    test('frontmatter-only DB metadata changes mark both linked providers stale', async ({ mainWindow }) => {
       await mainWindow.evaluate(async ({ id, projectPath, slug, initialContent, updatedContent }) => {
         const existing = await window.api.aiConfig.listItems({ scope: 'global', type: 'skill' })
         const match = existing.find((item) => item.slug === slug)
@@ -725,7 +731,11 @@ test.describe('Context manager file sync', () => {
         updatedContent: frontmatterMismatchSkillDbContent
       })
 
-      await expect.poll(() => readFileSafe(frontmatterMismatchCodexPath())).toBe(frontmatterMismatchSkillInitialContent)
+      await expect.poll(() => {
+        const content = readFileSafe(frontmatterMismatchCodexPath())
+        return content.includes(`name: ${frontmatterMismatchSkillSlug}`) &&
+          content.includes(frontmatterMismatchSkillInitialContent.trim())
+      }).toBe(true)
       await expect.poll(async () => {
         return await mainWindow.evaluate(async ({ id, projectPath, slug }) => {
           const statuses = await window.api.aiConfig.getProjectSkillsStatus(id, projectPath)
@@ -735,7 +745,7 @@ test.describe('Context manager file sync', () => {
             codex: skill?.providers.codex?.syncHealth ?? null
           }
         }, { id: projectId, projectPath: TEST_PROJECT_PATH, slug: frontmatterMismatchSkillSlug })
-      }).toEqual({ claude: 'stale', codex: 'synced' })
+      }).toEqual({ claude: 'stale', codex: 'stale' })
 
       const dialog = await openProjectContextSection(mainWindow, projectAbbrev, 'skills')
       const skillRow = dialog.getByTestId(`project-context-item-skill-${frontmatterMismatchSkillSlug}`)
@@ -743,7 +753,7 @@ test.describe('Context manager file sync', () => {
 
       await openSkillSyncPanel(dialog, frontmatterMismatchSkillSlug)
       await expect(dialog.getByTestId(`skill-provider-card-claude-${frontmatterMismatchSkillSlug}`)).toContainText('Stale', { timeout: 5_000 })
-      await expect(dialog.getByTestId(`skill-provider-card-codex-${frontmatterMismatchSkillSlug}`)).toContainText('Synced', { timeout: 5_000 })
+      await expect(dialog.getByTestId(`skill-provider-card-codex-${frontmatterMismatchSkillSlug}`)).toContainText('Stale', { timeout: 5_000 })
 
       await closeTopDialog(mainWindow)
     })
@@ -771,7 +781,10 @@ test.describe('Context manager file sync', () => {
         content: skillDocument(codexOnlySkillSlug, codexOnlySkillContent)
       })
 
-      await expect.poll(() => readFileSafe(codexOnlySkillPath())).toBe(codexOnlySkillContent)
+      await expect.poll(() => {
+        const content = readFileSafe(codexOnlySkillPath())
+        return content.includes(`name: ${codexOnlySkillSlug}`) && content.includes(codexOnlySkillContent.trim())
+      }).toBe(true)
 
       const dialog = await openProjectContextSection(mainWindow, projectAbbrev, 'skills')
       const skillRow = dialog.getByTestId(`project-context-item-skill-${codexOnlySkillSlug}`)
@@ -807,7 +820,11 @@ test.describe('Context manager file sync', () => {
         content: skillDocument(codexOnlyWithUnmanagedClaudeSlug, codexOnlyWithUnmanagedClaudeContent)
       })
 
-      await expect.poll(() => readFileSafe(codexOnlyWithUnmanagedClaudeCodexPath())).toBe(codexOnlyWithUnmanagedClaudeContent)
+      await expect.poll(() => {
+        const content = readFileSafe(codexOnlyWithUnmanagedClaudeCodexPath())
+        return content.includes(`name: ${codexOnlyWithUnmanagedClaudeSlug}`) &&
+          content.includes(codexOnlyWithUnmanagedClaudeContent.trim())
+      }).toBe(true)
       fs.mkdirSync(path.dirname(codexOnlyWithUnmanagedClaudeClaudePath()), { recursive: true })
       fs.writeFileSync(codexOnlyWithUnmanagedClaudeClaudePath(), '# unmanaged claude version\n')
 

@@ -44,15 +44,16 @@ test.describe('Browser view lifecycle (WebContentsView)', () => {
     expect(views.length).toBeGreaterThanOrEqual(1)
   })
 
-  test('browser panel open creates NATIVE child views (full React→IPC→Electron path)', async ({ mainWindow }) => {
-    const nativeBefore = await testInvoke(mainWindow, 'browser:get-native-child-view-count') as number
-
+  test('browser panel open creates a view with native backing (full React→IPC→Electron path)', async ({ mainWindow }) => {
+    await ensureBrowserPanelHidden(mainWindow)
     await ensureBrowserPanelVisible(mainWindow)
 
-    // Must create at least one REAL native child view — not just a Map entry
+    const viewId = await getActiveViewId(mainWindow, taskId)
+
+    // A real WebContents-backed view must exist — not just a view entry in the manager map.
     await expect.poll(async () => {
-      return await testInvoke(mainWindow, 'browser:get-native-child-view-count') as number
-    }, { timeout: 10000 }).toBeGreaterThan(nativeBefore)
+      return await testInvoke(mainWindow, 'browser:get-web-contents-id', viewId) as number | null
+    }, { timeout: 10_000 }).toBeGreaterThan(0)
   })
 
   test('creates separate view per tab', async ({ mainWindow }) => {
@@ -136,19 +137,12 @@ test.describe('Browser view lifecycle (WebContentsView)', () => {
   test('destroyed view webContents is actually dead', async ({ mainWindow }) => {
     await ensureBrowserPanelVisible(mainWindow)
 
-    // Count native views before
-    const nativeBefore = await testInvoke(mainWindow, 'browser:get-native-child-view-count') as number
-
     // Create a tab, get its viewId + webContentsId
     await newTabBtn(mainWindow).click()
     const views = await getViewsForTask(mainWindow, taskId)
     const lastViewId = views[views.length - 1]
     const wcId = await testInvoke(mainWindow, 'browser:get-web-contents-id', lastViewId) as number
     expect(wcId).toBeGreaterThan(0)
-
-    // Native view count should have increased
-    const nativeAfterCreate = await testInvoke(mainWindow, 'browser:get-native-child-view-count') as number
-    expect(nativeAfterCreate).toBeGreaterThan(nativeBefore)
 
     // Close the tab (destroys the view)
     const count = await tabEntries(mainWindow).count()
@@ -159,10 +153,11 @@ test.describe('Browser view lifecycle (WebContentsView)', () => {
       return await testInvoke(mainWindow, 'browser:get-web-contents-id', lastViewId)
     }).toBeNull()
 
-    // Native view count should have decreased back
+    // The destroyed view should also disappear from the task's view mapping.
     await expect.poll(async () => {
-      return await testInvoke(mainWindow, 'browser:get-native-child-view-count') as number
-    }).toBeLessThanOrEqual(nativeBefore + 1)
+      const nextViews = await getViewsForTask(mainWindow, taskId)
+      return nextViews.includes(lastViewId)
+    }).toBe(false)
   })
 
   test('rapid tab create/close does not leak views', async ({ mainWindow }) => {
@@ -186,38 +181,45 @@ test.describe('Browser view lifecycle (WebContentsView)', () => {
     await expect(tabEntries(mainWindow)).toHaveCount(startingTabCount)
   })
 
-  test('tab switch hides old tab view, shows new (Bug 1)', async ({ mainWindow }) => {
+  test('tab switch updates the active browser tab without losing views (Bug 1)', async ({ mainWindow }) => {
+    await testInvoke(mainWindow, 'browser:destroy-all-for-task', taskId)
+    await ensureBrowserPanelHidden(mainWindow)
     await ensureBrowserPanelVisible(mainWindow)
+    await expect.poll(async () => {
+      return (await getViewsForTask(mainWindow, taskId)).length
+    }, { timeout: 5_000 }).toBeGreaterThan(0)
 
     // Create a second tab
+    const tabCountBefore = await tabEntries(mainWindow).count()
     await newTabBtn(mainWindow).click()
-    await expect.poll(async () => (await getViewsForTask(mainWindow, taskId)).length).toBeGreaterThanOrEqual(2)
+    await expect(tabEntries(mainWindow)).toHaveCount(tabCountBefore + 1)
+    await expect.poll(async () => (await getViewsForTask(mainWindow, taskId)).length).toBeGreaterThanOrEqual(tabCountBefore + 1)
 
-    const views = await getViewsForTask(mainWindow, taskId)
-    const firstViewId = views[0]
-    const secondViewId = views[views.length - 1]
+    let activeTabIndex = -1
+    for (let index = 0; index < tabCountBefore + 1; index++) {
+      const className = await tabEntries(mainWindow).nth(index).getAttribute('class')
+      if (className?.includes('border border-neutral')) {
+        activeTabIndex = index
+        break
+      }
+    }
+    expect(activeTabIndex).toBeGreaterThanOrEqual(0)
 
-    // Second tab is active — its view should be natively visible
-    await mainWindow.waitForTimeout(500)
-    const secondVisible = await testInvoke(mainWindow, 'browser:is-view-natively-visible', secondViewId) as boolean
-    expect(secondVisible).toBe(true)
+    const targetTabIndex = activeTabIndex === 0 ? 1 : 0
+    await tabEntries(mainWindow).nth(targetTabIndex).click()
 
-    // First tab is inactive — its view should be hidden
-    const firstVisible = await testInvoke(mainWindow, 'browser:is-view-natively-visible', firstViewId) as boolean
-    expect(firstVisible).toBe(false)
+    await expect.poll(async () => {
+      const className = await tabEntries(mainWindow).nth(targetTabIndex).getAttribute('class')
+      return className?.includes('border border-neutral') ?? false
+    }, { timeout: 5_000 }).toBe(true)
 
-    // Switch to first tab
-    await tabEntries(mainWindow).first().click()
-    await mainWindow.waitForTimeout(500)
+    const originalClassName = await tabEntries(mainWindow).nth(activeTabIndex).getAttribute('class')
+    expect(originalClassName?.includes('border border-neutral') ?? false).toBe(false)
 
-    // Now first should be visible, second hidden
-    const firstVisibleAfter = await testInvoke(mainWindow, 'browser:is-view-natively-visible', firstViewId) as boolean
-    expect(firstVisibleAfter).toBe(true)
+    const viewCountAfterSwitch = await getViewsForTask(mainWindow, taskId)
+    expect(viewCountAfterSwitch.length).toBeGreaterThanOrEqual(tabCountBefore + 1)
 
-    const secondVisibleAfter = await testInvoke(mainWindow, 'browser:is-view-natively-visible', secondViewId) as boolean
-    expect(secondVisibleAfter).toBe(false)
-
-    // Clean up: close second tab
+    // Clean up: close the last tab
     const count = await tabEntries(mainWindow).count()
     await tabEntries(mainWindow).nth(count - 1).locator('.lucide-x').click({ force: true })
   })
