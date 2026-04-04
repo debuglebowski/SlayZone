@@ -14,8 +14,8 @@ export const PROVIDER_PATHS: Record<CliProvider, ProviderPathMapping> = {
     skillsDir: '.cursor/skills',
   },
   gemini: {
-    rootInstructions: 'GEMINI.md',
-    skillsDir: '.gemini/skills',
+    rootInstructions: 'AGENTS.md',
+    skillsDir: '.agents/skills',
   },
   opencode: {
     rootInstructions: 'OPENCODE.md',
@@ -41,7 +41,7 @@ export interface GlobalProviderPaths {
 export const GLOBAL_PROVIDER_PATHS: Record<string, GlobalProviderPaths> = {
   claude:   { label: 'Claude Code', baseDir: '.claude', instructions: 'CLAUDE.md' },
   codex:    { label: 'Codex',       baseDir: '.codex',  instructions: 'AGENTS.md' },
-  gemini:   { label: 'Gemini',      baseDir: '.gemini', instructions: 'GEMINI.md', skillsDir: 'skills' },
+  gemini:   { label: 'Gemini',      baseDir: '.agents', instructions: 'AGENTS.md', skillsDir: 'skills' },
   opencode: { label: 'OpenCode',    baseDir: '.config/opencode', instructions: 'AGENTS.md', skillsDir: 'skills' },
   qwen:     { label: 'Qwen Code',   baseDir: '.qwen',   instructions: 'QWEN.md',   skillsDir: 'skills' },
   copilot: { label: 'Copilot',    baseDir: '.copilot', instructions: 'AGENTS.md', skillsDir: 'skills' },
