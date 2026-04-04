@@ -181,7 +181,19 @@ export function renderSkillFrontmatter(frontmatter: Record<string, string>): str
 
   for (const key of Object.keys(frontmatter).sort()) {
     if (key === 'name' || key === 'description') continue
-    lines.push(toYamlLine(key, frontmatter[key] ?? ''))
+    const value = frontmatter[key] ?? ''
+    // Render JSON-encoded arrays as YAML block sequences
+    if (value.startsWith('[')) {
+      try {
+        const arr = JSON.parse(value)
+        if (Array.isArray(arr) && arr.length > 0) {
+          lines.push(`${toYamlKey(key)}:`)
+          for (const item of arr) lines.push(`  - ${item}`)
+          continue
+        }
+      } catch { /* fall through to default rendering */ }
+    }
+    lines.push(toYamlLine(key, value))
   }
 
   lines.push('---', '')

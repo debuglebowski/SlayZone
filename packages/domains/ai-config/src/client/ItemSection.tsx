@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type ChangeEvent } from 'react'
 import {
   AlertTriangle, ChevronDown, ChevronRight,
-  Plus, Loader2, X
+  Plus, Loader2, Trash2, X
 } from 'lucide-react'
 import {
   Button, IconButton, Input, Label,
@@ -501,12 +501,14 @@ function UnmanagedSkillItemRow({
   item,
   projectPath,
   managingSlug,
-  onManage
+  onManage,
+  onDelete
 }: {
   item: UnmanagedSkillRow
   projectPath: string
   managingSlug: string | null
   onManage: (item: UnmanagedSkillRow) => Promise<void>
+  onDelete: (item: UnmanagedSkillRow) => Promise<void>
 }) {
   const [expanded, setExpanded] = useState(false)
   const [committedSlug, setCommittedSlug] = useState(item.slug)
@@ -516,6 +518,7 @@ function UnmanagedSkillItemRow({
   const [loadingContent, setLoadingContent] = useState(false)
   const [savingSlug, setSavingSlug] = useState(false)
   const [savingContent, setSavingContent] = useState(false)
+  const [deleting, setDeleting] = useState(false)
   const [slugDirty, setSlugDirty] = useState(false)
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -621,6 +624,15 @@ function UnmanagedSkillItemRow({
     await onManage({ slug: normalizeSlug(slug), locations })
   }
 
+  const handleDeleteClick = async () => {
+    setDeleting(true)
+    try {
+      await onDelete({ slug: committedSlug, locations })
+    } finally {
+      setDeleting(false)
+    }
+  }
+
   const managing = managingSlug !== null && (
     managingSlug === committedSlug ||
     managingSlug === normalizeSlug(slug) ||
@@ -703,7 +715,18 @@ function UnmanagedSkillItemRow({
                 <p key={location.path} className="truncate font-mono text-[11px] text-muted-foreground">{location.relativePath}</p>
               ))}
             </div>
-            <div className="flex items-center justify-end">
+            <div className="flex items-center justify-end gap-2">
+              <Button
+                size="sm"
+                variant="ghost"
+                className="text-destructive"
+                data-testid={`unmanaged-skill-delete-${committedSlug}`}
+                onClick={() => { void handleDeleteClick() }}
+                disabled={deleting || managing || savingSlug || savingContent}
+              >
+                {deleting ? <Loader2 className="size-3.5 animate-spin" /> : <Trash2 className="size-3.5" />}
+                Delete files
+              </Button>
               <Button
                 size="sm"
                 variant="outline"
@@ -798,6 +821,18 @@ export function ItemSection({
     }
   }
 
+  const handleDeleteUnmanaged = async (item: UnmanagedSkillRow) => {
+    try {
+      for (const location of item.locations) {
+        await window.api.aiConfig.deleteContextFile(location.path, projectPath, projectId)
+      }
+      toast.success(`Deleted ${item.slug}`)
+      onChanged()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to delete skill files')
+    }
+  }
+
   return (
     <div className="flex h-full min-h-0 flex-col">
       <div className="min-h-0 flex-1 space-y-1 overflow-y-auto">
@@ -817,6 +852,7 @@ export function ItemSection({
             projectPath={projectPath}
             managingSlug={managingUnmanagedSlug}
             onManage={handleManageUnmanaged}
+            onDelete={handleDeleteUnmanaged}
           />
         ))}
 

@@ -1,5 +1,6 @@
 @import "tailwindcss";
 @import "tw-animate-css";
+@import "@xyflow/react/dist/style.css";
 @plugin "@tailwindcss/typography";
 
 /* Scan monorepo packages for Tailwind classes */
