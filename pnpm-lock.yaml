@@ -155,6 +155,9 @@ importers:
       '@tailwindcss/typography':
         specifier: ^0.5.19
         version: 0.5.19(tailwindcss@4.1.18)
+      '@xyflow/react':
+        specifier: ^12.10.2
+        version: 12.10.2(@types/react@19.2.8)(react-dom@19.2.3(react@19.2.3))(react@19.2.3)
       better-sqlite3:
         specifier: ^12.8.0
         version: 12.8.0

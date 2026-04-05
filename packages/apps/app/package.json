@@ -33,6 +33,7 @@
     "@modelcontextprotocol/sdk": "^1.26.0",
     "@radix-ui/react-collapsible": "^1.1.12",
     "@slayzone/ai-config": "workspace:*",
+    "@xyflow/react": "^12.10.2",
     "@slayzone/automations": "workspace:*",
     "@slayzone/diagnostics": "workspace:*",
     "@slayzone/file-editor": "workspace:*",
