@@ -1,5 +1,62 @@
 [
   {
+    "version": "0.14.0",
+    "date": "2026-04-06",
+    "tagline": "Context & shortcuts",
+    "items": [
+      {
+        "category": "feature",
+        "title": "Find in browser page",
+        "description": "Use Cmd+F to search within browser panels."
+      },
+      {
+        "category": "feature",
+        "title": "Tasks from browser links",
+        "description": "Turn any browser link into a new task with one click."
+      },
+      {
+        "category": "feature",
+        "title": "Session resume",
+        "description": "Resume previous AI sessions when reopening tasks."
+      },
+      {
+        "category": "feature",
+        "title": "Web panel CLI commands",
+        "description": "Create and manage web panels from the Slay CLI."
+      },
+      {
+        "category": "feature",
+        "title": "Priority keyboard shortcuts",
+        "description": "New priority-based shortcut system prevents conflicts between panels."
+      },
+      {
+        "category": "feature",
+        "title": "Blocker search",
+        "description": "Search and link blocker tasks with status icons."
+      },
+      {
+        "category": "improvement",
+        "title": "Copy session & conversation IDs",
+        "description": "Copy session and conversation IDs directly from the terminal dropdown menu."
+      },
+      {
+        "category": "improvement",
+        "title": "CLI DB mismatch warning",
+        "description": "CLI warns when the --dev flag targets a different database than the running app."
+      },
+      {
+        "category": "fix",
+        "title": "Browser zoom alignment",
+        "description": "Browser views stay aligned when using app zoom."
+      },
+      {
+        "category": "fix",
+        "title": "Browser URL on navigation",
+        "description": "URL input now updates correctly during history navigation."
+      },
+    ]
+  },
+  {
     "version": "0.13.0",
     "date": "2026-04-01",
     "tagline": "History & CLI power",

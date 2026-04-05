@@ -1,6 +1,84 @@
 # Changelog
 
 
+## v0.14.0
+
+[compare changes](https://github.com/debuglebowski/slayzone/compare/v0.13.0...v0.14.0)
+
+### 🚀 Enhancements
+
+- **cli:** Sync CLI version with app version at build time ([1400e237](https://github.com/debuglebowski/slayzone/commit/1400e237))
+- **task:** Add blocker search and status icons ([a6a11a0b](https://github.com/debuglebowski/slayzone/commit/a6a11a0b))
+- **editor:** Set caret + focus at search hit location when clicking results ([b10558d1](https://github.com/debuglebowski/slayzone/commit/b10558d1))
+- **cli:** Warn when --dev flag targets different DB than running app ([87d12ace](https://github.com/debuglebowski/slayzone/commit/87d12ace))
+- **task-browser:** Add Cmd+F find-in-page to browser panels ([d472c1c1](https://github.com/debuglebowski/slayzone/commit/d472c1c1))
+- **cli:** Elevate install with OS-native auth on EACCES ([887758dc](https://github.com/debuglebowski/slayzone/commit/887758dc))
+- **terminal:** Add copy session ID to context menu and dropdown menu ([cabe404d](https://github.com/debuglebowski/slayzone/commit/cabe404d))
+- **terminal:** Add copy session ID to context menu and dropdown menu" ([825c8e33](https://github.com/debuglebowski/slayzone/commit/825c8e33))
+- **terminal:** Add copy conversation ID to dropdown menu ([bc74ee6e](https://github.com/debuglebowski/slayzone/commit/bc74ee6e))
+- **browser:** Create tasks from browser links ([781d11b0](https://github.com/debuglebowski/slayzone/commit/781d11b0))
+- **leaderboard:** Add manual sync stats button ([caad0fcc](https://github.com/debuglebowski/slayzone/commit/caad0fcc))
+- **ui:** Replace Sparkles with BookOpen icon for context manager ([83db9e35](https://github.com/debuglebowski/slayzone/commit/83db9e35))
+- **shortcuts:** Add priority-based keyboard shortcut system ([2a640270](https://github.com/debuglebowski/slayzone/commit/2a640270))
+- **terminal:** Add session resume and adapter improvements ([a989a27e](https://github.com/debuglebowski/slayzone/commit/a989a27e))
+- **panels:** Add web panel CRUD with CLI commands ([bd976b69](https://github.com/debuglebowski/slayzone/commit/bd976b69))
+- **ai-config:** Add skill dependency graph visualization ([71e539b5](https://github.com/debuglebowski/slayzone/commit/71e539b5))
+- **ui:** Add context manager tab to home panel ([1c0caf3a](https://github.com/debuglebowski/slayzone/commit/1c0caf3a))
+- **ai-config:** Redesign context manager with 3-level navigation ([cbe092d9](https://github.com/debuglebowski/slayzone/commit/cbe092d9))
+- **e2e:** Add parallel runner, fixture helpers, globstar support ([7a01cb71](https://github.com/debuglebowski/slayzone/commit/7a01cb71))
+- **task-browser:** Scope URL import to current project ([0b9349e2](https://github.com/debuglebowski/slayzone/commit/0b9349e2))
+- **ai-config:** Expand provider registry with cursor, agents, mcp configs ([a86cb077](https://github.com/debuglebowski/slayzone/commit/a86cb077))
+- **ai-config:** Add zustand store and global files view ([4732c30f](https://github.com/debuglebowski/slayzone/commit/4732c30f))
+- **ai-config:** Rework instructions, skills, and MCP panels ([67c48070](https://github.com/debuglebowski/slayzone/commit/67c48070))
+
+### 🩹 Fixes
+
+- **cli:** Don't show install dialog when CLI is already installed ([b182ac9d](https://github.com/debuglebowski/slayzone/commit/b182ac9d))
+- **task:** Keep blocker search in add popover only ([0deea3fe](https://github.com/debuglebowski/slayzone/commit/0deea3fe))
+- **ai-config:** Sync frontmatter to all providers, not just claude ([678683ed](https://github.com/debuglebowski/slayzone/commit/678683ed))
+- **app:** Keep browser views aligned during app zoom ([646f1027](https://github.com/debuglebowski/slayzone/commit/646f1027))
+- **e2e:** Restore PTY handlers after mock specs, fix integration tests ([07762ad5](https://github.com/debuglebowski/slayzone/commit/07762ad5))
+- **ai-config:** Restore context manager entry points in tab bar and home panel ([3c0df883](https://github.com/debuglebowski/slayzone/commit/3c0df883))
+- **terminal:** Per-adapter startup timeout, increase Gemini to 20s ([c08c0c12](https://github.com/debuglebowski/slayzone/commit/c08c0c12))
+- **task-browser:** Fix URL input update on history navigation ([bb33a7c9](https://github.com/debuglebowski/slayzone/commit/bb33a7c9))
+
+### 💅 Refactors
+
+- **ai-config:** Remove context manager from global and project settings menus ([810e5162](https://github.com/debuglebowski/slayzone/commit/810e5162))
+- **ai-config:** Replace level tabs with collapsible sidebar sections ([7e401894](https://github.com/debuglebowski/slayzone/commit/7e401894))
+- **e2e:** Reorganize flat test files into subdirectories ([bf975b88](https://github.com/debuglebowski/slayzone/commit/bf975b88))
+- **ai-config:** Unified split-pane instructions with variant references ([8180da07](https://github.com/debuglebowski/slayzone/commit/8180da07))
+- **e2e:** Rebalance groups to 4 dirs, skip GPU/CLI-contention flakes ([a4554c1f](https://github.com/debuglebowski/slayzone/commit/a4554c1f))
+- **tabs:** Move context manager tab to right of home tab ([67ee0a0c](https://github.com/debuglebowski/slayzone/commit/67ee0a0c))
+
+### 📖 Documentation
+
+- Normalize AGENTS.md markdown formatting ([fb36ebaf](https://github.com/debuglebowski/slayzone/commit/fb36ebaf))
+
+### 🏡 Chore
+
+- Add frontmatter to skills, remove evaluate-competitor, update release ([151e498c](https://github.com/debuglebowski/slayzone/commit/151e498c))
+- Remove Gemini skills, consolidate agent docs ([cf26cee9](https://github.com/debuglebowski/slayzone/commit/cf26cee9))
+- Misc cleanups, type fixes, and perf data updates ([0cb3fc47](https://github.com/debuglebowski/slayzone/commit/0cb3fc47))
+- Update perf data ([8a9d7564](https://github.com/debuglebowski/slayzone/commit/8a9d7564))
+- Replace TEST_STATUS_REPORT with E2E-REPORT ([fbb24513](https://github.com/debuglebowski/slayzone/commit/fbb24513))
+- Fix truncated LICENSE, add license field to package.json ([0ccb23ee](https://github.com/debuglebowski/slayzone/commit/0ccb23ee))
+- Update performance profiling data ([ce74172c](https://github.com/debuglebowski/slayzone/commit/ce74172c))
+- Update performance profiling data ([4aa096b9](https://github.com/debuglebowski/slayzone/commit/4aa096b9))
+
+### ✅ Tests
+
+- **task:** Align stale UI expectations ([e2065d8a](https://github.com/debuglebowski/slayzone/commit/e2065d8a))
+- **e2e:** Add session and provider config test suites ([e590f356](https://github.com/debuglebowski/slayzone/commit/e590f356))
+- **e2e:** Update existing tests and fixtures ([21a3ba6c](https://github.com/debuglebowski/slayzone/commit/21a3ba6c))
+- **e2e:** Extract browser panel helpers in protocol blocking spec ([1744d7e7](https://github.com/debuglebowski/slayzone/commit/1744d7e7))
+- **e2e:** Update specs and fixtures for stability ([2c487081](https://github.com/debuglebowski/slayzone/commit/2c487081))
+- **e2e:** Skip codex resize test, document gray prompt box limitation ([34e920ff](https://github.com/debuglebowski/slayzone/commit/34e920ff))
+
+### ❤️ Contributors
+
+- Debuglebowski
+
 ## v0.13.0
 
 [compare changes](https://github.com/debuglebowski/slayzone/compare/v0.12.0...v0.13.0)
