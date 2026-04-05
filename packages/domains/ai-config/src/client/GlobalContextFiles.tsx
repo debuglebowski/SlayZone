@@ -234,7 +234,7 @@ export function GlobalContextFiles({ filter }: GlobalContextFilesProps = {}) {
       </div>
 
       {/* Drag handle */}
-      <div className="relative flex w-3 shrink-0 cursor-col-resize items-center justify-center" onMouseDown={onDragStart}>
+      <div className="relative flex w-3 shrink-0 cursor-col-resize items-center justify-center" onMouseDown={onDragStart} onDoubleClick={() => setSplitWidth(350)}>
         <div className="h-full w-px bg-border" />
       </div>
 
@@ -243,6 +243,7 @@ export function GlobalContextFiles({ filter }: GlobalContextFilesProps = {}) {
         {selectedPath ? (
           <Textarea
             className="min-h-0 max-h-none flex-1 resize-none [field-sizing:fixed] font-mono text-sm"
+            placeholder="File content..."
             value={content}
             onChange={handleContentChange}
           />

@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useRef, useState, type ChangeEvent, type MouseEvent as ReactMouseEvent } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, type MouseEvent as ReactMouseEvent } from 'react'
 import { File, FilePlus, Link, Unlink, RefreshCw, Save, Check, AlertCircle, Circle, Pencil, Trash2, RefreshCcw } from 'lucide-react'
 import { Button, ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuSeparator, ContextMenuTrigger, Dialog, DialogContent, DialogHeader, DialogTitle, Input, Label, Textarea, FileTree, fileTreeIndent, cn } from '@slayzone/ui'
 import type { CliProvider, ContextTreeEntry } from '../shared'
+import { useContextManagerStore } from './useContextManagerStore'
 import { GlobalItemPicker } from './GlobalItemPicker'
 import { contextEntryToSyncHealth } from './sync-view-model'
 
@@ -53,7 +54,8 @@ interface ProjectContextTreeProps {
 export function ProjectContextTree({ projectPath, projectId }: ProjectContextTreeProps) {
   const [entries, setEntries] = useState<ContextTreeEntry[]>([])
   const [loading, setLoading] = useState(false)
-  const [selectedPath, setSelectedPath] = useState<string | null>(null)
+  const selectedPath = useContextManagerStore((s) => s.projectSelectedPath)
+  const setSelectedPath = useContextManagerStore((s) => s.setProjectSelectedPath)
   const [content, setContent] = useState('')
   const [originalContent, setOriginalContent] = useState('')
   const [saving, setSaving] = useState(false)
@@ -61,7 +63,17 @@ export function ProjectContextTree({ projectPath, projectId }: ProjectContextTre
   const [showPicker, setShowPicker] = useState(false)
   const [creatingFile, setCreatingFile] = useState(false)
   const [newFilePath, setNewFilePath] = useState('')
-  const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set())
+  const storedExpandedFolders = useContextManagerStore((s) => s.projectExpandedFolders)
+  const setStoredExpandedFolders = useContextManagerStore((s) => s.setProjectExpandedFolders)
+  const expandedFolders = useMemo(() => new Set(storedExpandedFolders), [storedExpandedFolders])
+  const setExpandedFolders = useCallback((update: Set<string> | ((prev: Set<string>) => Set<string>)) => {
+    if (typeof update === 'function') {
+      const next = update(expandedFolders)
+      setStoredExpandedFolders([...next])
+    } else {
+      setStoredExpandedFolders([...update])
+    }
+  }, [expandedFolders, setStoredExpandedFolders])
   const [renamingEntry, setRenamingEntry] = useState<ContextTreeEntry | null>(null)
   const [renameValue, setRenameValue] = useState('')
   const [syncing, setSyncing] = useState(false)
@@ -299,7 +311,8 @@ export function ProjectContextTree({ projectPath, projectId }: ProjectContextTre
   }, [selectedPath])
 
   // Resizable split (pixel-based)
-  const [splitWidth, setSplitWidth] = useState(350)
+  const splitWidth = useContextManagerStore((s) => s.projectSplitWidth)
+  const setSplitWidth = useContextManagerStore((s) => s.setProjectSplitWidth)
   const containerRef = useRef<HTMLDivElement>(null)
   const dragging = useRef(false)
 
@@ -395,6 +408,7 @@ export function ProjectContextTree({ projectPath, projectId }: ProjectContextTre
       <div
         className="relative flex w-3 shrink-0 cursor-col-resize items-center justify-center"
         onMouseDown={onDragStart}
+        onDoubleClick={() => setSplitWidth(350)}
       >
         <div className="h-full w-px bg-border" />
       </div>
@@ -415,9 +429,15 @@ export function ProjectContextTree({ projectPath, projectId }: ProjectContextTre
             </div>
             <Textarea
               className="min-h-0 max-h-none flex-1 resize-none [field-sizing:fixed] font-mono text-sm"
+              placeholder="File content..."
               value={content}
               onChange={(e: ChangeEvent<HTMLTextAreaElement>) => setContent(e.target.value)}
             />
+            {selectedPath.endsWith('.json') && (() => {
+              if (!content.trim()) return null
+              try { JSON.parse(content); return <p className="text-[11px] text-green-600 dark:text-green-400 pt-1">Valid JSON</p> }
+              catch (e) { return <p className="text-[11px] text-destructive pt-1">{(e as Error).message}</p> }
+            })()}
           </>
         ) : (
           <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">
@@ -443,6 +463,7 @@ export function ProjectContextTree({ projectPath, projectId }: ProjectContextTre
           </DialogHeader>
           <Input
             className="font-mono text-xs"
+            placeholder="new-filename.md"
             value={renameValue}
             onChange={(e: ChangeEvent<HTMLInputElement>) => setRenameValue(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && handleRename()}

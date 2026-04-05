@@ -281,8 +281,7 @@ function isPathAllowed(filePath: string, projectPath: string | null): boolean {
   const resolved = path.resolve(filePath)
   const home = app.getPath('home')
   // Allow all global provider base dirs
-  for (const [provider, spec] of Object.entries(GLOBAL_PROVIDER_PATHS)) {
-    if (!isConfigurableCliProvider(provider)) continue
+  for (const [, spec] of Object.entries(GLOBAL_PROVIDER_PATHS)) {
     const dir = path.join(home, spec.baseDir)
     if (resolved.startsWith(dir + path.sep) || resolved === dir) return true
   }
@@ -544,23 +543,50 @@ export function registerAiConfigHandlers(ipcMain: IpcMain, db: Database): void {
     return results
   })
 
+  function fileContentMeta(filePath: string): { contentHash: string; lineCount: number } | undefined {
+    try {
+      const text = fs.readFileSync(filePath, 'utf-8')
+      return {
+        contentHash: createHash('md5').update(text).digest('hex'),
+        lineCount: text.split('\n').length,
+      }
+    } catch { return undefined }
+  }
+
   ipcMain.handle('ai-config:get-global-files', () => {
     const home = app.getPath('home')
     const entries: GlobalFileEntry[] = []
 
-    for (const [provider, spec] of Object.entries(GLOBAL_PROVIDER_PATHS)) {
-      if (!isConfigurableCliProvider(provider)) continue
+    for (const [key, spec] of Object.entries(GLOBAL_PROVIDER_PATHS)) {
       const baseDir = path.join(home, spec.baseDir)
 
       // Instructions file
       if (spec.instructions) {
         const filePath = path.join(baseDir, spec.instructions)
+        const exists = fs.existsSync(filePath)
+        const meta = exists ? fileContentMeta(filePath) : undefined
         entries.push({
           path: filePath,
           name: `~/${spec.baseDir}/${spec.instructions}`,
-          provider,
+          provider: key,
           category: 'instructions',
-          exists: fs.existsSync(filePath)
+          exists,
+          ...meta,
+        })
+      }
+
+      // MCP config file
+      if (spec.mcpConfig) {
+        const filePath = path.join(baseDir, spec.mcpConfig)
+        const exists = fs.existsSync(filePath)
+        const meta = exists ? fileContentMeta(filePath) : undefined
+        entries.push({
+          path: filePath,
+          name: `~/${spec.baseDir}/${spec.mcpConfig}`,
+          provider: key,
+          category: 'mcp',
+          exists,
+          ...meta,
         })
       }
 
@@ -571,12 +597,14 @@ export function registerAiConfigHandlers(ipcMain: IpcMain, db: Database): void {
           try {
             for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
               if (entry.isFile() && entry.name.endsWith('.md')) {
+                const fp = path.join(dir, entry.name)
                 entries.push({
-                  path: path.join(dir, entry.name),
+                  path: fp,
                   name: `~/${spec.baseDir}/${spec.skillsDir}/${entry.name}`,
-                  provider,
+                  provider: key,
                   category: 'skill',
-                  exists: true
+                  exists: true,
+                  ...fileContentMeta(fp),
                 })
               } else if (entry.isDirectory()) {
                 const skillFile = path.join(dir, entry.name, 'SKILL.md')
@@ -584,9 +612,10 @@ export function registerAiConfigHandlers(ipcMain: IpcMain, db: Database): void {
                   entries.push({
                     path: skillFile,
                     name: `~/${spec.baseDir}/${spec.skillsDir}/${entry.name}/SKILL.md`,
-                    provider,
+                    provider: key,
                     category: 'skill',
-                    exists: true
+                    exists: true,
+                    ...fileContentMeta(skillFile),
                   })
                 }
               }
@@ -622,11 +651,10 @@ export function registerAiConfigHandlers(ipcMain: IpcMain, db: Database): void {
 
   ipcMain.handle('ai-config:create-global-file', (
     _event,
-    provider: CliProvider,
+    provider: string,
     category: 'skill',
     slugInput: string
   ): GlobalFileEntry => {
-    if (!isConfigurableCliProvider(provider)) throw new Error(`Provider ${provider} is not configurable`)
     const spec = GLOBAL_PROVIDER_PATHS[provider]
     if (!spec) throw new Error(`Provider ${provider} does not support global file management`)
 
@@ -1060,34 +1088,45 @@ export function registerAiConfigHandlers(ipcMain: IpcMain, db: Database): void {
   }
 
   function recomputeInstructionsResult(projectId: string, projectPath: string): RootInstructionsResult {
-    const item = db.prepare(
-      "SELECT * FROM ai_config_items WHERE type = 'root_instructions' AND scope = 'project' AND project_id = ?"
-    ).get(projectId) as AiConfigItem | undefined
+    // Check for linked library variant
+    const variantRow = db.prepare("SELECT value FROM settings WHERE key = ?")
+      .get(`ai_instruction_variant:${projectId}`) as { value: string } | undefined
+    let variant: AiConfigItem | undefined
+    if (variantRow) {
+      variant = db.prepare(
+        "SELECT * FROM ai_config_items WHERE id = ? AND type = 'root_instructions' AND scope = 'global'"
+      ).get(variantRow.value) as AiConfigItem | undefined
+    }
 
     const providers = getEnabledProviders(projectId)
     const resolvedProject = path.resolve(projectPath)
-    const providerHealth: Partial<Record<CliProvider, { health: SyncHealth; reason: SyncReason | null }>> = {}
+    const providerHealth: Partial<Record<CliProvider, { health: SyncHealth; reason: SyncReason | null; contentHash?: string | null; lineCount?: number | null }>> = {}
 
     for (const provider of providers) {
       const rootPath = PROVIDER_PATHS[provider]?.rootInstructions
       if (!rootPath) continue
       const filePath = path.join(resolvedProject, rootPath)
-      if (!item) {
-        if (fs.existsSync(filePath)) {
-          providerHealth[provider] = { health: 'unmanaged', reason: 'not_linked' }
-        } else {
-          providerHealth[provider] = { health: 'not_synced', reason: 'not_linked' }
-        }
+      let fileHash: string | null = null
+      let lineCount: number | null = null
+      if (fs.existsSync(filePath)) {
+        const text = fs.readFileSync(filePath, 'utf-8')
+        fileHash = contentHash(text)
+        lineCount = text.split('\n').length
+      }
+      if (!variant) {
+        providerHealth[provider] = { health: 'not_synced', reason: 'not_linked', contentHash: fileHash, lineCount }
         continue
       }
-      const syncState = computeLinkedSyncState(filePath, item.content)
+      const syncState = computeLinkedSyncState(filePath, variant.content)
       providerHealth[provider] = {
         health: syncState.syncHealth,
-        reason: syncState.syncReason
+        reason: syncState.syncReason,
+        contentHash: fileHash,
+        lineCount
       }
     }
 
-    return { content: item?.content ?? '', providerHealth }
+    return { content: variant?.content ?? '', providerHealth }
   }
 
   ipcMain.handle('ai-config:get-root-instructions', (_event, projectId: string, projectPath: string) => {
@@ -1147,12 +1186,40 @@ export function registerAiConfigHandlers(ipcMain: IpcMain, db: Database): void {
     return item ?? null
   })
 
-  ipcMain.handle('ai-config:set-project-instruction-variant', (_event, projectId: string, variantItemId: string | null) => {
+  ipcMain.handle('ai-config:set-project-instruction-variant', (_event, projectId: string, variantItemId: string | null, projectPath?: string) => {
     if (variantItemId === null) {
       db.prepare("DELETE FROM settings WHERE key = ?").run(`ai_instruction_variant:${projectId}`)
-    } else {
-      db.prepare('INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value')
-        .run(`ai_instruction_variant:${projectId}`, variantItemId)
+      return
+    }
+
+    db.prepare('INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value')
+      .run(`ai_instruction_variant:${projectId}`, variantItemId)
+
+    // Auto-sync: write variant content to all provider instruction files
+    if (projectPath) {
+      const variant = db.prepare(
+        "SELECT * FROM ai_config_items WHERE id = ? AND type = 'root_instructions' AND scope = 'global'"
+      ).get(variantItemId) as AiConfigItem | undefined
+      if (variant) {
+        const hash = contentHash(variant.content)
+        const providers = getEnabledProviders(projectId)
+        const resolvedProject = path.resolve(projectPath)
+        for (const provider of providers) {
+          const rootPath = PROVIDER_PATHS[provider]?.rootInstructions
+          if (!rootPath) continue
+          const filePath = path.join(resolvedProject, rootPath)
+          if (!isPathAllowed(filePath, projectPath)) continue
+          const dir = path.dirname(filePath)
+          if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true })
+          fs.writeFileSync(filePath, variant.content, 'utf-8')
+          db.prepare(`
+            INSERT INTO ai_config_project_selections (id, project_id, item_id, provider, target_path, content_hash, selected_at)
+            VALUES (?, ?, ?, ?, ?, ?, datetime('now'))
+            ON CONFLICT(project_id, item_id, provider) DO UPDATE SET
+              target_path = excluded.target_path, content_hash = excluded.content_hash, selected_at = datetime('now')
+          `).run(crypto.randomUUID(), projectId, variant.id, provider, rootPath, hash)
+        }
+      }
     }
   })
 

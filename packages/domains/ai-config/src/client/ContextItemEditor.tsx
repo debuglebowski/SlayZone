@@ -11,9 +11,10 @@ interface ContextItemEditorProps {
   onUpdate: (patch: Omit<UpdateAiConfigItemInput, 'id'>) => Promise<void>
   onDelete: () => Promise<void>
   onClose: () => void
+  readOnly?: boolean
 }
 
-export function ContextItemEditor({ item, validationState, onUpdate, onDelete, onClose }: ContextItemEditorProps) {
+export function ContextItemEditor({ item, validationState, onUpdate, onDelete, onClose, readOnly }: ContextItemEditorProps) {
   const [slug, setSlug] = useState(item.slug)
   const [content, setContent] = useState(item.content)
   const [saving, setSaving] = useState(false)
@@ -41,6 +42,11 @@ export function ContextItemEditor({ item, validationState, onUpdate, onDelete, o
     }
   }
 
+  const isJson = slug.endsWith('.json')
+  const jsonError = isJson && content.trim()
+    ? (() => { try { JSON.parse(content); return null } catch (e) { return (e as Error).message } })()
+    : null
+
   const fixFrontmatterLabel = getSkillFrontmatterActionLabel(effectiveValidation)
 
   const handleFixFrontmatter = async () => {
@@ -50,18 +56,21 @@ export function ContextItemEditor({ item, validationState, onUpdate, onDelete, o
   }
 
   return (
-    <div className="space-y-3 rounded-lg border bg-muted/20 p-4">
+    <div className="flex-1 flex flex-col space-y-3">
       <div className="space-y-1">
         <Label className="text-xs">Filename</Label>
         <Input
           data-testid="context-item-editor-slug"
           className="font-mono text-sm"
+          placeholder="my-skill.md"
           value={slug}
+          readOnly={readOnly}
           onChange={(e: ChangeEvent<HTMLInputElement>) => {
             setSlug(e.target.value)
             setError(null)
           }}
           onBlur={(e: ChangeEvent<HTMLInputElement>) => {
+            if (readOnly) return
             const nextSlug = e.currentTarget.value
             setSlug(nextSlug)
             void save({ slug: nextSlug })
@@ -69,17 +78,20 @@ export function ContextItemEditor({ item, validationState, onUpdate, onDelete, o
         />
       </div>
 
-      <div className="space-y-1">
+      <div className="flex-1 flex flex-col space-y-1">
         <Label className="text-xs">Content</Label>
         <Textarea
           data-testid="context-item-editor-content"
-          className="min-h-48 font-mono text-sm"
+          className="flex-1 min-h-48 max-h-none field-sizing-fixed font-mono text-sm resize-none"
+          placeholder="Write your content here..."
           value={content}
+          readOnly={readOnly}
           onChange={(e: ChangeEvent<HTMLTextAreaElement>) => {
             setContent(e.target.value)
             setError(null)
           }}
           onBlur={(e: ChangeEvent<HTMLTextAreaElement>) => {
+            if (readOnly) return
             const nextContent = e.currentTarget.value
             setContent(nextContent)
             void save({ content: nextContent })
@@ -120,18 +132,29 @@ export function ContextItemEditor({ item, validationState, onUpdate, onDelete, o
         </div>
       )}
 
+      {isJson && jsonError && (
+        <div className="rounded border border-destructive/20 bg-destructive/5 px-2.5 py-2">
+          <p className="text-[11px] text-destructive">{jsonError}</p>
+        </div>
+      )}
+      {isJson && !jsonError && content.trim() && (
+        <p className="text-[11px] text-green-600 dark:text-green-400">Valid JSON</p>
+      )}
+
       <div className="flex items-center justify-between gap-2 pt-1">
         <Button size="sm" variant="ghost" onClick={onClose} data-testid="context-item-editor-close">
           Close
         </Button>
         <div className="flex items-center gap-2">
           <span className="text-[11px] text-muted-foreground">
-            {saving ? 'Saving...' : 'Autosave on blur'}
+            {readOnly ? 'Read-only (library skill)' : saving ? 'Saving...' : 'Autosave on blur'}
           </span>
-          <Button size="sm" variant="ghost" className="text-destructive" onClick={onDelete}>
-            <Trash2 className="mr-1 size-3" />
-            Delete
-          </Button>
+          {!readOnly && (
+            <Button size="sm" variant="ghost" className="text-destructive" onClick={onDelete}>
+              <Trash2 className="mr-1 size-3" />
+              Delete
+            </Button>
+          )}
         </div>
       </div>
     </div>

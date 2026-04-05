@@ -378,6 +378,7 @@ function SkillItemDetail({ item, providers, enabledProviders, isLocal, projectId
                 <Input
                   data-testid="skill-detail-filename"
                   className="font-mono text-xs !bg-surface-1 dark:!bg-surface-1 shadow-none"
+                  placeholder="my-skill"
                   value={sk.slug}
                   onChange={(e) => sk.setSlug(e.target.value)}
                 />

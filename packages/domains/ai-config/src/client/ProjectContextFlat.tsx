@@ -420,11 +420,14 @@ export function ProjectContextFlat({ projectId, projectPath, onOpenGlobalAiConfi
             <ArrowLeft className="size-3.5" />
             {sectionTitles[section]}
           </button>
-          {section !== 'instructions' && (
-            <span className="text-xs text-muted-foreground">
-              {sectionDescriptions[section]}
-            </span>
-          )}
+          <div className="flex items-center gap-2">
+            <div id="context-manager-header-actions" />
+            {section !== 'instructions' && (
+              <span className="text-xs text-muted-foreground">
+                {sectionDescriptions[section]}
+              </span>
+            )}
+          </div>
         </div>
       )}
 

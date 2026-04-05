@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState, type ChangeEvent } from 'react'
-import { Plus, Search } from 'lucide-react'
-import { Button, Dialog, DialogContent, DialogHeader, DialogTitle, Input, cn } from '@slayzone/ui'
+import { useEffect, useMemo, useState } from 'react'
+import { Library, Plus, Sparkles } from 'lucide-react'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, cn } from '@slayzone/ui'
 import { buildDefaultSkillContent } from '../shared'
 import type { AiConfigItem, AiConfigItemType, CliProvider } from '../shared'
 import { PROVIDER_PATHS } from '../shared/provider-registry'
@@ -27,27 +27,31 @@ function nextAvailableSlug(base: string, existingSlugs: Set<string>): string {
   return `${base}-${index}`
 }
 
+type Step = 'choose' | 'library'
+
 export function AddItemPicker({
   open, onOpenChange, type, projectId, projectPath,
   enabledProviders, existingLinks, onAdded
 }: AddItemPickerProps) {
+  const [step, setStep] = useState<Step>('choose')
   const [globalItems, setGlobalItems] = useState<AiConfigItem[]>([])
-  const [search, setSearch] = useState('')
   const [loading, setLoading] = useState(false)
 
+  // Reset step when dialog opens
   useEffect(() => {
-    if (!open) return
+    if (open) {
+      setStep('choose')
+    }
+  }, [open])
+
+  // Fetch library items when entering library step
+  useEffect(() => {
+    if (!open || step !== 'library') return
     void (async () => {
       const items = await window.api.aiConfig.listItems({ scope: 'global', type })
       setGlobalItems(items)
     })()
-  }, [open, type])
-
-  const filtered = useMemo(() => {
-    if (!search) return globalItems
-    const q = search.toLowerCase()
-    return globalItems.filter(i => i.slug.toLowerCase().includes(q) || i.name.toLowerCase().includes(q))
-  }, [globalItems, search])
+  }, [open, step, type])
 
   const compatibleProviders = useMemo(
     () => enabledProviders.filter((provider) => providerSupportsType(provider)),
@@ -97,83 +101,88 @@ export function AddItemPicker({
     }
   }
 
-  const label = 'Skill'
-
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
-        <DialogHeader>
-          <DialogTitle>Add {label}</DialogTitle>
+      <DialogContent className="max-w-md p-0 gap-0 overflow-hidden">
+        <DialogHeader className="px-5 pt-5 pb-3">
+          <DialogTitle className="text-base">
+            {step === 'choose' ? 'Add Skill' : 'Add from Library'}
+          </DialogTitle>
+          <p className="text-xs text-muted-foreground">
+            {step === 'choose' ? 'Create a new skill or link one from your library' : 'Link a global skill into this project'}
+          </p>
         </DialogHeader>
 
-        <div className="space-y-3">
-          {!canLinkFromLibrary && (
-            <p className="rounded-md border border-amber-500/30 bg-amber-500/10 px-2.5 py-2 text-xs text-amber-700 dark:text-amber-300">
-              No enabled providers support skills yet.
-              Enable a compatible provider first to link from the global library.
-            </p>
-          )}
-
-          <div className="relative">
-            <Search className="absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              data-testid="add-item-picker-search"
-              value={search}
-              onChange={(e: ChangeEvent<HTMLInputElement>) => setSearch(e.target.value)}
-              placeholder="Search global library..."
-              className="h-8 pl-8 text-xs"
-            />
-          </div>
-
-          <div className="max-h-56 space-y-0.5 overflow-y-auto rounded-md border p-1">
-            {filtered.length === 0 ? (
-              <p className="p-3 text-center text-xs text-muted-foreground">
-                {search ? 'No matches' : `No global ${type}s yet`}
-              </p>
-            ) : (
-              <>
-                <p className="px-2 py-1 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
-                  From Library
-                </p>
-                {filtered.map(item => {
-                  const linked = existingLinks.includes(item.id)
-                  return (
-                    <button
-                      key={item.id}
-                      disabled={linked || loading || !canLinkFromLibrary}
-                      onClick={() => handleSelectGlobal(item)}
-                      data-testid={`add-item-option-${item.slug}`}
-                      className={cn(
-                        'flex w-full items-center gap-2 rounded px-2.5 py-1.5 text-left text-sm transition-colors',
-                        linked
-                          ? 'cursor-not-allowed opacity-40'
-                          : 'hover:bg-muted/50'
-                      )}
-                    >
-                      <span className="min-w-0 flex-1 truncate font-mono text-xs">{item.slug}</span>
-                      {linked && (
-                        <span className="shrink-0 text-[10px] text-muted-foreground">Linked</span>
-                      )}
-                    </button>
-                  )
-                })}
-              </>
-            )}
-          </div>
-
-          <div className="border-t pt-3">
-            <Button
-              variant="outline"
-              size="sm"
-              className="w-full text-xs"
+        {step === 'choose' ? (
+          <div className="border-t">
+            <button
+              className="flex w-full items-start gap-3 border-b border-border/40 px-5 py-3 text-left transition-colors hover:bg-muted/40"
               onClick={handleCreateLocal}
               disabled={loading}
             >
-              <Plus className="mr-1 size-3" />
-              Create project {type}
-            </Button>
+              <Plus className="size-4 shrink-0 mt-0.5 text-muted-foreground" />
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-medium">Create new</p>
+                <p className="mt-0.5 text-xs text-muted-foreground">New project skill</p>
+              </div>
+            </button>
+            <button
+              className={cn(
+                'flex w-full items-start gap-3 px-5 py-3 text-left transition-colors',
+                canLinkFromLibrary ? 'hover:bg-muted/40' : 'opacity-40 cursor-not-allowed'
+              )}
+              onClick={() => canLinkFromLibrary && setStep('library')}
+              disabled={!canLinkFromLibrary}
+            >
+              <Library className="size-4 shrink-0 mt-0.5 text-muted-foreground" />
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-medium">From library</p>
+                <p className="mt-0.5 text-xs text-muted-foreground">
+                  {canLinkFromLibrary ? 'Link a global skill' : 'No compatible providers'}
+                </p>
+              </div>
+            </button>
           </div>
-        </div>
+        ) : (
+          <div className="border-t max-h-72 overflow-y-auto">
+            {globalItems.map(item => {
+              const linked = existingLinks.includes(item.id)
+              return (
+                <button
+                  key={item.id}
+                  disabled={linked || loading}
+                  onClick={() => handleSelectGlobal(item)}
+                  data-testid={`add-item-option-${item.slug}`}
+                  className={cn(
+                    'flex w-full items-start gap-3 border-b border-border/40 last:border-0 px-5 py-3 text-left transition-colors',
+                    linked
+                      ? 'cursor-not-allowed opacity-40'
+                      : 'hover:bg-muted/40'
+                  )}
+                >
+                  <Sparkles className="size-4 shrink-0 mt-0.5 text-muted-foreground" />
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <p className="text-sm font-medium truncate">{item.slug}</p>
+                      {linked && (
+                        <span className="shrink-0 text-[10px] text-muted-foreground">Linked</span>
+                      )}
+                    </div>
+                    <p className="mt-0.5 text-xs text-muted-foreground line-clamp-2">
+                      {item.content.slice(0, 120) || '(empty)'}
+                    </p>
+                  </div>
+                </button>
+              )
+            })}
+            {globalItems.length === 0 && (
+              <div className="px-5 py-8 text-center">
+                <p className="text-sm text-muted-foreground">No library skills available</p>
+                <p className="mt-1 text-xs text-muted-foreground/60">Create one in the Library section first</p>
+              </div>
+            )}
+          </div>
+        )}
       </DialogContent>
     </Dialog>
   )

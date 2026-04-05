@@ -364,7 +364,7 @@ export function McpFlatSection({ projectPath, enabledProviders, onOpenGlobalAiCo
       ) : (
         <>
           {enabledServers.length > 0 && (
-            <div className="space-y-2">
+            <div className="grid grid-cols-[repeat(auto-fill,minmax(360px,1fr))] gap-2">
               {enabledServers.map(server => {
                 const isExpanded = expandedKey === server.key
                 const syncHealth = getServerSyncHealth(server)
@@ -386,7 +386,7 @@ export function McpFlatSection({ projectPath, enabledProviders, onOpenGlobalAiCo
                     data-testid={`project-context-item-mcp-${server.key}`}
                   className={cn(
                       'rounded-md border overflow-hidden',
-                      isExpanded && 'border-primary/30'
+                      isExpanded && 'border-primary/30 col-[1/-1]'
                     )}
                   >
                     <div

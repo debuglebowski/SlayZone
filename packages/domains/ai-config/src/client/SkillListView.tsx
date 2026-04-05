@@ -1,6 +1,7 @@
-import { Plus, Trash2, AlertTriangle } from 'lucide-react'
+import { Trash2, AlertTriangle } from 'lucide-react'
 import { Button, cn } from '@slayzone/ui'
 import { getSkillValidation } from './skill-validation'
+import { useContextManagerStore } from './useContextManagerStore'
 import type { AiConfigItem } from '../shared'
 
 interface SkillListViewProps {
@@ -8,7 +9,6 @@ interface SkillListViewProps {
   selectedSkillId: string | null
   onSelectSkill: (id: string | null) => void
   onDeleteItem: (id: string) => void
-  onCreateSkill: () => void
 }
 
 export function SkillListView({
@@ -16,17 +16,12 @@ export function SkillListView({
   selectedSkillId,
   onSelectSkill,
   onDeleteItem,
-  onCreateSkill,
 }: SkillListViewProps) {
+  const showLineCount = useContextManagerStore((s) => s.showLineCount)
+
   return (
     <div className="space-y-2">
-      <div className="flex items-center justify-between">
-        <p className="text-xs text-muted-foreground">{items.length} skill{items.length !== 1 ? 's' : ''}</p>
-        <Button size="sm" variant="outline" onClick={onCreateSkill} className="h-7">
-          <Plus className="size-3 mr-1" />
-          New Skill
-        </Button>
-      </div>
+      <p className="text-xs text-muted-foreground">{items.length} skill{items.length !== 1 ? 's' : ''}</p>
 
       {items.length === 0 && (
         <p className="text-xs text-muted-foreground py-8 text-center">
@@ -65,6 +60,9 @@ export function SkillListView({
                   <p className="text-xs text-muted-foreground truncate">{item.name}</p>
                 )}
               </div>
+              {showLineCount && (
+                <span className="shrink-0 text-[10px] text-muted-foreground/60">{item.content.split('\n').length}L</span>
+              )}
               <Button
                 size="sm"
                 variant="ghost"

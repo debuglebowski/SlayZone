@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef } from 'react'
 import {
   ReactFlow,
-  Controls,
   Background,
   useNodesState,
   useEdgesState,
@@ -19,7 +18,7 @@ import { parseSkillFrontmatter, renderSkillFrontmatter } from '../shared'
 import { buildDependencyGraph, parseDependsOn, setDependsOn } from '../shared/skill-dependencies'
 import { computeGraphLayout } from '../shared/graph-layout'
 import { getSkillValidation } from './skill-validation'
-import { SkillNodeCard, type SkillNodeData } from './SkillNodeCard'
+import { SkillNodeCard, computeSkillNodeWidth, type SkillNodeData } from './SkillNodeCard'
 import { DependencyEdge, type DependencyEdgeData } from './DependencyEdge'
 
 const nodeTypes = { skill: SkillNodeCard }
@@ -65,7 +64,7 @@ function SkillGraphCanvasInner({
     const deps = buildDependencyGraph(skills)
     const stored = autoLayout ? {} : getStoredPositions(scope)
 
-    const graphNodes = skills.map(item => ({ id: item.id }))
+    const graphNodes = skills.map(item => ({ id: item.id, width: computeSkillNodeWidth(item.slug) }))
     const graphEdges = deps
       .map(d => ({
         source: slugToId.get(d.sourceSlug) ?? '',
@@ -90,6 +89,7 @@ function SkillGraphCanvasInner({
           validationStatus: validation?.status ?? null,
           description,
           selected: item.id === selectedSkillId,
+          width: computeSkillNodeWidth(item.slug),
         },
       }
     })
@@ -222,7 +222,6 @@ function SkillGraphCanvasInner({
         proOptions={{ hideAttribution: true }}
         className="bg-background"
       >
-        <Controls position="bottom-left" showInteractive={false} />
         <Background gap={20} size={1} />
       </ReactFlow>
       <div className="absolute left-3 top-3 flex gap-2">
@@ -230,12 +229,6 @@ function SkillGraphCanvasInner({
           <LayoutGrid className="mr-1.5 size-3.5" />
           Auto Layout
         </Button>
-        {onCreateSkill && (
-          <Button size="sm" variant="outline" onClick={onCreateSkill}>
-            <Plus className="mr-1.5 size-3.5" />
-            Add Skill
-          </Button>
-        )}
       </div>
     </div>
   )

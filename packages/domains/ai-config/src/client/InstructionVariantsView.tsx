@@ -1,15 +1,11 @@
 import { useCallback, useEffect, useRef, useState, type ChangeEvent, type MouseEvent as ReactMouseEvent } from 'react'
-import { Check, FileText, Plus, Save, Trash2 } from 'lucide-react'
-import { Button, Input, Textarea, cn } from '@slayzone/ui'
+import { createPortal } from 'react-dom'
+import { FileText, Plus, Save, Trash2 } from 'lucide-react'
+import { Button, Input, Label, Textarea, cn } from '@slayzone/ui'
 import type { AiConfigItem } from '../shared'
 
-interface InstructionVariantsViewProps {
-  projectId: string | null
-}
-
-export function InstructionVariantsView({ projectId }: InstructionVariantsViewProps) {
+export function InstructionVariantsView() {
   const [variants, setVariants] = useState<AiConfigItem[]>([])
-  const [projectVariantId, setProjectVariantId] = useState<string | null>(null)
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [editContent, setEditContent] = useState('')
   const [editName, setEditName] = useState('')
@@ -26,14 +22,10 @@ export function InstructionVariantsView({ projectId }: InstructionVariantsViewPr
     try {
       const items = await window.api.aiConfig.listInstructionVariants()
       setVariants(items)
-      if (projectId) {
-        const pv = await window.api.aiConfig.getProjectInstructionVariant(projectId)
-        setProjectVariantId(pv?.id ?? null)
-      }
     } finally {
       setLoading(false)
     }
-  }, [projectId])
+  }, [])
 
   useEffect(() => { void loadVariants() }, [loadVariants])
 
@@ -84,17 +76,7 @@ export function InstructionVariantsView({ projectId }: InstructionVariantsViewPr
       setEditContent('')
       setEditName('')
     }
-    if (projectVariantId === id && projectId) {
-      await window.api.aiConfig.setProjectInstructionVariant(projectId, null)
-      setProjectVariantId(null)
-    }
-  }, [selectedId, projectVariantId, projectId])
-
-  const handleSelectForProject = useCallback(async (variantId: string | null) => {
-    if (!projectId) return
-    await window.api.aiConfig.setProjectInstructionVariant(projectId, variantId)
-    setProjectVariantId(variantId)
-  }, [projectId])
+  }, [selectedId])
 
   // Resizable split
   const [splitWidth, setSplitWidth] = useState(350)
@@ -125,17 +107,20 @@ export function InstructionVariantsView({ projectId }: InstructionVariantsViewPr
 
   return (
     <div ref={containerRef} className="flex h-full w-full overflow-hidden rounded-lg border">
+      {/* Portal: New Variant button in header */}
+      {document.getElementById('context-manager-header-actions') &&
+        createPortal(
+          <Button size="sm" variant="outline" className="h-7 text-[11px]" onClick={handleCreate}>
+            <Plus className="size-3 mr-1" /> New Variant
+          </Button>,
+          document.getElementById('context-manager-header-actions')!,
+        )}
+
       {/* Left: variant list */}
       <div className="flex flex-col overflow-y-auto p-3" style={{ width: splitWidth }}>
-        <div className="mb-2">
-          <Button size="sm" variant="outline" className="w-full h-7 text-[11px]" onClick={handleCreate}>
-            <Plus className="size-3 mr-1" /> New Variant
-          </Button>
-        </div>
         <div className="flex-1 space-y-0.5">
           {variants.map((variant) => {
             const isActive = selectedId === variant.id
-            const isProjectSelected = projectVariantId === variant.id
             return (
               <button
                 key={variant.id}
@@ -151,16 +136,9 @@ export function InstructionVariantsView({ projectId }: InstructionVariantsViewPr
                   <FileText className="size-3.5 shrink-0" />
                   <span className="min-w-0 truncate font-mono">{variant.slug}</span>
                 </div>
-                {isProjectSelected && (
-                  <div className="flex items-center gap-1 pl-5 text-[10px] text-green-600 dark:text-green-400">
-                    <Check className="size-2.5" /> Selected
-                  </div>
-                )}
-                {!isProjectSelected && (
-                  <p className="pl-5 text-[10px] text-muted-foreground/60 line-clamp-1">
-                    {variant.content.slice(0, 60) || '(empty)'}
-                  </p>
-                )}
+                <p className="pl-5 text-[10px] text-muted-foreground/60 line-clamp-1">
+                  {variant.content.slice(0, 60) || '(empty)'}
+                </p>
               </button>
             )
           })}
@@ -173,7 +151,7 @@ export function InstructionVariantsView({ projectId }: InstructionVariantsViewPr
       </div>
 
       {/* Drag handle */}
-      <div className="relative flex w-3 shrink-0 cursor-col-resize items-center justify-center" onMouseDown={onDragStart}>
+      <div className="relative flex w-3 shrink-0 cursor-col-resize items-center justify-center" onMouseDown={onDragStart} onDoubleClick={() => setSplitWidth(350)}>
         <div className="h-full w-px bg-border" />
       </div>
 
@@ -182,22 +160,34 @@ export function InstructionVariantsView({ projectId }: InstructionVariantsViewPr
         {selected ? (
           <>
             {/* Toolbar */}
-            <div className="flex items-center justify-between gap-2 pb-2">
-              <Input
-                value={editName}
-                onChange={(e: ChangeEvent<HTMLInputElement>) => setEditName(e.target.value)}
-                placeholder="Variant name"
-                className="h-7 max-w-xs font-mono text-xs"
-              />
-              <div className="flex items-center gap-2">
+            <div className="flex items-center justify-between gap-2 pb-3">
+              <div className="flex flex-col gap-1 min-w-0 flex-1 max-w-xs">
+                <Label className="text-[11px] text-muted-foreground">Name</Label>
+                <Input
+                  value={editName}
+                  onChange={(e: ChangeEvent<HTMLInputElement>) => setEditName(e.target.value)}
+                  placeholder="Variant name"
+                  className="h-7 font-mono text-xs"
+                />
+              </div>
+              <div className="flex items-end gap-2 shrink-0 pb-px">
                 <Button size="sm" className="h-7 text-[11px]" onClick={handleSave} disabled={!dirty || saving}>
                   <Save className="size-3 mr-1" />
                   {saving ? 'Saving...' : 'Save'}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-7 text-[11px] text-muted-foreground hover:text-destructive"
+                  onClick={() => void handleDelete(selected.id)}
+                >
+                  <Trash2 className="size-3" />
                 </Button>
               </div>
             </div>
 
             {/* Editor */}
+            <Label className="text-[11px] text-muted-foreground mb-1">Content</Label>
             <Textarea
               className="min-h-0 max-h-none flex-1 resize-none [field-sizing:fixed] font-mono text-sm"
               value={editContent}
@@ -205,30 +195,6 @@ export function InstructionVariantsView({ projectId }: InstructionVariantsViewPr
               placeholder="Write instruction content..."
             />
 
-            {/* Bottom actions */}
-            <div className="flex items-center justify-between gap-2 pt-2">
-              <div>
-                {projectId && (
-                  <Button
-                    size="sm"
-                    variant={projectVariantId === selected.id ? 'default' : 'outline'}
-                    className="h-7 text-[11px]"
-                    onClick={() => handleSelectForProject(projectVariantId === selected.id ? null : selected.id)}
-                  >
-                    <Check className={cn('size-3 mr-1', projectVariantId !== selected.id && 'opacity-0')} />
-                    {projectVariantId === selected.id ? 'Selected' : 'Select for Project'}
-                  </Button>
-                )}
-              </div>
-              <Button
-                size="sm"
-                variant="ghost"
-                className="h-7 text-[11px] text-muted-foreground hover:text-destructive"
-                onClick={() => void handleDelete(selected.id)}
-              >
-                <Trash2 className="size-3 mr-1" /> Delete
-              </Button>
-            </div>
           </>
         ) : (
           <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">

@@ -118,6 +118,7 @@ export function ContextFilesPanel({ projectPath }: ContextFilesPanelProps) {
           ) : (
             <Textarea
               className="min-h-64 font-mono text-sm"
+              placeholder="File content..."
               value={content}
               onChange={(e: ChangeEvent<HTMLTextAreaElement>) => setContent(e.target.value)}
             />
