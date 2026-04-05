@@ -1243,10 +1243,9 @@ export const BrowserPanel = forwardRef<BrowserPanelHandle, BrowserPanelProps>(fu
                   <DropdownMenuItem
                     key={`${entry.taskId}-${idx}`}
                     onClick={() => {
-                      if (multiDeviceMode) {
-                        updateActiveTab({ url: entry.url })
-                        setInputUrl(entry.url)
-                      } else {
+                      setInputUrl(entry.url)
+                      updateActiveTab({ url: entry.url })
+                      if (!multiDeviceMode) {
                         activeActions?.navigate(entry.url)
                       }
                     }}
