@@ -22,7 +22,8 @@
     "@slayzone/ui": "workspace:*",
     "@xyflow/react": "^12.10.2",
     "js-yaml": "^4.1.1",
-    "lucide-react": "^0.562.0"
+    "lucide-react": "^0.562.0",
+    "zustand": "^5.0.0"
   },
   "peerDependencies": {
     "electron": "^41.0.0",
