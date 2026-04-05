@@ -34,6 +34,7 @@
     "@types/js-yaml": "^4.0.9",
     "@types/node": "^22.19.1",
     "@types/react": "^19.2.7",
+    "@types/react-dom": "^19.2.3",
     "typescript": "^5.9.3"
   }
 }

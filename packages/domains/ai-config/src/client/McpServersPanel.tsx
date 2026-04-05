@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { ExternalLink, Pencil, Star, Search, Plus, Trash2 } from 'lucide-react'
 import { Button, cn, IconButton, Input, Label, Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@slayzone/ui'
@@ -119,11 +119,7 @@ function useHeaderPortal() {
 
 const ALL_PROVIDERS: McpTarget[] = getConfigurableMcpTargets({ writableOnly: true })
 
-function createDefaultProviderFlags(): Partial<Record<McpTarget, boolean>> {
-  const flags: Partial<Record<McpTarget, boolean>> = {}
-  for (const provider of ALL_PROVIDERS) flags[provider] = true
-  return flags
-}
+
 
 // ---------------------------------------------------------------------------
 // Add/Edit MCP Server dialog — shared between global and project modes
