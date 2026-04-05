@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useRef, useState, type ChangeEvent, type MouseEvent as ReactMouseEvent } from 'react'
-import { File, FilePlus, Save, Trash2 } from 'lucide-react'
-import { Button, Input, Label, Textarea, cn } from '@slayzone/ui'
+import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, type MouseEvent as ReactMouseEvent } from 'react'
+import { File, FilePlus, Trash2 } from 'lucide-react'
+import { Button, Input, Textarea, cn } from '@slayzone/ui'
 import type { CliProvider, GlobalFileEntry } from '../shared'
 import { GLOBAL_PROVIDER_PATHS, isConfigurableCliProvider } from '../shared/provider-registry'
 
@@ -13,11 +13,9 @@ export function GlobalContextFiles({ filter }: GlobalContextFilesProps = {}) {
   const [loading, setLoading] = useState(true)
   const [selectedPath, setSelectedPath] = useState<string | null>(null)
   const [content, setContent] = useState('')
-  const [originalContent, setOriginalContent] = useState('')
-  const [saving, setSaving] = useState(false)
-  const [message, setMessage] = useState('')
   const [creatingFile, setCreatingFile] = useState<{ provider: CliProvider; category: 'skill' } | null>(null)
   const [newFileName, setNewFileName] = useState('')
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const loadFiles = useCallback(async () => {
     setLoading(true)
@@ -39,28 +37,35 @@ export function GlobalContextFiles({ filter }: GlobalContextFilesProps = {}) {
     try {
       const text = await window.api.aiConfig.readContextFile(entry.path, '')
       setContent(text)
-      setOriginalContent(text)
+
       setSelectedPath(entry.path)
-      setMessage('')
+
     } catch {
-      setMessage('Could not read file')
+      // silent
     }
   }
 
-  const saveFile = async () => {
-    if (!selectedPath) return
-    setSaving(true)
-    setMessage('')
+  const autoSave = useCallback(async (path: string, text: string) => {
     try {
-      await window.api.aiConfig.writeContextFile(selectedPath, content, '')
-      setOriginalContent(content)
-      setMessage('Saved')
-    } catch (err) {
-      setMessage(err instanceof Error ? err.message : 'Failed to save')
-    } finally {
-      setSaving(false)
+      await window.api.aiConfig.writeContextFile(path, text, '')
+
+    } catch {
+      // silent
     }
+  }, [])
+
+  const handleContentChange = (e: ChangeEvent<HTMLTextAreaElement>) => {
+    const text = e.target.value
+    setContent(text)
+    if (!selectedPath) return
+    if (saveTimer.current) clearTimeout(saveTimer.current)
+    const path = selectedPath
+    saveTimer.current = setTimeout(() => void autoSave(path, text), 800)
   }
+
+  useEffect(() => () => {
+    if (saveTimer.current) clearTimeout(saveTimer.current)
+  }, [])
 
   const deleteFile = async (entry: GlobalFileEntry) => {
     try {
@@ -68,12 +73,10 @@ export function GlobalContextFiles({ filter }: GlobalContextFilesProps = {}) {
       if (selectedPath === entry.path) {
         setSelectedPath(null)
         setContent('')
-        setOriginalContent('')
       }
       await loadFiles()
-      setMessage('Deleted')
-    } catch (err) {
-      setMessage(err instanceof Error ? err.message : 'Failed to delete')
+    } catch {
+      // silent
     }
   }
 
@@ -90,17 +93,14 @@ export function GlobalContextFiles({ filter }: GlobalContextFilesProps = {}) {
       const text = await window.api.aiConfig.readContextFile(created.path, '')
       setSelectedPath(created.path)
       setContent(text)
-      setOriginalContent(text)
+
       await loadFiles()
       setCreatingFile(null)
       setNewFileName('')
-      setMessage('Created')
-    } catch (err) {
-      setMessage(err instanceof Error ? err.message : 'Failed to create')
+    } catch {
+      // silent
     }
   }
-
-  const dirty = content !== originalContent
 
   const providerSections = Object.entries(GLOBAL_PROVIDER_PATHS)
     .filter(([provider]) => isConfigurableCliProvider(provider))
@@ -138,64 +138,75 @@ export function GlobalContextFiles({ filter }: GlobalContextFilesProps = {}) {
       {/* Left: file list */}
       <div className="flex flex-col overflow-y-auto p-3" style={{ width: splitWidth }}>
         <div className="flex-1 space-y-5">
-          {providerSections.map(({ provider, spec }) => {
-            const files = entries
-              .filter((entry) => entry.provider === provider)
-              .filter((entry) => !filter || entry.category === filter)
-              .sort((a, b) => a.name.localeCompare(b.name))
-            const instructions = files.filter((f) => f.category === 'instructions')
-            const skills = files.filter((f) => f.category === 'skill')
+          {filter === 'instructions' ? (
+            // File tree grouped by directory for instructions
+            <InstructionsFileList
+              entries={entries}
+              providerSections={providerSections}
+              selectedPath={selectedPath}
+              onOpen={openFile}
+            />
+          ) : (
+            // Grouped-by-provider layout for skills
+            providerSections.map(({ provider, spec }) => {
+              const files = entries
+                .filter((entry) => entry.provider === provider)
+                .filter((entry) => !filter || entry.category === filter)
+                .sort((a, b) => a.name.localeCompare(b.name))
+              const instructions = files.filter((f) => f.category === 'instructions')
+              const skills = files.filter((f) => f.category === 'skill')
 
-            return (
-              <div key={provider} data-testid={`global-files-provider-${provider}`}>
-                <p className="mb-1.5 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">{spec.label}</p>
-                <div className="space-y-0.5">
-                  {instructions.map((entry) => (
-                    <FileRow
-                      key={entry.path}
-                      entry={entry}
-                      selected={selectedPath === entry.path}
-                      onClick={() => openFile(entry)}
-                    />
-                  ))}
-                  {skills.length > 0 && (
-                    <div className="mt-1">
-                      <p className="px-1 py-0.5 text-[10px] text-muted-foreground">Skills</p>
-                      {skills.map((entry) => (
-                        <FileRow
-                          key={entry.path}
-                          entry={entry}
-                          selected={selectedPath === entry.path}
-                          onClick={() => openFile(entry)}
-                          onDelete={() => deleteFile(entry)}
-                          indent
-                        />
-                      ))}
-                    </div>
-                  )}
-                  {instructions.length === 0 && skills.length === 0 && (
-                    <p className="px-1 py-0.5 text-[10px] text-muted-foreground">No files yet</p>
-                  )}
-                  {/* Add button for providers with skills dir */}
-                  <div className="flex gap-1 pt-1">
-                    {spec.skillsDir && (
-                      <Button
-                        data-testid={`global-files-add-skill-${provider}`}
-                        size="sm"
-                        variant="ghost"
-                        className="h-6 text-[10px]"
-                        onClick={() => { setCreatingFile({ provider: provider as CliProvider, category: 'skill' }); setNewFileName('') }}
-                      >
-                        <FilePlus className="mr-0.5 size-3" /> Skill
-                      </Button>
+              return (
+                <div key={provider} data-testid={`global-files-provider-${provider}`}>
+                  <p className="mb-1.5 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">{spec.label}</p>
+                  <div className="space-y-0.5">
+                    {instructions.map((entry) => (
+                      <FileRow
+                        key={entry.path}
+                        entry={entry}
+                        selected={selectedPath === entry.path}
+                        onClick={() => openFile(entry)}
+                      />
+                    ))}
+                    {skills.length > 0 && (
+                      <div className="mt-1">
+                        <p className="px-1 py-0.5 text-[10px] text-muted-foreground">Skills</p>
+                        {skills.map((entry) => (
+                          <FileRow
+                            key={entry.path}
+                            entry={entry}
+                            selected={selectedPath === entry.path}
+                            onClick={() => openFile(entry)}
+                            onDelete={() => deleteFile(entry)}
+                            indent
+                          />
+                        ))}
+                      </div>
                     )}
+                    {instructions.length === 0 && skills.length === 0 && (
+                      <p className="px-1 py-0.5 text-[10px] text-muted-foreground">No files yet</p>
+                    )}
+                    {/* Add button for providers with skills dir */}
+                    <div className="flex gap-1 pt-1">
+                      {spec.skillsDir && (
+                        <Button
+                          data-testid={`global-files-add-skill-${provider}`}
+                          size="sm"
+                          variant="ghost"
+                          className="h-6 text-[10px]"
+                          onClick={() => { setCreatingFile({ provider: provider as CliProvider, category: 'skill' }); setNewFileName('') }}
+                        >
+                          <FilePlus className="mr-0.5 size-3" /> Skill
+                        </Button>
+                      )}
+                    </div>
                   </div>
                 </div>
-              </div>
-            )
-          })}
+              )
+            })
+          )}
 
-          {entries.length === 0 && !loading && (
+          {!filter && entries.length === 0 && !loading && (
             <p className="text-sm text-muted-foreground">No global config files found.</p>
           )}
         </div>
@@ -230,25 +241,11 @@ export function GlobalContextFiles({ filter }: GlobalContextFilesProps = {}) {
       {/* Right: editor */}
       <div className="flex min-w-0 flex-1 flex-col p-3">
         {selectedPath ? (
-          <>
-            <div className="flex items-center justify-between gap-2 pb-2">
-              <Label className="font-mono text-xs truncate">
-                {entries.find((e) => e.path === selectedPath)?.name ?? selectedPath}
-              </Label>
-              <div className="flex items-center gap-2">
-                {message && <span className="text-[11px] text-muted-foreground">{message}</span>}
-                <Button size="sm" onClick={saveFile} disabled={!dirty || saving}>
-                  <Save className="mr-1 size-3" />
-                  {saving ? 'Saving...' : 'Save'}
-                </Button>
-              </div>
-            </div>
-            <Textarea
-              className="min-h-0 max-h-none flex-1 resize-none [field-sizing:fixed] font-mono text-sm"
-              value={content}
-              onChange={(e: ChangeEvent<HTMLTextAreaElement>) => setContent(e.target.value)}
-            />
-          </>
+          <Textarea
+            className="min-h-0 max-h-none flex-1 resize-none [field-sizing:fixed] font-mono text-sm"
+            value={content}
+            onChange={handleContentChange}
+          />
         ) : (
           <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">
             Select a file to edit
@@ -259,35 +256,90 @@ export function GlobalContextFiles({ filter }: GlobalContextFilesProps = {}) {
   )
 }
 
-function FileRow({ entry, selected, onClick, onDelete, indent }: {
+function InstructionsFileList({ entries, providerSections, selectedPath, onOpen }: {
+  entries: GlobalFileEntry[]
+  providerSections: { provider: CliProvider; spec: (typeof GLOBAL_PROVIDER_PATHS)[string] }[]
+  selectedPath: string | null
+  onOpen: (entry: GlobalFileEntry) => void
+}) {
+  const files = useMemo(() => {
+    const result: { entry: GlobalFileEntry; relativePath: string }[] = []
+    for (const { provider, spec } of providerSections) {
+      const entry = entries.find((e) => e.provider === provider && e.category === 'instructions')
+      if (!entry) continue
+      const relativePath = `~/${spec.baseDir}/${spec.instructions ?? entry.name.split('/').pop()}`
+      result.push({ entry, relativePath })
+    }
+    return result
+  }, [entries, providerSections])
+
+  if (files.length === 0) {
+    return <p className="text-sm text-muted-foreground">No instruction files found.</p>
+  }
+
+  return (
+    <div className="space-y-1">
+      {files.map(({ entry, relativePath }) => {
+        const selected = selectedPath === entry.path
+        return (
+          <button
+            key={entry.path}
+            onClick={() => onOpen(entry)}
+            className={cn(
+              'flex w-full items-center gap-2 rounded-lg border px-3 py-2.5 text-left text-xs transition-colors',
+              selected
+                ? 'bg-primary/10 border-primary/30 text-foreground'
+                : 'border-transparent hover:bg-muted/50 text-muted-foreground'
+            )}
+          >
+            {entry.exists ? <File className="size-4 shrink-0" /> : <FilePlus className="size-4 shrink-0" />}
+            <span className="min-w-0 truncate font-mono text-sm">{relativePath}</span>
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
+function FileRow({ entry, selected, onClick, onDelete, indent, providerLabel }: {
   entry: GlobalFileEntry
   selected: boolean
   onClick: () => void
   onDelete?: () => void
   indent?: boolean
+  providerLabel?: string
 }) {
   const fileName = entry.name.split('/').pop() ?? entry.name
   return (
     <div
       className={cn(
-        'group flex items-center gap-1.5 rounded px-1 py-1 text-xs',
+        'group flex flex-col gap-0.5 rounded px-1 py-1.5 text-xs',
         selected ? 'bg-primary/10 text-foreground' : 'hover:bg-muted/50',
         !entry.exists && 'text-muted-foreground',
         indent && 'pl-3'
       )}
     >
-      <button className="flex min-w-0 flex-1 items-center gap-1.5" onClick={onClick}>
-        {entry.exists ? <File className="size-3.5 shrink-0" /> : <FilePlus className="size-3.5 shrink-0" />}
-        <span className="min-w-0 truncate font-mono">{fileName}</span>
-      </button>
-      {onDelete && (
-        <button
-          className="hidden rounded p-0.5 text-muted-foreground hover:text-destructive group-hover:block"
-          onClick={(e) => { e.stopPropagation(); onDelete() }}
-          title="Delete"
-        >
-          <Trash2 className="size-3" />
+      <div className="flex items-center gap-1.5">
+        <button className="flex min-w-0 flex-1 items-center gap-1.5" onClick={onClick}>
+          {entry.exists ? <File className="size-3.5 shrink-0" /> : <FilePlus className="size-3.5 shrink-0" />}
+          <span className="min-w-0 truncate font-mono">{fileName}</span>
         </button>
+        {onDelete && (
+          <button
+            className="hidden rounded p-0.5 text-muted-foreground hover:text-destructive group-hover:block"
+            onClick={(e) => { e.stopPropagation(); onDelete() }}
+            title="Delete"
+          >
+            <Trash2 className="size-3" />
+          </button>
+        )}
+      </div>
+      {providerLabel && (
+        <div className="flex gap-1 pl-5">
+          <span className="rounded-full bg-muted px-1.5 py-0 text-[10px] text-muted-foreground">
+            {providerLabel}
+          </span>
+        </div>
       )}
     </div>
   )

@@ -7,9 +7,10 @@ interface InstructionsSectionProps {
   level: ConfigLevel
   projectId: string | null
   projectPath?: string | null
+  onNavigateToLibrary?: () => void
 }
 
-export function InstructionsSection({ level, projectId, projectPath }: InstructionsSectionProps) {
+export function InstructionsSection({ level, projectId, projectPath, onNavigateToLibrary }: InstructionsSectionProps) {
   if (level === 'computer') {
     return <GlobalContextFiles filter="instructions" />
   }
@@ -19,6 +20,7 @@ export function InstructionsSection({ level, projectId, projectPath }: Instructi
       <ProjectInstructions
         projectId={projectId}
         projectPath={projectPath}
+        onNavigateToLibrary={onNavigateToLibrary}
       />
     )
   }

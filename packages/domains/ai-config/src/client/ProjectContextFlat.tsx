@@ -29,7 +29,6 @@ interface ProjectContextFlatProps {
 }
 
 type ProjectSection = 'providers' | 'instructions' | 'skill' | 'mcp'
-type InstructionsModeRequest = 'global' | 'custom' | null
 
 interface ContextData {
   linkedSkills: ProjectSkillStatus[]
@@ -254,8 +253,6 @@ export function ProjectContextFlat({ projectId, projectPath, onOpenGlobalAiConfi
   const [version, setVersion] = useState(0)
   const [syncingMode, setSyncingMode] = useState<'sync' | 'reset' | null>(null)
   const [section, setSection] = useState<ProjectSection | null>(null)
-  const [instructionsModeRequest, setInstructionsModeRequest] = useState<InstructionsModeRequest>(null)
-  const [instructionsUsingGlobal, setInstructionsUsingGlobal] = useState(false)
 
   const bumpVersion = useCallback(() => setVersion(v => v + 1), [])
 
@@ -328,11 +325,7 @@ export function ProjectContextFlat({ projectId, projectPath, onOpenGlobalAiConfi
     }
   }
 
-  useEffect(() => {
-    if (section !== 'instructions') {
-      setInstructionsModeRequest(null)
-    }
-  }, [section])
+
 
   if (!data) {
     return (
@@ -388,10 +381,6 @@ export function ProjectContextFlat({ projectId, projectPath, onOpenGlobalAiConfi
         <ProjectInstructions
           projectId={projectId}
           projectPath={projectPath}
-          onChanged={bumpVersion}
-          requestedMode={instructionsModeRequest}
-          onRequestedModeHandled={() => setInstructionsModeRequest(null)}
-          onUseGlobalSourceChange={setInstructionsUsingGlobal}
         />
       )
     }
@@ -431,49 +420,7 @@ export function ProjectContextFlat({ projectId, projectPath, onOpenGlobalAiConfi
             <ArrowLeft className="size-3.5" />
             {sectionTitles[section]}
           </button>
-          {section === 'instructions' ? (
-            <div className="flex items-center gap-2">
-              {instructionsUsingGlobal && onOpenGlobalAiConfig && (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="h-7 px-2 text-[11px]"
-                  data-testid="instructions-go-to-global"
-                  onClick={() => onOpenGlobalAiConfig('instructions')}
-                >
-                  Go to global
-                </Button>
-              )}
-              <div className="inline-flex items-center rounded-md border bg-muted/40 p-0.5" data-testid="instructions-source-tabs">
-                <button
-                  type="button"
-                  data-testid="instructions-source-tab-project"
-                  className={cn(
-                    'rounded px-2 py-1 text-[11px] transition-colors',
-                    !instructionsUsingGlobal
-                      ? 'bg-background text-foreground shadow-sm'
-                      : 'text-muted-foreground hover:text-foreground'
-                  )}
-                  onClick={() => setInstructionsModeRequest('custom')}
-                >
-                  Use custom instructions
-                </button>
-                <button
-                  type="button"
-                  data-testid="instructions-source-tab-shared"
-                  className={cn(
-                    'rounded px-2 py-1 text-[11px] transition-colors',
-                    instructionsUsingGlobal
-                      ? 'bg-background text-foreground shadow-sm'
-                      : 'text-muted-foreground hover:text-foreground'
-                  )}
-                  onClick={() => setInstructionsModeRequest('global')}
-                >
-                  Use global instructions
-                </button>
-              </div>
-            </div>
-          ) : (
+          {section !== 'instructions' && (
             <span className="text-xs text-muted-foreground">
               {sectionDescriptions[section]}
             </span>

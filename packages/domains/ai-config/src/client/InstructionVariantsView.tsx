@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useState } from 'react'
-import { Check, Plus, Trash2 } from 'lucide-react'
-import { Button, Textarea, Input, cn } from '@slayzone/ui'
+import { useCallback, useEffect, useRef, useState, type ChangeEvent, type MouseEvent as ReactMouseEvent } from 'react'
+import { Check, FileText, Plus, Save, Trash2 } from 'lucide-react'
+import { Button, Input, Textarea, cn } from '@slayzone/ui'
 import type { AiConfigItem } from '../shared'
 
 interface InstructionVariantsViewProps {
@@ -10,10 +10,16 @@ interface InstructionVariantsViewProps {
 export function InstructionVariantsView({ projectId }: InstructionVariantsViewProps) {
   const [variants, setVariants] = useState<AiConfigItem[]>([])
   const [projectVariantId, setProjectVariantId] = useState<string | null>(null)
-  const [editingId, setEditingId] = useState<string | null>(null)
+  const [selectedId, setSelectedId] = useState<string | null>(null)
   const [editContent, setEditContent] = useState('')
   const [editName, setEditName] = useState('')
+  const [originalContent, setOriginalContent] = useState('')
+  const [originalName, setOriginalName] = useState('')
+  const [saving, setSaving] = useState(false)
   const [loading, setLoading] = useState(true)
+
+  const selected = variants.find((v) => v.id === selectedId) ?? null
+  const dirty = selected ? (editContent !== originalContent || editName !== originalName) : false
 
   const loadVariants = useCallback(async () => {
     setLoading(true)
@@ -31,6 +37,14 @@ export function InstructionVariantsView({ projectId }: InstructionVariantsViewPr
 
   useEffect(() => { void loadVariants() }, [loadVariants])
 
+  const selectVariant = (variant: AiConfigItem) => {
+    setSelectedId(variant.id)
+    setEditContent(variant.content)
+    setEditName(variant.slug)
+    setOriginalContent(variant.content)
+    setOriginalName(variant.slug)
+  }
+
   const handleCreate = useCallback(async () => {
     const slug = `variant-${Date.now()}`
     const created = await window.api.aiConfig.createItem({
@@ -39,34 +53,42 @@ export function InstructionVariantsView({ projectId }: InstructionVariantsViewPr
       slug,
       content: '',
     })
-    setVariants(prev => [created, ...prev])
-    setEditingId(created.id)
-    setEditContent('')
-    setEditName(created.name)
+    setVariants((prev) => [created, ...prev])
+    selectVariant(created)
   }, [])
 
   const handleSave = useCallback(async () => {
-    if (!editingId) return
-    const updated = await window.api.aiConfig.updateItem({
-      id: editingId,
-      slug: editName || undefined,
-      content: editContent,
-    })
-    if (updated) {
-      setVariants(prev => prev.map(v => v.id === updated.id ? updated : v))
+    if (!selectedId) return
+    setSaving(true)
+    try {
+      const updated = await window.api.aiConfig.updateItem({
+        id: selectedId,
+        slug: editName || undefined,
+        content: editContent,
+      })
+      if (updated) {
+        setVariants((prev) => prev.map((v) => (v.id === updated.id ? updated : v)))
+        setOriginalContent(updated.content)
+        setOriginalName(updated.slug)
+      }
+    } finally {
+      setSaving(false)
     }
-    setEditingId(null)
-  }, [editingId, editContent, editName])
+  }, [selectedId, editContent, editName])
 
   const handleDelete = useCallback(async (id: string) => {
     await window.api.aiConfig.deleteItem(id)
-    setVariants(prev => prev.filter(v => v.id !== id))
-    if (editingId === id) setEditingId(null)
+    setVariants((prev) => prev.filter((v) => v.id !== id))
+    if (selectedId === id) {
+      setSelectedId(null)
+      setEditContent('')
+      setEditName('')
+    }
     if (projectVariantId === id && projectId) {
       await window.api.aiConfig.setProjectInstructionVariant(projectId, null)
       setProjectVariantId(null)
     }
-  }, [editingId, projectVariantId, projectId])
+  }, [selectedId, projectVariantId, projectId])
 
   const handleSelectForProject = useCallback(async (variantId: string | null) => {
     if (!projectId) return
@@ -74,10 +96,27 @@ export function InstructionVariantsView({ projectId }: InstructionVariantsViewPr
     setProjectVariantId(variantId)
   }, [projectId])
 
-  const startEditing = (variant: AiConfigItem) => {
-    setEditingId(variant.id)
-    setEditContent(variant.content)
-    setEditName(variant.slug)
+  // Resizable split
+  const [splitWidth, setSplitWidth] = useState(350)
+  const containerRef = useRef<HTMLDivElement>(null)
+  const dragging = useRef(false)
+
+  const onDragStart = (e: ReactMouseEvent) => {
+    e.preventDefault()
+    dragging.current = true
+    const onMove = (ev: globalThis.MouseEvent) => {
+      if (!dragging.current || !containerRef.current) return
+      const rect = containerRef.current.getBoundingClientRect()
+      const px = ev.clientX - rect.left
+      setSplitWidth(Math.min(Math.max(px, rect.width * 0.15), rect.width * 0.5))
+    }
+    const onUp = () => {
+      dragging.current = false
+      document.removeEventListener('mousemove', onMove)
+      document.removeEventListener('mouseup', onUp)
+    }
+    document.addEventListener('mousemove', onMove)
+    document.addEventListener('mouseup', onUp)
   }
 
   if (loading) {
@@ -85,93 +124,117 @@ export function InstructionVariantsView({ projectId }: InstructionVariantsViewPr
   }
 
   return (
-    <div className="space-y-4 max-w-3xl">
-      <div className="flex items-center justify-between">
-        <div>
-          <h3 className="text-sm font-semibold">Instruction Variants</h3>
-          <p className="text-xs text-muted-foreground">
-            Create reusable instruction sets. Projects can select one variant.
-          </p>
+    <div ref={containerRef} className="flex h-full w-full overflow-hidden rounded-lg border">
+      {/* Left: variant list */}
+      <div className="flex flex-col overflow-y-auto p-3" style={{ width: splitWidth }}>
+        <div className="mb-2">
+          <Button size="sm" variant="outline" className="w-full h-7 text-[11px]" onClick={handleCreate}>
+            <Plus className="size-3 mr-1" /> New Variant
+          </Button>
         </div>
-        <Button size="sm" variant="outline" onClick={handleCreate}>
-          <Plus className="size-3.5 mr-1" />
-          New Variant
-        </Button>
+        <div className="flex-1 space-y-0.5">
+          {variants.map((variant) => {
+            const isActive = selectedId === variant.id
+            const isProjectSelected = projectVariantId === variant.id
+            return (
+              <button
+                key={variant.id}
+                onClick={() => selectVariant(variant)}
+                className={cn(
+                  'flex w-full flex-col gap-0.5 rounded px-2 py-1.5 text-left text-xs transition-colors',
+                  isActive
+                    ? 'bg-primary/10 text-foreground'
+                    : 'hover:bg-muted/50 text-muted-foreground'
+                )}
+              >
+                <div className="flex items-center gap-1.5">
+                  <FileText className="size-3.5 shrink-0" />
+                  <span className="min-w-0 truncate font-mono">{variant.slug}</span>
+                </div>
+                {isProjectSelected && (
+                  <div className="flex items-center gap-1 pl-5 text-[10px] text-green-600 dark:text-green-400">
+                    <Check className="size-2.5" /> Selected
+                  </div>
+                )}
+                {!isProjectSelected && (
+                  <p className="pl-5 text-[10px] text-muted-foreground/60 line-clamp-1">
+                    {variant.content.slice(0, 60) || '(empty)'}
+                  </p>
+                )}
+              </button>
+            )
+          })}
+          {variants.length === 0 && (
+            <p className="px-2 py-4 text-center text-xs text-muted-foreground">
+              No variants yet
+            </p>
+          )}
+        </div>
       </div>
 
-      {variants.length === 0 && (
-        <p className="text-xs text-muted-foreground py-8 text-center">
-          No instruction variants yet. Create one to get started.
-        </p>
-      )}
+      {/* Drag handle */}
+      <div className="relative flex w-3 shrink-0 cursor-col-resize items-center justify-center" onMouseDown={onDragStart}>
+        <div className="h-full w-px bg-border" />
+      </div>
 
-      <div className="space-y-2">
-        {variants.map((variant) => {
-          const isEditing = editingId === variant.id
-          const isSelected = projectVariantId === variant.id
-
-          return (
-            <div
-              key={variant.id}
-              className={cn(
-                'rounded-lg border p-3 transition-colors',
-                isSelected && 'ring-1 ring-primary border-primary/50'
-              )}
-            >
-              {isEditing ? (
-                <div className="space-y-2">
-                  <Input
-                    value={editName}
-                    onChange={(e) => setEditName(e.target.value)}
-                    placeholder="Variant name (slug)"
-                    className="text-sm h-8"
-                  />
-                  <Textarea
-                    value={editContent}
-                    onChange={(e) => setEditContent(e.target.value)}
-                    placeholder="Instruction content..."
-                    rows={8}
-                    className="text-xs font-mono"
-                  />
-                  <div className="flex gap-2">
-                    <Button size="sm" onClick={handleSave}>Save</Button>
-                    <Button size="sm" variant="ghost" onClick={() => setEditingId(null)}>Cancel</Button>
-                  </div>
-                </div>
-              ) : (
-                <div className="flex items-start gap-3">
-                  <div className="flex-1 min-w-0 cursor-pointer" onClick={() => startEditing(variant)}>
-                    <p className="text-sm font-medium">{variant.slug}</p>
-                    <p className="text-xs text-muted-foreground line-clamp-2 mt-0.5">
-                      {variant.content.slice(0, 120) || '(empty)'}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-1 shrink-0">
-                    {projectId && (
-                      <Button
-                        size="sm"
-                        variant={isSelected ? 'default' : 'outline'}
-                        onClick={() => handleSelectForProject(isSelected ? null : variant.id)}
-                        className="h-7 text-xs"
-                      >
-                        <Check className={cn('size-3 mr-1', !isSelected && 'opacity-0')} />
-                        {isSelected ? 'Selected' : 'Select'}
-                      </Button>
-                    )}
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => handleDelete(variant.id)}
-                      className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive"
-                    >
-                      <Trash2 className="size-3.5" />
-                    </Button>
-                  </div>
-                </div>
-              )}
+      {/* Right: editor */}
+      <div className="flex min-w-0 flex-1 flex-col p-3">
+        {selected ? (
+          <>
+            {/* Toolbar */}
+            <div className="flex items-center justify-between gap-2 pb-2">
+              <Input
+                value={editName}
+                onChange={(e: ChangeEvent<HTMLInputElement>) => setEditName(e.target.value)}
+                placeholder="Variant name"
+                className="h-7 max-w-xs font-mono text-xs"
+              />
+              <div className="flex items-center gap-2">
+                <Button size="sm" className="h-7 text-[11px]" onClick={handleSave} disabled={!dirty || saving}>
+                  <Save className="size-3 mr-1" />
+                  {saving ? 'Saving...' : 'Save'}
+                </Button>
+              </div>
             </div>
-          )
-        })}
+
+            {/* Editor */}
+            <Textarea
+              className="min-h-0 max-h-none flex-1 resize-none [field-sizing:fixed] font-mono text-sm"
+              value={editContent}
+              onChange={(e: ChangeEvent<HTMLTextAreaElement>) => setEditContent(e.target.value)}
+              placeholder="Write instruction content..."
+            />
+
+            {/* Bottom actions */}
+            <div className="flex items-center justify-between gap-2 pt-2">
+              <div>
+                {projectId && (
+                  <Button
+                    size="sm"
+                    variant={projectVariantId === selected.id ? 'default' : 'outline'}
+                    className="h-7 text-[11px]"
+                    onClick={() => handleSelectForProject(projectVariantId === selected.id ? null : selected.id)}
+                  >
+                    <Check className={cn('size-3 mr-1', projectVariantId !== selected.id && 'opacity-0')} />
+                    {projectVariantId === selected.id ? 'Selected' : 'Select for Project'}
+                  </Button>
+                )}
+              </div>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-7 text-[11px] text-muted-foreground hover:text-destructive"
+                onClick={() => void handleDelete(selected.id)}
+              >
+                <Trash2 className="size-3 mr-1" /> Delete
+              </Button>
+            </div>
+          </>
+        ) : (
+          <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">
+            {variants.length === 0 ? 'Create a variant to get started' : 'Select a variant to edit'}
+          </div>
+        )}
       </div>
     </div>
   )
