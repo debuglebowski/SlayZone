@@ -19,7 +19,7 @@ export function stripMarkdown(md: string): string {
     .trim()
 }
 
-/** Lightweight HTML-to-Markdown converter for legacy TipTap descriptions. */
+/** Lightweight HTML-to-Markdown converter for legacy HTML descriptions. */
 function htmlToMarkdown(html: string): string {
   if (!html) return ''
   let s = html

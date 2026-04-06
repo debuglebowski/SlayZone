@@ -12,7 +12,7 @@ export function useGuardedHotkeys<T extends HTMLElement>(
   options?: OptionsOrDeps,
   dependencies?: OptionsOrDeps
 ) {
-  // Default enableOnContentEditable so shortcuts work inside editors (CodeMirror, TipTap, Milkdown).
+  // Default enableOnContentEditable so shortcuts work inside editors (CodeMirror, Milkdown).
   // Handlers that must defer to the editor (e.g. undo/redo) guard internally via el.isContentEditable.
   const opts = Array.isArray(options) ? options : { enableOnContentEditable: true, ...options }
 

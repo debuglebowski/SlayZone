@@ -44,7 +44,7 @@ packages/
 └── shared/
     ├── types/             # @slayzone/types - ElectronAPI contract
     ├── ui/                # @slayzone/ui - Radix/shadcn components
-    └── editor/            # @slayzone/editor - TipTap rich text
+    └── editor/            # @slayzone/editor - Milkdown rich text
 ```
 
 ## Domain Structure

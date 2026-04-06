@@ -40,7 +40,7 @@ packages/
 └── shared/
     ├── types/           # @slayzone/types - ElectronAPI
     ├── ui/              # @slayzone/ui - Components
-    └── editor/          # @slayzone/editor - TipTap
+    └── editor/          # @slayzone/editor - Milkdown
 ```
 
 ## Domain Structure

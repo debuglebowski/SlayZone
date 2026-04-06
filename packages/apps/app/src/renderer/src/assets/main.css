@@ -220,11 +220,7 @@
   50% { box-shadow: 0 0 35px 5px rgba(249,115,22,0.6), 0 0 80px 10px rgba(249,115,22,0.25); }
 }
 
-/* TipTap/ProseMirror styles */
-.tiptap {
-  height: 100%;
-}
-
+/* Milkdown/ProseMirror styles */
 .milkdown {
   height: 100%;
 }
@@ -282,7 +278,7 @@
   margin-block-end: 4px;
 }
 
-/* Task list checkbox styling (TipTap legacy) */
+/* Task list checkbox styling */
 .ProseMirror ul[data-type="taskList"] {
   list-style: none;
   padding-left: 0;

@@ -149,7 +149,7 @@ export const features = [
     slug: 'notes-editor',
     title: 'Rich text editor, per task',
     shortDescription:
-      'TipTap rich text editor per task. Markdown, nested checklists, code blocks. For when "TODO: figure this out" needs more than a terminal comment.',
+      'Rich text editor per task. Markdown, nested checklists, code blocks. For when "TODO: figure this out" needs more than a terminal comment.',
     details: [
       'Not every task is best represented as terminal output. Some work needs notes, checkpoints, snippets, or a handoff document that survives past the current session.',
       'The built-in editor gives each task a place for structured context: meeting notes, implementation plans, QA steps, or reminders for the next person touching the branch.',
