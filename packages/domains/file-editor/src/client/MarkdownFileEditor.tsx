@@ -6,6 +6,7 @@ import { history } from '@milkdown/plugin-history'
 import { indent } from '@milkdown/plugin-indent'
 import { listener, listenerCtx } from '@milkdown/plugin-listener'
 import { replaceAll } from '@milkdown/utils'
+import { taskListPlugin } from '@slayzone/editor'
 import { remarkFrontmatterPlugin, frontmatterSchema, frontmatterView } from './milkdown-frontmatter'
 import { useTheme } from '@slayzone/settings/client'
 import { getThemeEditorColors } from '@slayzone/ui'
@@ -60,6 +61,7 @@ export function MarkdownFileEditor({ filePath, content, onChange, onSave, versio
       .use(history)
       .use(indent)
       .use(listener)
+      .use(taskListPlugin)
       .use(remarkFrontmatterPlugin)
       .use(frontmatterSchema)
       .use(frontmatterView)

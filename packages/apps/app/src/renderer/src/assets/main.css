@@ -342,6 +342,34 @@
   margin-bottom: 0;
 }
 
+/* Task list checkbox styling (react-markdown + remarkGfm) */
+.prose ul.contains-task-list {
+  list-style: none;
+  padding-left: 0;
+}
+
+.prose li.task-list-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  list-style: none;
+  margin-top: 0;
+  margin-bottom: 0;
+}
+
+.prose li.task-list-item input[type="checkbox"] {
+  flex-shrink: 0;
+  cursor: default;
+  margin-top: 0.3em;
+  accent-color: var(--color-primary);
+}
+
+.prose li.task-list-item > ul.contains-task-list {
+  flex: 1;
+  margin-top: 0;
+  margin-bottom: 0;
+}
+
 /* Compact line spacing for notes editor */
 .prose-tight .ProseMirror.prose > * + * {
   margin-top: 0.125em;
