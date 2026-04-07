@@ -100,6 +100,11 @@ export async function notifyApp(): Promise<void> {
   }
 }
 
+export function getAssetsDir(): string {
+  const dir = process.env.SLAYZONE_DB_DIR ?? defaultDir()
+  return path.join(dir, 'assets')
+}
+
 export function openDb(): SlayDb {
   const dev = process.env.SLAYZONE_DEV === '1'
   const dbPath = getDbPath(dev)

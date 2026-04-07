@@ -1,6 +1,6 @@
 import { Command } from 'commander'
 import { execSync } from 'child_process'
-import { openDb, notifyApp, resolveProject, type SlayDb } from '../db'
+import { openDb, notifyApp, resolveProject, getAssetsDir, type SlayDb } from '../db'
 import { browserCommand } from './browser'
 import {
   getDefaultStatus,
@@ -11,6 +11,15 @@ import {
   type ColumnConfig,
 } from '@slayzone/projects/shared'
 import { DEFAULT_TERMINAL_MODES } from '@slayzone/terminal/shared'
+import {
+  getExtensionFromTitle,
+  getEffectiveRenderMode,
+  isBinaryRenderMode,
+  type RenderMode,
+} from '@slayzone/task/shared/types'
+import fs from 'fs'
+import path from 'path'
+import crypto from 'crypto'
 
 interface TaskRow extends Record<string, unknown> {
   id: string
@@ -847,6 +856,370 @@ export function tasksCommand(): Command {
     })
 
   cmd.addCommand(browserCommand())
+  cmd.addCommand(assetsSubcommand())
+
+  return cmd
+}
+
+// --- Task Assets ---
+
+interface AssetRow extends Record<string, unknown> {
+  id: string
+  task_id: string
+  title: string
+  render_mode: string | null
+  language: string | null
+  order: number
+  created_at: string
+  updated_at: string
+}
+
+function resolveAsset(db: SlayDb, prefix: string): AssetRow {
+  const rows = db.query<AssetRow>(
+    `SELECT * FROM task_assets WHERE id LIKE :prefix || '%' LIMIT 2`,
+    { ':prefix': prefix }
+  )
+  if (rows.length === 0) {
+    console.error(`Asset not found: "${prefix}"`)
+    process.exit(1)
+  }
+  if (rows.length > 1) {
+    console.error(`Ambiguous asset id "${prefix}". Matches: ${rows.map((r) => r.id.slice(0, 8)).join(', ')}`)
+    process.exit(1)
+  }
+  return rows[0]
+}
+
+function resolveTaskForAsset(db: SlayDb, taskOpt?: string): { id: string; title: string } {
+  const ref = taskOpt ?? process.env.SLAYZONE_TASK_ID
+  if (!ref) {
+    console.error('No task ID provided and $SLAYZONE_TASK_ID is not set.')
+    process.exit(1)
+  }
+  const rows = db.query<{ id: string; title: string }>(
+    `SELECT id, title FROM tasks WHERE id LIKE :prefix || '%' LIMIT 2`,
+    { ':prefix': ref }
+  )
+  if (rows.length === 0) {
+    console.error(`Task not found: "${ref}"`)
+    process.exit(1)
+  }
+  if (rows.length > 1) {
+    console.error(`Ambiguous task id "${ref}". Matches: ${rows.map((r) => r.id.slice(0, 8)).join(', ')}`)
+    process.exit(1)
+  }
+  return rows[0]
+}
+
+function assetFilePath(assetsDir: string, taskId: string, assetId: string, title: string): string {
+  const ext = getExtensionFromTitle(title) || '.txt'
+  return path.join(assetsDir, taskId, `${assetId}${ext}`)
+}
+
+function printAssets(assets: AssetRow[]) {
+  if (assets.length === 0) {
+    console.log('No assets.')
+    return
+  }
+  const idW = 9
+  const titleW = 24
+  const modeW = 16
+  console.log(`${'ID'.padEnd(idW)}  ${'TITLE'.padEnd(titleW)}  ${'MODE'.padEnd(modeW)}  CREATED`)
+  console.log(`${'-'.repeat(idW)}  ${'-'.repeat(titleW)}  ${'-'.repeat(modeW)}  ${'-'.repeat(20)}`)
+  for (const a of assets) {
+    const id = a.id.slice(0, 8).padEnd(idW)
+    const title = a.title.slice(0, titleW).padEnd(titleW)
+    const mode = getEffectiveRenderMode(a.title, a.render_mode as RenderMode | null).padEnd(modeW)
+    const created = a.created_at.slice(0, 19)
+    console.log(`${id}  ${title}  ${mode}  ${created}`)
+  }
+}
+
+async function readStdin(): Promise<Buffer> {
+  if (process.stdin.isTTY) {
+    console.error('No content provided. Pipe content via stdin.')
+    process.exit(1)
+  }
+  const chunks: Buffer[] = []
+  for await (const chunk of process.stdin) chunks.push(chunk)
+  return Buffer.concat(chunks)
+}
+
+function assetsSubcommand(): Command {
+  const cmd = new Command('assets').description('Manage task assets')
+
+  // slay tasks assets list <taskId>
+  cmd
+    .command('list <taskId>')
+    .description('List assets for a task')
+    .option('--json', 'Output as JSON')
+    .action(async (taskId: string, opts) => {
+      const db = openDb()
+      const task = resolveTaskForAsset(db, taskId)
+      const rows = db.query<AssetRow>(
+        `SELECT * FROM task_assets WHERE task_id = :taskId ORDER BY "order" ASC, created_at ASC`,
+        { ':taskId': task.id }
+      )
+      db.close()
+      if (opts.json) {
+        console.log(JSON.stringify(rows, null, 2))
+      } else {
+        printAssets(rows)
+      }
+    })
+
+  // slay tasks assets read <assetId>
+  cmd
+    .command('read <assetId>')
+    .description('Output asset content to stdout')
+    .action(async (assetId: string) => {
+      const db = openDb()
+      const asset = resolveAsset(db, assetId)
+      db.close()
+      const dir = getAssetsDir()
+      const fp = assetFilePath(dir, asset.task_id, asset.id, asset.title)
+      if (!fs.existsSync(fp)) return
+      const mode = getEffectiveRenderMode(asset.title, asset.render_mode as RenderMode | null)
+      if (isBinaryRenderMode(mode)) {
+        process.stdout.write(fs.readFileSync(fp))
+      } else {
+        process.stdout.write(fs.readFileSync(fp, 'utf-8'))
+      }
+    })
+
+  // slay tasks assets create <title>
+  cmd
+    .command('create <title>')
+    .description('Create a new asset')
+    .option('--task <id>', 'Task ID (or $SLAYZONE_TASK_ID)')
+    .option('--copy-from <path>', 'Copy content from file')
+    .option('--render-mode <mode>', 'Override render mode')
+    .option('--json', 'Output as JSON')
+    .action(async (title: string, opts) => {
+      const db = openDb()
+      const task = resolveTaskForAsset(db, opts.task)
+      const id = crypto.randomUUID()
+      const now = new Date().toISOString()
+      const maxOrder = db.query<{ m: number | null }>(
+        `SELECT MAX("order") as m FROM task_assets WHERE task_id = :taskId`,
+        { ':taskId': task.id }
+      )[0]?.m ?? -1
+
+      db.run(
+        `INSERT INTO task_assets (id, task_id, title, render_mode, "order", created_at, updated_at)
+         VALUES (:id, :taskId, :title, :renderMode, :order, :now, :now)`,
+        {
+          ':id': id,
+          ':taskId': task.id,
+          ':title': title,
+          ':renderMode': opts.renderMode ?? null,
+          ':order': maxOrder + 1,
+          ':now': now,
+        }
+      )
+
+      const dir = getAssetsDir()
+      const fp = assetFilePath(dir, task.id, id, title)
+      fs.mkdirSync(path.dirname(fp), { recursive: true })
+
+      if (opts.copyFrom) {
+        if (!fs.existsSync(opts.copyFrom)) {
+          console.error(`File not found: ${opts.copyFrom}`)
+          process.exit(1)
+        }
+        fs.copyFileSync(opts.copyFrom, fp)
+      } else {
+        const content = await readStdin()
+        fs.writeFileSync(fp, content)
+      }
+
+      db.close()
+      await notifyApp()
+
+      if (opts.json) {
+        console.log(JSON.stringify({ id, task_id: task.id, title, render_mode: opts.renderMode ?? null, order: maxOrder + 1, created_at: now, updated_at: now }, null, 2))
+      } else {
+        console.log(`Created: ${id.slice(0, 8)}  ${title}`)
+      }
+    })
+
+  // slay tasks assets upload <sourcePath>
+  cmd
+    .command('upload <sourcePath>')
+    .description('Upload a file as an asset')
+    .option('--task <id>', 'Task ID (or $SLAYZONE_TASK_ID)')
+    .option('--title <name>', 'Asset title (defaults to filename)')
+    .option('--json', 'Output as JSON')
+    .action(async (sourcePath: string, opts) => {
+      if (!fs.existsSync(sourcePath)) {
+        console.error(`File not found: ${sourcePath}`)
+        process.exit(1)
+      }
+      const db = openDb()
+      const task = resolveTaskForAsset(db, opts.task)
+      const id = crypto.randomUUID()
+      const title = opts.title ?? path.basename(sourcePath)
+      const now = new Date().toISOString()
+      const maxOrder = db.query<{ m: number | null }>(
+        `SELECT MAX("order") as m FROM task_assets WHERE task_id = :taskId`,
+        { ':taskId': task.id }
+      )[0]?.m ?? -1
+
+      db.run(
+        `INSERT INTO task_assets (id, task_id, title, "order", created_at, updated_at)
+         VALUES (:id, :taskId, :title, :order, :now, :now)`,
+        { ':id': id, ':taskId': task.id, ':title': title, ':order': maxOrder + 1, ':now': now }
+      )
+
+      const dir = getAssetsDir()
+      const fp = assetFilePath(dir, task.id, id, title)
+      fs.mkdirSync(path.dirname(fp), { recursive: true })
+      fs.copyFileSync(sourcePath, fp)
+
+      db.close()
+      await notifyApp()
+
+      if (opts.json) {
+        console.log(JSON.stringify({ id, task_id: task.id, title, order: maxOrder + 1, created_at: now, updated_at: now }, null, 2))
+      } else {
+        console.log(`Uploaded: ${id.slice(0, 8)}  ${title}`)
+      }
+    })
+
+  // slay tasks assets update <assetId>
+  cmd
+    .command('update <assetId>')
+    .description('Update asset metadata')
+    .option('--title <name>', 'New title')
+    .option('--render-mode <mode>', 'New render mode')
+    .option('--json', 'Output as JSON')
+    .action(async (assetId: string, opts) => {
+      if (!opts.title && !opts.renderMode) {
+        console.error('Provide at least one of --title, --render-mode.')
+        process.exit(1)
+      }
+      const db = openDb()
+      const asset = resolveAsset(db, assetId)
+
+      const sets: string[] = []
+      const params: Record<string, string | number | bigint | null | Uint8Array> = { ':id': asset.id }
+
+      if (opts.title !== undefined) {
+        sets.push('title = :title')
+        params[':title'] = opts.title
+      }
+      if (opts.renderMode !== undefined) {
+        sets.push('render_mode = :renderMode')
+        params[':renderMode'] = opts.renderMode
+      }
+      sets.push("updated_at = :now")
+      params[':now'] = new Date().toISOString()
+
+      db.run(`UPDATE task_assets SET ${sets.join(', ')} WHERE id = :id`, params)
+
+      // Rename file on disk if extension changed
+      if (opts.title) {
+        const dir = getAssetsDir()
+        const oldExt = getExtensionFromTitle(asset.title) || '.txt'
+        const newExt = getExtensionFromTitle(opts.title) || '.txt'
+        if (oldExt !== newExt) {
+          const oldPath = path.join(dir, asset.task_id, `${asset.id}${oldExt}`)
+          const newPath = path.join(dir, asset.task_id, `${asset.id}${newExt}`)
+          if (fs.existsSync(oldPath)) {
+            const content = fs.readFileSync(oldPath)
+            fs.writeFileSync(newPath, content)
+            fs.unlinkSync(oldPath)
+          }
+        }
+      }
+
+      db.close()
+      await notifyApp()
+
+      const newTitle = opts.title ?? asset.title
+      if (opts.json) {
+        const updated = { ...asset, title: newTitle, render_mode: opts.renderMode ?? asset.render_mode, updated_at: params[':now'] }
+        console.log(JSON.stringify(updated, null, 2))
+      } else {
+        console.log(`Updated: ${asset.id.slice(0, 8)}  ${newTitle}`)
+      }
+    })
+
+  // slay tasks assets write <assetId>
+  cmd
+    .command('write <assetId>')
+    .description('Replace asset content from stdin')
+    .action(async (assetId: string) => {
+      const db = openDb()
+      const asset = resolveAsset(db, assetId)
+      db.run(
+        `UPDATE task_assets SET updated_at = :now WHERE id = :id`,
+        { ':id': asset.id, ':now': new Date().toISOString() }
+      )
+      db.close()
+
+      const content = await readStdin()
+      const dir = getAssetsDir()
+      const fp = assetFilePath(dir, asset.task_id, asset.id, asset.title)
+      fs.mkdirSync(path.dirname(fp), { recursive: true })
+      fs.writeFileSync(fp, content)
+
+      await notifyApp()
+      console.log(`Written: ${asset.id.slice(0, 8)}  ${asset.title}`)
+    })
+
+  // slay tasks assets append <assetId>
+  cmd
+    .command('append <assetId>')
+    .description('Append to asset content from stdin')
+    .action(async (assetId: string) => {
+      const db = openDb()
+      const asset = resolveAsset(db, assetId)
+      db.run(
+        `UPDATE task_assets SET updated_at = :now WHERE id = :id`,
+        { ':id': asset.id, ':now': new Date().toISOString() }
+      )
+      db.close()
+
+      const content = await readStdin()
+      const dir = getAssetsDir()
+      const fp = assetFilePath(dir, asset.task_id, asset.id, asset.title)
+      fs.mkdirSync(path.dirname(fp), { recursive: true })
+      fs.appendFileSync(fp, content)
+
+      await notifyApp()
+      console.log(`Appended: ${asset.id.slice(0, 8)}  ${asset.title}`)
+    })
+
+  // slay tasks assets delete <assetId>
+  cmd
+    .command('delete <assetId>')
+    .description('Delete an asset')
+    .action(async (assetId: string) => {
+      const db = openDb()
+      const asset = resolveAsset(db, assetId)
+
+      const dir = getAssetsDir()
+      const fp = assetFilePath(dir, asset.task_id, asset.id, asset.title)
+      if (fs.existsSync(fp)) fs.unlinkSync(fp)
+
+      db.run(`DELETE FROM task_assets WHERE id = :id`, { ':id': asset.id })
+      db.close()
+      await notifyApp()
+      console.log(`Deleted: ${asset.id.slice(0, 8)}  ${asset.title}`)
+    })
+
+  // slay tasks assets path <assetId>
+  cmd
+    .command('path <assetId>')
+    .description('Print asset file path')
+    .action(async (assetId: string) => {
+      const db = openDb()
+      const asset = resolveAsset(db, assetId)
+      db.close()
+      const dir = getAssetsDir()
+      process.stdout.write(assetFilePath(dir, asset.task_id, asset.id, asset.title))
+    })
 
   return cmd
 }
