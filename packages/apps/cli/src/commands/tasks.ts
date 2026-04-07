@@ -238,7 +238,7 @@ export function tasksCommand(): Command {
     .command('create <title>')
     .description('Create a new task')
     .requiredOption('--project <name|id>', 'Project name (partial, case-insensitive) or ID')
-    .option('--description <text>', 'Task description')
+    .option('--description <text>', 'Task description (reference task specific assets via `[title](asset:<asset-id>)`)')
     .option('--status <status>', 'Initial status key')
     .option('--priority <n>', 'Priority 1-5 (1=highest)')
     .option('--due <date>', 'Due date (YYYY-MM-DD or ISO 8601)')
@@ -433,23 +433,28 @@ export function tasksCommand(): Command {
     .command('update [id]')
     .description('Update a task (id prefix supported; defaults to $SLAYZONE_TASK_ID)')
     .option('--title <title>', 'New title')
-    .option('--description <text>', 'New description')
+    .option('--description <text>', 'New description (reference task specific assets via `[title](asset:<asset-id>)`)')
+    .option('--append-description <text>', 'Append to existing description')
     .option('--status <status>', 'New status key')
     .option('--priority <n>', 'New priority 1-5')
     .option('--due <date>', 'Set due date (YYYY-MM-DD or ISO 8601)')
     .option('--no-due', 'Clear due date')
     .action(async (idPrefix, opts) => {
       idPrefix = resolveId(idPrefix)
-      if (opts.title === undefined && opts.description === undefined && opts.status === undefined
+      if (opts.description !== undefined && opts.appendDescription !== undefined) {
+        console.error('Cannot use both --description and --append-description.')
+        process.exit(1)
+      }
+      if (opts.title === undefined && opts.description === undefined && opts.appendDescription === undefined && opts.status === undefined
         && opts.priority === undefined && opts.due === undefined) {
-        console.error('Provide at least one of --title, --description, --status, --priority, --due, --no-due')
+        console.error('Provide at least one of --title, --description, --append-description, --status, --priority, --due, --no-due')
         process.exit(1)
       }
 
       const db = openDb()
 
-      const tasks = db.query<{ id: string; title: string; project_id: string }>(
-        `SELECT id, title, project_id FROM tasks WHERE id LIKE :prefix || '%' LIMIT 2`,
+      const tasks = db.query<{ id: string; title: string; project_id: string; description: string | null }>(
+        `SELECT id, title, project_id, description FROM tasks WHERE id LIKE :prefix || '%' LIMIT 2`,
         { ':prefix': idPrefix }
       )
 
@@ -479,6 +484,7 @@ export function tasksCommand(): Command {
 
       if (opts.title)       { sets.push('title = :title');             params[':title'] = opts.title }
       if (opts.description !== undefined) { sets.push('description = :description'); params[':description'] = opts.description || null }
+      if (opts.appendDescription) { sets.push('description = :description'); params[':description'] = (task.description ?? '') + '\n' + opts.appendDescription }
       if (resolvedStatus)   { sets.push('status = :status');           params[':status'] = resolvedStatus }
       if (opts.priority)    { sets.push('priority = :priority');       params[':priority'] = parseInt(opts.priority, 10) }
       if (typeof opts.due === 'string') { sets.push('due_date = :dueDate'); params[':dueDate'] = opts.due }
