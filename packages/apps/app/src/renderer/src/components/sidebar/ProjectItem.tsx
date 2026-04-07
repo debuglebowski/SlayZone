@@ -41,7 +41,7 @@ export function ProjectItem({
   } = useSortable({ id: project.id })
 
   const style = {
-    transform: CSS.Transform.toString(transform),
+    transform: transform ? CSS.Transform.toString({ ...transform, x: 0 }) : undefined,
     transition,
     opacity: isDragging ? 0.5 : undefined
   }
