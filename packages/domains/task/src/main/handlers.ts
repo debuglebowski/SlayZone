@@ -1,6 +1,8 @@
 import type { IpcMain } from 'electron'
+import { app } from 'electron'
 import type { Database } from 'better-sqlite3'
-import type { CreateTaskInput, UpdateTaskInput, Task, ProviderConfig } from '@slayzone/task/shared'
+import type { CreateTaskInput, UpdateTaskInput, Task, ProviderConfig, CreateAssetInput, UpdateAssetInput, TaskAsset, RenderMode } from '@slayzone/task/shared'
+import { getExtensionFromTitle } from '@slayzone/task/shared'
 import type { ColumnConfig } from '@slayzone/projects/shared'
 import { getDefaultStatus, isKnownStatus, isTerminalStatus, parseColumnsConfig } from '@slayzone/projects/shared'
 import { parseProject } from '@slayzone/projects/main'
@@ -16,7 +18,8 @@ import {
   buildTaskUpdatedEvents,
 } from './history'
 import path from 'path'
-import { existsSync } from 'fs'
+import { existsSync, mkdirSync, writeFileSync, readFileSync, unlinkSync, rmSync, copyFileSync, statSync } from 'fs'
+import { randomUUID } from 'crypto'
 import { removeWorktree, createWorktree, runWorktreeSetupScript, getCurrentBranch, isGitRepo, copyIgnoredFiles, resolveCopyBehavior } from '@slayzone/worktrees/main'
 
 type DiagnosticLevel = 'debug' | 'info' | 'warn' | 'error'
@@ -132,10 +135,13 @@ function cleanupTaskImmediate(taskId: string): void {
   runtimeAdapters.killPtysByTaskId(taskId)
 }
 
-/** Kill PTY + processes + remove worktree — used for archive and hard purge */
+/** Kill PTY + processes + remove worktree + asset files — used for archive and hard purge */
 async function cleanupTaskFull(db: Database, taskId: string): Promise<void> {
   cleanupTaskImmediate(taskId)
   runtimeAdapters.killTaskProcesses(taskId)
+  // Clean up asset files on disk
+  const assetsBaseDir = path.join(process.env.SLAYZONE_DB_DIR || app.getPath('userData'), 'assets', taskId)
+  if (existsSync(assetsBaseDir)) rmSync(assetsBaseDir, { recursive: true, force: true })
 
   const task = db.prepare(
     'SELECT worktree_path, project_id FROM tasks WHERE id = ?'
@@ -882,5 +888,172 @@ export function registerTaskHandlers(ipcMain: IpcMain, db: Database, onMutation?
       taskTags: taskTagMap,
       blockedTaskIds: blockedRows.map((r) => r.blocks_task_id)
     }
+  })
+
+  // --- Task Assets ---
+
+  const assetsDir = path.join(process.env.SLAYZONE_DB_DIR || app.getPath('userData'), 'assets')
+
+  function getAssetFilePath(taskId: string, assetId: string, title: string): string {
+    const ext = getExtensionFromTitle(title) || '.txt'
+    return path.join(assetsDir, taskId, `${assetId}${ext}`)
+  }
+
+  function parseAsset(row: Record<string, unknown> | undefined): TaskAsset | null {
+    if (!row) return null
+    return {
+      id: row.id as string,
+      task_id: row.task_id as string,
+      title: row.title as string,
+      render_mode: (row.render_mode as RenderMode) ?? null,
+      language: (row.language as string) ?? null,
+      order: row.order as number,
+      created_at: row.created_at as string,
+      updated_at: row.updated_at as string,
+    }
+  }
+
+  ipcMain.handle('db:assets:getByTask', (_, taskId: string) => {
+    const rows = db
+      .prepare('SELECT * FROM task_assets WHERE task_id = ? ORDER BY "order" ASC, created_at ASC')
+      .all(taskId) as Record<string, unknown>[]
+    return rows.map(parseAsset).filter(Boolean)
+  })
+
+  ipcMain.handle('db:assets:get', (_, id: string) => {
+    const row = db.prepare('SELECT * FROM task_assets WHERE id = ?').get(id) as Record<string, unknown> | undefined
+    return parseAsset(row)
+  })
+
+  ipcMain.handle('db:assets:create', (_, data: CreateAssetInput) => {
+    const id = randomUUID()
+    const maxOrder = (db.prepare('SELECT MAX("order") as m FROM task_assets WHERE task_id = ?').get(data.taskId) as { m: number | null }).m ?? -1
+
+    db.prepare(`
+      INSERT INTO task_assets (id, task_id, title, render_mode, language, "order")
+      VALUES (?, ?, ?, ?, ?, ?)
+    `).run(id, data.taskId, data.title, data.renderMode ?? null, data.language ?? null, maxOrder + 1)
+
+    // Write content to disk
+    const filePath = getAssetFilePath(data.taskId, id, data.title)
+    mkdirSync(path.dirname(filePath), { recursive: true })
+    writeFileSync(filePath, data.content ?? '', 'utf-8')
+
+    onMutation?.()
+    const row = db.prepare('SELECT * FROM task_assets WHERE id = ?').get(id) as Record<string, unknown> | undefined
+    return parseAsset(row)
+  })
+
+  ipcMain.handle('db:assets:update', (_, data: UpdateAssetInput) => {
+    const existing = db.prepare('SELECT * FROM task_assets WHERE id = ?').get(data.id) as Record<string, unknown> | undefined
+    if (!existing) return null
+
+    const sets: string[] = []
+    const values: unknown[] = []
+    if (data.title !== undefined) { sets.push('title = ?'); values.push(data.title) }
+    if (data.renderMode !== undefined) { sets.push('render_mode = ?'); values.push(data.renderMode) }
+    if (data.language !== undefined) { sets.push('language = ?'); values.push(data.language) }
+    if (sets.length > 0) {
+      sets.push('updated_at = datetime(\'now\')')
+      values.push(data.id)
+      db.prepare(`UPDATE task_assets SET ${sets.join(', ')} WHERE id = ?`).run(...values)
+    }
+
+    // If title changed and extension changed, rename file on disk
+    const taskId = existing.task_id as string
+    const oldTitle = existing.title as string
+    const newTitle = data.title ?? oldTitle
+    if (data.title !== undefined) {
+      const oldExt = getExtensionFromTitle(oldTitle) || '.txt'
+      const newExt = getExtensionFromTitle(newTitle) || '.txt'
+      if (oldExt !== newExt) {
+        const oldPath = path.join(assetsDir, taskId, `${data.id}${oldExt}`)
+        const newPath = path.join(assetsDir, taskId, `${data.id}${newExt}`)
+        if (existsSync(oldPath)) {
+          const content = readFileSync(oldPath, 'utf-8')
+          writeFileSync(newPath, content, 'utf-8')
+          unlinkSync(oldPath)
+        }
+      }
+    }
+
+    // Write content to disk if provided
+    if (data.content !== undefined) {
+      const filePath = getAssetFilePath(taskId, data.id, newTitle)
+      mkdirSync(path.dirname(filePath), { recursive: true })
+      writeFileSync(filePath, data.content, 'utf-8')
+    }
+
+    onMutation?.()
+    const row = db.prepare('SELECT * FROM task_assets WHERE id = ?').get(data.id) as Record<string, unknown> | undefined
+    return parseAsset(row)
+  })
+
+  ipcMain.handle('db:assets:delete', (_, id: string) => {
+    const existing = db.prepare('SELECT * FROM task_assets WHERE id = ?').get(id) as Record<string, unknown> | undefined
+    if (!existing) return false
+
+    const filePath = getAssetFilePath(existing.task_id as string, id, existing.title as string)
+    if (existsSync(filePath)) unlinkSync(filePath)
+
+    db.prepare('DELETE FROM task_assets WHERE id = ?').run(id)
+    onMutation?.()
+    return true
+  })
+
+  ipcMain.handle('db:assets:reorder', (_, assetIds: string[]) => {
+    const stmt = db.prepare('UPDATE task_assets SET "order" = ? WHERE id = ?')
+    db.transaction(() => {
+      assetIds.forEach((id, index) => {
+        stmt.run(index, id)
+      })
+    })()
+  })
+
+  ipcMain.handle('db:assets:readContent', (_, id: string) => {
+    const existing = db.prepare('SELECT * FROM task_assets WHERE id = ?').get(id) as Record<string, unknown> | undefined
+    if (!existing) return null
+    const filePath = getAssetFilePath(existing.task_id as string, id, existing.title as string)
+    if (!existsSync(filePath)) return ''
+    return readFileSync(filePath, 'utf-8')
+  })
+
+  ipcMain.handle('db:assets:getFilePath', (_, id: string) => {
+    const existing = db.prepare('SELECT * FROM task_assets WHERE id = ?').get(id) as Record<string, unknown> | undefined
+    if (!existing) return null
+    return getAssetFilePath(existing.task_id as string, id, existing.title as string)
+  })
+
+  ipcMain.handle('db:assets:upload', (_, data: { taskId: string; sourcePath: string; title?: string }) => {
+    const id = randomUUID()
+    const title = data.title ?? path.basename(data.sourcePath)
+    const maxOrder = (db.prepare('SELECT MAX("order") as m FROM task_assets WHERE task_id = ?').get(data.taskId) as { m: number | null }).m ?? -1
+
+    db.prepare(`
+      INSERT INTO task_assets (id, task_id, title, "order")
+      VALUES (?, ?, ?, ?)
+    `).run(id, data.taskId, title, maxOrder + 1)
+
+    const filePath = getAssetFilePath(data.taskId, id, title)
+    mkdirSync(path.dirname(filePath), { recursive: true })
+    copyFileSync(data.sourcePath, filePath)
+
+    onMutation?.()
+    const row = db.prepare('SELECT * FROM task_assets WHERE id = ?').get(id) as Record<string, unknown> | undefined
+    return parseAsset(row)
+  })
+
+  ipcMain.handle('db:assets:getFileSize', (_, id: string) => {
+    const existing = db.prepare('SELECT * FROM task_assets WHERE id = ?').get(id) as Record<string, unknown> | undefined
+    if (!existing) return null
+    const filePath = getAssetFilePath(existing.task_id as string, id, existing.title as string)
+    if (!existsSync(filePath)) return null
+    return statSync(filePath).size
+  })
+
+  // Cleanup asset files when a task is permanently deleted
+  ipcMain.handle('db:assets:cleanupTask', (_, taskId: string) => {
+    const taskDir = path.join(assetsDir, taskId)
+    if (existsSync(taskDir)) rmSync(taskDir, { recursive: true, force: true })
   })
 }

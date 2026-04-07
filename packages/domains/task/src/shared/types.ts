@@ -53,6 +53,7 @@ export interface PanelVisibility extends Record<string, boolean> {
   diff: boolean
   settings: boolean
   editor: boolean
+  assets: boolean
   processes: boolean
 }
 
@@ -97,7 +98,7 @@ export function isPanelEnabled(config: PanelConfig, id: string, view: PanelView)
 // Per-task URL state (panelId → current URL)
 export type WebPanelUrls = Record<string, string>
 
-export const BUILTIN_PANEL_IDS = ['terminal', 'browser', 'editor', 'diff', 'settings', 'processes'] as const
+export const BUILTIN_PANEL_IDS = ['terminal', 'browser', 'editor', 'assets', 'diff', 'settings', 'processes'] as const
 
 export const PREDEFINED_WEB_PANELS: WebPanelDefinition[] = [
   {
@@ -125,6 +126,76 @@ export const DEFAULT_PANEL_CONFIG: PanelConfig = {
     },
   },
   webPanels: [...PREDEFINED_WEB_PANELS]
+}
+
+// --- Task Assets ---
+
+export type RenderMode = 'markdown' | 'code' | 'html-preview' | 'svg-preview' | 'mermaid-preview' | 'image' | 'pdf'
+
+/** Maps file extensions → default render mode. Unlisted extensions default to 'code'. */
+export const EXTENSION_RENDER_MODES: Record<string, RenderMode> = {
+  '.md': 'markdown', '.mdx': 'markdown',
+  '.html': 'html-preview', '.htm': 'html-preview',
+  '.svg': 'svg-preview',
+  '.mmd': 'mermaid-preview', '.mermaid': 'mermaid-preview',
+  '.png': 'image', '.jpg': 'image', '.jpeg': 'image',
+  '.gif': 'image', '.webp': 'image', '.avif': 'image', '.bmp': 'image',
+  '.pdf': 'pdf',
+}
+
+export const RENDER_MODE_INFO: Record<RenderMode, { label: string }> = {
+  'markdown': { label: 'Rich Text' },
+  'code': { label: 'Code' },
+  'html-preview': { label: 'HTML Preview' },
+  'svg-preview': { label: 'SVG Preview' },
+  'mermaid-preview': { label: 'Mermaid Preview' },
+  'image': { label: 'Image' },
+  'pdf': { label: 'PDF' },
+}
+
+/** Whether a render mode represents a binary (non-text) asset. */
+export function isBinaryRenderMode(mode: RenderMode): boolean {
+  return mode === 'image' || mode === 'pdf'
+}
+
+/** Extract file extension from title (e.g. "notes.md" → ".md"). Empty string if none. */
+export function getExtensionFromTitle(title: string): string {
+  const dot = title.lastIndexOf('.')
+  if (dot <= 0) return ''
+  return title.slice(dot).toLowerCase()
+}
+
+/** Determine effective render mode: use override if set, else infer from extension. */
+export function getEffectiveRenderMode(title: string, override: RenderMode | null): RenderMode {
+  if (override) return override
+  return EXTENSION_RENDER_MODES[getExtensionFromTitle(title)] ?? 'code'
+}
+
+export interface TaskAsset {
+  id: string
+  task_id: string
+  title: string
+  render_mode: RenderMode | null
+  language: string | null
+  order: number
+  created_at: string
+  updated_at: string
+}
+
+export interface CreateAssetInput {
+  taskId: string
+  title: string
+  renderMode?: RenderMode
+  content?: string
+  language?: string | null
+}
+
+export interface UpdateAssetInput {
+  id: string
+  title?: string
+  renderMode?: RenderMode | null
+  content?: string
+  language?: string | null
 }
 
 export interface Task {

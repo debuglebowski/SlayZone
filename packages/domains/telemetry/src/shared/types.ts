@@ -27,6 +27,8 @@ export type TelemetryEventName =
   | 'task_priority_changed'
   | 'task_description_ai_generated'
   | 'subtask_created'
+  | 'asset_created'
+  | 'asset_deleted'
   | 'task_dependency_added'
   | 'temporary_task_created'
   | 'task_moved_to_project'
@@ -152,6 +154,8 @@ export interface TelemetryEventProps {
   task_priority_changed: { priority: string }
   task_description_ai_generated: Record<string, never>
   subtask_created: Record<string, never>
+  asset_created: Record<string, never>
+  asset_deleted: Record<string, never>
   task_dependency_added: Record<string, never>
   temporary_task_created: Record<string, never>
   task_moved_to_project: Record<string, never>
