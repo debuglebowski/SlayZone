@@ -174,6 +174,7 @@ export function getEffectiveRenderMode(title: string, override: RenderMode | nul
 export interface TaskAsset {
   id: string
   task_id: string
+  folder_id: string | null
   title: string
   render_mode: RenderMode | null
   language: string | null
@@ -185,6 +186,7 @@ export interface TaskAsset {
 export interface CreateAssetInput {
   taskId: string
   title: string
+  folderId?: string | null
   renderMode?: RenderMode
   content?: string
   language?: string | null
@@ -193,9 +195,31 @@ export interface CreateAssetInput {
 export interface UpdateAssetInput {
   id: string
   title?: string
+  folderId?: string | null
   renderMode?: RenderMode | null
   content?: string
   language?: string | null
+}
+
+export interface AssetFolder {
+  id: string
+  task_id: string
+  parent_id: string | null
+  name: string
+  order: number
+  created_at: string
+}
+
+export interface CreateAssetFolderInput {
+  taskId: string
+  name: string
+  parentId?: string | null
+}
+
+export interface UpdateAssetFolderInput {
+  id: string
+  name?: string
+  parentId?: string | null
 }
 
 export interface Task {

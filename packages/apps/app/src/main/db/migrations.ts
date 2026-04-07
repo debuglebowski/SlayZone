@@ -1844,6 +1844,25 @@ const migrations: Migration[] = [
           VALUES ('github-alirezarezvani-skills', 'Claude Skills Collection', '500+ skills for coding agents', 'github', 'alirezarezvani', 'claude-skills', 'main', '.gemini/skills');
       `)
     }
+  },
+  {
+    version: 99,
+    up: (db) => {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS asset_folders (
+          id TEXT PRIMARY KEY,
+          task_id TEXT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+          parent_id TEXT REFERENCES asset_folders(id) ON DELETE CASCADE,
+          name TEXT NOT NULL,
+          "order" INTEGER NOT NULL DEFAULT 0,
+          created_at TEXT NOT NULL DEFAULT (datetime('now'))
+        );
+        CREATE INDEX IF NOT EXISTS idx_asset_folders_task ON asset_folders(task_id);
+        CREATE INDEX IF NOT EXISTS idx_asset_folders_parent ON asset_folders(parent_id);
+
+        ALTER TABLE task_assets ADD COLUMN folder_id TEXT DEFAULT NULL REFERENCES asset_folders(id) ON DELETE SET NULL;
+      `)
+    }
   }
 ]
 

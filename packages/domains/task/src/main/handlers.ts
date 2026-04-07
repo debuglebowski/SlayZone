@@ -1,7 +1,7 @@
 import type { IpcMain } from 'electron'
 import { app } from 'electron'
 import type { Database } from 'better-sqlite3'
-import type { CreateTaskInput, UpdateTaskInput, Task, ProviderConfig, CreateAssetInput, UpdateAssetInput, TaskAsset, RenderMode } from '@slayzone/task/shared'
+import type { CreateTaskInput, UpdateTaskInput, Task, ProviderConfig, CreateAssetInput, UpdateAssetInput, TaskAsset, RenderMode, AssetFolder, CreateAssetFolderInput, UpdateAssetFolderInput } from '@slayzone/task/shared'
 import { getExtensionFromTitle } from '@slayzone/task/shared'
 import type { ColumnConfig } from '@slayzone/projects/shared'
 import { getDefaultStatus, isKnownStatus, isTerminalStatus, parseColumnsConfig } from '@slayzone/projects/shared'
@@ -18,7 +18,7 @@ import {
   buildTaskUpdatedEvents,
 } from './history'
 import path from 'path'
-import { existsSync, mkdirSync, writeFileSync, readFileSync, unlinkSync, rmSync, copyFileSync, statSync } from 'fs'
+import { existsSync, mkdirSync, writeFileSync, readFileSync, unlinkSync, rmSync, copyFileSync, statSync, readdirSync } from 'fs'
 import { randomUUID } from 'crypto'
 import { removeWorktree, createWorktree, runWorktreeSetupScript, getCurrentBranch, isGitRepo, copyIgnoredFiles, resolveCopyBehavior } from '@slayzone/worktrees/main'
 
@@ -904,12 +904,25 @@ export function registerTaskHandlers(ipcMain: IpcMain, db: Database, onMutation?
     return {
       id: row.id as string,
       task_id: row.task_id as string,
+      folder_id: (row.folder_id as string) ?? null,
       title: row.title as string,
       render_mode: (row.render_mode as RenderMode) ?? null,
       language: (row.language as string) ?? null,
       order: row.order as number,
       created_at: row.created_at as string,
       updated_at: row.updated_at as string,
+    }
+  }
+
+  function parseFolder(row: Record<string, unknown> | undefined): AssetFolder | null {
+    if (!row) return null
+    return {
+      id: row.id as string,
+      task_id: row.task_id as string,
+      parent_id: (row.parent_id as string) ?? null,
+      name: row.name as string,
+      order: row.order as number,
+      created_at: row.created_at as string,
     }
   }
 
@@ -927,12 +940,17 @@ export function registerTaskHandlers(ipcMain: IpcMain, db: Database, onMutation?
 
   ipcMain.handle('db:assets:create', (_, data: CreateAssetInput) => {
     const id = randomUUID()
-    const maxOrder = (db.prepare('SELECT MAX("order") as m FROM task_assets WHERE task_id = ?').get(data.taskId) as { m: number | null }).m ?? -1
+    const folderId = data.folderId ?? null
+    const maxOrder = (db.prepare(
+      folderId
+        ? 'SELECT MAX("order") as m FROM task_assets WHERE task_id = ? AND folder_id = ?'
+        : 'SELECT MAX("order") as m FROM task_assets WHERE task_id = ? AND folder_id IS NULL'
+    ).get(...(folderId ? [data.taskId, folderId] : [data.taskId])) as { m: number | null }).m ?? -1
 
     db.prepare(`
-      INSERT INTO task_assets (id, task_id, title, render_mode, language, "order")
-      VALUES (?, ?, ?, ?, ?, ?)
-    `).run(id, data.taskId, data.title, data.renderMode ?? null, data.language ?? null, maxOrder + 1)
+      INSERT INTO task_assets (id, task_id, folder_id, title, render_mode, language, "order")
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).run(id, data.taskId, folderId, data.title, data.renderMode ?? null, data.language ?? null, maxOrder + 1)
 
     // Write content to disk
     const filePath = getAssetFilePath(data.taskId, id, data.title)
@@ -951,6 +969,7 @@ export function registerTaskHandlers(ipcMain: IpcMain, db: Database, onMutation?
     const sets: string[] = []
     const values: unknown[] = []
     if (data.title !== undefined) { sets.push('title = ?'); values.push(data.title) }
+    if (data.folderId !== undefined) { sets.push('folder_id = ?'); values.push(data.folderId) }
     if (data.renderMode !== undefined) { sets.push('render_mode = ?'); values.push(data.renderMode) }
     if (data.language !== undefined) { sets.push('language = ?'); values.push(data.language) }
     if (sets.length > 0) {
@@ -1001,7 +1020,8 @@ export function registerTaskHandlers(ipcMain: IpcMain, db: Database, onMutation?
     return true
   })
 
-  ipcMain.handle('db:assets:reorder', (_, assetIds: string[]) => {
+  ipcMain.handle('db:assets:reorder', (_, data: string[] | { folderId: string | null; assetIds: string[] }) => {
+    const assetIds = Array.isArray(data) ? data : data.assetIds
     const stmt = db.prepare('UPDATE task_assets SET "order" = ? WHERE id = ?')
     db.transaction(() => {
       assetIds.forEach((id, index) => {
@@ -1051,9 +1071,128 @@ export function registerTaskHandlers(ipcMain: IpcMain, db: Database, onMutation?
     return statSync(filePath).size
   })
 
+  ipcMain.handle('db:assets:uploadDir', (_, data: { taskId: string; dirPath: string; parentFolderId: string | null }) => {
+    const createdFolders: ReturnType<typeof parseFolder>[] = []
+    const createdAssets: ReturnType<typeof parseAsset>[] = []
+
+    function walkDir(dirPath: string, parentFolderId: string | null) {
+      const entries = readdirSync(dirPath, { withFileTypes: true })
+      for (const entry of entries) {
+        const fullPath = path.join(dirPath, entry.name)
+        if (entry.isDirectory()) {
+          const folderId = randomUUID()
+          const maxOrder = (db.prepare(
+            parentFolderId
+              ? 'SELECT MAX("order") as m FROM asset_folders WHERE task_id = ? AND parent_id = ?'
+              : 'SELECT MAX("order") as m FROM asset_folders WHERE task_id = ? AND parent_id IS NULL'
+          ).get(...(parentFolderId ? [data.taskId, parentFolderId] : [data.taskId])) as { m: number | null }).m ?? -1
+
+          db.prepare(`
+            INSERT INTO asset_folders (id, task_id, parent_id, name, "order")
+            VALUES (?, ?, ?, ?, ?)
+          `).run(folderId, data.taskId, parentFolderId, entry.name, maxOrder + 1)
+
+          const row = db.prepare('SELECT * FROM asset_folders WHERE id = ?').get(folderId) as Record<string, unknown> | undefined
+          createdFolders.push(parseFolder(row))
+          walkDir(fullPath, folderId)
+        } else if (entry.isFile()) {
+          const assetId = randomUUID()
+          const title = entry.name
+          const maxOrder = (db.prepare(
+            parentFolderId
+              ? 'SELECT MAX("order") as m FROM task_assets WHERE task_id = ? AND folder_id = ?'
+              : 'SELECT MAX("order") as m FROM task_assets WHERE task_id = ? AND folder_id IS NULL'
+          ).get(...(parentFolderId ? [data.taskId, parentFolderId] : [data.taskId])) as { m: number | null }).m ?? -1
+
+          db.prepare(`
+            INSERT INTO task_assets (id, task_id, folder_id, title, "order")
+            VALUES (?, ?, ?, ?, ?)
+          `).run(assetId, data.taskId, parentFolderId, title, maxOrder + 1)
+
+          const filePath = getAssetFilePath(data.taskId, assetId, title)
+          mkdirSync(path.dirname(filePath), { recursive: true })
+          copyFileSync(fullPath, filePath)
+
+          const row = db.prepare('SELECT * FROM task_assets WHERE id = ?').get(assetId) as Record<string, unknown> | undefined
+          createdAssets.push(parseAsset(row))
+        }
+      }
+    }
+
+    db.transaction(() => {
+      walkDir(data.dirPath, data.parentFolderId)
+    })()
+
+    onMutation?.()
+    return { folders: createdFolders.filter(Boolean), assets: createdAssets.filter(Boolean) }
+  })
+
   // Cleanup asset files when a task is permanently deleted
   ipcMain.handle('db:assets:cleanupTask', (_, taskId: string) => {
     const taskDir = path.join(assetsDir, taskId)
     if (existsSync(taskDir)) rmSync(taskDir, { recursive: true, force: true })
+  })
+
+  // --- Asset Folders ---
+
+  ipcMain.handle('db:assetFolders:getByTask', (_, taskId: string) => {
+    const rows = db
+      .prepare('SELECT * FROM asset_folders WHERE task_id = ? ORDER BY "order" ASC, created_at ASC')
+      .all(taskId) as Record<string, unknown>[]
+    return rows.map(parseFolder).filter(Boolean)
+  })
+
+  ipcMain.handle('db:assetFolders:create', (_, data: CreateAssetFolderInput) => {
+    const id = randomUUID()
+    const parentId = data.parentId ?? null
+    const maxOrder = (db.prepare(
+      parentId
+        ? 'SELECT MAX("order") as m FROM asset_folders WHERE task_id = ? AND parent_id = ?'
+        : 'SELECT MAX("order") as m FROM asset_folders WHERE task_id = ? AND parent_id IS NULL'
+    ).get(...(parentId ? [data.taskId, parentId] : [data.taskId])) as { m: number | null }).m ?? -1
+
+    db.prepare(`
+      INSERT INTO asset_folders (id, task_id, parent_id, name, "order")
+      VALUES (?, ?, ?, ?, ?)
+    `).run(id, data.taskId, parentId, data.name, maxOrder + 1)
+
+    onMutation?.()
+    const row = db.prepare('SELECT * FROM asset_folders WHERE id = ?').get(id) as Record<string, unknown> | undefined
+    return parseFolder(row)
+  })
+
+  ipcMain.handle('db:assetFolders:update', (_, data: UpdateAssetFolderInput) => {
+    const existing = db.prepare('SELECT * FROM asset_folders WHERE id = ?').get(data.id) as Record<string, unknown> | undefined
+    if (!existing) return null
+
+    const sets: string[] = []
+    const values: unknown[] = []
+    if (data.name !== undefined) { sets.push('name = ?'); values.push(data.name) }
+    if (data.parentId !== undefined) { sets.push('parent_id = ?'); values.push(data.parentId) }
+    if (sets.length > 0) {
+      values.push(data.id)
+      db.prepare(`UPDATE asset_folders SET ${sets.join(', ')} WHERE id = ?`).run(...values)
+    }
+
+    onMutation?.()
+    const row = db.prepare('SELECT * FROM asset_folders WHERE id = ?').get(data.id) as Record<string, unknown> | undefined
+    return parseFolder(row)
+  })
+
+  ipcMain.handle('db:assetFolders:delete', (_, id: string) => {
+    const existing = db.prepare('SELECT * FROM asset_folders WHERE id = ?').get(id) as Record<string, unknown> | undefined
+    if (!existing) return false
+    db.prepare('DELETE FROM asset_folders WHERE id = ?').run(id)
+    onMutation?.()
+    return true
+  })
+
+  ipcMain.handle('db:assetFolders:reorder', (_, data: { parentId: string | null; folderIds: string[] }) => {
+    const stmt = db.prepare('UPDATE asset_folders SET "order" = ? WHERE id = ?')
+    db.transaction(() => {
+      data.folderIds.forEach((id, index) => {
+        stmt.run(index, id)
+      })
+    })()
   })
 }

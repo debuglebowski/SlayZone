@@ -872,12 +872,22 @@ export function tasksCommand(): Command {
 interface AssetRow extends Record<string, unknown> {
   id: string
   task_id: string
+  folder_id: string | null
   title: string
   render_mode: string | null
   language: string | null
   order: number
   created_at: string
   updated_at: string
+}
+
+interface AssetFolderRow extends Record<string, unknown> {
+  id: string
+  task_id: string
+  parent_id: string | null
+  name: string
+  order: number
+  created_at: string
 }
 
 function resolveAsset(db: SlayDb, prefix: string): AssetRow {
@@ -917,28 +927,89 @@ function resolveTaskForAsset(db: SlayDb, taskOpt?: string): { id: string; title:
   return rows[0]
 }
 
+function resolveFolder(db: SlayDb, prefix: string): AssetFolderRow {
+  const rows = db.query<AssetFolderRow>(
+    `SELECT * FROM asset_folders WHERE id LIKE :prefix || '%' LIMIT 2`,
+    { ':prefix': prefix }
+  )
+  if (rows.length === 0) {
+    console.error(`Folder not found: "${prefix}"`)
+    process.exit(1)
+  }
+  if (rows.length > 1) {
+    console.error(`Ambiguous folder id "${prefix}". Matches: ${rows.map((r) => r.id.slice(0, 8)).join(', ')}`)
+    process.exit(1)
+  }
+  return rows[0]
+}
+
 function assetFilePath(assetsDir: string, taskId: string, assetId: string, title: string): string {
   const ext = getExtensionFromTitle(title) || '.txt'
   return path.join(assetsDir, taskId, `${assetId}${ext}`)
 }
 
-function printAssets(assets: AssetRow[]) {
+function printAssets(assets: AssetRow[], folders?: AssetFolderRow[]) {
   if (assets.length === 0) {
     console.log('No assets.')
     return
   }
+  const folderMap = new Map((folders ?? []).map(f => [f.id, f.name]))
   const idW = 9
   const titleW = 24
   const modeW = 16
-  console.log(`${'ID'.padEnd(idW)}  ${'TITLE'.padEnd(titleW)}  ${'MODE'.padEnd(modeW)}  CREATED`)
-  console.log(`${'-'.repeat(idW)}  ${'-'.repeat(titleW)}  ${'-'.repeat(modeW)}  ${'-'.repeat(20)}`)
+  const folderW = 14
+  console.log(`${'ID'.padEnd(idW)}  ${'TITLE'.padEnd(titleW)}  ${'FOLDER'.padEnd(folderW)}  ${'MODE'.padEnd(modeW)}  CREATED`)
+  console.log(`${'-'.repeat(idW)}  ${'-'.repeat(titleW)}  ${'-'.repeat(folderW)}  ${'-'.repeat(modeW)}  ${'-'.repeat(20)}`)
   for (const a of assets) {
     const id = a.id.slice(0, 8).padEnd(idW)
     const title = a.title.slice(0, titleW).padEnd(titleW)
+    const folder = (a.folder_id ? (folderMap.get(a.folder_id) ?? '?') : '').slice(0, folderW).padEnd(folderW)
     const mode = getEffectiveRenderMode(a.title, a.render_mode as RenderMode | null).padEnd(modeW)
     const created = a.created_at.slice(0, 19)
-    console.log(`${id}  ${title}  ${mode}  ${created}`)
+    console.log(`${id}  ${title}  ${folder}  ${mode}  ${created}`)
   }
+}
+
+function printAssetTree(assets: AssetRow[], folders: AssetFolderRow[]) {
+  if (assets.length === 0 && folders.length === 0) {
+    console.log('No assets.')
+    return
+  }
+  // Build folder path map
+  const byId = new Map(folders.map(f => [f.id, f]))
+  function folderPath(id: string): string {
+    const f = byId.get(id)
+    if (!f) return '?'
+    return f.parent_id ? `${folderPath(f.parent_id)}/${f.name}` : f.name
+  }
+
+  // Group: parentId -> children
+  const childFolders = new Map<string | null, AssetFolderRow[]>()
+  for (const f of folders) {
+    const arr = childFolders.get(f.parent_id) ?? []
+    arr.push(f)
+    childFolders.set(f.parent_id, arr)
+  }
+  const assetsByFolder = new Map<string | null, AssetRow[]>()
+  for (const a of assets) {
+    const arr = assetsByFolder.get(a.folder_id) ?? []
+    arr.push(a)
+    assetsByFolder.set(a.folder_id, arr)
+  }
+
+  function printLevel(parentId: string | null, indent: string) {
+    const subFolders = childFolders.get(parentId) ?? []
+    for (const f of subFolders) {
+      console.log(`${indent}${f.name}/  (${f.id.slice(0, 8)})`)
+      printLevel(f.id, indent + '  ')
+    }
+    const subAssets = assetsByFolder.get(parentId) ?? []
+    for (const a of subAssets) {
+      console.log(`${indent}${a.title}  (${a.id.slice(0, 8)})`)
+    }
+  }
+
+  printLevel(null, '')
 }
 
 async function readStdin(): Promise<Buffer> {
@@ -959,6 +1030,7 @@ function assetsSubcommand(): Command {
     .command('list <taskId>')
     .description('List assets for a task')
     .option('--json', 'Output as JSON')
+    .option('--tree', 'Show as indented tree')
     .action(async (taskId: string, opts) => {
       const db = openDb()
       const task = resolveTaskForAsset(db, taskId)
@@ -966,11 +1038,17 @@ function assetsSubcommand(): Command {
         `SELECT * FROM task_assets WHERE task_id = :taskId ORDER BY "order" ASC, created_at ASC`,
         { ':taskId': task.id }
       )
+      const folderRows = db.query<AssetFolderRow>(
+        `SELECT * FROM asset_folders WHERE task_id = :taskId ORDER BY "order" ASC, created_at ASC`,
+        { ':taskId': task.id }
+      )
       db.close()
       if (opts.json) {
-        console.log(JSON.stringify(rows, null, 2))
+        console.log(JSON.stringify({ folders: folderRows, assets: rows }, null, 2))
+      } else if (opts.tree) {
+        printAssetTree(rows, folderRows)
       } else {
-        printAssets(rows)
+        printAssets(rows, folderRows)
       }
     })
 
@@ -998,25 +1076,30 @@ function assetsSubcommand(): Command {
     .command('create <title>')
     .description('Create a new asset')
     .option('--task <id>', 'Task ID (or $SLAYZONE_TASK_ID)')
+    .option('--folder <id>', 'Folder ID to create asset in')
     .option('--copy-from <path>', 'Copy content from file')
     .option('--render-mode <mode>', 'Override render mode')
     .option('--json', 'Output as JSON')
     .action(async (title: string, opts) => {
       const db = openDb()
       const task = resolveTaskForAsset(db, opts.task)
+      const folderId = opts.folder ? resolveFolder(db, opts.folder).id : null
       const id = crypto.randomUUID()
       const now = new Date().toISOString()
       const maxOrder = db.query<{ m: number | null }>(
-        `SELECT MAX("order") as m FROM task_assets WHERE task_id = :taskId`,
-        { ':taskId': task.id }
+        folderId
+          ? `SELECT MAX("order") as m FROM task_assets WHERE task_id = :taskId AND folder_id = :folderId`
+          : `SELECT MAX("order") as m FROM task_assets WHERE task_id = :taskId AND folder_id IS NULL`,
+        folderId ? { ':taskId': task.id, ':folderId': folderId } : { ':taskId': task.id }
       )[0]?.m ?? -1
 
       db.run(
-        `INSERT INTO task_assets (id, task_id, title, render_mode, "order", created_at, updated_at)
-         VALUES (:id, :taskId, :title, :renderMode, :order, :now, :now)`,
+        `INSERT INTO task_assets (id, task_id, folder_id, title, render_mode, "order", created_at, updated_at)
+         VALUES (:id, :taskId, :folderId, :title, :renderMode, :order, :now, :now)`,
         {
           ':id': id,
           ':taskId': task.id,
+          ':folderId': folderId,
           ':title': title,
           ':renderMode': opts.renderMode ?? null,
           ':order': maxOrder + 1,
@@ -1225,6 +1308,90 @@ function assetsSubcommand(): Command {
       db.close()
       const dir = getAssetsDir()
       process.stdout.write(assetFilePath(dir, asset.task_id, asset.id, asset.title))
+    })
+
+  // slay tasks assets mkdir <name>
+  cmd
+    .command('mkdir <name>')
+    .description('Create a folder')
+    .option('--task <id>', 'Task ID (or $SLAYZONE_TASK_ID)')
+    .option('--parent <id>', 'Parent folder ID')
+    .option('--json', 'Output as JSON')
+    .action(async (name: string, opts) => {
+      const db = openDb()
+      const task = resolveTaskForAsset(db, opts.task)
+      const parentId = opts.parent ? resolveFolder(db, opts.parent).id : null
+      const id = crypto.randomUUID()
+      const now = new Date().toISOString()
+      const maxOrder = db.query<{ m: number | null }>(
+        parentId
+          ? `SELECT MAX("order") as m FROM asset_folders WHERE task_id = :taskId AND parent_id = :parentId`
+          : `SELECT MAX("order") as m FROM asset_folders WHERE task_id = :taskId AND parent_id IS NULL`,
+        parentId ? { ':taskId': task.id, ':parentId': parentId } : { ':taskId': task.id }
+      )[0]?.m ?? -1
+
+      db.run(
+        `INSERT INTO asset_folders (id, task_id, parent_id, name, "order", created_at)
+         VALUES (:id, :taskId, :parentId, :name, :order, :now)`,
+        { ':id': id, ':taskId': task.id, ':parentId': parentId, ':name': name, ':order': maxOrder + 1, ':now': now }
+      )
+      db.close()
+      await notifyApp()
+
+      if (opts.json) {
+        console.log(JSON.stringify({ id, task_id: task.id, parent_id: parentId, name, order: maxOrder + 1, created_at: now }, null, 2))
+      } else {
+        console.log(`Created folder: ${id.slice(0, 8)}  ${name}`)
+      }
+    })
+
+  // slay tasks assets rmdir <folderId>
+  cmd
+    .command('rmdir <folderId>')
+    .description('Delete a folder (assets move to root)')
+    .option('--json', 'Output as JSON')
+    .action(async (folderId: string, opts) => {
+      const db = openDb()
+      const folder = resolveFolder(db, folderId)
+      db.run(`DELETE FROM asset_folders WHERE id = :id`, { ':id': folder.id })
+      db.close()
+      await notifyApp()
+
+      if (opts.json) {
+        console.log(JSON.stringify({ deleted: folder.id, name: folder.name }))
+      } else {
+        console.log(`Deleted folder: ${folder.id.slice(0, 8)}  ${folder.name}`)
+      }
+    })
+
+  // slay tasks assets mv <assetId>
+  cmd
+    .command('mv <assetId>')
+    .description('Move asset to a folder (or root)')
+    .requiredOption('--folder <id>', 'Target folder ID, or "root" for top level')
+    .option('--json', 'Output as JSON')
+    .action(async (assetId: string, opts) => {
+      const db = openDb()
+      const asset = resolveAsset(db, assetId)
+      let targetFolderId: string | null = null
+      let targetName = 'root'
+      if (opts.folder !== 'root') {
+        const folder = resolveFolder(db, opts.folder)
+        targetFolderId = folder.id
+        targetName = folder.name
+      }
+      db.run(
+        `UPDATE task_assets SET folder_id = :folderId, updated_at = :now WHERE id = :id`,
+        { ':folderId': targetFolderId, ':now': new Date().toISOString(), ':id': asset.id }
+      )
+      db.close()
+      await notifyApp()
+
+      if (opts.json) {
+        console.log(JSON.stringify({ id: asset.id, folder_id: targetFolderId }))
+      } else {
+        console.log(`Moved: ${asset.id.slice(0, 8)} -> ${targetName}`)
+      }
     })
 
   return cmd

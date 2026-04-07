@@ -1,11 +1,11 @@
-import { useState, useEffect, useCallback, useRef, useImperativeHandle, forwardRef, type DragEvent } from 'react'
-import { Paperclip, Plus, Upload, Trash2, GripVertical, FileText, Code, Globe, Image, GitBranch, Eye, Code2, Columns2, ZoomIn, ZoomOut } from 'lucide-react'
-import { DndContext, PointerSensor, useSensors, useSensor, closestCenter } from '@dnd-kit/core'
-import { SortableContext, verticalListSortingStrategy, useSortable } from '@dnd-kit/sortable'
-import { CSS } from '@dnd-kit/utilities'
-import { cn, Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, PanelToggle, Button, Input } from '@slayzone/ui'
+import { useState, useEffect, useCallback, useRef, useImperativeHandle, forwardRef, useMemo, type DragEvent } from 'react'
+import { Paperclip, Plus, Upload, Trash2, FileText, Code, Globe, Image, GitBranch, Eye, Code2, Columns2, ZoomIn, ZoomOut, FolderPlus, Pencil, FilePlus, FolderOpen, Folder, ArrowRight, Copy } from 'lucide-react'
+import {
+  cn, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, PanelToggle, Button, Input,
+  ContextMenu, ContextMenuTrigger, ContextMenuContent, ContextMenuItem, ContextMenuSeparator, ContextMenuSub, ContextMenuSubTrigger, ContextMenuSubContent,
+} from '@slayzone/ui'
 import { RichTextEditor } from '@slayzone/editor'
-import type { RenderMode, TaskAsset } from '@slayzone/task/shared'
+import type { RenderMode, TaskAsset, AssetFolder } from '@slayzone/task/shared'
 import { getEffectiveRenderMode, getExtensionFromTitle, RENDER_MODE_INFO, isBinaryRenderMode } from '@slayzone/task/shared'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
@@ -20,6 +20,9 @@ interface AssetsPanelProps {
   taskId: string
   isResizing?: boolean
 }
+
+const INDENT_PX = 20
+const BASE_PAD = 4
 
 const RENDER_MODE_ICONS: Record<RenderMode, typeof FileText> = {
   'markdown': FileText,
@@ -36,52 +39,12 @@ function getAssetIcon(asset: TaskAsset): typeof FileText {
   return RENDER_MODE_ICONS[mode] ?? Code
 }
 
-/** Render modes that have a meaningful preview/raw distinction */
 function hasPreviewToggle(mode: RenderMode): boolean {
   return mode === 'markdown' || mode === 'html-preview' || mode === 'svg-preview' || mode === 'mermaid-preview'
 }
 
 function hasZoom(mode: RenderMode): boolean {
   return mode === 'image' || mode === 'svg-preview' || mode === 'mermaid-preview'
-}
-
-// --- Sortable asset row ---
-
-function SortableAssetRow({ asset, selected, onSelect, onDelete }: {
-  asset: TaskAsset
-  selected: boolean
-  onSelect: () => void
-  onDelete: () => void
-}) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: asset.id })
-  const style = { transform: CSS.Transform.toString(transform), transition }
-  const TypeIcon = getAssetIcon(asset)
-
-  return (
-    <div
-      ref={setNodeRef}
-      style={style}
-      className={cn(
-        'flex items-center gap-1 px-1.5 py-1 rounded text-xs group/row cursor-pointer',
-        selected ? 'bg-muted text-foreground' : 'text-muted-foreground hover:text-foreground hover:bg-muted/50',
-        isDragging && 'opacity-50'
-      )}
-      onClick={onSelect}
-    >
-      <button type="button" className="shrink-0 cursor-grab opacity-0 group-hover/row:opacity-60" {...attributes} {...listeners}>
-        <GripVertical className="size-3" />
-      </button>
-      <TypeIcon className="size-3 shrink-0" />
-      <span className="truncate flex-1">{asset.title}</span>
-      <button
-        type="button"
-        className="shrink-0 opacity-0 group-hover/row:opacity-60 hover:!opacity-100 hover:text-destructive"
-        onClick={(e) => { e.stopPropagation(); onDelete() }}
-      >
-        <Trash2 className="size-3" />
-      </button>
-    </div>
-  )
 }
 
 // --- Image viewer ---
@@ -161,7 +124,6 @@ function AssetContentEditor({ asset, viewMode, zoomLevel, onZoom, readContent, s
   const renderMode = getEffectiveRenderMode(asset.title, asset.render_mode)
   const isBinary = isBinaryRenderMode(renderMode)
 
-  // Report stats when content changes
   useEffect(() => {
     const text = content ?? ''
     const words = text.trim() ? text.trim().split(/\s+/).length : 0
@@ -171,7 +133,6 @@ function AssetContentEditor({ asset, viewMode, zoomLevel, onZoom, readContent, s
     })
   }, [content, asset.id])
 
-  // Load content when asset changes (skip for binary)
   useEffect(() => {
     if (isBinary) {
       setLoading(false)
@@ -201,47 +162,24 @@ function AssetContentEditor({ asset, viewMode, zoomLevel, onZoom, readContent, s
     }, 500)
   }, [asset.id, saveContent])
 
-  if (loading) {
-    return <div className="flex-1 flex items-center justify-center text-xs text-muted-foreground">Loading...</div>
-  }
-
-  // Image render mode
-  if (renderMode === 'image') {
-    return <ImageViewer assetId={asset.id} zoomLevel={zoomLevel} onZoom={onZoom} getFilePath={getFilePath} />
-  }
-
-  // PDF render mode
-  if (renderMode === 'pdf') {
-    return <PdfViewer assetId={asset.id} getFilePath={getFilePath} />
-  }
+  if (loading) return <div className="flex-1 flex items-center justify-center text-xs text-muted-foreground">Loading...</div>
+  if (renderMode === 'image') return <ImageViewer assetId={asset.id} zoomLevel={zoomLevel} onZoom={onZoom} getFilePath={getFilePath} />
+  if (renderMode === 'pdf') return <PdfViewer assetId={asset.id} getFilePath={getFilePath} />
 
   const hasPreview = renderMode === 'markdown' || renderMode === 'html-preview' || renderMode === 'svg-preview' || renderMode === 'mermaid-preview'
 
-  // Markdown preview — WYSIWYG editor
   if (renderMode === 'markdown' && viewMode === 'preview') {
     return (
       <div className="flex-1 overflow-y-auto">
-        <RichTextEditor
-          value={content ?? ''}
-          onChange={handleChange}
-          placeholder="Write markdown..."
-          className="p-3"
-        />
+        <RichTextEditor value={content ?? ''} onChange={handleChange} placeholder="Write markdown..." className="p-3" />
       </div>
     )
   }
 
-  // Markdown split — raw left, rendered preview right
   if (renderMode === 'markdown' && viewMode === 'split') {
     return (
       <div className="flex-1 flex flex-row overflow-hidden">
-        <textarea
-          value={content ?? ''}
-          onChange={(e) => handleChange(e.target.value)}
-          className="flex-1 bg-transparent text-xs font-mono p-3 resize-none outline-none min-w-0"
-          placeholder="Write markdown..."
-          spellCheck={false}
-        />
+        <textarea value={content ?? ''} onChange={(e) => handleChange(e.target.value)} className="flex-1 bg-transparent text-xs font-mono p-3 resize-none outline-none min-w-0" placeholder="Write markdown..." spellCheck={false} />
         <div className="flex-1 border-l border-border overflow-y-auto min-w-0">
           <div className="prose prose-sm dark:prose-invert max-w-none p-3">
             <ReactMarkdown remarkPlugins={[remarkGfm]}>{content ?? ''}</ReactMarkdown>
@@ -251,26 +189,14 @@ function AssetContentEditor({ asset, viewMode, zoomLevel, onZoom, readContent, s
     )
   }
 
-  // Preview-only for html/svg/mermaid
   if (hasPreview && viewMode === 'preview') {
-    return (
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <AssetPreview renderMode={renderMode} content={content ?? ''} zoomLevel={zoomLevel} onZoom={onZoom} />
-      </div>
-    )
+    return <div className="flex-1 flex flex-col overflow-hidden"><AssetPreview renderMode={renderMode} content={content ?? ''} zoomLevel={zoomLevel} onZoom={onZoom} /></div>
   }
 
-  // Split: source + preview side by side
   if (hasPreview && viewMode === 'split') {
     return (
       <div className="flex-1 flex flex-row overflow-hidden">
-        <textarea
-          value={content ?? ''}
-          onChange={(e) => handleChange(e.target.value)}
-          className="flex-1 bg-transparent text-xs font-mono p-3 resize-none outline-none min-w-0"
-          placeholder={`Write ${getExtensionFromTitle(asset.title) || 'content'}...`}
-          spellCheck={false}
-        />
+        <textarea value={content ?? ''} onChange={(e) => handleChange(e.target.value)} className="flex-1 bg-transparent text-xs font-mono p-3 resize-none outline-none min-w-0" placeholder={`Write ${getExtensionFromTitle(asset.title) || 'content'}...`} spellCheck={false} />
         <div className="flex-1 flex flex-col border-l border-border overflow-hidden min-w-0">
           <AssetPreview renderMode={renderMode} content={content ?? ''} zoomLevel={zoomLevel} onZoom={onZoom} />
         </div>
@@ -278,21 +204,14 @@ function AssetContentEditor({ asset, viewMode, zoomLevel, onZoom, readContent, s
     )
   }
 
-  // Raw: source only (code, or any mode in raw view)
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
-      <textarea
-        value={content ?? ''}
-        onChange={(e) => handleChange(e.target.value)}
-        className="flex-1 bg-transparent text-xs font-mono p-3 resize-none outline-none"
-        placeholder={`Write ${getExtensionFromTitle(asset.title) || 'content'}...`}
-        spellCheck={false}
-      />
+      <textarea value={content ?? ''} onChange={(e) => handleChange(e.target.value)} className="flex-1 bg-transparent text-xs font-mono p-3 resize-none outline-none" placeholder={`Write ${getExtensionFromTitle(asset.title) || 'content'}...`} spellCheck={false} />
     </div>
   )
 }
 
-// --- Preview pane for html/svg/mermaid ---
+// --- Preview pane ---
 
 function AssetPreview({ renderMode, content, zoomLevel = 1, onZoom }: { renderMode: RenderMode; content: string; zoomLevel?: number; onZoom?: (fn: (z: number) => number) => void }) {
   const [mermaidSvg, setMermaidSvg] = useState<string | null>(null)
@@ -306,23 +225,12 @@ function AssetPreview({ renderMode, content, zoomLevel = 1, onZoom }: { renderMo
       try {
         const { svg } = await mermaid.render(`mermaid-preview-${Date.now()}`, content)
         if (!cancelled) setMermaidSvg(svg)
-      } catch {
-        if (!cancelled) setMermaidSvg(null)
-      }
+      } catch { if (!cancelled) setMermaidSvg(null) }
     }).catch(() => {})
     return () => { cancelled = true }
   }, [renderMode, content])
 
-  if (renderMode === 'html-preview') {
-    return (
-      <iframe
-        srcDoc={content}
-        sandbox="allow-scripts"
-        className="flex-1 bg-white"
-        title="HTML preview"
-      />
-    )
-  }
+  if (renderMode === 'html-preview') return <iframe srcDoc={content} sandbox="allow-scripts" className="flex-1 bg-white" title="HTML preview" />
 
   const handleWheel = useCallback((e: React.WheelEvent) => {
     if (!e.metaKey && !e.ctrlKey) return
@@ -332,60 +240,101 @@ function AssetPreview({ renderMode, content, zoomLevel = 1, onZoom }: { renderMo
 
   const zoomStyle = zoomLevel !== 1 ? { transform: `scale(${zoomLevel})`, transformOrigin: 'top left' } : undefined
 
-  if (renderMode === 'svg-preview') {
-    return (
-      <div className="flex-1 p-4 overflow-auto" onWheel={handleWheel}>
-        <div
-          style={zoomStyle}
-          dangerouslySetInnerHTML={{ __html: content }}
-        />
-      </div>
-    )
-  }
-
-  if (renderMode === 'mermaid-preview' && mermaidSvg) {
-    return (
-      <div className="flex-1 p-4 overflow-auto" onWheel={handleWheel}>
-        <div
-          style={zoomStyle}
-          dangerouslySetInnerHTML={{ __html: mermaidSvg }}
-        />
-      </div>
-    )
-  }
-
+  if (renderMode === 'svg-preview') return <div className="flex-1 p-4 overflow-auto" onWheel={handleWheel}><div style={zoomStyle} dangerouslySetInnerHTML={{ __html: content }} /></div>
+  if (renderMode === 'mermaid-preview' && mermaidSvg) return <div className="flex-1 p-4 overflow-auto" onWheel={handleWheel}><div style={zoomStyle} dangerouslySetInnerHTML={{ __html: mermaidSvg }} /></div>
   return null
 }
 
 // --- Main panel ---
 
 export const AssetsPanel = forwardRef<AssetsPanelHandle, AssetsPanelProps>(function AssetsPanel({ taskId, isResizing }, ref) {
-  const { assets, selectedId, setSelectedId, createAsset, updateAsset, deleteAsset, readContent, saveContent, uploadAsset, getFilePath, handleDragEnd } = useAssets(taskId)
-  const [newAssetOpen, setNewAssetOpen] = useState(false)
-  const [newAssetName, setNewAssetName] = useState('untitled.md')
+  const {
+    assets, folders, selectedId, setSelectedId,
+    createAsset, updateAsset, deleteAsset, renameAsset, moveAssetToFolder,
+    readContent, saveContent, uploadAsset, uploadDir, getFilePath,
+    createFolder, deleteFolder, renameFolder,
+    folderPathMap,
+  } = useAssets(taskId)
+
   const [viewMode, setViewMode] = useState<'preview' | 'split' | 'raw'>('preview')
   const [zoomLevel, setZoomLevel] = useState(1)
   const [assetStats, setAssetStats] = useState<AssetStats>({ fileSize: null, words: 0, lines: 0 })
   const [dragOver, setDragOver] = useState(false)
-  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }))
+  const [dropTargetFolder, setDropTargetFolder] = useState<string | null>(null)
+  const dragAssetIdRef = useRef<string | null>(null)
+
+  // Inline creation/rename state
+  const [creating, setCreating] = useState<{ parentFolderId: string | null; type: 'file' | 'folder' } | null>(null)
+  const [renaming, setRenaming] = useState<{ id: string; type: 'asset' | 'folder' } | null>(null)
+  const [renameValue, setRenameValue] = useState('')
+  const createInputRef = useRef<HTMLInputElement>(null)
+  const renameInputRef = useRef<HTMLInputElement>(null)
+
+  // Expanded folders state
+  const [expandedFolders, setExpandedFolders] = useState<Set<string>>(() => new Set())
+
+  // Auto-expand all folders on first load
+  useEffect(() => {
+    if (folders.length > 0) {
+      setExpandedFolders(prev => {
+        const next = new Set(prev)
+        for (const f of folders) next.add(f.id)
+        return next
+      })
+    }
+  }, [folders])
+
+  // Focus create/rename inputs when they appear
+  useEffect(() => { if (creating) createInputRef.current?.focus() }, [creating])
+  useEffect(() => { if (renaming) renameInputRef.current?.focus() }, [renaming])
 
   const selectedAsset = assets.find(a => a.id === selectedId) ?? null
   const selectedRenderMode = selectedAsset ? getEffectiveRenderMode(selectedAsset.title, selectedAsset.render_mode) : null
 
-  // Reset view mode and zoom when switching assets
   useEffect(() => { setViewMode('preview'); setZoomLevel(1) }, [selectedId])
 
   useImperativeHandle(ref, () => ({
     selectAsset: (id: string) => setSelectedId(id),
-    createAsset: () => setNewAssetOpen(true),
+    createAsset: () => setCreating({ parentFolderId: null, type: 'file' }),
   }), [setSelectedId])
 
-  const handleCreateNamed = useCallback(() => {
-    if (!newAssetName.trim()) return
-    createAsset({ title: newAssetName.trim() })
-    setNewAssetName('untitled.md')
-    setNewAssetOpen(false)
-  }, [createAsset, newAssetName])
+  // --- Inline create/rename handlers ---
+
+  const handleInlineCreate = useCallback((value: string) => {
+    if (!creating) return
+    const name = value.trim()
+    if (!name) { setCreating(null); return }
+    if (creating.type === 'file') {
+      createAsset({ title: name, folderId: creating.parentFolderId })
+    } else {
+      createFolder({ name, parentId: creating.parentFolderId })
+    }
+    setCreating(null)
+  }, [creating, createAsset, createFolder])
+
+  const handleInlineRename = useCallback((value: string) => {
+    if (!renaming) return
+    const name = value.trim()
+    if (!name) { setRenaming(null); return }
+    if (renaming.type === 'asset') {
+      renameAsset(renaming.id, name)
+    } else {
+      renameFolder(renaming.id, name)
+    }
+    setRenaming(null)
+  }, [renaming, renameAsset, renameFolder])
+
+  const startRenameAsset = useCallback((asset: TaskAsset) => {
+    setRenaming({ id: asset.id, type: 'asset' })
+    setRenameValue(asset.title)
+  }, [])
+
+  const startRenameFolder = useCallback((folder: AssetFolder) => {
+    setRenaming({ id: folder.id, type: 'folder' })
+    setRenameValue(folder.name)
+  }, [])
+
+  // --- Upload / drop ---
 
   const handleUpload = useCallback(async () => {
     const result = await window.api.dialog.showOpenDialog({
@@ -398,21 +347,303 @@ export const AssetsPanel = forwardRef<AssetsPanelHandle, AssetsPanelProps>(funct
     }
   }, [uploadAsset])
 
-  const handleDrop = useCallback(async (e: DragEvent) => {
+  const handleFileDrop = useCallback(async (e: DragEvent) => {
     e.preventDefault()
     setDragOver(false)
-    // Electron exposes file paths via lastDropPaths in preload
+    if (dragAssetIdRef.current) return
     const paths = (window as unknown as { __slayzone_lastDropPaths?: string[] }).__slayzone_lastDropPaths
+    const filePaths: string[] = []
     if (paths?.length) {
-      for (const p of paths) await uploadAsset(p)
+      filePaths.push(...paths)
     } else if (e.dataTransfer.files.length) {
-      // Fallback: use File API path if available (Electron)
       for (const file of Array.from(e.dataTransfer.files)) {
-        const filePath = (file as unknown as { path?: string }).path
-        if (filePath) await uploadAsset(filePath)
+        const fp = (file as unknown as { path?: string }).path
+        if (fp) filePaths.push(fp)
       }
     }
-  }, [uploadAsset])
+    for (const fp of filePaths) {
+      // Check if it's a directory by trying uploadDir, fall back to uploadAsset
+      try {
+        await uploadDir(fp)
+      } catch {
+        await uploadAsset(fp)
+      }
+    }
+  }, [uploadAsset, uploadDir])
+
+  // --- Drag-to-folder handlers ---
+
+  const handleAssetDragStart = useCallback((assetId: string) => (e: React.DragEvent) => {
+    dragAssetIdRef.current = assetId
+    e.dataTransfer.setData('text/plain', assetId)
+    e.dataTransfer.effectAllowed = 'move'
+  }, [])
+
+  const handleFolderDragOver = useCallback((folderId: string) => (e: React.DragEvent) => {
+    if (!dragAssetIdRef.current) return
+    e.preventDefault()
+    e.stopPropagation()
+    e.dataTransfer.dropEffect = 'move'
+    setDropTargetFolder(folderId)
+  }, [])
+
+  const handleFolderDragLeave = useCallback(() => {
+    setDropTargetFolder(null)
+  }, [])
+
+  const handleFolderDrop = useCallback((folderId: string) => (e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setDropTargetFolder(null)
+    const assetId = dragAssetIdRef.current
+    dragAssetIdRef.current = null
+    if (!assetId) return
+    moveAssetToFolder(assetId, folderId)
+  }, [moveAssetToFolder])
+
+  const handleRootDragOver = useCallback((e: React.DragEvent) => {
+    if (!dragAssetIdRef.current) return
+    e.preventDefault()
+    e.dataTransfer.dropEffect = 'move'
+    setDropTargetFolder('__root__')
+  }, [])
+
+  const handleRootDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault()
+    setDropTargetFolder(null)
+    const assetId = dragAssetIdRef.current
+    dragAssetIdRef.current = null
+    if (!assetId) return
+    moveAssetToFolder(assetId, null)
+  }, [moveAssetToFolder])
+
+  const handleDragEnd = useCallback(() => {
+    dragAssetIdRef.current = null
+    setDropTargetFolder(null)
+  }, [])
+
+  const toggleFolder = useCallback((folderId: string) => {
+    setExpandedFolders(prev => {
+      const next = new Set(prev)
+      if (next.has(folderId)) next.delete(folderId)
+      else next.add(folderId)
+      return next
+    })
+  }, [])
+
+  // --- Build tree structure from folders + assets ---
+
+  const { childFolders, assetsByFolder } = useMemo(() => {
+    const cf = new Map<string | null, AssetFolder[]>()
+    for (const f of folders) {
+      const arr = cf.get(f.parent_id) ?? []
+      arr.push(f)
+      cf.set(f.parent_id, arr)
+    }
+    const ab = new Map<string | null, TaskAsset[]>()
+    for (const a of assets) {
+      const arr = ab.get(a.folder_id) ?? []
+      arr.push(a)
+      ab.set(a.folder_id, arr)
+    }
+    return { childFolders: cf, assetsByFolder: ab }
+  }, [folders, assets])
+
+  // --- "Move to" folder list for context menu ---
+
+  const moveToFolders = useMemo(() => {
+    return folders.map(f => ({ id: f.id, name: f.name, path: folderPathMap.get(f.id) ?? f.name }))
+  }, [folders, folderPathMap])
+
+  // --- Copy path ---
+
+  const handleCopyPath = useCallback(async (assetId: string) => {
+    const fp = await getFilePath(assetId)
+    if (fp) navigator.clipboard.writeText(fp)
+  }, [getFilePath])
+
+  // --- Render inline input ---
+
+  const renderInlineInput = (parentFolderId: string | null, depth: number) => {
+    if (!creating || creating.parentFolderId !== parentFolderId) return null
+    return (
+      <div style={{ paddingLeft: depth * INDENT_PX + BASE_PAD }} className="py-0.5">
+        <Input
+          ref={createInputRef}
+          data-testid="assets-create-input"
+          placeholder={creating.type === 'file' ? 'filename.md' : 'folder name'}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') handleInlineCreate((e.target as HTMLInputElement).value)
+            if (e.key === 'Escape') setCreating(null)
+          }}
+          onBlur={(e) => handleInlineCreate(e.target.value)}
+          className="h-6 text-xs font-mono py-0 px-1"
+        />
+      </div>
+    )
+  }
+
+  // --- Recursive tree renderer ---
+
+  const renderTree = (parentId: string | null, depth: number) => {
+    const subFolders = childFolders.get(parentId) ?? []
+    const subAssets = assetsByFolder.get(parentId) ?? []
+
+    return (
+      <>
+        {subFolders.map(folder => {
+          const expanded = expandedFolders.has(folder.id)
+          const isDropTarget = dropTargetFolder === folder.id
+          const isRenaming = renaming?.id === folder.id && renaming.type === 'folder'
+
+          return (
+            <div
+              key={`d:${folder.id}`}
+              data-testid={`folder-row-${folder.id}`}
+              className={cn(isDropTarget && 'bg-primary/10 ring-1 ring-primary/30 rounded')}
+              onDragOver={handleFolderDragOver(folder.id)}
+              onDragLeave={handleFolderDragLeave}
+              onDrop={handleFolderDrop(folder.id)}
+            >
+              <ContextMenu>
+                <ContextMenuTrigger asChild>
+                  <button
+                    className="group/folder flex w-full select-none items-center gap-1.5 rounded px-1 py-1 text-xs hover:bg-muted/50"
+                    style={{ paddingLeft: depth * INDENT_PX + BASE_PAD }}
+                    onClick={() => toggleFolder(folder.id)}
+                  >
+                    {expanded
+                      ? <FolderOpen className="size-4 shrink-0 text-amber-400" />
+                      : <Folder className="size-4 shrink-0 text-amber-500/80" />}
+                    {isRenaming ? (
+                      <Input
+                        ref={renameInputRef}
+                        data-testid="assets-rename-input"
+                        value={renameValue}
+                        onChange={(e) => setRenameValue(e.target.value)}
+                        onKeyDown={(e) => {
+                          e.stopPropagation()
+                          if (e.key === 'Enter') handleInlineRename(renameValue)
+                          if (e.key === 'Escape') setRenaming(null)
+                        }}
+                        onBlur={() => handleInlineRename(renameValue)}
+                        onClick={(e) => e.stopPropagation()}
+                        className="h-5 text-xs font-mono py-0 px-1 flex-1"
+                      />
+                    ) : (
+                      <span className="truncate font-mono flex-1 text-left">{folder.name}</span>
+                    )}
+                  </button>
+                </ContextMenuTrigger>
+                <ContextMenuContent>
+                  <ContextMenuItem onSelect={() => setCreating({ parentFolderId: folder.id, type: 'file' })}>
+                    <FilePlus className="size-3 mr-2" /> New Asset
+                  </ContextMenuItem>
+                  <ContextMenuItem onSelect={() => setCreating({ parentFolderId: folder.id, type: 'folder' })}>
+                    <FolderPlus className="size-3 mr-2" /> New Folder
+                  </ContextMenuItem>
+                  <ContextMenuSeparator />
+                  <ContextMenuItem onSelect={() => startRenameFolder(folder)}>
+                    <Pencil className="size-3 mr-2" /> Rename
+                  </ContextMenuItem>
+                  <ContextMenuSeparator />
+                  <ContextMenuItem variant="destructive" onSelect={() => deleteFolder(folder.id)}>
+                    <Trash2 className="size-3 mr-2" /> Delete
+                  </ContextMenuItem>
+                </ContextMenuContent>
+              </ContextMenu>
+
+              {expanded && (
+                <>
+                  {renderTree(folder.id, depth + 1)}
+                  {renderInlineInput(folder.id, depth + 1)}
+                </>
+              )}
+            </div>
+          )
+        })}
+
+        {subAssets.map(asset => {
+          const TypeIcon = getAssetIcon(asset)
+          const isRenaming = renaming?.id === asset.id && renaming.type === 'asset'
+
+          return (
+            <div key={`f:${asset.id}`} data-testid={`asset-row-${asset.id}`}>
+              <ContextMenu>
+                <ContextMenuTrigger asChild>
+                  <button
+                    className={cn(
+                      'flex w-full items-center gap-1 py-1 rounded text-xs cursor-pointer',
+                      asset.id === selectedId ? 'bg-muted text-foreground' : 'text-muted-foreground hover:text-foreground hover:bg-muted/50',
+                    )}
+                    style={{ paddingLeft: depth * INDENT_PX + BASE_PAD, paddingRight: 6 }}
+                    onClick={() => setSelectedId(asset.id)}
+                    draggable={!isRenaming}
+                    onDragStart={handleAssetDragStart(asset.id)}
+                  >
+                    <TypeIcon className="size-3 shrink-0" />
+                    {isRenaming ? (
+                      <Input
+                        ref={renameInputRef}
+                        data-testid="assets-rename-input"
+                        value={renameValue}
+                        onChange={(e) => setRenameValue(e.target.value)}
+                        onKeyDown={(e) => {
+                          e.stopPropagation()
+                          if (e.key === 'Enter') handleInlineRename(renameValue)
+                          if (e.key === 'Escape') setRenaming(null)
+                        }}
+                        onBlur={() => handleInlineRename(renameValue)}
+                        onClick={(e) => e.stopPropagation()}
+                        className="h-5 text-xs font-mono py-0 px-1 flex-1"
+                      />
+                    ) : (
+                      <span className="truncate flex-1 text-left">{asset.title}</span>
+                    )}
+                  </button>
+                </ContextMenuTrigger>
+                <ContextMenuContent>
+                  <ContextMenuItem onSelect={() => startRenameAsset(asset)}>
+                    <Pencil className="size-3 mr-2" /> Rename
+                  </ContextMenuItem>
+                  {moveToFolders.length > 0 && (
+                    <ContextMenuSub>
+                      <ContextMenuSubTrigger>
+                        <ArrowRight className="size-3 mr-2" /> Move to
+                      </ContextMenuSubTrigger>
+                      <ContextMenuSubContent>
+                        {asset.folder_id && (
+                          <ContextMenuItem onSelect={() => moveAssetToFolder(asset.id, null)}>
+                            Root
+                          </ContextMenuItem>
+                        )}
+                        {moveToFolders
+                          .filter(f => f.id !== asset.folder_id)
+                          .map(f => (
+                            <ContextMenuItem key={f.id} onSelect={() => moveAssetToFolder(asset.id, f.id)}>
+                              {f.path}
+                            </ContextMenuItem>
+                          ))
+                        }
+                      </ContextMenuSubContent>
+                    </ContextMenuSub>
+                  )}
+                  <ContextMenuSeparator />
+                  <ContextMenuItem onSelect={() => handleCopyPath(asset.id)}>
+                    <Copy className="size-3 mr-2" /> Copy Path
+                  </ContextMenuItem>
+                  <ContextMenuSeparator />
+                  <ContextMenuItem variant="destructive" onSelect={() => deleteAsset(asset.id)}>
+                    <Trash2 className="size-3 mr-2" /> Delete
+                  </ContextMenuItem>
+                </ContextMenuContent>
+              </ContextMenu>
+            </div>
+          )
+        })}
+      </>
+    )
+  }
 
   // Sidebar resize
   const DEFAULT_SIDEBAR_WIDTH = 300
@@ -444,7 +675,8 @@ export const AssetsPanel = forwardRef<AssetsPanelHandle, AssetsPanelProps>(funct
       className={cn("flex flex-col h-full", dragOver && "ring-2 ring-primary/50 ring-inset")}
       onDragOver={(e) => { e.preventDefault(); setDragOver(true) }}
       onDragLeave={() => setDragOver(false)}
-      onDrop={handleDrop}
+      onDrop={handleFileDrop}
+      onDragEnd={handleDragEnd}
     >
       {/* Panel header */}
       <div className="flex items-center gap-2 px-3 py-1.5 border-b border-border shrink-0">
@@ -452,11 +684,15 @@ export const AssetsPanel = forwardRef<AssetsPanelHandle, AssetsPanelProps>(funct
         <span className="text-xs font-medium">Assets</span>
         <span className="text-[10px] text-muted-foreground">{assets.length}</span>
         <div className="ml-auto flex items-center gap-1.5">
-          <Button variant="outline" size="sm" className="!h-6 text-[10px] px-2" onClick={handleUpload}>
+          <Button data-testid="assets-upload-btn" variant="outline" size="sm" className="!h-6 text-[10px] px-2" onClick={handleUpload}>
             <Upload className="size-3 mr-1" />
             Upload
           </Button>
-          <Button variant="outline" size="sm" className="!h-6 text-[10px] px-2" onClick={() => setNewAssetOpen(true)}>
+          <Button data-testid="assets-folder-btn" variant="outline" size="sm" className="!h-6 text-[10px] px-2" onClick={() => setCreating({ parentFolderId: null, type: 'folder' })}>
+            <FolderPlus className="size-3 mr-1" />
+            Folder
+          </Button>
+          <Button data-testid="assets-new-btn" variant="outline" size="sm" className="!h-6 text-[10px] px-2" onClick={() => setCreating({ parentFolderId: null, type: 'file' })}>
             <Plus className="size-3 mr-1" />
             New
           </Button>
@@ -464,29 +700,42 @@ export const AssetsPanel = forwardRef<AssetsPanelHandle, AssetsPanelProps>(funct
       </div>
 
       <div className="flex flex-1 min-h-0">
-        {/* Left sidebar — asset list */}
-        <div className="shrink-0 overflow-y-auto p-1.5" style={{ width: sidebarWidth }}>
-          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-            <SortableContext items={assets.map(a => a.id)} strategy={verticalListSortingStrategy}>
-              {assets.map(asset => (
-                <SortableAssetRow
-                  key={asset.id}
-                  asset={asset}
-                  selected={asset.id === selectedId}
-                  onSelect={() => setSelectedId(asset.id)}
-                  onDelete={() => deleteAsset(asset.id)}
-                />
-              ))}
-            </SortableContext>
-          </DndContext>
-          {assets.length === 0 && (
-            <div className="text-[10px] text-muted-foreground/60 text-center py-4">
-              No assets yet
+        {/* Left sidebar — asset tree */}
+        <ContextMenu>
+          <ContextMenuTrigger asChild>
+            <div
+              data-testid="assets-sidebar"
+              className={cn("shrink-0 overflow-y-auto p-1.5 select-none text-sm", dropTargetFolder === '__root__' && 'bg-primary/10')}
+              style={{ width: sidebarWidth }}
+              onDragOver={handleRootDragOver}
+              onDragLeave={handleFolderDragLeave}
+              onDrop={handleRootDrop}
+            >
+              {assets.length > 0 || folders.length > 0 ? (
+                <>
+                  {renderTree(null, 0)}
+                  {renderInlineInput(null, 0)}
+                </>
+              ) : creating ? (
+                renderInlineInput(null, 0)
+              ) : (
+                <div className="text-[10px] text-muted-foreground/60 text-center py-4">
+                  No assets yet
+                </div>
+              )}
             </div>
-          )}
-        </div>
+          </ContextMenuTrigger>
+          <ContextMenuContent>
+            <ContextMenuItem onSelect={() => setCreating({ parentFolderId: null, type: 'file' })}>
+              <FilePlus className="size-3 mr-2" /> New Asset
+            </ContextMenuItem>
+            <ContextMenuItem onSelect={() => setCreating({ parentFolderId: null, type: 'folder' })}>
+              <FolderPlus className="size-3 mr-2" /> New Folder
+            </ContextMenuItem>
+          </ContextMenuContent>
+        </ContextMenu>
 
-        {/* Resize handle between sidebar and content */}
+        {/* Resize handle */}
         <div
           className="w-1 shrink-0 cursor-col-resize bg-border hover:bg-primary/40 transition-colors"
           onMouseDown={handleSidebarMouseDown}
@@ -511,7 +760,6 @@ export const AssetsPanel = forwardRef<AssetsPanelHandle, AssetsPanelProps>(funct
               />
               {/* Content footer */}
               <div className="flex items-center gap-2 px-3 py-2 border-t border-border shrink-0">
-                {/* Stats (left) */}
                 <div className="flex items-center gap-3 text-[10px] text-muted-foreground">
                   {assetStats.fileSize != null && <span><span className="text-muted-foreground/60">Size:</span> {formatFileSize(assetStats.fileSize)}</span>}
                   {!isBinaryRenderMode(selectedRenderMode!) && (
@@ -522,21 +770,13 @@ export const AssetsPanel = forwardRef<AssetsPanelHandle, AssetsPanelProps>(funct
                   )}
                 </div>
                 <div className="flex-1" />
-                {/* Zoom controls */}
                 {selectedRenderMode && hasZoom(selectedRenderMode) && (
                   <div className="flex items-center gap-1">
-                    <button type="button" className="size-6 flex items-center justify-center rounded hover:bg-muted text-muted-foreground hover:text-foreground" onClick={() => setZoomLevel(z => Math.max(0.25, z - 0.25))}>
-                      <ZoomOut className="size-3.5" />
-                    </button>
-                    <button type="button" className="text-[10px] text-muted-foreground hover:text-foreground min-w-[3ch] text-center" onClick={() => setZoomLevel(1)}>
-                      {Math.round(zoomLevel * 100)}%
-                    </button>
-                    <button type="button" className="size-6 flex items-center justify-center rounded hover:bg-muted text-muted-foreground hover:text-foreground" onClick={() => setZoomLevel(z => Math.min(4, z + 0.25))}>
-                      <ZoomIn className="size-3.5" />
-                    </button>
+                    <button type="button" className="size-6 flex items-center justify-center rounded hover:bg-muted text-muted-foreground hover:text-foreground" onClick={() => setZoomLevel(z => Math.max(0.25, z - 0.25))}><ZoomOut className="size-3.5" /></button>
+                    <button type="button" className="text-[10px] text-muted-foreground hover:text-foreground min-w-[3ch] text-center" onClick={() => setZoomLevel(1)}>{Math.round(zoomLevel * 100)}%</button>
+                    <button type="button" className="size-6 flex items-center justify-center rounded hover:bg-muted text-muted-foreground hover:text-foreground" onClick={() => setZoomLevel(z => Math.min(4, z + 0.25))}><ZoomIn className="size-3.5" /></button>
                   </div>
                 )}
-                {/* View mode toggle + render mode (right) */}
                 {selectedRenderMode && hasPreviewToggle(selectedRenderMode) && (
                   <PanelToggle
                     panels={[
@@ -551,13 +791,9 @@ export const AssetsPanel = forwardRef<AssetsPanelHandle, AssetsPanelProps>(funct
                   value={selectedAsset.render_mode ?? '__auto__'}
                   onValueChange={(v) => updateAsset({ id: selectedAsset.id, renderMode: v === '__auto__' ? null : v as RenderMode })}
                 >
-                  <SelectTrigger size="sm" className="!h-8 text-xs w-auto min-w-0 gap-1.5 px-2.5 border-border">
-                    <SelectValue />
-                  </SelectTrigger>
+                  <SelectTrigger size="sm" className="!h-8 text-xs w-auto min-w-0 gap-1.5 px-2.5 border-border"><SelectValue /></SelectTrigger>
                   <SelectContent position="popper" side="top" className="max-h-none overflow-y-visible">
-                    <SelectItem value="__auto__">
-                      Auto ({RENDER_MODE_INFO[getEffectiveRenderMode(selectedAsset.title, null)].label})
-                    </SelectItem>
+                    <SelectItem value="__auto__">Auto ({RENDER_MODE_INFO[getEffectiveRenderMode(selectedAsset.title, null)].label})</SelectItem>
                     {(Object.keys(RENDER_MODE_INFO) as RenderMode[]).map((mode) => (
                       <SelectItem key={mode} value={mode}>{RENDER_MODE_INFO[mode].label}</SelectItem>
                     ))}
@@ -572,23 +808,6 @@ export const AssetsPanel = forwardRef<AssetsPanelHandle, AssetsPanelProps>(funct
           )}
         </div>
       </div>
-
-      {/* New asset dialog */}
-      <Dialog open={newAssetOpen} onOpenChange={setNewAssetOpen}>
-        <DialogContent className="max-w-xs">
-          <DialogHeader><DialogTitle>New Asset</DialogTitle></DialogHeader>
-          <Input
-            value={newAssetName}
-            onChange={(e) => setNewAssetName(e.target.value)}
-            onKeyDown={(e) => { if (e.key === 'Enter') handleCreateNamed() }}
-            placeholder="filename.md"
-            autoFocus
-          />
-          <DialogFooter>
-            <Button size="sm" onClick={handleCreateNamed}>Create</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   )
 })

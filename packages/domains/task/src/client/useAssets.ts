@@ -1,39 +1,83 @@
-import { useState, useEffect, useCallback } from 'react'
-import type { DragEndEvent } from '@dnd-kit/core'
-import { arrayMove } from '@dnd-kit/sortable'
-import type { TaskAsset, RenderMode, CreateAssetInput, UpdateAssetInput } from '@slayzone/task/shared'
+import { useState, useEffect, useCallback, useMemo } from 'react'
+import type { TaskAsset, RenderMode, CreateAssetInput, UpdateAssetInput, AssetFolder, UpdateAssetFolderInput } from '@slayzone/task/shared'
 import { track } from '@slayzone/telemetry/client'
 
 export interface UseAssetsReturn {
   assets: TaskAsset[]
+  folders: AssetFolder[]
   selectedId: string | null
   setSelectedId: (id: string | null) => void
-  createAsset: (params: { title: string; renderMode?: RenderMode; content?: string; language?: string | null }) => Promise<TaskAsset | null>
+  // Asset ops
+  createAsset: (params: { title: string; folderId?: string | null; renderMode?: RenderMode; content?: string; language?: string | null }) => Promise<TaskAsset | null>
   updateAsset: (data: UpdateAssetInput) => Promise<void>
   deleteAsset: (id: string) => Promise<void>
+  renameAsset: (id: string, newTitle: string) => Promise<void>
+  moveAssetToFolder: (assetId: string, folderId: string | null) => Promise<void>
   readContent: (id: string) => Promise<string | null>
   saveContent: (id: string, content: string) => Promise<void>
   uploadAsset: (sourcePath: string, title?: string) => Promise<TaskAsset | null>
+  uploadDir: (dirPath: string, parentFolderId?: string | null) => Promise<void>
   getFilePath: (id: string) => Promise<string | null>
-  handleDragEnd: (event: DragEndEvent) => void
+  // Folder ops
+  createFolder: (params: { name: string; parentId?: string | null }) => Promise<AssetFolder | null>
+  updateFolder: (data: UpdateAssetFolderInput) => Promise<void>
+  deleteFolder: (id: string) => Promise<void>
+  renameFolder: (id: string, newName: string) => Promise<void>
+  // Path helpers
+  getAssetPath: (asset: TaskAsset) => string
+  pathToFolderId: Map<string, string>
+  folderPathMap: Map<string, string>
 }
 
 export function useAssets(taskId: string | null | undefined): UseAssetsReturn {
   const [assets, setAssets] = useState<TaskAsset[]>([])
+  const [folders, setFolders] = useState<AssetFolder[]>([])
   const [selectedId, setSelectedId] = useState<string | null>(null)
 
-  // Fetch assets on mount and external changes
+  // Fetch assets + folders on mount and external changes
   useEffect(() => {
     if (!taskId) return
     const load = (): void => {
       window.api.assets.getByTask(taskId).then(setAssets).catch(() => {})
+      window.api.assetFolders.getByTask(taskId).then(setFolders).catch(() => {})
     }
     load()
     const cleanup = window.api?.app?.onTasksChanged?.(load)
     return () => { cleanup?.() }
   }, [taskId])
 
-  const createAsset = useCallback(async (params: { title: string; renderMode?: RenderMode; content?: string; language?: string | null }): Promise<TaskAsset | null> => {
+  // Build folder path lookup: folderId -> slash-separated path
+  const folderPathMap = useMemo(() => {
+    const map = new Map<string, string>()
+    const byId = new Map(folders.map(f => [f.id, f]))
+    function resolve(id: string): string {
+      if (map.has(id)) return map.get(id)!
+      const f = byId.get(id)
+      if (!f) return ''
+      const path = f.parent_id ? `${resolve(f.parent_id)}/${f.name}` : f.name
+      map.set(id, path)
+      return path
+    }
+    for (const f of folders) resolve(f.id)
+    return map
+  }, [folders])
+
+  // Reverse lookup: path string -> folderId
+  const pathToFolderId = useMemo(() => {
+    const map = new Map<string, string>()
+    for (const [id, path] of folderPathMap) map.set(path, id)
+    return map
+  }, [folderPathMap])
+
+  const getAssetPath = useCallback((asset: TaskAsset): string => {
+    if (!asset.folder_id) return asset.title
+    const folderPath = folderPathMap.get(asset.folder_id)
+    return folderPath ? `${folderPath}/${asset.title}` : asset.title
+  }, [folderPathMap])
+
+  // --- Asset CRUD ---
+
+  const createAsset = useCallback(async (params: { title: string; folderId?: string | null; renderMode?: RenderMode; content?: string; language?: string | null }): Promise<TaskAsset | null> => {
     if (!taskId) return null
     const data: CreateAssetInput = { taskId, ...params }
     const asset = await window.api.assets.create(data)
@@ -59,6 +103,20 @@ export function useAssets(taskId: string | null | undefined): UseAssetsReturn {
     track('asset_deleted')
   }, [])
 
+  const renameAsset = useCallback(async (id: string, newTitle: string): Promise<void> => {
+    const updated = await window.api.assets.update({ id, title: newTitle })
+    if (updated) {
+      setAssets(prev => prev.map(a => a.id === id ? updated : a))
+    }
+  }, [])
+
+  const moveAssetToFolder = useCallback(async (assetId: string, folderId: string | null): Promise<void> => {
+    const updated = await window.api.assets.update({ id: assetId, folderId })
+    if (updated) {
+      setAssets(prev => prev.map(a => a.id === assetId ? updated : a))
+    }
+  }, [])
+
   const readContent = useCallback(async (id: string): Promise<string | null> => {
     return window.api.assets.readContent(id)
   }, [])
@@ -82,17 +140,55 @@ export function useAssets(taskId: string | null | undefined): UseAssetsReturn {
     return window.api.assets.getFilePath(id)
   }, [])
 
-  const handleDragEnd = useCallback((event: DragEndEvent): void => {
-    const { active, over } = event
-    if (!over || active.id === over.id) return
-    setAssets(prev => {
-      const oldIndex = prev.findIndex(a => a.id === active.id)
-      const newIndex = prev.findIndex(a => a.id === over.id)
-      const reordered = arrayMove(prev, oldIndex, newIndex)
-      window.api.assets.reorder(reordered.map(a => a.id))
-      return reordered
-    })
+  const uploadDir = useCallback(async (dirPath: string, parentFolderId?: string | null): Promise<void> => {
+    if (!taskId) return
+    await window.api.assets.uploadDir({ taskId, dirPath, parentFolderId: parentFolderId ?? null })
+    // Reload everything after bulk operation
+    const [newAssets, newFolders] = await Promise.all([
+      window.api.assets.getByTask(taskId),
+      window.api.assetFolders.getByTask(taskId),
+    ])
+    setAssets(newAssets)
+    setFolders(newFolders)
+  }, [taskId])
+
+  // --- Folder CRUD ---
+
+  const createFolder = useCallback(async (params: { name: string; parentId?: string | null }): Promise<AssetFolder | null> => {
+    if (!taskId) return null
+    const folder = await window.api.assetFolders.create({ taskId, ...params })
+    if (folder) {
+      setFolders(prev => [...prev, folder])
+    }
+    return folder
+  }, [taskId])
+
+  const updateFolder = useCallback(async (data: UpdateAssetFolderInput): Promise<void> => {
+    const updated = await window.api.assetFolders.update(data)
+    if (updated) {
+      setFolders(prev => prev.map(f => f.id === data.id ? updated : f))
+    }
   }, [])
 
-  return { assets, selectedId, setSelectedId, createAsset, updateAsset, deleteAsset, readContent, saveContent, uploadAsset, getFilePath, handleDragEnd }
+  const deleteFolder = useCallback(async (id: string): Promise<void> => {
+    await window.api.assetFolders.delete(id)
+    setFolders(prev => prev.filter(f => f.id !== id))
+    // Assets in deleted folder get folder_id = NULL (DB handles it), refresh local state
+    setAssets(prev => prev.map(a => a.folder_id === id ? { ...a, folder_id: null } : a))
+  }, [])
+
+  const renameFolder = useCallback(async (id: string, newName: string): Promise<void> => {
+    const updated = await window.api.assetFolders.update({ id, name: newName })
+    if (updated) {
+      setFolders(prev => prev.map(f => f.id === id ? updated : f))
+    }
+  }, [])
+
+  return {
+    assets, folders, selectedId, setSelectedId,
+    createAsset, updateAsset, deleteAsset, renameAsset, moveAssetToFolder,
+    readContent, saveContent, uploadAsset, uploadDir, getFilePath,
+    createFolder, updateFolder, deleteFolder, renameFolder,
+    getAssetPath, pathToFolderId, folderPathMap,
+  }
 }

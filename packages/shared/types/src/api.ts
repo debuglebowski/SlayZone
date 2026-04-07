@@ -1,5 +1,5 @@
 import type { Project, CreateProjectInput, UpdateProjectInput, ExecutionContext } from '@slayzone/projects/shared'
-import type { Task, CreateTaskInput, UpdateTaskInput, DesktopHandoffPolicy, TaskTemplate, CreateTaskTemplateInput, UpdateTaskTemplateInput, TaskAsset, CreateAssetInput, UpdateAssetInput } from '@slayzone/task/shared'
+import type { Task, CreateTaskInput, UpdateTaskInput, DesktopHandoffPolicy, TaskTemplate, CreateTaskTemplateInput, UpdateTaskTemplateInput, TaskAsset, CreateAssetInput, UpdateAssetInput, AssetFolder, CreateAssetFolderInput, UpdateAssetFolderInput } from '@slayzone/task/shared'
 import type { Tag, CreateTagInput, UpdateTagInput } from '@slayzone/tags/shared'
 import type {
   TerminalMode,
@@ -281,12 +281,20 @@ export interface ElectronAPI {
     create: (data: CreateAssetInput) => Promise<TaskAsset>
     update: (data: UpdateAssetInput) => Promise<TaskAsset | null>
     delete: (id: string) => Promise<boolean>
-    reorder: (assetIds: string[]) => Promise<void>
+    reorder: (data: string[] | { folderId: string | null; assetIds: string[] }) => Promise<void>
     readContent: (id: string) => Promise<string | null>
     getFilePath: (id: string) => Promise<string | null>
     upload: (data: { taskId: string; sourcePath: string; title?: string }) => Promise<TaskAsset>
     getFileSize: (id: string) => Promise<number | null>
     cleanupTask: (taskId: string) => Promise<void>
+    uploadDir: (data: { taskId: string; dirPath: string; parentFolderId: string | null }) => Promise<{ folders: AssetFolder[]; assets: TaskAsset[] }>
+  }
+  assetFolders: {
+    getByTask: (taskId: string) => Promise<AssetFolder[]>
+    create: (data: CreateAssetFolderInput) => Promise<AssetFolder>
+    update: (data: UpdateAssetFolderInput) => Promise<AssetFolder | null>
+    delete: (id: string) => Promise<boolean>
+    reorder: (data: { parentId: string | null; folderIds: string[] }) => Promise<void>
   }
   taskTemplates: {
     getByProject: (projectId: string) => Promise<TaskTemplate[]>
