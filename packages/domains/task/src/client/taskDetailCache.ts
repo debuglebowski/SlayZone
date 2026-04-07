@@ -6,7 +6,7 @@ import type { PanelVisibility } from '@slayzone/task/shared'
 import type { BrowserTabsState } from '@slayzone/task-browser/shared'
 
 const DEFAULT_PANEL_VISIBILITY: PanelVisibility = {
-  terminal: true, browser: false, diff: false, settings: true, editor: false, processes: false,
+  terminal: true, browser: false, diff: false, settings: true, editor: false, assets: false, processes: false,
 }
 
 export interface TaskDetailData {

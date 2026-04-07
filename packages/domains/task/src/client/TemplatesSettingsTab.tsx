@@ -40,6 +40,7 @@ const DEFAULT_PANEL_VISIBILITY: PanelVisibility = {
   diff: false,
   settings: true,
   editor: false,
+  assets: false,
   processes: false,
 }
 

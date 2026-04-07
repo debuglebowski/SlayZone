@@ -515,5 +515,24 @@
   border-color: var(--mk-comment);
 }
 
+/* Asset link chips — inline pills for [text](asset:id) links */
+.milkdown-editor .asset-link-chip {
+  display: inline;
+  background: color-mix(in srgb, var(--primary) 15%, transparent);
+  color: var(--primary);
+  border-radius: 3px;
+  padding: 1px 4px;
+  font-size: 0.875em;
+  cursor: pointer;
+  text-decoration: none;
+}
+.milkdown-editor .asset-link-chip:hover {
+  background: color-mix(in srgb, var(--primary) 25%, transparent);
+}
+.milkdown-editor .asset-link-chip a {
+  color: inherit;
+  text-decoration: none;
+}
+
 /* Milkdown frontmatter block */
 /* Frontmatter styles are inline in milkdown-frontmatter.ts to avoid Tailwind prose overrides */

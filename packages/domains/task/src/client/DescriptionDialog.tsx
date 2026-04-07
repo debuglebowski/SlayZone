@@ -1,6 +1,6 @@
 import { useRef, useCallback, useState } from 'react'
 import { Dialog, DialogContent } from '@slayzone/ui'
-import { RichTextEditor, type Editor, type EditorThemeColors } from '@slayzone/editor'
+import { RichTextEditor, type Editor, type EditorThemeColors, type AssetPickerItem } from '@slayzone/editor'
 import { editorViewCtx } from '@milkdown/core'
 
 interface DescriptionDialogProps {
@@ -15,6 +15,8 @@ interface DescriptionDialogProps {
   showToolbar?: boolean
   spellcheck?: boolean
   themeColors?: EditorThemeColors
+  assets?: AssetPickerItem[]
+  onAssetClick?: (assetId: string) => void
 }
 
 function getWordCount(editor: Editor | null): number {
@@ -26,7 +28,7 @@ function getWordCount(editor: Editor | null): number {
   } catch { return 0 }
 }
 
-export function DescriptionDialog({ open, onOpenChange, value, onChange, onSave, fontFamily, lineSpacing, checkedHighlight, showToolbar, spellcheck, themeColors }: DescriptionDialogProps) {
+export function DescriptionDialog({ open, onOpenChange, value, onChange, onSave, fontFamily, lineSpacing, checkedHighlight, showToolbar, spellcheck, themeColors, assets, onAssetClick }: DescriptionDialogProps) {
   const editorRef = useRef<Editor | null>(null)
   const [wordCount, setWordCount] = useState(0)
 
@@ -71,6 +73,8 @@ export function DescriptionDialog({ open, onOpenChange, value, onChange, onSave,
           showToolbar={showToolbar}
           spellcheck={spellcheck}
           themeColors={themeColors}
+          assets={assets}
+          onAssetClick={onAssetClick}
         />
       </DialogContent>
     </Dialog>

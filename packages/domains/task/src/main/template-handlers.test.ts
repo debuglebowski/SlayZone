@@ -56,7 +56,7 @@ await describe('db:taskTemplates:create', () => {
       description: 'A full template',
       terminalMode: 'codex',
       providerConfig: { codex: { flags: '--full-auto' } },
-      panelVisibility: { terminal: true, browser: true, diff: false, settings: false, editor: false, processes: false },
+      panelVisibility: { terminal: true, browser: true, diff: false, settings: false, editor: false, assets: false, processes: false },
       browserTabs: { tabs: [{ id: 't1', url: 'http://localhost:3000', title: 'Dev' }], activeTabId: 't1' },
       webPanelUrls: { grafana: 'http://grafana.local' },
       dangerouslySkipPermissions: true,
@@ -137,7 +137,7 @@ await describe('db:taskTemplates:update', () => {
     const updated = h.invoke('db:taskTemplates:update', {
       id: t.id,
       terminalMode: 'codex',
-      panelVisibility: { terminal: true, browser: true, diff: false, settings: false, editor: false, processes: false },
+      panelVisibility: { terminal: true, browser: true, diff: false, settings: false, editor: false, assets: false, processes: false },
     }) as TaskTemplate
     expect(updated.terminal_mode).toBe('codex')
     expect(updated.panel_visibility?.browser).toBe(true)
@@ -264,7 +264,7 @@ await describe('template application on task creation', () => {
   test('temporary task with templateId gets template applied', async () => {
     const tmpl = createTemplate('TempTemplate', {
       terminalMode: 'codex', defaultPriority: 2,
-      panelVisibility: { terminal: true, browser: true, diff: false, settings: false, editor: false, processes: false },
+      panelVisibility: { terminal: true, browser: true, diff: false, settings: false, editor: false, assets: false, processes: false },
     })
     const task = await createTask('Temp', { isTemporary: true, templateId: tmpl.id })
     expect(task.is_temporary).toBe(true)
@@ -317,7 +317,7 @@ await describe('updateTask persists template-like fields', () => {
       id: task.id,
       terminalMode: 'codex',
       providerConfig: { codex: { flags: '--custom' } },
-      panelVisibility: { terminal: true, browser: true, diff: false, settings: false, editor: false, processes: false },
+      panelVisibility: { terminal: true, browser: true, diff: false, settings: false, editor: false, assets: false, processes: false },
       browserTabs: { tabs: [{ id: 'b', url: 'http://app', title: 'App' }], activeTabId: 'b' },
       webPanelUrls: { panel1: 'http://panel.local' },
     }) as Task

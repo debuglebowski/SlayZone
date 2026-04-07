@@ -1,7 +1,9 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
-import { MoreHorizontal, Archive, Trash2, AlertTriangle, Loader2, Terminal as TerminalIcon, Globe, Settings2, GitBranch, FileCode, ChevronRight, Plus, GripVertical, X, Info, CheckCircle2, XCircle, Stethoscope, Cpu, Circle, Repeat, LayoutTemplate } from 'lucide-react'
+import { MoreHorizontal, Archive, Trash2, AlertTriangle, Loader2, Terminal as TerminalIcon, Globe, Settings2, GitBranch, FileCode, ChevronRight, Plus, GripVertical, X, Info, CheckCircle2, XCircle, Stethoscope, Cpu, Circle, Repeat, LayoutTemplate, Paperclip } from 'lucide-react'
 import { IconArrowsVertical, IconArrowsMaximize } from '@tabler/icons-react'
 import { DescriptionDialog } from './DescriptionDialog'
+import { AssetsPanel, type AssetsPanelHandle } from './AssetsPanel'
+import { useAssets } from './useAssets'
 import { DndContext, PointerSensor, useSensors, useSensor, closestCenter } from '@dnd-kit/core'
 import { SortableContext, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
@@ -61,7 +63,7 @@ import { Tooltip, TooltipTrigger, TooltipContent } from '@slayzone/ui'
 import { Popover, PopoverContent, PopoverTrigger } from '@slayzone/ui'
 import { TaskMetadataSidebar, ExternalSyncCard } from './TaskMetadataSidebar'
 import { RichTextEditor } from '@slayzone/editor'
-import { normalizeDescription, stripMarkdown } from '@slayzone/task/shared'
+import { normalizeDescription, stripMarkdown, getExtensionFromTitle, getEffectiveRenderMode, RENDER_MODE_INFO } from '@slayzone/task/shared'
 import { useTheme } from '@slayzone/settings/client'
 import { markSkipCache, usePty, useTerminalModes, getVisibleModes, getModeLabel, groupTerminalModes, useLoopMode, isLoopActive, stripAnsi, serializeTerminalHistory, LoopModeBanner, LoopModeDialog } from '@slayzone/terminal'
 import type { LoopConfig } from '@slayzone/terminal/shared'
@@ -224,6 +226,9 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
 
   // Sub-tasks
   const { subTasks, createSubTask, updateSubTask: handleUpdateSubTask, deleteSubTask: handleDeleteSubTask, handleDragEnd: handleSubTaskDragEnd } = useSubTasks(task?.id, initialData?.subTasks)
+
+  // Assets
+  const { assets } = useAssets(task?.id)
   const [addingSubTask, setAddingSubTask] = useState(false)
   const [subTaskTitle, setSubTaskTitle] = useState('')
   const subTaskInputRef = useRef<HTMLInputElement>(null)
@@ -257,6 +262,7 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
   const panelGitShortcut = useShortcutDisplay('panel-git')
   const panelProcessesShortcut = useShortcutDisplay('panel-processes')
   const panelSettingsShortcut = useShortcutDisplay('panel-settings')
+  const panelAssetsShortcut = useShortcutDisplay('panel-assets')
 
   const terminalInjectTitleShortcut = useShortcutDisplay('terminal-inject-title')
   const terminalInjectDescShortcut = useShortcutDisplay('terminal-inject-desc')
@@ -286,6 +292,7 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
   const [descriptionExpanded, setDescriptionExpanded] = useState(false)
   const [descriptionOpen, setDescriptionOpen] = useState(true)
   const [subTasksOpen, setSubTasksOpen] = useState(true)
+  const [assetsOpen, setAssetsOpen] = useState(true)
   const [detailsOpen, setDetailsOpen] = useState(true)
 
   // Doctor dialog state
@@ -310,7 +317,7 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
   const flagsInputRef = useRef<HTMLInputElement>(null)
 
   // Panel visibility state
-  const defaultPanelVisibility: PanelVisibility = { terminal: true, browser: false, diff: false, settings: true, editor: false, processes: false }
+  const defaultPanelVisibility: PanelVisibility = { terminal: true, browser: false, diff: false, settings: true, editor: false, assets: false, processes: false }
   const [panelVisibility, setPanelVisibility] = useState<PanelVisibility>(initialData?.panelVisibility ?? defaultPanelVisibility)
 
   // Sync title/description from global state when changed externally
@@ -406,6 +413,7 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
   const fileEditorRef = useRef<FileEditorViewHandle>(null)
   const terminalContainerRef = useRef<TerminalContainerHandle>(null)
   const browserPanelRef = useRef<BrowserPanelHandle>(null)
+  const assetsPanelRef = useRef<AssetsPanelHandle>(null)
   const pendingEditorFileRef = useRef<string | null>(null)
   const pendingSearchToggleRef = useRef(false)
   const fileEditorRefCallback = useCallback((handle: FileEditorViewHandle | null) => {
@@ -1031,6 +1039,11 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
         handlePanelToggle('tests', !panelVisibility.tests)
         return
       }
+      if (matchesShortcut(e, keys('panel-assets')) && isBuiltinEnabled('assets', 'task')) {
+        e.preventDefault()
+        handlePanelToggle('assets', !panelVisibility.assets)
+        return
+      }
       // Skip shortcuts that conflict with editor bindings (Mod+S, Mod+B)
       const target = e.target as HTMLElement
       const inEditor = target?.closest?.('[contenteditable="true"]')
@@ -1494,6 +1507,7 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
                     { id: 'terminal', icon: TerminalIcon, label: 'Terminal', shortcut: panelTerminalShortcut },
                     { id: 'browser', icon: Globe, label: 'Browser', shortcut: panelBrowserShortcut },
                     { id: 'editor', icon: FileCode, label: 'Editor', shortcut: panelEditorShortcut },
+                    { id: 'assets', icon: Paperclip, label: 'Assets', shortcut: panelAssetsShortcut },
                     { id: 'diff', icon: GitBranch, label: 'Git', shortcut: panelGitShortcut },
                     { id: 'processes', icon: Cpu, label: 'Processes', shortcut: panelProcessesShortcut },
                     { id: 'settings', icon: Settings2, label: 'Settings', shortcut: panelSettingsShortcut },
@@ -1979,11 +1993,30 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
           </div>
         )}
 
+        {/* Resize handle: ... | Assets */}
+        {!compact && panelVisibility.assets && (panelVisibility.terminal || panelVisibility.browser || panelVisibility.editor) && (
+          <ResizeHandle
+            width={resolvedWidths.assets ?? 300}
+            minWidth={200}
+            onWidthChange={(w) => updatePanelSizes({ assets: w })}
+            onDragStart={() => setIsResizing(true)}
+            onDragEnd={() => setIsResizing(false)}
+            onReset={resetAllPanels}
+          />
+        )}
+
+        {/* Assets Panel */}
+        {!compact && panelVisibility.assets && (
+          <div data-panel-id="assets" className={cn("shrink-0 rounded-md bg-surface-1 border border-border overflow-hidden flex flex-col transition-shadow duration-200", multipleVisiblePanels && focusedPanel === 'assets' && "shadow-[0_0_18px_rgba(255,255,255,0.25)]")} style={{ width: resolvedWidths.assets }}>
+            <AssetsPanel ref={assetsPanelRef} taskId={task.id} isResizing={isResizing} />
+          </div>
+        )}
+
         {/* Web Panels (custom + predefined) — rendered between editor and diff */}
         {!compact && enabledWebPanels.map((wp, idx) => {
           if (!panelVisibility[wp.id]) return null
           // Show resize handle if there's a visible panel before this one
-          const hasLeftNeighbor = panelVisibility.terminal || panelVisibility.browser || panelVisibility.editor ||
+          const hasLeftNeighbor = panelVisibility.terminal || panelVisibility.browser || panelVisibility.editor || panelVisibility.assets ||
             enabledWebPanels.slice(0, idx).some(prev => panelVisibility[prev.id])
           return (
             <div key={wp.id} className="contents">
@@ -2082,7 +2115,7 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
               <div className="ml-auto flex items-center gap-0.5">
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <IconButton type="button" variant="ghost" aria-label={descriptionExpanded ? "Default height" : "Full height"} className={cn("size-5 hover:text-foreground", descriptionExpanded ? "text-foreground bg-muted" : "text-muted-foreground")} onClick={() => setDescriptionExpanded((v) => { if (!v) { setDetailsOpen(false); setSubTasksOpen(false) } else { setDetailsOpen(true); setSubTasksOpen(true) } return !v })}>
+                    <IconButton type="button" variant="ghost" aria-label={descriptionExpanded ? "Default height" : "Full height"} className={cn("size-5 hover:text-foreground", descriptionExpanded ? "text-foreground bg-muted" : "text-muted-foreground")} onClick={() => setDescriptionExpanded((v) => { if (!v) { setDetailsOpen(false); setSubTasksOpen(false); setAssetsOpen(false) } else { setDetailsOpen(true); setSubTasksOpen(true); setAssetsOpen(true) } return !v })}>
                       <IconArrowsVertical size={12} />
                     </IconButton>
                   </TooltipTrigger>
@@ -2113,6 +2146,11 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
                   showToolbar={notesShowToolbar}
                   spellcheck={notesSpellcheck}
                   themeColors={notesThemeColors}
+                  assets={assets.map(a => ({ id: a.id, title: a.title, type: RENDER_MODE_INFO[getEffectiveRenderMode(a.title, a.render_mode)].label }))}
+                  onAssetClick={(assetId) => {
+                    if (!panelVisibility.assets) handlePanelToggle('assets', true)
+                    assetsPanelRef.current?.selectAsset(assetId)
+                  }}
                 />
               </div>
             )}
@@ -2174,6 +2212,49 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
               </div>
               </SortableContext>
               </DndContext>
+            </CollapsibleContent>
+          </Collapsible>}
+
+          {/* Assets */}
+          {!parentTask && <Collapsible open={assetsOpen} onOpenChange={setAssetsOpen} className="group/assets rounded-md border border-border overflow-hidden">
+            <div className="flex w-full items-center gap-1.5 bg-muted/50 px-2.5 py-1.5 min-h-8 text-xs font-medium text-muted-foreground group-data-[state=open]/assets:border-b border-border">
+              <CollapsibleTrigger className="flex items-center gap-1.5 hover:text-foreground transition-colors [&[data-state=open]>svg:first-child]:rotate-90">
+                <ChevronRight className="size-3 transition-transform" />
+                Assets
+              </CollapsibleTrigger>
+              {assets.length > 0 && (
+                <span className="ml-auto text-muted-foreground/60 text-[10px]">{assets.length}</span>
+              )}
+            </div>
+            <CollapsibleContent className="p-2">
+              <div className="flex flex-col gap-0.5 max-h-[30vh] overflow-y-auto">
+                {assets.map(asset => (
+                  <button
+                    key={asset.id}
+                    type="button"
+                    className="flex items-center gap-2 py-1 px-1 rounded text-xs text-muted-foreground hover:text-foreground hover:bg-muted/50 text-left"
+                    onClick={() => {
+                      if (!panelVisibility.assets) handlePanelToggle('assets', true)
+                      assetsPanelRef.current?.selectAsset(asset.id)
+                    }}
+                  >
+                    <Paperclip className="size-3 shrink-0" />
+                    <span className="truncate">{asset.title}</span>
+                    <span className="ml-auto text-[10px] opacity-60">{getExtensionFromTitle(asset.title) || 'file'}</span>
+                  </button>
+                ))}
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!panelVisibility.assets) handlePanelToggle('assets', true)
+                    assetsPanelRef.current?.createAsset()
+                  }}
+                  className="flex items-center gap-1.5 py-1 px-1 rounded text-xs text-muted-foreground hover:text-foreground hover:bg-muted/50 mt-1"
+                >
+                  <Plus className="size-3" />
+                  Add asset
+                </button>
+              </div>
             </CollapsibleContent>
           </Collapsible>}
 
@@ -2411,6 +2492,11 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
         showToolbar={notesShowToolbar}
         spellcheck={notesSpellcheck}
         themeColors={notesThemeColors}
+        assets={assets.map(a => ({ id: a.id, title: a.title, type: RENDER_MODE_INFO[getEffectiveRenderMode(a.title, a.render_mode)].label }))}
+        onAssetClick={(assetId) => {
+          if (!panelVisibility.assets) handlePanelToggle('assets', true)
+          assetsPanelRef.current?.selectAsset(assetId)
+        }}
       />
 
     </div>

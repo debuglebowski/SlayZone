@@ -29,7 +29,7 @@ function makeTaskDetailData(overrides: Partial<TaskDetailData> = {}): TaskDetail
     subTasks: [],
     parentTask: null,
     projectPathMissing: false,
-    panelVisibility: { terminal: true, browser: false, diff: false, settings: true, editor: false, processes: false },
+    panelVisibility: { terminal: true, browser: false, diff: false, settings: true, editor: false, assets: false, processes: false },
     browserTabs: { tabs: [{ id: 'default', url: 'about:blank', title: 'New Tab' }], activeTabId: 'default' },
     ...overrides,
   }
