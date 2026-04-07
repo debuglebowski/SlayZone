@@ -1,6 +1,38 @@
 # Changelog
 
 
+## v0.15.0
+
+[compare changes](https://github.com/debuglebowski/slayzone/compare/v0.14.0...v0.15.0)
+
+### 🚀 Enhancements
+
+- **projects:** Add Tasks category to project settings nav ([b7c61e77](https://github.com/debuglebowski/slayzone/commit/b7c61e77))
+- **terminal:** Add --wait to pty submit for AI mode input timing ([76e3f783](https://github.com/debuglebowski/slayzone/commit/76e3f783))
+- **projects:** Auto-move tasks on terminal state change ([724a4863](https://github.com/debuglebowski/slayzone/commit/724a4863))
+- **task:** Add task assets system — types, handlers, file storage ([30cb9a39](https://github.com/debuglebowski/slayzone/commit/30cb9a39))
+- **task:** Add assets panel UI with multi-format rendering ([c51a5ea9](https://github.com/debuglebowski/slayzone/commit/c51a5ea9))
+- **editor:** Asset link chips and @-mention picker in milkdown ([db94226f](https://github.com/debuglebowski/slayzone/commit/db94226f))
+- **cli:** Add asset CRUD subcommands ([c0867db8](https://github.com/debuglebowski/slayzone/commit/c0867db8))
+- **cli:** Add --append-description flag and asset link hints ([b70bad8d](https://github.com/debuglebowski/slayzone/commit/b70bad8d))
+
+### 🩹 Fixes
+
+- **terminal:** Ignore errors when killing PTY on Windows ([2e942d11](https://github.com/debuglebowski/slayzone/commit/2e942d11))
+- **usage-analytics:** Use local timezone for daily usage grouping ([bd8aa89d](https://github.com/debuglebowski/slayzone/commit/bd8aa89d))
+- **ui:** Remove collapsible animation classes ([ecd7ce39](https://github.com/debuglebowski/slayzone/commit/ecd7ce39))
+- **terminal:** Disable cursor blink ([9a797f32](https://github.com/debuglebowski/slayzone/commit/9a797f32))
+
+### 🏡 Chore
+
+- **nix:** Update sources to 0.14.0 ([487cbb2c](https://github.com/debuglebowski/slayzone/commit/487cbb2c))
+- Remove stale tiptap references, replace with milkdown ([be7841bb](https://github.com/debuglebowski/slayzone/commit/be7841bb))
+
+### ❤️ Contributors
+
+- Debuglebowski
+- Kdrapel ([@kdrapel](https://github.com/kdrapel))
+
 ## v0.14.0
 
 [compare changes](https://github.com/debuglebowski/slayzone/compare/v0.13.0...v0.14.0)

@@ -1,5 +1,57 @@
 [
   {
+    "version": "0.15.0",
+    "date": "2026-04-07",
+    "tagline": "Assets & automation",
+    "items": [
+      {
+        "category": "feature",
+        "title": "Task assets",
+        "description": "Attach files, images, and documents to tasks with a dedicated assets panel."
+      },
+      {
+        "category": "feature",
+        "title": "Asset mentions in editor",
+        "description": "Link assets inline with @-mention picker and visual chips in the editor."
+      },
+      {
+        "category": "feature",
+        "title": "Auto-move tasks on terminal state",
+        "description": "Tasks automatically move between columns when terminal state changes."
+      },
+      {
+        "category": "feature",
+        "title": "Asset CLI commands",
+        "description": "Create, list, and manage task assets from the Slay CLI."
+      },
+      {
+        "category": "improvement",
+        "title": "Project settings navigation",
+        "description": "New Tasks category in project settings for task automation rules."
+      },
+      {
+        "category": "improvement",
+        "title": "AI input timing",
+        "description": "PTY submit now supports --wait for better AI mode input timing."
+      },
+      {
+        "category": "fix",
+        "title": "Windows PTY cleanup",
+        "description": "Errors when killing PTY on Windows are now handled gracefully."
+      },
+      {
+        "category": "fix",
+        "title": "Usage analytics timezone",
+        "description": "Daily usage grouping now uses local timezone instead of UTC."
+      },
+      {
+        "category": "fix",
+        "title": "Terminal cursor blink",
+        "description": "Disabled distracting cursor blink in terminal panels."
+      }
+    ]
+  },
+  {
     "version": "0.14.0",
     "date": "2026-04-06",
     "tagline": "Context & shortcuts",
