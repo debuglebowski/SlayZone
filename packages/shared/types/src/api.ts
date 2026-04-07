@@ -574,6 +574,7 @@ export interface ElectronAPI {
     readContextFile: (filePath: string, projectPath: string) => Promise<string>
     writeContextFile: (filePath: string, content: string, projectPath: string) => Promise<void>
     getContextTree: (projectPath: string, projectId: string) => Promise<ContextTreeEntry[]>
+    reconcileProjectSkills: (projectId: string, projectPath: string) => Promise<number>
     loadGlobalItem: (input: LoadGlobalItemInput) => Promise<ContextTreeEntry>
     syncLinkedFile: (projectId: string, projectPath: string, itemId: string, provider?: CliProvider) => Promise<ContextTreeEntry>
     unlinkFile: (projectId: string, itemId: string) => Promise<boolean>

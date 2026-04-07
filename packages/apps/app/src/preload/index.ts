@@ -464,6 +464,8 @@ const api: ElectronAPI = {
       ipcRenderer.invoke('ai-config:write-context-file', filePath, content, projectPath),
     getContextTree: (projectPath, projectId) =>
       ipcRenderer.invoke('ai-config:get-context-tree', projectPath, projectId),
+    reconcileProjectSkills: (projectId, projectPath) =>
+      ipcRenderer.invoke('ai-config:reconcile-project-skills', projectId, projectPath) as Promise<number>,
     loadGlobalItem: (input) => ipcRenderer.invoke('ai-config:load-global-item', input),
     syncLinkedFile: (projectId, projectPath, itemId, provider?) =>
       ipcRenderer.invoke('ai-config:sync-linked-file', projectId, projectPath, itemId, provider),

@@ -16,7 +16,6 @@ import type {
 } from '../shared'
 import type { GlobalContextManagerSection } from './ContextManagerSettings'
 import { ItemSection } from './ItemSection'
-import { computeUnmanagedSkillRows } from './unmanaged-skills'
 import { McpFlatSection } from './McpFlatSection'
 import { ProjectInstructions } from './ProjectInstructions'
 import { ProviderChips } from './ProviderChips'
@@ -58,8 +57,6 @@ function computeSkillCounts(tree: ContextTreeEntry[]): SectionCounts {
     unmanaged: counts.unmanaged
   }
 }
-
-// computeUnmanagedSkillRows and skillSlugFromContextPath extracted to ./unmanaged-skills.ts
 
 function computeInstructionCounts(instructions: ContextData['instructions']): SectionCounts {
   const providerHealth = instructions.providerHealth ?? {}
@@ -289,7 +286,6 @@ export function ProjectContextFlat({ projectId, projectPath, onOpenGlobalAiConfi
 
   const linkedSkillIds = new Set(data.linkedSkills.map(s => s.item.id))
   const localSkills = data.localItems.filter(i => i.type === 'skill' && !linkedSkillIds.has(i.id))
-  const unmanagedSkills = computeUnmanagedSkillRows(data.contextTree)
 
   const sectionTitles: Record<ProjectSection, string> = {
     providers: 'Providers',
@@ -340,7 +336,6 @@ export function ProjectContextFlat({ projectId, projectPath, onOpenGlobalAiConfi
           type="skill"
           linkedItems={data.linkedSkills}
           localItems={localSkills}
-          unmanagedItems={unmanagedSkills}
           enabledProviders={data.enabledProviders}
           projectId={projectId}
           projectPath={projectPath}

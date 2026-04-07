@@ -50,6 +50,7 @@ import {
 } from '../shared/provider-registry'
 import type { McpConfigSpec } from '../shared/provider-registry'
 import type { GlobalFileEntry } from '../shared'
+import { skillSlugFromContextPath } from '../shared/skill-slug'
 import { registerMarketplaceHandlers } from './handlers-marketplace'
 import {
   normalizeSkillForPersistence,
@@ -1504,6 +1505,99 @@ export function registerAiConfigHandlers(ipcMain: IpcMain, db: Database): void {
     if (!row || !isConfigurableCliProvider(row.kind)) return
     db.prepare('UPDATE ai_config_sources SET enabled = ?, updated_at = datetime(\'now\') WHERE id = ?')
       .run(enabled ? 1 : 0, id)
+  })
+
+  // ---------------------------------------------------------------------------
+  // Reconcile: auto-create DB records for on-disk skill files
+  // ---------------------------------------------------------------------------
+  ipcMain.handle('ai-config:reconcile-project-skills', (_event, projectId: string, projectPath: string) => {
+    const resolvedProject = path.resolve(projectPath)
+    const enabledProviders = new Set(getEnabledProviders(projectId))
+    let created = 0
+
+    // 1. Scan skill directories for enabled providers only
+    type DiskSkill = { slug: string; filePath: string; relDir: string; provider: CliProvider }
+    const discovered: DiskSkill[] = []
+    const seenSlugs = new Map<string, DiskSkill>() // slug → first occurrence
+    const scannedDirs = new Set<string>()
+
+    for (const [providerKey, mapping] of Object.entries(PROVIDER_PATHS)) {
+      if (!isConfigurableCliProvider(providerKey)) continue
+      if (!enabledProviders.has(providerKey as CliProvider)) continue
+      if (!mapping.skillsDir) continue
+      const dir = path.join(resolvedProject, mapping.skillsDir)
+      if (scannedDirs.has(dir)) continue // avoid re-scanning shared dirs (codex+gemini → .agents/skills/)
+      scannedDirs.add(dir)
+      if (!fs.existsSync(dir) || !fs.statSync(dir).isDirectory()) continue
+      for (const filePath of collectMarkdownFilesRecursive(dir)) {
+        const relFile = path.relative(dir, filePath).split(path.sep).join('/')
+        const relPath = `${mapping.skillsDir}/${relFile}`
+        const slug = skillSlugFromContextPath(relPath)
+        if (!slug) continue
+        const normalized = normalizeSlug(slug)
+        if (!normalized) continue
+        const entry: DiskSkill = { slug: normalized, filePath, relDir: mapping.skillsDir, provider: providerKey as CliProvider }
+        discovered.push(entry)
+        if (!seenSlugs.has(normalized)) seenSlugs.set(normalized, entry)
+      }
+    }
+
+    if (discovered.length === 0) return 0
+
+    // 2. Query existing items (project-scoped + global) to avoid duplicates
+    const existingItems = db.prepare(`
+      SELECT id, slug, scope, project_id FROM ai_config_items
+      WHERE type = 'skill' AND (
+        (scope = 'project' AND project_id = ?) OR scope = 'global'
+      )
+    `).all(projectId) as Array<{ id: string; slug: string; scope: string; project_id: string | null }>
+    const slugToItem = new Map(existingItems.map(i => [i.slug, i]))
+
+    // 3. Query existing selections for this project
+    const existingSelections = db.prepare(`
+      SELECT item_id, provider FROM ai_config_project_selections WHERE project_id = ?
+    `).all(projectId) as Array<{ item_id: string; provider: string }>
+    const selectionKeys = new Set(existingSelections.map(s => `${s.item_id}:${s.provider}`))
+
+    // 4. For each unique slug, ensure DB item + selection exists
+    for (const entry of discovered) {
+      let item = slugToItem.get(entry.slug)
+
+      // Create item if not in DB
+      if (!item) {
+        const id = crypto.randomUUID()
+        const rawContent = fs.readFileSync(entry.filePath, 'utf-8')
+        const normalized = normalizeSkillForPersistence(entry.slug, rawContent, '{}')
+        const content = normalized ? normalized.content : rawContent
+        const metadataJson = normalized ? normalized.metadataJson : '{}'
+
+        db.prepare(`
+          INSERT INTO ai_config_items (id, type, scope, project_id, name, slug, content, metadata_json, created_at, updated_at)
+          VALUES (?, 'skill', 'project', ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
+        `).run(id, projectId, entry.slug, entry.slug, content, metadataJson)
+
+        item = { id, slug: entry.slug, scope: 'project', project_id: projectId }
+        slugToItem.set(entry.slug, item)
+        created++
+      }
+
+      // Create selection if missing for this provider
+      const selKey = `${item.id}:${entry.provider}`
+      if (!selectionKeys.has(selKey)) {
+        const targetPath = getSkillPath(entry.provider, entry.slug) ?? `${entry.relDir}/${entry.slug}/SKILL.md`
+        const selId = crypto.randomUUID()
+        try {
+          db.prepare(`
+            INSERT INTO ai_config_project_selections (id, project_id, item_id, provider, target_path, selected_at)
+            VALUES (?, ?, ?, ?, ?, datetime('now'))
+            ON CONFLICT(project_id, item_id, provider) DO NOTHING
+          `).run(selId, projectId, item.id, entry.provider, targetPath)
+        } catch { /* ignore constraint errors */ }
+        selectionKeys.add(selKey)
+      }
+    }
+
+    return created
   })
 
   ipcMain.handle('ai-config:get-project-providers', (_event, projectId: string) => {

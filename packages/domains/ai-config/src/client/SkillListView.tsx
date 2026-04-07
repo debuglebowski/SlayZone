@@ -1,13 +1,11 @@
-import { ArrowUpCircle, Circle, Store, Trash2, AlertTriangle } from 'lucide-react'
+import { ArrowUpCircle, Store, Trash2, AlertTriangle } from 'lucide-react'
 import { Button, cn } from '@slayzone/ui'
 import { getSkillValidation, getMarketplaceProvenance } from './skill-validation'
 import { useContextManagerStore } from './useContextManagerStore'
 import type { AiConfigItem, SkillUpdateInfo } from '../shared'
-import type { UnmanagedSkillRow } from './unmanaged-skills'
 
 interface SkillListViewProps {
   items: AiConfigItem[]
-  unmanagedItems?: UnmanagedSkillRow[]
   selectedSkillId: string | null
   onSelectSkill: (id: string | null) => void
   onDeleteItem: (id: string) => void
@@ -17,7 +15,6 @@ interface SkillListViewProps {
 
 export function SkillListView({
   items,
-  unmanagedItems,
   selectedSkillId,
   onSelectSkill,
   onDeleteItem,
@@ -25,7 +22,7 @@ export function SkillListView({
   onMarketplaceUpdate,
 }: SkillListViewProps) {
   const showLineCount = useContextManagerStore((s) => s.showLineCount)
-  const totalCount = items.length + (unmanagedItems?.length ?? 0)
+  const totalCount = items.length
 
   return (
     <div className="space-y-2">
@@ -100,25 +97,6 @@ export function SkillListView({
           )
         })}
 
-        {unmanagedItems && unmanagedItems.length > 0 && unmanagedItems.map((item) => (
-          <div
-            key={`unmanaged-${item.slug}`}
-            className="flex items-center gap-3 rounded-lg border border-dashed px-3 py-2"
-          >
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-1.5">
-                <span className="text-sm font-medium truncate">{item.slug}</span>
-                <span className="inline-flex items-center gap-1 rounded-full bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground shrink-0">
-                  <Circle className="size-2" />
-                  On disk
-                </span>
-              </div>
-              <p className="text-xs text-muted-foreground truncate">
-                {item.locations[0]?.relativePath}
-              </p>
-            </div>
-          </div>
-        ))}
       </div>
     </div>
   )

@@ -12,7 +12,6 @@ import { getSkillValidation } from './skill-validation'
 import { buildDefaultSkillContent } from '../shared'
 import type { AiConfigItem, AiConfigScope, CliProvider, ConfigLevel, SkillUpdateInfo, UpdateAiConfigItemInput } from '../shared'
 import { useContextManagerStore } from './useContextManagerStore'
-import { computeUnmanagedSkillRows, type UnmanagedSkillRow } from './unmanaged-skills'
 
 interface SkillsSectionProps {
   level: ConfigLevel
@@ -33,7 +32,6 @@ export function SkillsSection({ level, projectId, projectPath }: SkillsSectionPr
 
   const [items, setItems] = useState<AiConfigItem[]>([])
   const [linkedIds, setLinkedIds] = useState<string[]>([])
-  const [unmanagedItems, setUnmanagedItems] = useState<UnmanagedSkillRow[]>([])
   const [loadError, setLoadError] = useState<string | null>(null)
   const [version, setVersion] = useState(0)
   const [selectedSkillId, setSelectedSkillId] = useState<string | null>(null)
@@ -49,30 +47,27 @@ export function SkillsSection({ level, projectId, projectPath }: SkillsSectionPr
     let stale = false
     void (async () => {
       try {
+        if (isProject && projectId && projectPath) {
+          // Auto-create DB records for any new on-disk skill files
+          await window.api.aiConfig.reconcileProjectSkills(projectId, projectPath)
+        }
         const rows = await window.api.aiConfig.listItems({
           scope,
           projectId: isProject ? projectId : undefined,
           type: 'skill',
         })
         const newLinkedIds: string[] = []
-        let newUnmanaged: UnmanagedSkillRow[] = []
         if (isProject && projectId && projectPath) {
-          const [linked, contextTree] = await Promise.all([
-            window.api.aiConfig.getProjectSkillsStatus(projectId, projectPath),
-            window.api.aiConfig.getContextTree(projectPath, projectId),
-          ])
+          const linked = await window.api.aiConfig.getProjectSkillsStatus(projectId, projectPath)
           const ids = new Set(rows.map(r => r.id))
           for (const s of linked) {
             newLinkedIds.push(s.item.id)
             if (!ids.has(s.item.id)) rows.push(s.item)
           }
-          const allSlugs = new Set(rows.map(r => r.slug))
-          newUnmanaged = computeUnmanagedSkillRows(contextTree).filter(u => !allSlugs.has(u.slug))
         }
         if (stale) return
         setItems(rows)
         setLinkedIds(newLinkedIds)
-        setUnmanagedItems(newUnmanaged)
         setLoadError(null)
       } catch {
         if (stale) return
@@ -233,7 +228,6 @@ export function SkillsSection({ level, projectId, projectPath }: SkillsSectionPr
           <div className="flex-1 overflow-y-auto px-1">
             <SkillListView
               items={items}
-              unmanagedItems={isProject ? unmanagedItems : undefined}
               selectedSkillId={selectedSkillId}
               onSelectSkill={setSelectedSkillId}
               onDeleteItem={handleDeleteItem}

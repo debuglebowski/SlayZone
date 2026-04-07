@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type ChangeEvent } from 'react'
 import {
   AlertTriangle, ChevronDown, ChevronRight,
-  Plus, Loader2, Trash2, X
+  Plus, Loader2, X
 } from 'lucide-react'
 import {
   Button, IconButton, Input, Label,
@@ -19,8 +19,6 @@ import { SkillHelpCard } from './SkillHelpCard'
 import { StatusBadge, ProviderFileCard } from './SyncComponents'
 import { aggregateProviderSyncHealth, hasPendingProviderSync } from './sync-view-model'
 import { getSkillFrontmatterActionLabel, getSkillValidation } from './skill-validation'
-import type { UnmanagedSkillRow } from './unmanaged-skills'
-
 // ============================================================
 // Types & Helpers
 // ============================================================
@@ -29,7 +27,6 @@ interface ItemSectionProps {
   type: AiConfigItemType
   linkedItems: ProjectSkillStatus[]
   localItems: AiConfigItem[]
-  unmanagedItems: UnmanagedSkillRow[]
   enabledProviders: CliProvider[]
   projectId: string
   projectPath: string
@@ -47,35 +44,6 @@ function providerSupportsType(provider: CliProvider): boolean {
   return !!PROVIDER_PATHS[provider]?.skillsDir
 }
 
-function normalizeSlug(value: string): string {
-  return value.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'untitled'
-}
-
-function escapeRegExp(value: string): string {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-}
-
-function toProjectRelativePath(filePath: string, projectPath: string): string {
-  const normalizedFile = filePath.replace(/\\/g, '/')
-  const normalizedProject = projectPath.replace(/\\/g, '/').replace(/\/+$/, '')
-  if (!normalizedFile.startsWith(`${normalizedProject}/`)) return filePath
-  return normalizedFile.slice(normalizedProject.length + 1)
-}
-
-function renameUnmanagedSkillPath(filePath: string, oldSlug: string, newSlug: string): string | null {
-  const normalizedOldSlug = escapeRegExp(oldSlug)
-  const skillPathPattern = new RegExp(`[\\\\/]${normalizedOldSlug}[\\\\/]SKILL\\.md$`)
-  if (skillPathPattern.test(filePath)) {
-    return filePath.replace(skillPathPattern, `${filePath.includes('\\') ? '\\\\' : '/'}${newSlug}${filePath.includes('\\') ? '\\\\' : '/'}SKILL.md`)
-  }
-
-  const legacyPathPattern = new RegExp(`[\\\\/]${normalizedOldSlug}\\.md$`)
-  if (legacyPathPattern.test(filePath)) {
-    return filePath.replace(legacyPathPattern, `${filePath.includes('\\') ? '\\\\' : '/'}${newSlug}.md`)
-  }
-
-  return null
-}
 
 // ============================================================
 // Hook: useSkillItem
@@ -490,271 +458,20 @@ function SkillItemDetail({ item, providers, enabledProviders, isLocal, projectId
   )
 }
 
-function UnmanagedSkillItemRow({
-  item,
-  projectPath,
-  managingSlug,
-  onManage,
-  onDelete
-}: {
-  item: UnmanagedSkillRow
-  projectPath: string
-  managingSlug: string | null
-  onManage: (item: UnmanagedSkillRow) => Promise<void>
-  onDelete: (item: UnmanagedSkillRow) => Promise<void>
-}) {
-  const [expanded, setExpanded] = useState(false)
-  const [committedSlug, setCommittedSlug] = useState(item.slug)
-  const [slug, setSlug] = useState(item.slug)
-  const [content, setContent] = useState('')
-  const [locations, setLocations] = useState(item.locations)
-  const [loadingContent, setLoadingContent] = useState(false)
-  const [savingSlug, setSavingSlug] = useState(false)
-  const [savingContent, setSavingContent] = useState(false)
-  const [deleting, setDeleting] = useState(false)
-  const [slugDirty, setSlugDirty] = useState(false)
-  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
-
-  useEffect(() => {
-    setCommittedSlug(item.slug)
-    setSlug(item.slug)
-    setLocations(item.locations)
-    setSlugDirty(false)
-  }, [item.slug, item.locations])
-
-  const loadPrimaryContent = useCallback(async () => {
-    const primary = locations[0]
-    if (!primary) {
-      setContent('')
-      return
-    }
-    setLoadingContent(true)
-    try {
-      const text = await window.api.aiConfig.readContextFile(primary.path, projectPath)
-      setContent(text)
-    } catch {
-      setContent('')
-    } finally {
-      setLoadingContent(false)
-    }
-  }, [locations, projectPath])
-
-  const saveContentToDisk = useCallback(async (text: string) => {
-    if (locations.length === 0) return
-    setSavingContent(true)
-    try {
-      await Promise.all(
-        locations.map((location) => window.api.aiConfig.writeContextFile(location.path, text, projectPath))
-      )
-    } catch {
-      toast.error('Failed to save unmanaged skill')
-    } finally {
-      setSavingContent(false)
-    }
-  }, [locations, projectPath])
-
-  const handleToggleExpanded = () => {
-    setExpanded((prev) => {
-      const next = !prev
-      if (next) void loadPrimaryContent()
-      return next
-    })
-  }
-
-  const handleContentChange = (e: ChangeEvent<HTMLTextAreaElement>) => {
-    const text = e.target.value
-    setContent(text)
-    if (saveTimer.current) clearTimeout(saveTimer.current)
-    saveTimer.current = setTimeout(() => void saveContentToDisk(text), 800)
-  }
-
-  const handleSlugChange = (nextValue: string) => {
-    setSlug(nextValue)
-    setSlugDirty(normalizeSlug(nextValue) !== committedSlug)
-  }
-
-  const handleSlugSave = async () => {
-    const normalized = normalizeSlug(slug)
-    if (normalized === committedSlug) {
-      setSlug(normalized)
-      setSlugDirty(false)
-      return
-    }
-
-    setSavingSlug(true)
-    try {
-      const renamedLocations = locations.map((location) => {
-        const nextPath = renameUnmanagedSkillPath(location.path, committedSlug, normalized)
-        if (!nextPath) throw new Error(`Could not rename unmanaged path: ${location.relativePath}`)
-        return {
-          ...location,
-          path: nextPath,
-          relativePath: toProjectRelativePath(nextPath, projectPath)
-        }
-      })
-
-      for (let i = 0; i < locations.length; i += 1) {
-        await window.api.aiConfig.renameContextFile(locations[i].path, renamedLocations[i].path, projectPath)
-      }
-
-      setSlug(normalized)
-      setCommittedSlug(normalized)
-      setLocations(renamedLocations)
-      setSlugDirty(false)
-      toast.success(`Renamed unmanaged skill to ${normalized}.`)
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Rename failed')
-    } finally {
-      setSavingSlug(false)
-    }
-  }
-
-  const handleManageClick = async () => {
-    if (saveTimer.current) {
-      clearTimeout(saveTimer.current)
-      await saveContentToDisk(content)
-    }
-    await onManage({ slug: normalizeSlug(slug), locations })
-  }
-
-  const handleDeleteClick = async () => {
-    setDeleting(true)
-    try {
-      await onDelete({ slug: committedSlug, locations })
-    } finally {
-      setDeleting(false)
-    }
-  }
-
-  const managing = managingSlug !== null && (
-    managingSlug === committedSlug ||
-    managingSlug === normalizeSlug(slug) ||
-    managingSlug === item.slug
-  )
-
-  useEffect(() => () => {
-    if (saveTimer.current) clearTimeout(saveTimer.current)
-  }, [])
-
-  return (
-    <div
-      data-testid={`project-context-item-unmanaged-skill-${item.slug}`}
-      className={cn(
-        'rounded-md border overflow-hidden',
-        expanded && 'border-primary/30'
-      )}
-    >
-      <div
-        className={cn(
-          'flex items-center gap-2 px-3 py-2 transition-colors cursor-pointer',
-          expanded ? 'border-b border-primary/20' : 'hover:bg-muted/30'
-        )}
-        onClick={handleToggleExpanded}
-      >
-        {expanded
-          ? <ChevronDown className="size-3 shrink-0 text-muted-foreground" />
-          : <ChevronRight className="size-3 shrink-0 text-muted-foreground" />
-        }
-        <span className="flex-1 truncate font-mono text-xs">{committedSlug}</span>
-        <StatusBadge syncHealth="unmanaged" />
-      </div>
-      {expanded && (
-        <div className="p-4 space-y-3">
-          <div
-            data-testid={`unmanaged-skill-edit-section-${committedSlug}`}
-            className="space-y-3"
-          >
-            <p className="text-lg font-semibold leading-tight">Edit</p>
-            <div className="space-y-1">
-              <Label className="text-xs text-muted-foreground">Filename</Label>
-              <div className="flex items-center gap-2">
-                <Input
-                  data-testid="skill-detail-filename"
-                  className="font-mono text-xs !bg-surface-1 dark:!bg-surface-1 shadow-none"
-                  value={slug}
-                  onChange={(e) => handleSlugChange(e.target.value)}
-                />
-                {slugDirty && (
-                  <Button data-testid="skill-detail-rename" size="sm" onClick={handleSlugSave} disabled={savingSlug}>
-                    {savingSlug ? 'Renaming...' : 'Rename'}
-                  </Button>
-                )}
-              </div>
-            </div>
-
-            <div className="space-y-3">
-              <Textarea
-                data-testid="skill-detail-content"
-                className="min-h-[260px] max-h-[40vh] field-sizing-content resize-y font-mono text-sm !bg-surface-1 dark:!bg-surface-1 shadow-none"
-                placeholder="Write your skill content here."
-                value={loadingContent ? '' : content}
-                onChange={handleContentChange}
-              />
-              <div className="flex items-center justify-end">
-                {savingContent && (
-                  <span className="text-[11px] text-muted-foreground">Saving…</span>
-                )}
-              </div>
-            </div>
-          </div>
-
-          <div
-            data-testid={`unmanaged-skill-manage-section-${committedSlug}`}
-            className="space-y-3"
-          >
-            <p className="text-lg font-semibold leading-tight">Sync</p>
-            <div className="space-y-0.5">
-              {locations.map((location) => (
-                <p key={location.path} className="truncate font-mono text-[11px] text-muted-foreground">{location.relativePath}</p>
-              ))}
-            </div>
-            <div className="flex items-center justify-end gap-2">
-              <Button
-                size="sm"
-                variant="ghost"
-                className="text-destructive"
-                data-testid={`unmanaged-skill-delete-${committedSlug}`}
-                onClick={() => { void handleDeleteClick() }}
-                disabled={deleting || managing || savingSlug || savingContent}
-              >
-                {deleting ? <Loader2 className="size-3.5 animate-spin" /> : <Trash2 className="size-3.5" />}
-                Delete files
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                data-testid={`unmanaged-skill-manage-${committedSlug}`}
-                onClick={() => { void handleManageClick() }}
-                disabled={managing || slugDirty || savingSlug || savingContent}
-              >
-                {managing && <Loader2 className="size-3.5 animate-spin" />}
-                Turn into managed
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  )
-}
-
 // ============================================================
 // Main Export
 // ============================================================
 
 export function ItemSection({
-  type, linkedItems, localItems, unmanagedItems, enabledProviders,
+  type, linkedItems, localItems, enabledProviders,
   projectId, projectPath, onOpenGlobalAiConfig, onChanged
 }: ItemSectionProps) {
   const [showPicker, setShowPicker] = useState(false)
-  const [managingUnmanagedSlug, setManagingUnmanagedSlug] = useState<string | null>(null)
 
   const allItems = [
     ...localItems.map(item => ({ item, providers: {} as ProjectSkillStatus['providers'], isLocal: true })),
     ...linkedItems.map(s => ({ item: s.item, providers: s.providers, isLocal: s.item.scope === 'project' }))
   ]
-  const existingSlugs = new Set(allItems.map(({ item }) => item.slug))
-  const visibleUnmanagedItems = unmanagedItems.filter((item) => !existingSlugs.has(item.slug))
   const existingLinks = linkedItems.map(s => s.item.id)
 
   const handleRemove = async (itemId: string, isLocal: boolean) => {
@@ -764,66 +481,6 @@ export function ItemSection({
       await window.api.aiConfig.removeProjectSelection(projectId, itemId)
     }
     onChanged()
-  }
-
-  const handleManageUnmanaged = async (item: UnmanagedSkillRow) => {
-    setManagingUnmanagedSlug(item.slug)
-    let createdItemId: string | null = null
-    try {
-      const primaryLocation = item.locations[0]
-      if (!primaryLocation) throw new Error('No unmanaged file found')
-
-      const diskContent = await window.api.aiConfig.readContextFile(primaryLocation.path, projectPath)
-
-      const created = await window.api.aiConfig.createItem({
-        type: 'skill',
-        scope: 'project',
-        projectId,
-        slug: item.slug,
-        content: diskContent
-      })
-      createdItemId = created.id
-
-      const targetByProvider = new Map<CliProvider, string>()
-      for (const location of item.locations) {
-        if (!location.provider) continue
-        if (!targetByProvider.has(location.provider)) {
-          targetByProvider.set(location.provider, location.relativePath)
-        }
-      }
-      for (const [provider, targetPath] of targetByProvider.entries()) {
-        await window.api.aiConfig.setProjectSelection({
-          projectId,
-          itemId: created.id,
-          provider,
-          targetPath
-        })
-      }
-
-      toast.success(`Turned ${item.slug} into managed.`)
-      onChanged()
-    } catch (err) {
-      if (createdItemId) {
-        try {
-          await window.api.aiConfig.deleteItem(createdItemId)
-        } catch { /* ignore cleanup errors */ }
-      }
-      toast.error(err instanceof Error ? err.message : 'Failed to manage unmanaged skill')
-    } finally {
-      setManagingUnmanagedSlug(null)
-    }
-  }
-
-  const handleDeleteUnmanaged = async (item: UnmanagedSkillRow) => {
-    try {
-      for (const location of item.locations) {
-        await window.api.aiConfig.deleteContextFile(location.path, projectPath, projectId)
-      }
-      toast.success(`Deleted ${item.slug}`)
-      onChanged()
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed to delete skill files')
-    }
   }
 
   return (
@@ -838,17 +495,6 @@ export function ItemSection({
             onChanged={onChanged} onRemove={() => handleRemove(item.id, isLocal)}
           />
         ))}
-        {visibleUnmanagedItems.map((item) => (
-          <UnmanagedSkillItemRow
-            key={`unmanaged-${item.slug}`}
-            item={item}
-            projectPath={projectPath}
-            managingSlug={managingUnmanagedSlug}
-            onManage={handleManageUnmanaged}
-            onDelete={handleDeleteUnmanaged}
-          />
-        ))}
-
         <div
           data-testid={`project-context-add-${type}`}
           className="mt-1 flex items-center gap-2 rounded-md border border-dashed px-3 py-2 cursor-pointer text-muted-foreground transition-colors hover:bg-muted/15 hover:text-foreground"
