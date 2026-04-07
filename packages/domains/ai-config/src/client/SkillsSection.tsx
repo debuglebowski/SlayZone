@@ -10,7 +10,7 @@ import { AddItemPicker } from './AddItemPicker'
 import { SkillViewToggle, type SkillViewMode } from './SkillViewToggle'
 import { getSkillValidation } from './skill-validation'
 import { buildDefaultSkillContent } from '../shared'
-import type { AiConfigItem, AiConfigScope, CliProvider, ConfigLevel, UpdateAiConfigItemInput } from '../shared'
+import type { AiConfigItem, AiConfigScope, CliProvider, ConfigLevel, SkillUpdateInfo, UpdateAiConfigItemInput } from '../shared'
 import { useContextManagerStore } from './useContextManagerStore'
 
 interface SkillsSectionProps {
@@ -36,6 +36,7 @@ export function SkillsSection({ level, projectId, projectPath }: SkillsSectionPr
   const [enabledProviders, setEnabledProviders] = useState<CliProvider[]>([])
   const viewMode = (useContextManagerStore((s) => s.skillViewMode[scope]) ?? 'list') as SkillViewMode
   const setSkillViewMode = useContextManagerStore((s) => s.setSkillViewMode)
+  const [updateMap, setUpdateMap] = useState<Map<string, SkillUpdateInfo>>(new Map())
 
   const loadItems = useCallback(async () => {
     const rows = await window.api.aiConfig.listItems({
@@ -65,6 +66,15 @@ export function SkillsSection({ level, projectId, projectPath }: SkillsSectionPr
     void window.api.aiConfig.getProjectProviders(projectId).then(setEnabledProviders)
   }, [isProject, projectId])
 
+  // Load marketplace update info
+  useEffect(() => {
+    window.api.aiConfig.marketplace.checkUpdates().then((updates) => {
+      const map = new Map<string, SkillUpdateInfo>()
+      for (const u of updates) map.set(u.itemId, u)
+      setUpdateMap(map)
+    }).catch(() => {})
+  }, [items])
+
   const handleViewModeChange = useCallback((mode: SkillViewMode) => {
     setSkillViewMode(scope, mode)
   }, [setSkillViewMode, scope])
@@ -79,6 +89,14 @@ export function SkillsSection({ level, projectId, projectPath }: SkillsSectionPr
     setItems(prev => prev.filter(i => i.id !== id))
     if (selectedSkillId === id) setSelectedSkillId(null)
   }, [selectedSkillId])
+
+  const handleMarketplaceUpdate = useCallback(async (itemId: string) => {
+    const info = updateMap.get(itemId)
+    if (!info) return
+    const updated = await window.api.aiConfig.marketplace.updateSkill(itemId, info.entryId)
+    if (updated) setItems(prev => prev.map(i => i.id === updated.id ? (updated as AiConfigItem) : i))
+    setUpdateMap(prev => { const next = new Map(prev); next.delete(itemId); return next })
+  }, [updateMap])
 
   const handleCreateSkill = useCallback(async () => {
     const existingSlugs = new Set(items.map(i => i.slug))
@@ -170,6 +188,8 @@ export function SkillsSection({ level, projectId, projectPath }: SkillsSectionPr
           onUpdate={(patch) => handleUpdateItem(selectedItem.id, patch)}
           onDelete={() => handleDeleteItem(selectedItem.id)}
           onClose={() => setSelectedSkillId(null)}
+          updateInfo={updateMap.get(selectedItem.id) ?? null}
+          onMarketplaceUpdate={() => handleMarketplaceUpdate(selectedItem.id)}
         />,
         editorTarget
       )}
@@ -192,6 +212,8 @@ export function SkillsSection({ level, projectId, projectPath }: SkillsSectionPr
               selectedSkillId={selectedSkillId}
               onSelectSkill={setSelectedSkillId}
               onDeleteItem={handleDeleteItem}
+              updateMap={updateMap}
+              onMarketplaceUpdate={handleMarketplaceUpdate}
             />
           </div>
         )}

@@ -1,11 +1,12 @@
 import { useCallback } from 'react'
-import { ArrowLeft, FileText, FolderOpen, Server, Settings2, Sparkles } from 'lucide-react'
+import { ArrowLeft, FileText, FolderOpen, Server, Settings2, Sparkles, Store } from 'lucide-react'
 import { cn } from '@slayzone/ui'
 import { ProviderSyncSection } from './ProviderSyncSection'
 import { InstructionsSection } from './InstructionsSection'
 import { SkillsSection } from './SkillsSection'
 import { McpSection } from './McpSection'
 import { GlobalFilesView } from './GlobalFilesView'
+import { SkillMarketplace } from './SkillMarketplace'
 import { useContextManagerStore } from './useContextManagerStore'
 import type { ConfigLevel } from '../shared'
 
@@ -16,7 +17,7 @@ export interface ContextManagerShellProps {
   onBack: () => void
 }
 
-type Section = 'provider-sync' | 'instructions' | 'skills' | 'mcps' | 'files'
+type Section = 'provider-sync' | 'instructions' | 'skills' | 'mcps' | 'files' | 'marketplace'
 
 const STANDARD_SECTIONS: { id: Section; label: string; icon: typeof Sparkles }[] = [
   { id: 'instructions', label: 'Instructions', icon: FileText },
@@ -29,6 +30,10 @@ const LEVEL_SECTIONS: Record<ConfigLevel, { id: Section; label: string; icon: ty
   project: STANDARD_SECTIONS,
   library: STANDARD_SECTIONS,
 }
+
+const EXTERNAL_SECTIONS: { id: Section; label: string; icon: typeof Sparkles }[] = [
+  { id: 'marketplace', label: 'Marketplace', icon: Store },
+]
 
 const LEVELS: { id: ConfigLevel; label: string }[] = [
   { id: 'computer', label: 'Global' },
@@ -102,6 +107,10 @@ export function ContextManagerShell({
       )
     }
 
+    if (section === 'marketplace') {
+      return <SkillMarketplace projectId={selectedProjectId} projectPath={projectPath} />
+    }
+
     return null
   }
 
@@ -154,6 +163,33 @@ export function ContextManagerShell({
               </div>
             )
           })}
+
+          {/* External */}
+          <div>
+            <div className="px-4 py-1 text-[11px] uppercase tracking-widest text-muted-foreground/60">
+              External
+            </div>
+            <div className="space-y-0.5">
+              {EXTERNAL_SECTIONS.map(({ id: sectionId, label: sectionLabel, icon: SectionIcon }) => {
+                const isActive = !isProviders && activeSection === sectionId
+                return (
+                  <button
+                    key={sectionId}
+                    onClick={() => handleSectionClick(activeLevel, sectionId)}
+                    className={cn(
+                      'flex w-full items-center gap-2.5 rounded-md px-4 py-1.5 text-xs transition-colors',
+                      isActive
+                        ? 'bg-surface-2 font-medium text-foreground ring-1 ring-border'
+                        : 'text-muted-foreground hover:bg-surface-1 hover:text-foreground'
+                    )}
+                  >
+                    <SectionIcon className="size-3.5" />
+                    {sectionLabel}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
         </div>
 
         {/* Providers — pinned to bottom */}
@@ -176,17 +212,25 @@ export function ContextManagerShell({
 
       {/* Main content */}
       <div className="flex-1 min-h-0 min-w-0 rounded-xl border border-border/50 bg-surface-1 flex flex-col overflow-hidden p-6">
-        <div className="shrink-0 flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold">
-            {isProviders
-              ? 'Providers'
-              : `${LEVELS.find((l) => l.id === activeLevel)!.label} — ${LEVEL_SECTIONS[activeLevel].find((s) => s.id === activeSection)?.label ?? activeSection}`}
-          </h2>
-          <div id="context-manager-header-actions" />
-        </div>
-        <div className="flex-1 min-h-0">
-          {renderContent()}
-        </div>
+        {activeSection === 'marketplace' && !isProviders ? (
+          <div className="flex-1 min-h-0 flex flex-col">
+            {renderContent()}
+          </div>
+        ) : (
+          <>
+            <div className="shrink-0 flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold">
+                {isProviders
+                  ? 'Providers'
+                  : `${LEVELS.find((l) => l.id === activeLevel)!.label} — ${LEVEL_SECTIONS[activeLevel].find((s) => s.id === activeSection)?.label ?? activeSection}`}
+              </h2>
+              <div id="context-manager-header-actions" />
+            </div>
+            <div className="flex-1 min-h-0">
+              {renderContent()}
+            </div>
+          </>
+        )}
       </div>
 
       {/* Drag handle — populated via portal from SkillsSection */}

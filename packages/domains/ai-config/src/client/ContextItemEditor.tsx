@@ -1,9 +1,10 @@
 import { useEffect, useState, type ChangeEvent } from 'react'
-import { Trash2 } from 'lucide-react'
+import { ArrowUpCircle, Store, Trash2 } from 'lucide-react'
 import { Button, Input, Label, Textarea } from '@slayzone/ui'
 import { repairSkillFrontmatter } from '../shared'
-import type { AiConfigItem, SkillValidationState, UpdateAiConfigItemInput } from '../shared'
-import { getSkillFrontmatterActionLabel, getSkillValidation } from './skill-validation'
+import type { AiConfigItem, SkillUpdateInfo, SkillValidationState, UpdateAiConfigItemInput } from '../shared'
+import { getMarketplaceProvenance, getSkillFrontmatterActionLabel, getSkillValidation } from './skill-validation'
+import { useContextManagerStore } from './useContextManagerStore'
 
 interface ContextItemEditorProps {
   item: AiConfigItem
@@ -12,9 +13,13 @@ interface ContextItemEditorProps {
   onDelete: () => Promise<void>
   onClose: () => void
   readOnly?: boolean
+  updateInfo?: SkillUpdateInfo | null
+  onMarketplaceUpdate?: () => void
 }
 
-export function ContextItemEditor({ item, validationState, onUpdate, onDelete, onClose, readOnly }: ContextItemEditorProps) {
+export function ContextItemEditor({ item, validationState, onUpdate, onDelete, onClose, readOnly, updateInfo, onMarketplaceUpdate }: ContextItemEditorProps) {
+  const provenance = getMarketplaceProvenance(item)
+  const navigateToRegistry = useContextManagerStore((s) => s.navigateToMarketplaceRegistry)
   const [slug, setSlug] = useState(item.slug)
   const [content, setContent] = useState(item.content)
   const [saving, setSaving] = useState(false)
@@ -77,6 +82,34 @@ export function ContextItemEditor({ item, validationState, onUpdate, onDelete, o
           }}
         />
       </div>
+
+      {provenance && (
+        <div className="flex items-center justify-between rounded border border-border/50 bg-surface-2/50 px-2.5 py-2">
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            <Store className="size-3" />
+            <button
+              onClick={() => navigateToRegistry(provenance.registryId)}
+              className="hover:text-foreground transition-colors"
+            >
+              From <span className="font-medium text-foreground">{provenance.registryName ?? 'Marketplace'}</span>
+            </button>
+            {provenance.installedAt && (
+              <span className="text-muted-foreground/60">· Installed {new Date(provenance.installedAt).toLocaleDateString()}</span>
+            )}
+          </div>
+          {updateInfo && onMarketplaceUpdate && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-6 px-2 text-[11px] gap-1 text-amber-500 border-amber-500/30"
+              onClick={onMarketplaceUpdate}
+            >
+              <ArrowUpCircle className="size-3" />
+              Update available
+            </Button>
+          )}
+        </div>
+      )}
 
       <div className="flex-1 flex flex-col space-y-1">
         <Label className="text-xs">Content</Label>

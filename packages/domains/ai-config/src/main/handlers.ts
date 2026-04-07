@@ -22,7 +22,6 @@ import type {
   ProviderFileContent,
   SyncHealth,
   SyncReason,
-  SkillValidationState,
   RootInstructionsResult,
   SetAiConfigProjectSelectionInput,
   SyncAllInput,
@@ -36,8 +35,7 @@ import type {
 } from '../shared'
 import {
   parseSkillFrontmatter,
-  deriveSkillValidation,
-  renderSkillFrontmatter
+  deriveSkillValidation
 } from '../shared'
 import {
   PROVIDER_PATHS,
@@ -52,6 +50,12 @@ import {
 } from '../shared/provider-registry'
 import type { McpConfigSpec } from '../shared/provider-registry'
 import type { GlobalFileEntry } from '../shared'
+import { registerMarketplaceHandlers } from './handlers-marketplace'
+import {
+  normalizeSkillForPersistence,
+  stripCanonicalSkillMetadata,
+  writeSkillValidationMetadata
+} from './skill-normalize'
 
 const KNOWN_CONTEXT_FILES: Array<{ relative: string; name: string; category: ContextFileCategory }> = [
   { relative: 'CLAUDE.md', name: 'CLAUDE.md', category: 'claude' },
@@ -175,32 +179,6 @@ function removeLegacySkillFileIfPresent(
   fs.unlinkSync(legacyFilePath)
 }
 
-const SKILL_VALIDATION_METADATA_KEY = 'skillValidation'
-
-function parseJsonObject(raw: string): Record<string, unknown> {
-  try {
-    const parsed = JSON.parse(raw)
-    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
-      return parsed as Record<string, unknown>
-    }
-  } catch {
-    // ignore parse errors and fallback to empty object
-  }
-  return {}
-}
-
-function stripCanonicalSkillMetadata(metadataJson: string): string {
-  const parsed = parseJsonObject(metadataJson)
-  delete parsed.skillCanonical
-  return JSON.stringify(parsed)
-}
-
-function writeSkillValidationMetadata(metadataJson: string, validation: SkillValidationState): string {
-  const parsed = parseJsonObject(metadataJson)
-  parsed[SKILL_VALIDATION_METADATA_KEY] = validation
-  return JSON.stringify(parsed)
-}
-
 function ensureSkillValidationForSync(itemSlug: string, itemContent: string, _itemMetadataJson: string): void {
   const parsed = parseSkillFrontmatter(itemContent)
   if (!parsed) {
@@ -210,39 +188,6 @@ function ensureSkillValidationForSync(itemSlug: string, itemContent: string, _it
   if (!parseError) return
   const lineHint = parseError.line ? ` (line ${parseError.line})` : ''
   throw new Error(`Cannot sync skill "${itemSlug}" because frontmatter is invalid${lineHint}: ${parseError.message}`)
-}
-
-function normalizeSkillForPersistence(
-  slug: string,
-  rawContent: string,
-  metadataJson: string,
-  previousSlug?: string
-): {
-  content: string
-  metadataJson: string
-} {
-  const normalizedContent = rawContent.replace(/\r\n/g, '\n')
-  const parsedFrontmatter = parseSkillFrontmatter(normalizedContent)
-  let persistedContent = normalizedContent
-
-  if (parsedFrontmatter && !parsedFrontmatter.issues.some((issue) => issue.severity === 'error')) {
-    const previous = previousSlug ?? slug
-    const nextFrontmatter = { ...parsedFrontmatter.frontmatter }
-    if (!nextFrontmatter.name || nextFrontmatter.name === previous) {
-      nextFrontmatter.name = slug
-      persistedContent = renderSkillFrontmatter(nextFrontmatter)
-      const body = parsedFrontmatter.body.replace(/^\n+/, '')
-      persistedContent = body ? `${persistedContent}\n${body}` : `${persistedContent}\n`
-    }
-  }
-
-  const validation = deriveSkillValidation(slug, persistedContent)
-  const metadataWithoutCanonical = stripCanonicalSkillMetadata(metadataJson)
-
-  return {
-    content: persistedContent,
-    metadataJson: writeSkillValidationMetadata(metadataWithoutCanonical, validation)
-  }
 }
 
 function getSyncedItemContent(
@@ -1979,4 +1924,7 @@ export function registerAiConfigHandlers(ipcMain: IpcMain, db: Database): void {
   ipcMain.handle('ai-config:remove-global-mcp-server', (_event, input: RemoveGlobalMcpServerInput) => {
     removeMcpServerFromSpecs(homeDir, GLOBAL_MCP_SPECS, input.provider, input.serverKey)
   })
+
+  // Marketplace handlers
+  registerMarketplaceHandlers(ipcMain, db)
 }

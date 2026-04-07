@@ -1748,6 +1748,17 @@ const migrations: Migration[] = [
 
         INSERT INTO skill_registries (id, name, description, source_type)
           VALUES ('builtin-slayzone', 'SlayZone', 'Built-in skills curated by SlayZone', 'builtin');
+
+        INSERT INTO skill_registries (id, name, description, source_type, github_owner, github_repo, github_branch, github_path)
+          VALUES ('github-anthropics-skills', 'Anthropic Skills', 'Official skills from Anthropic', 'github', 'anthropics', 'skills', 'main', 'skills');
+        INSERT INTO skill_registries (id, name, description, source_type, github_owner, github_repo, github_branch, github_path)
+          VALUES ('github-composio-skills', 'Awesome Claude Skills', 'Curated skills and integrations by ComposioHQ', 'github', 'ComposioHQ', 'awesome-claude-skills', 'master', '');
+        INSERT INTO skill_registries (id, name, description, source_type, github_owner, github_repo, github_branch, github_path)
+          VALUES ('github-mattpocock-skills', 'Matt Pocock Skills', 'Personal skills by Matt Pocock', 'github', 'mattpocock', 'skills', 'main', '');
+        INSERT INTO skill_registries (id, name, description, source_type, github_owner, github_repo, github_branch, github_path)
+          VALUES ('github-huggingface-skills', 'Hugging Face Skills', 'AI/ML skills from Hugging Face', 'github', 'huggingface', 'skills', 'main', 'skills');
+        INSERT INTO skill_registries (id, name, description, source_type, github_owner, github_repo, github_branch, github_path)
+          VALUES ('github-alirezarezvani-skills', 'Claude Skills Collection', '500+ skills for coding agents', 'github', 'alirezarezvani', 'claude-skills', 'main', '.gemini/skills');
       `)
     }
   },
@@ -1815,6 +1826,23 @@ const migrations: Migration[] = [
 
         updateStmt.run(newTitle, renderMode, asset.id)
       }
+    }
+  },
+  {
+    version: 98,
+    up: (db) => {
+      db.exec(`
+        INSERT OR IGNORE INTO skill_registries (id, name, description, source_type, github_owner, github_repo, github_branch, github_path)
+          VALUES ('github-anthropics-skills', 'Anthropic Skills', 'Official skills from Anthropic', 'github', 'anthropics', 'skills', 'main', 'skills');
+        INSERT OR IGNORE INTO skill_registries (id, name, description, source_type, github_owner, github_repo, github_branch, github_path)
+          VALUES ('github-composio-skills', 'Awesome Claude Skills', 'Curated skills and integrations by ComposioHQ', 'github', 'ComposioHQ', 'awesome-claude-skills', 'master', '');
+        INSERT OR IGNORE INTO skill_registries (id, name, description, source_type, github_owner, github_repo, github_branch, github_path)
+          VALUES ('github-mattpocock-skills', 'Matt Pocock Skills', 'Personal skills by Matt Pocock', 'github', 'mattpocock', 'skills', 'main', '');
+        INSERT OR IGNORE INTO skill_registries (id, name, description, source_type, github_owner, github_repo, github_branch, github_path)
+          VALUES ('github-huggingface-skills', 'Hugging Face Skills', 'AI/ML skills from Hugging Face', 'github', 'huggingface', 'skills', 'main', 'skills');
+        INSERT OR IGNORE INTO skill_registries (id, name, description, source_type, github_owner, github_repo, github_branch, github_path)
+          VALUES ('github-alirezarezvani-skills', 'Claude Skills Collection', '500+ skills for coding agents', 'github', 'alirezarezvani', 'claude-skills', 'main', '.gemini/skills');
+      `)
     }
   }
 ]

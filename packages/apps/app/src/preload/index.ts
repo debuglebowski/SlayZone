@@ -51,6 +51,19 @@ const api: ElectronAPI = {
     getTagsForTask: (taskId) => ipcRenderer.invoke('db:taskTags:getForTask', taskId),
     setTagsForTask: (taskId, tagIds) => ipcRenderer.invoke('db:taskTags:setForTask', taskId, tagIds)
   },
+  assets: {
+    getByTask: (taskId) => ipcRenderer.invoke('db:assets:getByTask', taskId),
+    get: (id) => ipcRenderer.invoke('db:assets:get', id),
+    create: (data) => ipcRenderer.invoke('db:assets:create', data),
+    update: (data) => ipcRenderer.invoke('db:assets:update', data),
+    delete: (id) => ipcRenderer.invoke('db:assets:delete', id),
+    reorder: (ids) => ipcRenderer.invoke('db:assets:reorder', ids),
+    readContent: (id) => ipcRenderer.invoke('db:assets:readContent', id),
+    getFilePath: (id) => ipcRenderer.invoke('db:assets:getFilePath', id),
+    upload: (data) => ipcRenderer.invoke('db:assets:upload', data),
+    getFileSize: (id) => ipcRenderer.invoke('db:assets:getFileSize', id),
+    cleanupTask: (taskId) => ipcRenderer.invoke('db:assets:cleanupTask', taskId),
+  },
   taskTemplates: {
     getByProject: (projectId) => ipcRenderer.invoke('db:taskTemplates:getByProject', projectId),
     get: (id) => ipcRenderer.invoke('db:taskTemplates:get', id),
@@ -513,7 +526,21 @@ const api: ElectronAPI = {
       ipcRenderer.invoke('ai-config:get-expected-skill-content', projectPath, provider, itemId),
     pullProviderSkill: (projectId, projectPath, provider, itemId) =>
       ipcRenderer.invoke('ai-config:pull-provider-skill', projectId, projectPath, provider, itemId),
-    getGlobalFiles: () => ipcRenderer.invoke('ai-config:get-global-files')
+    getGlobalFiles: () => ipcRenderer.invoke('ai-config:get-global-files'),
+
+    marketplace: {
+      listRegistries: () => ipcRenderer.invoke('ai-config:marketplace:list-registries'),
+      addRegistry: (input) => ipcRenderer.invoke('ai-config:marketplace:add-registry', input),
+      removeRegistry: (registryId) => ipcRenderer.invoke('ai-config:marketplace:remove-registry', registryId),
+      toggleRegistry: (registryId, enabled) => ipcRenderer.invoke('ai-config:marketplace:toggle-registry', registryId, enabled),
+      refreshRegistry: (registryId) => ipcRenderer.invoke('ai-config:marketplace:refresh-registry', registryId),
+      refreshAll: () => ipcRenderer.invoke('ai-config:marketplace:refresh-all'),
+      listEntries: (input?) => ipcRenderer.invoke('ai-config:marketplace:list-entries', input),
+      installSkill: (input) => ipcRenderer.invoke('ai-config:marketplace:install-skill', input),
+      checkUpdates: () => ipcRenderer.invoke('ai-config:marketplace:check-updates'),
+      updateSkill: (itemId, entryId) => ipcRenderer.invoke('ai-config:marketplace:update-skill', itemId, entryId),
+      ensureFresh: () => ipcRenderer.invoke('ai-config:marketplace:ensure-fresh')
+    }
   },
   fs: {
     readDir: (rootPath, dirPath) => ipcRenderer.invoke('fs:readDir', rootPath, dirPath),

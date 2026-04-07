@@ -27,11 +27,15 @@ interface ContextManagerViewState {
   showBlobs: boolean
   showLineCount: boolean
 
+  // Marketplace navigation
+  marketplaceDrillRegistryId: string | null
+
   // Hydration
   isLoaded: boolean
 
   // Actions
   setActive: (level: ConfigLevel, section: string) => void
+  navigateToMarketplaceRegistry: (registryId: string) => void
   setSkillViewMode: (scope: string, mode: 'list' | 'graph') => void
   setGlobalSelectedPath: (path: string | null) => void
   setGlobalSplitWidth: (width: number) => void
@@ -76,9 +80,12 @@ const DEFAULTS: PersistedState = {
 export const useContextManagerStore = create<ContextManagerViewState>()(
   subscribeWithSelector((set) => ({
     ...DEFAULTS,
+    marketplaceDrillRegistryId: null,
     isLoaded: false,
 
     setActive: (level, section) => set({ activeLevel: level, activeSection: section }),
+    navigateToMarketplaceRegistry: (registryId) =>
+      set({ activeLevel: 'library' as ConfigLevel, activeSection: 'marketplace', marketplaceDrillRegistryId: registryId }),
     setSkillViewMode: (scope, mode) =>
       set((s) => ({ skillViewMode: { ...s.skillViewMode, [scope]: mode } })),
     setGlobalSelectedPath: (path) => set({ globalSelectedPath: path }),

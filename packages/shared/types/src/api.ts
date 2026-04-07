@@ -1,5 +1,5 @@
 import type { Project, CreateProjectInput, UpdateProjectInput, ExecutionContext } from '@slayzone/projects/shared'
-import type { Task, CreateTaskInput, UpdateTaskInput, DesktopHandoffPolicy, TaskTemplate, CreateTaskTemplateInput, UpdateTaskTemplateInput } from '@slayzone/task/shared'
+import type { Task, CreateTaskInput, UpdateTaskInput, DesktopHandoffPolicy, TaskTemplate, CreateTaskTemplateInput, UpdateTaskTemplateInput, TaskAsset, CreateAssetInput, UpdateAssetInput } from '@slayzone/task/shared'
 import type { Tag, CreateTagInput, UpdateTagInput } from '@slayzone/tags/shared'
 import type {
   TerminalMode,
@@ -42,7 +42,13 @@ import type {
   RemoveMcpServerInput,
   WriteGlobalMcpServerInput,
   RemoveGlobalMcpServerInput,
-  GlobalFileEntry
+  GlobalFileEntry,
+  SkillRegistry,
+  SkillRegistryEntry,
+  AddRegistryInput,
+  InstallSkillInput,
+  ListEntriesInput,
+  SkillUpdateInfo
 } from '@slayzone/ai-config/shared'
 import type { DirEntry, ReadFileResult, FileSearchResult, SearchFilesOptions, GitStatusMap } from '@slayzone/file-editor/shared'
 import type { TestCategory, CreateTestCategoryInput, UpdateTestCategoryInput, TestProfile, ScanResult, TestLabel, CreateTestLabelInput, UpdateTestLabelInput, TestFileLabel, TestFileNote } from '@slayzone/test-panel/shared'
@@ -268,6 +274,19 @@ export interface ElectronAPI {
     getAll: () => Promise<Record<string, string[]>>
     getTagsForTask: (taskId: string) => Promise<Tag[]>
     setTagsForTask: (taskId: string, tagIds: string[]) => Promise<void>
+  }
+  assets: {
+    getByTask: (taskId: string) => Promise<TaskAsset[]>
+    get: (id: string) => Promise<TaskAsset | null>
+    create: (data: CreateAssetInput) => Promise<TaskAsset>
+    update: (data: UpdateAssetInput) => Promise<TaskAsset | null>
+    delete: (id: string) => Promise<boolean>
+    reorder: (assetIds: string[]) => Promise<void>
+    readContent: (id: string) => Promise<string | null>
+    getFilePath: (id: string) => Promise<string | null>
+    upload: (data: { taskId: string; sourcePath: string; title?: string }) => Promise<TaskAsset>
+    getFileSize: (id: string) => Promise<number | null>
+    cleanupTask: (taskId: string) => Promise<void>
   }
   taskTemplates: {
     getByProject: (projectId: string) => Promise<TaskTemplate[]>
@@ -584,6 +603,21 @@ export interface ElectronAPI {
     getExpectedSkillContent: (projectPath: string, provider: CliProvider, itemId: string) => Promise<string>
     pullProviderSkill: (projectId: string, projectPath: string, provider: CliProvider, itemId: string) => Promise<ProjectSkillStatus>
     getGlobalFiles: () => Promise<GlobalFileEntry[]>
+
+    // Marketplace
+    marketplace: {
+      listRegistries: () => Promise<SkillRegistry[]>
+      addRegistry: (input: AddRegistryInput) => Promise<SkillRegistry>
+      removeRegistry: (registryId: string) => Promise<boolean>
+      toggleRegistry: (registryId: string, enabled: boolean) => Promise<void>
+      refreshRegistry: (registryId: string) => Promise<SkillRegistryEntry[]>
+      refreshAll: () => Promise<void>
+      listEntries: (input?: ListEntriesInput) => Promise<SkillRegistryEntry[]>
+      installSkill: (input: InstallSkillInput) => Promise<AiConfigItem>
+      checkUpdates: () => Promise<SkillUpdateInfo[]>
+      updateSkill: (itemId: string, entryId: string) => Promise<AiConfigItem>
+      ensureFresh: () => Promise<void>
+    }
   }
   fs: {
     readDir: (rootPath: string, dirPath: string) => Promise<DirEntry[]>

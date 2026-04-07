@@ -221,3 +221,76 @@ export interface RemoveGlobalMcpServerInput {
   provider: McpTarget
   serverKey: string
 }
+
+// Skill Marketplace
+export type SkillRegistrySourceType = 'builtin' | 'github'
+
+export interface SkillRegistry {
+  id: string
+  name: string
+  description: string
+  source_type: SkillRegistrySourceType
+  github_owner: string | null
+  github_repo: string | null
+  github_branch: string | null
+  github_path: string | null
+  icon_url: string | null
+  enabled: boolean
+  last_synced_at: string | null
+  created_at: string
+  updated_at: string
+  entry_count?: number
+}
+
+export interface SkillRegistryEntry {
+  id: string
+  registry_id: string
+  slug: string
+  name: string
+  description: string
+  content: string
+  version: string | null
+  category: string | null
+  author: string | null
+  tags: string[]
+  content_hash: string
+  fetched_at: string
+  installed?: boolean
+  installed_item_id?: string | null
+  has_update?: boolean
+  registry_name?: string
+}
+
+export interface AddRegistryInput {
+  githubUrl: string
+  branch?: string
+  path?: string
+}
+
+export interface InstallSkillInput {
+  entryId: string
+  scope: AiConfigScope
+  projectId?: string | null
+}
+
+export interface SkillUpdateInfo {
+  itemId: string
+  entryId: string
+  currentVersion: string
+  latestVersion: string
+  slug: string
+}
+
+export interface MarketplaceProvenance {
+  registryId: string
+  registryName: string | null
+  entryId: string
+  installedVersion: string | null
+  installedAt: string
+}
+
+export interface ListEntriesInput {
+  registryId?: string
+  search?: string
+  category?: string
+}
