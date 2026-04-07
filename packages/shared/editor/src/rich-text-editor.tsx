@@ -13,6 +13,8 @@ import { createPlaceholderPlugin } from './milkdown-placeholder'
 import { listItemMovePlugin } from './milkdown-list-move'
 import { escapeBlurPlugin } from './milkdown-escape-blur'
 import { taskListPlugin } from './milkdown-task-list'
+import { createAssetLinkPlugin, type AssetMentionState } from './milkdown-asset-link'
+import { AssetPicker, type AssetPickerItem } from './AssetPicker'
 
 export type { Editor }
 
@@ -98,6 +100,8 @@ interface RichTextEditorProps {
   showToolbar?: boolean
   spellcheck?: boolean
   themeColors?: EditorThemeColors
+  assets?: AssetPickerItem[]
+  onAssetClick?: (assetId: string) => void
 }
 
 export function RichTextEditor({
@@ -117,7 +121,9 @@ export function RichTextEditor({
   checkedHighlight,
   showToolbar,
   spellcheck,
-  themeColors
+  themeColors,
+  assets,
+  onAssetClick,
 }: RichTextEditorProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const editorInstanceRef = useRef<Editor | null>(null)
@@ -128,6 +134,12 @@ export function RichTextEditor({
   const suppressOnChange = useRef(false)
   const [formatState, setFormatState] = useState<FormatState>(emptyFormatState)
   const [editorReady, setEditorReady] = useState(false)
+  const [mentionState, setMentionState] = useState<AssetMentionState | null>(null)
+  const onAssetClickRef = useRef(onAssetClick)
+  const assetsRef = useRef(assets)
+  const insertAssetLinkRef = useRef<((view: import('@milkdown/prose/view').EditorView, assetId: string, assetTitle: string) => void) | null>(null)
+  onAssetClickRef.current = onAssetClick
+  assetsRef.current = assets
 
   onChangeRef.current = onChange
   onBlurRef.current = onBlur
@@ -164,6 +176,13 @@ export function RichTextEditor({
 
     const placeholderPlugin = createPlaceholderPlugin(placeholder)
 
+    // Asset link plugins (only when assets prop is provided)
+    const assetPlugins = createAssetLinkPlugin(
+      (assetId) => onAssetClickRef.current?.(assetId),
+      (state) => setMentionState(state),
+    )
+    insertAssetLinkRef.current = assetPlugins.insertAssetLink
+
     const editor = Editor.make()
       .config((ctx) => {
         ctx.set(rootCtx, containerRef.current!)
@@ -190,6 +209,8 @@ export function RichTextEditor({
       .use(toggleTaskListCommand)
       .use(formatStatePlugin)
       .use(blurHandlerPlugin)
+      .use(assetPlugins.assetLinkDecoPlugin)
+      .use(assetPlugins.assetMentionPlugin)
 
     editor.create().then((e) => {
       editorInstanceRef.current = e
@@ -280,6 +301,21 @@ export function RichTextEditor({
           themeColors ? 'milkdown-themed' : 'dark:prose-invert',
         )}
       />
+      {mentionState?.active && mentionState.coords && assetsRef.current && assetsRef.current.length > 0 && (
+        <AssetPicker
+          items={assetsRef.current}
+          query={mentionState.query}
+          coords={mentionState.coords}
+          onSelect={(item) => {
+            const editor = editorInstanceRef.current
+            if (editor) {
+              const view = editor.ctx.get(editorViewCtx)
+              insertAssetLinkRef.current?.(view, item.id, item.title)
+            }
+          }}
+          onClose={() => setMentionState(null)}
+        />
+      )}
     </div>
   )
 }
