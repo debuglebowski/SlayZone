@@ -1,6 +1,45 @@
 # Changelog
 
 
+## v0.16.0
+
+[compare changes](https://github.com/debuglebowski/slayzone/compare/v0.15.0...v0.16.0)
+
+### 🚀 Enhancements
+
+- **task:** Add asset folders with context menus, inline editing, and E2E tests ([3ee314dc](https://github.com/debuglebowski/slayzone/commit/3ee314dc))
+- **task:** Add asset search — local find bar and global search panel ([74b703b3](https://github.com/debuglebowski/slayzone/commit/74b703b3))
+- **task:** Restyle asset sidebar items as cards ([c5ae8afa](https://github.com/debuglebowski/slayzone/commit/c5ae8afa))
+- **task:** Auto-refresh asset content on CLI updates ([84c75ac0](https://github.com/debuglebowski/slayzone/commit/84c75ac0))
+- **cli:** Add `slay tasks assets mvdir` command to move folders ([59b0f966](https://github.com/debuglebowski/slayzone/commit/59b0f966))
+- **ai-config:** Auto-reconcile on-disk skills to DB, remove unmanaged concept ([cf410e03](https://github.com/debuglebowski/slayzone/commit/cf410e03))
+- **task:** Style asset folder rows as cards matching asset items ([241bc3c6](https://github.com/debuglebowski/slayzone/commit/241bc3c6))
+- **cli:** Add sync-slay-skill to regenerate CLI reference from source ([9f490f80](https://github.com/debuglebowski/slayzone/commit/9f490f80))
+
+### 🩹 Fixes
+
+- **projects:** Lock sidebar project drag to vertical axis ([8d000248](https://github.com/debuglebowski/slayzone/commit/8d000248))
+- **ai-config:** Load on-disk skills in context manager project view ([0c64c06e](https://github.com/debuglebowski/slayzone/commit/0c64c06e))
+- **task:** Prevent create-task form reset on background data refresh ([5bf91051](https://github.com/debuglebowski/slayzone/commit/5bf91051))
+- **file-editor:** Add taskListPlugin to MarkdownFileEditor for checkbox rendering ([459d488b](https://github.com/debuglebowski/slayzone/commit/459d488b))
+- **ai-config:** Show dependency direction arrows on skill graph edges ([0ec6837a](https://github.com/debuglebowski/slayzone/commit/0ec6837a))
+
+### 📖 Documentation
+
+- **cli:** Add slay CLI skill and SlayZone environment awareness ([665fe839](https://github.com/debuglebowski/slayzone/commit/665fe839))
+- **slay:** Require --dev flag in slay CLI skill ([f94b4ec5](https://github.com/debuglebowski/slayzone/commit/f94b4ec5))
+- **slay:** Add asset folder commands to skill reference ([7f0155bf](https://github.com/debuglebowski/slayzone/commit/7f0155bf))
+- **slay:** Sync skill reference with CLI source — add missing options and folder commands ([ed817e23](https://github.com/debuglebowski/slayzone/commit/ed817e23))
+- Sync AGENTS.md with current architecture ([eee633a6](https://github.com/debuglebowski/slayzone/commit/eee633a6))
+
+### 🏡 Chore
+
+- Rename dev:oauth → dev:protocol ([37ef2db2](https://github.com/debuglebowski/slayzone/commit/37ef2db2))
+
+### ❤️ Contributors
+
+- Debuglebowski
+
 ## v0.15.0
 
 [compare changes](https://github.com/debuglebowski/slayzone/compare/v0.14.0...v0.15.0)

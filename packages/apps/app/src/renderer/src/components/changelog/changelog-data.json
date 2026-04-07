@@ -1,5 +1,57 @@
 [
   {
+    "version": "0.16.0",
+    "date": "2026-04-08",
+    "tagline": "Folders & skills",
+    "items": [
+      {
+        "category": "feature",
+        "title": "Asset folders",
+        "description": "Organize task assets into folders with drag-and-drop, context menus, and inline renaming."
+      },
+      {
+        "category": "feature",
+        "title": "Asset search",
+        "description": "Find assets with a local search bar and global search panel integration."
+      },
+      {
+        "category": "feature",
+        "title": "Auto-reconcile skills",
+        "description": "On-disk skills are automatically synced to the database, removing the unmanaged concept."
+      },
+      {
+        "category": "improvement",
+        "title": "Asset card styling",
+        "description": "Asset sidebar items and folders now render as styled cards."
+      },
+      {
+        "category": "improvement",
+        "title": "Auto-refresh assets",
+        "description": "Asset content refreshes automatically when updated via CLI."
+      },
+      {
+        "category": "fix",
+        "title": "Sidebar drag lock",
+        "description": "Project drag in sidebar now locked to vertical axis to prevent accidental reordering."
+      },
+      {
+        "category": "fix",
+        "title": "Create-task form reset",
+        "description": "Create-task form no longer resets when background data refreshes."
+      },
+      {
+        "category": "fix",
+        "title": "Markdown checkboxes",
+        "description": "Checkboxes now render correctly in the markdown file editor."
+      },
+      {
+        "category": "fix",
+        "title": "Skill graph arrows",
+        "description": "Dependency direction arrows now display correctly on skill graph edges."
+      }
+    ]
+  },
+  {
     "version": "0.15.0",
     "date": "2026-04-07",
     "tagline": "Assets & automation",
