@@ -43,6 +43,7 @@
     "@slayzone/ui": "workspace:*",
     "@slayzone/worktrees": "workspace:*",
     "date-fns": "^4.1.0",
+    "mermaid": "^11.13.0",
     "lucide-react": "^0.562.0",
     "react-hook-form": "^7.71.1",
     "react-markdown": "^10.1.0",
