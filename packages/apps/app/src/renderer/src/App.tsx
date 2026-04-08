@@ -888,6 +888,7 @@ function App(): React.JSX.Element {
               tabs={tabs} activeIndex={activeTabIndex} activeView={activeView} terminalStates={terminalStates}
               projectColors={taskProjectColors} worktreeColors={taskWorktreeColors}
               onTabClick={(i) => setActiveTabIndex(i)} onTabClose={closeTab} onTabReorder={reorderTabs}
+              onTabRename={async (taskId, title) => { const t = await window.api.db.updateTask({ id: taskId, title }); updateTask(t) }}
               leftContent={contextManagerEnabled ? (
                 <div className={cn(
                   "ml-1 flex items-center gap-1.5 h-7 px-3 rounded-md cursor-pointer transition-colors select-none flex-shrink-0",

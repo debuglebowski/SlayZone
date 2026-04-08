@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useRef, useEffect, useCallback } from 'react'
 import { Home, X } from 'lucide-react'
 import { cn, Tooltip, TooltipTrigger, TooltipContent, getTerminalStateStyle, projectColorBg } from '@slayzone/ui'
 import type { TerminalState } from '@slayzone/terminal/shared'
@@ -33,6 +33,7 @@ interface TabBarProps {
   onTabClick: (index: number) => void
   onTabClose: (index: number) => void
   onTabReorder: (fromIndex: number, toIndex: number) => void
+  onTabRename?: (taskId: string, title: string) => void
   rightContent?: React.ReactNode
   leftContent?: React.ReactNode
 }
@@ -46,13 +47,19 @@ interface TabContentProps {
   isSubTask?: boolean
   isTemporary?: boolean
   projectColor?: string
+  isEditing?: boolean
+  editValue?: string
+  onEditChange?: (value: string) => void
+  onEditSubmit?: () => void
+  onEditCancel?: () => void
+  inputRef?: React.RefObject<HTMLInputElement | null>
 }
 
 function getStateInfo(state: TerminalState | undefined) {
   return getTerminalStateStyle(state)
 }
 
-function TabContent({ title, isActive, isDragging, onClose, terminalState, isSubTask, isTemporary, projectColor }: TabContentProps): React.JSX.Element {
+function TabContent({ title, isActive, isDragging, onClose, terminalState, isSubTask, isTemporary, projectColor, isEditing, editValue, onEditChange, onEditSubmit, onEditCancel, inputRef }: TabContentProps): React.JSX.Element {
   const stateInfo = getStateInfo(terminalState)
 
   return (
@@ -86,7 +93,24 @@ function TabContent({ title, isActive, isDragging, onClose, terminalState, isSub
         </Tooltip>
       )}
       {isSubTask && <span className="text-[10px] text-muted-foreground/60 shrink-0">SUB</span>}
-      <span className={cn('truncate text-sm', isTemporary && 'italic text-muted-foreground')}>{title}</span>
+      {isEditing ? (
+        <input
+          ref={inputRef}
+          className="bg-transparent border-none outline-none text-sm w-28 min-w-0"
+          value={editValue}
+          onChange={(e) => onEditChange?.(e.target.value)}
+          onBlur={() => onEditSubmit?.()}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') { e.preventDefault(); onEditSubmit?.() }
+            if (e.key === 'Escape') { e.preventDefault(); onEditCancel?.() }
+            e.stopPropagation()
+          }}
+          onClick={(e) => e.stopPropagation()}
+          onMouseDown={(e) => e.stopPropagation()}
+        />
+      ) : (
+        <span className={cn('truncate text-sm', isTemporary && 'italic text-muted-foreground')}>{title}</span>
+      )}
       {onClose && (
         <button
           className="h-4 w-4 rounded hover:bg-muted-foreground/20 flex items-center justify-center"
@@ -114,6 +138,13 @@ interface SortableTabProps {
   projectColor?: string
   worktreeColor?: string
   groupPosition?: GroupPosition
+  isEditing?: boolean
+  editValue?: string
+  onEditChange?: (value: string) => void
+  onEditSubmit?: () => void
+  onEditCancel?: () => void
+  onDoubleClick?: () => void
+  inputRef?: React.RefObject<HTMLInputElement | null>
 }
 
 function SortableTab({
@@ -125,7 +156,14 @@ function SortableTab({
   terminalState,
   projectColor,
   worktreeColor,
-  groupPosition
+  groupPosition,
+  isEditing,
+  editValue,
+  onEditChange,
+  onEditSubmit,
+  onEditCancel,
+  onDoubleClick,
+  inputRef
 }: SortableTabProps): React.JSX.Element {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: tab.taskId
@@ -164,7 +202,8 @@ function SortableTab({
       ref={setNodeRef}
       style={style}
       className="window-no-drag"
-      onClick={() => onTabClick(index)}
+      onClick={() => !isEditing && onTabClick(index)}
+      onDoubleClick={onDoubleClick}
       onAuxClick={(e) => {
         if (e.button === 1) {
           e.preventDefault()
@@ -182,6 +221,12 @@ function SortableTab({
         isSubTask={tab.isSubTask}
         isTemporary={tab.isTemporary}
         projectColor={projectColor}
+        isEditing={isEditing}
+        editValue={editValue}
+        onEditChange={onEditChange}
+        onEditSubmit={onEditSubmit}
+        onEditCancel={onEditCancel}
+        inputRef={inputRef}
       />
     </div>
   )
@@ -197,10 +242,41 @@ export function TabBar({
   onTabClick,
   onTabClose,
   onTabReorder,
+  onTabRename,
   rightContent,
   leftContent
 }: TabBarProps): React.JSX.Element {
   const [activeId, setActiveId] = useState<string | null>(null)
+  const [editingTaskId, setEditingTaskId] = useState<string | null>(null)
+  const [editValue, setEditValue] = useState('')
+  const editInputRef = useRef<HTMLInputElement>(null)
+  const editCancelledRef = useRef(false)
+
+  useEffect(() => {
+    if (editingTaskId && editInputRef.current) {
+      editInputRef.current.focus()
+      editInputRef.current.select()
+    }
+  }, [editingTaskId])
+
+  const handleDoubleClick = useCallback((tab: Tab & { type: 'task' }) => {
+    if (!onTabRename) return
+    setEditingTaskId(tab.taskId)
+    setEditValue(tab.title)
+  }, [onTabRename])
+
+  const handleEditSubmit = useCallback(() => {
+    if (editCancelledRef.current) { editCancelledRef.current = false; setEditingTaskId(null); return }
+    if (editingTaskId && editValue.trim()) {
+      onTabRename?.(editingTaskId, editValue.trim())
+    }
+    setEditingTaskId(null)
+  }, [editingTaskId, editValue, onTabRename])
+
+  const handleEditCancel = useCallback(() => {
+    editCancelledRef.current = true
+    setEditingTaskId(null)
+  }, [])
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -300,6 +376,13 @@ export function TabBar({
                   projectColor={projectColors?.get(tab.taskId)}
                   worktreeColor={worktreeColors?.get(tab.taskId)}
                   groupPosition={groupPositions.get(tab.taskId)}
+                  isEditing={editingTaskId === tab.taskId}
+                  editValue={editValue}
+                  onEditChange={setEditValue}
+                  onEditSubmit={handleEditSubmit}
+                  onEditCancel={handleEditCancel}
+                  onDoubleClick={() => handleDoubleClick(tab)}
+                  inputRef={editInputRef}
                 />
               )
             })}
