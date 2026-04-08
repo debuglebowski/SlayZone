@@ -56,6 +56,7 @@ import {
   useAttentionTasks,
   useNotificationState
 } from '@/components/notifications'
+import { AgentPanelButton, AgentSidePanel, useAgentPanelState } from '@/components/agent-panel'
 import { UsagePopover } from '@/components/usage/UsagePopover'
 import { BoostPill } from '@/components/usage/BoostPill'
 import { useUsage } from '@/components/usage/useUsage'
@@ -280,9 +281,14 @@ function App(): React.JSX.Element {
     }
   }, [onboardingOpen])
 
-  // Usage & notification state
+  // Usage, notification & agent panel state
   const { data: usageData, refresh: refreshUsage } = useUsage()
   const [notificationState, setNotificationState] = useNotificationState()
+  const [agentPanelState, setAgentPanelState] = useAgentPanelState()
+  const agentPanelMountedRef = useRef(false)
+  if (agentPanelState.isOpen) agentPanelMountedRef.current = true
+  const [agentMode, setAgentMode] = useState<string>('claude-code')
+  useEffect(() => { window.api.settings.get('default_terminal_mode').then(m => { if (m) setAgentMode(m) }) }, [])
   const { attentionTasks: allAttentionTasks, refresh: refreshAttentionTasks } = useAttentionTasks(tasks, null)
   const attentionTasks = useMemo(
     () => notificationState.filterCurrentProject
@@ -387,6 +393,8 @@ function App(): React.JSX.Element {
   const panelTestsShortcut = useShortcutDisplay('panel-tests')
   const panelAutomationsShortcut = useShortcutDisplay('panel-automations')
   const attentionPanelShortcut = useShortcutDisplay('attention-panel')
+  const agentPanelShortcut = useShortcutDisplay('agent-panel')
+  const agentSessionId = selectedProjectId ? `__agent-panel:${selectedProjectId}` : null
 
   // Keyboard shortcuts
   useGuardedHotkeys(getKeys('new-task'), (e) => {
@@ -516,7 +524,8 @@ function App(): React.JSX.Element {
 
   useGuardedHotkeys(getKeys('exit-zen-explode'), () => { if (explodeMode) setExplodeMode(false); else if (zenMode) setZenMode(false) }, { enableOnFormTags: true, enabled: !isRecording })
 
-  useGuardedHotkeys(getKeys('attention-panel'), (e) => { e.preventDefault(); trackShortcut('mod+shift+a'); setNotificationState({ isLocked: !notificationState.isLocked }) }, { enableOnFormTags: true, enabled: !isRecording })
+  useGuardedHotkeys(getKeys('attention-panel'), (e) => { e.preventDefault(); trackShortcut('ctrl+.'); setNotificationState({ isLocked: !notificationState.isLocked }) }, { enableOnFormTags: true, enabled: !isRecording })
+  useGuardedHotkeys(getKeys('agent-panel'), (e) => { e.preventDefault(); trackShortcut('mod+.'); if (selectedProjectId) setAgentPanelState({ isOpen: !agentPanelState.isOpen }) }, { enableOnFormTags: true, enabled: !isRecording })
 
   // Home tab panel shortcuts
   useEffect(() => {
@@ -862,7 +871,8 @@ function App(): React.JSX.Element {
           onTaskClick={openTask} zenMode={zenMode} onboardingChecklist={onboardingChecklist} attentionByProject={attentionByProject} onReorderProjects={reorderProjects}
         />
 
-        <div id="right-column" className={`flex-1 flex flex-col min-w-0 bg-surface-1 pb-2 pr-2 ${zenMode ? 'pl-2' : ''}`}>
+        <div id="right-column" className={`flex-1 flex min-w-0 bg-surface-1 pb-2 pr-2 ${zenMode ? 'pl-2' : ''}`}>
+          <div id="right-main" className="flex-1 flex flex-col min-w-0 min-h-0">
           <div className={zenMode ? "pl-16" : ""}>
             <TabBar
               tabs={tabs} activeIndex={activeTabIndex} activeView={activeView} terminalStates={terminalStates}
@@ -904,6 +914,7 @@ function App(): React.JSX.Element {
                     if (notificationState.desktopEnabled) window.api.pty.dismissAllNotifications()
                     setNotificationState({ desktopEnabled: !notificationState.desktopEnabled })
                   }} />
+                  <AgentPanelButton active={agentPanelState.isOpen} disabled={!selectedProjectId} onClick={() => setAgentPanelState({ isOpen: !agentPanelState.isOpen })} shortcutHint={agentPanelShortcut} />
                   <NotificationButton active={notificationState.isLocked} count={attentionTasks.length} onClick={() => setNotificationState({ isLocked: !notificationState.isLocked })} shortcutHint={attentionPanelShortcut} />
                 </div>
               }
@@ -1050,14 +1061,22 @@ function App(): React.JSX.Element {
               )}
             </div>
 
-            {notificationState.isLocked && (
-              <NotificationSidePanel width={notificationState.panelWidth} onWidthChange={(width) => setNotificationState({ panelWidth: width })}
-                attentionTasks={attentionTasks} projects={projects} filterCurrentProject={notificationState.filterCurrentProject}
-                onFilterToggle={() => setNotificationState({ filterCurrentProject: !notificationState.filterCurrentProject })}
-                onNavigate={openTask} onCloseTerminal={async (sessionId) => { await window.api.pty.kill(sessionId); refreshAttentionTasks() }}
-                selectedProjectId={selectedProjectId} currentProjectName={projects.find((p) => p.id === selectedProjectId)?.name} />
-            )}
           </div>
+          </div>
+
+          {agentSessionId && agentPanelMountedRef.current && (
+            <div className={agentPanelState.isOpen ? 'min-h-0' : 'w-0 overflow-hidden invisible'} style={agentPanelState.isOpen ? undefined : { position: 'absolute' as const }}>
+              <AgentSidePanel width={agentPanelState.panelWidth} onWidthChange={(w) => setAgentPanelState({ panelWidth: w })}
+                sessionId={agentSessionId} cwd={projects.find(p => p.id === selectedProjectId)?.path ?? ''} mode={agentMode as import('@slayzone/terminal/shared').TerminalMode} isActive={agentPanelState.isOpen} />
+            </div>
+          )}
+          {notificationState.isLocked && (
+            <NotificationSidePanel width={notificationState.panelWidth} onWidthChange={(width) => setNotificationState({ panelWidth: width })}
+              attentionTasks={attentionTasks} projects={projects} filterCurrentProject={notificationState.filterCurrentProject}
+              onFilterToggle={() => setNotificationState({ filterCurrentProject: !notificationState.filterCurrentProject })}
+              onNavigate={openTask} onCloseTerminal={async (sessionId) => { await window.api.pty.kill(sessionId); refreshAttentionTasks() }}
+              selectedProjectId={selectedProjectId} currentProjectName={projects.find((p) => p.id === selectedProjectId)?.name} />
+          )}
         </div>
 
         {/* Dialogs — lazy-mounted on first trigger, stay mounted for close/reopen animations */}

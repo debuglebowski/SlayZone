@@ -1,36 +1,27 @@
 import { useRef, useCallback } from 'react'
-import { NotificationPanel } from './NotificationPanel'
-import type { AttentionTask } from './useAttentionTasks'
-import type { Project } from '@slayzone/projects/shared'
+import { Terminal } from '@slayzone/terminal/client/Terminal'
+import type { TerminalMode } from '@slayzone/terminal/shared'
 
-interface NotificationSidePanelProps {
+interface AgentSidePanelProps {
   width: number
   onWidthChange: (width: number) => void
-  attentionTasks: AttentionTask[]
-  projects: Project[]
-  filterCurrentProject: boolean
-  onFilterToggle: () => void
-  onNavigate: (taskId: string) => void
-  onCloseTerminal: (sessionId: string) => void
-  selectedProjectId: string
-  currentProjectName?: string
+  sessionId: string
+  cwd: string
+  mode: TerminalMode
+  isActive: boolean
 }
 
-const MIN_WIDTH = 240
-const MAX_WIDTH = 480
+const MIN_WIDTH = 320
+const MAX_WIDTH = 720
 
-export function NotificationSidePanel({
+export function AgentSidePanel({
   width,
   onWidthChange,
-  attentionTasks,
-  projects,
-  filterCurrentProject,
-  onFilterToggle,
-  onNavigate,
-  onCloseTerminal,
-  selectedProjectId,
-  currentProjectName
-}: NotificationSidePanelProps) {
+  sessionId,
+  cwd,
+  mode,
+  isActive
+}: AgentSidePanelProps) {
   const isDragging = useRef(false)
   const startX = useRef(0)
   const startWidth = useRef(width)
@@ -66,20 +57,17 @@ export function NotificationSidePanel({
         className="w-1 cursor-col-resize hover:bg-primary/20 active:bg-primary/30 transition-colors"
         onMouseDown={handleMouseDown}
       />
-      <div className="flex-1 min-w-0 flex flex-col">
+      <div className="flex-1 min-w-0 min-h-0 flex flex-col">
         <div className="flex items-center h-11 px-3 bg-sidebar window-drag-region">
-          <span className="text-sm font-medium text-muted-foreground">Attention</span>
+          <span className="text-sm font-medium text-muted-foreground">Agent</span>
         </div>
         <div className="flex-1 min-h-0">
-          <NotificationPanel
-            attentionTasks={attentionTasks}
-            projects={projects}
-            filterCurrentProject={filterCurrentProject}
-            onFilterToggle={onFilterToggle}
-            onNavigate={onNavigate}
-            onCloseTerminal={onCloseTerminal}
-            selectedProjectId={selectedProjectId}
-            currentProjectName={currentProjectName}
+          <Terminal
+            key={sessionId}
+            sessionId={sessionId}
+            cwd={cwd}
+            mode={mode}
+            isActive={isActive}
           />
         </div>
       </div>
