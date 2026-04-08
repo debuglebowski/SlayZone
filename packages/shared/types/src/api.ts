@@ -288,6 +288,8 @@ export interface ElectronAPI {
     getFileSize: (id: string) => Promise<number | null>
     cleanupTask: (taskId: string) => Promise<void>
     uploadDir: (data: { taskId: string; dirPath: string; parentFolderId: string | null }) => Promise<{ folders: AssetFolder[]; assets: TaskAsset[] }>
+    downloadFile: (id: string) => Promise<boolean>
+    downloadFolder: (id: string) => Promise<boolean>
   }
   assetFolders: {
     getByTask: (taskId: string) => Promise<AssetFolder[]>

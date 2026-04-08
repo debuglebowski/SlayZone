@@ -1,5 +1,5 @@
 import type { IpcMain } from 'electron'
-import { app } from 'electron'
+import { app, dialog, BrowserWindow } from 'electron'
 import type { Database } from 'better-sqlite3'
 import type { CreateTaskInput, UpdateTaskInput, Task, ProviderConfig, CreateAssetInput, UpdateAssetInput, TaskAsset, RenderMode, AssetFolder, CreateAssetFolderInput, UpdateAssetFolderInput } from '@slayzone/task/shared'
 import { getExtensionFromTitle } from '@slayzone/task/shared'
@@ -1131,6 +1131,85 @@ export function registerTaskHandlers(ipcMain: IpcMain, db: Database, onMutation?
   ipcMain.handle('db:assets:cleanupTask', (_, taskId: string) => {
     const taskDir = path.join(assetsDir, taskId)
     if (existsSync(taskDir)) rmSync(taskDir, { recursive: true, force: true })
+  })
+
+  // --- Asset Download ---
+
+  ipcMain.handle('db:assets:downloadFile', async (_, id: string) => {
+    const existing = db.prepare('SELECT * FROM task_assets WHERE id = ?').get(id) as Record<string, unknown> | undefined
+    if (!existing) return false
+    const srcPath = getAssetFilePath(existing.task_id as string, id, existing.title as string)
+    if (!existsSync(srcPath)) return false
+
+    const defaultPath = path.join(app.getPath('downloads'), existing.title as string)
+    const win = BrowserWindow.getFocusedWindow()
+    const result = win
+      ? await dialog.showSaveDialog(win, { title: 'Download Asset', defaultPath })
+      : await dialog.showSaveDialog({ title: 'Download Asset', defaultPath })
+    if (result.canceled || !result.filePath) return false
+
+    copyFileSync(srcPath, result.filePath)
+    return true
+  })
+
+  ipcMain.handle('db:assets:downloadFolder', async (_, folderId: string) => {
+    const folder = db.prepare('SELECT * FROM asset_folders WHERE id = ?').get(folderId) as Record<string, unknown> | undefined
+    if (!folder) return false
+
+    const win = BrowserWindow.getFocusedWindow()
+    const result = win
+      ? await dialog.showOpenDialog(win, { title: 'Download Folder To', properties: ['openDirectory', 'createDirectory'] })
+      : await dialog.showOpenDialog({ title: 'Download Folder To', properties: ['openDirectory', 'createDirectory'] })
+    if (result.canceled || !result.filePaths.length) return false
+
+    const destRoot = result.filePaths[0]
+    const taskId = folder.task_id as string
+
+    // Build folder path map: folderId -> name segments
+    const allFolders = db.prepare('SELECT * FROM asset_folders WHERE task_id = ?').all(taskId) as Record<string, unknown>[]
+    const byId = new Map(allFolders.map(f => [f.id as string, f]))
+    function folderPath(id: string): string {
+      const f = byId.get(id)
+      if (!f) return ''
+      const parent = f.parent_id as string | null
+      return parent ? path.join(folderPath(parent), f.name as string) : (f.name as string)
+    }
+
+    // Collect target folder ids (folderId + all descendants)
+    const targetIds = new Set<string>([folderId])
+    let changed = true
+    while (changed) {
+      changed = false
+      for (const f of allFolders) {
+        const id = f.id as string
+        const parentId = f.parent_id as string | null
+        if (parentId && targetIds.has(parentId) && !targetIds.has(id)) {
+          targetIds.add(id)
+          changed = true
+        }
+      }
+    }
+
+    // Compute relative path from the target folder's parent
+    const rootFolderPath = folderPath(folderId)
+    const rootParentPath = path.dirname(rootFolderPath)
+
+    // Create all subdirectories
+    for (const id of targetIds) {
+      const rel = rootParentPath === '.' ? folderPath(id) : path.relative(rootParentPath, folderPath(id))
+      mkdirSync(path.join(destRoot, rel), { recursive: true })
+    }
+
+    // Copy assets in target folders
+    const assets = db.prepare('SELECT * FROM task_assets WHERE task_id = ? AND folder_id IN (' + [...targetIds].map(() => '?').join(',') + ')').all(taskId, ...targetIds) as Record<string, unknown>[]
+    for (const asset of assets) {
+      const srcPath = getAssetFilePath(taskId, asset.id as string, asset.title as string)
+      if (!existsSync(srcPath)) continue
+      const folderRel = rootParentPath === '.' ? folderPath(asset.folder_id as string) : path.relative(rootParentPath, folderPath(asset.folder_id as string))
+      copyFileSync(srcPath, path.join(destRoot, folderRel, asset.title as string))
+    }
+
+    return true
   })
 
   // --- Asset Folders ---

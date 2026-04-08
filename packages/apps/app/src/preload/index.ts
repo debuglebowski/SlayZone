@@ -64,6 +64,8 @@ const api: ElectronAPI = {
     getFileSize: (id) => ipcRenderer.invoke('db:assets:getFileSize', id),
     cleanupTask: (taskId) => ipcRenderer.invoke('db:assets:cleanupTask', taskId),
     uploadDir: (data) => ipcRenderer.invoke('db:assets:uploadDir', data),
+    downloadFile: (id) => ipcRenderer.invoke('db:assets:downloadFile', id),
+    downloadFolder: (id) => ipcRenderer.invoke('db:assets:downloadFolder', id),
   },
   assetFolders: {
     getByTask: (taskId) => ipcRenderer.invoke('db:assetFolders:getByTask', taskId),

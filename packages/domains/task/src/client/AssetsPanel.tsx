@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef, useImperativeHandle, forwardRef, useMemo, type DragEvent } from 'react'
-import { Plus, Upload, Trash2, FileText, Code, Globe, Image, GitBranch, Eye, Code2, Columns2, ZoomIn, ZoomOut, FolderPlus, Pencil, FilePlus, FolderOpen, Folder, ArrowRight, Copy, Search, Files, PanelLeftClose, PanelLeft } from 'lucide-react'
+import { Upload, Download, Trash2, FileText, Code, Globe, Image, GitBranch, Eye, Code2, Columns2, ZoomIn, ZoomOut, FolderPlus, Pencil, FilePlus, FolderOpen, Folder, ArrowRight, Copy, Search, Files, PanelLeftClose, PanelLeft } from 'lucide-react'
 import {
   cn, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, PanelToggle, Button, Input,
   ContextMenu, ContextMenuTrigger, ContextMenuContent, ContextMenuItem, ContextMenuSeparator, ContextMenuSub, ContextMenuSubTrigger, ContextMenuSubContent,
@@ -299,6 +299,7 @@ export const AssetsPanel = forwardRef<AssetsPanelHandle, AssetsPanelProps>(funct
     assets, folders, selectedId, setSelectedId,
     createAsset, updateAsset, deleteAsset, renameAsset, moveAssetToFolder,
     readContent, saveContent, uploadAsset, uploadDir, getFilePath,
+    downloadFile, downloadFolder,
     createFolder, deleteFolder, renameFolder,
     getAssetPath, folderPathMap,
   } = useAssets(taskId)
@@ -623,6 +624,9 @@ export const AssetsPanel = forwardRef<AssetsPanelHandle, AssetsPanelProps>(funct
                   <ContextMenuItem onSelect={() => startRenameFolder(folder)}>
                     <Pencil className="size-3 mr-2" /> Rename
                   </ContextMenuItem>
+                  <ContextMenuItem onSelect={() => downloadFolder(folder.id)}>
+                    <Download className="size-3 mr-2" /> Download
+                  </ContextMenuItem>
                   <ContextMenuSeparator />
                   <ContextMenuItem variant="destructive" onSelect={() => deleteFolder(folder.id)}>
                     <Trash2 className="size-3 mr-2" /> Delete
@@ -727,6 +731,9 @@ export const AssetsPanel = forwardRef<AssetsPanelHandle, AssetsPanelProps>(funct
                       <ContextMenuItem onSelect={() => handleCopyPath(asset.id)}>
                         <Copy className="size-3 mr-2" /> Copy Path
                       </ContextMenuItem>
+                      <ContextMenuItem onSelect={() => downloadFile(asset.id)}>
+                        <Download className="size-3 mr-2" /> Download
+                      </ContextMenuItem>
                       <ContextMenuSeparator />
                       <ContextMenuItem variant="destructive" onSelect={() => deleteAsset(asset.id)}>
                         <Trash2 className="size-3 mr-2" /> Delete
@@ -803,7 +810,7 @@ export const AssetsPanel = forwardRef<AssetsPanelHandle, AssetsPanelProps>(funct
               </div>
             </div>
           )}
-          {/* Top-right: action buttons */}
+          {/* Top-right: action buttons + asset controls */}
           <div className="flex items-center gap-1.5 px-3 py-1.5 flex-1">
             <button
               className="flex items-center justify-center size-7 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors shrink-0"
@@ -812,20 +819,58 @@ export const AssetsPanel = forwardRef<AssetsPanelHandle, AssetsPanelProps>(funct
             >
               {sidebarVisible ? <PanelLeftClose className="size-4" /> : <PanelLeft className="size-4" />}
             </button>
-            <div className="ml-auto flex items-center gap-1.5">
-              <Button data-testid="assets-upload-btn" variant="outline" size="sm" className="!h-6 text-[10px] px-2" onClick={handleUpload}>
-                <Upload className="size-3 mr-1" />
-                Upload
+            {selectedAsset && (
+              <>
+                <div className="flex items-center gap-3 text-[10px] text-muted-foreground ml-1">
+                  {assetStats.fileSize != null && <span><span className="text-muted-foreground/60">Size:</span> {formatFileSize(assetStats.fileSize)}</span>}
+                  {!isBinaryRenderMode(selectedRenderMode!) && (
+                    <>
+                      <span><span className="text-muted-foreground/60">Words:</span> {assetStats.words}</span>
+                      <span><span className="text-muted-foreground/60">Lines:</span> {assetStats.lines}</span>
+                    </>
+                  )}
+                </div>
+              </>
+            )}
+            <div className="flex-1" />
+            {selectedAsset && selectedRenderMode && (
+              <div className="flex items-center gap-1.5">
+                {hasZoom(selectedRenderMode) && (
+                  <div className="flex items-center gap-1">
+                    <button type="button" className="size-6 flex items-center justify-center rounded hover:bg-muted text-muted-foreground hover:text-foreground" onClick={() => setZoomLevel(z => Math.max(0.25, z - 0.25))}><ZoomOut className="size-3.5" /></button>
+                    <button type="button" className="text-[10px] text-muted-foreground hover:text-foreground min-w-[3ch] text-center" onClick={() => setZoomLevel(1)}>{Math.round(zoomLevel * 100)}%</button>
+                    <button type="button" className="size-6 flex items-center justify-center rounded hover:bg-muted text-muted-foreground hover:text-foreground" onClick={() => setZoomLevel(z => Math.min(4, z + 0.25))}><ZoomIn className="size-3.5" /></button>
+                  </div>
+                )}
+                {hasPreviewToggle(selectedRenderMode) && (
+                  <PanelToggle
+                    panels={[
+                      { id: 'preview', icon: Eye, label: 'Preview', active: viewMode === 'preview' },
+                      { id: 'split', icon: Columns2, label: 'Split', active: viewMode === 'split' },
+                      { id: 'raw', icon: Code2, label: 'Raw', active: viewMode === 'raw' },
+                    ]}
+                    onChange={(id) => setViewMode(id as 'preview' | 'split' | 'raw')}
+                  />
+                )}
+                <Select
+                  value={selectedAsset.render_mode ?? '__auto__'}
+                  onValueChange={(v) => updateAsset({ id: selectedAsset.id, renderMode: v === '__auto__' ? null : v as RenderMode })}
+                >
+                  <SelectTrigger size="sm" className="!h-8 text-xs w-auto min-w-0 gap-1.5 px-2.5 border-border"><SelectValue /></SelectTrigger>
+                  <SelectContent position="popper" side="bottom" className="max-h-none overflow-y-visible">
+                    <SelectItem value="__auto__">Auto ({RENDER_MODE_INFO[getEffectiveRenderMode(selectedAsset.title, null)].label})</SelectItem>
+                    {(Object.keys(RENDER_MODE_INFO) as RenderMode[]).map((mode) => (
+                      <SelectItem key={mode} value={mode}>{RENDER_MODE_INFO[mode].label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+            {selectedAsset && (
+              <Button variant="outline" size="sm" className="!h-7 !w-7 px-0 shrink-0" onClick={() => downloadFile(selectedAsset.id)} title="Download">
+                <Download className="size-3.5" />
               </Button>
-              <Button data-testid="assets-folder-btn" variant="outline" size="sm" className="!h-6 text-[10px] px-2" onClick={() => setCreating({ parentFolderId: null, type: 'folder' })}>
-                <FolderPlus className="size-3 mr-1" />
-                Folder
-              </Button>
-              <Button data-testid="assets-new-btn" variant="outline" size="sm" className="!h-6 text-[10px] px-2" onClick={() => setCreating({ parentFolderId: null, type: 'file' })}>
-                <Plus className="size-3 mr-1" />
-                New
-              </Button>
-            </div>
+            )}
           </div>
         </div>
       </TooltipProvider>
@@ -875,6 +920,20 @@ export const AssetsPanel = forwardRef<AssetsPanelHandle, AssetsPanelProps>(funct
                 </ContextMenuContent>
               </ContextMenu>
             )}
+            <div className="flex items-center gap-1.5 px-2 py-2 border-t border-border shrink-0 overflow-hidden">
+              <Button data-testid="assets-new-btn" variant="outline" size="sm" className={cn("!h-7 text-[10px] flex-1 min-w-0", sidebarWidth < 180 ? "px-0 justify-center" : "px-2")} onClick={() => setCreating({ parentFolderId: null, type: 'file' })} title="New file">
+                <FilePlus className="size-3 shrink-0" />
+                {sidebarWidth >= 180 && <span className="ml-1 truncate">New</span>}
+              </Button>
+              <Button data-testid="assets-folder-btn" variant="outline" size="sm" className={cn("!h-7 text-[10px] flex-1 min-w-0", sidebarWidth < 180 ? "px-0 justify-center" : "px-2")} onClick={() => setCreating({ parentFolderId: null, type: 'folder' })} title="New folder">
+                <FolderPlus className="size-3 shrink-0" />
+                {sidebarWidth >= 180 && <span className="ml-1 truncate">Folder</span>}
+              </Button>
+              <Button data-testid="assets-upload-btn" variant="outline" size="sm" className={cn("!h-7 text-[10px] flex-1 min-w-0", sidebarWidth < 180 ? "px-0 justify-center" : "px-2")} onClick={handleUpload} title="Upload file">
+                <Upload className="size-3 shrink-0" />
+                {sidebarWidth >= 180 && <span className="ml-1 truncate">Upload</span>}
+              </Button>
+            </div>
           </div>
         )}
 
@@ -913,48 +972,6 @@ export const AssetsPanel = forwardRef<AssetsPanelHandle, AssetsPanelProps>(funct
                 onContentReady={(c) => { contentForFindRef.current = c }}
                 scrollToLineRef={scrollToLineRef}
               />
-              {/* Content footer */}
-              <div className="flex items-center gap-2 px-3 py-2 border-t border-border shrink-0">
-                <div className="flex items-center gap-3 text-[10px] text-muted-foreground">
-                  {assetStats.fileSize != null && <span><span className="text-muted-foreground/60">Size:</span> {formatFileSize(assetStats.fileSize)}</span>}
-                  {!isBinaryRenderMode(selectedRenderMode!) && (
-                    <>
-                      <span><span className="text-muted-foreground/60">Words:</span> {assetStats.words}</span>
-                      <span><span className="text-muted-foreground/60">Lines:</span> {assetStats.lines}</span>
-                    </>
-                  )}
-                </div>
-                <div className="flex-1" />
-                {selectedRenderMode && hasZoom(selectedRenderMode) && (
-                  <div className="flex items-center gap-1">
-                    <button type="button" className="size-6 flex items-center justify-center rounded hover:bg-muted text-muted-foreground hover:text-foreground" onClick={() => setZoomLevel(z => Math.max(0.25, z - 0.25))}><ZoomOut className="size-3.5" /></button>
-                    <button type="button" className="text-[10px] text-muted-foreground hover:text-foreground min-w-[3ch] text-center" onClick={() => setZoomLevel(1)}>{Math.round(zoomLevel * 100)}%</button>
-                    <button type="button" className="size-6 flex items-center justify-center rounded hover:bg-muted text-muted-foreground hover:text-foreground" onClick={() => setZoomLevel(z => Math.min(4, z + 0.25))}><ZoomIn className="size-3.5" /></button>
-                  </div>
-                )}
-                {selectedRenderMode && hasPreviewToggle(selectedRenderMode) && (
-                  <PanelToggle
-                    panels={[
-                      { id: 'preview', icon: Eye, label: 'Preview', active: viewMode === 'preview' },
-                      { id: 'split', icon: Columns2, label: 'Split', active: viewMode === 'split' },
-                      { id: 'raw', icon: Code2, label: 'Raw', active: viewMode === 'raw' },
-                    ]}
-                    onChange={(id) => setViewMode(id as 'preview' | 'split' | 'raw')}
-                  />
-                )}
-                <Select
-                  value={selectedAsset.render_mode ?? '__auto__'}
-                  onValueChange={(v) => updateAsset({ id: selectedAsset.id, renderMode: v === '__auto__' ? null : v as RenderMode })}
-                >
-                  <SelectTrigger size="sm" className="!h-8 text-xs w-auto min-w-0 gap-1.5 px-2.5 border-border"><SelectValue /></SelectTrigger>
-                  <SelectContent position="popper" side="top" className="max-h-none overflow-y-visible">
-                    <SelectItem value="__auto__">Auto ({RENDER_MODE_INFO[getEffectiveRenderMode(selectedAsset.title, null)].label})</SelectItem>
-                    {(Object.keys(RENDER_MODE_INFO) as RenderMode[]).map((mode) => (
-                      <SelectItem key={mode} value={mode}>{RENDER_MODE_INFO[mode].label}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
             </>
           ) : (
             <div className="flex-1 flex items-center justify-center text-xs text-muted-foreground/60">
