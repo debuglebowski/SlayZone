@@ -7,10 +7,12 @@ export interface NotificationState {
   desktopEnabled: boolean
 }
 
+export const DEFAULT_NOTIFICATION_PANEL_WIDTH = 320
+
 const DEFAULT_STATE: NotificationState = {
   isLocked: false,
   filterCurrentProject: false,
-  panelWidth: 320,
+  panelWidth: DEFAULT_NOTIFICATION_PANEL_WIDTH,
   desktopEnabled: false
 }
 

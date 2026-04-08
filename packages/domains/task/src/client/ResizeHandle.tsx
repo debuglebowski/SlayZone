@@ -3,6 +3,7 @@ import { useRef, useCallback, useEffect } from 'react'
 interface ResizeHandleProps {
   width: number
   minWidth: number
+  maxWidth?: number
   onWidthChange: (width: number) => void
   onDragStart?: () => void
   onDragEnd?: () => void
@@ -12,6 +13,7 @@ interface ResizeHandleProps {
 export function ResizeHandle({
   width,
   minWidth,
+  maxWidth,
   onWidthChange,
   onDragStart,
   onDragEnd,
@@ -37,7 +39,7 @@ export function ResizeHandle({
       const handleMouseMove = (e: MouseEvent) => {
         if (!isDragging.current) return
         const delta = e.clientX - startX.current
-        const newWidth = Math.max(minWidth, startWidth.current - delta)
+        const newWidth = Math.min(maxWidth ?? Infinity, Math.max(minWidth, startWidth.current - delta))
         onWidthChange(newWidth)
       }
 
@@ -56,7 +58,7 @@ export function ResizeHandle({
         document.removeEventListener('mouseup', handleMouseUp)
       }
     },
-    [width, minWidth, onWidthChange, onDragStart, onDragEnd]
+    [width, minWidth, maxWidth, onWidthChange, onDragStart, onDragEnd]
   )
 
   return (

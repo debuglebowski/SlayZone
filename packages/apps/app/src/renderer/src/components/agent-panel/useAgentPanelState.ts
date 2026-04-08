@@ -5,9 +5,11 @@ export interface AgentPanelState {
   panelWidth: number
 }
 
+export const DEFAULT_AGENT_PANEL_WIDTH = 400
+
 const DEFAULT_STATE: AgentPanelState = {
   isOpen: false,
-  panelWidth: 400
+  panelWidth: DEFAULT_AGENT_PANEL_WIDTH
 }
 
 const SETTINGS_KEY = 'agentPanelState'

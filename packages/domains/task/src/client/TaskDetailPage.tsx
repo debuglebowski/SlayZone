@@ -173,6 +173,7 @@ export interface TaskDetailPageProps {
   settingsRevision?: number
   terminalFocusRequestId?: number
   onTerminalFocusRequestHandled?: (taskId: string, requestId: number) => void
+  isSidePanelResizing?: boolean
   /** Pre-fetched data from Suspense cache. Provided by TaskDetailDataLoader. */
   initialData: TaskDetailData | null
 }
@@ -193,6 +194,7 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
   settingsRevision = 0,
   terminalFocusRequestId = 0,
   onTerminalFocusRequestHandled,
+  isSidePanelResizing,
   initialData,
 }: TaskDetailPageProps): React.JSX.Element {
   // Prefer live global state; fall back to suspense-cached data for subtask race window
@@ -344,7 +346,8 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
 
   // Panel sizes for resizable panels
   const [panelSizes, updatePanelSizes, resetPanelSize, resetAllPanels] = usePanelSizes()
-  const [isResizing, setIsResizing] = useState(false)
+  const [isLocalResizing, setIsResizing] = useState(false)
+  const isResizing = isLocalResizing || !!isSidePanelResizing
 
   // Measure split-view container width for auto panel sizing
   const [containerWidth, setContainerWidth] = useState(0)

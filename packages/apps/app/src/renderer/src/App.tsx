@@ -53,10 +53,13 @@ import {
   DesktopNotificationToggle,
   NotificationButton,
   NotificationSidePanel,
+  NOTIFICATION_PANEL_MIN_WIDTH,
+  NOTIFICATION_PANEL_MAX_WIDTH,
   useAttentionTasks,
-  useNotificationState
+  useNotificationState,
+  DEFAULT_NOTIFICATION_PANEL_WIDTH
 } from '@/components/notifications'
-import { AgentPanelButton, AgentSidePanel, useAgentPanelState } from '@/components/agent-panel'
+import { AgentPanelButton, AgentSidePanel, AGENT_PANEL_MIN_WIDTH, AGENT_PANEL_MAX_WIDTH, useAgentPanelState, DEFAULT_AGENT_PANEL_WIDTH } from '@/components/agent-panel'
 import { UsagePopover } from '@/components/usage/UsagePopover'
 import { BoostPill } from '@/components/usage/BoostPill'
 import { useUsage } from '@/components/usage/useUsage'
@@ -285,6 +288,7 @@ function App(): React.JSX.Element {
   const { data: usageData, refresh: refreshUsage } = useUsage()
   const [notificationState, setNotificationState] = useNotificationState()
   const [agentPanelState, setAgentPanelState] = useAgentPanelState()
+  const [isSidePanelResizing, setIsSidePanelResizing] = useState(false)
   const agentPanelMountedRef = useRef(false)
   if (agentPanelState.isOpen) agentPanelMountedRef.current = true
   const [agentMode, setAgentMode] = useState<string>('claude-code')
@@ -933,7 +937,7 @@ function App(): React.JSX.Element {
           </div>
 
           <div id="content-wrapper" className="flex-1 min-h-0 flex">
-            <div id="main-area" className="flex-1 min-w-0 min-h-0 rounded-lg bg-surface-0 flex overflow-hidden p-4 gap-4">
+            <div id="main-area" className="flex-1 min-w-0 min-h-0 rounded-lg bg-surface-0 flex overflow-hidden p-4">
             <div
               className={cn("flex-1 min-w-0 min-h-0 rounded-lg overflow-hidden", explodeMode ? "grid gap-1 p-1" : "relative")}
               style={colorTintsEnabled && selectedProject && projectColorBg(selectedProject.color) ? { backgroundImage: `linear-gradient(${projectColorBg(selectedProject.color)}, ${projectColorBg(selectedProject.color)})` } : undefined}
@@ -1044,7 +1048,7 @@ function App(): React.JSX.Element {
                         onBack={goBack} onTaskUpdated={updateTask} onArchiveTask={archiveTask} onDeleteTask={deleteTask}
                         onNavigateToTask={openTask} onConvertTask={handleConvertTask} onCloseTab={closeTabByTaskId}
                         settingsRevision={settingsRevision} terminalFocusRequestId={terminalFocusRequests[tab.taskId] ?? 0}
-                        onTerminalFocusRequestHandled={handleTerminalFocusRequestHandled} />
+                        onTerminalFocusRequestHandled={handleTerminalFocusRequestHandled} isSidePanelResizing={isSidePanelResizing} />
                     </div></Suspense>
                     )}
                 </div>
@@ -1074,14 +1078,26 @@ function App(): React.JSX.Element {
               )}
             </div>
 
+            {agentSessionId && agentPanelMountedRef.current && agentPanelState.isOpen && (
+              <ResizeHandle width={agentPanelState.panelWidth} minWidth={AGENT_PANEL_MIN_WIDTH} maxWidth={AGENT_PANEL_MAX_WIDTH}
+                onWidthChange={(w) => setAgentPanelState({ panelWidth: w })}
+                onDragStart={() => setIsSidePanelResizing(true)} onDragEnd={() => setIsSidePanelResizing(false)}
+                onReset={() => setAgentPanelState({ panelWidth: DEFAULT_AGENT_PANEL_WIDTH })} />
+            )}
             {agentSessionId && agentPanelMountedRef.current && (
               <div className={agentPanelState.isOpen ? 'min-h-0' : 'w-0 overflow-hidden invisible'} style={agentPanelState.isOpen ? undefined : { position: 'absolute' as const }}>
-                <AgentSidePanel width={agentPanelState.panelWidth} onWidthChange={(w) => setAgentPanelState({ panelWidth: w })}
-                  sessionId={agentSessionId} cwd={projects.find(p => p.id === selectedProjectId)?.path ?? ''} mode={agentMode as import('@slayzone/terminal/shared').TerminalMode} isActive={agentPanelState.isOpen} />
+                <AgentSidePanel width={agentPanelState.panelWidth}
+                  sessionId={agentSessionId} cwd={projects.find(p => p.id === selectedProjectId)?.path ?? ''} mode={agentMode as import('@slayzone/terminal/shared').TerminalMode} isActive={agentPanelState.isOpen} isResizing={isSidePanelResizing} />
               </div>
             )}
             {notificationState.isLocked && (
-              <NotificationSidePanel width={notificationState.panelWidth} onWidthChange={(width) => setNotificationState({ panelWidth: width })}
+              <ResizeHandle width={notificationState.panelWidth} minWidth={NOTIFICATION_PANEL_MIN_WIDTH} maxWidth={NOTIFICATION_PANEL_MAX_WIDTH}
+                onWidthChange={(w) => setNotificationState({ panelWidth: w })}
+                onDragStart={() => setIsSidePanelResizing(true)} onDragEnd={() => setIsSidePanelResizing(false)}
+                onReset={() => setNotificationState({ panelWidth: DEFAULT_NOTIFICATION_PANEL_WIDTH })} />
+            )}
+            {notificationState.isLocked && (
+              <NotificationSidePanel width={notificationState.panelWidth}
                 attentionTasks={attentionTasks} projects={projects} filterCurrentProject={notificationState.filterCurrentProject}
                 onFilterToggle={() => setNotificationState({ filterCurrentProject: !notificationState.filterCurrentProject })}
                 onNavigate={openTask} onCloseTerminal={async (sessionId) => { await window.api.pty.kill(sessionId); refreshAttentionTasks() }}
