@@ -242,8 +242,8 @@ export function KanbanColumn({
       <div
         ref={setNodeRef}
         className={cn(
-          'flex-1 h-full rounded-lg bg-muted/30 p-2 min-h-[200px] overflow-y-auto scrollbar-hide',
-          showDropHighlight && 'bg-muted/50 ring-2 ring-primary/20'
+          'flex-1 h-full rounded-lg bg-white/50 dark:bg-muted/30 p-2 min-h-[200px] overflow-y-auto scrollbar-hide',
+          showDropHighlight && 'bg-white/70 dark:bg-muted/50 ring-2 ring-primary/20'
         )}
       >
         <SortableContext

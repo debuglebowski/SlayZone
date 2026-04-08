@@ -445,6 +445,16 @@ function App(): React.JSX.Element {
     })
   }, [])
   useEffect(() => {
+    return window.api.app.onToggleAttentionPanel(() => {
+      setNotificationState({ isLocked: !notificationState.isLocked })
+    })
+  }, [notificationState.isLocked])
+  useEffect(() => {
+    return window.api.app.onToggleAgentPanel(() => {
+      if (selectedProjectId) setAgentPanelState({ isOpen: !agentPanelState.isOpen })
+    })
+  }, [selectedProjectId, agentPanelState.isOpen])
+  useEffect(() => {
     return window.api.app.onOpenSettings(() => {
       setSettingsInitialTab('general'); setSettingsInitialAiConfigSection(null); setSettingsOpen(true)
     })
@@ -871,7 +881,7 @@ function App(): React.JSX.Element {
           onTaskClick={openTask} zenMode={zenMode} onboardingChecklist={onboardingChecklist} attentionByProject={attentionByProject} onReorderProjects={reorderProjects}
         />
 
-        <div id="right-column" className={`flex-1 flex min-w-0 bg-surface-1 pb-2 pr-2 ${zenMode ? 'pl-2' : ''}`}>
+        <div id="right-column" className={`flex-1 flex min-w-0 bg-sidebar pb-2 pr-2 ${zenMode ? 'pl-2' : ''}`}>
           <div id="right-main" className="flex-1 flex flex-col min-w-0 min-h-0">
           <div className={zenMode ? "pl-16" : ""}>
             <TabBar
@@ -922,8 +932,10 @@ function App(): React.JSX.Element {
           </div>
 
           <div id="content-wrapper" className="flex-1 min-h-0 flex">
-            <div id="main-area"
-              className={cn("flex-1 min-w-0 min-h-0 rounded-lg overflow-hidden bg-background", explodeMode ? "grid gap-1 p-1" : "relative")}
+            <div id="main-area" className="flex-1 min-w-0 min-h-0 rounded-lg bg-surface-0 flex overflow-hidden p-4 gap-4">
+            <div
+              className={cn("flex-1 min-w-0 min-h-0 rounded-lg overflow-hidden", explodeMode ? "grid gap-1 p-1" : "relative")}
+              style={colorTintsEnabled && selectedProject && projectColorBg(selectedProject.color) ? { backgroundImage: `linear-gradient(${projectColorBg(selectedProject.color)}, ${projectColorBg(selectedProject.color)})` } : undefined}
               style={explodeMode ? (() => { const cols = Math.ceil(Math.sqrt(openTaskIds.length)); const rows = Math.ceil(openTaskIds.length / cols); return { gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`, gridTemplateRows: `repeat(${rows}, minmax(0, 1fr))` } })() : undefined}
             >
               {tabs.map((tab, i) => {
@@ -936,7 +948,7 @@ function App(): React.JSX.Element {
                   inert={!explodeMode && !isViewActive ? true : undefined}
                 >
                     {tab.type === 'home' ? (
-                    <div className="flex flex-col flex-1 p-6 pt-4 h-full bg-surface-0" style={colorTintsEnabled && selectedProject && projectColorBg(selectedProject.color) ? { backgroundImage: `linear-gradient(${projectColorBg(selectedProject.color)}, ${projectColorBg(selectedProject.color)})` } : undefined}>
+                    <div id="home-detail" className="flex flex-col flex-1 h-full">
                       <header className="mb-4 window-no-drag space-y-2">
                         <div className="flex items-center gap-4">
                           <div className="flex-shrink-0">
@@ -985,7 +997,7 @@ function App(): React.JSX.Element {
                             return (
                               <React.Fragment key={id}>
                                 {i > 0 && <ResizeHandle width={w} minWidth={id === 'kanban' ? 400 : 200} onWidthChange={w => updatePanelSizes({ [HOME_PANEL_SIZE_KEY[id]]: w })} onReset={() => resetPanelSize(HOME_PANEL_SIZE_KEY[id])} />}
-                                <div className={cn('shrink-0 min-h-0 overflow-hidden', cn('rounded-lg border border-border', id === 'kanban' && Object.values(homePanel.homePanelVisibility).filter(Boolean).length <= 1 ? 'border-transparent' : cn('bg-background', id === 'kanban' ? 'p-3' : '')))} style={{ width: w }}>
+                                <div className={cn('shrink-0 min-h-0 overflow-hidden', cn('rounded-lg border border-border', id === 'kanban' && Object.values(homePanel.homePanelVisibility).filter(Boolean).length <= 1 && !agentPanelState.isOpen && !notificationState.isLocked ? 'border-transparent' : id === 'kanban' ? 'bg-surface-1 dark:bg-background p-3' : 'bg-background'))} style={{ width: w }}>
                                   {id === 'kanban' && filter.viewMode !== 'list' && (
                                     <KanbanBoard tasks={displayTasks} columns={selectedProject?.columns_config} viewConfig={getViewConfig(filter)} isActive={tabs[activeTabIndex]?.type === 'home'}
                                       onTaskMove={handleTaskMove} onTaskReorder={reorderTasks} onTaskClick={handleTaskClick}
@@ -1061,22 +1073,22 @@ function App(): React.JSX.Element {
               )}
             </div>
 
-          </div>
-          </div>
-
-          {agentSessionId && agentPanelMountedRef.current && (
-            <div className={agentPanelState.isOpen ? 'min-h-0' : 'w-0 overflow-hidden invisible'} style={agentPanelState.isOpen ? undefined : { position: 'absolute' as const }}>
-              <AgentSidePanel width={agentPanelState.panelWidth} onWidthChange={(w) => setAgentPanelState({ panelWidth: w })}
-                sessionId={agentSessionId} cwd={projects.find(p => p.id === selectedProjectId)?.path ?? ''} mode={agentMode as import('@slayzone/terminal/shared').TerminalMode} isActive={agentPanelState.isOpen} />
+            {agentSessionId && agentPanelMountedRef.current && (
+              <div className={agentPanelState.isOpen ? 'min-h-0' : 'w-0 overflow-hidden invisible'} style={agentPanelState.isOpen ? undefined : { position: 'absolute' as const }}>
+                <AgentSidePanel width={agentPanelState.panelWidth} onWidthChange={(w) => setAgentPanelState({ panelWidth: w })}
+                  sessionId={agentSessionId} cwd={projects.find(p => p.id === selectedProjectId)?.path ?? ''} mode={agentMode as import('@slayzone/terminal/shared').TerminalMode} isActive={agentPanelState.isOpen} />
+              </div>
+            )}
+            {notificationState.isLocked && (
+              <NotificationSidePanel width={notificationState.panelWidth} onWidthChange={(width) => setNotificationState({ panelWidth: width })}
+                attentionTasks={attentionTasks} projects={projects} filterCurrentProject={notificationState.filterCurrentProject}
+                onFilterToggle={() => setNotificationState({ filterCurrentProject: !notificationState.filterCurrentProject })}
+                onNavigate={openTask} onCloseTerminal={async (sessionId) => { await window.api.pty.kill(sessionId); refreshAttentionTasks() }}
+                selectedProjectId={selectedProjectId} currentProjectName={projects.find((p) => p.id === selectedProjectId)?.name} />
+            )}
             </div>
-          )}
-          {notificationState.isLocked && (
-            <NotificationSidePanel width={notificationState.panelWidth} onWidthChange={(width) => setNotificationState({ panelWidth: width })}
-              attentionTasks={attentionTasks} projects={projects} filterCurrentProject={notificationState.filterCurrentProject}
-              onFilterToggle={() => setNotificationState({ filterCurrentProject: !notificationState.filterCurrentProject })}
-              onNavigate={openTask} onCloseTerminal={async (sessionId) => { await window.api.pty.kill(sessionId); refreshAttentionTasks() }}
-              selectedProjectId={selectedProjectId} currentProjectName={projects.find((p) => p.id === selectedProjectId)?.name} />
-          )}
+          </div>
+          </div>
         </div>
 
         {/* Dialogs — lazy-mounted on first trigger, stay mounted for close/reopen animations */}

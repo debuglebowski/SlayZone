@@ -52,24 +52,22 @@ export function AgentSidePanel({
   )
 
   return (
-    <div className="flex h-full border-l bg-background" style={{ width }}>
+    <div className="relative h-full rounded-md bg-surface-1 border border-border overflow-hidden flex flex-col" style={{ width }}>
       <div
-        className="w-1 cursor-col-resize hover:bg-primary/20 active:bg-primary/30 transition-colors"
+        className="absolute left-0 top-0 bottom-0 w-1 z-10 cursor-col-resize hover:bg-primary/20 active:bg-primary/30 transition-colors"
         onMouseDown={handleMouseDown}
       />
-      <div className="flex-1 min-w-0 min-h-0 flex flex-col">
-        <div className="flex items-center h-11 px-3 bg-sidebar window-drag-region">
-          <span className="text-sm font-medium text-muted-foreground">Agent</span>
-        </div>
-        <div className="flex-1 min-h-0">
-          <Terminal
-            key={sessionId}
-            sessionId={sessionId}
-            cwd={cwd}
-            mode={mode}
-            isActive={isActive}
-          />
-        </div>
+      <div className="flex items-center shrink-0 h-10 px-2 gap-1 border-b border-border bg-surface-1">
+        <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Agent</span>
+      </div>
+      <div className="flex-1 min-h-0">
+        <Terminal
+          key={sessionId}
+          sessionId={sessionId}
+          cwd={cwd}
+          mode={mode}
+          isActive={isActive}
+        />
       </div>
     </div>
   )

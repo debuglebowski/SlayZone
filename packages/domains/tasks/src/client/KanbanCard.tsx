@@ -106,7 +106,7 @@ export function KanbanCard({
     >
       <Card
         className={cn(
-          'cursor-grab transition-colors duration-[400ms] hover:duration-[100ms] select-none py-0 gap-0 hover:bg-muted/50',
+          'cursor-grab transition-colors duration-[400ms] hover:duration-[100ms] select-none py-0 gap-0 bg-white dark:bg-card hover:bg-muted/50',
           isDragging && 'opacity-50 shadow-lg',
           isFocused && 'ring-2 ring-primary bg-muted/50',
           isOverdue && 'border-destructive',

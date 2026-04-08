@@ -64,7 +64,7 @@ export function NotificationPanel({
 
   return (
     <div className="flex flex-col h-full">
-      <div className="flex items-center bg-surface-2 p-1 gap-1 m-4 mb-0 rounded-lg">
+      <div className="flex items-center bg-surface-2 p-1 gap-1 mx-2 mt-2 rounded-lg">
         <button
           onClick={() => filterCurrentProject && onFilterToggle()}
           className={cn(
@@ -92,7 +92,7 @@ export function NotificationPanel({
       </div>
 
       <div className="flex-1 min-h-0 relative">
-        <div className="absolute inset-0 overflow-y-auto p-4 pt-6">
+        <div className="absolute inset-0 overflow-y-auto px-2 pt-2">
         {attentionTasks.length === 0 ? (
           <p className="text-sm text-muted-foreground text-center py-4">No tasks need attention</p>
         ) : (

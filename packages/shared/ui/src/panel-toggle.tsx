@@ -26,9 +26,9 @@ const variantStyles = {
     activeDisabled: 'bg-muted-foreground/20 text-foreground/40 shadow-sm cursor-not-allowed',
   },
   flat: {
-    container: 'bg-muted/50',
-    active: 'bg-muted text-foreground shadow-sm',
-    activeDisabled: 'bg-muted text-foreground/40 shadow-sm cursor-not-allowed',
+    container: 'bg-surface-2',
+    active: 'bg-background text-foreground shadow-sm',
+    activeDisabled: 'bg-background text-foreground/40 shadow-sm cursor-not-allowed',
   },
 }
 

@@ -1358,7 +1358,7 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
   const multipleVisiblePanels = visiblePanelCount > 1
 
   return (
-    <div id="task-detail" className={cn("h-full flex flex-col bg-surface-0", compact ? "p-0" : "p-4 gap-4")} style={colorTintsEnabled && projectColorBg(project?.color) ? { backgroundImage: `linear-gradient(${projectColorBg(project?.color)}, ${projectColorBg(project?.color)})` } : undefined}>
+    <div id="task-detail" className={cn("h-full flex flex-col", compact ? "p-0" : "gap-4")}>
       {compact && (
         <div className="shrink-0 flex items-center gap-2 px-2 h-10 bg-surface-1 border-b border-border min-w-0">
           <span className="text-xs font-medium truncate flex-1">

@@ -115,7 +115,7 @@ export function ContextManagerShell({
   }
 
   return (
-    <div className="flex h-full bg-surface-0 p-3">
+    <div className="flex h-full bg-surface-0">
       {/* Sidebar */}
       <nav className="mr-3 w-56 shrink-0 rounded-xl border border-border/50 bg-surface-1 flex flex-col overflow-y-auto">
         <header className="flex items-center gap-3 px-4 py-3">
