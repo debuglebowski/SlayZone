@@ -93,7 +93,7 @@ interface TerminalProps {
   providerFlags?: string | null
   executionContext?: import('@slayzone/terminal/shared').ExecutionContext | null
   isActive?: boolean
-  onAttached?: (api: { focus: () => void }) => void
+  onAttached?: (api: { sessionId: string; focus: () => void }) => void
   onConversationCreated?: (conversationId: string) => void
   onSessionInvalid?: () => void
   onReady?: (api: {
@@ -313,7 +313,7 @@ export const Terminal = forwardRef<TerminalHandle, TerminalProps>(function Termi
         } else {
           // Reattach existing terminal (container already has dimensions)
           containerRef.current.appendChild(cached.element)
-          onAttachedRef.current?.({ focus: () => cached.terminal.focus() })
+          onAttachedRef.current?.({ sessionId, focus: () => cached.terminal.focus() })
           cached.terminal.options.theme = resolvedTerminalTheme
           cached.terminal.options.minimumContrastRatio = resolvedTerminalVariant === 'light' ? 4.5 : 1
           terminalRef.current = cached.terminal
@@ -408,6 +408,7 @@ export const Terminal = forwardRef<TerminalHandle, TerminalProps>(function Termi
       // Create new terminal
       const terminal = new XTerm({
         allowProposedApi: true,
+        macOptionIsMeta: true,
         cursorBlink: false,
         fontSize: terminalFontSize,
         fontFamily: terminalFontFamily,
@@ -502,7 +503,7 @@ export const Terminal = forwardRef<TerminalHandle, TerminalProps>(function Termi
       registerActiveAddon(sessionId, serializeAddon)
 
       terminal.open(containerRef.current)
-      onAttachedRef.current?.({ focus: () => terminal.focus() })
+      onAttachedRef.current?.({ sessionId, focus: () => terminal.focus() })
       terminal.clear() // Ensure terminal starts completely fresh
       // Simple fit - container is guaranteed to have dimensions from waitForDimensions
       fitAddon.fit()

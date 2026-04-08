@@ -88,7 +88,7 @@ export const TerminalContainer = forwardRef<TerminalContainerHandle, TerminalCon
   }, [terminalOverrideThemeId, contentVariant])
   const splitGroupRef = useRef<TerminalSplitGroupHandle | null>(null)
   const tabBarRef = useRef<TerminalTabBarHandle | null>(null)
-  const pendingFocusRef = useRef(isActive)
+  const pendingFocusRef = useRef<string | boolean>(isActive)
   const terminalApiRef = useRef<{
     sendInput: (text: string) => Promise<void>
     write: (data: string) => Promise<boolean>
@@ -156,13 +156,17 @@ export const TerminalContainer = forwardRef<TerminalContainerHandle, TerminalCon
       if (matchesShortcut(e, useShortcutStore.getState().getKeys('terminal-split')) && activeGroup) {
         e.preventDefault()
         const lastPane = activeGroup.tabs[activeGroup.tabs.length - 1]
-        if (lastPane) { pendingFocusRef.current = true; splitTab(lastPane.id) }
+        if (lastPane) {
+          splitTab(lastPane.id).then(newTab => {
+            if (newTab) pendingFocusRef.current = getSessionId(newTab.id)
+          })
+        }
       }
     })
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [isActive, activeGroup, createTab, splitTab])
+  }, [isActive, activeGroup, createTab, splitTab, getSessionId])
 
   // Handle conversation created - only for main tab
   const handleConversationCreated = useCallback((convId: string) => {
@@ -174,8 +178,12 @@ export const TerminalContainer = forwardRef<TerminalContainerHandle, TerminalCon
     const group = groups.find(g => g.id === groupId)
     if (!group) return
     const lastPane = group.tabs[group.tabs.length - 1]
-    if (lastPane) { pendingFocusRef.current = true; splitTab(lastPane.id) }
-  }, [groups, splitTab])
+    if (lastPane) {
+      splitTab(lastPane.id).then(newTab => {
+        if (newTab) pendingFocusRef.current = getSessionId(newTab.id)
+      })
+    }
+  }, [groups, splitTab, getSessionId])
 
   // Close an entire group (all its panes)
   const closeGroup = useCallback(async (groupId: string) => {
@@ -222,8 +230,9 @@ export const TerminalContainer = forwardRef<TerminalContainerHandle, TerminalCon
     }
   }, [isActive])
 
-  const handlePaneAttached = useCallback((api: { focus: () => void }) => {
-    if (pendingFocusRef.current) {
+  const handlePaneAttached = useCallback((api: { sessionId: string; focus: () => void }) => {
+    const pending = pendingFocusRef.current
+    if (pending === true || pending === api.sessionId) {
       api.focus()
       pendingFocusRef.current = false
     }

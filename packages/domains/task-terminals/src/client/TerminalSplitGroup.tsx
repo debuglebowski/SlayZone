@@ -38,7 +38,7 @@ export interface TerminalSplitGroupHandle {
 interface TerminalSplitGroupProps {
   panes: PaneProps[]
   isActive?: boolean
-  onAttached?: (api: { focus: () => void }) => void
+  onAttached?: (api: { sessionId: string; focus: () => void }) => void
   onOpenUrl?: (url: string) => void
   onOpenFile?: (filePath: string, options?: { position?: { line: number; col?: number } }) => void
 }
