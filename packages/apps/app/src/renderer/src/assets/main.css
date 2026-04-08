@@ -225,6 +225,29 @@
   height: 100%;
 }
 
+.milkdown-editor table {
+  border: 1px solid var(--color-border);
+  border-radius: 0.5rem;
+  overflow: hidden;
+  border-collapse: separate;
+  border-spacing: 0;
+  width: auto;
+  max-width: 100%;
+}
+.milkdown-editor th,
+.milkdown-editor td {
+  border-bottom: 1px solid var(--color-border);
+  border-right: 1px solid var(--color-border);
+  padding: 0.5rem;
+}
+.milkdown-editor th:last-child,
+.milkdown-editor td:last-child {
+  border-right: none;
+}
+.milkdown-editor tr:last-child td {
+  border-bottom: none;
+}
+
 .ProseMirror {
   height: 100%;
   outline: none;

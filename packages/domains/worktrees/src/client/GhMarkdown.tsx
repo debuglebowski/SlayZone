@@ -242,7 +242,13 @@ const PROSE_CLASSES = `prose prose-sm dark:prose-invert max-w-none
   [&_details]:my-2 [&_details]:rounded-md
   [&_summary]:cursor-pointer [&_summary]:select-none
   [&_summary>h1]:inline [&_summary>h2]:inline [&_summary>h3]:inline [&_summary>h4]:inline
-  [&_summary>h1]:my-0 [&_summary>h2]:my-0 [&_summary>h3]:my-0 [&_summary>h4]:my-0`
+  [&_summary>h1]:my-0 [&_summary>h2]:my-0 [&_summary>h3]:my-0 [&_summary>h4]:my-0
+  [&_table]:border [&_table]:border-border [&_table]:rounded-lg [&_table]:overflow-hidden [&_table]:border-separate [&_table]:border-spacing-0 [&_table]:w-auto [&_table]:max-w-full
+  [&_thead]:border-b-0
+  [&_th]:border-b [&_th]:border-r [&_th]:border-border [&_th]:p-2
+  [&_td]:border-b [&_td]:border-r [&_td]:border-border [&_td]:p-2
+  [&_th:last-child]:border-r-0 [&_td:last-child]:border-r-0
+  [&_tr:last-child_td]:border-b-0`
 
 // --- Public component ---
 
