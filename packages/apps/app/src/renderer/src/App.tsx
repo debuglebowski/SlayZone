@@ -474,19 +474,30 @@ function App(): React.JSX.Element {
     if (num > 0 && num <= projects.length) { setSelectedProjectId(projects[num - 1].id); setActiveTabIndex(0) }
   }, { enableOnFormTags: true, enabled: !isRecording })
 
+  const navigateCycle = useCallback((direction: 1 | -1) => {
+    const cycle: ('context' | number)[] = [...tabCycleOrder]
+    if (contextManagerEnabled && cycle.length > 0) cycle.splice(1, 0, 'context')
+    if (cycle.length === 0) return
+    const { activeTabIndex: idx, activeView: view } = useTabStore.getState()
+    const pos = view === 'context' ? cycle.indexOf('context') : cycle.indexOf(idx)
+    const current = pos >= 0 ? pos : 0
+    const target = cycle[(current + direction + cycle.length) % cycle.length]
+    if (target === 'context') {
+      useTabStore.getState().setActiveView('context')
+    } else {
+      useTabStore.getState().setActiveView('tabs')
+      setActiveTabIndex(target)
+    }
+  }, [tabCycleOrder, contextManagerEnabled, setActiveTabIndex])
+
   useGuardedHotkeys(getKeys('next-tab'), (e) => {
     e.preventDefault()
-    if (tabCycleOrder.length === 0) return
-    const pos = tabCycleOrder.indexOf(useTabStore.getState().activeTabIndex)
-    setActiveTabIndex(tabCycleOrder[((pos >= 0 ? pos : 0) + 1) % tabCycleOrder.length])
+    navigateCycle(1)
   }, { enableOnFormTags: true, enabled: !isRecording })
 
   useGuardedHotkeys(getKeys('prev-tab'), (e) => {
     e.preventDefault()
-    if (tabCycleOrder.length === 0) return
-    const pos = tabCycleOrder.indexOf(useTabStore.getState().activeTabIndex)
-    const current = pos >= 0 ? pos : 0
-    setActiveTabIndex(tabCycleOrder[(current - 1 + tabCycleOrder.length) % tabCycleOrder.length])
+    navigateCycle(-1)
   }, { enableOnFormTags: true, enabled: !isRecording })
 
   useGuardedHotkeys(getKeys('reopen-closed-tab'), (e) => { e.preventDefault(); track('tab_reopened'); reopenClosedTab() }, { enableOnFormTags: true, enabled: !isRecording })
