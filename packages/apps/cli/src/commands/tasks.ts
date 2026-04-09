@@ -15,8 +15,13 @@ import {
   getExtensionFromTitle,
   getEffectiveRenderMode,
   isBinaryRenderMode,
+  canExportAsPdf,
+  canExportAsPng,
+  canExportAsHtml,
   type RenderMode,
 } from '@slayzone/task/shared/types'
+import { apiPost } from '../api'
+import archiver from 'archiver'
 import fs from 'fs'
 import path from 'path'
 import crypto from 'crypto'
@@ -1681,5 +1686,146 @@ function assetsSubcommand(): Command {
       }
     })
 
+  // slay tasks assets download [assetId]
+  cmd
+    .command('download [assetId]')
+    .description('Download an asset in a given format')
+    .option('--type <type>', 'Export type: raw, pdf, png, html, zip', 'raw')
+    .option('--output <path>', 'Output file path (default: ./<filename>)')
+    .option('--task <id>', 'Task ID for zip (or $SLAYZONE_TASK_ID)')
+    .option('--json', 'Output as JSON')
+    .addHelpText('after', `
+Download Types by Render Mode:
+  raw   — always available (copies original file)
+  pdf   — markdown, code, html, svg, mermaid
+  png   — svg, mermaid
+  html  — markdown, code, mermaid
+  zip   — all assets in task (no assetId needed)
+
+pdf/png/html require the SlayZone app to be running.
+`)
+    .action(async (assetId: string | undefined, opts) => {
+      const validTypes = ['raw', 'pdf', 'png', 'html', 'zip']
+      if (!validTypes.includes(opts.type)) {
+        console.error(`Invalid type "${opts.type}". Valid types: ${validTypes.join(', ')}`)
+        process.exit(1)
+      }
+
+      // --- ZIP: task-level ---
+      if (opts.type === 'zip') {
+        const db = openDb()
+        const task = resolveTaskForAsset(db, opts.task)
+        const assets = db.query<AssetRow>(
+          `SELECT * FROM task_assets WHERE task_id = :taskId ORDER BY "order" ASC`,
+          { ':taskId': task.id }
+        )
+        const folders = db.query<AssetFolderRow>(
+          `SELECT * FROM asset_folders WHERE task_id = :taskId`,
+          { ':taskId': task.id }
+        )
+        db.close()
+
+        if (assets.length === 0) {
+          console.error('No assets to download.')
+          process.exit(1)
+        }
+
+        const dir = getAssetsDir()
+        const outputPath = opts.output ? path.resolve(opts.output) : path.resolve('assets.zip')
+        fs.mkdirSync(path.dirname(outputPath), { recursive: true })
+
+        const byId = new Map(folders.map(f => [f.id, f]))
+        function folderPath(id: string): string {
+          const f = byId.get(id)
+          if (!f) return ''
+          return f.parent_id ? path.join(folderPath(f.parent_id), f.name) : f.name
+        }
+
+        const output = fs.createWriteStream(outputPath)
+        const archive = archiver('zip', { zlib: { level: 9 } })
+        archive.pipe(output)
+
+        for (const asset of assets) {
+          const fp = assetFilePath(dir, asset.task_id, asset.id, asset.title)
+          if (!fs.existsSync(fp)) continue
+          const rel = asset.folder_id
+            ? path.join(folderPath(asset.folder_id), asset.title)
+            : asset.title
+          archive.file(fp, { name: rel })
+        }
+
+        await archive.finalize()
+        await new Promise<void>((resolve, reject) => {
+          output.on('close', resolve)
+          output.on('error', reject)
+        })
+
+        if (opts.json) {
+          console.log(JSON.stringify({ path: outputPath, type: 'zip', taskId: task.id }))
+        } else {
+          console.log(outputPath)
+        }
+        return
+      }
+
+      // --- Non-zip: assetId required ---
+      if (!assetId) {
+        console.error(`Asset ID required for --type ${opts.type}. Use --type zip for task-level download.`)
+        process.exit(1)
+      }
+
+      const db = openDb()
+      const asset = resolveAsset(db, assetId)
+      db.close()
+
+      const mode = getEffectiveRenderMode(asset.title, asset.render_mode as RenderMode | null)
+      const baseName = asset.title.replace(/\.[^.]+$/, '') || asset.title
+
+      // --- RAW ---
+      if (opts.type === 'raw') {
+        const dir = getAssetsDir()
+        const srcPath = assetFilePath(dir, asset.task_id, asset.id, asset.title)
+        if (!fs.existsSync(srcPath)) {
+          console.error('Asset file not found on disk.')
+          process.exit(1)
+        }
+        const outputPath = opts.output ? path.resolve(opts.output) : path.resolve(asset.title)
+        fs.mkdirSync(path.dirname(outputPath), { recursive: true })
+        fs.copyFileSync(srcPath, outputPath)
+
+        if (opts.json) {
+          console.log(JSON.stringify({ path: outputPath, type: 'raw', assetId: asset.id }))
+        } else {
+          console.log(outputPath)
+        }
+        return
+      }
+
+      // --- PDF / PNG / HTML (requires app) ---
+      const available = getAvailableExportTypes(mode)
+      if (!available.includes(opts.type)) {
+        console.error(`Cannot export "${asset.title}" (${mode}) as ${opts.type}.\nAvailable types for ${mode}: ${available.join(', ')}`)
+        process.exit(1)
+      }
+
+      const ext = opts.type
+      const outputPath = opts.output ? path.resolve(opts.output) : path.resolve(`${baseName}.${ext}`)
+      await apiPost(`/api/assets/${asset.id}/export/${opts.type}`, { outputPath })
+
+      if (opts.json) {
+        console.log(JSON.stringify({ path: outputPath, type: opts.type, assetId: asset.id }))
+      } else {
+        console.log(outputPath)
+      }
+    })
+
   return cmd
+}
+
+function getAvailableExportTypes(mode: RenderMode): string[] {
+  const types = ['raw']
+  if (canExportAsPdf(mode)) types.push('pdf')
+  if (canExportAsPng(mode)) types.push('png')
+  if (canExportAsHtml(mode)) types.push('html')
+  return types
 }

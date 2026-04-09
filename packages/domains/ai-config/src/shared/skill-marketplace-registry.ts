@@ -69,7 +69,7 @@ All ID arguments support prefix matching (e.g., \`a1b2\` matches the full UUID s
 ## Other
 
 - \`slay init instructions\` — print SlayZone agent configuration template
-- \`slay init skill\` — print slay skill reference markdown
+- \`slay init skills\` — install all built-in slay skills from the marketplace registry
 - \`slay completions <shell>\` — generate shell completions (fish | zsh | bash)
 `
   },
@@ -298,6 +298,24 @@ Assets can be organized into folders. Folder operations support cycle detection 
 - \`slay tasks assets rmdir <folderId> [--json]\` — delete a folder. Contained assets are moved to root, not deleted.
 - \`slay tasks assets mvdir <folderId> --parent <id|"root"> [--json]\` — move a folder to a new parent. Use \`"root"\` to move to top level.
 - \`slay tasks assets mv <assetId> --folder <id|"root"> [--json]\` — move an asset into a folder. Use \`"root"\` for top level.
+
+## Download / Export
+
+Download assets in various formats. Default type is \`raw\` (original file).
+
+- \`slay tasks assets download <assetId> [--type raw|pdf|png|html] [--output <path>] [--json]\` — download a single asset.
+- \`slay tasks assets download --type zip [--task <id>] [--output <path>] [--json]\` — download all task assets as a ZIP archive (no assetId needed).
+
+**Available types by render mode:**
+| Type | Available for |
+|------|--------------|
+| raw  | all files |
+| pdf  | markdown, code, html, svg, mermaid |
+| png  | svg, mermaid |
+| html | markdown, code, mermaid |
+| zip  | all (task-level) |
+
+\`pdf\`, \`png\`, and \`html\` exports require the SlayZone app to be running. \`--output\` defaults to the current directory with an auto-generated filename.
 
 ## Piping examples
 

@@ -7,16 +7,17 @@ import { randomUUID } from 'node:crypto'
 import { BrowserWindow } from 'electron'
 import { z } from 'zod'
 import type { Database } from 'better-sqlite3'
-import { updateTask } from '@slayzone/task/main'
+import { updateTask, buildPdfHtml, buildMermaidPdfHtml, buildPngHtml, renderToPdf, renderToPng } from '@slayzone/task/main'
 import type { ProviderConfig } from '@slayzone/task/shared'
+import { getExtensionFromTitle, getEffectiveRenderMode, canExportAsPdf, canExportAsPng, canExportAsHtml } from '@slayzone/task/shared'
 import type { ColumnConfig } from '@slayzone/projects/shared'
 import { getDefaultStatus, isKnownStatus, parseColumnsConfig } from '@slayzone/projects/shared'
 import { listAllProcesses, killProcess, subscribeToProcessLogs } from './process-manager'
 import { listPtys, getBuffer, writePty, killPty, hasPty, subscribeToPtyData, onSessionChange, subscribeToStateChange, getState } from '@slayzone/terminal/main'
 import { getBrowserWebContents, waitForBrowserRegistration } from './browser-registry'
 import { app as electronApp } from 'electron'
-import { join } from 'node:path'
-import { mkdirSync, writeFileSync, readdirSync, unlinkSync, statSync } from 'node:fs'
+import { join, dirname } from 'node:path'
+import { mkdirSync, writeFileSync, readFileSync, readdirSync, unlinkSync, statSync, existsSync } from 'node:fs'
 
 let httpServer: Server | null = null
 let idleTimer: NodeJS.Timeout | null = null
@@ -724,6 +725,93 @@ export function startMcpServer(db: Database, opts?: { automationEngine?: { execu
     } catch (err) {
       res.status(500).json({ error: err instanceof Error ? err.message : String(err) })
     }
+  })
+
+  // --- Asset Export API (for CLI downloads) ---
+
+  const assetsDir = join(process.env.SLAYZONE_DB_DIR || electronApp.getPath('userData'), 'assets')
+  function getAssetFilePath(taskId: string, assetId: string, title: string): string {
+    const ext = getExtensionFromTitle(title) || '.txt'
+    return join(assetsDir, taskId, `${assetId}${ext}`)
+  }
+
+  app.post('/api/assets/:id/export/pdf', async (req, res) => {
+    const { outputPath } = req.body ?? {}
+    if (!outputPath) { res.status(400).json({ error: 'outputPath required' }); return }
+
+    const existing = db.prepare('SELECT * FROM task_assets WHERE id = ?').get(req.params.id) as Record<string, unknown> | undefined
+    if (!existing) { res.status(404).json({ error: 'Asset not found' }); return }
+
+    const title = existing.title as string
+    const mode = getEffectiveRenderMode(title, (existing.render_mode as string | null) as any)
+    if (!canExportAsPdf(mode)) { res.status(400).json({ error: `Cannot export ${mode} as pdf` }); return }
+
+    const srcPath = getAssetFilePath(existing.task_id as string, req.params.id, title)
+    if (!existsSync(srcPath)) { res.status(404).json({ error: 'Asset file not found' }); return }
+    const content = readFileSync(srcPath, 'utf-8')
+
+    const isMermaid = mode === 'mermaid-preview'
+    const html = isMermaid ? buildMermaidPdfHtml(content, title) : buildPdfHtml(content, mode, title)
+
+    try {
+      const pdfBuffer = await renderToPdf(html, isMermaid)
+      mkdirSync(dirname(outputPath), { recursive: true })
+      writeFileSync(outputPath, pdfBuffer)
+      res.json({ ok: true, path: outputPath })
+    } catch (err) {
+      res.status(500).json({ error: err instanceof Error ? err.message : String(err) })
+    }
+  })
+
+  app.post('/api/assets/:id/export/png', async (req, res) => {
+    const { outputPath } = req.body ?? {}
+    if (!outputPath) { res.status(400).json({ error: 'outputPath required' }); return }
+
+    const existing = db.prepare('SELECT * FROM task_assets WHERE id = ?').get(req.params.id) as Record<string, unknown> | undefined
+    if (!existing) { res.status(404).json({ error: 'Asset not found' }); return }
+
+    const title = existing.title as string
+    const mode = getEffectiveRenderMode(title, (existing.render_mode as string | null) as any)
+    if (!canExportAsPng(mode)) { res.status(400).json({ error: `Cannot export ${mode} as png` }); return }
+
+    const srcPath = getAssetFilePath(existing.task_id as string, req.params.id, title)
+    if (!existsSync(srcPath)) { res.status(404).json({ error: 'Asset file not found' }); return }
+    const content = readFileSync(srcPath, 'utf-8')
+
+    const html = buildPngHtml(content, mode, title)
+    if (!html) { res.status(500).json({ error: 'Failed to build PNG HTML (mermaid not available)' }); return }
+
+    try {
+      const pngBuffer = await renderToPng(html)
+      mkdirSync(dirname(outputPath), { recursive: true })
+      writeFileSync(outputPath, pngBuffer)
+      res.json({ ok: true, path: outputPath })
+    } catch (err) {
+      res.status(500).json({ error: err instanceof Error ? err.message : String(err) })
+    }
+  })
+
+  app.post('/api/assets/:id/export/html', async (req, res) => {
+    const { outputPath } = req.body ?? {}
+    if (!outputPath) { res.status(400).json({ error: 'outputPath required' }); return }
+
+    const existing = db.prepare('SELECT * FROM task_assets WHERE id = ?').get(req.params.id) as Record<string, unknown> | undefined
+    if (!existing) { res.status(404).json({ error: 'Asset not found' }); return }
+
+    const title = existing.title as string
+    const mode = getEffectiveRenderMode(title, (existing.render_mode as string | null) as any)
+    if (!canExportAsHtml(mode)) { res.status(400).json({ error: `Cannot export ${mode} as html` }); return }
+
+    const srcPath = getAssetFilePath(existing.task_id as string, req.params.id, title)
+    if (!existsSync(srcPath)) { res.status(404).json({ error: 'Asset file not found' }); return }
+    const content = readFileSync(srcPath, 'utf-8')
+
+    const isMermaid = mode === 'mermaid-preview'
+    const html = isMermaid ? buildMermaidPdfHtml(content, title) : buildPdfHtml(content, mode, title)
+
+    mkdirSync(dirname(outputPath), { recursive: true })
+    writeFileSync(outputPath, html, 'utf-8')
+    res.json({ ok: true, path: outputPath })
   })
 
   stopMcpServer()

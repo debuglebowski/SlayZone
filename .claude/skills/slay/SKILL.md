@@ -106,6 +106,7 @@ File-like storage attached to tasks — text, images, or any file, organized int
 - `slay tasks assets rmdir <folderId> [--json]` — delete a folder (contained assets move to root)
 - `slay tasks assets mvdir <folderId> --parent <id|"root"> [--json]` — move a folder under another parent or to root
 - `slay tasks assets mv <assetId> --folder <id|"root"> [--json]` — move an asset into a folder or to root
+- `slay tasks assets download [assetId] [--type raw|pdf|png|html|zip] [--output <path>] [--task <id>] [--json]` — download asset. Types by render mode: raw (always), pdf (markdown/code/html/svg/mermaid), png (svg/mermaid), html (markdown/code/mermaid), zip (all assets, no assetId needed). pdf/png/html require app running.
 
 ### Projects
 
