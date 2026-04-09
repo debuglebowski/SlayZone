@@ -1,14 +1,14 @@
 import { useState, useEffect, useCallback, useRef, useImperativeHandle, forwardRef, useMemo, type DragEvent } from 'react'
-import { Upload, Download, Trash2, FileText, Code, Globe, Image, GitBranch, Eye, Code2, Columns2, ZoomIn, ZoomOut, FolderPlus, Pencil, FilePlus, FolderOpen, Folder, ArrowRight, Copy, Search, Files, PanelLeftClose, PanelLeft, ChevronDown } from 'lucide-react'
+import { Upload, Download, Trash2, FileText, Code, Globe, Image, GitBranch, Eye, Code2, Columns2, ZoomIn, ZoomOut, FolderPlus, Pencil, FilePlus, FolderOpen, Folder, ArrowRight, Copy, Search, Files, PanelLeftClose, PanelLeft, ChevronDown, ImageDown, FileCode, Archive } from 'lucide-react'
 import {
   cn, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, PanelToggle, Button, Input,
   ContextMenu, ContextMenuTrigger, ContextMenuContent, ContextMenuItem, ContextMenuSeparator, ContextMenuSub, ContextMenuSubTrigger, ContextMenuSubContent,
-  DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem,
+  DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator,
   Tooltip, TooltipTrigger, TooltipContent, TooltipProvider,
 } from '@slayzone/ui'
 import { RichTextEditor } from '@slayzone/editor'
 import type { RenderMode, TaskAsset, AssetFolder } from '@slayzone/task/shared'
-import { getEffectiveRenderMode, getExtensionFromTitle, RENDER_MODE_INFO, isBinaryRenderMode, canExportAsPdf } from '@slayzone/task/shared'
+import { getEffectiveRenderMode, getExtensionFromTitle, RENDER_MODE_INFO, isBinaryRenderMode, canExportAsPdf, canExportAsPng, canExportAsHtml } from '@slayzone/task/shared'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { useAssets } from './useAssets'
@@ -280,13 +280,13 @@ function AssetPreview({ renderMode, content, zoomLevel = 1, onZoom }: { renderMo
     return () => { cancelled = true }
   }, [renderMode, content])
 
-  if (renderMode === 'html-preview') return <iframe srcDoc={content} sandbox="allow-scripts" className="flex-1 bg-white" title="HTML preview" />
-
   const handleWheel = useCallback((e: React.WheelEvent) => {
     if (!e.metaKey && !e.ctrlKey) return
     e.preventDefault()
     onZoom?.(z => Math.min(4, Math.max(0.25, z + (e.deltaY > 0 ? -0.1 : 0.1))))
   }, [onZoom])
+
+  if (renderMode === 'html-preview') return <iframe srcDoc={content} sandbox="allow-scripts" className="flex-1 bg-white" title="HTML preview" />
 
   const zoomStyle = zoomLevel !== 1 ? { transform: `scale(${zoomLevel})`, transformOrigin: 'top left' } : undefined
 
@@ -302,7 +302,7 @@ export const AssetsPanel = forwardRef<AssetsPanelHandle, AssetsPanelProps>(funct
     assets, folders, selectedId, setSelectedId,
     createAsset, updateAsset, deleteAsset, renameAsset, moveAssetToFolder,
     readContent, saveContent, uploadAsset, uploadDir, getFilePath,
-    downloadFile, downloadFolder, downloadAsPdf,
+    downloadFile, downloadFolder, downloadAsPdf, downloadAsPng, downloadAsHtml, downloadAllAsZip,
     createFolder, deleteFolder, renameFolder,
     getAssetPath, folderPathMap,
   } = useAssets(taskId, initialActiveAssetId)
@@ -352,7 +352,7 @@ export const AssetsPanel = forwardRef<AssetsPanelHandle, AssetsPanelProps>(funct
   }, [folders])
 
   // Focus create/rename inputs when they appear
-  useEffect(() => { if (creating) createInputRef.current?.focus() }, [creating])
+  useEffect(() => { if (creating) requestAnimationFrame(() => createInputRef.current?.focus()) }, [creating])
   useEffect(() => { if (renaming) renameInputRef.current?.focus() }, [renaming])
 
   const selectedAsset = assets.find(a => a.id === selectedId) ?? null
@@ -549,9 +549,13 @@ export const AssetsPanel = forwardRef<AssetsPanelHandle, AssetsPanelProps>(funct
   const renderInlineInput = (parentFolderId: string | null, depth: number) => {
     if (!creating || creating.parentFolderId !== parentFolderId) return null
     return (
-      <div style={{ paddingLeft: depth * INDENT_PX + BASE_PAD }} className="py-0.5">
+      <div style={{ paddingLeft: depth * INDENT_PX + BASE_PAD }} className="flex items-center gap-1.5 py-0.5">
+        {creating.type === 'file'
+          ? <FileText className="size-4 shrink-0 text-muted-foreground" />
+          : <Folder className="size-4 shrink-0 text-amber-500/80" />}
         <Input
           ref={createInputRef}
+          autoFocus
           data-testid="assets-create-input"
           placeholder={creating.type === 'file' ? 'filename.md' : 'folder name'}
           onKeyDown={(e) => {
@@ -559,7 +563,7 @@ export const AssetsPanel = forwardRef<AssetsPanelHandle, AssetsPanelProps>(funct
             if (e.key === 'Escape') setCreating(null)
           }}
           onBlur={(e) => handleInlineCreate(e.target.value)}
-          className="h-6 text-xs font-mono py-0 px-1"
+          className="h-6 text-xs font-mono py-0 px-1 border-0 focus-visible:ring-0 shadow-none"
         />
       </div>
     )
@@ -740,8 +744,18 @@ export const AssetsPanel = forwardRef<AssetsPanelHandle, AssetsPanelProps>(funct
                           <FileText className="size-3 mr-2" /> Download as PDF
                         </ContextMenuItem>
                       )}
+                      {canExportAsPng(getEffectiveRenderMode(asset.title, asset.render_mode)) && (
+                        <ContextMenuItem onSelect={() => downloadAsPng(asset.id)}>
+                          <ImageDown className="size-3 mr-2" /> Download as PNG
+                        </ContextMenuItem>
+                      )}
+                      {canExportAsHtml(getEffectiveRenderMode(asset.title, asset.render_mode)) && (
+                        <ContextMenuItem onSelect={() => downloadAsHtml(asset.id)}>
+                          <FileCode className="size-3 mr-2" /> Download as HTML
+                        </ContextMenuItem>
+                      )}
                       <ContextMenuItem onSelect={() => downloadFile(asset.id)}>
-                        <Download className="size-3 mr-2" /> Download raw
+                        <Download className="size-3 mr-2" /> Download file
                       </ContextMenuItem>
                       <ContextMenuSeparator />
                       <ContextMenuItem variant="destructive" onSelect={() => deleteAsset(asset.id)}>
@@ -878,28 +892,53 @@ export const AssetsPanel = forwardRef<AssetsPanelHandle, AssetsPanelProps>(funct
                 </div>
               </div>
             )}
-            {selectedAsset && selectedRenderMode && canExportAsPdf(selectedRenderMode) ? (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="outline" size="sm" className="!h-7 gap-1 px-1.5 shrink-0" title="Download">
-                    <Download className="size-3.5" />
-                    <ChevronDown className="size-3" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem onSelect={() => downloadAsPdf(selectedAsset.id)}>
-                    <FileText className="size-3 mr-2" /> Download as PDF
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onSelect={() => downloadFile(selectedAsset.id)}>
-                    <Download className="size-3 mr-2" /> Download raw
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            ) : selectedAsset ? (
-              <Button variant="outline" size="sm" className="!h-7 !w-7 px-0 shrink-0" onClick={() => downloadFile(selectedAsset.id)} title="Download">
-                <Download className="size-3.5" />
-              </Button>
-            ) : null}
+            {selectedAsset && selectedRenderMode && (() => {
+              const mode = selectedRenderMode
+              const hasPdf = canExportAsPdf(mode)
+              const hasPng = canExportAsPng(mode)
+              const hasHtml = canExportAsHtml(mode)
+              const hasExport = hasPdf || hasPng || hasHtml
+
+              return (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" size="sm" className="!h-7 gap-1 px-1.5 shrink-0" title="Download">
+                      <Download className="size-3.5" />
+                      <ChevronDown className="size-3" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    {hasPdf && (
+                      <DropdownMenuItem onSelect={() => downloadAsPdf(selectedAsset.id)}>
+                        <FileText className="size-3 mr-2" /> Download as PDF
+                      </DropdownMenuItem>
+                    )}
+                    {hasPng && (
+                      <DropdownMenuItem onSelect={() => downloadAsPng(selectedAsset.id)}>
+                        <ImageDown className="size-3 mr-2" /> Download as PNG
+                      </DropdownMenuItem>
+                    )}
+                    {hasHtml && (
+                      <DropdownMenuItem onSelect={() => downloadAsHtml(selectedAsset.id)}>
+                        <FileCode className="size-3 mr-2" /> Download as HTML
+                      </DropdownMenuItem>
+                    )}
+                    {hasExport && <DropdownMenuSeparator />}
+                    <DropdownMenuItem onSelect={() => downloadFile(selectedAsset.id)}>
+                      <Download className="size-3 mr-2" /> Download file
+                    </DropdownMenuItem>
+                    {assets.length > 0 && (
+                      <>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem onSelect={() => downloadAllAsZip()}>
+                          <Archive className="size-3 mr-2" /> Download all as ZIP
+                        </DropdownMenuItem>
+                      </>
+                    )}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              )
+            })()}
           </div>
         </div>
       </TooltipProvider>
@@ -946,6 +985,14 @@ export const AssetsPanel = forwardRef<AssetsPanelHandle, AssetsPanelProps>(funct
                   <ContextMenuItem onSelect={() => setCreating({ parentFolderId: null, type: 'folder' })}>
                     <FolderPlus className="size-3 mr-2" /> New Folder
                   </ContextMenuItem>
+                  {assets.length > 0 && (
+                    <>
+                      <ContextMenuSeparator />
+                      <ContextMenuItem onSelect={() => downloadAllAsZip()}>
+                        <Archive className="size-3 mr-2" /> Download all as ZIP
+                      </ContextMenuItem>
+                    </>
+                  )}
                 </ContextMenuContent>
               </ContextMenu>
             )}

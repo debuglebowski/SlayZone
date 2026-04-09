@@ -67,6 +67,9 @@ const api: ElectronAPI = {
     downloadFile: (id) => ipcRenderer.invoke('db:assets:downloadFile', id),
     downloadFolder: (id) => ipcRenderer.invoke('db:assets:downloadFolder', id),
     downloadAsPdf: (id) => ipcRenderer.invoke('db:assets:downloadAsPdf', id),
+    downloadAsPng: (id) => ipcRenderer.invoke('db:assets:downloadAsPng', id),
+    downloadAsHtml: (id) => ipcRenderer.invoke('db:assets:downloadAsHtml', id),
+    downloadAllAsZip: (taskId) => ipcRenderer.invoke('db:assets:downloadAllAsZip', taskId),
   },
   assetFolders: {
     getByTask: (taskId) => ipcRenderer.invoke('db:assetFolders:getByTask', taskId),

@@ -291,6 +291,9 @@ export interface ElectronAPI {
     downloadFile: (id: string) => Promise<boolean>
     downloadFolder: (id: string) => Promise<boolean>
     downloadAsPdf: (id: string) => Promise<boolean>
+    downloadAsPng: (id: string) => Promise<boolean>
+    downloadAsHtml: (id: string) => Promise<boolean>
+    downloadAllAsZip: (taskId: string) => Promise<boolean>
   }
   assetFolders: {
     getByTask: (taskId: string) => Promise<AssetFolder[]>

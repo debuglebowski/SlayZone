@@ -2,7 +2,7 @@ import type { IpcMain } from 'electron'
 import { app, dialog, BrowserWindow, shell } from 'electron'
 import type { Database } from 'better-sqlite3'
 import type { CreateTaskInput, UpdateTaskInput, Task, ProviderConfig, CreateAssetInput, UpdateAssetInput, TaskAsset, RenderMode, AssetFolder, CreateAssetFolderInput, UpdateAssetFolderInput } from '@slayzone/task/shared'
-import { getExtensionFromTitle, getEffectiveRenderMode, canExportAsPdf } from '@slayzone/task/shared'
+import { getExtensionFromTitle, getEffectiveRenderMode, canExportAsPdf, canExportAsPng, canExportAsHtml } from '@slayzone/task/shared'
 import type { ColumnConfig } from '@slayzone/projects/shared'
 import { getDefaultStatus, isKnownStatus, isTerminalStatus, parseColumnsConfig } from '@slayzone/projects/shared'
 import { parseProject } from '@slayzone/projects/main'
@@ -18,10 +18,11 @@ import {
   buildTaskUpdatedEvents,
 } from './history'
 import path from 'path'
-import { existsSync, mkdirSync, writeFileSync, readFileSync, unlinkSync, rmSync, copyFileSync, statSync, readdirSync } from 'fs'
+import { existsSync, mkdirSync, writeFileSync, readFileSync, unlinkSync, rmSync, copyFileSync, statSync, readdirSync, createWriteStream } from 'fs'
 import { randomUUID } from 'crypto'
 import { removeWorktree, createWorktree, runWorktreeSetupScript, getCurrentBranch, isGitRepo, copyIgnoredFiles, resolveCopyBehavior } from '@slayzone/worktrees/main'
 import { marked } from 'marked'
+import archiver from 'archiver'
 import { tmpdir } from 'os'
 
 type DiagnosticLevel = 'debug' | 'info' | 'warn' | 'error'
@@ -1376,6 +1377,171 @@ export function registerTaskHandlers(ipcMain: IpcMain, db: Database, onMutation?
       offscreen?.destroy()
       try { unlinkSync(tempPath) } catch {}
     }
+  })
+
+  // --- Download as PNG ---
+
+  ipcMain.handle('db:assets:downloadAsPng', async (_, id: string) => {
+    const existing = db.prepare('SELECT * FROM task_assets WHERE id = ?').get(id) as Record<string, unknown> | undefined
+    if (!existing) return false
+
+    const title = existing.title as string
+    const mode = getEffectiveRenderMode(title, (existing.render_mode as string | null) as any)
+    if (!canExportAsPng(mode)) return false
+
+    const srcPath = getAssetFilePath(existing.task_id as string, id, title)
+    if (!existsSync(srcPath)) return false
+    const content = readFileSync(srcPath, 'utf-8')
+
+    const isMermaid = mode === 'mermaid-preview'
+    const bodyHtml = isMermaid
+      ? `<pre class="mermaid">${escapeHtml(content)}</pre>`
+      : `<div style="display:inline-block">${content}</div>`
+
+    let mermaidScript = ''
+    if (isMermaid) {
+      try {
+        const mermaidPath = require.resolve('mermaid/dist/mermaid.min.js')
+        const mermaidJs = readFileSync(mermaidPath, 'utf-8')
+        mermaidScript = `<script>${mermaidJs}</script>
+<script>
+  mermaid.initialize({ startOnLoad: true, theme: 'default' });
+  mermaid.run().then(() => { document.title = 'READY'; }).catch(() => { document.title = 'READY'; });
+</script>`
+      } catch {
+        return false
+      }
+    } else {
+      mermaidScript = `<script>document.title = 'READY';</script>`
+    }
+
+    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${escapeHtml(title)}</title>
+<style>* { margin: 0; padding: 0; } body { background: white; display: inline-block; } .mermaid svg { display: block; }</style>
+</head><body>${bodyHtml}${mermaidScript}</body></html>`
+
+    const tempPath = path.join(tmpdir(), `slayzone-png-${id}.html`)
+    writeFileSync(tempPath, html, 'utf-8')
+
+    let offscreen: BrowserWindow | null = null
+    try {
+      offscreen = new BrowserWindow({
+        show: false,
+        width: 2000,
+        height: 2000,
+        webPreferences: { offscreen: true, nodeIntegration: false, contextIsolation: true },
+      })
+
+      await offscreen.loadFile(tempPath)
+
+      // Wait for content to be ready
+      const deadline = Date.now() + 5000
+      while (Date.now() < deadline) {
+        const ready = await offscreen.webContents.executeJavaScript('document.title')
+        if (ready === 'READY') break
+        await new Promise(r => setTimeout(r, 100))
+      }
+
+      // Measure content size and resize
+      const rect = await offscreen.webContents.executeJavaScript(
+        `(() => { const el = document.body.firstElementChild; if (!el) return { w: 400, h: 300 }; const r = el.getBoundingClientRect(); return { w: Math.ceil(r.width), h: Math.ceil(r.height) }; })()`
+      )
+      const w = Math.max(rect.w, 10)
+      const h = Math.max(rect.h, 10)
+      offscreen.setContentSize(w, h)
+      await new Promise(r => setTimeout(r, 100))
+
+      const image = await offscreen.webContents.capturePage({ x: 0, y: 0, width: w, height: h })
+      const pngBuffer = image.toPNG()
+
+      const baseName = title.replace(/\.[^.]+$/, '') || title
+      const defaultPath = path.join(app.getPath('downloads'), `${baseName}.png`)
+      const win = BrowserWindow.getFocusedWindow()
+      const result = win
+        ? await dialog.showSaveDialog(win, { title: 'Download as PNG', defaultPath, filters: [{ name: 'PNG', extensions: ['png'] }] })
+        : await dialog.showSaveDialog({ title: 'Download as PNG', defaultPath, filters: [{ name: 'PNG', extensions: ['png'] }] })
+      if (result.canceled || !result.filePath) return false
+
+      writeFileSync(result.filePath, pngBuffer)
+      shell.showItemInFolder(result.filePath)
+      return true
+    } finally {
+      offscreen?.destroy()
+      try { unlinkSync(tempPath) } catch {}
+    }
+  })
+
+  // --- Download as HTML ---
+
+  ipcMain.handle('db:assets:downloadAsHtml', async (_, id: string) => {
+    const existing = db.prepare('SELECT * FROM task_assets WHERE id = ?').get(id) as Record<string, unknown> | undefined
+    if (!existing) return false
+
+    const title = existing.title as string
+    const mode = getEffectiveRenderMode(title, (existing.render_mode as string | null) as any)
+    if (!canExportAsHtml(mode)) return false
+
+    const srcPath = getAssetFilePath(existing.task_id as string, id, title)
+    if (!existsSync(srcPath)) return false
+    const content = readFileSync(srcPath, 'utf-8')
+
+    const isMermaid = mode === 'mermaid-preview'
+    const html = isMermaid ? buildMermaidPdfHtml(content, title) : buildPdfHtml(content, mode, title)
+
+    const baseName = title.replace(/\.[^.]+$/, '') || title
+    const defaultPath = path.join(app.getPath('downloads'), `${baseName}.html`)
+    const win = BrowserWindow.getFocusedWindow()
+    const result = win
+      ? await dialog.showSaveDialog(win, { title: 'Download as HTML', defaultPath, filters: [{ name: 'HTML', extensions: ['html'] }] })
+      : await dialog.showSaveDialog({ title: 'Download as HTML', defaultPath, filters: [{ name: 'HTML', extensions: ['html'] }] })
+    if (result.canceled || !result.filePath) return false
+
+    writeFileSync(result.filePath, html, 'utf-8')
+    shell.showItemInFolder(result.filePath)
+    return true
+  })
+
+  // --- Download All as ZIP ---
+
+  ipcMain.handle('db:assets:downloadAllAsZip', async (_, taskId: string) => {
+    const allAssets = db.prepare('SELECT * FROM task_assets WHERE task_id = ?').all(taskId) as Record<string, unknown>[]
+    if (allAssets.length === 0) return false
+
+    const allFolders = db.prepare('SELECT * FROM asset_folders WHERE task_id = ?').all(taskId) as Record<string, unknown>[]
+    const byId = new Map(allFolders.map(f => [f.id as string, f]))
+    function folderPath(id: string): string {
+      const f = byId.get(id)
+      if (!f) return ''
+      const parent = f.parent_id as string | null
+      return parent ? path.join(folderPath(parent), f.name as string) : (f.name as string)
+    }
+
+    const win = BrowserWindow.getFocusedWindow()
+    const defaultPath = path.join(app.getPath('downloads'), 'assets.zip')
+    const result = win
+      ? await dialog.showSaveDialog(win, { title: 'Download All as ZIP', defaultPath, filters: [{ name: 'ZIP', extensions: ['zip'] }] })
+      : await dialog.showSaveDialog({ title: 'Download All as ZIP', defaultPath, filters: [{ name: 'ZIP', extensions: ['zip'] }] })
+    if (result.canceled || !result.filePath) return false
+
+    const output = createWriteStream(result.filePath)
+    const archive = archiver('zip', { zlib: { level: 9 } })
+    archive.pipe(output)
+
+    for (const asset of allAssets) {
+      const srcPath = getAssetFilePath(taskId, asset.id as string, asset.title as string)
+      if (!existsSync(srcPath)) continue
+      const folderId = asset.folder_id as string | null
+      const rel = folderId ? path.join(folderPath(folderId), asset.title as string) : (asset.title as string)
+      archive.file(srcPath, { name: rel })
+    }
+
+    await archive.finalize()
+    await new Promise<void>((resolve, reject) => {
+      output.on('close', resolve)
+      output.on('error', reject)
+    })
+
+    shell.showItemInFolder(result.filePath)
+    return true
   })
 
   // --- Asset Folders ---

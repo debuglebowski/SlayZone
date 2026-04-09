@@ -163,6 +163,16 @@ export function canExportAsPdf(mode: RenderMode): boolean {
   return mode === 'markdown' || mode === 'code' || mode === 'html-preview' || mode === 'svg-preview' || mode === 'mermaid-preview'
 }
 
+/** Render modes that support "Download as PNG" capture. */
+export function canExportAsPng(mode: RenderMode): boolean {
+  return mode === 'svg-preview' || mode === 'mermaid-preview'
+}
+
+/** Render modes that support "Download as HTML" export. */
+export function canExportAsHtml(mode: RenderMode): boolean {
+  return mode === 'markdown' || mode === 'code' || mode === 'mermaid-preview'
+}
+
 /** Extract file extension from title (e.g. "notes.md" → ".md"). Empty string if none. */
 export function getExtensionFromTitle(title: string): string {
   const dot = title.lastIndexOf('.')
