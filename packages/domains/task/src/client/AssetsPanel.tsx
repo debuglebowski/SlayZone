@@ -3,7 +3,7 @@ import { Upload, Download, Trash2, FileText, Code, Globe, Image, GitBranch, Eye,
 import {
   cn, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, PanelToggle, Button, Input,
   ContextMenu, ContextMenuTrigger, ContextMenuContent, ContextMenuItem, ContextMenuSeparator, ContextMenuSub, ContextMenuSubTrigger, ContextMenuSubContent,
-  DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator,
+  DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuSub, DropdownMenuSubTrigger, DropdownMenuSubContent,
   Tooltip, TooltipTrigger, TooltipContent, TooltipProvider,
 } from '@slayzone/ui'
 import { RichTextEditor } from '@slayzone/editor'
@@ -334,7 +334,7 @@ export const AssetsPanel = forwardRef<AssetsPanelHandle, AssetsPanelProps>(funct
   const [creating, setCreating] = useState<{ parentFolderId: string | null; type: 'file' | 'folder' } | null>(null)
   const [renaming, setRenaming] = useState<{ id: string; type: 'asset' | 'folder' } | null>(null)
   const [renameValue, setRenameValue] = useState('')
-  const createInputRef = useRef<HTMLInputElement>(null)
+  const createInputRef = useCallback((node: HTMLInputElement | null) => { node?.focus() }, [])
   const renameInputRef = useRef<HTMLInputElement>(null)
 
   // Expanded folders state
@@ -352,7 +352,6 @@ export const AssetsPanel = forwardRef<AssetsPanelHandle, AssetsPanelProps>(funct
   }, [folders])
 
   // Focus create/rename inputs when they appear
-  useEffect(() => { if (creating) requestAnimationFrame(() => createInputRef.current?.focus()) }, [creating])
   useEffect(() => { if (renaming) renameInputRef.current?.focus() }, [renaming])
 
   const selectedAsset = assets.find(a => a.id === selectedId) ?? null
@@ -555,7 +554,6 @@ export const AssetsPanel = forwardRef<AssetsPanelHandle, AssetsPanelProps>(funct
           : <Folder className="size-4 shrink-0 text-amber-500/80" />}
         <Input
           ref={createInputRef}
-          autoFocus
           data-testid="assets-create-input"
           placeholder={creating.type === 'file' ? 'filename.md' : 'folder name'}
           onKeyDown={(e) => {
@@ -659,7 +657,8 @@ export const AssetsPanel = forwardRef<AssetsPanelHandle, AssetsPanelProps>(funct
               const TypeIcon = getAssetIcon(asset)
               const isRenaming = renaming?.id === asset.id && renaming.type === 'asset'
               const ext = getExtensionFromTitle(asset.title).replace('.', '').toUpperCase()
-              const modeLabel = RENDER_MODE_INFO[getEffectiveRenderMode(asset.title, asset.render_mode)].label
+              const effectiveMode = getEffectiveRenderMode(asset.title, asset.render_mode)
+              const modeLabel = RENDER_MODE_INFO[effectiveMode].label
 
               return (
                 <div key={`f:${asset.id}`} data-testid={`asset-row-${asset.id}`} style={{ marginLeft: depth * INDENT_PX + BASE_PAD, marginRight: 4 }}>
@@ -739,24 +738,34 @@ export const AssetsPanel = forwardRef<AssetsPanelHandle, AssetsPanelProps>(funct
                       <ContextMenuItem onSelect={() => handleCopyPath(asset.id)}>
                         <Copy className="size-3 mr-2" /> Copy Path
                       </ContextMenuItem>
-                      {canExportAsPdf(getEffectiveRenderMode(asset.title, asset.render_mode)) && (
-                        <ContextMenuItem onSelect={() => downloadAsPdf(asset.id)}>
-                          <FileText className="size-3 mr-2" /> Download as PDF
-                        </ContextMenuItem>
-                      )}
-                      {canExportAsPng(getEffectiveRenderMode(asset.title, asset.render_mode)) && (
-                        <ContextMenuItem onSelect={() => downloadAsPng(asset.id)}>
-                          <ImageDown className="size-3 mr-2" /> Download as PNG
-                        </ContextMenuItem>
-                      )}
-                      {canExportAsHtml(getEffectiveRenderMode(asset.title, asset.render_mode)) && (
-                        <ContextMenuItem onSelect={() => downloadAsHtml(asset.id)}>
-                          <FileCode className="size-3 mr-2" /> Download as HTML
-                        </ContextMenuItem>
-                      )}
+                      <ContextMenuSeparator />
                       <ContextMenuItem onSelect={() => downloadFile(asset.id)}>
-                        <Download className="size-3 mr-2" /> Download file
+                        <Download className="size-3 mr-2" /> Download
                       </ContextMenuItem>
+                      {(canExportAsPdf(effectiveMode) || canExportAsPng(effectiveMode) || canExportAsHtml(effectiveMode)) && (
+                        <ContextMenuSub>
+                          <ContextMenuSubTrigger>
+                            <Download className="size-3 mr-2" /> Download as
+                          </ContextMenuSubTrigger>
+                          <ContextMenuSubContent>
+                            {canExportAsPdf(effectiveMode) && (
+                              <ContextMenuItem onSelect={() => downloadAsPdf(asset.id)}>
+                                <FileText className="size-3 mr-2" /> PDF
+                              </ContextMenuItem>
+                            )}
+                            {canExportAsPng(effectiveMode) && (
+                              <ContextMenuItem onSelect={() => downloadAsPng(asset.id)}>
+                                <ImageDown className="size-3 mr-2" /> PNG
+                              </ContextMenuItem>
+                            )}
+                            {canExportAsHtml(effectiveMode) && (
+                              <ContextMenuItem onSelect={() => downloadAsHtml(asset.id)}>
+                                <FileCode className="size-3 mr-2" /> HTML
+                              </ContextMenuItem>
+                            )}
+                          </ContextMenuSubContent>
+                        </ContextMenuSub>
+                      )}
                       <ContextMenuSeparator />
                       <ContextMenuItem variant="destructive" onSelect={() => deleteAsset(asset.id)}>
                         <Trash2 className="size-3 mr-2" /> Delete
@@ -908,25 +917,33 @@ export const AssetsPanel = forwardRef<AssetsPanelHandle, AssetsPanelProps>(funct
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
-                    {hasPdf && (
-                      <DropdownMenuItem onSelect={() => downloadAsPdf(selectedAsset.id)}>
-                        <FileText className="size-3 mr-2" /> Download as PDF
-                      </DropdownMenuItem>
-                    )}
-                    {hasPng && (
-                      <DropdownMenuItem onSelect={() => downloadAsPng(selectedAsset.id)}>
-                        <ImageDown className="size-3 mr-2" /> Download as PNG
-                      </DropdownMenuItem>
-                    )}
-                    {hasHtml && (
-                      <DropdownMenuItem onSelect={() => downloadAsHtml(selectedAsset.id)}>
-                        <FileCode className="size-3 mr-2" /> Download as HTML
-                      </DropdownMenuItem>
-                    )}
-                    {hasExport && <DropdownMenuSeparator />}
                     <DropdownMenuItem onSelect={() => downloadFile(selectedAsset.id)}>
-                      <Download className="size-3 mr-2" /> Download file
+                      <Download className="size-3 mr-2" /> Download
                     </DropdownMenuItem>
+                    {hasExport && (
+                      <DropdownMenuSub>
+                        <DropdownMenuSubTrigger>
+                          <Download className="size-3 mr-2" /> Download as
+                        </DropdownMenuSubTrigger>
+                        <DropdownMenuSubContent>
+                          {hasPdf && (
+                            <DropdownMenuItem onSelect={() => downloadAsPdf(selectedAsset.id)}>
+                              <FileText className="size-3 mr-2" /> PDF
+                            </DropdownMenuItem>
+                          )}
+                          {hasPng && (
+                            <DropdownMenuItem onSelect={() => downloadAsPng(selectedAsset.id)}>
+                              <ImageDown className="size-3 mr-2" /> PNG
+                            </DropdownMenuItem>
+                          )}
+                          {hasHtml && (
+                            <DropdownMenuItem onSelect={() => downloadAsHtml(selectedAsset.id)}>
+                              <FileCode className="size-3 mr-2" /> HTML
+                            </DropdownMenuItem>
+                          )}
+                        </DropdownMenuSubContent>
+                      </DropdownMenuSub>
+                    )}
                     {assets.length > 0 && (
                       <>
                         <DropdownMenuSeparator />
