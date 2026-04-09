@@ -42,6 +42,7 @@ depends_on:
   - slay-processes
   - slay-pty
   - slay-panels
+  - slay-auto-title
 ---
 
 Use the \`slay\` CLI to interact with the SlayZone task management system. The current task ID is available via \`$SLAYZONE_TASK_ID\` (set automatically in task terminals).
@@ -63,6 +64,7 @@ All ID arguments support prefix matching (e.g., \`a1b2\` matches the full UUID s
 | slay-processes | \`slay processes\` | Inspect and control running processes |
 | slay-pty | \`slay pty\` | Interact with PTY terminal sessions |
 | slay-panels | \`slay panels\` | Manage custom web panels |
+| slay-auto-title | — | Auto-title tasks from conversation context |
 
 ## Other
 
@@ -524,6 +526,33 @@ SlayZone ships with predefined panels for Figma, Notion, GitHub, Excalidraw, and
 
 - \`slay panels disable <id-or-name>\`
   Hide the panel from task view without deleting it. The panel config is preserved.
+`
+  },
+
+  // ── Workflow ──────────────────────────────────────────────────
+
+  {
+    slug: 'slay-auto-title',
+    name: 'Slay Auto Title',
+    description: 'Automatically title tasks based on conversation context',
+    category: 'workflow',
+    author: 'SlayZone',
+
+    content: `---
+name: slay-auto-title
+description: "Automatically title tasks based on conversation context"
+trigger: auto
+---
+
+Once you have enough context to understand what the task is about, update its title to reflect the actual work being done.
+
+## Rules
+
+- Derive a short, action-oriented title from the conversation (under 60 characters)
+- Good titles start with a verb: "Fix …", "Add …", "Refactor …", "Investigate …"
+- Only update when meaningful context exists — don't rename on trivial exchanges
+- Update again if the scope shifts significantly during the conversation
+- Use: \`slay tasks update --dev --title "<title>"\`
 `
   },
 ]

@@ -417,5 +417,29 @@ function seedBuiltinEntries(db: Database): void {
     db.prepare(
       `DELETE FROM skill_registry_entries WHERE registry_id = ? AND slug NOT IN (${placeholders})`
     ).run(registryId, ...validSlugs)
+
+    // Auto-update installed builtin skills whose content is stale
+    const staleItems = db.prepare(`
+      SELECT i.id as item_id, e.id as entry_id, i.metadata_json, e.slug, e.content, e.content_hash
+      FROM ai_config_items i
+      JOIN skill_registry_entries e ON e.id = json_extract(i.metadata_json, '$.marketplace.entryId')
+      WHERE e.registry_id = ?
+        AND e.content_hash != json_extract(i.metadata_json, '$.marketplace.installedVersion')
+    `).all(registryId) as Array<{
+      item_id: string; entry_id: string; metadata_json: string
+      slug: string; content: string; content_hash: string
+    }>
+
+    for (const item of staleItems) {
+      const normalized = normalizeSkillForPersistence(item.slug, item.content, item.metadata_json)
+      const meta = JSON.parse(normalized.metadataJson)
+      meta.marketplace = {
+        ...meta.marketplace,
+        installedVersion: item.content_hash,
+        installedAt: new Date().toISOString()
+      }
+      db.prepare('UPDATE ai_config_items SET content = ?, metadata_json = ?, updated_at = datetime("now") WHERE id = ?')
+        .run(normalized.content, JSON.stringify(meta), item.item_id)
+    }
   })()
 }
