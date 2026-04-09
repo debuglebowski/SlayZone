@@ -102,7 +102,7 @@ export function ContextFilesPanel({ projectPath }: ContextFilesPanelProps) {
       </div>
 
       {selectedPath && (
-        <div className="space-y-2 rounded-lg border bg-muted/20 p-4">
+        <div className="space-y-2 rounded-lg border bg-surface-3 p-4">
           <div className="flex items-center justify-between gap-2">
             <Label className="text-xs font-mono">{selectedFile?.name ?? selectedPath}</Label>
             <div className="flex items-center gap-2">

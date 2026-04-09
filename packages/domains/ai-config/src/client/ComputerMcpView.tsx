@@ -63,7 +63,7 @@ export function ComputerMcpView() {
         const isAdding = addingTo === config.provider
 
         return (
-          <div key={config.provider} className="rounded-lg border">
+          <div key={config.provider} className="rounded-lg border bg-surface-3">
             <div className="flex items-center gap-2 border-b px-3 py-2">
               <Server className="size-3.5 text-muted-foreground" />
               <span className="text-sm font-medium">

@@ -106,7 +106,7 @@ export function InstructionVariantsView() {
   }
 
   return (
-    <div ref={containerRef} className="flex h-full w-full overflow-hidden rounded-lg border">
+    <div ref={containerRef} className="flex h-full w-full overflow-hidden rounded-lg border bg-surface-3">
       {/* Portal: New Variant button in header */}
       {document.getElementById('context-manager-header-actions') &&
         createPortal(

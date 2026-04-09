@@ -260,7 +260,7 @@ export function GlobalFilesView() {
         </div>,
         headerTarget
       )}
-      <div ref={containerRef} className="flex h-full w-full overflow-hidden rounded-lg border">
+      <div ref={containerRef} className="flex h-full w-full overflow-hidden rounded-lg border bg-surface-3">
         {/* Left: per-provider file trees */}
         <div className="flex flex-col overflow-y-auto p-3" style={{ width: splitWidth }}>
           <div className="flex-1 space-y-4">

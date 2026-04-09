@@ -117,7 +117,7 @@ export function ContextManagerShell({
   return (
     <div className="flex h-full bg-surface-0">
       {/* Sidebar */}
-      <nav className="mr-3 w-56 shrink-0 rounded-xl border border-border/50 bg-surface-1 flex flex-col overflow-y-auto">
+      <nav className="mr-3 w-56 shrink-0 rounded-xl border border-border/50 bg-surface-2 flex flex-col overflow-y-auto">
         <header className="flex items-center gap-3 px-4 py-3">
           <button
             onClick={onBack}
@@ -151,7 +151,7 @@ export function ContextManagerShell({
                           'flex w-full items-center gap-2.5 rounded-md px-4 py-1.5 text-xs transition-colors',
                           isActive
                             ? 'bg-surface-3 font-medium text-foreground ring-1 ring-border'
-                            : 'text-muted-foreground hover:bg-surface-1 hover:text-foreground'
+                            : 'text-muted-foreground hover:bg-surface-3 hover:text-foreground'
                         )}
                       >
                         <SectionIcon className="size-3.5" />
@@ -180,7 +180,7 @@ export function ContextManagerShell({
                       'flex w-full items-center gap-2.5 rounded-md px-4 py-1.5 text-xs transition-colors',
                       isActive
                         ? 'bg-surface-3 font-medium text-foreground ring-1 ring-border'
-                        : 'text-muted-foreground hover:bg-surface-1 hover:text-foreground'
+                        : 'text-muted-foreground hover:bg-surface-3 hover:text-foreground'
                     )}
                   >
                     <SectionIcon className="size-3.5" />
@@ -201,7 +201,7 @@ export function ContextManagerShell({
               'flex w-full items-center gap-3 rounded-lg px-4 py-2.5 text-sm transition-colors',
               isProviders
                 ? 'bg-surface-3 font-medium text-foreground ring-1 ring-border'
-                : 'text-muted-foreground hover:bg-surface-1 hover:text-foreground'
+                : 'text-muted-foreground hover:bg-surface-3 hover:text-foreground'
             )}
           >
             <Settings2 className="size-4" />
@@ -211,7 +211,7 @@ export function ContextManagerShell({
       </nav>
 
       {/* Main content */}
-      <div className="flex-1 min-h-0 min-w-0 rounded-xl border border-border/50 bg-surface-1 flex flex-col overflow-hidden p-6">
+      <div className="flex-1 min-h-0 min-w-0 rounded-xl border border-border/50 bg-surface-2 flex flex-col overflow-hidden p-6">
         {activeSection === 'marketplace' && !isProviders ? (
           <div className="flex-1 min-h-0 flex flex-col">
             {renderContent()}
@@ -237,7 +237,7 @@ export function ContextManagerShell({
       <div id="context-manager-resize-handle" className="flex items-center" />
 
       {/* Editor panel — populated via portal from SkillsSection */}
-      <div id="context-manager-editor-panel" className="shrink-0 empty:hidden rounded-xl border border-border/50 bg-surface-1 overflow-y-auto p-6 flex flex-col" />
+      <div id="context-manager-editor-panel" className="shrink-0 empty:hidden rounded-xl border border-border/50 bg-surface-2 overflow-y-auto p-6 flex flex-col" />
     </div>
   )
 }

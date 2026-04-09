@@ -49,8 +49,8 @@ export function SkillListView({
               className={cn(
                 'group flex items-center gap-3 rounded-lg border px-3 py-2 cursor-pointer transition-colors',
                 isSelected
-                  ? 'ring-1 ring-primary border-primary/50 bg-surface-1'
-                  : 'hover:bg-surface-1'
+                  ? 'ring-1 ring-primary border-primary/50 bg-surface-3'
+                  : 'hover:bg-surface-3'
               )}
             >
               <div className="flex-1 min-w-0">

@@ -44,7 +44,7 @@ function ServerCard({ server, actions, footer, className }: {
   className?: string
 }) {
   return (
-    <div className={cn("flex flex-col justify-between rounded-lg border p-4 transition-colors hover:bg-muted/50", className)}>
+    <div className={cn("flex flex-col justify-between rounded-lg border bg-surface-3 p-4 transition-colors", className)}>
       <div>
         <div className="flex items-baseline justify-between gap-2">
           <span className="text-sm font-medium leading-tight">{server.name}</span>
@@ -69,7 +69,7 @@ function CustomServerCard({ server, actions, footer, className }: {
   className?: string
 }) {
   return (
-    <div className={cn("flex flex-col justify-between rounded-lg border p-4 transition-colors hover:bg-muted/50", className)}>
+    <div className={cn("flex flex-col justify-between rounded-lg border bg-surface-3 p-4 transition-colors", className)}>
       <div>
         <div className="flex items-baseline justify-between gap-2">
           <span className="text-sm font-medium leading-tight">{server.name}</span>
@@ -842,7 +842,7 @@ function ProjectMcpPanel({ projectPath, projectId }: ProjectMcpPanelProps) {
     }
     // Unknown server from config files
     return (
-      <div key={s.key} className={cn("flex flex-col justify-between rounded-lg border p-4 transition-colors hover:bg-muted/50", cardClass)}>
+      <div key={s.key} className={cn("flex flex-col justify-between rounded-lg border bg-surface-3 p-4 transition-colors", cardClass)}>
         <div className="flex items-baseline justify-between gap-2">
           <span className="text-sm font-medium leading-tight">{s.key}</span>
           <div className="flex shrink-0 items-center gap-1">{cardActions}</div>

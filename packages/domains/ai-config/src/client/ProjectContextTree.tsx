@@ -341,7 +341,7 @@ export function ProjectContextTree({ projectPath, projectId }: ProjectContextTre
   }
 
   return (
-    <div ref={containerRef} className="flex h-full overflow-hidden rounded-lg border">
+    <div ref={containerRef} className="flex h-full overflow-hidden rounded-lg border bg-surface-3">
       {/* Left: file tree */}
       <div className="flex flex-col overflow-y-auto p-3" style={{ width: splitWidth }}>
         <div className="flex-1 space-y-8">

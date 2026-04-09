@@ -84,7 +84,7 @@ export function ContextItemEditor({ item, validationState, onUpdate, onDelete, o
       </div>
 
       {provenance && (
-        <div className="flex items-center justify-between rounded border border-border/50 bg-surface-3/50 px-2.5 py-2">
+        <div className="flex items-center justify-between rounded border border-border/50 bg-surface-3 px-2.5 py-2">
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
             <Store className="size-3" />
             <button

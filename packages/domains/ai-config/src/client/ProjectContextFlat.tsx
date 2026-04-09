@@ -108,7 +108,7 @@ function OverviewCard({ testId, icon: Icon, label, detail, counts, onClick }: {
     <button
       data-testid={testId}
       onClick={onClick}
-      className="flex w-full items-center gap-3 rounded-lg border p-3.5 text-left transition-colors hover:bg-muted/50"
+      className="flex w-full items-center gap-3 rounded-lg border bg-surface-3 p-3.5 text-left transition-colors"
     >
       <Icon className="size-5 shrink-0 text-muted-foreground" />
       <div className="min-w-0 flex-1">

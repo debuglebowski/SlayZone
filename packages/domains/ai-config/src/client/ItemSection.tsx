@@ -254,7 +254,7 @@ function SkillItemDetail({ item, providers, enabledProviders, isLocal, projectId
     <div
       data-testid={`project-context-item-skill-${item.slug}`}
       className={cn(
-        'rounded-md border overflow-hidden',
+        'rounded-md border bg-surface-3 overflow-hidden',
         expanded && 'border-primary/30'
       )}
     >
@@ -337,7 +337,7 @@ function SkillItemDetail({ item, providers, enabledProviders, isLocal, projectId
               <div className="flex items-center gap-2">
                 <Input
                   data-testid="skill-detail-filename"
-                  className="font-mono text-xs !bg-surface-1 dark:!bg-surface-1 shadow-none"
+                  className="font-mono text-xs !bg-surface-3 dark:!bg-surface-3 shadow-none"
                   placeholder="my-skill"
                   value={sk.slug}
                   onChange={(e) => sk.setSlug(e.target.value)}
@@ -353,7 +353,7 @@ function SkillItemDetail({ item, providers, enabledProviders, isLocal, projectId
             <div className="space-y-3">
               <Textarea
                 data-testid="skill-detail-content"
-                className="min-h-[260px] max-h-[40vh] field-sizing-content resize-y font-mono text-sm !bg-surface-1 dark:!bg-surface-1 shadow-none"
+                className="min-h-[260px] max-h-[40vh] field-sizing-content resize-y font-mono text-sm !bg-surface-3 dark:!bg-surface-3 shadow-none"
                 placeholder="Write your skill content here."
                 value={sk.content}
                 onChange={sk.handleContentChange}

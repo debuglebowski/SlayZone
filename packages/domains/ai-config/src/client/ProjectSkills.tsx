@@ -149,7 +149,7 @@ export function ProjectSkills({ projectId, projectPath, type, openPickerTrigger,
               ) : (
                 <button
                   onClick={() => setEditingId(item.id)}
-                  className="flex w-full items-center justify-between gap-3 rounded-md border px-3 py-2.5 text-left transition-colors hover:bg-muted/50"
+                  className="flex w-full items-center justify-between gap-3 rounded-md border bg-surface-3 px-3 py-2.5 text-left transition-colors"
                 >
                   <div className="min-w-0">
                     <p className="truncate font-mono text-sm">{item.slug}</p>
@@ -166,7 +166,7 @@ export function ProjectSkills({ projectId, projectPath, type, openPickerTrigger,
           {skills.map(({ item, providers }) => (
             <div
               key={item.id}
-              className="flex items-center justify-between gap-3 rounded-md border px-3 py-2.5"
+              className="flex items-center justify-between gap-3 rounded-md border bg-surface-3 px-3 py-2.5"
             >
               <div className="min-w-0">
                 <p className="truncate font-mono text-sm">{item.slug}</p>

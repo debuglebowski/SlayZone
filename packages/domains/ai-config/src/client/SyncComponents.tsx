@@ -69,7 +69,7 @@ export function ProviderFileCard({
   const suffix = testIdSuffix ? `-${testIdSuffix}` : ''
 
   return (
-    <div data-testid={`${testIdPrefix}-provider-card-${provider}${suffix}`} className="rounded-lg border bg-surface-1">
+    <div data-testid={`${testIdPrefix}-provider-card-${provider}${suffix}`} className="rounded-lg border bg-surface-3">
       <div
         data-testid={`${testIdPrefix}-provider-row-${provider}${suffix}`}
         className={cn(

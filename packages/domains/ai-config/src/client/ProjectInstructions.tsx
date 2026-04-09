@@ -222,7 +222,7 @@ export function ProjectInstructions({
 
       {linkedVariant ? (
         /* Mode B: Library variant linked — full-width read-only view */
-        <div className="flex h-full w-full flex-col overflow-hidden rounded-lg border">
+        <div className="flex h-full w-full flex-col overflow-hidden rounded-lg border bg-surface-3">
           <Textarea
             className="min-h-0 max-h-none flex-1 resize-none rounded-none border-0 shadow-none focus-visible:ring-0 bg-transparent dark:bg-transparent [padding-top:1rem] [padding-bottom:1rem] [field-sizing:fixed] font-mono text-sm opacity-80"
             value={linkedVariant.content}
@@ -231,7 +231,7 @@ export function ProjectInstructions({
         </div>
       ) : (
         /* Mode A: Custom — split-pane with file list + editable editor */
-        <div ref={containerRef} className="flex h-full w-full overflow-hidden rounded-lg border">
+        <div ref={containerRef} className="flex h-full w-full overflow-hidden rounded-lg border bg-surface-3">
           {/* Left: file list */}
           <div className="flex flex-col overflow-y-auto p-3" style={{ width: splitWidth }}>
             <div className="flex-1 space-y-1">

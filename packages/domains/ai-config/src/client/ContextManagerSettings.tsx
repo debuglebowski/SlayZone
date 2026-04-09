@@ -63,7 +63,7 @@ function OverviewCard({ testId, icon: Icon, label, detail, onClick }: {
     <button
       data-testid={testId}
       onClick={onClick}
-      className="flex w-full items-center gap-3 rounded-lg border p-3.5 text-left transition-colors hover:bg-muted/50"
+      className="flex w-full items-center gap-3 rounded-lg border bg-surface-3 p-3.5 text-left transition-colors"
     >
       <Icon className="size-5 shrink-0 text-muted-foreground" />
       <div className="min-w-0 flex-1">
@@ -196,7 +196,7 @@ function ProvidersPanel() {
           <div
             key={provider.id}
             className={cn(
-              'flex items-center justify-between rounded-md border px-3 py-2.5',
+              'flex items-center justify-between rounded-md border bg-surface-3 px-3 py-2.5',
               isPlaceholder && 'opacity-50'
             )}
           >
@@ -363,7 +363,7 @@ function GlobalContextManager({ initialSection }: { initialSection: GlobalContex
             <button
               onClick={() => setEditingId(item.id)}
               data-testid={`context-global-item-${item.slug}`}
-              className="flex w-full items-center justify-between gap-3 rounded-md border px-3 py-2.5 text-left transition-colors hover:bg-muted/50"
+              className="flex w-full items-center justify-between gap-3 rounded-md border bg-surface-3 px-3 py-2.5 text-left transition-colors"
             >
               <div className="min-w-0">
                 <p className="truncate font-mono text-sm">{item.slug}</p>

@@ -385,7 +385,7 @@ export function McpFlatSection({ projectPath, enabledProviders, onOpenGlobalAiCo
                     key={server.key}
                     data-testid={`project-context-item-mcp-${server.key}`}
                   className={cn(
-                      'rounded-md border overflow-hidden',
+                      'rounded-md border bg-surface-3 overflow-hidden',
                       isExpanded && 'border-primary/30 col-[1/-1]'
                     )}
                   >
@@ -433,7 +433,7 @@ export function McpFlatSection({ projectPath, enabledProviders, onOpenGlobalAiCo
                               </Button>
                             )}
                           </div>
-                          <div className="rounded-lg border bg-surface-1 p-3 space-y-2">
+                          <div className="rounded-lg border bg-surface-3 p-3 space-y-2">
                             <div className="text-xs text-muted-foreground">
                               <span className="font-medium text-foreground">Command: </span>
                               <span className="font-mono">{draftConfig?.command ?? '-'} {draftConfig?.args?.join(' ') ?? ''}</span>
@@ -505,7 +505,7 @@ export function McpFlatSection({ projectPath, enabledProviders, onOpenGlobalAiCo
                             })}
 
                             {disabledDetectedProviders.length > 0 && (
-                              <div className="rounded-lg border bg-surface-1 px-3 py-2.5">
+                              <div className="rounded-lg border bg-surface-3 px-3 py-2.5">
                                 <p className="text-[11px] text-muted-foreground">
                                   Detected in disabled providers:
                                   {' '}
@@ -515,7 +515,7 @@ export function McpFlatSection({ projectPath, enabledProviders, onOpenGlobalAiCo
                             )}
 
                             {displayProviders.length === 0 && (
-                              <p className="rounded-lg border bg-surface-1 px-3 py-4 text-center text-sm text-muted-foreground">
+                              <p className="rounded-lg border bg-surface-3 px-3 py-4 text-center text-sm text-muted-foreground">
                                 No MCP-capable providers enabled for this project.
                               </p>
                             )}

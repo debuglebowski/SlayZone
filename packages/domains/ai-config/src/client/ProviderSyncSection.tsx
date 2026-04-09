@@ -59,7 +59,7 @@ export function ProviderSyncSection({ projectId }: ProviderSyncSectionProps) {
           return (
             <div
               key={provider.id}
-              className="flex items-center gap-4 rounded-lg border p-3"
+              className="flex items-center gap-4 rounded-lg border bg-surface-3 p-3"
             >
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
