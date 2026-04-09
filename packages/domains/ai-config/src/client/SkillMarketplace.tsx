@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { ArrowLeft, ExternalLink, Plus, RefreshCw, Search, Settings2 } from 'lucide-react'
 import { Button, Input, cn, toast } from '@slayzone/ui'
 import type { SkillRegistry, SkillRegistryEntry } from '../shared'
@@ -181,6 +181,17 @@ export function SkillMarketplace({ projectId, projectPath }: SkillMarketplacePro
   const activeRegistry = activeRegistryId ? registries.find(r => r.id === activeRegistryId) : null
   const isDrilledIn = browseMode === 'registries' && activeRegistry != null
   const showSkillGrid = browseMode === 'all' || activeRegistryId !== null
+
+  const groupedEntries = useMemo(() => {
+    const groups = new Map<string, typeof entries>()
+    for (const entry of entries) {
+      const cat = entry.category || 'general'
+      const list = groups.get(cat)
+      if (list) list.push(entry)
+      else groups.set(cat, [entry])
+    }
+    return groups
+  }, [entries])
 
   return (
     <div className="flex flex-col h-full gap-4">
@@ -370,18 +381,25 @@ export function SkillMarketplace({ projectId, projectPath }: SkillMarketplacePro
                   </p>
                 </div>
               ) : (
-                <div className="grid gap-3 content-start overflow-y-auto flex-1" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(400px, 1fr))' }}>
-                  {entries.map((entry) => (
-                    <SkillEntryCard
-                      key={entry.id}
-                      entry={entry}
-                      onAddToLibrary={handleAddToLibrary}
-                      onAddToProject={handleAddToProject}
-                      hasProject={hasProject}
-                      onUpdate={handleUpdate}
-                      onPreview={setPreviewEntry}
-                      installing={installing === entry.id}
-                    />
+                <div className="flex flex-col gap-12 overflow-y-auto flex-1">
+                  {[...groupedEntries.entries()].map(([category, categoryEntries]) => (
+                    <div key={category}>
+                      <h3 className="text-lg font-semibold text-foreground mb-4 uppercase">{category}</h3>
+                      <div className="grid gap-3 content-start" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(400px, 1fr))' }}>
+                        {categoryEntries.map((entry) => (
+                          <SkillEntryCard
+                            key={entry.id}
+                            entry={entry}
+                            onAddToLibrary={handleAddToLibrary}
+                            onAddToProject={handleAddToProject}
+                            hasProject={hasProject}
+                            onUpdate={handleUpdate}
+                            onPreview={setPreviewEntry}
+                            installing={installing === entry.id}
+                          />
+                        ))}
+                      </div>
+                    </div>
                   ))}
                 </div>
               )}

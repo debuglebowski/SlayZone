@@ -17,16 +17,6 @@ function contentHash(content: string): string {
   return createHash('sha256').update(content).digest('hex')
 }
 
-function parseTagsJson(raw: string | null): string[] {
-  if (!raw) return []
-  try {
-    const parsed = JSON.parse(raw)
-    return Array.isArray(parsed) ? parsed : []
-  } catch {
-    return []
-  }
-}
-
 function rowToRegistry(row: Record<string, unknown>): SkillRegistry {
   return {
     id: row.id as string,
@@ -55,9 +45,8 @@ function rowToEntry(row: Record<string, unknown>): SkillRegistryEntry {
     description: (row.description as string) ?? '',
     content: row.content as string,
     version: (row.version as string) ?? null,
-    category: (row.category as string) ?? null,
+    category: (row.category as string) ?? 'general',
     author: (row.author as string) ?? null,
-    tags: parseTagsJson(row.tags as string | null),
     content_hash: row.content_hash as string,
     fetched_at: row.fetched_at as string,
     installed: row.installed_item_id != null,
@@ -334,8 +323,8 @@ async function refreshRegistry(db: Database, registryId: string): Promise<SkillR
     // Upsert entries in a transaction
     db.transaction(() => {
       const upsert = db.prepare(`
-        INSERT INTO skill_registry_entries (id, registry_id, slug, name, description, content, version, category, author, tags, content_hash, fetched_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+        INSERT INTO skill_registry_entries (id, registry_id, slug, name, description, content, version, category, author, content_hash, fetched_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
         ON CONFLICT (registry_id, slug) DO UPDATE SET
           name = excluded.name,
           description = excluded.description,
@@ -343,7 +332,6 @@ async function refreshRegistry(db: Database, registryId: string): Promise<SkillR
           version = excluded.version,
           category = excluded.category,
           author = excluded.author,
-          tags = excluded.tags,
           content_hash = excluded.content_hash,
           fetched_at = excluded.fetched_at
       `)
@@ -369,9 +357,8 @@ async function refreshRegistry(db: Database, registryId: string): Promise<SkillR
           entry.description,
           entry.content,
           entry.version,
-          entry.category,
+          entry.category ?? 'general',
           entry.author,
-          JSON.stringify(entry.tags),
           entry.content_hash
         )
       }
@@ -395,15 +382,14 @@ function seedBuiltinEntries(db: Database): void {
   if (!exists) return
 
   const upsert = db.prepare(`
-    INSERT INTO skill_registry_entries (id, registry_id, slug, name, description, content, version, category, author, tags, content_hash, fetched_at)
-    VALUES (?, ?, ?, ?, ?, ?, 'builtin', ?, ?, ?, ?, datetime('now'))
+    INSERT INTO skill_registry_entries (id, registry_id, slug, name, description, content, version, category, author, content_hash, fetched_at)
+    VALUES (?, ?, ?, ?, ?, ?, 'builtin', ?, ?, ?, datetime('now'))
     ON CONFLICT (registry_id, slug) DO UPDATE SET
       name = excluded.name,
       description = excluded.description,
       content = excluded.content,
       category = excluded.category,
       author = excluded.author,
-      tags = excluded.tags,
       content_hash = excluded.content_hash,
       fetched_at = excluded.fetched_at
   `)
@@ -422,7 +408,6 @@ function seedBuiltinEntries(db: Database): void {
         skill.content,
         skill.category,
         skill.author,
-        JSON.stringify(skill.tags),
         hash
       )
     }

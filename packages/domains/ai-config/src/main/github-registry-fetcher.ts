@@ -16,7 +16,6 @@ interface RegistryManifest {
     slug: string
     category?: string
     author?: string
-    tags?: string[]
   }>
 }
 
@@ -28,7 +27,6 @@ export interface FetchedSkillEntry {
   version: string
   category: string | null
   author: string | null
-  tags: string[]
   content_hash: string
 }
 
@@ -142,7 +140,6 @@ export async function fetchGitHubRegistry(opts: {
           version: file.sha,
           category: manifestData?.category ?? null,
           author: manifestData?.author ?? null,
-          tags: manifestData?.tags ?? [],
           content_hash: contentHash(content)
         } satisfies FetchedSkillEntry
       })

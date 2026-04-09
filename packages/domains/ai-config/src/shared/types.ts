@@ -250,9 +250,8 @@ export interface SkillRegistryEntry {
   description: string
   content: string
   version: string | null
-  category: string | null
+  category: string
   author: string | null
-  tags: string[]
   content_hash: string
   fetched_at: string
   installed?: boolean

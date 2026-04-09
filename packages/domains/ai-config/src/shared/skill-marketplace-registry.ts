@@ -1,5 +1,6 @@
 export type SkillMarketplaceCategory =
-  | 'slayzone'
+  | 'cli'
+  | 'configuration'
   | 'languages'
   | 'frameworks'
   | 'testing'
@@ -14,7 +15,6 @@ export interface BuiltinSkillEntry {
   description: string
   category: SkillMarketplaceCategory
   author: string
-  tags: string[]
   content: string
 }
 
@@ -25,14 +25,15 @@ export const BUILTIN_SKILLS: BuiltinSkillEntry[] = [
     slug: 'slay',
     name: 'Slay',
     description: 'Full CLI reference for slay — orchestrates all slay domain skills',
-    category: 'slayzone',
+    category: 'cli',
     author: 'SlayZone',
-    tags: ['slay', 'cli'],
+
     content: `---
 name: slay
 description: "Full CLI reference for slay — orchestrates all slay domain skills"
 trigger: auto
 depends_on:
+  - slay-context
   - slay-tasks
   - slay-browser
   - slay-assets
@@ -53,6 +54,7 @@ All ID arguments support prefix matching (e.g., \`a1b2\` matches the full UUID s
 
 | Skill | Commands | Purpose |
 |-------|----------|---------|
+| slay-context | — | Ensure root instruction files include SlayZone context |
 | slay-tasks | \`slay tasks\`, \`slay tags\`, \`slay templates\` | Task lifecycle, subtasks, tags, templates |
 | slay-browser | \`slay tasks browser\` | Control the task browser panel |
 | slay-assets | \`slay tasks assets\` | Manage files and folders attached to tasks |
@@ -70,15 +72,59 @@ All ID arguments support prefix matching (e.g., \`a1b2\` matches the full UUID s
 `
   },
 
+  // ── Context ────────────────────────────────────────────────────
+
+  {
+    slug: 'slay-context',
+    name: 'Slay Context',
+    description: 'Ensure root instruction files include SlayZone environment context',
+    category: 'configuration',
+    author: 'SlayZone',
+    content: `---
+name: slay-context
+description: "Ensure root instruction files include SlayZone environment context"
+trigger: auto
+---
+
+You are running inside **SlayZone** — a desktop task management app with integrated AI coding assistants (Claude Code, Codex, Gemini, Cursor, and more). Your terminal session, browser panel, and task metadata are all managed by the app. Use the \`slay\` CLI to interact with it (see the slay skill for full reference).
+
+## Instruction file maintenance
+
+When working in a project, check whether the project's root instruction files contain a **SlayZone Environment** section. The files to check depend on which ones already exist — never create a file that doesn't exist yet.
+
+| File | Used by |
+|------|---------|
+| \`CLAUDE.md\` | Claude Code |
+| \`AGENTS.md\` | Codex, Cursor, Gemini, Copilot |
+| \`OPENCODE.md\` | OpenCode |
+| \`QWEN.md\` | Qwen Code |
+
+For each file that exists and does **not** already contain a "SlayZone Environment" section, add the following section (adapt the heading level to match the file's existing style):
+
+\`\`\`markdown
+## SlayZone Environment
+
+You are running inside a SlayZone task terminal — a desktop task management app with integrated AI coding assistants. Your terminal session, browser panel, and task metadata are all managed by the app.
+
+Use the \\\`slay\\\` CLI to read and update your task, manage subtasks, control the browser panel, and more. The current task ID is available via \\\`$SLAYZONE_TASK_ID\\\` (set automatically in task terminals).
+\`\`\`
+
+**Rules:**
+- Only modify files that already exist on disk
+- If the section already exists (check for "SlayZone Environment" heading), leave it unchanged
+- Place the section near the top of the file, after any title or introduction
+`
+  },
+
   // ── Domain skills ─────────────────────────────────────────────
 
   {
     slug: 'slay-tasks',
     name: 'Slay Tasks',
     description: 'Manage tasks, subtasks, tags, and templates via the slay CLI',
-    category: 'slayzone',
+    category: 'cli',
     author: 'SlayZone',
-    tags: ['slay', 'tasks', 'subtasks', 'tags', 'templates'],
+
     content: `---
 name: slay-tasks
 description: "Manage tasks, subtasks, tags, and templates via the slay CLI"
@@ -152,9 +198,9 @@ Templates define defaults for new tasks: terminal mode, status, priority, provid
     slug: 'slay-browser',
     name: 'Slay Browser',
     description: 'Control the task browser panel via the slay CLI',
-    category: 'slayzone',
+    category: 'cli',
     author: 'SlayZone',
-    tags: ['slay', 'browser', 'screenshot', 'automation'],
+
     content: `---
 name: slay-browser
 description: "Control the task browser panel via the slay CLI"
@@ -202,9 +248,9 @@ A typical browser verification flow:
     slug: 'slay-assets',
     name: 'Slay Assets',
     description: 'Manage task assets (files, folders) via the slay CLI',
-    category: 'slayzone',
+    category: 'cli',
     author: 'SlayZone',
-    tags: ['slay', 'assets', 'files', 'upload'],
+
     content: `---
 name: slay-assets
 description: "Manage task assets (files, folders) via the slay CLI"
@@ -265,9 +311,9 @@ curl -s https://example.com/data.json | slay tasks assets append <assetId>
     slug: 'slay-automations',
     name: 'Slay Automations',
     description: 'Create and manage automations via the slay CLI',
-    category: 'slayzone',
+    category: 'cli',
     author: 'SlayZone',
-    tags: ['slay', 'automations', 'cron', 'triggers'],
+
     content: `---
 name: slay-automations
 description: "Create and manage automations via the slay CLI"
@@ -329,9 +375,9 @@ Automations are project-scoped, event-driven actions. They fire shell commands i
     slug: 'slay-projects',
     name: 'Slay Projects',
     description: 'Manage projects via the slay CLI',
-    category: 'slayzone',
+    category: 'cli',
     author: 'SlayZone',
-    tags: ['slay', 'projects'],
+
     content: `---
 name: slay-projects
 description: "Manage projects via the slay CLI"
@@ -359,9 +405,9 @@ Project names are resolved via case-insensitive substring matching — \`slay ta
     slug: 'slay-processes',
     name: 'Slay Processes',
     description: 'List and manage running processes via the slay CLI',
-    category: 'slayzone',
+    category: 'cli',
     author: 'SlayZone',
-    tags: ['slay', 'processes', 'logs'],
+
     content: `---
 name: slay-processes
 description: "List and manage running processes via the slay CLI"
@@ -392,9 +438,9 @@ All process commands require the SlayZone app to be running, as data comes from 
     slug: 'slay-pty',
     name: 'Slay PTY',
     description: 'Interact with PTY terminal sessions via the slay CLI',
-    category: 'slayzone',
+    category: 'cli',
     author: 'SlayZone',
-    tags: ['slay', 'pty', 'terminal', 'sessions'],
+
     content: `---
 name: slay-pty
 description: "Interact with PTY terminal sessions via the slay CLI"
@@ -449,9 +495,9 @@ cat prompt.md | slay pty submit <id>
     slug: 'slay-panels',
     name: 'Slay Panels',
     description: 'Manage web panels via the slay CLI',
-    category: 'slayzone',
+    category: 'cli',
     author: 'SlayZone',
-    tags: ['slay', 'panels', 'web'],
+
     content: `---
 name: slay-panels
 description: "Manage web panels via the slay CLI"
