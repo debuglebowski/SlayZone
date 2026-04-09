@@ -140,7 +140,7 @@ export function TaskContextMenu({
         <ContextMenuContent className="w-48">
           {/* Status submenu */}
           <ContextMenuSub>
-            <ContextMenuSubTrigger><CircleDot className="mr-2 size-3.5" />Status</ContextMenuSubTrigger>
+            <ContextMenuSubTrigger><CircleDot className="mr-2 size-3.5" /><span className="flex-1">Status</span><span className="text-muted-foreground text-xs mr-1.5">S</span></ContextMenuSubTrigger>
             <ContextMenuSubContent>
               <ContextMenuRadioGroup value={task.status} onValueChange={handleStatusChange}>
                 {statusOptions.map((s) => {
@@ -159,7 +159,7 @@ export function TaskContextMenu({
 
           {/* Priority submenu */}
           <ContextMenuSub>
-            <ContextMenuSubTrigger><Signal className="mr-2 size-3.5" />Priority</ContextMenuSubTrigger>
+            <ContextMenuSubTrigger><Signal className="mr-2 size-3.5" /><span className="flex-1">Priority</span><span className="text-muted-foreground text-xs mr-1.5">P</span></ContextMenuSubTrigger>
             <ContextMenuSubContent>
               <ContextMenuRadioGroup
                 value={String(task.priority)}
