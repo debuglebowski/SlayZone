@@ -33,7 +33,7 @@ const COLS = [
 function KanbanCard({ task, delay, highlight }: { task: MockTask; delay: number; highlight?: boolean }): React.JSX.Element {
   return (
     <motion.div
-      className={`bg-background border rounded-lg px-3 py-3 ${highlight ? 'ring-2 ring-primary' : ''}`}
+      className={`bg-surface-1 border rounded-lg px-3 py-3 ${highlight ? 'ring-2 ring-primary' : ''}`}
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay, duration: 0.2 }}
@@ -91,7 +91,7 @@ function TaskView(): React.JSX.Element {
 
         {/* Settings panel */}
         <motion.div
-          className="w-1/4 shrink-0 rounded-xl border overflow-hidden flex flex-col bg-background"
+          className="w-1/4 shrink-0 rounded-xl border overflow-hidden flex flex-col bg-surface-1"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.1 }}

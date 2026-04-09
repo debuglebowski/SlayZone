@@ -150,7 +150,7 @@ export function ContextManagerShell({
                         className={cn(
                           'flex w-full items-center gap-2.5 rounded-md px-4 py-1.5 text-xs transition-colors',
                           isActive
-                            ? 'bg-surface-2 font-medium text-foreground ring-1 ring-border'
+                            ? 'bg-surface-3 font-medium text-foreground ring-1 ring-border'
                             : 'text-muted-foreground hover:bg-surface-1 hover:text-foreground'
                         )}
                       >
@@ -179,7 +179,7 @@ export function ContextManagerShell({
                     className={cn(
                       'flex w-full items-center gap-2.5 rounded-md px-4 py-1.5 text-xs transition-colors',
                       isActive
-                        ? 'bg-surface-2 font-medium text-foreground ring-1 ring-border'
+                        ? 'bg-surface-3 font-medium text-foreground ring-1 ring-border'
                         : 'text-muted-foreground hover:bg-surface-1 hover:text-foreground'
                     )}
                   >
@@ -200,7 +200,7 @@ export function ContextManagerShell({
             className={cn(
               'flex w-full items-center gap-3 rounded-lg px-4 py-2.5 text-sm transition-colors',
               isProviders
-                ? 'bg-surface-2 font-medium text-foreground ring-1 ring-border'
+                ? 'bg-surface-3 font-medium text-foreground ring-1 ring-border'
                 : 'text-muted-foreground hover:bg-surface-1 hover:text-foreground'
             )}
           >

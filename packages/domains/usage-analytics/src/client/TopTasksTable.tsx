@@ -11,7 +11,7 @@ export function TopTasksTable({ data, onTaskClick }: Props) {
 
   if (sorted.length === 0) {
     return (
-      <div className="rounded-lg border bg-card p-4">
+      <div className="rounded-lg border bg-surface-2 p-4">
         <p className="text-sm font-medium text-muted-foreground mb-3">Top Tasks by Tokens</p>
         <p className="text-sm text-muted-foreground">No task data — usage will be attributed once sessions match task IDs.</p>
       </div>
@@ -19,7 +19,7 @@ export function TopTasksTable({ data, onTaskClick }: Props) {
   }
 
   return (
-    <div className="flex h-full flex-col rounded-lg border bg-card p-4">
+    <div className="flex h-full flex-col rounded-lg border bg-surface-2 p-4">
       <p className="text-sm font-medium text-muted-foreground mb-3">Top Tasks by Tokens</p>
       <div className="flex-1 min-h-0 overflow-y-auto scrollbar-thin">
         <table className="w-full text-sm">

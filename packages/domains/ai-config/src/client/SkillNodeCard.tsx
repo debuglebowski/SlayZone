@@ -32,7 +32,7 @@ export const SkillNodeCard = memo(function SkillNodeCard({ data }: NodeProps) {
     <div
       style={{ width }}
       className={cn(
-        'rounded-lg border bg-background px-3 py-2.5 shadow-sm transition-shadow',
+        'rounded-lg border bg-surface-1 px-3 py-2.5 shadow-sm transition-shadow',
         selected ? 'ring-2 ring-primary border-primary shadow-md' : 'hover:shadow-md'
       )}
     >

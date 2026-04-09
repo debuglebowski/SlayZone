@@ -16,7 +16,7 @@ export function SkillEntryCard({ entry, onAddToLibrary, onAddToProject, onUpdate
   const hasUpdate = !!entry.has_update
 
   return (
-    <div className="rounded-lg border border-border/50 bg-background p-4 flex flex-col gap-3">
+    <div className="rounded-lg border border-border/50 bg-surface-1 p-4 flex flex-col gap-3">
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0 flex-1">
           <h3 className="text-sm font-medium truncate">{entry.name}</h3>
@@ -25,7 +25,7 @@ export function SkillEntryCard({ entry, onAddToLibrary, onAddToProject, onUpdate
           )}
         </div>
         {entry.category && (
-          <span className="shrink-0 rounded-full bg-surface-2 px-2 py-0.5 text-[10px] text-muted-foreground">
+          <span className="shrink-0 rounded-full bg-surface-3 px-2 py-0.5 text-[10px] text-muted-foreground">
             {entry.category}
           </span>
         )}
@@ -36,7 +36,7 @@ export function SkillEntryCard({ entry, onAddToLibrary, onAddToProject, onUpdate
       {entry.tags.length > 0 && (
         <div className="flex flex-wrap gap-1">
           {entry.tags.slice(0, 4).map((tag) => (
-            <span key={tag} className="rounded bg-surface-2/60 px-1.5 py-0.5 text-[10px] text-muted-foreground">
+            <span key={tag} className="rounded bg-surface-3/60 px-1.5 py-0.5 text-[10px] text-muted-foreground">
               {tag}
             </span>
           ))}

@@ -76,7 +76,7 @@ function BrowserPanel(): React.JSX.Element {
           <ArrowRight className="size-5 text-muted-foreground/40" />
           <RefreshCw className="size-5 text-muted-foreground/60" />
         </div>
-        <div className="flex-1 h-8 rounded bg-background border flex items-center gap-2 px-3">
+        <div className="flex-1 h-8 rounded bg-surface-1 border flex items-center gap-2 px-3">
           <Lock className="size-4 text-muted-foreground/40 shrink-0" />
           <span className="text-[15px] text-muted-foreground/70" style={{ fontFamily: 'monospace' }}>localhost:5173</span>
         </div>

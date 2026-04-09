@@ -70,7 +70,7 @@ function PriorityBars({ priority }: { priority: number }): React.JSX.Element {
 function MockCard({ task, delay }: { task: MockTask; delay: number }): React.JSX.Element {
   return (
     <motion.div
-      className="bg-background border rounded-lg px-3 py-3 flex items-start gap-3"
+      className="bg-surface-1 border rounded-lg px-3 py-3 flex items-start gap-3"
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay, duration: 0.2 }}

@@ -1373,9 +1373,9 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
       {/* Header */}
       {!compact && <header className="shrink-0 relative">
         <div>
-          <div className="flex items-center gap-4 window-no-drag">
+          <div className="flex items-center justify-between gap-4 window-no-drag">
             {task.is_temporary ? (
-              <div className="flex flex-1 min-w-0">
+              <div className="flex shrink-0">
                 <div className="relative min-w-0 w-full">
                   <div className="flex items-center gap-3">
                     <Tooltip>
@@ -1424,7 +1424,7 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
                   </div>
                 </div>
               </div>
-            ) : (<div className="flex items-center gap-2 flex-1 min-w-0">
+            ) : (<div className="flex items-center gap-2 shrink-0">
               {(() => {
                 const statusStyle = getColumnStatusStyle(task.status, project?.columns_config)
                 if (!statusStyle) return null
@@ -1503,7 +1503,7 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
             )}
 
 
-            <div className="flex items-center gap-2">
+            <div className="min-w-0">
               <PanelToggle
                 panels={(() => {
                   const builtins: { id: string; icon: typeof Globe; label: string; shortcut?: string }[] = [
@@ -1561,7 +1561,7 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
       <div id="task-panels" ref={splitContainerRef} className="flex-1 flex min-h-0">
         {!compact && !hasVisiblePanels && (
           <div className="flex-1 flex items-center justify-center">
-            <div className="w-full max-w-xl min-h-52 rounded-lg border border-border bg-surface-2 px-5 py-7 text-center flex flex-col items-center justify-center">
+            <div className="w-full max-w-xl min-h-52 rounded-lg border border-border bg-surface-3 px-5 py-7 text-center flex flex-col items-center justify-center">
               <p className="text-2xl font-semibold">No panel tab is shown</p>
               <p className="mt-3 text-base text-muted-foreground">Use the panel tabs in the header to open one.</p>
             </div>

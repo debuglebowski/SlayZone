@@ -58,7 +58,7 @@ export function UsageAnalyticsPage({ onTaskClick }: Props) {
         </div>
 
         {!providerSupported ? (
-          <div className="rounded-lg border bg-card p-8 text-center">
+          <div className="rounded-lg border bg-surface-2 p-8 text-center">
             <p className="text-sm text-muted-foreground">
               {providerLabel} does not store usage data locally. Usage tracking is only available for {formatSupportedProviders()}.
             </p>

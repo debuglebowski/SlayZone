@@ -77,7 +77,7 @@ function ProcessRow({
   logEndRef: (el: HTMLDivElement | null) => void
 }) {
   return (
-    <div className="rounded-lg border border-border bg-surface-2 overflow-hidden group/row">
+    <div className="rounded-lg border border-border bg-surface-3 overflow-hidden group/row">
       <div className="flex items-center gap-3 px-3.5 py-3">
         {/* Label + command */}
         <div className="flex flex-col min-w-0 flex-1 gap-0.5">

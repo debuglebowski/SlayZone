@@ -636,7 +636,7 @@ function LinkedPrView({ pr, projectPath, visible, onUnlink, onPrUpdated }: {
       <div className="flex-1 min-h-0 relative">
         <div ref={activeTab === 'description' ? scrollRef : undefined} className={cn('absolute inset-0 overflow-y-auto', activeTab !== 'description' && 'hidden')}>
             <div className="px-4 py-3">
-              <div className="rounded-lg border bg-surface-2 overflow-hidden">
+              <div className="rounded-lg border bg-surface-3 overflow-hidden">
                 {pr.body ? (
                   <div className="px-3 py-2.5 text-xs">
                     <GhMarkdown>{pr.body}</GhMarkdown>
@@ -663,7 +663,7 @@ function LinkedPrView({ pr, projectPath, visible, onUnlink, onPrUpdated }: {
                       <div className="flex-1 w-px bg-border mt-1" />
                     )}
                   </div>
-                  <div className="flex-1 min-w-0 rounded-lg border bg-surface-2 overflow-hidden mb-4">
+                  <div className="flex-1 min-w-0 rounded-lg border bg-surface-3 overflow-hidden mb-4">
                     <div
                       className="flex items-center gap-2 px-3 py-1.5 bg-muted/30 border-b cursor-pointer"
                       onClick={() => toggleCollapse('__pr_body__')}
@@ -789,7 +789,7 @@ function LinkedPrView({ pr, projectPath, visible, onUnlink, onPrUpdated }: {
       {/* Comment input */}
       <div className="shrink-0 border-t">
         <form onSubmit={handleSubmitComment} className="p-3">
-          <div className="rounded-lg border bg-surface-2 focus-within:ring-1 focus-within:ring-ring transition-shadow">
+          <div className="rounded-lg border bg-surface-3 focus-within:ring-1 focus-within:ring-ring transition-shadow">
             <textarea
               ref={textareaRef}
               value={commentBody}
@@ -961,7 +961,7 @@ function TimelineItem({ comment, collapsed, onToggleCollapse, onReply, isOwnComm
       </div>
 
       {/* Comment card */}
-      <div className="flex-1 min-w-0 rounded-lg border bg-surface-2 overflow-hidden mb-4">
+      <div className="flex-1 min-w-0 rounded-lg border bg-surface-3 overflow-hidden mb-4">
         {/* Comment header */}
         <div
           className="flex items-center gap-2 px-3 py-1.5 bg-muted/30 border-b cursor-pointer"

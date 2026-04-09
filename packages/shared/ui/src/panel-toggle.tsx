@@ -27,15 +27,15 @@ const variantStyles = {
   },
   flat: {
     container: 'bg-surface-2',
-    active: 'bg-background text-foreground shadow-sm',
-    activeDisabled: 'bg-background text-foreground/40 shadow-sm cursor-not-allowed',
+    active: 'bg-surface-3 text-foreground shadow-sm',
+    activeDisabled: 'bg-surface-3 text-foreground/40 shadow-sm cursor-not-allowed',
   },
 }
 
 export function PanelToggle({ panels, onChange, variant = 'flat', className }: PanelToggleProps) {
   const styles = variantStyles[variant]
   return (
-    <div className={cn('flex items-center rounded-lg p-1 gap-1', styles.container, className)}>
+    <div className={cn('flex items-center rounded-lg p-1 gap-1 overflow-x-auto scrollbar-hide', styles.container, className)}>
       {panels.map((panel) => (
         <Tooltip key={panel.id}>
           <TooltipTrigger asChild>

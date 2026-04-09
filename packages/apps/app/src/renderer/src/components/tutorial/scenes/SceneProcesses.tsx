@@ -37,7 +37,7 @@ const PROCESSES: { scope: string; items: Process[] }[] = [
 function ProcessRow({ process, delay }: { process: Process; delay: number }): React.JSX.Element {
   return (
     <motion.div
-      className="flex items-center gap-3 px-4 py-3 border rounded-lg bg-background"
+      className="flex items-center gap-3 px-4 py-3 border rounded-lg bg-surface-1"
       initial={{ opacity: 0, y: 6 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay, duration: 0.15 }}
@@ -75,7 +75,7 @@ function ProcessesPanel(): React.JSX.Element {
 
   return (
     <motion.div
-      className="flex-1 rounded-xl border overflow-hidden flex flex-col bg-background"
+      className="flex-1 rounded-xl border overflow-hidden flex flex-col bg-surface-1"
       initial={{ opacity: 0, x: 16 }}
       animate={{ opacity: 1, x: 0 }}
       transition={{ duration: 0.25 }}

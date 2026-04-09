@@ -161,7 +161,7 @@ function DiffTab(): React.JSX.Element {
 function GitPanel({ diffActive }: { diffActive: boolean }): React.JSX.Element {
   return (
     <motion.div
-      className="flex-1 rounded-xl border overflow-hidden flex flex-col bg-background"
+      className="flex-1 rounded-xl border overflow-hidden flex flex-col bg-surface-1"
       initial={{ opacity: 0, x: 16 }}
       animate={{ opacity: 1, x: 0 }}
       transition={{ duration: 0.25 }}

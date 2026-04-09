@@ -315,7 +315,7 @@ export function FeedbackDialog(): React.JSX.Element {
                         <div className="relative space-y-0">
                           {messages.map((msg) => (
                             <div key={msg.id} className="pb-3">
-                              <div className="rounded-lg border bg-background p-3 shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
+                              <div className="rounded-lg border bg-surface-1 p-3 shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
                                 <p className="whitespace-pre-wrap text-[13px] leading-relaxed">{msg.content}</p>
                                 <p className="mt-2 text-[10px] text-muted-foreground/50">{formatDate(msg.created_at)}</p>
                               </div>
@@ -343,7 +343,7 @@ export function FeedbackDialog(): React.JSX.Element {
                   {/* Compose */}
                   <div className="bg-muted/5 px-5 py-4">
                     <p className="mb-2 text-[10px] font-medium text-amber-500">Do not share any sensitive or personal information.</p>
-                    <div className="rounded-lg border bg-background shadow-[0_1px_3px_rgba(0,0,0,0.04)] focus-within:ring-2 focus-within:ring-ring/50">
+                    <div className="rounded-lg border bg-surface-1 shadow-[0_1px_3px_rgba(0,0,0,0.04)] focus-within:ring-2 focus-within:ring-ring/50">
                       <textarea
                         value={content}
                         onChange={(e) => setContent(e.target.value)}

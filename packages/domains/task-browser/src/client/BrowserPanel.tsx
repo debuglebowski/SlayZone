@@ -1518,7 +1518,7 @@ export const BrowserPanel = forwardRef<BrowserPanelHandle, BrowserPanelProps>(fu
             />
           ))}
           {!activeViewState.hasLoadedRealPage && !loadError && !hiddenByOverlay && (
-            <div data-testid="browser-loading-animation" className="absolute inset-0 z-10 bg-background">
+            <div data-testid="browser-loading-animation" className="absolute inset-0 z-10 bg-surface-0">
               <BrowserLoadingAnimation />
             </div>
           )}

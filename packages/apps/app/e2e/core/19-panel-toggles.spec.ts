@@ -26,7 +26,7 @@ test.describe('Panel toggles', () => {
 
   /** Scope to visible PanelToggle buttons in the active task tab */
   const panelBtn = (page: import('@playwright/test').Page, label: string) =>
-    page.locator('.bg-surface-2.rounded-lg:visible').filter({ has: page.locator('button:has-text("Terminal")') }).locator(`button:has-text("${label}")`)
+    page.locator('.bg-surface-3.rounded-lg:visible').filter({ has: page.locator('button:has-text("Terminal")') }).locator(`button:has-text("${label}")`)
 
   const isPanelActive = async (page: import('@playwright/test').Page, label: string) => {
     const className = await panelBtn(page, label).getAttribute('class')

@@ -455,7 +455,7 @@ function TaskItem({
       <TooltipTrigger asChild>
         <button 
           onClick={() => onClick?.(task)}
-          className="flex items-center gap-2.5 w-full rounded-md border transition-all group/task px-2.5 py-2 bg-surface-2 text-sm text-foreground hover:border-primary/50 hover:bg-muted/50 shadow-sm"
+          className="flex items-center gap-2.5 w-full rounded-md border transition-all group/task px-2.5 py-2 bg-surface-3 text-sm text-foreground hover:border-primary/50 hover:bg-muted/50 shadow-sm"
         >
           <PriorityIcon priority={task.priority} className="h-3.5 w-3.5 shrink-0" />
           <TerminalSquare className="h-4 w-4 shrink-0 text-primary/70 group-hover/task:text-primary" />

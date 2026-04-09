@@ -52,7 +52,7 @@ export function LoopModeBanner({ config, status, iteration, onStart, onPause, on
 
   return (
     <div
-      className={`absolute top-6 right-6 z-10 w-72 rounded-xl border-2 ${active ? 'border-orange-500/60' : 'border-border'} bg-background backdrop-blur-md text-xs overflow-hidden transition-all duration-300`}
+      className={`absolute top-6 right-6 z-10 w-72 rounded-xl border-2 ${active ? 'border-orange-500/60' : 'border-border'} bg-surface-1 backdrop-blur-md text-xs overflow-hidden transition-all duration-300`}
       style={{
         boxShadow: active
           ? '0 0 20px 0 rgba(249,115,22,0.4), 0 0 60px 0 rgba(249,115,22,0.15)'

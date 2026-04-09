@@ -44,7 +44,7 @@ export function ArchivedTasksView({
       {/* Draggable region for window movement - clears traffic lights */}
       <div className="h-10 window-drag-region" />
       {/* Header */}
-      <header className="sticky top-10 z-10 border-b bg-background p-4">
+      <header className="sticky top-10 z-10 border-b bg-surface-0 p-4">
         <div className="flex items-center gap-4 window-no-drag">
           <IconButton variant="ghost" aria-label="Back to board" onClick={onBack}>
             <ArrowLeft className="size-5" />

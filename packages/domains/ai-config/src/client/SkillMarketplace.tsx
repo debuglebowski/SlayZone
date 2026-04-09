@@ -280,7 +280,7 @@ export function SkillMarketplace({ projectId, projectPath }: SkillMarketplacePro
               <Button
                 variant="ghost"
                 size="sm"
-                className={cn('h-7 text-xs gap-1.5', view === 'manage' && 'bg-surface-2')}
+                className={cn('h-7 text-xs gap-1.5', view === 'manage' && 'bg-surface-3')}
                 onClick={() => setView(view === 'manage' ? 'browse' : 'manage')}
               >
                 <Settings2 className="size-3" />
@@ -308,11 +308,11 @@ export function SkillMarketplace({ projectId, projectPath }: SkillMarketplacePro
                 <button
                   key={reg.id}
                   onClick={() => handleDrillIn(reg.id)}
-                  className="rounded-lg border border-border/50 bg-background p-4 flex flex-col gap-2 text-left hover:border-border transition-colors h-fit"
+                  className="rounded-lg border border-border/50 bg-surface-1 p-4 flex flex-col gap-2 text-left hover:border-border transition-colors h-fit"
                 >
                   <div className="flex items-start justify-between gap-2">
                     <h3 className="text-sm font-medium truncate">{reg.name}</h3>
-                    <span className="shrink-0 rounded-full bg-surface-2 px-2 py-0.5 text-[10px] text-muted-foreground">
+                    <span className="shrink-0 rounded-full bg-surface-3 px-2 py-0.5 text-[10px] text-muted-foreground">
                       {reg.source_type}
                     </span>
                   </div>
@@ -353,7 +353,7 @@ export function SkillMarketplace({ projectId, projectPath }: SkillMarketplacePro
                   </div>
                   {registries.length > 1 && (
                     <select
-                      className="h-8 rounded-md border border-border/50 bg-background px-2 text-xs text-foreground"
+                      className="h-8 rounded-md border border-border/50 bg-surface-1 px-2 text-xs text-foreground"
                       value={selectedRegistry ?? ''}
                       onChange={(e) => setSelectedRegistry(e.target.value || null)}
                     >
@@ -371,7 +371,7 @@ export function SkillMarketplace({ projectId, projectPath }: SkillMarketplacePro
                   <button
                     className={cn(
                       'rounded-full px-2.5 py-1 text-[11px] transition-colors',
-                      !selectedCategory ? 'bg-foreground text-background' : 'bg-surface-2 text-muted-foreground hover:text-foreground'
+                      !selectedCategory ? 'bg-foreground text-background' : 'bg-surface-3 text-muted-foreground hover:text-foreground'
                     )}
                     onClick={() => setSelectedCategory(null)}
                   >
@@ -382,7 +382,7 @@ export function SkillMarketplace({ projectId, projectPath }: SkillMarketplacePro
                       key={cat}
                       className={cn(
                         'rounded-full px-2.5 py-1 text-[11px] transition-colors capitalize',
-                        selectedCategory === cat ? 'bg-foreground text-background' : 'bg-surface-2 text-muted-foreground hover:text-foreground'
+                        selectedCategory === cat ? 'bg-foreground text-background' : 'bg-surface-3 text-muted-foreground hover:text-foreground'
                       )}
                       onClick={() => setSelectedCategory(cat)}
                     >

@@ -147,7 +147,7 @@ export function SceneTerminal(): React.JSX.Element {
 
         {/* Settings panel card — right */}
         <motion.div
-          className="w-1/4 shrink-0 rounded-xl border overflow-hidden flex flex-col bg-background"
+          className="w-1/4 shrink-0 rounded-xl border overflow-hidden flex flex-col bg-surface-1"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.1 }}

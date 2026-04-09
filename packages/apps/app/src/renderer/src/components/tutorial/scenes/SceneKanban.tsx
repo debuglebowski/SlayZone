@@ -19,7 +19,7 @@ function MockCard({ task, highlighted }: { task: MockTask; highlighted?: boolean
       layoutId={task.id}
       layout
       className={cn(
-        'bg-background border rounded-md px-2.5 py-2 flex items-start gap-2 cursor-grab hover:bg-muted/50 transition-colors',
+        'bg-surface-1 border rounded-md px-2.5 py-2 flex items-start gap-2 cursor-grab hover:bg-muted/50 transition-colors',
         highlighted && 'ring-2 ring-primary shadow-sm shadow-primary/20'
       )}
       transition={{ type: 'spring', stiffness: 280, damping: 28 }}
@@ -109,7 +109,7 @@ export function SceneKanban(): React.JSX.Element {
   const inProgress = moved ? [INITIAL_BACKLOG[0], ...INITIAL_IN_PROGRESS] : INITIAL_IN_PROGRESS
 
   return (
-    <div className="w-full h-full flex flex-col rounded-xl border bg-background shadow-xl overflow-hidden">
+    <div className="w-full h-full flex flex-col rounded-xl border bg-surface-0 shadow-xl overflow-hidden">
       {/* Tab bar — Home tab active (kanban is the home view) */}
       <div className="h-9 shrink-0 flex items-center gap-1 px-2 bg-neutral-100 dark:bg-neutral-900/80">
         <div className="h-6 px-2 rounded-md flex items-center gap-1 bg-neutral-200 dark:bg-neutral-700 border border-neutral-300 dark:border-neutral-600 shrink-0">

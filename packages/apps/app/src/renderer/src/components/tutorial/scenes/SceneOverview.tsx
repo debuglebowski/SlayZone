@@ -72,7 +72,7 @@ function PriorityBars({ priority }: { priority: number }): React.JSX.Element {
 function MockCard({ task, delay }: { task: MockTask; delay: number }): React.JSX.Element {
   return (
     <motion.div
-      className="bg-background border rounded-md px-1.5 py-1.5 flex items-start gap-1.5 cursor-grab hover:bg-muted/50"
+      className="bg-surface-1 border rounded-md px-1.5 py-1.5 flex items-start gap-1.5 cursor-grab hover:bg-muted/50"
       initial={{ opacity: 0, scale: 0.95 }}
       animate={{ opacity: 1, scale: 1 }}
       transition={{ delay, type: 'spring', stiffness: 400, damping: 25 }}
@@ -113,7 +113,7 @@ function MockColumn({ col, colDelay }: { col: MockColumn; colDelay: number }): R
 
 export function SceneOverview(): React.JSX.Element {
   return (
-    <div className="w-full h-full flex rounded-xl border bg-background shadow-xl overflow-hidden">
+    <div className="w-full h-full flex rounded-xl border bg-surface-0 shadow-xl overflow-hidden">
       {/* Sidebar */}
       <motion.div
         className="w-10 shrink-0 border-r flex flex-col items-center py-2 gap-1.5"

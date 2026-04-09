@@ -225,7 +225,7 @@ function SkillGraphCanvasInner({
         fitView
         fitViewOptions={{ padding: 0.2 }}
         proOptions={{ hideAttribution: true }}
-        className="bg-background"
+        className="bg-surface-0"
       >
         <Background gap={20} size={1} />
       </ReactFlow>

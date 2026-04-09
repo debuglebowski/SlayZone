@@ -244,7 +244,7 @@ export function AutomationCard({
   }
 
   return (
-    <div className="rounded-xl border border-border bg-surface-2 overflow-hidden">
+    <div className="rounded-xl border border-border bg-surface-3 overflow-hidden">
       <div className="flex items-center gap-3 px-4 py-3">
         <button
           type="button"

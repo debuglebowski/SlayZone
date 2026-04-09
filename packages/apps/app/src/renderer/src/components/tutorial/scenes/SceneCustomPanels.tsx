@@ -46,7 +46,7 @@ function SettingsView({ figmaOn, excalidrawOn }: { figmaOn: boolean; excalidrawO
   }
 
   return (
-    <div className="w-full h-full flex bg-background rounded-2xl overflow-hidden">
+    <div className="w-full h-full flex bg-surface-0 rounded-2xl overflow-hidden">
       {/* Left sidebar */}
       <div className="w-44 shrink-0 border-r flex flex-col p-3 gap-0.5">
         <div className="px-3 py-2 mb-2">
@@ -74,7 +74,7 @@ function SettingsView({ figmaOn, excalidrawOn }: { figmaOn: boolean; excalidrawO
           <p className="text-[12px] text-muted-foreground/40 mt-0.5">Built-in panels. Disabled panels won't appear in any task.</p>
           <div className="flex flex-col gap-1.5 mt-3">
             {NATIVE_PANELS.map(({ icon: Icon, label, shortcut }) => (
-              <div key={label} className="flex items-center gap-3 px-4 py-2.5 rounded-lg border bg-background">
+              <div key={label} className="flex items-center gap-3 px-4 py-2.5 rounded-lg border bg-surface-1">
                 <Icon className="size-4 text-muted-foreground/50 shrink-0" />
                 <span className="text-[13px] font-medium flex-1">{label}</span>
                 <Kbd>{shortcut}</Kbd>
@@ -90,7 +90,7 @@ function SettingsView({ figmaOn, excalidrawOn }: { figmaOn: boolean; excalidrawO
           <p className="text-[12px] text-muted-foreground/40 mt-0.5">Web views embedded as panels inside tasks.</p>
           <div className="flex flex-col gap-1.5 mt-3">
             {EXTERNAL_PANELS.map(({ label, url, shortcut }) => (
-              <div key={label} className="flex items-center gap-3 px-4 py-2.5 rounded-lg border bg-background">
+              <div key={label} className="flex items-center gap-3 px-4 py-2.5 rounded-lg border bg-surface-1">
                 <Globe className="size-4 text-muted-foreground/50 shrink-0" />
                 <span className="text-[13px] font-medium">{label}</span>
                 <span className="text-[11px] text-muted-foreground/30 flex-1">{url}</span>
@@ -126,7 +126,7 @@ function WebPanelHeader({ name }: { name: string }): React.JSX.Element {
 function FigmaPanel(): React.JSX.Element {
   return (
     <motion.div
-      className="flex-1 rounded-xl border overflow-hidden flex flex-col bg-background"
+      className="flex-1 rounded-xl border overflow-hidden flex flex-col bg-surface-1"
       initial={{ opacity: 0, x: 16 }}
       animate={{ opacity: 1, x: 0 }}
       transition={{ duration: 0.25 }}
@@ -174,7 +174,7 @@ function FigmaPanel(): React.JSX.Element {
 function ExcalidrawPanel(): React.JSX.Element {
   return (
     <motion.div
-      className="flex-1 rounded-xl border overflow-hidden flex flex-col bg-background"
+      className="flex-1 rounded-xl border overflow-hidden flex flex-col bg-surface-1"
       initial={{ opacity: 0, x: 16 }}
       animate={{ opacity: 1, x: 0 }}
       transition={{ duration: 0.25, delay: 0.1 }}

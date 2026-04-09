@@ -20,12 +20,12 @@ export function RegistryManageSection({ registries, onToggle, onRemove, onRefres
       {registries.map((reg) => (
         <div
           key={reg.id}
-          className="flex items-center gap-3 rounded-lg border border-border/50 bg-background px-4 py-3"
+          className="flex items-center gap-3 rounded-lg border border-border/50 bg-surface-1 px-4 py-3"
         >
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2">
               <span className="text-sm font-medium truncate">{reg.name}</span>
-              <span className="rounded-full bg-surface-2 px-2 py-0.5 text-[10px] text-muted-foreground">
+              <span className="rounded-full bg-surface-3 px-2 py-0.5 text-[10px] text-muted-foreground">
                 {reg.source_type}
               </span>
             </div>

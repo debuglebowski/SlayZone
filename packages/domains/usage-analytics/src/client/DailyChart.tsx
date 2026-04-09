@@ -81,7 +81,7 @@ export function DailyChart({ data, range }: Props) {
 
   if (chartData.length === 0) {
     return (
-      <div className="rounded-lg border bg-card p-4">
+      <div className="rounded-lg border bg-surface-2 p-4">
         <p className="text-sm font-medium text-muted-foreground mb-3">{title}</p>
         <div className="flex h-48 items-center justify-center text-sm text-muted-foreground">
           No data for this period
@@ -91,7 +91,7 @@ export function DailyChart({ data, range }: Props) {
   }
 
   return (
-    <div className="rounded-lg border bg-card p-4">
+    <div className="rounded-lg border bg-surface-2 p-4">
       <div className="flex items-center justify-between mb-3">
         <p className="text-sm font-medium text-muted-foreground">{title}</p>
         <div className="flex items-center gap-3">

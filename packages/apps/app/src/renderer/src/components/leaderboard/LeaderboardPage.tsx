@@ -205,7 +205,7 @@ function LeaderboardPageInner({ auth }: { auth: ReturnType<typeof useLeaderboard
   return (
     <div className="h-full overflow-hidden bg-[radial-gradient(1200px_400px_at_20%_-10%,color-mix(in_oklab,var(--primary)_12%,transparent),transparent_65%)]">
       <div className="mx-auto w-full h-full max-w-[1440px] p-6 flex flex-col gap-5">
-        <section className="rounded-xl border bg-background/85 backdrop-blur-sm p-5">
+        <section className="rounded-xl border bg-surface-1/85 backdrop-blur-sm p-5">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
               <h1 className="text-3xl font-semibold tracking-tight">Leaderboard</h1>
@@ -416,7 +416,7 @@ function LeaderboardTable({
   viewerRow: TableRow | null | undefined
 }): React.JSX.Element {
   return (
-    <div className="rounded-xl border bg-background overflow-hidden min-w-0 h-full flex flex-col">
+    <div className="rounded-xl border bg-surface-1 overflow-hidden min-w-0 h-full flex flex-col">
       <div className="px-4 py-3 border-b bg-muted/20">
         <div className="flex items-center gap-3 h-12">
           <span className="text-muted-foreground">{icon}</span>

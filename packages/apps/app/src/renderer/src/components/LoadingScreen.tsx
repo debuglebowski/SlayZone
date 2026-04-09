@@ -74,7 +74,7 @@ export function LoadingScreen({ onDone }: { onDone?: () => void }): React.JSX.El
 
   return (
     <motion.div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-background"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-surface-0"
       variants={containerVariants}
       initial="initial"
       animate="animate"

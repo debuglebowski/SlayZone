@@ -3,7 +3,7 @@ import { TEST_PROJECT_PATH } from '../fixtures/electron'
 
 /** Locate a home panel toggle button by label */
 const homePanelBtn = (page: import('@playwright/test').Page, label: string) =>
-  page.locator('.bg-surface-2.rounded-lg').filter({ has: page.locator(`button:has-text("Kanban")`) }).locator(`button:has-text("${label}")`)
+  page.locator('.bg-surface-3.rounded-lg').filter({ has: page.locator(`button:has-text("Kanban")`) }).locator(`button:has-text("${label}")`)
 
 test.describe('Home panel persistence', () => {
   let abbrevA: string

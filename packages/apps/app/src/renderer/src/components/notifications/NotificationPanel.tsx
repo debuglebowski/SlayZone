@@ -64,7 +64,7 @@ export function NotificationPanel({
 
   return (
     <div className="flex flex-col h-full">
-      <div className="flex items-center bg-surface-2 p-1 gap-1 mx-2 mt-2 rounded-lg">
+      <div className="flex items-center bg-surface-3 p-1 gap-1 mx-2 mt-2 rounded-lg">
         <button
           onClick={() => filterCurrentProject && onFilterToggle()}
           className={cn(
@@ -115,7 +115,7 @@ export function NotificationPanel({
                 {tasks.map(({ task, sessionId, lastOutputTime }) => (
                   <div
                     key={task.id}
-                    className="rounded-lg border bg-card p-3 shadow-sm hover:bg-accent/50 transition-colors cursor-pointer"
+                    className="rounded-lg border bg-surface-2 p-3 shadow-sm hover:bg-accent/50 transition-colors cursor-pointer"
                     onClick={() => {
                       track('notification_clicked')
                       onNavigate(task.id)

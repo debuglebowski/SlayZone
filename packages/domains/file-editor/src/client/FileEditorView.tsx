@@ -236,7 +236,7 @@ export const FileEditorView = forwardRef<FileEditorViewHandle, FileEditorViewPro
 
   return (
     <div
-      className="h-full flex bg-background relative"
+      className="h-full flex bg-surface-0 relative"
       style={editorPanelStyle as React.CSSProperties | undefined}
       onDragOver={handleFileDragOver}
       onDragEnter={handleFileDragEnter}

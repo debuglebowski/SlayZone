@@ -63,7 +63,7 @@ export function SkillListView({
                     )} />
                   )}
                   {provenance && (
-                    <span className="flex items-center gap-1 rounded-full bg-surface-2 px-1.5 py-0.5 text-[10px] text-muted-foreground shrink-0">
+                    <span className="flex items-center gap-1 rounded-full bg-surface-3 px-1.5 py-0.5 text-[10px] text-muted-foreground shrink-0">
                       <Store className="size-2.5" />
                       {provenance.registryName ?? 'Marketplace'}
                     </span>

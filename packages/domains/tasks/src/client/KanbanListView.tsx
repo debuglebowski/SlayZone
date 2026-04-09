@@ -558,7 +558,7 @@ export function KanbanListView({
       </div>
       <DragOverlay>
         {activeTask ? (
-          <div className="rounded-md bg-background border px-2.5 py-1.5 shadow-lg text-xs font-medium opacity-90">
+          <div className="rounded-md bg-surface-1 border px-2.5 py-1.5 shadow-lg text-xs font-medium opacity-90">
             {activeTask.title}
           </div>
         ) : null}

@@ -20,7 +20,7 @@ export function TaskShell(): React.JSX.Element {
       </div>
       {/* Panel area skeleton */}
       <div className="flex-1 flex">
-        <div className="flex-1 bg-background" />
+        <div className="flex-1 bg-surface-0" />
       </div>
     </div>
   )

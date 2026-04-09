@@ -838,7 +838,7 @@ export const AssetsPanel = forwardRef<AssetsPanelHandle, AssetsPanelProps>(funct
             {selectedAsset && selectedRenderMode && (
               <div className="flex items-center gap-1.5">
                 {hasZoom(selectedRenderMode) && (
-                  <div className="flex items-center gap-1 bg-surface-2 rounded-lg p-1">
+                  <div className="flex items-center gap-1 bg-surface-3 rounded-lg p-1">
                     <button type="button" className="size-6 flex items-center justify-center rounded-md hover:bg-muted text-muted-foreground hover:text-foreground" onClick={() => setZoomLevel(z => Math.max(0.25, z - 0.25))}><ZoomOut className="size-3.5" /></button>
                     <button type="button" className="text-[10px] text-muted-foreground hover:text-foreground min-w-[3ch] text-center" onClick={() => setZoomLevel(1)}>{Math.round(zoomLevel * 100)}%</button>
                     <button type="button" className="size-6 flex items-center justify-center rounded-md hover:bg-muted text-muted-foreground hover:text-foreground" onClick={() => setZoomLevel(z => Math.min(4, z + 0.25))}><ZoomIn className="size-3.5" /></button>
@@ -855,7 +855,7 @@ export const AssetsPanel = forwardRef<AssetsPanelHandle, AssetsPanelProps>(funct
                     onChange={(id) => setViewMode(id as 'preview' | 'split' | 'raw')}
                   />
                 )}
-                <div className="bg-surface-2 rounded-lg p-1">
+                <div className="bg-surface-3 rounded-lg p-1">
                   <Select
                     value={selectedAsset.render_mode ?? '__auto__'}
                     onValueChange={(v) => updateAsset({ id: selectedAsset.id, renderMode: v === '__auto__' ? null : v as RenderMode })}

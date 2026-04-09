@@ -61,7 +61,7 @@ interface SceneShellProps {
 
 export function SceneShell({ activeProject = 0, tabs, children }: SceneShellProps): React.JSX.Element {
   return (
-    <div className="w-full h-full flex rounded-2xl bg-background overflow-hidden relative">
+    <div className="w-full h-full flex rounded-2xl bg-surface-0 overflow-hidden relative">
       {/* Sidebar */}
       <div className="w-20 shrink-0 border-r flex flex-col items-center">
         <div className="flex flex-col items-center gap-3 pt-3 pb-4">
