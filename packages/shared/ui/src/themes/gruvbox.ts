@@ -39,6 +39,7 @@ export const gruvbox: UnifiedThemeDefinition = {
       surface0: '#1d2021',
       surface1: '#282828',
       surface2: '#32302f',
+      surface3: '#3c3836',
       modal: '#1d2021',
       modalBorder: 'rgba(235, 219, 178, 0.25)',
     },

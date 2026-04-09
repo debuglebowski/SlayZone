@@ -34,6 +34,7 @@ export interface ChromeColors {
   surface0: string
   surface1: string
   surface2: string
+  surface3: string
   modal: string
   modalBorder: string
 }

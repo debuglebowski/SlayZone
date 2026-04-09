@@ -63,6 +63,7 @@
   --color-surface-0: var(--surface-0);
   --color-surface-1: var(--surface-1);
   --color-surface-2: var(--surface-2);
+  --color-surface-3: var(--surface-3);
   --color-modal: var(--modal);
 
   --animate-collapsible-down: collapsible-down 0.15s ease-out;
@@ -86,7 +87,7 @@
   --radius: 6px;
   --background: oklch(0.94 0 0);
   --foreground: oklch(0.13 0 0);
-  --card: oklch(0.98 0 0);
+  --card: var(--surface-2);
   --card-foreground: oklch(0.13 0 0);
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.13 0 0);
@@ -115,9 +116,10 @@
   --sidebar-accent-foreground: oklch(0.205 0 0);
   --sidebar-border: oklch(0 0 0 / 15%);
   --sidebar-ring: oklch(0.55 0 0);
-  --surface-0: oklch(0.94 0 0);
-  --surface-1: oklch(0.96 0 0);
-  --surface-2: oklch(1 0 0);
+  --surface-0: oklch(0.90 0 0);
+  --surface-1: oklch(0.94 0 0);
+  --surface-2: oklch(0.96 0 0);
+  --surface-3: oklch(1 0 0);
   --modal: oklch(1 0 0);
   --modal-border: oklch(0 0 0 / 35%);
 }
@@ -125,7 +127,7 @@
 .dark {
   --background: #141418;
   --foreground: #fafafa;
-  --card: #18181b;
+  --card: var(--surface-2);
   --card-foreground: #fafafa;
   --popover: #18181b;
   --popover-foreground: #fafafa;
@@ -157,6 +159,7 @@
   --surface-0: #09090b;
   --surface-1: #141418;
   --surface-2: #18181b;
+  --surface-3: #1e1e22;
   --modal: #09090b;
   --modal-border: rgba(255, 255, 255, 0.25);
 }

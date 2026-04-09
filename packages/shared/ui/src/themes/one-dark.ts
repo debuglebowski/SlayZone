@@ -39,6 +39,7 @@ export const oneDark: UnifiedThemeDefinition = {
       surface0: '#21252b',
       surface1: '#282c34',
       surface2: '#2c313c',
+      surface3: '#343a45',
       modal: '#21252b',
       modalBorder: 'rgba(171, 178, 191, 0.25)',
     },

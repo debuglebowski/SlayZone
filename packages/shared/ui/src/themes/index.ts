@@ -90,6 +90,7 @@ const chromeVarMap: [string, keyof ChromeColors][] = [
   ['--surface-0', 'surface0'],
   ['--surface-1', 'surface1'],
   ['--surface-2', 'surface2'],
+  ['--surface-3', 'surface3'],
   ['--modal', 'modal'],
   ['--modal-border', 'modalBorder'],
 ]

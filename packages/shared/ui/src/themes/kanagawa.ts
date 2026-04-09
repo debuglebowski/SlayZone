@@ -39,6 +39,7 @@ export const kanagawa: UnifiedThemeDefinition = {
       surface0: '#16161d',
       surface1: '#1f1f28',
       surface2: '#252530',
+      surface3: '#2c2c38',
       modal: '#16161d',
       modalBorder: 'rgba(220, 215, 186, 0.25)',
     },

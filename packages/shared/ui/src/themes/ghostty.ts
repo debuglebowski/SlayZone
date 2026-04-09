@@ -39,6 +39,7 @@ export const ghostty: UnifiedThemeDefinition = {
       surface0: '#1d1f21',
       surface1: '#282c34',
       surface2: '#2c313c',
+      surface3: '#343a45',
       modal: '#1d1f21',
       modalBorder: 'rgba(255, 255, 255, 0.25)',
     },

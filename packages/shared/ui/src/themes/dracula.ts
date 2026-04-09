@@ -39,6 +39,7 @@ export const dracula: UnifiedThemeDefinition = {
       surface0: '#21222c',
       surface1: '#282a36',
       surface2: '#2e303e',
+      surface3: '#363848',
       modal: '#21222c',
       modalBorder: 'rgba(248, 248, 242, 0.25)',
     },

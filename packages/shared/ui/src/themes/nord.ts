@@ -39,6 +39,7 @@ export const nord: UnifiedThemeDefinition = {
       surface0: '#272c36',
       surface1: '#2e3440',
       surface2: '#3b4252',
+      surface3: '#434c5e',
       modal: '#272c36',
       modalBorder: 'rgba(216, 222, 233, 0.25)',
     },
