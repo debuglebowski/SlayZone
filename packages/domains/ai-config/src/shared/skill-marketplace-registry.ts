@@ -67,7 +67,7 @@ All ID arguments support prefix matching (e.g., \`a1b2\` matches the full UUID s
 - \`slay init instructions\` — print SlayZone agent configuration template
 - \`slay init skill\` — print slay skill reference markdown
 - \`slay completions <shell>\` — generate shell completions (fish | zsh | bash)
-\`
+`
   },
 
   // ── Domain skills ─────────────────────────────────────────────
@@ -480,3 +480,4 @@ SlayZone ships with predefined panels for Figma, Notion, GitHub, Excalidraw, and
   Hide the panel from task view without deleting it. The panel config is preserved.
 `
   },
+]
