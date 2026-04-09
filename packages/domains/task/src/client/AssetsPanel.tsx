@@ -334,7 +334,13 @@ export const AssetsPanel = forwardRef<AssetsPanelHandle, AssetsPanelProps>(funct
   const [creating, setCreating] = useState<{ parentFolderId: string | null; type: 'file' | 'folder' } | null>(null)
   const [renaming, setRenaming] = useState<{ id: string; type: 'asset' | 'folder' } | null>(null)
   const [renameValue, setRenameValue] = useState('')
-  const createInputRef = useCallback((node: HTMLInputElement | null) => { node?.focus() }, [])
+  const willCreateRef = useRef(false)
+  const createInputRef = useCallback((node: HTMLInputElement | null) => {
+    if (node) requestAnimationFrame(() => node.focus())
+  }, [])
+  const preventAutoFocus = useCallback((e: Event) => {
+    if (willCreateRef.current) { e.preventDefault(); willCreateRef.current = false }
+  }, [])
   const renameInputRef = useRef<HTMLInputElement>(null)
 
   // Expanded folders state
@@ -560,7 +566,7 @@ export const AssetsPanel = forwardRef<AssetsPanelHandle, AssetsPanelProps>(funct
             if (e.key === 'Enter') handleInlineCreate((e.target as HTMLInputElement).value)
             if (e.key === 'Escape') setCreating(null)
           }}
-          onBlur={(e) => handleInlineCreate(e.target.value)}
+          onBlur={(e) => { const v = (e.target as HTMLInputElement).value.trim(); if (v) handleInlineCreate(v) }}
           className="h-6 text-xs font-mono py-0 px-1 border-0 focus-visible:ring-0 shadow-none"
         />
       </div>
@@ -619,11 +625,11 @@ export const AssetsPanel = forwardRef<AssetsPanelHandle, AssetsPanelProps>(funct
                     )}
                   </button>
                 </ContextMenuTrigger>
-                <ContextMenuContent>
-                  <ContextMenuItem onSelect={() => setCreating({ parentFolderId: folder.id, type: 'file' })}>
+                <ContextMenuContent onCloseAutoFocus={preventAutoFocus}>
+                  <ContextMenuItem onSelect={() => { willCreateRef.current = true; setCreating({ parentFolderId: folder.id, type: 'file' }) }}>
                     <FilePlus className="size-3 mr-2" /> New Asset
                   </ContextMenuItem>
-                  <ContextMenuItem onSelect={() => setCreating({ parentFolderId: folder.id, type: 'folder' })}>
+                  <ContextMenuItem onSelect={() => { willCreateRef.current = true; setCreating({ parentFolderId: folder.id, type: 'folder' }) }}>
                     <FolderPlus className="size-3 mr-2" /> New Folder
                   </ContextMenuItem>
                   <ContextMenuSeparator />
@@ -995,11 +1001,11 @@ export const AssetsPanel = forwardRef<AssetsPanelHandle, AssetsPanelProps>(funct
                     )}
                   </div>
                 </ContextMenuTrigger>
-                <ContextMenuContent>
-                  <ContextMenuItem onSelect={() => setCreating({ parentFolderId: null, type: 'file' })}>
+                <ContextMenuContent onCloseAutoFocus={preventAutoFocus}>
+                  <ContextMenuItem onSelect={() => { willCreateRef.current = true; setCreating({ parentFolderId: null, type: 'file' }) }}>
                     <FilePlus className="size-3 mr-2" /> New Asset
                   </ContextMenuItem>
-                  <ContextMenuItem onSelect={() => setCreating({ parentFolderId: null, type: 'folder' })}>
+                  <ContextMenuItem onSelect={() => { willCreateRef.current = true; setCreating({ parentFolderId: null, type: 'folder' }) }}>
                     <FolderPlus className="size-3 mr-2" /> New Folder
                   </ContextMenuItem>
                   {assets.length > 0 && (

@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect, useRef, useMemo, forwardRef, useImperativeHandle } from 'react'
 import { track } from '@slayzone/telemetry/client'
 import {
+  File,
   FilePlus,
   FolderPlus,
   Folder,
@@ -123,7 +124,13 @@ export const EditorFileTree = forwardRef<EditorFileTreeHandle, EditorFileTreePro
   const [creating, setCreating] = useState<{ parentPath: string; type: 'file' | 'directory' } | null>(null)
   const [renaming, setRenaming] = useState<string | null>(null)
   const [renameValue, setRenameValue] = useState('')
-  const createInputRef = useRef<HTMLInputElement>(null)
+  const willCreateRef = useRef(false)
+  const createInputRef = useCallback((node: HTMLInputElement | null) => {
+    if (node) requestAnimationFrame(() => node.focus())
+  }, [])
+  const preventAutoFocus = useCallback((e: Event) => {
+    if (willCreateRef.current) { e.preventDefault(); willCreateRef.current = false }
+  }, [])
   const renameInputRef = useRef<HTMLInputElement>(null)
 
   // --- Drag and drop state ---
@@ -336,6 +343,7 @@ export const EditorFileTree = forwardRef<EditorFileTreeHandle, EditorFileTreePro
   )
 
   const startCreate = useCallback((parentPath: string, type: 'file' | 'directory') => {
+    willCreateRef.current = true
     setCreating({ parentPath, type })
     if (parentPath) {
       setExpandedFolders((prev) => new Set([...prev, parentPath]))
@@ -348,9 +356,6 @@ export const EditorFileTree = forwardRef<EditorFileTreeHandle, EditorFileTreePro
     setRenameValue(entry.name)
   }, [])
 
-  useEffect(() => {
-    if (creating) createInputRef.current?.focus()
-  }, [creating])
   useEffect(() => {
     if (renaming) renameInputRef.current?.focus()
   }, [renaming])
@@ -843,7 +848,7 @@ export const EditorFileTree = forwardRef<EditorFileTreeHandle, EditorFileTreePro
                 )}
               </button>
             </ContextMenuTrigger>
-            <ContextMenuContent>
+            <ContextMenuContent onCloseAutoFocus={preventAutoFocus}>
               {renderContextMenuItems(entry, true)}
             </ContextMenuContent>
           </ContextMenu>
@@ -854,7 +859,10 @@ export const EditorFileTree = forwardRef<EditorFileTreeHandle, EditorFileTreePro
 
           {/* Inline create input inside this folder */}
           {creating && creating.parentPath === entry.path && (
-            <div style={{ paddingLeft: (depth + 1) * INDENT_PX + BASE_PAD }} className="py-0.5">
+            <div style={{ paddingLeft: (depth + 1) * INDENT_PX + BASE_PAD }} className="flex items-center gap-1.5 py-0.5">
+              {creating.type === 'file'
+                ? <File className="size-4 shrink-0 text-muted-foreground" />
+                : <Folder className="size-4 shrink-0 text-amber-500/80" />}
               <Input
                 ref={createInputRef}
                 placeholder={creating.type === 'file' ? 'filename' : 'folder name'}
@@ -862,8 +870,8 @@ export const EditorFileTree = forwardRef<EditorFileTreeHandle, EditorFileTreePro
                   if (e.key === 'Enter') handleCreate((e.target as HTMLInputElement).value)
                   if (e.key === 'Escape') setCreating(null)
                 }}
-                onBlur={(e) => handleCreate(e.target.value)}
-                className="h-6 text-xs font-mono py-0 px-1"
+                onBlur={(e) => { const v = (e.target as HTMLInputElement).value.trim(); if (v) handleCreate(v) }}
+                className="h-6 text-xs font-mono py-0 px-1 border-0 focus-visible:ring-0 shadow-none"
               />
             </div>
           )}
@@ -917,7 +925,7 @@ export const EditorFileTree = forwardRef<EditorFileTreeHandle, EditorFileTreePro
               )}
             </button>
           </ContextMenuTrigger>
-          <ContextMenuContent>
+          <ContextMenuContent onCloseAutoFocus={preventAutoFocus}>
             {renderContextMenuItems(entry, false)}
           </ContextMenuContent>
         </ContextMenu>
@@ -966,7 +974,10 @@ export const EditorFileTree = forwardRef<EditorFileTreeHandle, EditorFileTreePro
 
         {/* Root-level create input */}
         {creating && creating.parentPath === '' && (
-          <div className="px-2 py-0.5">
+          <div className="px-2 py-0.5 flex items-center gap-1.5">
+            {creating.type === 'file'
+              ? <File className="size-4 shrink-0 text-muted-foreground" />
+              : <Folder className="size-4 shrink-0 text-amber-500/80" />}
             <Input
               ref={createInputRef}
               placeholder={creating.type === 'file' ? 'filename' : 'folder name'}
@@ -974,14 +985,14 @@ export const EditorFileTree = forwardRef<EditorFileTreeHandle, EditorFileTreePro
                 if (e.key === 'Enter') handleCreate((e.target as HTMLInputElement).value)
                 if (e.key === 'Escape') setCreating(null)
               }}
-              onBlur={(e) => handleCreate(e.target.value)}
-              className="h-6 text-xs font-mono py-0 px-1"
+              onBlur={(e) => { const v = (e.target as HTMLInputElement).value.trim(); if (v) handleCreate(v) }}
+              className="h-6 text-xs font-mono py-0 px-1 border-0 focus-visible:ring-0 shadow-none"
             />
           </div>
         )}
         </div>
       </ContextMenuTrigger>
-      <ContextMenuContent>
+      <ContextMenuContent onCloseAutoFocus={preventAutoFocus}>
         <ContextMenuItem onSelect={() => startCreate('', 'file')}>
           <FilePlus className="size-3 mr-2" /> New file
         </ContextMenuItem>

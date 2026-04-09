@@ -55,9 +55,9 @@ test.describe('File editor', () => {
   // --- .gitignore awareness ---
 
   test('editor panel is visible with file tree', async ({ mainWindow }) => {
-    // Editor button in PanelToggle should have active class (bg-muted)
-    const btn = mainWindow.locator('.bg-surface-3.rounded-lg:visible').locator('button:has-text("Editor")')
-    await expect(btn).toHaveClass(/bg-muted/)
+    // Editor button in PanelToggle should have active class (bg-surface-3)
+    const btn = mainWindow.locator('.bg-surface-2.rounded-lg:visible').locator('button:has-text("Editor")')
+    await expect(btn).toHaveClass(/bg-surface-3/)
     await expect(editorPanel(mainWindow).getByText('Files')).toBeVisible()
   })
 
@@ -409,6 +409,105 @@ test.describe('File editor', () => {
     // Restore tree visibility for subsequent tests
     await mainWindow.locator('button[title="Show file tree"]:visible').first().click()
     await expect(editorPanel(mainWindow).getByText('Files')).toBeVisible()
+  })
+
+  // --- Inline create file/folder ---
+
+  /** The inline create input */
+  const createInput = (page: import('@playwright/test').Page, type: 'file' | 'folder' = 'file') =>
+    editorPanel(page).locator(`input[placeholder="${type === 'file' ? 'filename' : 'folder name'}"]`)
+
+  test('new file input stays visible after context menu trigger', async ({ mainWindow }) => {
+    await treeFile(mainWindow, 'src').click({ button: 'right' })
+    await expect(mainWindow.getByRole('menuitem', { name: 'New file' })).toBeVisible({ timeout: 3_000 })
+    await mainWindow.getByRole('menuitem', { name: 'New file' }).click()
+
+    const input = createInput(mainWindow)
+    await expect(input).toBeVisible({ timeout: 3_000 })
+
+    // The bug: input disappears due to Radix focus steal → onBlur → empty dismiss
+    await mainWindow.waitForTimeout(500)
+    await expect(input).toBeVisible()
+
+    // Cleanup
+    await input.press('Escape')
+  })
+
+  test('new file input is focused', async ({ mainWindow }) => {
+    await treeFile(mainWindow, 'src').click({ button: 'right' })
+    await mainWindow.getByRole('menuitem', { name: 'New file' }).click()
+
+    const input = createInput(mainWindow)
+    await expect(input).toBeVisible({ timeout: 3_000 })
+
+    // Wait for Radix context menu close + focus to settle, then assert stable focus
+    await mainWindow.waitForTimeout(500)
+    await expect(input).toBeFocused()
+
+    await input.press('Escape')
+  })
+
+  test('Enter in create input creates file', async ({ mainWindow }) => {
+    await treeFile(mainWindow, 'src').click({ button: 'right' })
+    await mainWindow.getByRole('menuitem', { name: 'New file' }).click()
+
+    const input = createInput(mainWindow)
+    await expect(input).toBeVisible({ timeout: 3_000 })
+    await input.fill('brand-new.ts')
+    await input.press('Enter')
+
+    await expect(input).not.toBeVisible({ timeout: 3_000 })
+    expect(fs.existsSync(path.join(TEST_PROJECT_PATH, 'src', 'brand-new.ts'))).toBe(true)
+    await expect(treeFile(mainWindow, 'brand-new.ts')).toBeVisible({ timeout: 5_000 })
+
+    fs.unlinkSync(path.join(TEST_PROJECT_PATH, 'src', 'brand-new.ts'))
+  })
+
+  test('Escape dismisses create input without creating file', async ({ mainWindow }) => {
+    await treeFile(mainWindow, 'src').click({ button: 'right' })
+    await mainWindow.getByRole('menuitem', { name: 'New file' }).click()
+
+    const input = createInput(mainWindow)
+    await expect(input).toBeVisible({ timeout: 3_000 })
+    await input.press('Escape')
+
+    await expect(input).not.toBeVisible({ timeout: 3_000 })
+    expect(fs.existsSync(path.join(TEST_PROJECT_PATH, 'src', 'escaped-file.ts'))).toBe(false)
+  })
+
+  test('creating folder via context menu', async ({ mainWindow }) => {
+    await treeFile(mainWindow, 'src').click({ button: 'right' })
+    await mainWindow.getByRole('menuitem', { name: 'New folder' }).click()
+
+    const input = createInput(mainWindow, 'folder')
+    await expect(input).toBeVisible({ timeout: 3_000 })
+    await input.fill('components')
+    await input.press('Enter')
+
+    await expect(input).not.toBeVisible({ timeout: 3_000 })
+    expect(fs.existsSync(path.join(TEST_PROJECT_PATH, 'src', 'components'))).toBe(true)
+    await expect(treeFile(mainWindow, 'components')).toBeVisible({ timeout: 5_000 })
+
+    fs.rmSync(path.join(TEST_PROJECT_PATH, 'src', 'components'), { recursive: true })
+  })
+
+  test('blur with text in create input commits file', async ({ mainWindow }) => {
+    await treeFile(mainWindow, 'src').click({ button: 'right' })
+    await mainWindow.getByRole('menuitem', { name: 'New file' }).click()
+
+    const input = createInput(mainWindow)
+    await expect(input).toBeVisible({ timeout: 3_000 })
+    await input.fill('blur-created.ts')
+
+    // Click elsewhere to blur
+    await treeFile(mainWindow, 'hello.ts').click()
+
+    await expect.poll(
+      () => fs.existsSync(path.join(TEST_PROJECT_PATH, 'src', 'blur-created.ts')),
+      { timeout: 5_000 }
+    ).toBe(true)
+
+    fs.unlinkSync(path.join(TEST_PROJECT_PATH, 'src', 'blur-created.ts'))
   })
 
   // --- Drag and drop within file tree ---
