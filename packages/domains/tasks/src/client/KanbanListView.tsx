@@ -143,6 +143,7 @@ function SortableListRow(props: ListRowProps): React.JSX.Element {
       columns={props.columns}
       tags={props.tags}
       taskTagIds={props.taskTagIds}
+      isBlocked={props.isBlocked}
       onUpdateTask={props.onUpdateTask}
       onArchiveTask={props.onArchiveTask}
       onDeleteTask={props.onDeleteTask}

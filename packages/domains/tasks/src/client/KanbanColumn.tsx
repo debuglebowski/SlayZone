@@ -119,6 +119,7 @@ function SortableKanbanCard({
         columns={columns}
         tags={tags}
         taskTagIds={taskTagIds}
+        isBlocked={isBlocked}
         onUpdateTask={onUpdateTask}
         onArchiveTask={onArchiveTask}
         onDeleteTask={onDeleteTask}

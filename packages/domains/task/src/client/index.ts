@@ -1,7 +1,7 @@
 export { CreateTaskDialog } from './CreateTaskDialog'
 export { EditTaskDialog } from './EditTaskDialog'
 export { DeleteTaskDialog } from './DeleteTaskDialog'
-export { TaskMetadataSidebar } from './TaskMetadataSidebar'
+export { TaskMetadataSidebar, BlockerStatusIcon } from './TaskMetadataSidebar'
 export { ProcessesPanel } from './ProcessesPanel'
 export { ResizeHandle } from './ResizeHandle'
 export { usePanelSizes } from './usePanelSizes'

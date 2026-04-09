@@ -83,13 +83,18 @@ export function useTasksData(): UseTasksDataReturn {
       const tag = (e as CustomEvent).detail as Tag
       setTags((prev) => prev.map((t) => t.id === tag.id ? tag : t))
     }
+    const handleBlockedChanged = () => {
+      window.api.taskDependencies.getAllBlockedTaskIds().then(ids => setBlockedTaskIds(new Set(ids)))
+    }
     window.addEventListener('slayzone:tag-created', handleTagCreated)
     window.addEventListener('slayzone:tag-updated', handleTagUpdated)
+    window.addEventListener('slayzone:blocked-changed', handleBlockedChanged)
     return () => {
       delete (window as any).__slayzone_refreshData
       cleanup?.()
       window.removeEventListener('slayzone:tag-created', handleTagCreated)
       window.removeEventListener('slayzone:tag-updated', handleTagUpdated)
+      window.removeEventListener('slayzone:blocked-changed', handleBlockedChanged)
     }
   }, [])
 
@@ -198,10 +203,19 @@ export function useTasksData(): UseTasksDataReturn {
     await window.api.db.deleteTask(taskId)
   }, [])
 
-  // Context menu update (status, priority, project)
+  // Context menu update (status, priority, project, blocked)
   const contextMenuUpdate = useCallback(async (taskId: string, updates: Partial<Task>) => {
     const previousTasks = tasks
     setTasks((prev) => prev.map((t) => (t.id === taskId ? { ...t, ...updates } : t)))
+
+    if (updates.is_blocked !== undefined) {
+      setBlockedTaskIds(prev => {
+        const next = new Set(prev)
+        if (updates.is_blocked) next.add(taskId)
+        else next.delete(taskId)
+        return next
+      })
+    }
 
     try {
       await window.api.db.updateTask({
@@ -209,10 +223,20 @@ export function useTasksData(): UseTasksDataReturn {
         status: updates.status,
         priority: updates.priority,
         projectId: updates.project_id,
-        snoozedUntil: updates.snoozed_until
+        snoozedUntil: updates.snoozed_until,
+        isBlocked: updates.is_blocked,
+        blockedComment: updates.blocked_comment
       })
     } catch {
       setTasks(previousTasks)
+      if (updates.is_blocked !== undefined) {
+        setBlockedTaskIds(prev => {
+          const next = new Set(prev)
+          if (updates.is_blocked) next.delete(taskId)
+          else next.add(taskId)
+          return next
+        })
+      }
     }
   }, [tasks])
 

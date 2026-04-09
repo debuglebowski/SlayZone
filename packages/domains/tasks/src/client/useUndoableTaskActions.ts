@@ -43,7 +43,9 @@ export function useUndoableTaskActions(mutations: TaskMutations, undo: UndoAPI) 
 
       const desc = updates.status
         ? `Changed "${task.title}" → ${updates.status}`
-        : `Updated "${task.title}"`
+        : updates.is_blocked !== undefined
+          ? `${updates.is_blocked ? 'Blocked' : 'Unblocked'} "${task.title}"`
+          : `Updated "${task.title}"`
 
       undo.push({
         label: desc,

@@ -49,7 +49,7 @@ function matchesTaskSearch(task: Task, query: string): boolean {
   return task.title.toLowerCase().includes(normalizedQuery)
 }
 
-function BlockerStatusIcon({
+export function BlockerStatusIcon({
   task,
   columns
 }: {
