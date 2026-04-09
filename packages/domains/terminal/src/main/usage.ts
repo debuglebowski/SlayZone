@@ -1,6 +1,6 @@
 import type { IpcMain } from 'electron'
 import { net } from 'electron'
-import { spawn } from 'child_process'
+import { execFile, spawn } from 'child_process'
 import { readFile } from 'fs/promises'
 import { join } from 'path'
 import { homedir } from 'os'
@@ -9,6 +9,22 @@ import type { ProviderUsage, UsageWindow, UsageProviderConfig } from '@slayzone/
 
 const TIMEOUT_MS = 10_000
 const MIN_BACKOFF_MS = 30_000    // minimum backoff on 429 (even if retry-after says 0)
+const FALLBACK_CLAUDE_VERSION = '2.1.0'
+
+let cachedClaudeVersion: string | null = null
+
+function getClaudeVersion(): Promise<string> {
+  if (cachedClaudeVersion) return Promise.resolve(cachedClaudeVersion)
+  return new Promise((resolve) => {
+    execFile('claude', ['--version'], { timeout: 5_000 }, (err, stdout) => {
+      if (err || !stdout.trim()) return resolve(FALLBACK_CLAUDE_VERSION)
+      // Output may be "claude-code/1.0.33" or "1.0.33" — extract version
+      const match = stdout.trim().match(/(\d+\.\d+\.\d+)/)
+      cachedClaudeVersion = match?.[1] ?? FALLBACK_CLAUDE_VERSION
+      resolve(cachedClaudeVersion)
+    })
+  })
+}
 
 // ── Provider metadata ────────────────────────────────────────────────
 
@@ -123,11 +139,13 @@ async function fetchClaudeUsage(): Promise<ProviderUsage> {
   const token = await getClaudeToken()
   if (!token) return usageError(CLAUDE, `Not logged in — run \`${CLAUDE.cli}\` to authenticate`)
 
+  const version = await getClaudeVersion()
   const res = await fetch('https://api.anthropic.com/api/oauth/usage', {
     headers: {
       'Authorization': `Bearer ${token}`,
       'anthropic-beta': 'oauth-2025-04-20',
-      'Content-Type': 'application/json'
+      'Content-Type': 'application/json',
+      'User-Agent': `claude-code/${version}`,
     }
   })
 
@@ -370,7 +388,11 @@ function fetchProvider(p: ProviderMeta, fetcher: () => Promise<ProviderUsage>): 
     if (e instanceof RateLimitError) {
       const backoff = Math.max(e.retryAfterMs, MIN_BACKOFF_MS)
       const backoffUntil = Math.max(existing?.backoffUntil ?? 0, Date.now() + backoff)
-      if (existing) existing.backoffUntil = backoffUntil
+      if (existing) {
+        existing.backoffUntil = backoffUntil
+      } else {
+        cache.set(p.id, { result: usageError(p, 'Rate limited'), cachedAt: Date.now(), backoffUntil })
+      }
     }
     const errorMsg = e instanceof RateLimitError ? e.message : friendlyError(e)
     // Preserve last valid windows so UI can show stale data + error indicator
