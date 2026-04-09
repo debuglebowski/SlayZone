@@ -525,6 +525,52 @@ test('OAuth URL first-line range spans all continuation lines', () => {
   assert(links[0].range.end.y, 6, 'end on last continuation line')
 })
 
+// ─────────────────────────────────────
+// FileLinkProvider wrapped lines
+// ─────────────────────────────────────
+console.log('\nFileLinkProvider wrapped lines')
+console.log('─'.repeat(40))
+
+import { FileLinkProvider } from './web-link-provider'
+
+function getFileLinksSync(term: Terminal, bufferLineNumber: number): ILink[] {
+  const provider = new FileLinkProvider(term, () => {})
+  let result: ILink[] = []
+  provider.provideLinks(bufferLineNumber, (links) => { result = links ?? [] })
+  return result
+}
+
+test('detects file path split across wrapped lines (first line)', () => {
+  // Simulates: ⏺ Update(packages/domains/ai-config/src/shared/skill-marketplace-registry.ts)
+  // wrapped at col 60
+  const term = mockTerminal([
+    { text: '⏺ Update(packages/domains/ai-config/src/shared/skill-market', isWrapped: false },
+    { text: 'place-registry.ts)', isWrapped: true },
+  ])
+  const links = getFileLinksSync(term, 1)
+  assert(links.length, 1, 'should find 1 file link on first line')
+  assert(links[0].text, 'packages/domains/ai-config/src/shared/skill-marketplace-registry.ts', 'full path')
+})
+
+test('detects file path split across wrapped lines (continuation line)', () => {
+  const term = mockTerminal([
+    { text: '⏺ Update(packages/domains/ai-config/src/shared/skill-market', isWrapped: false },
+    { text: 'place-registry.ts)', isWrapped: true },
+  ])
+  const links = getFileLinksSync(term, 2)
+  assert(links.length, 1, 'should find 1 file link on continuation line')
+  assert(links[0].text, 'packages/domains/ai-config/src/shared/skill-marketplace-registry.ts', 'full path')
+})
+
+test('non-wrapped file path still works', () => {
+  const term = mockTerminal([
+    { text: '⏺ Update(packages/domains/ai-config/src/shared/skill-marketplace-registry.ts)', isWrapped: false },
+  ])
+  const links = getFileLinksSync(term, 1)
+  assert(links.length, 1, 'should find 1 file link')
+  assert(links[0].text, 'packages/domains/ai-config/src/shared/skill-marketplace-registry.ts', 'full path')
+})
+
 console.log('─'.repeat(40))
 console.log(`\n${passed} passed, ${failed} failed\n`)
 process.exit(failed > 0 ? 1 : 0)

@@ -81,30 +81,33 @@ export class FileLinkProvider implements ILinkProvider {
   ) {}
 
   provideLinks(bufferLineNumber: number, callback: (links: ILink[] | undefined) => void): void {
-    const line = this._terminal.buffer.active.getLine(bufferLineNumber - 1)
-    if (!line) {
+    const lineIndex = bufferLineNumber - 1
+    const [lines, topLineIndex] = getWindowedLineStrings(lineIndex, this._terminal)
+    const joinedText = lines.join('')
+    if (!joinedText) {
       callback(undefined)
       return
     }
 
-    // File links don't span wrapped lines — paths with spaces aren't matched anyway
-    const text = line.translateToString(true)
     const regex = new RegExp(FILE_REGEX.source, 'g')
     const links: ILink[] = []
     let match: RegExpExecArray | null
 
-    while ((match = regex.exec(text)) !== null) {
+    while ((match = regex.exec(joinedText)) !== null) {
       const fullMatch = match[0]
       const lineNum = match[1] ? parseInt(match[1], 10) : undefined
       const colNum = match[2] ? parseInt(match[2], 10) : undefined
       // Strip the :line:col suffix from the file path
       const filePath = lineNum !== undefined ? fullMatch.replace(/:\d+(?::\d+)?$/, '') : fullMatch
-      const startX = match.index
+
+      const [startY, startX] = mapStringIndex(this._terminal, topLineIndex, 0, match.index)
+      const [endY, endX] = mapStringIndex(this._terminal, topLineIndex, 0, match.index + fullMatch.length)
+      if (startY === -1 || endY === -1) continue
 
       links.push({
         range: {
-          start: { x: startX + 1, y: bufferLineNumber },
-          end: { x: startX + fullMatch.length + 1, y: bufferLineNumber }
+          start: { x: startX + 1, y: startY + 1 },
+          end: { x: endX, y: endY + 1 }
         },
         text: fullMatch,
         decorations: { underline: false, pointerCursor: true },
