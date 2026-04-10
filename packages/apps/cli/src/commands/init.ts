@@ -1,7 +1,10 @@
 import { Command } from 'commander'
 import { createHash } from 'node:crypto'
-import { BUILTIN_SKILLS } from '@slayzone/ai-config/shared'
-import { openDb, notifyApp } from '../db'
+import fs from 'node:fs'
+import path from 'node:path'
+import { BUILTIN_SKILLS, PROVIDER_PATHS } from '@slayzone/ai-config/shared'
+import type { CliProvider } from '@slayzone/ai-config/shared'
+import { openDb, notifyApp, resolveProject, resolveProjectByPath } from '../db'
 
 const INSTRUCTIONS = `\
 # SlayZone Environment
@@ -25,10 +28,43 @@ export function initCommand(): Command {
 
   cmd
     .command('skills')
-    .description('Install all built-in slay skills from the marketplace registry')
-    .action(async () => {
+    .description('Install all built-in slay skills for the current project')
+    .option('--project <name|id>', 'Target project (defaults to project matching cwd)')
+    .action(async (opts) => {
       const db = openDb()
+
+      let projectId: string
+      let projectName: string
+      let projectPath: string | null
+
+      if (opts.project) {
+        const p = resolveProject(db, opts.project)
+        projectId = p.id
+        projectName = p.name
+        const row = db.query<{ path: string | null }>(`SELECT path FROM projects WHERE id = :id`, { ':id': p.id })
+        projectPath = row[0]?.path ?? null
+      } else {
+        const p = resolveProjectByPath(db, process.cwd())
+        projectId = p.id
+        projectName = p.name
+        projectPath = p.path
+      }
+
+      // Resolve enabled providers for file writing
+      let providers: CliProvider[] = ['claude']
+      const providerRow = db.query<{ value: string }>(
+        `SELECT value FROM settings WHERE key = :key`,
+        { ':key': `ai_providers:${projectId}` }
+      )
+      if (providerRow.length > 0) {
+        try {
+          const parsed = JSON.parse(providerRow[0].value)
+          if (Array.isArray(parsed) && parsed.length > 0) providers = parsed
+        } catch { /* use default */ }
+      }
+
       const registryId = 'builtin-slayzone'
+      const installedSkills: { slug: string; content: string }[] = []
 
       let installed = 0
       let skipped = 0
@@ -37,10 +73,9 @@ export function initCommand(): Command {
         const entryId = `builtin-${skill.slug}`
         const hash = createHash('sha256').update(skill.content).digest('hex')
 
-        // Check if already installed by slug
         const existing = db.query<{ id: string }>(
-          `SELECT id FROM ai_config_items WHERE type = 'skill' AND slug = :slug AND scope = 'global'`,
-          { ':slug': skill.slug }
+          `SELECT id FROM ai_config_items WHERE type = 'skill' AND slug = :slug AND scope = 'project' AND project_id = :projectId`,
+          { ':slug': skill.slug, ':projectId': projectId }
         )
 
         if (existing.length > 0) {
@@ -63,9 +98,10 @@ export function initCommand(): Command {
 
         db.run(
           `INSERT INTO ai_config_items (id, type, scope, project_id, name, slug, content, metadata_json, created_at, updated_at)
-           VALUES (:id, 'skill', 'global', NULL, :name, :slug, :content, :metadata, :now, :now)`,
+           VALUES (:id, 'skill', 'project', :projectId, :name, :slug, :content, :metadata, :now, :now)`,
           {
             ':id': id,
+            ':projectId': projectId,
             ':name': skill.name,
             ':slug': skill.slug,
             ':content': skill.content,
@@ -73,17 +109,31 @@ export function initCommand(): Command {
             ':now': now,
           }
         )
+        installedSkills.push({ slug: skill.slug, content: skill.content })
         installed++
         console.log(`  Installed ${skill.name}`)
+      }
+
+      // Write skill files to disk
+      if (projectPath && installedSkills.length > 0) {
+        for (const provider of providers) {
+          const mapping = PROVIDER_PATHS[provider]
+          if (!mapping?.skillsDir) continue
+          for (const skill of installedSkills) {
+            const filePath = path.join(projectPath, mapping.skillsDir, skill.slug, 'SKILL.md')
+            fs.mkdirSync(path.dirname(filePath), { recursive: true })
+            fs.writeFileSync(filePath, skill.content, 'utf-8')
+          }
+        }
       }
 
       db.close()
 
       if (installed > 0) {
         await notifyApp()
-        console.log(`\nInstalled ${installed} skill${installed === 1 ? '' : 's'}${skipped > 0 ? `, ${skipped} already installed` : ''}`)
+        console.log(`\nInstalled ${installed} skill${installed === 1 ? '' : 's'} for "${projectName}"${skipped > 0 ? `, ${skipped} already installed` : ''}`)
       } else {
-        console.log(`All ${skipped} skills already installed`)
+        console.log(`All ${skipped} skills already installed for "${projectName}"`)
       }
     })
 

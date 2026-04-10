@@ -11,6 +11,33 @@ export interface SlayDb {
   close(): void
 }
 
+export function resolveProjectByPath(db: SlayDb, dirPath: string): { id: string; name: string; path: string } {
+  const normalized = dirPath.replace(/\/+$/, '')
+  const projects = db.query<{ id: string; name: string; path: string }>(
+    `SELECT id, name, path FROM projects WHERE path IS NOT NULL`
+  )
+
+  let best: { id: string; name: string; path: string } | null = null
+  let bestLen = -1
+
+  for (const p of projects) {
+    const pPath = p.path.replace(/\/+$/, '')
+    if (normalized === pPath || normalized.startsWith(pPath + '/')) {
+      if (pPath.length > bestLen) {
+        best = { id: p.id, name: p.name, path: p.path }
+        bestLen = pPath.length
+      }
+    }
+  }
+
+  if (!best) {
+    console.error(`No project found for directory: ${dirPath}`)
+    console.error('Create a project with a path first, or use --project <name|id> to specify one.')
+    process.exit(1)
+  }
+  return best
+}
+
 export function resolveProject(db: SlayDb, proj: string): { id: string; name: string } {
   const projects = db.query<{ id: string; name: string }>(
     `SELECT id, name FROM projects WHERE id = :proj OR LOWER(name) LIKE :projLike LIMIT 10`,
