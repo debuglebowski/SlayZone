@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, type ComponentProps } from 'react'
-import { ChevronRight, HelpCircle, Plus, RefreshCw, Trash2, CheckCircle2, AlertCircle } from 'lucide-react'
-import { Button, IconButton, Input, Label, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Switch, Tooltip, TooltipTrigger, TooltipContent, toast } from '@slayzone/ui'
+import { ChevronRight, Copy, HelpCircle, Plus, RefreshCw, Trash2, CheckCircle2, AlertCircle } from 'lucide-react'
+import { Button, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger, IconButton, Input, Label, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Switch, Tooltip, TooltipTrigger, TooltipContent, toast } from '@slayzone/ui'
 import { groupTerminalModes } from '@slayzone/terminal'
 import type { TerminalModeInfo, CreateTerminalModeInput, UpdateTerminalModeInput, UsageProviderConfig, UsageWindow } from '@slayzone/terminal/shared'
 import { DETECTION_ENGINES } from '@slayzone/terminal/shared'
@@ -441,6 +441,18 @@ export function AiProvidersSettingsTab(props: AiProvidersSettingsTabProps) {
 
   const slugify = (text: string) => text.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')
 
+  const duplicateMode = (mode: TerminalModeInfo) => {
+    setNewModeLabel(`${mode.label} (Copy)`)
+    setNewInitialCommand(mode.initialCommand || '')
+    setNewResumeCommand(mode.resumeCommand || '')
+    setNewDefaultFlags(mode.defaultFlags || '')
+    setNewDetectionEngine(mode.type || 'terminal')
+    setNewPatternAttention(mode.patternAttention || '')
+    setNewPatternWorking(mode.patternWorking || '')
+    setNewPatternError(mode.patternError || '')
+    setShowAddForm(true)
+  }
+
   const isValidRegex = (pattern: string) => {
     try {
       new RegExp(pattern)
@@ -562,14 +574,50 @@ export function AiProvidersSettingsTab(props: AiProvidersSettingsTabProps) {
           </div>
 
           {!showAddForm ? (
-            <Button
-              variant="outline"
-              className="w-full border-dashed"
-              onClick={() => setShowAddForm(true)}
-            >
-              <Plus className="size-3.5 mr-1.5" />
-              Add Custom Provider
-            </Button>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                className="flex-1 border-dashed"
+                onClick={() => setShowAddForm(true)}
+              >
+                <Plus className="size-3.5 mr-1.5" />
+                Add Custom Provider
+              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" className="flex-1 border-dashed">
+                    <Copy className="size-3.5 mr-1.5" />
+                    Duplicate Provider
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  {(() => {
+                    const builtin = modes.filter(m => m.isBuiltin && m.id !== 'terminal')
+                    const custom = modes.filter(m => !m.isBuiltin)
+                    return (
+                      <>
+                        <DropdownMenuLabel className="text-xs text-muted-foreground">Built-in</DropdownMenuLabel>
+                        {builtin.map(mode => (
+                          <DropdownMenuItem key={mode.id} onClick={() => duplicateMode(mode)}>
+                            {mode.label}
+                          </DropdownMenuItem>
+                        ))}
+                        {custom.length > 0 && (
+                          <>
+                            <DropdownMenuLabel className="text-xs text-muted-foreground mt-4">Custom</DropdownMenuLabel>
+                            {custom.map(mode => (
+                              <DropdownMenuItem key={mode.id} onClick={() => duplicateMode(mode)}>
+                                {mode.label}
+                              </DropdownMenuItem>
+                            ))}
+                          </>
+                        )}
+                      </>
+                    )
+                  })()}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
           ) : (
             <div className="p-4 rounded-lg border border-dashed space-y-4">
               <div className="flex items-center justify-between">
