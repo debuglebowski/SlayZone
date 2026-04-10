@@ -69,35 +69,60 @@ export function SlayNudgeBanner({ projectPath, onDismiss, onSetupComplete }: Sla
         <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle>Set up slay CLI for AI agents</DialogTitle>
-            <DialogDescription>
-              The slay CLI lets AI agents interact with SlayZone — managing tasks, reading descriptions,
-              updating status, controlling the browser panel, and more. Add it to your project so agents
-              discover it automatically.
-            </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-2">
-            <div className="flex items-center gap-2">
-              <code className="flex-1 bg-muted px-3 py-1.5 rounded text-xs font-mono">
-                slay init instructions {'>'}{'>'}  CLAUDE.md
-              </code>
-              <RunButton state={instructionsState} onClick={() => runCommand('instructions')} />
+          <div className="space-y-4 text-sm text-muted-foreground">
+            <p>
+              The <code className="text-foreground font-mono text-xs">slay</code> CLI lets AI agents
+              running inside SlayZone interact with your tasks &mdash; reading descriptions, updating
+              status, managing subtasks, controlling the browser panel, and coordinating with other agents.
+            </p>
+
+          </div>
+
+          <div className="space-y-4 pt-2">
+            <div className="space-y-1.5">
+              <p className="text-sm font-medium">
+                1. Add instructions
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Appends a SlayZone environment description to your CLAUDE.md.
+              </p>
+              <div className="flex items-center gap-2">
+                <code className="flex-1 bg-muted px-3 py-1.5 rounded text-xs font-mono">
+                  slay init instructions {'>'}{'>'}  CLAUDE.md
+                </code>
+                <RunButton state={instructionsState} onClick={() => runCommand('instructions')} />
+              </div>
             </div>
-            <div className="flex items-center gap-2">
-              <code className="flex-1 bg-muted px-3 py-1.5 rounded text-xs font-mono">
-                slay init skills
-              </code>
-              <RunButton state={skillsState} onClick={() => runCommand('skills')} />
+
+            <div className="space-y-1.5">
+              <p className="text-sm font-medium">
+                2. Add skills
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Creates a skill file with the full slay command reference so agents know
+                every available command.
+              </p>
+              <div className="flex items-center gap-2">
+                <code className="flex-1 bg-muted px-3 py-1.5 rounded text-xs font-mono">
+                  slay init skills
+                </code>
+                <RunButton state={skillsState} onClick={() => runCommand('skills')} />
+              </div>
             </div>
           </div>
 
           {error && (
-            <p className="text-xs text-destructive">{error}</p>
+            <p className="text-xs text-destructive pt-2">{error}</p>
           )}
 
-          <p className="text-xs text-muted-foreground">
-            Or use Settings &rarr; Context Manager to set up visually.
-          </p>
+          <div className="bg-muted/50 rounded-md px-3 py-2.5 mt-2">
+            <p className="text-xs text-muted-foreground">
+              This is fully reversible &mdash; just delete the added lines from CLAUDE.md
+              and remove the generated skill directory to undo.
+            </p>
+          </div>
         </DialogContent>
       </Dialog>
     </>
