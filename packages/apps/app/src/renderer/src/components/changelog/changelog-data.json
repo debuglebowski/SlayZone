@@ -1,5 +1,27 @@
 [
   {
+    "version": "0.17.3",
+    "date": "2026-04-11",
+    "tagline": "Config & graphs",
+    "items": [
+      {
+        "category": "feature",
+        "title": "Duplicate AI provider",
+        "description": "Duplicate an existing provider configuration with one click in AI settings."
+      },
+      {
+        "category": "feature",
+        "title": "Marketplace library & project actions",
+        "description": "Add or remove libraries and projects directly from marketplace skill cards."
+      },
+      {
+        "category": "fix",
+        "title": "Skill graph edge rendering",
+        "description": "Fixed inconsistent edge styles and spurious back-edges in the skill graph."
+      }
+    ]
+  },
+  {
     "version": "0.17.2",
     "date": "2026-04-10",
     "tagline": "Boot crash fix",

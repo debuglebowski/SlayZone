@@ -1,6 +1,28 @@
 # Changelog
 
 
+## v0.17.3
+
+[compare changes](https://github.com/debuglebowski/slayzone/compare/v0.17.2...v0.17.3)
+
+### 🚀 Enhancements
+
+- **settings:** Add duplicate provider button to AI providers tab ([de6d2d01](https://github.com/debuglebowski/slayzone/commit/de6d2d01))
+- **ai-config:** Add/remove library & project actions on marketplace cards ([563f2ae2](https://github.com/debuglebowski/slayzone/commit/563f2ae2))
+
+### 🩹 Fixes
+
+- **ai-config:** Uniform skill graph edge rendering + fix spurious back-edges ([98e4f7e1](https://github.com/debuglebowski/slayzone/commit/98e4f7e1))
+
+### 🏡 Chore
+
+- **nix:** Update sources to 0.17.2 ([77b9af7c](https://github.com/debuglebowski/slayzone/commit/77b9af7c))
+- Reorder slay skill frontmatter ([ab2a0f30](https://github.com/debuglebowski/slayzone/commit/ab2a0f30))
+
+### ❤️ Contributors
+
+- Debuglebowski
+
 ## v0.17.2
 
 [compare changes](https://github.com/debuglebowski/slayzone/compare/v0.17.1...v0.17.2)
