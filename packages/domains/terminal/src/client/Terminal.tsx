@@ -156,6 +156,7 @@ export const Terminal = forwardRef<TerminalHandle, TerminalProps>(function Termi
   const lastRenderedSeqRef = useRef<number>(-1)
   const resizeDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [isDragOver, setIsDragOver] = useState(false)
+  const dragCounter = useRef(0)
   const [searchOpen, setSearchOpen] = useState(false)
   const [isInitializing, setIsInitializing] = useState(true)
   const [isReplaying, setIsReplaying] = useState(false)
@@ -1014,22 +1015,34 @@ export const Terminal = forwardRef<TerminalHandle, TerminalProps>(function Termi
     const handleDrop = async (e: DragEvent) => {
       e.preventDefault()
       e.stopPropagation()
+      dragCounter.current = 0
       setIsDragOver(false)
+      terminalRef.current?.focus()
 
       const files = e.dataTransfer?.files
-      if (!files?.length) {
+      if (!files?.length) return
+
+      try {
+        const paths: string[] = []
+        for (const file of files) {
+          const path = await processFile(file)
+          if (path) paths.push(path)
+        }
+
+        if (paths.length > 0) {
+          insertPath(paths.join(' '))
+        }
+      } finally {
         terminalRef.current?.focus()
-        return
       }
+    }
 
-      const paths: string[] = []
-      for (const file of files) {
-        const path = await processFile(file)
-        if (path) paths.push(path)
-      }
-
-      if (paths.length > 0) {
-        insertPath(paths.join(' '))
+    const handleDragEnter = (e: DragEvent) => {
+      e.preventDefault()
+      e.stopPropagation()
+      dragCounter.current++
+      if (e.dataTransfer?.types.includes('Files')) {
+        setIsDragOver(true)
       }
       terminalRef.current?.focus()
     }
@@ -1037,22 +1050,26 @@ export const Terminal = forwardRef<TerminalHandle, TerminalProps>(function Termi
     const handleDragOver = (e: DragEvent) => {
       e.preventDefault()
       e.stopPropagation()
-      setIsDragOver(true)
     }
 
     const handleDragLeave = (e: DragEvent) => {
       e.preventDefault()
       e.stopPropagation()
-      setIsDragOver(false)
+      dragCounter.current--
+      if (dragCounter.current === 0) {
+        setIsDragOver(false)
+      }
     }
 
     container.addEventListener('paste', handlePaste)
+    container.addEventListener('dragenter', handleDragEnter)
     container.addEventListener('drop', handleDrop)
     container.addEventListener('dragover', handleDragOver)
     container.addEventListener('dragleave', handleDragLeave)
 
     return () => {
       container.removeEventListener('paste', handlePaste)
+      container.removeEventListener('dragenter', handleDragEnter)
       container.removeEventListener('drop', handleDrop)
       container.removeEventListener('dragover', handleDragOver)
       container.removeEventListener('dragleave', handleDragLeave)
