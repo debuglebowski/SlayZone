@@ -663,7 +663,7 @@ export const BrowserPanel = forwardRef<BrowserPanelHandle, BrowserPanelProps>(fu
 
     onTabsChange({ tabs: newTabs, activeTabId: newActiveId })
     track('browser_tab_closed')
-  }, [tabs, onTabsChange, onRequestHide, newTabUrl])
+  }, [tabs, onTabsChange, onRequestHide])
 
   const switchToTab = useCallback((tabId: string) => {
     onTabsChange({ ...tabs, activeTabId: tabId })

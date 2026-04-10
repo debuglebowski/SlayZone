@@ -817,7 +817,7 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
           return
         } else if (bt.tabs.length === 1) {
           setBrowserTabs({ tabs: [], activeTabId: null })
-          handlePanelToggle('browser', false)
+          setPanelVisibility(prev => ({ ...prev, browser: false }))
           return
         }
       }
@@ -1042,15 +1042,16 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
         return
       }
       if (matchesShortcut(e, keys('panel-terminal'))) {
-        e.preventDefault()
         // Cmd+T opens a new browser tab when browser panel is focused
         if (lastFocusedPanelRef.current === 'browser' && panelVisibility.browser && isBuiltinEnabled('browser', 'task')) {
+          e.preventDefault()
           const newTab = { id: `tab-${crypto.randomUUID().slice(0, 8)}`, url: 'about:blank', title: 'New Tab' }
           setBrowserTabs(prev => ({ tabs: [...prev.tabs, newTab], activeTabId: newTab.id }))
           requestAnimationFrame(() => browserPanelRef.current?.focusUrlBar())
           return
         }
         if (isBuiltinEnabled('terminal', 'task')) {
+          e.preventDefault()
           handlePanelToggle('terminal', !panelVisibility.terminal)
         }
         return
