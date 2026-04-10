@@ -1,5 +1,17 @@
 [
   {
+    "version": "0.17.2",
+    "date": "2026-04-10",
+    "tagline": "Boot crash fix",
+    "items": [
+      {
+        "category": "fix",
+        "title": "Boot crash on skill registry update",
+        "description": "Fixed datetime() SQL quoting that caused a crash on startup."
+      }
+    ]
+  },
+  {
     "version": "0.17.1",
     "date": "2026-04-10",
     "tagline": "Stability fixes",
