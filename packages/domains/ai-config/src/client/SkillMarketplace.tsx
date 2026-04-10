@@ -88,10 +88,12 @@ export function SkillMarketplace({ projectId, projectPath }: SkillMarketplacePro
   }, [loadEntries])
 
   const handleAddToProject = useCallback(async (entryId: string) => {
-    if (!projectId) return
+    if (!projectId || !projectPath) return
     setInstalling(entryId)
     try {
-      await window.api.aiConfig.marketplace.installSkill({ entryId, scope: 'project', projectId })
+      const item = await window.api.aiConfig.marketplace.installSkill({ entryId, scope: 'project', projectId })
+      // Best-effort sync — write skill files to disk for all enabled providers
+      try { await window.api.aiConfig.syncLinkedFile(projectId, projectPath, item.id) } catch { /* sync self-heals on next Sync All */ }
       toast.success('Skill added to project')
       await loadEntries()
     } catch (err) {
@@ -99,7 +101,7 @@ export function SkillMarketplace({ projectId, projectPath }: SkillMarketplacePro
     } finally {
       setInstalling(null)
     }
-  }, [loadEntries, projectId])
+  }, [loadEntries, projectId, projectPath])
 
   const handleUpdate = useCallback(async (itemId: string, entryId: string) => {
     setInstalling(entryId)
