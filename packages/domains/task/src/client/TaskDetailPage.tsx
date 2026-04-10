@@ -815,6 +815,10 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
           const newActiveId = newTabs[Math.min(idx, newTabs.length - 1)]?.id ?? null
           setBrowserTabs({ tabs: newTabs, activeTabId: newActiveId })
           return
+        } else if (bt.tabs.length === 1) {
+          setBrowserTabs({ tabs: [], activeTabId: null })
+          handlePanelToggle('browser', false)
+          return
         }
       }
       // Nothing was closed — close the task tab
@@ -941,6 +945,11 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
       setPanelVisibility(newVisibility)
       // Auto-focus panel content so scope tracker detects the right scope
       if (panelId === 'browser' && active) {
+        // Create a fresh tab when reopening with no tabs
+        if (browserTabs.tabs.length === 0) {
+          const newTab = { id: `tab-${crypto.randomUUID().slice(0, 8)}`, url: 'about:blank', title: 'New Tab' }
+          setBrowserTabs({ tabs: [newTab], activeTabId: newTab.id })
+        }
         requestAnimationFrame(() => browserPanelRef.current?.focus())
       }
       // Persist to DB
@@ -1032,9 +1041,18 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
         }
         return
       }
-      if (matchesShortcut(e, keys('panel-terminal')) && isBuiltinEnabled('terminal', 'task')) {
+      if (matchesShortcut(e, keys('panel-terminal'))) {
         e.preventDefault()
-        handlePanelToggle('terminal', !panelVisibility.terminal)
+        // Cmd+T opens a new browser tab when browser panel is focused
+        if (lastFocusedPanelRef.current === 'browser' && panelVisibility.browser && isBuiltinEnabled('browser', 'task')) {
+          const newTab = { id: `tab-${crypto.randomUUID().slice(0, 8)}`, url: 'about:blank', title: 'New Tab' }
+          setBrowserTabs(prev => ({ tabs: [...prev.tabs, newTab], activeTabId: newTab.id }))
+          requestAnimationFrame(() => browserPanelRef.current?.focusUrlBar())
+          return
+        }
+        if (isBuiltinEnabled('terminal', 'task')) {
+          handlePanelToggle('terminal', !panelVisibility.terminal)
+        }
         return
       }
       if (matchesShortcut(e, keys('panel-processes')) && isBuiltinEnabled('processes', 'task')) {
@@ -1989,6 +2007,7 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
               className="h-full"
               tabs={browserTabs}
               onTabsChange={handleBrowserTabsChange}
+              onRequestHide={() => handlePanelToggle('browser', false)}
               taskId={task.id}
               projectId={task.project_id}
               isResizing={isResizing}
