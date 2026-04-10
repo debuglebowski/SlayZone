@@ -115,7 +115,7 @@ export function registerMarketplaceHandlers(ipcMain: IpcMain, db: Database): voi
   })
 
   ipcMain.handle('ai-config:marketplace:toggle-registry', (_event, registryId: string, enabled: boolean) => {
-    db.prepare('UPDATE skill_registries SET enabled = ?, updated_at = datetime("now") WHERE id = ?')
+    db.prepare(`UPDATE skill_registries SET enabled = ?, updated_at = datetime('now') WHERE id = ?`)
       .run(enabled ? 1 : 0, registryId)
   })
 
@@ -438,7 +438,7 @@ function seedBuiltinEntries(db: Database): void {
         installedVersion: item.content_hash,
         installedAt: new Date().toISOString()
       }
-      db.prepare('UPDATE ai_config_items SET content = ?, metadata_json = ?, updated_at = datetime("now") WHERE id = ?')
+      db.prepare(`UPDATE ai_config_items SET content = ?, metadata_json = ?, updated_at = datetime('now') WHERE id = ?`)
         .run(normalized.content, JSON.stringify(meta), item.item_id)
     }
   })()
