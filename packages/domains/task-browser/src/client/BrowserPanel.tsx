@@ -810,12 +810,12 @@ export const BrowserPanel = forwardRef<BrowserPanelHandle, BrowserPanelProps>(fu
     if (url.startsWith('/')) {
       url = `file://${url}`
     } else if (!hasScheme) {
-      const looksLikeUrl =
+      const isLocal =
         /^localhost(:\d+)?(\/|$)/.test(url) ||
-        /^\d{1,3}(\.\d{1,3}){3}(:\d+)?(\/|$)/.test(url) ||
-        (url.includes('.') && !url.includes(' '))
+        /^\d{1,3}(\.\d{1,3}){3}(:\d+)?(\/|$)/.test(url)
+      const looksLikeUrl = isLocal || (url.includes('.') && !url.includes(' '))
       url = looksLikeUrl
-        ? `https://${url}`
+        ? `${isLocal ? 'http' : 'https'}://${url}`
         : `https://www.google.com/search?q=${encodeURIComponent(url)}`
     }
 
