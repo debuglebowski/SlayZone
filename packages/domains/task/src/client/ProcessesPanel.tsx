@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
-import { Play, Square, RotateCcw, Plus, Trash2, Cpu, Pencil, FileText, MoreHorizontal, CornerDownLeft, Info } from 'lucide-react'
+import { Play, Square, RotateCcw, Plus, Trash2, Cpu, Pencil, FileText, MoreHorizontal, CornerDownLeft, Info, Loader2 } from 'lucide-react'
 import { cn, DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, Tooltip, TooltipTrigger, TooltipContent } from '@slayzone/ui'
 import { ProcessDialog } from './ProcessDialog'
 type ProcessStatus = 'running' | 'stopped' | 'completed' | 'error'
@@ -224,6 +224,7 @@ function SectionHeader({ label }: { label: string }) {
 
 export function ProcessesPanel({ taskId, projectId, cwd, terminalSessionId }: { taskId: string | null; projectId: string | null; cwd?: string | null; terminalSessionId?: string }) {
   const [processes, setProcesses] = useState<ProcessEntry[]>([])
+  const [loading, setLoading] = useState(true)
   const [expandedLogs, setExpandedLogs] = useState<Set<string>>(new Set())
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editingProcess, setEditingProcess] = useState<ProcessEntry | null>(null)
@@ -231,7 +232,11 @@ export function ProcessesPanel({ taskId, projectId, cwd, terminalSessionId }: { 
   const logEndRefs = useRef<Record<string, HTMLDivElement | null>>({})
 
   useEffect(() => {
-    window.api.processes.listForTask(taskId, projectId).then((list) => setProcesses(list as ProcessEntry[]))
+    setLoading(true)
+    window.api.processes.listForTask(taskId, projectId).then((list) => {
+      setProcesses(list as ProcessEntry[])
+      setLoading(false)
+    })
   }, [taskId, projectId])
 
   useEffect(() => {
@@ -358,7 +363,11 @@ export function ProcessesPanel({ taskId, projectId, cwd, terminalSessionId }: { 
 
       {/* List */}
       <div className="flex-1 min-h-0 overflow-y-auto">
-        {isEmpty ? (
+        {loading ? (
+          <div className="h-full flex items-center justify-center">
+            <Loader2 className="size-6 animate-spin text-muted-foreground" />
+          </div>
+        ) : isEmpty ? (
           <div className="h-full flex flex-col items-center justify-center gap-5 p-8">
             <div className="flex flex-col items-center gap-3">
               <div className="size-12 rounded-xl bg-muted/50 flex items-center justify-center">
