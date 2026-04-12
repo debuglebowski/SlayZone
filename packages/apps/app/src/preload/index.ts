@@ -225,6 +225,11 @@ const api: ElectronAPI = {
       ipcRenderer.on('app:close-current-focus', handler)
       return () => ipcRenderer.removeListener('app:close-current-focus', handler)
     },
+    onSyncSessionId: (callback: () => void) => {
+      const handler = () => callback()
+      ipcRenderer.on('app:sync-session-id', handler)
+      return () => ipcRenderer.removeListener('app:sync-session-id', handler)
+    },
     onReloadBrowser: (callback: () => void) => {
       const handler = () => callback()
       ipcRenderer.on('app:reload-browser', handler)

@@ -38,6 +38,7 @@ export const shortcutDefinitions: ShortcutDefinition[] = [
   { id: 'prev-tab', label: 'Previous Tab', group: 'Tabs', defaultKeys: 'ctrl+shift+tab', scope: 'global' },
   { id: 'reopen-closed-tab', label: 'Reopen Closed Tab', group: 'Tabs', defaultKeys: 'mod+shift+t', scope: 'global' },
   { id: 'new-temp-task', label: 'New Temporary Task', group: 'Tabs', defaultKeys: 'mod+shift+n', scope: 'global' },
+  { id: 'sync-session-id', label: 'Sync Detected Session ID', group: 'General', defaultKeys: 'mod+shift+u', scope: 'global' },
   { id: 'switch-project-1-9', label: 'Switch Project 1–9', group: 'Tabs', defaultKeys: 'mod+shift+1-9', scope: 'global', customizable: false },
 
   // Task Panels (task scope)
@@ -84,7 +85,7 @@ export const shortcutDefinitions: ShortcutDefinition[] = [
 ]
 
 /** Shortcut IDs that are driven by Electron native menu accelerators. */
-const MENU_SHORTCUT_IDS = ['global-settings', 'project-settings', 'new-temp-task', 'close-tab', 'close-task'] as const
+const MENU_SHORTCUT_IDS = ['global-settings', 'project-settings', 'new-temp-task', 'close-tab', 'close-task', 'sync-session-id'] as const
 
 /** Default keys for menu-driven shortcuts, derived from shortcutDefinitions. */
 export const MENU_SHORTCUT_DEFAULTS: Record<string, string> = Object.fromEntries(

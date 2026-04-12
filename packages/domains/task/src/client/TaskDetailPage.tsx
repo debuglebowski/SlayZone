@@ -268,6 +268,7 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
   const terminalInjectTitleShortcut = useShortcutDisplay('terminal-inject-title')
   const terminalInjectDescShortcut = useShortcutDisplay('terminal-inject-desc')
   const terminalRestartShortcut = useShortcutDisplay('terminal-restart')
+  const syncSessionIdShortcut = useShortcutDisplay('sync-session-id')
 
   // Detected session ID from /status command
   const [detectedSessionId, setDetectedSessionId] = useState<string | null>(null)
@@ -589,6 +590,15 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
     onTaskUpdated(updated)
     setDetectedSessionId(null)
   }, [task, detectedSessionId, onTaskUpdated])
+
+  const handleUpdateSessionIdRef = useRef(handleUpdateSessionId)
+  useEffect(() => { handleUpdateSessionIdRef.current = handleUpdateSessionId }, [handleUpdateSessionId])
+
+  // Cmd+Shift+U: sync detected session ID to DB (only when this task is active and banner is showing)
+  useEffect(() => {
+    if (!isActive) return
+    return window.api.app.onSyncSessionId(() => { void handleUpdateSessionIdRef.current() })
+  }, [isActive])
 
   // Persist detected conversation IDs immediately for modes that need session discovery.
   useEffect(() => {
@@ -1646,6 +1656,7 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
                 onClick={handleUpdateSessionId}
               >
                 Update DB
+                <kbd className="ml-2 opacity-70" style={{ fontFamily: 'system-ui' }}>{syncSessionIdShortcut}</kbd>
               </Button>
             </div>
           )}

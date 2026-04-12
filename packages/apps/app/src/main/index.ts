@@ -880,6 +880,11 @@ app.whenReady().then(async () => {
             label: 'New Temporary Task',
             accelerator: getMenuAccelerator('new-temp-task', overrides),
             click: () => emitNewTemporaryTask()
+          },
+          {
+            label: 'Sync Detected Session ID',
+            accelerator: getMenuAccelerator('sync-session-id', overrides),
+            click: () => mainWindow?.webContents.send('app:sync-session-id')
           }
         ]
       },

@@ -405,6 +405,7 @@ export interface ElectronAPI {
     onScreenshotTrigger: (callback: () => void) => () => void
     onUpdateStatus: (callback: (status: UpdateStatus) => void) => () => void
     onCloseCurrent: (callback: () => void) => () => void
+    onSyncSessionId: (callback: () => void) => () => void
     onReloadBrowser: (callback: () => void) => () => void
     onReloadApp: (callback: () => void) => () => void
     onZoomFactorChanged: (callback: (factor: number) => void) => () => void
