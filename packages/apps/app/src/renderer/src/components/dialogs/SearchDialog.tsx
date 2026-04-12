@@ -1,8 +1,7 @@
-import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react'
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
 import {
   Command,
   CommandEmpty,
-  CommandGroup,
   CommandInput,
   CommandItem,
   CommandList,
@@ -11,13 +10,14 @@ import {
   cn
 } from '@slayzone/ui'
 import { CheckSquare, Folder } from 'lucide-react'
+import { Fzf } from 'fzf'
 import { FileIcon } from '@slayzone/icons'
 import { track } from '@slayzone/telemetry/client'
 import { useDialogStore } from '@slayzone/settings'
 import type { Task } from '@slayzone/task/shared'
 import type { Project } from '@slayzone/projects/shared'
 
-const MAX_FILES = 100
+const MAX_RESULTS = 50
 
 type FilterKind = 'all' | 'files' | 'tasks' | 'projects'
 const FILTERS: { id: FilterKind; label: string }[] = [
@@ -27,6 +27,53 @@ const FILTERS: { id: FilterKind; label: string }[] = [
   { id: 'projects', label: 'Projects' }
 ]
 
+type SearchItem =
+  | { kind: 'file'; id: string; label: string; sublabel: string; filePath: string }
+  | { kind: 'task'; id: string; label: string; sublabel: string }
+  | { kind: 'project'; id: string; label: string; sublabel: string }
+
+const KIND_WEIGHT: Record<SearchItem['kind'], number> = {
+  file: 1.0,
+  task: 0.95,
+  project: 0.9
+}
+
+const BASENAME_BOOST = 1.5
+
+function selectorForItem(item: SearchItem): string {
+  if (item.kind === 'file') return item.filePath
+  return item.label
+}
+
+function Highlight({ text, positions }: { text: string; positions: Set<number> }) {
+  if (positions.size === 0) return <>{text}</>
+  const parts: ReactNode[] = []
+  let run = ''
+  let inMatch = false
+  for (let i = 0; i < text.length; i++) {
+    const matched = positions.has(i)
+    if (matched !== inMatch && run) {
+      parts.push(inMatch ? <mark key={i} className="bg-transparent text-foreground font-semibold">{run}</mark> : run)
+      run = ''
+    }
+    inMatch = matched
+    run += text[i]
+  }
+  if (run) {
+    parts.push(inMatch ? <mark key={text.length} className="bg-transparent text-foreground font-semibold">{run}</mark> : run)
+  }
+  return <>{parts}</>
+}
+
+function offsetPositions(positions: Set<number>, offset: number): Set<number> {
+  const out = new Set<number>()
+  for (const p of positions) {
+    const adj = p - offset
+    if (adj >= 0) out.add(adj)
+  }
+  return out
+}
+
 interface SearchDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
@@ -34,17 +81,6 @@ interface SearchDialogProps {
   projects: Project[]
   onSelectTask: (taskId: string) => void
   onSelectProject: (projectId: string) => void
-}
-
-function fuzzyMatch(query: string, target: string): boolean {
-  if (!query) return true
-  const lower = target.toLowerCase()
-  const q = query.toLowerCase()
-  let qi = 0
-  for (let i = 0; i < lower.length && qi < q.length; i++) {
-    if (lower[i] === q[qi]) qi++
-  }
-  return qi === q.length
 }
 
 export function SearchDialog({
@@ -84,39 +120,83 @@ export function SearchDialog({
     }
   }, [open])
 
-  const filteredFiles = useMemo(() => {
-    if (!search || !fileContext) return []
-    const matches: string[] = []
-    for (const f of allFiles) {
-      if (fuzzyMatch(search, f)) {
-        matches.push(f)
-        if (matches.length >= MAX_FILES) break
+  const items = useMemo<SearchItem[]>(() => {
+    const list: SearchItem[] = []
+    const showFiles = filter === 'all' || filter === 'files'
+    const showTasks = filter === 'all' || filter === 'tasks'
+    const showProjects = filter === 'all' || filter === 'projects'
+
+    if (showFiles && fileContext) {
+      for (const f of allFiles) {
+        const name = f.split('/').pop() ?? f
+        const dir = f.includes('/') ? f.slice(0, f.lastIndexOf('/')) : ''
+        list.push({ kind: 'file', id: f, label: name, sublabel: dir, filePath: f })
       }
     }
-    return matches
-  }, [allFiles, search, fileContext])
+    if (showTasks) {
+      for (const t of tasks) {
+        const projectName = projects.find((p) => p.id === t.project_id)?.name ?? ''
+        list.push({ kind: 'task', id: t.id, label: t.title, sublabel: projectName })
+      }
+    }
+    if (showProjects) {
+      for (const p of projects) {
+        list.push({ kind: 'project', id: p.id, label: p.name, sublabel: '' })
+      }
+    }
+    return list
+  }, [allFiles, tasks, projects, filter, fileContext])
 
-  const filteredTasks = useMemo(() => {
+  const fzfLabel = useMemo(() => new Fzf(items, { selector: (i) => i.label, limit: MAX_RESULTS * 2, casing: 'case-insensitive' }), [items])
+  const fzfPath = useMemo(() => new Fzf(items, { selector: selectorForItem, limit: MAX_RESULTS * 2, casing: 'case-insensitive' }), [items])
+
+  const results = useMemo(() => {
     if (!search) return []
-    return tasks.filter((task) => {
-      const projectName = projects.find((p) => p.id === task.project_id)?.name ?? ''
-      return fuzzyMatch(search, task.title) || fuzzyMatch(search, projectName)
-    })
-  }, [tasks, projects, search])
+    const labelHits = fzfLabel.find(search)
+    const pathHits = fzfPath.find(search)
 
-  const filteredProjects = useMemo(() => {
-    if (!search) return []
-    return projects.filter((p) => fuzzyMatch(search, p.name))
-  }, [projects, search])
+    const pathMap = new Map(pathHits.map((r) => [r.item.id, r]))
+    const seenIds = new Set<string>()
+    const merged: { item: SearchItem; score: number; positions: Set<number>; usedPath: boolean }[] = []
 
-  const showFiles = filter === 'all' || filter === 'files'
-  const showTasks = filter === 'all' || filter === 'tasks'
-  const showProjects = filter === 'all' || filter === 'projects'
+    for (const r of labelHits) {
+      seenIds.add(r.item.id)
+      const boosted = r.score * BASENAME_BOOST
+      const pathHit = r.item.kind === 'file' ? pathMap.get(r.item.id) : undefined
+      if (pathHit && pathHit.score > boosted) {
+        merged.push({ item: r.item, score: pathHit.score, positions: pathHit.positions, usedPath: true })
+      } else {
+        merged.push({ item: r.item, score: boosted, positions: r.positions, usedPath: false })
+      }
+    }
 
-  const visibleCount =
-    (showFiles ? filteredFiles.length : 0) +
-    (showTasks ? filteredTasks.length : 0) +
-    (showProjects ? filteredProjects.length : 0)
+    for (const r of pathHits) {
+      if (!seenIds.has(r.item.id)) {
+        seenIds.add(r.item.id)
+        merged.push({ item: r.item, score: r.score, positions: r.positions, usedPath: true })
+      }
+    }
+
+    const weighted = merged.map((r) => ({
+      ...r,
+      weightedScore: r.score * KIND_WEIGHT[r.item.kind]
+    }))
+    weighted.sort((a, b) => b.weightedScore - a.weightedScore || selectorForItem(a.item).length - selectorForItem(b.item).length)
+    return weighted.slice(0, MAX_RESULTS)
+  }, [fzfLabel, fzfPath, search])
+
+  const firstValue = results[0]
+    ? results[0].item.kind === 'file'
+      ? results[0].item.id
+      : `${results[0].item.kind}:${results[0].item.id}`
+    : ''
+  const [selected, setSelected] = useState('')
+  const [prevFirstValue, setPrevFirstValue] = useState('')
+
+  if (firstValue !== prevFirstValue) {
+    setPrevFirstValue(firstValue)
+    setSelected(firstValue)
+  }
 
   const handleKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
     if (e.key !== 'Tab') return
@@ -129,11 +209,13 @@ export function SearchDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="overflow-hidden p-0" showCloseButton={false}>
+      <DialogContent className="overflow-hidden p-0 max-w-2xl" showCloseButton={false}>
         <Command
           shouldFilter={false}
+          value={selected}
+          onValueChange={setSelected}
           onKeyDown={handleKeyDown}
-          className="[&_[cmdk-group]]:px-2 [&_[cmdk-input-wrapper]_svg]:h-5 [&_[cmdk-input-wrapper]_svg]:w-5 [&_[cmdk-input]]:h-12 [&_[cmdk-item]]:px-2 [&_[cmdk-item]]:py-3 [&_[cmdk-item]_svg]:h-5 [&_[cmdk-item]_svg]:w-5"
+          className="[&_[cmdk-input-wrapper]_svg]:h-5 [&_[cmdk-input-wrapper]_svg]:w-5 [&_[cmdk-input]]:h-12 [&_[cmdk-item]]:px-2 [&_[cmdk-item]]:py-3 [&_[cmdk-item]_svg]:h-5 [&_[cmdk-item]_svg]:w-5"
         >
           <CommandInput
             placeholder="Search files, tasks, projects..."
@@ -160,70 +242,66 @@ export function SearchDialog({
             ))}
             <span className="ml-auto text-[10px] text-muted-foreground/70">Tab to switch</span>
           </div>
-          <CommandList>
-            {search && visibleCount === 0 && <CommandEmpty>No results found.</CommandEmpty>}
+          <CommandList className="max-h-[600px]">
+            {search && results.length === 0 && <CommandEmpty>No results found.</CommandEmpty>}
 
-            {showFiles && filteredFiles.length > 0 && (
-              <CommandGroup heading="Files">
-                {filteredFiles.map((filePath) => {
-                  const name = filePath.split('/').pop() ?? filePath
-                  const dir = filePath.includes('/') ? filePath.slice(0, filePath.lastIndexOf('/')) : ''
-                  return (
-                    <CommandItem
-                      key={filePath}
-                      value={filePath}
-                      onSelect={() => {
-                        track('quick_open_used')
-                        fileContext?.openFile(filePath)
-                        onOpenChange(false)
-                      }}
-                    >
-                      <FileIcon fileName={name} className="size-4 shrink-0 flex items-center [&>svg]:size-full" />
-                      <span className="truncate font-mono text-xs">{name}</span>
-                      {dir && (
-                        <span className="ml-auto text-[11px] text-muted-foreground truncate max-w-[200px]">{dir}</span>
-                      )}
-                    </CommandItem>
-                  )
-                })}
-              </CommandGroup>
-            )}
-
-            {showTasks && filteredTasks.length > 0 && (
-              <CommandGroup heading="Tasks">
-                {filteredTasks.map((task) => (
+            {results.map((r) => {
+              const item = r.item
+              if (item.kind === 'file') {
+                const namePositions = r.usedPath
+                  ? offsetPositions(r.positions, item.filePath.length - item.label.length)
+                  : r.positions
+                return (
                   <CommandItem
-                    key={task.id}
-                    value={`task:${task.id}`}
+                    key={item.id}
+                    value={item.id}
                     onSelect={() => {
-                      onSelectTask(task.id)
+                      track('quick_open_used')
+                      fileContext?.openFile(item.filePath)
+                      onOpenChange(false)
+                    }}
+                  >
+                    <FileIcon fileName={item.label} className="size-4 shrink-0 flex items-center [&>svg]:size-full" />
+                    <span className="truncate font-mono text-xs">
+                      <Highlight text={item.label} positions={namePositions} />
+                    </span>
+                    {item.sublabel && (
+                      <span className="ml-auto text-[11px] text-muted-foreground truncate max-w-[200px]">
+                        {item.sublabel}
+                      </span>
+                    )}
+                  </CommandItem>
+                )
+              }
+              if (item.kind === 'task') {
+                return (
+                  <CommandItem
+                    key={`task:${item.id}`}
+                    value={`task:${item.id}`}
+                    onSelect={() => {
+                      onSelectTask(item.id)
                       onOpenChange(false)
                     }}
                   >
                     <CheckSquare className="mr-2 h-4 w-4" />
-                    <span>{task.title}</span>
+                    <span><Highlight text={item.label} positions={r.positions} /></span>
                   </CommandItem>
-                ))}
-              </CommandGroup>
-            )}
-
-            {showProjects && filteredProjects.length > 0 && (
-              <CommandGroup heading="Projects">
-                {filteredProjects.map((project) => (
-                  <CommandItem
-                    key={project.id}
-                    value={`project:${project.id}`}
-                    onSelect={() => {
-                      onSelectProject(project.id)
-                      onOpenChange(false)
-                    }}
-                  >
-                    <Folder className="mr-2 h-4 w-4" />
-                    <span>{project.name}</span>
-                  </CommandItem>
-                ))}
-              </CommandGroup>
-            )}
+                )
+              }
+              return (
+                <CommandItem
+                  key={`project:${item.id}`}
+                  value={`project:${item.id}`}
+                  onSelect={() => {
+                    onSelectProject(item.id)
+                    onOpenChange(false)
+                  }}
+                >
+                  <Folder className="mr-2 h-4 w-4" />
+                  <span><Highlight text={item.label} positions={r.positions} /></span>
+                </CommandItem>
+              )
+            })}
           </CommandList>
         </Command>
       </DialogContent>
