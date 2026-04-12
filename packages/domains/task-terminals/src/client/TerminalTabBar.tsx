@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback, forwardRef, useImperativeHandle } from 'react'
-import { Plus, X, Columns2, Terminal as TerminalIcon, Bot, Command, MousePointerClick, Sparkles, Code, Glasses, RotateCcw } from 'lucide-react'
+import { Plus, X, Columns2, Terminal as TerminalIcon, Bot, Command, MousePointerClick, Sparkles, Code, Glasses } from 'lucide-react'
 import { cn, useShortcutDisplay } from '@slayzone/ui'
 import type { TerminalTab, TerminalGroup } from '../shared/types'
 import type { TerminalMode } from '@slayzone/terminal/shared'
@@ -15,7 +15,6 @@ interface TerminalTabBarProps {
   onPaneMove: (tabId: string, targetGroupId: string | null) => void
   onGroupRename: (tabId: string, label: string | null) => void
   terminalTitles?: Map<string, string>
-  onMainReset?: () => void
   rightContent?: React.ReactNode
 }
 
@@ -49,7 +48,6 @@ export const TerminalTabBar = forwardRef<TerminalTabBarHandle, TerminalTabBarPro
   onPaneMove,
   onGroupRename,
   terminalTitles,
-  onMainReset,
   rightContent
 }: TerminalTabBarProps, ref: React.Ref<TerminalTabBarHandle>) {
   const terminalSplitShortcut = useShortcutDisplay('terminal-split')
@@ -225,19 +223,6 @@ export const TerminalTabBar = forwardRef<TerminalTabBarHandle, TerminalTabBarPro
                       )}
                       {tab.isMain && (
                         <span className="text-[10px] text-orange-300/80 bg-orange-400/10 px-1.5 rounded-full">main</span>
-                      )}
-                      {tab.isMain && onMainReset && (
-                        <button
-                          data-testid="terminal-main-reset"
-                          className="h-4 w-4 rounded hover:bg-neutral-300/50 dark:hover:bg-neutral-600/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
-                          onClick={e => {
-                            e.stopPropagation()
-                            onMainReset()
-                          }}
-                          title="Reset terminal session"
-                        >
-                          <RotateCcw className="size-3" />
-                        </button>
                       )}
                       {!tab.isMain && (
                         <button

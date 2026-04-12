@@ -347,7 +347,6 @@ export const TerminalContainer = forwardRef<TerminalContainerHandle, TerminalCon
         onPaneClose={closeTab}
         onPaneMove={movePane}
         onGroupRename={renameTab}
-        onMainReset={onMainReset}
         rightContent={rightContent}
       />
       <div className="flex-1 min-h-0 relative">
