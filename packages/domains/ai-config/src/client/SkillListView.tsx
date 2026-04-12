@@ -2,8 +2,9 @@ import { useMemo } from 'react'
 import { ArrowUpCircle, Library, Store, Trash2, AlertTriangle } from 'lucide-react'
 import { Button, cn } from '@slayzone/ui'
 import { getSkillValidation, getMarketplaceProvenance } from './skill-validation'
+import { StatusBadge } from './SyncComponents'
 import { useContextManagerStore, type SkillGroupBy } from './useContextManagerStore'
-import type { AiConfigItem, SkillUpdateInfo } from '../shared'
+import type { AiConfigItem, SyncHealth, SkillUpdateInfo } from '../shared'
 
 type SkillSource = 'project' | 'library' | 'marketplace'
 
@@ -66,6 +67,7 @@ interface SkillListViewProps {
   onDeleteItem: (id: string) => void
   updateMap?: Map<string, SkillUpdateInfo>
   onMarketplaceUpdate?: (itemId: string) => void
+  syncHealthMap?: Map<string, SyncHealth>
 }
 
 export function SkillListView({
@@ -77,6 +79,7 @@ export function SkillListView({
   onDeleteItem,
   updateMap,
   onMarketplaceUpdate,
+  syncHealthMap,
 }: SkillListViewProps) {
   const showLineCount = useContextManagerStore((s) => s.showLineCount)
   const totalCount = items.length
@@ -109,6 +112,7 @@ export function SkillListView({
                   isSelected={selectedSkillId === item.id}
                   showLineCount={showLineCount}
                   hasUpdate={updateMap?.has(item.id)}
+                  syncHealth={syncHealthMap?.get(item.id)}
                   onSelect={onSelectSkill}
                   onDelete={onDeleteItem}
                   onMarketplaceUpdate={onMarketplaceUpdate}
@@ -127,6 +131,7 @@ export function SkillListView({
             isSelected={selectedSkillId === item.id}
             showLineCount={showLineCount}
             hasUpdate={updateMap?.has(item.id)}
+            syncHealth={syncHealthMap?.get(item.id)}
             onSelect={onSelectSkill}
             onDelete={onDeleteItem}
             onMarketplaceUpdate={onMarketplaceUpdate}
@@ -144,6 +149,7 @@ function SkillRow({
   isSelected,
   showLineCount,
   hasUpdate,
+  syncHealth,
   onSelect,
   onDelete,
   onMarketplaceUpdate,
@@ -153,6 +159,7 @@ function SkillRow({
   isSelected: boolean
   showLineCount: boolean
   hasUpdate?: boolean
+  syncHealth?: SyncHealth
   onSelect: (id: string | null) => void
   onDelete: (id: string) => void
   onMarketplaceUpdate?: (itemId: string) => void
@@ -192,6 +199,9 @@ function SkillRow({
               <Library className="size-2.5" />
               Library
             </span>
+          )}
+          {syncHealth === 'stale' && (
+            <StatusBadge syncHealth={syncHealth} />
           )}
           {hasUpdate && (
             <button
