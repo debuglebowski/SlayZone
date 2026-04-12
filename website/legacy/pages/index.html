@@ -36,7 +36,7 @@
   .hero-wrap .social-links a:hover { color: #fff; }
 
   .hero { padding: 100px 0 40px; text-align: center; }
-  .hero-logo-wrap { position: relative; display: inline-block; height: 180px; margin-bottom: 48px; animation: fadeIn 0.6s ease both; }
+  .hero-logo-wrap { position: relative; display: inline-block; height: 180px; margin-bottom: 48px; animation: fadeIn 0.6s ease both; cursor: pointer; }
   .hero-logo { height: 180px; filter: drop-shadow(0 8px 30px rgba(244,104,23,0.25)); transition: opacity 0.15s ease; }
   .hero-logo-canvas { position: absolute; top: calc(50% - 15px); left: 50%; transform: translate(-50%, -50%); height: 328px; opacity: 0; pointer-events: none; }
   .hero-logo-wrap.playing .hero-logo { opacity: 0; }
@@ -1145,26 +1145,39 @@ setTimeout(run, 1200);
     window.addEventListener('load', function() { setTimeout(loadVideo, 0); });
   }
 
-  // Start video when jellyfish is clicked
   var jellyEl = document.querySelector('[data-click-float]');
   var jellyIcon = jellyEl ? jellyEl.querySelector('.cf-icon') : null;
-  if (jellyIcon) {
-    jellyIcon.addEventListener('click', function() {
-      if (running) return;
-      jellyEl.style.opacity = '0';
-      loadVideo();
-      video.play().then(function() {
-        running = true;
-        wrap.classList.add('playing');
-        renderFrame();
-      });
-    });
-    video.addEventListener('ended', function() {
-      running = false;
-      wrap.classList.remove('playing');
-      jellyEl.style.opacity = '1';
+
+  function startVideo() {
+    if (running) return;
+    if (jellyEl) jellyEl.style.opacity = '0';
+    loadVideo();
+    video.play().then(function() {
+      running = true;
+      wrap.classList.add('playing');
+      renderFrame();
     });
   }
+
+  // Octopus logo — track clicks, start video on 2nd click
+  var logoClicks = 0;
+  wrap.addEventListener('click', function() {
+    logoClicks += 1;
+    if (logoClicks === 2) startVideo();
+    posthog.capture('octopus_logo_clicked');
+  });
+
+  if (jellyIcon) {
+    jellyIcon.addEventListener('click', function() {
+      startVideo();
+      posthog.capture('jellyfish_clicked');
+    });
+  }
+  video.addEventListener('ended', function() {
+    running = false;
+    wrap.classList.remove('playing');
+    if (jellyEl) jellyEl.style.opacity = '1';
+  });
 })();
 </script>
 <script>
