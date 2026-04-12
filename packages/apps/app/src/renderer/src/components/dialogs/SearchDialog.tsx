@@ -7,14 +7,16 @@ import {
   CommandList,
   Dialog,
   DialogContent,
-  cn
+  cn,
+  PriorityIcon,
+  getTaskStatusStyle
 } from '@slayzone/ui'
 import { CheckSquare, Folder } from 'lucide-react'
 import { Fzf } from 'fzf'
 import { FileIcon } from '@slayzone/icons'
 import { track } from '@slayzone/telemetry/client'
 import { useDialogStore } from '@slayzone/settings'
-import type { Task } from '@slayzone/task/shared'
+import { type Task, priorityOptions } from '@slayzone/task/shared'
 import type { Project } from '@slayzone/projects/shared'
 
 const MAX_RESULTS = 50
@@ -29,7 +31,7 @@ const FILTERS: { id: FilterKind; label: string }[] = [
 
 type SearchItem =
   | { kind: 'file'; id: string; label: string; sublabel: string; filePath: string }
-  | { kind: 'task'; id: string; label: string; sublabel: string }
+  | { kind: 'task'; id: string; label: string; sublabel: string; status: string; priority: number }
   | { kind: 'project'; id: string; label: string; sublabel: string }
 
 const KIND_WEIGHT: Record<SearchItem['kind'], number> = {
@@ -136,7 +138,7 @@ export function SearchDialog({
     if (showTasks) {
       for (const t of tasks) {
         const projectName = projects.find((p) => p.id === t.project_id)?.name ?? ''
-        list.push({ kind: 'task', id: t.id, label: t.title, sublabel: projectName })
+        list.push({ kind: 'task', id: t.id, label: t.title, sublabel: projectName, status: t.status, priority: t.priority })
       }
     }
     if (showProjects) {
@@ -274,6 +276,8 @@ export function SearchDialog({
                 )
               }
               if (item.kind === 'task') {
+                const statusStyle = getTaskStatusStyle(item.status)
+                const priorityLabel = priorityOptions.find((o) => o.value === item.priority)?.label
                 return (
                   <CommandItem
                     key={`task:${item.id}`}
@@ -284,7 +288,19 @@ export function SearchDialog({
                     }}
                   >
                     <CheckSquare className="mr-2 h-4 w-4" />
-                    <span><Highlight text={item.label} positions={r.positions} /></span>
+                    <span className="truncate"><Highlight text={item.label} positions={r.positions} /></span>
+                    <div className="ml-auto flex items-center gap-1.5 shrink-0">
+                      {statusStyle && (
+                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-medium border border-border/60 text-muted-foreground">
+                          <statusStyle.icon className={cn('size-3!', statusStyle.iconClass)} />
+                          {statusStyle.label}
+                        </span>
+                      )}
+                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-medium border border-border/60 text-muted-foreground">
+                        <PriorityIcon priority={item.priority} className="size-3!" />
+                        {priorityLabel}
+                      </span>
+                    </div>
                   </CommandItem>
                 )
               }
