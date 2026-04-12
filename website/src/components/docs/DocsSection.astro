@@ -1,0 +1,77 @@
+---
+const { id, title, body } = Astro.props
+---
+
+<section id={id}>
+  <h2>{title}</h2>
+  <div class="body" set:html={body}></div>
+</section>
+
+<style>
+  section {
+    margin-bottom: 64px;
+    scroll-margin-top: 40px;
+  }
+  h2 {
+    font-size: 26px;
+    font-weight: 700;
+    margin-bottom: 16px;
+    color: #1a1a2e;
+    border-bottom: 2px solid #f8f8fa;
+    padding-bottom: 8px;
+  }
+  .body :global(h3) {
+    font-size: 18px;
+    font-weight: 700;
+    margin: 32px 0 12px;
+    color: #1a1a2e;
+  }
+  .body :global(p) {
+    margin: 0 0 16px;
+    color: #444;
+  }
+  .body :global(ul),
+  .body :global(ol) {
+    margin: 0 0 16px;
+    padding-left: 20px;
+    color: #444;
+  }
+  .body :global(li) { margin-bottom: 8px; }
+  .body :global(strong) { color: #1a1a2e; font-weight: 600; }
+  .body :global(a) { color: var(--accent); text-decoration: none; }
+  .body :global(a:hover) { text-decoration: underline; }
+  .body :global(code) {
+    font-family: 'JetBrains Mono', monospace;
+    background: #f4f4f9;
+    padding: 2px 4px;
+    border-radius: 4px;
+    color: #e85d0f;
+    font-size: 0.9em;
+  }
+  .body :global(pre) {
+    background: #0c0e1a;
+    color: #e8e8f0;
+    padding: 20px;
+    border-radius: 8px;
+    overflow-x: auto;
+    margin: 16px 0;
+  }
+  .body :global(pre code) {
+    background: none;
+    color: inherit;
+    padding: 0;
+    font-size: 13px;
+  }
+  .body :global(.highlight-box) {
+    background: #fef3ed;
+    padding: 16px 20px;
+    border-radius: 8px;
+    margin: 24px 0;
+    border-left: 4px solid var(--accent);
+  }
+  .body :global(.highlight-box p) {
+    margin: 0;
+    color: #854d0e;
+    font-size: 15px;
+  }
+</style>

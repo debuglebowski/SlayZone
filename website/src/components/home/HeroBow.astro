@@ -1,0 +1,31 @@
+<div class="hero-bow">
+  <div class="hero-wave">
+    <svg viewBox="0 0 1440 80" preserveAspectRatio="none" class="wave-back"><path d="M0,40 C180,80 360,0 540,40 C720,80 900,0 1080,40 C1260,80 1440,0 1440,40 L1440,80 L0,80 Z" fill="rgba(255,255,255,0.3)"/></svg>
+    <svg viewBox="0 0 1440 80" preserveAspectRatio="none" class="wave-front"><path d="M0,50 C180,10 360,80 540,50 C720,10 900,80 1080,50 C1260,10 1440,80 1440,50 L1440,80 L0,80 Z" fill="#ffffff"/></svg>
+  </div>
+</div>
+
+
+
+<script is:inline>
+(function() {
+  var bow = document.querySelector('.hero-bow');
+  for (var i = 0; i < 25; i++) {
+    var b = document.createElement('div');
+    b.className = 'bubble';
+    var size = Math.random() * 50 + 8;
+    var bright = Math.random() * 0.08 + 0.03;
+    b.style.width = size + 'px';
+    b.style.height = size + 'px';
+    b.style.left = Math.random() * 100 + '%';
+    b.style.bottom = '-' + size + 'px';
+    b.style.background = 'rgba(255,255,255,' + (bright * 0.6) + ')';
+    b.style.border = '1px solid rgba(255,255,255,' + bright + ')';
+    b.style.setProperty('--drift', (Math.random() - 0.5) * 80 + 'px');
+    b.style.animationDuration = (Math.random() * 12 + 8) + 's';
+    b.style.animationDelay = (Math.random() * 12) + 's';
+    bow.appendChild(b);
+  }
+})();
+
+</script>

@@ -1,0 +1,106 @@
+        <div class="app-frame" style="flex-direction:row;">
+          <div class="fk-sidebar">
+            <div class="fk-sidebar-dots"><span class="app-dot r"></span><span class="app-dot y"></span><span class="app-dot g"></span></div>
+            <div class="fk-proj" style="background:#4466ff;">SZ<div class="fk-proj-dot" style="background:var(--green)"></div></div>
+            <div class="fk-proj active" style="background:#ee8833;">WD</div>
+            <div class="fk-proj" style="background:#44bb55;">HC</div>
+          </div>
+          <div style="flex:1;display:flex;flex-direction:column;overflow:hidden;">
+          <div class="tab-bar" id="f2-tabs">
+            <div class="tab-bar-home">🏠</div>
+            <div class="tab-item" data-tab="0"><span class="tab-dot" style="background:var(--amber)"></span> PR#24 <span class="tab-x">×</span></div>
+            <div class="tab-item active" data-tab="1"><span class="tab-dot" style="background:var(--green)"></span> Auth refactor <span class="tab-x">×</span></div>
+            <div class="tab-item" data-tab="2"><span class="tab-dot" style="background:var(--green)"></span> Search endpoint <span class="tab-x">×</span></div>
+            <div class="tab-item" data-tab="3"><span class="tab-dot" style="background:var(--amber)"></span> Rate limiting <span class="tab-x">×</span></div>
+          </div>
+          <!-- Task view: Auth refactor -->
+          <div class="f2-view" id="f2-view-1">
+          <div class="task-bar"><div class="task-bar-left"><span class="task-name">Auth refactor</span><span class="task-branch">⎇ feat/auth</span></div><div class="task-bar-right"><span class="tb-btn active">▸_ Terminal</span><span class="tb-btn">◧ Browser</span><span class="tb-btn">± Diff</span></div></div>
+          <div class="feat-term-wrap">
+            <div class="term" id="f2-term">
+              <div class="tl instant"><div style="display:flex;gap:16px;align-items:flex-start;"><div style="white-space:pre;line-height:1.4;"><span style="color:#e8946a;"> ▐▛███▜▌</span><br><span style="color:#e8946a;">▝▜█████▛▘</span><br><span style="color:#e8946a;">  ▘▘ ▝▝</span></div><div style="line-height:1.7;"><span class="t-out">Claude Code</span> <span class="t-muted">v2.1.42</span><br><span class="t-muted">Opus 4.6 · Claude Team</span><br><span class="t-muted">~/dev/projects/api-v2</span></div></div></div>
+              <div class="tl instant"><span class="t-sep">────────────────────────────────────────────────────────────</span></div>
+              <div class="tl instant"><span class="t-muted">❯ Try "edit auth.ts to..."</span></div>
+              <div class="tl instant"><span class="t-sep">────────────────────────────────────────────────────────────</span></div>
+              <div class="tl instant"><span class="t-muted">  ? for shortcuts</span></div>
+              <div class="tl instant"><br></div>
+              <div class="tl" data-d="600"><span class="t-prompt">❯</span> <span class="t-cmd">refactor auth middleware to use JWT validation</span></div>
+              <div class="tl" data-d="1200"><br></div>
+              <div class="tl" data-d="1400"><span class="t-blue">Claude</span> <span class="t-out">I'll refactor the auth middleware. Examining current code...</span></div>
+              <div class="tl" data-d="2000"><br></div>
+              <div class="tl" data-d="2200"><span class="t-file">  src/middleware/auth.ts</span> <span class="t-out">— rewriting</span></div>
+              <div class="tl" data-d="2500"><span class="t-file">  src/utils/jwt.ts</span> <span class="t-out">— created</span></div>
+              <div class="tl" data-d="2800"><span class="t-file">  src/types/auth.d.ts</span> <span class="t-out">— updated</span></div>
+              <div class="tl" data-d="3400"><br></div>
+              <div class="tl" data-d="3600"><span class="t-green">✓</span> <span class="t-out">JWT middleware replacing session-based auth</span></div>
+              <div class="tl" data-d="3900"><span class="t-green">✓</span> <span class="t-out">Token refresh + expiry handling added</span></div>
+              <div class="tl" data-d="4200"><span class="t-out">Running tests...</span> <span class="t-green">14 passed</span></div>
+              <div class="tl" data-d="4800"><br></div>
+              <div class="tl" data-d="5000"><span class="t-prompt">❯</span> <span class="cursor-blink"></span></div>
+            </div>
+          </div>
+          </div>
+          <!-- Task view: Search endpoint -->
+          <div class="f2-view" id="f2-view-2" style="display:none;">
+          <div class="task-bar"><div class="task-bar-left"><span class="task-name">Search endpoint</span><span class="task-branch">⎇ feat/search</span></div><div class="task-bar-right"><span class="tb-btn active">▸_ Terminal</span><span class="tb-btn">◧ Browser</span><span class="tb-btn">± Diff</span></div></div>
+          <div class="feat-term-wrap">
+            <div class="term" id="f2-term-2">
+              <div class="tl instant"><div style="display:flex;gap:16px;align-items:flex-start;"><div style="white-space:pre;line-height:1.4;font-size:16px;">🟢</div><div style="line-height:1.7;"><span class="t-out">OpenAI Codex</span> <span class="t-muted">v0.1.0</span><br><span class="t-muted">~/dev/projects/api-v2</span></div></div></div>
+              <div class="tl instant"><span class="t-sep">────────────────────────────────────────────────────────────</span></div>
+              <div class="tl instant"><br></div>
+              <div class="tl" data-d="600"><span class="t-prompt">❯</span> <span class="t-cmd">add full-text search to /api/v2/search</span></div>
+              <div class="tl" data-d="1200"><br></div>
+              <div class="tl" data-d="1400"><span class="t-green">Codex</span> <span class="t-out">Indexing schema and building search handler...</span></div>
+              <div class="tl" data-d="2000"><br></div>
+              <div class="tl" data-d="2200"><span class="t-file">  src/routes/search.ts</span> <span class="t-out">— created</span></div>
+              <div class="tl" data-d="2500"><span class="t-file">  src/utils/indexer.ts</span> <span class="t-out">— created</span></div>
+              <div class="tl" data-d="3000"><br></div>
+              <div class="tl" data-d="3200"><span class="t-green">✓</span> <span class="t-out">Full-text search with trigram index</span></div>
+              <div class="tl" data-d="3500"><span class="t-out">Running tests...</span> <span class="t-green">8 passed</span></div>
+              <div class="tl" data-d="4000"><br></div>
+              <div class="tl" data-d="4200"><span class="t-prompt">❯</span> <span class="cursor-blink"></span></div>
+            </div>
+          </div>
+          </div>
+          </div>
+        </div>
+
+<script is:inline>
+(function() {
+  var sleep = window.__feat.sleep;
+  var loopOnVisible = window.__feat.loopOnVisible;
+  var revealLines = window.__feat.revealLines;
+  var resetLines = window.__feat.resetLines;
+  (function() {
+    function switchF2Tab(idx) {
+      var tabs = document.querySelectorAll('#f2-tabs .tab-item');
+      tabs.forEach(function(t) { t.classList.remove('active'); });
+      tabs[idx].classList.add('active');
+      document.getElementById('f2-view-1').style.display = idx === 1 ? '' : 'none';
+      document.getElementById('f2-view-2').style.display = idx === 2 ? '' : 'none';
+    }
+
+    loopOnVisible(document.getElementById('feat-2'), async function() {
+      // Start on Auth refactor
+      switchF2Tab(1);
+      var c1 = document.getElementById('f2-term');
+      resetLines(c1);
+      await sleep(400);
+      await revealLines(c1);
+      await sleep(1500);
+
+      // Switch to Search endpoint
+      switchF2Tab(2);
+      var c2 = document.getElementById('f2-term-2');
+      resetLines(c2);
+      await sleep(400);
+      await revealLines(c2);
+      await sleep(1500);
+
+      // Switch back to Auth
+      switchF2Tab(1);
+      await sleep(2000);
+    });
+  })();
+})();
+</script>

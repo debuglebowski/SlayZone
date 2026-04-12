@@ -1,0 +1,70 @@
+<!-- Cross-component scripts: download buttons (refs #dl-btn + #dl-btn-2) + click-floats -->
+<script is:inline>
+// OS-aware download button
+(function(){
+  var btns = [document.getElementById('dl-btn'), document.getElementById('dl-btn-2')];
+  var ua = navigator.userAgent;
+  var icons = {
+    mac: '<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/></svg>',
+    win: '<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M0 3.449L9.75 2.1v9.451H0m10.949-9.602L24 0v11.4H10.949M0 12.6h9.75v9.451L0 20.699M10.949 12.6H24V24l-12.9-1.801"/></svg>',
+    linux: '<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12.504 0c-.155 0-.315.008-.48.021-4.226.333-3.105 4.807-3.17 6.298-.076 1.092-.3 1.953-1.05 3.02-.885 1.051-2.127 2.75-2.716 4.521-.278.832-.41 1.684-.287 2.489a.424.424 0 00-.11.135c-.26.268-.45.6-.663.839-.199.199-.485.267-.797.4-.313.136-.658.269-.864.68-.09.189-.136.394-.132.602 0 .199.027.4.055.536.058.399.116.728.04.97-.249.68-.28 1.145-.106 1.484.174.334.535.47.94.601.81.2 1.91.135 2.774.6.926.466 1.866.67 2.616.47.526-.116.97-.464 1.208-.946.587-.003 1.23-.269 2.26-.334.699-.058 1.574.267 2.577.2.025.134.063.198.114.333l.003.003c.391.778 1.113 1.132 1.884 1.071.771-.06 1.592-.536 2.257-1.306.631-.765 1.683-1.084 2.378-1.503.348-.199.629-.469.649-.853.023-.4-.2-.811-.714-1.376v-.097a5.1 5.1 0 00-.033-.436c-.204-.801-.324-1.273-.204-1.786.12-.515.4-.868.706-1.27.315-.39.652-.8.862-1.429.21-.63.296-1.436.06-2.53-.548-2.527-2.162-4.186-3.015-5.003-.867-.808-1.33-1.535-1.283-2.538.052-1.188-.583-5.937-4.77-5.937zM11.5 1c2.09 0 2.65 2.167 2.862 3.197.096.455.151.923.099 1.395-.108.928-.554 1.723-1.375 2.53-.672.66-1.275 1.42-1.712 2.27-.139.27-.27.55-.389.84-.21.485-.398.99-.56 1.51-.028.102-.049.2-.063.293-.087.548-.034 1.083.134 1.573.079.24.19.47.33.687l.028.039c.107.148.224.3.354.454.063.075.13.15.204.228.22.234.472.46.787.696.19.139.396.27.62.391.222.12.464.228.727.321.146.052.3.098.462.137.173.042.353.078.542.108l.053.006c1.026.125 2.176-.013 3.052-.432.222-.105.422-.228.59-.368.18-.148.33-.318.432-.508.188-.35.202-.744.058-1.18-.14-.436-.45-.902-.956-1.419.09-.074.18-.153.267-.238.47-.416.94-1.001 1.19-1.715.25-.712.26-1.53.04-2.44-.522-2.15-2.132-3.82-2.982-4.605-.856-.79-1.297-1.51-1.268-2.377.035-.867-.143-2.327-.722-3.423C13.5 1.344 12.67 1 11.5 1z"/></svg>'
+  };
+  function getMacArch() {
+    try {
+      var uad = navigator.userAgentData;
+      if (uad && uad.architecture) return /x86|x64/i.test(uad.architecture) ? 'x64' : 'arm64';
+    } catch(e) {}
+    return 'arm64';
+  }
+  var macArch = getMacArch();
+  var base = 'https://github.com/debuglebowski/SlayZone/releases/latest/download/';
+  var urls = {
+    mac: base + 'SlayZone-' + macArch + '.dmg',
+    win: base + 'SlayZone-setup.exe',
+    linux: base + 'SlayZone-x86_64.AppImage'
+  };
+  var os, icon, label;
+  if (/Mac|iPhone|iPad|iPod/.test(ua)) { os='mac'; icon=icons.mac; label='Download for Mac'; }
+  else if (/Win/.test(ua)) { os='win'; icon=icons.win; label='Download for Windows'; }
+  else { os='linux'; icon=icons.linux; label='Download for Linux'; }
+  btns.forEach(function(b){
+    if(!b) return;
+    b.innerHTML = icon + label; b.href = urls[os];
+    b.addEventListener('click', function(){ posthog.capture('download_clicked', { os: os }); });
+  });
+  document.querySelectorAll('a[href*="github.com/debuglebowski/SlayZone"]').forEach(function(a){
+    if(a.id === 'dl-btn' || a.id === 'dl-btn-2') return;
+    a.addEventListener('click', function(){ posthog.capture('github_clicked'); });
+  });
+  // Glitter waterfall on hover
+  btns.forEach(function(b) {
+    if (!b) return;
+    var glitterInterval;
+    var colors = ['#fff', '#ffe0c0', '#ffd4a8', '#fff5e6', '#ffcfa0'];
+    function spawnGlitter() {
+      for (var i = 0; i < 10; i++) {
+        var g = document.createElement('span');
+        g.className = 'glitter';
+        var size = 1.5 + Math.random() * 2.5;
+        var c = colors[Math.floor(Math.random() * colors.length)];
+        g.style.setProperty('--g-size', size + 'px');
+        g.style.setProperty('--fall-h', (30 + Math.random() * 40) + 'px');
+        g.style.left = (5 + Math.random() * 90) + '%';
+        g.style.background = c;
+        g.style.boxShadow = '0 0 ' + (3 + size) + 'px ' + c;
+        g.style.animation = 'glitter-fall ' + (0.5 + Math.random() * 0.6) + 's ease-in forwards';
+        g.style.animationDelay = (Math.random() * 0.1) + 's';
+        b.appendChild(g);
+        g.addEventListener('animationend', function() { this.remove(); });
+      }
+    }
+    b.addEventListener('mouseenter', function() {
+      spawnGlitter();
+      glitterInterval = setInterval(spawnGlitter, 50);
+    });
+    b.addEventListener('mouseleave', function() {
+      clearInterval(glitterInterval);
+    });
+  });
+})();
+</script>

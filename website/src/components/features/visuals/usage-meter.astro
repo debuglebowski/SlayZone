@@ -1,0 +1,100 @@
+        <div class="app-frame" style="flex-direction:row;">
+          <div class="fk-sidebar">
+            <div class="fk-sidebar-dots"><span class="app-dot r"></span><span class="app-dot y"></span><span class="app-dot g"></span></div>
+            <div class="fk-proj" style="background:#4466ff;">SZ<div class="fk-proj-dot" style="background:var(--green)"></div></div>
+            <div class="fk-proj active" style="background:#ee8833;">WD</div>
+            <div class="fk-proj" style="background:#44bb55;">HC</div>
+          </div>
+          <div style="flex:1;display:flex;flex-direction:column;overflow:hidden;">
+          <div class="tab-bar">
+            <div class="tab-bar-home">🏠</div>
+            <div class="tab-item active"><span class="tab-dot" style="background:var(--green)"></span> Auth refactor <span class="tab-x">×</span></div>
+            <div style="margin-left:auto;display:flex;align-items:center;gap:8px;padding-right:10px;">
+              <span id="f11-trigger" style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--text-dim);padding:3px 8px;border-radius:4px;cursor:default;">Claude 5h</span>
+              <span style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--text-dim);padding:3px 8px;border-radius:4px;">Codex 7h</span>
+            </div>
+          </div>
+          <div class="feat-burn">
+            <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:80%;filter:blur(2px);opacity:0.35;pointer-events:none;font-family:'JetBrains Mono',monospace;font-size:11px;line-height:1.8;color:var(--text-dim);padding:20px;">
+              <span style="color:var(--green)">✓</span> JWT middleware rewritten<br>
+              <span style="color:var(--green)">✓</span> Token refresh added<br>
+              <span style="color:var(--amber)">  src/types/auth.d.ts</span> — updated<br><br>
+              <span>Running tests...</span> <span style="color:var(--green)">14 passed</span><br><br>
+              <span style="color:var(--text-dim)">❯</span> git push origin feat/auth<br>
+              <span>Enumerating objects: 12, done.</span><br>
+              <span>Counting objects: 100% (12/12), done.</span><br>
+              <span>Writing objects: 100% (7/7), 2.14 KiB</span>
+            </div>
+            <div class="fk-cursor" id="f11-cursor" style="top:50%;left:50%;"><svg viewBox="0 0 24 24" fill="none"><path d="M5 3l14 8.5L12 14l-2 7L5 3z" fill="white" stroke="black" stroke-width="1.5" stroke-linejoin="round"/></svg></div>
+            <div class="usage-popover" id="f11-popover">
+              <div class="usage-provider-section">
+                <div class="usage-provider">Claude</div>
+                <div class="usage-limit-header"><span></span><span>Resets in</span></div>
+                <div class="usage-limit-row"><div class="usage-limit-dot" style="background:var(--text-dim)"></div><span class="usage-limit-label">5h</span><div class="bar-track"><div class="bar-fill orange" id="f11-claude-5h" data-w="72"></div></div><span class="usage-limit-pct" id="f11-claude-5h-pct">0%</span><span class="usage-limit-time">3h 14m</span></div>
+                <div class="usage-limit-row"><div class="usage-limit-dot" style="background:var(--text-dim);opacity:0.4"></div><span class="usage-limit-label">7d</span><div class="bar-track"><div class="bar-fill orange" id="f11-claude-7d" data-w="38"></div></div><span class="usage-limit-pct" id="f11-claude-7d-pct">0%</span><span class="usage-limit-time">6d 11h</span></div>
+              </div>
+              <div class="usage-provider-section">
+                <div class="usage-provider">Codex</div>
+                <div class="usage-limit-row"><div class="usage-limit-dot" style="background:var(--text-dim)"></div><span class="usage-limit-label">5h</span><div class="bar-track"><div class="bar-fill blue" id="f11-codex-5h" data-w="45"></div></div><span class="usage-limit-pct" id="f11-codex-5h-pct">0%</span><span class="usage-limit-time">4h 56m</span></div>
+                <div class="usage-limit-row"><div class="usage-limit-dot" style="background:var(--text-dim);opacity:0.4"></div><span class="usage-limit-label">7d</span><div class="bar-track"><div class="bar-fill blue" id="f11-codex-7d" data-w="21"></div></div><span class="usage-limit-pct" id="f11-codex-7d-pct">0%</span><span class="usage-limit-time">6d 23h</span></div>
+              </div>
+              <div class="usage-footer"><span>Updated 0m ago</span><span>↻</span></div>
+            </div>
+          </div>
+          </div>
+        </div>
+
+<script is:inline>
+(function() {
+  var sleep = window.__feat.sleep;
+  var loopOnVisible = window.__feat.loopOnVisible;
+  var revealLines = window.__feat.revealLines;
+  var resetLines = window.__feat.resetLines;
+  loopOnVisible(document.getElementById('feat-11'), async function() {
+    var pop = document.getElementById('f11-popover');
+    var cursor = document.getElementById('f11-cursor');
+    var trigger = document.getElementById('f11-trigger');
+    var bars = [
+      { el: document.getElementById('f11-claude-5h'), pct: document.getElementById('f11-claude-5h-pct'), target: 72 },
+      { el: document.getElementById('f11-claude-7d'), pct: document.getElementById('f11-claude-7d-pct'), target: 38 },
+      { el: document.getElementById('f11-codex-5h'), pct: document.getElementById('f11-codex-5h-pct'), target: 45 },
+      { el: document.getElementById('f11-codex-7d'), pct: document.getElementById('f11-codex-7d-pct'), target: 21 }
+    ];
+    // Reset
+    var burn = document.getElementById('f11-popover').closest('.feat-burn');
+    var w = burn.offsetWidth;
+    pop.classList.remove('vis');
+    cursor.classList.remove('vis');
+    cursor.style.transition = 'none';
+    cursor.style.top = '50%'; cursor.style.left = '50%';
+    bars.forEach(function(b) { b.el.style.width = '0'; b.pct.textContent = '0%'; });
+    await sleep(800);
+    // Show cursor in center
+    cursor.classList.add('vis');
+    await sleep(400);
+    // Move cursor to trigger
+    cursor.style.transition = '';
+    cursor.style.top = '-18px'; cursor.style.left = (w - 90) + 'px';
+    await sleep(800);
+    // Click — show popover
+    pop.classList.add('vis');
+    await sleep(600);
+    // Animate bars
+    bars.forEach(function(b) { b.el.style.width = b.target + '%'; });
+    var steps = 15;
+    for (var i = 1; i <= steps; i++) {
+      var p = i / steps;
+      bars.forEach(function(b) { b.pct.textContent = Math.round(b.target * p) + '%'; });
+      await sleep(60);
+    }
+    // Move cursor away
+    await sleep(1000);
+    cursor.style.top = '40%'; cursor.style.left = '50%';
+    await sleep(600);
+    cursor.classList.remove('vis');
+    await sleep(4000);
+    pop.classList.remove('vis');
+    await sleep(1200);
+  });
+})();
+</script>

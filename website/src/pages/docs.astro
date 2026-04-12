@@ -1,5 +1,44 @@
 ---
-import LegacyPage from '../components/LegacyPage.astro'
+import BaseLayout from '../layouts/BaseLayout.astro'
+import SiteNav from '../components/SiteNav.astro'
+import SiteFooter from '../components/SiteFooter.astro'
+import SidebarLayout from '../components/ui/SidebarLayout.astro'
+import DocsSection from '../components/docs/DocsSection.astro'
+import { docsSidebar, docsSections } from '../data/docs.js'
 ---
 
-<LegacyPage page="docs.html" />
+<BaseLayout
+  title="SlayZone — Documentation"
+  description="Simple guide for using SlayZone to manage tasks and AI agents."
+  canonicalPath="/docs.html"
+>
+  <Fragment slot="nav"><SiteNav current="docs" /></Fragment>
+  <SidebarLayout
+    title="Documentation"
+    subtitle="Everything here has been generated with AI. Use at your own risk. Lol."
+    sidebarSections={docsSidebar}
+  >
+    {docsSections.map((section) => (
+      <DocsSection id={section.id} title={section.title} body={section.body} />
+    ))}
+  </SidebarLayout>
+  <Fragment slot="footer"><SiteFooter /></Fragment>
+</BaseLayout>
+
+<script>
+  const sections = document.querySelectorAll<HTMLElement>('.docs-main section')
+  const navLinks = document.querySelectorAll<HTMLAnchorElement>('.docs-sidebar a')
+  function update() {
+    let current = ''
+    sections.forEach((section) => {
+      if (window.scrollY >= section.offsetTop - 150) {
+        current = section.id
+      }
+    })
+    navLinks.forEach((a) => {
+      a.classList.toggle('active', a.getAttribute('href') === '#' + current)
+    })
+  }
+  window.addEventListener('scroll', update, { passive: true })
+  update()
+</script>

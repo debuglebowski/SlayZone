@@ -1,5 +1,51 @@
 ---
-import LegacyPage from '../components/LegacyPage.astro'
+import BaseLayout from '../layouts/BaseLayout.astro'
+import SiteNav from '../components/SiteNav.astro'
+import SiteFooter from '../components/SiteFooter.astro'
+import SidebarLayout from '../components/ui/SidebarLayout.astro'
+import FaqGroup from '../components/faq/FaqGroup.astro'
+import { faqGroups } from '../data/faq.js'
+
+const sidebarSections = [
+  {
+    heading: 'Categories',
+    links: faqGroups.map((group) => ({ href: `#${group.id}`, label: group.title })),
+  },
+]
 ---
 
-<LegacyPage page="faq.html" />
+<BaseLayout
+  title="SlayZone — FAQ"
+  description="Frequently Asked Questions about SlayZone."
+  canonicalPath="/faq.html"
+>
+  <Fragment slot="nav"><SiteNav current="faq" /></Fragment>
+  <SidebarLayout
+    title="Frequently Asked Questions"
+    subtitle="Quick answers to common questions about SlayZone's workflow, agents, and privacy."
+    sidebarSections={sidebarSections}
+  >
+    {faqGroups.map((group) => (
+      <FaqGroup id={group.id} title={group.title} items={group.items} />
+    ))}
+  </SidebarLayout>
+  <Fragment slot="footer"><SiteFooter /></Fragment>
+</BaseLayout>
+
+<script>
+  const sections = document.querySelectorAll<HTMLElement>('.faq-group')
+  const navLinks = document.querySelectorAll<HTMLAnchorElement>('.docs-sidebar a')
+  function update() {
+    let current = ''
+    sections.forEach((section) => {
+      if (window.scrollY >= section.offsetTop - 150) {
+        current = section.id
+      }
+    })
+    navLinks.forEach((a) => {
+      a.classList.toggle('active', a.getAttribute('href') === '#' + current)
+    })
+  }
+  window.addEventListener('scroll', update, { passive: true })
+  update()
+</script>

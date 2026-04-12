@@ -1,0 +1,63 @@
+---
+const { text } = Astro.props
+---
+
+<span class="info-wrap">
+  <svg class="info-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+    <circle cx="8" cy="8" r="6.5" />
+    <path d="M8 7.2v3.6M8 5.2v.4" />
+  </svg>
+  <span class="feature-tip">{text}</span>
+</span>
+
+<style>
+  .info-wrap {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    cursor: help;
+  }
+  .info-icon {
+    width: 14px;
+    height: 14px;
+    color: #bbb;
+    flex-shrink: 0;
+    transition: color 0.2s;
+  }
+  .info-wrap:hover .info-icon { color: #888; }
+  .feature-tip {
+    position: absolute;
+    left: 0;
+    transform: translateY(4px);
+    bottom: calc(100% + 10px);
+    background: #1a1a2e;
+    color: #e8e8f0;
+    font-size: 12px;
+    font-weight: 400;
+    line-height: 1.5;
+    padding: 8px 12px;
+    border-radius: 8px;
+    white-space: normal;
+    width: 260px;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.2s, transform 0.2s;
+    z-index: 10;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+  }
+  .feature-tip::after {
+    content: '';
+    position: absolute;
+    top: 100%;
+    left: 7px;
+    border: 6px solid transparent;
+    border-top-color: #1a1a2e;
+  }
+  .info-wrap:hover .feature-tip {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  @media (max-width: 640px) {
+    .feature-tip { width: 200px; }
+  }
+</style>

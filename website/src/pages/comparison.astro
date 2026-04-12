@@ -1,5 +1,78 @@
 ---
-import LegacyPage from '../components/LegacyPage.astro'
+import BaseLayout from '../layouts/BaseLayout.astro'
+import SiteNav from '../components/SiteNav.astro'
+import SiteFooter from '../components/SiteFooter.astro'
+import ComparisonTable from '../components/comparison/ComparisonTable.astro'
+import { competitors, comparisonRows } from '../data/comparison.js'
 ---
 
-<LegacyPage page="comparison.html" />
+<BaseLayout
+  title="SlayZone — Comparison"
+  description="How SlayZone compares to Cursor, VibeKanban, Devin, and others."
+  canonicalPath="/comparison.html"
+>
+  <Fragment slot="nav"><SiteNav current="comparison" /></Fragment>
+  <section class="comparison-intro">
+    <h1>Super unbiased comparison</h1>
+    <p class="subtitle">
+      An <span class="gradient">as-honest-as-I-can</span> look at SlayZone vs the field.
+    </p>
+  </section>
+  <ComparisonTable competitors={competitors} rows={comparisonRows} />
+  <Fragment slot="footer"><SiteFooter /></Fragment>
+</BaseLayout>
+
+<style>
+  .comparison-intro {
+    text-align: center;
+    margin: 60px 0;
+  }
+  h1 {
+    font-size: 36px;
+    font-weight: 700;
+    letter-spacing: -1.5px;
+    margin: 0 0 8px;
+  }
+  .subtitle {
+    color: #888;
+    font-size: 16px;
+    margin: 0;
+  }
+  .gradient {
+    background: linear-gradient(135deg, var(--accent), #e8850f);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    font-weight: 500;
+  }
+  @media (max-width: 640px) {
+    h1 { font-size: 26px; margin: 32px 0 8px; }
+    .subtitle { font-size: 14px; margin-bottom: 32px; }
+  }
+</style>
+
+<script>
+  const scroll = document.querySelector<HTMLDivElement>('.cg-scroll')
+  const frame = document.querySelector<HTMLDivElement>('.cg-frame')
+  if (scroll) {
+    const sync = () => {
+      const atEnd = scroll.scrollLeft + scroll.clientWidth >= scroll.scrollWidth - 2
+      scroll.classList.toggle('scrolled', scroll.scrollLeft > 0)
+      if (frame) frame.classList.toggle('scrolled-end', atEnd)
+    }
+    scroll.addEventListener('scroll', sync)
+    sync()
+  }
+  const btn = document.querySelector<HTMLButtonElement>('[data-expand-btn]')
+  if (btn) {
+    btn.addEventListener('click', () => {
+      document.querySelector('.page-shell')?.classList.toggle('expanded-comparison')
+    })
+  }
+</script>
+
+<style is:global>
+  .page-shell.expanded-comparison {
+    max-width: calc(100vw - 48px);
+  }
+</style>

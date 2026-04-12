@@ -1,0 +1,50 @@
+---
+const { question, answer } = Astro.props
+---
+
+<div class="faq-item">
+  <h3>{question}</h3>
+  <p set:html={answer}></p>
+</div>
+
+<style>
+  .faq-item h3 {
+    font-size: 20px;
+    font-weight: 700;
+    margin-bottom: 16px;
+    color: #1a1a2e;
+    display: flex;
+    align-items: flex-start;
+    gap: 16px;
+    line-height: 1.4;
+  }
+  .faq-item h3::before {
+    content: 'Q';
+    color: var(--accent);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 14px;
+    background: var(--accent-dim);
+    padding: 4px 8px;
+    border-radius: 4px;
+    flex-shrink: 0;
+  }
+  .faq-item p {
+    font-size: 17px;
+    color: #444;
+    line-height: 1.7;
+    padding-left: 48px;
+    margin: 0;
+  }
+  .faq-item :global(strong) { color: #1a1a2e; font-weight: 600; }
+  .faq-item :global(code) {
+    font-family: 'JetBrains Mono', monospace;
+    background: #f4f4f9;
+    padding: 2px 4px;
+    border-radius: 4px;
+    color: #e85d0f;
+    font-size: 0.9em;
+  }
+  @media (max-width: 850px) {
+    .faq-item p { padding-left: 0; }
+  }
+</style>

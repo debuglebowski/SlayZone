@@ -1,0 +1,37 @@
+<!-- Defines window.__feat helpers. Must appear BEFORE visual component scripts. -->
+<script is:inline>
+  window.__feat = {
+    sleep: function(ms) { return new Promise(r => setTimeout(r, ms)); },
+    loopOnVisible: function(el, fn, threshold) {
+      let timer = null, running = false;
+      const obs = new IntersectionObserver((entries) => {
+        entries.forEach(e => {
+          if (e.isIntersecting) {
+            function go() { if (running) return; running = true; fn().then(() => { running = false; timer = setTimeout(go, 1000); }); }
+            go();
+          } else {
+            if (timer) { clearTimeout(timer); timer = null; }
+            running = false;
+          }
+        });
+      }, { threshold: threshold || 0.2 });
+      obs.observe(el);
+    },
+    revealLines: function(container) {
+      const lines = container.querySelectorAll('.tl:not(.instant)');
+      lines.forEach(l => l.classList.remove('vis'));
+      return new Promise(resolve => {
+        let max = 0;
+        lines.forEach(l => {
+          const d = parseInt(l.dataset.d) || 0;
+          if (d > max) max = d;
+          setTimeout(() => l.classList.add('vis'), d);
+        });
+        setTimeout(resolve, max + 600);
+      });
+    },
+    resetLines: function(container) {
+      container.querySelectorAll('.tl:not(.instant)').forEach(l => l.classList.remove('vis'));
+    }
+  };
+</script>

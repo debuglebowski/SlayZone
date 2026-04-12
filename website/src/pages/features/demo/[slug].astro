@@ -1,6 +1,34 @@
 ---
+import FeaturesHelpers from '../../../components/features/FeaturesHelpers.astro'
+import FeaturesInit from '../../../components/features/FeaturesInit.astro'
 import { features, findFeatureBySlug } from '../../../data/features.js'
-import { loadLegacySegments } from '../../../lib/legacy.js'
+import '../../../styles/features.css'
+
+import Board from '../../../components/features/visuals/board.astro'
+import Terminals from '../../../components/features/visuals/terminals.astro'
+import EmbeddedBrowser from '../../../components/features/visuals/embedded-browser.astro'
+import Worktrees from '../../../components/features/visuals/worktrees.astro'
+import GitWorkflow from '../../../components/features/visuals/git-workflow.astro'
+import DiffViewer from '../../../components/features/visuals/diff-viewer.astro'
+import CommitGraph from '../../../components/features/visuals/commit-graph.astro'
+import PullRequests from '../../../components/features/visuals/pull-requests.astro'
+import NotesEditor from '../../../components/features/visuals/notes-editor.astro'
+import DevServers from '../../../components/features/visuals/dev-servers.astro'
+import UsageMeter from '../../../components/features/visuals/usage-meter.astro'
+import UsageReports from '../../../components/features/visuals/usage-reports.astro'
+import IssueSync from '../../../components/features/visuals/issue-sync.astro'
+import ExplodeMode from '../../../components/features/visuals/explode-mode.astro'
+import AttentionPanel from '../../../components/features/visuals/attention-panel.astro'
+import McpBoard from '../../../components/features/visuals/mcp-board.astro'
+
+const visuals: Record<string, any> = {
+  'board': Board, 'terminals': Terminals, 'embedded-browser': EmbeddedBrowser,
+  'worktrees': Worktrees, 'git-workflow': GitWorkflow, 'diff-viewer': DiffViewer,
+  'commit-graph': CommitGraph, 'pull-requests': PullRequests, 'notes-editor': NotesEditor,
+  'dev-servers': DevServers, 'usage-meter': UsageMeter, 'usage-reports': UsageReports,
+  'issue-sync': IssueSync, 'explode-mode': ExplodeMode, 'attention-panel': AttentionPanel,
+  'mcp-board': McpBoard,
+}
 
 export function getStaticPaths() {
   return features.map((feature) => ({
@@ -9,52 +37,8 @@ export function getStaticPaths() {
 }
 
 const feature = findFeatureBySlug(Astro.params.slug)
-
-if (!feature) {
-  throw new Error(`Unknown feature slug: ${Astro.params.slug}`)
-}
-
-const { styles, bodyHtml, scripts } = loadLegacySegments('features.html')
-const scopedCss = `
-  html, body {
-    margin: 0 !important;
-    padding: 0 !important;
-    background: transparent !important;
-    overflow: hidden !important;
-  }
-  .container {
-    max-width: none !important;
-    min-height: 0 !important;
-    padding: 0 !important;
-  }
-  nav,
-  .page-header,
-  footer,
-  .feature-text {
-    display: none !important;
-  }
-  .features-list {
-    margin: 0 !important;
-  }
-  .feature-section {
-    display: none !important;
-    opacity: 1 !important;
-    transform: none !important;
-  }
-  #${feature.legacyId} {
-    display: grid !important;
-    grid-template-columns: 1fr !important;
-    gap: 0 !important;
-    padding: 0 !important;
-    border-top: 0 !important;
-  }
-  #${feature.legacyId} .feature-visual {
-    width: 100% !important;
-    border-radius: 0 !important;
-    background: transparent !important;
-    box-shadow: none !important;
-  }
-`
+if (!feature) throw new Error(`Unknown feature slug: ${Astro.params.slug}`)
+const Visual = visuals[feature.slug]
 ---
 
 <!DOCTYPE html>
@@ -64,10 +48,37 @@ const scopedCss = `
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@500&family=JetBrains+Mono:wght@400;700&family=Outfit:wght@300;500;700&display=swap" rel="stylesheet" />
-    <style is:global set:html={`${styles}\n${scopedCss}`} />
+    <style is:global>
+      :root {
+        --bg: #0c0e1a;
+        --surface: #111428;
+        --surface2: #151833;
+        --border: #1e2240;
+        --text: #e8e8f0;
+        --text-dim: #6a6e8a;
+        --accent: #f46817;
+        --accent-light: #f7e463;
+        --accent-dim: rgba(244,104,23,0.08);
+        --red: #f44336;
+        --blue: #4da6ff;
+        --amber: #f7a825;
+        --green: #3dd68c;
+      }
+      * { box-sizing: border-box; }
+      html, body { margin: 0; padding: 0; background: transparent; overflow: hidden; font-family: 'Outfit', sans-serif; font-weight: 300; }
+      .feature-section { opacity: 1; transform: none; padding: 0; }
+      .feature-visual { width: 100%; border-radius: 0; background: transparent; }
+    </style>
   </head>
   <body>
-    <Fragment set:html={bodyHtml} />
-    {scripts.map((code) => <script is:inline set:html={code} />)}
+    <FeaturesHelpers />
+    <div class="feature-section" id={feature.legacyId} style="display:grid;grid-template-columns:1fr;">
+      <div class="feature-visual">
+        <div class="scale-wrap">
+          <Visual />
+        </div>
+      </div>
+    </div>
+    <FeaturesInit />
   </body>
 </html>

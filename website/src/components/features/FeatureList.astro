@@ -1,0 +1,55 @@
+---
+import FeaturesHelpers from './FeaturesHelpers.astro'
+import FeaturesInit from './FeaturesInit.astro'
+import FeatureSection from './FeatureSection.astro'
+import { features } from '../../data/features.js'
+
+import Board from './visuals/board.astro'
+import Terminals from './visuals/terminals.astro'
+import EmbeddedBrowser from './visuals/embedded-browser.astro'
+import Worktrees from './visuals/worktrees.astro'
+import GitWorkflow from './visuals/git-workflow.astro'
+import DiffViewer from './visuals/diff-viewer.astro'
+import CommitGraph from './visuals/commit-graph.astro'
+import PullRequests from './visuals/pull-requests.astro'
+import NotesEditor from './visuals/notes-editor.astro'
+import DevServers from './visuals/dev-servers.astro'
+import UsageMeter from './visuals/usage-meter.astro'
+import UsageReports from './visuals/usage-reports.astro'
+import IssueSync from './visuals/issue-sync.astro'
+import ExplodeMode from './visuals/explode-mode.astro'
+import AttentionPanel from './visuals/attention-panel.astro'
+import McpBoard from './visuals/mcp-board.astro'
+
+const visuals: Record<string, any> = {
+  'board': Board,
+  'terminals': Terminals,
+  'embedded-browser': EmbeddedBrowser,
+  'worktrees': Worktrees,
+  'git-workflow': GitWorkflow,
+  'diff-viewer': DiffViewer,
+  'commit-graph': CommitGraph,
+  'pull-requests': PullRequests,
+  'notes-editor': NotesEditor,
+  'dev-servers': DevServers,
+  'usage-meter': UsageMeter,
+  'usage-reports': UsageReports,
+  'issue-sync': IssueSync,
+  'explode-mode': ExplodeMode,
+  'attention-panel': AttentionPanel,
+  'mcp-board': McpBoard,
+}
+---
+
+<FeaturesHelpers />
+<div class="features-list">
+  {features.map((feature) => {
+    const Visual = visuals[feature.slug]
+    return (
+      <FeatureSection feature={feature}>
+        <Visual />
+      </FeatureSection>
+    )
+  })}
+</div>
+<FeaturesInit />

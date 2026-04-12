@@ -1,0 +1,114 @@
+        <div class="app-frame">
+          <div class="feat-graph">
+            <div class="feat-graph-inner" id="f7-inner">
+            <svg width="72" height="792">
+              <!-- Main trunk: row0→row21 -->
+              <line x1="18" y1="18" x2="18" y2="774" stroke="#e2e2e2" stroke-width="2" opacity="0.35"/>
+              <!-- feat/auth (violet): r0→r1, r1-r2, r2→r3 -->
+              <path d="M18,18 C18,32.4 42,31.6 42,54" stroke="#a78bfa" stroke-width="2" fill="none" opacity="0.35"/>
+              <line x1="42" y1="54" x2="42" y2="90" stroke="#a78bfa" stroke-width="2" opacity="0.35"/>
+              <path d="M42,90 C42,104.4 18,103.6 18,126" stroke="#a78bfa" stroke-width="2" fill="none" opacity="0.35"/>
+              <!-- fix/rate-limit (green): r5→r6, r6-r7, r7→r8 -->
+              <path d="M18,198 C18,212.4 66,211.6 66,234" stroke="#10b981" stroke-width="2" fill="none" opacity="0.35"/>
+              <line x1="66" y1="234" x2="66" y2="270" stroke="#10b981" stroke-width="2" opacity="0.35"/>
+              <path d="M66,270 C66,284.4 18,283.6 18,306" stroke="#10b981" stroke-width="2" fill="none" opacity="0.35"/>
+              <!-- feat/cache (cyan): r10→r11, r11-r13, r13→r14 -->
+              <path d="M18,378 C18,392.4 42,391.6 42,414" stroke="#06b6d4" stroke-width="2" fill="none" opacity="0.35"/>
+              <line x1="42" y1="414" x2="42" y2="486" stroke="#06b6d4" stroke-width="2" opacity="0.35"/>
+              <path d="M42,486 C42,500.4 18,499.6 18,522" stroke="#06b6d4" stroke-width="2" fill="none" opacity="0.35"/>
+              <!-- feat/search (amber): r16→r17, r17-r19, r19→r20 -->
+              <path d="M18,594 C18,608.4 42,607.6 42,630" stroke="#f59e0b" stroke-width="2" fill="none" opacity="0.35"/>
+              <line x1="42" y1="630" x2="42" y2="702" stroke="#f59e0b" stroke-width="2" opacity="0.35"/>
+              <path d="M42,702 C42,716.4 18,715.6 18,738" stroke="#f59e0b" stroke-width="2" fill="none" opacity="0.35"/>
+
+              <!-- Merge dots (hollow) r0, r5, r10, r16 -->
+              <circle cx="18" cy="18" r="5" fill="none" stroke="#e2e2e2" stroke-width="2"/>
+              <circle cx="18" cy="18" r="2.5" fill="var(--bg)"/>
+              <circle cx="18" cy="198" r="5" fill="none" stroke="#e2e2e2" stroke-width="2"/>
+              <circle cx="18" cy="198" r="2.5" fill="var(--bg)"/>
+              <circle cx="18" cy="378" r="5" fill="none" stroke="#e2e2e2" stroke-width="2"/>
+              <circle cx="18" cy="378" r="2.5" fill="var(--bg)"/>
+              <circle cx="18" cy="594" r="5" fill="none" stroke="#e2e2e2" stroke-width="2"/>
+              <circle cx="18" cy="594" r="2.5" fill="var(--bg)"/>
+              <!-- Main dots r3,r4,r8,r9,r14,r15,r20,r21 -->
+              <circle cx="18" cy="126" r="4" fill="#e2e2e2"/>
+              <circle cx="18" cy="162" r="4" fill="#e2e2e2"/>
+              <circle cx="18" cy="306" r="4" fill="#e2e2e2"/>
+              <circle cx="18" cy="342" r="4" fill="#e2e2e2"/>
+              <circle cx="18" cy="522" r="4" fill="#e2e2e2"/>
+              <circle cx="18" cy="558" r="4" fill="#e2e2e2"/>
+              <circle cx="18" cy="738" r="4" fill="#e2e2e2"/>
+              <circle cx="18" cy="774" r="4" fill="#e2e2e2"/>
+              <!-- feat/auth dots r1,r2 -->
+              <circle cx="42" cy="54" r="4" fill="#a78bfa"/>
+              <circle cx="42" cy="90" r="4" fill="#a78bfa"/>
+              <!-- fix/rate-limit dots r6,r7 -->
+              <circle cx="66" cy="234" r="4" fill="#10b981"/>
+              <circle cx="66" cy="270" r="4" fill="#10b981"/>
+              <!-- feat/cache dots r11,r12,r13 -->
+              <circle cx="42" cy="414" r="4" fill="#06b6d4"/>
+              <circle cx="42" cy="450" r="4" fill="#06b6d4"/>
+              <circle cx="42" cy="486" r="4" fill="#06b6d4"/>
+              <!-- feat/search dots r17,r18,r19 -->
+              <circle cx="42" cy="630" r="4" fill="#f59e0b"/>
+              <circle cx="42" cy="666" r="4" fill="#f59e0b"/>
+              <circle cx="42" cy="702" r="4" fill="#f59e0b"/>
+            </svg>
+            <!-- r0: merge feat/auth -->
+            <div class="cg-row"><div class="cg-row-inner" style="background:rgba(226,226,226,0.07)"><div class="cg-row-text"><div class="cg-msg">Merge feat/auth into main</div><div class="cg-meta">a3f8c21 · debuglebowski · 2m</div></div><span class="cg-ref" style="background:rgba(226,226,226,0.12);color:#e2e2e2">main</span><span class="cg-ref" style="background:rgba(167,139,250,0.12);color:#a78bfa">feat/auth</span><span class="cg-tag">v2.1.0</span></div></div>
+            <!-- r1,r2: feat/auth -->
+            <div class="cg-row"><div class="cg-row-inner" style="background:rgba(167,139,250,0.07)"><div class="cg-row-text"><div class="cg-msg">add token refresh + expiry handling</div><div class="cg-meta">b72e9f4 · debuglebowski · 1h</div></div></div></div>
+            <div class="cg-row"><div class="cg-row-inner" style="background:rgba(167,139,250,0.07)"><div class="cg-row-text"><div class="cg-msg">replace session auth with JWT validation</div><div class="cg-meta">c91d3a8 · debuglebowski · 2h</div></div></div></div>
+            <!-- r3,r4: main -->
+            <div class="cg-row"><div class="cg-row-inner" style="background:rgba(226,226,226,0.07)"><div class="cg-row-text"><div class="cg-msg">fix: pagination offset for empty results</div><div class="cg-meta">d45b1e7 · debuglebowski · 3h</div></div></div></div>
+            <div class="cg-row"><div class="cg-row-inner" style="background:rgba(226,226,226,0.07)"><div class="cg-row-text"><div class="cg-msg">chore: bump dependencies</div><div class="cg-meta">d99a1b2 · debuglebowski · 4h</div></div></div></div>
+            <!-- r5: merge fix/rate-limit -->
+            <div class="cg-row"><div class="cg-row-inner" style="background:rgba(226,226,226,0.07)"><div class="cg-row-text"><div class="cg-msg">Merge fix/rate-limit into main</div><div class="cg-meta">e88a2c3 · debuglebowski · 5h</div></div><span class="cg-ref" style="background:rgba(16,185,129,0.12);color:#10b981">fix/rate-limit</span></div></div>
+            <!-- r6,r7: fix/rate-limit -->
+            <div class="cg-row"><div class="cg-row-inner" style="background:rgba(16,185,129,0.07)"><div class="cg-row-text"><div class="cg-msg">add sliding window rate limiter</div><div class="cg-meta">f12d5b9 · debuglebowski · 6h</div></div></div></div>
+            <div class="cg-row"><div class="cg-row-inner" style="background:rgba(16,185,129,0.07)"><div class="cg-row-text"><div class="cg-msg">rate limit config from env vars</div><div class="cg-meta">g67e8a1 · debuglebowski · 7h</div></div></div></div>
+            <!-- r8,r9: main -->
+            <div class="cg-row"><div class="cg-row-inner" style="background:rgba(226,226,226,0.07)"><div class="cg-row-text"><div class="cg-msg">chore: upgrade express to v5</div><div class="cg-meta">h34c9d2 · debuglebowski · 1d</div></div></div></div>
+            <div class="cg-row"><div class="cg-row-inner" style="background:rgba(226,226,226,0.07)"><div class="cg-row-text"><div class="cg-msg">refactor: extract middleware pipeline</div><div class="cg-meta">j21a4e6 · debuglebowski · 1d</div></div></div></div>
+            <!-- r10: merge feat/cache -->
+            <div class="cg-row"><div class="cg-row-inner" style="background:rgba(226,226,226,0.07)"><div class="cg-row-text"><div class="cg-msg">Merge feat/cache into main</div><div class="cg-meta">k55b7d3 · debuglebowski · 2d</div></div><span class="cg-ref" style="background:rgba(6,182,212,0.12);color:#06b6d4">feat/cache</span></div></div>
+            <!-- r11,r12,r13: feat/cache -->
+            <div class="cg-row"><div class="cg-row-inner" style="background:rgba(6,182,212,0.07)"><div class="cg-row-text"><div class="cg-msg">add Redis cache layer for hot queries</div><div class="cg-meta">l88c1f9 · debuglebowski · 2d</div></div></div></div>
+            <div class="cg-row"><div class="cg-row-inner" style="background:rgba(6,182,212,0.07)"><div class="cg-row-text"><div class="cg-msg">cache invalidation on write-through</div><div class="cg-meta">m44d2a7 · debuglebowski · 2d</div></div></div></div>
+            <div class="cg-row"><div class="cg-row-inner" style="background:rgba(6,182,212,0.07)"><div class="cg-row-text"><div class="cg-msg">add cache TTL config + metrics endpoint</div><div class="cg-meta">n99e5b1 · debuglebowski · 3d</div></div></div></div>
+            <!-- r14,r15: main -->
+            <div class="cg-row"><div class="cg-row-inner" style="background:rgba(226,226,226,0.07)"><div class="cg-row-text"><div class="cg-msg">docs: update API changelog</div><div class="cg-meta">o12f8c4 · debuglebowski · 3d</div></div></div></div>
+            <div class="cg-row"><div class="cg-row-inner" style="background:rgba(226,226,226,0.07)"><div class="cg-row-text"><div class="cg-msg">test: add integration test suite</div><div class="cg-meta">p33g7h8 · debuglebowski · 3d</div></div></div></div>
+            <!-- r16: merge feat/search -->
+            <div class="cg-row"><div class="cg-row-inner" style="background:rgba(226,226,226,0.07)"><div class="cg-row-text"><div class="cg-msg">Merge feat/search into main</div><div class="cg-meta">q77i2j5 · debuglebowski · 4d</div></div><span class="cg-ref" style="background:rgba(245,158,11,0.12);color:#f59e0b">feat/search</span></div></div>
+            <!-- r17,r18,r19: feat/search -->
+            <div class="cg-row"><div class="cg-row-inner" style="background:rgba(245,158,11,0.07)"><div class="cg-row-text"><div class="cg-msg">add full-text search with trigram index</div><div class="cg-meta">r11k4l8 · debuglebowski · 4d</div></div></div></div>
+            <div class="cg-row"><div class="cg-row-inner" style="background:rgba(245,158,11,0.07)"><div class="cg-row-text"><div class="cg-msg">search result ranking + pagination</div><div class="cg-meta">s55m6n2 · debuglebowski · 4d</div></div></div></div>
+            <div class="cg-row"><div class="cg-row-inner" style="background:rgba(245,158,11,0.07)"><div class="cg-row-text"><div class="cg-msg">add search highlight + snippet extraction</div><div class="cg-meta">t88o9p4 · debuglebowski · 5d</div></div></div></div>
+            <!-- r20,r21: main -->
+            <div class="cg-row"><div class="cg-row-inner" style="background:rgba(226,226,226,0.07)"><div class="cg-row-text"><div class="cg-msg">ci: add GitHub Actions workflow</div><div class="cg-meta">u22q1r6 · debuglebowski · 5d</div></div></div></div>
+            <div class="cg-row"><div class="cg-row-inner" style="background:rgba(226,226,226,0.07)"><div class="cg-row-text"><div class="cg-msg">initial commit</div><div class="cg-meta">i90f1b5 · debuglebowski · 6d</div></div><span class="cg-tag">v2.0.0</span></div></div>
+            </div>
+          </div>
+        </div>
+
+<script is:inline>
+(function() {
+  var sleep = window.__feat.sleep;
+  var loopOnVisible = window.__feat.loopOnVisible;
+  var revealLines = window.__feat.revealLines;
+  var resetLines = window.__feat.resetLines;
+  loopOnVisible(document.getElementById('feat-7'), async function() {
+    var inner = document.getElementById('f7-inner');
+    inner.style.transition = 'none';
+    inner.style.transform = 'translateY(0)';
+    await sleep(2000);
+    inner.style.transition = 'transform 10s cubic-bezier(0.25,0.1,0.25,1)';
+    inner.style.transform = 'translateY(-276px)';
+    await sleep(11000);
+    inner.style.transition = 'transform 3s ease-out';
+    inner.style.transform = 'translateY(0)';
+    await sleep(4000);
+  });
+})();
+</script>

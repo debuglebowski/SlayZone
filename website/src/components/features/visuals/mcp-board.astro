@@ -1,0 +1,120 @@
+        <div class="app-frame" style="flex-direction:row;">
+          <div class="fk-sidebar">
+            <div class="fk-sidebar-dots"><span class="app-dot r"></span><span class="app-dot y"></span><span class="app-dot g"></span></div>
+            <div class="fk-proj" style="background:#4466ff;">SZ<div class="fk-proj-dot" style="background:var(--green)"></div></div>
+            <div class="fk-proj active" style="background:#ee8833;">WD</div>
+            <div class="fk-proj" style="background:#44bb55;">HC</div>
+          </div>
+          <div style="flex:1;display:flex;flex-direction:column;overflow:hidden;">
+          <div class="tab-bar">
+            <div class="tab-bar-home">🏠</div>
+            <div class="tab-item active"><span class="tab-dot" style="background:var(--green)"></span> Auth refactor <span class="tab-x">×</span></div>
+            <div class="tab-item"><span class="tab-dot" style="background:var(--green)"></span> Search endpoint <span class="tab-x">×</span></div>
+          </div>
+          <div class="task-bar"><div class="task-bar-left"><span class="task-name">Auth refactor</span></div><div class="task-bar-right"><span class="tb-btn active">▸_ Terminal</span><span class="tb-btn">◧ Browser</span><span class="tb-btn">⎇ Git</span></div></div>
+          <!-- Terminal view -->
+          <div id="f16-term-wrap" style="flex:1;display:flex;flex-direction:column;">
+            <div class="pane-hd"><span class="pane-dot green"></span> terminal — claude code</div>
+            <div class="term" id="f16-term">
+              <div class="tl instant"><span class="t-muted"># Agent reads task context via MCP</span></div>
+              <div class="tl" data-d="150"><span class="t-prompt">❯</span> <span class="t-out">Reading task context from SlayZone...</span></div>
+              <div class="tl" data-d="300"><span class="t-green">✓</span> <span class="t-out">Task: Auth refactor</span></div>
+              <div class="tl" data-d="400"><span class="t-green">✓</span> <span class="t-out">Subtasks: 3 (2 done, 1 remaining)</span></div>
+              <div class="tl" data-d="550"><br></div>
+              <div class="tl" data-d="600"><span class="t-muted"># Agent completes work and updates board</span></div>
+              <div class="tl" data-d="750"><span class="t-prompt">❯</span> <span class="t-out">Updating task status...</span></div>
+              <div class="tl" data-d="900"><span class="t-green">✓</span> <span class="t-out">Subtask "Update tests" → done</span></div>
+              <div class="tl" data-d="1050"><span class="t-green">✓</span> <span class="t-out">Task status → review</span></div>
+              <div class="tl" data-d="1200"><br></div>
+              <div class="tl" data-d="1300"><span class="t-prompt">❯</span> <span class="cursor-blink"></span></div>
+            </div>
+          </div>
+          <!-- Kanban board (hidden initially) -->
+          <div class="f16-board" id="f16-board" style="display:none;">
+            <div><div class="f16-col-hd">Backlog</div>
+              <div class="f16-card" id="f16-c-db"><div class="f16-card-name">DB migration</div><div class="f16-card-meta">idle</div></div>
+              <div class="f16-card" id="f16-c-docs"><div class="f16-card-name">API docs</div><div class="f16-card-meta">idle</div></div>
+            </div>
+            <div><div class="f16-col-hd">In Progress</div>
+              <div class="f16-card" id="f16-c-auth"><div class="f16-card-name">Auth refactor</div><div class="f16-card-meta">working · 14m</div></div>
+              <div class="f16-card" id="f16-c-search"><div class="f16-card-name">Search endpoint</div><div class="f16-card-meta">working · 8m</div></div>
+            </div>
+            <div><div class="f16-col-hd">Review</div>
+              <div class="f16-card" id="f16-c-rate"><div class="f16-card-name">Rate limiting</div><div class="f16-card-meta">review</div></div>
+            </div>
+            <div><div class="f16-col-hd">Done</div>
+              <div class="f16-card" id="f16-c-ci"><div class="f16-card-name">CI pipeline</div><div class="f16-card-meta">done · 2h ago</div></div>
+            </div>
+          </div>
+          </div>
+        </div>
+
+<script is:inline>
+(function() {
+  var sleep = window.__feat.sleep;
+  var loopOnVisible = window.__feat.loopOnVisible;
+  var revealLines = window.__feat.revealLines;
+  var resetLines = window.__feat.resetLines;
+  loopOnVisible(document.getElementById('feat-16'), async function() {
+    var term = document.getElementById('f16-term');
+    var termWrap = document.getElementById('f16-term-wrap');
+    var board = document.getElementById('f16-board');
+    var cards = board.querySelectorAll('.f16-card');
+    var cAuth = document.getElementById('f16-c-auth');
+    var cRate = document.getElementById('f16-c-rate');
+
+    // Reset: show terminal, hide board, remove clones, restore originals
+    termWrap.style.display = ''; board.style.display = 'none';
+    board.querySelectorAll('.f16-card:not([id])').forEach(function(c) { c.remove(); });
+    cAuth.style.display = ''; cAuth.classList.remove('vis','moving');
+    cRate.style.display = ''; cRate.classList.remove('vis','moving');
+    cards.forEach(function(c) { c.classList.remove('vis','moving'); });
+    resetLines(term);
+    await sleep(200);
+
+    // Play terminal lines (fast, no extra padding)
+    var lines = term.querySelectorAll('.tl:not(.instant)');
+    var maxD = 0;
+    lines.forEach(function(l) { var d = parseInt(l.dataset.d) || 0; if (d > maxD) maxD = d; setTimeout(function() { l.classList.add('vis'); }, d); });
+    await sleep(maxD + 200);
+
+    // Switch to kanban
+    termWrap.style.display = 'none'; board.style.display = '';
+
+    // Cards appear one by one
+    for (var i = 0; i < cards.length; i++) {
+      cards[i].classList.add('vis');
+      await sleep(100);
+    }
+    await sleep(800);
+
+    // Move Auth refactor: In Progress → Review
+    cAuth.classList.add('moving');
+    await sleep(350);
+    cAuth.style.display = 'none';
+    var reviewCol = cRate.parentElement;
+    var authClone = cAuth.cloneNode(true);
+    authClone.className = 'f16-card';
+    authClone.style.display = '';
+    authClone.querySelector('.f16-card-meta').textContent = 'review';
+    reviewCol.appendChild(authClone);
+    await sleep(50);
+    authClone.classList.add('vis');
+    await sleep(800);
+
+    // Move Rate limiting: Review → Done
+    cRate.classList.add('moving');
+    await sleep(350);
+    cRate.style.display = 'none';
+    var doneCol = document.getElementById('f16-c-ci').parentElement;
+    var rateClone = cRate.cloneNode(true);
+    rateClone.className = 'f16-card';
+    rateClone.style.display = '';
+    rateClone.querySelector('.f16-card-meta').textContent = 'done · just now';
+    doneCol.appendChild(rateClone);
+    await sleep(50);
+    rateClone.classList.add('vis');
+    await sleep(800);
+  });
+})();
+</script>

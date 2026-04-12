@@ -1,0 +1,216 @@
+        <div class="app-frame" style="flex-direction:row;position:relative;">
+          <div class="fk-cursor" id="fk-cursor"><svg viewBox="0 0 24 24" fill="none"><path d="M5 3l14 8.5L12 14l-2 7L5 3z" fill="white" stroke="black" stroke-width="1.5" stroke-linejoin="round"/></svg></div>
+          <div class="fk-click-ripple" id="fk-ripple"></div>
+          <div class="fk-layout">
+            <!-- Sidebar -->
+            <div class="fk-sidebar">
+              <div class="fk-sidebar-dots"><span class="app-dot r"></span><span class="app-dot y"></span><span class="app-dot g"></span></div>
+              <div class="fk-proj" id="fk-p-sz" style="background:#4466ff;">SZ<div class="fk-proj-dot" style="background:var(--green)"></div></div>
+              <div class="fk-proj active" id="fk-p-wd" style="background:#ee8833;">WD</div>
+              <div class="fk-proj" id="fk-p-hc" style="background:#44bb55;">HC</div>
+              <div style="width:36px;height:36px;border-radius:10px;border:1px dashed var(--border);display:flex;align-items:center;justify-content:center;color:var(--text-dim);font-size:16px;">+</div>
+            </div>
+            <!-- Main -->
+            <div class="fk-main">
+              <div class="fk-topbar">
+                <div class="fk-topbar-title" id="fk-title">World Domination</div>
+                <div class="fk-topbar-right">
+                  <span class="fk-topbar-btn">≡ Filter</span>
+                  <span class="fk-topbar-btn">◫ Display</span>
+                </div>
+              </div>
+              <div class="fk-board" style="grid-template-columns:repeat(4,1fr);" id="fk-board">
+                <div class="fk-col">
+                  <div class="fk-col-head">Backlog <span class="cnt">3</span><span class="fk-plus">+</span></div>
+                  <div class="fk-card"><span class="fk-card-icon">⫸</span><div class="fk-card-body"><div class="fk-card-title">Rewrite everything in Rust</div></div></div>
+                  <div class="fk-card"><span class="fk-card-icon">⫸</span><div class="fk-card-body"><div class="fk-card-title">Delete node_modules (again)</div></div></div>
+                  <div class="fk-card"><span class="fk-card-icon">⫸</span><div class="fk-card-body"><div class="fk-card-title">Convince PM that "done" means done</div></div></div>
+                </div>
+                <div class="fk-col" id="fk-col-todo">
+                  <div class="fk-col-head">Todo <span class="cnt" id="fk-cnt-todo">3</span><span class="fk-plus">+</span></div>
+                  <div class="fk-card" id="fk-drag-card"><span class="fk-card-icon">⫸</span><div class="fk-card-body"><div class="fk-card-title">Fix "quick fix" from Friday</div></div><div class="fk-card-dot attention"></div></div>
+                  <div class="fk-card"><span class="fk-card-icon">⫸</span><div class="fk-card-body"><div class="fk-card-title">Pretend to understand the codebase</div></div><div class="fk-card-dot attention"></div></div>
+                  <div class="fk-card"><span class="fk-card-icon">⫸</span><div class="fk-card-body"><div class="fk-card-title">Add auth (for real this time)</div></div></div>
+                </div>
+                <div class="fk-col" id="fk-col-progress">
+                  <div class="fk-col-head">In Progress <span class="cnt" id="fk-cnt-progress">2</span><span class="fk-plus">+</span></div>
+                  <div class="fk-card"><span class="fk-card-icon">⫸</span><div class="fk-card-body"><div class="fk-card-title">Mass-assign tasks to Claude</div></div><div class="fk-card-dot working"></div></div>
+                  <div class="fk-card"><span class="fk-card-icon">⫸</span><div class="fk-card-body"><div class="fk-card-title">Take credit in standup</div></div><div class="fk-card-dot idle"></div></div>
+                </div>
+                <div class="fk-col">
+                  <div class="fk-col-head">Done <span class="cnt">2</span></div>
+                  <div class="fk-card" style="opacity:0.6;"><span class="fk-card-icon">⫸</span><div class="fk-card-body"><div class="fk-card-title">Google "how to exit vim"</div></div></div>
+                  <div class="fk-card" style="opacity:0.6;"><span class="fk-card-icon">⫸</span><div class="fk-card-body"><div class="fk-card-title">Install SlayZone</div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        </div>
+      </div>
+
+<script is:inline>
+(function() {
+  var sleep = window.__feat.sleep;
+  var loopOnVisible = window.__feat.loopOnVisible;
+  var revealLines = window.__feat.revealLines;
+  var resetLines = window.__feat.resetLines;
+  (function() {
+    var boardWD = '<div class="fk-col"><div class="fk-col-head">Backlog <span class="cnt">3</span><span class="fk-plus">+</span></div><div class="fk-card"><span class="fk-card-icon">⫸</span><div class="fk-card-body"><div class="fk-card-title">Rewrite everything in Rust</div></div></div><div class="fk-card"><span class="fk-card-icon">⫸</span><div class="fk-card-body"><div class="fk-card-title">Delete node_modules (again)</div></div></div><div class="fk-card"><span class="fk-card-icon">⫸</span><div class="fk-card-body"><div class="fk-card-title">Convince PM that "done" means done</div></div></div></div><div class="fk-col" id="fk-col-todo"><div class="fk-col-head">Todo <span class="cnt" id="fk-cnt-todo">3</span><span class="fk-plus">+</span></div><div class="fk-card" id="fk-drag-card"><span class="fk-card-icon">⫸</span><div class="fk-card-body"><div class="fk-card-title">Fix "quick fix" from Friday</div></div><div class="fk-card-dot attention"></div></div><div class="fk-card"><span class="fk-card-icon">⫸</span><div class="fk-card-body"><div class="fk-card-title">Pretend to understand the codebase</div></div><div class="fk-card-dot attention"></div></div><div class="fk-card"><span class="fk-card-icon">⫸</span><div class="fk-card-body"><div class="fk-card-title">Add auth (for real this time)</div></div></div></div><div class="fk-col" id="fk-col-progress"><div class="fk-col-head">In Progress <span class="cnt" id="fk-cnt-progress">2</span><span class="fk-plus">+</span></div><div class="fk-card"><span class="fk-card-icon">⫸</span><div class="fk-card-body"><div class="fk-card-title">Mass-assign tasks to Claude</div></div><div class="fk-card-dot working"></div></div><div class="fk-card"><span class="fk-card-icon">⫸</span><div class="fk-card-body"><div class="fk-card-title">Take credit in standup</div></div><div class="fk-card-dot idle"></div></div></div><div class="fk-col"><div class="fk-col-head">Done <span class="cnt">2</span></div><div class="fk-card" style="opacity:0.6;"><span class="fk-card-icon">⫸</span><div class="fk-card-body"><div class="fk-card-title">Google "how to exit vim"</div></div></div><div class="fk-card" style="opacity:0.6;"><span class="fk-card-icon">⫸</span><div class="fk-card-body"><div class="fk-card-title">Install SlayZone</div></div></div></div>';
+
+    var boardSZ = '<div class="fk-col"><div class="fk-col-head">Backlog <span class="cnt">2</span><span class="fk-plus">+</span></div><div class="fk-card"><span class="fk-card-icon">⫸</span><div class="fk-card-body"><div class="fk-card-title">Dark mode for dark mode</div></div></div><div class="fk-card"><span class="fk-card-icon">⫸</span><div class="fk-card-body"><div class="fk-card-title">Add more testimonials (make them up)</div></div></div></div><div class="fk-col"><div class="fk-col-head">Todo <span class="cnt">2</span><span class="fk-plus">+</span></div><div class="fk-card"><span class="fk-card-icon">⫸</span><div class="fk-card-body"><div class="fk-card-title">Features page animations</div></div><div class="fk-card-dot working"></div></div><div class="fk-card"><span class="fk-card-icon">⫸</span><div class="fk-card-body"><div class="fk-card-title">Ship before heat death of universe</div></div></div></div><div class="fk-col"><div class="fk-col-head">In Progress <span class="cnt">1</span><span class="fk-plus">+</span></div><div class="fk-card"><span class="fk-card-icon">⫸</span><div class="fk-card-body"><div class="fk-card-title">Impress one (1) person on HN</div></div><div class="fk-card-dot attention"></div></div></div><div class="fk-col"><div class="fk-col-head">Done <span class="cnt">1</span></div><div class="fk-card" style="opacity:0.6;"><span class="fk-card-icon">⫸</span><div class="fk-card-body"><div class="fk-card-title">Exist</div></div></div></div>';
+
+    var projects = [
+      { id: 'fk-p-wd', title: 'World Domination', board: boardWD },
+      { id: 'fk-p-sz', title: 'SlayZone', board: boardSZ }
+    ];
+
+    var currentProject = 0;
+
+    function setActiveProject(idx) {
+      document.querySelectorAll('.fk-sidebar .fk-proj').forEach(function(p) { p.classList.remove('active'); });
+      document.getElementById(projects[idx].id).classList.add('active');
+      document.getElementById('fk-title').textContent = projects[idx].title;
+    }
+
+    async function switchProject(idx) {
+      var board = document.getElementById('fk-board');
+      board.classList.add('fade');
+      await sleep(250);
+      setActiveProject(idx);
+      board.innerHTML = projects[idx].board;
+      board.classList.remove('fade');
+      currentProject = idx;
+    }
+
+    var cursor = document.getElementById('fk-cursor');
+    var ripple = document.getElementById('fk-ripple');
+    var frame = cursor.parentElement;
+
+    function moveTo(x, y) {
+      cursor.style.left = x + 'px';
+      cursor.style.top = y + 'px';
+    }
+
+    function showCursor(x, y) {
+      cursor.style.transition = 'opacity 0.3s ease';
+      moveTo(x, y);
+      cursor.classList.add('vis');
+    }
+
+    function hideCursor() { cursor.classList.remove('vis'); }
+
+    async function animateMoveTo(x, y) {
+      cursor.style.transition = 'opacity 0.3s ease, left 0.6s cubic-bezier(0.4,0,0.2,1), top 0.6s cubic-bezier(0.4,0,0.2,1)';
+      moveTo(x, y);
+      await sleep(650);
+    }
+
+    function click(x, y) {
+      ripple.style.left = x + 'px';
+      ripple.style.top = y + 'px';
+      ripple.classList.remove('go');
+      void ripple.offsetWidth;
+      ripple.classList.add('go');
+    }
+
+    function getPos(el) {
+      var r = el.getBoundingClientRect();
+      var fr = frame.getBoundingClientRect();
+      // Cursor tip is at top-left of SVG, so no offset needed — just point at element center
+      var scaleWrap = frame.closest('.scale-wrap');
+      var s = scaleWrap ? scaleWrap.getBoundingClientRect().width / 720 : 1;
+      return { x: (r.left - fr.left + r.width / 2) / s, y: (r.top - fr.top + r.height / 2) / s };
+    }
+
+    loopOnVisible(document.getElementById('feat-1'), async function() {
+      hideCursor();
+      await switchProject(0);
+      await sleep(600);
+
+      var dragCard = document.getElementById('fk-drag-card');
+      var colProgress = document.getElementById('fk-col-progress');
+      var cntTodo = document.getElementById('fk-cnt-todo');
+      var cntProgress = document.getElementById('fk-cnt-progress');
+
+      // Cursor appears on the drag card
+      var cardPos = getPos(dragCard);
+      showCursor(cardPos.x, cardPos.y);
+      await sleep(500);
+
+      // "Pick up" card — make it absolutely positioned and follow cursor
+      click(cardPos.x, cardPos.y);
+      await sleep(200);
+      var cardRect = dragCard.getBoundingClientRect();
+      var frameRect = frame.getBoundingClientRect();
+      var scaleWrap = frame.closest('.scale-wrap');
+      var s = scaleWrap ? scaleWrap.getBoundingClientRect().width / 720 : 1;
+      var startX = (cardRect.left - frameRect.left) / s;
+      var startY = (cardRect.top - frameRect.top) / s;
+      var cardW = cardRect.width / s;
+      var cardH = cardRect.height / s;
+
+      // Ghost placeholder stays in flow
+      dragCard.classList.add('ghost');
+
+      // Floating card that follows cursor — anchored to cursor position
+      var floater = document.createElement('div');
+      floater.className = 'fk-card dragging';
+      floater.style.cssText = 'position:absolute;z-index:10;width:' + cardW + 'px;margin:0;pointer-events:none;';
+      floater.innerHTML = dragCard.innerHTML;
+      frame.appendChild(floater);
+
+      // Offset: card hangs from cursor at the grab point
+      var grabOffsetX = cardPos.x - startX;
+      var grabOffsetY = cardPos.y - startY;
+
+      function syncFloater() {
+        var cx = parseFloat(cursor.style.left) || 0;
+        var cy = parseFloat(cursor.style.top) || 0;
+        floater.style.left = (cx - grabOffsetX) + 'px';
+        floater.style.top = (cy - grabOffsetY) + 'px';
+      }
+
+      // Use same transition as cursor so they stay in sync
+      floater.style.transition = 'left 0.6s cubic-bezier(0.4,0,0.2,1), top 0.6s cubic-bezier(0.4,0,0.2,1)';
+      syncFloater();
+      await sleep(100);
+
+      // Move cursor — floater follows via same transition timing
+      var lastCard = colProgress.querySelectorAll('.fk-card');
+      var dropTarget = lastCard[lastCard.length - 1];
+      var dropPos = getPos(dropTarget);
+      var dropCardRect = dropTarget.getBoundingClientRect();
+      var dropY = (dropCardRect.bottom - frameRect.top) / s + 8;
+
+      // Move both together — set floater destination, then animate cursor
+      floater.style.left = (dropPos.x - grabOffsetX) + 'px';
+      floater.style.top = (dropY - grabOffsetY) + 'px';
+      await animateMoveTo(dropPos.x, dropY);
+
+      // Drop — remove floater, insert real card
+      frame.removeChild(floater);
+      var clone = document.createElement('div');
+      clone.className = 'fk-card fk-card-moved landed';
+      clone.innerHTML = '<span class="fk-card-icon">⫸</span><div class="fk-card-body"><div class="fk-card-title">Fix "quick fix" from Friday</div></div><div class="fk-card-dot attention" style="animation:pulse 2s ease infinite"></div>';
+      colProgress.appendChild(clone);
+      click(dropPos.x, dropY);
+      cntTodo.textContent = '2'; cntProgress.textContent = '3';
+      await sleep(1200);
+
+      // Move cursor to SZ project in sidebar
+      var szProj = document.getElementById('fk-p-sz');
+      var szPos = getPos(szProj);
+      await animateMoveTo(szPos.x, szPos.y);
+      await sleep(200);
+      click(szPos.x, szPos.y);
+      await sleep(200);
+
+      // Switch project
+      await switchProject(1);
+      hideCursor();
+      await sleep(3500);
+    });
+  })();
+})();
+</script>

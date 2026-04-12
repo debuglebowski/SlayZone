@@ -1,0 +1,143 @@
+---
+const markup = '  <section class="demo-section">\n    <div class="app-frame" id="app-frame">\n      <div class="fake-cursor" id="fake-cursor"><svg viewBox="0 0 24 24" fill="none"><path d="M5 3l14 8.5L12 14l-2 7L5 3z" fill="white" stroke="black" stroke-width="1.5" stroke-linejoin="round"/></svg></div>\n      <div class="app-bar" id="app-bar">\n        <div class="app-bar-default" id="app-bar-default">\n          <span class="app-dot r"></span><span class="app-dot y"></span><span class="app-dot g"></span>\n          <span class="app-title" id="app-title">slayzone — project: api-v2 — 14 tasks</span>\n        </div>\n        <div class="app-bar-task" id="app-bar-task">\n          <div class="task-toolbar-left">\n            <span class="app-dot r"></span><span class="app-dot y"></span><span class="app-dot g"></span>\n            <span class="task-name">Auth refactor</span>\n            <span class="task-branch">⎇ feat/auth-refactor</span>\n          </div>\n          <div class="task-toolbar-right">\n            <button class="toolbar-btn active" id="btn-terminal">▸_ Terminal</button>\n            <button class="toolbar-btn" id="btn-browser">◧ Browser</button>\n            <button class="toolbar-btn" id="btn-diff">± Diff</button>\n          </div>\n        </div>\n      </div>\n      <div class="app-body" id="app-body">\n\n        <div class="state-kanban" id="state-kanban">\n          <div class="kanban-board">\n            <div class="kanban-col">\n              <div class="col-header">Backlog <span class="col-count">3</span></div>\n              <div class="card"><div class="card-title">Rate limiting</div><div class="card-meta"><span class="card-status">queued</span></div></div>\n              <div class="card"><div class="card-title">Webhook retries</div><div class="card-meta"><span class="card-status">queued</span></div></div>\n            </div>\n            <div class="kanban-col">\n              <div class="col-header">In Progress <span class="col-count">4</span></div>\n              <div class="card" id="target-card"><div class="card-title">Auth refactor</div><div class="card-meta"><div class="card-agents"><span class="agent-dot working"></span></div><span class="card-status s-working">working</span></div></div>\n              <div class="card"><div class="card-title">Search endpoint</div><div class="card-meta"><div class="card-agents"><span class="agent-dot working"></span></div><span class="card-status s-working">working</span></div></div>\n              <div class="card" style="border-color:rgba(247,168,37,0.3);"><div class="card-title">DB migration</div><div class="card-meta"><div class="card-agents"><span class="agent-dot attention"></span></div><span class="card-status s-attention">attention</span></div></div>\n            </div>\n            <div class="kanban-col">\n              <div class="col-header">Review <span class="col-count">3</span></div>\n              <div class="card"><div class="card-title">Pagination</div><div class="card-meta"><div class="card-agents"><span class="agent-dot working"></span></div><span class="card-status s-working">working</span></div></div>\n              <div class="card"><div class="card-title">Error handling</div><div class="card-meta"><div class="card-agents"><span class="agent-dot attention"></span></div><span class="card-status s-attention">attention</span></div></div>\n            </div>\n            <div class="kanban-col">\n              <div class="col-header">Done <span class="col-count">4</span></div>\n              <div class="card" style="opacity:0.6;"><div class="card-title">Fix navbar</div><div class="card-meta"><span class="card-status">done</span></div></div>\n              <div class="card" style="opacity:0.6;"><div class="card-title">Setup CI</div><div class="card-meta"><span class="card-status">done</span></div></div>\n            </div>\n          </div>\n        </div>\n\n        <!-- TASK VIEW -->\n        <div class="state-task" id="state-task">\n          <div class="task-content">\n            <div class="pane-terminal">\n              <div class="pane-header"><span class="pane-dot"></span> claude code — auth-refactor</div>\n              <div class="terminal-content" id="terminal-content">\n                <!-- Claude Code start screen -->\n                <div class="term-line instant-row" data-delay="0">\n                  <div class="cc-header">\n                    <div class="cc-logo"><span class="t-logo"> ▐▛███▜▌</span><br><span class="t-logo">▝▜█████▛▘</span><br><span class="t-logo">  ▘▘ ▝▝</span></div>\n                    <div class="cc-info"><span class="t-output">Claude Code</span> <span class="t-muted">v2.1.42</span><br><span class="t-muted">Opus 4.6 · Claude Team</span><br><span class="t-muted">~/dev/projects/api-v2</span></div>\n                  </div>\n                </div>\n                <div class="term-line" data-delay="0"><span class="t-separator">────────────────────────────────────────────────────────────────────</span></div>\n                <div class="term-line" data-delay="0"><span class="t-muted">❯ Try "edit auth.ts to..."</span></div>\n                <div class="term-line" data-delay="0"><span class="t-separator">────────────────────────────────────────────────────────────────────</span></div>\n                <div class="term-line" data-delay="0"><span class="t-muted">  ? for shortcuts</span></div>\n                <div class="term-line" data-delay="0"><br></div>\n                <!-- Prompt + work -->\n                <div class="term-line" data-delay="1200"><span class="t-prompt">❯</span> <span class="t-cmd">refactor auth middleware to use JWT validation</span></div>\n                <div class="term-line" data-delay="1800"><br></div>\n                <div class="term-line" data-delay="2000"><span class="t-claude">Claude</span> <span class="t-output">I\'ll refactor the auth middleware. Examining current code...</span></div>\n                <div class="term-line" data-delay="2600"><br></div>\n                <div class="term-line" data-delay="2800"><span class="t-file">  src/middleware/auth.ts</span> <span class="t-output">— rewriting</span></div>\n                <div class="term-line" data-delay="3100"><span class="t-file">  src/utils/jwt.ts</span> <span class="t-output">— created</span></div>\n                <div class="term-line" data-delay="3400"><span class="t-file">  src/types/auth.d.ts</span> <span class="t-output">— updated</span></div>\n                <div class="term-line" data-delay="3900"><br></div>\n                <div class="term-line" data-delay="4100"><span class="t-success">✓</span> <span class="t-output">JWT middleware replacing session-based auth</span></div>\n                <div class="term-line" data-delay="4400"><span class="t-success">✓</span> <span class="t-output">Token refresh + expiry handling added</span></div>\n                <div class="term-line" data-delay="4700"><span class="t-output">Running tests...</span> <span class="t-success">14 passed</span></div>\n                <div class="term-line" data-delay="5100"><br></div>\n                <div class="term-line" data-delay="5300"><span class="t-prompt">❯</span> <span class="cursor-blink"></span></div>\n              </div>\n            </div>\n\n            <!-- BROWSER -->\n            <div class="pane-browser" id="pane-browser">\n              <div class="browser-bar">\n                <div class="browser-url"><span class="lock">🔒</span> localhost:3000/dashboard</div>\n              </div>\n              <div class="browser-viewport">\n                <div class="browser-page">\n                  <div class="dash-topbar">\n                    <div class="dash-logo">ApiDash</div>\n                    <div class="dash-nav">\n                      <span class="dash-nav-item active">Overview</span>\n                      <span class="dash-nav-item">Endpoints</span>\n                      <span class="dash-nav-item">Logs</span>\n                    </div>\n                    <div class="dash-avatar"></div>\n                  </div>\n                  <div class="dash-hero">\n                    <div class="dash-hero-title">API v2 — Auth Refactor Preview</div>\n                    <div class="dash-hero-sub">JWT validation active · 3 endpoints updated · all tests passing</div>\n                  </div>\n                  <div class="dash-cards">\n                    <div class="dash-card"><div class="dash-card-label">Requests / min</div><div class="dash-card-val green">1,247</div></div>\n                    <div class="dash-card"><div class="dash-card-label">Avg latency</div><div class="dash-card-val amber">42ms</div></div>\n                    <div class="dash-card"><div class="dash-card-label">Auth success</div><div class="dash-card-val blue">99.2%</div></div>\n                  </div>\n                  <div class="dash-table">\n                    <div class="dash-table-head"><span>Endpoint</span><span>Method</span><span>Status</span><span>Time</span></div>\n                    <div class="dash-table-row"><span class="endpoint">/api/v2/auth/token</span><span class="method post">POST</span><span class="status">200</span><span class="time">12ms</span></div>\n                    <div class="dash-table-row"><span class="endpoint">/api/v2/users/me</span><span class="method get">GET</span><span class="status">200</span><span class="time">8ms</span></div>\n                    <div class="dash-table-row"><span class="endpoint">/api/v2/auth/refresh</span><span class="method post">POST</span><span class="status">200</span><span class="time">15ms</span></div>\n                  </div>\n                </div>\n              </div>\n            </div>\n\n            <!-- DIFF -->\n            <div class="pane-diff" id="pane-diff">\n              <div class="diff-header">± 3 files changed</div>\n              <div class="diff-content">\n                <div class="diff-file">src/middleware/auth.ts <span class="diff-stats"><span class="add">+47</span> <span class="del">−23</span></span></div>\n                <div class="diff-hunk">@@ -1,12 +1,18 @@</div>\n                <div class="diff-line ctx"><span class="diff-ln">1</span> import { Request, Response, Next } from \'express\';</div>\n                <div class="diff-line del"><span class="diff-ln">2</span>-import { getSession } from \'../utils/session\';</div>\n                <div class="diff-line del"><span class="diff-ln">3</span>-import { SessionStore } from \'../types/session\';</div>\n                <div class="diff-line add"><span class="diff-ln">2</span>+import { verifyToken, TokenPayload } from \'../utils/jwt\';</div>\n                <div class="diff-line add"><span class="diff-ln">3</span>+import { AuthError } from \'../types/auth\';</div>\n                <div class="diff-line ctx"><span class="diff-ln">4</span></div>\n                <div class="diff-line del"><span class="diff-ln">5</span>-export async function authMiddleware(req, res, next) {</div>\n                <div class="diff-line del"><span class="diff-ln">6</span>-  const session = await getSession(req.cookies.sid);</div>\n                <div class="diff-line del"><span class="diff-ln">7</span>-  if (!session) return res.status(401).end();</div>\n                <div class="diff-line del"><span class="diff-ln">8</span>-  req.user = session.user;</div>\n                <div class="diff-line add"><span class="diff-ln">5</span>+export async function authMiddleware(</div>\n                <div class="diff-line add"><span class="diff-ln">6</span>+  req: Request, res: Response, next: Next</div>\n                <div class="diff-line add"><span class="diff-ln">7</span>+) {</div>\n                <div class="diff-line add"><span class="diff-ln">8</span>+  const token = req.headers.authorization?.split(\' \')[1];</div>\n                <div class="diff-line add"><span class="diff-ln">9</span>+  if (!token) throw new AuthError(\'NO_TOKEN\');</div>\n                <div class="diff-line add"><span class="diff-ln">10</span>+</div>\n                <div class="diff-line add"><span class="diff-ln">11</span>+  const payload = await verifyToken(token);</div>\n                <div class="diff-line add"><span class="diff-ln">12</span>+  req.user = payload.user;</div>\n                <div class="diff-line ctx"><span class="diff-ln">13</span>   next();</div>\n                <div class="diff-line ctx"><span class="diff-ln">14</span> }</div>\n              </div>\n            </div>\n          </div>\n        </div>\n      </div>\n\n    </div>\n    <div class="demo-step-label" id="step-label"><span>1/4</span> &nbsp;Kanban board — scan all tasks at a glance</div>\n  </section>\n\n'
+---
+
+<Fragment set:html={markup} />
+
+<script is:inline>
+const $ = id => document.getElementById(id);
+const cursor = $('fake-cursor'), appFrame = $('app-frame'), appBody = $('app-body');
+const stateKanban = $('state-kanban'), stateTask = $('state-task');
+const targetCard = $('target-card');
+const btnBrowser = $('btn-browser'), btnDiff = $('btn-diff');
+const paneBrowser = $('pane-browser'), paneDiff = $('pane-diff');
+const stepLabel = $('step-label'), terminalContent = $('terminal-content');
+const appBarDefault = $('app-bar-default'), appBarTask = $('app-bar-task');
+
+function pos(el) {
+  const fr = appFrame.getBoundingClientRect(), er = el.getBoundingClientRect();
+  const s = fr.width / appFrame.offsetWidth || 1;
+  return { x: (er.left - fr.left + er.width/2) / s, y: (er.top - fr.top + er.height/2) / s };
+}
+function moveTo(x,y,ms=600) {
+  cursor.style.transition = `left ${ms}ms cubic-bezier(0.25,0.1,0.25,1), top ${ms}ms cubic-bezier(0.25,0.1,0.25,1)`;
+  cursor.style.left = x+'px'; cursor.style.top = y+'px';
+}
+function show() { cursor.classList.add('visible'); }
+function hide() { cursor.classList.remove('visible'); }
+function doClick(x,y) {
+  const r = document.createElement('div');
+  r.className = 'click-ripple'; r.style.left = x+'px'; r.style.top = y+'px';
+  appFrame.appendChild(r);
+  requestAnimationFrame(() => r.classList.add('animate'));
+  setTimeout(() => r.remove(), 600);
+}
+function progress(p) { }
+function label(s, t) { stepLabel.innerHTML = '<span>'+s+'/4</span> \u00a0'+t; }
+
+function showTaskBar() { appBarDefault.classList.add('hidden'); appBarTask.classList.add('visible'); }
+function showDefaultBar() { appBarDefault.classList.remove('hidden'); appBarTask.classList.remove('visible'); }
+
+function resetTerm() { terminalContent.querySelectorAll('.term-line').forEach(l => l.classList.remove('visible','instant')); }
+function animTerm() {
+  terminalContent.querySelectorAll('.term-line').forEach(l => {
+    const d = parseInt(l.dataset.delay);
+    if (d === 0) l.classList.add('instant');
+    else setTimeout(() => l.classList.add('visible'), d);
+  });
+}
+
+function reset() {
+  hide(); showDefaultBar();
+  stateKanban.classList.remove('hidden');
+  stateTask.classList.remove('visible');
+  paneBrowser.classList.remove('visible');
+  paneDiff.classList.remove('visible');
+  btnBrowser.classList.remove('active','hover-effect');
+  btnDiff.classList.remove('active','hover-effect');
+  targetCard.classList.remove('hover-effect');
+  $('btn-terminal').classList.add('active');
+  resetTerm(); progress(0);
+  label('1','Kanban board \u2014 scan all tasks at a glance');
+  cursor.style.transition = 'none';
+  cursor.style.left = '50%'; cursor.style.top = '110%';
+}
+
+function run() {
+  reset();
+  var t = setTimeout;
+
+  t(function(){ show(); progress(5); }, 600);
+  t(function(){ var p = pos(targetCard); moveTo(p.x, p.y, 800); progress(10); }, 900);
+  t(function(){ targetCard.classList.add('hover-effect'); progress(15); }, 1800);
+  t(function(){ var p = pos(targetCard); doClick(p.x, p.y); targetCard.classList.remove('hover-effect'); progress(20); }, 2300);
+
+  t(function(){
+    stateKanban.classList.add('hidden');
+    stateTask.classList.add('visible');
+    showTaskBar();
+    label('2','Task opens \u2014 Claude Code running');
+    progress(25); hide();
+    animTerm();
+  }, 2600);
+
+  t(function(){ progress(35); }, 4000);
+  t(function(){ progress(45); }, 6000);
+
+  t(function(){
+    show();
+    var p = pos(btnBrowser);
+    cursor.style.transition = 'none';
+    cursor.style.left = (p.x+100)+'px'; cursor.style.top = (p.y+50)+'px';
+    progress(50);
+  }, 8000);
+  t(function(){ var p = pos(btnBrowser); moveTo(p.x, p.y, 600); }, 8300);
+  t(function(){ btnBrowser.classList.add('hover-effect'); progress(53); }, 9000);
+  t(function(){
+    var p = pos(btnBrowser); doClick(p.x, p.y);
+    btnBrowser.classList.remove('hover-effect');
+    btnBrowser.classList.add('active');
+    paneBrowser.classList.add('visible');
+    label('3','Inline browser \u2014 preview the running app');
+    progress(58); hide();
+  }, 9500);
+
+  t(function(){ progress(65); }, 11000);
+
+  t(function(){
+    show();
+    var p = pos(btnDiff);
+    cursor.style.transition = 'none';
+    cursor.style.left = (p.x+100)+'px'; cursor.style.top = (p.y+50)+'px';
+    progress(70);
+  }, 12500);
+  t(function(){ var p = pos(btnDiff); moveTo(p.x, p.y, 600); }, 12800);
+  t(function(){ btnDiff.classList.add('hover-effect'); progress(73); }, 13500);
+  t(function(){
+    var p = pos(btnDiff); doClick(p.x, p.y);
+    btnDiff.classList.remove('hover-effect');
+    btnDiff.classList.add('active');
+    paneDiff.classList.add('visible');
+    label('4','Three panels \u2014 terminal, browser, and diff side by side');
+    progress(82); hide();
+  }, 14000);
+
+  t(function(){ progress(90); }, 15500);
+  t(function(){ progress(95); }, 17000);
+
+  t(function(){
+    progress(100);
+    stateTask.classList.remove('visible');
+    paneBrowser.classList.remove('visible');
+    paneDiff.classList.remove('visible');
+    btnBrowser.classList.remove('active');
+    btnDiff.classList.remove('active');
+    showDefaultBar();
+    stateKanban.classList.remove('hidden');
+    label('1','Kanban board \u2014 scan all tasks at a glance');
+  }, 18500);
+
+  t(run, 20500);
+}
+
+</script>

@@ -1,5 +1,13 @@
 ---
-import LegacyPage from '../components/LegacyPage.astro'
+import BaseLayout from '../layouts/BaseLayout.astro'
+import NotFoundHero from '../components/notfound/NotFoundHero.astro'
 ---
 
-<LegacyPage page="404.html" />
+<BaseLayout
+  title="SlayZone — 404"
+  description="Page not found in the zone."
+  canonicalPath="/404.html"
+  bare
+>
+  <NotFoundHero />
+</BaseLayout>

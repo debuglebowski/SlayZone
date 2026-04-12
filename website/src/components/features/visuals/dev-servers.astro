@@ -1,0 +1,61 @@
+        <div class="app-frame" style="flex-direction:row;">
+          <div class="fk-sidebar">
+            <div class="fk-sidebar-dots"><span class="app-dot r"></span><span class="app-dot y"></span><span class="app-dot g"></span></div>
+            <div class="fk-proj" style="background:#4466ff;">SZ<div class="fk-proj-dot" style="background:var(--green)"></div></div>
+            <div class="fk-proj active" style="background:#ee8833;">WD</div>
+            <div class="fk-proj" style="background:#44bb55;">HC</div>
+          </div>
+          <div style="flex:1;display:flex;flex-direction:column;overflow:hidden;">
+          <div class="tab-bar">
+            <div class="tab-bar-home">🏠</div>
+            <div class="tab-item"><span class="tab-dot" style="background:var(--amber)"></span> PR#24 <span class="tab-x">×</span></div>
+            <div class="tab-item active"><span class="tab-dot" style="background:var(--green)"></span> Auth refactor <span class="tab-x">×</span></div>
+            <div class="tab-item"><span class="tab-dot" style="background:var(--green)"></span> Search endpoint <span class="tab-x">×</span></div>
+            <div class="tab-item"><span class="tab-dot" style="background:var(--amber)"></span> Rate limiting <span class="tab-x">×</span></div>
+          </div>
+          <div class="task-bar"><div class="task-bar-left"><span class="task-name">Auth refactor</span></div><div class="task-bar-right"><span class="tb-btn active">▸_ Terminal</span><span class="tb-btn">◧ Browser</span><span class="tb-btn">± Diff</span><span class="tb-btn">⎇ Git</span></div></div>
+          <div class="feat-git-split">
+            <div class="feat-git-left">
+              <div style="color:var(--text-dim)"><span class="t-green">✓</span> JWT middleware rewritten<br><span class="t-green">✓</span> Token refresh added<br><span class="t-file">  src/types/auth.d.ts</span> — updated<br><br><span class="t-out">Running tests...</span> <span class="t-green">14 passed</span><br><br><span class="t-prompt">❯</span> <span class="cursor-blink"></span></div>
+            </div>
+            <div class="feat-git-right" id="f10-panel">
+              <div class="feat-proc" id="f10-proc">
+                <div class="proc-header"><span class="proc-header-title">Processes</span><span class="proc-header-btn">+ New process</span></div>
+                <div class="proc-card">
+                  <div class="proc-card-info"><div class="proc-card-name">Vite Dev</div><div class="proc-card-cmd">pnpm dev</div></div>
+                  <div class="proc-card-meta"><span class="proc-badge running">● Running</span></div>
+                  <div class="proc-card-actions">□ ↻ ⏎ ···</div>
+                </div>
+                <div class="proc-card">
+                  <div class="proc-card-info"><div class="proc-card-name">TypeScript Watch</div><div class="proc-card-cmd">tsc --watch</div></div>
+                  <div class="proc-card-meta"><span class="proc-badge running">● Running</span></div>
+                  <div class="proc-card-actions">□ ↻ ⏎ ···</div>
+                </div>
+                <div class="proc-card">
+                  <div class="proc-card-info"><div class="proc-card-name">Jest Watch</div><div class="proc-card-cmd">jest --watchAll</div></div>
+                  <div class="proc-card-meta"><span class="proc-badge idle">● Idle</span></div>
+                  <div class="proc-card-actions">▷ □ ⏎ ···</div>
+                </div>
+              </div>
+            </div>
+          </div>
+          </div>
+        </div>
+
+<script is:inline>
+(function() {
+  var sleep = window.__feat.sleep;
+  var loopOnVisible = window.__feat.loopOnVisible;
+  var revealLines = window.__feat.revealLines;
+  var resetLines = window.__feat.resetLines;
+  loopOnVisible(document.getElementById('feat-10'), async function() {
+    var panel = document.getElementById('f10-panel');
+    panel.classList.remove('open');
+    await sleep(1200);
+    panel.classList.add('open');
+    await sleep(8000);
+    panel.classList.remove('open');
+    await sleep(1200);
+  });
+})();
+</script>

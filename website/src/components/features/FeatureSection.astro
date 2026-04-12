@@ -1,0 +1,15 @@
+---
+const { feature } = Astro.props
+---
+
+<div class="feature-section" id={feature.legacyId}>
+  <div class="feature-visual">
+    <div class="scale-wrap">
+      <slot />
+    </div>
+  </div>
+  <div class="feature-text">
+    <h2>{feature.title}</h2>
+    <p set:html={feature.shortDescription}></p>
+  </div>
+</div>

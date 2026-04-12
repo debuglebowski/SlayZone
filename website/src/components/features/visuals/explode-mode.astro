@@ -1,0 +1,52 @@
+        <div class="app-frame" style="flex-direction:row;position:relative;">
+          <div class="fk-sidebar" id="f14-app-sidebar">
+            <div class="fk-sidebar-dots"><span class="app-dot r"></span><span class="app-dot y"></span><span class="app-dot g"></span></div>
+            <div class="fk-proj" style="background:#4466ff;">SZ<div class="fk-proj-dot" style="background:var(--green)"></div></div>
+            <div class="fk-proj active" style="background:#ee8833;">WD</div>
+            <div class="fk-proj" style="background:#44bb55;">HC</div>
+          </div>
+          <div style="flex:1;display:flex;flex-direction:column;overflow:hidden;">
+          <div class="tab-bar">
+            <div class="tab-bar-home">🏠</div>
+            <div class="tab-item active"><span class="tab-dot" style="background:var(--green)"></span> Auth refactor <span class="tab-x">×</span></div>
+            <div class="tab-item"><span class="tab-dot" style="background:var(--green)"></span> Search endpoint <span class="tab-x">×</span></div>
+            <div class="tab-item"><span class="tab-dot" style="background:var(--amber)"></span> Rate limiting <span class="tab-x">×</span></div>
+            <div style="margin-left:auto;padding-right:10px;display:flex;align-items:center;"><span class="tb-btn" id="f14-explode-btn" style="font-size:9px;">⊞ Explode</span></div>
+          </div>
+          <div class="task-bar"><div class="task-bar-left"><span class="task-name">Auth refactor</span></div><div class="task-bar-right"><span class="tb-btn active">▸_ Terminal</span><span class="tb-btn">◧ Browser</span><span class="tb-btn">⎇ Git</span></div></div>
+          <!-- Single task view (shown initially) -->
+          <div class="feat-git-left" id="f14-single" style="flex:1;margin:10px;border-radius:8px;">
+            <div style="color:var(--text-dim)"><span class="t-green">✓</span> JWT middleware rewritten<br><span class="t-green">✓</span> Token refresh added<br><span class="t-file">  src/types/auth.d.ts</span> — updated<br><br><span class="t-out">Running tests...</span> <span class="t-green">14 passed</span><br><br><span class="t-prompt">❯</span> <span class="cursor-blink"></span></div>
+          </div>
+          <!-- Explode grid (hidden initially) -->
+          <div class="explode-grid" id="f14-grid" style="display:none;">
+            <div class="explode-pane"><div class="explode-pane-hd"><span class="pane-dot green"></span> Auth refactor</div><div class="explode-pane-body"><span class="t-prompt">❯</span> refactor auth to JWT<br><span class="t-blue">Claude</span> Working on it...<br><span class="t-green">✓</span> middleware rewritten</div></div>
+            <div class="explode-pane"><div class="explode-pane-hd"><span class="pane-dot green"></span> Search endpoint</div><div class="explode-pane-body"><span class="t-prompt">❯</span> add full-text search<br><span class="t-blue">Claude</span> Indexing schema...<br><span class="t-file">search.ts</span> — created</div></div>
+            <div class="explode-pane"><div class="explode-pane-hd"><span class="pane-dot amber"></span> Rate limiting</div><div class="explode-pane-body"><span class="t-prompt">❯</span> implement rate limiter<br><span class="t-amber">⚠</span> Which strategy?<br><span class="cursor-blink"></span></div></div>
+            <div class="explode-pane"><div class="explode-pane-hd"><span class="pane-dot" style="background:var(--text-dim)"></span> DB migration</div><div class="explode-pane-body"><span class="t-prompt">❯</span> <span style="color:var(--text-dim)">idle</span></div></div>
+          </div>
+          </div>
+        </div>
+
+<script is:inline>
+(function() {
+  var sleep = window.__feat.sleep;
+  var loopOnVisible = window.__feat.loopOnVisible;
+  var revealLines = window.__feat.revealLines;
+  var resetLines = window.__feat.resetLines;
+  loopOnVisible(document.getElementById('feat-14'), async function() {
+    var single = document.getElementById('f14-single');
+    var grid = document.getElementById('f14-grid');
+    var btn = document.getElementById('f14-explode-btn');
+    single.style.display = ''; grid.style.display = 'none';
+    btn.classList.remove('active');
+    await sleep(2000);
+    btn.classList.add('active');
+    single.style.display = 'none'; grid.style.display = '';
+    await sleep(5000);
+    btn.classList.remove('active');
+    single.style.display = ''; grid.style.display = 'none';
+    await sleep(1500);
+  });
+})();
+</script>

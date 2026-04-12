@@ -3,9 +3,11 @@ const {
   title,
   description,
   canonicalPath = '/',
+  bare = false,
 } = Astro.props
 
 const canonicalUrl = new URL(canonicalPath, 'https://slay.zone').toString()
+const bodyClass = bare ? 'bare' : ''
 ---
 
 <!DOCTYPE html>
@@ -58,15 +60,41 @@ const canonicalUrl = new URL(canonicalPath, 'https://slay.zone').toString()
         --green: #3dd68c;
       }
       html { background: #ffffff; }
-      body {
-        margin: 0;
-        background: linear-gradient(180deg, #fff7f1 0%, #ffffff 18%, #fff 100%);
+      body { margin: 0; }
+      body:not(.bare) {
+        background: #ffffff;
         color: #1a1a2e;
         font-family: 'Outfit', sans-serif;
         font-weight: 300;
         line-height: 1.6;
       }
+      body.bare {
+        background: var(--bg);
+        color: var(--text);
+        font-family: 'JetBrains Mono', monospace;
+        font-weight: 400;
+        line-height: 1.6;
+        min-height: 100vh;
+      }
       a { color: inherit; }
+      .sr-only {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        padding: 0;
+        margin: -1px;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+        white-space: nowrap;
+        border: 0;
+      }
+      a:focus-visible,
+      button:focus-visible,
+      input:focus-visible,
+      [tabindex]:focus-visible {
+        outline: 2px solid var(--accent);
+        outline-offset: 2px;
+      }
       .skip-link {
         position: absolute;
         left: -9999px;
@@ -206,14 +234,22 @@ const canonicalUrl = new URL(canonicalPath, 'https://slay.zone').toString()
       }
     </style>
   </head>
-  <body>
-    <a href="#main-content" class="skip-link">Skip to main content</a>
-    <div class="page-shell">
-      <slot name="nav" />
+  <body class={bodyClass}>
+    {bare ? (
       <main id="main-content">
         <slot />
       </main>
-      <slot name="footer" />
-    </div>
+    ) : (
+      <>
+        <a href="#main-content" class="skip-link">Skip to main content</a>
+        <div class="page-shell">
+          <slot name="nav" />
+          <main id="main-content">
+            <slot />
+          </main>
+          <slot name="footer" />
+        </div>
+      </>
+    )}
   </body>
 </html>

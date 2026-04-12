@@ -1,0 +1,34 @@
+---
+const { value } = Astro.props
+---
+
+{value === 'yes' && <span class="check">✓</span>}
+{value === 'no' && <span class="no">✗</span>}
+{value === 'partial' && (
+  <span class="partial">
+    <svg width="20" height="20" viewBox="0 0 16 16" fill="none" stroke-width="2.5" stroke-linecap="round">
+      <line x1="3" y1="13" x2="8" y2="8" stroke="#d4a017" />
+      <line x1="8" y1="8" x2="13" y2="3" stroke="#d4a017" />
+    </svg>
+  </span>
+)}
+
+<style>
+  .check {
+    color: var(--accent);
+    font-size: 24px;
+    font-weight: 700;
+  }
+  .no {
+    color: #1a1a2e;
+    font-size: 24px;
+  }
+  .partial {
+    display: inline-flex;
+    color: #1a1a2e;
+    font-size: 24px;
+  }
+  @media (max-width: 640px) {
+    .check, .no, .partial { font-size: 20px; }
+  }
+</style>

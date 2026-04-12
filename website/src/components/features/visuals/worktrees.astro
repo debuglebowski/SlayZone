@@ -1,0 +1,75 @@
+        <div class="app-frame">
+          <div class="feat-wt" id="f4-wt">
+            <div class="wt-inner">
+            <div class="wt-root" id="f4-root">~/dev/</div>
+            <div class="wt-pipe">│</div>
+            <div class="wt-row"><div class="wt-tree-line">├──</div><span style="color:var(--text);">api-v2/</span></div>
+            <div class="wt-pipe">│</div>
+            <div class="wt-row"><div class="wt-tree-line">└──</div><span style="color:var(--text);">api-v2-worktrees/</span></div>
+            <div class="wt-pipe" style="padding-left:30px;">│</div>
+            <div class="wt-row" style="padding-left:30px;">
+              <div class="wt-tree-line">├──</div>
+              <div class="wt-folder" id="f4-f1">auth-refactor/</div>
+              <div class="wt-connector" id="f4-c1"></div>
+              <div class="wt-branch-badge" id="f4-b1"><span class="wt-status-dot active"></span> ⎇ feat/auth</div>
+            </div>
+            <div class="wt-pipe" style="padding-left:30px;">│</div>
+            <div class="wt-row" style="padding-left:30px;">
+              <div class="wt-tree-line">├──</div>
+              <div class="wt-folder" id="f4-f2">search-endpoint/</div>
+              <div class="wt-connector" id="f4-c2"></div>
+              <div class="wt-branch-badge" id="f4-b2"><span class="wt-status-dot active"></span> ⎇ feat/search</div>
+            </div>
+            <div class="wt-pipe" style="padding-left:30px;">│</div>
+            <div class="wt-row" style="padding-left:30px;">
+              <div class="wt-tree-line">└──</div>
+              <div class="wt-folder" id="f4-f3">rate-limiting/</div>
+              <div class="wt-connector" id="f4-c3"></div>
+              <div class="wt-branch-badge" id="f4-b3"><span class="wt-status-dot idle"></span> ⎇ feat/rate-limit</div>
+            </div>
+            </div>
+          </div>
+        </div>
+
+<script is:inline>
+(function() {
+  var sleep = window.__feat.sleep;
+  var loopOnVisible = window.__feat.loopOnVisible;
+  var revealLines = window.__feat.revealLines;
+  var resetLines = window.__feat.resetLines;
+  loopOnVisible(document.getElementById('feat-4'), async function() {
+    var root = document.getElementById('f4-root');
+    var ids = [
+      { f: 'f4-f1', c: 'f4-c1', b: 'f4-b1' },
+      { f: 'f4-f2', c: 'f4-c2', b: 'f4-b2' },
+      { f: 'f4-f3', c: 'f4-c3', b: 'f4-b3' }
+    ];
+
+    // Reset
+    root.classList.remove('vis');
+    ids.forEach(function(r) {
+      document.getElementById(r.f).classList.remove('vis');
+      document.getElementById(r.c).classList.remove('vis');
+      document.getElementById(r.b).classList.remove('vis');
+    });
+
+    await sleep(400);
+
+    // Show root path
+    root.classList.add('vis');
+    await sleep(500);
+
+    // Reveal each row: folder → connector draws → branch badge
+    for (var i = 0; i < ids.length; i++) {
+      document.getElementById(ids[i].f).classList.add('vis');
+      await sleep(300);
+      document.getElementById(ids[i].c).classList.add('vis');
+      await sleep(350);
+      document.getElementById(ids[i].b).classList.add('vis');
+      await sleep(400);
+    }
+
+    await sleep(3500);
+  });
+})();
+</script>

@@ -1,0 +1,45 @@
+---
+import FaqItem from './FaqItem.astro'
+
+const { id, title, items } = Astro.props
+---
+
+<section id={id} class="faq-group">
+  <h2>{title}</h2>
+  <div class="faq-grid">
+    {items.map((item: { question: string; answer: string }) => (
+      <FaqItem question={item.question} answer={item.answer} />
+    ))}
+  </div>
+</section>
+
+<style>
+  .faq-group {
+    margin-bottom: 80px;
+    scroll-margin-top: 40px;
+  }
+  .faq-group h2 {
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.2em;
+    color: var(--accent);
+    margin-bottom: 40px;
+    font-family: 'JetBrains Mono', monospace;
+    text-align: left;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    font-weight: 700;
+  }
+  .faq-group h2::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: #f0f0f5;
+  }
+  .faq-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 48px;
+  }
+</style>

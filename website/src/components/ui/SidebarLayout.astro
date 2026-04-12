@@ -1,0 +1,81 @@
+---
+const { title, subtitle, sidebarSections = [] } = Astro.props
+---
+
+<div class="docs-layout">
+  <aside class="docs-sidebar">
+    {sidebarSections.map((section: { heading: string; links: { href: string; label: string }[] }) => (
+      <>
+        <h4>{section.heading}</h4>
+        <ul>
+          {section.links.map((link) => (
+            <li><a href={link.href}>{link.label}</a></li>
+          ))}
+        </ul>
+      </>
+    ))}
+  </aside>
+  <div class="docs-main">
+    <h1>{title}</h1>
+    {subtitle && <p class="subtitle">{subtitle}</p>}
+    <slot />
+  </div>
+</div>
+
+<style>
+  .docs-layout {
+    display: flex;
+    gap: 48px;
+    margin: 40px 0 80px;
+  }
+  .docs-sidebar {
+    width: 180px;
+    flex-shrink: 0;
+    position: sticky;
+    top: 40px;
+    height: fit-content;
+  }
+  .docs-sidebar h4 {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+    color: var(--accent);
+    margin: 24px 0 12px;
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 700;
+  }
+  .docs-sidebar h4:first-child { margin-top: 0; }
+  .docs-sidebar ul { list-style: none; margin: 0; padding: 0; }
+  .docs-sidebar a {
+    text-decoration: none;
+    color: #777;
+    font-size: 14px;
+    display: block;
+    padding: 4px 0;
+  }
+  .docs-sidebar a:hover { color: var(--accent); }
+  .docs-sidebar a.active { color: var(--accent); font-weight: 600; }
+  .docs-main { flex: 1; min-width: 0; }
+  .docs-main h1 {
+    font-size: 36px;
+    font-weight: 700;
+    margin: 0 0 8px;
+    letter-spacing: -1px;
+  }
+  .subtitle {
+    color: #888;
+    font-size: 18px;
+    margin: 0 0 48px;
+  }
+  @media (max-width: 850px) {
+    .docs-layout { flex-direction: column; }
+    .docs-sidebar {
+      width: 100%;
+      border-bottom: 1px solid #eee;
+      padding-bottom: 24px;
+      position: relative;
+      top: 0;
+    }
+    .docs-sidebar ul { display: flex; flex-wrap: wrap; gap: 12px; }
+  }
+</style>

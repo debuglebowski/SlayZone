@@ -1,0 +1,231 @@
+---
+const asciiArt = ` _  _    ___  _  _
+| || |  / _ \\| || |
+| || |_| | | | || |_
+|__   _| | | |__   _|
+   | | | |_| |  | |
+   |_|  \\___/   |_|`
+---
+
+<div class="notfound">
+  <div class="terminal-wrap">
+    <div class="terminal-bar">
+      <span class="dot r"></span>
+      <span class="dot y"></span>
+      <span class="dot g"></span>
+      <span class="terminal-title">slayzone — lost</span>
+    </div>
+    <div class="terminal-body" id="terminal-body">
+      <div class="line"><pre class="ascii-404">{asciiArt}</pre></div>
+      <div class="line"><span class="err">Error: page not found in the zone</span></div>
+      <div class="line"><span class="out">Type </span><span class="cmd">help</span><span class="out"> for available commands</span></div>
+      <div class="line">&nbsp;</div>
+      <div class="input-line">
+        <span class="prompt">visitor</span><span class="out">@</span><span class="path">slay.zone</span><span class="out">:~$ </span>
+        <input type="text" id="terminal-input" autofocus autocomplete="off" spellcheck="false" />
+      </div>
+    </div>
+  </div>
+  <p class="hint">or just <a href="/index.html">go home</a></p>
+</div>
+
+<style>
+  .notfound {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+  }
+  .terminal-wrap { width: 90%; max-width: 640px; }
+  .terminal-bar {
+    background: #1a1d3a;
+    border-radius: 10px 10px 0 0;
+    padding: 12px 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .dot { width: 12px; height: 12px; border-radius: 50%; }
+  .dot.r { background: #f44336; }
+  .dot.y { background: #f7a825; }
+  .dot.g { background: #3dd68c; }
+  .terminal-title {
+    margin-left: 12px;
+    color: var(--text-dim);
+    font-size: 12px;
+  }
+  .terminal-body {
+    background: #0a0c18;
+    border-radius: 0 0 10px 10px;
+    padding: 24px;
+    min-height: 300px;
+    font-size: 14px;
+    line-height: 1.8;
+    overflow-y: auto;
+    max-height: 60vh;
+  }
+  .line { white-space: pre-wrap; word-break: break-word; }
+  .line .prompt { color: var(--accent); }
+  .line .path { color: var(--blue); }
+  .line .cmd { color: var(--text); }
+  .line .out { color: var(--text-dim); }
+  .line .err { color: var(--red); }
+  .line .ok { color: var(--green); }
+  .line .accent { color: var(--accent); }
+  .input-line { display: flex; align-items: center; }
+  .input-line .prompt { color: var(--accent); }
+  .input-line .path { color: var(--blue); }
+  #terminal-input {
+    background: none;
+    border: none;
+    color: var(--text);
+    font-family: inherit;
+    font-size: 14px;
+    flex: 1;
+    outline: none;
+    caret-color: var(--accent);
+    padding: 0;
+    margin: 0;
+  }
+  .ascii-404 {
+    color: var(--accent);
+    font-size: 10px;
+    line-height: 1.2;
+    margin-bottom: 8px;
+  }
+  .hint {
+    text-align: center;
+    margin-top: 20px;
+    color: var(--text-dim);
+    font-family: 'Outfit', sans-serif;
+    font-size: 13px;
+    font-weight: 300;
+  }
+  .hint a {
+    color: var(--accent);
+    text-decoration: none;
+  }
+  .hint a:hover { text-decoration: underline; }
+</style>
+
+<script>
+  const body = document.getElementById('terminal-body') as HTMLElement | null
+  const input = document.getElementById('terminal-input') as HTMLInputElement | null
+  if (body && input) {
+    type Line = { type: string; text: string }
+    const history: string[] = []
+    let historyIdx = -1
+
+    const commands: Record<string, (args: string) => Line[]> = {
+      help: () => [
+        { type: 'out', text: 'Available commands:' },
+        { type: 'cmd', text: '  help       — this message' },
+        { type: 'cmd', text: '  home       — go to homepage' },
+        { type: 'cmd', text: '  docs       — go to documentation' },
+        { type: 'cmd', text: '  faq        — frequently asked questions' },
+        { type: 'cmd', text: '  github     — open source repo' },
+        { type: 'cmd', text: '  whoami     — identify yourself' },
+        { type: 'cmd', text: '  pwd        — print working directory' },
+        { type: 'cmd', text: '  ls         — list directory contents' },
+        { type: 'cmd', text: '  cat        — read a file' },
+        { type: 'cmd', text: '  date       — current date' },
+        { type: 'cmd', text: '  clear      — clear terminal' },
+        { type: 'cmd', text: '  exit       — go home' },
+        { type: 'cmd', text: '  sudo       — nice try' },
+      ],
+      home: () => { window.location.href = '/index.html'; return [] },
+      docs: () => { window.location.href = '/docs.html'; return [] },
+      faq: () => { window.location.href = '/faq.html'; return [] },
+      github: () => {
+        window.open('https://github.com/debuglebowski/SlayZone', '_blank')
+        return [{ type: 'ok', text: 'Opening GitHub...' }]
+      },
+      exit: () => { window.location.href = '/index.html'; return [] },
+      whoami: () => [{ type: 'out', text: 'A lost visitor looking for something that does not exist.' }],
+      pwd: () => [{ type: 'out', text: '/dev/null/404' }],
+      date: () => [{ type: 'out', text: new Date().toString() }],
+      clear: () => {
+        body.querySelectorAll('.line').forEach((l) => l.remove())
+        return []
+      },
+      ls: () => [
+        { type: 'out', text: 'drwxr-xr-x  hopes-and-dreams/' },
+        { type: 'out', text: '-rw-r--r--  the-page-you-wanted.html.deleted' },
+        { type: 'out', text: '-rw-r--r--  regret.log' },
+        { type: 'ok', text: '-rw-r--r--  index.html' },
+      ],
+      cat: (args: string) => {
+        if (!args) return [{ type: 'err', text: 'cat: missing file operand' }]
+        const f = args.trim()
+        if (f === 'regret.log') return [
+          { type: 'out', text: '[' + new Date().toISOString() + '] WARN: User navigated to nonexistent page' },
+          { type: 'out', text: '[' + new Date().toISOString() + '] ERROR: Page not found' },
+          { type: 'out', text: '[' + new Date().toISOString() + '] INFO: Offering terminal as consolation' },
+        ]
+        if (f === 'index.html') return [{ type: 'ok', text: 'That one exists. Try: home' }]
+        if (f.includes('hopes') || f.includes('dreams')) return [{ type: 'out', text: '(empty)' }]
+        return [{ type: 'err', text: 'cat: ' + f + ': No such file or directory' }]
+      },
+      sudo: () => [
+        { type: 'err', text: 'Nice try. You are not in the sudoers file.' },
+        { type: 'err', text: 'This incident will be reported.' },
+      ],
+    }
+
+    function run(cmd: string): Line[] {
+      const parts = cmd.trim().split(/\s+/)
+      const name = parts[0].toLowerCase()
+      const args = parts.slice(1).join(' ')
+      if (!name) return []
+      if (commands[name]) return commands[name](args)
+      return [{ type: 'err', text: name + ': command not found. Type help for available commands.' }]
+    }
+
+    function escHtml(s: string) {
+      return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    }
+
+    function addLine(type: string, text: string) {
+      const d = document.createElement('div')
+      d.className = 'line'
+      const s = document.createElement('span')
+      s.className = type || 'out'
+      s.textContent = text
+      d.appendChild(s)
+      const inputLine = body.querySelector('.input-line')
+      body.insertBefore(d, inputLine)
+    }
+
+    function addPromptLine(cmd: string) {
+      const d = document.createElement('div')
+      d.className = 'line'
+      d.innerHTML = '<span class="prompt">visitor</span><span class="out">@</span><span class="path">slay.zone</span><span class="out">:~$ </span><span class="cmd">' + escHtml(cmd) + '</span>'
+      const inputLine = body.querySelector('.input-line')
+      body.insertBefore(d, inputLine)
+    }
+
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        const cmd = input.value
+        input.value = ''
+        if (cmd.trim()) {
+          history.push(cmd)
+          historyIdx = history.length
+        }
+        addPromptLine(cmd)
+        run(cmd).forEach((r) => addLine(r.type, r.text))
+        body.scrollTop = body.scrollHeight
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault()
+        if (historyIdx > 0) { historyIdx--; input.value = history[historyIdx] }
+      } else if (e.key === 'ArrowDown') {
+        e.preventDefault()
+        if (historyIdx < history.length - 1) { historyIdx++; input.value = history[historyIdx] }
+        else { historyIdx = history.length; input.value = '' }
+      }
+    })
+
+    body.addEventListener('click', () => input.focus())
+  }
+</script>

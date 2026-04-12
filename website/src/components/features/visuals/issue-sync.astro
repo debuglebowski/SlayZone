@@ -1,0 +1,39 @@
+        <div class="app-frame">
+          <div class="feat-int">
+            <div class="int-ring">
+              <svg class="int-svg" viewBox="0 0 340 340">
+                <!-- Orbit ring -->
+                <circle cx="170" cy="170" r="130" fill="none" stroke="var(--border)" stroke-width="1" opacity="0.3"/>
+                <!-- Linear (170,40) ↔ center (170,170) -->
+                <path d="M170,40 Q215,90 170,170" fill="none" stroke="var(--accent)" stroke-width="3" stroke-dasharray="8 12" stroke-linecap="round" opacity="0.6"><animate attributeName="stroke-dashoffset" from="0" to="-15" dur="0.5s" repeatCount="indefinite"/></path>
+                <path d="M170,170 Q125,90 170,40" fill="none" stroke="var(--blue)" stroke-width="3" stroke-dasharray="8 12" stroke-linecap="round" opacity="0.6"><animate attributeName="stroke-dashoffset" from="0" to="-15" dur="0.5s" repeatCount="indefinite"/></path>
+                <!-- GitHub (49,250) ↔ center -->
+                <path d="M49,250 Q50,175 170,170" fill="none" stroke="var(--accent)" stroke-width="3" stroke-dasharray="8 12" stroke-linecap="round" opacity="0.6"><animate attributeName="stroke-dashoffset" from="0" to="-15" dur="0.5s" repeatCount="indefinite"/></path>
+                <path d="M170,170 Q105,260 49,250" fill="none" stroke="var(--blue)" stroke-width="3" stroke-dasharray="8 12" stroke-linecap="round" opacity="0.6"><animate attributeName="stroke-dashoffset" from="0" to="-15" dur="0.5s" repeatCount="indefinite"/></path>
+                <!-- Jira (291,250) ↔ center -->
+                <path d="M291,250 Q290,175 170,170" fill="none" stroke="var(--accent)" stroke-width="3" stroke-dasharray="8 12" stroke-linecap="round" opacity="0.6"><animate attributeName="stroke-dashoffset" from="0" to="-15" dur="0.5s" repeatCount="indefinite"/></path>
+                <path d="M170,170 Q235,260 291,250" fill="none" stroke="var(--blue)" stroke-width="3" stroke-dasharray="8 12" stroke-linecap="round" opacity="0.6"><animate attributeName="stroke-dashoffset" from="0" to="-15" dur="0.5s" repeatCount="indefinite"/></path>
+              </svg>
+              <!-- Center: Slay -->
+              <div class="int-center">
+                <div class="int-center-icon"><img src="/logo.svg" width="56" height="40" alt="SlayZone"/></div>
+                <div class="int-center-label">SlayZone</div>
+              </div>
+              <!-- Linear (top) -->
+              <div class="int-node" style="top:11.8%;left:50%;">
+                <div class="int-node-icon"><svg viewBox="0 0 24 24" fill="none"><path d="M3 17L10.5 9.5L15 14L21 7" stroke="#5E6AD2" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+                <div class="int-node-label">Linear</div>
+              </div>
+              <!-- GitHub (bottom-left) -->
+              <div class="int-node" style="top:73.5%;left:14.4%;">
+                <div class="int-node-icon"><svg viewBox="0 0 24 24" fill="#e2e2e2"><path d="M12 2C6.477 2 2 6.477 2 12c0 4.42 2.865 8.166 6.839 9.489.5.092.682-.217.682-.482 0-.237-.008-.866-.013-1.7-2.782.604-3.369-1.34-3.369-1.34-.454-1.156-1.11-1.464-1.11-1.464-.908-.62.069-.608.069-.608 1.003.07 1.531 1.03 1.531 1.03.892 1.529 2.341 1.087 2.91.831.092-.646.35-1.086.636-1.336-2.22-.253-4.555-1.11-4.555-4.943 0-1.091.39-1.984 1.029-2.683-.103-.253-.446-1.27.098-2.647 0 0 .84-.269 2.75 1.025A9.578 9.578 0 0112 6.836a9.59 9.59 0 012.504.337c1.909-1.294 2.747-1.025 2.747-1.025.546 1.377.203 2.394.1 2.647.64.699 1.028 1.592 1.028 2.683 0 3.842-2.339 4.687-4.566 4.935.359.309.678.919.678 1.852 0 1.336-.012 2.415-.012 2.743 0 .267.18.578.688.48C19.138 20.161 22 16.416 22 12c0-5.523-4.477-10-10-10z"/></svg></div>
+                <div class="int-node-label">GitHub</div>
+              </div>
+              <!-- Jira (bottom-right) -->
+              <div class="int-node" style="top:73.5%;left:85.6%;">
+                <div class="int-node-icon"><svg viewBox="0 0 24 24" fill="none"><path d="M12.005 2L5 9.005l7.005 7.005L19.01 9.005 12.005 2z" fill="#2684FF"/><path d="M12.005 9.005L5 16.01l7.005 7.005 7.005-7.005-7.005-7.005z" fill="#2684FF" opacity="0.6"/></svg></div>
+                <div class="int-node-label">Jira</div>
+              </div>
+            </div>
+          </div>
+        </div>

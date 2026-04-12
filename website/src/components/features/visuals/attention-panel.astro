@@ -1,0 +1,123 @@
+        <div class="app-frame" style="flex-direction:row;">
+          <div class="fk-sidebar">
+            <div class="fk-sidebar-dots"><span class="app-dot r"></span><span class="app-dot y"></span><span class="app-dot g"></span></div>
+            <div class="fk-proj" style="background:#4466ff;">SZ<div class="fk-proj-dot" style="background:var(--green)"></div></div>
+            <div class="fk-proj active" style="background:#ee8833;">WD</div>
+            <div class="fk-proj" style="background:#44bb55;">HC</div>
+          </div>
+          <div id="f15-col" style="flex:1;display:flex;flex-direction:column;overflow:hidden;position:relative;">
+          <div class="fk-cursor" id="f15-cursor" style="top:50%;left:50%;"><svg viewBox="0 0 24 24" fill="none"><path d="M5 3l14 8.5L12 14l-2 7L5 3z" fill="white" stroke="black" stroke-width="1.5" stroke-linejoin="round"/></svg></div>
+          <div class="tab-bar">
+            <div class="tab-bar-home">🏠</div>
+            <div class="tab-item active" id="f15-tab-auth"><span class="tab-dot" style="background:var(--green)"></span> Auth refactor <span class="tab-x">×</span></div>
+            <div class="tab-item" id="f15-tab-search"><span class="tab-dot" style="background:var(--amber)"></span> Search endpoint <span class="tab-x">×</span></div>
+            <div class="tab-item"><span class="tab-dot" style="background:var(--green)"></span> Rate limiting <span class="tab-x">×</span></div>
+            <div style="margin-left:auto;padding-right:10px;display:flex;align-items:center;"><span class="tb-btn" id="f15-attn-btn" style="font-size:9px;">⚠ 2</span></div>
+          </div>
+          <div class="task-bar"><div class="task-bar-left"><span class="task-name" id="f15-task-name">Auth refactor</span></div><div class="task-bar-right"><span class="tb-btn active">▸_ Terminal</span><span class="tb-btn">◧ Browser</span><span class="tb-btn">⎇ Git</span></div></div>
+          <div class="feat-attn">
+            <div class="attn-main">
+              <!-- Auth terminal (shown initially) -->
+              <div class="feat-git-left" id="f15-term-auth" style="flex:1;margin:0;">
+                <div style="color:var(--text-dim)"><span class="t-green">✓</span> JWT middleware rewritten<br><span class="t-green">✓</span> Token refresh added<br><span class="t-file">  src/types/auth.d.ts</span> — updated<br><br><span class="t-out">Running tests...</span> <span class="t-green">14 passed</span><br><br><span class="t-prompt">❯</span> <span class="cursor-blink"></span></div>
+              </div>
+              <!-- Search terminal (hidden initially) -->
+              <div class="feat-git-left" id="f15-term-search" style="flex:1;margin:0;display:none;">
+                <div style="color:var(--text-dim)"><span class="t-amber">⚠</span> Which search strategy? Full-text or trigram?<br><span class="t-blue">Claude</span> needs your input<br><br><span class="t-prompt">❯</span> <span id="f15-typed"></span><span class="cursor-blink"></span></div>
+              </div>
+            </div>
+            <div class="attn-panel" id="f15-panel">
+              <div class="attn-panel-hd">Needs attention <span class="attn-badge">2</span></div>
+              <div class="attn-panel-item" id="f15-item-search"><div class="attn-dot" style="background:var(--amber)"></div><div><div style="font-size:11px;color:var(--text);font-weight:500;">Search endpoint</div><div style="font-size:9px;color:var(--text-dim);">⚠ Which search strategy?</div></div><span style="margin-left:auto;font-size:9px;color:var(--text-dim);flex-shrink:0;">3m</span></div>
+              <div class="attn-panel-item"><div class="attn-dot" style="background:var(--amber)"></div><div><div style="font-size:11px;color:var(--text);font-weight:500;">Pagination</div><div style="font-size:9px;color:var(--text-dim);">⚠ Offset or cursor-based?</div></div><span style="margin-left:auto;font-size:9px;color:var(--text-dim);flex-shrink:0;">1m</span></div>
+            </div>
+          </div>
+          </div>
+        </div>
+
+<script is:inline>
+(function() {
+  var sleep = window.__feat.sleep;
+  var loopOnVisible = window.__feat.loopOnVisible;
+  var revealLines = window.__feat.revealLines;
+  var resetLines = window.__feat.resetLines;
+  loopOnVisible(document.getElementById('feat-15'), async function() {
+    var col = document.getElementById('f15-col');
+    var panel = document.getElementById('f15-panel');
+    var attnBtn = document.getElementById('f15-attn-btn');
+    var cursor = document.getElementById('f15-cursor');
+    var tabAuth = document.getElementById('f15-tab-auth');
+    var tabSearch = document.getElementById('f15-tab-search');
+    var taskName = document.getElementById('f15-task-name');
+    var termAuth = document.getElementById('f15-term-auth');
+    var termSearch = document.getElementById('f15-term-search');
+    var itemSearch = document.getElementById('f15-item-search');
+    var typed = document.getElementById('f15-typed');
+
+    function pos(el) {
+      var cr = col.getBoundingClientRect();
+      var er = el.getBoundingClientRect();
+      return { top: (er.top - cr.top + er.height / 2) + 'px', left: (er.left - cr.left + er.width / 2) + 'px' };
+    }
+
+    // Reset
+    panel.classList.remove('open');
+    attnBtn.classList.remove('active');
+    tabAuth.classList.add('active'); tabSearch.classList.remove('active');
+    taskName.textContent = 'Auth refactor';
+    termAuth.style.display = ''; termSearch.style.display = 'none';
+    typed.textContent = '';
+    itemSearch.style.background = '';
+    cursor.classList.remove('vis');
+    cursor.style.transition = 'none';
+    cursor.style.top = '60%'; cursor.style.left = '40%';
+    await sleep(1200);
+
+    // Cursor appears, moves to attention button
+    cursor.classList.add('vis');
+    await sleep(400);
+    cursor.style.transition = '';
+    var br = col.getBoundingClientRect();
+    cursor.style.top = (attnBtn.getBoundingClientRect().top - br.top + attnBtn.offsetHeight / 2) + 'px';
+    cursor.style.left = (col.offsetWidth - 35) + 'px';
+    await sleep(800);
+
+    // Click — panel opens
+    attnBtn.classList.add('active');
+    panel.classList.add('open');
+    await sleep(1200);
+
+    // Move cursor to "Search endpoint" item
+    var ip = pos(itemSearch);
+    cursor.style.top = (parseInt(ip.top) + 10) + 'px'; cursor.style.left = (parseInt(ip.left) + 30) + 'px';
+    await sleep(800);
+
+    // Click — highlight
+    itemSearch.style.background = 'rgba(255,255,255,0.08)';
+    await sleep(800);
+
+    // Switch tab
+    tabAuth.classList.remove('active'); tabSearch.classList.add('active');
+    taskName.textContent = 'Search endpoint';
+    termAuth.style.display = 'none'; termSearch.style.display = '';
+    itemSearch.style.background = '';
+    panel.classList.remove('open');
+    attnBtn.classList.remove('active');
+    await sleep(600);
+
+    // Move cursor to terminal, fade out
+    cursor.style.top = '75%'; cursor.style.left = '25%';
+    await sleep(700);
+    cursor.classList.remove('vis');
+    await sleep(300);
+
+    // Type instruction
+    var msg = 'use trigram index with pg_trgm';
+    for (var i = 0; i < msg.length; i++) {
+      typed.textContent += msg[i];
+      await sleep(50);
+    }
+    await sleep(4000);
+  });
+})();
+</script>

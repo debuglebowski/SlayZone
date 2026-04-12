@@ -1,5 +1,47 @@
 ---
-import LegacyPage from '../components/LegacyPage.astro'
+import BaseLayout from '../layouts/BaseLayout.astro'
+import HeroBow from '../components/home/HeroBow.astro'
+import HeroNav from '../components/home/HeroNav.astro'
+import HeroContent from '../components/home/HeroContent.astro'
+import DemoFrame from '../components/home/DemoFrame.astro'
+import HomeFeatures from '../components/home/HomeFeatures.astro'
+import HomeComparison from '../components/home/HomeComparison.astro'
+import Benchmark from '../components/home/Benchmark.astro'
+import LoveTerminals from '../components/home/LoveTerminals.astro'
+import HomeCta from '../components/home/HomeCta.astro'
+import HomeFooter from '../components/home/HomeFooter.astro'
+import HomeScripts from '../components/home/HomeScripts.astro'
+import '../styles/index.css'
 ---
 
-<LegacyPage page="index.html" />
+<BaseLayout
+  title="SlayZone — Desktop Kanban for AI Coding Agents"
+  description="Kanban with terminals. Every card hides a terminal, a browser, and a git worktree. Local-first agent management."
+  canonicalPath="/"
+  bare
+>
+  <div class="hero-wrap">
+    <HeroBow />
+    <div class="container">
+      <HeroNav />
+      <HeroContent />
+      <DemoFrame />
+    </div>
+  </div>
+
+  <div class="bottom-section">
+    <div class="container">
+      <HomeFeatures />
+      <HomeComparison />
+      <Benchmark />
+      <LoveTerminals />
+      <HomeCta />
+      <HomeFooter />
+    </div>
+  </div>
+</BaseLayout>
+
+<HomeScripts />
+<script>
+  document.body.classList.add('index-page')
+</script>

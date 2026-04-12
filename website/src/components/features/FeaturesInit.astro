@@ -1,0 +1,19 @@
+<!-- Page-level init: scale wraps + scroll reveal. Must appear AFTER feature section markup. -->
+<script is:inline>
+  function updateScales() {
+    document.querySelectorAll('.feature-visual .scale-wrap').forEach(wrap => {
+      const c = wrap.parentElement;
+      const s = c.offsetWidth / 720;
+      wrap.style.transform = 'scale(' + s + ')';
+      c.style.height = (540 * s) + 'px';
+    });
+  }
+  updateScales();
+  window.addEventListener('resize', updateScales);
+
+  const sections = document.querySelectorAll('.feature-section');
+  const revealObs = new IntersectionObserver((entries) => {
+    entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add('visible'); revealObs.unobserve(e.target); } });
+  }, { threshold: 0.15 });
+  sections.forEach(s => revealObs.observe(s));
+</script>

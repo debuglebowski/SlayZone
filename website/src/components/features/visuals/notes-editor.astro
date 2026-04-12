@@ -1,0 +1,99 @@
+        <div class="app-frame" style="flex-direction:row;">
+          <div class="fk-sidebar">
+            <div class="fk-sidebar-dots"><span class="app-dot r"></span><span class="app-dot y"></span><span class="app-dot g"></span></div>
+            <div class="fk-proj" style="background:#4466ff;">SZ<div class="fk-proj-dot" style="background:var(--green)"></div></div>
+            <div class="fk-proj active" style="background:#ee8833;">WD</div>
+            <div class="fk-proj" style="background:#44bb55;">HC</div>
+          </div>
+          <div style="flex:1;display:flex;flex-direction:column;overflow:hidden;">
+          <div class="tab-bar">
+            <div class="tab-bar-home">🏠</div>
+            <div class="tab-item"><span class="tab-dot" style="background:var(--amber)"></span> PR#24 <span class="tab-x">×</span></div>
+            <div class="tab-item active"><span class="tab-dot" style="background:var(--green)"></span> Auth refactor <span class="tab-x">×</span></div>
+            <div class="tab-item"><span class="tab-dot" style="background:var(--green)"></span> Search endpoint <span class="tab-x">×</span></div>
+            <div class="tab-item"><span class="tab-dot" style="background:var(--amber)"></span> Rate limiting <span class="tab-x">×</span></div>
+          </div>
+          <div class="task-bar"><div class="task-bar-left"><span class="task-name">Auth refactor</span></div><div class="task-bar-right"><span class="tb-btn active">▸_ Terminal</span><span class="tb-btn">◧ Browser</span><span class="tb-btn active" id="f9-editor-btn">✎ Editor</span><span class="tb-btn">⎇ Git</span></div></div>
+          <div class="feat-git-split">
+            <div class="feat-git-left">
+              <div style="color:var(--text-dim)"><span class="t-green">✓</span> JWT middleware rewritten<br><span class="t-green">✓</span> Token refresh added<br><span class="t-file">  src/types/auth.d.ts</span> — updated<br><br><span class="t-out">Running tests...</span> <span class="t-green">14 passed</span><br><br><span class="t-prompt">❯</span> <span class="cursor-blink"></span></div>
+            </div>
+            <div class="feat-git-right" id="f9-panel">
+              <div class="feat-editor">
+                <div class="ed-filetree collapsed" id="f9-filetree">
+                  <div class="ed-file dir">▾ src/</div>
+                  <div class="ed-file" style="padding-left:18px;">middleware/</div>
+                  <div class="ed-file" style="padding-left:26px;">auth.ts</div>
+                  <div class="ed-file" style="padding-left:18px;">utils/</div>
+                  <div class="ed-file" style="padding-left:26px;">jwt.ts</div>
+                  <div class="ed-file" style="padding-left:18px;">types/</div>
+                  <div class="ed-file" style="padding-left:26px;">auth.d.ts</div>
+                  <div class="ed-file dir">▾ notes/</div>
+                  <div class="ed-file active" style="padding-left:18px;">plan.md</div>
+                  <div class="ed-file" style="padding-left:18px;">todo.md</div>
+                </div>
+                <div class="ed-main">
+                <div class="ed-topbar">
+                  <button class="ed-tree-toggle active" id="f9-tree-toggle">☰</button>
+                  <span class="ed-tab active">plan.md</span>
+                  <span class="ed-tab">auth.ts</span>
+                  <span class="ed-tab">jwt.ts</span>
+                </div>
+                <div class="ed-content" id="f9-editor">
+                  <div class="ed-h1">Auth Refactor Plan</div>
+                  <div class="ed-p">Replace session-based authentication with JWT tokens. This affects the middleware layer, token utilities, and all auth-dependent routes.</div>
+                  <div style="font-size:14px;font-weight:700;margin-bottom:8px;color:var(--text);">Checklist</div>
+                  <div class="ed-check done"><div class="ed-check-box on">✓</div><span>Implement JWT verify utility</span></div>
+                  <div class="ed-check done"><div class="ed-check-box on">✓</div><span>Rewrite auth middleware</span></div>
+                  <div class="ed-check" id="f9-check3"><div class="ed-check-box" id="f9-box3"></div><span id="f9-label3">Update integration tests</span></div>
+                  <div class="ed-check"><div class="ed-check-box"></div><span>Remove session store dependency</span></div>
+                  <div class="ed-check"><div class="ed-check-box"></div><span>Update API documentation</span></div>
+                </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          </div>
+        </div>
+
+<script is:inline>
+(function() {
+  var sleep = window.__feat.sleep;
+  var loopOnVisible = window.__feat.loopOnVisible;
+  var revealLines = window.__feat.revealLines;
+  var resetLines = window.__feat.resetLines;
+  loopOnVisible(document.getElementById('feat-9'), async function() {
+    var panel = document.getElementById('f9-panel');
+    var btn = document.getElementById('f9-editor-btn');
+    var tree = document.getElementById('f9-filetree');
+    var toggle = document.getElementById('f9-tree-toggle');
+    const box = document.getElementById('f9-box3');
+    const label = document.getElementById('f9-label3');
+    const check = document.getElementById('f9-check3');
+    panel.classList.remove('open');
+    btn.classList.remove('active');
+    tree.classList.add('collapsed');
+    toggle.classList.remove('active');
+    box.classList.remove('on'); box.textContent = '';
+    check.classList.remove('done');
+    label.style.textDecoration = ''; label.style.opacity = '';
+    await sleep(1200);
+    btn.classList.add('active');
+    panel.classList.add('open');
+    await sleep(1500);
+    toggle.classList.add('active');
+    tree.classList.remove('collapsed');
+    await sleep(2000);
+    box.classList.add('on'); box.textContent = '✓';
+    check.classList.add('done');
+    label.style.textDecoration = 'line-through'; label.style.opacity = '0.5';
+    await sleep(3000);
+    toggle.classList.remove('active');
+    tree.classList.add('collapsed');
+    await sleep(2000);
+    btn.classList.remove('active');
+    panel.classList.remove('open');
+    await sleep(1200);
+  });
+})();
+</script>
