@@ -276,6 +276,24 @@ export function registerMarketplaceHandlers(ipcMain: IpcMain, db: Database): voi
     }))
   })
 
+  ipcMain.handle('ai-config:marketplace:unlink-skill', (_event, itemId: string) => {
+    const item = db.prepare('SELECT metadata_json FROM ai_config_items WHERE id = ?').get(itemId) as { metadata_json: string } | undefined
+    if (!item) throw new Error('Skill not found')
+
+    let metadata: Record<string, unknown>
+    try {
+      metadata = JSON.parse(item.metadata_json) as Record<string, unknown>
+    } catch {
+      metadata = {}
+    }
+    delete metadata.marketplace
+
+    db.prepare(`UPDATE ai_config_items SET metadata_json = ?, updated_at = datetime('now') WHERE id = ?`)
+      .run(JSON.stringify(metadata), itemId)
+
+    return db.prepare('SELECT * FROM ai_config_items WHERE id = ?').get(itemId)
+  })
+
   ipcMain.handle('ai-config:marketplace:update-skill', (_event, itemId: string, entryId: string) => {
     const entry = db.prepare('SELECT * FROM skill_registry_entries WHERE id = ?').get(entryId) as Record<string, unknown> | undefined
     if (!entry) throw new Error('Registry entry not found')

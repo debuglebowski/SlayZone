@@ -29,6 +29,10 @@ interface ContextManagerViewState {
 
   // Marketplace navigation
   marketplaceDrillRegistryId: string | null
+  marketplaceDrillEntryId: string | null
+
+  // Library skill navigation (one-shot, consumed by SkillsSection on mount)
+  pendingLibrarySkillId: string | null
 
   // Hydration
   isLoaded: boolean
@@ -36,6 +40,9 @@ interface ContextManagerViewState {
   // Actions
   setActive: (level: ConfigLevel, section: string) => void
   navigateToMarketplaceRegistry: (registryId: string) => void
+  navigateToMarketplaceEntry: (registryId: string, entryId: string) => void
+  navigateToLibrarySkill: (itemId: string) => void
+  consumePendingLibrarySkillId: () => string | null
   setSkillViewMode: (scope: string, mode: 'list' | 'graph') => void
   setGlobalSelectedPath: (path: string | null) => void
   setGlobalSplitWidth: (width: number) => void
@@ -78,14 +85,25 @@ const DEFAULTS: PersistedState = {
 }
 
 export const useContextManagerStore = create<ContextManagerViewState>()(
-  subscribeWithSelector((set) => ({
+  subscribeWithSelector((set, get) => ({
     ...DEFAULTS,
     marketplaceDrillRegistryId: null,
+    marketplaceDrillEntryId: null,
+    pendingLibrarySkillId: null,
     isLoaded: false,
 
     setActive: (level, section) => set({ activeLevel: level, activeSection: section }),
     navigateToMarketplaceRegistry: (registryId) =>
-      set({ activeLevel: 'library' as ConfigLevel, activeSection: 'marketplace', marketplaceDrillRegistryId: registryId }),
+      set({ activeLevel: 'library' as ConfigLevel, activeSection: 'marketplace', marketplaceDrillRegistryId: registryId, marketplaceDrillEntryId: null }),
+    navigateToMarketplaceEntry: (registryId, entryId) =>
+      set({ activeLevel: 'library' as ConfigLevel, activeSection: 'marketplace', marketplaceDrillRegistryId: registryId, marketplaceDrillEntryId: entryId }),
+    navigateToLibrarySkill: (itemId) =>
+      set({ activeLevel: 'library' as ConfigLevel, activeSection: 'skills', pendingLibrarySkillId: itemId }),
+    consumePendingLibrarySkillId: () => {
+      const id = get().pendingLibrarySkillId
+      if (id) set({ pendingLibrarySkillId: null })
+      return id
+    },
     setSkillViewMode: (scope, mode) =>
       set((s) => ({ skillViewMode: { ...s.skillViewMode, [scope]: mode } })),
     setGlobalSelectedPath: (path) => set({ globalSelectedPath: path }),

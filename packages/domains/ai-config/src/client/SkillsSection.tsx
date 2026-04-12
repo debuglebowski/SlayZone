@@ -91,6 +91,16 @@ export function SkillsSection({ level, projectId, projectPath }: SkillsSectionPr
     }).catch(() => {})
   }, [items])
 
+  // Consume one-shot library skill selection from the store (set by Go-to-library button).
+  useEffect(() => {
+    if (level !== 'library') return
+    if (items.length === 0) return
+    const pending = useContextManagerStore.getState().consumePendingLibrarySkillId()
+    if (pending && items.some(i => i.id === pending)) {
+      setSelectedSkillId(pending)
+    }
+  }, [level, items])
+
   const handleViewModeChange = useCallback((mode: SkillViewMode) => {
     setSkillViewMode(scope, mode)
   }, [setSkillViewMode, scope])
@@ -113,6 +123,23 @@ export function SkillsSection({ level, projectId, projectPath }: SkillsSectionPr
     if (updated) setItems(prev => prev.map(i => i.id === updated.id ? (updated as AiConfigItem) : i))
     setUpdateMap(prev => { const next = new Map(prev); next.delete(itemId); return next })
   }, [updateMap])
+
+  const handleUnlink = useCallback(async (target: AiConfigItem) => {
+    const hasMarketplace = (() => {
+      try { return !!JSON.parse(target.metadata_json)?.marketplace } catch { return false }
+    })()
+    if (hasMarketplace) {
+      const updated = await window.api.aiConfig.marketplace.unlinkSkill(target.id)
+      if (updated) setItems(prev => prev.map(i => i.id === updated.id ? (updated as AiConfigItem) : i))
+      return
+    }
+    if (isProject && projectId && target.scope === 'global') {
+      await window.api.aiConfig.removeProjectSelection(projectId, target.id)
+      setItems(prev => prev.filter(i => i.id !== target.id))
+      setLinkedIds(prev => prev.filter(id => id !== target.id))
+      if (selectedSkillId === target.id) setSelectedSkillId(null)
+    }
+  }, [isProject, projectId, selectedSkillId])
 
   const handleCreateSkill = useCallback(async () => {
     const existingSlugs = new Set(items.map(i => i.slug))
@@ -208,6 +235,7 @@ export function SkillsSection({ level, projectId, projectPath }: SkillsSectionPr
           onClose={() => setSelectedSkillId(null)}
           updateInfo={updateMap.get(selectedItem.id) ?? null}
           onMarketplaceUpdate={() => handleMarketplaceUpdate(selectedItem.id)}
+          onUnlink={() => handleUnlink(selectedItem)}
         />,
         editorTarget
       )}
@@ -231,6 +259,7 @@ export function SkillsSection({ level, projectId, projectPath }: SkillsSectionPr
             <SkillListView
               items={sortedItems}
               selectedSkillId={selectedSkillId}
+              isProject={isProject}
               onSelectSkill={setSelectedSkillId}
               onDeleteItem={handleDeleteItem}
               updateMap={updateMap}

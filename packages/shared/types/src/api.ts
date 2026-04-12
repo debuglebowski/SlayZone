@@ -636,6 +636,7 @@ export interface ElectronAPI {
       installSkill: (input: InstallSkillInput) => Promise<AiConfigItem>
       checkUpdates: () => Promise<SkillUpdateInfo[]>
       updateSkill: (itemId: string, entryId: string) => Promise<AiConfigItem>
+      unlinkSkill: (itemId: string) => Promise<AiConfigItem>
       ensureFresh: () => Promise<void>
     }
   }

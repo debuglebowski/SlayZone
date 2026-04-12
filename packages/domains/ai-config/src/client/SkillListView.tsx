@@ -1,4 +1,4 @@
-import { ArrowUpCircle, Store, Trash2, AlertTriangle } from 'lucide-react'
+import { ArrowUpCircle, Library, Store, Trash2, AlertTriangle } from 'lucide-react'
 import { Button, cn } from '@slayzone/ui'
 import { getSkillValidation, getMarketplaceProvenance } from './skill-validation'
 import { useContextManagerStore } from './useContextManagerStore'
@@ -7,6 +7,7 @@ import type { AiConfigItem, SkillUpdateInfo } from '../shared'
 interface SkillListViewProps {
   items: AiConfigItem[]
   selectedSkillId: string | null
+  isProject?: boolean
   onSelectSkill: (id: string | null) => void
   onDeleteItem: (id: string) => void
   updateMap?: Map<string, SkillUpdateInfo>
@@ -16,6 +17,7 @@ interface SkillListViewProps {
 export function SkillListView({
   items,
   selectedSkillId,
+  isProject,
   onSelectSkill,
   onDeleteItem,
   updateMap,
@@ -38,6 +40,7 @@ export function SkillListView({
         {items.map((item) => {
           const validation = getSkillValidation(item)
           const provenance = getMarketplaceProvenance(item)
+          const isLibraryLinked = isProject && !provenance && item.scope === 'global'
           const hasUpdate = updateMap?.has(item.id)
           const isSelected = selectedSkillId === item.id
           const hasIssues = validation && validation.status !== 'valid'
@@ -68,6 +71,12 @@ export function SkillListView({
                       {provenance.registryName ?? 'Marketplace'}
                     </span>
                   )}
+                  {isLibraryLinked && (
+                    <span className="flex items-center gap-1 rounded-full bg-surface-3 px-1.5 py-0.5 text-[10px] text-muted-foreground shrink-0">
+                      <Library className="size-2.5" />
+                      Library
+                    </span>
+                  )}
                   {hasUpdate && (
                     <button
                       onClick={(e) => { e.stopPropagation(); onMarketplaceUpdate?.(item.id) }}
@@ -78,9 +87,6 @@ export function SkillListView({
                     </button>
                   )}
                 </div>
-                {item.name !== item.slug && (
-                  <p className="text-xs text-muted-foreground truncate">{item.name}</p>
-                )}
               </div>
               {showLineCount && (
                 <span className="shrink-0 text-[10px] text-muted-foreground/60">{item.content.split('\n').length}L</span>

@@ -572,6 +572,7 @@ const api: ElectronAPI = {
       installSkill: (input) => ipcRenderer.invoke('ai-config:marketplace:install-skill', input),
       checkUpdates: () => ipcRenderer.invoke('ai-config:marketplace:check-updates'),
       updateSkill: (itemId, entryId) => ipcRenderer.invoke('ai-config:marketplace:update-skill', itemId, entryId),
+      unlinkSkill: (itemId) => ipcRenderer.invoke('ai-config:marketplace:unlink-skill', itemId),
       ensureFresh: () => ipcRenderer.invoke('ai-config:marketplace:ensure-fresh')
     }
   },

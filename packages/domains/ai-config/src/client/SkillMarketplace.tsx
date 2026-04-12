@@ -67,13 +67,25 @@ export function SkillMarketplace({ projectId, projectPath }: SkillMarketplacePro
 
   // Handle external navigation (e.g. clicking marketplace badge in skill list)
   useEffect(() => {
-    const drillId = useContextManagerStore.getState().marketplaceDrillRegistryId
+    const { marketplaceDrillRegistryId: drillId } = useContextManagerStore.getState()
     if (drillId) {
       setActiveRegistryId(drillId)
       setBrowseMode('registries')
       useContextManagerStore.setState({ marketplaceDrillRegistryId: null })
     }
   }, [])
+
+  // Open the preview dialog for a specific entry once entries finish loading.
+  useEffect(() => {
+    if (loading) return
+    const pendingEntryId = useContextManagerStore.getState().marketplaceDrillEntryId
+    if (!pendingEntryId) return
+    const entry = entries.find(e => e.id === pendingEntryId)
+    if (entry) {
+      setPreviewEntry(entry)
+      useContextManagerStore.setState({ marketplaceDrillEntryId: null })
+    }
+  }, [loading, entries])
 
   const handleAddToLibrary = useCallback(async (entryId: string) => {
     setInstalling(entryId)
