@@ -42,7 +42,7 @@ export const shortcutDefinitions: ShortcutDefinition[] = [
   { id: 'switch-project-1-9', label: 'Switch Project 1–9', group: 'Tabs', defaultKeys: 'mod+shift+1-9', scope: 'global', customizable: false },
 
   // Task Panels (task scope)
-  { id: 'panel-terminal', label: 'Terminal', group: 'Task Panels', defaultKeys: 'mod+t', scope: 'task' },
+  { id: 'panel-terminal', label: 'Terminal', group: 'Task Panels', defaultKeys: 'mod+k', scope: 'task' },
   { id: 'panel-browser', label: 'Browser', group: 'Task Panels', defaultKeys: 'mod+b', scope: 'task' },
   { id: 'panel-editor', label: 'Editor', group: 'Task Panels', defaultKeys: 'mod+e', scope: 'task' },
   { id: 'panel-git', label: 'Git', group: 'Task Panels', defaultKeys: 'mod+g', scope: 'task' },
@@ -61,7 +61,7 @@ export const shortcutDefinitions: ShortcutDefinition[] = [
   { id: 'terminal-screenshot', label: 'Screenshot', group: 'Terminal', defaultKeys: 'mod+shift+s', scope: 'terminal' },
   { id: 'terminal-search', label: 'Search', group: 'Terminal', defaultKeys: 'mod+f', scope: 'terminal' },
   { id: 'terminal-clear', label: 'Clear Buffer', group: 'Terminal', defaultKeys: 'mod+shift+k', scope: 'terminal' },
-  { id: 'terminal-new-group', label: 'New Group', group: 'Terminal', defaultKeys: 'mod+t', scope: 'terminal' },
+  { id: 'terminal-new-group', label: 'New Group', group: 'Terminal', defaultKeys: 'mod+k', scope: 'terminal' },
   { id: 'terminal-split', label: 'Split', group: 'Terminal', defaultKeys: 'mod+d', scope: 'terminal' },
   { id: 'terminal-restart', label: 'Restart', group: 'Terminal', defaultKeys: 'mod+alt+r', scope: 'terminal' },
 

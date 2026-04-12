@@ -61,21 +61,21 @@ describe('getKeys', () => {
 
 describe('findConflict', () => {
   it('finds same-scope conflict', () => {
-    const conflict = useShortcutStore.getState().findConflict('mod+k', 'global')
+    const conflict = useShortcutStore.getState().findConflict('mod+p', 'global')
     expect(conflict).toBeDefined()
     expect(conflict!.id).toBe('search')
   })
 
   it('ignores cross-scope shortcuts', () => {
-    // mod+t is default for panel-terminal (task scope)
-    const conflict = useShortcutStore.getState().findConflict('mod+t', 'global')
+    // mod+k is default for panel-terminal (task scope)
+    const conflict = useShortcutStore.getState().findConflict('mod+k', 'global')
     expect(conflict).toBeUndefined()
   })
 
   it('checks overrides not just defaults', () => {
     useShortcutStore.setState({ overrides: { search: 'mod+shift+p' } })
-    // Original mod+k should no longer conflict
-    const conflict = useShortcutStore.getState().findConflict('mod+k', 'global')
+    // Original mod+p should no longer conflict
+    const conflict = useShortcutStore.getState().findConflict('mod+p', 'global')
     expect(conflict).toBeUndefined()
     // New binding should conflict
     const conflict2 = useShortcutStore.getState().findConflict('mod+shift+p', 'global')
@@ -86,10 +86,10 @@ describe('findConflict', () => {
 
 describe('findShadow', () => {
   it('finds global shortcut that shadows scoped shortcut', () => {
-    // mod+t is default for terminal-new-group (terminal scope)
-    // If we assign mod+t to a global shortcut, it shadows
-    useShortcutStore.setState({ overrides: { 'new-task': 'mod+t' } })
-    const shadow = useShortcutStore.getState().findShadow('mod+t', 'global')
+    // mod+k is default for terminal-new-group (terminal scope)
+    // If we assign mod+k to a global shortcut, it shadows
+    useShortcutStore.setState({ overrides: { 'new-task': 'mod+k' } })
+    const shadow = useShortcutStore.getState().findShadow('mod+k', 'global')
     expect(shadow).toBeDefined()
     expect(shadow!.scope).not.toBe('global')
   })
@@ -103,7 +103,7 @@ describe('findShadow', () => {
   })
 
   it('ignores same-scope (handled by findConflict)', () => {
-    const shadow = useShortcutStore.getState().findShadow('mod+k', 'global')
+    const shadow = useShortcutStore.getState().findShadow('mod+p', 'global')
     expect(shadow).toBeUndefined()
   })
 

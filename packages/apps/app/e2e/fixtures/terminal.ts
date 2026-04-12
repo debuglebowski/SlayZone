@@ -51,8 +51,8 @@ export async function openTaskTerminal(
   if (await taskCardTitle.isVisible({ timeout: 2_000 }).catch(() => false)) {
     await taskCardTitle.click()
   } else {
-    await page.keyboard.press('Meta+k')
-    const searchInput = page.getByPlaceholder('Search tasks and projects...')
+    await page.keyboard.press('Meta+p')
+    const searchInput = page.getByPlaceholder('Search files, tasks, projects...')
     await expect(searchInput).toBeVisible()
     await searchInput.fill(opts.taskTitle)
     const dialog = page.locator('[role="dialog"]:visible').last()

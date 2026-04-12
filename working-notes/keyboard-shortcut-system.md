@@ -35,7 +35,7 @@ Replace the three scopes (`global`, `task-panel`, `terminal`) with five, each wi
 **Modifier shortcuts (capture phase — beats CM/xterm):**
 - **Cmd+S**: editor scope (80) save > task scope (40) settings toggle
 - **Cmd+G**: browser scope (80) find-next > task scope (40) git panel
-- **Cmd+T**: terminal scope (80) new-group > task scope (40) terminal toggle
+- **Cmd+K**: terminal scope (80) new-group > task scope (40) terminal toggle
 - **Cmd+F**: terminal scope (80) search vs browser scope (80) find — no conflict, can't both have focus
 
 **Non-modifier shortcuts (bubble phase — loses to Radix/popovers):**
@@ -381,8 +381,8 @@ Update `validatePanelShortcut()` in `panel-config.ts`.
    - Cmd+S outside editor → toggles settings
    - Cmd+G in browser panel → find-next (NOT git panel)
    - Cmd+G outside browser → toggles git panel
-   - Cmd+T in terminal → new group (NOT terminal toggle)
-   - Cmd+T outside terminal → toggles terminal panel
+   - Cmd+K in terminal → new group (NOT terminal toggle)
+   - Cmd+K outside terminal → toggles terminal panel
    - Cmd+F in terminal → terminal search; in browser → browser find
    - Escape in terminal search → closes search (NOT exit zen)
    - Escape with Radix dropdown open → closes dropdown (NOT exit zen)

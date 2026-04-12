@@ -83,8 +83,8 @@ export async function ensureBrowserPanelHidden(page: Page): Promise<void> {
 // ── Task navigation ─────────────────────────────────────────────────
 
 export async function openTaskViaSearch(page: Page, title: string): Promise<void> {
-  await page.keyboard.press('Meta+k')
-  const input = page.getByPlaceholder('Search tasks and projects...')
+  await page.keyboard.press('Meta+p')
+  const input = page.getByPlaceholder('Search files, tasks, projects...')
   await expect(input).toBeVisible()
   await input.fill(title)
   await page.keyboard.press('Enter')

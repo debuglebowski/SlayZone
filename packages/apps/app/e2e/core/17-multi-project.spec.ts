@@ -41,9 +41,9 @@ test.describe('Multi-project & persistence', () => {
   })
 
   test('search finds tasks across projects', async ({ mainWindow }) => {
-    await mainWindow.keyboard.press('Meta+k')
+    await mainWindow.keyboard.press('Meta+p')
 
-    const searchInput = mainWindow.getByPlaceholder('Search tasks and projects...')
+    const searchInput = mainWindow.getByPlaceholder('Search files, tasks, projects...')
     await expect(searchInput).toBeVisible({ timeout: 5_000 })
     await searchInput.fill('Beta task')
 
@@ -54,9 +54,9 @@ test.describe('Multi-project & persistence', () => {
   })
 
   test('search with no matching results', async ({ mainWindow }) => {
-    await mainWindow.keyboard.press('Meta+k')
+    await mainWindow.keyboard.press('Meta+p')
 
-    const searchInput = mainWindow.getByPlaceholder('Search tasks and projects...')
+    const searchInput = mainWindow.getByPlaceholder('Search files, tasks, projects...')
     await expect(searchInput).toBeVisible({ timeout: 5_000 })
     await searchInput.fill('xyznonexistent999')
 

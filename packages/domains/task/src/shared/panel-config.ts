@@ -41,7 +41,7 @@ export function mergePredefinedWebPanels(config: PanelConfig): PanelConfig {
   return { ...config, webPanels: [...synced, ...missing] }
 }
 
-const RESERVED_PANEL_SHORTCUTS = new Set(['t', 'b', 'e', 'g', 's'])
+const RESERVED_PANEL_SHORTCUTS = new Set(['k', 'b', 'e', 'g', 's'])
 
 /** Validate a panel keyboard shortcut. Returns null if valid, or an error message if invalid. */
 export function validatePanelShortcut(

@@ -294,13 +294,13 @@ test.describe('Browser panel', () => {
       await btn.click()
     }
 
-    // Focus browser panel, press Cmd+T — should NOT create a tab
+    // Focus browser panel, press Cmd+T — should NOT create a tab (intercepted by app)
     await mainWindow.locator('[data-browser-panel]').first().click()
     const countBefore = await tabEntries(mainWindow).count()
     await mainWindow.keyboard.press('Meta+t')
     expect(await tabEntries(mainWindow).count()).toBe(countBefore)
 
-    // Enable capture, press Cmd+T — should create a tab
+    // Enable capture, press Cmd+T — should create a tab (browser interprets Cmd+T as new tab)
     await btn.click()
     await expect(btn).toHaveClass(/text-green/)
     await mainWindow.locator('[data-browser-panel]').first().click()

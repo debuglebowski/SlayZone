@@ -57,8 +57,8 @@ test.describe('Web panels', () => {
   }
 
   const openTaskViaSearch = async (page: import('@playwright/test').Page, title: string) => {
-    await page.keyboard.press('Meta+k')
-    const input = page.getByPlaceholder('Search tasks and projects...')
+    await page.keyboard.press('Meta+p')
+    const input = page.getByPlaceholder('Search files, tasks, projects...')
     await expect(input).toBeVisible()
     await input.fill(title)
     await page.keyboard.press('Enter')
@@ -257,10 +257,10 @@ test.describe('Web panels', () => {
     await nameInput.scrollIntoViewIfNeeded()
     await nameInput.fill('BadShortcut')
     await dialog.getByPlaceholder('URL').fill('test.com')
-    await dialog.getByPlaceholder('Key').last().fill('t')
+    await dialog.getByPlaceholder('Key').last().fill('k')
     await dialog.getByRole('button', { name: 'Add Panel' }).click()
 
-    await expect(dialog.getByText(/reserved|⌘T/i).first()).toBeVisible({ timeout: 3_000 })
+    await expect(dialog.getByText(/reserved|⌘K/i).first()).toBeVisible({ timeout: 3_000 })
     await expect(findCard(dialog, 'BadShortcut')).toHaveCount(0)
 
     await nameInput.clear()

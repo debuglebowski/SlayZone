@@ -24,7 +24,7 @@ function Kbd({ children }: { children: string }): React.JSX.Element {
 const SIDEBAR_TABS = ['General', 'Appearance', 'Panels', 'Tags', 'Import & Export', 'Telemetry', 'Labs', 'About']
 
 const NATIVE_PANELS = [
-  { icon: Terminal, label: 'Terminal', shortcut: '⌘T' },
+  { icon: Terminal, label: 'Terminal', shortcut: '⌘K' },
   { icon: Globe, label: 'Browser', shortcut: '⌘B' },
   { icon: FileCode, label: 'Editor', shortcut: '⌘E' },
   { icon: GitBranch, label: 'Diff', shortcut: '⌘G' },

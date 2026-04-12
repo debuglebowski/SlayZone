@@ -20,28 +20,28 @@ test.describe('Navigation & tabs', () => {
     await expect(mainWindow.locator('h3').getByText('Inbox', { exact: true })).toBeVisible({ timeout: 5_000 })
   })
 
-  test('Cmd+K opens search dialog', async ({ mainWindow }) => {
-    await mainWindow.keyboard.press('Meta+k')
-    await expect(mainWindow.getByPlaceholder('Search tasks and projects...')).toBeVisible({
+  test('Cmd+P opens search dialog', async ({ mainWindow }) => {
+    await mainWindow.keyboard.press('Meta+p')
+    await expect(mainWindow.getByPlaceholder('Search files, tasks, projects...')).toBeVisible({
       timeout: 3_000,
     })
   })
 
   test('search finds tasks', async ({ mainWindow }) => {
-    const searchInput = mainWindow.getByPlaceholder('Search tasks and projects...')
+    const searchInput = mainWindow.getByPlaceholder('Search files, tasks, projects...')
     await searchInput.fill('Nav search')
-    await expect(mainWindow.getByLabel('Tasks').getByText('Nav search task')).toBeVisible({ timeout: 3_000 })
+    await expect(mainWindow.locator('[cmdk-item]').getByText('Nav search task')).toBeVisible({ timeout: 3_000 })
     await mainWindow.keyboard.press('Escape')
   })
 
-  test('Cmd+K search selects result and navigates', async ({ mainWindow }) => {
-    await mainWindow.keyboard.press('Meta+k')
-    const searchInput = mainWindow.getByPlaceholder('Search tasks and projects...')
+  test('Cmd+P search selects result and navigates', async ({ mainWindow }) => {
+    await mainWindow.keyboard.press('Meta+p')
+    const searchInput = mainWindow.getByPlaceholder('Search files, tasks, projects...')
     await searchInput.fill('Nav detail task')
-    await expect(mainWindow.getByLabel('Tasks').getByText('Nav detail task')).toBeVisible({ timeout: 3_000 })
+    await expect(mainWindow.locator('[cmdk-item]').getByText('Nav detail task')).toBeVisible({ timeout: 3_000 })
 
     // Click the specific result to avoid selecting wrong task
-    await mainWindow.getByLabel('Tasks').getByText('Nav detail task').click()
+    await mainWindow.locator('[cmdk-item]').getByText('Nav detail task').click()
 
     // Use evaluate to find visible input (hidden tab inputs may exist in DOM)
     // Poll until the task detail input appears with the expected value
@@ -56,7 +56,7 @@ test.describe('Navigation & tabs', () => {
 
   test('open task from kanban and close tab', async ({ mainWindow }) => {
     await mainWindow.keyboard.press('Escape')
-    await expect(mainWindow.getByPlaceholder('Search tasks and projects...')).not.toBeVisible()
+    await expect(mainWindow.getByPlaceholder('Search files, tasks, projects...')).not.toBeVisible()
 
     await goHome(mainWindow)
     await clickProject(mainWindow, projectAbbrev)

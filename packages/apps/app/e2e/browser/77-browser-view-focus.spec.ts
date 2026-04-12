@@ -68,7 +68,7 @@ test.describe('Browser view focus (WebContentsView)', () => {
     await mainWindow.waitForTimeout(200)
 
     // Verify search dialog is not open
-    const searchInput = mainWindow.getByPlaceholder('Search tasks and projects...')
+    const searchInput = mainWindow.getByPlaceholder('Search files, tasks, projects...')
     await expect(searchInput).not.toBeVisible({ timeout: 2_000 })
 
     // Simulate Cmd+K arriving via the IPC bridge (as if pressed in WebContentsView)

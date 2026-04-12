@@ -23,7 +23,7 @@ test.describe('Terminal tab keyboard isolation', () => {
     await s.refreshData()
   })
 
-  test('Cmd+T only creates tab in active task, not hidden ones', async ({ mainWindow }) => {
+  test('Cmd+K only creates tab in active task, not hidden ones', async ({ mainWindow }) => {
     // Open task A
     await openTaskTerminal(mainWindow, { projectAbbrev, taskTitle: 'IsoTask Alpha' })
     await waitForPtySession(mainWindow, getMainSessionId(taskIdA), 20_000)
@@ -32,9 +32,9 @@ test.describe('Terminal tab keyboard isolation', () => {
     await openTaskTerminal(mainWindow, { projectAbbrev, taskTitle: 'IsoTask Bravo' })
     await waitForPtySession(mainWindow, getMainSessionId(taskIdB), 20_000)
 
-    // Task B is active. Dispatch Cmd+T directly (Electron native menu may intercept keyboard.press).
+    // Task B is active. Dispatch Cmd+K directly (Electron native menu may intercept keyboard.press).
     await mainWindow.evaluate(() => {
-      window.dispatchEvent(new KeyboardEvent('keydown', { key: 't', metaKey: true, bubbles: true }))
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', metaKey: true, bubbles: true }))
     })
 
     // Wait for the new tab to appear in task B

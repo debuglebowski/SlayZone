@@ -23,8 +23,8 @@ test.describe('Git worktree operations', () => {
     if (await taskCardTitle.isVisible({ timeout: 1_500 }).catch(() => false)) {
       await taskCardTitle.click()
     } else {
-      await page.keyboard.press('Meta+k')
-      const input = page.getByPlaceholder('Search tasks and projects...')
+      await page.keyboard.press('Meta+p')
+      const input = page.getByPlaceholder('Search files, tasks, projects...')
       await expect(input).toBeVisible()
       await input.fill(title)
       await page.getByRole('dialog').last().getByText(title).first().click()
