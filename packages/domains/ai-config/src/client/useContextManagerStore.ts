@@ -3,6 +3,8 @@ import { subscribeWithSelector } from 'zustand/middleware'
 import { shallow } from 'zustand/shallow'
 import type { ConfigLevel } from '../shared'
 
+export type SkillGroupBy = 'none' | 'source' | 'prefix'
+
 interface ContextManagerViewState {
   // Navigation
   activeLevel: ConfigLevel
@@ -26,6 +28,9 @@ interface ContextManagerViewState {
   // File tree display toggles
   showBlobs: boolean
   showLineCount: boolean
+
+  // Skill list grouping
+  skillGroupBy: SkillGroupBy
 
   // Marketplace navigation
   marketplaceDrillRegistryId: string | null
@@ -52,6 +57,7 @@ interface ContextManagerViewState {
   setSkillEditorWidth: (width: number | null) => void
   setShowBlobs: (show: boolean) => void
   setShowLineCount: (show: boolean) => void
+  setSkillGroupBy: (v: SkillGroupBy) => void
   _loadState: (persisted: Partial<PersistedState>) => void
 }
 
@@ -68,6 +74,7 @@ interface PersistedState {
   skillEditorWidth: number | null
   showBlobs: boolean
   showLineCount: boolean
+  skillGroupBy: SkillGroupBy
 }
 
 const DEFAULTS: PersistedState = {
@@ -82,6 +89,7 @@ const DEFAULTS: PersistedState = {
   skillEditorWidth: null,
   showBlobs: true,
   showLineCount: true,
+  skillGroupBy: 'source',
 }
 
 export const useContextManagerStore = create<ContextManagerViewState>()(
@@ -114,8 +122,16 @@ export const useContextManagerStore = create<ContextManagerViewState>()(
     setSkillEditorWidth: (width) => set({ skillEditorWidth: width }),
     setShowBlobs: (show) => set({ showBlobs: show }),
     setShowLineCount: (show) => set({ showLineCount: show }),
+    setSkillGroupBy: (v) => set({ skillGroupBy: v }),
 
-    _loadState: (persisted) => set({ ...DEFAULTS, ...persisted, isLoaded: true }),
+    _loadState: (persisted) => {
+      const validGroupBy: SkillGroupBy[] = ['none', 'source', 'prefix']
+      const { skillGroupBy: rawGroupBy, ...rest } = persisted
+      const groupBy = validGroupBy.includes(rawGroupBy as SkillGroupBy)
+        ? (rawGroupBy as SkillGroupBy)
+        : (DEFAULTS.skillGroupBy as SkillGroupBy)
+      set({ ...DEFAULTS, ...rest, skillGroupBy: groupBy, isLoaded: true })
+    },
   }))
 )
 
@@ -160,6 +176,7 @@ function pickPersisted(state: ContextManagerViewState): PersistedState {
     skillEditorWidth: state.skillEditorWidth,
     showBlobs: state.showBlobs,
     showLineCount: state.showLineCount,
+    skillGroupBy: state.skillGroupBy,
   }
 }
 

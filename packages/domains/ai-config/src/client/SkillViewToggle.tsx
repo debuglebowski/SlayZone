@@ -11,7 +11,7 @@ interface SkillViewToggleProps {
 
 export function SkillViewToggle({ value, onChange, className }: SkillViewToggleProps) {
   return (
-    <div className={cn('flex items-center gap-0.5 rounded-md bg-muted p-0.5', className)}>
+    <div className={cn('flex items-center gap-0.5 rounded-md border bg-muted p-0.5', className)}>
       <button
         onClick={() => onChange('graph')}
         className={cn(

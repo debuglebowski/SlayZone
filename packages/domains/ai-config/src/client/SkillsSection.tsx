@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent } from 'react'
 import { createPortal } from 'react-dom'
 import { Plus } from 'lucide-react'
-import { Button } from '@slayzone/ui'
+import { Button, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@slayzone/ui'
 import { SkillGraphCanvas } from './SkillGraphCanvas'
 import { SkillListView } from './SkillListView'
 import { ContextItemEditor } from './ContextItemEditor'
@@ -39,6 +39,8 @@ export function SkillsSection({ level, projectId, projectPath }: SkillsSectionPr
   const [enabledProviders, setEnabledProviders] = useState<CliProvider[]>([])
   const viewMode = (useContextManagerStore((s) => s.skillViewMode[scope]) ?? 'list') as SkillViewMode
   const setSkillViewMode = useContextManagerStore((s) => s.setSkillViewMode)
+  const skillGroupBy = useContextManagerStore((s) => s.skillGroupBy)
+  const setSkillGroupBy = useContextManagerStore((s) => s.setSkillGroupBy)
   const [updateMap, setUpdateMap] = useState<Map<string, SkillUpdateInfo>>(new Map())
 
   const bumpVersion = useCallback(() => setVersion(v => v + 1), [])
@@ -205,9 +207,21 @@ export function SkillsSection({ level, projectId, projectPath }: SkillsSectionPr
   return (
     <>
       {headerTarget && createPortal(
-        <div className="flex items-center gap-2">
-          <SkillViewToggle value={viewMode} onChange={handleViewModeChange} />
-          <Button size="sm" variant="outline" onClick={isProject ? () => setShowAddPicker(true) : handleCreateSkill}>
+        <div className="flex items-stretch gap-4 h-8">
+          {viewMode === 'list' && (
+            <Select value={skillGroupBy} onValueChange={setSkillGroupBy}>
+              <SelectTrigger size="sm" className="h-full w-auto gap-1.5 py-0 text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">No grouping</SelectItem>
+                <SelectItem value="source">Group by source</SelectItem>
+                <SelectItem value="prefix">Group by prefix</SelectItem>
+              </SelectContent>
+            </Select>
+          )}
+          <SkillViewToggle value={viewMode} onChange={handleViewModeChange} className="h-full" />
+          <Button size="sm" variant="outline" className="h-full" onClick={isProject ? () => setShowAddPicker(true) : handleCreateSkill}>
             <Plus className="mr-1 size-3.5" />
             Add Skill
           </Button>
@@ -260,6 +274,7 @@ export function SkillsSection({ level, projectId, projectPath }: SkillsSectionPr
               items={sortedItems}
               selectedSkillId={selectedSkillId}
               isProject={isProject}
+              groupBy={skillGroupBy}
               onSelectSkill={setSelectedSkillId}
               onDeleteItem={handleDeleteItem}
               updateMap={updateMap}
