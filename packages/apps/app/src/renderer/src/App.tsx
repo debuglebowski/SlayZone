@@ -24,7 +24,7 @@ import { usePanelSizes } from '@slayzone/task/client/usePanelSizes'
 import { usePanelConfig } from '@slayzone/task/client/usePanelConfig'
 import { useDetectedRepos } from '@slayzone/projects/client/useDetectedRepos'
 import type { ProjectCreationContext, ProjectStartMode } from '@slayzone/projects'
-import { useTabStore, useDialogStore, AppearanceProvider } from '@slayzone/settings'
+import { useTabStore, useDialogStore, AppearanceProvider, type SearchFileContext } from '@slayzone/settings'
 import { track, trackShortcut } from '@slayzone/telemetry/client'
 import { usePty } from '@slayzone/terminal/client'
 // Shared
@@ -96,7 +96,6 @@ const DeleteProjectDialog = lazy(() => import('@slayzone/projects').then(m => ({
 const OnboardingDialog = lazy(() => import('@slayzone/onboarding').then(m => ({ default: m.OnboardingDialog })))
 const SearchDialog = lazy(() => import('@/components/dialogs/SearchDialog').then(m => ({ default: m.SearchDialog })))
 const CliInstallDialog = lazy(() => import('@/components/dialogs/CliInstallDialog').then(m => ({ default: m.CliInstallDialog })))
-const QuickOpenDialog = lazy(() => import('@slayzone/file-editor/client/QuickOpenDialog').then(m => ({ default: m.QuickOpenDialog })))
 const ChangelogDialog = lazy(() => import('@/components/changelog/ChangelogDialog').then(m => ({ default: m.ChangelogDialog })))
 
 type ProjectSettingsTab = 'general' | 'environment' | 'tasks' | 'tasks/general' | 'tasks/statuses' | 'integrations' | 'ai-config' | 'tests'
@@ -405,7 +404,34 @@ function App(): React.JSX.Element {
     if (projects.length > 0) { e.preventDefault(); trackShortcut('mod+n'); useDialogStore.getState().openCreateTask() }
   }, { enableOnFormTags: true, enabled: !isRecording })
 
-  useGuardedHotkeys(getKeys('search'), (e) => { e.preventDefault(); trackShortcut('mod+k'); useDialogStore.getState().openSearch() }, { enableOnFormTags: true, enabled: !isRecording })
+  // Build a snapshot of the home file-open context for the unified palette.
+  // Captured into the dialog payload at the moment the shortcut fires; cleared on close.
+  const buildHomeFileContext = useCallback((): SearchFileContext | undefined => {
+    const project = projects.find((p) => p.id === selectedProjectId)
+    if (!project?.path) return undefined
+    return {
+      projectPath: project.path,
+      openFile: (filePath) => {
+        if (homePanel.homeEditorRef.current) {
+          if (!homePanel.homePanelVisibility.editor) {
+            homePanel.setHomePanelVisibility((prev) => ({ ...prev, editor: true }))
+          }
+          homePanel.homeEditorRef.current.openFile(filePath)
+        } else {
+          homePanel.pendingHomeEditorFileRef.current = filePath
+          homePanel.setHomePanelVisibility((prev) => ({ ...prev, editor: true }))
+        }
+      }
+    }
+  }, [projects, selectedProjectId, homePanel])
+
+  useGuardedHotkeys(getKeys('search'), (e) => {
+    // Only fire on home tab; TaskDetailPage owns Cmd+K when a task tab is active.
+    if (tabs[activeTabIndex]?.type !== 'home') return
+    e.preventDefault()
+    trackShortcut('mod+k')
+    useDialogStore.getState().openSearch({ fileContext: buildHomeFileContext() })
+  }, { enableOnFormTags: true, enabled: !isRecording })
 
   useGuardedHotkeys('mod+z', async (e) => {
     const el = e.target as HTMLElement
@@ -575,9 +601,11 @@ function App(): React.JSX.Element {
         return
       }
 
-      // Quick Open (panel-quick-open)
-      if (matchesShortcut(e, getKeys('panel-quick-open')) && isHomePanelEnabled('editor', 'home')) {
-        e.preventDefault(); homePanel.setHomeQuickOpenVisible(true); return
+      // Quick Open (panel-quick-open) — opens the unified palette with home file context
+      if (matchesShortcut(e, getKeys('panel-quick-open'))) {
+        e.preventDefault()
+        useDialogStore.getState().openSearch({ fileContext: buildHomeFileContext() })
+        return
       }
 
       // Git (panel-git)
@@ -607,7 +635,7 @@ function App(): React.JSX.Element {
     })
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [tabs, activeTabIndex, selectedProjectId, homePanel.homePanelVisibility, getKeys, isRecording])
+  }, [tabs, activeTabIndex, selectedProjectId, homePanel.homePanelVisibility, getKeys, isRecording, buildHomeFileContext])
 
   // Cmd+R: reload the active browser view (WebContentsView or webview fallback)
   useEffect(() => {
@@ -1112,14 +1140,6 @@ function App(): React.JSX.Element {
         </div>
 
         {/* Dialogs — lazy-mounted on first trigger, stay mounted for close/reopen animations */}
-        {shouldMount('quickOpen', homePanel.homeQuickOpenVisible) && <Suspense fallback={null}><QuickOpenDialog open={homePanel.homeQuickOpenVisible} onOpenChange={homePanel.setHomeQuickOpenVisible}
-          projectPath={projects.find(p => p.id === selectedProjectId)?.path ?? ''}
-          onOpenFile={(filePath) => {
-            if (homePanel.homeEditorRef.current) {
-              if (!homePanel.homePanelVisibility.editor) homePanel.setHomePanelVisibility(prev => ({ ...prev, editor: true }))
-              homePanel.homeEditorRef.current.openFile(filePath)
-            } else { homePanel.pendingHomeEditorFileRef.current = filePath; homePanel.setHomePanelVisibility(prev => ({ ...prev, editor: true })) }
-          }} /></Suspense>}
         {shouldMount('createTask', createTaskOpen) && <Suspense fallback={null}><CreateTaskDialog open={createTaskOpen} onOpenChange={(open) => { if (!open) useDialogStore.getState().closeCreateTask() }} onCreated={handleTaskCreated} onCreatedAndOpen={handleTaskCreatedAndOpen}
           draft={createTaskDialogDraft}
           tags={projectTags} onTagCreated={(tag: Tag) => setTags((prev) => [...prev, tag])} /></Suspense>}

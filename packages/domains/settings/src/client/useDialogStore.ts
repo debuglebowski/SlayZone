@@ -3,6 +3,11 @@ import type { CreateTaskDraft } from '@slayzone/task/shared'
 import type { Task } from '@slayzone/task/shared'
 import type { Project } from '@slayzone/projects/shared'
 
+export interface SearchFileContext {
+  projectPath: string
+  openFile: (path: string) => void
+}
+
 interface DialogState {
   // Create task
   createTaskOpen: boolean
@@ -40,7 +45,8 @@ interface DialogState {
   closeChangelog: () => void
 
   searchOpen: boolean
-  openSearch: () => void
+  searchFileContext: SearchFileContext | null
+  openSearch: (payload?: { fileContext?: SearchFileContext }) => void
   closeSearch: () => void
 
   completeTaskDialogOpen: boolean
@@ -83,8 +89,9 @@ export const useDialogStore = create<DialogState>()((set) => ({
   closeChangelog: () => set({ changelogOpen: false }),
 
   searchOpen: false,
-  openSearch: () => set({ searchOpen: true }),
-  closeSearch: () => set({ searchOpen: false }),
+  searchFileContext: null,
+  openSearch: (payload) => set({ searchOpen: true, searchFileContext: payload?.fileContext ?? null }),
+  closeSearch: () => set({ searchOpen: false, searchFileContext: null }),
 
   completeTaskDialogOpen: false,
   openCompleteTaskDialog: () => set({ completeTaskDialogOpen: true }),

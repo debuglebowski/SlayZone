@@ -10,8 +10,7 @@
     "./shared": "./src/shared/index.ts",
     "./main": "./src/main/index.ts",
     "./client": "./src/client/index.ts",
-    "./client/FileEditorView": "./src/client/FileEditorView.tsx",
-    "./client/QuickOpenDialog": "./src/client/QuickOpenDialog.tsx"
+    "./client/FileEditorView": "./src/client/FileEditorView.tsx"
   },
   "scripts": {
     "typecheck": "tsgo --noEmit",

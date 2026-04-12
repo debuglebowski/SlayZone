@@ -126,7 +126,6 @@ vi.mock('@slayzone/worktrees', () => ({ UnifiedGitPanel: React.forwardRef(() => 
 vi.mock('@slayzone/task-browser', () => ({ BrowserPanel: React.forwardRef(() => null) }))
 vi.mock('@slayzone/task-browser/shared', () => ({}))
 vi.mock('@slayzone/file-editor/client', () => ({ FileEditorView: React.forwardRef(() => null) }))
-vi.mock('@slayzone/file-editor/client/QuickOpenDialog', () => ({ QuickOpenDialog: () => null }))
 vi.mock('@slayzone/file-editor/shared', () => ({}))
 vi.mock('@slayzone/telemetry/client', () => ({ track: vi.fn() }))
 vi.mock('./DescriptionDialog', () => ({ DescriptionDialog: () => null }))

@@ -64,7 +64,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@slayzone/ui'
 import { TaskMetadataSidebar, ExternalSyncCard } from './TaskMetadataSidebar'
 import { RichTextEditor } from '@slayzone/editor'
 import { normalizeDescription, stripMarkdown, getExtensionFromTitle, getEffectiveRenderMode, RENDER_MODE_INFO } from '@slayzone/task/shared'
-import { useTheme } from '@slayzone/settings/client'
+import { useTheme, useDialogStore, type SearchFileContext } from '@slayzone/settings/client'
 import { markSkipCache, usePty, useTerminalModes, getVisibleModes, getModeLabel, groupTerminalModes, useLoopMode, isLoopActive, stripAnsi, serializeTerminalHistory, LoopModeBanner, LoopModeDialog, SlayNudgeBanner, useSlayNudge } from '@slayzone/terminal'
 import type { LoopConfig } from '@slayzone/terminal/shared'
 import { TerminalContainer, type TerminalContainerHandle } from '@slayzone/task-terminals'
@@ -72,7 +72,6 @@ import { UnifiedGitPanel, type UnifiedGitPanelHandle, type GitTabId } from '@sla
 import { buildStatusOptions, cn, getColumnStatusStyle, useAppearance, matchesShortcut, useShortcutStore, useShortcutDisplay, withModalGuard, getThemeEditorColors, type EditorThemeColors } from '@slayzone/ui'
 import { BrowserPanel, type BrowserPanelHandle } from '@slayzone/task-browser'
 import { FileEditorView, type FileEditorViewHandle } from '@slayzone/file-editor/client'
-import { QuickOpenDialog } from '@slayzone/file-editor/client/QuickOpenDialog'
 import type { EditorOpenFilesState, OpenFileOptions } from '@slayzone/file-editor/shared'
 import { track } from '@slayzone/telemetry/client'
 import { usePanelSizes, resolveWidths } from './usePanelSizes'
@@ -417,7 +416,6 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
   const browserOpenRef = useRef(panelVisibility.browser)
   const gitPanelRef = useRef<UnifiedGitPanelHandle>(null)
   const [gitDefaultTab, setGitDefaultTab] = useState<GitTabId>('general')
-  const [quickOpenVisible, setQuickOpenVisible] = useState(false)
   const fileEditorRef = useRef<FileEditorViewHandle>(null)
   const terminalContainerRef = useRef<TerminalContainerHandle>(null)
   const browserPanelRef = useRef<BrowserPanelHandle>(null)
@@ -957,11 +955,20 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
     if (fileEditorRef.current) {
       fileEditorRef.current.openFile(filePath, options)
     } else {
-      // Editor not mounted yet — queue file and enable panel (position lost)
       pendingEditorFileRef.current = filePath
       handlePanelToggle('editor', true)
     }
   }, [handlePanelToggle])
+
+  // Snapshot of the task's file-open context for the unified palette.
+  // Captured into the dialog payload at the moment the shortcut fires; cleared on close.
+  const buildTaskFileContext = useCallback((): SearchFileContext | undefined => {
+    if (!effectiveRepoPath) return undefined
+    return {
+      projectPath: effectiveRepoPath,
+      openFile: (filePath: string) => handleQuickOpenFile(filePath)
+    }
+  }, [effectiveRepoPath, handleQuickOpenFile])
 
   // Cmd+T/B/G/S/E/P + web panel shortcuts for panel toggles
   useEffect(() => {
@@ -1005,10 +1012,17 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
         return
       }
 
-      // Cmd+P: quick open — works even inside CodeMirror
-      if (matchesShortcut(e, keys('panel-quick-open')) && isBuiltinEnabled('editor', 'task') && effectiveRepoPath) {
+      // Cmd+K: unified palette (files + tasks + projects) — task owns this when active
+      if (matchesShortcut(e, keys('search'))) {
         e.preventDefault()
-        setQuickOpenVisible(true)
+        useDialogStore.getState().openSearch({ fileContext: buildTaskFileContext() })
+        return
+      }
+
+      // Cmd+P: unified palette with file context — works even inside CodeMirror
+      if (matchesShortcut(e, keys('panel-quick-open'))) {
+        e.preventDefault()
+        useDialogStore.getState().openSearch({ fileContext: buildTaskFileContext() })
         return
       }
 
@@ -1077,7 +1091,7 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
     })
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [isActive, panelVisibility, handlePanelToggle, isBuiltinEnabled, enabledWebPanels])
+  }, [isActive, panelVisibility, handlePanelToggle, isBuiltinEnabled, enabledWebPanels, buildTaskFileContext])
 
   // Focus and select title input when editing
   useEffect(() => {
@@ -2417,15 +2431,6 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
           </div>
         )}
       </div>
-
-      {effectiveRepoPath && (
-        <QuickOpenDialog
-          open={quickOpenVisible}
-          onOpenChange={setQuickOpenVisible}
-          projectPath={effectiveRepoPath}
-          onOpenFile={handleQuickOpenFile}
-        />
-      )}
 
       <LoopModeDialog
         open={loopDialogOpen}

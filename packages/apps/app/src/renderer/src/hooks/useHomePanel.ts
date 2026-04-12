@@ -51,8 +51,6 @@ export function useHomePanel(
     }
   }, [])
 
-  const [homeQuickOpenVisible, setHomeQuickOpenVisible] = useState(false)
-
   // Container width tracking via ResizeObserver
   const [homeContainerWidth, setHomeContainerWidth] = useState(0)
   const homeRoRef = useRef<ResizeObserver | null>(null)
@@ -85,8 +83,6 @@ export function useHomePanel(
     pendingHomeEditorFileRef,
     pendingHomeSearchToggleRef,
     homeEditorRefCallback,
-    homeQuickOpenVisible,
-    setHomeQuickOpenVisible,
     homeContainerRef,
     homeResolvedWidths
   }
