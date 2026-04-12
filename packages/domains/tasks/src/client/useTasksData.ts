@@ -203,10 +203,15 @@ export function useTasksData(): UseTasksDataReturn {
     await window.api.db.deleteTask(taskId)
   }, [])
 
-  // Context menu update (status, priority, project, blocked)
+  // Context menu update (status, priority, project, blocked).
+  // Snapshot pattern keeps deps empty so the callback ref stays stable across
+  // renders — prevents fanout re-renders in consumers (e.g. useUndoableTaskActions).
   const contextMenuUpdate = useCallback(async (taskId: string, updates: Partial<Task>) => {
-    const previousTasks = tasks
-    setTasks((prev) => prev.map((t) => (t.id === taskId ? { ...t, ...updates } : t)))
+    let previousTasks: Task[] = []
+    setTasks((prev) => {
+      previousTasks = prev
+      return prev.map((t) => (t.id === taskId ? { ...t, ...updates } : t))
+    })
 
     if (updates.is_blocked !== undefined) {
       setBlockedTaskIds(prev => {
@@ -238,7 +243,7 @@ export function useTasksData(): UseTasksDataReturn {
         })
       }
     }
-  }, [tasks])
+  }, [])
 
   // Reorder projects
   const reorderProjects = useCallback((projectIds: string[]) => {

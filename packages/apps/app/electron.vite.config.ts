@@ -77,20 +77,50 @@ export default defineConfig(({ mode }) => {
       define: {
         __POSTHOG_API_KEY__: JSON.stringify(env.POSTHOG_DISABLED === '1' ? '' : (env.POSTHOG_API_KEY ?? 'phc_b66nL6IJ3JhzrOEh98Tdk857rRYuoqWMmQmWShSnstV')),
         __POSTHOG_HOST__: JSON.stringify(env.POSTHOG_HOST ?? 'https://eu.i.posthog.com'),
-        __DEV__: JSON.stringify(mode !== 'production')
+        __DEV__: JSON.stringify(mode !== 'production'),
+        __SLAYZONE_PROFILE__: JSON.stringify(env.SLAYZONE_PROFILE === '1')
       },
       resolve: {
         alias: {
           '@renderer': resolve('src/renderer/src'),
           '@': resolve('src/renderer/src'),
           'convex/_generated': resolve(root, 'convex/_generated'),
-          'posthog-js': 'posthog-js/dist/module.no-external.js'
+          'posthog-js': 'posthog-js/dist/module.no-external.js',
+          // When SLAYZONE_PROFILE=1, swap to React's profiling builds so the
+          // <Profiler> component actually fires onRender in production builds.
+          // Otherwise React strips Profiler to a no-op in prod and the perf
+          // harness sees zero commits.
+          ...(env.SLAYZONE_PROFILE === '1'
+            ? { 'react-dom/client': 'react-dom/profiling', 'scheduler/tracing': 'scheduler/tracing-profiling' }
+            : {})
+        }
+      },
+      // Pre-transform known hot files at dev server start so first interaction
+      // doesn't pay the inline transform cost. Dev-only — ignored by build.
+      server: {
+        warmup: {
+          clientFiles: [
+            './src/renderer/src/main.tsx',
+            './src/renderer/src/App.tsx',
+            '../../domains/tasks/src/client/useTasksData.ts',
+            '../../domains/task/src/client/TaskDetailPage.tsx',
+            '../../domains/settings/src/client/useTabStore.ts'
+          ]
         }
       },
       plugins: [
-        react({ babel: { plugins: ['babel-plugin-react-compiler'] } }),
+        // React Compiler runs babel AST analysis on every .tsx. Its purpose is
+        // prod-runtime memoization injection, so gate it to prod builds only
+        // — saves several seconds on dev cold start + 50-200ms per HMR cycle.
+        react({
+          babel: {
+            plugins: mode === 'production' ? ['babel-plugin-react-compiler'] : []
+          }
+        }),
         tailwindcss(),
-        visualizer({ filename: 'bundle-report.html', gzipSize: true, template: 'treemap' })
+        // Bundle analyzer is a rollup plugin; only useful at build time.
+        mode === 'production' &&
+          visualizer({ filename: 'bundle-report.html', gzipSize: true, template: 'treemap' })
       ],
       optimizeDeps: {
         exclude: slayzoneDeps,

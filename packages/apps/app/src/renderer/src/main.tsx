@@ -9,6 +9,7 @@ import { taskDetailCache } from '@slayzone/task/client/taskDetailCache'
 import App from './App'
 import { getDiagnosticsContext } from './lib/diagnosticsClient'
 import { ConvexAuthBootstrap } from './lib/convexAuth'
+import { MaybeProfiler } from './lib/perfProfiler'
 
 window.addEventListener('error', (event) => {
   window.api.diagnostics.recordClientError({
@@ -51,7 +52,9 @@ tabStoreReady.then(() => {
         <ThemeProvider>
           <TelemetryProvider>
             <UndoProvider>
-              <App />
+              <MaybeProfiler>
+                <App />
+              </MaybeProfiler>
             </UndoProvider>
           </TelemetryProvider>
         </ThemeProvider>
