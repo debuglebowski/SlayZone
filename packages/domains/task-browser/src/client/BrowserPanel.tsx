@@ -91,6 +91,7 @@ interface BrowserPanelProps {
   className?: string
   tabs: BrowserTabsState
   onTabsChange: (tabs: BrowserTabsState) => void
+  onRequestHide?: () => void
   taskId?: string
   projectId?: string
   isResizing?: boolean
@@ -356,6 +357,7 @@ export const BrowserPanel = forwardRef<BrowserPanelHandle, BrowserPanelProps>(fu
   className,
   tabs,
   onTabsChange,
+  onRequestHide,
   taskId,
   projectId,
   isResizing,
@@ -652,9 +654,9 @@ export const BrowserPanel = forwardRef<BrowserPanelHandle, BrowserPanelProps>(fu
     let newActiveId = tabs.activeTabId
     if (tabId === tabs.activeTabId) {
       if (newTabs.length === 0) {
-        const newTab: BrowserTab = { id: generateTabId(), url: newTabUrl, title: newTabUrl === 'about:blank' ? 'New Tab' : newTabUrl }
-        onTabsChange({ tabs: [newTab], activeTabId: newTab.id })
+        onTabsChange({ tabs: [], activeTabId: null })
         track('browser_tab_closed')
+        onRequestHide?.()
         return
       }
       newActiveId = newTabs[Math.min(idx, newTabs.length - 1)]?.id || null
@@ -662,7 +664,7 @@ export const BrowserPanel = forwardRef<BrowserPanelHandle, BrowserPanelProps>(fu
 
     onTabsChange({ tabs: newTabs, activeTabId: newActiveId })
     track('browser_tab_closed')
-  }, [tabs, onTabsChange, newTabUrl])
+  }, [tabs, onTabsChange, onRequestHide])
 
   const switchToTab = useCallback((tabId: string) => {
     onTabsChange({ ...tabs, activeTabId: tabId })

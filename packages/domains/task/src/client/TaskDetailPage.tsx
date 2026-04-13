@@ -776,6 +776,7 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
   const [focusedPanel, setFocusedPanel] = useState<string | null>(null)
   const onCloseTabRef = useRef(onCloseTab)
   onCloseTabRef.current = onCloseTab
+  const handlePanelToggleRef = useRef<typeof handlePanelToggle>(null!)
   useEffect(() => {
     const handleFocusIn = (e: FocusEvent): void => {
       const target = e.target as HTMLElement | null
@@ -822,6 +823,10 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
           const newTabs = bt.tabs.filter(t => t.id !== bt.activeTabId)
           const newActiveId = newTabs[Math.min(idx, newTabs.length - 1)]?.id ?? null
           setBrowserTabs({ tabs: newTabs, activeTabId: newActiveId })
+          return
+        } else if (bt.tabs.length === 1) {
+          setBrowserTabs({ tabs: [], activeTabId: null })
+          handlePanelToggleRef.current('browser', false)
           return
         }
       }
@@ -949,6 +954,11 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
       setPanelVisibility(newVisibility)
       // Auto-focus panel content so scope tracker detects the right scope
       if (panelId === 'browser' && active) {
+        // Create a fresh tab when reopening with no tabs
+        if (browserTabs.tabs.length === 0) {
+          const newTab = { id: `tab-${crypto.randomUUID().slice(0, 8)}`, url: 'about:blank', title: 'New Tab' }
+          setBrowserTabs({ tabs: [newTab], activeTabId: newTab.id })
+        }
         requestAnimationFrame(() => browserPanelRef.current?.focus())
       }
       // Persist to DB
@@ -960,6 +970,7 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
     },
     [task, panelVisibility, onTaskUpdated, resetPanelSize]
   )
+  handlePanelToggleRef.current = handlePanelToggle
 
   const handleQuickOpenFile = useCallback((filePath: string, options?: OpenFileOptions) => {
     if (fileEditorRef.current) {
@@ -1049,9 +1060,19 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
         }
         return
       }
-      if (matchesShortcut(e, keys('panel-terminal')) && isBuiltinEnabled('terminal', 'task')) {
-        e.preventDefault()
-        handlePanelToggle('terminal', !panelVisibility.terminal)
+      if (matchesShortcut(e, keys('panel-terminal'))) {
+        // Cmd+T opens a new browser tab when browser panel is focused
+        if (lastFocusedPanelRef.current === 'browser' && panelVisibility.browser && isBuiltinEnabled('browser', 'task')) {
+          e.preventDefault()
+          const newTab = { id: `tab-${crypto.randomUUID().slice(0, 8)}`, url: 'about:blank', title: 'New Tab' }
+          setBrowserTabs(prev => ({ tabs: [...prev.tabs, newTab], activeTabId: newTab.id }))
+          requestAnimationFrame(() => browserPanelRef.current?.focusUrlBar())
+          return
+        }
+        if (isBuiltinEnabled('terminal', 'task')) {
+          e.preventDefault()
+          handlePanelToggle('terminal', !panelVisibility.terminal)
+        }
         return
       }
       if (matchesShortcut(e, keys('panel-processes')) && isBuiltinEnabled('processes', 'task')) {
@@ -2007,6 +2028,7 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
               className="h-full"
               tabs={browserTabs}
               onTabsChange={handleBrowserTabsChange}
+              onRequestHide={() => handlePanelToggle('browser', false)}
               taskId={task.id}
               projectId={task.project_id}
               isResizing={isResizing}
