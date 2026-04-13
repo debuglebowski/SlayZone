@@ -9,6 +9,55 @@ export interface ProviderSyncEntry {
   syncReason?: SyncReason | null
 }
 
+export interface ProviderGroupEntry {
+  path: string
+  syncHealth: SyncHealth
+  syncReason: SyncReason | null
+  diskContent?: string
+}
+
+export interface ProviderGroup {
+  key: string
+  providers: CliProvider[]
+  path: string
+  syncHealth: SyncHealth
+  syncReason: SyncReason | null
+  diskContent: string | null
+}
+
+export function groupProvidersByPath(
+  providers: Partial<Record<CliProvider, ProviderGroupEntry>>,
+  order: ReadonlyArray<CliProvider>
+): ProviderGroup[] {
+  const byPath = new Map<string, ProviderGroup>()
+  const groupsInOrder: ProviderGroup[] = []
+
+  for (const provider of order) {
+    const entry = providers[provider]
+    if (!entry) continue
+    if (entry.syncReason === 'not_linked' && entry.syncHealth !== 'unmanaged') continue
+
+    const key = entry.path
+    const existing = byPath.get(key)
+    if (existing) {
+      existing.providers.push(provider)
+      continue
+    }
+    const group: ProviderGroup = {
+      key,
+      providers: [provider],
+      path: entry.path,
+      syncHealth: entry.syncHealth,
+      syncReason: entry.syncReason,
+      diskContent: entry.diskContent ?? null
+    }
+    byPath.set(key, group)
+    groupsInOrder.push(group)
+  }
+
+  return groupsInOrder
+}
+
 export interface SyncHealthCounts {
   total: number
   synced: number

@@ -167,6 +167,20 @@ function isLegacySkillTargetPath(provider: CliProvider, targetPath: string, item
 
 function getCanonicalSelectionTargetPath(provider: CliProvider, itemType: string, itemSlug: string, targetPath: string): string {
   if (itemType !== 'skill') return targetPath
+
+  // Heal stale DB rows pointing at an old provider folder (e.g. gemini selections stored as
+  // `.gemini/skills/<slug>/SKILL.md` before gemini moved to the shared `.agents/skills`).
+  // Predicate: any `.<dir>/skills/<slug>/SKILL.md` shape — covers both current and removed
+  // provider folders. Custom manual paths (e.g. `.claude/skills/manual/foo.md`) don't match
+  // because the segment before `SKILL.md` is the slug, so they're left alone.
+  const canonical = getSkillPath(provider, itemSlug)
+  if (canonical && targetPath !== canonical) {
+    const escapedSlug = itemSlug.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    const providerFolderShape = new RegExp(`^\\.[\\w-]+\\/skills\\/${escapedSlug}\\/SKILL\\.md$`)
+    if (providerFolderShape.test(targetPath)) return canonical
+  }
+
+  // Legacy fallback: slug.md → slug/SKILL.md when stored path is the old flat shape.
   if (!isLegacySkillTargetPath(provider, targetPath, itemSlug)) return targetPath
   const canonicalPath = path.join(path.dirname(targetPath), itemSlug, 'SKILL.md')
   return path.isAbsolute(targetPath) ? canonicalPath : canonicalPath.split(path.sep).join('/')

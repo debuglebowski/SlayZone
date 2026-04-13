@@ -163,6 +163,13 @@ export function SkillsSection({ level, projectId, projectPath }: SkillsSectionPr
     await refreshSyncStatus()
   }, [isProject, projectId, projectPath, refreshSyncStatus])
 
+  const handlePullSkillProviderFromDisk = useCallback(async (itemId: string, provider: CliProvider) => {
+    if (!isProject || !projectId || !projectPath) return
+    const updated = await window.api.aiConfig.pullProviderSkill(projectId, projectPath, provider, itemId)
+    setItems(prev => prev.map(i => i.id === updated.item.id ? updated.item : i))
+    await refreshSyncStatus()
+  }, [isProject, projectId, projectPath, refreshSyncStatus])
+
   const handleUnlink = useCallback(async (target: AiConfigItem) => {
     const hasMarketplace = (() => {
       try { return !!JSON.parse(target.metadata_json)?.marketplace } catch { return false }
@@ -290,6 +297,7 @@ export function SkillsSection({ level, projectId, projectPath }: SkillsSectionPr
           syncStatus={statusMap.get(selectedItem.id) ?? null}
           onSyncToDisk={() => handleSyncSkillToDisk(selectedItem.id)}
           onSyncProviderToDisk={(provider) => handleSyncSkillProviderToDisk(selectedItem.id, provider)}
+          onPullProviderFromDisk={(provider) => handlePullSkillProviderFromDisk(selectedItem.id, provider)}
         />,
         editorTarget
       )}
