@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import { shortcutDefinitions, type ShortcutDefinition, type ShortcutScope } from '@slayzone/shortcuts'
+import { shortcutDefinitions, SHORTCUT_DEFAULT_MIGRATIONS, type ShortcutDefinition, type ShortcutScope } from '@slayzone/shortcuts'
 
 // Typed accessor for the Electron preload API. The full type lives in @slayzone/types
 // and is augmented onto Window by the preload. We use a minimal cast here so this
@@ -42,10 +42,16 @@ export const useShortcutStore = create<ShortcutState>((set, get) => ({
     if (raw) {
       try {
         const parsed = JSON.parse(raw)
-        // Migrate: attention-panel was changed from mod+shift+a to ctrl+.
-        // Remove stale override so users get the new default
-        if (parsed['attention-panel'] === 'mod+shift+a') {
-          delete parsed['attention-panel']
+        // Clear any user overrides that still match a retired default, so the
+        // new default takes effect. Registry lives next to shortcutDefinitions.
+        let changed = false
+        for (const { id, oldDefault } of SHORTCUT_DEFAULT_MIGRATIONS) {
+          if (parsed[id] === oldDefault) {
+            delete parsed[id]
+            changed = true
+          }
+        }
+        if (changed) {
           await api().settings.set(SETTINGS_KEY, JSON.stringify(parsed))
           api().shortcuts.changed()
         }

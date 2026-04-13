@@ -42,6 +42,39 @@ describe('load', () => {
     expect(useShortcutStore.getState().overrides).toEqual({})
     expect(useShortcutStore.getState().loaded).toBe(true)
   })
+
+  describe('default migrations', () => {
+    it('clears user overrides matching retired defaults', async () => {
+      mockSettings.get.mockResolvedValue(JSON.stringify({
+        'attention-panel': 'mod+shift+a',
+        'zen-mode': 'mod+j',
+        'panel-settings': 'mod+s',
+        search: 'mod+shift+p', // unrelated, should persist
+      }))
+      await useShortcutStore.getState().load()
+      expect(useShortcutStore.getState().overrides).toEqual({ search: 'mod+shift+p' })
+      // Single persist write + single notify for the whole migration pass
+      expect(mockSettings.set).toHaveBeenCalledOnce()
+      expect(mockSettings.set).toHaveBeenCalledWith('custom_shortcuts', JSON.stringify({ search: 'mod+shift+p' }))
+      expect(mockShortcuts.changed).toHaveBeenCalledOnce()
+    })
+
+    it('preserves overrides that differ from the retired default', async () => {
+      // User deliberately set zen-mode to a custom combo — must not be wiped
+      mockSettings.get.mockResolvedValue(JSON.stringify({ 'zen-mode': 'mod+alt+j' }))
+      await useShortcutStore.getState().load()
+      expect(useShortcutStore.getState().overrides).toEqual({ 'zen-mode': 'mod+alt+j' })
+      expect(mockSettings.set).not.toHaveBeenCalled()
+      expect(mockShortcuts.changed).not.toHaveBeenCalled()
+    })
+
+    it('skips persist + notify when no migration applies', async () => {
+      mockSettings.get.mockResolvedValue(JSON.stringify({ search: 'mod+shift+p' }))
+      await useShortcutStore.getState().load()
+      expect(mockSettings.set).not.toHaveBeenCalled()
+      expect(mockShortcuts.changed).not.toHaveBeenCalled()
+    })
+  })
 })
 
 describe('getKeys', () => {
@@ -108,8 +141,8 @@ describe('findShadow', () => {
   })
 
   it('ignores same-scope (handled by findConflict)', () => {
-    // mod+j is zen-mode (global only, no cross-scope binding at this key)
-    const shadow = useShortcutStore.getState().findShadow('mod+j', 'global')
+    // mod+z is undo (global only, no cross-scope binding at this key)
+    const shadow = useShortcutStore.getState().findShadow('mod+z', 'global')
     expect(shadow).toBeUndefined()
   })
 
@@ -120,7 +153,7 @@ describe('findShadow', () => {
   })
 
   it('finds task scope shadowed by component scope', () => {
-    // mod+s is task scope (panel-settings) and editor scope (editor-save)
+    // mod+s is editor scope (editor-save). From task scope, editor shadows.
     const shadow = useShortcutStore.getState().findShadow('mod+s', 'task')
     expect(shadow).toBeDefined()
     expect(shadow!.scope).toBe('editor')

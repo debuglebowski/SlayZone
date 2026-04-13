@@ -3,6 +3,7 @@ export { type ShortcutScope, SCOPE_PRIORITY } from './scope'
 export {
   shortcutDefinitions,
   MENU_SHORTCUT_DEFAULTS,
+  SHORTCUT_DEFAULT_MIGRATIONS,
   type ShortcutDefinition,
 } from './definitions'
 export { toElectronAccelerator, matchesShortcut, matchesElectronInput, formatKeysForDisplay, withShortcut, type ElectronInput } from './accelerator'

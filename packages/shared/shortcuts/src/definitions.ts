@@ -18,7 +18,7 @@ export const shortcutDefinitions: ShortcutDefinition[] = [
   { id: 'new-task', label: 'New Task', group: 'General', defaultKeys: 'mod+n', scope: 'global' },
   { id: 'search', label: 'Search', group: 'General', defaultKeys: 'mod+k', scope: 'global' },
   { id: 'complete-close-tab', label: 'Complete & Close Tab', group: 'General', defaultKeys: 'mod+shift+d', scope: 'global' },
-  { id: 'zen-mode', label: 'Zen Mode', group: 'General', defaultKeys: 'mod+j', scope: 'global' },
+  { id: 'zen-mode', label: 'Zen Mode', group: 'General', defaultKeys: 'mod+shift+j', scope: 'global' },
   { id: 'explode-mode', label: 'Explode Mode', group: 'General', defaultKeys: 'mod+shift+e', scope: 'global' },
   { id: 'exit-zen-explode', label: 'Exit Zen / Explode', group: 'General', defaultKeys: 'escape', scope: 'global' },
   { id: 'attention-panel', label: 'Attention Panel', group: 'General', defaultKeys: 'ctrl+.', scope: 'global' },
@@ -48,7 +48,7 @@ export const shortcutDefinitions: ShortcutDefinition[] = [
   { id: 'panel-editor', label: 'Editor', group: 'Task Panels', defaultKeys: 'mod+e', scope: 'task' },
   { id: 'panel-git', label: 'Git', group: 'Task Panels', defaultKeys: 'mod+g', scope: 'task' },
   { id: 'panel-git-diff', label: 'Git Diff', group: 'Task Panels', defaultKeys: 'mod+shift+g', scope: 'task' },
-  { id: 'panel-settings', label: 'Settings', group: 'Task Panels', defaultKeys: 'mod+s', scope: 'task' },
+  { id: 'panel-settings', label: 'Settings', group: 'Task Panels', defaultKeys: 'mod+j', scope: 'task' },
   { id: 'panel-processes', label: 'Processes', group: 'Task Panels', defaultKeys: 'mod+p', scope: 'task' },
   { id: 'panel-tests', label: 'Tests', group: 'Task Panels', defaultKeys: 'mod+u', scope: 'task' },
   { id: 'panel-assets', label: 'Assets', group: 'Task Panels', defaultKeys: 'mod+shift+a', scope: 'task' },
@@ -82,6 +82,15 @@ export const shortcutDefinitions: ShortcutDefinition[] = [
 
   // Terminal additions (terminal scope)
   { id: 'terminal-search-close', label: 'Close Search', group: 'Terminal', defaultKeys: 'escape', scope: 'terminal' },
+]
+
+/** Legacy default key combos that should be cleared from user overrides on load,
+ *  so users pick up the new default after a rebind. Append an entry on every
+ *  default swap — pair with the new `defaultKeys` value above. */
+export const SHORTCUT_DEFAULT_MIGRATIONS: { id: string; oldDefault: string }[] = [
+  { id: 'attention-panel', oldDefault: 'mod+shift+a' }, // moved to ctrl+.
+  { id: 'zen-mode',        oldDefault: 'mod+j' },       // moved to mod+shift+j
+  { id: 'panel-settings',  oldDefault: 'mod+s' },       // moved to mod+j
 ]
 
 /** Shortcut IDs that are driven by Electron native menu accelerators. */

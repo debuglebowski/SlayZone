@@ -1069,7 +1069,7 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
         handlePanelToggle('assets', !panelVisibility.assets)
         return
       }
-      // Skip shortcuts that conflict with editor bindings (Mod+S, Mod+B)
+      // Skip shortcuts inside CodeMirror / contenteditable so editor bindings (e.g. Mod+B) win
       const target = e.target as HTMLElement
       const inEditor = target?.closest?.('[contenteditable="true"]')
       const inCodeMirror = target?.closest?.('.cm-editor')
