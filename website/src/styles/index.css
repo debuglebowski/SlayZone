@@ -17,8 +17,8 @@
 
   .hero { padding: 100px 0 40px; text-align: center; }
   .hero-logo-wrap { position: relative; display: inline-block; }
-  .hero-logo { height: 180px; margin-bottom: 48px; filter: drop-shadow(0 8px 30px rgba(244,104,23,0.25)); transition: opacity 0.15s ease; animation: fadeIn 0.6s ease both; cursor: pointer; }
-  .hero-logo-canvas { position: absolute; top: calc(50% - 15px); left: 50%; transform: translate(-50%, -50%); height: 328px; opacity: 0; pointer-events: none; }
+  .hero-logo { height: 180px; margin-bottom: 48px; filter: drop-shadow(0 8px 30px rgba(244,104,23,0.25)); transition: opacity 0.15s ease; animation: fadeIn 0.6s ease; cursor: pointer; }
+  .hero-logo-canvas { position: absolute; top: calc(50% - 42px); left: 50%; transform: translate(-50%, -50%); height: 328px; opacity: 0; pointer-events: none; }
   .hero-logo-wrap.playing .hero-logo { opacity: 0; }
   .hero-logo-wrap.playing .hero-logo-canvas { opacity: 1; filter: drop-shadow(0 8px 30px rgba(244,104,23,0.25)); -webkit-mask-image: radial-gradient(ellipse 45% 65%, black 50%, transparent 100%); mask-image: radial-gradient(ellipse 45% 65%, black 50%, transparent 100%); }
   h1 { font-size: clamp(40px,5.5vw,60px); font-weight: 700; letter-spacing: -2px; line-height: 1.05; margin: 0 0 24px; animation: fadeIn 0.6s ease 0.1s both; }
