@@ -11,7 +11,7 @@ import { Card, CardContent, Tooltip, TooltipContent, TooltipTrigger, Popover, Po
 import { useAppearance } from '@slayzone/settings/client'
 import { todayISO } from './kanban'
 import { priorityOptions } from '@slayzone/task/shared'
-import { AlarmClockOff, GitMerge, Link2 } from 'lucide-react'
+import { AlarmClockOff, GitMerge } from 'lucide-react'
 import { usePty } from '@slayzone/terminal'
 import type { CardProperties } from './FilterState'
 
@@ -115,7 +115,7 @@ export function KanbanCard({
         data-task-id={task.id}
         onClick={(e) => onClick?.(e)}
       >
-      <CardContent className={cn("px-2.5 pt-5", resolvedTags.length > 0 || (subTaskCount && subTaskCount.total > 0) || ((cp?.dueDate ?? true) && task.due_date) ? "pb-3" : "pb-5")}>
+      <CardContent className={cn("px-2.5 pt-5", resolvedTags.length > 0 || (subTaskCount && subTaskCount.total > 0) || ((cp?.dueDate ?? true) && task.due_date) || ((cp?.blocked ?? true) && isBlocked) ? "pb-3" : "pb-5")}>
         <div className="flex items-start gap-3">
           {/* Project color dot - shown in All view */}
           {showProject && project ? (
@@ -186,11 +186,6 @@ export function KanbanCard({
                   <TooltipContent>Linked to Linear</TooltipContent>
                 </Tooltip>
               )}
-              {(cp?.blocked ?? true) && isBlocked && (
-                <span className="flex items-center text-amber-500 shrink-0" title="Blocked">
-                  <Link2 className="h-2.5 w-2.5" />
-                </span>
-              )}
               {task.snoozed_until && new Date(task.snoozed_until) > new Date() && (
                 <Tooltip>
                   <TooltipTrigger asChild>
@@ -204,8 +199,8 @@ export function KanbanCard({
               )}
               </div>
             </div>
-            {/* Bottom row: subtasks + tags + due date */}
-            {(resolvedTags.length > 0 || (subTaskCount && subTaskCount.total > 0) || ((cp?.dueDate ?? true) && task.due_date)) && (
+            {/* Bottom row: subtasks + tags + blocked + due date */}
+            {(resolvedTags.length > 0 || (subTaskCount && subTaskCount.total > 0) || ((cp?.dueDate ?? true) && task.due_date) || ((cp?.blocked ?? true) && isBlocked)) && (
               <div className="flex items-center gap-3 mt-3">
                 {(cp?.subtasks ?? true) && subTaskCount && subTaskCount.total > 0 && (() => {
                   const pct = subTaskCount.done / subTaskCount.total
@@ -284,9 +279,14 @@ export function KanbanCard({
                     </PopoverContent>
                   </Popover>
                 )}
+                {(cp?.blocked ?? true) && isBlocked && (
+                  <span className="shrink-0 h-5 rounded-full ring-1 ring-amber-500 px-2 text-[10px] font-medium leading-none flex items-center text-amber-500" title="Blocked">
+                    Blocked
+                  </span>
+                )}
                 {(cp?.dueDate ?? true) && task.due_date && (
                   <span className={cn(
-                    "ml-auto shrink-0 h-5 rounded-full ring-1 px-2 text-[10px] font-medium leading-none flex items-center",
+                    "shrink-0 h-5 rounded-full ring-1 px-2 text-[10px] font-medium leading-none flex items-center",
                     isOverdue
                       ? "text-destructive ring-destructive"
                       : "text-muted-foreground ring-border"
