@@ -1,6 +1,84 @@
 # Changelog
 
 
+## v0.18.0
+
+[compare changes](https://github.com/debuglebowski/slayzone/compare/v0.17.3...v0.18.0)
+
+### 🚀 Enhancements
+
+- Floating agent panel — auto-detach on window blur ([31a18476](https://github.com/debuglebowski/slayzone/commit/31a18476))
+- **task-browser:** Default localhost/IP URLs to http:// ([a2c33f67](https://github.com/debuglebowski/slayzone/commit/a2c33f67))
+- **processes:** Add loading spinner to processes panel ([0abd2e46](https://github.com/debuglebowski/slayzone/commit/0abd2e46))
+- **website:** Add jellyfish click-to-play octopus video ([353535ed](https://github.com/debuglebowski/slayzone/commit/353535ed))
+- **website:** Track jellyfish/logo clicks, logo 2x starts video ([11878633](https://github.com/debuglebowski/slayzone/commit/11878633))
+- **palette:** Unify Cmd+K/Cmd+P into one palette ([03c9a01e](https://github.com/debuglebowski/slayzone/commit/03c9a01e))
+- **perf:** Add reusable Playwright profiling harness + dev perf fixes ([b609bb10](https://github.com/debuglebowski/slayzone/commit/b609bb10))
+- **shortcuts:** Add Cmd+Shift+U shortcut for Update DB button ([d0f98450](https://github.com/debuglebowski/slayzone/commit/d0f98450))
+- **ai-config:** Lock bound skills with source banners, sync, unlink ([a3f2e762](https://github.com/debuglebowski/slayzone/commit/a3f2e762))
+- **palette:** Fzf-based search with dual-score ranking and match highlighting ([cc952cb4](https://github.com/debuglebowski/slayzone/commit/cc952cb4))
+- **ai-config:** Add group-by dropdown for skills list (source/prefix) ([0c581359](https://github.com/debuglebowski/slayzone/commit/0c581359))
+- Add caveman, caveman-commit, caveman-review skills ([29871aea](https://github.com/debuglebowski/slayzone/commit/29871aea))
+- **editor:** Add markdown split mode with per-file/asset view persistence ([c6b228d2](https://github.com/debuglebowski/slayzone/commit/c6b228d2))
+- **cli:** Add commit-and-done skill and --close flag on tasks done ([40d9cfb4](https://github.com/debuglebowski/slayzone/commit/40d9cfb4))
+- **search:** Show status and priority pills on task results ([b81b0a43](https://github.com/debuglebowski/slayzone/commit/b81b0a43))
+- **shortcuts:** Swap search/terminal/processes defaults ([2185f2c2](https://github.com/debuglebowski/slayzone/commit/2185f2c2))
+- **agent-panel:** Add provider dropdown + reset icon button ([fb78fa93](https://github.com/debuglebowski/slayzone/commit/fb78fa93))
+- **ai-config:** Flag stale skills in context manager list ([9caffb33](https://github.com/debuglebowski/slayzone/commit/9caffb33))
+- **ai-config:** Show stale indicator on skill graph cards ([d95724b4](https://github.com/debuglebowski/slayzone/commit/d95724b4))
+- **kanban-card:** Move blocked indicator to bottom row as pill ([8184d33a](https://github.com/debuglebowski/slayzone/commit/8184d33a))
+- **ai-config:** Stale skill diff + per-provider sync in editor ([5c0b2f86](https://github.com/debuglebowski/slayzone/commit/5c0b2f86))
+- **editor:** Notion-like markdown typography via .mk-doc system ([47e245d5](https://github.com/debuglebowski/slayzone/commit/47e245d5))
+- **cli:** Init prints command reference + suggest on error ([2c5c2fa2](https://github.com/debuglebowski/slayzone/commit/2c5c2fa2))
+- **shortcuts:** Allow unbinding shortcuts + null-safe types ([d341533c](https://github.com/debuglebowski/slayzone/commit/d341533c))
+- **ai-config:** Pull-from-file + path-shared provider grouping ([ecbb03ae](https://github.com/debuglebowski/slayzone/commit/ecbb03ae))
+- **shortcuts:** Settings panel → Cmd+J, zen → Cmd+Shift+J ([70a58643](https://github.com/debuglebowski/slayzone/commit/70a58643))
+- **ai-config:** Stale-skill dot on context manager tab ([17202b0f](https://github.com/debuglebowski/slayzone/commit/17202b0f))
+- **projects:** Custom icon — letters or image ([884132c7](https://github.com/debuglebowski/slayzone/commit/884132c7))
+- **floating-agent:** State machine, menu, manual detach, size persistence ([79bfb917](https://github.com/debuglebowski/slayzone/commit/79bfb917))
+- **browser:** Hide panel on last tab close, Cmd+T new tab ([#65](https://github.com/debuglebowski/slayzone/pull/65))
+
+### 🩹 Fixes
+
+- **terminal:** Send injected text in single write to prevent whitespace drops ([8d2cfddb](https://github.com/debuglebowski/slayzone/commit/8d2cfddb))
+- **cli:** Respect --dev flag in slay tasks open ([0f12c425](https://github.com/debuglebowski/slayzone/commit/0f12c425))
+- **editor:** Fix dead prose selector breaking dark mode text colors ([997628a1](https://github.com/debuglebowski/slayzone/commit/997628a1))
+- **cli:** Surface silent HTTP failures in notifyApp + tasks done --close ([8a04c760](https://github.com/debuglebowski/slayzone/commit/8a04c760))
+- **ui:** Align context-menu rows via CSS subgrid ([e159a667](https://github.com/debuglebowski/slayzone/commit/e159a667))
+- **website:** Restore hero-logo-wrap div ([074cb3e7](https://github.com/debuglebowski/slayzone/commit/074cb3e7))
+- **website:** Anchor octopus canvas to logo wrap ([9fe4b2b2](https://github.com/debuglebowski/slayzone/commit/9fe4b2b2))
+- **website:** Hide static octopus when dance video plays ([56b5700d](https://github.com/debuglebowski/slayzone/commit/56b5700d))
+- **website:** Restore jellyfish click-to-play trigger ([3b573ad1](https://github.com/debuglebowski/slayzone/commit/3b573ad1))
+- **website:** Bootstrap hero demo animation loop ([6ad1bd3c](https://github.com/debuglebowski/slayzone/commit/6ad1bd3c))
+- **dev:** Remove broken Vite warmup block ([3eb7e180](https://github.com/debuglebowski/slayzone/commit/3eb7e180))
+
+### 💅 Refactors
+
+- **palette:** Unify search shortcut to Cmd+P, remove panel-quick-open ([1bde2129](https://github.com/debuglebowski/slayzone/commit/1bde2129))
+- **website:** Migrate legacy HTML to native Astro components ([a2323866](https://github.com/debuglebowski/slayzone/commit/a2323866))
+- **shortcuts:** Rebind terminal to Cmd+K, fix E2E selectors and search refs ([7c6c0a1c](https://github.com/debuglebowski/slayzone/commit/7c6c0a1c))
+- **terminal:** Drop redundant reset button from main tab header ([17b566ff](https://github.com/debuglebowski/slayzone/commit/17b566ff))
+- **ai-config:** Rename global → computer/library ([ab3cadf1](https://github.com/debuglebowski/slayzone/commit/ab3cadf1))
+- **browser:** Dedicate Cmd+T to new browser tab ([090e1d0f](https://github.com/debuglebowski/slayzone/commit/090e1d0f))
+
+### 📖 Documentation
+
+- **claude:** Default to caveman ultra, trim stale monorepo sections ([9a5a4ddb](https://github.com/debuglebowski/slayzone/commit/9a5a4ddb))
+- **comparison:** Track Vibeyard competitor ([45c8d1ec](https://github.com/debuglebowski/slayzone/commit/45c8d1ec))
+- Sync AGENTS.md context + slay skill refs ([1f0a0dfb](https://github.com/debuglebowski/slayzone/commit/1f0a0dfb))
+
+### 🏡 Chore
+
+- **nix:** Update sources to 0.17.3 ([ca1a3c18](https://github.com/debuglebowski/slayzone/commit/ca1a3c18))
+- **marketplace:** Swap default skill registries ([8f434f01](https://github.com/debuglebowski/slayzone/commit/8f434f01))
+- Add perf profiling reports, gitignore cpuprofile/json artifacts ([9f214a8c](https://github.com/debuglebowski/slayzone/commit/9f214a8c))
+
+### ❤️ Contributors
+
+- Debuglebowski
+- Ian Thorslund
+- Robert Sinke
+
 ## v0.17.3
 
 [compare changes](https://github.com/debuglebowski/slayzone/compare/v0.17.2...v0.17.3)

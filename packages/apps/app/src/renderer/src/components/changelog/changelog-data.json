@@ -1,5 +1,127 @@
 [
   {
+    "version": "0.18.0",
+    "date": "2026-04-13",
+    "tagline": "Palette, panels & polish",
+    "items": [
+      {
+        "category": "feature",
+        "title": "Unified command palette",
+        "description": "Cmd+K and Cmd+P now open one palette with fzf-based search, dual-score ranking, and match highlighting."
+      },
+      {
+        "category": "feature",
+        "title": "Floating agent panel",
+        "description": "Agent panel has a proper state machine, menu, manual detach, auto-detach on window blur, and persistent sizing."
+      },
+      {
+        "category": "feature",
+        "title": "Custom project icons",
+        "description": "Set a project icon using letters or an image."
+      },
+      {
+        "category": "feature",
+        "title": "Markdown split mode in editor",
+        "description": "Toggle between source and preview with per-file and per-asset view persistence, plus Notion-like typography."
+      },
+      {
+        "category": "feature",
+        "title": "Browser panel auto-hide",
+        "description": "Browser panel hides when the last tab closes; Cmd+T opens a new tab."
+      },
+      {
+        "category": "feature",
+        "title": "Stale skill detection",
+        "description": "Stale-skill dots on context manager tabs and skill graph cards, plus per-provider sync in the editor."
+      },
+      {
+        "category": "feature",
+        "title": "Bound skill source banners",
+        "description": "Bound skills are locked with a source banner and support sync and unlink from the file."
+      },
+      {
+        "category": "feature",
+        "title": "Agent panel provider controls",
+        "description": "Pick the provider from a dropdown and reset conversation state from the panel header."
+      },
+      {
+        "category": "feature",
+        "title": "Search result pills",
+        "description": "Task search results show status and priority as pills."
+      },
+      {
+        "category": "feature",
+        "title": "Skills group-by",
+        "description": "Group the skills list by source or prefix via a new dropdown."
+      },
+      {
+        "category": "feature",
+        "title": "Kanban blocked pill",
+        "description": "Blocked indicator moved to the card's bottom row as a pill."
+      },
+      {
+        "category": "feature",
+        "title": "Unbindable shortcuts",
+        "description": "Clear a shortcut binding to disable it entirely."
+      },
+      {
+        "category": "feature",
+        "title": "New keyboard shortcuts",
+        "description": "Cmd+J opens settings, Cmd+Shift+J toggles zen mode, Cmd+Shift+U updates the database."
+      },
+      {
+        "category": "feature",
+        "title": "CLI commit-and-done",
+        "description": "New commit-and-done skill plus `slay tasks done --close` to close the tab after finishing."
+      },
+      {
+        "category": "feature",
+        "title": "Processes panel spinner",
+        "description": "Loading spinner while processes panel fetches state."
+      },
+      {
+        "category": "feature",
+        "title": "Smarter browser URLs",
+        "description": "Task browser defaults localhost and IP addresses to http://."
+      },
+      {
+        "category": "feature",
+        "title": "CLI init command reference",
+        "description": "`slay init` prints the full command reference and suggests commands on error."
+      },
+      {
+        "category": "improvement",
+        "title": "Terminal rebound to Cmd+K",
+        "description": "Terminal, search, and processes shortcuts reshuffled for better finger ergonomics."
+      },
+      {
+        "category": "improvement",
+        "title": "Context menu alignment",
+        "description": "Context-menu rows now align cleanly via CSS subgrid."
+      },
+      {
+        "category": "fix",
+        "title": "Editor dark mode text colors",
+        "description": "Dead prose selector no longer breaks text colors in dark mode."
+      },
+      {
+        "category": "fix",
+        "title": "Dev server Vite warmup",
+        "description": "Removed broken Vite warmup block that could crash dev startup."
+      },
+      {
+        "category": "fix",
+        "title": "CLI HTTP errors surfaced",
+        "description": "Silent HTTP failures in notifyApp and `slay tasks done --close` are now shown."
+      },
+      {
+        "category": "fix",
+        "title": "CLI --dev flag in tasks open",
+        "description": "`slay tasks open` now respects the --dev flag."
+      }
+    ]
+  },
+  {
     "version": "0.17.3",
     "date": "2026-04-11",
     "tagline": "Config & graphs",
