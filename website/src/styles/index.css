@@ -16,6 +16,7 @@
   .hero-wrap .social-links a:hover { color: #fff; }
 
   .hero { padding: 100px 0 40px; text-align: center; }
+  .hero-logo-wrap { position: relative; display: inline-block; }
   .hero-logo { height: 180px; margin-bottom: 48px; filter: drop-shadow(0 8px 30px rgba(244,104,23,0.25)); transition: opacity 0.15s ease; animation: fadeIn 0.6s ease both; cursor: pointer; }
   .hero-logo-canvas { position: absolute; top: calc(50% - 15px); left: 50%; transform: translate(-50%, -50%); height: 328px; opacity: 0; pointer-events: none; }
   .hero-logo-wrap.playing .hero-logo { opacity: 0; }
