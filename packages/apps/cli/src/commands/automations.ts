@@ -60,7 +60,10 @@ function parseRow(row: AutomationRow) {
 }
 
 export function automationsCommand(): Command {
-  const cmd = new Command('automations').description('Manage automations')
+  const cmd = new Command('automations')
+    .description('Manage automations')
+    .showSuggestionAfterError(true)
+    .showHelpAfterError(true)
 
   // slay automations list
   cmd

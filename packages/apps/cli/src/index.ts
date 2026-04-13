@@ -17,6 +17,8 @@ const program = new Command()
   .description('SlayZone CLI')
   .version(__APP_VERSION__)
   .option('--dev', 'Use development database (slayzone.dev.sqlite)')
+  .showSuggestionAfterError(true)
+  .showHelpAfterError(true)
   .hook('preAction', (thisCommand) => {
     const root = thisCommand.parent ?? thisCommand
     if (root.opts().dev) process.env.SLAYZONE_DEV = '1'

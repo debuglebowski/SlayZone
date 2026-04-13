@@ -11,13 +11,31 @@ const INSTRUCTIONS = `\
 
 You are running inside [SlayZone](https://slayzone.com), a desktop development environment built around a kanban board. Each task on the board is a full workspace with terminal panels, a file editor, a browser panel, and git integration. Your session is one of potentially many agents working in parallel on different tasks. A human or another agent may interact with you through the terminal.
 
-Your task has a title, description, status, and subtasks — use the \`slay\` CLI to read and update them. See the \`slay\` skill for the full command reference.
-
 \`$SLAYZONE_TASK_ID\` is set to the ID of the task you are running inside. Most \`slay\` commands default to it when no explicit ID is given.
+
+## slay CLI commands
+
+| Command | Subcommands |
+|---------|-------------|
+| \`slay tasks\` | \`list\` \`create\` \`view\` \`update\` \`done\` \`open\` \`search\` \`archive\` \`delete\` \`subtasks\` \`subtask-add\` \`tag\` \`blockers\` \`blocking\` \`blocked\` |
+| \`slay tasks browser\` | \`url\` \`navigate\` \`click\` \`type\` \`eval\` \`content\` \`screenshot\` |
+| \`slay tasks assets\` | \`list\` \`read\` \`create\` \`upload\` \`update\` \`write\` \`append\` \`delete\` \`path\` \`mkdir\` \`rmdir\` \`mvdir\` \`mv\` \`download\` |
+| \`slay pty\` | \`list\` \`buffer\` \`follow\` \`write\` \`submit\` \`wait\` \`kill\` |
+| \`slay projects\` | \`list\` \`create\` \`update\` |
+| \`slay automations\` | \`list\` \`view\` \`create\` \`update\` \`delete\` \`toggle\` \`run\` \`runs\` |
+| \`slay processes\` | \`list\` \`logs\` \`kill\` \`follow\` |
+| \`slay panels\` | \`list\` \`create\` \`delete\` \`enable\` \`disable\` |
+| \`slay tags\` | \`list\` \`create\` \`delete\` |
+| \`slay templates\` | \`list\` \`view\` \`create\` \`update\` \`delete\` |
+
+Global flag: \`--dev\` (use dev database). All IDs support prefix matching. Run \`slay <cmd> --help\` for flags and usage.
 `
 
 export function initCommand(): Command {
-  const cmd = new Command('init').description('Print SlayZone templates for AI agent configuration')
+  const cmd = new Command('init')
+    .description('Print SlayZone templates for AI agent configuration')
+    .showSuggestionAfterError(true)
+    .showHelpAfterError(true)
 
   cmd
     .command('instructions')

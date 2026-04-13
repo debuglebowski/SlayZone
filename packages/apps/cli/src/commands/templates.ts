@@ -40,7 +40,10 @@ function safeJsonParse(s: string | null): unknown {
 }
 
 export function templatesCommand(): Command {
-  const cmd = new Command('templates').description('Manage task templates')
+  const cmd = new Command('templates')
+    .description('Manage task templates')
+    .showSuggestionAfterError(true)
+    .showHelpAfterError(true)
 
   // slay templates list
   cmd

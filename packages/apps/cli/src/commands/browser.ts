@@ -11,7 +11,10 @@ function resolveTaskId(): string {
 }
 
 export function browserCommand(): Command {
-  const cmd = new Command('browser').description('Control the task browser panel (first tab)')
+  const cmd = new Command('browser')
+    .description('Control the task browser panel (first tab)')
+    .showSuggestionAfterError(true)
+    .showHelpAfterError(true)
 
   cmd.option('--panel <state>', 'Panel visibility: visible or hidden')
 

@@ -30,7 +30,10 @@ function findPanel(config: PanelConfig, idOrName: string): WebPanelDefinition | 
 }
 
 export function panelsCommand(): Command {
-  const cmd = new Command('panels').description('Manage web panels')
+  const cmd = new Command('panels')
+    .description('Manage web panels')
+    .showSuggestionAfterError(true)
+    .showHelpAfterError(true)
 
   // slay panels list
   cmd

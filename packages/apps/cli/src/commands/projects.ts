@@ -57,7 +57,10 @@ function ensureProjectPath(projectPath: string | null): boolean {
 }
 
 export function projectsCommand(): Command {
-  const cmd = new Command('projects').description('Manage projects')
+  const cmd = new Command('projects')
+    .description('Manage projects')
+    .showSuggestionAfterError(true)
+    .showHelpAfterError(true)
 
   // slay projects list
   cmd

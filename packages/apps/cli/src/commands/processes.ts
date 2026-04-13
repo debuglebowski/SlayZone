@@ -13,7 +13,10 @@ interface ProcessInfo {
 }
 
 export function processesCommand(): Command {
-  const cmd = new Command('processes').description('List and inspect running processes')
+  const cmd = new Command('processes')
+    .description('List and inspect running processes')
+    .showSuggestionAfterError(true)
+    .showHelpAfterError(true)
 
   // slay processes list
   cmd

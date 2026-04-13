@@ -11,7 +11,10 @@ interface TagRow extends Record<string, unknown> {
 }
 
 export function tagsCommand(): Command {
-  const cmd = new Command('tags').description('Manage tags')
+  const cmd = new Command('tags')
+    .description('Manage tags')
+    .showSuggestionAfterError(true)
+    .showHelpAfterError(true)
 
   // slay tags list
   cmd

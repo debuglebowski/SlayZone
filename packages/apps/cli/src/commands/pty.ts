@@ -56,7 +56,10 @@ async function waitForState(sessionId: string, state: string, timeout: number): 
 }
 
 export function ptyCommand(): Command {
-  const cmd = new Command('pty').description('List and interact with PTY sessions')
+  const cmd = new Command('pty')
+    .description('List and interact with PTY sessions')
+    .showSuggestionAfterError(true)
+    .showHelpAfterError(true)
 
   // slay pty list
   cmd
