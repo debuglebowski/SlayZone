@@ -15,9 +15,17 @@ import {
   SelectValue,
   Tooltip,
   TooltipContent,
-  TooltipTrigger
+  TooltipTrigger,
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuCheckboxItem,
+  DropdownMenuSeparator
 } from '@slayzone/ui'
-import { RotateCcw } from 'lucide-react'
+import { RotateCcw, MoreHorizontal, PictureInPicture2, PictureInPicture, Focus } from 'lucide-react'
+
+export type FloatingStateKind = 'attached' | 'detached' | 'disabled'
 
 interface AgentSidePanelProps {
   width: number
@@ -28,6 +36,11 @@ interface AgentSidePanelProps {
   isResizing?: boolean
   onNewSession?: () => void
   onModeChange?: (mode: TerminalMode) => void
+  floatingEnabled?: boolean
+  onToggleFloating?: () => void
+  floatingState?: FloatingStateKind
+  onDetach?: () => void
+  onReattach?: () => void
 }
 
 export const AGENT_PANEL_MIN_WIDTH = 320
@@ -41,7 +54,12 @@ export function AgentSidePanel({
   isActive,
   isResizing,
   onNewSession,
-  onModeChange
+  onModeChange,
+  floatingEnabled,
+  onToggleFloating,
+  floatingState = 'attached',
+  onDetach,
+  onReattach
 }: AgentSidePanelProps) {
   const { modes } = useTerminalModes()
   const visibleModes = getVisibleModes(modes, mode)
@@ -94,6 +112,44 @@ export function AgentSidePanel({
               </TooltipTrigger>
               <TooltipContent side="bottom">Clear conversation</TooltipContent>
             </Tooltip>
+          )}
+          {onToggleFloating && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  aria-label="Floating agent options"
+                  className={`h-6 w-6 flex items-center justify-center transition-colors ${
+                    floatingEnabled || floatingState === 'detached'
+                      ? 'text-primary hover:text-primary/80'
+                      : 'text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  <MoreHorizontal className="size-4" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="min-w-48">
+                {floatingState === 'detached' ? (
+                  <DropdownMenuItem onSelect={() => onReattach?.()}>
+                    <PictureInPicture className="size-4 text-muted-foreground" />
+                    <span>Reattach</span>
+                  </DropdownMenuItem>
+                ) : (
+                  <DropdownMenuItem onSelect={() => onDetach?.()}>
+                    <PictureInPicture2 className="size-4 text-muted-foreground" />
+                    <span>Detach</span>
+                  </DropdownMenuItem>
+                )}
+                <DropdownMenuSeparator />
+                <DropdownMenuCheckboxItem
+                  checked={!!floatingEnabled}
+                  onCheckedChange={() => onToggleFloating()}
+                  className="pl-2 pr-8 [&>span:first-child]:left-auto [&>span:first-child]:right-2"
+                >
+                  <Focus className="size-4 text-muted-foreground" />
+                  <span>Detach on blur</span>
+                </DropdownMenuCheckboxItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           )}
         </div>
       </div>

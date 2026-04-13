@@ -47,33 +47,32 @@ if (isFloatingAgent) {
       </ThemeProvider>
     </PtyProvider>
   )
+} else {
+  // Wait for tab store to hydrate from SQLite before rendering —
+  // prevents race conditions where effects wipe persisted tabs.
+  tabStoreReady.then(() => {
+    // Prefetch task details for open tabs — warms Suspense cache before React mounts.
+    // Fire-and-forget: the cache's resolved-value tracking + notify ensures immediate
+    // re-render when data arrives, eliminating the 250ms use() scheduling delay.
+    for (const tab of useTabStore.getState().tabs) {
+      if (tab.type === 'task') taskDetailCache.prefetch('taskDetail', tab.taskId)
+    }
+
+    performance.mark('sz:reactMount')
+    createRoot(document.getElementById('root')!).render(
+      <ConvexAuthBootstrap>
+        <PtyProvider>
+          <ThemeProvider>
+            <TelemetryProvider>
+              <UndoProvider>
+                <MaybeProfiler>
+                  <App />
+                </MaybeProfiler>
+              </UndoProvider>
+            </TelemetryProvider>
+          </ThemeProvider>
+        </PtyProvider>
+      </ConvexAuthBootstrap>
+    )
+  })
 }
-
-if (!isFloatingAgent)
-// Wait for tab store to hydrate from SQLite before rendering —
-// prevents race conditions where effects wipe persisted tabs.
-tabStoreReady.then(() => {
-  // Prefetch task details for open tabs — warms Suspense cache before React mounts.
-  // Fire-and-forget: the cache's resolved-value tracking + notify ensures immediate
-  // re-render when data arrives, eliminating the 250ms use() scheduling delay.
-  for (const tab of useTabStore.getState().tabs) {
-    if (tab.type === 'task') taskDetailCache.prefetch('taskDetail', tab.taskId)
-  }
-
-  performance.mark('sz:reactMount')
-  createRoot(document.getElementById('root')!).render(
-    <ConvexAuthBootstrap>
-      <PtyProvider>
-        <ThemeProvider>
-          <TelemetryProvider>
-            <UndoProvider>
-              <MaybeProfiler>
-                <App />
-              </MaybeProfiler>
-            </UndoProvider>
-          </TelemetryProvider>
-        </ThemeProvider>
-      </PtyProvider>
-    </ConvexAuthBootstrap>
-  )
-})

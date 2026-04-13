@@ -263,20 +263,20 @@ const api: ElectronAPI = {
     installCli: () => ipcRenderer.invoke('app:install-cli')
   },
   floatingAgent: {
-    detach: (sessionId: string, panelWidth: number) => ipcRenderer.invoke('floating-agent:detach', sessionId, panelWidth),
-    reattach: (sessionId: string) => ipcRenderer.invoke('floating-agent:reattach', sessionId),
+    setEnabled: (enabled: boolean) => ipcRenderer.invoke('floating-agent:set-enabled', enabled),
+    setSessionId: (sessionId: string | null) => ipcRenderer.invoke('floating-agent:set-session-id', sessionId),
+    setPanelOpen: (isOpen: boolean) => ipcRenderer.invoke('floating-agent:set-panel-open', isOpen),
+    toggleCollapse: () => ipcRenderer.invoke('floating-agent:toggle-collapse'),
+    resetSize: () => ipcRenderer.invoke('floating-agent:reset-size'),
+    detach: () => ipcRenderer.invoke('floating-agent:detach'),
+    reattach: () => ipcRenderer.invoke('floating-agent:reattach'),
+    getState: () => ipcRenderer.invoke('floating-agent:get-state'),
     getSession: () => ipcRenderer.invoke('floating-agent:get-session'),
     getConfig: () => ipcRenderer.invoke('floating-agent:get-config'),
-    toggleCollapse: () => ipcRenderer.invoke('floating-agent:toggle-collapse'),
-    onWindowBlur: (callback: () => void) => {
-      const handler = () => callback()
-      ipcRenderer.on('app:window-blur', handler)
-      return () => ipcRenderer.removeListener('app:window-blur', handler)
-    },
-    onWindowFocus: (callback: () => void) => {
-      const handler = () => callback()
-      ipcRenderer.on('app:window-focus', handler)
-      return () => ipcRenderer.removeListener('app:window-focus', handler)
+    onState: (callback: (state: { kind: string; sessionId: string | null; mode: 'auto' | 'manual' | null; hasCustomSize: boolean }) => void) => {
+      const handler = (_: unknown, state: { kind: string; sessionId: string | null; mode: 'auto' | 'manual' | null; hasCustomSize: boolean }) => callback(state)
+      ipcRenderer.on('floating-agent:state', handler)
+      return () => ipcRenderer.removeListener('floating-agent:state', handler)
     },
     onSessionChanged: (callback: () => void) => {
       const handler = () => callback()

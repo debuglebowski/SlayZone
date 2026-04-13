@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
+import { Frame, X } from 'lucide-react'
 import { Terminal } from '@slayzone/terminal/client/Terminal'
 import { usePty } from '@slayzone/terminal/client'
 import type { TerminalMode, TerminalState } from '@slayzone/terminal/shared'
@@ -17,6 +18,8 @@ export function FloatingAgentPanel() {
   const [style, setStyle] = useState<'widget' | 'icon'>('widget')
   const [terminalState, setTerminalState] = useState<TerminalState>('starting')
   const [showTerminal, setShowTerminal] = useState(false)
+  const [detachMode, setDetachMode] = useState<'auto' | 'manual' | null>(null)
+  const [hasCustomSize, setHasCustomSize] = useState(false)
   const { subscribeState, getState } = usePty()
 
   useEffect(() => {
@@ -49,6 +52,17 @@ export function FloatingAgentPanel() {
   }, [])
 
   useEffect(() => {
+    window.api.floatingAgent.getState().then((s) => {
+      setDetachMode(s.mode)
+      setHasCustomSize(s.hasCustomSize)
+    })
+    return window.api.floatingAgent.onState((s) => {
+      setDetachMode(s.mode)
+      setHasCustomSize(s.hasCustomSize)
+    })
+  }, [])
+
+  useEffect(() => {
     if (!session) return
     const contextState = getState(session.sessionId)
     if (contextState !== 'starting') {
@@ -67,11 +81,22 @@ export function FloatingAgentPanel() {
     window.api.floatingAgent.toggleCollapse()
   }, [])
 
+  const handleResetSize = useCallback(() => {
+    window.api.floatingAgent.resetSize()
+  }, [])
+
+  const handleClose = useCallback(() => {
+    window.api.floatingAgent.reattach()
+  }, [])
+
+  const showClose = detachMode === 'manual'
+  const showReset = hasCustomSize
+
   if (collapsed) {
     if (style === 'icon') {
       return <FloatingAgentCollapsedIcon state={terminalState} onExpand={handleToggle} />
     }
-    return <FloatingAgentCollapsed state={terminalState} onExpand={handleToggle} />
+    return <FloatingAgentCollapsed state={terminalState} onExpand={handleToggle} onResetSize={handleResetSize} onClose={handleClose} showClose={showClose} showReset={showReset} />
   }
 
   return (
@@ -81,14 +106,39 @@ export function FloatingAgentPanel() {
         style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
       >
         <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-widest">Agent</span>
-        <button
-          className="w-5 h-5 flex items-center justify-center rounded text-muted-foreground hover:bg-surface-2 hover:text-foreground transition-colors"
-          style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
-          onClick={handleToggle}
-          title="Minimize"
-        >
-          &#x2014;
-        </button>
+        <div className="flex items-center gap-0.5">
+          {showReset && (
+            <button
+              className="w-5 h-5 flex items-center justify-center rounded text-muted-foreground hover:bg-surface-2 hover:text-foreground transition-colors"
+              style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
+              onClick={handleResetSize}
+              title="Reset size & position"
+              aria-label="Reset size and position"
+            >
+              <Frame className="size-3" />
+            </button>
+          )}
+          <button
+            className="w-5 h-5 flex items-center justify-center rounded text-muted-foreground hover:bg-surface-2 hover:text-foreground transition-colors"
+            style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
+            onClick={handleToggle}
+            title="Minimize"
+            aria-label="Minimize"
+          >
+            &#x2014;
+          </button>
+          {showClose && (
+            <button
+              className="w-5 h-5 flex items-center justify-center rounded text-muted-foreground hover:bg-red-500/20 hover:text-red-500 transition-colors"
+              style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
+              onClick={handleClose}
+              title="Close (reattach to sidebar)"
+              aria-label="Close"
+            >
+              <X className="size-3" />
+            </button>
+          )}
+        </div>
       </div>
       <div className={`flex-1 min-h-0 transition-opacity duration-200${showTerminal ? ' opacity-100' : ' opacity-0'}`}>
         {session && showTerminal ? (

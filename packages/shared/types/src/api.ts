@@ -419,13 +419,17 @@ export interface ElectronAPI {
     installCli: () => Promise<{ ok: boolean; path?: string; permissionDenied?: boolean; elevationCancelled?: boolean; error?: string; pathNotInPATH?: boolean }>
   }
   floatingAgent: {
-    detach: (sessionId: string, panelWidth: number) => Promise<void>
-    reattach: (sessionId: string) => Promise<void>
+    setEnabled: (enabled: boolean) => Promise<{ kind: string }>
+    setSessionId: (sessionId: string | null) => Promise<{ kind: string }>
+    setPanelOpen: (isOpen: boolean) => Promise<{ kind: string }>
+    toggleCollapse: () => Promise<{ kind: string; collapsed: boolean }>
+    resetSize: () => Promise<{ kind: string }>
+    detach: () => Promise<{ kind: string; sessionId: string | null; mode: 'auto' | 'manual' | null; hasCustomSize: boolean }>
+    reattach: () => Promise<{ kind: string; sessionId: string | null; mode: 'auto' | 'manual' | null; hasCustomSize: boolean }>
+    getState: () => Promise<{ kind: string; sessionId: string | null; mode: 'auto' | 'manual' | null; hasCustomSize: boolean }>
     getSession: () => Promise<{ sessionId: string; cwd: string; mode: string } | null>
     getConfig: () => Promise<{ style: string; position: string }>
-    toggleCollapse: () => Promise<void>
-    onWindowBlur: (callback: () => void) => () => void
-    onWindowFocus: (callback: () => void) => () => void
+    onState: (callback: (state: { kind: string; sessionId: string | null; mode: 'auto' | 'manual' | null; hasCustomSize: boolean }) => void) => () => void
     onSessionChanged: (callback: () => void) => () => void
     onCollapseChanged: (callback: (collapsed: boolean) => void) => () => void
   }

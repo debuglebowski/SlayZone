@@ -430,23 +430,30 @@ function App(): React.JSX.Element {
     setAgentPanelState({ mode: nextMode, sessionIndex: (agentPanelState.sessionIndex ?? 0) + 1 })
   }, [agentMode, agentSessionId, agentPanelState.sessionIndex, setAgentPanelState])
 
-  // Floating agent panel: detach on blur, reattach on focus
-  const floatingDetachedRef = useRef(false)
+  // Floating agent panel: push context to main-process state machine.
+  // All detach/reattach decisions happen in main; renderer just keeps ctx in sync.
   useEffect(() => {
-    const unsubBlur = window.api.floatingAgent.onWindowBlur(() => {
-      if (agentPanelState.isOpen && agentSessionId) {
-        window.api.floatingAgent.detach(agentSessionId, agentPanelState.panelWidth)
-        floatingDetachedRef.current = true
-      }
+    window.api.floatingAgent.setSessionId(agentSessionId)
+  }, [agentSessionId])
+  useEffect(() => {
+    window.api.floatingAgent.setPanelOpen(agentPanelState.isOpen)
+  }, [agentPanelState.isOpen])
+  useEffect(() => {
+    window.api.floatingAgent.setEnabled(agentPanelState.floatingEnabled)
+  }, [agentPanelState.floatingEnabled])
+
+  // Subscribe to floating-agent state for menu label + sidebar visibility.
+  const [floatingAgentState, setFloatingAgentState] = useState<{ kind: 'attached' | 'detached' | 'disabled'; mode: 'auto' | 'manual' | null }>({ kind: 'attached', mode: null })
+  useEffect(() => {
+    window.api.floatingAgent.getState().then((s) => {
+      setFloatingAgentState({ kind: s.kind as 'attached' | 'detached' | 'disabled', mode: s.mode })
     })
-    const unsubFocus = window.api.floatingAgent.onWindowFocus(() => {
-      if (floatingDetachedRef.current && agentSessionId) {
-        window.api.floatingAgent.reattach(agentSessionId)
-        floatingDetachedRef.current = false
-      }
+    return window.api.floatingAgent.onState((s) => {
+      setFloatingAgentState({ kind: s.kind as 'attached' | 'detached' | 'disabled', mode: s.mode })
     })
-    return () => { unsubBlur(); unsubFocus() }
-  }, [agentPanelState.isOpen, agentPanelState.panelWidth, agentSessionId])
+  }, [])
+  // Hide sidebar panel when manually detached (auto mode keeps panel visible to avoid layout flash).
+  const hideSidebarPanel = floatingAgentState.kind === 'detached' && floatingAgentState.mode === 'manual'
 
   // Keyboard shortcuts
   useGuardedHotkeys(getKeys('new-task'), (e) => {
@@ -1161,17 +1168,22 @@ function App(): React.JSX.Element {
               )}
             </div>
 
-            {agentSessionId && agentPanelMountedRef.current && agentPanelState.isOpen && (
+            {agentSessionId && agentPanelMountedRef.current && agentPanelState.isOpen && !hideSidebarPanel && (
               <ResizeHandle width={agentPanelState.panelWidth} minWidth={AGENT_PANEL_MIN_WIDTH} maxWidth={AGENT_PANEL_MAX_WIDTH}
                 onWidthChange={(w) => setAgentPanelState({ panelWidth: w })}
                 onDragStart={() => setIsSidePanelResizing(true)} onDragEnd={() => setIsSidePanelResizing(false)}
                 onReset={() => setAgentPanelState({ panelWidth: DEFAULT_AGENT_PANEL_WIDTH })} />
             )}
-            {agentSessionId && agentPanelMountedRef.current && (
+            {agentSessionId && agentPanelMountedRef.current && !hideSidebarPanel && (
               <div className={agentPanelState.isOpen ? 'min-h-0' : 'w-0 overflow-hidden invisible'} style={agentPanelState.isOpen ? undefined : { position: 'absolute' as const }}>
                 <AgentSidePanel width={agentPanelState.panelWidth}
                   sessionId={agentSessionId} cwd={projects.find(p => p.id === selectedProjectId)?.path ?? ''} mode={agentMode as import('@slayzone/terminal/shared').TerminalMode} isActive={agentPanelState.isOpen} isResizing={isSidePanelResizing}
-                  onNewSession={handleAgentNewSession} onModeChange={handleAgentModeChange} />
+                  onNewSession={handleAgentNewSession} onModeChange={handleAgentModeChange}
+                  floatingEnabled={agentPanelState.floatingEnabled}
+                  onToggleFloating={() => setAgentPanelState({ floatingEnabled: !agentPanelState.floatingEnabled })}
+                  floatingState={floatingAgentState.kind}
+                  onDetach={() => window.api.floatingAgent.detach()}
+                  onReattach={() => window.api.floatingAgent.reattach()} />
               </div>
             )}
             {notificationState.isLocked && (

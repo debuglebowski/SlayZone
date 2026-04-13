@@ -899,9 +899,10 @@ export async function createPty(opts: CreatePtyOptions): Promise<{ success: bool
                   taskId: taskIdFromSessionId(sessionId),
                   payload: { conversationId: detected, method: 'disk' }
                 })
-                if (!win.isDestroyed()) {
+                const detectedWin = getWin()
+                if (!detectedWin.isDestroyed()) {
                   try {
-                    win.webContents.send('pty:session-detected', sessionId, detected)
+                    detectedWin.webContents.send('pty:session-detected', sessionId, detected)
                   } catch {
                     // Window destroyed, ignore
                   }
