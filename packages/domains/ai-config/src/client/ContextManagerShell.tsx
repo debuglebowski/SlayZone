@@ -1,4 +1,4 @@
-import { useCallback } from 'react'
+import { useCallback, useEffect, useRef } from 'react'
 import { ArrowLeft, FileText, FolderOpen, Server, Settings2, Sparkles, Store } from 'lucide-react'
 import { cn } from '@slayzone/ui'
 import { ProviderSyncSection } from './ProviderSyncSection'
@@ -8,6 +8,7 @@ import { McpSection } from './McpSection'
 import { ComputerFilesView } from './ComputerFilesView'
 import { SkillMarketplace } from './SkillMarketplace'
 import { useContextManagerStore } from './useContextManagerStore'
+import { useStaleSkillCount } from './useStaleSkillCount'
 import type { ConfigLevel } from '../shared'
 
 export interface ContextManagerShellProps {
@@ -55,6 +56,20 @@ export function ContextManagerShell({
 
   // "providers" is a special view, track it locally (not worth persisting)
   const isProviders = activeSection === 'provider-sync'
+
+  // Stale skill count for project nav badge. Shared hook handles mount/focus refresh.
+  // Extra refresh: when leaving skills/providers (sections where mutations happen).
+  const { count: staleSkillCount, refresh: refreshStaleSkillCount } = useStaleSkillCount(
+    selectedProjectId,
+    projectPath,
+  )
+  const prevSectionRef = useRef(activeSection)
+  useEffect(() => {
+    const prev = prevSectionRef.current
+    const wasMutable = prev === 'skills' || prev === 'provider-sync'
+    if (wasMutable && prev !== activeSection) refreshStaleSkillCount()
+    prevSectionRef.current = activeSection
+  }, [activeSection, refreshStaleSkillCount])
 
   const handleSectionClick = useCallback((level: ConfigLevel, section: string) => {
     setActive(level, section)
@@ -143,6 +158,7 @@ export function ContextManagerShell({
                 <div className="space-y-0.5">
                   {LEVEL_SECTIONS[levelId].map(({ id: sectionId, label: sectionLabel, icon: SectionIcon }) => {
                     const isActive = !isProviders && activeLevel === levelId && activeSection === sectionId
+                    const showStale = levelId === 'project' && sectionId === 'skills' && staleSkillCount > 0
                     return (
                       <button
                         key={sectionId}
@@ -156,6 +172,9 @@ export function ContextManagerShell({
                       >
                         <SectionIcon className="size-3.5" />
                         {sectionLabel}
+                        {showStale && (
+                          <span className="ml-auto size-2 rounded-full bg-amber-500" title={`${staleSkillCount} stale`} />
+                        )}
                       </button>
                     )
                   })}

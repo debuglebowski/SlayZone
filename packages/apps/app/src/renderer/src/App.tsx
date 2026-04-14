@@ -49,7 +49,7 @@ import {
 import { SidebarProvider, cn, PanelToggle, useUndo, matchesShortcut, useShortcutStore, shortcutDefinitions, useShortcutDisplay, withShortcut, withModalGuard, scopeTracker } from '@slayzone/ui'
 import { AppSidebar } from '@/components/sidebar/AppSidebar'
 import { useChangelogAutoOpen } from '@/components/changelog/useChangelogAutoOpen'
-import { useStaleSkillCount } from '@/hooks/useStaleSkillCount'
+import { useStaleSkillCount } from '@slayzone/ai-config/client'
 import { TabBar } from '@/components/tabs/TabBar'
 import {
   DesktopNotificationToggle,
