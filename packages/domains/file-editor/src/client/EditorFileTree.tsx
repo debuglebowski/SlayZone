@@ -142,6 +142,7 @@ export const EditorFileTree = forwardRef<EditorFileTreeHandle, EditorFileTreePro
     if (willCreateRef.current) { e.preventDefault(); willCreateRef.current = false }
   }, [])
   const renameInputRef = useRef<HTMLInputElement>(null)
+  const cancelRenameRef = useRef(false)
 
   // --- Drag and drop state ---
   const dragPathRef = useRef<string | null>(null)
@@ -840,10 +841,10 @@ export const EditorFileTree = forwardRef<EditorFileTreeHandle, EditorFileTreePro
                 value={renameValue}
                 onChange={(e) => setRenameValue(e.target.value)}
                 onKeyDown={(e) => {
-                  if (e.key === 'Enter') handleRename(entry.path, renameValue)
-                  if (e.key === 'Escape') setRenaming(null)
+                  if (e.key === 'Enter') { cancelRenameRef.current = false; handleRename(entry.path, renameValue) }
+                  if (e.key === 'Escape') { cancelRenameRef.current = true; setRenaming(null) }
                 }}
-                onBlur={() => handleRename(entry.path, renameValue)}
+                onBlur={() => { if (!cancelRenameRef.current) handleRename(entry.path, renameValue); cancelRenameRef.current = false }}
                 className="h-6 text-xs font-mono py-0 px-1"
               />
             </div>
@@ -916,10 +917,10 @@ export const EditorFileTree = forwardRef<EditorFileTreeHandle, EditorFileTreePro
             value={renameValue}
             onChange={(e) => setRenameValue(e.target.value)}
             onKeyDown={(e) => {
-              if (e.key === 'Enter') handleRename(entry.path, renameValue)
-              if (e.key === 'Escape') setRenaming(null)
+              if (e.key === 'Enter') { cancelRenameRef.current = false; handleRename(entry.path, renameValue) }
+              if (e.key === 'Escape') { cancelRenameRef.current = true; setRenaming(null) }
             }}
-            onBlur={() => handleRename(entry.path, renameValue)}
+            onBlur={() => { if (!cancelRenameRef.current) handleRename(entry.path, renameValue); cancelRenameRef.current = false }}
             className="h-6 text-xs font-mono py-0 px-1"
           />
         </div>
