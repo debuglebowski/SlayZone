@@ -85,7 +85,6 @@ export function AutomationsPanel({ projectId }: AutomationsPanelProps) {
       <div className="flex items-center justify-between px-3 py-2 border-b shrink-0">
         <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
           Automations
-          <span className="normal-case tracking-normal rounded-full bg-blue-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-blue-500">Beta</span>
         </h3>
         <Button variant="ghost" size="sm" className="h-6 text-xs" onClick={handleNew}>
           <Plus className="w-3 h-3 mr-1" /> New

@@ -48,7 +48,6 @@ export function UserSettingsDialog({
   const { modes, createMode, updateMode, deleteMode, testMode, restoreDefaults, resetToDefaultState } = useTerminalModes()
   
   const [activeTab, setActiveTab] = useState(initialTab)
-  const [contextManagerEnabled, setContextManagerEnabled] = useState(false)
   const [defaultTerminalMode, setDefaultTerminalMode] = useState<TerminalMode>('claude-code')
 
   useEffect(() => {
@@ -66,15 +65,8 @@ export function UserSettingsDialog({
   }, [])
 
   useEffect(() => {
-    if (open) {
-      const resolvedInitialTab = !contextManagerEnabled && initialTab === 'ai-config' ? 'appearance' : initialTab
-      setActiveTab(resolvedInitialTab)
-    }
-  }, [open, initialTab, contextManagerEnabled])
-
-  useEffect(() => {
-    window.api.app.isContextManagerEnabled().then(setContextManagerEnabled)
-  }, [])
+    if (open) setActiveTab(initialTab)
+  }, [open, initialTab])
 
   const navigateTo = (tab: string) => {
     setActiveTab(tab)

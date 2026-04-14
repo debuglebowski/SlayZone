@@ -52,6 +52,7 @@ export function AppearanceSettingsTab() {
   } = useTheme()
 
   const [projectColorTints, setProjectColorTints] = useState(true)
+  const [showContextManager, setShowContextManager] = useState(true)
   const [terminalFontSize, setTerminalFontSize] = useState('13')
   const [editorFontSize, setEditorFontSize] = useState('13')
   const [reduceMotion, setReduceMotion] = useState(false)
@@ -64,6 +65,7 @@ export function AppearanceSettingsTab() {
 
   useEffect(() => {
     window.api.settings.get('project_color_tints_enabled').then(val => setProjectColorTints(val !== '0'))
+    window.api.settings.get('show_context_manager').then(val => setShowContextManager(val !== '0'))
     window.api.settings.get('terminal_font_size').then(val => setTerminalFontSize(val ?? '13'))
     window.api.settings.get('editor_font_size').then(val => setEditorFontSize(val ?? '13'))
     window.api.settings.get('reduce_motion').then(val => setReduceMotion(val === '1'))
@@ -276,6 +278,16 @@ export function AppearanceSettingsTab() {
             <Switch
               checked={projectScopedTabs}
               onCheckedChange={(checked) => useTabStore.getState().setProjectScopedTabs(checked)}
+            />
+          </div>
+          <div className="grid grid-cols-[220px_minmax(0,1fr)] items-center gap-4">
+            <SettingLabel tip="Show the Context Manager button in the tab bar">Context Manager</SettingLabel>
+            <Switch
+              checked={showContextManager}
+              onCheckedChange={(checked) => {
+                setShowContextManager(checked)
+                window.api.settings.set('show_context_manager', checked ? '1' : '0')
+              }}
             />
           </div>
         </CardContent>

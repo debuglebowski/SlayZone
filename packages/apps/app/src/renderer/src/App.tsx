@@ -166,9 +166,8 @@ function App(): React.JSX.Element {
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [settingsRevision, setSettingsRevision] = useState(0)
   const [colorTintsEnabled, setColorTintsEnabled] = useState(true)
-  const [contextManagerEnabled, setContextManagerEnabled] = useState(false)
+  const [showContextManager, setShowContextManager] = useState(true)
   const [testsPanelEnabled, setTestsPanelEnabled] = useState(false)
-  const [automationsPanelEnabled, setAutomationsPanelEnabled] = useState(false)
   const [projectLockEnabled, setProjectLockEnabled] = useState(false)
   const [settingsInitialTab, setSettingsInitialTab] = useState<string>('appearance')
   const [settingsInitialAiConfigSection, setSettingsInitialAiConfigSection] = useState<ContextManagerSection | null>(null)
@@ -377,16 +376,15 @@ function App(): React.JSX.Element {
   // Read settings on mount and whenever settings change
   useEffect(() => {
     window.api.settings.get('project_color_tints_enabled').then((v) => setColorTintsEnabled(v !== '0'))
-    window.api.app.isContextManagerEnabled().then(setContextManagerEnabled)
+    window.api.settings.get('show_context_manager').then((v) => setShowContextManager(v !== '0'))
     window.api.app.isTestsPanelEnabled().then(setTestsPanelEnabled)
-    window.api.app.isAutomationsEnabled().then(setAutomationsPanelEnabled)
     window.api.app.isProjectLockEnabled().then(setProjectLockEnabled)
   }, [settingsRevision])
 
-  // Close context manager when lab is disabled
+  // Close context manager when hidden
   useEffect(() => {
-    if (!contextManagerEnabled && useTabStore.getState().activeView === 'context') useTabStore.getState().setActiveView('tabs')
-  }, [contextManagerEnabled])
+    if (!showContextManager && useTabStore.getState().activeView === 'context') useTabStore.getState().setActiveView('tabs')
+  }, [showContextManager])
 
   useEffect(() => {
     if (selectedProjectId) {
@@ -613,7 +611,7 @@ function App(): React.JSX.Element {
   const navigateCycle = useCallback((direction: 1 | -1) => {
     const filtered = tabCycleOrder.filter((i) => toVisibleIndex(i) >= 0)
     const cycle: ('context' | number)[] = [...filtered]
-    if (contextManagerEnabled && cycle.length > 0) cycle.splice(1, 0, 'context')
+    if (showContextManager && cycle.length > 0) cycle.splice(1, 0, 'context')
     if (cycle.length === 0) return
     const { activeTabIndex: idx, activeView: view } = useTabStore.getState()
     const pos = view === 'context' ? cycle.indexOf('context') : cycle.indexOf(idx)
@@ -625,7 +623,7 @@ function App(): React.JSX.Element {
       useTabStore.getState().setActiveView('tabs')
       setActiveTabIndex(target)
     }
-  }, [tabCycleOrder, toVisibleIndex, contextManagerEnabled, setActiveTabIndex])
+  }, [tabCycleOrder, toVisibleIndex, showContextManager, setActiveTabIndex])
 
   useGuardedHotkeys(getKeys('next-tab'), (e) => {
     e.preventDefault()
@@ -712,7 +710,7 @@ function App(): React.JSX.Element {
       } else if (matchesShortcut(e, getKeys('panel-tests')) && testsPanelEnabled && isHomePanelEnabled('tests', 'home')) {
         e.preventDefault()
         homePanel.setHomePanelVisibility(prev => ({ ...prev, tests: !prev.tests }))
-      } else if (matchesShortcut(e, getKeys('panel-automations')) && automationsPanelEnabled && isHomePanelEnabled('automations', 'home')) {
+      } else if (matchesShortcut(e, getKeys('panel-automations')) && isHomePanelEnabled('automations', 'home')) {
         e.preventDefault()
         homePanel.setHomePanelVisibility(prev => ({ ...prev, automations: !prev.automations }))
       }
@@ -1006,7 +1004,7 @@ function App(): React.JSX.Element {
               projectColors={taskProjectColors} worktreeColors={taskWorktreeColors}
               onTabClick={(i) => setActiveTabIndex(toFullIndex(i))} onTabClose={(i) => closeTab(toFullIndex(i))} onTabReorder={(from, to) => reorderTabs(toFullIndex(from), toFullIndex(to))}
               onTabRename={async (taskId, title) => { const t = await window.api.db.updateTask({ id: taskId, title }); updateTask(t) }}
-              leftContent={contextManagerEnabled ? (
+              leftContent={showContextManager ? (
                 <Tooltip><TooltipTrigger asChild>
                   <div className={cn(
                     "relative ml-1 flex items-center gap-1.5 h-7 px-3 rounded-md cursor-pointer transition-colors select-none flex-shrink-0",
@@ -1121,7 +1119,7 @@ function App(): React.JSX.Element {
                                 { id: 'editor', icon: FileCode, label: 'Editor', shortcut: panelEditorShortcut, active: homePanel.homePanelVisibility.editor, disabled: !selectedProjectId },
                                 { id: 'processes', icon: Cpu, label: 'Processes', shortcut: panelProcessesShortcut, active: homePanel.homePanelVisibility.processes, disabled: !selectedProjectId },
                                 ...(testsPanelEnabled ? [{ id: 'tests', icon: FlaskConical, label: 'Tests', shortcut: panelTestsShortcut, active: homePanel.homePanelVisibility.tests, disabled: !selectedProjectId }] : []),
-                                ...(automationsPanelEnabled ? [{ id: 'automations', icon: Zap, label: 'Automations', shortcut: panelAutomationsShortcut, active: homePanel.homePanelVisibility.automations, disabled: !selectedProjectId }] : []),
+                                { id: 'automations', icon: Zap, label: 'Automations', shortcut: panelAutomationsShortcut, active: homePanel.homePanelVisibility.automations, disabled: !selectedProjectId },
                               ].filter(p => p.id === 'kanban' || isHomePanelEnabled(p.id, 'home'))}
                               onChange={(id, active) => homePanel.setHomePanelVisibility(prev => ({ ...prev, [id]: active }))}
                             />

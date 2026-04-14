@@ -380,16 +380,12 @@ export interface ElectronAPI {
       reason: 'registered' | 'dev-skipped' | 'registration-failed'
     }>
     getVersion: () => Promise<string>
-    isContextManagerEnabled: () => Promise<boolean>
-    isContextManagerEnabledSync: boolean
     isTestsPanelEnabled: () => Promise<boolean>
     isTestsPanelEnabledSync: boolean
     isJiraIntegrationEnabled: () => Promise<boolean>
     isJiraIntegrationEnabledSync: boolean
     isLoopModeEnabled: () => Promise<boolean>
     isLoopModeEnabledSync: boolean
-    isAutomationsEnabled: () => Promise<boolean>
-    isAutomationsEnabledSync: boolean
     isProjectLockEnabled: () => Promise<boolean>
     isProjectLockEnabledSync: boolean
     getZoomFactor: () => Promise<number>
