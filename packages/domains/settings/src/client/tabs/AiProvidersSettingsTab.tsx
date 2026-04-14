@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef, type ComponentProps } from 'react'
 import { ChevronRight, Copy, HelpCircle, Plus, RefreshCw, Trash2, CheckCircle2, AlertCircle } from 'lucide-react'
-import { Button, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger, IconButton, Input, Label, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Switch, Tooltip, TooltipTrigger, TooltipContent, toast } from '@slayzone/ui'
-import { groupTerminalModes } from '@slayzone/terminal'
-import type { TerminalModeInfo, CreateTerminalModeInput, UpdateTerminalModeInput, UsageProviderConfig, UsageWindow } from '@slayzone/terminal/shared'
+import { Button, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger, IconButton, Input, Label, Select, SelectContent, SelectItem, SelectSeparator, SelectTrigger, SelectValue, Switch, Tooltip, TooltipTrigger, TooltipContent, toast } from '@slayzone/ui'
+import { getVisibleModes, getModeLabel, groupTerminalModes } from '@slayzone/terminal'
+import type { TerminalMode, TerminalModeInfo, CreateTerminalModeInput, UpdateTerminalModeInput, UsageProviderConfig, UsageWindow } from '@slayzone/terminal/shared'
 import { DETECTION_ENGINES } from '@slayzone/terminal/shared'
 import { SettingsTabIntro } from './SettingsTabIntro'
 import { PanelBreadcrumb } from './PanelBreadcrumb'
@@ -418,11 +418,13 @@ interface AiProvidersSettingsTabProps {
   testMode: (command: string) => Promise<{ ok: boolean; error?: string; detail?: string }>
   restoreDefaults: () => Promise<void>
   resetToDefaultState: () => Promise<void>
+  defaultTerminalMode: TerminalMode
+  onDefaultTerminalModeChange: (mode: TerminalMode) => void
 }
 
 export function AiProvidersSettingsTab(props: AiProvidersSettingsTabProps) {
   const {
-    activeTab, navigateTo, modes, createMode, updateMode, deleteMode, testMode, restoreDefaults, resetToDefaultState,
+    activeTab, navigateTo, modes, createMode, updateMode, deleteMode, testMode, restoreDefaults, resetToDefaultState, defaultTerminalMode, onDefaultTerminalModeChange,
   } = props
 
   const [testResults, setTestResults] = useState<Record<string, { ok: boolean; error?: string; detail?: string }>>({})
@@ -490,6 +492,26 @@ export function AiProvidersSettingsTab(props: AiProvidersSettingsTabProps) {
 
       {activeTab === 'ai-providers' && (
         <div className="space-y-6">
+          <div className="space-y-3">
+            <Label className="text-sm font-medium">Default provider</Label>
+            <Select value={defaultTerminalMode} onValueChange={(v) => onDefaultTerminalModeChange(v as TerminalMode)}>
+              <SelectTrigger className="max-w-sm"><SelectValue /></SelectTrigger>
+              <SelectContent position="popper" align="start" className="min-w-[var(--radix-select-trigger-width)] max-h-none">
+                {(() => {
+                  const visibleModes = getVisibleModes(modes, defaultTerminalMode)
+                  const { builtin, custom } = groupTerminalModes(visibleModes)
+                  return (
+                    <>
+                      {builtin.map(m => <SelectItem key={m.id} value={m.id}>{getModeLabel(m)}</SelectItem>)}
+                      {custom.length > 0 && builtin.length > 0 && <SelectSeparator />}
+                      {custom.map(m => <SelectItem key={m.id} value={m.id}>{getModeLabel(m)}</SelectItem>)}
+                    </>
+                  )
+                })()}
+              </SelectContent>
+            </Select>
+          </div>
+
           <div className="flex items-center justify-between">
             <Label className="text-base font-semibold">Providers</Label>
             <div className="flex gap-2">

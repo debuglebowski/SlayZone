@@ -12,13 +12,12 @@ interface PanelsSettingsTabProps {
   activeTab: string
   navigateTo: (tab: string) => void
   modes: TerminalModeInfo[]
+  defaultTerminalMode: TerminalMode
+  onDefaultTerminalModeChange: (mode: TerminalMode) => void
 }
 
-export function PanelsSettingsTab({ activeTab, navigateTo, modes }: PanelsSettingsTabProps) {
+export function PanelsSettingsTab({ activeTab, navigateTo, modes, defaultTerminalMode, onDefaultTerminalModeChange }: PanelsSettingsTabProps) {
   const [panelConfig, setPanelConfig] = useState<PanelConfig>(DEFAULT_PANEL_CONFIG)
-  
-  // Terminal
-  const [defaultTerminalMode, setDefaultTerminalMode] = useState<TerminalMode>('claude-code')
   const [terminalFontFamily, setTerminalFontFamily] = useState('Menlo, Monaco, "Courier New", monospace')
   const [terminalScrollback, setTerminalScrollback] = useState('5000')
   
@@ -71,7 +70,6 @@ export function PanelsSettingsTab({ activeTab, navigateTo, modes }: PanelsSettin
   useEffect(() => {
     Promise.all([
       window.api.settings.get('panel_config'),
-      window.api.settings.get('default_terminal_mode'),
       window.api.settings.get('terminal_font_family'),
       window.api.settings.get('terminal_scrollback'),
       window.api.settings.get('editor_word_wrap'),
@@ -87,9 +85,8 @@ export function PanelsSettingsTab({ activeTab, navigateTo, modes }: PanelsSettin
       window.api.settings.get('browser_default_devices'),
       window.api.settings.get('commit_graph_config'),
       window.api.settings.get('editor_markdown_view_mode'),
-    ]).then(([pc, tm, tff, ts, eww, erw, ets, eit, dcl, diw, dste, dsaob, bdu, bdz, bdd, cgc, emvm]) => {
+    ]).then(([pc, tff, ts, eww, erw, ets, eit, dcl, diw, dste, dsaob, bdu, bdz, bdd, cgc, emvm]) => {
       if (pc) setPanelConfig(mergePredefinedWebPanels(JSON.parse(pc) as PanelConfig))
-      if (tm) setDefaultTerminalMode(tm as TerminalMode)
       if (tff) setTerminalFontFamily(tff)
       if (ts) setTerminalScrollback(ts)
       if (eww === 'on') setEditorWordWrap('on')
@@ -389,9 +386,9 @@ export function PanelsSettingsTab({ activeTab, navigateTo, modes }: PanelsSettin
           </div>
           <div className="space-y-3">
             <Label className="text-sm font-medium">Default mode</Label>
-            <Select value={defaultTerminalMode} onValueChange={(v) => { setDefaultTerminalMode(v as TerminalMode); window.api.settings.set('default_terminal_mode', v) }}>
+            <Select value={defaultTerminalMode} onValueChange={(v) => onDefaultTerminalModeChange(v as TerminalMode)}>
               <SelectTrigger className="max-w-sm"><SelectValue /></SelectTrigger>
-              <SelectContent position="popper" className="min-w-[var(--radix-select-trigger-width)] max-h-none">
+              <SelectContent position="popper" align="start" className="min-w-[var(--radix-select-trigger-width)] max-h-none">
                 {(() => {
                   const visibleModes = getVisibleModes(modes, defaultTerminalMode)
                   const { builtin, custom } = groupTerminalModes(visibleModes)

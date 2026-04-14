@@ -1,7 +1,8 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { XIcon } from 'lucide-react'
 import { Dialog, DialogContent, SettingsLayout } from '@slayzone/ui'
 import { useTerminalModes } from '@slayzone/terminal'
+import type { TerminalMode } from '@slayzone/terminal/shared'
 import { useTelemetry, TelemetrySettings } from '@slayzone/telemetry/client'
 import type { ContextManagerSection } from '../../../ai-config/src/client/ContextManagerSettings'
 
@@ -48,6 +49,21 @@ export function UserSettingsDialog({
   
   const [activeTab, setActiveTab] = useState(initialTab)
   const [contextManagerEnabled, setContextManagerEnabled] = useState(false)
+  const [defaultTerminalMode, setDefaultTerminalMode] = useState<TerminalMode>('claude-code')
+
+  useEffect(() => {
+    if (open) {
+      window.api.settings.get('default_terminal_mode').then(m => {
+        if (m) setDefaultTerminalMode(m as TerminalMode)
+      })
+    }
+  }, [open])
+
+  const onDefaultTerminalModeChange = useCallback((mode: TerminalMode) => {
+    setDefaultTerminalMode(mode)
+    window.api.settings.set('default_terminal_mode', mode)
+    window.dispatchEvent(new CustomEvent('sz:settings-changed'))
+  }, [])
 
   useEffect(() => {
     if (open) {
@@ -119,6 +135,8 @@ export function UserSettingsDialog({
                 testMode={testMode}
                 restoreDefaults={restoreDefaults}
                 resetToDefaultState={resetToDefaultState}
+                defaultTerminalMode={defaultTerminalMode}
+                onDefaultTerminalModeChange={onDefaultTerminalModeChange}
               />
             )}
 
@@ -127,6 +145,8 @@ export function UserSettingsDialog({
                 activeTab={activeTab}
                 navigateTo={navigateTo}
                 modes={modes}
+                defaultTerminalMode={defaultTerminalMode}
+                onDefaultTerminalModeChange={onDefaultTerminalModeChange}
               />
             )}
 
