@@ -21,6 +21,7 @@ convex/.env.local
 
 # Local Claude settings
 .claude/settings.local.json
+.claude/scheduled_tasks.lock
 
 # Superpowers specs and plans (local only)
 docs/superpowers/
