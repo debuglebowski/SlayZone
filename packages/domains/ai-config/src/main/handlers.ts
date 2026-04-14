@@ -43,6 +43,7 @@ import {
   PROVIDER_PATHS,
   PROVIDER_LABELS,
   COMPUTER_PROVIDER_PATHS,
+  TERMINAL_MODE_TO_PROVIDER,
   isConfigurableCliProvider,
   filterConfigurableCliProviders,
   isConfigurableMcpTarget,
@@ -1063,16 +1064,30 @@ export function registerAiConfigHandlers(ipcMain: IpcMain, db: Database): void {
 
   // --- Root instructions + skills status ---
 
+  function getDefaultProviderKind(): CliProvider | undefined {
+    const mode = (db.prepare("SELECT value FROM settings WHERE key = 'default_terminal_mode'")
+      .get() as { value: string } | undefined)?.value ?? 'claude-code'
+    return TERMINAL_MODE_TO_PROVIDER[mode]
+  }
+
   function getEnabledProviders(projectId: string): CliProvider[] {
+    let providers: CliProvider[]
     const row = db.prepare('SELECT value FROM settings WHERE key = ?')
       .get(`ai_providers:${projectId}`) as { value: string } | undefined
     if (row) {
       const parsed = parseConfiguredProviders(row.value)
-      if (parsed) return parsed
+      providers = parsed ?? []
+    } else {
+      const active = db.prepare('SELECT kind FROM ai_config_sources WHERE enabled = 1 AND status = ?')
+        .all('active') as Array<{ kind: string }>
+      providers = filterConfigurableCliProviders(active.map(p => p.kind))
     }
-    const active = db.prepare('SELECT kind FROM ai_config_sources WHERE enabled = 1 AND status = ?')
-      .all('active') as Array<{ kind: string }>
-    return filterConfigurableCliProviders(active.map(p => p.kind))
+    // Always include the default terminal mode's provider
+    const defaultKind = getDefaultProviderKind()
+    if (defaultKind && !providers.includes(defaultKind)) {
+      providers.push(defaultKind)
+    }
+    return providers
   }
 
   function recomputeInstructionsResult(projectId: string, projectPath: string): RootInstructionsResult {
@@ -1540,17 +1555,21 @@ export function registerAiConfigHandlers(ipcMain: IpcMain, db: Database): void {
 
   ipcMain.handle('ai-config:list-providers', () => {
     const providers = db.prepare('SELECT * FROM ai_config_sources ORDER BY name').all() as CliProviderInfo[]
+    const defaultKind = getDefaultProviderKind()
     return providers
       .filter((provider) => isConfigurableCliProvider(provider.kind))
       .map((provider) => ({
         ...provider,
-        name: PROVIDER_LABELS[provider.kind as CliProvider] ?? provider.name
+        name: PROVIDER_LABELS[provider.kind as CliProvider] ?? provider.name,
+        isDefault: provider.kind === defaultKind,
       }))
   })
 
   ipcMain.handle('ai-config:toggle-provider', (_event, id: string, enabled: boolean) => {
     const row = db.prepare('SELECT kind FROM ai_config_sources WHERE id = ?').get(id) as { kind: string } | undefined
     if (!row || !isConfigurableCliProvider(row.kind)) return
+    // Prevent disabling the default terminal mode's provider
+    if (!enabled && row.kind === getDefaultProviderKind()) return
     db.prepare('UPDATE ai_config_sources SET enabled = ?, updated_at = datetime(\'now\') WHERE id = ?')
       .run(enabled ? 1 : 0, id)
   })

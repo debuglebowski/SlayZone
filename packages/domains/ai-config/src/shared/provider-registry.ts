@@ -1,5 +1,16 @@
 import type { CliProvider, McpTarget, McpServerConfig, ProviderPathMapping } from './types'
 
+/** Maps terminal mode IDs to their corresponding Context Manager provider kind */
+export const TERMINAL_MODE_TO_PROVIDER: Partial<Record<string, CliProvider>> = {
+  'claude-code': 'claude',
+  'codex': 'codex',
+  'gemini': 'gemini',
+  'cursor-agent': 'cursor',
+  'opencode': 'opencode',
+  'qwen-code': 'qwen',
+  'copilot': 'copilot',
+}
+
 export const PROVIDER_PATHS: Record<CliProvider, ProviderPathMapping> = {
   claude: {
     rootInstructions: 'CLAUDE.md',

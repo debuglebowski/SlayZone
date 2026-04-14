@@ -92,6 +92,8 @@ export interface CliProviderInfo {
   kind: string
   enabled: boolean
   status: CliProviderStatus
+  /** True when this provider matches the default terminal mode — cannot be disabled */
+  isDefault?: boolean
 }
 
 export type ContextFileProvider = CliProvider | 'manual'

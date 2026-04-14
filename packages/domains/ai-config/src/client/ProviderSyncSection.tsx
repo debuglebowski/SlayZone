@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { cn } from '@slayzone/ui'
+import { cn, Tooltip, TooltipContent, TooltipTrigger } from '@slayzone/ui'
 import {
   PROVIDER_LABELS,
   PROVIDER_CAPABILITIES,
@@ -15,18 +15,22 @@ export function ProviderSyncSection({ projectId }: ProviderSyncSectionProps) {
   const [providers, setProviders] = useState<CliProviderInfo[]>([])
   const [projectProviders, setProjectProviders] = useState<CliProvider[]>([])
 
+  const fetchProviders = useCallback(async () => {
+    const list = await window.api.aiConfig.listProviders()
+    setProviders(list)
+    if (projectId) {
+      const pp = await window.api.aiConfig.getProjectProviders(projectId)
+      setProjectProviders(pp)
+    }
+  }, [projectId])
+
   useEffect(() => {
     let stale = false
-    void (async () => {
-      const list = await window.api.aiConfig.listProviders()
-      if (!stale) setProviders(list)
-      if (projectId) {
-        const pp = await window.api.aiConfig.getProjectProviders(projectId)
-        if (!stale) setProjectProviders(pp)
-      }
-    })()
-    return () => { stale = true }
-  }, [projectId])
+    void fetchProviders().then(() => { if (stale) return })
+    const handler = () => { void fetchProviders() }
+    window.addEventListener('sz:settings-changed', handler)
+    return () => { stale = true; window.removeEventListener('sz:settings-changed', handler) }
+  }, [fetchProviders])
 
   const handleToggleComputer = useCallback(async (id: string, enabled: boolean) => {
     await window.api.aiConfig.toggleProvider(id, enabled)
@@ -67,6 +71,9 @@ export function ProviderSyncSection({ projectId }: ProviderSyncSectionProps) {
                     {PROVIDER_LABELS[provider.id as CliProvider] ?? provider.name}
                   </span>
                   <div className="flex gap-1">
+                    {provider.isDefault && (
+                      <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">Default</span>
+                    )}
                     {caps?.mcpWritable && (
                       <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">MCP</span>
                     )}
@@ -80,20 +87,35 @@ export function ProviderSyncSection({ projectId }: ProviderSyncSectionProps) {
               {/* Computer toggle */}
               <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
                 <span>Computer</span>
-                <button
-                  role="switch"
-                  aria-checked={provider.enabled}
-                  onClick={() => handleToggleComputer(provider.id, !provider.enabled)}
-                  className={cn(
-                    'relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full transition-colors',
-                    provider.enabled ? 'bg-primary' : 'bg-muted'
-                  )}
-                >
-                  <span className={cn(
-                    'pointer-events-none block size-3.5 rounded-full bg-background shadow-sm transition-transform',
-                    provider.enabled ? 'translate-x-[18px]' : 'translate-x-[3px]'
-                  )} />
-                </button>
+                {provider.isDefault ? (
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span
+                        role="switch"
+                        aria-checked
+                        className="relative inline-flex h-5 w-9 shrink-0 items-center rounded-full bg-primary opacity-60 cursor-not-allowed"
+                      >
+                        <span className="pointer-events-none block size-3.5 rounded-full bg-background shadow-sm translate-x-[18px]" />
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent>Cannot disable — this is your default terminal mode</TooltipContent>
+                  </Tooltip>
+                ) : (
+                  <button
+                    role="switch"
+                    aria-checked={provider.enabled}
+                    onClick={() => handleToggleComputer(provider.id, !provider.enabled)}
+                    className={cn(
+                      'relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full transition-colors',
+                      provider.enabled ? 'bg-primary' : 'bg-muted'
+                    )}
+                  >
+                    <span className={cn(
+                      'pointer-events-none block size-3.5 rounded-full bg-background shadow-sm transition-transform',
+                      provider.enabled ? 'translate-x-[18px]' : 'translate-x-[3px]'
+                    )} />
+                  </button>
+                )}
               </label>
 
               {/* Project override */}

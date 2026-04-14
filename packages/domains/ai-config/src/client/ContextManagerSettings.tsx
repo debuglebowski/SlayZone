@@ -4,7 +4,7 @@ import {
   Plus, Sparkles, Server, FileText, FolderTree, Settings2,
   type LucideIcon
 } from 'lucide-react'
-import { Button, cn, Switch } from '@slayzone/ui'
+import { Button, cn, Switch, Tooltip, TooltipContent, TooltipTrigger } from '@slayzone/ui'
 import { buildDefaultSkillContent } from '../shared'
 import type {
   AiConfigItem, AiConfigScope, CliProvider,
@@ -167,17 +167,22 @@ function ProvidersPanel() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    void (async () => {
+    const fetch = async () => {
       try {
         const list = await window.api.aiConfig.listProviders()
         setProviders(list)
       } finally {
         setLoading(false)
       }
-    })()
+    }
+    void fetch()
+    const handler = () => { void fetch() }
+    window.addEventListener('sz:settings-changed', handler)
+    return () => window.removeEventListener('sz:settings-changed', handler)
   }, [])
 
   const handleToggle = async (provider: CliProviderInfo) => {
+    if (provider.isDefault) return
     const newEnabled = !provider.enabled
     await window.api.aiConfig.toggleProvider(provider.id, newEnabled)
     setProviders(prev => prev.map(p => p.id === provider.id ? { ...p, enabled: newEnabled } : p))
@@ -207,12 +212,26 @@ function ProvidersPanel() {
               {isPlaceholder && (
                 <p className="text-[11px] text-muted-foreground">Coming soon</p>
               )}
+              {provider.isDefault && (
+                <p className="text-[11px] text-muted-foreground">Default provider</p>
+              )}
             </div>
-            <Switch
-              checked={provider.enabled}
-              onCheckedChange={() => handleToggle(provider)}
-              disabled={isPlaceholder}
-            />
+            {provider.isDefault ? (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span>
+                    <Switch checked disabled />
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent>Cannot disable — this is your default terminal mode</TooltipContent>
+              </Tooltip>
+            ) : (
+              <Switch
+                checked={provider.enabled}
+                onCheckedChange={() => handleToggle(provider)}
+                disabled={isPlaceholder}
+              />
+            )}
           </div>
         )
       })}
