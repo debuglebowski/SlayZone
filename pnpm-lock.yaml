@@ -1288,6 +1288,9 @@ importers:
 
   packages/shared/test-utils:
     dependencies:
+      '@slayzone/platform':
+        specifier: workspace:*
+        version: link:../platform
       better-sqlite3:
         specifier: ^12.8.0
         version: 12.8.0
