@@ -864,6 +864,7 @@ function App(): React.JSX.Element {
   // Scratch terminal
   const handleCreateScratchTerminal = useCallback(async (): Promise<void> => {
     if (!selectedProjectId) return
+    if (durationLocked) return
     const existing = tasks.filter((t) => t.project_id === selectedProjectId).map((t) => t.title.match(/^Terminal (\d+)$/)).filter(Boolean).map((m) => parseInt(m![1], 10))
     const next = existing.length > 0 ? Math.max(...existing) + 1 : 1
     const status = getDefaultStatus(selectedProject?.columns_config)
@@ -874,7 +875,7 @@ function App(): React.JSX.Element {
     const lookup = useTabStore.getState()._taskLookup
     useTabStore.setState({ _taskLookup: { ...lookup, tasks: [task, ...lookup.tasks] } })
     openTask(task.id)
-  }, [selectedProjectId, selectedProject, tasks, setTasks, openTask])
+  }, [selectedProjectId, selectedProject, tasks, setTasks, openTask, durationLocked])
 
   useEffect(() => {
     ;(window as { __slayzone_createScratchTerminal?: () => Promise<void> }).__slayzone_createScratchTerminal = handleCreateScratchTerminal
@@ -890,6 +891,7 @@ function App(): React.JSX.Element {
 
   const handleTaskCreatedAndOpen = (task: Task): void => {
     setTasks((prev) => [task, ...prev]); useDialogStore.getState().closeCreateTask()
+    if (durationLocked) return
     setTerminalFocusRequests((prev) => ({ ...prev, [task.id]: (prev[task.id] ?? 0) + 1 }))
     const lookup = useTabStore.getState()._taskLookup
     useTabStore.setState({ _taskLookup: { ...lookup, tasks: [task, ...lookup.tasks] } })
@@ -1045,12 +1047,12 @@ function App(): React.JSX.Element {
                     </button>
                   </TooltipTrigger><TooltipContent side="bottom" className="text-xs">{explodeMode ? 'Exit explode mode' : 'Explode mode'} ({explodeModeShortcut})</TooltipContent></Tooltip>
                   <Tooltip><TooltipTrigger asChild>
-                    <button onClick={selectedProjectId ? handleCreateScratchTerminal : undefined} disabled={!selectedProjectId}
-                      className={cn("h-7 w-7 flex items-center justify-center transition-colors", selectedProjectId ? "text-muted-foreground hover:text-foreground" : "text-muted-foreground/40 cursor-not-allowed")}>
+                    <button onClick={selectedProjectId && !durationLocked ? handleCreateScratchTerminal : undefined} disabled={!selectedProjectId || durationLocked}
+                      className={cn("h-7 w-7 flex items-center justify-center transition-colors", selectedProjectId && !durationLocked ? "text-muted-foreground hover:text-foreground" : "text-muted-foreground/40 cursor-not-allowed")}>
                       <TerminalSquare className="size-4" />
                     </button>
                   </TooltipTrigger><TooltipContent side="bottom" className="text-xs max-w-64">
-                    {selectedProjectId ? <div className="space-y-1"><p>{withShortcut('New temporary task', newTempTaskShortcut)}</p><p className="text-muted-foreground">Temporary tasks auto-delete on close.</p></div> : <p>Select a project first</p>}
+                    {!selectedProjectId ? <p>Select a project first</p> : durationLocked ? <p>Project locked</p> : <div className="space-y-1"><p>{withShortcut('New temporary task', newTempTaskShortcut)}</p><p className="text-muted-foreground">Temporary tasks auto-delete on close.</p></div>}
                   </TooltipContent></Tooltip>
                   <DesktopNotificationToggle enabled={notificationState.desktopEnabled} onToggle={() => {
                     if (notificationState.desktopEnabled) window.api.pty.dismissAllNotifications()
