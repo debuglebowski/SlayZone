@@ -1,5 +1,37 @@
 [
   {
+    "version": "0.20.0",
+    "date": "2026-04-15",
+    "tagline": "Locks graduate, assets live",
+    "items": [
+      {
+        "category": "improvement",
+        "title": "Project Lock graduated",
+        "description": "Project Lock moved out of Labs into the main Settings."
+      },
+      {
+        "category": "improvement",
+        "title": "Lock UX overhaul",
+        "description": "Full-takeover lock screen with Re-lock and Apply actions, plus blocked task creation while locked."
+      },
+      {
+        "category": "improvement",
+        "title": "Notes line-spacing split",
+        "description": "Split notes line-spacing into separate Readability and Width controls."
+      },
+      {
+        "category": "fix",
+        "title": "Live asset UI",
+        "description": "Task asset panel now refreshes when file content changes on disk."
+      },
+      {
+        "category": "fix",
+        "title": "Instructions edits survive",
+        "description": "AI config instructions no longer lose edits and react to disk changes."
+      }
+    ]
+  },
+  {
     "version": "0.19.0",
     "date": "2026-04-14",
     "tagline": "Locks, tabs & providers",

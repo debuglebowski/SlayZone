@@ -1,6 +1,30 @@
 # Changelog
 
 
+## v0.20.0
+
+[compare changes](https://github.com/debuglebowski/slayzone/compare/v0.19.0...v0.20.0)
+
+### 🚀 Enhancements
+
+- **editor:** Split notes line-spacing into Readability + Width ([fb0634b5](https://github.com/debuglebowski/slayzone/commit/fb0634b5))
+- **projects:** Lock UX overhaul — full takeover, Re-lock, Apply ([d2bf7b77](https://github.com/debuglebowski/slayzone/commit/d2bf7b77))
+- **projects:** Block task creation while locked + lock guard tests ([0cea642d](https://github.com/debuglebowski/slayzone/commit/0cea642d))
+- **settings:** Graduate Project Lock from Labs ([8501cb60](https://github.com/debuglebowski/slayzone/commit/8501cb60))
+
+### 🩹 Fixes
+
+- **task:** Refresh asset UI when content changes on disk ([c2b2d875](https://github.com/debuglebowski/slayzone/commit/c2b2d875))
+- **ai-config:** Stop losing instructions edits + react to disk changes ([e6428b60](https://github.com/debuglebowski/slayzone/commit/e6428b60))
+
+### 📖 Documentation
+
+- **skills:** Document SLAYZONE_PROJECT_ID + sync slay reference ([296a6f47](https://github.com/debuglebowski/slayzone/commit/296a6f47))
+
+### ❤️ Contributors
+
+- Debuglebowski
+
 ## v0.19.0
 
 [compare changes](https://github.com/debuglebowski/slayzone/compare/v0.18.0...v0.19.0)
