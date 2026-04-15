@@ -388,8 +388,6 @@ export interface ElectronAPI {
     isJiraIntegrationEnabledSync: boolean
     isLoopModeEnabled: () => Promise<boolean>
     isLoopModeEnabledSync: boolean
-    isProjectLockEnabled: () => Promise<boolean>
-    isProjectLockEnabledSync: boolean
     getZoomFactor: () => Promise<number>
     adjustZoom: (command: 'in' | 'out' | 'reset') => Promise<number>
     isPlaywright: boolean

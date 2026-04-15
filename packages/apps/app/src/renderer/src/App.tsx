@@ -168,7 +168,6 @@ function App(): React.JSX.Element {
   const [colorTintsEnabled, setColorTintsEnabled] = useState(true)
   const [showContextManager, setShowContextManager] = useState(true)
   const [testsPanelEnabled, setTestsPanelEnabled] = useState(false)
-  const [projectLockEnabled, setProjectLockEnabled] = useState(false)
   const [settingsInitialTab, setSettingsInitialTab] = useState<string>('appearance')
   const [settingsInitialAiConfigSection, setSettingsInitialAiConfigSection] = useState<ContextManagerSection | null>(null)
   const onboardingOpen = useDialogStore((s) => s.onboardingOpen)
@@ -313,18 +312,16 @@ function App(): React.JSX.Element {
   const selectedProject = useMemo(() => projects.find((p) => p.id === selectedProjectId) ?? null, [projects, selectedProjectId])
 
   // Project lock guard — wraps all task-open paths
-  const durationLocked = projectLockEnabled && (isProjectDurationLocked(selectedProject) || isScheduleLocked(selectedProject))
+  const durationLocked = isProjectDurationLocked(selectedProject) || isScheduleLocked(selectedProject)
   const guardTaskOpen = useCallback((taskId: string, fn: (id: string) => void) => {
-    if (projectLockEnabled) {
-      const existing = useTabStore.getState().tabs.some(t => t.type === 'task' && t.taskId === taskId)
-      if (!existing && selectedProject && isRateLimited(selectedProject)) {
-        toast('Task limit reached — try again later')
-        return
-      }
-      if (!existing && selectedProject) recordTaskOpen(selectedProject.id)
+    const existing = useTabStore.getState().tabs.some(t => t.type === 'task' && t.taskId === taskId)
+    if (!existing && selectedProject && isRateLimited(selectedProject)) {
+      toast('Task limit reached — try again later')
+      return
     }
+    if (!existing && selectedProject) recordTaskOpen(selectedProject.id)
     fn(taskId)
-  }, [projectLockEnabled, selectedProject])
+  }, [selectedProject])
 
   const openTask = useCallback((taskId: string) => {
     guardTaskOpen(taskId, (id) => startTransition(() => rawOpenTask(id)))
@@ -377,7 +374,6 @@ function App(): React.JSX.Element {
     window.api.settings.get('project_color_tints_enabled').then((v) => setColorTintsEnabled(v !== '0'))
     window.api.settings.get('show_context_manager').then((v) => setShowContextManager(v !== '0'))
     window.api.app.isTestsPanelEnabled().then(setTestsPanelEnabled)
-    window.api.app.isProjectLockEnabled().then(setProjectLockEnabled)
   }, [settingsRevision])
 
   // Close context manager when hidden
@@ -1101,7 +1097,7 @@ function App(): React.JSX.Element {
                           </div>
                           {projects.length > 0 && !(projectPathMissing && selectedProjectId) && (
                             <div className="ml-auto flex items-center gap-1">
-                              {selectedProject && projectLockEnabled && hasActiveLockOverride(selectedProject) && (
+                              {selectedProject && hasActiveLockOverride(selectedProject) && (
                                 <Button
                                   variant="ghost"
                                   size="sm"
@@ -1115,7 +1111,7 @@ function App(): React.JSX.Element {
                                   Re-lock
                                 </Button>
                               )}
-                              {selectedProject && projectLockEnabled && <ProjectLockPopover project={selectedProject} onUpdated={updateProject} />}
+                              {selectedProject && <ProjectLockPopover project={selectedProject} onUpdated={updateProject} />}
                               <div className="h-4 w-px bg-border" />
                               <FilterBar filter={filter} onChange={setFilter} tags={projectTags} columns={selectedProject?.columns_config} />
                             </div>
