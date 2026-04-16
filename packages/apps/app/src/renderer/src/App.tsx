@@ -482,7 +482,11 @@ function App(): React.JSX.Element {
 
   // Keyboard shortcuts
   useGuardedHotkeys(getKeys('new-task'), (e) => {
-    if (projects.length > 0) { e.preventDefault(); trackShortcut(getKeys('new-task')); useDialogStore.getState().openCreateTask() }
+    if (projects.length > 0) {
+      e.preventDefault(); trackShortcut(getKeys('new-task'))
+      if (durationLocked) { toast('Project is locked — cannot open new tabs'); return }
+      useDialogStore.getState().openCreateTask()
+    }
   }, { enableOnFormTags: true, enabled: !isRecording })
 
   // Build a snapshot of the home file-open context for the unified palette.
@@ -860,7 +864,7 @@ function App(): React.JSX.Element {
   // Scratch terminal
   const handleCreateScratchTerminal = useCallback(async (): Promise<void> => {
     if (!selectedProjectId) return
-    if (durationLocked) return
+    if (durationLocked) { toast('Project is locked — cannot open new tabs'); return }
     const existing = tasks.filter((t) => t.project_id === selectedProjectId).map((t) => t.title.match(/^Terminal (\d+)$/)).filter(Boolean).map((m) => parseInt(m![1], 10))
     const next = existing.length > 0 ? Math.max(...existing) + 1 : 1
     const status = getDefaultStatus(selectedProject?.columns_config)
@@ -887,7 +891,7 @@ function App(): React.JSX.Element {
 
   const handleTaskCreatedAndOpen = (task: Task): void => {
     setTasks((prev) => [task, ...prev]); useDialogStore.getState().closeCreateTask()
-    if (durationLocked) return
+    if (durationLocked) { toast('Project is locked — cannot open new tabs'); return }
     setTerminalFocusRequests((prev) => ({ ...prev, [task.id]: (prev[task.id] ?? 0) + 1 }))
     const lookup = useTabStore.getState()._taskLookup
     useTabStore.setState({ _taskLookup: { ...lookup, tasks: [task, ...lookup.tasks] } })
