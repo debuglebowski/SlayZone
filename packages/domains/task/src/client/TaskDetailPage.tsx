@@ -973,6 +973,14 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
   )
   handlePanelToggleRef.current = handlePanelToggle
 
+  const openAssetRef = useRef<(taskId: string, assetId: string) => void>(() => {})
+  openAssetRef.current = (targetTaskId, assetId) => {
+    if (!task || targetTaskId !== task.id) return
+    if (!panelVisibility.assets) handlePanelToggle('assets', true)
+    assetsPanelRef.current?.selectAsset(assetId)
+  }
+  useEffect(() => window.api.app.onOpenAsset((tid, aid) => openAssetRef.current(tid, aid)), [])
+
   const handleQuickOpenFile = useCallback((filePath: string, options?: OpenFileOptions) => {
     if (fileEditorRef.current) {
       fileEditorRef.current.openFile(filePath, options)

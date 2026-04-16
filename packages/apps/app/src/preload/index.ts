@@ -218,6 +218,11 @@ const api: ElectronAPI = {
       ipcRenderer.on('app:open-task', handler)
       return () => ipcRenderer.removeListener('app:open-task', handler)
     },
+    onOpenAsset: (callback: (taskId: string, assetId: string) => void) => {
+      const handler = (_: unknown, payload: { taskId: string; assetId: string }) => callback(payload.taskId, payload.assetId)
+      ipcRenderer.on('app:open-asset', handler)
+      return () => ipcRenderer.removeListener('app:open-asset', handler)
+    },
     onScreenshotTrigger: (callback: () => void) => {
       const handler = () => callback()
       ipcRenderer.on('app:screenshot-trigger', handler)
@@ -479,7 +484,14 @@ const api: ElectronAPI = {
     mergePr: (input) => ipcRenderer.invoke('git:mergePr', input),
     getPrDiff: (repoPath, prNumber) => ipcRenderer.invoke('git:getPrDiff', repoPath, prNumber),
     getGhUser: (repoPath) => ipcRenderer.invoke('git:getGhUser', repoPath),
-    editPrComment: (input) => ipcRenderer.invoke('git:editPrComment', input)
+    editPrComment: (input) => ipcRenderer.invoke('git:editPrComment', input),
+    listStashes: (repoPath) => ipcRenderer.invoke('git:listStashes', repoPath),
+    createStash: (repoPath, message, includeUntracked, keepIndex) => ipcRenderer.invoke('git:createStash', repoPath, message, includeUntracked, keepIndex),
+    applyStash: (repoPath, index) => ipcRenderer.invoke('git:applyStash', repoPath, index),
+    popStash: (repoPath, index) => ipcRenderer.invoke('git:popStash', repoPath, index),
+    dropStash: (repoPath, index) => ipcRenderer.invoke('git:dropStash', repoPath, index),
+    branchFromStash: (repoPath, index, branchName) => ipcRenderer.invoke('git:branchFromStash', repoPath, index, branchName),
+    getStashDiff: (repoPath, index) => ipcRenderer.invoke('git:getStashDiff', repoPath, index)
   },
   tabs: {
     list: (taskId) => ipcRenderer.invoke('tabs:list', taskId),

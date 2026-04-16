@@ -17,7 +17,7 @@ import type {
 } from '@slayzone/terminal/shared'
 import type { TerminalTab, CreateTerminalTabInput, UpdateTerminalTabInput } from '@slayzone/task-terminals/shared'
 import type { Theme, ThemePreference } from '@slayzone/settings/shared'
-import type { CreateWorktreeOpts, IgnoredFileNode, DetectedWorktree, MergeResult, MergeWithAIResult, GitDiffSnapshot, GitSyncResult, ConflictFileContent, ConflictAnalysis, RebaseProgress, CommitInfo, AheadBehind, StatusSummary, BranchListResult, DeleteBranchResult, PruneResult, DiffStatsSummary, WorktreeMetadata, RebaseOntoResult, DagCommit, ResolvedGraph, ForkGraphResult, GhPullRequest, GhPrTimelineEvent, CreatePrInput, CreatePrResult, MergePrInput, EditPrCommentInput } from '@slayzone/worktrees/shared'
+import type { CreateWorktreeOpts, IgnoredFileNode, DetectedWorktree, MergeResult, MergeWithAIResult, GitDiffSnapshot, GitSyncResult, ConflictFileContent, ConflictAnalysis, RebaseProgress, CommitInfo, AheadBehind, StatusSummary, BranchListResult, DeleteBranchResult, PruneResult, DiffStatsSummary, WorktreeMetadata, RebaseOntoResult, DagCommit, ResolvedGraph, ForkGraphResult, GhPullRequest, GhPrTimelineEvent, CreatePrInput, CreatePrResult, MergePrInput, EditPrCommentInput, StashEntry, StashApplyResult } from '@slayzone/worktrees/shared'
 import type { MergeContext } from '@slayzone/task/shared'
 import type {
   AiConfigItem,
@@ -402,6 +402,7 @@ export interface ElectronAPI {
     onCloseTask: (callback: (taskId: string) => void) => () => void
     onBrowserEnsurePanelOpen: (callback: (taskId: string, url?: string) => void) => () => void
     onOpenTask: (callback: (taskId: string) => void) => () => void
+    onOpenAsset: (callback: (taskId: string, assetId: string) => void) => () => void
     onScreenshotTrigger: (callback: () => void) => () => void
     onUpdateStatus: (callback: (status: UpdateStatus) => void) => () => void
     onCloseCurrent: (callback: () => void) => () => void
@@ -566,6 +567,14 @@ export interface ElectronAPI {
     getPrDiff: (repoPath: string, prNumber: number) => Promise<string>
     getGhUser: (repoPath: string) => Promise<string>
     editPrComment: (input: EditPrCommentInput) => Promise<void>
+    // Stash
+    listStashes: (repoPath: string) => Promise<StashEntry[]>
+    createStash: (repoPath: string, message: string, includeUntracked: boolean, keepIndex: boolean) => Promise<GitSyncResult>
+    applyStash: (repoPath: string, index: number) => Promise<StashApplyResult>
+    popStash: (repoPath: string, index: number) => Promise<StashApplyResult>
+    dropStash: (repoPath: string, index: number) => Promise<GitSyncResult>
+    branchFromStash: (repoPath: string, index: number, branchName: string) => Promise<GitSyncResult>
+    getStashDiff: (repoPath: string, index: number) => Promise<string>
   }
   tabs: {
     list: (taskId: string) => Promise<TerminalTab[]>

@@ -1401,6 +1401,8 @@ function assetsSubcommand(): Command {
 
       db.close()
       await notifyApp()
+      const openPort = getMcpPort()
+      if (openPort) await postJson(openPort, `/api/open-asset/${id}`)
 
       if (opts.json) {
         console.log(JSON.stringify({ id, task_id: task.id, title, render_mode: opts.renderMode ?? null, order: maxOrder + 1, created_at: now, updated_at: now }, null, 2))
@@ -1444,6 +1446,8 @@ function assetsSubcommand(): Command {
 
       db.close()
       await notifyApp()
+      const openPort = getMcpPort()
+      if (openPort) await postJson(openPort, `/api/open-asset/${id}`)
 
       if (opts.json) {
         console.log(JSON.stringify({ id, task_id: task.id, title, order: maxOrder + 1, created_at: now, updated_at: now }, null, 2))
