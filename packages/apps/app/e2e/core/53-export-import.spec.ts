@@ -183,4 +183,70 @@ test.describe('Export & Import', () => {
     expect(result.success).toBe(false)
     expect(result.error).toContain('Unsupported export version')
   })
+
+  test('import project with sub-tasks + stale parent_id succeeds', async ({ mainWindow }) => {
+    const s = seed(mainWindow)
+    const fkProject = await s.createProject({
+      name: 'FK Project',
+      color: '#14b8a6',
+      path: TEST_PROJECT_PATH
+    })
+
+    // Create child BEFORE parent so child's rowid is lower. SELECT * returns
+    // rowid order → child row appears before parent in the bundle. Without
+    // deferred FKs the INSERT for child would fail (parent not yet present).
+    const child = await s.createTask({ projectId: fkProject.id, title: 'FK Child' })
+    const parent = await s.createTask({ projectId: fkProject.id, title: 'FK Parent' })
+    const orphan = await s.createTask({ projectId: fkProject.id, title: 'FK Orphan' })
+
+    // Wire parent_id via test-only IPC (disables FK checks to seed stale ref).
+    await testInvoke(mainWindow, 'export-import:test:set-task-parent', child.id, parent.id)
+    await testInvoke(
+      mainWindow,
+      'export-import:test:set-task-parent',
+      orphan.id,
+      '00000000-0000-4000-8000-000000000000'
+    )
+
+    const filePath = path.join(exportDir, 'fk-project.slay')
+    const exportResult = await testInvoke(
+      mainWindow,
+      'export-import:test:export-project-to-path',
+      fkProject.id,
+      filePath
+    )
+    expect(exportResult.success).toBe(true)
+
+    const importResult = await testInvoke(
+      mainWindow,
+      'export-import:test:import-from-path',
+      filePath
+    )
+    expect(importResult.success).toBe(true)
+    expect(importResult.error).toBeUndefined()
+    expect(importResult.taskCount).toBe(3)
+
+    await s.refreshData()
+    const allTasks = await s.getTasks()
+    const importedProjectId = importResult.importedProjects[0].id
+    const importedTasks = allTasks.filter(
+      (t: { project_id: string }) => t.project_id === importedProjectId
+    )
+    expect(importedTasks).toHaveLength(3)
+
+    const byTitle = new Map<string, { id: string; parent_id: string | null }>(
+      importedTasks.map((t: { title: string; id: string; parent_id: string | null }) => [
+        t.title,
+        { id: t.id, parent_id: t.parent_id }
+      ])
+    )
+    const importedParent = byTitle.get('FK Parent')!
+    const importedChild = byTitle.get('FK Child')!
+    const importedOrphan = byTitle.get('FK Orphan')!
+
+    // Parent/child link preserved via remap despite insertion order.
+    expect(importedChild.parent_id).toBe(importedParent.id)
+    // Stale parent_id nulled out — no crash, no dangling ref.
+    expect(importedOrphan.parent_id).toBeNull()
+  })
 })

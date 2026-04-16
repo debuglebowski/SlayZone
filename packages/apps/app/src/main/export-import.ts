@@ -151,21 +151,52 @@ function exportProject(db: Database, projectId: string): SlayExportBundle {
 
 // ── Import ───────────────────────────────────────────────────────────────────
 
-// Columns that reference other entity IDs and need remapping.
-// value = true means nullable (skip remap if null), false = required
-const FK_MAP: Record<string, Record<string, boolean>> = {
-  tasks: { project_id: false, parent_id: true },
-  task_tags: { task_id: false, tag_id: false },
-  task_dependencies: { task_id: false, blocks_task_id: false },
-  terminal_tabs: { task_id: false },
-  ai_config_items: { project_id: true },
-  ai_config_project_selections: { project_id: false, item_id: false }
-}
-
 // Columns that are reserved SQL words and need quoting
 const RESERVED_COLUMNS = new Set(['order', 'key', 'value', 'group', 'default'])
 
-function insertRow(db: Database, table: string, row: Row, remap: Map<string, string>): void {
+interface FkColInfo {
+  nullable: boolean
+}
+
+// Whitelist of tables we import into — used to validate PRAGMA table-name
+// interpolation (PRAGMAs don't support parameter binding).
+const IMPORT_TABLES = new Set([
+  'projects',
+  'tasks',
+  'tags',
+  'task_tags',
+  'task_dependencies',
+  'terminal_tabs',
+  'ai_config_items',
+  'ai_config_project_selections',
+  'ai_config_sources',
+  'settings'
+])
+
+function buildFkInfo(db: Database, table: string): Map<string, FkColInfo> {
+  if (!IMPORT_TABLES.has(table)) throw new Error(`Unknown import table: ${table}`)
+  const fks = db.prepare(`PRAGMA foreign_key_list("${table}")`).all() as Array<{
+    from: string
+  }>
+  const cols = db.prepare(`PRAGMA table_info("${table}")`).all() as Array<{
+    name: string
+    notnull: number
+  }>
+  const nullableByCol = new Map(cols.map((c) => [c.name, c.notnull === 0]))
+  const result = new Map<string, FkColInfo>()
+  for (const fk of fks) {
+    result.set(fk.from, { nullable: nullableByCol.get(fk.from) ?? true })
+  }
+  return result
+}
+
+function insertRow(
+  db: Database,
+  table: string,
+  row: Row,
+  remap: Map<string, string>,
+  fkInfo: Map<string, FkColInfo>
+): void {
   const remapped = { ...row }
 
   // Remap primary key
@@ -173,18 +204,20 @@ function insertRow(db: Database, table: string, row: Row, remap: Map<string, str
     remapped.id = remap.get(remapped.id as string)
   }
 
-  // Remap foreign keys
-  const fks = FK_MAP[table]
-  if (fks) {
-    for (const [col, nullable] of Object.entries(fks)) {
-      const val = remapped[col]
-      if (val == null) continue
-      if (remap.has(val as string)) {
-        remapped[col] = remap.get(val as string)
-      } else if (!nullable) {
-        // FK target not in remap — skip this row
-        return
-      }
+  // Remap foreign keys. Cases:
+  //   val == null                    → leave null
+  //   val in remap                   → rewrite to new id
+  //   val not in remap, nullable     → null out stale ref
+  //   val not in remap, not-nullable → skip row entirely
+  for (const [col, info] of fkInfo) {
+    const val = remapped[col]
+    if (val == null) continue
+    if (remap.has(val as string)) {
+      remapped[col] = remap.get(val as string)
+    } else if (info.nullable) {
+      remapped[col] = null
+    } else {
+      return
     }
   }
 
@@ -255,49 +288,59 @@ function importBundle(db: Database, bundle: SlayExportBundle): ImportResult {
     if ('opencode_conversation_id' in t) t.opencode_conversation_id = null
   }
 
+  const fkInfoByTable = new Map<string, Map<string, FkColInfo>>()
+  const fkInfo = (table: string): Map<string, FkColInfo> => {
+    let info = fkInfoByTable.get(table)
+    if (!info) {
+      info = buildFkInfo(db, table)
+      fkInfoByTable.set(table, info)
+    }
+    return info
+  }
+
   const insertAll = db.transaction(() => {
-    // 1. Projects
-    for (const p of data.projects) insertRow(db, 'projects', p, remap)
+    // Defer FK checks to COMMIT so insertion order within this transaction
+    // doesn't matter (e.g. child task whose parent appears later in the
+    // bundle). Auto-resets at transaction end.
+    db.pragma('defer_foreign_keys = ON')
 
-    // 2. Tasks (parent_id may reference other tasks — order doesn't matter
-    //    since we defer FK checks within the transaction)
-    for (const t of data.tasks) insertRow(db, 'tasks', t, remap)
+    for (const p of data.projects) insertRow(db, 'projects', p, remap, fkInfo('projects'))
 
-    // 3. Tags (skip if already exists — reused via remap)
+    for (const t of data.tasks) insertRow(db, 'tasks', t, remap, fkInfo('tasks'))
+
     for (const tag of data.tags) {
       const newId = remap.get(tag.id as string)!
       const exists = db.prepare('SELECT id FROM tags WHERE id = ?').get(newId)
-      if (!exists) insertRow(db, 'tags', tag, remap)
+      if (!exists) insertRow(db, 'tags', tag, remap, fkInfo('tags'))
     }
 
-    // 4. Task tags
-    for (const tt of data.task_tags) insertRow(db, 'task_tags', tt, remap)
+    for (const tt of data.task_tags)
+      insertRow(db, 'task_tags', tt, remap, fkInfo('task_tags'))
 
-    // 5. Task dependencies
-    for (const dep of data.task_dependencies) insertRow(db, 'task_dependencies', dep, remap)
+    for (const dep of data.task_dependencies)
+      insertRow(db, 'task_dependencies', dep, remap, fkInfo('task_dependencies'))
 
-    // 6. Terminal tabs
-    for (const tab of data.terminal_tabs) insertRow(db, 'terminal_tabs', tab, remap)
+    for (const tab of data.terminal_tabs)
+      insertRow(db, 'terminal_tabs', tab, remap, fkInfo('terminal_tabs'))
 
-    // 7. AI config items
-    for (const item of data.ai_config_items) insertRow(db, 'ai_config_items', item, remap)
+    for (const item of data.ai_config_items)
+      insertRow(db, 'ai_config_items', item, remap, fkInfo('ai_config_items'))
 
-    // 8. AI config project selections
     for (const sel of data.ai_config_project_selections)
-      insertRow(db, 'ai_config_project_selections', sel, remap)
+      insertRow(db, 'ai_config_project_selections', sel, remap, fkInfo('ai_config_project_selections'))
 
-    // 9. Settings (all-export only, don't overwrite existing)
+    // Settings (all-export only, don't overwrite existing)
     for (const s of data.settings) {
       const exists = db.prepare('SELECT key FROM settings WHERE key = ?').get(s.key as string)
-      if (!exists) insertRow(db, 'settings', s, remap)
+      if (!exists) insertRow(db, 'settings', s, remap, fkInfo('settings'))
     }
 
-    // 10. AI config sources (all-export only, don't overwrite existing)
+    // AI config sources (all-export only, don't overwrite existing)
     for (const src of data.ai_config_sources) {
       const exists = db.prepare('SELECT id FROM ai_config_sources WHERE id = ?').get(src.id as string)
       if (!exists) {
         remap.set(src.id as string, crypto.randomUUID())
-        insertRow(db, 'ai_config_sources', src, remap)
+        insertRow(db, 'ai_config_sources', src, remap, fkInfo('ai_config_sources'))
       }
     }
   })
@@ -450,5 +493,25 @@ export function registerExportImportHandlers(ipcMain: IpcMain, db: Database, isT
         return { success: false, error: String(e) }
       }
     })
+
+    // Test-only: set parent_id directly. Allows tests to simulate stale
+    // (orphan) FKs by temporarily disabling FK checks for this single
+    // statement. Must not be exposed outside isTest mode.
+    ipcMain.handle(
+      'export-import:test:set-task-parent',
+      (_, taskId: string, parentId: string | null) => {
+        try {
+          db.pragma('foreign_keys = OFF')
+          try {
+            db.prepare('UPDATE tasks SET parent_id = ? WHERE id = ?').run(parentId, taskId)
+          } finally {
+            db.pragma('foreign_keys = ON')
+          }
+          return { success: true }
+        } catch (e) {
+          return { success: false, error: String(e) }
+        }
+      }
+    )
   }
 }
