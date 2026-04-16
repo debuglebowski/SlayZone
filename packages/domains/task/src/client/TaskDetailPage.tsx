@@ -162,6 +162,7 @@ export interface TaskDetailPageProps {
   project: Project | null
   isActive?: boolean
   compact?: boolean
+  zenMode?: boolean
   onBack: () => void
   onTaskUpdated: (task: Task) => void
   onArchiveTask?: (taskId: string) => Promise<void>
@@ -183,6 +184,7 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
   project: projectProp,
   isActive,
   compact,
+  zenMode,
   onBack,
   onTaskUpdated,
   onArchiveTask,
@@ -1440,7 +1442,7 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
         </div>
       )}
       {/* Header */}
-      {!compact && <header className="shrink-0 relative">
+      {!compact && !zenMode && <header className="shrink-0 relative">
         <div>
           <div className="flex items-center justify-between gap-4 window-no-drag">
             {task.is_temporary ? (

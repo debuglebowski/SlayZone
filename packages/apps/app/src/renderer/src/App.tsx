@@ -1,7 +1,7 @@
 import React, { Suspense, lazy, useState, useEffect, useRef, useMemo, useCallback, useTransition } from 'react'
 import { useGuardedHotkeys } from '@slayzone/ui'
 import { initShortcuts } from './shortcut-init'
-import { AlertTriangle, FolderClosed, LayoutGrid, TerminalSquare, GitBranch, FileCode, Cpu, Kanban, FlaskConical, Zap, BookOpen, Lock } from 'lucide-react'
+import { AlertTriangle, FolderClosed, LayoutGrid, TerminalSquare, GitBranch, FileCode, Cpu, Kanban, FlaskConical, Zap, BookOpen, Lock, Focus } from 'lucide-react'
 import { buildCreateTaskDraftFromBrowserLink } from '@slayzone/task/shared'
 import type { Task } from '@slayzone/task/shared'
 import type { Project } from '@slayzone/projects/shared'
@@ -433,6 +433,7 @@ function App(): React.JSX.Element {
   // Shortcut display strings (reactive to user customization)
   const projectScopedTabs = useTabStore((s) => s.projectScopedTabs)
   const explodeModeShortcut = useShortcutDisplay('explode-mode')
+  const zenModeShortcut = useShortcutDisplay('zen-mode')
   const projectTabsShortcut = useShortcutDisplay('toggle-project-tabs')
   const newTempTaskShortcut = useShortcutDisplay('new-temp-task')
   const panelGitShortcut = useShortcutDisplay('panel-git')
@@ -1048,6 +1049,12 @@ function App(): React.JSX.Element {
                     </button>
                   </TooltipTrigger><TooltipContent side="bottom" className="text-xs">{projectScopedTabs ? 'Show all tabs' : 'Show project tabs only'} ({projectTabsShortcut})</TooltipContent></Tooltip>
                   <Tooltip><TooltipTrigger asChild>
+                    <button onClick={() => setZenMode((prev) => !prev)}
+                      className={cn("h-7 w-7 flex items-center justify-center transition-colors border-b-2", zenMode ? "text-foreground border-foreground" : "text-muted-foreground border-transparent hover:text-foreground")}>
+                      <Focus className="size-4" />
+                    </button>
+                  </TooltipTrigger><TooltipContent side="bottom" className="text-xs">{zenMode ? 'Exit zen mode' : 'Zen mode'} ({zenModeShortcut})</TooltipContent></Tooltip>
+                  <Tooltip><TooltipTrigger asChild>
                     <button disabled={openTaskIds.length < 2} onClick={() => setExplodeMode((prev) => !prev)}
                       className={cn("h-7 w-7 flex items-center justify-center transition-colors border-b-2", explodeMode ? "text-foreground border-foreground" : "text-muted-foreground border-transparent hover:text-foreground", openTaskIds.length < 2 && "opacity-30 pointer-events-none")}>
                       <LayoutGrid className="size-4" />
@@ -1208,7 +1215,7 @@ function App(): React.JSX.Element {
                     <div className={explodeMode ? "absolute inset-0" : "h-full"}>
                       <TaskDetailDataLoader taskId={tab.taskId}
                         task={tasksMap.get(tab.taskId) ?? null} project={projectsMap.get(tasksMap.get(tab.taskId)?.project_id ?? '') ?? null}
-                        isActive={explodeMode || isViewActive} compact={explodeMode}
+                        isActive={explodeMode || isViewActive} compact={explodeMode} zenMode={zenMode}
                         onBack={goBack} onTaskUpdated={updateTask} onArchiveTask={archiveTask} onDeleteTask={deleteTask}
                         onNavigateToTask={openTask} onConvertTask={handleConvertTask} onCloseTab={closeTabByTaskId}
                         settingsRevision={settingsRevision} terminalFocusRequestId={terminalFocusRequests[tab.taskId] ?? 0}
