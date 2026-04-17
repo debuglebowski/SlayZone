@@ -1,5 +1,15 @@
+---
+import { MAC_ARM64_URL, MAC_X64_URL, WIN_URL, LINUX_URL } from '../../data/downloadUrls';
+
+const URLS = {
+  macArm64: MAC_ARM64_URL,
+  macX64: MAC_X64_URL,
+  win: WIN_URL,
+  linux: LINUX_URL,
+};
+---
 <!-- Cross-component scripts: download buttons (refs #dl-btn + #dl-btn-2) + click-floats -->
-<script is:inline>
+<script is:inline define:vars={{ URLS }}>
 // OS-aware download button
 (function(){
   var btns = [document.getElementById('dl-btn'), document.getElementById('dl-btn-2')];
@@ -17,11 +27,10 @@
     return 'arm64';
   }
   var macArch = getMacArch();
-  var base = 'https://github.com/debuglebowski/SlayZone/releases/latest/download/';
   var urls = {
-    mac: base + 'SlayZone-' + macArch + '.dmg',
-    win: base + 'SlayZone-setup.exe',
-    linux: base + 'SlayZone-x86_64.AppImage'
+    mac: macArch === 'x64' ? URLS.macX64 : URLS.macArm64,
+    win: URLS.win,
+    linux: URLS.linux
   };
   var os, icon, label;
   if (/Mac|iPhone|iPad|iPod/.test(ua)) { os='mac'; icon=icons.mac; label='Download for Mac'; }
