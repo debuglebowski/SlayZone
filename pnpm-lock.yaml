@@ -1480,7 +1480,13 @@ importers:
       '@astrojs/sitemap':
         specifier: ^3.7.1
         version: 3.7.1
+      js-yaml:
+        specifier: ^4.1.1
+        version: 4.1.1
     devDependencies:
+      '@types/js-yaml':
+        specifier: ^4.0.9
+        version: 4.0.9
       astro:
         specifier: ^5.14.3
         version: 5.18.1(@types/node@24.12.0)(jiti@2.6.1)(lightningcss@1.30.2)(rollup@4.55.1)(tsx@4.21.0)(typescript@5.9.3)
