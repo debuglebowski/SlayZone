@@ -2462,7 +2462,7 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
         {/* Processes Panel */}
         {!compact && panelVisibility.processes && (
           <div data-panel-id="processes" className={cn("shrink-0 rounded-md bg-surface-1 border border-border overflow-hidden flex flex-col transition-shadow duration-200", multipleVisiblePanels && focusedPanel === 'processes' && "shadow-[0_0_18px_rgba(255,255,255,0.25)]")} style={{ width: resolvedWidths.processes }}>
-            <ProcessesPanel taskId={task.id} projectId={project?.id ?? null} cwd={effectiveRepoPath || project?.path} terminalSessionId={getMainSessionId(task.id)} />
+            <ProcessesPanel taskId={task.id} projectId={project?.id ?? null} cwd={effectiveRepoPath || project?.path} terminalSessionId={getMainSessionId(task.id)} onOpenUrl={openDevServerInBrowser} />
           </div>
         )}
       </div>

@@ -72,6 +72,7 @@ function ProcessRow({
   onKill,
   onEdit,
   onInject,
+  onOpenUrl,
   logEndRef,
 }: {
   proc: ProcessEntry
@@ -83,6 +84,7 @@ function ProcessRow({
   onKill: () => void
   onEdit: () => void
   onInject: () => void
+  onOpenUrl?: (url: string) => void
   logEndRef: (el: HTMLDivElement | null) => void
 }) {
   const serverUrl = proc.status === 'running' ? proc.serverUrl ?? null : null
@@ -182,7 +184,11 @@ function ProcessRow({
             href={serverUrl}
             target="_blank"
             rel="noreferrer"
-            onClick={(e) => { e.preventDefault(); void window.api.shell.openExternal(serverUrl) }}
+            onClick={(e) => {
+              e.preventDefault()
+              if (onOpenUrl) onOpenUrl(serverUrl)
+              else void window.api.shell.openExternal(serverUrl)
+            }}
             className="inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full border shrink-0 text-sky-400 bg-sky-400/10 border-sky-400/20 hover:bg-sky-400/20 transition-colors"
             title={`Open ${serverUrl}`}
           >
@@ -244,7 +250,7 @@ function SectionHeader({ label }: { label: string }) {
   )
 }
 
-export function ProcessesPanel({ taskId, projectId, cwd, terminalSessionId }: { taskId: string | null; projectId: string | null; cwd?: string | null; terminalSessionId?: string }) {
+export function ProcessesPanel({ taskId, projectId, cwd, terminalSessionId, onOpenUrl }: { taskId: string | null; projectId: string | null; cwd?: string | null; terminalSessionId?: string; onOpenUrl?: (url: string) => void }) {
   const [processes, setProcesses] = useState<ProcessEntry[]>([])
   const [loading, setLoading] = useState(true)
   const [expandedLogs, setExpandedLogs] = useState<Set<string>>(new Set())
@@ -440,6 +446,7 @@ export function ProcessesPanel({ taskId, projectId, cwd, terminalSessionId }: { 
                     onKill={() => void handleKill(proc.id)}
                     onEdit={() => openEditDialog(proc)}
                     onInject={() => handleInject(proc)}
+                    onOpenUrl={onOpenUrl}
                     logEndRef={el => { logEndRefs.current[proc.id] = el }}
                   />
                 ))}
@@ -460,6 +467,7 @@ export function ProcessesPanel({ taskId, projectId, cwd, terminalSessionId }: { 
                     onKill={() => void handleKill(proc.id)}
                     onEdit={() => openEditDialog(proc)}
                     onInject={() => handleInject(proc)}
+                    onOpenUrl={onOpenUrl}
                     logEndRef={el => { logEndRefs.current[proc.id] = el }}
                   />
                 ))}
