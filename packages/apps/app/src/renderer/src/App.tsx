@@ -179,6 +179,10 @@ function App(): React.JSX.Element {
   const [terminalFocusRequests, setTerminalFocusRequests] = useState<Record<string, number>>({})
   const [zenMode, setZenMode] = useState(false)
   const [explodeMode, setExplodeMode] = useState(false)
+  // In explode mode, tracks which grid cell owns keyboard shortcuts (Cmd+D etc.).
+  // Null outside explode mode. Updated via focusin bubble on the grid wrapper.
+  const [focusedExplodeTaskId, setFocusedExplodeTaskId] = useState<string | null>(null)
+  const explodeGridRef = useRef<HTMLDivElement | null>(null)
   const [panelSizes, updatePanelSizes, resetPanelSize] = usePanelSizes()
   const { isBuiltinEnabled: isHomePanelEnabled } = usePanelConfig()
   const [updateVersion, setUpdateVersion] = useState<string | null>(null)
@@ -379,6 +383,32 @@ function App(): React.JSX.Element {
 
   // Auto-disable explode mode when fewer than 2 task tabs
   useEffect(() => { if (openTaskIds.length < 2) setExplodeMode(false) }, [openTaskIds.length])
+
+  // Seed / clear focused explode cell on mode toggle; keep valid as tabs change
+  useEffect(() => {
+    if (!explodeMode) { setFocusedExplodeTaskId(null); return }
+    setFocusedExplodeTaskId(prev => {
+      if (prev && openTaskIds.includes(prev)) return prev
+      const activeTab = tabs[activeTabIndex]
+      if (activeTab?.type === 'task') return activeTab.taskId
+      return openTaskIds[0] ?? null
+    })
+  }, [explodeMode, openTaskIds, activeTabIndex, tabs])
+
+  // Delegated focusin: bubble from xterm / editor / browser → grid cell; resolve task id.
+  useEffect(() => {
+    if (!explodeMode) return
+    const grid = explodeGridRef.current
+    if (!grid) return
+    const handleFocusIn = (e: FocusEvent): void => {
+      const target = e.target as HTMLElement | null
+      const cell = target?.closest('[data-explode-task-id]')
+      const id = cell?.getAttribute('data-explode-task-id')
+      if (id) setFocusedExplodeTaskId(id)
+    }
+    grid.addEventListener('focusin', handleFocusIn)
+    return () => grid.removeEventListener('focusin', handleFocusIn)
+  }, [explodeMode])
 
   // Read settings on mount and whenever settings change
   useEffect(() => {
@@ -1092,6 +1122,7 @@ function App(): React.JSX.Element {
           <div id="content-wrapper" className="flex-1 min-h-0 flex">
             <div id="main-area" className="flex-1 min-w-0 min-h-0 rounded-lg bg-surface-0 flex overflow-hidden p-4">
             <div
+              ref={explodeGridRef}
               className={cn("flex-1 min-w-0 min-h-0 rounded-lg overflow-hidden", explodeMode ? "grid gap-1 p-1" : "relative")}
               style={{
                 ...(explodeMode ? (() => { const visibleTaskCount = visibleTabs.filter(t => t.type === 'task').length; const cols = Math.ceil(Math.sqrt(visibleTaskCount)); const rows = Math.ceil(visibleTaskCount / cols); return { gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`, gridTemplateRows: `repeat(${rows}, minmax(0, 1fr))` } })() : undefined),
@@ -1101,10 +1132,14 @@ function App(): React.JSX.Element {
                 const isVisible = toVisibleIndex(i) >= 0
                 if (explodeMode && (tab.type !== 'task' || !isVisible)) return null
                 const isViewActive = activeView === 'tabs' && i === activeTabIndex
+                const isExplodeFocused = explodeMode && tab.type === 'task' && focusedExplodeTaskId === tab.taskId
                 return (
                 <div
                   key={tab.type === 'home' ? 'home' : tab.taskId}
-                  className={explodeMode ? "rounded overflow-hidden border border-border min-h-0 relative" : `absolute inset-0 ${!isViewActive ? 'invisible' : 'z-10'}`}
+                  data-explode-task-id={explodeMode && tab.type === 'task' ? tab.taskId : undefined}
+                  className={explodeMode
+                    ? cn("rounded overflow-hidden border min-h-0 relative", isExplodeFocused ? "border-primary/60 ring-2 ring-primary/40" : "border-border")
+                    : `absolute inset-0 ${!isViewActive ? 'invisible' : 'z-10'}`}
                   inert={!explodeMode && !isViewActive ? true : undefined}
                 >
                     {tab.type === 'home' ? (
@@ -1225,7 +1260,9 @@ function App(): React.JSX.Element {
                     <div className={explodeMode ? "absolute inset-0" : "h-full"}>
                       <TaskDetailDataLoader taskId={tab.taskId}
                         task={tasksMap.get(tab.taskId) ?? null} project={projectsMap.get(tasksMap.get(tab.taskId)?.project_id ?? '') ?? null}
-                        isActive={explodeMode || isViewActive} compact={explodeMode} zenMode={zenMode}
+                        isActive={explodeMode || isViewActive}
+                        hasShortcutFocus={explodeMode ? focusedExplodeTaskId === tab.taskId : isViewActive}
+                        compact={explodeMode} zenMode={zenMode}
                         onBack={goBack} onTaskUpdated={updateTask} onArchiveTask={archiveTask} onDeleteTask={deleteTask}
                         onNavigateToTask={openTask} onConvertTask={handleConvertTask} onCloseTab={closeTabByTaskId}
                         settingsRevision={settingsRevision} terminalFocusRequestId={terminalFocusRequests[tab.taskId] ?? 0}

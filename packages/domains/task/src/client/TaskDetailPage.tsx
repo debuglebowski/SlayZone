@@ -161,6 +161,8 @@ export interface TaskDetailPageProps {
   /** Live project object from global state (source of truth). */
   project: Project | null
   isActive?: boolean
+  /** Owns keyboard shortcuts. Defaults to `isActive`. In explode mode, only the focused cell has this true. */
+  hasShortcutFocus?: boolean
   compact?: boolean
   zenMode?: boolean
   onBack: () => void
@@ -183,6 +185,7 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
   task: taskProp,
   project: projectProp,
   isActive,
+  hasShortcutFocus,
   compact,
   zenMode,
   onBack,
@@ -201,6 +204,9 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
   // Prefer live global state; fall back to suspense-cached data for subtask race window
   const task = taskProp ?? initialData?.task ?? null
   const project = projectProp ?? initialData?.project ?? null
+
+  // Owns keyboard shortcuts; falls back to isActive so non-explode callers need not set it.
+  const shortcutActive = hasShortcutFocus ?? isActive
 
   const { modes } = useTerminalModes()
 
@@ -598,9 +604,9 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
 
   // Cmd+Shift+U: sync detected session ID to DB (only when this task is active and banner is showing)
   useEffect(() => {
-    if (!isActive) return
+    if (!shortcutActive) return
     return window.api.app.onSyncSessionId(() => { void handleUpdateSessionIdRef.current() })
-  }, [isActive])
+  }, [shortcutActive])
 
   // Persist detected conversation IDs immediately for modes that need session discovery.
   useEffect(() => {
@@ -741,7 +747,7 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
     }
 
     const handleKeyDown = withModalGuard((e: KeyboardEvent): void => {
-      if (!isActive) return
+      if (!shortcutActive) return
       if (useShortcutStore.getState().isRecording) return
       if (matchesShortcut(e, useShortcutStore.getState().getKeys('terminal-inject-desc'))) {
         if (!isTerminalFocused()) return
@@ -758,16 +764,16 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
     })
     window.addEventListener('keydown', handleKeyDown, { capture: true })
     return () => window.removeEventListener('keydown', handleKeyDown, { capture: true })
-  }, [isActive, handleInjectTitle, handleInjectDescription, handleRestartTerminal])
+  }, [shortcutActive, handleInjectTitle, handleInjectDescription, handleRestartTerminal])
 
   // Cmd+Shift+S screenshot trigger from main process
   useEffect(() => {
-    if (!isActive) return
+    if (!shortcutActive) return
     return window.api.app.onScreenshotTrigger(() => {
       const viewId = browserPanelRef.current?.getActiveViewId()
       if (viewId) void handleScreenshot(viewId)
     })
-  }, [isActive, handleScreenshot])
+  }, [shortcutActive, handleScreenshot])
 
   // Keep a ref so the onCloseCurrent handler always sees current browserTabs without re-subscribing
   const browserTabsRef = useRef(browserTabs)
@@ -809,7 +815,7 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
   // Cmd+W: close focused sub-item (terminal group, browser tab, editor file),
   // or fall through to close the task tab if nothing to close
   useEffect(() => {
-    if (!isActive) return
+    if (!shortcutActive) return
     return window.api.app.onCloseCurrent(async () => {
       const panel = lastFocusedPanelRef.current
       if (panel === 'terminal') {
@@ -835,7 +841,7 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
       // Nothing was closed — close the task tab
       onCloseTabRef.current?.(taskId)
     })
-  }, [isActive, setBrowserTabs])
+  }, [shortcutActive, setBrowserTabs])
 
   // Cmd+R browser reload is handled globally in App.tsx
 
@@ -1005,7 +1011,7 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
   // Cmd+T/B/G/S/E/P + web panel shortcuts for panel toggles
   useEffect(() => {
     const handleKeyDown = withModalGuard((e: KeyboardEvent): void => {
-      if (!isActive) return
+      if (!shortcutActive) return
       // Cmd+Shift+G: git diff tab toggle
       if (useShortcutStore.getState().isRecording) return
       const keys = (id: string) => useShortcutStore.getState().getKeys(id)
@@ -1123,7 +1129,7 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
     })
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [isActive, panelVisibility, handlePanelToggle, isBuiltinEnabled, enabledWebPanels, buildTaskFileContext])
+  }, [shortcutActive, panelVisibility, handlePanelToggle, isBuiltinEnabled, enabledWebPanels, buildTaskFileContext])
 
   // Focus and select title input when editing
   useEffect(() => {
@@ -1733,6 +1739,7 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
                   key={`${terminalKey}-${task.project_id}-${effectiveRepoPath || ''}-${task.worktree_path || ''}-${task.base_dir || ''}`}
                   taskId={task.id}
                   isActive={isActive}
+                  hasShortcutFocus={shortcutActive}
                   cwd={effectiveRepoPath || project?.path || ''}
                   defaultMode={task.terminal_mode}
                   conversationId={getConversationIdForMode(task) || undefined}

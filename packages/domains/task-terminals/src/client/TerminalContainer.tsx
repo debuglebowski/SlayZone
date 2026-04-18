@@ -22,6 +22,8 @@ interface TerminalContainerProps {
   providerFlags?: string
   executionContext?: import('@slayzone/terminal/shared').ExecutionContext | null
   isActive?: boolean
+  /** Owns keyboard shortcuts (Cmd+D, Cmd+T). Defaults to `isActive`. In explode mode, only the focused cell has this true. */
+  hasShortcutFocus?: boolean
   focusRequestId?: number
   onConversationCreated?: (conversationId: string) => void
   onSessionInvalid?: () => void
@@ -53,6 +55,7 @@ export const TerminalContainer = forwardRef<TerminalContainerHandle, TerminalCon
   providerFlags,
   executionContext,
   isActive = true,
+  hasShortcutFocus,
   focusRequestId = 0,
   onConversationCreated,
   onSessionInvalid,
@@ -79,6 +82,9 @@ export const TerminalContainer = forwardRef<TerminalContainerHandle, TerminalCon
     renameTab,
     getSessionId
   } = useTaskTerminals(taskId, defaultMode)
+
+  // Owns keyboard shortcuts; falls back to isActive so non-explode callers need not set it.
+  const shortcutActive = hasShortcutFocus ?? isActive
 
   const { subscribePrompt, subscribeTitle } = usePty()
   const { terminalOverrideThemeId, contentVariant } = useTheme()
@@ -141,7 +147,7 @@ export const TerminalContainer = forwardRef<TerminalContainerHandle, TerminalCon
 
   // Keyboard shortcuts
   useEffect(() => {
-    if (!isActive) return
+    if (!shortcutActive) return
     if (useShortcutStore.getState().isRecording) return
 
     const handleKeyDown = withModalGuard((e: KeyboardEvent) => {
@@ -166,7 +172,7 @@ export const TerminalContainer = forwardRef<TerminalContainerHandle, TerminalCon
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [isActive, activeGroup, createTab, splitTab, getSessionId])
+  }, [shortcutActive, activeGroup, createTab, splitTab, getSessionId])
 
   // Handle conversation created - only for main tab
   const handleConversationCreated = useCallback((convId: string) => {
@@ -220,15 +226,15 @@ export const TerminalContainer = forwardRef<TerminalContainerHandle, TerminalCon
     tryApplyFocusRequest()
   }, [tryApplyFocusRequest])
 
-  // Focus terminal when task becomes active
+  // Focus terminal when task becomes the shortcut-focused cell (or active in non-explode)
   useEffect(() => {
-    if (!isActive) return
+    if (!shortcutActive) return
     if (splitGroupRef.current) {
       splitGroupRef.current.focus()
     } else {
       pendingFocusRef.current = true
     }
-  }, [isActive])
+  }, [shortcutActive])
 
   const handlePaneAttached = useCallback((api: { sessionId: string; focus: () => void }) => {
     const pending = pendingFocusRef.current
