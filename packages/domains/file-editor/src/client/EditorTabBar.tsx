@@ -40,10 +40,10 @@ export function EditorTabBar({ files, activeFilePath, onSelect, onClose, isDirty
             key={file.path}
             className={cn(
               'group flex items-center gap-1.5 px-3 h-7 text-xs rounded-md shrink-0 transition-colors',
-              'bg-neutral-100 dark:bg-neutral-800/50 hover:bg-neutral-200/80 dark:hover:bg-neutral-700/50',
+              'bg-surface-2 dark:bg-surface-2/50 hover:bg-accent/80 dark:hover:bg-accent/50',
               active
-                ? 'bg-neutral-200 dark:bg-neutral-700 border border-neutral-300 dark:border-neutral-600 text-foreground'
-                : 'text-neutral-500 dark:text-neutral-400'
+                ? 'bg-tab-active border border-border text-foreground'
+                : 'text-muted-foreground dark:text-muted-foreground'
             )}
             onClick={() => onSelect(file.path)}
             onAuxClick={(e) => {

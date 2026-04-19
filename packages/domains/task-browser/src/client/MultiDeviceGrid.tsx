@@ -66,7 +66,7 @@ function DeviceColumn({ slot, preset, url, isResizing, reloadTrigger, forceReloa
         >
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <button className="pointer-events-auto flex items-center gap-1 text-xs font-medium text-neutral-300 hover:text-neutral-100 transition-colors">
+              <button className="pointer-events-auto flex items-center gap-1 text-xs font-medium text-foreground hover:text-muted-foreground transition-colors">
                 <span>{preset.name} — {preset.width}&times;{preset.height}</span>
                 <ChevronDown className="size-3" />
               </button>
@@ -82,7 +82,7 @@ function DeviceColumn({ slot, preset, url, isResizing, reloadTrigger, forceReloa
                 ).map(([cat, items], gi) => (
                   <div key={cat}>
                     {gi > 0 && <DropdownMenuSeparator />}
-                    <DropdownMenuLabel className="text-[10px] text-neutral-500 px-2 py-1">{cat}</DropdownMenuLabel>
+                    <DropdownMenuLabel className="text-[10px] text-muted-foreground px-2 py-1">{cat}</DropdownMenuLabel>
                     {items.map(p => (
                       <DropdownMenuItem
                         key={p.name}
@@ -104,20 +104,20 @@ function DeviceColumn({ slot, preset, url, isResizing, reloadTrigger, forceReloa
                   onChange={e => setCustomW(e.target.value)}
                   onKeyDown={e => { e.stopPropagation(); if (e.key === 'Enter') applyCustom() }}
                   placeholder="W"
-                  className="w-16 h-6 px-1.5 text-xs bg-neutral-800 border border-neutral-700 rounded text-neutral-200 focus:outline-none focus:border-neutral-500"
+                  className="w-16 h-6 px-1.5 text-xs bg-surface-2 border border-border rounded text-foreground focus:outline-none focus:border-ring"
                 />
-                <span className="text-xs text-neutral-500">×</span>
+                <span className="text-xs text-muted-foreground">×</span>
                 <input
                   type="number"
                   value={customH}
                   onChange={e => setCustomH(e.target.value)}
                   onKeyDown={e => { e.stopPropagation(); if (e.key === 'Enter') applyCustom() }}
                   placeholder="H"
-                  className="w-16 h-6 px-1.5 text-xs bg-neutral-800 border border-neutral-700 rounded text-neutral-200 focus:outline-none focus:border-neutral-500"
+                  className="w-16 h-6 px-1.5 text-xs bg-surface-2 border border-border rounded text-foreground focus:outline-none focus:border-ring"
                 />
                 <button
                   onClick={applyCustom}
-                  className="h-6 px-2 text-xs bg-neutral-700 hover:bg-neutral-600 rounded text-neutral-200 transition-colors"
+                  className="h-6 px-2 text-xs bg-accent hover:bg-accent rounded text-foreground transition-colors"
                 >
                   Apply
                 </button>
@@ -207,7 +207,7 @@ export function MultiDeviceGrid({ config, layout, url, isResizing, reloadTrigger
     <div
       id="grid-container"
       ref={containerRef}
-      className={`flex-1 flex p-8 overflow-hidden bg-neutral-900 ${isHorizontal ? 'flex-row' : 'flex-col'}`}
+      className={`flex-1 flex p-8 overflow-hidden bg-surface-0 ${isHorizontal ? 'flex-row' : 'flex-col'}`}
     >
       {enabledSlots.map((slot, i) => (
         <React.Fragment key={slot}>

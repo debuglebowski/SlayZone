@@ -184,7 +184,7 @@ export const TerminalSplitGroup = forwardRef<TerminalSplitGroupHandle, TerminalS
           </div>
           {i < panes.length - 1 && (
             <div
-              className="w-1 cursor-col-resize bg-neutral-200 dark:bg-neutral-700 hover:bg-blue-400 dark:hover:bg-blue-500 transition-colors shrink-0"
+              className="w-1 cursor-col-resize bg-accent hover:bg-blue-400 dark:hover:bg-blue-500 transition-colors shrink-0"
               onMouseDown={(e) => handleMouseDown(i, e)}
             />
           )}

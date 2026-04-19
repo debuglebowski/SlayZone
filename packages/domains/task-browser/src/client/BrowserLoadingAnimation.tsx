@@ -65,7 +65,7 @@ export function BrowserLoadingAnimation() {
         </div>
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
           <span
-            className="text-xs font-mono text-neutral-400 transition-opacity duration-300 whitespace-nowrap backdrop-blur-sm rounded-full px-3 py-1"
+            className="text-xs font-mono text-muted-foreground transition-opacity duration-300 whitespace-nowrap backdrop-blur-sm rounded-full px-3 py-1"
             style={{ opacity: fade ? 1 : 0 }}
           >
             {LOADING_TEXTS[textIndex]}

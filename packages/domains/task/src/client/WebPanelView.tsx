@@ -193,9 +193,9 @@ export function WebPanelView({
       <div className="relative flex-1">
         <div ref={placeholderRef} data-view-id={viewId} data-web-panel className="absolute inset-0" />
         {state.error && (
-          <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-[#1a1a1a] text-neutral-400 gap-2">
-            <div className="text-xs font-medium text-neutral-300">Failed to load</div>
-            <div className="text-[11px] text-neutral-500">{state.error.description}</div>
+          <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-surface-0 text-muted-foreground gap-2">
+            <div className="text-xs font-medium text-muted-foreground">Failed to load</div>
+            <div className="text-[11px] text-muted-foreground">{state.error.description}</div>
             <IconButton
               variant="ghost"
               size="icon-sm"

@@ -1788,7 +1788,7 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
                             <SelectTrigger
                               data-testid="terminal-mode-trigger"
                               size="sm"
-                              className="min-w-32 h-7 text-xs bg-neutral-100 border-neutral-300 dark:bg-neutral-800 dark:border-neutral-700"
+                              className="min-w-32 !h-7 py-0 text-xs"
                             >
                               <SelectValue />
                             </SelectTrigger>
@@ -1836,7 +1836,7 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
                                     }
                                   }}
                                 >
-                                  <SelectTrigger className="h-7 text-xs bg-neutral-100 border-neutral-300 dark:bg-neutral-800 dark:border-neutral-700 w-28">
+                                  <SelectTrigger className="h-7 text-xs w-28">
                                     <SelectValue />
                                   </SelectTrigger>
                                   <SelectContent>
@@ -1881,7 +1881,7 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
                                   }
                                 }}
                                 placeholder="Flags"
-                                className="h-7 text-xs bg-neutral-100 border-neutral-300 dark:bg-neutral-800 dark:border-neutral-700 w-72"
+                                className="h-7 text-xs w-72"
                               />
                             ) : (
                               flagsInputValue.trim().length === 0 ? (
@@ -1914,7 +1914,7 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
                                       className="h-7 w-fit max-w-72 px-2 flex items-center cursor-pointer rounded hover:bg-muted/50"
                                       onClick={() => setIsEditingFlags(true)}
                                     >
-                                      <div className="text-xs text-neutral-700 dark:text-neutral-200 truncate">
+                                      <div className="text-xs text-foreground dark:text-foreground truncate">
                                         {flagsInputValue}
                                       </div>
                                     </div>
@@ -2547,7 +2547,7 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
                 </div>
                 {!r.ok && r.fix && (
                   <div className="ml-6">
-                    <code className="text-xs bg-neutral-100 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 rounded px-2 py-1.5 font-mono block">
+                    <code className="text-xs bg-surface-2 dark:bg-surface-2 text-foreground dark:text-foreground rounded px-2 py-1.5 font-mono block">
                       {r.fix}
                     </code>
                   </div>

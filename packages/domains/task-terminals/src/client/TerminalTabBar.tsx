@@ -173,11 +173,11 @@ export const TerminalTabBar = forwardRef<TerminalTabBarHandle, TerminalTabBarPro
               data-tab-active={isActive ? 'true' : 'false'}
               className={cn(
                 'group flex items-center h-7 rounded-md cursor-pointer transition-all select-none shrink-0',
-                'bg-neutral-100 dark:bg-neutral-800/50 hover:bg-neutral-200/80 dark:hover:bg-neutral-700/50',
+                'bg-surface-2 dark:bg-surface-2/50 hover:bg-accent/80 dark:hover:bg-accent/50',
                 isActive
-                  ? 'bg-neutral-200 dark:bg-neutral-700 border border-neutral-300 dark:border-neutral-600'
-                  : 'text-neutral-500 dark:text-neutral-400',
-                isDragOver && 'bg-neutral-200 dark:bg-neutral-600 shadow-[inset_0_-2px_0_0_theme(colors.neutral.400)] dark:shadow-[inset_0_-2px_0_0_theme(colors.neutral.400)]'
+                  ? 'bg-tab-active border border-border'
+                  : 'text-muted-foreground',
+                isDragOver && 'bg-tab-active shadow-[inset_0_-2px_0_0_var(--border)]'
               )}
               onClick={() => onGroupSelect(group.id)}
               onDragOver={(e) => handleGroupDragOver(e, group.id)}
@@ -192,7 +192,7 @@ export const TerminalTabBar = forwardRef<TerminalTabBarHandle, TerminalTabBarPro
                 return (
                   <div key={tab.id} className={cn('flex items-center', isDragging && 'opacity-50')}>
                     {i > 0 && (
-                      <div className="w-px h-3.5 bg-neutral-300 dark:bg-neutral-600 shrink-0" />
+                      <div className="w-px h-3.5 bg-accent shrink-0" />
                     )}
                     <div
                       draggable
@@ -227,7 +227,7 @@ export const TerminalTabBar = forwardRef<TerminalTabBarHandle, TerminalTabBarPro
                       {!tab.isMain && (
                         <button
                           data-testid={`terminal-pane-close-${tab.id}`}
-                          className="h-4 w-4 rounded hover:bg-neutral-300/50 dark:hover:bg-neutral-600/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                          className="h-4 w-4 rounded hover:bg-accent/50 dark:hover:bg-neutral-600/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
                           onClick={e => {
                             e.stopPropagation()
                             if (isSinglePane) {
@@ -249,7 +249,7 @@ export const TerminalTabBar = forwardRef<TerminalTabBarHandle, TerminalTabBarPro
         })}
         <button
           data-testid="terminal-tab-split"
-          className="flex items-center justify-center h-7 w-7 rounded-md text-neutral-500 hover:text-neutral-700 hover:bg-neutral-200/50 dark:text-neutral-400 dark:hover:text-neutral-200 dark:hover:bg-neutral-800/50 shrink-0"
+          className="flex items-center justify-center h-7 w-7 rounded-md text-muted-foreground hover:text-foreground hover:bg-tab-active/50 dark:text-muted-foreground dark:hover:text-foreground dark:hover:bg-surface-2/50 shrink-0"
           onClick={() => onGroupSplit(activeGroupId)}
           title={withShortcut('Split terminal', terminalSplitShortcut)}
         >
@@ -260,8 +260,8 @@ export const TerminalTabBar = forwardRef<TerminalTabBarHandle, TerminalTabBarPro
           className={cn(
             'flex items-center justify-center h-7 w-7 rounded-md shrink-0 transition-colors',
             dragOverNewGroup
-              ? 'bg-neutral-200 dark:bg-neutral-600 text-neutral-700 dark:text-neutral-200 shadow-[inset_0_-2px_0_0_theme(colors.neutral.400)] dark:shadow-[inset_0_-2px_0_0_theme(colors.neutral.400)]'
-              : 'text-neutral-500 hover:text-neutral-700 hover:bg-neutral-200/50 dark:text-neutral-400 dark:hover:text-neutral-200 dark:hover:bg-neutral-800/50'
+              ? 'bg-tab-active dark:bg-accent text-neutral-700 dark:text-foreground shadow-[inset_0_-2px_0_0_var(--border)]'
+              : 'text-muted-foreground hover:text-foreground hover:bg-tab-active/50 dark:text-muted-foreground dark:hover:text-foreground dark:hover:bg-surface-2/50'
           )}
           onDragOver={handleNewGroupDragOver}
           onDragLeave={handleNewGroupDragLeave}

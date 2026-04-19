@@ -43,6 +43,22 @@ See [ARCHITECTURE.md](./ARCHITECTURE.md) for system architecture and [PHILOSOPHY
 | `pnpm test:e2e` | Run E2E tests (requires build) |
 | `pnpm lint` | Lint all packages |
 
+## Theming
+
+All colors must reference theme tokens. Never use raw Tailwind palette classes (`bg-neutral-*`, `text-zinc-*`, `border-gray-*`) or arbitrary hex (`bg-[#1a1a1a]`) — they bypass the theme and break under custom themes.
+
+Token map:
+- Surfaces: `bg-background`, `bg-surface-0/1/2/3`, `bg-card`, `bg-popover`, `bg-sidebar`
+- Controls: `bg-accent`, `bg-muted`, `bg-primary`, `bg-secondary`, `bg-destructive`
+- Active tab: `bg-tab-active`
+- Text: `text-foreground`, `text-muted-foreground`, `text-*-foreground` (paired)
+- Borders: `border-border`, `border-input`, `border-ring`
+- Inputs: `bg-input` (alpha overlay, context-aware)
+
+Form surfaces (`SelectTrigger`, `Input`, `Button variant="outline"`) use `dark:bg-input/30` alpha overlay — auto-tints parent. Don't override with solid colors.
+
+`pnpm lint:theme` enforces — runs in `pnpm lint`. Tutorial scenes + project-color palette are excluded.
+
 ## Commit Messages
 
 [Conventional Commits](https://www.conventionalcommits.org/):

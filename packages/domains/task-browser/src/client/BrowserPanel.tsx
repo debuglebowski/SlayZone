@@ -1070,9 +1070,9 @@ export const BrowserPanel = forwardRef<BrowserPanelHandle, BrowserPanelProps>(fu
               }}
               className={cn(
                 'group flex items-center gap-1.5 h-7 px-3 rounded-md cursor-pointer transition-colors select-none flex-shrink-0',
-                'bg-neutral-100 dark:bg-neutral-800/50 hover:bg-neutral-200/80 dark:hover:bg-neutral-700/50',
+                'bg-surface-2 dark:bg-surface-2/50 hover:bg-accent/80 dark:hover:bg-accent/50',
                 'max-w-[300px]',
-                isActive ? 'bg-neutral-200 dark:bg-neutral-700 border border-neutral-300 dark:border-neutral-600' : 'text-neutral-500 dark:text-neutral-400',
+                isActive ? 'bg-tab-active border border-border' : 'text-muted-foreground dark:text-muted-foreground',
                 isActive && isPickingElement && 'ring-2 ring-amber-500/70 border-amber-500/70'
               )}
             >
@@ -1088,7 +1088,7 @@ export const BrowserPanel = forwardRef<BrowserPanelHandle, BrowserPanelProps>(fu
         })}
         <button
           onClick={() => createNewTab()}
-          className="h-7 px-2 rounded-md hover:bg-neutral-200/80 dark:hover:bg-neutral-700/50 text-neutral-500 dark:text-neutral-400 flex items-center"
+          className="h-7 px-2 rounded-md hover:bg-accent/80 dark:hover:bg-accent/50 text-muted-foreground dark:text-muted-foreground flex items-center"
         >
           <Plus className="size-4" />
         </button>
@@ -1440,7 +1440,7 @@ export const BrowserPanel = forwardRef<BrowserPanelHandle, BrowserPanelProps>(fu
 
       {/* Responsive toolbar */}
       {multiDeviceMode && !extensionsManagerOpen && (
-        <div className="shrink-0 flex items-center py-2 px-2 gap-3 border-b border-border bg-neutral-900">
+        <div className="shrink-0 flex items-center py-2 px-2 gap-3 border-b border-border bg-surface-0">
           {/* Device toggle buttons */}
           {SLOT_BUTTONS.map(({ slot, icon: Icon, label }) => {
             const enabled = multiDeviceConfig[slot].enabled
@@ -1452,7 +1452,7 @@ export const BrowserPanel = forwardRef<BrowserPanelHandle, BrowserPanelProps>(fu
                   'h-8 px-3 flex items-center gap-1.5 text-xs font-medium rounded-lg border transition-colors',
                   enabled
                     ? 'text-blue-400 bg-blue-500/15 border-blue-500/30 hover:bg-blue-500/25'
-                    : 'text-neutral-500 border-neutral-700 hover:text-neutral-300 hover:bg-neutral-800'
+                    : 'text-muted-foreground border-border hover:text-foreground hover:bg-surface-2'
                 )}
               >
                 <Icon className="size-3.5" />
@@ -1463,7 +1463,7 @@ export const BrowserPanel = forwardRef<BrowserPanelHandle, BrowserPanelProps>(fu
           <div className="flex-1" />
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" className="h-8 px-2 text-xs text-neutral-500 hover:text-neutral-300 gap-1">
+              <Button variant="ghost" className="h-8 px-2 text-xs text-muted-foreground hover:text-foreground gap-1">
                 {multiDeviceLayout === 'horizontal' ? 'Side by side' : 'Stacked'}
                 <ChevronDown className="size-3" />
               </Button>
@@ -1535,13 +1535,13 @@ export const BrowserPanel = forwardRef<BrowserPanelHandle, BrowserPanelProps>(fu
             </div>
           )}
           {loadError && (
-            <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-[#1a1a1a] text-neutral-400 gap-3">
-              <div className="text-sm font-medium text-neutral-300">Failed to load page</div>
-              <div className="text-xs text-neutral-500 max-w-xs text-center truncate" title={loadError.url}>
+            <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-surface-0 text-muted-foreground gap-3">
+              <div className="text-sm font-medium text-foreground">Failed to load page</div>
+              <div className="text-xs text-muted-foreground max-w-xs text-center truncate" title={loadError.url}>
                 {loadError.description} ({loadError.code})
               </div>
               <button
-                className="inline-flex items-center gap-1.5 rounded-md border border-neutral-700 bg-neutral-800 px-3 py-1.5 text-xs text-neutral-300 hover:bg-neutral-700"
+                className="inline-flex items-center gap-1.5 rounded-md border border-border bg-surface-2 px-3 py-1.5 text-xs text-foreground hover:bg-accent"
                 onClick={() => { setActiveViewState(prev => ({ ...prev, error: null })); activeActions?.reload() }}
               >
                 <RotateCw className="size-3.5" />

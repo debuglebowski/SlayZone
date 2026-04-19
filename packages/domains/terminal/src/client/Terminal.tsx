@@ -1132,23 +1132,23 @@ export const Terminal = forwardRef<TerminalHandle, TerminalProps>(function Termi
           </div>
         )}
         {initError && (
-          <div className="absolute inset-0 flex items-center justify-center bg-white dark:bg-[#0a0a0a] z-10 p-4">
+          <div className="absolute inset-0 flex items-center justify-center bg-background dark:bg-surface-0 z-10 p-4">
             <div className="text-red-400 text-sm text-center">Failed to start terminal: {initError}</div>
           </div>
         )}
         {showDeadOverlay && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center bg-white dark:bg-[#0a0a0a] z-10 p-6 gap-4 overflow-y-auto">
+          <div className="absolute inset-0 flex flex-col items-center justify-center bg-background dark:bg-surface-0 z-10 p-6 gap-4 overflow-y-auto">
             {deadCrashOutput && (
-              <pre className="text-xs text-neutral-500 dark:text-neutral-400 max-h-32 overflow-y-auto w-full max-w-lg bg-neutral-50 dark:bg-neutral-900 rounded p-3 font-mono whitespace-pre-wrap break-all">
+              <pre className="text-xs text-muted-foreground dark:text-muted-foreground max-h-32 overflow-y-auto w-full max-w-lg bg-surface-2 dark:bg-surface-0 rounded p-3 font-mono whitespace-pre-wrap break-all">
                 {stripAnsi(deadCrashOutput).split('\n').slice(-20).join('\n')}
               </pre>
             )}
-            <p className="text-sm text-neutral-500">Process exited with code {deadExitCode}</p>
+            <p className="text-sm text-muted-foreground">Process exited with code {deadExitCode}</p>
             <div className="flex gap-2">
               {onRetry && (
                 <button
                   onClick={handleRetry}
-                  className="px-3 py-1.5 text-sm rounded-md bg-neutral-100 dark:bg-neutral-800 hover:bg-neutral-200 dark:hover:bg-neutral-700 text-neutral-700 dark:text-neutral-300 transition-colors"
+                  className="px-3 py-1.5 text-sm rounded-md bg-surface-2 dark:bg-surface-2 hover:bg-accent dark:hover:bg-accent text-foreground dark:text-foreground transition-colors"
                 >
                   Retry
                 </button>
@@ -1156,7 +1156,7 @@ export const Terminal = forwardRef<TerminalHandle, TerminalProps>(function Termi
               <button
                 onClick={() => void handleDoctor()}
                 disabled={doctorLoading}
-                className="px-3 py-1.5 text-sm rounded-md bg-neutral-100 dark:bg-neutral-800 hover:bg-neutral-200 dark:hover:bg-neutral-700 text-neutral-700 dark:text-neutral-300 transition-colors disabled:opacity-50 flex items-center gap-1.5"
+                className="px-3 py-1.5 text-sm rounded-md bg-surface-2 dark:bg-surface-2 hover:bg-accent dark:hover:bg-accent text-foreground dark:text-foreground transition-colors disabled:opacity-50 flex items-center gap-1.5"
               >
                 {doctorLoading
                   ? <><Loader2 className="size-3.5 animate-spin" />Checking…</>
@@ -1178,12 +1178,12 @@ export const Terminal = forwardRef<TerminalHandle, TerminalProps>(function Termi
                       }
                       <div className="min-w-0 space-y-0.5">
                         <p className="text-xs font-medium leading-none">{r.check}</p>
-                        <p className="text-xs text-neutral-500 dark:text-neutral-400">{r.detail}</p>
+                        <p className="text-xs text-muted-foreground dark:text-muted-foreground">{r.detail}</p>
                       </div>
                     </div>
                     {!r.ok && r.fix && (
                       <div className="ml-5">
-                        <code className="text-xs bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-300 rounded px-2 py-1 font-mono block">
+                        <code className="text-xs bg-surface-2 dark:bg-surface-2 text-muted-foreground dark:text-foreground rounded px-2 py-1 font-mono block">
                           {r.fix}
                         </code>
                       </div>

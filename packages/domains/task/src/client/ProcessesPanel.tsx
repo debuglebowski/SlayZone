@@ -222,16 +222,16 @@ function ProcessRow({
 
       {/* Log panel */}
       {expanded && (
-        <div className="bg-neutral-950 dark:bg-black border-t border-neutral-900">
-          <div className="flex items-center px-4 py-1.5 border-b border-neutral-900/80">
-            <span className="text-[10px] text-neutral-600 font-mono">
+        <div className="bg-surface-0 dark:bg-black border-t border-border">
+          <div className="flex items-center px-4 py-1.5 border-b border-border">
+            <span className="text-[10px] text-muted-foreground font-mono">
               {proc.logBuffer.length === 0 ? 'no output' : `${proc.logBuffer.length} lines`}
             </span>
           </div>
           <div className="max-h-52 overflow-y-auto">
-            <pre className="text-[10px] font-mono text-neutral-300 px-4 py-3 whitespace-pre-wrap break-all leading-relaxed">
+            <pre className="text-[10px] font-mono text-foreground px-4 py-3 whitespace-pre-wrap break-all leading-relaxed">
               {proc.logBuffer.length === 0
-                ? <span className="text-neutral-600 italic">Waiting for output…</span>
+                ? <span className="text-muted-foreground italic">Waiting for output…</span>
                 : proc.logBuffer.join('\n')}
             </pre>
             <div ref={logEndRef} />

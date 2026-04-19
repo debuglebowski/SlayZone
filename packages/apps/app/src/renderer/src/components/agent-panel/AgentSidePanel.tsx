@@ -7,6 +7,7 @@ import {
 } from '@slayzone/terminal'
 import type { TerminalMode } from '@slayzone/terminal/shared'
 import {
+  Button,
   Select,
   SelectContent,
   SelectItem,
@@ -80,7 +81,7 @@ export function AgentSidePanel({
               <SelectTrigger
                 data-testid="agent-panel-mode-trigger"
                 size="sm"
-                className="!h-6 min-w-28 px-2 py-0 text-xs bg-neutral-100 border-neutral-300 dark:bg-neutral-800 dark:border-neutral-700"
+                className="!h-6 min-w-28 px-2 py-0 text-xs"
               >
                 <SelectValue />
               </SelectTrigger>
@@ -102,13 +103,14 @@ export function AgentSidePanel({
           {onNewSession && (
             <Tooltip>
               <TooltipTrigger asChild>
-                <button
+                <Button
+                  variant="outline"
                   onClick={onNewSession}
                   aria-label="Clear conversation"
-                  className="h-6 w-6 flex items-center justify-center rounded-md border text-foreground bg-neutral-100 border-neutral-300 hover:bg-neutral-200 dark:bg-neutral-800 dark:border-neutral-700 dark:hover:bg-neutral-700 transition-colors"
+                  className="h-6 w-6 p-0 rounded-md"
                 >
                   <RotateCcw className="size-3.5" />
-                </button>
+                </Button>
               </TooltipTrigger>
               <TooltipContent side="bottom">Clear conversation</TooltipContent>
             </Tooltip>

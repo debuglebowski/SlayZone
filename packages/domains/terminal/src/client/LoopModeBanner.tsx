@@ -26,11 +26,11 @@ const STATUS_LABELS: Record<LoopStatus, string> = {
 }
 
 const STATUS_DOT_COLORS: Record<LoopStatus, string> = {
-  idle: 'bg-neutral-400',
+  idle: 'bg-muted-foreground',
   running: 'bg-yellow-500',
   paused: 'bg-blue-500',
   passed: 'bg-green-500',
-  stopped: 'bg-neutral-400',
+  stopped: 'bg-muted-foreground',
   error: 'bg-red-500',
   'max-reached': 'bg-orange-500'
 }

@@ -26,10 +26,10 @@ function TypingCursor() {
 
   return (
     <div className="flex items-center justify-center h-full">
-      <div className="font-mono text-sm text-neutral-400">
+      <div className="font-mono text-sm text-muted-foreground">
         <span className="text-green-500">$</span>{' '}
         {displayed}
-        <span className={`inline-block w-[8px] h-[14px] bg-neutral-400 align-middle ml-[1px] translate-y-[1px] ${showCursor ? 'opacity-100' : 'opacity-0'}`} />
+        <span className={`inline-block w-[8px] h-[14px] bg-muted-foreground align-middle ml-[1px] translate-y-[1px] ${showCursor ? 'opacity-100' : 'opacity-0'}`} />
       </div>
     </div>
   )
@@ -153,7 +153,7 @@ function PulseGrid() {
             return (
               <div
                 key={i}
-                className="w-[6px] h-[6px] rounded-full bg-neutral-600"
+                className="w-[6px] h-[6px] rounded-full bg-muted-foreground"
                 style={{
                   opacity: edgeFade * 0.15,
                   animation: `pulse-grid 2s ease-in-out ${delay}s infinite`,
@@ -165,7 +165,7 @@ function PulseGrid() {
         </div>
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
           <span
-            className="text-xs font-mono text-neutral-400 transition-opacity duration-300 whitespace-nowrap backdrop-blur-sm rounded-full px-3 py-1"
+            className="text-xs font-mono text-muted-foreground transition-opacity duration-300 whitespace-nowrap backdrop-blur-sm rounded-full px-3 py-1"
             style={{ opacity: fade ? 1 : 0 }}
           >
             {LOADING_TEXTS[textIndex]}
@@ -206,10 +206,10 @@ function AsciiArt() {
 
   return (
     <div className="flex flex-col items-center justify-center h-full gap-3">
-      <pre className="text-neutral-500 text-xs leading-tight font-mono select-none">
+      <pre className="text-muted-foreground text-xs leading-tight font-mono select-none">
         {frames[frame].join('\n')}
       </pre>
-      <span className="text-neutral-500 text-xs font-mono w-20 text-center">
+      <span className="text-muted-foreground text-xs font-mono w-20 text-center">
         loading{dots}
       </span>
     </div>
@@ -250,10 +250,10 @@ function Scanline() {
             <span className={`${line.includes('..') ? 'text-yellow-500' : 'text-green-500'}`}>
               {line.slice(0, 8)}
             </span>
-            <span className="text-neutral-500">{line.slice(8)}</span>
+            <span className="text-muted-foreground">{line.slice(8)}</span>
           </div>
         ))}
-        <div className="h-[14px] w-[8px] bg-neutral-500 animate-pulse" />
+        <div className="h-[14px] w-[8px] bg-muted-foreground animate-pulse" />
       </div>
       <style>{`
         @keyframes fade-in {
@@ -278,9 +278,9 @@ export function TerminalLoadingShowcase() {
   return (
     <div className="flex flex-col gap-2 h-full p-2 overflow-auto">
       {animations.map(({ name, component: Component }) => (
-        <div key={name} className="flex-1 min-h-[120px] rounded-lg border border-neutral-800 overflow-hidden relative">
-          <div className="absolute top-2 left-3 z-10 text-[10px] text-neutral-600 font-mono">{name}</div>
-          <div className="h-full w-full bg-[#0a0a0a]">
+        <div key={name} className="flex-1 min-h-[120px] rounded-lg border border-border overflow-hidden relative">
+          <div className="absolute top-2 left-3 z-10 text-[10px] text-muted-foreground font-mono">{name}</div>
+          <div className="h-full w-full bg-surface-0">
             <Component />
           </div>
         </div>

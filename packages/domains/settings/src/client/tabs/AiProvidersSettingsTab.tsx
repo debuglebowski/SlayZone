@@ -75,8 +75,8 @@ function UsageConfigSection({
 
   if (mode.isBuiltin) {
     return (
-      <div className="pt-4 border-t border-neutral-200 dark:border-neutral-800">
-        <div className="rounded-xl border bg-neutral-50/50 dark:bg-neutral-900/30 p-5">
+      <div className="pt-4 border-t border-border dark:border-border">
+        <div className="rounded-xl border bg-surface-2/50 dark:bg-surface-0/30 p-5">
           <div className="flex items-center gap-2">
             <div className="size-2 rounded-full bg-blue-500" />
             <span className="text-sm font-medium">Usage Tracking</span>
@@ -88,8 +88,8 @@ function UsageConfigSection({
   }
 
   return (
-    <div className="pt-4 border-t border-neutral-200 dark:border-neutral-800">
-      <div className="rounded-xl border bg-neutral-50/50 dark:bg-neutral-900/30 p-5 space-y-4">
+    <div className="pt-4 border-t border-border dark:border-border">
+      <div className="rounded-xl border bg-surface-2/50 dark:bg-surface-0/30 p-5 space-y-4">
         <div className="flex items-center justify-between">
           <div className="space-y-1">
             <h4 className="text-sm font-semibold">Usage Tracking</h4>
@@ -252,7 +252,7 @@ function UsageConfigSection({
             )}
 
             {/* Response Mapping */}
-            <div className="pt-3 border-t border-neutral-200 dark:border-neutral-800 space-y-3">
+            <div className="pt-3 border-t border-border dark:border-border space-y-3">
               <div className="flex items-center gap-1.5">
                 <h5 className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Response Mapping</h5>
                 <HelpTip>Configure how to extract rate-limit windows from the API's JSON response. Each window becomes a usage bar.</HelpTip>
@@ -347,7 +347,7 @@ function UsageConfigSection({
             </div>
 
             {/* Test */}
-            <div className="flex items-center gap-3 pt-3 border-t border-neutral-200 dark:border-neutral-800">
+            <div className="flex items-center gap-3 pt-3 border-t border-border dark:border-border">
               <Button
                 variant="outline"
                 size="sm"
@@ -561,7 +561,7 @@ export function AiProvidersSettingsTab(props: AiProvidersSettingsTabProps) {
                   )}
 
                   {custom.length > 0 && (
-                    <div className="space-y-3 pt-4 border-t border-neutral-200 dark:border-neutral-800">
+                    <div className="space-y-3 pt-4 border-t border-border dark:border-border">
                       <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Custom</h4>
                       <div className="space-y-2">
                         {custom.map((mode) => (
@@ -716,7 +716,7 @@ export function AiProvidersSettingsTab(props: AiProvidersSettingsTabProps) {
                 </p>
               </div>
 
-              <div className="pt-2 border-t border-dashed border-neutral-200 dark:border-neutral-800 space-y-3">
+              <div className="pt-2 border-t border-dashed border-border dark:border-border space-y-3">
                 <h5 className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Status Detection</h5>
                 <div className="space-y-2">
                   <Label className="text-[10px] uppercase text-muted-foreground">Detection Engine</Label>
@@ -961,8 +961,8 @@ export function AiProvidersSettingsTab(props: AiProvidersSettingsTabProps) {
                 </div>
 
                 {!mode.isBuiltin && (
-                  <div className="pt-4 border-t border-neutral-200 dark:border-neutral-800">
-                    <div className="rounded-xl border bg-neutral-50/50 dark:bg-neutral-900/30 p-5 space-y-4">
+                  <div className="pt-4 border-t border-border dark:border-border">
+                    <div className="rounded-xl border bg-surface-2/50 dark:bg-surface-0/30 p-5 space-y-4">
                       <div className="space-y-1">
                         <h4 className="text-sm font-semibold">Status Detection</h4>
                         <p className="text-xs text-muted-foreground leading-relaxed">

@@ -150,7 +150,7 @@ export function DeviceWebview({ url, preset, partition, isResizing, reloadTrigge
   }, [topOffset, scaledHeight, containerW])
 
   return (
-    <div id="dw-container" ref={containerRef} className="relative flex-1 overflow-hidden bg-neutral-900">
+    <div id="dw-container" ref={containerRef} className="relative flex-1 overflow-hidden bg-surface-0">
       <div
         id="dw-viewport"
         className="absolute origin-top-left overflow-hidden"
@@ -175,7 +175,7 @@ export function DeviceWebview({ url, preset, partition, isResizing, reloadTrigge
           />
         )}
         {loadError && (
-          <div className="absolute inset-0 z-10 flex items-center justify-center bg-neutral-900/90 text-neutral-400 text-[11px] text-center p-2">
+          <div className="absolute inset-0 z-10 flex items-center justify-center bg-surface-0/80 text-muted-foreground text-[11px] text-center p-2">
             {loadError}
           </div>
         )}
