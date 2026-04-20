@@ -10,14 +10,14 @@ import { CSS } from '@dnd-kit/utilities'
 import type { Task, PanelVisibility, UpdateTaskInput } from '@slayzone/task/shared'
 import type { TaskTemplate } from '@slayzone/task/shared'
 import type { TaskDetailData } from './taskDetailCache'
-import { BUILTIN_PANEL_IDS, getProviderConversationId, getProviderFlags, setProviderConversationId, setProviderFlags, clearAllConversationIds } from '@slayzone/task/shared'
+import { BUILTIN_PANEL_IDS, getProviderConversationId, getProviderFlags, setProviderConversationId, setProviderFlags, clearAllConversationIds, priorityOptions } from '@slayzone/task/shared'
 import type { BrowserTabsState } from '@slayzone/task-browser/shared'
 import type { Tag } from '@slayzone/tags/shared'
 import type { Project } from '@slayzone/projects/shared'
 import { getDefaultStatus, getDoneStatus, isTerminalStatus, resolveRepoPath } from '@slayzone/projects/shared'
 import { useDetectedRepos } from '@slayzone/projects'
 import { DEV_SERVER_URL_PATTERN, SESSION_ID_COMMANDS, SESSION_ID_UNAVAILABLE } from '@slayzone/terminal/shared'
-import type { TerminalMode, ValidationResult } from '@slayzone/terminal/shared'
+import type { TerminalMode, TerminalState, ValidationResult } from '@slayzone/terminal/shared'
 import { Button, IconButton, PanelToggle, DevServerToast, Collapsible, CollapsibleTrigger, CollapsibleContent } from '@slayzone/ui'
 import {
   DropdownMenu,
@@ -69,7 +69,7 @@ import { markSkipCache, usePty, useTerminalModes, getVisibleModes, getModeLabel,
 import type { LoopConfig } from '@slayzone/terminal/shared'
 import { TerminalContainer, type TerminalContainerHandle } from '@slayzone/task-terminals'
 import { UnifiedGitPanel, type UnifiedGitPanelHandle, type GitTabId } from '@slayzone/worktrees'
-import { buildStatusOptions, cn, getColumnStatusStyle, useAppearance, matchesShortcut, useShortcutStore, useShortcutDisplay, withModalGuard, getThemeEditorColors, type EditorThemeColors } from '@slayzone/ui'
+import { buildStatusOptions, cn, getColumnStatusStyle, getTerminalStateStyle, PriorityIcon, useAppearance, matchesShortcut, useShortcutStore, useShortcutDisplay, withModalGuard, getThemeEditorColors, type EditorThemeColors } from '@slayzone/ui'
 import { BrowserPanel, type BrowserPanelHandle } from '@slayzone/task-browser'
 import { FileEditorView, type FileEditorViewHandle } from '@slayzone/file-editor/client'
 import type { EditorOpenFilesState, OpenFileOptions } from '@slayzone/file-editor/shared'
@@ -154,6 +154,25 @@ function SortableSubTask({ sub, columns, statusOptions, onNavigate, onUpdate, on
   )
 }
 
+function PtyStateDot({ sessionId }: { sessionId: string }): React.JSX.Element | null {
+  const { getState, subscribeState } = usePty()
+  const [state, setState] = useState<TerminalState>(() => getState(sessionId))
+  useEffect(() => {
+    setState(getState(sessionId))
+    return subscribeState(sessionId, (next) => setState(next))
+  }, [sessionId, getState, subscribeState])
+  const style = state !== 'starting' ? getTerminalStateStyle(state) : null
+  if (!style) return null
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span className={cn('shrink-0 size-2 rounded-full', style.color)} aria-label={`Terminal: ${style.label}`} />
+      </TooltipTrigger>
+      <TooltipContent>Terminal: {style.label}</TooltipContent>
+    </Tooltip>
+  )
+}
+
 export interface TaskDetailPageProps {
   taskId: string
   /** Live task object from global state (source of truth). */
@@ -232,6 +251,7 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
   const statusOptions = useMemo(() => buildStatusOptions(project?.columns_config), [project?.columns_config])
   const completedStatus = useMemo(() => getDoneStatus(project?.columns_config), [project?.columns_config])
   const [statusPopoverOpen, setStatusPopoverOpen] = useState(false)
+  const [priorityPopoverOpen, setPriorityPopoverOpen] = useState(false)
 
   // Sub-tasks
   const { subTasks, createSubTask, updateSubTask: handleUpdateSubTask, deleteSubTask: handleDeleteSubTask, handleDragEnd: handleSubTaskDragEnd } = useSubTasks(task?.id, initialData?.subTasks)
@@ -1440,11 +1460,76 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
   return (
     <div id="task-detail" className={cn("h-full flex flex-col", compact ? "p-0" : "gap-4")}>
       {compact && (
-        <div className="shrink-0 flex items-center gap-2 px-2 h-10 bg-surface-1 border-b border-border min-w-0">
+        <div className="shrink-0 flex items-center gap-1.5 px-2 h-10 bg-surface-1 border-b border-border min-w-0">
+          {!task.is_temporary && (() => {
+            const statusStyle = getColumnStatusStyle(task.status, project?.columns_config)
+            if (!statusStyle) return null
+            const StatusIcon = statusStyle.icon
+            return (
+              <Popover open={statusPopoverOpen} onOpenChange={setStatusPopoverOpen}>
+                <PopoverTrigger asChild>
+                  <button type="button" className="shrink-0 cursor-pointer transition-opacity hover:opacity-70">
+                    <StatusIcon className={cn('size-4', statusStyle.iconClass)} strokeWidth={3} />
+                  </button>
+                </PopoverTrigger>
+                <PopoverContent className="w-44 p-1" align="start">
+                  {statusOptions.map((opt) => {
+                    const optStyle = getColumnStatusStyle(opt.value, project?.columns_config)
+                    const OptIcon = optStyle?.icon ?? Circle
+                    const isCurrent = opt.value === task.status
+                    return (
+                      <button
+                        key={opt.value}
+                        type="button"
+                        className={cn('flex w-full items-center gap-2 rounded px-2 py-1.5 text-sm cursor-pointer hover:bg-accent', isCurrent && 'bg-accent font-medium')}
+                        onClick={async () => {
+                          const updated = await window.api.db.updateTask({ id: task.id, status: opt.value })
+                          handleTaskUpdate(updated)
+                          setStatusPopoverOpen(false)
+                        }}
+                      >
+                        <OptIcon className={cn('size-4', optStyle?.iconClass)} />
+                        {opt.label}
+                      </button>
+                    )
+                  })}
+                </PopoverContent>
+              </Popover>
+            )
+          })()}
           <span className="text-xs font-medium truncate flex-1">
             {task.is_temporary ? 'Temporary task' : task.title}
           </span>
-          <span className="text-[10px] text-muted-foreground shrink-0">{task.terminal_mode}</span>
+          {!task.is_temporary && (
+            <Popover open={priorityPopoverOpen} onOpenChange={setPriorityPopoverOpen}>
+              <PopoverTrigger asChild>
+                <button type="button" className="shrink-0 inline-flex items-center rounded-full bg-muted/50 px-1.5 py-0.5 cursor-pointer transition-colors hover:bg-muted">
+                  <PriorityIcon priority={task.priority} className="size-3.5" />
+                </button>
+              </PopoverTrigger>
+              <PopoverContent className="w-[140px] p-1" align="end">
+                {priorityOptions.map((opt) => (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    className={cn('flex w-full items-center gap-2 rounded px-2 py-1 text-xs cursor-pointer hover:bg-accent', opt.value === task.priority && 'bg-accent font-medium')}
+                    onClick={async () => {
+                      const updated = await window.api.db.updateTask({ id: task.id, priority: opt.value })
+                      handleTaskUpdate(updated)
+                      setPriorityPopoverOpen(false)
+                    }}
+                  >
+                    <PriorityIcon priority={opt.value} className="size-3.5" />
+                    {opt.label}
+                  </button>
+                ))}
+              </PopoverContent>
+            </Popover>
+          )}
+          <span className="shrink-0 inline-flex items-center rounded-full bg-muted/50 px-2 py-0.5 text-[10px] text-muted-foreground">
+            {task.terminal_mode}
+          </span>
+          <PtyStateDot sessionId={getMainSessionId(task.id)} />
         </div>
       )}
       {/* Header */}
