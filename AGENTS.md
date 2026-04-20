@@ -14,6 +14,10 @@ The session is ran with the `$SLAYZONE_TASK_ID` environment variable, so you can
 
 Default to **caveman ultra** mode for entire session. Load the `caveman` skill at session start. Skill's own boundaries (code/commits/PRs stay normal) still apply.
 
+## Engineering Mindset
+
+Assume near-infinite dev capability. Always pick most sustainable, robust long-term solution — never the quick hack. But **never drop existing functionality** to get there. Migrate, refactor, preserve behavior.
+
 ## Stack
 
 - **Runtime**: Electron 41

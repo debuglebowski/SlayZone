@@ -1,6 +1,6 @@
 ---
 name: sync-slay-skill
-description: "Read CLI command source files and regenerate the slay SKILL.md + init.ts command reference to match"
+description: "Read CLI command source files and regenerate the slay SKILL.md command reference to match"
 trigger: none
 ---
 
@@ -29,9 +29,8 @@ Read these files in full to extract the command tree:
 
 Skip `completions.ts` and `init.ts` — internal/meta commands, not documented.
 
-Also read both targets to understand current state:
+Also read the target to understand current state:
 - `.claude/skills/slay/SKILL.md`
-- `packages/apps/cli/src/commands/init.ts`
 
 ## Step 2: Extract command tree
 

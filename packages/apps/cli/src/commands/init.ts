@@ -13,22 +13,9 @@ You are running inside [SlayZone](https://slayzone.com), a desktop development e
 
 \`$SLAYZONE_TASK_ID\` is set to the ID of the task you are running inside. Most \`slay\` commands default to it when no explicit ID is given.
 
-## slay CLI commands
+## slay CLI
 
-| Command | Subcommands |
-|---------|-------------|
-| \`slay tasks\` | \`list\` \`create\` \`view\` \`update\` \`done\` \`open\` \`search\` \`archive\` \`delete\` \`subtasks\` \`subtask-add\` \`tag\` \`blockers\` \`blocking\` \`blocked\` |
-| \`slay tasks browser\` | \`url\` \`navigate\` \`click\` \`type\` \`eval\` \`content\` \`screenshot\` |
-| \`slay tasks assets\` | \`list\` \`read\` \`create\` \`upload\` \`update\` \`write\` \`append\` \`delete\` \`path\` \`mkdir\` \`rmdir\` \`mvdir\` \`mv\` \`download\` |
-| \`slay pty\` | \`list\` \`buffer\` \`follow\` \`write\` \`submit\` \`wait\` \`kill\` |
-| \`slay projects\` | \`list\` \`create\` \`update\` |
-| \`slay automations\` | \`list\` \`view\` \`create\` \`update\` \`delete\` \`toggle\` \`run\` \`runs\` |
-| \`slay processes\` | \`list\` \`logs\` \`kill\` \`follow\` |
-| \`slay panels\` | \`list\` \`create\` \`delete\` \`enable\` \`disable\` |
-| \`slay tags\` | \`list\` \`create\` \`delete\` |
-| \`slay templates\` | \`list\` \`view\` \`create\` \`update\` \`delete\` |
-
-Global flag: \`--dev\` (use dev database). All IDs support prefix matching. Run \`slay <cmd> --help\` for flags and usage.
+You can interact with SlayZone via the \`slay\` CLI. **Load the \`slay\` skill before running any \`slay\` command** — it holds the full reference of commands, flags, and domain-specific guides. Do not guess subcommands or flags.
 `
 
 export function initCommand(): Command {
