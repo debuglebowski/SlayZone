@@ -1,5 +1,5 @@
 export type TerminalMode = string
-export type TerminalState = 'starting' | 'running' | 'attention' | 'error' | 'dead'
+export type TerminalState = 'starting' | 'running' | 'attention' | 'idle' | 'error' | 'dead'
 
 export const BuiltinTerminalMode = {
   ClaudeCode: 'claude-code',

@@ -139,6 +139,7 @@ export function registerChatHandlers(ipcMain: IpcMain, db: Database): void {
 
     const info = await createChat({
       tabId: opts.tabId,
+      taskId: opts.taskId,
       mode: opts.mode,
       cwd: opts.cwd,
       conversationId: providerCfg.chatConversationId ?? null,

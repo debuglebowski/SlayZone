@@ -86,6 +86,7 @@ await test('createChat: unknown mode → throws ChatTransportError', async () =>
   try {
     await mgr.createChat({
       tabId: 't1',
+    taskId: 'task-test',
       mode: 'nonexistent-mode',
       cwd: '/tmp',
       conversationId: null,
@@ -110,6 +111,7 @@ await test('createChat: missing binary → throws ChatTransportError', async () 
   try {
     await mgr.createChat({
       tabId: 't2',
+    taskId: 'task-test',
       mode: 'claude-code',
       cwd: '/tmp',
       conversationId: null,
@@ -135,6 +137,7 @@ await test('createChat: pipes fixture NDJSON → emits typed events + ring buffe
   })
   await mgr.createChat({
     tabId: 'tab-x',
+    taskId: 'task-test',
     mode: 'claude-code',
     cwd: '/tmp',
     conversationId: null,
@@ -166,6 +169,7 @@ await test('getEventBufferSince: returns only events with seq > afterSeq', async
   })
   await mgr.createChat({
     tabId: 'tab-y',
+    taskId: 'task-test',
     mode: 'claude-code',
     cwd: '/tmp',
     conversationId: null,
@@ -191,6 +195,7 @@ await test('persist callback fires on turn-init', async () => {
   const persisted: string[] = []
   await mgr.createChat({
     tabId: 'tab-z',
+    taskId: 'task-test',
     mode: 'claude-code',
     cwd: '/tmp',
     conversationId: null,
@@ -214,6 +219,7 @@ await test('sendUserMessage: writes NDJSON line to stdin', async () => {
   })
   await mgr.createChat({
     tabId: 'tab-msg',
+    taskId: 'task-test',
     mode: 'claude-code',
     cwd: '/tmp',
     conversationId: null,
@@ -248,6 +254,7 @@ await test('invalid --resume: onInvalidResume fires + auto-retry with fresh sess
   })
   await mgr.createChat({
     tabId: 'tab-resume',
+    taskId: 'task-test',
     mode: 'claude-code',
     cwd: '/tmp',
     conversationId: 'stale-session-id',
@@ -299,6 +306,7 @@ await test('exit event: fires process-exit + chat:exit broadcast', async () => {
   })
   await mgr.createChat({
     tabId: 'tab-exit',
+    taskId: 'task-test',
     mode: 'claude-code',
     cwd: '/tmp',
     conversationId: null,
@@ -309,6 +317,89 @@ await test('exit event: fires process-exit + chat:exit broadcast', async () => {
   expect(eventKinds.includes('process-exit')).toBeTruthy()
   expect(exits.length).toBe(1)
   expect(exits[0].code).toBe(0)
+})
+
+await test('reset race: old session exit fires after removeSession — broadcast swallowed', async () => {
+  await setup()
+  let spawnCount = 0
+  const children: FakeChild[] = []
+  const events: string[] = []
+  const exits: Array<{ code: number | null }> = []
+  mgr.setTransportDepsForTests({
+    whichBinary: async () => '/fake/claude',
+    spawn: () => {
+      spawnCount++
+      const f = makeFakeChild()
+      children.push(f)
+      return f as unknown as ChildProcess
+    },
+    broadcastEvent: (_tab, event) => events.push(event.kind),
+    broadcastExit: (_tab, code) => exits.push({ code }),
+    broadcastStateChange: () => {},
+  })
+
+  // 1. Spawn session A.
+  await mgr.createChat({
+    tabId: 'tab-reset',
+    taskId: 'task-test',
+    mode: 'claude-code',
+    cwd: '/tmp',
+    conversationId: null,
+    providerFlags: [],
+  })
+  expect(spawnCount).toBe(1)
+
+  // 2. Reset flow: kill + remove + create.
+  mgr.kill('tab-reset')
+  mgr.removeSession('tab-reset')
+  await mgr.createChat({
+    tabId: 'tab-reset',
+    taskId: 'task-test',
+    mode: 'claude-code',
+    cwd: '/tmp',
+    conversationId: null,
+    providerFlags: [],
+  })
+  expect(spawnCount).toBe(2)
+
+  const beforeExitCount = exits.length
+
+  // 3. Old session A's exit fires LATE — after new session already spawned.
+  ;(children[0] as unknown as EventEmitter).emit('exit', 0, null)
+  await new Promise((r) => setTimeout(r, 10))
+
+  // Identity guard must have swallowed it — no new exit broadcast.
+  expect(exits.length).toBe(beforeExitCount)
+  // process-exit event must NOT have been buffered on the new session either.
+  // (If it had, eventKinds would include 'process-exit'.)
+  expect(events.filter((k) => k === 'process-exit').length).toBe(0)
+})
+
+await test('reset race: live session exit (not stale) still broadcasts', async () => {
+  await setup()
+  const fake = makeFakeChild()
+  const events: string[] = []
+  const exits: Array<{ code: number | null }> = []
+  mgr.setTransportDepsForTests({
+    whichBinary: async () => '/fake/claude',
+    spawn: () => fake as unknown as ChildProcess,
+    broadcastEvent: (_tab, event) => events.push(event.kind),
+    broadcastExit: (_tab, code) => exits.push({ code }),
+    broadcastStateChange: () => {},
+  })
+  await mgr.createChat({
+    tabId: 'tab-live',
+    taskId: 'task-test',
+    mode: 'claude-code',
+    cwd: '/tmp',
+    conversationId: null,
+    providerFlags: [],
+  })
+  // Session still in map (no reset). Exit fires.
+  ;(fake as unknown as EventEmitter).emit('exit', 0, null)
+  await new Promise((r) => setTimeout(r, 10))
+  expect(exits.length).toBe(1)
+  expect(events.includes('process-exit')).toBeTruthy()
 })
 
 console.log(`\n${passed} passed, ${failed} failed`)

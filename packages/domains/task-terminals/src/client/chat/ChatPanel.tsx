@@ -26,6 +26,7 @@ import { createBuiltinsSource } from './autocomplete/sources/builtins'
 import { createFilesSource } from './autocomplete/sources/files'
 import type { AutocompleteSource, ChatActions, NavigateActions } from './autocomplete/types'
 import { resetChat } from './autocomplete/chat-actions'
+import { mergeEffortFlag } from './autocomplete/flags'
 import {
   UserMessage,
   AssistantText,
@@ -116,6 +117,7 @@ export function ChatPanel(props: ChatPanelProps) {
       api?: {
         chat?: {
           kill: (tabId: string) => Promise<void>
+          remove: (tabId: string) => Promise<void>
           create: (opts: {
             tabId: string
             taskId: string
@@ -131,6 +133,7 @@ export function ChatPanel(props: ChatPanelProps) {
     const chat = api?.chat
     return {
       kill: (id) => chat?.kill(id) ?? Promise.resolve(),
+      remove: (id) => chat?.remove(id) ?? Promise.resolve(),
       create: (opts) => chat?.create(opts) ?? Promise.resolve(null),
       send: (id, text) => chat?.send(id, text) ?? Promise.resolve(false),
       interrupt: (id) => chat?.interrupt(id) ?? Promise.resolve(),
@@ -256,7 +259,18 @@ export function ChatPanel(props: ChatPanelProps) {
     getScrollElement: () => listRef.current,
     estimateSize: () => 64,
     overscan: 8,
+    getItemKey: (index) => {
+      const item = displayedTimeline[index]
+      if (!item) return index
+      // Stable per-item keys so streaming text updates re-measure the same DOM node.
+      if (item.kind === 'text' || item.kind === 'thinking') return `${item.kind}:${item.messageId}`
+      if (item.kind === 'tool') return `tool:${item.invocation.id}`
+      if (item.kind === 'session-start') return `session:${item.sessionId}`
+      if (item.kind === 'result') return `result:${item.timestamp}`
+      return `${item.kind}:${index}`
+    },
   })
+
 
   const chatView = useMemo(() => ({ collapseSignal, finalOnly }), [collapseSignal, finalOnly])
 
@@ -295,6 +309,33 @@ export function ChatPanel(props: ChatPanelProps) {
   const handleSend = useCallback(async () => {
     const text = draft.trim()
     if (!text || state.sessionEnded) return
+
+    // Builtin `/effort <level>` — update session flags + restart. Doesn't send to chat.
+    const effortMatch = /^\/effort\s+(\S+)\s*$/.exec(text)
+    if (effortMatch) {
+      const level = effortMatch[1].toLowerCase()
+      const valid = ['low', 'medium', 'high', 'xhigh', 'max']
+      if (!valid.includes(level)) {
+        toast(`Invalid effort level "${level}". Use: ${valid.join(', ')}`)
+        return
+      }
+      setDraft('')
+      const nextFlags = mergeEffortFlag(providerFlagsOverride ?? null, level)
+      await resetChat(
+        chatApi,
+        { tabId, taskId, mode, cwd, providerFlagsOverride: nextFlags },
+        {
+          interruptFirst: inFlight,
+          onSuccess: () => toast(`Effort set to ${level}`),
+          onError: (err) =>
+            toast(`Effort change failed: ${err instanceof Error ? err.message : String(err)}`),
+        }
+      ).catch(() => {
+        /* handled via onError */
+      })
+      return
+    }
+
     // Allow sources (e.g. commands) to transform `/cmdname args` into expanded template.
     const transform = autocomplete.transformSubmit(text)
     const toSend = transform?.send ?? text
@@ -306,7 +347,7 @@ export function ChatPanel(props: ChatPanelProps) {
       return
     }
     await sendMessage(toSend)
-  }, [draft, inFlight, state.sessionEnded, sendMessage, autocomplete])
+  }, [draft, inFlight, state.sessionEnded, sendMessage, autocomplete, chatApi, tabId, taskId, mode, cwd, providerFlagsOverride])
 
   // Drain queue: when the active turn finishes, send the next queued message.
   useEffect(() => {
@@ -343,6 +384,9 @@ export function ChatPanel(props: ChatPanelProps) {
 
   const [resetting, setResetting] = useState(false)
   const [pendingChatDisable, setPendingChatDisable] = useState(false)
+  // Suppress "Session ended" UI during a reset — process-exit fires between kill and
+  // the new session's turn-init, creating a brief flash of the ended state.
+  const displaySessionEnded = state.sessionEnded && !resetting
   const handleReset = useCallback(async () => {
     if (resetting) return
     setResetting(true)
@@ -401,8 +445,7 @@ export function ChatPanel(props: ChatPanelProps) {
           {isEmpty && !inFlight ? (
             <EmptyState
               onPick={(text) => {
-                setDraft(text)
-                textareaRef.current?.focus()
+                void sendMessage(text)
               }}
             />
           ) : (
@@ -416,7 +459,6 @@ export function ChatPanel(props: ChatPanelProps) {
                     key={v.key}
                     data-index={v.index}
                     ref={virtualizer.measureElement}
-                    className="animate-in fade-in-0 slide-in-from-bottom-1 duration-200"
                     style={{
                       position: 'absolute',
                       top: 0,
@@ -482,7 +524,7 @@ export function ChatPanel(props: ChatPanelProps) {
           className={cn(
             'relative flex items-center gap-2 rounded-2xl bg-muted/40 ring-1 ring-border/60 px-3 py-1.5 transition-shadow',
             'focus-within:ring-2 focus-within:ring-primary/40 focus-within:bg-background',
-            state.sessionEnded && 'opacity-50 pointer-events-none'
+            displaySessionEnded && 'opacity-50 pointer-events-none'
           )}
         >
           {autocomplete.show && autocomplete.active && (
@@ -512,8 +554,8 @@ export function ChatPanel(props: ChatPanelProps) {
               setCursorPos(el.selectionStart ?? el.value.length)
             }}
             onKeyDown={onKeyDown}
-            placeholder={state.sessionEnded ? 'Session ended' : 'Ask Claude anything…'}
-            disabled={state.sessionEnded}
+            placeholder={displaySessionEnded ? 'Session ended' : 'Ask Claude anything…'}
+            disabled={displaySessionEnded}
             rows={1}
             className="flex-1 resize-none bg-transparent text-sm outline-none placeholder:text-muted-foreground/60 max-h-[240px] py-0.5 leading-normal"
           />
@@ -522,7 +564,7 @@ export function ChatPanel(props: ChatPanelProps) {
               onClick={() => {
                 void interrupt()
               }}
-              disabled={state.sessionEnded}
+              disabled={displaySessionEnded}
               className="shrink-0 size-8 rounded-full flex items-center justify-center bg-destructive text-destructive-foreground hover:bg-destructive/90 transition-colors disabled:opacity-50"
               title="Stop generation"
               aria-label="Stop generation"
@@ -534,10 +576,10 @@ export function ChatPanel(props: ChatPanelProps) {
               onClick={() => {
                 void handleSend()
               }}
-              disabled={!draft.trim() || state.sessionEnded}
+              disabled={!draft.trim() || displaySessionEnded}
               className={cn(
                 'shrink-0 size-8 rounded-full flex items-center justify-center transition-colors',
-                draft.trim() && !state.sessionEnded
+                draft.trim() && !displaySessionEnded
                   ? 'bg-primary text-primary-foreground hover:bg-primary/90'
                   : 'bg-muted text-muted-foreground cursor-not-allowed'
               )}
@@ -565,7 +607,7 @@ export function ChatPanel(props: ChatPanelProps) {
               {sessionIdCopied ? <Check className="size-3" /> : <Copy className="size-3 opacity-60" />}
             </button>
           )}
-          {state.sessionEnded && <span className="text-destructive">Session ended</span>}
+          {displaySessionEnded && <span className="text-destructive">Session ended</span>}
           <button
             onClick={() => setCollapseSignal((n) => n + 1)}
             className="flex items-center gap-1 px-1.5 py-0.5 rounded-md hover:bg-muted/60 hover:text-foreground transition-colors"

@@ -8,6 +8,7 @@
 
 export type AgentEvent =
   | TurnInitEvent
+  | UserMessageEvent
   | AssistantTextEvent
   | AssistantThinkingEvent
   | ToolCallEvent
@@ -65,6 +66,12 @@ export interface StreamBlockStopEvent {
 
 export interface StreamMessageStopEvent {
   kind: 'stream-message-stop'
+}
+
+/** Synthetic event emitted by the main process when the user sends a message. Buffered so it survives replay. */
+export interface UserMessageEvent {
+  kind: 'user-message'
+  text: string
 }
 
 export interface TurnInitEvent {

@@ -24,6 +24,8 @@ export interface SessionRef {
 
 export interface ChatActions {
   kill: (tabId: string) => Promise<void>
+  /** Delete the session from the main-side map so a subsequent `create` spawns fresh. */
+  remove: (tabId: string) => Promise<void>
   create: (opts: {
     tabId: string
     taskId: string

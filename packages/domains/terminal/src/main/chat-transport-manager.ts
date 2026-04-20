@@ -6,26 +6,35 @@ import type { AgentAdapter } from './agents/types'
 import { getAdapter } from './agents/registry'
 import { whichBinary as realWhichBinary } from './shell-env'
 
+export type ChatTerminalState = 'starting' | 'running' | 'attention' | 'idle' | 'error' | 'dead'
+
 /** Dependency-injection seam for tests. */
 export interface TransportDeps {
   spawn: (cmd: string, args: string[], opts: SpawnOptions) => ChildProcess
   whichBinary: (name: string) => Promise<string | null>
   broadcastEvent: (tabId: string, event: AgentEvent, seq: number) => void
   broadcastExit: (tabId: string, code: number | null, signal: string | null) => void
+  /** Broadcast state transitions on `pty:state-change` so the existing UI reflects chat activity. */
+  broadcastStateChange: (sessionId: string, newState: ChatTerminalState, oldState: ChatTerminalState) => void
 }
 
 /**
  * Default broadcast uses Electron's BrowserWindow. We require it lazily so that
  * non-electron test runs can import this module without pulling in `electron`.
  */
-function electronBroadcast(channel: 'chat:event' | 'chat:exit'): (...args: unknown[]) => void {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const { BrowserWindow } = require('electron') as typeof import('electron')
-  return (...args: unknown[]) => {
-    for (const w of BrowserWindow.getAllWindows()) {
-      if (w.isDestroyed()) continue
-      w.webContents.send(channel, ...args)
+function electronBroadcast(channel: 'chat:event' | 'chat:exit' | 'pty:state-change'): (...args: unknown[]) => void {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { BrowserWindow } = require('electron') as typeof import('electron')
+    return (...args: unknown[]) => {
+      for (const w of BrowserWindow.getAllWindows()) {
+        if (w.isDestroyed()) continue
+        w.webContents.send(channel, ...args)
+      }
     }
+  } catch {
+    // Non-electron context (tests run under tsx). No-op broadcast.
+    return () => {}
   }
 }
 
@@ -37,6 +46,9 @@ const defaultDeps: TransportDeps = {
   },
   broadcastExit: (tabId, code, signal) => {
     electronBroadcast('chat:exit')(tabId, code, signal)
+  },
+  broadcastStateChange: (sessionId, newState, oldState) => {
+    electronBroadcast('pty:state-change')(sessionId, newState, oldState)
   },
 }
 
@@ -68,6 +80,8 @@ interface BufferedEvent {
 interface Session {
   sessionId: string
   tabId: string
+  /** Parent task id — used to key `pty:state-change` broadcasts matching the main terminal sessionId format `${taskId}:${tabId}`. */
+  taskId: string
   mode: string
   cwd: string
   adapter: AgentAdapter
@@ -76,6 +90,7 @@ interface Session {
   nextSeq: number
   ended: boolean
   startedAt: string
+  terminalState: ChatTerminalState
   /** True if this spawn used --resume (vs fresh --session-id). */
   usedResume: boolean
   /** True once we received any confirmation that the session is healthy. */
@@ -102,9 +117,32 @@ function appendToBuffer(session: Session, event: AgentEvent): number {
   return seq
 }
 
+function transitionState(session: Session, next: ChatTerminalState): void {
+  if (session.terminalState === next) return
+  const old = session.terminalState
+  session.terminalState = next
+  const stateSessionId = `${session.taskId}:${session.tabId}`
+  deps.broadcastStateChange(stateSessionId, next, old)
+}
+
 function handleEvent(session: Session, event: AgentEvent): void {
   const seq = appendToBuffer(session, event)
   deps.broadcastEvent(session.tabId, event, seq)
+
+  // Feed chat activity into the shared terminal-state channel so tab indicators,
+  // kanban cards, and task automations react to chat sessions the same way as PTY.
+  // Semantics:
+  //   running   — mid-turn (processing user msg or tool call)
+  //   idle      — turn finished, waiting on user (distinct from PTY 'attention' which implies a prompt)
+  //   error     — result came back with isError
+  //   dead      — process exited
+  if (event.kind === 'user-message' || event.kind === 'turn-init' || event.kind === 'tool-call') {
+    transitionState(session, 'running')
+  } else if (event.kind === 'result') {
+    transitionState(session, event.isError ? 'error' : 'idle')
+  } else if (event.kind === 'process-exit') {
+    transitionState(session, 'dead')
+  }
 
   // Mark session as healthy once we see any real content.
   if (
@@ -187,6 +225,8 @@ function detectResumeFailure(event: AgentEvent): string | null {
 
 export interface CreateChatOpts {
   tabId: string
+  /** Task id — required so `pty:state-change` broadcasts use `${taskId}:${tabId}` keys. */
+  taskId: string
   mode: string
   cwd: string
   /** If set, --resume <id>; otherwise fresh --session-id <newUuid>. */
@@ -243,6 +283,7 @@ export async function createChat(opts: CreateChatOpts): Promise<ChatSessionInfo>
   const session: Session = {
     sessionId,
     tabId: opts.tabId,
+    taskId: opts.taskId,
     mode: opts.mode,
     cwd: opts.cwd,
     adapter,
@@ -251,6 +292,7 @@ export async function createChat(opts: CreateChatOpts): Promise<ChatSessionInfo>
     nextSeq: 0,
     ended: false,
     startedAt: new Date().toISOString(),
+    terminalState: 'starting',
     usedResume: Boolean(opts.conversationId),
     sawHealthyTurn: false,
     retryScheduled: false,
@@ -296,6 +338,11 @@ export async function createChat(opts: CreateChatOpts): Promise<ChatSessionInfo>
       flushStderr()
     }
     session.ended = true
+    // If this session was already replaced in the tab (e.g. reset: kill+create raced and the
+    // new session is already live), swallow the exit so the UI doesn't revert to "Session ended".
+    if (sessions.get(opts.tabId) !== session) {
+      return
+    }
     handleEvent(session, { kind: 'process-exit', code, signal })
     deps.broadcastExit(opts.tabId, code, signal)
     // Leave session in map so reattach can read buffer; consumer deletes on tab close.
@@ -317,6 +364,8 @@ export function sendUserMessage(tabId: string, text: string): boolean {
   if (!session || session.ended) return false
   const line = session.adapter.serializeUserMessage(text, session.sessionId)
   session.child.stdin?.write(line + '\n')
+  // Record into the session buffer so tab reloads / replay reconstruct user messages.
+  handleEvent(session, { kind: 'user-message', text })
   return true
 }
 

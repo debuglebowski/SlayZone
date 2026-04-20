@@ -133,8 +133,8 @@ export function useChatSession(opts: UseChatSessionOpts): UseChatSessionResult {
 
   const sendMessage = async (text: string): Promise<void> => {
     const chat = getChatApi()
-    // Optimistically add user message to timeline before network round-trip.
-    dispatch({ type: 'user-sent', text })
+    // Main emits a `user-message` event to the session buffer which flows back via chat:event.
+    // Single source of truth → survives tab reload / buffer replay.
     await chat.send(opts.tabId, text)
   }
 

@@ -133,6 +133,18 @@ export function reducer(state: ChatTimelineState, action: Action): ChatTimelineS
 function applyEvent(state: ChatTimelineState, event: AgentEvent): ChatTimelineState {
   const ts = Date.now()
   switch (event.kind) {
+    case 'user-message': {
+      const item: TimelineItem = {
+        kind: 'user-text',
+        text: event.text,
+        timestamp: ts,
+      }
+      return {
+        ...state,
+        timeline: [...state.timeline, item],
+        userMessagesSent: state.userMessagesSent + 1,
+      }
+    }
     case 'turn-init': {
       // Restart detection: session previously ended, OR sessionId changed (new process spawned).
       // Kill+create cycle (reset chat, /clear builtin) produces a fresh turn-init — clear timeline
@@ -170,12 +182,17 @@ function applyEvent(state: ChatTimelineState, event: AgentEvent): ChatTimelineSt
       }
       // Prepend session-start: user messages may arrive in the timeline before turn-init
       // (optimistic user-sent dispatch races the stream). Keep session-start at the top.
+      // Also clear any stale end-state: a fresh turn-init means a live process, which may
+      // arrive AFTER a late process-exit from a prior (already-replaced) session during reset.
       return {
         ...state,
         timeline: [item, ...state.timeline],
         sessionStarted: true,
         sessionId: event.sessionId,
         model: event.model,
+        sessionEnded: false,
+        exitCode: null,
+        exitSignal: null,
       }
     }
     case 'assistant-text': {
@@ -470,8 +487,9 @@ function applyEvent(state: ChatTimelineState, event: AgentEvent): ChatTimelineSt
         ],
       }
     case 'rate-limit':
-      // 'allowed' is a noop signal — skip to avoid virtualized empty row (renderer returns null).
-      if (event.status === 'allowed') return state
+      // Suppress 'allowed' / 'allowed_warning' — informational, not actionable. Only surface
+      // blocked / exceeded / hard-limit statuses.
+      if (event.status.startsWith('allowed')) return state
       return {
         ...state,
         timeline: [...state.timeline, { kind: 'rate-limit', status: event.status, timestamp: ts }],

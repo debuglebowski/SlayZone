@@ -111,6 +111,15 @@ export const builtinCommands: BuiltinCommand[] = [
       ctx.toast(`Session: ${ctx.session.mode} — cwd ${ctx.session.cwd}`)
     },
   },
+  {
+    name: 'effort',
+    description: 'Set reasoning effort — usage: /effort <low|medium|high|xhigh|max>',
+    run(ctx) {
+      // Park draft so user types the level, then handleSend intercepts on Enter.
+      ctx.setDraft('/effort ')
+      ctx.toast('effort: type level (low, medium, high, xhigh, max) then Enter')
+    },
+  },
 ]
 
 export function filterBuiltins(filter: string): BuiltinCommand[] {

@@ -187,6 +187,32 @@ test('unknown event is dropped from timeline', () => {
   expect(unknown.length).toBe(0)
 })
 
+test('reset race: process-exit arriving between reset and new turn-init must not stick sessionEnded', () => {
+  // Timeline simulating a Reset click:
+  // 1. Client dispatches `reset` → state cleared.
+  // 2. Old session's late exit event arrives (was in flight when kill was issued).
+  // 3. New session spawns, turn-init arrives.
+  // After turn-init, sessionEnded must be false — the user should see a live session.
+  let s = initialState()
+  s = reducer(s, { type: 'event', event: ev.turnInit('old-sid') })
+  s = reducer(s, { type: 'event', event: ev.text('m-1', 'from old session') })
+
+  // User clicks Reset → timeline cleared first.
+  s = reducer(s, { type: 'reset' })
+  expect(s.sessionEnded).toBe(false)
+
+  // Old process's exit event arrives AFTER reset but BEFORE new turn-init.
+  s = reducer(s, { type: 'process-exit', code: 0, signal: null })
+  expect(s.sessionEnded).toBe(true)
+
+  // New session's turn-init arrives. sessionStarted was false (from reset), so this
+  // hits the fresh-init path. Must clear sessionEnded.
+  s = reducer(s, { type: 'event', event: ev.turnInit('new-sid') })
+  expect(s.sessionEnded).toBe(false)
+  expect(s.sessionStarted).toBe(true)
+  expect(s.sessionId).toBe('new-sid')
+})
+
 test('stream deltas build text item incrementally', () => {
   let s = initialState()
   s = reducer(s, { type: 'event', event: ev.turnInit() })

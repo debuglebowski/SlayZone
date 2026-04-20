@@ -13,6 +13,10 @@ export interface ResetChatOptions {
  * Kill the current chat session and immediately create a fresh one w/ the same
  * tab/task/mode/cwd (and providerFlags override if set). Shared by the reset button
  * and the `/clear` builtin to keep both paths in sync.
+ *
+ * Must `remove` between kill and create: otherwise createChat sees the still-alive
+ * old session in its map and returns it unchanged (early-return guard), so the reset
+ * becomes a no-op.
  */
 export async function resetChat(
   chat: ChatActions,
@@ -28,6 +32,7 @@ export async function resetChat(
   }
   try {
     await chat.kill(session.tabId)
+    await chat.remove(session.tabId)
     await chat.create({
       tabId: session.tabId,
       taskId: session.taskId,

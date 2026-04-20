@@ -32,7 +32,7 @@ type SessionDetectedCallback = (sessionId: string) => void
 type DevServerCallback = (url: string) => void
 type TitleChangeCallback = (title: string) => void
 
-const ALIVE_STATES: Set<TerminalState> = new Set(['running', 'attention'])
+const ALIVE_STATES: Set<TerminalState> = new Set(['running', 'attention', 'idle'])
 
 function taskIdFromSessionId(sessionId: string): string {
   const idx = sessionId.indexOf(':')
@@ -242,8 +242,9 @@ export function PtyProvider({ children }: { children: ReactNode }) {
     })
 
     const unsubStateChange = window.api.pty.onStateChange((sessionId, newState, oldState) => {
-      const state = statesRef.current.get(sessionId)
-      if (!state) return // Ignore state changes for unknown tasks
+      // Bootstrap state entry if missing — chat sessions may emit before any component subscribes.
+      // The entry is cheap; without it, early transitions are lost and `getState` stays 'starting'.
+      const state = getOrCreateState(sessionId)
 
       state.state = newState as TerminalState
 

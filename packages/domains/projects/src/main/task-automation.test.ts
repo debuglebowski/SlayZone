@@ -62,6 +62,15 @@ await describe('task automation: state change triggers', () => {
     expect(notifyCalls).toBe(1)
   })
 
+  test('running->idle triggers on_terminal_idle (chat completion)', () => {
+    resetNotify()
+    const projId = seedProject({ on_terminal_active: null, on_terminal_idle: 'review' })
+    const taskId = seedTask(projId, 'in_progress')
+    handleTerminalStateChange(h.db, `${taskId}:0`, 'idle', 'running', notifyTasksChanged)
+    expect(getStatus(taskId)).toBe('review')
+    expect(notifyCalls).toBe(1)
+  })
+
   test('both configs work in sequence (active then idle)', () => {
     resetNotify()
     const projId = seedProject({ on_terminal_active: 'in_progress', on_terminal_idle: 'review' })

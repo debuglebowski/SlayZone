@@ -46,24 +46,24 @@ function useCopy(text: string): { copied: boolean; copy: () => void } {
 
 // --- Turn-scoped wrappers ---
 
-/** User message — right-aligned bubble. */
+/** User prompt — right-aligned card. */
 export function UserMessage({ item }: { item: Extract<TimelineItem, { kind: 'user-text' }> }) {
   return (
-    <div className="group px-4 py-2 flex justify-end">
-      <div className="max-w-[85%] rounded-2xl rounded-br-sm bg-primary text-primary-foreground px-4 py-2.5 text-sm whitespace-pre-wrap break-words shadow-sm">
+    <div className="px-4 py-2 flex justify-end">
+      <div className="max-w-[85%] min-w-0 rounded-lg border border-primary/25 bg-primary/5 shadow-sm px-3 py-2 text-sm text-foreground whitespace-pre-wrap break-words">
         {item.text}
       </div>
     </div>
   )
 }
 
-/** Assistant message — left-aligned, avatar + prose. Timestamp + Copy live on the ResultFooter below. */
+/** Assistant message — left-aligned avatar + card that sizes to content up to 85%. */
 export function AssistantText({ item }: { item: Extract<TimelineItem, { kind: 'text' }> }) {
   return (
     <div className="px-4 py-2">
       <div className="flex gap-3 items-start">
         <AssistantAvatar />
-        <div className="flex-1 min-w-0">
+        <div className="min-w-0 max-w-[85%] rounded-lg border border-border/50 bg-card/40 shadow-sm px-3 py-2">
           <div className="text-sm leading-relaxed [&_p]:my-2 [&_p:first-child]:mt-0 [&_p:last-child]:mb-0 [&_pre]:my-3 [&_ul]:my-2 [&_ol]:my-2 [&_h1]:text-base [&_h1]:font-semibold [&_h1]:mt-4 [&_h2]:text-sm [&_h2]:font-semibold [&_h2]:mt-3 [&_h3]:text-sm [&_h3]:font-medium [&_code]:font-mono [&_code]:text-[0.85em]">
             <GhMarkdown>{item.text}</GhMarkdown>
           </div>
