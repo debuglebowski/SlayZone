@@ -5,6 +5,8 @@ import { Search, ChevronUp, ChevronDown, ALargeSmall, X } from 'lucide-react'
 interface TerminalSearchBarProps {
   searchAddon: SearchAddon
   onClose: () => void
+  /** Bump to pull focus back into the input when the bar is already open. */
+  focusToken?: number
 }
 
 const decorations = {
@@ -16,7 +18,7 @@ const decorations = {
   activeMatchColorOverviewRuler: '#ca8a04'
 }
 
-export function TerminalSearchBar({ searchAddon, onClose }: TerminalSearchBarProps) {
+export function TerminalSearchBar({ searchAddon, onClose, focusToken }: TerminalSearchBarProps) {
   const inputRef = useRef<HTMLInputElement>(null)
   const [query, setQuery] = useState('')
   const [caseSensitive, setCaseSensitive] = useState(false)
@@ -82,11 +84,11 @@ export function TerminalSearchBar({ searchAddon, onClose }: TerminalSearchBarPro
     }
   }, [onClose, findNext, findPrevious])
 
-  // Focus input on mount
+  // Focus + select input on mount and whenever focusToken bumps
   useEffect(() => {
     inputRef.current?.focus()
     inputRef.current?.select()
-  }, [])
+  }, [focusToken])
 
   const countDisplay = query
     ? resultCount > 0

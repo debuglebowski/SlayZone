@@ -66,6 +66,10 @@
   --color-surface-3: var(--surface-3);
   --color-modal: var(--modal);
   --color-tab-active: var(--tab-active);
+  --color-search-match: var(--search-match);
+  --color-search-match-foreground: var(--search-match-foreground);
+  --color-search-match-active: var(--search-match-active);
+  --color-search-match-active-foreground: var(--search-match-active-foreground);
 
   --animate-collapsible-down: collapsible-down 0.15s ease-out;
   --animate-collapsible-up: collapsible-up 0.15s ease-out;
@@ -124,6 +128,10 @@
   --tab-active: oklch(0.88 0 0);
   --modal: oklch(1 0 0);
   --modal-border: oklch(0 0 0 / 35%);
+  --search-match: oklch(0.9 0.14 85);
+  --search-match-foreground: oklch(0.18 0.05 85);
+  --search-match-active: oklch(0.78 0.19 55);
+  --search-match-active-foreground: oklch(0.15 0 0);
 }
 
 .dark {
@@ -165,6 +173,10 @@
   --tab-active: #3f3f46;
   --modal: #09090b;
   --modal-border: rgba(255, 255, 255, 0.25);
+  --search-match: oklch(0.48 0.13 85);
+  --search-match-foreground: oklch(0.96 0 0);
+  --search-match-active: oklch(0.68 0.2 55);
+  --search-match-active-foreground: oklch(0.15 0 0);
 }
 
 [data-sonner-toaster][dir='ltr'] {
@@ -736,3 +748,22 @@
 
 /* Milkdown frontmatter styles are inline in milkdown-frontmatter.ts
    to avoid Tailwind prose overrides. */
+
+/* ==========================================================================
+   Asset in-file search highlighting
+   Shared classes used by SearchableCodeView (CodeMirror decorations),
+   the Milkdown preview plugin, and the ReactMarkdown preview renderer.
+   Colors come from theme tokens so they follow the active theme.
+   ========================================================================== */
+.cm-asset-search-match,
+.asset-search-match {
+  background: var(--color-search-match);
+  color: var(--color-search-match-foreground);
+  border-radius: 2px;
+}
+.cm-asset-search-match-active,
+.asset-search-match-active {
+  background: var(--color-search-match-active) !important;
+  color: var(--color-search-match-active-foreground) !important;
+  outline: 1px solid var(--color-search-match-active);
+}

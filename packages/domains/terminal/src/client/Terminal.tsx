@@ -158,6 +158,7 @@ export const Terminal = forwardRef<TerminalHandle, TerminalProps>(function Termi
   const [isDragOver, setIsDragOver] = useState(false)
   const dragCounter = useRef(0)
   const [searchOpen, setSearchOpen] = useState(false)
+  const [searchFocusToken, setSearchFocusToken] = useState(0)
   const [isInitializing, setIsInitializing] = useState(true)
   const [isReplaying, setIsReplaying] = useState(false)
   const [initError, setInitError] = useState<string | null>(null)
@@ -227,7 +228,7 @@ export const Terminal = forwardRef<TerminalHandle, TerminalProps>(function Termi
     getSelection: () => terminalRef.current?.getSelection() ?? '',
     selectAll: () => terminalRef.current?.selectAll(),
     scrollToBottom: () => terminalRef.current?.scrollToBottom(),
-    openSearch: () => setSearchOpen(true),
+    openSearch: () => { setSearchOpen(true); setSearchFocusToken(t => t + 1) },
     clearBuffer: clearBufferWithoutRestart
   }))
 
@@ -246,6 +247,7 @@ export const Terminal = forwardRef<TerminalHandle, TerminalProps>(function Termi
     if (e.type === 'keydown' && !useShortcutStore.getState().isRecording) {
       if (matchesShortcut(e, useShortcutStore.getState().getKeys('terminal-search'))) {
         setSearchOpen(true)
+        setSearchFocusToken(t => t + 1)
         track('terminal_search_used')
         return false
       }
@@ -1115,6 +1117,7 @@ export const Terminal = forwardRef<TerminalHandle, TerminalProps>(function Termi
         <TerminalSearchBar
           searchAddon={searchAddonRef.current}
           onClose={handleSearchClose}
+          focusToken={searchFocusToken}
         />
       )}
       <div

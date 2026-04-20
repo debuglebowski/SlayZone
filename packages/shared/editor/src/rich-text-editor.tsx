@@ -14,6 +14,7 @@ import { listItemMovePlugin } from './milkdown-list-move'
 import { escapeBlurPlugin } from './milkdown-escape-blur'
 import { taskListPlugin } from './milkdown-task-list'
 import { createAssetLinkPlugin, type AssetMentionState } from './milkdown-asset-link'
+import { createSearchHighlightPlugin, setSearch as setMilkdownSearch } from './milkdown-search-highlight'
 import { AssetPicker, type AssetPickerItem } from './AssetPicker'
 
 export type { Editor }
@@ -107,6 +108,16 @@ interface RichTextEditorProps {
   themeColors?: EditorThemeColors
   assets?: AssetPickerItem[]
   onAssetClick?: (assetId: string) => void
+  /** In-editor search query. Non-empty values highlight matches. */
+  searchQuery?: string
+  /** Index of the active match (used to scroll into view and paint the active color). */
+  searchActiveIndex?: number
+  /** Treat the query as case-sensitive. */
+  searchMatchCase?: boolean
+  /** Treat the query as a regular expression. */
+  searchRegex?: boolean
+  /** Called when the number of matches changes. */
+  onSearchMatchCountChange?: (count: number) => void
 }
 
 export function RichTextEditor({
@@ -131,6 +142,11 @@ export function RichTextEditor({
   themeColors,
   assets,
   onAssetClick,
+  searchQuery = '',
+  searchActiveIndex = 0,
+  searchMatchCase = false,
+  searchRegex = false,
+  onSearchMatchCountChange,
 }: RichTextEditorProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const editorInstanceRef = useRef<Editor | null>(null)
@@ -144,6 +160,8 @@ export function RichTextEditor({
   const [mentionState, setMentionState] = useState<AssetMentionState | null>(null)
   const onAssetClickRef = useRef(onAssetClick)
   const assetsRef = useRef(assets)
+  const onSearchMatchCountChangeRef = useRef(onSearchMatchCountChange)
+  onSearchMatchCountChangeRef.current = onSearchMatchCountChange
   const insertAssetLinkRef = useRef<((view: import('@milkdown/prose/view').EditorView, assetId: string, assetTitle: string) => void) | null>(null)
   onAssetClickRef.current = onAssetClick
   assetsRef.current = assets
@@ -190,6 +208,10 @@ export function RichTextEditor({
     )
     insertAssetLinkRef.current = assetPlugins.insertAssetLink
 
+    const searchPlugin = createSearchHighlightPlugin({
+      onMatchCountChange: (n) => onSearchMatchCountChangeRef.current?.(n),
+    })
+
     const editor = Editor.make()
       .config((ctx) => {
         ctx.set(rootCtx, containerRef.current!)
@@ -218,6 +240,7 @@ export function RichTextEditor({
       .use(blurHandlerPlugin)
       .use(assetPlugins.assetLinkDecoPlugin)
       .use(assetPlugins.assetMentionPlugin)
+      .use(searchPlugin)
 
     editor.create().then((e) => {
       editorInstanceRef.current = e
@@ -255,6 +278,16 @@ export function RichTextEditor({
     }
     suppressOnChange.current = false
   }, [value])
+
+  // Push search state into the editor's search plugin
+  useEffect(() => {
+    const editor = editorInstanceRef.current
+    if (!editor || !editorReady) return
+    try {
+      const view = editor.ctx.get(editorViewCtx)
+      setMilkdownSearch(view, searchQuery, searchActiveIndex, searchMatchCase, searchRegex)
+    } catch { /* editor not ready */ }
+  }, [searchQuery, searchActiveIndex, searchMatchCase, searchRegex, editorReady])
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const handleCommand = useCallback((cmdKey: any) => {

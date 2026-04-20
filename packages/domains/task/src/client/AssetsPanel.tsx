@@ -1,11 +1,13 @@
 import { useState, useEffect, useCallback, useRef, useImperativeHandle, forwardRef, useMemo, type CSSProperties, type DragEvent } from 'react'
-import { Upload, Download, Trash2, FileText, Code, Globe, Image, GitBranch, Eye, Code2, Columns2, ZoomIn, ZoomOut, FolderPlus, Pencil, FilePlus, FolderOpen, Folder, ArrowRight, Copy, Search, Files, PanelLeftClose, PanelLeft, ChevronDown, ImageDown, FileCode, Archive, Rows2, Rows3, Maximize2, AlignCenter, type LucideIcon } from 'lucide-react'
+import { Upload, Download, Trash2, FileText, Code, Globe, Image, GitBranch, Eye, Code2, Columns2, ZoomIn, ZoomOut, FolderPlus, Pencil, FilePlus, FolderOpen, Folder, ArrowRight, Copy, Search, Files, PanelLeftClose, PanelLeft, ImageDown, FileCode, Archive, Rows2, Rows3, Maximize2, AlignCenter, History, type LucideIcon } from 'lucide-react'
 import {
   cn, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Button, Input,
   ContextMenu, ContextMenuTrigger, ContextMenuContent, ContextMenuItem, ContextMenuSeparator, ContextMenuSub, ContextMenuSubTrigger, ContextMenuSubContent,
   DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuSub, DropdownMenuSubTrigger, DropdownMenuSubContent,
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,
   Tooltip, TooltipTrigger, TooltipContent, TooltipProvider,
 } from '@slayzone/ui'
+import type { AssetVersion, DiffResult } from '@slayzone/task-assets/shared'
 import { RichTextEditor } from '@slayzone/editor'
 import type { RenderMode, TaskAsset, AssetFolder } from '@slayzone/task/shared'
 import { getEffectiveRenderMode, getExtensionFromTitle, RENDER_MODE_INFO, isBinaryRenderMode, canExportAsPdf, canExportAsPng, canExportAsHtml } from '@slayzone/task/shared'
@@ -13,6 +15,7 @@ import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { useAppearance, getThemeEditorColors, type EditorThemeColors } from '@slayzone/ui'
 import { useTheme } from '@slayzone/settings/client'
+import { SearchableCodeView } from '@slayzone/file-editor/client/SearchableCodeView'
 import { useAssets } from './useAssets'
 import { AssetFindBar } from './AssetFindBar'
 import { AssetSearchPanel } from './AssetSearchPanel'
@@ -153,7 +156,7 @@ export interface AssetStats {
   lines: number
 }
 
-function AssetContentEditor({ asset, viewMode, zoomLevel, onZoom, readContent, saveContent, getFilePath, onStats, onContentReady, scrollToLineRef, effectiveReadability, effectiveWidth }: {
+function AssetContentEditor({ asset, viewMode, zoomLevel, onZoom, readContent, saveContent, getFilePath, onStats, effectiveReadability, effectiveWidth, searchQuery, searchActiveIndex, searchMatchCase, searchRegex, onSearchMatchCountChange }: {
   asset: TaskAsset
   viewMode: 'preview' | 'split' | 'raw'
   zoomLevel: number
@@ -162,10 +165,13 @@ function AssetContentEditor({ asset, viewMode, zoomLevel, onZoom, readContent, s
   saveContent: (id: string, content: string) => Promise<void>
   getFilePath: (id: string) => Promise<string | null>
   onStats?: (stats: AssetStats) => void
-  onContentReady?: (content: string) => void
-  scrollToLineRef?: React.MutableRefObject<((line: number) => void) | null>
   effectiveReadability: 'compact' | 'normal'
   effectiveWidth: 'narrow' | 'wide'
+  searchQuery: string
+  searchActiveIndex: number
+  searchMatchCase: boolean
+  searchRegex: boolean
+  onSearchMatchCountChange: (count: number) => void
 }) {
   const { notesFontFamily, notesCheckedHighlight, notesShowToolbar, notesSpellcheck } = useAppearance()
   const { editorThemeId, contentVariant } = useTheme()
@@ -193,10 +199,10 @@ function AssetContentEditor({ asset, viewMode, zoomLevel, onZoom, readContent, s
   const contentRef = useRef(content)
   const isDirtyRef = useRef(false)
   const onStatsRef = useRef(onStats)
-  const textareaRef = useRef<HTMLTextAreaElement>(null)
   contentRef.current = content
   isDirtyRef.current = isDirty
   onStatsRef.current = onStats
+  const fileExt = getExtensionFromTitle(asset.title) || undefined
 
   const renderMode = getEffectiveRenderMode(asset.title, asset.render_mode)
   const isBinary = isBinaryRenderMode(renderMode)
@@ -262,22 +268,6 @@ function AssetContentEditor({ asset, viewMode, zoomLevel, onZoom, readContent, s
     return () => { off() }
   }, [asset.id, loadFromDisk])
 
-  // Notify parent of content changes for find bar
-  useEffect(() => {
-    if (content != null) onContentReady?.(content)
-  }, [content, onContentReady])
-
-  // Register scroll-to-line for find bar
-  useEffect(() => {
-    if (!scrollToLineRef) return
-    scrollToLineRef.current = (line: number) => {
-      const ta = textareaRef.current
-      if (!ta) return
-      const lineHeight = ta.scrollHeight / Math.max(1, (content ?? '').split('\n').length)
-      ta.scrollTop = Math.max(0, (line - 3) * lineHeight)
-    }
-    return () => { scrollToLineRef.current = null }
-  }, [scrollToLineRef, content])
 
   const handleChange = useCallback((value: string) => {
     setContent(value)
@@ -342,7 +332,21 @@ function AssetContentEditor({ asset, viewMode, zoomLevel, onZoom, readContent, s
     if (renderMode === 'markdown' && viewMode === 'preview') {
       return (
         <div className="flex-1 overflow-y-auto">
-          <RichTextEditor value={content ?? ''} onChange={handleChange} placeholder="Write markdown..." readability={effectiveReadability} width={effectiveWidth} fontFamily={notesFontFamily} checkedHighlight={notesCheckedHighlight} showToolbar={notesShowToolbar} spellcheck={notesSpellcheck} themeColors={themeColors} />
+          <RichTextEditor
+            value={content ?? ''}
+            onChange={handleChange}
+            placeholder="Write markdown..."
+            readability={effectiveReadability}
+            width={effectiveWidth}
+            fontFamily={notesFontFamily}
+            checkedHighlight={notesCheckedHighlight}
+            showToolbar={notesShowToolbar}
+            spellcheck={notesSpellcheck}
+            themeColors={themeColors}
+            searchQuery={searchQuery}
+            searchActiveIndex={searchActiveIndex}
+            onSearchMatchCountChange={onSearchMatchCountChange}
+          />
         </div>
       )
     }
@@ -350,7 +354,20 @@ function AssetContentEditor({ asset, viewMode, zoomLevel, onZoom, readContent, s
     if (renderMode === 'markdown' && viewMode === 'split') {
       return (
         <div className="flex-1 flex flex-row overflow-hidden">
-          <textarea ref={textareaRef} value={content ?? ''} onChange={(e) => handleChange(e.target.value)} className="flex-1 bg-transparent text-xs font-mono p-3 resize-none outline-none min-w-0" placeholder="Write markdown..." spellCheck={false} />
+          <div className="flex-1 min-w-0">
+            <SearchableCodeView
+              value={content ?? ''}
+              onChange={handleChange}
+              fileExt={fileExt}
+              version={contentVersion}
+              searchQuery={searchQuery}
+              searchActiveIndex={searchActiveIndex}
+              searchMatchCase={searchMatchCase}
+              searchRegex={searchRegex}
+              onSearchMatchCountChange={onSearchMatchCountChange}
+              placeholder="Write markdown..."
+            />
+          </div>
           <div className="flex-1 border-l border-border min-w-0 min-h-0">
             <div className="mk-doc" data-readability={effectiveReadability} data-width={effectiveWidth} style={themeStyle}>
               <div className="mk-doc-scroll">
@@ -371,7 +388,20 @@ function AssetContentEditor({ asset, viewMode, zoomLevel, onZoom, readContent, s
     if (hasPreview && viewMode === 'split') {
       return (
         <div className="flex-1 flex flex-row overflow-hidden">
-          <textarea ref={textareaRef} value={content ?? ''} onChange={(e) => handleChange(e.target.value)} className="flex-1 bg-transparent text-xs font-mono p-3 resize-none outline-none min-w-0" placeholder={`Write ${getExtensionFromTitle(asset.title) || 'content'}...`} spellCheck={false} />
+          <div className="flex-1 min-w-0">
+            <SearchableCodeView
+              value={content ?? ''}
+              onChange={handleChange}
+              fileExt={fileExt}
+              version={contentVersion}
+              searchQuery={searchQuery}
+              searchActiveIndex={searchActiveIndex}
+              searchMatchCase={searchMatchCase}
+              searchRegex={searchRegex}
+              onSearchMatchCountChange={onSearchMatchCountChange}
+              placeholder={`Write ${fileExt || 'content'}...`}
+            />
+          </div>
           <div className="flex-1 flex flex-col border-l border-border overflow-hidden min-w-0">
             <AssetPreview renderMode={renderMode} content={content ?? ''} zoomLevel={zoomLevel} onZoom={onZoom} />
           </div>
@@ -381,7 +411,16 @@ function AssetContentEditor({ asset, viewMode, zoomLevel, onZoom, readContent, s
 
     return (
       <div className="flex-1 flex flex-col overflow-hidden">
-        <textarea ref={textareaRef} value={content ?? ''} onChange={(e) => handleChange(e.target.value)} className="flex-1 bg-transparent text-xs font-mono p-3 resize-none outline-none" placeholder={`Write ${getExtensionFromTitle(asset.title) || 'content'}...`} spellCheck={false} />
+        <SearchableCodeView
+          value={content ?? ''}
+          onChange={handleChange}
+          fileExt={fileExt}
+          version={contentVersion}
+          searchQuery={searchQuery}
+          searchActiveIndex={searchActiveIndex}
+          onSearchMatchCountChange={onSearchMatchCountChange}
+          placeholder={`Write ${fileExt || 'content'}...`}
+        />
       </div>
     )
   })()
@@ -436,6 +475,7 @@ export const AssetsPanel = forwardRef<AssetsPanelHandle, AssetsPanelProps>(funct
     createAsset, updateAsset, deleteAsset, renameAsset, moveAssetToFolder,
     readContent, saveContent, uploadAsset, uploadDir, getFilePath,
     downloadFile, downloadFolder, downloadAsPdf, downloadAsPng, downloadAsHtml, downloadAllAsZip,
+    listVersions, readVersion, createVersion, diffVersions,
     createFolder, deleteFolder, renameFolder,
     getAssetPath, folderPathMap,
   } = useAssets(taskId, initialActiveAssetId)
@@ -463,7 +503,62 @@ export const AssetsPanel = forwardRef<AssetsPanelHandle, AssetsPanelProps>(funct
   const [sidebarVisible, setSidebarVisible] = useState(true)
   const [findOpen, setFindOpen] = useState(false)
   const [findQuery, setFindQuery] = useState('')
-  const contentForFindRef = useRef<string>('')
+  const [findActiveIndex, setFindActiveIndex] = useState(0)
+  const [findMatchCount, setFindMatchCount] = useState(0)
+  const [findMatchCase, setFindMatchCase] = useState(false)
+  const [findUseRegex, setFindUseRegex] = useState(false)
+  const [findFocusToken, setFindFocusToken] = useState(0)
+
+  // Versions dropdown state
+  const [assetVersions, setAssetVersions] = useState<AssetVersion[]>([])
+  const [versionsLoading, setVersionsLoading] = useState(false)
+  const [viewingVersion, setViewingVersion] = useState<{
+    version: AssetVersion
+    content: string
+    diff: DiffResult | null
+    mode: 'diff' | 'content'
+  } | null>(null)
+
+  const refreshVersions = useCallback(async (assetId: string): Promise<void> => {
+    setVersionsLoading(true)
+    try {
+      const rows = await listVersions(assetId, { limit: 50 })
+      setAssetVersions(rows)
+    } catch {
+      setAssetVersions([])
+    } finally {
+      setVersionsLoading(false)
+    }
+  }, [listVersions])
+
+  const openVersion = useCallback(async (assetId: string, version: AssetVersion, allVersions: AssetVersion[]): Promise<void> => {
+    try {
+      const content = await readVersion(assetId, version.version_num)
+      const isLatest = allVersions.length > 0 && allVersions[0].id === version.id
+      let diff: DiffResult | null = null
+      let mode: 'diff' | 'content' = 'content'
+      if (!isLatest) {
+        try {
+          diff = await diffVersions(assetId, version.version_num)
+          mode = 'diff'
+        } catch {
+          diff = null
+        }
+      }
+      setViewingVersion({ version, content, diff, mode })
+    } catch (err) {
+      console.error('Failed to load version', err)
+    }
+  }, [readVersion, diffVersions])
+
+  const handleCreateVersion = useCallback(async (assetId: string): Promise<void> => {
+    try {
+      await createVersion(assetId)
+      await refreshVersions(assetId)
+    } catch (err) {
+      console.error('Create version failed', err)
+    }
+  }, [createVersion, refreshVersions])
 
   // Inline creation/rename state
   const [creating, setCreating] = useState<{ parentFolderId: string | null; type: 'file' | 'folder' } | null>(null)
@@ -503,8 +598,14 @@ export const AssetsPanel = forwardRef<AssetsPanelHandle, AssetsPanelProps>(funct
   useEffect(() => {
     const asset = assets.find(a => a.id === selectedId)
     setViewMode((asset?.view_mode as 'preview' | 'split' | 'raw') ?? assetDefaultViewMode)
-    setZoomLevel(1); setFindOpen(false); setFindQuery('')
+    setZoomLevel(1); setFindOpen(false); setFindQuery(''); setFindActiveIndex(0); setFindMatchCount(0); setFindMatchCase(false); setFindUseRegex(false)
   }, [selectedId])
+
+  // Reset active index when the search parameters change so the first match is the target
+  useEffect(() => { setFindActiveIndex(0) }, [findQuery, findMatchCase, findUseRegex])
+
+  // Reset match count when query clears — a blank query should show no matches
+  useEffect(() => { if (!findQuery.trim()) setFindMatchCount(0) }, [findQuery])
 
   useImperativeHandle(ref, () => ({
     selectAsset: (id: string) => setSelectedId(id),
@@ -635,18 +736,29 @@ export const AssetsPanel = forwardRef<AssetsPanelHandle, AssetsPanelProps>(funct
       const rm = selectedAsset ? getEffectiveRenderMode(selectedAsset.title, selectedAsset.render_mode) : null
       if (selectedAsset && rm && !isBinaryRenderMode(rm)) {
         setFindOpen(true)
+        // Bump so the find bar pulls focus even when already open.
+        setFindFocusToken(t => t + 1)
       }
     }
   }, [selectedAsset])
 
-  const handleSearchResult = useCallback((assetId: string, query: string, _line: number) => {
+  const handleSearchResult = useCallback((assetId: string, payload: { query: string; matchCase: boolean; useRegex: boolean; matchIndex: number }) => {
     setSelectedId(assetId)
-    setFindQuery(query)
-    // Defer opening find bar so the new asset content loads first
-    setTimeout(() => setFindOpen(true), 50)
+    setFindQuery(payload.query)
+    setFindMatchCase(payload.matchCase)
+    setFindUseRegex(payload.useRegex)
+    // Force raw view. Rendered-preview views (Milkdown markdown, html/svg/
+    // mermaid) index matches over rendered text and would diverge from the
+    // sidebar's raw-text matchIndex — the source-text CodeMirror view is the
+    // only one guaranteed to agree with the sidebar's indexing.
+    setViewMode('raw')
+    // Defer opening find bar + setting active index so the new asset content
+    // loads and the view's match list is rebuilt before we try to scroll.
+    setTimeout(() => {
+      setFindOpen(true)
+      setFindActiveIndex(payload.matchIndex)
+    }, 50)
   }, [setSelectedId])
-
-  const scrollToLineRef = useRef<((line: number) => void) | null>(null)
 
   const toggleFolder = useCallback((folderId: string) => {
     setExpandedFolders(prev => {
@@ -1092,9 +1204,8 @@ export const AssetsPanel = forwardRef<AssetsPanelHandle, AssetsPanelProps>(funct
                 <div className="w-px h-5 bg-border shrink-0 mx-2" />
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <Button variant="outline" size="sm" className="!h-7 gap-1 px-1.5 shrink-0" title="Download">
+                    <Button variant="outline" size="sm" className="!h-7 px-1.5 shrink-0" title="Download">
                       <Download className="size-3.5" />
-                      <ChevronDown className="size-3" />
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
@@ -1133,6 +1244,40 @@ export const AssetsPanel = forwardRef<AssetsPanelHandle, AssetsPanelProps>(funct
                         </DropdownMenuItem>
                       </>
                     )}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+                <DropdownMenu onOpenChange={(open) => { if (open && selectedAsset) refreshVersions(selectedAsset.id) }}>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" size="sm" className="!h-7 px-1.5 shrink-0" title="Versions">
+                      <History className="size-3.5" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="min-w-[260px] max-h-[400px] overflow-auto">
+                    {versionsLoading && (
+                      <DropdownMenuItem disabled>Loading…</DropdownMenuItem>
+                    )}
+                    {!versionsLoading && assetVersions.length === 0 && (
+                      <DropdownMenuItem disabled>No versions</DropdownMenuItem>
+                    )}
+                    {assetVersions.map((v, idx) => {
+                      const isLatest = idx === 0 && assetVersions.length > 1
+                      return (
+                        <DropdownMenuItem
+                          key={v.id}
+                          onSelect={() => selectedAsset && openVersion(selectedAsset.id, v, assetVersions)}
+                          className="flex items-center justify-between gap-3"
+                        >
+                          <span className="font-mono text-xs">v{v.version_num}{isLatest ? ' · latest' : ''}</span>
+                          <span className="text-muted-foreground text-[10px] truncate max-w-[140px]">
+                            {v.name ?? new Date(v.created_at).toLocaleString()}
+                          </span>
+                        </DropdownMenuItem>
+                      )
+                    })}
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onSelect={() => selectedAsset && handleCreateVersion(selectedAsset.id)}>
+                      <FilePlus className="size-3 mr-2" /> Create version
+                    </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
                 </>
@@ -1227,9 +1372,15 @@ export const AssetsPanel = forwardRef<AssetsPanelHandle, AssetsPanelProps>(funct
             <AssetFindBar
               query={findQuery}
               onQueryChange={setFindQuery}
-              onClose={() => { setFindOpen(false); setFindQuery('') }}
-              content={contentForFindRef.current}
-              onScrollToLine={scrollToLineRef.current ?? undefined}
+              onClose={() => { setFindOpen(false); setFindQuery(''); setFindActiveIndex(0) }}
+              matchCount={findMatchCount}
+              activeIndex={findActiveIndex}
+              onActiveIndexChange={(fn) => setFindActiveIndex(fn)}
+              matchCase={findMatchCase}
+              onMatchCaseChange={setFindMatchCase}
+              useRegex={findUseRegex}
+              onUseRegexChange={setFindUseRegex}
+              focusToken={findFocusToken}
             />
           )}
           {selectedAsset ? (
@@ -1244,10 +1395,13 @@ export const AssetsPanel = forwardRef<AssetsPanelHandle, AssetsPanelProps>(funct
                 saveContent={saveContent}
                 getFilePath={getFilePath}
                 onStats={setAssetStats}
-                onContentReady={(c) => { contentForFindRef.current = c }}
-                scrollToLineRef={scrollToLineRef}
                 effectiveReadability={effectiveReadability}
                 effectiveWidth={effectiveWidth}
+                searchQuery={findOpen ? findQuery : ''}
+                searchActiveIndex={findActiveIndex}
+                searchMatchCase={findMatchCase}
+                searchRegex={findUseRegex}
+                onSearchMatchCountChange={setFindMatchCount}
               />
             </>
           ) : (
@@ -1257,6 +1411,95 @@ export const AssetsPanel = forwardRef<AssetsPanelHandle, AssetsPanelProps>(funct
           )}
         </div>
       </div>
+      <Dialog open={viewingVersion !== null} onOpenChange={(open) => { if (!open) setViewingVersion(null) }}>
+        <DialogContent className="max-w-3xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-3">
+              <span>
+                v{viewingVersion?.version.version_num}
+                {viewingVersion?.version.name ? ` · ${viewingVersion.version.name}` : ''}
+              </span>
+              {viewingVersion?.diff && (
+                <div className="ml-auto flex gap-1">
+                  <Button
+                    variant={viewingVersion.mode === 'diff' ? 'default' : 'outline'}
+                    size="sm"
+                    className="!h-6 text-[10px] px-2"
+                    onClick={() => setViewingVersion((v) => (v ? { ...v, mode: 'diff' } : v))}
+                  >
+                    Diff vs latest
+                  </Button>
+                  <Button
+                    variant={viewingVersion.mode === 'content' ? 'default' : 'outline'}
+                    size="sm"
+                    className="!h-6 text-[10px] px-2"
+                    onClick={() => setViewingVersion((v) => (v ? { ...v, mode: 'content' } : v))}
+                  >
+                    Full content
+                  </Button>
+                </div>
+              )}
+            </DialogTitle>
+            <DialogDescription>
+              {viewingVersion ? new Date(viewingVersion.version.created_at).toLocaleString() : ''}
+              {viewingVersion ? ` · ${viewingVersion.version.size} bytes · ${viewingVersion.version.content_hash.slice(0, 8)}` : ''}
+            </DialogDescription>
+          </DialogHeader>
+          {viewingVersion && viewingVersion.mode === 'diff' && viewingVersion.diff ? (
+            viewingVersion.diff.kind === 'binary' ? (
+              <pre className="font-mono text-xs bg-muted p-3 rounded">
+                (binary differs)
+                {`\n  a: ${viewingVersion.diff.a.hash.slice(0, 8)}  ${viewingVersion.diff.a.size} bytes`}
+                {`\n  b: ${viewingVersion.diff.b.hash.slice(0, 8)}  ${viewingVersion.diff.b.size} bytes`}
+              </pre>
+            ) : viewingVersion.diff.hunks.length === 0 ? (
+              <pre className="font-mono text-xs bg-muted p-3 rounded text-muted-foreground">
+                (no differences)
+              </pre>
+            ) : (
+              <pre className="font-mono text-xs whitespace-pre-wrap break-words bg-muted p-3 rounded max-h-[60vh] overflow-auto">
+                {viewingVersion.diff.hunks.map((hunk, hi) => (
+                  <div key={hi} className={hi > 0 ? 'mt-3 pt-3 border-t border-border' : ''}>
+                    {hunk.lines.map((line, li) => (
+                      <span
+                        key={li}
+                        className={
+                          line.kind === 'add'
+                            ? 'text-green-600 dark:text-green-400 block'
+                            : line.kind === 'del'
+                              ? 'text-red-600 dark:text-red-400 block'
+                              : 'block opacity-70'
+                        }
+                      >
+                        {line.kind === 'add' ? '+' : line.kind === 'del' ? '-' : ' '}
+                        {line.text}
+                      </span>
+                    ))}
+                  </div>
+                ))}
+              </pre>
+            )
+          ) : (
+            <pre className="font-mono text-xs whitespace-pre-wrap break-words bg-muted p-3 rounded max-h-[60vh] overflow-auto">
+              {viewingVersion?.content}
+            </pre>
+          )}
+          <DialogFooter>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={async () => {
+                if (!viewingVersion || !selectedAsset) return
+                await saveContent(selectedAsset.id, viewingVersion.content)
+                setViewingVersion(null)
+              }}
+            >
+              Restore as current
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => setViewingVersion(null)}>Close</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 })

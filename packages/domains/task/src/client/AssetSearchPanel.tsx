@@ -7,12 +7,19 @@ interface AssetSearchPanelProps {
   assets: TaskAsset[]
   readContent: (id: string) => Promise<string | null>
   getAssetPath: (asset: TaskAsset) => string
-  onSelectResult: (assetId: string, query: string, line: number) => void
+  onSelectResult: (assetId: string, payload: {
+    query: string
+    matchCase: boolean
+    useRegex: boolean
+    matchIndex: number
+  }) => void
 }
 
 interface SearchMatch {
   line: number
   lineText: string
+  /** 0-based index of this line's first match within the file's full match list. */
+  matchIndex: number
 }
 
 interface AssetResult {
@@ -62,7 +69,9 @@ export function AssetSearchPanel({ assets, readContent, getAssetPath, onSelectRe
       try {
         const flags = matchCase ? 'g' : 'gi'
         const escaped = useRegex ? query : query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-        const re = new RegExp(escaped, flags)
+        // Validate once so malformed user regex short-circuits via the outer
+        // try/catch before we read every file.
+        void new RegExp(escaped, flags)
 
         // Load content for all text assets (cached)
         await Promise.all(textAssets.map(async (a) => {
@@ -78,10 +87,20 @@ export function AssetSearchPanel({ assets, readContent, getAssetPath, onSelectRe
           if (!content) continue
           const lines = content.split('\n')
           const matches: SearchMatch[] = []
+          let globalCount = 0
           for (let i = 0; i < lines.length; i++) {
-            re.lastIndex = 0
-            if (re.test(lines[i])) {
-              matches.push({ line: i + 1, lineText: lines[i] })
+            // Count matches in this line with a fresh regex so `g` flag state
+            // is isolated per line.
+            const lineRe = new RegExp(escaped, flags)
+            let n = 0
+            let m: RegExpExecArray | null
+            while ((m = lineRe.exec(lines[i])) !== null) {
+              if (m[0].length === 0) { lineRe.lastIndex++; continue }
+              n++
+            }
+            if (n > 0) {
+              matches.push({ line: i + 1, lineText: lines[i], matchIndex: globalCount })
+              globalCount += n
             }
           }
           if (matches.length > 0) {
@@ -171,7 +190,7 @@ export function AssetSearchPanel({ assets, readContent, getAssetPath, onSelectRe
                 <button
                   key={i}
                   className="flex items-center gap-2 w-full pl-7 pr-2 py-0.5 hover:bg-muted/50 text-left"
-                  onClick={() => onSelectResult(file.asset.id, query, match.line)}
+                  onClick={() => onSelectResult(file.asset.id, { query, matchCase, useRegex, matchIndex: match.matchIndex })}
                 >
                   <span className="text-[10px] text-muted-foreground tabular-nums shrink-0 w-6 text-right">{match.line}</span>
                   <HighlightedLine text={match.lineText} query={query} matchCase={matchCase} useRegex={useRegex} />
