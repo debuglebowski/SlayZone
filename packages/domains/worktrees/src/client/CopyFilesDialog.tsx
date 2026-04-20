@@ -258,8 +258,8 @@ export function CopyFilesDialog({ open, onOpenChange, repoPath, onConfirm }: Cop
   )
 
   const toggle = useCallback((path: string) => {
+    const state = states.get(path) ?? 'unchecked'
     setSelected(prev => {
-      const state = computeStates(tree, prev).states.get(path) ?? 'unchecked'
       const chain = findChain(tree, path)
       if (!chain) return prev
       const leaf = chain[chain.length - 1]
@@ -292,15 +292,15 @@ export function CopyFilesDialog({ open, onOpenChange, repoPath, onConfirm }: Cop
       return next
     })
     setSelectedPresetId('custom')
-  }, [tree])
+  }, [tree, states])
+
+  const allTopSelected = tree.length > 0 && tree.every(n => (states.get(n.path) ?? 'unchecked') === 'checked')
 
   const toggleAll = () => {
-    const topLevel = tree.map(n => n.path)
-    const allSelected = topLevel.every(p => selected.has(p))
-    if (allSelected && selected.size === topLevel.length) {
+    if (allTopSelected) {
       setSelected(new Set())
     } else {
-      setSelected(new Set(topLevel))
+      setSelected(new Set(tree.map(n => n.path)))
     }
     setSelectedPresetId('custom')
   }
@@ -315,7 +315,7 @@ export function CopyFilesDialog({ open, onOpenChange, repoPath, onConfirm }: Cop
   }, [])
 
   const handleConfirm = () => {
-    if (selected.size === 0) {
+    if (selectedFileCount === 0) {
       onConfirm({ mode: 'none' })
     } else {
       onConfirm({ mode: 'custom', paths: [...selected] })
@@ -325,8 +325,6 @@ export function CopyFilesDialog({ open, onOpenChange, repoPath, onConfirm }: Cop
   const handleSkip = () => {
     onConfirm({ mode: 'none' })
   }
-
-  const allTopSelected = tree.length > 0 && tree.every(n => (states.get(n.path) ?? 'unchecked') === 'checked')
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
