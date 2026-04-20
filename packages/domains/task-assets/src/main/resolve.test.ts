@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { isReservedName, resolveVersionRef, tryResolveVersionRef } from './resolve'
-import { createVersion } from './mutations'
+import { createVersion, setCurrentVersion } from './mutations'
 import { isVersionError } from './errors'
 import { makeTestEnv, type TestEnv } from './test-helpers'
 
@@ -29,12 +29,31 @@ describe('resolveVersionRef', () => {
     expect(resolveVersionRef(env.db, 'a1', -1).version_num).toBe(2)
   })
 
-  it('resolves HEAD as latest', () => {
+  it('resolves HEAD as current', () => {
     expect(resolveVersionRef(env.db, 'a1', 'HEAD').version_num).toBe(3)
   })
 
-  it('resolves HEAD~2', () => {
+  it('resolves "current" as current', () => {
+    expect(resolveVersionRef(env.db, 'a1', 'current').version_num).toBe(3)
+  })
+
+  it('HEAD follows current after set-current', () => {
+    setCurrentVersion(env.db, env.txn, 'a1', 1)
+    expect(resolveVersionRef(env.db, 'a1', 'HEAD').version_num).toBe(1)
+    expect(resolveVersionRef(env.db, 'a1', 'current').version_num).toBe(1)
+    // "latest" stays tied to max(version_num)
+    expect(resolveVersionRef(env.db, 'a1', 'latest').version_num).toBe(3)
+  })
+
+  it('resolves HEAD~2 via parent chain', () => {
     expect(resolveVersionRef(env.db, 'a1', 'HEAD~2').version_num).toBe(1)
+  })
+
+  it('HEAD~N walks parent chain not version_num', () => {
+    // Switch current to v2, then HEAD~1 should be v1 (its parent), not
+    // v1 by accident of version_num.
+    setCurrentVersion(env.db, env.txn, 'a1', 2)
+    expect(resolveVersionRef(env.db, 'a1', 'HEAD~1').version_num).toBe(1)
   })
 
   it('resolves "latest"', () => {
@@ -90,6 +109,9 @@ describe('isReservedName', () => {
   })
   it('rejects latest', () => {
     expect(isReservedName('latest')).toBe(true)
+  })
+  it('rejects current', () => {
+    expect(isReservedName('current')).toBe(true)
   })
   it('rejects pure numerics', () => {
     expect(isReservedName('42')).toBe(true)

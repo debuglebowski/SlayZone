@@ -319,7 +319,7 @@ export interface ElectronAPI {
       create: (data: { assetId: string; name?: string | null }) => Promise<AssetVersion>
       rename: (data: { assetId: string; versionRef: VersionRef; newName: string | null }) => Promise<AssetVersion>
       diff: (data: { assetId: string; a: VersionRef; b?: VersionRef }) => Promise<DiffResult>
-      prune: (data: { assetId: string; keepLast?: number; keepNamed?: boolean; dryRun?: boolean }) => Promise<PruneReport>
+      prune: (data: { assetId: string; keepLast?: number; keepNamed?: boolean; keepCurrent?: boolean; dryRun?: boolean }) => Promise<PruneReport>
       setCurrent: (data: { assetId: string; versionRef: VersionRef }) => Promise<AssetVersion>
     }
   }

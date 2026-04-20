@@ -1,6 +1,6 @@
 import { BlobStore } from './blob-store'
 import type { DbLike, TxnRunner } from './db'
-import { listVersions } from './resolve'
+import { getCurrentVersion, listVersions } from './resolve'
 import type { AssetId, AssetVersion, ContentHash, PruneOptions, PruneReport } from '../shared/types'
 
 /**
@@ -35,9 +35,12 @@ export function pruneVersions(
 ): PruneReport {
   const keepLast = opts.keepLast ?? 0
   const keepNamed = opts.keepNamed ?? true
+  const keepCurrent = opts.keepCurrent ?? true
   const dryRun = opts.dryRun ?? false
 
   const allVersions = listVersions(db, assetId, { limit: 1_000_000 })
+  const currentId = keepCurrent ? getCurrentVersion(db, assetId)?.id : undefined
+
   const toDelete: AssetVersion[] = []
   let keptNamed = 0
 
@@ -46,6 +49,7 @@ export function pruneVersions(
     const isRecent = i < keepLast
     const isNamed = v.name !== null
     if (isRecent) continue
+    if (currentId && v.id === currentId) continue
     if (keepNamed && isNamed) {
       keptNamed++
       continue

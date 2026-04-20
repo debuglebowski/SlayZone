@@ -1,7 +1,7 @@
 import { mkdirSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { listVersions } from './resolve'
+import { getCurrentVersion, listVersions } from './resolve'
 import { seedInitialVersions } from './seed'
 import { makeTestEnv, type TestEnv } from './test-helpers'
 
@@ -34,6 +34,12 @@ describe('seedInitialVersions', () => {
     expect(r.skippedMissing).toBe(0)
     expect(listVersions(env.db, 'a1')).toHaveLength(1)
     expect(listVersions(env.db, 'a2')).toHaveLength(1)
+    // Seed must wire current_version_id so getCurrentVersion resolves
+    // explicitly (not via the latest fallback).
+    const a1Current = getCurrentVersion(env.db, 'a1')
+    expect(a1Current?.version_num).toBe(1)
+    const row = env.db.prepare('SELECT current_version_id FROM task_assets WHERE id = ?').get('a1') as { current_version_id: string | null }
+    expect(row.current_version_id).toBe(a1Current?.id)
   })
 
   it('skips assets with missing files', () => {

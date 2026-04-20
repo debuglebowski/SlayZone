@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { Check, FilePlus, Lock, Pencil, Eye } from 'lucide-react'
+import { Check, FilePlus, Lock, Pencil, Eye, GitCompare } from 'lucide-react'
 import {
   Button,
   Dialog,
@@ -51,6 +51,7 @@ interface Props {
   onSetCurrent: (versionRef: number) => Promise<void>
   onRename: (versionRef: number, newName: string | null) => Promise<void>
   onOpenPreview: (version: AssetVersion) => void
+  onDiff: (version: AssetVersion) => void
   onCreateVersion: () => Promise<void>
 }
 
@@ -67,6 +68,8 @@ interface NodeChromeProps {
   startRename: (v: AssetVersion) => void
   onSetCurrent: (v: AssetVersion) => void | Promise<void>
   onOpenPreview: (v: AssetVersion) => void
+  onDiff: (v: AssetVersion) => void
+  canDiff: boolean
 }
 
 function RenameField({
@@ -111,6 +114,8 @@ function VersionPill({
   startRename,
   onSetCurrent,
   onOpenPreview,
+  onDiff,
+  canDiff,
 }: NodeChromeProps): React.JSX.Element {
   return (
     <div className="group relative flex items-stretch min-w-[220px]">
@@ -119,7 +124,7 @@ function VersionPill({
           'flex-1 flex flex-col gap-1 rounded-lg border px-3 py-2 shadow-sm',
           isCurrent
             ? 'border-primary bg-primary/10'
-            : 'border-border bg-card hover:bg-muted/60',
+            : 'border-border bg-card group-hover:bg-muted/60',
         )}
       >
         <div className="flex items-center gap-2">
@@ -156,35 +161,46 @@ function VersionPill({
       </div>
       <div
         className={cn(
-          'absolute left-full top-0 ml-2 flex flex-col gap-1 rounded-md border border-border bg-popover px-1.5 py-1.5 shadow-[0_3px_6px_rgba(0,0,0,0.25)] dark:shadow-[0_3px_6px_rgba(255,255,255,0.1)] transition-opacity z-10 min-w-[150px]',
-          'opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto focus-within:opacity-100 focus-within:pointer-events-auto',
+          'absolute left-full top-0 pl-2 transition-opacity z-10',
+          'opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto hover:opacity-100 hover:pointer-events-auto focus-within:opacity-100 focus-within:pointer-events-auto',
         )}
       >
-        <Button
-          variant="ghost"
-          size="sm"
-          className="h-7 justify-start px-2 text-xs"
-          disabled={isCurrent || isBusy}
-          onClick={() => void onSetCurrent(v)}
-        >
-          <Check className="size-3.5 mr-2" /> Set as current
-        </Button>
-        <Button
-          variant="ghost"
-          size="sm"
-          className="h-7 justify-start px-2 text-xs"
-          onClick={() => onOpenPreview(v)}
-        >
-          <Eye className="size-3.5 mr-2" /> Open
-        </Button>
-        <Button
-          variant="ghost"
-          size="sm"
-          className="h-7 justify-start px-2 text-xs"
-          onClick={() => startRename(v)}
-        >
-          <Pencil className="size-3.5 mr-2" /> Rename
-        </Button>
+        <div className="flex flex-col gap-1 rounded-md border border-border bg-popover px-1.5 py-1.5 shadow-[0_3px_6px_rgba(0,0,0,0.25)] dark:shadow-[0_3px_6px_rgba(255,255,255,0.1)] min-w-[150px]">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-7 justify-start px-2 text-xs"
+            disabled={isCurrent || isBusy}
+            onClick={() => void onSetCurrent(v)}
+          >
+            <Check className="size-3.5 mr-2" /> Set as current
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-7 justify-start px-2 text-xs"
+            onClick={() => onOpenPreview(v)}
+          >
+            <Eye className="size-3.5 mr-2" /> Preview
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-7 justify-start px-2 text-xs"
+            disabled={!canDiff}
+            onClick={() => onDiff(v)}
+          >
+            <GitCompare className="size-3.5 mr-2" /> Diff
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-7 justify-start px-2 text-xs"
+            onClick={() => startRename(v)}
+          >
+            <Pencil className="size-3.5 mr-2" /> Rename
+          </Button>
+        </div>
       </div>
     </div>
   )
@@ -199,6 +215,7 @@ export function AssetVersionsDialog({
   onSetCurrent,
   onRename,
   onOpenPreview,
+  onDiff,
   onCreateVersion,
 }: Props): React.JSX.Element {
   const [renamingId, setRenamingId] = useState<string | null>(null)
@@ -294,6 +311,8 @@ export function AssetVersionsDialog({
           startRename={startRename}
           onSetCurrent={handleSetCurrent}
           onOpenPreview={onOpenPreview}
+          onDiff={onDiff}
+          canDiff={!isCurrent}
         />
       </div>
     )
@@ -308,13 +327,13 @@ export function AssetVersionsDialog({
             Root at the bottom, newest branches above. Set any version as current — edits from the app then branch from it.
           </DialogDescription>
         </DialogHeader>
-        <div className="max-h-[60vh] overflow-auto border border-border rounded-md bg-background">
+        <div className="h-[75vh] overflow-auto border border-border rounded-md bg-background">
           {loading ? (
             <div className="px-3 py-4 text-sm text-muted-foreground">Loading…</div>
           ) : forest.length === 0 ? (
             <div className="px-3 py-4 text-sm text-muted-foreground">No versions yet.</div>
           ) : (
-            <div className="flex justify-center gap-10 px-4 py-6">
+            <div className="flex items-center justify-center gap-10 px-4 py-6 min-h-full">
               {forest.map((n) => renderSubtree(n))}
             </div>
           )}

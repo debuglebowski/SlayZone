@@ -1,7 +1,7 @@
 import { createPatch, structuredPatch } from 'diff'
 import { BlobStore } from './blob-store'
 import type { DbLike } from './db'
-import { getLatestVersion, resolveVersionRef } from './resolve'
+import { getCurrentVersion, resolveVersionRef } from './resolve'
 import type { AssetId, ContentHash, DiffHunk, DiffResult, VersionRef } from '../shared/types'
 import { VersionError } from './errors'
 
@@ -23,9 +23,9 @@ export function diffVersions(db: DbLike, blobStore: BlobStore, input: DiffInput)
   const verA = resolveVersionRef(db, input.assetId, input.a)
   const verB = input.b !== undefined
     ? resolveVersionRef(db, input.assetId, input.b)
-    : getLatestVersion(db, input.assetId)
+    : getCurrentVersion(db, input.assetId)
   if (!verB) {
-    throw new VersionError('NOT_FOUND', 'No latest version to compare against', {
+    throw new VersionError('NOT_FOUND', 'No current version to compare against', {
       assetId: input.assetId,
     })
   }
@@ -72,9 +72,9 @@ export function diffUnified(db: DbLike, blobStore: BlobStore, input: DiffInput):
   const verA = resolveVersionRef(db, input.assetId, input.a)
   const verB = input.b !== undefined
     ? resolveVersionRef(db, input.assetId, input.b)
-    : getLatestVersion(db, input.assetId)
+    : getCurrentVersion(db, input.assetId)
   if (!verB) {
-    throw new VersionError('NOT_FOUND', 'No latest version to compare against', {
+    throw new VersionError('NOT_FOUND', 'No current version to compare against', {
       assetId: input.assetId,
     })
   }

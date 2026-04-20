@@ -6,6 +6,8 @@ import {
   createVersion,
   saveCurrent,
   mutateVersion,
+  setCurrentVersion,
+  getCurrentVersion,
   listVersions,
   resolveVersionRef,
   readVersionContent,
@@ -2073,6 +2075,62 @@ pdf/png/html require the SlayZone app to be running.
     })
 
   versions
+    .command('set-current <assetId> <version>')
+    .description('Set the current (HEAD) version. Next UI save branches from here if the target is locked.')
+    .option('--json', 'Output as JSON')
+    .action(async (assetId: string, version: string, opts: { json?: boolean }) => {
+      const db = openDb()
+      const asset = resolveAsset(db, assetId)
+      const raw = db.raw()
+      const txn = nodeSqliteTxn(raw)
+      try {
+        const v = setCurrentVersion(raw, txn, asset.id, version)
+        const blobStore = new BlobStore(getDataDir())
+        // Flush the selected version's bytes to disk so editors pick up on next read.
+        const bytes = readVersionContent(blobStore, v)
+        const dir = getAssetsDir()
+        const fp = assetFilePath(dir, asset.task_id, asset.id, asset.title)
+        fs.mkdirSync(path.dirname(fp), { recursive: true })
+        fs.writeFileSync(fp, bytes)
+        db.close()
+        await notifyApp()
+        if (opts.json) {
+          console.log(JSON.stringify(v, null, 2))
+        } else {
+          console.log(`Current: v${v.version_num}${v.name ? ` (${v.name})` : ''}  ${v.content_hash.slice(0, 8)}`)
+        }
+      } catch (err) {
+        db.close()
+        if (isVersionError(err)) {
+          console.error(`Error [${err.code}]: ${err.message}`)
+          process.exit(1)
+        }
+        throw err
+      }
+    })
+
+  versions
+    .command('current <assetId>')
+    .description('Print the current (HEAD) version')
+    .option('--json', 'Output as JSON')
+    .action((assetId: string, opts: { json?: boolean }) => {
+      const db = openDb()
+      const asset = resolveAsset(db, assetId)
+      const raw = db.raw()
+      const v = getCurrentVersion(raw, asset.id)
+      db.close()
+      if (!v) {
+        console.error('No versions for this asset')
+        process.exit(1)
+      }
+      if (opts.json) {
+        console.log(JSON.stringify(v, null, 2))
+      } else {
+        console.log(`v${v.version_num}${v.name ? ` (${v.name})` : ''}  ${v.content_hash.slice(0, 8)}`)
+      }
+    })
+
+  versions
     .command('create <assetId>')
     .description('Create a version from the current working copy (honors unchanged content)')
     .option('--name <name>', 'Optional name for the version')
@@ -2141,12 +2199,13 @@ pdf/png/html require the SlayZone app to be running.
 
   versions
     .command('prune <assetId>')
-    .description('Remove old versions. Named versions protected by default.')
+    .description('Remove old versions. Named and current versions protected by default.')
     .option('--keep-last <n>', 'Keep the N most recent versions', (v) => parseInt(v, 10), 0)
     .option('--no-keep-named', 'Also delete named versions')
+    .option('--no-keep-current', 'Allow deleting the current (HEAD) version')
     .option('--dry-run', 'Show what would be deleted without modifying')
     .option('--json', 'Output as JSON')
-    .action(async (assetId: string, opts: { keepLast: number; keepNamed: boolean; dryRun?: boolean; json?: boolean }) => {
+    .action(async (assetId: string, opts: { keepLast: number; keepNamed: boolean; keepCurrent: boolean; dryRun?: boolean; json?: boolean }) => {
       const db = openDb()
       const asset = resolveAsset(db, assetId)
       const blobStore = new BlobStore(getDataDir())
@@ -2156,6 +2215,7 @@ pdf/png/html require the SlayZone app to be running.
         const report = pruneVersions(raw, txn, blobStore, asset.id, {
           keepLast: opts.keepLast,
           keepNamed: opts.keepNamed,
+          keepCurrent: opts.keepCurrent,
           dryRun: opts.dryRun,
         })
         db.close()

@@ -1265,11 +1265,12 @@ export function registerTaskHandlers(ipcMain: IpcMain, db: Database, onMutation?
     return wrapVersionError(() => diffVersions(db, blobStore, { assetId: data.assetId, a: data.a, b: data.b }))
   })
 
-  ipcMain.handle('db:assets:versions:prune', (_, data: { assetId: string; keepLast?: number; keepNamed?: boolean; dryRun?: boolean }) => {
+  ipcMain.handle('db:assets:versions:prune', (_, data: { assetId: string; keepLast?: number; keepNamed?: boolean; keepCurrent?: boolean; dryRun?: boolean }) => {
     return wrapVersionError(() =>
       pruneVersions(db, versionTxn, blobStore, data.assetId, {
         keepLast: data.keepLast,
         keepNamed: data.keepNamed,
+        keepCurrent: data.keepCurrent,
         dryRun: data.dryRun,
       })
     )

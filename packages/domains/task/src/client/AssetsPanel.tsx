@@ -5,6 +5,8 @@ import {
   ContextMenu, ContextMenuTrigger, ContextMenuContent, ContextMenuItem, ContextMenuSeparator, ContextMenuSub, ContextMenuSubTrigger, ContextMenuSubContent,
   DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuSub, DropdownMenuSubTrigger, DropdownMenuSubContent,
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,
+  Tabs, TabsList, TabsTrigger,
+  toast,
   Tooltip, TooltipTrigger, TooltipContent, TooltipProvider,
 } from '@slayzone/ui'
 import type { AssetVersion, DiffResult } from '@slayzone/task-assets/shared'
@@ -519,6 +521,8 @@ export const AssetsPanel = forwardRef<AssetsPanelHandle, AssetsPanelProps>(funct
     content: string
     diff: DiffResult | null
     mode: 'diff' | 'content'
+    /** version_num to diff against. undefined = default (latest per IPC). */
+    diffAgainst: number | undefined
   } | null>(null)
 
   const refreshVersions = useCallback(async (assetId: string): Promise<void> => {
@@ -533,25 +537,28 @@ export const AssetsPanel = forwardRef<AssetsPanelHandle, AssetsPanelProps>(funct
     }
   }, [listVersions])
 
-  const openVersion = useCallback(async (assetId: string, version: AssetVersion, allVersions: AssetVersion[]): Promise<void> => {
+  const openVersion = useCallback(async (assetId: string, version: AssetVersion, mode: 'diff' | 'content'): Promise<void> => {
     try {
-      const content = await readVersion(assetId, version.version_num)
-      const isLatest = allVersions.length > 0 && allVersions[0].id === version.id
-      let diff: DiffResult | null = null
-      let mode: 'diff' | 'content' = 'content'
-      if (!isLatest) {
-        try {
-          diff = await diffVersions(assetId, version.version_num)
-          mode = 'diff'
-        } catch {
-          diff = null
-        }
-      }
-      setViewingVersion({ version, content, diff, mode })
+      const [content, diff] = await Promise.all([
+        readVersion(assetId, version.version_num),
+        diffVersions(assetId, version.version_num).catch(() => null),
+      ])
+      setViewingVersion({ version, content, diff, mode, diffAgainst: undefined })
     } catch (err) {
       console.error('Failed to load version', err)
     }
   }, [readVersion, diffVersions])
+
+  const changeDiffAgainst = useCallback(async (assetId: string, targetVersionNum: number | undefined): Promise<void> => {
+    setViewingVersion((v) => (v ? { ...v, diffAgainst: targetVersionNum } : v))
+    if (!viewingVersion) return
+    try {
+      const diff = await diffVersions(assetId, viewingVersion.version.version_num, targetVersionNum)
+      setViewingVersion((v) => (v ? { ...v, diff } : v))
+    } catch {
+      setViewingVersion((v) => (v ? { ...v, diff: null } : v))
+    }
+  }, [diffVersions, viewingVersion])
 
   const handleCreateVersion = useCallback(async (assetId: string): Promise<void> => {
     try {
@@ -1400,8 +1407,12 @@ export const AssetsPanel = forwardRef<AssetsPanelHandle, AssetsPanelProps>(funct
         loading={versionsLoading}
         onSetCurrent={async (ref) => {
           if (!selectedAsset) return
-          await setCurrentVersion(selectedAsset.id, ref)
-          await refreshVersions(selectedAsset.id)
+          try {
+            await setCurrentVersion(selectedAsset.id, ref)
+            await refreshVersions(selectedAsset.id)
+          } catch (err) {
+            toast.error(`Failed to set current: ${err instanceof Error ? err.message : String(err)}`)
+          }
         }}
         onRename={async (ref, newName) => {
           if (!selectedAsset) return
@@ -1410,7 +1421,11 @@ export const AssetsPanel = forwardRef<AssetsPanelHandle, AssetsPanelProps>(funct
         }}
         onOpenPreview={(v) => {
           if (!selectedAsset) return
-          void openVersion(selectedAsset.id, v, assetVersions)
+          void openVersion(selectedAsset.id, v, 'content')
+        }}
+        onDiff={(v) => {
+          if (!selectedAsset) return
+          void openVersion(selectedAsset.id, v, 'diff')
         }}
         onCreateVersion={async () => {
           if (!selectedAsset) return
@@ -1420,31 +1435,9 @@ export const AssetsPanel = forwardRef<AssetsPanelHandle, AssetsPanelProps>(funct
       <Dialog open={viewingVersion !== null} onOpenChange={(open) => { if (!open) setViewingVersion(null) }}>
         <DialogContent className="max-w-3xl">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-3">
-              <span>
-                v{viewingVersion?.version.version_num}
-                {viewingVersion?.version.name ? ` · ${viewingVersion.version.name}` : ''}
-              </span>
-              {viewingVersion?.diff && (
-                <div className="ml-auto flex gap-1">
-                  <Button
-                    variant={viewingVersion.mode === 'diff' ? 'default' : 'outline'}
-                    size="sm"
-                    className="!h-6 text-[10px] px-2"
-                    onClick={() => setViewingVersion((v) => (v ? { ...v, mode: 'diff' } : v))}
-                  >
-                    Diff vs latest
-                  </Button>
-                  <Button
-                    variant={viewingVersion.mode === 'content' ? 'default' : 'outline'}
-                    size="sm"
-                    className="!h-6 text-[10px] px-2"
-                    onClick={() => setViewingVersion((v) => (v ? { ...v, mode: 'content' } : v))}
-                  >
-                    Full content
-                  </Button>
-                </div>
-              )}
+            <DialogTitle>
+              v{viewingVersion?.version.version_num}
+              {viewingVersion?.version.name ? ` · ${viewingVersion.version.name}` : ''}
             </DialogTitle>
             <DialogDescription>
               {viewingVersion ? new Date(viewingVersion.version.created_at).toLocaleString() : ''}
@@ -1490,19 +1483,75 @@ export const AssetsPanel = forwardRef<AssetsPanelHandle, AssetsPanelProps>(funct
               {viewingVersion?.content}
             </pre>
           )}
-          <DialogFooter>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={async () => {
-                if (!viewingVersion || !selectedAsset) return
-                await saveContent(selectedAsset.id, viewingVersion.content)
-                setViewingVersion(null)
-              }}
-            >
-              Restore as current
-            </Button>
-            <Button variant="outline" size="sm" onClick={() => setViewingVersion(null)}>Close</Button>
+          <DialogFooter className="sm:justify-between">
+            {viewingVersion?.diff ? (
+              <div className="flex items-center gap-2">
+                <Tabs
+                  value={viewingVersion.mode}
+                  onValueChange={(val) =>
+                    setViewingVersion((v) => (v ? { ...v, mode: val as 'diff' | 'content' } : v))
+                  }
+                >
+                  <TabsList className="h-8">
+                    <TabsTrigger
+                      value="diff"
+                      className="text-xs data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:border-transparent"
+                    >
+                      Diff
+                    </TabsTrigger>
+                    <TabsTrigger
+                      value="content"
+                      className="text-xs data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:border-transparent"
+                    >
+                      Full
+                    </TabsTrigger>
+                  </TabsList>
+                </Tabs>
+                {viewingVersion.mode === 'diff' && (
+                  <Select
+                    value={viewingVersion.diffAgainst === undefined ? '__current__' : String(viewingVersion.diffAgainst)}
+                    onValueChange={(val) => {
+                      if (!selectedAsset) return
+                      const num = val === '__current__' ? undefined : Number(val)
+                      void changeDiffAgainst(selectedAsset.id, num)
+                    }}
+                  >
+                    <SelectTrigger size="sm" className="text-xs w-[160px]">
+                      <SelectValue placeholder="vs…" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__current__">vs current</SelectItem>
+                      {assetVersions
+                        .filter((v) => v.version_num !== viewingVersion.version.version_num)
+                        .map((v) => (
+                          <SelectItem key={v.id} value={String(v.version_num)}>
+                            vs v{v.version_num}{v.name ? ` · ${v.name}` : ''}
+                          </SelectItem>
+                        ))}
+                    </SelectContent>
+                  </Select>
+                )}
+              </div>
+            ) : <span />}
+            <div className="flex gap-2">
+              <Button variant="outline" size="sm" onClick={() => setViewingVersion(null)}>Close</Button>
+              <Button
+                size="sm"
+                disabled={!viewingVersion || viewingVersion.version.id === (selectedAsset?.current_version_id ?? null)}
+                onClick={async () => {
+                  if (!viewingVersion || !selectedAsset) return
+                  try {
+                    await setCurrentVersion(selectedAsset.id, viewingVersion.version.version_num)
+                    await refreshVersions(selectedAsset.id)
+                    setViewingVersion(null)
+                  } catch (err) {
+                    toast.error(`Failed to set current: ${err instanceof Error ? err.message : String(err)}`)
+                  }
+                }}
+              >
+                Set as current
+              </Button>
+            </div>
           </DialogFooter>
         </DialogContent>
       </Dialog>

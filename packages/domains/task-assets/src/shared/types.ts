@@ -37,6 +37,8 @@ export type DiffResult =
 export interface PruneOptions {
   keepLast?: number
   keepNamed?: boolean
+  /** Protect the current (HEAD) version from deletion. Default true. */
+  keepCurrent?: boolean
   dryRun?: boolean
 }
 

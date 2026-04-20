@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { createVersion } from './mutations'
-import { listVersions } from './resolve'
+import { createVersion, setCurrentVersion } from './mutations'
+import { getCurrentVersion, listVersions } from './resolve'
 import { gcOrphanBlobs, pruneVersions } from './prune'
 import { makeTestEnv, type TestEnv } from './test-helpers'
 
@@ -47,6 +47,23 @@ describe('pruneVersions', () => {
     pruneVersions(env.db, env.txn, env.blobStore, 'a1', { keepLast: 0, keepNamed: false })
     const after = env.blobStore.listAllHashes().length
     expect(after).toBeLessThan(before)
+  })
+
+  it('keepCurrent protects current version (default true)', () => {
+    setCurrentVersion(env.db, env.txn, 'a1', 2) // switch current to v2
+    pruneVersions(env.db, env.txn, env.blobStore, 'a1', { keepLast: 0, keepNamed: false })
+    const remaining = listVersions(env.db, 'a1')
+    expect(remaining.some((v) => v.version_num === 2)).toBe(true)
+    expect(getCurrentVersion(env.db, 'a1')?.version_num).toBe(2)
+  })
+
+  it('keepCurrent:false allows deleting current', () => {
+    setCurrentVersion(env.db, env.txn, 'a1', 2)
+    pruneVersions(env.db, env.txn, env.blobStore, 'a1', {
+      keepLast: 0, keepNamed: false, keepCurrent: false,
+    })
+    const remaining = listVersions(env.db, 'a1')
+    expect(remaining.some((v) => v.version_num === 2)).toBe(false)
   })
 })
 

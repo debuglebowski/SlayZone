@@ -115,7 +115,10 @@ export function tryResolveVersionRef(
   }
 
   const trimmed = ref.trim()
-  if (trimmed === '' || trimmed.toLowerCase() === 'head' || trimmed.toLowerCase() === 'latest') {
+  if (trimmed === '' || trimmed.toLowerCase() === 'head' || trimmed.toLowerCase() === 'current') {
+    return getCurrentVersion(db, assetId)
+  }
+  if (trimmed.toLowerCase() === 'latest') {
     return getLatestVersion(db, assetId)
   }
 
@@ -162,20 +165,22 @@ function resolveRelative(
   assetId: AssetId | string,
   stepsBack: number
 ): AssetVersion | null {
-  const latest = getLatestVersion(db, assetId)
-  if (!latest) return null
-  if (stepsBack === 0) return latest
-  const row = db
-    .prepare(
-      `SELECT * FROM asset_versions
-       WHERE asset_id = ? AND version_num < ?
-       ORDER BY version_num DESC LIMIT 1 OFFSET ?`
-    )
-    .get(assetId, latest.version_num, stepsBack - 1)
-  return parseRow(row)
+  // Walk parent chain from current. Correct in tree mode — HEAD~N is "N
+  // steps back along this branch's ancestry", not "N steps back by
+  // version_num" (which could jump across branches).
+  let cursor = getCurrentVersion(db, assetId)
+  if (!cursor) return null
+  for (let i = 0; i < stepsBack; i++) {
+    if (!cursor.parent_id) return null
+    const row = db.prepare('SELECT * FROM asset_versions WHERE id = ?').get(cursor.parent_id)
+    const parsed = parseRow(row)
+    if (!parsed) return null
+    cursor = parsed
+  }
+  return cursor
 }
 
-const RESERVED = new Set(['head', 'latest'])
+const RESERVED = new Set(['head', 'latest', 'current'])
 
 export function isReservedName(name: string): boolean {
   if (!name) return true

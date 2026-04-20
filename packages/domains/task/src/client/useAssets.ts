@@ -31,7 +31,7 @@ export interface UseAssetsReturn {
   createVersion: (assetId: string, name?: string | null) => Promise<AssetVersion>
   renameVersion: (assetId: string, versionRef: VersionRef, newName: string | null) => Promise<AssetVersion>
   diffVersions: (assetId: string, a: VersionRef, b?: VersionRef) => Promise<DiffResult>
-  pruneVersions: (assetId: string, opts: { keepLast?: number; keepNamed?: boolean; dryRun?: boolean }) => Promise<PruneReport>
+  pruneVersions: (assetId: string, opts: { keepLast?: number; keepNamed?: boolean; keepCurrent?: boolean; dryRun?: boolean }) => Promise<PruneReport>
   setCurrentVersion: (assetId: string, versionRef: VersionRef) => Promise<AssetVersion>
   // Folder ops
   createFolder: (params: { name: string; parentId?: string | null }) => Promise<AssetFolder | null>
@@ -220,7 +220,7 @@ export function useAssets(taskId: string | null | undefined, initialSelectedId?:
     return window.api.assets.versions.diff({ assetId, a, b })
   }, [])
 
-  const pruneVersions = useCallback(async (assetId: string, opts: { keepLast?: number; keepNamed?: boolean; dryRun?: boolean }): Promise<PruneReport> => {
+  const pruneVersions = useCallback(async (assetId: string, opts: { keepLast?: number; keepNamed?: boolean; keepCurrent?: boolean; dryRun?: boolean }): Promise<PruneReport> => {
     return window.api.assets.versions.prune({ assetId, ...opts })
   }, [])
 

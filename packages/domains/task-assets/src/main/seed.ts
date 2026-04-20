@@ -37,11 +37,14 @@ export function seedInitialVersions(
 
   const insertVersion = db.prepare(
     `INSERT INTO asset_versions
-     (id, asset_id, version_num, content_hash, size, name, author_type, author_id)
-     VALUES (?, ?, 1, ?, ?, NULL, NULL, NULL)`
+     (id, asset_id, version_num, content_hash, size, name, author_type, author_id, parent_id)
+     VALUES (?, ?, 1, ?, ?, NULL, NULL, NULL, NULL)`
   )
   const insertBlob = db.prepare(
     'INSERT OR IGNORE INTO asset_blobs (hash, size) VALUES (?, ?)'
+  )
+  const setCurrent = db.prepare(
+    'UPDATE task_assets SET current_version_id = ? WHERE id = ?'
   )
 
   const total = needsSeed.length
@@ -57,7 +60,9 @@ export function seedInitialVersions(
     txn(() => {
       const blob = blobStore.write(buf)
       insertBlob.run(blob.hash, blob.size)
-      insertVersion.run(randomUUID() as VersionId, row.id, blob.hash, blob.size)
+      const versionId = randomUUID() as VersionId
+      insertVersion.run(versionId, row.id, blob.hash, blob.size)
+      setCurrent.run(versionId, row.id)
     })
     seeded++
   }
