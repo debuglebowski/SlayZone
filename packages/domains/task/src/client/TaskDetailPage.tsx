@@ -2329,7 +2329,7 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
           </Collapsible>
 
           {/* Sub-tasks */}
-          <Collapsible open={subTasksOpen} onOpenChange={setSubTasksOpen} className={cn("group/sub rounded-md border border-border flex flex-col", subTasksOpen && !(descriptionExpanded && descriptionOpen) ? "flex-1 min-h-0" : "shrink-0")}>
+          <Collapsible open={subTasksOpen} onOpenChange={setSubTasksOpen} className={cn("group/sub rounded-md border border-border flex flex-col", subTasksOpen && !(descriptionExpanded && descriptionOpen) ? (subTasks.length > 5 ? "flex-1 min-h-0" : "shrink-0 min-h-[160px]") : "shrink-0")}>
             <div className="shrink-0 flex w-full items-center gap-1.5 bg-muted/50 px-2.5 py-1.5 min-h-8 text-xs font-medium text-muted-foreground group-data-[state=open]/sub:border-b border-border">
               <CollapsibleTrigger className="flex items-center gap-1.5 hover:text-foreground transition-colors [&[data-state=open]>svg:first-child]:rotate-90">
                 <ChevronRight className="size-3 transition-transform" />
