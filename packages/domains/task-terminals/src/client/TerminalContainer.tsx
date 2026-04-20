@@ -80,6 +80,7 @@ export const TerminalContainer = forwardRef<TerminalContainerHandle, TerminalCon
     closeTab,
     movePane,
     renameTab,
+    setTabDisplayMode,
     getSessionId
   } = useTaskTerminals(taskId, defaultMode)
 
@@ -310,6 +311,7 @@ export const TerminalContainer = forwardRef<TerminalContainerHandle, TerminalCon
       const canClose = !tab.isMain
       return {
         tab,
+        taskId,
         sessionId: getSessionId(tab.id),
         cwd,
         conversationId: tab.isMain ? conversationId : undefined,
@@ -334,10 +336,12 @@ export const TerminalContainer = forwardRef<TerminalContainerHandle, TerminalCon
           }
         } : null,
         onRename: tab.isMain ? null : () => tabBarRef.current?.startRename(tab.id),
-        onResetSession: tab.isMain && onMainReset ? onMainReset : null
+        onResetSession: tab.isMain && onMainReset ? onMainReset : null,
+        onSetDisplayMode: (target: import('../shared/types').TabDisplayMode) =>
+          setTabDisplayMode(tab.id, target)
       }
     })
-  }, [activeGroup, getSessionId, cwd, conversationId, existingConversationId, initialPrompt, providerFlags, executionContext, handleConversationCreated, onSessionInvalid, handleTerminalReady, onFirstInput, onRetry, handleSplitGroup, createTab, closeGroup, closeTab, onMainReset])
+  }, [activeGroup, getSessionId, cwd, taskId, conversationId, existingConversationId, supportsSessionId, initialPrompt, providerFlags, executionContext, handleConversationCreated, onSessionInvalid, handleTerminalReady, onFirstInput, onRetry, handleSplitGroup, createTab, closeGroup, closeTab, onMainReset, setTabDisplayMode])
 
   return (
     <div className="h-full flex flex-col" style={terminalPanelStyle as React.CSSProperties | undefined}>

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
-import type { TerminalTab, TerminalGroup } from '../shared/types'
+import type { TabDisplayMode, TerminalTab, TerminalGroup } from '../shared/types'
 import type { TerminalMode } from '@slayzone/terminal/shared'
 import { usePty } from '@slayzone/terminal'
 
@@ -13,6 +13,7 @@ interface UseTaskTerminalsResult {
   closeTab: (tabId: string) => Promise<boolean>
   movePane: (tabId: string, targetGroupId: string | null) => Promise<void>
   renameTab: (tabId: string, label: string | null) => Promise<void>
+  setTabDisplayMode: (tabId: string, displayMode: TabDisplayMode) => Promise<void>
   getSessionId: (tabId: string) => string
 }
 
@@ -168,6 +169,34 @@ export function useTaskTerminals(taskId: string, defaultMode: TerminalMode): Use
     }
   }, [])
 
+  const setTabDisplayMode = useCallback(
+    async (tabId: string, displayMode: TabDisplayMode): Promise<void> => {
+      const tab = tabs.find((t) => t.id === tabId)
+      if (!tab) return
+      if (tab.displayMode === displayMode) return
+
+      // Kill whichever transport is currently live for this tab.
+      // Both calls are idempotent/no-op if nothing is running.
+      const sessionId = `${taskId}:${tabId}`
+      try {
+        await window.api.pty.kill(sessionId)
+      } catch {
+        /* ignore */
+      }
+      try {
+        await window.api.chat.remove(tabId)
+      } catch {
+        /* ignore */
+      }
+
+      const updated = await window.api.tabs.update({ id: tabId, displayMode })
+      if (updated) {
+        setTabs((prev) => prev.map((t) => (t.id === tabId ? updated : t)))
+      }
+    },
+    [taskId, tabs]
+  )
+
   const getSessionId = useCallback((tabId: string): string => {
     return `${taskId}:${tabId}`
   }, [taskId])
@@ -182,6 +211,7 @@ export function useTaskTerminals(taskId: string, defaultMode: TerminalMode): Use
     closeTab,
     movePane,
     renameTab,
+    setTabDisplayMode,
     getSessionId
   }
 }

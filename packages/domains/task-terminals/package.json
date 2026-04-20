@@ -19,6 +19,8 @@
     "@slayzone/telemetry": "workspace:*",
     "@slayzone/terminal": "workspace:*",
     "@slayzone/ui": "workspace:*",
+    "@slayzone/worktrees": "workspace:*",
+    "@tanstack/react-virtual": "^3.13.22",
     "lucide-react": "^0.562.0"
   },
   "peerDependencies": {

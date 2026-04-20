@@ -1,10 +1,12 @@
 import { useState, useCallback, useRef, forwardRef, useImperativeHandle } from 'react'
 import { Terminal, type TerminalHandle } from '@slayzone/terminal/client/Terminal'
-import type { TerminalTab } from '../shared/types'
+import type { TabDisplayMode, TerminalTab } from '../shared/types'
 import { TerminalContextMenu } from './TerminalContextMenu'
+import { ChatPanel } from './chat/ChatPanel'
 
 interface PaneProps {
   tab: TerminalTab
+  taskId: string
   sessionId: string
   cwd: string
   conversationId?: string | null
@@ -13,6 +15,7 @@ interface PaneProps {
   initialPrompt?: string | null
   providerFlags?: string
   executionContext?: import('@slayzone/terminal/shared').ExecutionContext | null
+  permissionNotice?: string | null
   onConversationCreated?: (conversationId: string) => void
   onSessionInvalid?: () => void
   onReady?: (api: {
@@ -29,6 +32,7 @@ interface PaneProps {
   onClose?: (() => void) | null
   onRename?: (() => void) | null
   onResetSession?: (() => void) | null
+  onSetDisplayMode?: (target: TabDisplayMode) => void
 }
 
 export interface TerminalSplitGroupHandle {
@@ -121,6 +125,22 @@ export const TerminalSplitGroup = forwardRef<TerminalSplitGroupHandle, TerminalS
   }, [sizes])
 
   const renderPane = (pane: PaneProps) => {
+    const useChat = pane.tab.displayMode === 'chat' && pane.tab.mode === 'claude-code'
+    if (useChat) {
+      return (
+        <ChatPanel
+          key={pane.tab.id}
+          tabId={pane.tab.id}
+          taskId={pane.taskId}
+          mode={pane.tab.mode}
+          cwd={pane.cwd}
+          providerFlagsOverride={pane.providerFlags ?? null}
+          permissionNotice={pane.permissionNotice ?? null}
+          onSetDisplayMode={pane.onSetDisplayMode}
+        />
+      )
+    }
+
     const hasContextMenu = pane.onSplit && pane.onNewGroup
     const terminal = (
       <Terminal
@@ -160,6 +180,7 @@ export const TerminalSplitGroup = forwardRef<TerminalSplitGroupHandle, TerminalS
         onClose={pane.onClose ?? null}
         onRename={pane.onRename ?? null}
         onResetSession={pane.onResetSession ?? null}
+        onSetDisplayMode={pane.onSetDisplayMode}
       >
         <div className="h-full">{terminal}</div>
       </TerminalContextMenu>
@@ -184,7 +205,7 @@ export const TerminalSplitGroup = forwardRef<TerminalSplitGroupHandle, TerminalS
           </div>
           {i < panes.length - 1 && (
             <div
-              className="w-1 cursor-col-resize bg-accent hover:bg-blue-400 dark:hover:bg-blue-500 transition-colors shrink-0"
+              className="w-1 cursor-col-resize bg-accent dark:bg-accent hover:bg-blue-400 dark:hover:bg-blue-500 transition-colors shrink-0"
               onMouseDown={(e) => handleMouseDown(i, e)}
             />
           )}

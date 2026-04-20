@@ -204,3 +204,38 @@ export const SESSION_ID_COMMANDS: Partial<Record<TerminalMode, string>> = {
 
 /** Providers where session ID detection is not possible — no --session-id flag and no detection command. */
 export const SESSION_ID_UNAVAILABLE: readonly TerminalMode[] = ['ccs', 'cursor-agent', 'opencode']
+
+export type SkillSource = 'user' | 'project' | 'agents'
+
+export interface SkillInfo {
+  name: string
+  description: string
+  source: SkillSource
+  path: string
+}
+
+export type CommandSource = 'user' | 'project'
+
+export interface CommandInfo {
+  name: string
+  description: string
+  source: CommandSource
+  path: string
+  /** Raw markdown body (frontmatter stripped) — injected as user msg on accept. */
+  body: string
+}
+
+export type AgentSource = 'user' | 'project'
+
+export interface AgentInfo {
+  name: string
+  description: string
+  source: AgentSource
+  path: string
+}
+
+export interface FileMatch {
+  /** Project-relative path. Directories end with `/`. */
+  path: string
+  isDirectory: boolean
+}

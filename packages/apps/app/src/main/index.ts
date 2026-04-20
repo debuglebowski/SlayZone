@@ -99,7 +99,7 @@ import { BlobStore, betterSqliteTxn, seedInitialVersions } from '@slayzone/task-
 import { getExtensionFromTitle } from '@slayzone/task/shared'
 import { registerTagHandlers } from '@slayzone/tags/main'
 import { registerSettingsHandlers, registerThemeHandlers } from '@slayzone/settings/main'
-import { registerPtyHandlers, registerUsageHandlers, killAllPtys, killPtysByTaskId, startIdleChecker, stopIdleChecker, dismissAllNotifications, syncTerminalModes, getPtyPids, onSessionChange, onGlobalStateChange } from '@slayzone/terminal/main'
+import { registerPtyHandlers, registerUsageHandlers, killAllPtys, killPtysByTaskId, startIdleChecker, stopIdleChecker, dismissAllNotifications, syncTerminalModes, getPtyPids, onSessionChange, onGlobalStateChange, registerChatHandlers, shutdownChatTransports } from '@slayzone/terminal/main'
 import { attachFloatingAgent, setupFloatingAgent } from './floating-agent'
 import { registerTerminalTabsHandlers } from '@slayzone/task-terminals/main'
 import { registerWorktreeHandlers } from '@slayzone/worktrees/main'
@@ -1103,6 +1103,7 @@ app.whenReady().then(async () => {
   }
 
   registerTerminalTabsHandlers(ipcMain, db)
+  registerChatHandlers(ipcMain, db)
   registerFilesHandlers(ipcMain)
   registerWorktreeHandlers(ipcMain, db)
   registerAiConfigHandlers(ipcMain, db)
@@ -1417,6 +1418,13 @@ div{text-align:center}h1{font-size:14px;font-weight:500;color:#aaa}p{font-size:1
       throw new Error('Blocked external app handoff URL')
     }
     shell.openExternal(url)
+  })
+
+  ipcMain.handle('shell:open-path', async (_event, absPath: string): Promise<string> => {
+    if (typeof absPath !== 'string' || !absPath.startsWith('/')) {
+      throw new Error('absolute path required')
+    }
+    return shell.openPath(absPath)
   })
 
   ipcMain.handle('auth:github-system-sign-in', async (_event, input: {
@@ -2011,6 +2019,7 @@ div{text-align:center}h1{font-size:14px;font-weight:500;color:#aaa}p{font-size:1
     ipcMain.handle('app:reset-for-test', async () => {
       // 1. Kill running processes
       killAllPtys()
+      shutdownChatTransports()
       dismissAllNotifications()
       stopIdleChecker()
       killAllProcesses()
@@ -2305,6 +2314,7 @@ app.on('will-quit', () => {
   stopAutoBackup()
   closeAssetWatcher()
   killAllPtys()
+  shutdownChatTransports()
   killAllProcesses()
   closeDatabase()
   closeDiagnosticsDatabase()

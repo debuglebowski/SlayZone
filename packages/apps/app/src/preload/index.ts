@@ -84,6 +84,7 @@ const api: ElectronAPI = {
       rename: (data) => ipcRenderer.invoke('db:assets:versions:rename', data),
       diff: (data) => ipcRenderer.invoke('db:assets:versions:diff', data),
       prune: (data) => ipcRenderer.invoke('db:assets:versions:prune', data),
+      setCurrent: (data) => ipcRenderer.invoke('db:assets:versions:setCurrent', data),
     },
   },
   assetFolders: {
@@ -150,7 +151,8 @@ const api: ElectronAPI = {
         desktopHandoff?: import('@slayzone/task/shared').DesktopHandoffPolicy
       }
     ) =>
-      ipcRenderer.invoke('shell:open-external', url, options)
+      ipcRenderer.invoke('shell:open-external', url, options),
+    openPath: (absPath: string) => ipcRenderer.invoke('shell:open-path', absPath)
   },
   auth: {
     githubSystemSignIn: (input: { convexUrl: string; redirectTo: string }) =>
@@ -400,6 +402,41 @@ const api: ElectronAPI = {
     },
     getState: (sessionId: string) => ipcRenderer.invoke('pty:getState', sessionId),
     validate: (mode: string) => ipcRenderer.invoke('pty:validate', mode)
+  },
+  chat: {
+    supports: (mode: string) => ipcRenderer.invoke('chat:supports', mode),
+    create: (opts: { tabId: string; taskId: string; mode: string; cwd: string; providerFlagsOverride?: string | null }) =>
+      ipcRenderer.invoke('chat:create', opts),
+    send: (tabId: string, text: string) => ipcRenderer.invoke('chat:send', tabId, text),
+    interrupt: (tabId: string) => ipcRenderer.invoke('chat:interrupt', tabId),
+    kill: (tabId: string) => ipcRenderer.invoke('chat:kill', tabId),
+    remove: (tabId: string) => ipcRenderer.invoke('chat:remove', tabId),
+    getBufferSince: (tabId: string, afterSeq: number) =>
+      ipcRenderer.invoke('chat:getBufferSince', tabId, afterSeq),
+    getInfo: (tabId: string) => ipcRenderer.invoke('chat:getInfo', tabId),
+    inspectPermissions: (taskId: string, mode: string) =>
+      ipcRenderer.invoke('chat:inspectPermissions', taskId, mode),
+    listSkills: (cwd: string) => ipcRenderer.invoke('chat:listSkills', cwd),
+    listCommands: (cwd: string) => ipcRenderer.invoke('chat:listCommands', cwd),
+    listAgents: (cwd: string) => ipcRenderer.invoke('chat:listAgents', cwd),
+    listFiles: (cwd: string, query: string, limit?: number) =>
+      ipcRenderer.invoke('chat:listFiles', cwd, query, limit),
+    onEvent: ((callback: (tabId: string, event: unknown, seq: number) => void) => {
+      const handler = (_e: unknown, tabId: string, event: unknown, seq: number) =>
+        callback(tabId, event, seq)
+      ipcRenderer.on('chat:event', handler)
+      return () => {
+        ipcRenderer.removeListener('chat:event', handler)
+      }
+    }) as ElectronAPI['chat']['onEvent'],
+    onExit: (callback: (tabId: string, code: number | null, signal: string | null) => void) => {
+      const handler = (_e: unknown, tabId: string, code: number | null, signal: string | null) =>
+        callback(tabId, code, signal)
+      ipcRenderer.on('chat:exit', handler)
+      return () => {
+        ipcRenderer.removeListener('chat:exit', handler)
+      }
+    },
   },
   terminalModes: {
     list: () => ipcRenderer.invoke('terminalModes:list'),

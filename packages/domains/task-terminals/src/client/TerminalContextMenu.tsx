@@ -8,15 +8,20 @@ import {
   ContextMenuTrigger,
   useShortcutDisplay,
   useAppearance,
-  appearanceDefaults
+  appearanceDefaults,
 } from '@slayzone/ui'
+import { ConfirmDisplayModeDialog } from './ConfirmDisplayModeDialog'
 import {
   Copy, ClipboardPaste, TextSelect, Eraser, Search,
   Columns2, Plus, X, PenLine,
   ZoomIn, ZoomOut, RotateCw, ArrowDownToLine,
-  Hash, Power
+  Hash, Power, MessageSquare
 } from 'lucide-react'
 import type { TerminalHandle } from '@slayzone/terminal/client/Terminal'
+import type { TabDisplayMode } from '../shared/types'
+
+/** Modes for which the chat transport is available. Keep in sync with main/agents/registry.ts */
+const CHAT_SUPPORTED_MODES: readonly string[] = ['claude-code']
 
 interface TerminalContextMenuProps {
   children: React.ReactNode
@@ -29,6 +34,7 @@ interface TerminalContextMenuProps {
   onClose: (() => void) | null
   onRename: (() => void) | null
   onResetSession: (() => void) | null
+  onSetDisplayMode?: (target: TabDisplayMode) => void
 }
 
 const FONT_SIZE_MIN = 8
@@ -44,10 +50,13 @@ export function TerminalContextMenu({
   onNewGroup,
   onClose,
   onRename,
-  onResetSession
+  onResetSession,
+  onSetDisplayMode
 }: TerminalContextMenuProps) {
   const [hasSelection, setHasSelection] = useState(false)
+  const [pendingChatEnable, setPendingChatEnable] = useState(false)
   const { terminalFontSize } = useAppearance()
+  const chatSupported = CHAT_SUPPORTED_MODES.includes(mode)
 
   const searchShortcut = useShortcutDisplay('terminal-search')
   const clearShortcut = useShortcutDisplay('terminal-clear')
@@ -197,9 +206,25 @@ export function TerminalContextMenu({
                 Reset Session
               </ContextMenuItem>
             )}
+            {chatSupported && onSetDisplayMode && (
+              <ContextMenuItem onSelect={() => setPendingChatEnable(true)}>
+                <MessageSquare className="size-4" />
+                Enable chat (beta)
+              </ContextMenuItem>
+            )}
           </>
         )}
       </ContextMenuContent>
+
+      <ConfirmDisplayModeDialog
+        open={pendingChatEnable}
+        target="chat"
+        onConfirm={() => {
+          onSetDisplayMode?.('chat')
+          setPendingChatEnable(false)
+        }}
+        onCancel={() => setPendingChatEnable(false)}
+      />
     </ContextMenu>
   )
 }

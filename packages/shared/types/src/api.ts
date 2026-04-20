@@ -14,8 +14,23 @@ import type {
   ValidationResult,
   TerminalModeInfo,
   CreateTerminalModeInput,
-  UpdateTerminalModeInput
+  UpdateTerminalModeInput,
+  AgentEvent,
+  SkillInfo,
+  CommandInfo,
+  AgentInfo,
+  FileMatch,
 } from '@slayzone/terminal/shared'
+
+export interface ChatSessionInfo {
+  sessionId: string
+  tabId: string
+  mode: string
+  cwd: string
+  pid: number | null
+  startedAt: string
+  ended: boolean
+}
 import type { TerminalTab, CreateTerminalTabInput, UpdateTerminalTabInput } from '@slayzone/task-terminals/shared'
 import type { Theme, ThemePreference } from '@slayzone/settings/shared'
 import type { CreateWorktreeOpts, IgnoredFileNode, DetectedWorktree, MergeResult, MergeWithAIResult, GitDiffSnapshot, GitSyncResult, ConflictFileContent, ConflictAnalysis, RebaseProgress, CommitInfo, AheadBehind, StatusSummary, BranchListResult, DeleteBranchResult, PruneResult, DiffStatsSummary, WorktreeMetadata, RebaseOntoResult, DagCommit, ResolvedGraph, ForkGraphResult, GhPullRequest, GhPrTimelineEvent, CreatePrInput, CreatePrResult, MergePrInput, EditPrCommentInput, StashEntry, StashApplyResult } from '@slayzone/worktrees/shared'
@@ -305,6 +320,7 @@ export interface ElectronAPI {
       rename: (data: { assetId: string; versionRef: VersionRef; newName: string | null }) => Promise<AssetVersion>
       diff: (data: { assetId: string; a: VersionRef; b?: VersionRef }) => Promise<DiffResult>
       prune: (data: { assetId: string; keepLast?: number; keepNamed?: boolean; dryRun?: boolean }) => Promise<PruneReport>
+      setCurrent: (data: { assetId: string; versionRef: VersionRef }) => Promise<AssetVersion>
     }
   }
   assetFolders: {
@@ -365,6 +381,7 @@ export interface ElectronAPI {
         desktopHandoff?: DesktopHandoffPolicy
       }
     ) => Promise<void>
+    openPath: (absPath: string) => Promise<string>
   }
   auth: {
     githubSystemSignIn: (input: { convexUrl: string; redirectTo: string }) => Promise<{
@@ -484,6 +501,42 @@ export interface ElectronAPI {
     validate: (mode: TerminalMode) => Promise<ValidationResult[]>
     setTheme: (theme: { foreground: string; background: string; cursor: string }) => Promise<void>
     setShellOverride: (value: string | null) => Promise<void>
+  }
+  chat: {
+    supports: (mode: string) => Promise<boolean>
+    create: (opts: {
+      tabId: string
+      taskId: string
+      mode: string
+      cwd: string
+      providerFlagsOverride?: string | null
+    }) => Promise<ChatSessionInfo>
+    send: (tabId: string, text: string) => Promise<boolean>
+    interrupt: (tabId: string) => Promise<void>
+    kill: (tabId: string) => Promise<void>
+    remove: (tabId: string) => Promise<void>
+    getBufferSince: (
+      tabId: string,
+      afterSeq: number
+    ) => Promise<Array<{ seq: number; event: AgentEvent }>>
+    getInfo: (tabId: string) => Promise<ChatSessionInfo | null>
+    inspectPermissions: (
+      taskId: string,
+      mode: string
+    ) => Promise<{
+      ok: boolean
+      hasSkipPerms: boolean
+      hasPermissionMode: boolean
+      permissionModeValue: string | null
+    }>
+    listSkills: (cwd: string) => Promise<SkillInfo[]>
+    listCommands: (cwd: string) => Promise<CommandInfo[]>
+    listAgents: (cwd: string) => Promise<AgentInfo[]>
+    listFiles: (cwd: string, query: string, limit?: number) => Promise<FileMatch[]>
+    onEvent: (callback: (tabId: string, event: AgentEvent, seq: number) => void) => () => void
+    onExit: (
+      callback: (tabId: string, code: number | null, signal: string | null) => void
+    ) => () => void
   }
   terminalModes: {
     list: () => Promise<TerminalModeInfo[]>
