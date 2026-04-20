@@ -958,9 +958,14 @@ export class BrowserViewManager {
       wc.mainFrame.executeJavaScript(MODIFIED_LINK_CAPTURE_SCRIPT).catch(() => {})
     })
 
-    wc.on('did-fail-load', (_e, errorCode, errorDescription, validatedURL) => {
+    wc.on('did-fail-load', (_e, errorCode, errorDescription, validatedURL, isMainFrame) => {
       // ERR_ABORTED (-3) fires on normal navigation cancellation — ignore
       if (errorCode === -3) return
+      // Sub-frame failures (e.g. third-party iframes blocked by CSP frame-ancestors
+      // or X-Frame-Options) must not surface as full-page errors. Google Contacts
+      // hovercard widget inside Docs/Drive intermittently hits ERR_BLOCKED_BY_RESPONSE
+      // when gapi sends a stale parent origin.
+      if (!isMainFrame) return
       send({
         viewId,
         type: 'did-fail-load',
