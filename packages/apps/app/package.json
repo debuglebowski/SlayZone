@@ -47,6 +47,7 @@
     "@slayzone/suspense": "workspace:*",
     "@slayzone/tags": "workspace:*",
     "@slayzone/task": "workspace:*",
+    "@slayzone/task-assets": "workspace:*",
     "@slayzone/task-terminals": "workspace:*",
     "@slayzone/tasks": "workspace:*",
     "@slayzone/telemetry": "workspace:*",

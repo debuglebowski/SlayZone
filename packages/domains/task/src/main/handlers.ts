@@ -24,6 +24,20 @@ import { removeWorktree, createWorktree, runWorktreeSetupScript, getCurrentBranc
 import archiver from 'archiver'
 import { buildPdfHtml, buildMermaidPdfHtml, buildPngHtml, renderToPdf, renderToPng } from './asset-export'
 import { startAssetWatcher } from './asset-watcher'
+import {
+  BlobStore,
+  betterSqliteTxn,
+  createVersion,
+  mutateLatestVersion,
+  listVersions,
+  resolveVersionRef,
+  readVersionContent,
+  renameVersion,
+  pruneVersions,
+  diffVersions,
+  isVersionError,
+} from '@slayzone/task-assets/main'
+import type { AuthorContext, VersionRef } from '@slayzone/task-assets/shared'
 
 type DiagnosticLevel = 'debug' | 'info' | 'warn' | 'error'
 
@@ -917,7 +931,11 @@ export function registerTaskHandlers(ipcMain: IpcMain, db: Database, onMutation?
 
   // --- Task Assets ---
 
-  const assetsDir = path.join(process.env.SLAYZONE_DB_DIR || app.getPath('userData'), 'assets')
+  const dataDir = process.env.SLAYZONE_DB_DIR || app.getPath('userData')
+  const assetsDir = path.join(dataDir, 'assets')
+  const blobStore = new BlobStore(dataDir)
+  const versionTxn = betterSqliteTxn(db)
+  const uiAuthor: AuthorContext = { type: 'user', id: null }
   startAssetWatcher(assetsDir)
 
   function getAssetFilePath(taskId: string, assetId: string, title: string): string {
@@ -984,14 +1002,18 @@ export function registerTaskHandlers(ipcMain: IpcMain, db: Database, onMutation?
     // Write content to disk
     const filePath = getAssetFilePath(data.taskId, id, data.title)
     mkdirSync(path.dirname(filePath), { recursive: true })
-    writeFileSync(filePath, data.content ?? '', 'utf-8')
+    const initialBytes = Buffer.from(data.content ?? '', 'utf-8')
+    writeFileSync(filePath, initialBytes)
+
+    // Seed v1 for the new asset.
+    createVersion(db, versionTxn, blobStore, { assetId: id, bytes: initialBytes, author: uiAuthor })
 
     onMutation?.()
     const row = db.prepare('SELECT * FROM task_assets WHERE id = ?').get(id) as Record<string, unknown> | undefined
     return parseAsset(row)
   })
 
-  ipcMain.handle('db:assets:update', (_, data: UpdateAssetInput) => {
+  ipcMain.handle('db:assets:update', (_, data: UpdateAssetInput & { mutateVersion?: boolean }) => {
     const existing = db.prepare('SELECT * FROM task_assets WHERE id = ?').get(data.id) as Record<string, unknown> | undefined
     if (!existing) return null
 
@@ -1028,11 +1050,30 @@ export function registerTaskHandlers(ipcMain: IpcMain, db: Database, onMutation?
       }
     }
 
-    // Write content to disk if provided
+    // Write content to disk if provided. UI saves default to mutating the
+    // latest version in place (data.mutateVersion === true) — only the
+    // explicit "Create version" action creates new versions from UI.
     if (data.content !== undefined) {
       const filePath = getAssetFilePath(taskId, data.id, newTitle)
       mkdirSync(path.dirname(filePath), { recursive: true })
-      writeFileSync(filePath, data.content, 'utf-8')
+      const bytes = Buffer.from(data.content, 'utf-8')
+      writeFileSync(filePath, bytes)
+      try {
+        if (data.mutateVersion) {
+          mutateLatestVersion(db, versionTxn, blobStore, { assetId: data.id, bytes, author: uiAuthor })
+        } else {
+          createVersion(db, versionTxn, blobStore, { assetId: data.id, bytes, author: uiAuthor })
+        }
+      } catch (err: unknown) {
+        if (isVersionError(err) && err.code === 'NAMED_IMMUTABLE') {
+          // Latest is named — fall back to creating a new version even though
+          // mutate was requested. UI users should not lose data because of a
+          // name on the latest row.
+          createVersion(db, versionTxn, blobStore, { assetId: data.id, bytes, author: uiAuthor })
+        } else {
+          throw err
+        }
+      }
     }
 
     onMutation?.()
@@ -1100,6 +1141,13 @@ export function registerTaskHandlers(ipcMain: IpcMain, db: Database, onMutation?
     const filePath = getAssetFilePath(data.taskId, id, title)
     mkdirSync(path.dirname(filePath), { recursive: true })
     copyFileSync(data.sourcePath, filePath)
+
+    // Seed v1 from uploaded bytes.
+    createVersion(db, versionTxn, blobStore, {
+      assetId: id,
+      bytes: readFileSync(filePath),
+      author: uiAuthor,
+    })
 
     onMutation?.()
     const row = db.prepare('SELECT * FROM task_assets WHERE id = ?').get(id) as Record<string, unknown> | undefined
@@ -1174,6 +1222,66 @@ export function registerTaskHandlers(ipcMain: IpcMain, db: Database, onMutation?
   ipcMain.handle('db:assets:cleanupTask', (_, taskId: string) => {
     const taskDir = path.join(assetsDir, taskId)
     if (existsSync(taskDir)) rmSync(taskDir, { recursive: true, force: true })
+  })
+
+  // --- Asset Versions ---
+
+  function wrapVersionError<T>(fn: () => T): T {
+    try {
+      return fn()
+    } catch (err: unknown) {
+      if (isVersionError(err)) {
+        // Return a serializable error to the renderer.
+        throw new Error(`[${err.code}] ${err.message}`)
+      }
+      throw err
+    }
+  }
+
+  ipcMain.handle('db:assets:versions:list', (_, data: { assetId: string; limit?: number; offset?: number }) => {
+    return listVersions(db, data.assetId, { limit: data.limit, offset: data.offset })
+  })
+
+  ipcMain.handle('db:assets:versions:read', (_, data: { assetId: string; versionRef: VersionRef }) => {
+    return wrapVersionError(() => {
+      const v = resolveVersionRef(db, data.assetId, data.versionRef)
+      const buf = readVersionContent(blobStore, v)
+      return buf.toString('utf-8')
+    })
+  })
+
+  ipcMain.handle('db:assets:versions:create', (_, data: { assetId: string; name?: string | null }) => {
+    return wrapVersionError(() => {
+      const existing = db.prepare('SELECT * FROM task_assets WHERE id = ?').get(data.assetId) as Record<string, unknown> | undefined
+      if (!existing) throw new Error('Asset not found')
+      const filePath = getAssetFilePath(existing.task_id as string, data.assetId, existing.title as string)
+      const bytes = existsSync(filePath) ? readFileSync(filePath) : Buffer.alloc(0)
+      return createVersion(db, versionTxn, blobStore, {
+        assetId: data.assetId,
+        bytes,
+        name: data.name ?? null,
+        honorUnchanged: true,
+        author: uiAuthor,
+      })
+    })
+  })
+
+  ipcMain.handle('db:assets:versions:rename', (_, data: { assetId: string; versionRef: VersionRef; newName: string | null }) => {
+    return wrapVersionError(() => renameVersion(db, versionTxn, data.assetId, data.versionRef, data.newName))
+  })
+
+  ipcMain.handle('db:assets:versions:diff', (_, data: { assetId: string; a: VersionRef; b?: VersionRef }) => {
+    return wrapVersionError(() => diffVersions(db, blobStore, { assetId: data.assetId, a: data.a, b: data.b }))
+  })
+
+  ipcMain.handle('db:assets:versions:prune', (_, data: { assetId: string; keepLast?: number; keepNamed?: boolean; dryRun?: boolean }) => {
+    return wrapVersionError(() =>
+      pruneVersions(db, versionTxn, blobStore, data.assetId, {
+        keepLast: data.keepLast,
+        keepNamed: data.keepNamed,
+        dryRun: data.dryRun,
+      })
+    )
   })
 
   // --- Asset Download ---

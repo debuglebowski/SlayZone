@@ -5,10 +5,21 @@
 
 type SqlParams = Record<string, string | number | bigint | null | Uint8Array>
 
+export interface RawDb {
+  prepare(sql: string): {
+    run(...params: unknown[]): { changes: number; lastInsertRowid?: number | bigint }
+    get(...params: unknown[]): unknown
+    all(...params: unknown[]): unknown[]
+  }
+  exec(sql: string): unknown
+}
+
 export interface SlayDb {
   query<T extends object>(sql: string, params?: SqlParams): T[]
   run(sql: string, params?: SqlParams): void
   close(): void
+  /** Underlying DatabaseSync for shared logic that uses positional params. */
+  raw(): RawDb
 }
 
 export function resolveProjectByPath(db: SlayDb, dirPath: string): { id: string; name: string; path: string } {

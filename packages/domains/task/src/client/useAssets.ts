@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import type { TaskAsset, RenderMode, CreateAssetInput, UpdateAssetInput, AssetFolder, UpdateAssetFolderInput } from '@slayzone/task/shared'
+import type { AssetVersion, VersionRef, DiffResult, PruneReport } from '@slayzone/task-assets/shared'
 import { track } from '@slayzone/telemetry/client'
 
 export interface UseAssetsReturn {
@@ -24,6 +25,13 @@ export interface UseAssetsReturn {
   downloadAsPng: (id: string) => Promise<boolean>
   downloadAsHtml: (id: string) => Promise<boolean>
   downloadAllAsZip: () => Promise<boolean>
+  // Versions
+  listVersions: (assetId: string, opts?: { limit?: number; offset?: number }) => Promise<AssetVersion[]>
+  readVersion: (assetId: string, versionRef: VersionRef) => Promise<string>
+  createVersion: (assetId: string, name?: string | null) => Promise<AssetVersion>
+  renameVersion: (assetId: string, versionRef: VersionRef, newName: string | null) => Promise<AssetVersion>
+  diffVersions: (assetId: string, a: VersionRef, b?: VersionRef) => Promise<DiffResult>
+  pruneVersions: (assetId: string, opts: { keepLast?: number; keepNamed?: boolean; dryRun?: boolean }) => Promise<PruneReport>
   // Folder ops
   createFolder: (params: { name: string; parentId?: string | null }) => Promise<AssetFolder | null>
   updateFolder: (data: UpdateAssetFolderInput) => Promise<void>
@@ -132,7 +140,9 @@ export function useAssets(taskId: string | null | undefined, initialSelectedId?:
   }, [])
 
   const saveContent = useCallback(async (id: string, content: string): Promise<void> => {
-    await window.api.assets.update({ id, content })
+    // UI saves always mutate the latest version in place. The explicit
+    // "Create version" action is the only UI path that creates new versions.
+    await window.api.assets.update({ id, content, mutateVersion: true })
   }, [])
 
   const uploadAsset = useCallback(async (sourcePath: string, title?: string): Promise<TaskAsset | null> => {
@@ -187,6 +197,32 @@ export function useAssets(taskId: string | null | undefined, initialSelectedId?:
     setFolders(newFolders)
   }, [taskId])
 
+  // --- Versions ---
+
+  const listVersions = useCallback(async (assetId: string, opts?: { limit?: number; offset?: number }): Promise<AssetVersion[]> => {
+    return window.api.assets.versions.list({ assetId, ...opts })
+  }, [])
+
+  const readVersion = useCallback(async (assetId: string, versionRef: VersionRef): Promise<string> => {
+    return window.api.assets.versions.read({ assetId, versionRef })
+  }, [])
+
+  const createVersion = useCallback(async (assetId: string, name?: string | null): Promise<AssetVersion> => {
+    return window.api.assets.versions.create({ assetId, name })
+  }, [])
+
+  const renameVersion = useCallback(async (assetId: string, versionRef: VersionRef, newName: string | null): Promise<AssetVersion> => {
+    return window.api.assets.versions.rename({ assetId, versionRef, newName })
+  }, [])
+
+  const diffVersions = useCallback(async (assetId: string, a: VersionRef, b?: VersionRef): Promise<DiffResult> => {
+    return window.api.assets.versions.diff({ assetId, a, b })
+  }, [])
+
+  const pruneVersions = useCallback(async (assetId: string, opts: { keepLast?: number; keepNamed?: boolean; dryRun?: boolean }): Promise<PruneReport> => {
+    return window.api.assets.versions.prune({ assetId, ...opts })
+  }, [])
+
   // --- Folder CRUD ---
 
   const createFolder = useCallback(async (params: { name: string; parentId?: string | null }): Promise<AssetFolder | null> => {
@@ -224,6 +260,7 @@ export function useAssets(taskId: string | null | undefined, initialSelectedId?:
     createAsset, updateAsset, deleteAsset, renameAsset, moveAssetToFolder,
     readContent, saveContent, uploadAsset, uploadDir, getFilePath,
     downloadFile, downloadFolder, downloadAsPdf, downloadAsPng, downloadAsHtml, downloadAllAsZip,
+    listVersions, readVersion, createVersion, renameVersion, diffVersions, pruneVersions,
     createFolder, updateFolder, deleteFolder, renameFolder,
     getAssetPath, pathToFolderId, folderPathMap,
   }

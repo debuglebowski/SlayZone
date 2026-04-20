@@ -132,5 +132,12 @@ export function openDb(): SlayDb {
     close() {
       db.close()
     },
+    raw() {
+      return db as unknown as ReturnType<SlayDb['raw']>
+    },
   }
+}
+
+export function getDataDir(): string {
+  return process.env.SLAYZONE_DB_DIR ?? defaultDir()
 }

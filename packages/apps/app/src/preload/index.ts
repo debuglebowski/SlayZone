@@ -77,6 +77,14 @@ const api: ElectronAPI = {
     downloadAsPng: (id) => ipcRenderer.invoke('db:assets:downloadAsPng', id),
     downloadAsHtml: (id) => ipcRenderer.invoke('db:assets:downloadAsHtml', id),
     downloadAllAsZip: (taskId) => ipcRenderer.invoke('db:assets:downloadAllAsZip', taskId),
+    versions: {
+      list: (data) => ipcRenderer.invoke('db:assets:versions:list', data),
+      read: (data) => ipcRenderer.invoke('db:assets:versions:read', data),
+      create: (data) => ipcRenderer.invoke('db:assets:versions:create', data),
+      rename: (data) => ipcRenderer.invoke('db:assets:versions:rename', data),
+      diff: (data) => ipcRenderer.invoke('db:assets:versions:diff', data),
+      prune: (data) => ipcRenderer.invoke('db:assets:versions:prune', data),
+    },
   },
   assetFolders: {
     getByTask: (taskId) => ipcRenderer.invoke('db:assetFolders:getByTask', taskId),

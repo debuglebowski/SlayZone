@@ -1,5 +1,6 @@
 import type { Project, CreateProjectInput, UpdateProjectInput, ExecutionContext } from '@slayzone/projects/shared'
 import type { Task, CreateTaskInput, UpdateTaskInput, DesktopHandoffPolicy, TaskTemplate, CreateTaskTemplateInput, UpdateTaskTemplateInput, TaskAsset, CreateAssetInput, UpdateAssetInput, AssetFolder, CreateAssetFolderInput, UpdateAssetFolderInput } from '@slayzone/task/shared'
+import type { AssetVersion, VersionRef, DiffResult, PruneReport } from '@slayzone/task-assets/shared'
 import type { Tag, CreateTagInput, UpdateTagInput } from '@slayzone/tags/shared'
 import type {
   TerminalMode,
@@ -280,7 +281,7 @@ export interface ElectronAPI {
     getByTask: (taskId: string) => Promise<TaskAsset[]>
     get: (id: string) => Promise<TaskAsset | null>
     create: (data: CreateAssetInput) => Promise<TaskAsset>
-    update: (data: UpdateAssetInput) => Promise<TaskAsset | null>
+    update: (data: UpdateAssetInput & { mutateVersion?: boolean }) => Promise<TaskAsset | null>
     delete: (id: string) => Promise<boolean>
     reorder: (data: string[] | { folderId: string | null; assetIds: string[] }) => Promise<void>
     readContent: (id: string) => Promise<string | null>
@@ -297,6 +298,14 @@ export interface ElectronAPI {
     downloadAsPng: (id: string) => Promise<boolean>
     downloadAsHtml: (id: string) => Promise<boolean>
     downloadAllAsZip: (taskId: string) => Promise<boolean>
+    versions: {
+      list: (data: { assetId: string; limit?: number; offset?: number }) => Promise<AssetVersion[]>
+      read: (data: { assetId: string; versionRef: VersionRef }) => Promise<string>
+      create: (data: { assetId: string; name?: string | null }) => Promise<AssetVersion>
+      rename: (data: { assetId: string; versionRef: VersionRef; newName: string | null }) => Promise<AssetVersion>
+      diff: (data: { assetId: string; a: VersionRef; b?: VersionRef }) => Promise<DiffResult>
+      prune: (data: { assetId: string; keepLast?: number; keepNamed?: boolean; dryRun?: boolean }) => Promise<PruneReport>
+    }
   }
   assetFolders: {
     getByTask: (taskId: string) => Promise<AssetFolder[]>

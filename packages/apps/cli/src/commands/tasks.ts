@@ -1,6 +1,19 @@
 import { Command } from 'commander'
 import http from 'node:http'
-import { openDb, notifyApp, postJson, resolveProject, resolveProjectArg, getAssetsDir, getMcpPort, type SlayDb } from '../db'
+import { openDb, notifyApp, postJson, resolveProject, resolveProjectArg, getAssetsDir, getDataDir, getMcpPort, type SlayDb } from '../db'
+import {
+  BlobStore,
+  createVersion,
+  mutateLatestVersion,
+  listVersions,
+  resolveVersionRef,
+  readVersionContent,
+  renameVersion,
+  diffVersions,
+  pruneVersions,
+  nodeSqliteTxn,
+  isVersionError,
+} from '@slayzone/task-assets/main'
 import { browserCommand } from './browser'
 import {
   getDefaultStatus,
@@ -26,6 +39,13 @@ import archiver from 'archiver'
 import fs from 'fs'
 import path from 'path'
 import crypto from 'crypto'
+import type { AuthorContext } from '@slayzone/task-assets/shared'
+
+function cliAuthor(): AuthorContext {
+  const mode = process.env.SLAYZONE_AGENT_MODE
+  if (mode) return { type: 'agent', id: mode }
+  return { type: 'user', id: null }
+}
 
 interface TaskRow extends Record<string, unknown> {
   id: string
@@ -1425,16 +1445,28 @@ function assetsSubcommand(): Command {
       const fp = assetFilePath(dir, task.id, id, title)
       fs.mkdirSync(path.dirname(fp), { recursive: true })
 
+      let bytes: Buffer
       if (opts.copyFrom) {
         if (!fs.existsSync(opts.copyFrom)) {
           console.error(`File not found: ${opts.copyFrom}`)
           process.exit(1)
         }
-        fs.copyFileSync(opts.copyFrom, fp)
+        bytes = fs.readFileSync(opts.copyFrom)
+        fs.writeFileSync(fp, bytes)
       } else {
         const content = await readStdin()
-        fs.writeFileSync(fp, content)
+        bytes = Buffer.from(content)
+        fs.writeFileSync(fp, bytes)
       }
+
+      // Create v1 version row.
+      const blobStore = new BlobStore(getDataDir())
+      const raw = db.raw()
+      createVersion(raw, nodeSqliteTxn(raw), blobStore, {
+        assetId: id,
+        bytes,
+        author: cliAuthor(),
+      })
 
       db.close()
       await notifyApp()
@@ -1480,6 +1512,15 @@ function assetsSubcommand(): Command {
       const fp = assetFilePath(dir, task.id, id, title)
       fs.mkdirSync(path.dirname(fp), { recursive: true })
       fs.copyFileSync(sourcePath, fp)
+
+      // Seed v1 version row from uploaded bytes.
+      const blobStore = new BlobStore(getDataDir())
+      const raw = db.raw()
+      createVersion(raw, nodeSqliteTxn(raw), blobStore, {
+        assetId: id,
+        bytes: fs.readFileSync(fp),
+        author: cliAuthor(),
+      })
 
       db.close()
       await notifyApp()
@@ -1556,46 +1597,82 @@ function assetsSubcommand(): Command {
   cmd
     .command('write <assetId>')
     .description('Replace asset content from stdin')
-    .action(async (assetId: string) => {
+    .option('--mutate-version', 'Amend latest version in place instead of creating a new one')
+    .action(async (assetId: string, opts: { mutateVersion?: boolean }) => {
       const db = openDb()
       const asset = resolveAsset(db, assetId)
-      db.run(
-        `UPDATE task_assets SET updated_at = :now WHERE id = :id`,
-        { ':id': asset.id, ':now': new Date().toISOString() }
-      )
-      db.close()
 
       const content = await readStdin()
+      const bytes = Buffer.from(content)
+
       const dir = getAssetsDir()
       const fp = assetFilePath(dir, asset.task_id, asset.id, asset.title)
       fs.mkdirSync(path.dirname(fp), { recursive: true })
-      fs.writeFileSync(fp, content)
+      fs.writeFileSync(fp, bytes)
 
-      await notifyApp()
-      console.log(`Written: ${asset.id.slice(0, 8)}  ${asset.title}`)
+      const blobStore = new BlobStore(getDataDir())
+      const raw = db.raw()
+      const txn = nodeSqliteTxn(raw)
+      try {
+        const v = opts.mutateVersion
+          ? mutateLatestVersion(raw, txn, blobStore, { assetId: asset.id, bytes, author: cliAuthor() })
+          : createVersion(raw, txn, blobStore, { assetId: asset.id, bytes, author: cliAuthor() })
+        db.run(`UPDATE task_assets SET updated_at = :now WHERE id = :id`, {
+          ':id': asset.id,
+          ':now': new Date().toISOString(),
+        })
+        db.close()
+        await notifyApp()
+        console.log(`Written: ${asset.id.slice(0, 8)}  ${asset.title}  v${v.version_num}`)
+      } catch (err) {
+        db.close()
+        if (isVersionError(err)) {
+          console.error(`Error [${err.code}]: ${err.message}`)
+          process.exit(1)
+        }
+        throw err
+      }
     })
 
   // slay tasks assets append <assetId>
   cmd
     .command('append <assetId>')
     .description('Append to asset content from stdin')
-    .action(async (assetId: string) => {
+    .option('--mutate-version', 'Amend latest version in place instead of creating a new one')
+    .action(async (assetId: string, opts: { mutateVersion?: boolean }) => {
       const db = openDb()
       const asset = resolveAsset(db, assetId)
-      db.run(
-        `UPDATE task_assets SET updated_at = :now WHERE id = :id`,
-        { ':id': asset.id, ':now': new Date().toISOString() }
-      )
-      db.close()
 
       const content = await readStdin()
+
       const dir = getAssetsDir()
       const fp = assetFilePath(dir, asset.task_id, asset.id, asset.title)
       fs.mkdirSync(path.dirname(fp), { recursive: true })
       fs.appendFileSync(fp, content)
+      const fullBytes = fs.readFileSync(fp)
 
-      await notifyApp()
-      console.log(`Appended: ${asset.id.slice(0, 8)}  ${asset.title}`)
+      const blobStore = new BlobStore(getDataDir())
+      const raw = db.raw()
+      const txn = nodeSqliteTxn(raw)
+      try {
+        const v = opts.mutateVersion
+          ? mutateLatestVersion(raw, txn, blobStore, { assetId: asset.id, bytes: fullBytes, author: cliAuthor() })
+          : createVersion(raw, txn, blobStore, { assetId: asset.id, bytes: fullBytes, author: cliAuthor() })
+        db.run(`UPDATE task_assets SET updated_at = :now WHERE id = :id`, {
+          ':id': asset.id,
+          ':now': new Date().toISOString(),
+        })
+        db.close()
+        await notifyApp()
+        console.log(`Appended: ${asset.id.slice(0, 8)}  ${asset.title}  v${v.version_num}`)
+      } catch (err) {
+        db.close()
+        if (isVersionError(err)) {
+          console.error(`Error [${err.code}]: ${err.message}`)
+          process.exit(1)
+        }
+        throw err
+      }
     })
 
   // slay tasks assets delete <assetId>
@@ -1887,6 +1964,213 @@ pdf/png/html require the SlayZone app to be running.
         console.log(outputPath)
       }
     })
+
+  // --- Versions subcommand ---
+  const versions = new Command('versions').description('Manage asset version history')
+
+  versions
+    .command('list <assetId>')
+    .description('List version history for an asset (newest first)')
+    .option('--limit <n>', 'Max rows', (v) => parseInt(v, 10), 50)
+    .option('--offset <n>', 'Skip N rows', (v) => parseInt(v, 10), 0)
+    .option('--json', 'Output as JSON')
+    .action(async (assetId: string, opts: { limit: number; offset: number; json?: boolean }) => {
+      const db = openDb()
+      const asset = resolveAsset(db, assetId)
+      const blobStore = new BlobStore(getDataDir())
+      void blobStore
+      const raw = db.raw()
+      const rows = listVersions(raw, asset.id, { limit: opts.limit, offset: opts.offset })
+      db.close()
+      if (opts.json) {
+        console.log(JSON.stringify(rows, null, 2))
+        return
+      }
+      if (rows.length === 0) {
+        console.log('(no versions)')
+        return
+      }
+      console.log(`VER  HASH       SIZE   NAME              AUTHOR            CREATED`)
+      console.log(`---  ---------  -----  ----------------  ----------------  ----------------`)
+      for (const v of rows) {
+        const hash = v.content_hash.slice(0, 8)
+        const name = (v.name ?? '').padEnd(16).slice(0, 16)
+        const author = ((v.author_id ?? v.author_type ?? '') as string).padEnd(16).slice(0, 16)
+        console.log(`v${String(v.version_num).padEnd(3)} ${hash}  ${String(v.size).padStart(5)}  ${name}  ${author}  ${v.created_at}`)
+      }
+    })
+
+  versions
+    .command('read <assetId> <version>')
+    .description('Print content of a specific version (int, hash prefix, name, -N, HEAD~N)')
+    .action(async (assetId: string, versionRef: string) => {
+      const db = openDb()
+      const asset = resolveAsset(db, assetId)
+      const blobStore = new BlobStore(getDataDir())
+      const raw = db.raw()
+      try {
+        const v = resolveVersionRef(raw, asset.id, versionRef)
+        const buf = readVersionContent(blobStore, v)
+        db.close()
+        process.stdout.write(buf)
+      } catch (err) {
+        db.close()
+        if (isVersionError(err)) {
+          console.error(`Error [${err.code}]: ${err.message}`)
+          process.exit(1)
+        }
+        throw err
+      }
+    })
+
+  versions
+    .command('diff <assetId> <a> [b]')
+    .description('Diff two versions (b defaults to latest). Colorized unless --no-color.')
+    .option('--no-color', 'Plain output')
+    .option('--json', 'Output as JSON')
+    .action(async (assetId: string, a: string, b: string | undefined, opts: { color: boolean; json?: boolean }) => {
+      const db = openDb()
+      const asset = resolveAsset(db, assetId)
+      const blobStore = new BlobStore(getDataDir())
+      const raw = db.raw()
+      try {
+        const result = diffVersions(raw, blobStore, { assetId: asset.id, a, b })
+        db.close()
+        if (opts.json) {
+          console.log(JSON.stringify(result, null, 2))
+          return
+        }
+        if (result.kind === 'binary') {
+          console.log(`(binary)`)
+          console.log(`  a: ${result.a.hash.slice(0, 8)}  ${result.a.size} bytes`)
+          console.log(`  b: ${result.b.hash.slice(0, 8)}  ${result.b.size} bytes`)
+          return
+        }
+        const useColor = opts.color !== false && process.stdout.isTTY
+        const RED = useColor ? '\x1b[31m' : ''
+        const GREEN = useColor ? '\x1b[32m' : ''
+        const RESET = useColor ? '\x1b[0m' : ''
+        for (const hunk of result.hunks) {
+          for (const line of hunk.lines) {
+            if (line.kind === 'add') process.stdout.write(`${GREEN}+${line.text}${RESET}\n`)
+            else if (line.kind === 'del') process.stdout.write(`${RED}-${line.text}${RESET}\n`)
+            else process.stdout.write(` ${line.text}\n`)
+          }
+        }
+      } catch (err) {
+        db.close()
+        if (isVersionError(err)) {
+          console.error(`Error [${err.code}]: ${err.message}`)
+          process.exit(1)
+        }
+        throw err
+      }
+    })
+
+  versions
+    .command('create <assetId>')
+    .description('Create a version from the current working copy (honors unchanged content)')
+    .option('--name <name>', 'Optional name for the version')
+    .option('--json', 'Output as JSON')
+    .action(async (assetId: string, opts: { name?: string; json?: boolean }) => {
+      const db = openDb()
+      const asset = resolveAsset(db, assetId)
+      const blobStore = new BlobStore(getDataDir())
+      const raw = db.raw()
+      const txn = nodeSqliteTxn(raw)
+      try {
+        const dir = getAssetsDir()
+        const fp = assetFilePath(dir, asset.task_id, asset.id, asset.title)
+        const bytes = fs.existsSync(fp) ? fs.readFileSync(fp) : Buffer.alloc(0)
+        const v = createVersion(raw, txn, blobStore, {
+          assetId: asset.id,
+          bytes,
+          name: opts.name ?? null,
+          honorUnchanged: true,
+          author: cliAuthor(),
+        })
+        db.close()
+        if (opts.json) {
+          console.log(JSON.stringify(v, null, 2))
+        } else {
+          console.log(`Created: v${v.version_num}${v.name ? ` (${v.name})` : ''}`)
+        }
+      } catch (err) {
+        db.close()
+        if (isVersionError(err)) {
+          console.error(`Error [${err.code}]: ${err.message}`)
+          process.exit(1)
+        }
+        throw err
+      }
+    })
+
+  versions
+    .command('rename <assetId> <version> [newName]')
+    .description('Set, change, or clear (omit newName) the name of a version')
+    .option('--clear', 'Clear the name')
+    .option('--json', 'Output as JSON')
+    .action(async (assetId: string, versionRef: string, newName: string | undefined, opts: { clear?: boolean; json?: boolean }) => {
+      const db = openDb()
+      const asset = resolveAsset(db, assetId)
+      const raw = db.raw()
+      const txn = nodeSqliteTxn(raw)
+      try {
+        const target = opts.clear ? null : (newName ?? null)
+        const v = renameVersion(raw, txn, asset.id, versionRef, target)
+        db.close()
+        if (opts.json) {
+          console.log(JSON.stringify(v, null, 2))
+        } else {
+          console.log(`Renamed v${v.version_num}: ${target ?? '(no name)'}`)
+        }
+      } catch (err) {
+        db.close()
+        if (isVersionError(err)) {
+          console.error(`Error [${err.code}]: ${err.message}`)
+          process.exit(1)
+        }
+        throw err
+      }
+    })
+
+  versions
+    .command('prune <assetId>')
+    .description('Remove old versions. Named versions protected by default.')
+    .option('--keep-last <n>', 'Keep the N most recent versions', (v) => parseInt(v, 10), 0)
+    .option('--no-keep-named', 'Also delete named versions')
+    .option('--dry-run', 'Show what would be deleted without modifying')
+    .option('--json', 'Output as JSON')
+    .action(async (assetId: string, opts: { keepLast: number; keepNamed: boolean; dryRun?: boolean; json?: boolean }) => {
+      const db = openDb()
+      const asset = resolveAsset(db, assetId)
+      const blobStore = new BlobStore(getDataDir())
+      const raw = db.raw()
+      const txn = nodeSqliteTxn(raw)
+      try {
+        const report = pruneVersions(raw, txn, blobStore, asset.id, {
+          keepLast: opts.keepLast,
+          keepNamed: opts.keepNamed,
+          dryRun: opts.dryRun,
+        })
+        db.close()
+        if (opts.json) {
+          console.log(JSON.stringify(report, null, 2))
+        } else {
+          const verb = opts.dryRun ? 'would delete' : 'deleted'
+          console.log(`${verb} ${report.deletedVersions} versions, ${report.deletedBlobs} blobs (kept ${report.keptNamed} named)`)
+        }
+      } catch (err) {
+        db.close()
+        if (isVersionError(err)) {
+          console.error(`Error [${err.code}]: ${err.message}`)
+          process.exit(1)
+        }
+        throw err
+      }
+    })
+
+  cmd.addCommand(versions)
 
   return cmd
 }

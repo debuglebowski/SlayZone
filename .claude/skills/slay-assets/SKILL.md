@@ -62,6 +62,28 @@ Download assets in various formats. Default type is `raw` (original file).
 
 `pdf`, `png`, and `html` exports require the SlayZone app to be running. `--output` defaults to the current directory with an auto-generated filename.
 
+## Versions
+
+Every asset has a linear version history. Writing creates a new version by default; `--mutate-version` amends the latest in place. Restoring an old version is a pipe: `read | write`. The CLI sets `author = 'agent'` when `$SLAYZONE_AGENT_MODE` is set, else `'user'`.
+
+`<version>` accepts: int (`3`), hash prefix (`a1b2`), name (`before-refactor`), relative (`-N`), or `HEAD~N`.
+
+- `slay tasks assets write <assetId> [--mutate-version]` — `--mutate-version` swaps the latest version's content_hash in place; default creates a new version row.
+- `slay tasks assets append <assetId> [--mutate-version]` — same flag semantics; useful for log-style appends to keep history flat.
+
+- `slay tasks assets versions list <assetId> [--limit <n>] [--offset <n>] [--json]` — list versions, newest first.
+- `slay tasks assets versions read <assetId> <version>` — print content of a specific version to stdout.
+- `slay tasks assets versions diff <assetId> <a> [b] [--no-color] [--json]` — unified diff between two versions; `b` defaults to latest. Colorized output unless piped or `--no-color`.
+- `slay tasks assets versions create <assetId> [--name <name>] [--json]` — create a new version from the current working copy. Honors unchanged content (always creates a row). Names are unique per asset; reserved: `HEAD`, `latest`, pure numerics.
+- `slay tasks assets versions rename <assetId> <version> [newName] [--clear] [--json]` — set, change, or clear (with `--clear`) a version's name. Named versions cannot be mutated.
+- `slay tasks assets versions prune <assetId> [--keep-last <n>] [--no-keep-named] [--dry-run] [--json]` — delete old versions and GC orphan blobs. Named versions are protected by default.
+
+Restore an old version (creates a new version pointing at the old blob — non-destructive):
+
+```bash
+slay tasks assets versions read <assetId> 3 | slay tasks assets write <assetId>
+```
+
 ## Piping examples
 
 ```bash

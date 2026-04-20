@@ -1960,6 +1960,40 @@ const migrations: Migration[] = [
         ALTER TABLE task_assets ADD COLUMN width_override TEXT DEFAULT NULL;
       `)
     }
+  },
+  {
+    version: 110,
+    up: (db) => {
+      db.exec(`
+        ALTER TABLE terminal_tabs ADD COLUMN display_mode TEXT NOT NULL DEFAULT 'xterm';
+      `)
+    }
+  },
+  {
+    version: 111,
+    up: (db) => {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS asset_versions (
+          id TEXT PRIMARY KEY,
+          asset_id TEXT NOT NULL REFERENCES task_assets(id) ON DELETE CASCADE,
+          version_num INTEGER NOT NULL,
+          content_hash TEXT NOT NULL,
+          size INTEGER NOT NULL,
+          name TEXT,
+          author_type TEXT,
+          author_id TEXT,
+          created_at TEXT NOT NULL DEFAULT (datetime('now'))
+        );
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_asset_versions_num ON asset_versions(asset_id, version_num);
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_asset_versions_name ON asset_versions(asset_id, name) WHERE name IS NOT NULL;
+        CREATE INDEX IF NOT EXISTS idx_asset_versions_hash ON asset_versions(content_hash);
+
+        CREATE TABLE IF NOT EXISTS asset_blobs (
+          hash TEXT PRIMARY KEY,
+          size INTEGER NOT NULL
+        );
+      `)
+    }
   }
 ]
 

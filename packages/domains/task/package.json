@@ -36,6 +36,7 @@
     "@slayzone/settings": "workspace:*",
     "@slayzone/suspense": "workspace:*",
     "@slayzone/tags": "workspace:*",
+    "@slayzone/task-assets": "workspace:*",
     "@slayzone/task-browser": "workspace:*",
     "@slayzone/task-terminals": "workspace:*",
     "@slayzone/telemetry": "workspace:*",

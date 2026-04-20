@@ -95,6 +95,8 @@ import { registerBackupHandlers, startAutoBackup, stopAutoBackup, createPreMigra
 // Domain handlers
 import { registerProjectHandlers, handleTerminalStateChange } from '@slayzone/projects/main'
 import { configureTaskRuntimeAdapters, registerTaskHandlers, registerTaskTemplateHandlers, registerFilesHandlers, closeAssetWatcher } from '@slayzone/task/main'
+import { BlobStore, betterSqliteTxn, seedInitialVersions } from '@slayzone/task-assets/main'
+import { getExtensionFromTitle } from '@slayzone/task/shared'
 import { registerTagHandlers } from '@slayzone/tags/main'
 import { registerSettingsHandlers, registerThemeHandlers } from '@slayzone/settings/main'
 import { registerPtyHandlers, registerUsageHandlers, killAllPtys, killPtysByTaskId, startIdleChecker, stopIdleChecker, dismissAllNotifications, syncTerminalModes, getPtyPids, onSessionChange, onGlobalStateChange } from '@slayzone/terminal/main'
@@ -793,6 +795,23 @@ app.whenReady().then(async () => {
   await createPreMigrationBackup(db, LATEST_MIGRATION_VERSION)
   runMigrations(db)
   normalizeProjectStatusData(db)
+
+  // Seed initial asset versions (v1) for any assets without history. Idempotent.
+  {
+    const dataDir = process.env.SLAYZONE_DB_DIR || app.getPath('userData')
+    const assetsDir = join(dataDir, 'assets')
+    const blobStore = new BlobStore(dataDir)
+    const txnRunner = betterSqliteTxn(db)
+    const seedReport = seedInitialVersions(db, txnRunner, blobStore, {
+      resolveFilePath: (row) => {
+        const ext = getExtensionFromTitle(row.title) || '.txt'
+        return join(assetsDir, row.task_id, `${row.id}${ext}`)
+      }
+    })
+    if (seedReport.seeded > 0 || seedReport.skippedMissing > 0) {
+      console.log(`[asset-versions] seeded=${seedReport.seeded} skippedMissing=${seedReport.skippedMissing}`)
+    }
+  }
   const diagDb = getDiagnosticsDatabase()
   const isLabEnabled = (key: string): boolean => {
     const row = db.prepare('SELECT value FROM settings WHERE key = ?').get(key) as { value: string } | undefined
