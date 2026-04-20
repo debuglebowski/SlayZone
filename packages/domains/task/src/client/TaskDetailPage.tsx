@@ -95,6 +95,7 @@ function SortableSubTask({ sub, columns, statusOptions, onNavigate, onUpdate, on
   const style = { transform: CSS.Transform.toString(transform), transition }
   const statusStyle = getColumnStatusStyle(sub.status, columns)
   const StatusIcon = statusStyle?.icon
+  const [statusOpen, setStatusOpen] = useState(false)
 
   return (
     <ContextMenu>
@@ -110,12 +111,39 @@ function SortableSubTask({ sub, columns, statusOptions, onNavigate, onUpdate, on
           <span {...attributes} {...listeners} className="absolute -left-4 cursor-grab opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground">
             <GripVertical className="size-3" />
           </span>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <span className="shrink-0">{StatusIcon && <StatusIcon className={cn("size-3.5", statusStyle?.iconClass)} />}</span>
-            </TooltipTrigger>
-            <TooltipContent side="bottom" className="text-xs">{statusStyle?.label ?? sub.status}</TooltipContent>
-          </Tooltip>
+          <Popover open={statusOpen} onOpenChange={setStatusOpen}>
+            <PopoverTrigger asChild>
+              <button
+                type="button"
+                aria-label={`Status: ${statusStyle?.label ?? sub.status}`}
+                onClick={(e) => e.stopPropagation()}
+                className="shrink-0 cursor-pointer transition-opacity hover:opacity-70"
+              >
+                {StatusIcon && <StatusIcon className={cn("size-3.5", statusStyle?.iconClass)} />}
+              </button>
+            </PopoverTrigger>
+            <PopoverContent className="w-44 p-1" align="start" onClick={(e) => e.stopPropagation()}>
+              {statusOptions.map((opt) => {
+                const optStyle = getColumnStatusStyle(opt.value, columns)
+                const OptIcon = optStyle?.icon ?? Circle
+                const isCurrent = opt.value === sub.status
+                return (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    className={cn('flex w-full items-center gap-2 rounded px-2 py-1.5 text-sm cursor-pointer hover:bg-accent', isCurrent && 'bg-accent font-medium')}
+                    onClick={() => {
+                      onUpdate(sub.id, { status: opt.value })
+                      setStatusOpen(false)
+                    }}
+                  >
+                    <OptIcon className={cn('size-4', optStyle?.iconClass)} />
+                    {opt.label}
+                  </button>
+                )
+              })}
+            </PopoverContent>
+          </Popover>
           <span
             className={cn("text-xs flex-1 truncate", isTerminalStatus(sub.status, columns ?? null) && "line-through text-muted-foreground")}
             onClick={() => onNavigate?.(sub.id)}
