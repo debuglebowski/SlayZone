@@ -10,6 +10,7 @@ export type DiagnosticSource =
   | 'task'
   | 'settings'
   | 'db'
+  | 'usage'
 
 export interface DiagnosticEvent {
   id?: string

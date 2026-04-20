@@ -5,6 +5,7 @@ import { readFile } from 'fs/promises'
 import { join } from 'path'
 import { homedir } from 'os'
 import type Database from 'better-sqlite3'
+import { recordDiagnosticEvent } from '@slayzone/diagnostics/main'
 import type { ProviderUsage, UsageWindow, UsageProviderConfig } from '@slayzone/terminal/shared'
 
 const TIMEOUT_MS = 10_000
@@ -73,7 +74,30 @@ function friendlyError(e: unknown): string {
     return 'Request timed out'
   if (msg.includes('CERT') || msg.includes('SSL'))
     return 'SSL error — VPN or proxy may be interfering'
+  if (msg.includes('ERR_FAILED') || msg.includes('ECONNRESET') || msg.includes('ERR_NETWORK_CHANGED') || msg.includes('ERR_HTTP2'))
+    return 'Network request failed — refresh to retry'
   return msg
+}
+
+function isTransientNetError(e: unknown): boolean {
+  if (!(e instanceof Error)) return false
+  const msg = e.message
+  return msg.includes('ERR_FAILED')
+    || msg.includes('ECONNRESET')
+    || msg.includes('ERR_NETWORK_CHANGED')
+    || msg.includes('ERR_HTTP2')
+    || msg.includes('UND_ERR_SOCKET')
+}
+
+async function withRetry<T>(fn: () => Promise<T>): Promise<T> {
+  try {
+    return await fn()
+  } catch (e) {
+    if (e instanceof RateLimitError) throw e
+    if (!isTransientNetError(e)) throw e
+    await new Promise((r) => setTimeout(r, 500))
+    return fn()
+  }
 }
 
 // ── Dot-path extraction ─────────────────────────────────────────────
@@ -185,8 +209,11 @@ function mapCodexWindow(key: string, label: string, w: { used_percent: number; r
 }
 
 async function fetchCodexUsageWithToken(auth: CodexAuth): Promise<ProviderUsage> {
-  // Electron's net module uses Chromium's HTTP stack (HTTP/2) which bypasses Cloudflare JA3 fingerprint checks
+  // Electron's net module uses Chromium's HTTP stack (HTTP/2) which bypasses Cloudflare JA3 fingerprint checks.
+  // credentials: 'omit' isolates from the app's shared cookie jar — prevents stale `__cf_bm` (Cloudflare
+  // bot-manager) cookies from other chatgpt.com traffic (webviews) triggering challenge RST_STREAM on our fetch.
   const res = await net.fetch('https://chatgpt.com/backend-api/wham/usage', {
+    credentials: 'omit',
     headers: {
       'Authorization': `Bearer ${auth.accessToken}`,
       'ChatGPT-Account-Id': auth.accountId,
@@ -320,6 +347,7 @@ async function fetchCustomUsage(providerId: string, providerLabel: string, confi
   const authHeaders = await resolveAuth(config)
   const res = await net.fetch(config.url, {
     method: config.method || 'GET',
+    credentials: 'omit',
     headers: {
       'Accept': 'application/json',
       ...authHeaders,
@@ -341,6 +369,7 @@ async function testUsageConfig(config: UsageProviderConfig): Promise<{ ok: boole
     const authHeaders = await resolveAuth(config)
     const res = await net.fetch(config.url, {
       method: config.method || 'GET',
+      credentials: 'omit',
       headers: { 'Accept': 'application/json', ...authHeaders },
     })
     if (!res.ok) return { ok: false, error: `HTTP ${res.status}` }
@@ -358,11 +387,14 @@ async function testUsageConfig(config: UsageProviderConfig): Promise<{ ok: boole
 const MIN_INTERVAL_MS = 10_000   // hard floor: never fetch faster than 10s apart
 const DEFAULT_TTL_MS = 60_000    // auto-poll cache: 1 minute
 
+const MAX_STALE_FAILURES = 3  // drop cached windows after N consecutive failures
+
 interface CacheEntry {
   result: ProviderUsage
   cachedAt: number
   backoffUntil: number
   tokenHint?: string
+  consecutiveFailures: number
 }
 
 const cache = new Map<string, CacheEntry>()
@@ -386,30 +418,64 @@ function fetchProvider(p: ProviderMeta, fetcher: () => Promise<ProviderUsage>, t
     return Promise.resolve(existing.result)
   }
 
-  return fetcher().then((result) => {
+  return withRetry(fetcher).then((result) => {
     cache.set(p.id, {
       result,
       cachedAt: Date.now(),
       backoffUntil: existing?.backoffUntil ?? 0,
       tokenHint,
+      consecutiveFailures: 0,
     })
     return result
   }).catch((e): ProviderUsage => {
+    const failures = (existing?.consecutiveFailures ?? 0) + 1
+    recordDiagnosticEvent({
+      level: failures >= MAX_STALE_FAILURES ? 'warn' : 'info',
+      source: 'usage',
+      event: 'usage.fetch_error',
+      message: `${p.id}: ${e instanceof Error ? e.message : String(e)}`,
+      payload: {
+        provider: p.id,
+        errorName: e instanceof Error ? e.name : null,
+        rawMessage: e instanceof Error ? e.message : String(e),
+        stack: e instanceof Error ? e.stack : null,
+        consecutiveFailures: failures,
+        isRateLimit: e instanceof RateLimitError,
+      },
+    })
     if (e instanceof RateLimitError) {
       const backoff = Math.max(e.retryAfterMs, MIN_BACKOFF_MS)
       const backoffUntil = Math.max(existing?.backoffUntil ?? 0, Date.now() + backoff)
       if (existing) {
         existing.backoffUntil = backoffUntil
+        existing.consecutiveFailures = failures
       } else {
-        cache.set(p.id, { result: usageError(p, 'Rate limited'), cachedAt: Date.now(), backoffUntil, tokenHint })
+        cache.set(p.id, { result: usageError(p, 'Rate limited'), cachedAt: Date.now(), backoffUntil, tokenHint, consecutiveFailures: failures })
       }
     }
     const errorMsg = e instanceof RateLimitError ? e.message : friendlyError(e)
-    // Preserve last valid windows so UI can show stale data + error indicator
-    if (existing?.result.windows.length) {
-      return { ...existing.result, error: errorMsg }
+    // Preserve last valid windows so UI can show stale data + error indicator —
+    // but drop stale windows after N consecutive failures so "9h old" doesn't persist forever.
+    if (existing?.result.windows.length && failures < MAX_STALE_FAILURES) {
+      const stale = { ...existing.result, error: errorMsg }
+      cache.set(p.id, {
+        result: stale,
+        cachedAt: existing.cachedAt,
+        backoffUntil: existing.backoffUntil,
+        tokenHint: existing.tokenHint,
+        consecutiveFailures: failures,
+      })
+      return stale
     }
-    return usageError(p, errorMsg)
+    const err = usageError(p, errorMsg)
+    cache.set(p.id, {
+      result: err,
+      cachedAt: Date.now(),
+      backoffUntil: existing?.backoffUntil ?? 0,
+      tokenHint,
+      consecutiveFailures: failures,
+    })
+    return err
   })
 }
 
