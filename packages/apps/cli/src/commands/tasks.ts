@@ -20,6 +20,7 @@ import {
   canExportAsHtml,
   type RenderMode,
 } from '@slayzone/task/shared/types'
+import { validateReparent, reparentErrorMessage, type ReparentTaskRow } from '@slayzone/task/shared/reparent-validation'
 import { apiPost } from '../api'
 import archiver from 'archiver'
 import fs from 'fs'
@@ -487,6 +488,8 @@ export function tasksCommand(): Command {
     .option('--priority <n>', 'New priority 1-5')
     .option('--due <date>', 'Set due date (YYYY-MM-DD or ISO 8601)')
     .option('--no-due', 'Clear due date')
+    .option('--parent <id>', 'Reparent task under <id> (prefix supported, must be in same project)')
+    .option('--no-parent', 'Detach task (make top-level)')
     .option('--permanent', 'Convert temporary task to a real task')
     .action(async (idPrefix, opts) => {
       idPrefix = resolveId(idPrefix)
@@ -495,8 +498,8 @@ export function tasksCommand(): Command {
         process.exit(1)
       }
       if (opts.title === undefined && opts.description === undefined && opts.appendDescription === undefined && opts.status === undefined
-        && opts.priority === undefined && opts.due === undefined && !opts.permanent) {
-        console.error('Provide at least one of --title, --description, --append-description, --status, --priority, --due, --no-due, --permanent')
+        && opts.priority === undefined && opts.due === undefined && opts.parent === undefined && !opts.permanent) {
+        console.error('Provide at least one of --title, --description, --append-description, --status, --priority, --due, --no-due, --parent, --no-parent, --permanent')
         process.exit(1)
       }
 
@@ -531,6 +534,39 @@ export function tasksCommand(): Command {
       const sets: string[] = ['updated_at = :now']
       const params: Record<string, string | number | null> = { ':now': new Date().toISOString(), ':id': task.id }
 
+      let resolvedParentId: string | null | undefined
+      if (opts.parent === false) {
+        resolvedParentId = null
+      } else if (typeof opts.parent === 'string') {
+        const parentMatches = db.query<{ id: string }>(
+          `SELECT id FROM tasks WHERE id LIKE :prefix || '%' LIMIT 2`,
+          { ':prefix': opts.parent }
+        )
+        if (parentMatches.length === 0) { console.error(`Parent task not found: ${opts.parent}`); process.exit(1) }
+        if (parentMatches.length > 1) {
+          console.error(`Ambiguous parent id prefix "${opts.parent}". Matches: ${parentMatches.map((t) => t.id.slice(0, 8)).join(', ')}`)
+          process.exit(1)
+        }
+        resolvedParentId = parentMatches[0].id
+      }
+      if (resolvedParentId !== undefined) {
+        const result = validateReparent({
+          taskId: task.id,
+          parentId: resolvedParentId,
+          lookup: (id: string) => {
+            const rows = db.query<ReparentTaskRow>(
+              `SELECT id, project_id, parent_id, archived_at, deleted_at FROM tasks WHERE id = :id LIMIT 1`,
+              { ':id': id }
+            )
+            return rows[0] ?? null
+          },
+        })
+        if (!result.ok) {
+          console.error(reparentErrorMessage(result.error, { taskId: task.id, parentId: resolvedParentId }))
+          process.exit(1)
+        }
+      }
+
       if (opts.title)       { sets.push('title = :title');             params[':title'] = opts.title }
       if (opts.description !== undefined) { sets.push('description = :description'); params[':description'] = opts.description || null }
       if (opts.appendDescription) { sets.push('description = :description'); params[':description'] = (task.description ?? '') + '\n' + opts.appendDescription }
@@ -538,6 +574,7 @@ export function tasksCommand(): Command {
       if (opts.priority)    { sets.push('priority = :priority');       params[':priority'] = parseInt(opts.priority, 10) }
       if (typeof opts.due === 'string') { sets.push('due_date = :dueDate'); params[':dueDate'] = opts.due }
       else if (opts.due === false)      { sets.push('due_date = NULL') }
+      if (resolvedParentId !== undefined) { sets.push('parent_id = :parentId'); params[':parentId'] = resolvedParentId }
       if (opts.permanent)   { sets.push('is_temporary = 0') }
 
       db.run(`UPDATE tasks SET ${sets.join(', ')} WHERE id = :id`, params)

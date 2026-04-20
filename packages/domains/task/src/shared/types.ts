@@ -404,4 +404,6 @@ export interface UpdateTaskInput {
   activeAssetId?: string | null
   // Multi-repo
   repoName?: string | null
+  // Reparent: undefined = no change, null = detach to root, string = new parent id
+  parentId?: string | null
 }

@@ -2328,8 +2328,8 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
             )}
           </Collapsible>
 
-          {/* Sub-tasks (only for top-level tasks) */}
-          {!parentTask && <Collapsible open={subTasksOpen} onOpenChange={setSubTasksOpen} className={cn("group/sub rounded-md border border-border flex flex-col", subTasksOpen && !(descriptionExpanded && descriptionOpen) ? "flex-1 min-h-0" : "shrink-0")}>
+          {/* Sub-tasks */}
+          <Collapsible open={subTasksOpen} onOpenChange={setSubTasksOpen} className={cn("group/sub rounded-md border border-border flex flex-col", subTasksOpen && !(descriptionExpanded && descriptionOpen) ? "flex-1 min-h-0" : "shrink-0")}>
             <div className="shrink-0 flex w-full items-center gap-1.5 bg-muted/50 px-2.5 py-1.5 min-h-8 text-xs font-medium text-muted-foreground group-data-[state=open]/sub:border-b border-border">
               <CollapsibleTrigger className="flex items-center gap-1.5 hover:text-foreground transition-colors [&[data-state=open]>svg:first-child]:rotate-90">
                 <ChevronRight className="size-3 transition-transform" />
@@ -2385,10 +2385,10 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
               </SortableContext>
               </DndContext>
             </CollapsibleContent>
-          </Collapsible>}
+          </Collapsible>
 
           {/* Assets */}
-          {!parentTask && <Collapsible open={assetsOpen} onOpenChange={setAssetsOpen} className="group/assets shrink-0 rounded-md border border-border overflow-hidden">
+          <Collapsible open={assetsOpen} onOpenChange={setAssetsOpen} className="group/assets shrink-0 rounded-md border border-border overflow-hidden">
             <div className="flex w-full items-center gap-1.5 bg-muted/50 px-2.5 py-1.5 min-h-8 text-xs font-medium text-muted-foreground group-data-[state=open]/assets:border-b border-border">
               <CollapsibleTrigger className="flex items-center gap-1.5 hover:text-foreground transition-colors [&[data-state=open]>svg:first-child]:rotate-90">
                 <ChevronRight className="size-3 transition-transform" />
@@ -2428,7 +2428,7 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
                 </button>
               </div>
             </CollapsibleContent>
-          </Collapsible>}
+          </Collapsible>
 
           {/* Details */}
           <Collapsible open={descriptionExpanded && descriptionOpen ? detailsOpen : true} onOpenChange={setDetailsOpen} className="shrink-0 mt-auto">

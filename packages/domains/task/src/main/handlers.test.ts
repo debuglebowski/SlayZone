@@ -448,6 +448,68 @@ describe('db:tasks:update', () => {
     expect(updated.is_blocked).toBe(false)
     expect(updated.blocked_comment).toBeNull()
   })
+
+  test('reparents task under a new parent', () => {
+    const a = createTask('A')
+    const b = createTask('B')
+    const updated = h.invoke('db:tasks:update', { id: a.id, parentId: b.id }) as Task
+    expect(updated.parent_id).toBe(b.id)
+  })
+
+  test('detaches task when parentId is null', () => {
+    const parent = createTask('ParentDetach')
+    const child = createTask('ChildDetach', { parentId: parent.id })
+    const detached = h.invoke('db:tasks:update', { id: child.id, parentId: null }) as Task
+    expect(detached.parent_id).toBeNull()
+  })
+
+  test('rejects self-parent', () => {
+    const t = createTask('SelfLoop')
+    let threw = false
+    try { h.invoke('db:tasks:update', { id: t.id, parentId: t.id }) }
+    catch (e) { threw = true; expect((e as Error).message).toContain('Cannot make task its own parent') }
+    expect(threw).toBe(true)
+  })
+
+  test('rejects cycle', () => {
+    // a -> b -> c chain, then try to reparent a under c (would cycle through a)
+    const a = createTask('CycleA')
+    const b = createTask('CycleB', { parentId: a.id })
+    const c = createTask('CycleC', { parentId: b.id })
+    let threw = false
+    try { h.invoke('db:tasks:update', { id: a.id, parentId: c.id }) }
+    catch (e) { threw = true; expect((e as Error).message).toContain('cycle') }
+    expect(threw).toBe(true)
+  })
+
+  test('rejects cross-project reparent', () => {
+    const otherProjectId = crypto.randomUUID()
+    h.db.prepare('INSERT INTO projects (id, name, color, path) VALUES (?, ?, ?, ?)').run(otherProjectId, 'OtherProj', '#f00', '/tmp/other')
+    const local = createTask('Local')
+    const foreign = h.invoke('db:tasks:create', { projectId: otherProjectId, title: 'Foreign' }) as Task
+    let threw = false
+    try { h.invoke('db:tasks:update', { id: local.id, parentId: foreign.id }) }
+    catch (e) { threw = true; expect((e as Error).message).toContain('different project') }
+    expect(threw).toBe(true)
+  })
+
+  test('rejects archived parent', () => {
+    const parent = createTask('ArchivedParent')
+    h.invoke('db:tasks:archive', parent.id)
+    const child = createTask('OrphanChild')
+    let threw = false
+    try { h.invoke('db:tasks:update', { id: child.id, parentId: parent.id }) }
+    catch (e) { threw = true; expect((e as Error).message).toContain('archived') }
+    expect(threw).toBe(true)
+  })
+
+  test('allows depth >1 (grandchild)', () => {
+    const g = createTask('Grand')
+    const p = createTask('ParentMid', { parentId: g.id })
+    const c = createTask('ChildLeaf')
+    const updated = h.invoke('db:tasks:update', { id: c.id, parentId: p.id }) as Task
+    expect(updated.parent_id).toBe(p.id)
+  })
 })
 
 // --- Archive ---
@@ -621,7 +683,7 @@ describe('db:taskDependencies', () => {
 
 // --- onMutation callback ---
 
-describe('onMutation callback', () => {
+describe('onMutation callback', async () => {
   let callCount = 0
   const onMutation = (): void => { callCount++ }
   const h2 = await createTestHarness()

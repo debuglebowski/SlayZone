@@ -112,9 +112,10 @@ function createMcpServer(db: Database): McpServer {
       priority: z.number().min(1).max(5).optional().describe('Priority 1-5 (1=highest)'),
       assignee: z.string().nullable().optional().describe('Assignee name (null to clear)'),
       due_date: z.string().nullable().optional().describe('Due date ISO string (null to clear)'),
+      parent_id: z.string().nullable().optional().describe('Reparent task. String = new parent id (must be in same project, no cycles, not archived). null = detach to root.'),
       close: z.boolean().optional().describe('Close the task tab in the UI')
     },
-    async ({ task_id, due_date, close, ...fields }) => {
+    async ({ task_id, due_date, parent_id, close, ...fields }) => {
       if (fields.status !== undefined) {
         const taskRow = db.prepare('SELECT project_id FROM tasks WHERE id = ?').get(task_id) as
           | { project_id: string }
@@ -136,7 +137,12 @@ function createMcpServer(db: Database): McpServer {
         }
       }
 
-      const updated = updateTask(db, { id: task_id, ...fields, dueDate: due_date })
+      let updated
+      try {
+        updated = updateTask(db, { id: task_id, ...fields, dueDate: due_date, parentId: parent_id })
+      } catch (err) {
+        return { content: [{ type: 'text' as const, text: (err as Error).message }], isError: true }
+      }
       if (!updated) {
         return { content: [{ type: 'text' as const, text: `Task ${task_id} not found` }], isError: true }
       }

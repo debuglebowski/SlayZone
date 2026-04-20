@@ -2,7 +2,7 @@ import type { IpcMain } from 'electron'
 import { app, dialog, BrowserWindow, shell } from 'electron'
 import type { Database } from 'better-sqlite3'
 import type { CreateTaskInput, UpdateTaskInput, Task, ProviderConfig, CreateAssetInput, UpdateAssetInput, TaskAsset, RenderMode, AssetFolder, CreateAssetFolderInput, UpdateAssetFolderInput } from '@slayzone/task/shared'
-import { getExtensionFromTitle, getEffectiveRenderMode, canExportAsPdf, canExportAsPng, canExportAsHtml } from '@slayzone/task/shared'
+import { getExtensionFromTitle, getEffectiveRenderMode, canExportAsPdf, canExportAsPng, canExportAsHtml, validateReparent, reparentErrorMessage, type ReparentTaskRow } from '@slayzone/task/shared'
 import type { ColumnConfig } from '@slayzone/projects/shared'
 import { getDefaultStatus, isKnownStatus, isTerminalStatus, parseColumnsConfig } from '@slayzone/projects/shared'
 import { parseProject } from '@slayzone/projects/main'
@@ -376,6 +376,19 @@ export function updateTask(db: Database, data: UpdateTaskInput): Task | null {
       if (data.worktreeParentBranch === undefined) { fields.push('worktree_parent_branch = ?'); values.push(null) }
       if (data.baseDir === undefined) { fields.push('base_dir = ?'); values.push(null) }
     }
+  }
+  if (data.parentId !== undefined) {
+    const lookupStmt = db.prepare('SELECT id, project_id, parent_id, archived_at, deleted_at FROM tasks WHERE id = ?')
+    const result = validateReparent({
+      taskId: data.id,
+      parentId: data.parentId,
+      targetProjectId,
+      lookup: (id) => (lookupStmt.get(id) as ReparentTaskRow | undefined) ?? null,
+    })
+    if (!result.ok) {
+      throw new Error(reparentErrorMessage(result.error, { taskId: data.id, parentId: data.parentId }))
+    }
+    fields.push('parent_id = ?'); values.push(data.parentId)
   }
   if (data.terminalMode !== undefined) { fields.push('terminal_mode = ?'); values.push(data.terminalMode) }
   if (data.terminalShell !== undefined) { fields.push('terminal_shell = ?'); values.push(data.terminalShell) }
