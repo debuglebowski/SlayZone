@@ -10,6 +10,13 @@ import { WebglAddon } from '@xterm/addon-webgl'
 import '@xterm/xterm/css/xterm.css'
 import { PulseGrid } from './TerminalLoadingAnimations'
 
+// Strip trailing whitespace from each line of selection text.
+// xterm's getTrimmedLength treats rendered spaces (e.g. from padded UI like
+// lazygit, fzf, tables) as real content, so copies include them. Pasting
+// that into a narrower terminal wraps → phantom line breaks.
+const trimSelectionTrailingSpaces = (s: string): string =>
+  s.split('\n').map(l => l.replace(/[ \t]+$/, '')).join('\n')
+
 // Override xterm underline styles - Claude Code outputs these and they persist incorrectly
 // This is a definitive fix that works regardless of ANSI code filtering
 const underlineOverride = document.createElement('style')
@@ -225,7 +232,7 @@ export const Terminal = forwardRef<TerminalHandle, TerminalProps>(function Termi
   useImperativeHandle(ref, () => ({
     focus: () => terminalRef.current?.focus(),
     hasSelection: () => terminalRef.current?.hasSelection() ?? false,
-    getSelection: () => terminalRef.current?.getSelection() ?? '',
+    getSelection: () => trimSelectionTrailingSpaces(terminalRef.current?.getSelection() ?? ''),
     selectAll: () => terminalRef.current?.selectAll(),
     scrollToBottom: () => terminalRef.current?.scrollToBottom(),
     openSearch: () => { setSearchOpen(true); setSearchFocusToken(t => t + 1) },
@@ -938,7 +945,7 @@ export const Terminal = forwardRef<TerminalHandle, TerminalProps>(function Termi
         e.preventDefault()
         e.stopPropagation()
         const sel = terminalRef.current?.getSelection()
-        if (sel) void navigator.clipboard.writeText(sel)
+        if (sel) void navigator.clipboard.writeText(trimSelectionTrailingSpaces(sel))
       }
 
       if (e.code === 'KeyV') {
@@ -953,6 +960,26 @@ export const Terminal = forwardRef<TerminalHandle, TerminalProps>(function Termi
     container.addEventListener('keydown', handleCopyPaste, true)
     return () => container.removeEventListener('keydown', handleCopyPaste, true)
   }, [sessionId])
+
+  // Intercept Cmd+C / right-click Copy (xterm's native path writes raw
+  // selection text, which includes trailing spaces from rendered padding).
+  // Override clipboard payload with right-trimmed lines.
+  useEffect(() => {
+    const container = containerRef.current
+    if (!container) return
+
+    const onCopy = (e: ClipboardEvent): void => {
+      const sel = terminalRef.current?.getSelection()
+      if (!sel) return
+      const cleaned = trimSelectionTrailingSpaces(sel)
+      if (cleaned === sel) return
+      e.clipboardData?.setData('text/plain', cleaned)
+      e.preventDefault()
+    }
+
+    container.addEventListener('copy', onCopy, true)
+    return () => container.removeEventListener('copy', onCopy, true)
+  }, [])
 
   // Handle paste and drag-drop for files/images
   useEffect(() => {
