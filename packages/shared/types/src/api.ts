@@ -486,6 +486,7 @@ export interface ElectronAPI {
     dismissAllNotifications: () => Promise<void>
     onData: (callback: (sessionId: string, data: string, seq: number) => void) => () => void
     onExit: (callback: (sessionId: string, exitCode: number) => void) => () => void
+    onRespawnSuggested: (callback: (taskId: string) => void) => () => void
     onSessionNotFound: (callback: (sessionId: string) => void) => () => void
     onAttention: (callback: (sessionId: string) => void) => () => void
     onStateChange: (

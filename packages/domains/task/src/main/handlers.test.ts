@@ -3,7 +3,7 @@
  * Run with: npx tsx packages/domains/task/src/main/handlers.test.ts
  */
 import { createTestHarness, test, expect, describe } from '../../../../shared/test-utils/ipc-harness.js'
-import { registerTaskHandlers, updateTask } from './handlers.js'
+import { registerTaskHandlers, updateTask, configureTaskRuntimeAdapters } from './handlers.js'
 import type { Task, ProviderConfig } from '../shared/types.js'
 
 const h = await createTestHarness()
@@ -760,6 +760,71 @@ describe('onMutation callback', async () => {
   })
 
   h2.cleanup()
+})
+
+// --- Revive flow (GitHub issue #77) ---
+// These tests call updateTask() directly (bypassing the async ipcMain handler
+// wrapper) so they remain independent of the create-via-handler path.
+
+describe('updateTask — revive flow (terminal → non-terminal)', () => {
+  const killCalls: string[] = []
+  const respawnCalls: string[] = []
+  configureTaskRuntimeAdapters({
+    killPtysByTaskId: (id) => killCalls.push(id),
+    killTaskProcesses: () => {},
+    recordDiagnosticEvent: () => {},
+    requestPtyRespawn: (id) => respawnCalls.push(id)
+  })
+
+  const reviveProjectId = crypto.randomUUID()
+  h.db.prepare('INSERT INTO projects (id, name, color, path) VALUES (?, ?, ?, ?)')
+    .run(reviveProjectId, 'ReviveProject', '#abc', '/tmp/revive')
+
+  function seedTask(status: string): string {
+    const id = crypto.randomUUID()
+    h.db.prepare(
+      'INSERT INTO tasks (id, project_id, title, status, priority, terminal_mode, provider_config) VALUES (?, ?, ?, ?, 3, ?, ?)'
+    ).run(id, reviveProjectId, `task-${status}`, status, 'claude-code', '{}')
+    return id
+  }
+
+  test('status done → in_progress invokes requestPtyRespawn once', () => {
+    killCalls.length = 0
+    respawnCalls.length = 0
+    const id = seedTask('in_progress')
+    updateTask(h.db, { id, status: 'done' })
+    expect(killCalls.length).toBe(1)
+    expect(killCalls[0]).toBe(id)
+    expect(respawnCalls.length).toBe(0)
+    updateTask(h.db, { id, status: 'in_progress' })
+    expect(respawnCalls.length).toBe(1)
+    expect(respawnCalls[0]).toBe(id)
+  })
+
+  test('status todo → in_progress (non-terminal → non-terminal) does NOT respawn', () => {
+    killCalls.length = 0
+    respawnCalls.length = 0
+    const id = seedTask('todo')
+    updateTask(h.db, { id, status: 'in_progress' })
+    expect(respawnCalls.length).toBe(0)
+  })
+
+  test('status inbox → done (non-terminal → terminal) kills but does NOT respawn', () => {
+    killCalls.length = 0
+    respawnCalls.length = 0
+    const id = seedTask('inbox')
+    updateTask(h.db, { id, status: 'done' })
+    expect(killCalls.length).toBe(1)
+    expect(respawnCalls.length).toBe(0)
+  })
+
+  test('status done → done (same terminal) does NOT respawn', () => {
+    killCalls.length = 0
+    respawnCalls.length = 0
+    const id = seedTask('done')
+    updateTask(h.db, { id, status: 'done' })
+    expect(respawnCalls.length).toBe(0)
+  })
 })
 
 h.cleanup()

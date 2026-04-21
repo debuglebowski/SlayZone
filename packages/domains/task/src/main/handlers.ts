@@ -56,12 +56,16 @@ interface TaskRuntimeAdapters {
   killPtysByTaskId: (taskId: string) => void
   killTaskProcesses: (taskId: string) => void
   recordDiagnosticEvent: (event: DiagnosticEventPayload) => void
+  /** Broadcast a respawn request to the renderer when a task transitions from a
+   *  terminal status back to a non-terminal one. Renderer decides whether to act. */
+  requestPtyRespawn: (taskId: string) => void
 }
 
 const defaultRuntimeAdapters: TaskRuntimeAdapters = {
   killPtysByTaskId: () => {},
   killTaskProcesses: () => {},
-  recordDiagnosticEvent: () => {}
+  recordDiagnosticEvent: () => {},
+  requestPtyRespawn: () => {}
 }
 
 let runtimeAdapters: TaskRuntimeAdapters = defaultRuntimeAdapters
@@ -504,12 +508,25 @@ export function updateTask(db: Database, data: UpdateTaskInput): Task | null {
 
   const effectiveStatus = normalizedStatusForWrite
   const reachedTerminal = effectiveStatus !== undefined && isTerminalStatus(effectiveStatus, targetColumns)
+  // `previouslyTerminal` uses the PRE-write status. Compute before project-change
+  // logic may invalidate the old status's known-ness. Use same column config (pre-change)
+  // only when project didn't change; otherwise semantics are ambiguous and we skip respawn.
+  const previouslyTerminal = !projectChanged && existing?.status
+    ? isTerminalStatus(existing.status, targetColumns)
+    : false
+  const revived = effectiveStatus !== undefined && !reachedTerminal && previouslyTerminal
   if (reachedTerminal || projectChanged) {
     runtimeAdapters.killPtysByTaskId(data.id)
   }
   // Clear snooze when task reaches terminal status
   if (reachedTerminal && !fields.some((f) => f.startsWith('snoozed_until'))) {
     db.prepare('UPDATE tasks SET snoozed_until = NULL WHERE id = ? AND snoozed_until IS NOT NULL').run(data.id)
+  }
+  // Revive path: task moved from a terminal status (e.g. `done`) back to an active
+  // one (e.g. `in_progress`). Signal the renderer to respawn the main AI tab so
+  // the user can continue typing without manual Retry. See GitHub issue #77.
+  if (revived) {
+    runtimeAdapters.requestPtyRespawn(data.id)
   }
 
   const row = db.prepare('SELECT * FROM tasks WHERE id = ?').get(data.id) as Record<string, unknown> | undefined

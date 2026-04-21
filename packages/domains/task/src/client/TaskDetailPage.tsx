@@ -10,7 +10,7 @@ import { CSS } from '@dnd-kit/utilities'
 import type { Task, PanelVisibility, UpdateTaskInput } from '@slayzone/task/shared'
 import type { TaskTemplate } from '@slayzone/task/shared'
 import type { TaskDetailData } from './taskDetailCache'
-import { BUILTIN_PANEL_IDS, getProviderConversationId, getProviderFlags, setProviderConversationId, setProviderFlags, clearAllConversationIds, priorityOptions } from '@slayzone/task/shared'
+import { BUILTIN_PANEL_IDS, getProviderConversationId, getProviderFlags, setProviderConversationId, setProviderFlags, clearAllConversationIds, getProviderLastKilledAt, COLD_RESPAWN_MS, priorityOptions } from '@slayzone/task/shared'
 import type { BrowserTabsState } from '@slayzone/task-browser/shared'
 import type { Tag } from '@slayzone/tags/shared'
 import type { Project } from '@slayzone/projects/shared'
@@ -725,6 +725,36 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
     markSkipCache(mainSessionId)
     setTerminalKey((k) => k + 1)
   }, [task, resetTaskState, onTaskUpdated, getMainSessionId])
+
+  // Revive: when main broadcasts pty:respawn-suggested for this task (after a
+  // terminal → non-terminal status transition), remount the terminal so the user
+  // can keep typing without clicking Retry. See GitHub issue #77.
+  // Plain shell mode is skipped — no conversation model, respawning a shell would
+  // surprise the user. Hot bounces resume the existing conversation; cold (>30 min)
+  // bounces start a fresh one.
+  useEffect(() => {
+    if (!task) return
+    const unsubscribe = window.api.pty.onRespawnSuggested(async (taskId) => {
+      if (taskId !== task.id) return
+      if (task.terminal_mode === 'terminal') return
+      const sid = getMainSessionId(task.id)
+      // Idempotent: if a PTY is already alive, another listener (or the user) beat
+      // us to it — skip to avoid a double-spawn.
+      try {
+        if (await window.api.pty.exists(sid)) return
+      } catch {
+        return
+      }
+      const killedAt = getProviderLastKilledAt(task.provider_config, task.terminal_mode)
+      const isCold = killedAt == null || (Date.now() - killedAt) > COLD_RESPAWN_MS
+      if (isCold) {
+        await handleResetTerminal()
+      } else {
+        await handleRestartTerminal()
+      }
+    })
+    return unsubscribe
+  }, [task, getMainSessionId, handleRestartTerminal, handleResetTerminal])
 
   // Doctor: validate CLI binary and dependencies
   const handleDoctor = useCallback(async () => {

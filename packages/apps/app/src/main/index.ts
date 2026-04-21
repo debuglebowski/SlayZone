@@ -99,7 +99,8 @@ import { BlobStore, betterSqliteTxn, seedInitialVersions } from '@slayzone/task-
 import { getExtensionFromTitle } from '@slayzone/task/shared'
 import { registerTagHandlers } from '@slayzone/tags/main'
 import { registerSettingsHandlers, registerThemeHandlers } from '@slayzone/settings/main'
-import { registerPtyHandlers, registerUsageHandlers, killAllPtys, killPtysByTaskId, startIdleChecker, stopIdleChecker, dismissAllNotifications, syncTerminalModes, getPtyPids, onSessionChange, onGlobalStateChange, registerChatHandlers, shutdownChatTransports } from '@slayzone/terminal/main'
+import { registerPtyHandlers, registerUsageHandlers, killAllPtys, killPtysByTaskId, startIdleChecker, stopIdleChecker, dismissAllNotifications, syncTerminalModes, getPtyPids, onSessionChange, onGlobalStateChange, registerChatHandlers, shutdownChatTransports, setOnHostKillHandler, broadcastRespawnRequest } from '@slayzone/terminal/main'
+import { setProviderLastKilledAt, type ProviderConfig } from '@slayzone/task/shared'
 import { attachFloatingAgent, setupFloatingAgent } from './floating-agent'
 import { registerTerminalTabsHandlers } from '@slayzone/task-terminals/main'
 import { registerWorktreeHandlers } from '@slayzone/worktrees/main'
@@ -1023,8 +1024,31 @@ app.whenReady().then(async () => {
     killPtysByTaskId,
     killTaskProcesses,
     recordDiagnosticEvent,
+    requestPtyRespawn: broadcastRespawnRequest,
   })
   logBoot('task runtime adapters configured')
+
+  // Persist the host-kill timestamp into provider_config so the revive flow can
+  // choose between resume (hot) and fresh conversation (cold) — see COLD_RESPAWN_MS.
+  setOnHostKillHandler((taskId, mode) => {
+    try {
+      const row = db.prepare('SELECT provider_config FROM tasks WHERE id = ?').get(taskId) as
+        | { provider_config: string | null }
+        | undefined
+      if (!row) return
+      const cfg: ProviderConfig = row.provider_config ? JSON.parse(row.provider_config) : {}
+      const next = setProviderLastKilledAt(cfg, mode, Date.now())
+      db.prepare('UPDATE tasks SET provider_config = ? WHERE id = ?').run(JSON.stringify(next), taskId)
+    } catch (err) {
+      recordDiagnosticEvent({
+        level: 'warn',
+        source: 'pty',
+        event: 'pty.host_kill_persist_failed',
+        taskId,
+        message: (err as Error).message
+      })
+    }
+  })
 
   // Register domain handlers (inject ipcMain and db)
   const notifyTasksChanged = (): void => { mainWindow?.webContents.send('tasks:changed') }

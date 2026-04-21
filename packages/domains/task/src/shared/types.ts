@@ -18,7 +18,14 @@ export interface MergeContext {
 
 /** Per-provider config stored as JSON in the provider_config column. Key = TerminalMode value. */
 export interface ProviderConfig {
-  [mode: string]: { conversationId?: string | null; flags?: string }
+  [mode: string]: {
+    conversationId?: string | null
+    flags?: string
+    // Unix-ms timestamp of the last host-initiated PTY kill (e.g. task moved to a
+    // terminal status). Used by the revive path to decide whether to resume the
+    // prior conversation (hot) or start a fresh one (cold — see COLD_RESPAWN_MS).
+    lastPtyKilledAt?: number | null
+  }
 }
 
 export function getProviderConversationId(cfg: ProviderConfig | undefined | null, mode: string): string | null {
@@ -29,6 +36,10 @@ export function getProviderFlags(cfg: ProviderConfig | undefined | null, mode: s
   return cfg?.[mode]?.flags ?? ''
 }
 
+export function getProviderLastKilledAt(cfg: ProviderConfig | undefined | null, mode: string): number | null {
+  return cfg?.[mode]?.lastPtyKilledAt ?? null
+}
+
 export function setProviderConversationId(cfg: ProviderConfig | undefined | null, mode: string, val: string | null): ProviderConfig {
   return { ...cfg, [mode]: { ...cfg?.[mode], conversationId: val } }
 }
@@ -36,6 +47,15 @@ export function setProviderConversationId(cfg: ProviderConfig | undefined | null
 export function setProviderFlags(cfg: ProviderConfig | undefined | null, mode: string, val: string): ProviderConfig {
   return { ...cfg, [mode]: { ...cfg?.[mode], flags: val } }
 }
+
+export function setProviderLastKilledAt(cfg: ProviderConfig | undefined | null, mode: string, val: number | null): ProviderConfig {
+  return { ...cfg, [mode]: { ...cfg?.[mode], lastPtyKilledAt: val } }
+}
+
+/** Threshold past which a revive should start a fresh AI conversation rather than
+ *  resume the previous one. Keeps hot-bounces seamless while avoiding stale context
+ *  days later. */
+export const COLD_RESPAWN_MS = 30 * 60 * 1000
 
 /** Returns a partial ProviderConfig that sets conversationId=null for all modes in cfg.
  *  Does NOT include flags — the handler deep-merges, so existing flags survive. */

@@ -344,6 +344,11 @@ const api: ElectronAPI = {
       ipcRenderer.on('pty:exit', handler)
       return () => ipcRenderer.removeListener('pty:exit', handler)
     },
+    onRespawnSuggested: (callback: (taskId: string) => void) => {
+      const handler = (_event: unknown, taskId: string) => callback(taskId)
+      ipcRenderer.on('pty:respawn-suggested', handler)
+      return () => ipcRenderer.removeListener('pty:respawn-suggested', handler)
+    },
     onSessionNotFound: (callback: (sessionId: string) => void) => {
       const handler = (_event: unknown, sessionId: string) => callback(sessionId)
       ipcRenderer.on('pty:session-not-found', handler)

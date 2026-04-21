@@ -119,6 +119,10 @@ interface PtySession {
   lastEmittedTitle: string
   // Polls pty.process on interval — decoupled from data flow so idle shells update too
   titlePollInterval?: NodeJS.Timeout
+  // Closure-scoped finalizer registered by createPty. Allows external callers
+  // (e.g. killPty) to route through the same exit path as natural exits so the
+  // renderer reliably receives pty:exit + pty:state-change → 'dead'.
+  finalizer?: (exitCode: number) => void
 }
 
 export type { PtyInfo }
@@ -181,11 +185,29 @@ const SESSION_ID_WATCH_TIMEOUT_MS = 5000
 // Delay after first PTY output before auto-sending session detection command
 const SESSION_ID_AUTO_DETECT_DELAY_MS = 3000
 
+// Exit code used when a PTY is killed programmatically by the app (e.g. task reached
+// terminal status). Distinct from -1 (unknown) so diagnostics and renderer logic
+// can distinguish intentional host kills from crashes.
+export const PTY_EXIT_KILLED_BY_HOST = -2
+
+// Watchdog delay — if SIGKILL doesn't result in onExit firing within this window,
+// the finalizer is invoked explicitly so the renderer never observes a zombie session.
+const KILL_FINALIZE_WATCHDOG_MS = 500
+
 // Reference to main window for sending idle events
 let mainWindow: BrowserWindow | null = null
 
 // Interval reference for idle checker
 let idleCheckerInterval: NodeJS.Timeout | null = null
+
+// Host-level callback invoked when finalizeSessionExit runs with the host-kill
+// sentinel exit code. Lets the app persist the kill timestamp into the DB so the
+// revive flow can decide between resuming and starting a fresh AI conversation.
+let onHostKillHandler: ((taskId: string, mode: TerminalMode) => void) | null = null
+
+export function setOnHostKillHandler(handler: ((taskId: string, mode: TerminalMode) => void) | null): void {
+  onHostKillHandler = handler
+}
 
 function taskIdFromSessionId(sessionId: string): string {
   return sessionId.split(':')[0] || sessionId
@@ -772,11 +794,29 @@ export async function createPty(opts: CreatePtyOptions): Promise<{ success: bool
           exitCode
         }
       })
+      // Host-initiated kill (e.g. task moved to terminal status). Let the app
+      // persist the timestamp so the revive flow can pick between resume and
+      // fresh conversation based on how long the task sat in the terminal column.
+      if (exitCode === PTY_EXIT_KILLED_BY_HOST && onHostKillHandler && exitSession) {
+        try {
+          onHostKillHandler(exitSession.taskId, exitSession.mode)
+        } catch (err) {
+          recordDiagnosticEvent({
+            level: 'warn',
+            source: 'pty',
+            event: 'pty.host_kill_handler_error',
+            sessionId,
+            taskId: exitSession.taskId,
+            message: (err as Error).message
+          })
+        }
+      }
       // Delay session cleanup so any trailing onData events (buffered in the PTY fd)
       // can still be processed and forwarded to the renderer before we drop the session.
       setTimeout(() => {
         dataListeners.delete(sessionId)
         sessions.delete(sessionId)
+        stateMachine.unregister(sessionId)
         notifySessionChange()
       }, 100)
       const exitWin = getWin()
@@ -791,6 +831,11 @@ export async function createPty(opts: CreatePtyOptions): Promise<{ success: bool
         }
       }
     }
+
+    // Expose the finalizer on the session so external callers (killPty) can
+    // route through the same single exit path as natural exits.
+    const registeredSession = sessions.get(sessionId)
+    if (registeredSession) registeredSession.finalizer = finalizeSessionExit
 
     const armStartupTimeout = (target: pty.IPty): void => {
       clearStartupTimeout()
@@ -1402,22 +1447,29 @@ export function killPty(sessionId: string): boolean {
   if (session.sessionIdAutoDetectTimer) {
     clearTimeout(session.sessionIdAutoDetectTimer)
   }
-  stopTitlePolling(session)
-  // Clear state debounce timer
-  stateMachine.unregister(sessionId)
-  // Dismiss any lingering desktop notification
-  dismissNotification(sessionId)
-  // Delete from map FIRST so onData handlers exit early during kill
-  dataListeners.delete(sessionId)
-  sessions.delete(sessionId)
-  notifySessionChange()
-  // Use SIGKILL (9) to forcefully terminate - SIGTERM may not kill child processes
-  // Wrap in try/catch: on Windows, killing an already-dead process throws
+  // Note: we intentionally do NOT eagerly delete from sessions/dataListeners
+  // here. Doing so causes the node-pty onExit handler's guard
+  // (`if (!session || session.pty !== target) return`) to fire, which would
+  // skip finalizeSessionExit and prevent pty:exit / pty:state-change('dead')
+  // from reaching the renderer (GitHub issue #77). Instead, SIGKILL first and
+  // let the natural onExit path run through finalizeSessionExit; the 100 ms
+  // trailing cleanup inside finalizeSessionExit handles map deletion.
+  const finalizer = session.finalizer
   try {
     session.pty.kill('SIGKILL')
   } catch {
-    // Process already exited — not an error
+    // Process already exited (e.g. Windows). onExit may not fire — finalize
+    // explicitly so the renderer is still notified.
+    finalizer?.(PTY_EXIT_KILLED_BY_HOST)
+    return true
   }
+  // Watchdog: if onExit doesn't deliver within KILL_FINALIZE_WATCHDOG_MS,
+  // invoke the finalizer directly. `finalized` flag makes double-invocation safe.
+  setTimeout(() => {
+    if (sessions.get(sessionId) === session) {
+      finalizer?.(PTY_EXIT_KILLED_BY_HOST)
+    }
+  }, KILL_FINALIZE_WATCHDOG_MS)
   return true
 }
 
@@ -1491,6 +1543,25 @@ export function killAllPtys(): void {
   for (const [taskId] of sessions) {
     killPty(taskId)
   }
+}
+
+/** Broadcast a respawn request for a task to the renderer. The renderer decides
+ *  whether any mounted TaskDetailPage should act (e.g. main tab PTY no longer
+ *  exists and AI mode is configured). Matches the pty:exit IPC dispatch pattern. */
+export function broadcastRespawnRequest(taskId: string): void {
+  if (!mainWindow || mainWindow.isDestroyed()) return
+  try {
+    mainWindow.webContents.send('pty:respawn-suggested', taskId)
+  } catch {
+    // window destroyed — ignore
+  }
+  recordDiagnosticEvent({
+    level: 'info',
+    source: 'pty',
+    event: 'pty.respawn_suggested',
+    sessionId: taskId,
+    taskId
+  })
 }
 
 export function killPtysByTaskId(taskId: string): void {
