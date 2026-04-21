@@ -5,10 +5,13 @@ import type { AgentEvent } from '../shared/agent-events'
 import type { AgentAdapter } from './agents/types'
 import { getAdapter } from './agents/registry'
 import { whichBinary as realWhichBinary } from './shell-env'
+import type { BufferedEvent } from './chat-events-store'
+
+export type { BufferedEvent } from './chat-events-store'
 
 export type ChatTerminalState = 'starting' | 'running' | 'attention' | 'idle' | 'error' | 'dead'
 
-/** Dependency-injection seam for tests. */
+/** Dependency-injection seam for tests AND for production wiring (event persistence). */
 export interface TransportDeps {
   spawn: (cmd: string, args: string[], opts: SpawnOptions) => ChildProcess
   whichBinary: (name: string) => Promise<string | null>
@@ -16,6 +19,12 @@ export interface TransportDeps {
   broadcastExit: (tabId: string, code: number | null, signal: string | null) => void
   /** Broadcast state transitions on `pty:state-change` so the existing UI reflects chat activity. */
   broadcastStateChange: (sessionId: string, newState: ChatTerminalState, oldState: ChatTerminalState) => void
+  /**
+   * Called for every event appended to a session's buffer. Default no-op.
+   * chat-handlers wires this to persist events to SQLite so chat history
+   * survives full Electron app reload.
+   */
+  persistEvent: (tabId: string, seq: number, event: AgentEvent) => void
 }
 
 /**
@@ -50,12 +59,20 @@ const defaultDeps: TransportDeps = {
   broadcastStateChange: (sessionId, newState, oldState) => {
     electronBroadcast('pty:state-change')(sessionId, newState, oldState)
   },
+  persistEvent: () => {
+    // No-op default: persistence is wired in main via configureTransport().
+  },
 }
 
 let deps: TransportDeps = defaultDeps
 
 export function setTransportDepsForTests(override: Partial<TransportDeps>): void {
   deps = { ...defaultDeps, ...override }
+}
+
+/** Production-side dep injection (e.g. wire persistEvent to SQLite at startup). */
+export function configureTransport(override: Partial<TransportDeps>): void {
+  deps = { ...deps, ...override }
 }
 
 export function resetTransportDeps(): void {
@@ -70,11 +87,6 @@ export interface ChatSessionInfo {
   pid: number | null
   startedAt: string
   ended: boolean
-}
-
-interface BufferedEvent {
-  seq: number
-  event: AgentEvent
 }
 
 interface Session {
@@ -113,6 +125,12 @@ function appendToBuffer(session: Session, event: AgentEvent): number {
   session.buffer.push({ seq, event })
   if (session.buffer.length > MAX_BUFFER_EVENTS) {
     session.buffer.splice(0, session.buffer.length - MAX_BUFFER_EVENTS)
+  }
+  // Mirror to persistence layer (no-op if unconfigured).
+  try {
+    deps.persistEvent(session.tabId, seq, event)
+  } catch (err) {
+    console.error('[chat-transport] persistEvent failed:', err)
   }
   return seq
 }
@@ -196,6 +214,12 @@ async function respawnFresh(session: Session): Promise<void> {
   } catch {
     /* ignore */
   }
+  // Snapshot before delete: respawn carries forward in-memory buffer + seq so
+  // restored history (and the user's last message that triggered the failed
+  // resume) survives the fresh spawn. nextSeq stays monotonic so newly-emitted
+  // events keep collision-free PRIMARY KEY (tab_id, seq) in chat_events.
+  const carriedBuffer = [...session.buffer]
+  const carriedNextSeq = session.nextSeq
   // Remove before recreate so createChat treats tabId as fresh.
   sessions.delete(session.tabId)
   const nextOpts: CreateChatOpts = {
@@ -203,6 +227,8 @@ async function respawnFresh(session: Session): Promise<void> {
     conversationId: null,
     // Don't loop: disable retry on the second attempt.
     autoRetryOnInvalidResume: false,
+    initialBuffer: carriedBuffer,
+    initialNextSeq: carriedNextSeq,
   }
   try {
     await createChat(nextOpts)
@@ -244,6 +270,18 @@ export interface CreateChatOpts {
    * Default true. Renderer sees one brief exit, then a fresh turn-init for the same tab.
    */
   autoRetryOnInvalidResume?: boolean
+  /**
+   * Persisted history for this tab (loaded from chat_events SQLite table by chat-handlers).
+   * When supplied, the new in-memory session.buffer is seeded with these events so
+   * `getEventBufferSince(tabId, -1)` replays the full restored history immediately —
+   * no waiting for the agent process to re-emit anything.
+   */
+  initialBuffer?: BufferedEvent[]
+  /**
+   * Starting seq for the new in-memory session. Should be MAX(seq)+1 over persisted
+   * rows for this tab so newly-appended events don't collide with restored ones.
+   */
+  initialNextSeq?: number
 }
 
 export async function createChat(opts: CreateChatOpts): Promise<ChatSessionInfo> {
@@ -280,6 +318,15 @@ export async function createChat(opts: CreateChatOpts): Promise<ChatSessionInfo>
     shell: false,
   })
 
+  // Seed buffer/seq from persisted history when chat-handlers passed it in.
+  // Cap seeded buffer at MAX_BUFFER_EVENTS to mirror the in-memory invariant.
+  const seededBuffer: BufferedEvent[] = opts.initialBuffer
+    ? opts.initialBuffer.slice(-MAX_BUFFER_EVENTS)
+    : []
+  const seededNextSeq =
+    opts.initialNextSeq ??
+    (seededBuffer.length > 0 ? seededBuffer[seededBuffer.length - 1].seq + 1 : 0)
+
   const session: Session = {
     sessionId,
     tabId: opts.tabId,
@@ -288,8 +335,8 @@ export async function createChat(opts: CreateChatOpts): Promise<ChatSessionInfo>
     cwd: opts.cwd,
     adapter,
     child,
-    buffer: [],
-    nextSeq: 0,
+    buffer: seededBuffer,
+    nextSeq: seededNextSeq,
     ended: false,
     startedAt: new Date().toISOString(),
     terminalState: 'starting',

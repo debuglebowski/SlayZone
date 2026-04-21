@@ -9,8 +9,15 @@ import {
   getEventBufferSince,
   getSessionInfo,
   killAll,
+  configureTransport,
   type ChatSessionInfo,
 } from './chat-transport-manager'
+import {
+  persistChatEvent,
+  loadChatEvents,
+  getNextSeqForTab,
+  clearChatEventsForTab,
+} from './chat-events-store'
 import { parseShellArgs } from './adapters/flag-parser'
 import { supportsChatMode } from './agents/registry'
 import { listSkills } from './skills'
@@ -126,6 +133,18 @@ export function inspectPermissionFlags(flags: string[]): {
 }
 
 export function registerChatHandlers(ipcMain: IpcMain, db: Database): void {
+  // Wire SQLite persistence into the transport. Default deps had a no-op
+  // persistEvent; configureTransport keeps spawn/whichBinary/broadcast* untouched.
+  configureTransport({
+    persistEvent: (tabId, seq, event) => {
+      try {
+        persistChatEvent(db, tabId, seq, event)
+      } catch (err) {
+        console.error('[chat-handlers] persistChatEvent failed:', err)
+      }
+    },
+  })
+
   ipcMain.handle('chat:supports', (_, mode: string): boolean => supportsChatMode(mode))
 
   ipcMain.handle('chat:create', async (_, opts: ChatCreateOpts): Promise<ChatSessionInfo> => {
@@ -137,6 +156,11 @@ export function registerChatHandlers(ipcMain: IpcMain, db: Database): void {
       ''
     const providerFlags = parseShellArgs(flagsString)
 
+    // Restore persisted history so chat panel re-fills immediately after app reload.
+    // Empty arrays for fresh tabs — no extra cost, single SELECT each.
+    const initialBuffer = loadChatEvents(db, opts.tabId)
+    const initialNextSeq = getNextSeqForTab(db, opts.tabId)
+
     const info = await createChat({
       tabId: opts.tabId,
       taskId: opts.taskId,
@@ -144,6 +168,8 @@ export function registerChatHandlers(ipcMain: IpcMain, db: Database): void {
       cwd: opts.cwd,
       conversationId: providerCfg.chatConversationId ?? null,
       providerFlags,
+      initialBuffer,
+      initialNextSeq,
       onPersistSessionId: (id) => {
         writeChatConversationId(db, opts.taskId, opts.mode, id)
       },
@@ -168,6 +194,14 @@ export function registerChatHandlers(ipcMain: IpcMain, db: Database): void {
 
   ipcMain.handle('chat:remove', (_, tabId: string): void => {
     removeSession(tabId)
+    // Tab is gone — drop persisted history. (FK ON DELETE CASCADE also clears
+    // it when the terminal_tabs row itself is deleted, but chat:remove can be
+    // invoked before the tab row is gone, so be explicit.)
+    try {
+      clearChatEventsForTab(db, tabId)
+    } catch (err) {
+      console.error('[chat-handlers] clearChatEventsForTab failed:', err)
+    }
   })
 
   ipcMain.handle('chat:getBufferSince', (_, tabId: string, afterSeq: number) => {
