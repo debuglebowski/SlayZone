@@ -1138,7 +1138,7 @@ function App(): React.JSX.Element {
             <div id="main-area" className="flex-1 min-w-0 min-h-0 rounded-lg bg-surface-0 flex overflow-hidden p-4">
             <div
               ref={explodeGridRef}
-              className={cn("flex-1 min-w-0 min-h-0 rounded-lg overflow-hidden", explodeMode ? "grid gap-1 p-1" : "relative")}
+              className={cn("flex-1 min-w-0 min-h-0 rounded-lg overflow-hidden relative", explodeMode ? "grid gap-1 p-1" : "")}
               style={{
                 ...(explodeMode ? (() => { const MIN_CELL_W = 480; const visibleTaskCount = visibleTabs.filter(t => t.type === 'task').length; const widthCols = explodeGridWidth > 0 ? Math.max(1, Math.floor(explodeGridWidth / MIN_CELL_W)) : Math.ceil(Math.sqrt(visibleTaskCount)); const cols = Math.max(1, Math.min(widthCols, visibleTaskCount)); const rows = Math.ceil(visibleTaskCount / cols); return { gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`, gridTemplateRows: `repeat(${rows}, minmax(0, 1fr))` } })() : undefined),
               }}
