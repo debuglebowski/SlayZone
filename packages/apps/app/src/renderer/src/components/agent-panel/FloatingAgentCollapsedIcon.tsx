@@ -10,6 +10,7 @@ const DOT_COLORS: Record<TerminalState, string> = {
   starting:  '#fbbf24',
   running:   '#fbbf24',
   attention: '#4ade80',
+  idle:      '#4ade80',
   error:     '#ef4444',
   dead:      '#666',
 }
