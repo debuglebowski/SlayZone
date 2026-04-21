@@ -1,6 +1,103 @@
 # Changelog
 
 
+## v0.21.0
+
+[compare changes](https://github.com/debuglebowski/slayzone/compare/v0.20.0...v0.21.0)
+
+### 🚀 Enhancements
+
+- **theme:** Reskin slay dark Ghostty-inspired with white text ([8796a0c1](https://github.com/debuglebowski/slayzone/commit/8796a0c1))
+- **cli:** Open asset in UI after create/upload ([9d24090d](https://github.com/debuglebowski/slayzone/commit/9d24090d))
+- **editor:** Auto-expand compacted folders to first branch point ([d7ed28e4](https://github.com/debuglebowski/slayzone/commit/d7ed28e4))
+- **git:** Add stash tab to unified git panel ([a5c7ef72](https://github.com/debuglebowski/slayzone/commit/a5c7ef72))
+- **projects:** Toast when locked project blocks new tabs ([39aef83f](https://github.com/debuglebowski/slayzone/commit/39aef83f))
+- **web-panels:** Migrate from webview to WebContentsView ([f3af76b5](https://github.com/debuglebowski/slayzone/commit/f3af76b5))
+- **processes:** Show server URL pill, move pills to bottom ([ecca533e](https://github.com/debuglebowski/slayzone/commit/ecca533e))
+- **zen-mode:** Add icon toggle, hide task header ([03cf1c33](https://github.com/debuglebowski/slayzone/commit/03cf1c33))
+- **processes:** URL pill opens in browser panel ([5cb9319e](https://github.com/debuglebowski/slayzone/commit/5cb9319e))
+- **website:** Add og-preview.jpg + build:og script ([c2b572b1](https://github.com/debuglebowski/slayzone/commit/c2b572b1))
+- **website:** Add Features + Comparison to nav ([92172873](https://github.com/debuglebowski/slayzone/commit/92172873))
+- **skills:** Add slay-orchestrate local skill ([5dc862ee](https://github.com/debuglebowski/slayzone/commit/5dc862ee))
+- **website:** JSON-LD SoftwareApplication schema on homepage ([3ead33d8](https://github.com/debuglebowski/slayzone/commit/3ead33d8))
+- **website:** Tighten meta descriptions for AI-search queries ([952bc25d](https://github.com/debuglebowski/slayzone/commit/952bc25d))
+- **website:** Add FAQPage JSON-LD on /faq ([7cfa0420](https://github.com/debuglebowski/slayzone/commit/7cfa0420))
+- **website:** Add llms.txt endpoint for AI crawlers ([f5dd5541](https://github.com/debuglebowski/slayzone/commit/f5dd5541))
+- **task:** Copy task ID button in settings header ([a946a131](https://github.com/debuglebowski/slayzone/commit/a946a131))
+- **task:** Enrich explode-mode header ([3baa6274](https://github.com/debuglebowski/slayzone/commit/3baa6274))
+- **task:** Reparent tasks via update (CLI + MCP + UI) ([7ea63b6d](https://github.com/debuglebowski/slayzone/commit/7ea63b6d))
+- **task:** In-asset search highlight + jump in both raw and preview ([4e5ce340](https://github.com/debuglebowski/slayzone/commit/4e5ce340))
+- **task-assets:** Content-addressed version history for assets ([8ae384bb](https://github.com/debuglebowski/slayzone/commit/8ae384bb))
+- **chat:** Structured chat transport w/ autocomplete + streaming ([5e68fad3](https://github.com/debuglebowski/slayzone/commit/5e68fad3))
+- **task-assets:** Version tree w/ current pointer, lock rule, and modal ([47758ebe](https://github.com/debuglebowski/slayzone/commit/47758ebe))
+- **task:** Clickable sub-task status icon w/ popover ([35d5a49e](https://github.com/debuglebowski/slayzone/commit/35d5a49e))
+- **task-assets:** Review fixes — HEAD=current, diff default, prune guard, CLI set-current, UI polish ([8eac2ddb](https://github.com/debuglebowski/slayzone/commit/8eac2ddb))
+- **browser:** Enable trackpad pinch zoom (1x–3x) ([b164d45a](https://github.com/debuglebowski/slayzone/commit/b164d45a))
+- **task-terminals:** Add "Enable chat" to header menu + widen ctx menu ([7bab3452](https://github.com/debuglebowski/slayzone/commit/7bab3452))
+- **task:** Settings cards use grid w/ fit-content share ([f6bfb003](https://github.com/debuglebowski/slayzone/commit/f6bfb003))
+- **chat:** Resilient reset + streaming UX + idle state + effort + queue ([b524d2f4](https://github.com/debuglebowski/slayzone/commit/b524d2f4))
+- **skills:** Add comparison-page skill ([6083005f](https://github.com/debuglebowski/slayzone/commit/6083005f))
+- **worktrees:** Export DiffView + GhMarkdown + diff types ([83ac9108](https://github.com/debuglebowski/slayzone/commit/83ac9108))
+- **chat:** Loading state during history replay ([8c196bb6](https://github.com/debuglebowski/slayzone/commit/8c196bb6))
+- **worktrees:** Auto-init submodules on worktree create ([9891b6d8](https://github.com/debuglebowski/slayzone/commit/9891b6d8))
+- **worktrees:** Color-code worktree list and never color-code main worktree ([#75](https://github.com/debuglebowski/slayzone/pull/75))
+- **explode:** Size grid cols by available width ([183bb139](https://github.com/debuglebowski/slayzone/commit/183bb139))
+- **terminal:** Persist chat history across app reload ([6953645b](https://github.com/debuglebowski/slayzone/commit/6953645b))
+- **website:** Add Superset.sh head-to-head page ([725a7028](https://github.com/debuglebowski/slayzone/commit/725a7028))
+- **website:** Add ?static flag to freeze hero animations ([15282311](https://github.com/debuglebowski/slayzone/commit/15282311))
+
+### 🩹 Fixes
+
+- **file-editor:** Show rename input for directory entries ([ce6f05c2](https://github.com/debuglebowski/slayzone/commit/ce6f05c2))
+- **file-editor:** Prevent Escape from triggering rename via onBlur ([bece1b70](https://github.com/debuglebowski/slayzone/commit/bece1b70))
+- **website:** Switch to clean URLs, drop .html suffixes ([07a916be](https://github.com/debuglebowski/slayzone/commit/07a916be))
+- **import:** Defer FK checks + auto-derive FK remap ([b3e93048](https://github.com/debuglebowski/slayzone/commit/b3e93048))
+- **markdown:** Match wide-mode horizontal pad to vertical ([aa3633de](https://github.com/debuglebowski/slayzone/commit/aa3633de))
+- **website:** SSR download button href fallback ([7673eeae](https://github.com/debuglebowski/slayzone/commit/7673eeae))
+- **tasks:** Allow new-task modal in locked project ([c0e92518](https://github.com/debuglebowski/slayzone/commit/c0e92518))
+- **task:** Stop new-task modal flashing state during close ([80f3b868](https://github.com/debuglebowski/slayzone/commit/80f3b868))
+- **task:** Scope Cmd+D to focused cell in explode mode ([80acdcfa](https://github.com/debuglebowski/slayzone/commit/80acdcfa))
+- **task:** Settings panel overflow with long sub-task list ([35da7e71](https://github.com/debuglebowski/slayzone/commit/35da7e71))
+- **terminal:** Trim trailing spaces from copied selection ([6f59279f](https://github.com/debuglebowski/slayzone/commit/6f59279f))
+- **browser:** Ignore sub-frame did-fail-load ([67e13510](https://github.com/debuglebowski/slayzone/commit/67e13510))
+- **usage:** Harden provider fetch against transient net::ERR_FAILED ([8a96cb47](https://github.com/debuglebowski/slayzone/commit/8a96cb47))
+- **task:** Subtasks min-h when few, flex-1 when many ([fbef03c3](https://github.com/debuglebowski/slayzone/commit/fbef03c3))
+- **cli:** Make subtask-add parent an option so title default works ([#72](https://github.com/debuglebowski/slayzone/pull/72))
+- **terminal:** Revive PTY on task status done→in_progress ([50f15aa1](https://github.com/debuglebowski/slayzone/commit/50f15aa1))
+- **worktrees:** Authoritative color registry, no tab/panel divergence ([530ddec1](https://github.com/debuglebowski/slayzone/commit/530ddec1))
+- **file-editor:** Preserve expandedFolders + robust Escape on rename ([e5187c68](https://github.com/debuglebowski/slayzone/commit/e5187c68))
+- **agent-panel:** Add idle TerminalState mapping ([7ca25ff0](https://github.com/debuglebowski/slayzone/commit/7ca25ff0))
+- **worktrees:** Color on task mutations + tests + detect-fail cache ([c1f2adf1](https://github.com/debuglebowski/slayzone/commit/c1f2adf1))
+- **terminal:** Route dropped/pasted paths via xterm paste() ([54e7425f](https://github.com/debuglebowski/slayzone/commit/54e7425f))
+- **terminal:** Inline non-image file paths on drop/paste ([7a9556ba](https://github.com/debuglebowski/slayzone/commit/7a9556ba))
+
+### 💅 Refactors
+
+- **theme:** Sweep palette classes to theme tokens ([70f06a36](https://github.com/debuglebowski/slayzone/commit/70f06a36))
+- **file-editor:** Extract renderRenameInput helper for tree entries ([91c1c4e2](https://github.com/debuglebowski/slayzone/commit/91c1c4e2))
+
+### 📖 Documentation
+
+- Add engineering mindset to CLAUDE.md ([65eb8ec5](https://github.com/debuglebowski/slayzone/commit/65eb8ec5))
+- **skills:** Slim init doc, add Engineering Mindset ([324bd7bd](https://github.com/debuglebowski/slayzone/commit/324bd7bd))
+- **file-editor:** Comment why rename Escape uses capture phase ([712cb523](https://github.com/debuglebowski/slayzone/commit/712cb523))
+
+### 🏡 Chore
+
+- **nix:** Update sources to 0.20.0 ([5571464e](https://github.com/debuglebowski/slayzone/commit/5571464e))
+- **website:** Declare js-yaml as explicit dep ([337fcc67](https://github.com/debuglebowski/slayzone/commit/337fcc67))
+- Drop broken pnpm -r lint from root lint script ([c751794c](https://github.com/debuglebowski/slayzone/commit/c751794c))
+
+### ✅ Tests
+
+- **e2e:** Chat-mode toggle UI ([dcabbfd7](https://github.com/debuglebowski/slayzone/commit/dcabbfd7))
+
+### ❤️ Contributors
+
+- Debuglebowski
+- Ian Thorslund
+- Nadim Morhell
+
 ## v0.20.0
 
 [compare changes](https://github.com/debuglebowski/slayzone/compare/v0.19.0...v0.20.0)

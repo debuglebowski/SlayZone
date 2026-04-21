@@ -1,5 +1,162 @@
 [
   {
+    "version": "0.21.0",
+    "date": "2026-04-21",
+    "tagline": "Asset history & chat",
+    "items": [
+      {
+        "category": "feature",
+        "title": "Versioned task assets",
+        "description": "Content-addressed version history with a version tree, current pointer, lock rule, and CLI set-current."
+      },
+      {
+        "category": "feature",
+        "title": "Structured chat transport",
+        "description": "Chat with autocomplete, streaming, resilient reset, idle state, effort, and queue."
+      },
+      {
+        "category": "feature",
+        "title": "Chat history persists",
+        "description": "Terminal chat history now survives app reloads."
+      },
+      {
+        "category": "feature",
+        "title": "Git stash tab",
+        "description": "New Stash tab in the unified git panel."
+      },
+      {
+        "category": "feature",
+        "title": "Zen mode toggle",
+        "description": "Dedicated zen-mode icon toggle that also hides the task header."
+      },
+      {
+        "category": "feature",
+        "title": "Reparent tasks",
+        "description": "Move tasks to a new parent via CLI, MCP, or the UI."
+      },
+      {
+        "category": "feature",
+        "title": "Clickable sub-task status",
+        "description": "Tap a sub-task status icon to change it via popover."
+      },
+      {
+        "category": "feature",
+        "title": "In-asset search",
+        "description": "Highlight and jump through matches in both raw and preview modes."
+      },
+      {
+        "category": "feature",
+        "title": "Processes URL pill",
+        "description": "Detected server URLs show as a pill that opens the browser panel."
+      },
+      {
+        "category": "feature",
+        "title": "Copy task ID",
+        "description": "Copy a task's ID straight from the settings header."
+      },
+      {
+        "category": "feature",
+        "title": "Trackpad pinch zoom",
+        "description": "Browser panel supports 1x–3x trackpad pinch zoom."
+      },
+      {
+        "category": "feature",
+        "title": "Worktree color-coding",
+        "description": "Color-coded worktree list with an authoritative registry; main worktree stays uncolored."
+      },
+      {
+        "category": "improvement",
+        "title": "Ghostty-inspired dark theme",
+        "description": "Reskinned slay dark theme with white text, Ghostty-inspired."
+      },
+      {
+        "category": "improvement",
+        "title": "WebContentsView web panels",
+        "description": "Migrated web panels from webview to WebContentsView for stability and perf."
+      },
+      {
+        "category": "improvement",
+        "title": "Explode-mode grid",
+        "description": "Sub-task grid columns size by available width and explode-mode header is richer."
+      },
+      {
+        "category": "improvement",
+        "title": "CLI opens asset in UI",
+        "description": "Creating or uploading an asset via CLI now opens it in the app."
+      },
+      {
+        "category": "improvement",
+        "title": "Editor folder auto-expand",
+        "description": "Compacted folders auto-expand to the first branch point."
+      },
+      {
+        "category": "improvement",
+        "title": "Enable chat shortcut",
+        "description": "New Enable chat entry in the terminal header menu with wider context menu."
+      },
+      {
+        "category": "improvement",
+        "title": "Lock toast feedback",
+        "description": "Toast appears when a locked project blocks creating a new tab."
+      },
+      {
+        "category": "fix",
+        "title": "PTY revival on status flip",
+        "description": "Terminal revives its PTY when a task flips from done back to in-progress."
+      },
+      {
+        "category": "fix",
+        "title": "Dropped paths inline",
+        "description": "Non-image file paths inline correctly on drop or paste into the terminal."
+      },
+      {
+        "category": "fix",
+        "title": "File tree rename",
+        "description": "Directory rename input shows, Escape no longer triggers rename via onBlur, expandedFolders preserved."
+      },
+      {
+        "category": "fix",
+        "title": "New-task modal in locked project",
+        "description": "Locked projects now allow the new-task modal and the modal no longer flashes during close."
+      },
+      {
+        "category": "fix",
+        "title": "Cmd+D in explode mode",
+        "description": "Cmd+D scopes to the focused cell in explode mode."
+      },
+      {
+        "category": "fix",
+        "title": "Terminal copy trim",
+        "description": "Trailing spaces are trimmed from copied terminal selections."
+      },
+      {
+        "category": "fix",
+        "title": "Subtasks layout",
+        "description": "Settings panel no longer overflows with long sub-task lists; subtasks have min-h when few, flex-1 when many."
+      },
+      {
+        "category": "fix",
+        "title": "Import FK handling",
+        "description": "Import defers FK checks and auto-derives FK remap."
+      },
+      {
+        "category": "fix",
+        "title": "Browser sub-frame errors",
+        "description": "Browser panel ignores sub-frame did-fail-load events."
+      },
+      {
+        "category": "fix",
+        "title": "Provider fetch resilience",
+        "description": "Usage analytics hardens provider fetch against transient net::ERR_FAILED."
+      },
+      {
+        "category": "fix",
+        "title": "Wide-mode markdown padding",
+        "description": "Wide-mode markdown horizontal padding matches vertical."
+      }
+    ]
+  },
+  {
     "version": "0.20.0",
     "date": "2026-04-15",
     "tagline": "Locks graduate, assets live",
