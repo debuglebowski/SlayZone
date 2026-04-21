@@ -113,7 +113,14 @@ export function openDb(): SlayDb {
 
   if (!fs.existsSync(dbPath)) {
     console.error(`Database not found: ${dbPath}`)
-    console.error('Make sure SlayZone has been launched at least once.')
+    const altPath = !process.env.SLAYZONE_DB_PATH ? getDbPath(!dev) : null
+    if (altPath && fs.existsSync(altPath)) {
+      const hint = dev ? 'without --dev' : 'with --dev'
+      console.error(`Found other database at: ${altPath}`)
+      console.error(`Re-run ${hint} to target that database.`)
+    } else {
+      console.error('Make sure SlayZone has been launched at least once.')
+    }
     process.exit(1)
   }
 
