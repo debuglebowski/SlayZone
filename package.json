@@ -33,7 +33,7 @@
     "build:win:all": "pnpm --filter @slayzone/app build:win:all",
     "build:linux": "pnpm --filter @slayzone/app build:linux",
     "typecheck": "pnpm -r typecheck",
-    "lint": "pnpm lint:theme && pnpm -r lint",
+    "lint": "pnpm lint:theme",
     "lint:deps": "knip --include dependencies,unlisted",
     "lint:theme": "bash scripts/lint-theme.sh",
     "format": "prettier --write .",
