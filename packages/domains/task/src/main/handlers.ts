@@ -126,11 +126,12 @@ async function attachWorktreeColors(db: Database, tasks: Task[]): Promise<Task[]
   }
   if (projectIds.size === 0) return tasks
 
-  const projectPaths = new Map<string, string>()
-  for (const pid of projectIds) {
-    const row = db.prepare('SELECT path FROM projects WHERE id = ?').get(pid) as { path: string } | undefined
-    if (row?.path) projectPaths.set(pid, row.path)
-  }
+  const ids = [...projectIds]
+  const placeholders = ids.map(() => '?').join(',')
+  const rows = db
+    .prepare(`SELECT id, path FROM projects WHERE id IN (${placeholders})`)
+    .all(...ids) as { id: string; path: string }[]
+  const projectPaths = new Map(rows.filter((r) => r.path).map((r) => [r.id, r.path]))
 
   await Promise.all([...projectPaths.values()].map((p) => ensureProjectWorktreeColors(p)))
 
@@ -152,6 +153,12 @@ async function parseAndColorTask(db: Database, row: Record<string, unknown> | un
   if (!task) return null
   const [colored] = await attachWorktreeColors(db, [task])
   return colored
+}
+
+async function colorOne<T extends Task | null | undefined>(db: Database, task: T): Promise<T> {
+  if (!task) return task
+  const [colored] = await attachWorktreeColors(db, [task])
+  return colored as T
 }
 
 function getProjectColumns(db: Database, projectId: string): ColumnConfig[] | null {
@@ -713,7 +720,7 @@ export function registerTaskHandlers(ipcMain: IpcMain, db: Database, onMutation?
       ipcMain.emit('db:tasks:create:done', null, id, data.projectId)
       onMutation?.()
     }
-    return task
+    return colorOne(db, task)
   })
 
   ipcMain.handle('db:tasks:getSubTasks', async (_, parentId: string) => {
@@ -729,7 +736,7 @@ export function registerTaskHandlers(ipcMain: IpcMain, db: Database, onMutation?
     return parseAndColorTasks(db, rows)
   })
 
-  ipcMain.handle('db:tasks:update', (_, data: UpdateTaskInput) => {
+  ipcMain.handle('db:tasks:update', async (_, data: UpdateTaskInput) => {
     const result = db.transaction(() => {
       const previousRow = db.prepare('SELECT * FROM tasks WHERE id = ?').get(data.id) as Record<string, unknown> | undefined
       const previousTask = parseTask(previousRow)
@@ -749,7 +756,7 @@ export function registerTaskHandlers(ipcMain: IpcMain, db: Database, onMutation?
       ipcMain.emit('db:tasks:update:done', null, data.id, { oldStatus: result.previousTask?.status })
       onMutation?.()
     }
-    return result.nextTask
+    return colorOne(db, result.nextTask)
   })
 
   // Soft-delete: kill PTY but preserve worktree for undo
@@ -781,7 +788,7 @@ export function registerTaskHandlers(ipcMain: IpcMain, db: Database, onMutation?
   })
 
   // Restore a soft-deleted task
-  ipcMain.handle('db:tasks:restore', (_, id: string) => {
+  ipcMain.handle('db:tasks:restore', async (_, id: string) => {
     const task = db.transaction(() => {
       db.prepare(`
         UPDATE tasks SET deleted_at = NULL, updated_at = datetime('now') WHERE id = ?
@@ -794,7 +801,7 @@ export function registerTaskHandlers(ipcMain: IpcMain, db: Database, onMutation?
       return nextTask
     })()
     onMutation?.()
-    return task
+    return colorOne(db, task)
   })
 
   // Archive operations
