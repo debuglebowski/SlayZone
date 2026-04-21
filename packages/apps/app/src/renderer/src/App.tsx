@@ -183,6 +183,7 @@ function App(): React.JSX.Element {
   // Null outside explode mode. Updated via focusin bubble on the grid wrapper.
   const [focusedExplodeTaskId, setFocusedExplodeTaskId] = useState<string | null>(null)
   const explodeGridRef = useRef<HTMLDivElement | null>(null)
+  const [explodeGridWidth, setExplodeGridWidth] = useState(0)
   const [panelSizes, updatePanelSizes, resetPanelSize] = usePanelSizes()
   const { isBuiltinEnabled: isHomePanelEnabled } = usePanelConfig()
   const [updateVersion, setUpdateVersion] = useState<string | null>(null)
@@ -408,6 +409,20 @@ function App(): React.JSX.Element {
     }
     grid.addEventListener('focusin', handleFocusIn)
     return () => grid.removeEventListener('focusin', handleFocusIn)
+  }, [explodeMode])
+
+  // Track grid width so explode mode can pack more columns as the window grows.
+  useEffect(() => {
+    if (!explodeMode) return
+    const grid = explodeGridRef.current
+    if (!grid) return
+    setExplodeGridWidth(grid.clientWidth)
+    const ro = new ResizeObserver(entries => {
+      const w = entries[0]?.contentRect.width ?? 0
+      setExplodeGridWidth(w)
+    })
+    ro.observe(grid)
+    return () => ro.disconnect()
   }, [explodeMode])
 
   // Read settings on mount and whenever settings change
@@ -1125,7 +1140,7 @@ function App(): React.JSX.Element {
               ref={explodeGridRef}
               className={cn("flex-1 min-w-0 min-h-0 rounded-lg overflow-hidden", explodeMode ? "grid gap-1 p-1" : "relative")}
               style={{
-                ...(explodeMode ? (() => { const visibleTaskCount = visibleTabs.filter(t => t.type === 'task').length; const cols = Math.ceil(Math.sqrt(visibleTaskCount)); const rows = Math.ceil(visibleTaskCount / cols); return { gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`, gridTemplateRows: `repeat(${rows}, minmax(0, 1fr))` } })() : undefined),
+                ...(explodeMode ? (() => { const MIN_CELL_W = 480; const visibleTaskCount = visibleTabs.filter(t => t.type === 'task').length; const widthCols = explodeGridWidth > 0 ? Math.max(1, Math.floor(explodeGridWidth / MIN_CELL_W)) : Math.ceil(Math.sqrt(visibleTaskCount)); const cols = Math.max(1, Math.min(widthCols, visibleTaskCount)); const rows = Math.ceil(visibleTaskCount / cols); return { gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`, gridTemplateRows: `repeat(${rows}, minmax(0, 1fr))` } })() : undefined),
               }}
             >
               {tabs.map((tab, i) => {
