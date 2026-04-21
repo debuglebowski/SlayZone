@@ -864,6 +864,23 @@ export const EditorFileTree = forwardRef<EditorFileTreeHandle, EditorFileTreePro
     )
   }, [getEffectiveSelection, visibleEntries, clipboard, handleCut, handleCopy, handlePaste, handleDuplicate, handleCopyPath, handleRevealInFinder, handleDeleteSelected, startCreate, startRename])
 
+  const renderRenameInput = (entryPath: string) => (
+    <Input
+      ref={renameInputRef}
+      value={renameValue}
+      onChange={(e) => { setRenameValue(e.target.value); renameValueRef.current = e.target.value }}
+      onKeyDownCapture={(e) => {
+        if (e.key === 'Escape') { renameValueRef.current = ''; setRenaming(null) }
+      }}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') handleRename(entryPath, renameValueRef.current)
+      }}
+      onBlur={() => { if (renameValueRef.current.trim()) handleRename(entryPath, renameValueRef.current) }}
+      className="h-6 text-xs font-mono py-0 px-1"
+      data-testid="rename-input"
+    />
+  )
+
   const renderEntry = (entry: DirEntry, depth: number, displayName?: string, chainPaths?: string[]) => {
     const pad = depth * INDENT_PX + BASE_PAD
     const isSelected = selectedPaths.has(entry.path)
@@ -886,20 +903,7 @@ export const EditorFileTree = forwardRef<EditorFileTreeHandle, EditorFileTreePro
           {renaming === entry.path ? (
             <div style={{ paddingLeft: pad }} className="flex items-center gap-1.5 py-0.5">
               <Folder className="size-4 shrink-0 text-amber-500/80" />
-              <Input
-                ref={renameInputRef}
-                value={renameValue}
-                onChange={(e) => { setRenameValue(e.target.value); renameValueRef.current = e.target.value }}
-                onKeyDownCapture={(e) => {
-                  if (e.key === 'Escape') { renameValueRef.current = ''; setRenaming(null) }
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') handleRename(entry.path, renameValueRef.current)
-                }}
-                onBlur={() => { if (renameValueRef.current.trim()) handleRename(entry.path, renameValueRef.current) }}
-                className="h-6 text-xs font-mono py-0 px-1"
-                data-testid="rename-input"
-              />
+              {renderRenameInput(entry.path)}
             </div>
           ) : (
             <ContextMenu>
@@ -965,20 +969,7 @@ export const EditorFileTree = forwardRef<EditorFileTreeHandle, EditorFileTreePro
     if (renaming === entry.path) {
       return (
         <div key={`f:${entry.path}`} style={{ paddingLeft: pad }}>
-          <Input
-            ref={renameInputRef}
-            value={renameValue}
-            onChange={(e) => { setRenameValue(e.target.value); renameValueRef.current = e.target.value }}
-            onKeyDownCapture={(e) => {
-              if (e.key === 'Escape') { renameValueRef.current = ''; setRenaming(null) }
-            }}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') handleRename(entry.path, renameValueRef.current)
-            }}
-            onBlur={() => { if (renameValueRef.current.trim()) handleRename(entry.path, renameValueRef.current) }}
-            className="h-6 text-xs font-mono py-0 px-1"
-            data-testid="rename-input"
-          />
+          {renderRenameInput(entry.path)}
         </div>
       )
     }
