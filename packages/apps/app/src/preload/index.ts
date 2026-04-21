@@ -6,11 +6,22 @@ import type { TerminalState, PromptInfo } from '@slayzone/terminal/shared'
 // Must be in the preload's main world — isolated world's preventDefault alone
 // may not be seen by Chromium's drop allowance check.
 let lastDropPaths: string[] = []
+let lastPastePaths: string[] = []
 window.addEventListener('dragover', (e) => e.preventDefault(), true)
 window.addEventListener('drop', (e) => {
   e.preventDefault()
   if (!e.dataTransfer?.files.length) return
   lastDropPaths = Array.from(e.dataTransfer.files).map((f) => webUtils.getPathForFile(f))
+}, true)
+// Electron 32+ removed File.path; webUtils.getPathForFile only runs in main
+// world. Capture here so renderers can resolve Finder-pasted file paths.
+// Reset on every paste — text pastes must clear prior file-paste state so
+// later consumers don't read stale paths.
+window.addEventListener('paste', (e) => {
+  const files = e.clipboardData?.files
+  lastPastePaths = files?.length
+    ? Array.from(files).map((f) => webUtils.getPathForFile(f))
+    : []
 }, true)
 
 // Custom APIs for renderer
@@ -315,6 +326,11 @@ const api: ElectronAPI = {
     getDropPaths: () => {
       const paths = lastDropPaths
       lastDropPaths = []
+      return paths
+    },
+    getPastePaths: () => {
+      const paths = lastPastePaths
+      lastPastePaths = []
       return paths
     }
   },

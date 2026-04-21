@@ -1009,12 +1009,16 @@ export const Terminal = forwardRef<TerminalHandle, TerminalProps>(function Termi
       terminalRef.current?.paste(escaped)
     }
 
-    // Process a single file
-    const processFile = async (file: File, mimeType?: string): Promise<string | null> => {
-      const filePath = (file as File & { path?: string }).path
-      if (filePath) {
-        return filePath
-      } else if (mimeType?.startsWith('image/') || file.type.startsWith('image/')) {
+    // Process a single file. Electron 32+ removed File.path; real disk paths
+    // must come from webUtils.getPathForFile, which only works in preload —
+    // pass the pre-extracted path in for drop events.
+    const processFile = async (
+      file: File,
+      mimeType?: string,
+      droppedPath?: string
+    ): Promise<string | null> => {
+      if (droppedPath) return droppedPath
+      if (mimeType?.startsWith('image/') || file.type.startsWith('image/')) {
         // Image from clipboard (screenshot, browser copy) - save to temp
         const base64 = await fileToBase64(file)
         const result = await window.api.files.saveTempImage(base64, mimeType || file.type)
@@ -1029,16 +1033,26 @@ export const Terminal = forwardRef<TerminalHandle, TerminalProps>(function Termi
       const items = e.clipboardData?.items
       if (!items) return
 
+      // Symmetric with handleDrop: preload's capture-phase paste listener
+      // already resolved any filesystem paths (Finder-pasted files) via
+      // webUtils. Zip by index with file items.
+      const pastedPaths = window.api.files.getPastePaths()
+
       const paths: string[] = []
+      let fileIdx = 0
 
       for (const item of items) {
         if (item.kind === 'file') {
           const file = item.getAsFile()
-          if (!file) continue
+          if (!file) {
+            fileIdx++
+            continue
+          }
 
           e.preventDefault()
-          const path = await processFile(file, item.type)
+          const path = await processFile(file, item.type, pastedPaths[fileIdx])
           if (path) paths.push(path)
+          fileIdx++
         }
       }
 
@@ -1058,10 +1072,15 @@ export const Terminal = forwardRef<TerminalHandle, TerminalProps>(function Termi
       const files = e.dataTransfer?.files
       if (!files?.length) return
 
+      // Preload's capture-phase drop listener already extracted real disk
+      // paths via webUtils.getPathForFile; zip by index with the File list.
+      const droppedPaths = window.api.files.getDropPaths()
+
       try {
         const paths: string[] = []
-        for (const file of files) {
-          const path = await processFile(file)
+        for (let i = 0; i < files.length; i++) {
+          const file = files[i]
+          const path = await processFile(file, undefined, droppedPaths[i])
           if (path) paths.push(path)
         }
 
