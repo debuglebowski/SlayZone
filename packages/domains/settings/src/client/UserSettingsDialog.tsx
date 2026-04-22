@@ -81,7 +81,7 @@ export function UserSettingsDialog({
       key: 'panels',
       label: 'Panels',
       children: [
-        { key: 'panels/terminal', label: 'Terminal' },
+        { key: 'panels/terminal', label: 'Agent' },
         { key: 'panels/browser', label: 'Browser' },
         { key: 'panels/editor', label: 'Editor' },
         { key: 'panels/git', label: 'Git' },

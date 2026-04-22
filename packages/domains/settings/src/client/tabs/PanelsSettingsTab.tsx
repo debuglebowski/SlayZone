@@ -265,7 +265,7 @@ export function PanelsSettingsTab({ activeTab, navigateTo, modes, defaultTermina
               {/* Terminal — task only */}
               <button type="button" className="flex items-center gap-3 h-11 rounded-lg border px-4 w-full text-left hover:bg-accent/30 transition-colors" onClick={() => navigateTo('panels/terminal')}>
                 <SquareTerminal className="size-4 shrink-0" />
-                <span className="text-sm font-medium flex-1">Terminal</span>
+                <span className="text-sm font-medium flex-1">Agent</span>
 
                 <div className="flex items-center gap-5 shrink-0">
                   <Tooltip><TooltipTrigger asChild><span><Switch disabled checked={false} onClick={(e) => e.stopPropagation()} /></span></TooltipTrigger><TooltipContent side="top">Task-only panel</TooltipContent></Tooltip>
@@ -379,9 +379,9 @@ export function PanelsSettingsTab({ activeTab, navigateTo, modes, defaultTermina
 
       {activeTab === 'panels/terminal' && (
         <div className="rounded-lg border p-5 space-y-6">
-          <PanelBreadcrumb label="Terminal" onBack={() => navigateTo('panels')} />
+          <PanelBreadcrumb label="Agent" onBack={() => navigateTo('panels')} />
           <div className="flex items-center justify-between">
-            <Label className="text-base font-semibold">Terminal</Label>
+            <Label className="text-base font-semibold">Agent</Label>
             <Switch checked={isPanelEnabled(panelConfig, 'terminal', 'task')} onCheckedChange={(c) => togglePanel('terminal', 'task', c)} />
           </div>
           <div className="space-y-3">

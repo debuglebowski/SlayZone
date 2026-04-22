@@ -1729,7 +1729,7 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
               <PanelToggle
                 panels={(() => {
                   const builtins: { id: string; icon: typeof Globe; label: string; shortcut?: string | null }[] = [
-                    { id: 'terminal', icon: TerminalIcon, label: 'Terminal', shortcut: panelTerminalShortcut },
+                    { id: 'terminal', icon: TerminalIcon, label: 'Agent', shortcut: panelTerminalShortcut },
                     { id: 'browser', icon: Globe, label: 'Browser', shortcut: panelBrowserShortcut },
                     { id: 'editor', icon: FileCode, label: 'Editor', shortcut: panelEditorShortcut },
                     { id: 'assets', icon: Paperclip, label: 'Assets', shortcut: panelAssetsShortcut },

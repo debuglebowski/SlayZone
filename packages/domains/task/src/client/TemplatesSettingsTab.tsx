@@ -26,7 +26,7 @@ import { BUILTIN_PANEL_IDS } from '@slayzone/task/shared'
 const NONE = '__none__'
 
 const PANEL_LABELS: Record<string, string> = {
-  terminal: 'Terminal',
+  terminal: 'Agent',
   browser: 'Browser',
   editor: 'Editor',
   diff: 'Git',
