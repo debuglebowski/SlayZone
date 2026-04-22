@@ -6,22 +6,25 @@ let mermaidModule: typeof import('mermaid')['default'] | null = null
 let mermaidTheme: string | null = null
 let mermaidIdCounter = 0
 
+// Cache SVG by code string — instant re-display when typing other parts of doc
+// Capped at 50 entries (FIFO) to prevent unbounded memory growth
+const MAX_CACHE = 50
+const svgCache = new Map<string, string>()
+
 async function getMermaid(dark: boolean) {
   const theme = dark ? 'dark' : 'default'
   if (!mermaidModule) {
     const mod = await import('mermaid')
     mermaidModule = mod.default
-    mermaidModule.initialize({ startOnLoad: false, theme, securityLevel: 'loose' })
+    mermaidModule.initialize({ startOnLoad: false, theme, securityLevel: 'strict' })
     mermaidTheme = theme
   } else if (mermaidTheme !== theme) {
-    mermaidModule.initialize({ startOnLoad: false, theme, securityLevel: 'loose' })
+    svgCache.clear()
+    mermaidModule.initialize({ startOnLoad: false, theme, securityLevel: 'strict' })
     mermaidTheme = theme
   }
   return mermaidModule
 }
-
-// Cache SVG by code string — instant re-display when typing other parts of doc
-const svgCache = new Map<string, string>()
 
 // --- Pan/zoom controls ---
 
@@ -167,6 +170,7 @@ export function MermaidBlock({ code }: { code: string }) {
       const { svg: rendered } = await m.render(id, code)
       if (!cancelled) {
         if (rendered) {
+          if (svgCache.size >= MAX_CACHE) svgCache.delete(svgCache.keys().next().value!)
           svgCache.set(code, rendered)
           setSvg(rendered)
         } else {
