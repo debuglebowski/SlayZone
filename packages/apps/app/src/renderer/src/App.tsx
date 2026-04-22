@@ -386,6 +386,7 @@ function App(): React.JSX.Element {
 
   // Visible tabs (project-scoped filtering — purely visual, full tabs stay mounted)
   const { visibleTabs, visibleActiveIndex, toFullIndex, toVisibleIndex } = useVisibleTabs(tabs, tasksMap)
+  const visibleTaskCount = useMemo(() => visibleTabs.filter((t) => t.type === 'task').length, [visibleTabs])
 
   // Auto-switch project when activating a task tab
   const activeTab = tabs[activeTabIndex]
@@ -1076,33 +1077,43 @@ function App(): React.JSX.Element {
           <div id="right-main" className="flex-1 flex flex-col min-w-0 min-h-0">
           <div className={zenMode ? "pl-16" : ""}>
             <TabBar
+              hideTabs={explodeMode}
               tabs={visibleTabs} activeIndex={visibleActiveIndex} activeView={activeView} terminalStates={terminalStates}
               projectColors={taskProjectColors} worktreeColors={taskWorktreeColors}
               taskProgress={taskProgress} doneTaskIds={doneTaskIds}
               onTabClick={(i) => setActiveTabIndex(toFullIndex(i))} onTabClose={(i) => closeTab(toFullIndex(i))} onTabReorder={(from, to) => reorderTabs(toFullIndex(from), toFullIndex(to))}
               onTabRename={async (taskId, title) => { const t = await window.api.db.updateTask({ id: taskId, title }); updateTask(t) }}
-              leftContent={showContextManager ? (
-                <Tooltip><TooltipTrigger asChild>
-                  <div className={cn(
-                    "relative ml-1 flex items-center gap-1.5 h-7 px-3 rounded-md cursor-pointer transition-colors select-none flex-shrink-0",
-                    "hover:bg-accent/80 dark:hover:bg-accent/50",
-                    "border",
-                    activeView === 'context'
-                      ? "bg-tab-active border-border"
-                      : "border-transparent text-muted-foreground dark:text-muted-foreground"
-                  )} onClick={() => useTabStore.getState().setActiveView(activeView === 'context' ? 'tabs' : 'context')}>
-                    <BookOpen className="h-4 w-4" />
-                    {staleSkillCount > 0 && (
-                      <span
-                        aria-label={`${staleSkillCount} stale skill${staleSkillCount === 1 ? '' : 's'}`}
-                        data-testid="context-manager-stale-dot"
-                        className="absolute top-1 right-1 w-2 h-2 rounded-full bg-amber-500"
-                      />
-                    )}
-                  </div>
-                </TooltipTrigger><TooltipContent side="bottom" className="text-xs">
-                  {staleSkillCount > 0 ? `Context Manager (${staleSkillCount} stale)` : 'Context Manager'}
-                </TooltipContent></Tooltip>
+              leftContent={(showContextManager || explodeMode) ? (
+                <>
+                  {showContextManager && (
+                    <Tooltip><TooltipTrigger asChild>
+                      <div className={cn(
+                        "relative ml-1 flex items-center gap-1.5 h-7 px-3 rounded-md cursor-pointer transition-colors select-none flex-shrink-0",
+                        "hover:bg-accent/80 dark:hover:bg-accent/50",
+                        "border",
+                        activeView === 'context'
+                          ? "bg-tab-active border-border"
+                          : "border-transparent text-muted-foreground dark:text-muted-foreground"
+                      )} onClick={() => useTabStore.getState().setActiveView(activeView === 'context' ? 'tabs' : 'context')}>
+                        <BookOpen className="h-4 w-4" />
+                        {staleSkillCount > 0 && (
+                          <span
+                            aria-label={`${staleSkillCount} stale skill${staleSkillCount === 1 ? '' : 's'}`}
+                            data-testid="context-manager-stale-dot"
+                            className="absolute top-1 right-1 w-2 h-2 rounded-full bg-amber-500"
+                          />
+                        )}
+                      </div>
+                    </TooltipTrigger><TooltipContent side="bottom" className="text-xs">
+                      {staleSkillCount > 0 ? `Context Manager (${staleSkillCount} stale)` : 'Context Manager'}
+                    </TooltipContent></Tooltip>
+                  )}
+                  {explodeMode && (
+                    <div className="ml-2 text-sm text-muted-foreground select-none flex-shrink-0">
+                      {visibleTaskCount} {visibleTaskCount === 1 ? 'task' : 'tasks'}
+                    </div>
+                  )}
+                </>
               ) : undefined}
               rightContent={
                 <div className="flex items-center gap-1">
@@ -1153,7 +1164,7 @@ function App(): React.JSX.Element {
               ref={explodeGridRef}
               className={cn("flex-1 min-w-0 min-h-0 rounded-lg overflow-hidden relative", explodeMode ? "grid gap-1 p-1" : "")}
               style={{
-                ...(explodeMode ? (() => { const MIN_CELL_W = 480; const visibleTaskCount = visibleTabs.filter(t => t.type === 'task').length; const widthCols = explodeGridWidth > 0 ? Math.max(1, Math.floor(explodeGridWidth / MIN_CELL_W)) : Math.ceil(Math.sqrt(visibleTaskCount)); const cols = Math.max(1, Math.min(widthCols, visibleTaskCount)); const rows = Math.ceil(visibleTaskCount / cols); return { gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`, gridTemplateRows: `repeat(${rows}, minmax(0, 1fr))` } })() : undefined),
+                ...(explodeMode ? (() => { const MIN_CELL_W = 480; const widthCols = explodeGridWidth > 0 ? Math.max(1, Math.floor(explodeGridWidth / MIN_CELL_W)) : Math.ceil(Math.sqrt(visibleTaskCount)); const cols = Math.max(1, Math.min(widthCols, visibleTaskCount)); const rows = Math.ceil(visibleTaskCount / cols); return { gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`, gridTemplateRows: `repeat(${rows}, minmax(0, 1fr))` } })() : undefined),
               }}
             >
               {tabs.map((tab, i) => {

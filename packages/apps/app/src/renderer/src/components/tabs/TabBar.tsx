@@ -38,6 +38,7 @@ interface TabBarProps {
   onTabRename?: (taskId: string, title: string) => void
   rightContent?: React.ReactNode
   leftContent?: React.ReactNode
+  hideTabs?: boolean
 }
 
 interface TabContentProps {
@@ -282,7 +283,8 @@ export function TabBar({
   onTabReorder,
   onTabRename,
   rightContent,
-  leftContent
+  leftContent,
+  hideTabs = false
 }: TabBarProps): React.JSX.Element {
   const [activeId, setActiveId] = useState<string | null>(null)
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null)
@@ -395,7 +397,8 @@ export function TabBar({
 
       {/* Scrollable task tabs area */}
       <div className="flex items-center overflow-x-auto scrollbar-hide flex-1 min-w-0">
-        {/* Task tabs - sortable, flat DOM for dnd-kit compatibility */}
+        {!hideTabs && (
+        /* Task tabs - sortable, flat DOM for dnd-kit compatibility */
         <DndContext
           sensors={sensors}
           collisionDetection={closestCenter}
@@ -445,6 +448,7 @@ export function TabBar({
             )}
           </DragOverlay>
         </DndContext>
+        )}
       </div>
 
       {/* Fixed right content */}
