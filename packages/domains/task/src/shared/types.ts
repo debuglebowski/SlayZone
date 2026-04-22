@@ -274,6 +274,7 @@ export interface Task {
   assignee: string | null
   status: TaskStatus
   priority: number // 1-5, default 3
+  progress: number // 0-100, default 0
   order: number
   due_date: string | null
   archived_at: string | null
@@ -378,6 +379,7 @@ export interface UpdateTaskInput {
   assignee?: string | null
   status?: string
   priority?: number
+  progress?: number
   dueDate?: string | null
   projectId?: string
   // Terminal config

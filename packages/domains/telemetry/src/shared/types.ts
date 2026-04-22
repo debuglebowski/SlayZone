@@ -25,6 +25,7 @@ export type TelemetryEventName =
   | 'task_archived'
   | 'task_status_changed'
   | 'task_priority_changed'
+  | 'task_progress_changed'
   | 'task_description_ai_generated'
   | 'subtask_created'
   | 'asset_created'
@@ -154,6 +155,7 @@ export interface TelemetryEventProps {
   task_archived: { bulk: boolean }
   task_status_changed: { from: string; to: string }
   task_priority_changed: { priority: string }
+  task_progress_changed: { value: string }
   task_description_ai_generated: Record<string, never>
   subtask_created: Record<string, never>
   asset_created: Record<string, never>

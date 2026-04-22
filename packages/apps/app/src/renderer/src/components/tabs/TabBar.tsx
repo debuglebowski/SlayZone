@@ -1,6 +1,6 @@
 import { useState, useMemo, useRef, useEffect, useCallback } from 'react'
 import { Home, X } from 'lucide-react'
-import { cn, Tooltip, TooltipTrigger, TooltipContent, getTerminalStateStyle, projectColorBg, useShortcutDisplay, withShortcut } from '@slayzone/ui'
+import { cn, ProgressRing, Tooltip, TooltipTrigger, TooltipContent, getTerminalStateStyle, projectColorBg, useShortcutDisplay, withShortcut } from '@slayzone/ui'
 import type { TerminalState } from '@slayzone/terminal/shared'
 import {
   DndContext,
@@ -30,6 +30,8 @@ interface TabBarProps {
   terminalStates?: Map<string, TerminalState>
   projectColors?: Map<string, string>
   worktreeColors?: Map<string, string>
+  taskProgress?: Map<string, number>
+  doneTaskIds?: Set<string>
   onTabClick: (index: number) => void
   onTabClose: (index: number) => void
   onTabReorder: (fromIndex: number, toIndex: number) => void
@@ -47,6 +49,8 @@ interface TabContentProps {
   isSubTask?: boolean
   isTemporary?: boolean
   projectColor?: string
+  progress?: number
+  isDone?: boolean
   isEditing?: boolean
   editValue?: string
   onEditChange?: (value: string) => void
@@ -59,8 +63,9 @@ function getStateInfo(state: TerminalState | undefined) {
   return getTerminalStateStyle(state)
 }
 
-function TabContent({ title, isActive, isDragging, onClose, terminalState, isSubTask, isTemporary, projectColor, isEditing, editValue, onEditChange, onEditSubmit, onEditCancel, inputRef }: TabContentProps): React.JSX.Element {
+function TabContent({ title, isActive, isDragging, onClose, terminalState, isSubTask, isTemporary, projectColor, progress, isDone, isEditing, editValue, onEditChange, onEditSubmit, onEditCancel, inputRef }: TabContentProps): React.JSX.Element {
   const stateInfo = getStateInfo(terminalState)
+  const showProgressRing = !isDone && progress != null && progress > 0
 
   return (
     <div
@@ -85,11 +90,36 @@ function TabContent({ title, isActive, isDragging, onClose, terminalState, isSub
       {stateInfo && (
         <Tooltip>
           <TooltipTrigger asChild>
-            <span className={cn('w-2 h-2 rounded-full flex-shrink-0', stateInfo.color)} />
+            <span className="relative inline-flex items-center justify-center shrink-0 size-3.5">
+              {showProgressRing && (
+                <ProgressRing
+                  value={progress!}
+                  size={14}
+                  strokeWidth={1.5}
+                  className="absolute inset-0"
+                />
+              )}
+              <span className={cn('w-2 h-2 rounded-full', stateInfo.color)} />
+            </span>
           </TooltipTrigger>
           <TooltipContent side="bottom" className="text-xs">
-            {stateInfo.label}
+            {showProgressRing ? `${stateInfo.label} · ${Math.round(progress!)}%` : stateInfo.label}
           </TooltipContent>
+        </Tooltip>
+      )}
+      {!stateInfo && showProgressRing && (
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <span className="relative inline-flex items-center justify-center shrink-0 size-3.5">
+              <ProgressRing
+                value={progress!}
+                size={14}
+                strokeWidth={1.5}
+                className="absolute inset-0"
+              />
+            </span>
+          </TooltipTrigger>
+          <TooltipContent side="bottom" className="text-xs">{Math.round(progress!)}%</TooltipContent>
         </Tooltip>
       )}
       {isSubTask && <span className="text-[10px] text-muted-foreground/60 shrink-0">SUB</span>}
@@ -137,6 +167,8 @@ interface SortableTabProps {
   terminalState?: TerminalState
   projectColor?: string
   worktreeColor?: string
+  progress?: number
+  isDone?: boolean
   groupPosition?: GroupPosition
   isEditing?: boolean
   editValue?: string
@@ -156,6 +188,8 @@ function SortableTab({
   terminalState,
   projectColor,
   worktreeColor,
+  progress,
+  isDone,
   groupPosition,
   isEditing,
   editValue,
@@ -221,6 +255,8 @@ function SortableTab({
         isSubTask={tab.isSubTask}
         isTemporary={tab.isTemporary}
         projectColor={projectColor}
+        progress={progress}
+        isDone={isDone}
         isEditing={isEditing}
         editValue={editValue}
         onEditChange={onEditChange}
@@ -239,6 +275,8 @@ export function TabBar({
   terminalStates,
   projectColors,
   worktreeColors,
+  taskProgress,
+  doneTaskIds,
   onTabClick,
   onTabClose,
   onTabReorder,
@@ -378,6 +416,8 @@ export function TabBar({
                   terminalState={terminalStates?.get(tab.taskId)}
                   projectColor={projectColors?.get(tab.taskId)}
                   worktreeColor={worktreeColors?.get(tab.taskId)}
+                  progress={taskProgress?.get(tab.taskId)}
+                  isDone={doneTaskIds?.has(tab.taskId)}
                   groupPosition={groupPositions.get(tab.taskId)}
                   isEditing={editingTaskId === tab.taskId}
                   editValue={editValue}
@@ -399,6 +439,8 @@ export function TabBar({
                 terminalState={terminalStates?.get(activeTab.taskId)}
                 isTemporary={activeTab.isTemporary}
                 projectColor={projectColors?.get(activeTab.taskId)}
+                progress={taskProgress?.get(activeTab.taskId)}
+                isDone={doneTaskIds?.has(activeTab.taskId)}
               />
             )}
           </DragOverlay>

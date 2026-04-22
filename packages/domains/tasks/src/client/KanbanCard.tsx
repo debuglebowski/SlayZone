@@ -5,7 +5,8 @@ import type { Tag } from '@slayzone/tags/shared'
 import { TagSelector } from '@slayzone/tags/client'
 import type { Project } from '@slayzone/projects/shared'
 import type { ColumnConfig } from '@slayzone/projects/shared'
-import { isTerminalStatus } from '@slayzone/projects/shared'
+import { isCompletedStatus, isTerminalStatus } from '@slayzone/projects/shared'
+import { TaskProgressPopover } from '@slayzone/task/client'
 import type { TerminalState } from '@slayzone/terminal/shared'
 import { Card, CardContent, Tooltip, TooltipContent, TooltipTrigger, Popover, PopoverContent, PopoverTrigger, cn, getTerminalStateStyle, PriorityIcon } from '@slayzone/ui'
 import { useAppearance } from '@slayzone/settings/client'
@@ -199,9 +200,21 @@ export function KanbanCard({
               )}
               </div>
             </div>
-            {/* Bottom row: subtasks + tags + blocked + due date */}
-            {(resolvedTags.length > 0 || (subTaskCount && subTaskCount.total > 0) || ((cp?.dueDate ?? true) && task.due_date) || ((cp?.blocked ?? true) && isBlocked)) && (
+            {/* Bottom row: progress + subtasks + tags + blocked + due date */}
+            {(() => {
+              const showProgress = (task.progress ?? 0) > 0 && !isCompletedStatus(task.status, columns)
+              const showRow = showProgress || resolvedTags.length > 0 || (subTaskCount && subTaskCount.total > 0) || ((cp?.dueDate ?? true) && task.due_date) || ((cp?.blocked ?? true) && isBlocked)
+              if (!showRow) return null
+              return (
               <div className="flex items-center gap-3 mt-3">
+                {showProgress && (
+                  <TaskProgressPopover
+                    value={task.progress ?? 0}
+                    onCommit={(next) => onUpdateTask?.(task.id, { progress: next })}
+                    size={14}
+                    strokeWidth={2}
+                  />
+                )}
                 {(cp?.subtasks ?? true) && subTaskCount && subTaskCount.total > 0 && (() => {
                   const pct = subTaskCount.done / subTaskCount.total
                   const r = 8
@@ -295,7 +308,8 @@ export function KanbanCard({
                   </span>
                 )}
               </div>
-            )}
+              )
+            })()}
           </div>
         </div>
       </CardContent>

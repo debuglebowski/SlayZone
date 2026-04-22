@@ -429,6 +429,10 @@ export function updateTask(db: Database, data: UpdateTaskInput): Task | null {
   }
   if (data.assignee !== undefined) { fields.push('assignee = ?'); values.push(data.assignee) }
   if (data.priority !== undefined) { fields.push('priority = ?'); values.push(data.priority) }
+  if (data.progress !== undefined) {
+    fields.push('progress = ?')
+    values.push(Math.max(0, Math.min(100, Math.round(data.progress))))
+  }
   if (data.dueDate !== undefined) { fields.push('due_date = ?'); values.push(data.dueDate) }
   if (data.projectId !== undefined) {
     fields.push('project_id = ?'); values.push(data.projectId)

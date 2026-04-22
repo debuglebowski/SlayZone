@@ -5,7 +5,7 @@ import { AlertTriangle, FolderClosed, LayoutGrid, TerminalSquare, GitBranch, Fil
 import { buildCreateTaskDraftFromBrowserLink } from '@slayzone/task/shared'
 import type { Task } from '@slayzone/task/shared'
 import type { Project } from '@slayzone/projects/shared'
-import { getDefaultStatus, getDoneStatus, getStatusByCategory, resolveRepoPath } from '@slayzone/projects/shared'
+import { getDefaultStatus, getDoneStatus, getStatusByCategory, isCompletedStatus, resolveRepoPath } from '@slayzone/projects/shared'
 import type { Tag } from '@slayzone/tags/shared'
 // Domains
 import {
@@ -231,6 +231,18 @@ function App(): React.JSX.Element {
 
   // Tab colors (extracted — pure derivation)
   const { taskProjectColors, taskWorktreeColors, tabCycleOrder } = useTabColors(tabs, tasks, projects, colorTintsEnabled)
+
+  // Per-tab task progress + completion state (mirrors Map-prop pattern above)
+  const { taskProgress, doneTaskIds } = useMemo(() => {
+    const progress = new Map<string, number>()
+    const done = new Set<string>()
+    const columnsByProject = new Map(projects.map((p) => [p.id, p.columns_config]))
+    for (const task of tasks) {
+      if (typeof task.progress === 'number' && task.progress > 0) progress.set(task.id, task.progress)
+      if (isCompletedStatus(task.status, columnsByProject.get(task.project_id))) done.add(task.id)
+    }
+    return { taskProgress: progress, doneTaskIds: done }
+  }, [tasks, projects])
 
   // Onboarding
   const showAnimatedTour = useDialogStore((s) => s.showAnimatedTour)
@@ -1066,6 +1078,7 @@ function App(): React.JSX.Element {
             <TabBar
               tabs={visibleTabs} activeIndex={visibleActiveIndex} activeView={activeView} terminalStates={terminalStates}
               projectColors={taskProjectColors} worktreeColors={taskWorktreeColors}
+              taskProgress={taskProgress} doneTaskIds={doneTaskIds}
               onTabClick={(i) => setActiveTabIndex(toFullIndex(i))} onTabClose={(i) => closeTab(toFullIndex(i))} onTabReorder={(from, to) => reorderTabs(toFullIndex(from), toFullIndex(to))}
               onTabRename={async (taskId, title) => { const t = await window.api.db.updateTask({ id: taskId, title }); updateTask(t) }}
               leftContent={showContextManager ? (

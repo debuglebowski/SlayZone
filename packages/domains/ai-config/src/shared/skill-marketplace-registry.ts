@@ -146,6 +146,8 @@ Task commands are the core of the slay CLI. Most commands accept an optional \`[
 - \`slay tasks update [id] [--title <title>] [--description <text>] [--append-description <text>] [--status <status>] [--priority <1-5>] [--due <date>] [--no-due]\`
   Update a task. \`--append-description\` adds text after a newline separator (mutually exclusive with \`--description\`). \`--no-due\` clears the due date.
 
+- \`slay tasks progress [id] <value>\` — set task progress (integer 0-100). Id defaults to \`$SLAYZONE_TASK_ID\` when omitted.
+
 - \`slay tasks done [id]\` — mark task complete using the project's configured "done" status.
 
 - \`slay tasks archive <id>\` — hide from kanban but keep in database. Use for tasks you don't need visible but want to preserve.

@@ -2050,6 +2050,12 @@ const migrations: Migration[] = [
     up: (db) => {
       db.exec(`ALTER TABLE projects ADD COLUMN worktree_submodule_init TEXT DEFAULT NULL`)
     }
+  },
+  {
+    version: 115,
+    up: (db) => {
+      db.exec(`ALTER TABLE tasks ADD COLUMN progress INTEGER NOT NULL DEFAULT 0`)
+    }
   }
 ]
 

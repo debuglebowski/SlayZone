@@ -396,7 +396,7 @@ export function seed(page: Page) {
       dueDate?: string
     }) => page.evaluate((d) => window.api.db.createTask(d), data),
 
-    updateTask: (data: { id: string; status?: string; priority?: number; dueDate?: string | null }) =>
+    updateTask: (data: { id: string; status?: string; priority?: number; progress?: number; dueDate?: string | null }) =>
       page.evaluate((d) => window.api.db.updateTask(d), data),
 
     deleteTask: (id: string) => page.evaluate((i) => window.api.db.deleteTask(i), id),

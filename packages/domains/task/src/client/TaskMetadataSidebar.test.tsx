@@ -40,6 +40,8 @@ vi.mock('@slayzone/ui', () => {
     Tooltip: Passthrough,
     TooltipTrigger: ({ children }: any) => <>{children}</>,
     TooltipContent: ({ children }: any) => <div>{children}</div>,
+    ProgressRing: () => null,
+    Slider: () => null,
     buildStatusOptions: () => [],
     taskStatusOptions: [],
     cn: (...args: Array<string | false | null | undefined>) => args.filter(Boolean).join(' '),
@@ -66,6 +68,10 @@ vi.mock('@slayzone/projects', () => ({ ProjectSelect: () => null }))
 vi.mock('./SnoozePicker', () => ({ SnoozePicker: () => null }))
 vi.mock('@slayzone/projects/shared', () => ({
   isTerminalStatus: (status: string, columns?: Array<{ id: string; category?: string }>) => {
+    const column = columns?.find((item) => item.id === status)
+    return column?.category === 'completed' || status === 'done'
+  },
+  isCompletedStatus: (status: string, columns?: Array<{ id: string; category?: string }>) => {
     const column = columns?.find((item) => item.id === status)
     return column?.category === 'completed' || status === 'done'
   }
