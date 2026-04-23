@@ -52,7 +52,7 @@ export default defineConfig(({ mode }) => {
           input: {
             index: resolve('src/main/index.ts'),
           },
-          external: ['better-sqlite3', 'node-pty']
+          external: ['better-sqlite3', 'node-pty', 'posix']
         }
       }
     },

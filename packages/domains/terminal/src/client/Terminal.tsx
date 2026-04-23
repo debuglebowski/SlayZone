@@ -866,12 +866,21 @@ export const Terminal = forwardRef<TerminalHandle, TerminalProps>(function Termi
       terminalRef.current.options.minimumContrastRatio = contrastRatio
     }
     updateAllThemes(resolvedTerminalTheme, contrastRatio)
-    // Keep main process in sync so it can respond to OSC 10/11/12 color queries
-    // synchronously (async renderer response arrives too late once readline is active).
+    // Keep main process in sync so it can respond to OSC 10/11/12/4 color
+    // queries synchronously (async renderer response arrives too late once
+    // readline is active). ansi[0..15] mirrors xterm.js ITheme order so OSC 4
+    // palette queries return what is actually rendered.
+    const t = resolvedTerminalTheme
+    const ansi = [
+      t.black, t.red, t.green, t.yellow, t.blue, t.magenta, t.cyan, t.white,
+      t.brightBlack, t.brightRed, t.brightGreen, t.brightYellow,
+      t.brightBlue, t.brightMagenta, t.brightCyan, t.brightWhite,
+    ].filter((c): c is string => typeof c === 'string')
     void window.api.pty.setTheme({
-      foreground: resolvedTerminalTheme.foreground ?? '#ffffff',
-      background: resolvedTerminalTheme.background ?? '#000000',
-      cursor: resolvedTerminalTheme.cursor ?? '#ffffff',
+      foreground: t.foreground ?? '#ffffff',
+      background: t.background ?? '#000000',
+      cursor: t.cursor ?? '#ffffff',
+      ansi: ansi.length === 16 ? ansi : undefined,
     })
   }, [terminalThemeId, contentVariant])
 

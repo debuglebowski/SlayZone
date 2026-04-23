@@ -7,7 +7,8 @@
       "better-sqlite3",
       "electron",
       "esbuild",
-      "node-pty"
+      "node-pty",
+      "posix"
     ],
     "overrides": {
       "zod": "^4",

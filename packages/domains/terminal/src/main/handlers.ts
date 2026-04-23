@@ -313,7 +313,7 @@ ipcMain.handle('pty:resize', (_, sessionId: string, cols: number, rows: number) 
     dismissAllNotifications()
   })
 
-  ipcMain.handle('pty:set-theme', (_, theme: { foreground: string; background: string; cursor: string }) => {
+  ipcMain.handle('pty:set-theme', (_, theme: { foreground: string; background: string; cursor: string; ansi?: readonly string[] }) => {
     setTerminalTheme(theme)
   })
 
