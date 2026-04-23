@@ -248,10 +248,70 @@ describe('slug conflict returns existing item', () => {
   })
 })
 
+// ---------------------------------------------------------------------------
+// orphan marketplace metadata gets scrubbed on re-seed
+// ---------------------------------------------------------------------------
+
+const h7 = await createTestHarness()
+registerAiConfigHandlers(h7.ipcMain as never, h7.db)
+const p7 = seedProject(h7)
+
+describe('orphan marketplace metadata scrub', () => {
+  test('item pointing at removed builtin entry loses marketplace badge on refresh', () => {
+    const itemId = crypto.randomUUID()
+    const orphanMeta = {
+      marketplace: {
+        registryId: 'builtin-slayzone',
+        registryName: 'SlayZone Built-in',
+        entryId: 'builtin-ghost-skill',
+        installedVersion: 'deadbeef',
+        installedAt: new Date().toISOString(),
+      },
+    }
+    h7.db.prepare(`
+      INSERT INTO ai_config_items (id, type, scope, project_id, name, slug, content, metadata_json, created_at, updated_at)
+      VALUES (?, 'skill', 'project', ?, 'Ghost Skill', 'ghost-skill', '# ghost', ?, datetime('now'), datetime('now'))
+    `).run(itemId, p7.projectId, JSON.stringify(orphanMeta))
+
+    h7.invoke('ai-config:marketplace:refresh-registry', 'builtin-slayzone')
+
+    const row = h7.db.prepare('SELECT metadata_json FROM ai_config_items WHERE id = ?').get(itemId) as { metadata_json: string }
+    const meta = JSON.parse(row.metadata_json) as Record<string, unknown>
+    expect(meta.marketplace).toBeUndefined()
+  })
+
+  test('item pointing at valid builtin entry keeps its marketplace metadata', () => {
+    const entry = h7.db.prepare(`
+      SELECT id, slug, content_hash FROM skill_registry_entries WHERE registry_id = 'builtin-slayzone' LIMIT 1
+    `).get() as { id: string; slug: string; content_hash: string }
+    const itemId = crypto.randomUUID()
+    const validMeta = {
+      marketplace: {
+        registryId: 'builtin-slayzone',
+        registryName: 'SlayZone Built-in',
+        entryId: entry.id,
+        installedVersion: entry.content_hash,
+        installedAt: new Date().toISOString(),
+      },
+    }
+    h7.db.prepare(`
+      INSERT INTO ai_config_items (id, type, scope, project_id, name, slug, content, metadata_json, created_at, updated_at)
+      VALUES (?, 'skill', 'project', ?, ?, ?, '# valid', ?, datetime('now'), datetime('now'))
+    `).run(itemId, p7.projectId, entry.slug + '-valid', entry.slug + '-valid', JSON.stringify(validMeta))
+
+    h7.invoke('ai-config:marketplace:refresh-registry', 'builtin-slayzone')
+
+    const row = h7.db.prepare('SELECT metadata_json FROM ai_config_items WHERE id = ?').get(itemId) as { metadata_json: string }
+    const meta = JSON.parse(row.metadata_json) as { marketplace?: { entryId?: string } }
+    expect(meta.marketplace?.entryId).toBe(entry.id)
+  })
+})
+
 h1.cleanup()
 h2.cleanup()
 h3.cleanup()
 h4.cleanup()
 h5.cleanup()
 h6.cleanup()
+h7.cleanup()
 console.log('\nDone')

@@ -451,6 +451,28 @@ function seedBuiltinEntries(db: Database): void {
       `DELETE FROM skill_registry_entries WHERE registry_id = ? AND slug NOT IN (${placeholders})`
     ).run(registryId, ...validSlugs)
 
+    // Scrub orphan marketplace metadata: items still tagged with this registry
+    // but whose entryId no longer exists (e.g. skill removed from BUILTIN_SKILLS
+    // but item row kept). Otherwise UI keeps showing the "built-in" badge.
+    const orphans = db.prepare(`
+      SELECT i.id, i.metadata_json
+      FROM ai_config_items i
+      WHERE json_extract(i.metadata_json, '$.marketplace.registryId') = ?
+        AND NOT EXISTS (
+          SELECT 1 FROM skill_registry_entries e
+          WHERE e.id = json_extract(i.metadata_json, '$.marketplace.entryId')
+        )
+    `).all(registryId) as Array<{ id: string; metadata_json: string }>
+
+    for (const orphan of orphans) {
+      let meta: Record<string, unknown>
+      try { meta = JSON.parse(orphan.metadata_json) as Record<string, unknown> }
+      catch { meta = {} }
+      delete meta.marketplace
+      db.prepare(`UPDATE ai_config_items SET metadata_json = ?, updated_at = datetime('now') WHERE id = ?`)
+        .run(JSON.stringify(meta), orphan.id)
+    }
+
     // Auto-update installed builtin skills whose content is stale
     const staleItems = db.prepare(`
       SELECT i.id as item_id, e.id as entry_id, i.metadata_json, e.slug, e.content, e.content_hash
