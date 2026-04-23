@@ -9,6 +9,9 @@ export interface OpenFile {
   tooLarge?: boolean
   sizeBytes?: number
   diskChanged?: boolean
+  /** File was removed from disk while tab was open. Dirty tabs are kept so
+   * the user can save-to-recreate or close-to-discard. */
+  deleted?: boolean
   /** Non-text file rendered by dedicated viewer (image, etc.) */
   binary?: boolean
 }
@@ -95,7 +98,7 @@ export function useFileEditor(
       setOpenFiles((prev) =>
         prev.map((f) =>
           f.path === filePath
-            ? { ...f, content: result.content, originalContent: result.content, diskChanged: false }
+            ? { ...f, content: result.content, originalContent: result.content, diskChanged: false, deleted: false }
             : f
         )
       )
@@ -111,6 +114,59 @@ export function useFileEditor(
 
   const projectPathRef = useRef(projectPath)
   projectPathRef.current = projectPath
+
+  const openFilesRef = useRef(openFiles)
+  openFilesRef.current = openFiles
+
+  useEffect(() => {
+    const unsubscribe = window.api.fs.onFileDeleted((rootPath, relPath) => {
+      const normalize = (p: string) => p.replace(/\/+$/, '')
+      if (normalize(rootPath) !== normalize(projectPathRef.current)) return
+
+      const prefix = relPath + '/'
+      const isMatch = (p: string) => p === relPath || p.startsWith(prefix)
+
+      const current = openFilesRef.current
+      const matching = current.filter((f) => isMatch(f.path))
+      if (matching.length === 0) return
+
+      // Dirty files stay open (marked deleted); clean files close.
+      const nextFiles: OpenFile[] = []
+      const closedPaths = new Set<string>()
+      for (const f of current) {
+        if (!isMatch(f.path)) { nextFiles.push(f); continue }
+        const dirty = f.content !== f.originalContent
+        if (dirty) {
+          nextFiles.push({ ...f, deleted: true, diskChanged: true })
+        } else {
+          closedPaths.add(f.path)
+        }
+      }
+      setOpenFiles(nextFiles)
+
+      if (closedPaths.size > 0) {
+        setActiveFilePath((curActive) => {
+          if (!curActive || !closedPaths.has(curActive)) return curActive
+          return nextFiles.length > 0 ? nextFiles[nextFiles.length - 1].path : null
+        })
+        setFileVersions((prev) => {
+          let changed = false
+          const next = new Map<string, number>()
+          for (const [k, v] of prev) {
+            if (closedPaths.has(k)) { changed = true; continue }
+            next.set(k, v)
+          }
+          return changed ? next : prev
+        })
+      }
+
+      if (treeRefreshTimer.current) clearTimeout(treeRefreshTimer.current)
+      treeRefreshTimer.current = setTimeout(() => {
+        setTreeRefreshKey((k) => k + 1)
+      }, 500)
+    })
+    return unsubscribe
+  }, [])
 
   useEffect(() => {
     const unsubscribe = window.api.fs.onFileChanged((rootPath, relPath) => {
@@ -134,7 +190,7 @@ export function useFileEditor(
         if (isDirty) {
           // Mark as disk-changed, don't auto-reload
           const next = [...prev]
-          next[fileIdx] = { ...file, diskChanged: true }
+          next[fileIdx] = { ...file, diskChanged: true, deleted: false }
           return next
         }
 
@@ -227,7 +283,7 @@ export function useFileEditor(
     await window.api.fs.writeFile(projectPath, filePath, file.content)
     setOpenFiles((prev) =>
       prev.map((f) =>
-        f.path === filePath ? { ...f, originalContent: f.content, diskChanged: false } : f
+        f.path === filePath ? { ...f, originalContent: f.content, diskChanged: false, deleted: false } : f
       )
     )
   }, [projectPath, openFiles])
@@ -263,6 +319,14 @@ export function useFileEditor(
     (filePath: string) => {
       const file = openFiles.find((f) => f.path === filePath)
       return file?.diskChanged ?? false
+    },
+    [openFiles]
+  )
+
+  const isFileDeleted = useCallback(
+    (filePath: string) => {
+      const file = openFiles.find((f) => f.path === filePath)
+      return file?.deleted ?? false
     },
     [openFiles]
   )
@@ -318,6 +382,7 @@ export function useFileEditor(
     isDirty,
     hasDirtyFiles,
     isFileDiskChanged,
+    isFileDeleted,
     renameOpenFile,
     refreshTree,
     isRestoring,

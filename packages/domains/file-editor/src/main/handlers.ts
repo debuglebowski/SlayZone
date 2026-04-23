@@ -180,9 +180,12 @@ export function registerFileEditorHandlers(ipcMain: IpcMain): void {
         if (prev) clearTimeout(prev)
         debounceMap.set(relPath, setTimeout(() => {
           debounceMap.delete(relPath)
+          const abs = path.join(root, relPath)
+          const exists = fs.existsSync(abs)
+          const channel = exists ? 'fs:changed' : 'fs:deleted'
           for (const w of wins) {
             if (!w.isDestroyed()) {
-              w.webContents.send('fs:changed', root, relPath)
+              w.webContents.send(channel, root, relPath)
             }
           }
         }, 100))
@@ -207,6 +210,7 @@ export function registerFileEditorHandlers(ipcMain: IpcMain): void {
 
   ipcMain.handle('fs:writeFile', (_event, rootPath: string, filePath: string, content: string): void => {
     const abs = assertWithinRoot(rootPath, filePath)
+    fs.mkdirSync(path.dirname(abs), { recursive: true })
     fs.writeFileSync(abs, content, 'utf-8')
   })
 

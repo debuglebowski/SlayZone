@@ -58,6 +58,7 @@ export const FileEditorView = forwardRef<FileEditorViewHandle, FileEditorViewPro
     closeFile,
     isDirty,
     isFileDiskChanged,
+    isFileDeleted,
     renameOpenFile,
     isRestoring,
     refreshTree,
@@ -340,10 +341,11 @@ export const FileEditorView = forwardRef<FileEditorViewHandle, FileEditorViewPro
             onClose={handleCloseFile}
             isDirty={isDirty}
             diskChanged={isFileDiskChanged}
+            deleted={isFileDeleted}
             treeVisible={treeVisible}
             onToggleTree={() => setTreeVisible((v) => !v)}
           />
-          {isMarkdown && activeFile?.content != null && (
+          {isMarkdown && activeFile?.content != null && !activeFile?.deleted && (
             <div className="flex items-center shrink-0 mr-2 bg-surface-1 rounded-md p-0.5 gap-0.5">
               {([
                 { mode: 'rich' as const, icon: Eye, title: 'Rich text' },
@@ -363,6 +365,16 @@ export const FileEditorView = forwardRef<FileEditorViewHandle, FileEditorViewPro
           )}
         </div>
 
+        {activeFile?.deleted && (
+          <div className="shrink-0 flex items-center gap-3 px-3 py-2 bg-destructive/10 border-b border-destructive/30 text-xs">
+            <span className="text-destructive font-medium">File deleted on disk.</span>
+            <span className="text-muted-foreground">Save to recreate, or close tab to discard changes.</span>
+            <div className="ml-auto flex items-center gap-2">
+              <Button size="sm" variant="outline" onClick={() => saveFile(activeFile.path)}>Save</Button>
+              <Button size="sm" variant="ghost" onClick={() => closeFile(activeFile.path)}>Discard</Button>
+            </div>
+          </div>
+        )}
         {activeFile && isImage ? (
           <div className="flex-1 min-h-0 flex items-center justify-center overflow-auto p-4 bg-[repeating-conic-gradient(hsl(var(--muted))_0%_25%,transparent_0%_50%)_50%/16px_16px]">
             <img

@@ -10,6 +10,7 @@ interface EditorTabBarProps {
   onClose: (path: string) => void
   isDirty: (path: string) => boolean
   diskChanged?: (path: string) => boolean
+  deleted?: (path: string) => boolean
   treeVisible?: boolean
   onToggleTree?: () => void
 }
@@ -18,7 +19,7 @@ function fileName(path: string): string {
   return path.split('/').pop() ?? path
 }
 
-export function EditorTabBar({ files, activeFilePath, onSelect, onClose, isDirty, diskChanged, treeVisible, onToggleTree }: EditorTabBarProps) {
+export function EditorTabBar({ files, activeFilePath, onSelect, onClose, isDirty, diskChanged, deleted, treeVisible, onToggleTree }: EditorTabBarProps) {
   return (
     <div className="flex items-center h-10 px-2 gap-1 flex-1 min-w-0">
       {onToggleTree && (
@@ -55,7 +56,9 @@ export function EditorTabBar({ files, activeFilePath, onSelect, onClose, isDirty
             <span className="truncate max-w-[160px] font-mono">
               {name}
             </span>
-            {diskChanged?.(file.path) && (
+            {deleted?.(file.path) ? (
+              <span className="text-[10px] leading-none text-destructive shrink-0">deleted</span>
+            ) : diskChanged?.(file.path) && (
               <span className="text-[10px] leading-none text-amber-500 shrink-0">changed</span>
             )}
             <span
