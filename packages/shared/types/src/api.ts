@@ -270,6 +270,7 @@ export interface ElectronAPI {
     getTasksByProject: (projectId: string) => Promise<Task[]>
     getTask: (id: string) => Promise<Task | null>
     getSubTasks: (parentId: string) => Promise<Task[]>
+    getSubTasksRecursive: (rootId: string) => Promise<Task[]>
     createTask: (data: CreateTaskInput) => Promise<Task>
     updateTask: (data: UpdateTaskInput) => Promise<Task>
     deleteTask: (id: string) => Promise<boolean>
@@ -414,6 +415,8 @@ export interface ElectronAPI {
     isJiraIntegrationEnabledSync: boolean
     isLoopModeEnabled: () => Promise<boolean>
     isLoopModeEnabledSync: boolean
+    isAgentManagerEnabled: () => Promise<boolean>
+    isAgentManagerEnabledSync: boolean
     isAgentPanelLabelEnabled: () => Promise<boolean>
     isAgentPanelLabelEnabledSync: boolean
     getZoomFactor: () => Promise<number>

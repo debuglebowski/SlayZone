@@ -1,11 +1,13 @@
 import { useState, useEffect, useCallback, useRef, useMemo, forwardRef, useImperativeHandle } from 'react'
 import { usePty } from '@slayzone/terminal'
+import { Terminal as TerminalView } from '@slayzone/terminal/client/Terminal'
 import type { TerminalMode } from '@slayzone/terminal/shared'
 import { matchesShortcut, useShortcutStore, withModalGuard, getThemeChrome, getChromeStyleOverrides } from '@slayzone/ui'
 import { useTheme } from '@slayzone/settings/client'
 import { useTaskTerminals } from './useTaskTerminals'
 import { TerminalTabBar, type TerminalTabBarHandle } from './TerminalTabBar'
 import { TerminalSplitGroup, type TerminalSplitGroupHandle } from './TerminalSplitGroup'
+import { ManagerSidebar, type ManagerTask } from './ManagerSidebar'
 import type { TabDisplayMode } from '../shared/types'
 
 export interface TerminalContainerHandle {
@@ -45,6 +47,10 @@ interface TerminalContainerProps {
   onMainReset?: () => void
   rightContent?: React.ReactNode
   overlay?: React.ReactNode
+  /** Title of the root task — shown as "Main" row label in manager sidebar. */
+  taskTitle?: string
+  /** Persisted orchestrator/manager-mode toggle state (from task.manager_mode). */
+  initialManagerMode?: boolean
 }
 
 export const TerminalContainer = forwardRef<TerminalContainerHandle, TerminalContainerProps>(function TerminalContainer({
@@ -73,6 +79,8 @@ export const TerminalContainer = forwardRef<TerminalContainerHandle, TerminalCon
   onMainReset,
   rightContent,
   overlay,
+  taskTitle,
+  initialManagerMode,
 }: TerminalContainerProps, ref) {
   const {
     tabs,
@@ -90,6 +98,56 @@ export const TerminalContainer = forwardRef<TerminalContainerHandle, TerminalCon
 
   // Owns keyboard shortcuts; falls back to isActive so non-explode callers need not set it.
   const shortcutActive = hasShortcutFocus ?? isActive
+
+  // Manager mode: optional left sidebar showing subtask tree; selecting a subtask
+  // swaps the output area to that subtask's main PTY session. Gated by labs flag.
+  // Persisted per-task via tasks.manager_mode column.
+  const agentManagerEnabled = window.api.app.isAgentManagerEnabledSync
+  const [managerMode, setManagerMode] = useState<boolean>(initialManagerMode ?? false)
+  const [managerSelectedTask, setManagerSelectedTask] = useState<ManagerTask | null>(null)
+  const handleManagerToggle = useCallback(() => {
+    setManagerMode((v) => {
+      const next = !v
+      if (v) setManagerSelectedTask(null)
+      window.api.db.updateTask({ id: taskId, managerMode: next }).catch(() => {})
+      return next
+    })
+  }, [taskId])
+  const handleManagerSelect = useCallback((task: ManagerTask | null) => {
+    setManagerSelectedTask(task)
+  }, [])
+  // Reset selection + sync mode from task prop when switching task.
+  useEffect(() => {
+    setManagerSelectedTask(null)
+    setManagerMode(initialManagerMode ?? false)
+  }, [taskId, initialManagerMode])
+
+  // Track whether task has any direct subtasks — toggle button hidden otherwise.
+  // `loaded` guards the auto-exit effect so it doesn't fire before the first fetch resolves
+  // (which would incorrectly clear a persisted managerMode on mount).
+  const [subtaskInfo, setSubtaskInfo] = useState<{ loaded: boolean; has: boolean }>({ loaded: false, has: false })
+  useEffect(() => {
+    let cancelled = false
+    setSubtaskInfo({ loaded: false, has: false })
+    const refresh = (): void => {
+      window.api.db.getSubTasks(taskId)
+        .then((rows) => { if (!cancelled) setSubtaskInfo({ loaded: true, has: rows.length > 0 }) })
+        .catch(() => {})
+    }
+    refresh()
+    const cleanup = window.api?.app?.onTasksChanged?.(refresh)
+    return () => { cancelled = true; cleanup?.() }
+  }, [taskId])
+  const hasSubtasks = subtaskInfo.has
+
+  // Auto-exit manager mode if subtasks disappear — persist the off state.
+  useEffect(() => {
+    if (subtaskInfo.loaded && !subtaskInfo.has && managerMode) {
+      setManagerMode(false)
+      setManagerSelectedTask(null)
+      window.api.db.updateTask({ id: taskId, managerMode: false }).catch(() => {})
+    }
+  }, [subtaskInfo, managerMode, taskId])
 
   const { subscribePrompt, subscribeTitle } = usePty()
   const { terminalOverrideThemeId, contentVariant } = useTheme()
@@ -358,33 +416,61 @@ export const TerminalContainer = forwardRef<TerminalContainerHandle, TerminalCon
     })
   }, [activeGroup, getSessionId, cwd, taskId, conversationId, existingConversationId, supportsSessionId, initialPrompt, providerFlags, executionContext, handleConversationCreated, onSessionInvalid, handleTerminalReady, onFirstInput, onRetry, handleSplitGroup, createTab, closeGroup, closeTab, onMainReset, setTabDisplayMode])
 
+  const showingSubtaskPty = managerMode && managerSelectedTask && managerSelectedTask.id !== taskId
+  const subtaskCwd = managerSelectedTask?.worktree_path ?? managerSelectedTask?.base_dir ?? cwd
+
   return (
-    <div className="h-full flex flex-col" style={terminalPanelStyle as React.CSSProperties | undefined}>
-      <TerminalTabBar
-        ref={tabBarRef}
-        groups={groups}
-        activeGroupId={activeGroupId}
-        terminalTitles={terminalTitles}
-        onGroupSelect={(groupId) => { pendingFocusRef.current = true; setActiveGroupId(groupId) }}
-        onGroupCreate={() => { pendingFocusRef.current = true; createTab() }}
-        onGroupClose={closeGroup}
-        onGroupSplit={handleSplitGroup}
-        onPaneClose={closeTab}
-        onPaneMove={movePane}
-        onGroupRename={renameTab}
-        rightContent={rightContent}
-      />
-      <div className="flex-1 min-h-0 relative">
-        <TerminalSplitGroup
-          ref={splitGroupRef}
-          key={activeGroupId}
-          panes={paneProps}
-          isActive={isActive}
-          onAttached={handlePaneAttached}
-          onOpenUrl={onOpenUrl}
-          onOpenFile={onOpenFile}
+    <div className="h-full flex" style={terminalPanelStyle as React.CSSProperties | undefined}>
+      {agentManagerEnabled && managerMode && (
+        <ManagerSidebar
+          rootTaskId={taskId}
+          rootTitle={taskTitle ?? 'Main'}
+          selectedTaskId={managerSelectedTask?.id ?? null}
+          onSelect={handleManagerSelect}
+          onToggleOff={handleManagerToggle}
         />
-        {overlay}
+      )}
+      <div className="flex-1 min-w-0 flex flex-col">
+        <TerminalTabBar
+          ref={tabBarRef}
+          groups={groups}
+          activeGroupId={activeGroupId}
+          terminalTitles={terminalTitles}
+          onGroupSelect={(groupId) => { pendingFocusRef.current = true; setActiveGroupId(groupId) }}
+          onGroupCreate={() => { pendingFocusRef.current = true; createTab() }}
+          onGroupClose={closeGroup}
+          onGroupSplit={handleSplitGroup}
+          onPaneClose={closeTab}
+          onPaneMove={movePane}
+          onGroupRename={renameTab}
+          rightContent={rightContent}
+          managerModeActive={agentManagerEnabled && managerMode}
+          onManagerToggle={agentManagerEnabled && hasSubtasks ? handleManagerToggle : undefined}
+        />
+        <div className="flex-1 min-h-0 relative">
+          {showingSubtaskPty && managerSelectedTask ? (
+            <TerminalView
+              key={`manager:${managerSelectedTask.id}`}
+              sessionId={`${managerSelectedTask.id}:${managerSelectedTask.id}`}
+              cwd={subtaskCwd}
+              mode={managerSelectedTask.terminal_mode}
+              isActive={isActive}
+              onOpenUrl={onOpenUrl}
+              onOpenFile={onOpenFile}
+            />
+          ) : (
+            <TerminalSplitGroup
+              ref={splitGroupRef}
+              key={activeGroupId}
+              panes={paneProps}
+              isActive={isActive}
+              onAttached={handlePaneAttached}
+              onOpenUrl={onOpenUrl}
+              onOpenFile={onOpenFile}
+            />
+          )}
+          {overlay}
+        </div>
       </div>
     </div>
   )

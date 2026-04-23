@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback, forwardRef, useImperativeHandle } from 'react'
-import { Plus, X, Columns2, Terminal as TerminalIcon, Bot, Command, MousePointerClick, Sparkles, Code, Glasses } from 'lucide-react'
+import { Plus, X, Columns2, Terminal as TerminalIcon, Bot, Command, MousePointerClick, Sparkles, Code, Glasses, ListTree } from 'lucide-react'
 import { cn, useShortcutDisplay, withShortcut } from '@slayzone/ui'
 import type { TerminalTab, TerminalGroup } from '../shared/types'
 import type { TerminalMode } from '@slayzone/terminal/shared'
@@ -16,6 +16,8 @@ interface TerminalTabBarProps {
   onGroupRename: (tabId: string, label: string | null) => void
   terminalTitles?: Map<string, string>
   rightContent?: React.ReactNode
+  managerModeActive?: boolean
+  onManagerToggle?: () => void
 }
 
 const MODE_ICONS: Partial<Record<TerminalMode, typeof TerminalIcon>> = {
@@ -48,7 +50,9 @@ export const TerminalTabBar = forwardRef<TerminalTabBarHandle, TerminalTabBarPro
   onPaneMove,
   onGroupRename,
   terminalTitles,
-  rightContent
+  rightContent,
+  managerModeActive,
+  onManagerToggle
 }: TerminalTabBarProps, ref: React.Ref<TerminalTabBarHandle>) {
   const terminalSplitShortcut = useShortcutDisplay('terminal-split')
   const [editingTabId, setEditingTabId] = useState<string | null>(null)
@@ -158,6 +162,22 @@ export const TerminalTabBar = forwardRef<TerminalTabBarHandle, TerminalTabBarPro
       data-testid="terminal-tabbar"
       className="flex items-center h-10 px-2 bg-surface-1 border-b border-border"
     >
+      {onManagerToggle && !managerModeActive && (
+        <button
+          type="button"
+          data-testid="terminal-manager-toggle"
+          className={cn(
+            'flex items-center justify-center h-7 w-7 rounded-md shrink-0 mr-1 cursor-pointer transition-all select-none',
+            'bg-surface-2 dark:bg-surface-2/50 hover:bg-accent/80 dark:hover:bg-accent/50',
+            'text-muted-foreground'
+          )}
+          onClick={onManagerToggle}
+          title="Manager mode"
+          aria-pressed="false"
+        >
+          <ListTree className="size-4" />
+        </button>
+      )}
       <div className="flex items-center gap-1 min-w-0 overflow-x-auto scrollbar-hide">
         {groups.map(group => {
           const isActive = group.id === activeGroupId

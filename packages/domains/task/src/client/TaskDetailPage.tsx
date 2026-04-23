@@ -17,7 +17,7 @@ import type { Project } from '@slayzone/projects/shared'
 import { getDefaultStatus, getDoneStatus, isTerminalStatus, resolveRepoPath } from '@slayzone/projects/shared'
 import { useDetectedRepos } from '@slayzone/projects'
 import { DEV_SERVER_URL_PATTERN, SESSION_ID_COMMANDS, SESSION_ID_UNAVAILABLE } from '@slayzone/terminal/shared'
-import type { TerminalMode, TerminalState, ValidationResult } from '@slayzone/terminal/shared'
+import type { TerminalMode, ValidationResult } from '@slayzone/terminal/shared'
 import { Button, IconButton, PanelToggle, DevServerToast, Collapsible, CollapsibleTrigger, CollapsibleContent } from '@slayzone/ui'
 import {
   DropdownMenu,
@@ -65,11 +65,11 @@ import { TaskMetadataSidebar, ExternalSyncCard } from './TaskMetadataSidebar'
 import { RichTextEditor } from '@slayzone/editor'
 import { normalizeDescription, stripMarkdown, getExtensionFromTitle, getEffectiveRenderMode, RENDER_MODE_INFO } from '@slayzone/task/shared'
 import { useTheme, useDialogStore, type SearchFileContext } from '@slayzone/settings/client'
-import { markSkipCache, usePty, useTerminalModes, getVisibleModes, getModeLabel, groupTerminalModes, useLoopMode, isLoopActive, stripAnsi, serializeTerminalHistory, LoopModeBanner, LoopModeDialog, SlayNudgeBanner, useSlayNudge } from '@slayzone/terminal'
+import { markSkipCache, usePty, useTerminalModes, getVisibleModes, getModeLabel, groupTerminalModes, useLoopMode, isLoopActive, stripAnsi, serializeTerminalHistory, LoopModeBanner, LoopModeDialog, SlayNudgeBanner, useSlayNudge, PtyStateDot } from '@slayzone/terminal'
 import type { LoopConfig } from '@slayzone/terminal/shared'
 import { TerminalContainer, type TerminalContainerHandle, ConfirmDisplayModeDialog, type TabDisplayMode, isChatSupported } from '@slayzone/task-terminals'
 import { UnifiedGitPanel, type UnifiedGitPanelHandle, type GitTabId } from '@slayzone/worktrees'
-import { buildStatusOptions, cn, getColumnStatusStyle, getTerminalStateStyle, PriorityIcon, useAppearance, matchesShortcut, useShortcutStore, useShortcutDisplay, withModalGuard, getThemeEditorColors, getAgentPanelLabel, type EditorThemeColors } from '@slayzone/ui'
+import { buildStatusOptions, cn, getColumnStatusStyle, PriorityIcon, useAppearance, matchesShortcut, useShortcutStore, useShortcutDisplay, withModalGuard, getThemeEditorColors, getAgentPanelLabel, type EditorThemeColors } from '@slayzone/ui'
 import { BrowserPanel, type BrowserPanelHandle } from '@slayzone/task-browser'
 import { FileEditorView, type FileEditorViewHandle } from '@slayzone/file-editor/client'
 import type { EditorOpenFilesState, OpenFileOptions } from '@slayzone/file-editor/shared'
@@ -179,25 +179,6 @@ function SortableSubTask({ sub, columns, statusOptions, onNavigate, onUpdate, on
         <ContextMenuItem variant="destructive" onSelect={() => onDelete(sub.id)}>Delete</ContextMenuItem>
       </ContextMenuContent>
     </ContextMenu>
-  )
-}
-
-function PtyStateDot({ sessionId }: { sessionId: string }): React.JSX.Element | null {
-  const { getState, subscribeState } = usePty()
-  const [state, setState] = useState<TerminalState>(() => getState(sessionId))
-  useEffect(() => {
-    setState(getState(sessionId))
-    return subscribeState(sessionId, (next) => setState(next))
-  }, [sessionId, getState, subscribeState])
-  const style = state !== 'starting' ? getTerminalStateStyle(state) : null
-  if (!style) return null
-  return (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <span className={cn('shrink-0 size-2 rounded-full', style.color)} aria-label={`Terminal: ${style.label}`} />
-      </TooltipTrigger>
-      <TooltipContent>Terminal: {style.label}</TooltipContent>
-    </Tooltip>
   )
 }
 
@@ -1883,6 +1864,8 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
                   ref={terminalContainerRef}
                   key={`${terminalKey}-${task.project_id}-${effectiveRepoPath || ''}-${task.worktree_path || ''}-${task.base_dir || ''}`}
                   taskId={task.id}
+                  taskTitle={task.title}
+                  initialManagerMode={task.manager_mode}
                   isActive={isActive}
                   hasShortcutFocus={shortcutActive}
                   cwd={effectiveRepoPath || project?.path || ''}
