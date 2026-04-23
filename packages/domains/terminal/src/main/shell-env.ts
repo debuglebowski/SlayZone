@@ -92,6 +92,33 @@ export function buildExecCommand(binary: string, args: string[] = []): string {
 }
 
 /**
+ * Target soft limit for RLIMIT_NOFILE in PTY-spawned shells. macOS default is
+ * 256, which is too low for Bun-compiled CLIs (e.g. Factory.ai droid) that
+ * open many fds on startup and fail with an opaque "An unknown error occurred
+ * (Unexpected)" when they hit EMFILE. 65535 is well within the typical
+ * kern.maxfilesperproc (245760 on recent macOS).
+ */
+const PTY_FD_SOFT_LIMIT = 65535
+
+/**
+ * Wrap a shell invocation with a /bin/sh prefix that raises RLIMIT_NOFILE
+ * before exec'ing the real shell. The `exec` keyword replaces the sh process
+ * so the PID and PTY association are preserved.
+ *
+ * No-ops on Windows (ulimit unavailable) and when the current soft limit is
+ * already at or above the target (never lowers an intentionally-raised limit).
+ */
+export function wrapShellWithUlimit(shell: string, args: string[]): { file: string; args: string[] } {
+  if (platform() === 'win32') return { file: shell, args }
+  const quoted = [shell, ...args].map(quoteForShell).join(' ')
+  // The inner `if` guards against lowering: if `ulimit -n` reports "unlimited"
+  // or a value already >= target, leave it alone. Stderr-redirect + `|| true`
+  // makes the ulimit call best-effort so a read-only rlimit doesn't abort exec.
+  const script = `cur=$(ulimit -n 2>/dev/null); if [ "$cur" != unlimited ] && [ "$cur" -lt ${PTY_FD_SOFT_LIMIT} ] 2>/dev/null; then ulimit -n ${PTY_FD_SOFT_LIMIT} 2>/dev/null || true; fi; exec ${quoted}`
+  return { file: '/bin/sh', args: ['-c', script] }
+}
+
+/**
  * Check if shell environment is available for terminal launching.
  */
 export function validateShellEnv(): ValidationResult {

@@ -501,7 +501,7 @@ export interface ElectronAPI {
     onStats: (cb: (stats: Record<string, ProcessStats>) => void) => () => void
     getState: (sessionId: string) => Promise<TerminalState | null>
     validate: (mode: TerminalMode) => Promise<ValidationResult[]>
-    setTheme: (theme: { foreground: string; background: string; cursor: string }) => Promise<void>
+    setTheme: (theme: { foreground: string; background: string; cursor: string; ansi?: readonly string[] }) => Promise<void>
     setShellOverride: (value: string | null) => Promise<void>
   }
   chat: {

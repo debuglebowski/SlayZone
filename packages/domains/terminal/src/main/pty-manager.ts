@@ -12,8 +12,11 @@ import { getAdapter, type TerminalMode, type TerminalAdapter, type SpawnConfig, 
 import { interpolateTemplate } from './adapters/template-interpolation'
 import { parseShellArgs } from './adapters/flag-parser'
 import { StateMachine, activityToTerminalState } from './state-machine'
-import { quoteForShell, buildExecCommand, resolveUserShell, getShellStartupArgs } from './shell-env'
+import { quoteForShell, buildExecCommand, resolveUserShell, getShellStartupArgs, wrapShellWithUlimit } from './shell-env'
 import { shouldShellFallback, shouldNotifySessionNotFound, buildRecoveryMessage } from './pty-exit-strategy'
+import { computeSyncQueryResponse, type TerminalTheme } from './sync-query-response'
+import { filterBufferData } from './filter-buffer-data'
+export { filterBufferData }
 
 // Database reference for notifications
 let db: Database | null = null
@@ -215,95 +218,31 @@ function taskIdFromSessionId(sessionId: string): string {
 
 // Theme colors used to respond to OSC 10/11/12 color queries synchronously.
 // Set by the renderer via pty:set-theme IPC whenever the theme changes.
-interface TerminalTheme { foreground: string; background: string; cursor: string }
 let currentTerminalTheme: TerminalTheme = { foreground: '#ffffff', background: '#000000', cursor: '#ffffff' }
 
 export function setTerminalTheme(theme: TerminalTheme): void {
   currentTerminalTheme = theme
 }
 
-function hexToOscRgb(hex: string): string {
-  const r = hex.slice(1, 3)
-  const g = hex.slice(3, 5)
-  const b = hex.slice(5, 7)
-  return `rgb:${r}${r}/${g}${g}/${b}${b}`
-}
-
-import { filterBufferData } from './filter-buffer-data'
-export { filterBufferData }
-
-// Intercept timing-critical terminal queries synchronously in the PTY onData handler.
-// CPR/DA/DSR must be answered before the program proceeds to readline mode.
-// An async renderer round-trip would arrive too late — the response bytes would then
-// appear as garbage text in the user's prompt.
-// OSC color queries (10/11/12) are also handled here using the cached theme.
-//
-// Split sequences: OSC/CSI sequences can arrive split across two onData calls.
-// session.syncQueryPending carries any trailing incomplete sequence to the next call.
+// Answer timing-critical terminal queries synchronously. See computeSyncQueryResponse
+// in ./sync-query-response for the pure logic. Writes responses via writeSync(fd)
+// rather than pty.write() (which is async) so they reach the program in the same
+// read loop iteration — an async response would land after the program had moved
+// on and show up as garbage bytes in stdin.
 function interceptSyncQueries(session: PtySession, data: string): string {
-  // Prepend any incomplete sequence carried from the previous chunk
-  let input = session.syncQueryPending + data
-  session.syncQueryPending = ''
+  const input = session.syncQueryPending + data
+  const { response, forwarded, pendingPartial } = computeSyncQueryResponse(input, currentTerminalTheme)
+  session.syncQueryPending = pendingPartial
 
-  let response = ''
-
-  // DA1 — Primary Device Attributes
-  input = input.replace(/\x1b\[0?c/g, () => { response += '\x1b[?62;4;22c'; return '' })
-  // DA2 — Secondary Device Attributes
-  input = input.replace(/\x1b\[>0?c/g, () => { response += '\x1b[>0;10;1c'; return '' })
-  // DSR — Device Status Report
-  input = input.replace(/\x1b\[5n/g, () => { response += '\x1b[0n'; return '' })
-  // CPR — Cursor Position. Respond with row=1 col=1. Programs (readline) use CPR mainly
-  // to check if the cursor is at col=1 before drawing a prompt. In practice the terminal
-  // is at col=1 at this point (startup output ends with a newline).
-  input = input.replace(/\x1b\[6n/g, () => { response += '\x1b[1;1R'; return '' })
-
-  // OSC 10/11/12 — Foreground / Background / Cursor color queries.
-  // Answered using the theme last set by the renderer via pty:set-theme.
-  input = input.replace(/\x1b\]10;\?(?:\x07|\x1b\\)/g, () => {
-    response += `\x1b]10;${hexToOscRgb(currentTerminalTheme.foreground)}\x07`
-    return ''
-  })
-  input = input.replace(/\x1b\]11;\?(?:\x07|\x1b\\)/g, () => {
-    response += `\x1b]11;${hexToOscRgb(currentTerminalTheme.background)}\x07`
-    return ''
-  })
-  input = input.replace(/\x1b\]12;\?(?:\x07|\x1b\\)/g, () => {
-    response += `\x1b]12;${hexToOscRgb(currentTerminalTheme.cursor)}\x07`
-    return ''
-  })
-
-  // Strip any remaining OSC queries (e.g. OSC 4 palette) to prevent xterm.js
-  // from responding — its responses travel main→IPC→renderer→IPC→main→pty,
-  // arriving far too late and injecting stale OSC bytes into the process stdin.
-  input = input.replace(/\x1b\]\d+;[^\x07\x1b]*\?(?:\x07|\x1b\\)/g, '')
-
-  // Write responses synchronously via writeSync(fd) — NOT pty.write() which is
-  // async (fs.write + callback queue). Real terminal emulators respond with a
-  // synchronous write() syscall in the same read loop iteration. Using node-pty's
-  // async write causes responses to arrive in a later event loop tick, after the
-  // querying program may have already timed out and moved on (e.g. gh CLI's
-  // lipgloss queries OSC 11, times out, starts survey prompt, then our late
-  // response arrives as unexpected \x1b] bytes in stdin).
   if (response) {
     try {
       writeSync((session.pty as unknown as { fd: number }).fd, response)
     } catch {
-      // Fallback to async write if fd access fails
       session.pty.write(response)
     }
   }
 
-  // Check for a trailing incomplete OSC or CSI sequence that may complete in the next chunk.
-  // OSC: ESC ] <body> — body ends with BEL or ST (ESC \). Trailing ESC alone could be ST start.
-  // CSI: ESC [ <params> — ends with a letter in range @–~.
-  const partial = input.match(/\x1b(?:\][^\x07\x1b]*\x1b?|\[[0-9;:>]*)?$/)
-  if (partial?.[0]) {
-    session.syncQueryPending = partial[0]
-    input = input.slice(0, -partial[0].length)
-  }
-
-  return input
+  return forwarded
 }
 
 function stripAnsiForSessionParse(data: string): string {
@@ -702,13 +641,22 @@ export async function createPty(opts: CreatePtyOptions): Promise<{ success: bool
     let usedShellFallback = false
     const spawnStartTs = Date.now()
     let ptyProcess: pty.IPty
+    // Non-transport spawns get wrapped in `/bin/sh -c 'ulimit -n 65535; exec
+    // <shell> <args>'` so child processes inherit a soft fd limit high enough
+    // for Bun-compiled CLIs (e.g. droid). Transport spawns (docker/ssh) handle
+    // their own env on the remote side.
+    const spawn = (rawFile: string, rawArgs: string[]): pty.IPty => {
+      if (transport) return pty.spawn(rawFile, rawArgs, spawnOptions)
+      const wrapped = wrapShellWithUlimit(rawFile, rawArgs)
+      return pty.spawn(wrapped.file, wrapped.args, spawnOptions)
+    }
     try {
-      ptyProcess = pty.spawn(spawnFile, initialArgs, spawnOptions)
+      ptyProcess = spawn(spawnFile, initialArgs)
     } catch (err) {
       // Fallback for shells that reject login flag combinations (host only).
       if (!canRetryInteractiveOnly) throw err
       usedArgs = initialArgs.filter((arg) => arg !== '-l')
-      ptyProcess = pty.spawn(spawnFile, usedArgs, spawnOptions)
+      ptyProcess = spawn(spawnFile, usedArgs)
       usedFallback = true
       recordDiagnosticEvent({
         level: 'warn',
@@ -1166,7 +1114,7 @@ export async function createPty(opts: CreatePtyOptions): Promise<{ success: bool
         if (canAsyncFallback) {
           const fallbackArgs = initialArgs.filter((arg) => arg !== '-l')
           try {
-            const fallbackPty = pty.spawn(spawnConfig.shell, fallbackArgs, spawnOptions)
+            const fallbackPty = spawn(spawnConfig.shell, fallbackArgs)
             usedArgs = fallbackArgs
             usedFallback = true
             ptyProcess = fallbackPty
@@ -1233,7 +1181,7 @@ export async function createPty(opts: CreatePtyOptions): Promise<{ success: bool
           const shellOnlyArgs = transport ? [...transport.args] : [...spawnConfig.args]
           const previousArgs = [...usedArgs]
           try {
-            const fallbackShellPty = pty.spawn(spawnFile, shellOnlyArgs, spawnOptions)
+            const fallbackShellPty = spawn(spawnFile, shellOnlyArgs)
             usedShellFallback = true
             ptyProcess = fallbackShellPty
             session.pty = fallbackShellPty

@@ -1,4 +1,13 @@
 
+// Raise RLIMIT_NOFILE before anything else can spawn a child so every
+// descendant (PTYs, ripgrep, git, renderer helpers) inherits a high soft
+// limit. Best-effort: logs and continues on failure — the per-PTY sh wrapper
+// in shell-env.ts still protects terminal sessions if the native addon
+// can't load.
+import { raiseFdLimit } from './raise-fd-limit'
+const fdLimitResult = raiseFdLimit()
+console.log('[fd-limit]', JSON.stringify(fdLimitResult))
+
 import { app, shell, BrowserWindow, ipcMain, nativeTheme, session, webContents, dialog, Menu, protocol, screen } from 'electron'
 import { join, extname, normalize, sep, resolve } from 'path'
 import { homedir } from 'os'
