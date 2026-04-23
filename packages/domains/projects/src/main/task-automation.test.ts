@@ -258,6 +258,34 @@ await describe('task automation: edge cases', () => {
     expect(getStatus(taskId)).toBe('in_progress')
     expect(notifyCalls).toBe(1) // no additional notification
   })
+
+  test('task in completed status is NOT un-completed by automation', () => {
+    resetNotify()
+    const projId = seedProject({ on_terminal_active: 'in_progress', on_terminal_idle: null })
+    const taskId = seedTask(projId, 'done')
+    handleTerminalStateChange(h.db, `${taskId}:0`, 'running', 'attention', notifyTasksChanged)
+    expect(getStatus(taskId)).toBe('done')
+    expect(notifyCalls).toBe(0)
+  })
+
+  test('task in canceled status is NOT un-canceled by automation', () => {
+    resetNotify()
+    // Add canceled column to project
+    const projId = crypto.randomUUID()
+    const columns = JSON.stringify([
+      { id: 'todo', label: 'Todo', color: 'blue', position: 0, category: 'unstarted' },
+      { id: 'in_progress', label: 'In Progress', color: 'yellow', position: 1, category: 'started' },
+      { id: 'done', label: 'Done', color: 'green', position: 2, category: 'completed' },
+      { id: 'canceled', label: 'Canceled', color: 'slate', position: 3, category: 'canceled' },
+    ])
+    h.db.prepare(
+      "INSERT INTO projects (id, name, color, path, columns_config, task_automation_config) VALUES (?, ?, ?, ?, ?, ?)"
+    ).run(projId, `Proj-${projId.slice(0, 6)}`, '#ff0000', '/tmp/test', columns, JSON.stringify({ on_terminal_active: 'in_progress', on_terminal_idle: null }))
+    const taskId = seedTask(projId, 'canceled')
+    handleTerminalStateChange(h.db, `${taskId}:0`, 'running', 'attention', notifyTasksChanged)
+    expect(getStatus(taskId)).toBe('canceled')
+    expect(notifyCalls).toBe(0)
+  })
 })
 
 h.cleanup()
