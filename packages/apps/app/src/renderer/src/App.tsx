@@ -960,6 +960,14 @@ function App(): React.JSX.Element {
     }
   }, [handleCreateScratchTerminal])
 
+  // Expose a programmatic task-opener so domain UI (e.g. Manager sidebar) can open a task as a tab.
+  useEffect(() => {
+    ;(window as { __slayzone_openTask?: (taskId: string) => void }).__slayzone_openTask = (taskId: string) => openTask(taskId)
+    return () => {
+      delete (window as { __slayzone_openTask?: (taskId: string) => void }).__slayzone_openTask
+    }
+  }, [openTask])
+
   useEffect(() => { return window.api.app.onNewTemporaryTask(() => { handleCreateScratchTerminal() }) }, [handleCreateScratchTerminal])
 
   // Task handlers

@@ -1,8 +1,50 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { ChevronRight, ListTree, Circle } from 'lucide-react'
-import { cn, Switch, Label, getTaskStatusStyle, ProgressRing } from '@slayzone/ui'
+import { ChevronRight, ListTree, Circle, ExternalLink, CircleDot, Signal, Gauge } from 'lucide-react'
+import {
+  cn,
+  Switch,
+  Label,
+  getTaskStatusStyle,
+  ProgressRing,
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuSeparator,
+  ContextMenuSub,
+  ContextMenuSubContent,
+  ContextMenuSubTrigger,
+  ContextMenuTrigger,
+  ContextMenuRadioGroup,
+  ContextMenuRadioItem,
+  PriorityIcon,
+} from '@slayzone/ui'
 import { PtyStateDot } from '@slayzone/terminal'
 import type { TerminalMode } from '@slayzone/terminal/shared'
+
+const BUILTIN_STATUSES: ReadonlyArray<{ value: string; label: string }> = [
+  { value: 'inbox', label: 'Inbox' },
+  { value: 'backlog', label: 'Backlog' },
+  { value: 'todo', label: 'Todo' },
+  { value: 'in_progress', label: 'In Progress' },
+  { value: 'review', label: 'Review' },
+  { value: 'done', label: 'Done' },
+  { value: 'canceled', label: 'Canceled' },
+]
+
+const PRIORITY_LABELS: Record<number, string> = {
+  1: 'Urgent',
+  2: 'High',
+  3: 'Medium',
+  4: 'Low',
+  5: 'Someday',
+}
+
+const PROGRESS_PRESETS = [0, 25, 50, 75, 100] as const
+
+function openTaskInTab(taskId: string): void {
+  const fn = (window as { __slayzone_openTask?: (id: string) => void }).__slayzone_openTask
+  fn?.(taskId)
+}
 
 const WIDTH_STORAGE_KEY = 'slayzone:manager-sidebar-width'
 const HIDE_COMPLETED_KEY = 'slayzone:manager-sidebar-hide-completed'
@@ -30,6 +72,7 @@ export interface ManagerTask {
   terminal_mode: TerminalMode
   status: string
   progress: number
+  priority: number
 }
 
 export interface ManagerSidebarProps {
@@ -95,6 +138,82 @@ function paddingLeftForDepth(depth: number): number {
   return guideXForAncestor(depth - 1) + ELBOW_END_OFFSET + TEXT_GAP_AFTER_CURVE
 }
 
+function RowContextMenu({ task, onOpenChange, children }: { task: ManagerTask; onOpenChange?: (open: boolean) => void; children: React.ReactNode }): React.JSX.Element {
+  const handleStatusChange = useCallback((status: string) => {
+    window.api.db.updateTask({ id: task.id, status }).catch(() => {})
+  }, [task.id])
+  const handlePriorityChange = useCallback((v: string) => {
+    window.api.db.updateTask({ id: task.id, priority: Number.parseInt(v, 10) }).catch(() => {})
+  }, [task.id])
+  const handleProgressChange = useCallback((v: string) => {
+    window.api.db.updateTask({ id: task.id, progress: Number.parseInt(v, 10) }).catch(() => {})
+  }, [task.id])
+  return (
+    <ContextMenu onOpenChange={onOpenChange}>
+      <ContextMenuTrigger asChild>{children}</ContextMenuTrigger>
+      <ContextMenuContent className="w-56">
+        <ContextMenuItem onSelect={() => openTaskInTab(task.id)}>
+          <ExternalLink className="mr-2 size-3.5" />
+          Open task
+        </ContextMenuItem>
+        <ContextMenuSeparator />
+        <ContextMenuSub>
+          <ContextMenuSubTrigger>
+            <CircleDot className="mr-2 size-3.5" />
+            <span className="flex-1">Status</span>
+          </ContextMenuSubTrigger>
+          <ContextMenuSubContent>
+            <ContextMenuRadioGroup value={task.status} onValueChange={handleStatusChange}>
+              {BUILTIN_STATUSES.map((s) => {
+                const style = getTaskStatusStyle(s.value)
+                const Icon = style?.icon
+                return (
+                  <ContextMenuRadioItem key={s.value} value={s.value}>
+                    {Icon && <Icon className={cn('mr-1.5 size-3.5', style?.iconClass)} />}
+                    {s.label}
+                  </ContextMenuRadioItem>
+                )
+              })}
+            </ContextMenuRadioGroup>
+          </ContextMenuSubContent>
+        </ContextMenuSub>
+        <ContextMenuSub>
+          <ContextMenuSubTrigger>
+            <Signal className="mr-2 size-3.5" />
+            <span className="flex-1">Priority</span>
+          </ContextMenuSubTrigger>
+          <ContextMenuSubContent>
+            <ContextMenuRadioGroup value={String(task.priority)} onValueChange={handlePriorityChange}>
+              {Object.entries(PRIORITY_LABELS).map(([value, label]) => (
+                <ContextMenuRadioItem key={value} value={value}>
+                  <PriorityIcon priority={Number(value)} className="mr-1.5 size-3.5" />
+                  {label}
+                </ContextMenuRadioItem>
+              ))}
+            </ContextMenuRadioGroup>
+          </ContextMenuSubContent>
+        </ContextMenuSub>
+        <ContextMenuSub>
+          <ContextMenuSubTrigger>
+            <Gauge className="mr-2 size-3.5" />
+            <span className="flex-1">Progress</span>
+            <span className="ml-4 text-xs text-muted-foreground tabular-nums">{Math.round(task.progress)}%</span>
+          </ContextMenuSubTrigger>
+          <ContextMenuSubContent>
+            <ContextMenuRadioGroup value={String(task.progress)} onValueChange={handleProgressChange}>
+              {PROGRESS_PRESETS.map((p) => (
+                <ContextMenuRadioItem key={p} value={String(p)}>
+                  {p}%
+                </ContextMenuRadioItem>
+              ))}
+            </ContextMenuRadioGroup>
+          </ContextMenuSubContent>
+        </ContextMenuSub>
+      </ContextMenuContent>
+    </ContextMenu>
+  )
+}
+
 function ProgressDot({ sessionId, progress, isDone }: { sessionId: string; progress: number; isDone: boolean }): React.JSX.Element {
   const show = !isDone && progress > 0
   return (
@@ -156,6 +275,7 @@ function NodeRow({
   onSelect: (task: ManagerTask) => void
 }): React.JSX.Element {
   const [expanded, setExpanded] = useState(true)
+  const [menuOpen, setMenuOpen] = useState(false)
   const sessionId = `${node.task.id}:${node.task.id}`
   const hasChildren = node.children.length > 0
   const isSelected = selectedTaskId === node.task.id
@@ -165,39 +285,47 @@ function NodeRow({
 
   return (
     <>
+      <RowContextMenu task={node.task} onOpenChange={setMenuOpen}>
       <button
         type="button"
         data-testid={`manager-node-${node.task.id}`}
         onClick={() => onSelect(node.task)}
-        className={cn(
-          'group relative w-full flex items-center gap-1.5 h-7 pr-2 rounded-md text-left text-sm shrink-0 transition-colors',
-          isSelected
-            ? 'bg-tab-active text-foreground'
-            : 'text-muted-foreground hover:bg-accent/50 hover:text-foreground'
-        )}
+        className="group relative w-full h-7 text-left text-sm shrink-0"
         style={{ paddingLeft: paddingLeftForDepth(node.depth) }}
       >
         <TreeGuides depth={node.depth} ancestorFlags={node.ancestorFlags} />
-        <span className={cn('truncate flex-1', isCompleted && 'line-through opacity-60')}>{node.task.title || 'Untitled'}</span>
-        <span className="shrink-0 flex items-center justify-center size-4">
-          {hasChildren && (
-            <span
-              role="button"
-              tabIndex={-1}
-              onClick={(e) => {
-                e.stopPropagation()
-                setExpanded((v) => !v)
-              }}
-              aria-label={expanded ? 'Collapse' : 'Expand'}
-              className="flex items-center justify-center size-4 rounded hover:bg-accent/40"
-            >
-              <ChevronRight className={cn('size-3.5 transition-transform', expanded && 'rotate-90')} />
-            </span>
+        <span
+          className={cn(
+            'flex items-center gap-1.5 h-full pl-2 pr-2 rounded-md transition-colors',
+            isSelected
+              ? 'bg-tab-active text-foreground'
+              : menuOpen
+                ? 'bg-accent text-accent-foreground'
+                : 'text-muted-foreground group-hover:bg-accent group-hover:text-accent-foreground'
           )}
+        >
+          <span className={cn('truncate flex-1', isCompleted && 'line-through opacity-60')}>{node.task.title || 'Untitled'}</span>
+          <span className="shrink-0 flex items-center justify-center size-4">
+            {hasChildren && (
+              <span
+                role="button"
+                tabIndex={-1}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setExpanded((v) => !v)
+                }}
+                aria-label={expanded ? 'Collapse' : 'Expand'}
+                className="flex items-center justify-center size-4 rounded hover:bg-accent/40"
+              >
+                <ChevronRight className={cn('size-3.5 transition-transform', expanded && 'rotate-90')} />
+              </span>
+            )}
+          </span>
+          <StatusIcon className={cn('shrink-0 size-3.5', statusStyle?.iconClass)} aria-label={statusStyle?.label} />
+          <ProgressDot sessionId={sessionId} progress={node.task.progress} isDone={isCompleted} />
         </span>
-        <StatusIcon className={cn('shrink-0 size-3.5', statusStyle?.iconClass)} aria-label={statusStyle?.label} />
-        <ProgressDot sessionId={sessionId} progress={node.task.progress} isDone={isCompleted} />
       </button>
+      </RowContextMenu>
       {expanded &&
         node.children.map((child) => (
           <NodeRow
