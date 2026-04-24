@@ -503,32 +503,10 @@ function VirtualRowList<Row>({ rows, renderRow, estimateSize, rowKey, className 
   )
 }
 
-// ---- Side-by-side row with per-half horizontal scroll sync ----
-
-function SbsRowView({ row, wrap, sync }: { row: SideRow; wrap: boolean; sync: SbsSyncApi }) {
-  return (
-    <div className="flex">
-      <div
-        ref={sync.register}
-        onScroll={sync.onScroll}
-        className={cn('flex-1 min-w-0 basis-1/2', !wrap && 'overflow-x-auto scrollbar-hide')}
-      >
-        <div className={cn('flex flex-col', !wrap && 'min-w-full w-max')}>
-          <SbsHalf item={row.left} side="left" wrap={wrap} />
-        </div>
-      </div>
-      <div
-        ref={sync.register}
-        onScroll={sync.onScroll}
-        className={cn('flex-1 min-w-0 basis-1/2', !wrap && 'overflow-x-auto scrollbar-hide')}
-      >
-        <div className={cn('flex flex-col', !wrap && 'min-w-full w-max')}>
-          <SbsHalf item={row.right} side="right" wrap={wrap} />
-        </div>
-      </div>
-    </div>
-  )
-}
+// ---- Side-by-side column renderers ----
+// Two columns each scroll horizontally as ONE unit. Both show native
+// overlay scrollbars; useSbsSync mirrors scrollLeft so the two halves
+// stay locked together.
 
 export const DiffView = memo(function DiffView({ diff, sideBySide = false, wrap = false, contextLines = '3' }: DiffViewProps) {
   // Lazy inline-highlight pass: parseUnifiedDiff no longer runs this per-file.
@@ -594,30 +572,71 @@ export const DiffView = memo(function DiffView({ diff, sideBySide = false, wrap 
   }
 
   if (sideBySide) {
-    const renderSbsRow = (row: SbsRow) => {
+    const renderLeft = (row: SbsRow) => {
       if (row.kind === 'gap') return <GapDivider count={row.count} />
-      return <SbsRowView row={row.row} wrap={wrap} sync={sbsSync} />
+      return <SbsHalf item={row.row.left} side="left" wrap={wrap} />
+    }
+    const renderRight = (row: SbsRow) => {
+      if (row.kind === 'gap') return <GapDivider count={row.count} />
+      return <SbsHalf item={row.row.right} side="right" wrap={wrap} />
     }
     // Small diffs: skip virtualizer overhead entirely.
     if (sbsRows.length < VIRTUALIZE_THRESHOLD) {
       return (
-        <div className="relative font-mono text-xs leading-5">
+        <div className="relative font-mono text-xs leading-5 flex">
           <div className="pointer-events-none absolute top-0 bottom-0 left-1/2 w-px bg-border/40 z-10" />
-          {sbsRows.map((r) => (
-            <div key={r.key}>{renderSbsRow(r)}</div>
-          ))}
+          <div
+            ref={sbsSync.register}
+            onScroll={sbsSync.onScroll}
+            className={cn('basis-1/2 min-w-0', !wrap && 'overflow-x-auto')}
+          >
+            <div className={cn('flex flex-col', !wrap && 'min-w-full w-max')}>
+              {sbsRows.map((r) => <div key={r.key}>{renderLeft(r)}</div>)}
+            </div>
+          </div>
+          <div
+            ref={sbsSync.register}
+            onScroll={sbsSync.onScroll}
+            className={cn('basis-1/2 min-w-0', !wrap && 'overflow-x-auto')}
+          >
+            <div className={cn('flex flex-col', !wrap && 'min-w-full w-max')}>
+              {sbsRows.map((r) => <div key={r.key}>{renderRight(r)}</div>)}
+            </div>
+          </div>
         </div>
       )
     }
     return (
-      <div className="relative font-mono text-xs leading-5">
+      <div className="relative font-mono text-xs leading-5 flex">
         <div className="pointer-events-none absolute top-0 bottom-0 left-1/2 w-px bg-border/40 z-10" />
-        <VirtualRowList<SbsRow>
-          rows={sbsRows}
-          renderRow={renderSbsRow}
-          estimateSize={20}
-          rowKey={(r) => r.key}
-        />
+        <div
+          ref={sbsSync.register}
+          onScroll={sbsSync.onScroll}
+          className={cn('basis-1/2 min-w-0', !wrap && 'overflow-x-auto scrollbar-hide')}
+        >
+          <div className={cn(!wrap && 'min-w-full w-max')}>
+            <VirtualRowList<SbsRow>
+              rows={sbsRows}
+              renderRow={renderLeft}
+              estimateSize={20}
+              rowKey={(r) => r.key}
+            />
+          </div>
+        </div>
+        <div
+          ref={sbsSync.register}
+          onScroll={sbsSync.onScroll}
+          className={cn('basis-1/2 min-w-0', !wrap && 'overflow-x-auto')}
+        >
+          <div className={cn(!wrap && 'min-w-full w-max')}>
+            <VirtualRowList<SbsRow>
+              rows={sbsRows}
+              renderRow={renderRight}
+              estimateSize={20}
+              rowKey={(r) => r.key}
+            />
+          </div>
+        </div>
       </div>
     )
   }
@@ -630,7 +649,7 @@ export const DiffView = memo(function DiffView({ diff, sideBySide = false, wrap 
   // Small diffs: skip virtualizer overhead entirely.
   if (unifiedRows.length < VIRTUALIZE_THRESHOLD) {
     return (
-      <div className={cn('font-mono text-xs leading-5', !wrap && 'overflow-x-auto scrollbar-hide')}>
+      <div className={cn('font-mono text-xs leading-5', !wrap && 'overflow-x-auto')}>
         <div className={cn('flex flex-col', !wrap && 'min-w-full w-max')}>
           {unifiedRows.map((r) => (
             <div key={r.key}>{renderUnifiedRow(r)}</div>
@@ -641,7 +660,7 @@ export const DiffView = memo(function DiffView({ diff, sideBySide = false, wrap 
   }
 
   return (
-    <div className={cn('font-mono text-xs leading-5', !wrap && 'overflow-x-auto scrollbar-hide')}>
+    <div className={cn('font-mono text-xs leading-5', !wrap && 'overflow-x-auto')}>
       <div className={cn(!wrap && 'min-w-full w-max')}>
         <VirtualRowList<UnifiedRow>
           rows={unifiedRows}
