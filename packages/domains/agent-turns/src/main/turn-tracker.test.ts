@@ -49,6 +49,7 @@ function freshTask(): { taskId: string; tabId: string; repo: string } {
 await describe('recordTurnBoundary — single snapshot per call', () => {
   test('first call inserts row scoped to worktree, prev_snapshot_sha null', async () => {
     const { tabId, repo } = freshTask()
+    fs.writeFileSync(path.join(repo, 'first.txt'), 'first edit')
     await recordTurnBoundary(h.db, tabId, 'first prompt')
     const list = listTurnsForWorktree(h.db, repo)
     expect(list).toHaveLength(1)
@@ -59,6 +60,7 @@ await describe('recordTurnBoundary — single snapshot per call', () => {
 
   test('second call with new edits → row chained via prev_snapshot_sha', async () => {
     const { tabId, repo } = freshTask()
+    fs.writeFileSync(path.join(repo, 'first.txt'), 'first edit')
     await recordTurnBoundary(h.db, tabId, 'p1')
     fs.writeFileSync(path.join(repo, 'edit.txt'), 'change 1')
     await recordTurnBoundary(h.db, tabId, 'p2')
@@ -69,9 +71,17 @@ await describe('recordTurnBoundary — single snapshot per call', () => {
 
   test('repeat with no edits → dedupe drops it', async () => {
     const { tabId, repo } = freshTask()
+    fs.writeFileSync(path.join(repo, 'first.txt'), 'first')
     await recordTurnBoundary(h.db, tabId, 'p1')
+    // No edits between calls — second call must be deduped.
     await recordTurnBoundary(h.db, tabId, 'p2-noop')
     expect(listTurnsForWorktree(h.db, repo)).toHaveLength(1)
+  })
+
+  test('first call with NO edits (clean worktree) → dropped', async () => {
+    const { tabId, repo } = freshTask()
+    await recordTurnBoundary(h.db, tabId, 'noop on clean tree')
+    expect(listTurnsForWorktree(h.db, repo)).toHaveLength(0)
   })
 })
 
@@ -103,6 +113,7 @@ await describe('multi-task in same worktree', () => {
 await describe('task deletion sets task_id to NULL but keeps the turn', () => {
   test('ON DELETE SET NULL', async () => {
     const { taskId, tabId, repo } = freshTask()
+    fs.writeFileSync(path.join(repo, 'before-delete.txt'), 'data')
     await recordTurnBoundary(h.db, tabId, 'before delete')
     expect(listTurnsForWorktree(h.db, repo)[0].task_id).toBe(taskId)
 
@@ -126,6 +137,7 @@ await describe('worktree path fallback', () => {
     const tabId = `tab-${taskId.slice(0, 8)}`
     h.db.prepare('INSERT INTO tasks (id, project_id, title) VALUES (?, ?, ?)').run(taskId, altProj, 'T')
     h.db.prepare('INSERT INTO terminal_tabs (id, task_id, mode, position) VALUES (?, ?, ?, ?)').run(tabId, taskId, 'claude-code', 0)
+    fs.writeFileSync(path.join(repo, 'fb.txt'), 'fb')
     await recordTurnBoundary(h.db, tabId, 'x')
     expect(listTurnsForWorktree(h.db, repo)).toHaveLength(1)
   })

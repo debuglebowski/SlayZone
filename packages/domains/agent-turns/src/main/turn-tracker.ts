@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto'
 import { realpathSync } from 'node:fs'
 import type { Database } from 'better-sqlite3'
 import type { AgentEvent } from '@slayzone/terminal/shared'
-import { snapshotWorktree, deleteTurnRef } from './git-snapshot'
+import { snapshotWorktree, deleteTurnRef, diffIsEmptyCached, diffIsEmpty } from './git-snapshot'
 import {
   insertTurn,
   deleteTurn,
@@ -74,9 +74,19 @@ export async function recordTurnBoundary(
   if (!sha) return
 
   const prev = getLatestTurnForWorktree(db, ctx.worktreePath)
-  if (prev && prev.snapshot_sha === sha) {
+  // Dedupe semantically — commit SHA always differs (commit message includes
+  // turn id). Compare actual diff content.
+  if (prev && diffIsEmptyCached(ctx.worktreePath, prev.snapshot_sha, sha)) {
     await deleteTurnRef(ctx.worktreePath, id)
     return
+  }
+  // Also drop if first turn but identical to HEAD (no actual changes).
+  if (!prev) {
+    const parentRes = await diffIsEmpty(ctx.worktreePath, `${sha}^`, sha)
+    if (parentRes) {
+      await deleteTurnRef(ctx.worktreePath, id)
+      return
+    }
   }
 
   try {

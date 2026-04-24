@@ -2,7 +2,7 @@ import type { IpcMain } from 'electron'
 import type { Database } from 'better-sqlite3'
 import { realpathSync } from 'node:fs'
 import { listTurnsForWorktree } from './db'
-import { diffIsEmptySync } from './git-snapshot'
+import { diffIsEmptyCached } from './git-snapshot'
 import type { AgentTurnRange } from '../shared/types'
 
 function canonical(p: string): string {
@@ -23,12 +23,12 @@ function filterAndRethread(repoPath: string, rows: AgentTurnRange[]): AgentTurnR
   let prevSha: string | null = null
   for (const r of rows) {
     const from = prevSha
-    if (from !== null && diffIsEmptySync(repoPath, from, r.snapshot_sha)) {
+    if (from !== null && diffIsEmptyCached(repoPath, from, r.snapshot_sha)) {
       // Dropped: keep prevSha — next surviving row will diff against the older base.
       continue
     }
-    if (from === null && diffIsEmptySync(repoPath, '4b825dc642cb6eb9a060e54bf8d69288fbee4904', r.snapshot_sha)) {
-      // First turn but identical to empty tree — nothing in repo. Drop.
+    if (from === null && diffIsEmptyCached(repoPath, `${r.snapshot_sha}^`, r.snapshot_sha)) {
+      // First turn but identical to its parent (HEAD-at-snap-time) — no real changes. Drop.
       continue
     }
     out.push({ ...r, prev_snapshot_sha: from })

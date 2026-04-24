@@ -233,10 +233,12 @@ export const GitDiffPanel = forwardRef<GitDiffPanelHandle, GitDiffPanelProps>(fu
   const selectedItemRef = useRef<HTMLDivElement>(null)
   const didInitSplitRef = useRef(false)
 
-  // Resolve effective sha range for the current turn selection. Empty tree
-  // sha as fallback so the first-ever turn can diff "everything in this turn".
+  // Resolve effective sha range for the current turn selection. For the first
+  // turn (no prior snapshot), use the snapshot's parent commit (= HEAD at the
+  // moment the snapshot was taken). git accepts `<sha>^` syntax, so the
+  // fallback diffs against HEAD-at-snap-time, NOT the empty tree.
   const fromSha = selectedTurn
-    ? (selectedTurn.prev_snapshot_sha ?? '4b825dc642cb6eb9a060e54bf8d69288fbee4904')
+    ? (selectedTurn.prev_snapshot_sha ?? `${selectedTurn.snapshot_sha}^`)
     : undefined
   const toSha = selectedTurn ? selectedTurn.snapshot_sha : undefined
 

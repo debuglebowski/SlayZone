@@ -37,11 +37,16 @@ function freshRepo(): string {
 }
 
 await describe('snapshotWorktree — clean tree', () => {
-  test('returns HEAD SHA and creates ref', async () => {
+  test('always commits a snapshot with parent=HEAD; ref created', async () => {
     const repo = freshRepo()
     const head = git(repo, 'rev-parse', 'HEAD')
     const sha = await snapshotWorktree(repo, 'turn-A')
-    expect(sha).toBe(head)
+    expect(sha !== null).toBe(true)
+    // sha must NOT equal HEAD — always a fresh commit so `<sha>^` reliably points at HEAD-at-snap-time.
+    expect(sha === head).toBe(false)
+    // Parent of snapshot commit is HEAD.
+    const parent = git(repo, 'rev-parse', `${sha}^`)
+    expect(parent).toBe(head)
     expect(refExists(repo, 'refs/slayzone/turns/turn-A')).toBe(true)
   })
 })

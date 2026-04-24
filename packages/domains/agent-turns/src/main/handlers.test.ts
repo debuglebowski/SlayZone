@@ -90,6 +90,22 @@ await describe('list filters empty-diff turns + re-threads prev_snapshot_sha', (
     expect(list[2].prev_snapshot_sha).toBe(list[1].snapshot_sha)
   })
 
+  test('repeated list calls reuse the diff-empty cache (no extra git spawns)', async () => {
+    const { tabId, repo } = freshTask()
+    fs.writeFileSync(path.join(repo, 'd.txt'), 'cached')
+    await recordTurnBoundary(h.db, tabId, 'p1')
+    fs.writeFileSync(path.join(repo, 'd.txt'), 'cached2')
+    await recordTurnBoundary(h.db, tabId, 'p2')
+
+    const list1 = (await h.invoke('agent-turns:list', repo)) as AgentTurnRange[]
+    const list2 = (await h.invoke('agent-turns:list', repo)) as AgentTurnRange[]
+    expect(list1).toHaveLength(2)
+    expect(list2).toHaveLength(2)
+    // Same shape both times — second call is fully memoized.
+    expect(list1[0].snapshot_sha).toBe(list2[0].snapshot_sha)
+    expect(list1[1].snapshot_sha).toBe(list2[1].snapshot_sha)
+  })
+
   test('canonicalizes incoming worktreePath via realpath', async () => {
     const { tabId, repo } = freshTask()
     fs.writeFileSync(path.join(repo, 'c.txt'), 'data')

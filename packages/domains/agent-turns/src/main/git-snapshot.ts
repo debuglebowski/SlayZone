@@ -1,5 +1,5 @@
 import { spawn, spawnSync } from 'node:child_process'
-import { mkdtempSync, rmSync, existsSync } from 'node:fs'
+import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
@@ -41,10 +41,10 @@ export async function snapshotWorktree(repoPath: string, turnId: string): Promis
   const headSha = head.stdout.trim()
   if (!headSha) return null
 
-  let tmpIdx: string | null = null
+  let tmpDir: string | null = null
   try {
-    const tmpDir = mkdtempSync(join(tmpdir(), 'slayzone-turn-'))
-    tmpIdx = join(tmpDir, 'index')
+    tmpDir = mkdtempSync(join(tmpdir(), 'slayzone-turn-'))
+    const tmpIdx = join(tmpDir, 'index')
     const env = { GIT_INDEX_FILE: tmpIdx }
 
     // Seed the temp index from HEAD so unchanged files inherit their existing tree entries.
@@ -60,28 +60,24 @@ export async function snapshotWorktree(repoPath: string, turnId: string): Promis
     const treeSha = tree.stdout.trim()
     if (!treeSha) return null
 
-    // If the resulting tree matches HEAD's tree, nothing changed — snapshot HEAD itself
-    // so callers still get a comparable ref point.
-    const headTree = await exec(['rev-parse', `${headSha}^{tree}`], repoPath)
-    let sha: string
-    if (headTree.status === 0 && headTree.stdout.trim() === treeSha) {
-      sha = headSha
-    } else {
-      const commit = await exec(
-        ['commit-tree', treeSha, '-p', headSha, '-m', `slayzone turn ${turnId}`],
-        repoPath
-      )
-      if (commit.status !== 0) return null
-      sha = commit.stdout.trim()
-      if (!sha) return null
-    }
+    // ALWAYS create a commit-tree with parent=HEAD. Avoids the previous
+    // HEAD-shortcut that produced ambiguous diff bases (HEAD^ != HEAD-at-snap-time).
+    // Empty-diff cases are caught downstream (turn-tracker insert dedupe via
+    // diffIsEmptyCached, and list-time filter).
+    const commit = await exec(
+      ['commit-tree', treeSha, '-p', headSha, '-m', `slayzone turn ${turnId}`],
+      repoPath
+    )
+    if (commit.status !== 0) return null
+    const sha = commit.stdout.trim()
+    if (!sha) return null
 
     const ref = await exec(['update-ref', `refs/slayzone/turns/${turnId}`, sha], repoPath)
     if (ref.status !== 0) return null
     return sha
   } finally {
-    if (tmpIdx && existsSync(tmpIdx)) {
-      try { rmSync(join(tmpIdx, '..'), { recursive: true, force: true }) } catch { /* ignore */ }
+    if (tmpDir) {
+      try { rmSync(tmpDir, { recursive: true, force: true }) } catch { /* ignore */ }
     }
   }
 }
@@ -101,4 +97,39 @@ export function diffIsEmptySync(repoPath: string, fromSha: string, toSha: string
   if (fromSha === toSha) return true
   const r = spawnSync('git', ['diff', '--quiet', fromSha, toSha], { cwd: repoPath })
   return r.status === 0
+}
+
+/**
+ * Memoized version of diffIsEmptySync. Result is a pure function of the
+ * `(repoPath, fromSha, toSha)` tuple — both SHAs are content-addressed git
+ * objects, so the answer never changes. Bounded LRU cache (FIFO eviction) so
+ * a long-running app can't grow it unboundedly. Used by `agent-turns:list` to
+ * avoid spawning git for every row on every refetch.
+ */
+const DIFF_EMPTY_CACHE_MAX = 2000
+const diffEmptyCache = new Map<string, boolean>()
+
+export function diffIsEmptyCached(repoPath: string, fromSha: string, toSha: string): boolean {
+  if (fromSha === toSha) return true
+  const key = `${repoPath}\x00${fromSha}\x00${toSha}`
+  const hit = diffEmptyCache.get(key)
+  if (hit !== undefined) {
+    // Refresh insertion order for LRU-ish behavior.
+    diffEmptyCache.delete(key)
+    diffEmptyCache.set(key, hit)
+    return hit
+  }
+  const result = diffIsEmptySync(repoPath, fromSha, toSha)
+  diffEmptyCache.set(key, result)
+  if (diffEmptyCache.size > DIFF_EMPTY_CACHE_MAX) {
+    // Evict oldest (Map preserves insertion order).
+    const oldestKey = diffEmptyCache.keys().next().value
+    if (oldestKey !== undefined) diffEmptyCache.delete(oldestKey)
+  }
+  return result
+}
+
+/** Test-only: clear the cache between scenarios. */
+export function _resetDiffEmptyCacheForTests(): void {
+  diffEmptyCache.clear()
 }
