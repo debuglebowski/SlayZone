@@ -25,6 +25,7 @@ convex/.env.local
 
 # Superpowers specs and plans (local only)
 docs/superpowers/
+.plans/
 
 # Generated icon intermediates
 packages/apps/app/build/icon.iconset/
