@@ -6,6 +6,7 @@ import { track } from '@slayzone/telemetry/client'
 export interface UseAssetsReturn {
   assets: TaskAsset[]
   folders: AssetFolder[]
+  isLoading: boolean
   selectedId: string | null
   setSelectedId: (id: string | null) => void
   // Asset ops
@@ -47,6 +48,7 @@ export interface UseAssetsReturn {
 export function useAssets(taskId: string | null | undefined, initialSelectedId?: string | null): UseAssetsReturn {
   const [assets, setAssets] = useState<TaskAsset[]>([])
   const [folders, setFolders] = useState<AssetFolder[]>([])
+  const [isLoading, setIsLoading] = useState<boolean>(!!taskId)
   const [selectedId, setSelectedId] = useState<string | null>(initialSelectedId ?? null)
 
   // Re-sync selection when switching tasks
@@ -55,14 +57,23 @@ export function useAssets(taskId: string | null | undefined, initialSelectedId?:
 
   // Fetch assets + folders on mount and external changes
   useEffect(() => {
-    if (!taskId) return
+    if (!taskId) { setIsLoading(false); return }
+    setIsLoading(true)
+    let cancelled = false
+    let firstLoad = true
     const load = (): void => {
-      window.api.assets.getByTask(taskId).then(setAssets).catch(() => {})
-      window.api.assetFolders.getByTask(taskId).then(setFolders).catch(() => {})
+      const p = Promise.all([
+        window.api.assets.getByTask(taskId).then(r => { if (!cancelled) setAssets(r) }).catch(() => {}),
+        window.api.assetFolders.getByTask(taskId).then(r => { if (!cancelled) setFolders(r) }).catch(() => {}),
+      ])
+      if (firstLoad) {
+        firstLoad = false
+        p.finally(() => { if (!cancelled) setIsLoading(false) })
+      }
     }
     load()
     const cleanup = window.api?.app?.onTasksChanged?.(load)
-    return () => { cleanup?.() }
+    return () => { cancelled = true; cleanup?.() }
   }, [taskId])
 
   // Build folder path lookup: folderId -> slash-separated path
@@ -267,7 +278,7 @@ export function useAssets(taskId: string | null | undefined, initialSelectedId?:
   }, [])
 
   return {
-    assets, folders, selectedId, setSelectedId,
+    assets, folders, isLoading, selectedId, setSelectedId,
     createAsset, updateAsset, deleteAsset, renameAsset, moveAssetToFolder,
     readContent, saveContent, uploadAsset, uploadDir, getFilePath,
     downloadFile, downloadFolder, downloadAsPdf, downloadAsPng, downloadAsHtml, downloadAllAsZip,

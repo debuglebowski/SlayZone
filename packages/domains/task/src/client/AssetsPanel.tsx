@@ -8,6 +8,7 @@ import {
   Tabs, TabsList, TabsTrigger,
   toast,
   Tooltip, TooltipTrigger, TooltipContent, TooltipProvider,
+  PulseGrid,
 } from '@slayzone/ui'
 import type { AssetVersion, DiffResult } from '@slayzone/task-assets/shared'
 import { RichTextEditor } from '@slayzone/editor'
@@ -475,7 +476,7 @@ function AssetPreview({ renderMode, content, zoomLevel = 1, onZoom }: { renderMo
 
 export const AssetsPanel = forwardRef<AssetsPanelHandle, AssetsPanelProps>(function AssetsPanel({ taskId, isResizing, initialActiveAssetId, onActiveAssetIdChange }, ref) {
   const {
-    assets, folders, selectedId, setSelectedId,
+    assets, folders, isLoading, selectedId, setSelectedId,
     createAsset, updateAsset, deleteAsset, renameAsset, moveAssetToFolder,
     readContent, saveContent, uploadAsset, uploadDir, getFilePath,
     downloadFile, downloadFolder, downloadAsPdf, downloadAsPng, downloadAsHtml, downloadAllAsZip,
@@ -1089,13 +1090,18 @@ export const AssetsPanel = forwardRef<AssetsPanelHandle, AssetsPanelProps>(funct
 
   return (
     <div
-      className={cn("flex flex-col h-full", dragOver && "ring-2 ring-primary/50 ring-inset")}
+      className={cn("relative flex flex-col h-full", dragOver && "ring-2 ring-primary/50 ring-inset")}
       onDragOver={(e) => { e.preventDefault(); setDragOver(true) }}
       onDragLeave={() => setDragOver(false)}
       onDrop={handleFileDrop}
       onDragEnd={handleDragEnd}
       onKeyDown={handlePanelKeyDown}
     >
+      {isLoading && (
+        <div className="absolute inset-0 z-20 bg-background">
+          <PulseGrid />
+        </div>
+      )}
       {/* Panel header */}
       <TooltipProvider delayDuration={400}>
         <div className={cn("flex items-center border-b border-border shrink-0", sidebarVisible && "grid grid-cols-[auto_1fr]")}>
