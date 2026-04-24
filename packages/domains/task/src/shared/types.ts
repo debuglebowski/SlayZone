@@ -226,9 +226,9 @@ export function getExtensionFromTitle(title: string): string {
   return title.slice(dot).toLowerCase()
 }
 
-/** Determine effective render mode: use override if set, else infer from extension. */
+/** Determine effective render mode: use override if set and valid, else infer from extension. */
 export function getEffectiveRenderMode(title: string, override: RenderMode | null): RenderMode {
-  if (override) return override
+  if (override && override in RENDER_MODE_INFO) return override
   return EXTENSION_RENDER_MODES[getExtensionFromTitle(title)] ?? 'code'
 }
 
@@ -338,6 +338,8 @@ export interface Task {
   web_panel_urls: WebPanelUrls | null
   // Editor panel state (JSON)
   editor_open_files: EditorOpenFilesState | null
+  // Diff panel collapsed file keys (JSON array of `${source}:${path}` strings)
+  diff_collapsed_files: string[] | null
   // Merge mode
   merge_state: MergeState | null
   merge_context: MergeContext | null
@@ -439,6 +441,7 @@ export interface UpdateTaskInput {
   webPanelUrls?: WebPanelUrls | null
   // Editor state
   editorOpenFiles?: EditorOpenFilesState | null
+  diffCollapsedFiles?: string[] | null
   // Merge mode
   mergeState?: MergeState | null
   mergeContext?: MergeContext | null

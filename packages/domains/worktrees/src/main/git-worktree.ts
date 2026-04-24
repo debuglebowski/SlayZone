@@ -773,7 +773,10 @@ export async function getFileDiff(
   return execGit(diffCmd, { cwd: repoPath })
 }
 
-export async function getWorkingDiff(repoPath: string, opts?: { contextLines?: string; ignoreWhitespace?: boolean }): Promise<GitDiffSnapshot> {
+export async function getWorkingDiff(
+  repoPath: string,
+  opts?: { contextLines?: string; ignoreWhitespace?: boolean; fromSha?: string; toSha?: string }
+): Promise<GitDiffSnapshot> {
   await execGit(['rev-parse', '--git-dir'], { cwd: repoPath }).catch(() => {
     throw new Error(`Not a git repository: ${repoPath}`)
   })
@@ -788,6 +791,27 @@ export async function getWorkingDiff(repoPath: string, opts?: { contextLines?: s
   }
   if (opts?.ignoreWhitespace) {
     extraFlags.push('-w')
+  }
+
+  // Range mode: diff two snapshot SHAs. Used by Turns feature to scope the diff
+  // to a single agent turn. Everything reported as "unstaged" since the
+  // staged/unstaged distinction is meaningless across two committed snapshots.
+  if (opts?.fromSha && opts?.toSha) {
+    const [files, patch] = await Promise.all([
+      execGitFileList(['diff', '--name-only', opts.fromSha, opts.toSha], { cwd: repoPath }),
+      execGit(['diff', '--no-ext-diff', ...extraFlags, opts.fromSha, opts.toSha], { cwd: repoPath }),
+    ])
+    return {
+      targetPath: repoPath,
+      files: files.sort(),
+      stagedFiles: [],
+      unstagedFiles: files.sort(),
+      untrackedFiles: [],
+      unstagedPatch: patch,
+      stagedPatch: '',
+      generatedAt: new Date().toISOString(),
+      isGitRepo: true
+    }
   }
 
   // Run independent git queries in parallel
@@ -811,6 +835,7 @@ export async function getWorkingDiff(repoPath: string, opts?: { contextLines?: s
     isGitRepo: true
   }
 }
+
 
 export async function getConflictContent(repoPath: string, filePath: string): Promise<ConflictFileContent> {
   const gitShow = async (stage: string): Promise<string | null> => {

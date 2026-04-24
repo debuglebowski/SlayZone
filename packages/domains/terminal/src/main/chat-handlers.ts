@@ -25,6 +25,13 @@ import { listCommands } from './commands'
 import { listAgents } from './agents-registry'
 import { listProjectFiles } from './files-scan'
 import type { SkillInfo, CommandInfo, AgentInfo, FileMatch } from '../shared/types'
+import type { AgentEvent } from '../shared/agent-events'
+
+export interface ChatHandlerOpts {
+  /** Optional secondary subscriber to every persisted chat event. Used by the
+   * agent-turns domain to detect turn boundaries (user-message + result). */
+  onChatEvent?: (tabId: string, event: AgentEvent) => void
+}
 
 interface ChatCreateOpts {
   tabId: string
@@ -132,7 +139,7 @@ export function inspectPermissionFlags(flags: string[]): {
   }
 }
 
-export function registerChatHandlers(ipcMain: IpcMain, db: Database): void {
+export function registerChatHandlers(ipcMain: IpcMain, db: Database, opts: ChatHandlerOpts = {}): void {
   // Wire SQLite persistence into the transport. Default deps had a no-op
   // persistEvent; configureTransport keeps spawn/whichBinary/broadcast* untouched.
   configureTransport({
@@ -141,6 +148,13 @@ export function registerChatHandlers(ipcMain: IpcMain, db: Database): void {
         persistChatEvent(db, tabId, seq, event)
       } catch (err) {
         console.error('[chat-handlers] persistChatEvent failed:', err)
+      }
+      if (opts.onChatEvent) {
+        try {
+          opts.onChatEvent(tabId, event)
+        } catch (err) {
+          console.error('[chat-handlers] onChatEvent failed:', err)
+        }
       }
     },
   })

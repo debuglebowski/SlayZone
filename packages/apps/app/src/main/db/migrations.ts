@@ -2062,6 +2062,73 @@ const migrations: Migration[] = [
     up: (db) => {
       db.exec(`ALTER TABLE tasks ADD COLUMN manager_mode INTEGER NOT NULL DEFAULT 0`)
     }
+  },
+  {
+    version: 117,
+    up: (db) => {
+      db.exec(`
+        CREATE TABLE agent_turns (
+          id TEXT PRIMARY KEY,
+          task_id TEXT NOT NULL,
+          terminal_tab_id TEXT NOT NULL,
+          start_sha TEXT NOT NULL,
+          end_sha TEXT,
+          prompt_preview TEXT NOT NULL,
+          started_at INTEGER NOT NULL,
+          completed_at INTEGER,
+          FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE
+        );
+        CREATE INDEX idx_agent_turns_task ON agent_turns(task_id, started_at DESC);
+      `)
+    }
+  },
+  {
+    version: 118,
+    up: (db) => {
+      // Replace pair-snapshot model (start/end) with single snapshot per turn.
+      // v117 just shipped — table is empty in practice — safe to drop+recreate.
+      db.exec(`
+        DROP TABLE IF EXISTS agent_turns;
+        CREATE TABLE agent_turns (
+          id TEXT PRIMARY KEY,
+          task_id TEXT NOT NULL,
+          terminal_tab_id TEXT NOT NULL,
+          snapshot_sha TEXT NOT NULL,
+          prompt_preview TEXT NOT NULL DEFAULT '',
+          created_at INTEGER NOT NULL,
+          FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE
+        );
+        CREATE INDEX idx_agent_turns_task ON agent_turns(task_id, created_at ASC);
+      `)
+    }
+  },
+  {
+    version: 119,
+    up: (db) => {
+      // Switch grouping from task → worktree path. task_id retained (nullable)
+      // for attribution: who/which task asked. ON DELETE SET NULL so deleting a
+      // task doesn't lose the turn history that lives with the repo.
+      db.exec(`
+        DROP TABLE IF EXISTS agent_turns;
+        CREATE TABLE agent_turns (
+          id TEXT PRIMARY KEY,
+          worktree_path TEXT NOT NULL,
+          task_id TEXT,
+          terminal_tab_id TEXT NOT NULL,
+          snapshot_sha TEXT NOT NULL,
+          prompt_preview TEXT NOT NULL DEFAULT '',
+          created_at INTEGER NOT NULL,
+          FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE SET NULL
+        );
+        CREATE INDEX idx_agent_turns_worktree ON agent_turns(worktree_path, created_at ASC);
+      `)
+    }
+  },
+  {
+    version: 120,
+    up: (db) => {
+      db.exec(`ALTER TABLE tasks ADD COLUMN diff_collapsed_files TEXT DEFAULT NULL`)
+    }
   }
 ]
 

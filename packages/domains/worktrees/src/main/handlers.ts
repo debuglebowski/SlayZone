@@ -370,7 +370,7 @@ ${steps.join('\n\n')}`
     return getConflictedFiles(path)
   })
 
-  ipcMain.handle('git:getWorkingDiff', (_, path: string, opts?: { contextLines?: string; ignoreWhitespace?: boolean }) => {
+  ipcMain.handle('git:getWorkingDiff', (_, path: string, opts?: { contextLines?: string; ignoreWhitespace?: boolean; fromSha?: string; toSha?: string }) => {
     return getWorkingDiff(path, opts)
   })
 

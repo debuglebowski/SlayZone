@@ -473,5 +473,50 @@ await describe('git:mergeWithAI', () => {
   })
 })
 
+// --- git:getWorkingDiff with fromSha/toSha (Turns range mode) ---
+
+await describe('git:getWorkingDiff range mode', () => {
+  test('diff between two arbitrary SHAs returns scoped patch + file list', async () => {
+    const sha1 = git('git rev-parse HEAD')
+    fs.writeFileSync(path.join(repoPath, 'range-a.txt'), 'first turn change')
+    git('git add range-a.txt')
+    git('git commit -m "range turn a"')
+    const sha2 = git('git rev-parse HEAD')
+
+    const snap = await h.invoke('git:getWorkingDiff', repoPath, {
+      contextLines: 'all',
+      fromSha: sha1,
+      toSha: sha2,
+    }) as { files: string[]; unstagedPatch: string; stagedPatch: string; stagedFiles: string[]; untrackedFiles: string[] }
+
+    expect(snap.files).toContain('range-a.txt')
+    expect(snap.unstagedPatch.includes('first turn change')).toBe(true)
+    // Range mode collapses everything into unstaged side
+    expect(snap.stagedPatch).toBe('')
+    expect(snap.stagedFiles).toHaveLength(0)
+    expect(snap.untrackedFiles).toHaveLength(0)
+  })
+
+  test('diff between identical SHAs returns empty', async () => {
+    const sha = git('git rev-parse HEAD')
+    const snap = await h.invoke('git:getWorkingDiff', repoPath, {
+      fromSha: sha,
+      toSha: sha,
+    }) as { files: string[]; unstagedPatch: string }
+    expect(snap.files).toHaveLength(0)
+    expect(snap.unstagedPatch).toBe('')
+  })
+
+  test('without fromSha/toSha falls back to HEAD-based working diff', async () => {
+    fs.writeFileSync(path.join(repoPath, 'unstaged-edit.txt'), 'live change')
+    const snap = await h.invoke('git:getWorkingDiff', repoPath, {
+      contextLines: 'all',
+    }) as { untrackedFiles: string[] }
+    // Untracked file appears (unique to non-range mode)
+    expect(snap.untrackedFiles.includes('unstaged-edit.txt')).toBe(true)
+    fs.unlinkSync(path.join(repoPath, 'unstaged-edit.txt'))
+  })
+})
+
 h.cleanup()
 console.log('\nDone')

@@ -2,6 +2,7 @@ import type { Project, CreateProjectInput, UpdateProjectInput, ExecutionContext 
 import type { Task, CreateTaskInput, UpdateTaskInput, DesktopHandoffPolicy, TaskTemplate, CreateTaskTemplateInput, UpdateTaskTemplateInput, TaskAsset, CreateAssetInput, UpdateAssetInput, AssetFolder, CreateAssetFolderInput, UpdateAssetFolderInput } from '@slayzone/task/shared'
 import type { AssetVersion, VersionRef, DiffResult, PruneReport } from '@slayzone/task-assets/shared'
 import type { Tag, CreateTagInput, UpdateTagInput } from '@slayzone/tags/shared'
+import type { AgentTurnRange } from '@slayzone/agent-turns/shared'
 import type {
   TerminalMode,
   TerminalState,
@@ -288,6 +289,10 @@ export interface ElectronAPI {
     deleteTag: (id: string) => Promise<boolean>
     reorderTags: (tagIds: string[]) => Promise<void>
   }
+  agentTurns: {
+    list: (worktreePath: string) => Promise<AgentTurnRange[]>
+    onChanged: (callback: (worktreePath: string) => void) => () => void
+  }
   taskTags: {
     getAll: () => Promise<Record<string, string[]>>
     getTagsForTask: (taskId: string) => Promise<Tag[]>
@@ -573,7 +578,7 @@ export interface ElectronAPI {
     mergeWithAI: (projectPath: string, worktreePath: string, parentBranch: string, sourceBranch: string) => Promise<MergeWithAIResult>
     isMergeInProgress: (path: string) => Promise<boolean>
     getConflictedFiles: (path: string) => Promise<string[]>
-    getWorkingDiff: (path: string, opts?: { contextLines?: string; ignoreWhitespace?: boolean }) => Promise<GitDiffSnapshot>
+    getWorkingDiff: (path: string, opts?: { contextLines?: string; ignoreWhitespace?: boolean; fromSha?: string; toSha?: string }) => Promise<GitDiffSnapshot>
     stageFile: (path: string, filePath: string) => Promise<void>
     unstageFile: (path: string, filePath: string) => Promise<void>
     discardFile: (path: string, filePath: string, untracked?: boolean) => Promise<void>

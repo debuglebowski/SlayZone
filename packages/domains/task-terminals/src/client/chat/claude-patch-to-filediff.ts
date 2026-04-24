@@ -46,7 +46,10 @@ export function claudeEditResultToFileDiff(structured: unknown): FileDiff | null
     return {
       header: `@@ -${h.oldStart},${h.oldLines} +${h.newStart},${h.newLines} @@`,
       oldStart: h.oldStart,
+      oldLen: h.oldLines,
       newStart: h.newStart,
+      newLen: h.newLines,
+      label: '',
       lines,
     }
   })

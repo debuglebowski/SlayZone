@@ -108,11 +108,12 @@ import { BlobStore, betterSqliteTxn, seedInitialVersions } from '@slayzone/task-
 import { getExtensionFromTitle } from '@slayzone/task/shared'
 import { registerTagHandlers } from '@slayzone/tags/main'
 import { registerSettingsHandlers, registerThemeHandlers } from '@slayzone/settings/main'
-import { registerPtyHandlers, registerUsageHandlers, killAllPtys, killPtysByTaskId, startIdleChecker, stopIdleChecker, dismissAllNotifications, syncTerminalModes, getPtyPids, onSessionChange, onGlobalStateChange, registerChatHandlers, shutdownChatTransports, setOnHostKillHandler, broadcastRespawnRequest } from '@slayzone/terminal/main'
+import { registerPtyHandlers, registerUsageHandlers, killAllPtys, killPtysByTaskId, startIdleChecker, stopIdleChecker, dismissAllNotifications, syncTerminalModes, getPtyPids, onSessionChange, onGlobalStateChange, onPtyInputSubmit, registerChatHandlers, shutdownChatTransports, setOnHostKillHandler, broadcastRespawnRequest } from '@slayzone/terminal/main'
 import { setProviderLastKilledAt, type ProviderConfig } from '@slayzone/task/shared'
 import { attachFloatingAgent, setupFloatingAgent } from './floating-agent'
 import { registerTerminalTabsHandlers } from '@slayzone/task-terminals/main'
 import { registerWorktreeHandlers } from '@slayzone/worktrees/main'
+import { registerAgentTurnsHandlers, initChatTurnSubscriber, initPtyTurnSubscriber } from '@slayzone/agent-turns/main'
 import { registerDiagnosticsHandlers, registerProcessDiagnostics, recordDiagnosticEvent, stopDiagnostics, setIpcSuccessHook } from '@slayzone/diagnostics/main'
 import { IPC_TELEMETRY_MAP } from '@slayzone/telemetry/shared'
 import { registerAiConfigHandlers } from '@slayzone/ai-config/main'
@@ -1136,9 +1137,12 @@ app.whenReady().then(async () => {
   }
 
   registerTerminalTabsHandlers(ipcMain, db)
-  registerChatHandlers(ipcMain, db)
+  registerChatHandlers(ipcMain, db, { onChatEvent: initChatTurnSubscriber(db) })
   registerFilesHandlers(ipcMain)
   registerWorktreeHandlers(ipcMain, db)
+  registerAgentTurnsHandlers(ipcMain, db)
+  // xterm-mode turn detection: every Enter press in a PTY = turn boundary.
+  onPtyInputSubmit(initPtyTurnSubscriber(db))
   registerAiConfigHandlers(ipcMain, db)
   const integrationHandles = registerIntegrationHandlers(ipcMain, db, { enableTestChannels: isPlaywright })
   registerFileEditorHandlers(ipcMain)

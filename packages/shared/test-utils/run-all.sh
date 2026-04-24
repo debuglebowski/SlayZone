@@ -32,6 +32,9 @@ run_test packages/domains/file-editor/src/main/handlers.test.ts
 run_test packages/domains/diagnostics/src/main/service.test.ts
 run_test packages/domains/integrations/src/main/handlers.db.test.ts
 run_test packages/domains/worktrees/src/main/handlers.test.ts
+run_test packages/domains/agent-turns/src/main/db.test.ts
+run_test packages/domains/agent-turns/src/main/git-snapshot.test.ts
+run_test packages/domains/agent-turns/src/main/turn-tracker.test.ts
 run_test packages/domains/integrations/src/main/handlers.api.test.ts
 run_test packages/domains/integrations/src/main/handlers.analyze.test.ts
 run_test packages/domains/automations/src/shared/templates.test.ts

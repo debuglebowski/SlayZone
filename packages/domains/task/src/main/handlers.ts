@@ -105,6 +105,7 @@ function parseTask(row: Record<string, unknown> | undefined): Task | null {
     browser_tabs: safeJsonParse(row.browser_tabs),
     web_panel_urls: safeJsonParse(row.web_panel_urls),
     editor_open_files: safeJsonParse(row.editor_open_files),
+    diff_collapsed_files: safeJsonParse(row.diff_collapsed_files),
     merge_context: safeJsonParse(row.merge_context),
     loop_config: safeJsonParse(row.loop_config),
     is_temporary: Boolean(row.is_temporary),
@@ -539,6 +540,7 @@ export function updateTask(db: Database, data: UpdateTaskInput): Task | null {
   if (data.browserTabs !== undefined) { fields.push('browser_tabs = ?'); values.push(data.browserTabs ? JSON.stringify(data.browserTabs) : null) }
   if (data.webPanelUrls !== undefined) { fields.push('web_panel_urls = ?'); values.push(data.webPanelUrls ? JSON.stringify(data.webPanelUrls) : null) }
   if (data.editorOpenFiles !== undefined) { fields.push('editor_open_files = ?'); values.push(data.editorOpenFiles ? JSON.stringify(data.editorOpenFiles) : null) }
+  if (data.diffCollapsedFiles !== undefined) { fields.push('diff_collapsed_files = ?'); values.push(data.diffCollapsedFiles && data.diffCollapsedFiles.length ? JSON.stringify(data.diffCollapsedFiles) : null) }
   if (data.mergeState !== undefined) { fields.push('merge_state = ?'); values.push(data.mergeState) }
   if (data.mergeContext !== undefined) { fields.push('merge_context = ?'); values.push(data.mergeContext ? JSON.stringify(data.mergeContext) : null) }
   if (data.loopConfig !== undefined) { fields.push('loop_config = ?'); values.push(data.loopConfig ? JSON.stringify(data.loopConfig) : null) }

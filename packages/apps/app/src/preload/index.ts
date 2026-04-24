@@ -59,6 +59,14 @@ const api: ElectronAPI = {
     deleteTag: (id) => ipcRenderer.invoke('db:tags:delete', id),
     reorderTags: (tagIds) => ipcRenderer.invoke('db:tags:reorder', tagIds)
   },
+  agentTurns: {
+    list: (worktreePath) => ipcRenderer.invoke('agent-turns:list', worktreePath),
+    onChanged: (callback) => {
+      const handler = (_: unknown, worktreePath: string): void => callback(worktreePath)
+      ipcRenderer.on('agent-turns:changed', handler)
+      return () => ipcRenderer.removeListener('agent-turns:changed', handler)
+    }
+  },
   taskTags: {
     getAll: () => ipcRenderer.invoke('db:taskTags:getAll'),
     getTagsForTask: (taskId) => ipcRenderer.invoke('db:taskTags:getForTask', taskId),

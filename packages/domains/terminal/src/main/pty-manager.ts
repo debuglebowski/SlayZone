@@ -163,6 +163,31 @@ export function onGlobalStateChange(cb: (sessionId: string, newState: TerminalSt
   return () => { globalStateChangeListeners.delete(cb) }
 }
 
+/**
+ * Fires when a PTY input line is submitted (Enter pressed) with non-empty
+ * buffered input. Used by agent-turns to mark turn boundaries in xterm-mode
+ * tabs (where structured agent events are unavailable).
+ *
+ * Args: sessionId (`${taskId}` or `${taskId}:${tabId}`), taskId, line (the
+ * accumulated stdin since the previous Enter, raw — caller should trim).
+ */
+const inputSubmitListeners = new Set<(sessionId: string, taskId: string, line: string) => void>()
+
+export function onPtyInputSubmit(
+  cb: (sessionId: string, taskId: string, line: string) => void
+): () => void {
+  inputSubmitListeners.add(cb)
+  return () => { inputSubmitListeners.delete(cb) }
+}
+
+function emitInputSubmit(sessionId: string, taskId: string, line: string): void {
+  for (const cb of inputSubmitListeners) {
+    try { cb(sessionId, taskId, line) } catch (err) {
+      console.error('[pty-manager] inputSubmit listener threw:', err)
+    }
+  }
+}
+
 function notifySessionChange(): void {
   for (const cb of sessionChangeListeners) cb()
 }
@@ -1316,6 +1341,12 @@ export function writePty(sessionId: string, data: string): boolean {
   // On Enter: transition TUI to 'working' if adapter opts in
   const hasNewline = data.includes('\r') || data.includes('\n')
   if (hasNewline) {
+    // Notify turn-tracker subscribers BEFORE we reset the buffer below.
+    // Snapshot of stdin so far = the just-submitted prompt.
+    const submittedLine = session.inputBuffer
+    if (submittedLine.trim().length > 0) {
+      emitInputSubmit(sessionId, session.taskId, submittedLine)
+    }
     if (session.adapter.transitionOnInput && session.inputBuffer.trim().length > 0 && session.state !== 'running') {
       session.activity = 'working'
       session.lastOutputTime = Date.now() // reset idle timer from input submission
