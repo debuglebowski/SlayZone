@@ -145,13 +145,37 @@ function renderContent(content: string, type: DiffLineType['type'], wrap: boolea
   // React element count on syntax-heavy lines (e.g. a line with four adjacent
   // token boundaries that all resolve to the same class produces ONE span
   // after this, down from four). Pure optimisation — output text is identical.
+  //
+  // Span lookup uses a 2-pointer walk instead of `spans.find` per segment.
+  // Spans arrive in position order from the tokenize worker (highlightTree
+  // traverses in document order, non-overlapping at leaves) and segments are
+  // walked in ascending `from`, so advancing a pointer past any span that
+  // ends at or before the current segment's start is safe. Amortized O(1)
+  // per segment instead of O(M) — saves real time on long minified lines
+  // with hundreds of tokens. Preserves `find`'s first-match semantic: within
+  // a set of candidates whose `from ≤ segFrom`, we pick the earliest array
+  // index whose `to ≥ segTo`, matching the prior behavior byte-for-byte.
   type Seg = { from: number; to: number; cls: string }
   const rawSegs: Seg[] = []
+  const spanArr = hasSpans ? spans! : undefined
+  let sp = 0
   for (let i = 0; i < points.length - 1; i++) {
     const from = points[i]
     const to = points[i + 1]
     if (to <= from) continue
-    const tokenSpan = hasSpans ? spans!.find((s) => s.from <= from && s.to >= to) : undefined
+    let tokenSpan: HlSpan | undefined
+    if (spanArr) {
+      // Retire spans that end at or before this segment starts — they cannot
+      // match this or any later segment (segments only move forward).
+      while (sp < spanArr.length && spanArr[sp].to <= from) sp++
+      // Scan forward from sp for the first span covering [from, to]. Spans
+      // starting after `from` cannot cover it, so this loop terminates quickly.
+      for (let k = sp; k < spanArr.length; k++) {
+        const s = spanArr[k]
+        if (s.from > from) break
+        if (s.to >= to) { tokenSpan = s; break }
+      }
+    }
     const highlighted = hasHl ? highlights!.some((h) => h.start <= from && h.end >= to) : false
     const cls = cn(ws, tokenSpan?.classes, highlighted && highlightClass)
     rawSegs.push({ from, to, cls })

@@ -43,6 +43,13 @@ const EXCLUDED_GIT_SUBDIRS = new Set(['objects', 'logs'])
 
 export interface GitWatcherEvents {
   'git:diff-changed': (payload: { worktreePath: string }) => void
+  /**
+   * Emitted when a watcher tears down due to an error (ENOSPC, worktree
+   * deletion, platform quirk). Renderer listens and tightens its poll
+   * cadence — without this it would stay pinned at WATCHER_FALLBACK_POLL_MS
+   * (30s) forever, since `watchStart` already resolved successfully.
+   */
+  'git:diff-watch-failed': (payload: { worktreePath: string }) => void
 }
 
 export interface GitWatcher extends EventEmitter {
@@ -133,6 +140,14 @@ export function createGitWatcher(): GitWatcher {
 
   function openWatcher(entry: WatchEntry, root: string, isGitDir: boolean): void {
     try {
+      // `recursive: true` is safe on all three target platforms:
+      //   - macOS: supported since Node 7 (FSEvents backend)
+      //   - Windows: supported since Node 7 (ReadDirectoryChangesW)
+      //   - Linux: supported natively since Node 20 (inotify walk)
+      // Electron 41 bundles Node 22.x, so we never hit the pre-Node-20 Linux
+      // silent-no-op path. If the Electron baseline ever drops below Node 20,
+      // add a Linux guard here that falls back to watching .git/{index,HEAD,refs/heads}
+      // non-recursively.
       const watcher = fs.watch(root, { recursive: true }, (_eventType, filename) => {
         if (entry.closed) return
         if (!filename) {
@@ -166,6 +181,14 @@ export function createGitWatcher(): GitWatcher {
         // Detach on error. Next subscribe() recreates.
         teardown(entry)
         entries.delete(entry.worktreePath)
+        // Notify renderer(s) so they can drop `watcherActive` and retighten
+        // their poll cadence. Fire AFTER teardown so any late 'close' event
+        // from fs.watch is already drained.
+        try {
+          emitter.emit('git:diff-watch-failed', { worktreePath: entry.worktreePath })
+        } catch {
+          /* listener threw — never crash the watcher */
+        }
       })
 
       entry.watchers.push(watcher)

@@ -403,6 +403,19 @@ export const GitDiffPanel = forwardRef<GitDiffPanelHandle, GitDiffPanelProps>(fu
     }
   }, [flatEntries, selectedFile])
 
+  // Prune userToggledFilesRef entries whose files no longer exist in the diff.
+  // Otherwise the set grows unbounded over a long session as files churn.
+  // Uses the same `${source}:${path}` key format as flowRows / collapsedFiles.
+  useEffect(() => {
+    const set = userToggledFilesRef.current
+    if (set.size === 0) return
+    const current = new Set<string>()
+    for (const e of flatEntries) current.add(`${e.source}:${e.path}`)
+    for (const key of set) {
+      if (!current.has(key)) set.delete(key)
+    }
+  }, [flatEntries])
+
   // Scroll selected item into view
   useEffect(() => {
     selectedItemRef.current?.scrollIntoView({ block: 'nearest' })
@@ -472,11 +485,17 @@ export const GitDiffPanel = forwardRef<GitDiffPanelHandle, GitDiffPanelProps>(fu
   const rangeExtractorSticky = useCallback((range: Range) => {
     const headers = stickyHeaderIndicesRef.current
     // Last header at or before range.startIndex — pins it while its body scrolls.
+    // Binary search (upper_bound - 1): headers are in ascending order, and this
+    // fires on every scroll tick so O(log N) matters for large file counts.
     let active = -1
-    for (let i = 0; i < headers.length; i++) {
-      if (headers[i] <= range.startIndex) active = headers[i]
-      else break
+    let lo = 0
+    let hi = headers.length
+    while (lo < hi) {
+      const mid = (lo + hi) >>> 1
+      if (headers[mid] <= range.startIndex) lo = mid + 1
+      else hi = mid
     }
+    if (lo > 0) active = headers[lo - 1]
     activeStickyIndexRef.current = active
     const base = defaultRangeExtractor(range)
     if (active < 0) return base

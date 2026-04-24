@@ -654,6 +654,7 @@ export interface ElectronAPI {
     watchStart: (worktreePath: string) => Promise<void>
     watchStop: (worktreePath: string) => Promise<void>
     onDiffChanged: (cb: (worktreePath: string) => void) => () => void
+    onDiffWatchFailed: (cb: (worktreePath: string) => void) => () => void
   }
   tabs: {
     list: (taskId: string) => Promise<TerminalTab[]>

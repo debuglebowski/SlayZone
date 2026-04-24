@@ -74,6 +74,8 @@ interface PathWatcherState {
   entries: Set<StoreEntry>
   /** Teardown returned by api.git.onDiffChanged — set once we register. */
   listenerDispose: (() => void) | null
+  /** Teardown returned by api.git.onDiffWatchFailed — set once we register. */
+  failureListenerDispose: (() => void) | null
   /** Is the main-process watcher live? `false` if watchStart failed / unavailable. */
   watcherActive: boolean
   /** Pending watchStart promise — guard against racing subscribe/unsubscribe. */
@@ -282,6 +284,7 @@ function acquirePathWatcher(targetPath: string, entry: StoreEntry): void {
     state = {
       entries: new Set(),
       listenerDispose: null,
+      failureListenerDispose: null,
       watcherActive: false,
       startPromise: null,
     }
@@ -300,6 +303,28 @@ function acquirePathWatcher(targetPath: string, entry: StoreEntry): void {
   state.listenerDispose = api.git.onDiffChanged((changedPath) => {
     if (changedPath === targetPath) handleDiffChanged(targetPath)
   })
+
+  // Listen for main-process watcher death (ENOSPC, worktree removed, etc.).
+  // Without this, watcherActive stays true forever and the poll timer is
+  // stuck at WATCHER_FALLBACK_POLL_MS (30s) even though no fs events will
+  // arrive. Flip watcherActive off + re-arm timers so poll tightens back
+  // to the subscriber-requested cadence (typically 5s).
+  if (api.git.onDiffWatchFailed) {
+    const capturedStateForFailure = state
+    capturedStateForFailure.failureListenerDispose = api.git.onDiffWatchFailed((failedPath) => {
+      if (failedPath !== targetPath) return
+      // Ensure this state is still the canonical one for the path — a
+      // release/re-acquire race could have replaced it.
+      if (pathWatchers.get(targetPath) !== capturedStateForFailure) return
+      if (!capturedStateForFailure.watcherActive) return
+      capturedStateForFailure.watcherActive = false
+      retimeAllForPath(targetPath)
+      // Trigger an immediate catch-up fetch — something just changed on disk
+      // that caused the watcher to die, and we don't want to wait for the
+      // next poll tick to surface it.
+      for (const e of capturedStateForFailure.entries) void runFetch(e)
+    })
+  }
 
   const capturedState = state
   capturedState.startPromise = api.git.watchStart(targetPath).then(
@@ -328,6 +353,10 @@ function releasePathWatcher(targetPath: string, entry: StoreEntry): void {
   if (state.listenerDispose) {
     try { state.listenerDispose() } catch { /* ignore */ }
     state.listenerDispose = null
+  }
+  if (state.failureListenerDispose) {
+    try { state.failureListenerDispose() } catch { /* ignore */ }
+    state.failureListenerDispose = null
   }
   const api = typeof window !== 'undefined' ? window.api : undefined
   if (state.watcherActive && api?.git?.watchStop) {
@@ -503,6 +532,9 @@ export function _resetStore(): void {
   for (const [p, state] of pathWatchers) {
     if (state.listenerDispose) {
       try { state.listenerDispose() } catch { /* ignore */ }
+    }
+    if (state.failureListenerDispose) {
+      try { state.failureListenerDispose() } catch { /* ignore */ }
     }
     if (state.watcherActive) {
       const api = typeof window !== 'undefined' ? window.api : undefined

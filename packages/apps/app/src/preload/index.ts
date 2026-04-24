@@ -584,6 +584,11 @@ const api: ElectronAPI = {
       const handler = (_: unknown, payload: { worktreePath: string }) => cb(payload.worktreePath)
       ipcRenderer.on('git:diff-changed', handler)
       return () => { ipcRenderer.off('git:diff-changed', handler) }
+    },
+    onDiffWatchFailed: (cb) => {
+      const handler = (_: unknown, payload: { worktreePath: string }) => cb(payload.worktreePath)
+      ipcRenderer.on('git:diff-watch-failed', handler)
+      return () => { ipcRenderer.off('git:diff-watch-failed', handler) }
     }
   },
   tabs: {

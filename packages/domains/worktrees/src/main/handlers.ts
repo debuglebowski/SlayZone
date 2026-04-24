@@ -184,6 +184,19 @@ function attachWatcherBridge(): void {
       }
     }
   })
+  watcher.on('git:diff-watch-failed', (payload) => {
+    // Fan out the failure so each renderer can flip `watcherActive = false`
+    // for that path and retighten its poll timer. Same broadcast shape as
+    // diff-changed — store self-filters by worktreePath.
+    for (const win of BrowserWindow.getAllWindows()) {
+      if (win.isDestroyed()) continue
+      try {
+        win.webContents.send('git:diff-watch-failed', payload)
+      } catch {
+        /* window closing — ignore */
+      }
+    }
+  })
 }
 
 export function registerWorktreeHandlers(ipcMain: IpcMain, db: Database): void {
