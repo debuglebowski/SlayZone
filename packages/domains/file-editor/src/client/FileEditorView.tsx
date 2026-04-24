@@ -10,6 +10,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
   Button,
+  PulseGrid,
   Tooltip,
   TooltipContent,
   TooltipProvider,
@@ -93,7 +94,9 @@ export const FileEditorView = forwardRef<FileEditorViewHandle, FileEditorViewPro
   }, [activeFilePath])
   const [sidebarMode, setSidebarMode] = useState<'tree' | 'search'>('tree')
   const [isFileDragOver, setIsFileDragOver] = useState(false)
+  const [treeReady, setTreeReady] = useState(false)
   const dragCounter = useRef(0)
+  const showLoading = isRestoring || (treeVisible && !treeReady)
 
   // --- Emit state changes to parent for persistence ---
   // Parent (TaskDetailPage) debounces at 500ms, so frequent calls here are fine.
@@ -318,6 +321,7 @@ export const FileEditorView = forwardRef<FileEditorViewHandle, FileEditorViewPro
                 refreshKey={treeRefreshKey}
                 expandedFolders={expandedFolders}
                 onExpandedFoldersChange={setExpandedFolders}
+                onReady={() => setTreeReady(true)}
               />
             )}
           </div>
@@ -441,6 +445,12 @@ export const FileEditorView = forwardRef<FileEditorViewHandle, FileEditorViewPro
           </div>
         )}
       </div>
+
+      {showLoading && (
+        <div className="absolute inset-0 z-40 bg-surface-0">
+          <PulseGrid />
+        </div>
+      )}
 
       {/* Drop overlay */}
       {isFileDragOver && (

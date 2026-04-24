@@ -106,13 +106,15 @@ interface EditorFileTreeProps {
   /** Controlled expanded folders (optional — uses internal state if not provided) */
   expandedFolders?: Set<string>
   onExpandedFoldersChange?: (folders: Set<string>) => void
+  /** Called once root directory finishes initial load */
+  onReady?: () => void
 }
 
 export interface EditorFileTreeHandle {
   scrollToPath: (path: string) => void
 }
 
-export const EditorFileTree = forwardRef<EditorFileTreeHandle, EditorFileTreeProps>(function EditorFileTree({ projectPath, onOpenFile, onFileRenamed, activeFilePath, refreshKey, expandedFolders: controlledExpanded, onExpandedFoldersChange }, ref) {
+export const EditorFileTree = forwardRef<EditorFileTreeHandle, EditorFileTreeProps>(function EditorFileTree({ projectPath, onOpenFile, onFileRenamed, activeFilePath, refreshKey, expandedFolders: controlledExpanded, onExpandedFoldersChange, onReady }, ref) {
   // Map of dirPath -> children entries (lazy loaded)
   const [dirContents, setDirContents] = useState<Map<string, DirEntry[]>>(new Map())
   const [internalExpanded, setInternalExpanded] = useState<Set<string>>(new Set())
@@ -218,8 +220,10 @@ export const EditorFileTree = forwardRef<EditorFileTreeHandle, EditorFileTreePro
   )
 
   // Load root + persisted expanded folders on mount
+  const onReadyRef = useRef(onReady)
+  onReadyRef.current = onReady
   useEffect(() => {
-    loadDir('')
+    loadDir('').then(() => onReadyRef.current?.())
     expandedFolders.forEach((dir) => loadDir(dir))
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loadDir])

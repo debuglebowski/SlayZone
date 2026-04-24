@@ -2,13 +2,12 @@ import { useEffect, useRef, useCallback, useState, forwardRef, useImperativeHand
 import { CheckCircle2, XCircle, Loader2 } from 'lucide-react'
 import { Terminal as XTerm } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
-import { matchesShortcut, useShortcutStore } from '@slayzone/ui'
+import { matchesShortcut, useShortcutStore, PulseGrid } from '@slayzone/ui'
 import { WebLinkProvider, FileLinkProvider } from './web-link-provider'
 import { SerializeAddon } from '@xterm/addon-serialize'
 import { SearchAddon } from '@xterm/addon-search'
 import { WebglAddon } from '@xterm/addon-webgl'
 import '@xterm/xterm/css/xterm.css'
-import { PulseGrid } from './TerminalLoadingAnimations'
 
 // Strip trailing whitespace from each line of selection text.
 // xterm's getTrimmedLength treats rendered spaces (e.g. from padded UI like
