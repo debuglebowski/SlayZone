@@ -23,10 +23,12 @@ export function useAgentTurns(worktreePath: string | null | undefined): AgentTur
 
   useEffect(() => {
     if (!worktreePath) return
+    const norm = (p: string) => p.replace(/\/+$/, '')
+    const target = norm(worktreePath)
     const off = window.api.agentTurns.onChanged((changedPath) => {
-      // Match either canonical or as-passed; main-side broadcast uses canonical,
-      // renderer may pass either. Normalize via endsWith for the simplest match.
-      if (changedPath === worktreePath || changedPath.endsWith(worktreePath) || worktreePath.endsWith(changedPath)) {
+      // Strict equality after trailing-slash normalization. Avoids false
+      // positives from suffix-match when two worktree paths share a tail.
+      if (norm(changedPath) === target) {
         void reload()
       }
     })
