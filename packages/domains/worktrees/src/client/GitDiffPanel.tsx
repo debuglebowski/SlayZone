@@ -5,7 +5,8 @@ import {
   Button, FileTree, buildFileTree, flattenFileTree, fileTreeIndent, cn, buttonVariants,
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
-  PulseGrid
+  PulseGrid,
+  Tooltip, TooltipContent, TooltipProvider, TooltipTrigger
 } from '@slayzone/ui'
 import { useAppearance } from '@slayzone/settings/client'
 import type { Task, MergeState } from '@slayzone/task/shared'
@@ -45,6 +46,23 @@ function deriveStatus(path: string, diffs: FileDiffType[]): 'M' | 'A' | 'D' {
   if (diff?.isNew) return 'A'
   if (diff?.isDeleted) return 'D'
   return 'M'
+}
+
+// Honest display: ingestion now stores '' for prompts it can't reliably
+// capture (raw PTY stdin). Legacy rows written before that policy may contain
+// control chars or CSI-debris like `[I [O [A` — treat them as empty too so
+// users never see garbled text.
+function cleanPromptForDisplay(raw: string): string {
+  // eslint-disable-next-line no-control-regex
+  if (/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f\x1b]/.test(raw)) return ''
+  // CSI debris left after upstream stripped ESC:
+  //   `[I`/`[O`, `[A-D`, `[H`/`[F` — focus/arrow/home/end
+  //   `[<digits>~`                 — bracketed paste, function keys, PgUp/PgDn
+  //   `[<digits>;<digits><letter>` — cursor position with modifiers
+  //   `[<digits><letter>`          — CUU/CUD/CUF/CUB with count
+  if (/\[[IOABCDHF](?![A-Za-z])/.test(raw)) return ''
+  if (/\[\d+[;~A-Za-z]/.test(raw)) return ''
+  return raw
 }
 
 const STATUS_COLORS: Record<FileEntry['status'], string> = {
@@ -923,14 +941,16 @@ export const GitDiffPanel = forwardRef<GitDiffPanelHandle, GitDiffPanelProps>(fu
                 rendered when in continuous-flow or with a selected file, so the user
                 always has an All toggle even before any turn snapshots exist. */}
             {diffContinuousFlow && (
-              <div className="shrink-0 h-9 flex items-center gap-1.5 px-2 bg-muted/30 border-b overflow-x-auto">
+              <TooltipProvider delayDuration={300}>
+              <div className="shrink-0 h-9 flex items-center px-2 bg-muted/30 border-b">
+                <div className="flex-1 min-w-0 flex items-center gap-1.5 overflow-x-auto scrollbar-hide">
                 <button
                   onClick={() => setSelectedTurnId('all')}
                   className={cn(
-                    'shrink-0 px-3 h-6 rounded-full text-[11px] font-medium border transition-colors',
+                    'shrink-0 inline-flex items-center justify-center px-3 h-6 rounded-full text-[11px] leading-none font-medium border transition-colors',
                     selectedTurnId === 'all'
-                      ? 'bg-primary text-primary-foreground border-primary'
-                      : 'bg-background hover:bg-muted text-foreground border-border'
+                      ? 'bg-muted text-foreground border-foreground/30'
+                      : 'bg-background hover:bg-muted text-muted-foreground border-border'
                   )}
                 >
                   All turns
@@ -940,27 +960,42 @@ export const GitDiffPanel = forwardRef<GitDiffPanelHandle, GitDiffPanelProps>(fu
                   // reversed iteration starts at newest (idx 0) → n = length - idx.
                   const n = turns.length - idx
                   const active = selectedTurnId === t.id
-                  const tip = [
-                    t.task_title ? `Task: ${t.task_title}` : null,
-                    t.prompt_preview ? `Prompt: ${t.prompt_preview}` : null,
-                  ].filter(Boolean).join('\n') || `Turn ${n}`
+                  const promptClean = t.prompt_preview ? cleanPromptForDisplay(t.prompt_preview) : ''
+                  const hasTip = !!(t.task_title || promptClean)
                   return (
-                    <button
-                      key={t.id}
-                      onClick={() => setSelectedTurnId(t.id)}
-                      title={tip}
-                      className={cn(
-                        'shrink-0 px-3 h-6 rounded-full text-[11px] font-medium border transition-colors',
-                        active
-                          ? 'bg-primary text-primary-foreground border-primary'
-                          : 'bg-background hover:bg-muted text-foreground border-border'
-                      )}
-                    >
-                      Turn {n}
-                    </button>
+                    <Tooltip key={t.id}>
+                      <TooltipTrigger asChild>
+                        <button
+                          onClick={() => setSelectedTurnId(t.id)}
+                          className={cn(
+                            'shrink-0 inline-flex items-center justify-center px-3 h-6 rounded-full text-[11px] leading-none font-medium border transition-colors',
+                            active
+                              ? 'bg-muted text-foreground border-foreground/30'
+                              : 'bg-background hover:bg-muted text-muted-foreground border-border'
+                          )}
+                        >
+                          Turn {n}
+                        </button>
+                      </TooltipTrigger>
+                      <TooltipContent side="bottom" align="start" className="max-w-xs">
+                        {hasTip ? (
+                          <>
+                            {t.task_title && <p className="text-sm font-semibold">{t.task_title}</p>}
+                            {promptClean && (
+                              <p className={cn('text-xs italic line-clamp-4 break-words', t.task_title && 'mt-1')}>
+                                {promptClean}
+                              </p>
+                            )}
+                          </>
+                        ) : (
+                          <p className="text-sm font-semibold">Turn {n}</p>
+                        )}
+                      </TooltipContent>
+                    </Tooltip>
                   )
                 })}
-                <div className="ml-auto flex items-center gap-0.5 shrink-0 sticky right-0 bg-muted/30 pl-1">
+                </div>
+                <div className="shrink-0 flex items-center gap-0.5 pl-8">
                   <button
                     onClick={() => {
                       // Mark every current file as user-toggled so auto-collapse
@@ -985,6 +1020,7 @@ export const GitDiffPanel = forwardRef<GitDiffPanelHandle, GitDiffPanelProps>(fu
                   </button>
                 </div>
               </div>
+              </TooltipProvider>
             )}
             {/* Body */}
             {diffContinuousFlow ? (
