@@ -577,7 +577,14 @@ const api: ElectronAPI = {
     popStash: (repoPath, index) => ipcRenderer.invoke('git:popStash', repoPath, index),
     dropStash: (repoPath, index) => ipcRenderer.invoke('git:dropStash', repoPath, index),
     branchFromStash: (repoPath, index, branchName) => ipcRenderer.invoke('git:branchFromStash', repoPath, index, branchName),
-    getStashDiff: (repoPath, index) => ipcRenderer.invoke('git:getStashDiff', repoPath, index)
+    getStashDiff: (repoPath, index) => ipcRenderer.invoke('git:getStashDiff', repoPath, index),
+    watchStart: (worktreePath) => ipcRenderer.invoke('git:watch-start', worktreePath),
+    watchStop: (worktreePath) => ipcRenderer.invoke('git:watch-stop', worktreePath),
+    onDiffChanged: (cb) => {
+      const handler = (_: unknown, payload: { worktreePath: string }) => cb(payload.worktreePath)
+      ipcRenderer.on('git:diff-changed', handler)
+      return () => { ipcRenderer.off('git:diff-changed', handler) }
+    }
   },
   tabs: {
     list: (taskId) => ipcRenderer.invoke('tabs:list', taskId),

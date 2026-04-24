@@ -112,7 +112,7 @@ import { registerPtyHandlers, registerUsageHandlers, killAllPtys, killPtysByTask
 import { setProviderLastKilledAt, type ProviderConfig } from '@slayzone/task/shared'
 import { attachFloatingAgent, setupFloatingAgent } from './floating-agent'
 import { registerTerminalTabsHandlers } from '@slayzone/task-terminals/main'
-import { registerWorktreeHandlers } from '@slayzone/worktrees/main'
+import { registerWorktreeHandlers, closeGitWatcher } from '@slayzone/worktrees/main'
 import { registerAgentTurnsHandlers, initChatTurnSubscriber, initPtyTurnSubscriber } from '@slayzone/agent-turns/main'
 import { registerDiagnosticsHandlers, registerProcessDiagnostics, recordDiagnosticEvent, stopDiagnostics, setIpcSuccessHook } from '@slayzone/diagnostics/main'
 import { IPC_TELEMETRY_MAP } from '@slayzone/telemetry/shared'
@@ -2078,6 +2078,7 @@ div{text-align:center}h1{font-size:14px;font-weight:500;color:#aaa}p{font-size:1
       // 4. Close file watchers
       closeAllWatchers()
       closeAssetWatcher()
+      closeGitWatcher()
 
       // 5. Clear registries + flags + browser view manager
       clearBrowserRegistry()
@@ -2354,6 +2355,7 @@ app.on('will-quit', () => {
   stopIdleChecker()
   stopAutoBackup()
   closeAssetWatcher()
+  closeGitWatcher()
   killAllPtys()
   shutdownChatTransports()
   killAllProcesses()

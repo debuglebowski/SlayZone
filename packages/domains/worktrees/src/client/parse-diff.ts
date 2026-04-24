@@ -30,6 +30,12 @@ export interface FileDiff {
   isDeleted: boolean
   additions: number
   deletions: number
+  /**
+   * Set by `ensureInlineHighlights` after inline-highlight pass has run for
+   * this file's hunks. Lets callers invoke the helper idempotently so we
+   * only compute highlights for files the user actually looks at.
+   */
+  _highlightsApplied?: boolean
 }
 
 const HUNK_HEADER = /^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@(.*)$/
@@ -77,6 +83,18 @@ export function computeInlineHighlights(
   }
 }
 
+/**
+ * Compute inline char-level highlights for paired add/delete lines in the
+ * given FileDiff. Idempotent — a `_highlightsApplied` flag on the FileDiff
+ * short-circuits repeat calls. Called lazily by `DiffView` just before a file
+ * renders so offscreen files in large patches never pay the cost.
+ */
+export function ensureInlineHighlights(fileDiff: FileDiff): void {
+  if (fileDiff._highlightsApplied) return
+  applyInlineHighlights(fileDiff.hunks)
+  fileDiff._highlightsApplied = true
+}
+
 function applyInlineHighlights(hunks: DiffHunk[]): void {
   for (const hunk of hunks) {
     const lines = hunk.lines
@@ -112,7 +130,7 @@ function applyInlineHighlights(hunks: DiffHunk[]): void {
   }
 }
 
-export function parseUnifiedDiff(patch: string): FileDiff[] {
+function parseUnifiedDiffImpl(patch: string): FileDiff[] {
   if (!patch.trim()) return []
 
   const files: FileDiff[] = []
@@ -199,9 +217,67 @@ export function parseUnifiedDiff(patch: string): FileDiff[] {
       fileDiff.hunks.push(hunk)
     }
 
-    applyInlineHighlights(fileDiff.hunks)
+    // Inline highlights are now applied lazily via `ensureInlineHighlights`,
+    // called from DiffView just before a file renders. Parsing a 200-file
+    // patch no longer walks every hunk to pair up adds/deletes up front.
     files.push(fileDiff)
   }
 
   return files
+}
+
+// ── Global LRU parse cache ───────────────────────────────────────────
+// Patches are immutable-by-string, so keying on the raw patch text is safe.
+// A single Map doubles as our LRU: delete-then-set on hit promotes the key
+// to most-recently-used; eviction drops the oldest (first-inserted) entry.
+// Shared across every GitDiffPanel instance + stash + untracked-file paths.
+// Count cap bounds small-patch churn; byte cap bounds megabyte-sized patches.
+const MAX_ENTRIES = 64
+// 8 MB total across resolved entries — prevents unbounded growth from a few huge diffs.
+const MAX_BYTES = 8 * 1024 * 1024
+
+type ParseCacheEntry = { value: FileDiff[]; bytes: number }
+const parseCache = new Map<string, ParseCacheEntry>()
+let parseCacheBytes = 0
+
+// Heuristic: patch string is the dominant input; parsed result roughly scales
+// with it. `len * 4` approximates UTF-16 key (len*2) + proportional value cost.
+function estimatePatchBytes(patch: string): number {
+  return patch.length * 4
+}
+
+function evictParseCache(): void {
+  // Evict oldest-inserted entries until both caps satisfied.
+  while (parseCache.size > MAX_ENTRIES || parseCacheBytes > MAX_BYTES) {
+    const iter = parseCache.keys().next()
+    if (iter.done) break
+    const oldestKey = iter.value
+    const oldest = parseCache.get(oldestKey)
+    if (oldest === undefined) break
+    parseCache.delete(oldestKey)
+    parseCacheBytes -= oldest.bytes
+    if (parseCacheBytes < 0) parseCacheBytes = 0
+  }
+}
+
+export function parseUnifiedDiff(patch: string): FileDiff[] {
+  const cached = parseCache.get(patch)
+  if (cached !== undefined) {
+    // Promote to MRU — byte total unchanged (same entry, same size).
+    parseCache.delete(patch)
+    parseCache.set(patch, cached)
+    return cached.value
+  }
+  const parsed = parseUnifiedDiffImpl(patch)
+  const bytes = estimatePatchBytes(patch)
+  parseCache.set(patch, { value: parsed, bytes })
+  parseCacheBytes += bytes
+  evictParseCache()
+  return parsed
+}
+
+/** Test/diagnostic hook. Clears the module-level LRU cache. */
+export function _clearParseDiffCache(): void {
+  parseCache.clear()
+  parseCacheBytes = 0
 }

@@ -28,6 +28,7 @@
     "@codemirror/state": "^6.5.2",
     "@codemirror/view": "^6.36.5",
     "@lezer/highlight": "^1.0.0",
+    "@slayzone/agent-turns": "workspace:*",
     "@slayzone/diagnostics": "workspace:*",
     "@slayzone/editor": "workspace:*",
     "@slayzone/telemetry": "workspace:*",

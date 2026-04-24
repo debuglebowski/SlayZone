@@ -1,6 +1,8 @@
 import type { IpcMain } from 'electron'
+import { BrowserWindow } from 'electron'
 import type { Database } from 'better-sqlite3'
 import { recordDiagnosticEvent } from '@slayzone/diagnostics/main'
+import { getGitWatcher } from './git-watcher'
 import {
   isGitRepo,
   detectWorktrees,
@@ -158,7 +160,47 @@ export function resolveSubmoduleInitBehavior(db: Database, projectId?: string): 
   return (settingRow?.value as WorktreeSubmoduleInit) || 'auto'
 }
 
+/**
+ * Module-scope flag so we wire the watcher → IPC broadcast bridge exactly once,
+ * even if registerWorktreeHandlers is called twice (it is, during hot reload in
+ * dev — the PTY block guards against this with `removeHandler`, but the watcher
+ * is a singleton EventEmitter and would otherwise accumulate listeners).
+ */
+let watcherBridgeAttached = false
+
+function attachWatcherBridge(): void {
+  if (watcherBridgeAttached) return
+  watcherBridgeAttached = true
+  const watcher = getGitWatcher()
+  watcher.on('git:diff-changed', (payload) => {
+    // Broadcast to all renderer windows — each window's store entries
+    // self-filter by worktreePath.
+    for (const win of BrowserWindow.getAllWindows()) {
+      if (win.isDestroyed()) continue
+      try {
+        win.webContents.send('git:diff-changed', payload)
+      } catch {
+        /* window closing — ignore */
+      }
+    }
+  })
+}
+
 export function registerWorktreeHandlers(ipcMain: IpcMain, db: Database): void {
+  attachWatcherBridge()
+
+  // Push-update fs watcher for git state (replaces renderer polling).
+  // Renderer calls watch-start on mount, watch-stop on unmount. Refcounted
+  // per worktreePath in the main process, so multiple windows / panels share
+  // one watcher. Throws via IPC on failure → renderer falls back to poll.
+  ipcMain.handle('git:watch-start', (_, worktreePath: string): void => {
+    getGitWatcher().subscribe(worktreePath)
+  })
+
+  ipcMain.handle('git:watch-stop', (_, worktreePath: string): void => {
+    getGitWatcher().unsubscribe(worktreePath)
+  })
+
   // Git operations
   ipcMain.handle('git:isGitRepo', (_, p: string) => {
     return isGitRepo(p)

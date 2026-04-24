@@ -2,7 +2,7 @@
  * Tests for parse-diff.ts
  * Run with: npx tsx packages/domains/worktrees/src/client/parse-diff.test.ts
  */
-import { parseUnifiedDiff, computeInlineHighlights } from './parse-diff'
+import { parseUnifiedDiff, computeInlineHighlights, ensureInlineHighlights } from './parse-diff'
 
 let passed = 0
 let failed = 0
@@ -338,13 +338,32 @@ test('inline highlights applied to paired add/delete lines', () => {
 -const x = 10;
 +const x = 20;
  // end`
-  const lines = parseUnifiedDiff(patch)[0].hunks[0].lines
+  const fd = parseUnifiedDiff(patch)[0]
+  // Highlights now computed lazily — caller opts in via ensureInlineHighlights.
+  ensureInlineHighlights(fd)
+  const lines = fd.hunks[0].lines
   const del = lines[0]
   const add = lines[1]
   // "const x = 10;" vs "const x = 20;"
   // prefix "const x = " (10), suffix "0;" (2) → only "1" vs "2" differs
   expect(del.highlights).toEqual([{ start: 10, end: 11 }])
   expect(add.highlights).toEqual([{ start: 10, end: 11 }])
+})
+
+test('ensureInlineHighlights is idempotent', () => {
+  const patch = `diff --git a/f.txt b/f.txt
+--- a/f.txt
++++ b/f.txt
+@@ -1,2 +1,2 @@
+-const x = 10;
++const x = 20;
+ // end`
+  const fd = parseUnifiedDiff(patch)[0]
+  ensureInlineHighlights(fd)
+  ensureInlineHighlights(fd) // second call is a no-op
+  expect(fd._highlightsApplied).toBe(true)
+  const lines = fd.hunks[0].lines
+  expect(lines[0].highlights).toEqual([{ start: 10, end: 11 }])
 })
 
 test('no highlights when add/delete lines are too different', () => {
@@ -354,7 +373,9 @@ test('no highlights when add/delete lines are too different', () => {
 @@ -1 +1 @@
 -completely different line here
 +nothing in common at all xyz`
-  const lines = parseUnifiedDiff(patch)[0].hunks[0].lines
+  const fd = parseUnifiedDiff(patch)[0]
+  ensureInlineHighlights(fd)
+  const lines = fd.hunks[0].lines
   // These lines share very little — should fall below 30% threshold
   expect(lines[0].highlights).toBe(undefined)
   expect(lines[1].highlights).toBe(undefined)

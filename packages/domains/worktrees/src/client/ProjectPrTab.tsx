@@ -4,10 +4,9 @@ import {
   GitPullRequest,
   GitMerge,
   CircleDot,
-  CircleX,
-  Loader2
+  CircleX
 } from 'lucide-react'
-import { cn } from '@slayzone/ui'
+import { cn, PulseGrid } from '@slayzone/ui'
 import type { Task } from '@slayzone/task/shared'
 import type { GhPullRequest } from '../shared/types'
 
@@ -132,11 +131,7 @@ export function ProjectPrTab({ projectPath, visible, tasks, onTaskClick }: Proje
   }
 
   if (loading) {
-    return (
-      <div className="h-full flex items-center justify-center">
-        <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-      </div>
-    )
+    return <PulseGrid />
   }
 
   if (error) {

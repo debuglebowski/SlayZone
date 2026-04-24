@@ -1,7 +1,9 @@
-import { memo, useCallback, useMemo, useRef } from 'react'
+import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { FileImage, FileMinus } from 'lucide-react'
+import { useVirtualizer } from '@tanstack/react-virtual'
 import { cn } from '@slayzone/ui'
 import type { FileDiff, DiffLine as DiffLineType, InlineHighlight } from './parse-diff'
+import { ensureInlineHighlights } from './parse-diff'
 import { tokenizeContent, type HlSpan } from './highlight'
 
 type ContextLines = '0' | '3' | '5' | 'all'
@@ -18,6 +20,18 @@ interface FlatLine {
   spans?: HlSpan[]
 }
 
+interface LineRef {
+  side: 'old' | 'new'
+  idx: number
+}
+
+interface FlattenResult {
+  flat: FlatLine[]
+  oldContent: string
+  newContent: string
+  refs: LineRef[]
+}
+
 interface DisplayChunk {
   kind: 'visible'
   lines: FlatLine[]
@@ -29,44 +43,51 @@ interface GapChunk {
   count: number
 }
 
-function flattenAndTokenize(diff: FileDiff): FlatLine[] {
+// Threshold under which virtualization overhead isn't worth it. Small diffs
+// render every row directly so there's no measurement/positioning overhead.
+const VIRTUALIZE_THRESHOLD = 100
+
+function flattenDiff(diff: FileDiff): FlattenResult {
   const oldLines: string[] = []
   const newLines: string[] = []
-  const refs: { side: 'old' | 'new'; idx: number }[][] = []
+  const refs: LineRef[] = []
+  const flat: FlatLine[] = []
 
   for (const hunk of diff.hunks) {
     for (const l of hunk.lines) {
-      const r: { side: 'old' | 'new'; idx: number }[] = []
+      let ref: LineRef
       if (l.type === 'context') {
-        r.push({ side: 'old', idx: oldLines.length })
-        r.push({ side: 'new', idx: newLines.length })
+        ref = { side: 'new', idx: newLines.length }
         oldLines.push(l.content)
         newLines.push(l.content)
       } else if (l.type === 'delete') {
-        r.push({ side: 'old', idx: oldLines.length })
+        ref = { side: 'old', idx: oldLines.length }
         oldLines.push(l.content)
       } else {
-        r.push({ side: 'new', idx: newLines.length })
+        ref = { side: 'new', idx: newLines.length }
         newLines.push(l.content)
       }
-      refs.push(r)
+      refs.push(ref)
+      flat.push({ line: l })
     }
   }
 
-  const oldSpans = tokenizeContent(oldLines.join('\n'), diff.path)
-  const newSpans = tokenizeContent(newLines.join('\n'), diff.path)
-
-  const flat: FlatLine[] = []
-  let idx = 0
-  for (const hunk of diff.hunks) {
-    for (const line of hunk.lines) {
-      const ref = refs[idx].find((r) => r.side === 'new') ?? refs[idx][0]
-      const arr = ref?.side === 'old' ? oldSpans : newSpans
-      flat.push({ line, spans: ref ? arr[ref.idx] : undefined })
-      idx++
-    }
+  return {
+    flat,
+    oldContent: oldLines.join('\n'),
+    newContent: newLines.join('\n'),
+    refs,
   }
-  return flat
+}
+
+function applySpans(flat: FlatLine[], refs: LineRef[], oldSpans: HlSpan[][], newSpans: HlSpan[][]): FlatLine[] {
+  const out: FlatLine[] = new Array(flat.length)
+  for (let i = 0; i < flat.length; i++) {
+    const ref = refs[i]
+    const arr = ref.side === 'old' ? oldSpans : newSpans
+    out[i] = { line: flat[i].line, spans: arr[ref.idx] }
+  }
+  return out
 }
 
 function computeChunks(flat: FlatLine[], contextLines: ContextLines): (DisplayChunk | GapChunk)[] {
@@ -99,6 +120,8 @@ function computeChunks(flat: FlatLine[], contextLines: ContextLines): (DisplayCh
       out.push({ kind: 'visible', lines, firstIdx: start })
     }
   }
+  if (out.length && out[0].kind === 'gap') out.shift()
+  if (out.length && out[out.length - 1].kind === 'gap') out.pop()
   return out
 }
 
@@ -117,21 +140,38 @@ function renderContent(content: string, type: DiffLineType['type'], wrap: boolea
   if (hasHl) for (const h of highlights!) { b.add(h.start); b.add(h.end) }
   const points = [...b].sort((a, z) => a - z)
 
-  const parts: React.JSX.Element[] = []
+  // First pass: compute [from, to, className] segments. Second pass coalesces
+  // adjacent segments with identical classes into one span, which slashes
+  // React element count on syntax-heavy lines (e.g. a line with four adjacent
+  // token boundaries that all resolve to the same class produces ONE span
+  // after this, down from four). Pure optimisation — output text is identical.
+  type Seg = { from: number; to: number; cls: string }
+  const rawSegs: Seg[] = []
   for (let i = 0; i < points.length - 1; i++) {
     const from = points[i]
     const to = points[i + 1]
     if (to <= from) continue
     const tokenSpan = hasSpans ? spans!.find((s) => s.from <= from && s.to >= to) : undefined
     const highlighted = hasHl ? highlights!.some((h) => h.start <= from && h.end >= to) : false
+    const cls = cn(ws, tokenSpan?.classes, highlighted && highlightClass)
+    rawSegs.push({ from, to, cls })
+  }
+
+  const parts: React.JSX.Element[] = []
+  let i = 0
+  while (i < rawSegs.length) {
+    const start = i
+    const cls = rawSegs[i].cls
+    let end = i + 1
+    while (end < rawSegs.length && rawSegs[end].cls === cls) end++
+    const from = rawSegs[start].from
+    const to = rawSegs[end - 1].to
     parts.push(
-      <span
-        key={i}
-        className={cn(ws, tokenSpan?.classes, highlighted && highlightClass)}
-      >
+      <span key={start} className={cls}>
         {content.slice(from, to)}
       </span>
     )
+    i = end
   }
   return <>{parts}</>
 }
@@ -142,9 +182,9 @@ const UnifiedLine = memo(function UnifiedLine({ item, wrap }: { item: FlatLine; 
   return (
     <div
       className={cn(
-        'flex w-full',
-        line.type === 'add' && 'bg-green-500/10',
-        line.type === 'delete' && 'bg-red-500/10'
+        'flex w-full border-l-[3px] border-l-transparent',
+        line.type === 'add' && 'bg-green-500/10 border-l-green-500',
+        line.type === 'delete' && 'bg-red-500/10 border-l-red-500'
       )}
     >
       <span className="w-10 shrink-0 text-right pr-1.5 text-muted-foreground/50 select-none border-r border-border/30 tabular-nums">
@@ -172,7 +212,16 @@ interface SideRow {
   right: FlatLine | null
 }
 
+// ── buildSbsRows cache (H) ────────────────────────────────────────────
+// Keyed on the `lines` array reference — chunk.lines is stable across renders
+// as long as the upstream `chunks` memo hasn't rebuilt, so a WeakMap lets
+// repeat calls (e.g. when unrelated state invalidates the enclosing memo
+// chain) reuse the row list without re-pairing adds/deletes.
+const sbsRowsCache = new WeakMap<FlatLine[], SideRow[]>()
+
 function buildSbsRows(lines: FlatLine[]): SideRow[] {
+  const cached = sbsRowsCache.get(lines)
+  if (cached) return cached
   const rows: SideRow[] = []
   let i = 0
   while (i < lines.length) {
@@ -197,13 +246,14 @@ function buildSbsRows(lines: FlatLine[]): SideRow[] {
       })
     }
   }
+  sbsRowsCache.set(lines, rows)
   return rows
 }
 
 const SbsHalf = memo(function SbsHalf({ item, side, wrap }: { item: FlatLine | null; side: 'left' | 'right'; wrap: boolean }) {
   if (!item) {
     return (
-      <div className="flex w-full bg-muted/20">
+      <div className="flex w-full bg-muted/20 border-l-[3px] border-l-transparent">
         <span className="w-10 shrink-0 border-r border-border/30" />
         <span className="w-5 shrink-0" />
         <span className={cn(wrap ? 'min-w-0 flex-1' : 'shrink-0')}>&nbsp;</span>
@@ -218,9 +268,9 @@ const SbsHalf = memo(function SbsHalf({ item, side, wrap }: { item: FlatLine | n
   return (
     <div
       className={cn(
-        'flex w-full',
-        isAdd && 'bg-green-500/10',
-        isDel && 'bg-red-500/10'
+        'flex w-full border-l-[3px] border-l-transparent',
+        isAdd && 'bg-green-500/10 border-l-green-500',
+        isDel && 'bg-red-500/10 border-l-red-500'
       )}
     >
       <span className="w-10 shrink-0 text-right pr-1.5 text-muted-foreground/50 select-none border-r border-border/30 tabular-nums">
@@ -243,32 +293,253 @@ const SbsHalf = memo(function SbsHalf({ item, side, wrap }: { item: FlatLine | n
 function GapDivider({ count }: { count: number }) {
   return (
     <div className="px-2 py-1.5 bg-card w-full">
-      <div className="rounded-md border border-dashed border-border text-muted-foreground px-3 py-1 text-[11px] font-medium tracking-wide">
+      <div className="rounded-md bg-muted text-muted-foreground px-3 py-1 text-[11px] font-medium tracking-wide">
         {count} unmodified line{count === 1 ? '' : 's'}
       </div>
     </div>
   )
 }
 
-export const DiffView = memo(function DiffView({ diff, sideBySide = false, wrap = false, contextLines = '3' }: DiffViewProps) {
-  const flat = useMemo(() => flattenAndTokenize(diff), [diff])
-  const chunks = useMemo(() => computeChunks(flat, contextLines), [flat, contextLines])
+// ---- Flat row sequence (chunks + gaps → positionable list) ----
 
-  const sbsScrollRefs = useRef<(HTMLDivElement | null)[]>([])
+type UnifiedRow =
+  | { kind: 'gap'; count: number; key: string }
+  | { kind: 'line'; item: FlatLine; key: string }
+
+type SbsRow =
+  | { kind: 'gap'; count: number; key: string }
+  | { kind: 'row'; row: SideRow; key: string }
+
+function buildUnifiedRows(chunks: (DisplayChunk | GapChunk)[]): UnifiedRow[] {
+  const rows: UnifiedRow[] = []
+  chunks.forEach((c, ci) => {
+    if (c.kind === 'gap') {
+      rows.push({ kind: 'gap', count: c.count, key: `g${ci}` })
+    } else {
+      c.lines.forEach((item, li) => rows.push({ kind: 'line', item, key: `v${ci}-${li}` }))
+    }
+  })
+  return rows
+}
+
+function buildSbsRowList(chunks: (DisplayChunk | GapChunk)[]): SbsRow[] {
+  const rows: SbsRow[] = []
+  chunks.forEach((c, ci) => {
+    if (c.kind === 'gap') {
+      rows.push({ kind: 'gap', count: c.count, key: `g${ci}` })
+    } else {
+      buildSbsRows(c.lines).forEach((row, ri) => rows.push({ kind: 'row', row, key: `v${ci}-${ri}` }))
+    }
+  })
+  return rows
+}
+
+// ---- Scroll parent discovery ----
+// Walk up from an element to the nearest scrollable ancestor so the virtualizer
+// can hook into whatever container the consumer provided (split-view owns a
+// scroll div). If an `absolute`-positioned ancestor sits between us and the
+// scroll parent, we are nested inside an outer virtualizer (continuous-flow
+// mode in GitDiffPanel) — virtualizing here would conflict with the outer
+// virtualizer's position tracking. Return null in that case so the caller can
+// fall back to plain rendering and let the outer virtualizer do its job.
+function findScrollParent(el: HTMLElement | null): HTMLElement | null {
+  let cur = el?.parentElement ?? null
+  let sawAbsolute = false
+  while (cur) {
+    const style = window.getComputedStyle(cur)
+    if (style.position === 'absolute') sawAbsolute = true
+    const overflowY = style.overflowY
+    if (overflowY === 'auto' || overflowY === 'scroll' || overflowY === 'overlay') {
+      return sawAbsolute ? null : cur
+    }
+    cur = cur.parentElement
+  }
+  return null
+}
+
+// ---- Horizontal scroll sync (side-by-side, !wrap) ----
+// Virtualization means N halves for visible rows instead of 2 per chunk, so we
+// register every half with a shared ref set and broadcast scrollLeft on change.
+interface SbsSyncApi {
+  register: (el: HTMLDivElement | null) => void
+  onScroll: (e: React.UIEvent<HTMLDivElement>) => void
+  scrollLeftRef: React.MutableRefObject<number>
+}
+
+function useSbsSync(): SbsSyncApi {
+  const elsRef = useRef<Set<HTMLDivElement>>(new Set())
+  const scrollLeftRef = useRef(0)
   const syncingRef = useRef(false)
-  const onSbsScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
+
+  const register = useCallback((el: HTMLDivElement | null) => {
+    if (!el) return
+    if (!elsRef.current.has(el)) {
+      elsRef.current.add(el)
+      // Bring new half in sync with the current scroll position so virtualized
+      // rows that mount mid-scroll don't jump back to zero.
+      if (el.scrollLeft !== scrollLeftRef.current) {
+        el.scrollLeft = scrollLeftRef.current
+      }
+    }
+  }, [])
+
+  const onScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
     if (syncingRef.current) return
     syncingRef.current = true
     const src = e.currentTarget
     const sl = src.scrollLeft
-    for (const el of sbsScrollRefs.current) {
-      if (el && el !== src && el.scrollLeft !== sl) el.scrollLeft = sl
+    scrollLeftRef.current = sl
+    for (const el of elsRef.current) {
+      if (el !== src && el.scrollLeft !== sl) el.scrollLeft = sl
     }
     syncingRef.current = false
   }, [])
-  const setSbsRef = useCallback((i: number) => (el: HTMLDivElement | null) => {
-    sbsScrollRefs.current[i] = el
+
+  // Clean up disconnected elements on every render (cheap; set size = visible rows)
+  useEffect(() => {
+    const alive = new Set<HTMLDivElement>()
+    for (const el of elsRef.current) {
+      if (el.isConnected) alive.add(el)
+    }
+    elsRef.current = alive
+  })
+
+  return { register, onScroll, scrollLeftRef }
+}
+
+// ---- Virtualized row list (shared for unified + sbs) ----
+
+interface VirtualRowListProps<Row> {
+  rows: Row[]
+  renderRow: (row: Row, index: number) => React.ReactNode
+  estimateSize: number
+  rowKey: (row: Row) => string
+  className?: string
+}
+
+type ScrollState = { parent: HTMLElement; nested: false } | { parent: null; nested: true } | null
+
+function VirtualRowList<Row>({ rows, renderRow, estimateSize, rowKey, className }: VirtualRowListProps<Row>) {
+  const sentinelRef = useRef<HTMLDivElement | null>(null)
+  const [scrollState, setScrollState] = useState<ScrollState>(null)
+
+  useLayoutEffect(() => {
+    const parent = findScrollParent(sentinelRef.current)
+    if (parent) setScrollState({ parent, nested: false })
+    else setScrollState({ parent: null, nested: true })
   }, [])
+
+  const parent = scrollState?.nested === false ? scrollState.parent : null
+  const virtualizer = useVirtualizer({
+    count: rows.length,
+    getScrollElement: () => parent,
+    estimateSize: () => estimateSize,
+    overscan: 8,
+    getItemKey: (i) => rowKey(rows[i]),
+  })
+
+  // Measurement frame: until scroll state known, reserve space with estimate.
+  if (scrollState === null) {
+    return (
+      <div ref={sentinelRef} className={className} style={{ height: rows.length * estimateSize }} />
+    )
+  }
+
+  // Nested inside an outer virtualizer (e.g. GitDiffPanel continuous-flow mode)
+  // — fall back to plain rendering. Outer virtualizer keeps offscreen files
+  // unmounted, which handles the large-diff case at the file granularity.
+  if (scrollState.nested) {
+    return (
+      <div ref={sentinelRef} className={className}>
+        {rows.map((r, i) => (
+          <div key={rowKey(r)}>{renderRow(r, i)}</div>
+        ))}
+      </div>
+    )
+  }
+
+  const items = virtualizer.getVirtualItems()
+  return (
+    <div
+      ref={sentinelRef}
+      className={className}
+      style={{ height: virtualizer.getTotalSize(), position: 'relative', width: '100%' }}
+    >
+      {items.map((v) => (
+        <div
+          key={v.key}
+          data-index={v.index}
+          ref={virtualizer.measureElement}
+          style={{ position: 'absolute', top: 0, left: 0, right: 0, transform: `translateY(${v.start}px)` }}
+        >
+          {renderRow(rows[v.index], v.index)}
+        </div>
+      ))}
+    </div>
+  )
+}
+
+// ---- Side-by-side row with per-half horizontal scroll sync ----
+
+function SbsRowView({ row, wrap, sync }: { row: SideRow; wrap: boolean; sync: SbsSyncApi }) {
+  return (
+    <div className="flex">
+      <div
+        ref={sync.register}
+        onScroll={sync.onScroll}
+        className={cn('flex-1 min-w-0 basis-1/2', !wrap && 'overflow-x-auto scrollbar-hide')}
+      >
+        <div className={cn('flex flex-col', !wrap && 'min-w-full w-max')}>
+          <SbsHalf item={row.left} side="left" wrap={wrap} />
+        </div>
+      </div>
+      <div
+        ref={sync.register}
+        onScroll={sync.onScroll}
+        className={cn('flex-1 min-w-0 basis-1/2', !wrap && 'overflow-x-auto scrollbar-hide')}
+      >
+        <div className={cn('flex flex-col', !wrap && 'min-w-full w-max')}>
+          <SbsHalf item={row.right} side="right" wrap={wrap} />
+        </div>
+      </div>
+    </div>
+  )
+}
+
+export const DiffView = memo(function DiffView({ diff, sideBySide = false, wrap = false, contextLines = '3' }: DiffViewProps) {
+  // Lazy inline-highlight pass: parseUnifiedDiff no longer runs this per-file.
+  // Calling here means offscreen files in a large virtualized patch never pay
+  // the cost. `ensureInlineHighlights` is idempotent via a flag on FileDiff.
+  const flattened = useMemo(() => {
+    ensureInlineHighlights(diff)
+    return flattenDiff(diff)
+  }, [diff])
+  const [highlighted, setHighlighted] = useState<FlatLine[] | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    setHighlighted(null)
+    const { flat, refs, oldContent, newContent } = flattened
+    if (flat.length === 0) return
+    Promise.all([
+      tokenizeContent(oldContent, diff.path),
+      tokenizeContent(newContent, diff.path),
+    ]).then(([oldSpans, newSpans]) => {
+      if (cancelled) return
+      setHighlighted(applySpans(flat, refs, oldSpans, newSpans))
+    }).catch(() => {
+      // highlight.ts already swallows/logs; fall through to plain rendering
+    })
+    return () => { cancelled = true }
+  }, [flattened, diff.path])
+
+  const flat = highlighted ?? flattened.flat
+  const chunks = useMemo(() => computeChunks(flat, contextLines), [flat, contextLines])
+
+  const unifiedRows = useMemo(() => (sideBySide ? [] : buildUnifiedRows(chunks)), [chunks, sideBySide])
+  const sbsRows = useMemo(() => (sideBySide ? buildSbsRowList(chunks) : []), [chunks, sideBySide])
+
+  const sbsSync = useSbsSync()
 
   if (diff.isBinary) {
     return (
@@ -299,55 +570,61 @@ export const DiffView = memo(function DiffView({ diff, sideBySide = false, wrap 
   }
 
   if (sideBySide) {
-    let scrollIdx = 0
+    const renderSbsRow = (row: SbsRow) => {
+      if (row.kind === 'gap') return <GapDivider count={row.count} />
+      return <SbsRowView row={row.row} wrap={wrap} sync={sbsSync} />
+    }
+    // Small diffs: skip virtualizer overhead entirely.
+    if (sbsRows.length < VIRTUALIZE_THRESHOLD) {
+      return (
+        <div className="relative font-mono text-xs leading-5">
+          <div className="pointer-events-none absolute top-0 bottom-0 left-1/2 w-px bg-border/40 z-10" />
+          {sbsRows.map((r) => (
+            <div key={r.key}>{renderSbsRow(r)}</div>
+          ))}
+        </div>
+      )
+    }
     return (
-      <div className="font-mono text-xs leading-5">
-        {chunks.map((c, ci) => {
-          if (c.kind === 'gap') {
-            return <GapDivider key={`g${ci}`} count={c.count} />
-          }
-          const rows = buildSbsRows(c.lines)
-          const leftIdx = scrollIdx++
-          const rightIdx = scrollIdx++
-          return (
-            <div key={`v${ci}`} className="flex">
-              <div
-                ref={setSbsRef(leftIdx)}
-                onScroll={onSbsScroll}
-                className={cn('flex-1 min-w-0', !wrap && 'overflow-x-auto scrollbar-hide')}
-              >
-                <div className={cn('flex flex-col', !wrap && 'min-w-full w-max')}>
-                  {rows.map((row, ri) => (
-                    <SbsHalf key={ri} item={row.left} side="left" wrap={wrap} />
-                  ))}
-                </div>
-              </div>
-              <div className="w-px bg-border/40 shrink-0" />
-              <div
-                ref={setSbsRef(rightIdx)}
-                onScroll={onSbsScroll}
-                className={cn('flex-1 min-w-0', !wrap && 'overflow-x-auto scrollbar-hide')}
-              >
-                <div className={cn('flex flex-col', !wrap && 'min-w-full w-max')}>
-                  {rows.map((row, ri) => (
-                    <SbsHalf key={ri} item={row.right} side="right" wrap={wrap} />
-                  ))}
-                </div>
-              </div>
-            </div>
-          )
-        })}
+      <div className="relative font-mono text-xs leading-5">
+        <div className="pointer-events-none absolute top-0 bottom-0 left-1/2 w-px bg-border/40 z-10" />
+        <VirtualRowList<SbsRow>
+          rows={sbsRows}
+          renderRow={renderSbsRow}
+          estimateSize={20}
+          rowKey={(r) => r.key}
+        />
+      </div>
+    )
+  }
+
+  const renderUnifiedRow = (row: UnifiedRow) => {
+    if (row.kind === 'gap') return <GapDivider count={row.count} />
+    return <UnifiedLine item={row.item} wrap={wrap} />
+  }
+
+  // Small diffs: skip virtualizer overhead entirely.
+  if (unifiedRows.length < VIRTUALIZE_THRESHOLD) {
+    return (
+      <div className={cn('font-mono text-xs leading-5', !wrap && 'overflow-x-auto scrollbar-hide')}>
+        <div className={cn('flex flex-col', !wrap && 'min-w-full w-max')}>
+          {unifiedRows.map((r) => (
+            <div key={r.key}>{renderUnifiedRow(r)}</div>
+          ))}
+        </div>
       </div>
     )
   }
 
   return (
     <div className={cn('font-mono text-xs leading-5', !wrap && 'overflow-x-auto scrollbar-hide')}>
-      <div className={cn('flex flex-col', !wrap && 'min-w-full w-max')}>
-        {chunks.map((c, ci) => c.kind === 'gap'
-          ? <GapDivider key={`g${ci}`} count={c.count} />
-          : c.lines.map((item, li) => <UnifiedLine key={`v${ci}-${li}`} item={item} wrap={wrap} />)
-        )}
+      <div className={cn(!wrap && 'min-w-full w-max')}>
+        <VirtualRowList<UnifiedRow>
+          rows={unifiedRows}
+          renderRow={renderUnifiedRow}
+          estimateSize={20}
+          rowKey={(r) => r.key}
+        />
       </div>
     </div>
   )

@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo, forwardRef, useImperativeHandle } from 'react'
 import { Archive, FileText } from 'lucide-react'
-import { cn } from '@slayzone/ui'
+import { cn, PulseGrid } from '@slayzone/ui'
 import type { StashEntry } from '../shared/types'
 import { useGitPanelContext } from './UnifiedGitPanel'
 import { parseUnifiedDiff, type FileDiff } from './parse-diff'
@@ -100,6 +100,10 @@ export const StashTab = forwardRef<StashTabHandle, StashTabProps>(function Stash
 
   const isEmpty = !loading && filteredStashes.length === 0
 
+  if (loading && stashes.length === 0) {
+    return <PulseGrid />
+  }
+
   if (isEmpty) {
     return (
       <div className="h-full flex flex-col items-center justify-center gap-3">
@@ -150,7 +154,7 @@ export const StashTab = forwardRef<StashTabHandle, StashTabProps>(function Stash
             </div>
             <div className="flex-1 min-h-0 overflow-auto font-mono text-xs">
               {diffLoading ? (
-                <div className="p-4 text-muted-foreground">Loading diff…</div>
+                <PulseGrid />
               ) : diff.length === 0 ? (
                 <div className="p-4 text-muted-foreground">No changes</div>
               ) : (

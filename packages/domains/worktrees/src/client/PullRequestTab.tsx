@@ -52,6 +52,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogDescription,
+  PulseGrid,
 } from '@slayzone/ui'
 import type { Task, UpdateTaskInput } from '@slayzone/task/shared'
 import type { GhPullRequest, GhPrComment, GhPrCommit, GhPrTimelineEvent, MergeStrategy } from '../shared/types'
@@ -151,11 +152,7 @@ export function PullRequestTab({ task, projectPath, visible, onUpdateTask, onTas
   }
 
   if (loading) {
-    return (
-      <div className="h-full flex items-center justify-center">
-        <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-      </div>
-    )
+    return <PulseGrid />
   }
 
   if (ghInstalled === false) {

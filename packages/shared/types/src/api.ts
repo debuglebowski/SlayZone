@@ -650,6 +650,10 @@ export interface ElectronAPI {
     dropStash: (repoPath: string, index: number) => Promise<GitSyncResult>
     branchFromStash: (repoPath: string, index: number, branchName: string) => Promise<GitSyncResult>
     getStashDiff: (repoPath: string, index: number) => Promise<string>
+    // fs watcher for push-based diff invalidation (replaces renderer polling)
+    watchStart: (worktreePath: string) => Promise<void>
+    watchStop: (worktreePath: string) => Promise<void>
+    onDiffChanged: (cb: (worktreePath: string) => void) => () => void
   }
   tabs: {
     list: (taskId: string) => Promise<TerminalTab[]>

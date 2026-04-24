@@ -1,34 +1,19 @@
 import { forwardRef, memo, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react'
-import { Plus, Minus, Undo2, ChevronRight, GitMerge, CheckCircle2, FileDiff } from 'lucide-react'
+import { Plus, Minus, Undo2, ChevronRight, GitMerge, CheckCircle2, FileDiff, UnfoldVertical, FoldVertical } from 'lucide-react'
+import { useVirtualizer, defaultRangeExtractor, type Range } from '@tanstack/react-virtual'
 import {
   Button, FileTree, buildFileTree, flattenFileTree, fileTreeIndent, cn, buttonVariants,
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
-  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+  PulseGrid
 } from '@slayzone/ui'
 import { useAppearance } from '@slayzone/settings/client'
 import type { Task, MergeState } from '@slayzone/task/shared'
-import type { GitDiffSnapshot } from '../shared/types'
 import { parseUnifiedDiff } from './parse-diff'
 import type { FileDiff as FileDiffType } from './parse-diff'
 import { DiffView } from './DiffView'
-
-function arraysEqual(a: string[], b: string[]): boolean {
-  if (a.length !== b.length) return false
-  for (let i = 0; i < a.length; i++) {
-    if (a[i] !== b[i]) return false
-  }
-  return true
-}
-
-function snapshotsEqual(a: GitDiffSnapshot, b: GitDiffSnapshot): boolean {
-  return (
-    a.unstagedPatch === b.unstagedPatch &&
-    a.stagedPatch === b.stagedPatch &&
-    arraysEqual(a.unstagedFiles, b.unstagedFiles) &&
-    arraysEqual(a.stagedFiles, b.stagedFiles) &&
-    arraysEqual(a.untrackedFiles, b.untrackedFiles)
-  )
-}
+import { useAgentTurns, type AgentTurnRange } from '@slayzone/agent-turns/client'
+import { useGitDiffSnapshot } from './git-diff-store'
 
 interface GitDiffPanelProps {
   task: Task | null
@@ -199,9 +184,7 @@ export const GitDiffPanel = forwardRef<GitDiffPanelHandle, GitDiffPanelProps>(fu
   const isMergeMode = mergeState === 'uncommitted'
   const { diffContextLines, diffIgnoreWhitespace, diffContinuousFlow, diffTreeCollapsed, diffSideBySide, diffWrap } = useAppearance()
   const targetPath = useMemo(() => task?.worktree_path ?? projectPath, [task?.worktree_path, projectPath])
-  const [snapshot, setSnapshot] = useState<GitDiffSnapshot | null>(null)
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const [commitError, setCommitError] = useState<string | null>(null)
   const [selectedFile, setSelectedFile] = useState<{ path: string; source: 'unstaged' | 'staged' } | null>(null)
   const [fileListWidth, setFileListWidth] = useState(320)
   const [untrackedDiffs, setUntrackedDiffs] = useState<Map<string, FileDiffType>>(new Map())
@@ -210,61 +193,77 @@ export const GitDiffPanel = forwardRef<GitDiffPanelHandle, GitDiffPanelProps>(fu
   const [committing, setCommitting] = useState(false)
   const [stagedCollapsed, setStagedCollapsed] = useState(false)
   const [unstagedCollapsed, setUnstagedCollapsed] = useState(false)
-  const [collapsedFiles, setCollapsedFiles] = useState<Set<string>>(new Set())
+  const [collapsedFiles, setCollapsedFiles] = useState<Set<string>>(
+    () => new Set(task?.diff_collapsed_files ?? [])
+  )
+  // Reset when switching tasks so we don't carry one task's collapsed set into another.
+  const lastLoadedTaskIdRef = useRef<string | null>(task?.id ?? null)
+  useEffect(() => {
+    if (task?.id !== lastLoadedTaskIdRef.current) {
+      lastLoadedTaskIdRef.current = task?.id ?? null
+      setCollapsedFiles(new Set(task?.diff_collapsed_files ?? []))
+    }
+  }, [task?.id, task?.diff_collapsed_files])
+  // Persist on change, debounced. Skip first render so we don't overwrite the
+  // freshly-loaded value with itself.
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const didMountSaveRef = useRef(false)
+  useEffect(() => {
+    if (!task?.id) return
+    if (!didMountSaveRef.current) { didMountSaveRef.current = true; return }
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current)
+    const taskId = task.id
+    const arr = [...collapsedFiles]
+    saveTimerRef.current = setTimeout(() => {
+      void window.api.db.updateTask({ id: taskId, diffCollapsedFiles: arr })
+    }, 400)
+    return () => { if (saveTimerRef.current) clearTimeout(saveTimerRef.current) }
+  }, [collapsedFiles, task?.id])
+  const [selectedTurnId, setSelectedTurnId] = useState<string | 'all'>('all')
+  const turns = useAgentTurns(targetPath)
+  const selectedTurn: AgentTurnRange | null = useMemo(
+    () => (selectedTurnId === 'all' ? null : turns.find((t) => t.id === selectedTurnId) ?? null),
+    [selectedTurnId, turns]
+  )
   const [confirmAction, setConfirmAction] = useState<ConfirmAction | null>(null)
   const confirmActionRef = useRef<ConfirmAction | null>(null)
   if (confirmAction) confirmActionRef.current = confirmAction
   const splitContainerRef = useRef<HTMLDivElement>(null)
   const fileListRef = useRef<HTMLDivElement>(null)
   const selectedItemRef = useRef<HTMLDivElement>(null)
-  const prevSnapshotRef = useRef<GitDiffSnapshot | null>(null)
   const didInitSplitRef = useRef(false)
 
-  const fetchDiff = async (): Promise<void> => {
-    if (!targetPath) return
-    setLoading(true)
-    try {
-      // Always fetch full context. diffContextLines controls display collapse, not fetch.
-      const next = await window.api.git.getWorkingDiff(targetPath, {
-        contextLines: 'all',
-        ignoreWhitespace: diffIgnoreWhitespace,
-      })
-      if (!prevSnapshotRef.current || !snapshotsEqual(prevSnapshotRef.current, next)) {
-        prevSnapshotRef.current = next
-        setSnapshot(next)
-      }
-      setError(null)
-    } catch (err) {
-      prevSnapshotRef.current = null
-      setSnapshot(null)
-      setError(err instanceof Error ? err.message : String(err))
-    } finally {
-      setLoading(false)
-    }
-  }
+  // Resolve effective sha range for the current turn selection. Empty tree
+  // sha as fallback so the first-ever turn can diff "everything in this turn".
+  const fromSha = selectedTurn
+    ? (selectedTurn.prev_snapshot_sha ?? '4b825dc642cb6eb9a060e54bf8d69288fbee4904')
+    : undefined
+  const toSha = selectedTurn ? selectedTurn.snapshot_sha : undefined
 
-  const fetchDiffRef = useRef(fetchDiff)
-  fetchDiffRef.current = fetchDiff
-  useImperativeHandle(ref, () => ({ refresh: () => { fetchDiffRef.current() } }), [])
+  // Shared snapshot: identity-stable across panels hitting the same worktree,
+  // refcounted timer, in-store snapshotsEqual short-circuit. contextLines is
+  // part of the store key so toggling the display setting triggers a re-fetch
+  // at the new context depth (skipping client-side collapse).
+  const { snapshot, loading, error: fetchError, refresh } = useGitDiffSnapshot(targetPath, {
+    visible,
+    ignoreWhitespace: diffIgnoreWhitespace,
+    fromSha,
+    toSha,
+    contextLines: diffContextLines,
+    pollIntervalMs,
+  })
+  const error = commitError ?? fetchError
 
-  useEffect(() => {
-    if (!visible || !targetPath) return
-    fetchDiff()
-    const timer = setInterval(() => {
-      fetchDiff()
-    }, pollIntervalMs)
-    return () => clearInterval(timer)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [visible, targetPath, pollIntervalMs, diffIgnoreWhitespace])
+  const refreshRef = useRef(refresh)
+  refreshRef.current = refresh
+  useImperativeHandle(ref, () => ({ refresh: () => { refreshRef.current() } }), [])
 
-  const unstagedFileDiffs = useMemo(
-    () => parseUnifiedDiff(snapshot?.unstagedPatch ?? ''),
-    [snapshot?.unstagedPatch]
-  )
-  const stagedFileDiffs = useMemo(
-    () => parseUnifiedDiff(snapshot?.stagedPatch ?? ''),
-    [snapshot?.stagedPatch]
-  )
+  // parseUnifiedDiff is backed by a global LRU keyed by the raw patch string,
+  // so identical patches across panels + re-renders return the same array
+  // reference. No useMemo wrapper needed — the cache already gives identity
+  // stability across every caller.
+  const unstagedFileDiffs = parseUnifiedDiff(snapshot?.unstagedPatch ?? '')
+  const stagedFileDiffs = parseUnifiedDiff(snapshot?.stagedPatch ?? '')
 
   const unstagedEntries: FileEntry[] = useMemo(() => {
     if (!snapshot) return []
@@ -409,13 +408,112 @@ export const GitDiffPanel = forwardRef<GitDiffPanelHandle, GitDiffPanelProps>(fu
     selectedItemRef.current?.scrollIntoView({ block: 'nearest' })
   }, [selectedFile])
 
-  // Refs to per-file sections in continuous mode (scroll target on file click)
-  const sectionRefs = useRef<Map<string, HTMLDivElement | null>>(new Map())
+  // Continuous-flow entries (only files with diffs — matches what we render)
+  const flowEntries = useMemo(
+    () => flatEntries.map((entry) => ({ entry, diff: getDiffForEntry(entry) }))
+      .filter((x): x is { entry: FileEntry; diff: FileDiffType } => !!x.diff),
+    [flatEntries, getDiffForEntry]
+  )
+
+  // Fix 6 — Huge files stall continuous-flow because DiffView's line-level
+  // virtualizer falls back to plain rendering when nested inside this outer
+  // row virtualizer (see findScrollParent in DiffView.tsx). Threading an outer
+  // scroll parent into the inner virtualizer requires reworking DiffView's
+  // scroll-parent discovery + scrollMargin handling for nested virtualizers —
+  // a future improvement. For now, auto-collapse huge files on first sight so
+  // the user pays the render cost only when they opt in by expanding.
+  const HUGE_FILE_THRESHOLD = 1000
+  // Tracks files the user has explicitly toggled (expanded or collapsed) so
+  // auto-collapse won't override their intent on subsequent renders.
+  const userToggledFilesRef = useRef<Set<string>>(new Set())
+
+  // Build two virtual rows per file (header + body) so headers can be sticky
+  // via the tanstack-virtual sticky pattern: rangeExtractor always includes
+  // the active sticky index, and that row renders with `position: sticky`
+  // instead of `position: absolute`. Collapsed files emit only a header row
+  // (their body contributes nothing to total height).
+  type FlowRow =
+    | { kind: 'header'; fileKey: string; fileIdx: number; entry: FileEntry; diff: FileDiffType }
+    | { kind: 'body'; fileKey: string; fileIdx: number; entry: FileEntry; diff: FileDiffType }
+
+  const flowRows = useMemo<FlowRow[]>(() => {
+    const rows: FlowRow[] = []
+    flowEntries.forEach(({ entry, diff }, fileIdx) => {
+      const fileKey = `${entry.source}:${entry.path}`
+      rows.push({ kind: 'header', fileKey, fileIdx, entry, diff })
+      const userToggled = userToggledFilesRef.current.has(fileKey)
+      const explicitlyCollapsed = collapsedFiles.has(fileKey)
+      const autoCollapsed = !userToggled && (diff.additions + diff.deletions) > HUGE_FILE_THRESHOLD
+      const collapsed = explicitlyCollapsed || autoCollapsed
+      if (!collapsed) {
+        rows.push({ kind: 'body', fileKey, fileIdx, entry, diff })
+      }
+    })
+    return rows
+  }, [flowEntries, collapsedFiles])
+
+  // Indices of header rows — used by rangeExtractor for sticky behavior.
+  const stickyHeaderIndices = useMemo(() => {
+    const out: number[] = []
+    for (let i = 0; i < flowRows.length; i++) {
+      if (flowRows[i].kind === 'header') out.push(i)
+    }
+    return out
+  }, [flowRows])
+
+  const stickyHeaderIndicesRef = useRef(stickyHeaderIndices)
+  stickyHeaderIndicesRef.current = stickyHeaderIndices
+
+  // Active sticky index = last header index at or before the current start.
+  // Tracked via a ref (not state) so the rangeExtractor closure reads the
+  // freshest value without invalidating the virtualizer config each render.
+  const activeStickyIndexRef = useRef<number>(-1)
+
+  const rangeExtractorSticky = useCallback((range: Range) => {
+    const headers = stickyHeaderIndicesRef.current
+    // Last header at or before range.startIndex — pins it while its body scrolls.
+    let active = -1
+    for (let i = 0; i < headers.length; i++) {
+      if (headers[i] <= range.startIndex) active = headers[i]
+      else break
+    }
+    activeStickyIndexRef.current = active
+    const base = defaultRangeExtractor(range)
+    if (active < 0) return base
+    const set = new Set<number>(base)
+    set.add(active)
+    return [...set].sort((a, b) => a - b)
+  }, [])
+
+  // Virtualized scroll container for continuous flow
+  const flowScrollRef = useRef<HTMLDivElement | null>(null)
+  const rowVirtualizer = useVirtualizer({
+    count: flowRows.length,
+    getScrollElement: () => flowScrollRef.current,
+    // Header rows are short (~40px); bodies are measured. Estimate splits the
+    // difference — overscan + measureElement converge quickly.
+    estimateSize: (index) => flowRows[index]?.kind === 'header' ? 40 : 320,
+    overscan: 2,
+    getItemKey: (index) => {
+      const r = flowRows[index]
+      if (!r) return index
+      return `${r.kind}:${r.fileKey}`
+    },
+    rangeExtractor: rangeExtractorSticky,
+  })
+
+  // Scroll to selected file only when the user picks one — not on every poll
+  // that rebuilds flowEntries identity. flowRowsRef lets the effect look up
+  // the current header index without subscribing to array changes.
+  const flowRowsRef = useRef(flowRows)
+  flowRowsRef.current = flowRows
   useEffect(() => {
     if (!diffContinuousFlow || !selectedFile) return
     const key = `${selectedFile.source}:${selectedFile.path}`
-    sectionRefs.current.get(key)?.scrollIntoView({ block: 'start', behavior: 'smooth' })
-  }, [selectedFile, diffContinuousFlow])
+    const idx = flowRowsRef.current.findIndex((r) => r.kind === 'header' && r.fileKey === key)
+    if (idx < 0) return
+    rowVirtualizer.scrollToIndex(idx, { align: 'start' })
+  }, [selectedFile, diffContinuousFlow, rowVirtualizer])
 
   const handleBulkAction = useCallback(async (action: 'stageAll' | 'unstageAll') => {
     if (!targetPath) return
@@ -425,7 +523,7 @@ export const GitDiffPanel = forwardRef<GitDiffPanelHandle, GitDiffPanelProps>(fu
       } else {
         await window.api.git.unstageAll(targetPath)
       }
-      await fetchDiffRef.current()
+      await refreshRef.current()
     } catch {
       // silently fail — next poll will correct state
     }
@@ -439,7 +537,7 @@ export const GitDiffPanel = forwardRef<GitDiffPanelHandle, GitDiffPanelProps>(fu
       } else {
         await window.api.git.unstageFile(targetPath, filePath)
       }
-      await fetchDiffRef.current()
+      await refreshRef.current()
     } catch {
       // silently fail — next poll will correct state
     }
@@ -449,7 +547,7 @@ export const GitDiffPanel = forwardRef<GitDiffPanelHandle, GitDiffPanelProps>(fu
     if (!targetPath) return
     try {
       await window.api.git.discardFile(targetPath, filePath, untracked)
-      await fetchDiffRef.current()
+      await refreshRef.current()
     } catch {
       // silently fail — next poll will correct state
     }
@@ -463,7 +561,7 @@ export const GitDiffPanel = forwardRef<GitDiffPanelHandle, GitDiffPanelProps>(fu
       } else {
         await window.api.git.unstageFile(targetPath, folderPath)
       }
-      await fetchDiffRef.current()
+      await refreshRef.current()
     } catch {
       // silently fail — next poll will correct state
     }
@@ -475,9 +573,9 @@ export const GitDiffPanel = forwardRef<GitDiffPanelHandle, GitDiffPanelProps>(fu
     try {
       await window.api.git.commitFiles(targetPath, commitMessage.trim())
       setCommitMessage('')
-      await fetchDiffRef.current()
+      await refreshRef.current()
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err))
+      setCommitError(err instanceof Error ? err.message : String(err))
     } finally {
       setCommitting(false)
     }
@@ -620,7 +718,7 @@ export const GitDiffPanel = forwardRef<GitDiffPanelHandle, GitDiffPanelProps>(fu
           onClick={async () => {
             setCommitting(true)
             try { await onCommitAndContinueMerge() }
-            catch (err) { setError(err instanceof Error ? err.message : String(err)) }
+            catch (err) { setCommitError(err instanceof Error ? err.message : String(err)) }
             finally { setCommitting(false) }
           }}
         >
@@ -671,6 +769,12 @@ export const GitDiffPanel = forwardRef<GitDiffPanelHandle, GitDiffPanelProps>(fu
           <p className="text-xs text-muted-foreground">
             Set a project path or worktree to view git diff
           </p>
+        </div>
+      )}
+
+      {targetPath && !error && loading && !snapshot && (
+        <div className="flex-1 min-h-0">
+          <PulseGrid />
         </div>
       )}
 
@@ -794,60 +898,170 @@ export const GitDiffPanel = forwardRef<GitDiffPanelHandle, GitDiffPanelProps>(fu
 
           {/* Right: diff viewer */}
           <div className="flex-1 min-w-0 min-h-0 flex flex-col">
-            {/* Intra-pane header: file path / count + Full file (single-mode only) */}
-            {(diffContinuousFlow || selectedFile) && (
-              <div className="shrink-0 h-[30px] px-3 text-[11px] font-medium text-muted-foreground uppercase tracking-wide bg-muted border-b z-10 flex items-center justify-between select-none">
-                <span className="truncate">
-                  {diffContinuousFlow
-                    ? `${flatEntries.length} changed file${flatEntries.length === 1 ? '' : 's'}`
-                    : selectedFile?.path}
-                </span>
+            {/* Turns chip row — replaces the legacy "X changed files" header. Always
+                rendered when in continuous-flow or with a selected file, so the user
+                always has an All toggle even before any turn snapshots exist. */}
+            {diffContinuousFlow && (
+              <div className="shrink-0 h-9 flex items-center gap-1.5 px-2 bg-muted/30 border-b overflow-x-auto">
+                <button
+                  onClick={() => setSelectedTurnId('all')}
+                  className={cn(
+                    'shrink-0 px-3 h-6 rounded-full text-[11px] font-medium border transition-colors',
+                    selectedTurnId === 'all'
+                      ? 'bg-primary text-primary-foreground border-primary'
+                      : 'bg-background hover:bg-muted text-foreground border-border'
+                  )}
+                >
+                  All turns
+                </button>
+                {[...turns].reverse().map((t, idx) => {
+                  // Newest visible turn = Turn 1, older = 2,3,...
+                  const n = idx + 1
+                  const active = selectedTurnId === t.id
+                  const tip = [
+                    t.task_title ? `Task: ${t.task_title}` : null,
+                    t.prompt_preview ? `Prompt: ${t.prompt_preview}` : null,
+                  ].filter(Boolean).join('\n') || `Turn ${n}`
+                  return (
+                    <button
+                      key={t.id}
+                      onClick={() => setSelectedTurnId(t.id)}
+                      title={tip}
+                      className={cn(
+                        'shrink-0 px-3 h-6 rounded-full text-[11px] font-medium border transition-colors',
+                        active
+                          ? 'bg-primary text-primary-foreground border-primary'
+                          : 'bg-background hover:bg-muted text-foreground border-border'
+                      )}
+                    >
+                      Turn {n}
+                    </button>
+                  )
+                })}
+                <div className="ml-auto flex items-center gap-0.5 shrink-0 sticky right-0 bg-muted/30 pl-1">
+                  <button
+                    onClick={() => {
+                      // Mark every current file as user-toggled so auto-collapse
+                      // of huge files stays overridden after Expand all.
+                      for (const e of flatEntries) userToggledFilesRef.current.add(`${e.source}:${e.path}`)
+                      setCollapsedFiles(new Set())
+                    }}
+                    title="Expand all files"
+                    className="size-6 inline-flex items-center justify-center rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    <UnfoldVertical className="size-3.5" />
+                  </button>
+                  <button
+                    onClick={() => {
+                      for (const e of flatEntries) userToggledFilesRef.current.add(`${e.source}:${e.path}`)
+                      setCollapsedFiles(new Set(flatEntries.map((e) => `${e.source}:${e.path}`)))
+                    }}
+                    title="Collapse all files"
+                    className="size-6 inline-flex items-center justify-center rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    <FoldVertical className="size-3.5" />
+                  </button>
+                </div>
               </div>
             )}
             {/* Body */}
             {diffContinuousFlow ? (
               <div className="flex-1 min-h-0 flex flex-col pt-2">
-                <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden px-2 pb-2 space-y-2">
-                {flatEntries.length === 0 ? (
-                  <div className="h-full flex items-center justify-center p-6">
+                {flowEntries.length === 0 ? (
+                  <div className="flex-1 min-h-0 flex items-center justify-center p-6">
                     <p className="text-xs text-muted-foreground">No changes</p>
                   </div>
-                ) : flatEntries.map((entry) => {
-                  const diff = getDiffForEntry(entry)
-                  if (!diff) return null
-                  const key = `${entry.source}:${entry.path}`
-                  const collapsed = collapsedFiles.has(key)
-                  return (
-                    <div
-                      key={key}
-                      ref={(el) => { sectionRefs.current.set(key, el) }}
-                      className="rounded-lg bg-card shadow-sm"
-                    >
-                      <div
-                        className="h-10 px-3 text-xs font-medium bg-muted border border-border flex items-center gap-2 cursor-pointer select-none hover:bg-muted/80 sticky top-0 z-20 rounded-t-lg"
-                        onClick={() => setCollapsedFiles((prev) => {
-                          const next = new Set(prev)
-                          if (next.has(key)) next.delete(key); else next.add(key)
-                          return next
-                        })}
-                      >
-                        <ChevronRight className={cn('size-3 shrink-0 transition-transform text-muted-foreground', !collapsed && 'rotate-90')} />
-                        <span className={cn('font-bold', STATUS_COLORS[entry.status])}>{entry.status}</span>
-                        <span className="truncate">{entry.path}</span>
-                        <span className="ml-auto text-[10px] text-muted-foreground tabular-nums space-x-1">
-                          {diff.additions > 0 && <span className="text-green-600 dark:text-green-400">+{diff.additions}</span>}
-                          {diff.deletions > 0 && <span className="text-red-600 dark:text-red-400">-{diff.deletions}</span>}
-                        </span>
-                      </div>
-                      {!collapsed && (
-                        <div className="overflow-hidden rounded-b-lg border-x border-b border-border">
-                          <DiffView diff={diff} sideBySide={diffSideBySide} wrap={diffWrap} contextLines={diffContextLines} />
-                        </div>
-                      )}
+                ) : (
+                  <div
+                    ref={flowScrollRef}
+                    className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden px-2 pb-2"
+                  >
+                    <div style={{ height: rowVirtualizer.getTotalSize(), position: 'relative', width: '100%' }}>
+                      {rowVirtualizer.getVirtualItems().map((v) => {
+                        const row = flowRows[v.index]
+                        if (!row) return null
+                        const { entry, diff, fileKey } = row
+                        const userToggled = userToggledFilesRef.current.has(fileKey)
+                        const explicitlyCollapsed = collapsedFiles.has(fileKey)
+                        const autoCollapsed = !userToggled && (diff.additions + diff.deletions) > HUGE_FILE_THRESHOLD
+                        const collapsed = explicitlyCollapsed || autoCollapsed
+                        const isActiveSticky = v.index === activeStickyIndexRef.current
+                        const isHeader = row.kind === 'header'
+
+                        // Sticky pattern: the active header uses `position: sticky`
+                        // (no transform) so it pins at top: 0 of the scroll parent
+                        // while its body scrolls. All other rows use the standard
+                        // `position: absolute` + translateY placement.
+                        const style: React.CSSProperties = isHeader && isActiveSticky
+                          ? {
+                              position: 'sticky',
+                              top: 0,
+                              left: 0,
+                              right: 0,
+                              zIndex: 20,
+                            }
+                          : {
+                              position: 'absolute',
+                              top: 0,
+                              left: 0,
+                              right: 0,
+                              transform: `translateY(${v.start}px)`,
+                            }
+
+                        if (isHeader) {
+                          return (
+                            <div
+                              key={v.key}
+                              data-index={v.index}
+                              ref={rowVirtualizer.measureElement}
+                              style={collapsed ? { ...style, paddingBottom: 8 } : style}
+                            >
+                              <div
+                                className={cn(
+                                  'h-10 px-3 text-xs font-medium bg-muted border border-border flex items-center gap-2 cursor-pointer select-none hover:bg-muted/80',
+                                  collapsed ? 'rounded-lg' : 'rounded-t-lg'
+                                )}
+                                onClick={() => {
+                                  // Record user intent so auto-collapse won't override the toggle.
+                                  userToggledFilesRef.current.add(fileKey)
+                                  setCollapsedFiles((prev) => {
+                                    const next = new Set(prev)
+                                    // If currently collapsed (explicitly or auto), expand → remove from set.
+                                    // Otherwise collapse → add to set.
+                                    if (collapsed) next.delete(fileKey); else next.add(fileKey)
+                                    return next
+                                  })
+                                }}
+                              >
+                                <ChevronRight className={cn('size-3 shrink-0 transition-transform text-muted-foreground', !collapsed && 'rotate-90')} />
+                                <span className={cn('font-bold', STATUS_COLORS[entry.status])}>{entry.status}</span>
+                                <span className="truncate">{entry.path}</span>
+                                <span className="ml-auto text-[10px] text-muted-foreground tabular-nums space-x-1">
+                                  {diff.additions > 0 && <span className="text-green-600 dark:text-green-400">+{diff.additions}</span>}
+                                  {diff.deletions > 0 && <span className="text-red-600 dark:text-red-400">-{diff.deletions}</span>}
+                                </span>
+                              </div>
+                            </div>
+                          )
+                        }
+
+                        // Body row — only emitted for expanded files.
+                        return (
+                          <div
+                            key={v.key}
+                            data-index={v.index}
+                            ref={rowVirtualizer.measureElement}
+                            style={{ ...style, paddingBottom: 8 }}
+                          >
+                            <div className="overflow-hidden rounded-b-lg border-x border-b border-border bg-card shadow-sm">
+                              <DiffView diff={diff} sideBySide={diffSideBySide} wrap={diffWrap} contextLines={diffContextLines} />
+                            </div>
+                          </div>
+                        )
+                      })}
                     </div>
-                  )
-                })}
-                </div>
+                  </div>
+                )}
               </div>
             ) : (
               <>
@@ -879,57 +1093,6 @@ export const GitDiffPanel = forwardRef<GitDiffPanelHandle, GitDiffPanelProps>(fu
               </>
             )}
           </div>
-        </div>
-      )}
-
-      {/* Floating commit bar — when tree collapsed, sidebar (which holds commit input) is hidden */}
-      {targetPath && !error && snapshot && hasAnyChanges && diffTreeCollapsed && (
-        <div className="shrink-0 p-2 border-t space-y-1.5">
-          <textarea
-            className="w-full resize-none rounded border bg-transparent px-2 py-1.5 text-xs font-mono placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
-            style={{ maxHeight: 120 }}
-            placeholder="Commit message"
-            rows={2}
-            value={commitMessage}
-            onChange={(e) => {
-              setCommitMessage(e.target.value)
-              const el = e.target
-              el.style.height = 'auto'
-              el.style.height = `${Math.min(el.scrollHeight, 120)}px`
-            }}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
-                e.preventDefault()
-                handleCommit()
-              }
-            }}
-          />
-          {isMergeMode && onCommitAndContinueMerge ? (
-            <Button
-              variant="default"
-              size="sm"
-              className="w-full h-7 text-xs"
-              disabled={committing}
-              onClick={async () => {
-                setCommitting(true)
-                try { await onCommitAndContinueMerge() }
-                catch (err) { setError(err instanceof Error ? err.message : String(err)) }
-                finally { setCommitting(false) }
-              }}
-            >
-              {committing ? 'Committing...' : 'Commit & Continue Merge'}
-            </Button>
-          ) : (
-            <Button
-              variant="default"
-              size="sm"
-              className="w-full h-7 text-xs"
-              disabled={!commitMessage.trim() || stagedEntries.length === 0 || committing}
-              onClick={handleCommit}
-            >
-              {committing ? 'Committing...' : `Commit${stagedEntries.length > 0 ? ` (${stagedEntries.length} staged)` : ''}`}
-            </Button>
-          )}
         </div>
       )}
 
