@@ -1,6 +1,7 @@
 import { createContext, forwardRef, useCallback, useContext, useEffect, useImperativeHandle, useRef, useState } from 'react'
-import { Check, X, SkipForward, AlertTriangle, RefreshCw, Plus } from 'lucide-react'
-import { Button, Checkbox, IconButton, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Switch, cn, useShortcutDisplay } from '@slayzone/ui'
+import { Check, X, SkipForward, AlertTriangle, RefreshCw, Plus, PanelLeftClose, PanelLeftOpen, AlignJustify, Columns2, WrapText } from 'lucide-react'
+import { Button, Checkbox, IconButton, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Switch, Tooltip, TooltipContent, TooltipTrigger, cn, useShortcutDisplay } from '@slayzone/ui'
+import { useAppearance } from '@slayzone/settings/client'
 import type { Task, UpdateTaskInput, MergeContext } from '@slayzone/task/shared'
 import type { FilterState } from '@slayzone/tasks'
 import type { Project, DetectedRepo } from '@slayzone/projects/shared'
@@ -111,6 +112,12 @@ export const UnifiedGitPanel = forwardRef<UnifiedGitPanelHandle, UnifiedGitPanel
 
   const showWorktrees = !task
   const [hasGithubRemote, setHasGithubRemote] = useState(false)
+
+  const { diffContinuousFlow, diffTreeCollapsed, diffSideBySide, diffWrap } = useAppearance()
+  const setBoolSetting = useCallback((key: string, value: boolean) => {
+    window.api.settings.set(key, value ? '1' : '0')
+    window.dispatchEvent(new CustomEvent('sz:settings-changed'))
+  }, [])
 
   // Check if repo has a GitHub remote
   useEffect(() => {
@@ -271,15 +278,73 @@ export const UnifiedGitPanel = forwardRef<UnifiedGitPanelHandle, UnifiedGitPanel
           </Select>
         )}
         {activeTab === 'changes' && (
-          <IconButton
-            aria-label="Refresh"
-            variant="ghost"
-            className="h-7 w-7"
-            title="Refresh"
-            onClick={() => diffRef.current?.refresh()}
-          >
-            <RefreshCw className="h-3.5 w-3.5" />
-          </IconButton>
+          <>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <IconButton
+                  aria-label={diffTreeCollapsed ? 'Show file tree' : 'Hide file tree'}
+                  variant="ghost"
+                  className={cn('h-7 w-7', diffTreeCollapsed && 'bg-primary/15 text-primary')}
+                  onClick={() => setBoolSetting('diff_tree_collapsed', !diffTreeCollapsed)}
+                >
+                  {diffTreeCollapsed ? <PanelLeftOpen className="h-3.5 w-3.5" /> : <PanelLeftClose className="h-3.5 w-3.5" />}
+                </IconButton>
+              </TooltipTrigger>
+              <TooltipContent>{diffTreeCollapsed ? 'Show file tree' : 'Hide file tree'}</TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <IconButton
+                  aria-label="Continuous flow"
+                  variant="ghost"
+                  className={cn('h-7 w-7', diffContinuousFlow && 'bg-primary/15 text-primary')}
+                  onClick={() => setBoolSetting('diff_continuous_flow', !diffContinuousFlow)}
+                >
+                  <AlignJustify className="h-3.5 w-3.5" />
+                </IconButton>
+              </TooltipTrigger>
+              <TooltipContent>{diffContinuousFlow ? 'Show one file at a time' : 'Show continuous flow'}</TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <IconButton
+                  aria-label="Side-by-side"
+                  variant="ghost"
+                  className={cn('h-7 w-7', diffSideBySide && 'bg-primary/15 text-primary')}
+                  onClick={() => setBoolSetting('diff_side_by_side', !diffSideBySide)}
+                >
+                  <Columns2 className="h-3.5 w-3.5" />
+                </IconButton>
+              </TooltipTrigger>
+              <TooltipContent>{diffSideBySide ? 'Unified diff' : 'Side-by-side diff'}</TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <IconButton
+                  aria-label="Wrap lines"
+                  variant="ghost"
+                  className={cn('h-7 w-7', diffWrap && 'bg-primary/15 text-primary')}
+                  onClick={() => setBoolSetting('diff_wrap', !diffWrap)}
+                >
+                  <WrapText className="h-3.5 w-3.5" />
+                </IconButton>
+              </TooltipTrigger>
+              <TooltipContent>{diffWrap ? 'No wrap' : 'Wrap long lines'}</TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <IconButton
+                  aria-label="Refresh"
+                  variant="ghost"
+                  className="h-7 w-7"
+                  onClick={() => diffRef.current?.refresh()}
+                >
+                  <RefreshCw className="h-3.5 w-3.5" />
+                </IconButton>
+              </TooltipTrigger>
+              <TooltipContent>Refresh</TooltipContent>
+            </Tooltip>
+          </>
         )}
         {activeTab === 'worktrees' && (
           <IconButton

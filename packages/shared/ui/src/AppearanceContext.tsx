@@ -22,6 +22,10 @@ export interface AppearanceSettings {
   // Diff
   diffContextLines: '0' | '3' | '5' | 'all'
   diffIgnoreWhitespace: boolean
+  diffContinuousFlow: boolean
+  diffTreeCollapsed: boolean
+  diffSideBySide: boolean
+  diffWrap: boolean
   // Browser
   browserDefaultZoom: number
   browserDefaultUrl: string
@@ -52,6 +56,10 @@ export const appearanceDefaults: AppearanceSettings = {
   terminalScrollback: 5000,
   diffContextLines: '3',
   diffIgnoreWhitespace: false,
+  diffContinuousFlow: false,
+  diffTreeCollapsed: false,
+  diffSideBySide: false,
+  diffWrap: false,
   browserDefaultZoom: 100,
   browserDefaultUrl: '',
   browserDeviceDefaults: null,

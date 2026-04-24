@@ -1,5 +1,5 @@
 import { forwardRef, memo, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react'
-import { Plus, Minus, Undo2, ChevronRight, GitMerge, CheckCircle2, FileDiff, FileText } from 'lucide-react'
+import { Plus, Minus, Undo2, ChevronRight, GitMerge, CheckCircle2, FileDiff } from 'lucide-react'
 import {
   Button, FileTree, buildFileTree, flattenFileTree, fileTreeIndent, cn, buttonVariants,
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
@@ -137,7 +137,7 @@ const FileListItem = memo(function FileListItem({
     <div
       ref={itemRef}
       className={cn(
-        'group w-full text-left py-1 pr-3 flex items-center gap-1.5 text-xs font-mono hover:bg-muted/50 transition-colors cursor-pointer rounded',
+        'group w-full text-left py-2 pr-3 flex items-center gap-1.5 text-xs font-mono hover:bg-muted/50 transition-colors cursor-pointer rounded',
         selected && 'bg-primary/10'
       )}
       style={{ paddingLeft: fileTreeIndent(depth) }}
@@ -197,7 +197,7 @@ export const GitDiffPanel = forwardRef<GitDiffPanelHandle, GitDiffPanelProps>(fu
   onAbortMerge
 }, ref) {
   const isMergeMode = mergeState === 'uncommitted'
-  const { diffContextLines, diffIgnoreWhitespace } = useAppearance()
+  const { diffContextLines, diffIgnoreWhitespace, diffContinuousFlow, diffTreeCollapsed, diffSideBySide, diffWrap } = useAppearance()
   const targetPath = useMemo(() => task?.worktree_path ?? projectPath, [task?.worktree_path, projectPath])
   const [snapshot, setSnapshot] = useState<GitDiffSnapshot | null>(null)
   const [loading, setLoading] = useState(false)
@@ -210,7 +210,7 @@ export const GitDiffPanel = forwardRef<GitDiffPanelHandle, GitDiffPanelProps>(fu
   const [committing, setCommitting] = useState(false)
   const [stagedCollapsed, setStagedCollapsed] = useState(false)
   const [unstagedCollapsed, setUnstagedCollapsed] = useState(false)
-  const [showFullFile, setShowFullFile] = useState(false)
+  const [collapsedFiles, setCollapsedFiles] = useState<Set<string>>(new Set())
   const [confirmAction, setConfirmAction] = useState<ConfirmAction | null>(null)
   const confirmActionRef = useRef<ConfirmAction | null>(null)
   if (confirmAction) confirmActionRef.current = confirmAction
@@ -224,8 +224,9 @@ export const GitDiffPanel = forwardRef<GitDiffPanelHandle, GitDiffPanelProps>(fu
     if (!targetPath) return
     setLoading(true)
     try {
+      // Always fetch full context. diffContextLines controls display collapse, not fetch.
       const next = await window.api.git.getWorkingDiff(targetPath, {
-        contextLines: diffContextLines,
+        contextLines: 'all',
         ignoreWhitespace: diffIgnoreWhitespace,
       })
       if (!prevSnapshotRef.current || !snapshotsEqual(prevSnapshotRef.current, next)) {
@@ -254,7 +255,7 @@ export const GitDiffPanel = forwardRef<GitDiffPanelHandle, GitDiffPanelProps>(fu
     }, pollIntervalMs)
     return () => clearInterval(timer)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [visible, targetPath, pollIntervalMs, diffContextLines, diffIgnoreWhitespace])
+  }, [visible, targetPath, pollIntervalMs, diffIgnoreWhitespace])
 
   const unstagedFileDiffs = useMemo(
     () => parseUnifiedDiff(snapshot?.unstagedPatch ?? ''),
@@ -361,30 +362,7 @@ export const GitDiffPanel = forwardRef<GitDiffPanelHandle, GitDiffPanelProps>(fu
     return getDiffForEntry(entry) ?? null
   }, [selectedFile, flatEntries, getDiffForEntry])
 
-  // Full-file diff: fetched per-file only when toggle is on
-  const [fullFileDiff, setFullFileDiff] = useState<FileDiffType | null>(null)
-  const fullFileFetchKey = showFullFile && selectedFile ? `${selectedFile.source}:${selectedFile.path}` : null
-  useEffect(() => {
-    setFullFileDiff(null)
-    if (!fullFileFetchKey || !targetPath || !selectedFile || !normalDiff) {
-      return
-    }
-    let cancelled = false
-    window.api.git.getFileDiff(targetPath, selectedFile.path, selectedFile.source === 'staged', {
-      contextLines: 'all',
-      ignoreWhitespace: diffIgnoreWhitespace,
-    }).then((patch) => {
-      if (cancelled) return
-      const parsed = parseUnifiedDiff(patch)
-      setFullFileDiff(parsed.find((d) => d.path === selectedFile.path) ?? parsed[0] ?? null)
-    }).catch(() => {
-      if (!cancelled) setFullFileDiff(null)
-    })
-    return () => { cancelled = true }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fullFileFetchKey, targetPath, diffIgnoreWhitespace, normalDiff])
-
-  const selectedDiff = showFullFile && fullFileDiff ? fullFileDiff : normalDiff
+  const selectedDiff = normalDiff
 
   // Eagerly fetch diffs for untracked files (for counts + preview)
   const prevUntrackedRef = useRef<string[]>([])
@@ -430,6 +408,14 @@ export const GitDiffPanel = forwardRef<GitDiffPanelHandle, GitDiffPanelProps>(fu
   useEffect(() => {
     selectedItemRef.current?.scrollIntoView({ block: 'nearest' })
   }, [selectedFile])
+
+  // Refs to per-file sections in continuous mode (scroll target on file click)
+  const sectionRefs = useRef<Map<string, HTMLDivElement | null>>(new Map())
+  useEffect(() => {
+    if (!diffContinuousFlow || !selectedFile) return
+    const key = `${selectedFile.source}:${selectedFile.path}`
+    sectionRefs.current.get(key)?.scrollIntoView({ block: 'start', behavior: 'smooth' })
+  }, [selectedFile, diffContinuousFlow])
 
   const handleBulkAction = useCallback(async (action: 'stageAll' | 'unstageAll') => {
     if (!targetPath) return
@@ -604,6 +590,56 @@ export const GitDiffPanel = forwardRef<GitDiffPanelHandle, GitDiffPanelProps>(fu
     </>
   ), [handleStageFolderAction, handleDiscardFile])
 
+  const commitInputBlock = (
+    <div className="shrink-0 p-2 border-t space-y-1.5">
+      <textarea
+        className="w-full resize-none rounded border bg-transparent px-2 py-1.5 text-xs font-mono placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+        style={{ maxHeight: 120 }}
+        placeholder="Commit message"
+        rows={3}
+        value={commitMessage}
+        onChange={(e) => {
+          setCommitMessage(e.target.value)
+          const el = e.target
+          el.style.height = 'auto'
+          el.style.height = `${Math.min(el.scrollHeight, 120)}px`
+        }}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+            e.preventDefault()
+            handleCommit()
+          }
+        }}
+      />
+      {isMergeMode && onCommitAndContinueMerge ? (
+        <Button
+          variant="default"
+          size="sm"
+          className="w-full h-7 text-xs"
+          disabled={committing}
+          onClick={async () => {
+            setCommitting(true)
+            try { await onCommitAndContinueMerge() }
+            catch (err) { setError(err instanceof Error ? err.message : String(err)) }
+            finally { setCommitting(false) }
+          }}
+        >
+          {committing ? 'Committing...' : 'Commit & Continue Merge'}
+        </Button>
+      ) : (
+        <Button
+          variant="default"
+          size="sm"
+          className="w-full h-7 text-xs"
+          disabled={!commitMessage.trim() || stagedEntries.length === 0 || committing}
+          onClick={handleCommit}
+        >
+          {committing ? 'Committing...' : `Commit${stagedEntries.length > 0 ? ` (${stagedEntries.length} staged)` : ''}`}
+        </Button>
+      )}
+    </div>
+  )
+
   return (
     <div data-testid="git-diff-panel" className="h-full flex flex-col">
       {/* Merge-mode banner */}
@@ -660,6 +696,7 @@ export const GitDiffPanel = forwardRef<GitDiffPanelHandle, GitDiffPanelProps>(fu
       {targetPath && !error && snapshot && hasAnyChanges && (
         <div ref={splitContainerRef} className="flex-1 min-h-0 flex">
           {/* Left: file lists + commit */}
+          {!diffTreeCollapsed && (
           <div
             className="shrink-0 flex flex-col min-h-0 border-r"
             style={{ width: fileListWidth }}
@@ -747,105 +784,152 @@ export const GitDiffPanel = forwardRef<GitDiffPanelHandle, GitDiffPanelProps>(fu
             )}
             </div>
 
-            {/* Commit input — pinned to bottom */}
-            <div className="shrink-0 p-2 border-t space-y-1.5">
-              <textarea
-                className="w-full resize-none rounded border bg-transparent px-2 py-1.5 text-xs font-mono placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
-                style={{ maxHeight: 120 }}
-                placeholder="Commit message"
-                rows={3}
-                value={commitMessage}
-                onChange={(e) => {
-                  setCommitMessage(e.target.value)
-                  const el = e.target
-                  el.style.height = 'auto'
-                  el.style.height = `${Math.min(el.scrollHeight, 120)}px`
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
-                    e.preventDefault()
-                    handleCommit()
-                  }
-                }}
-              />
-              {isMergeMode && onCommitAndContinueMerge ? (
-                <Button
-                  variant="default"
-                  size="sm"
-                  className="w-full h-7 text-xs"
-                  disabled={committing}
-                  onClick={async () => {
-                    setCommitting(true)
-                    try { await onCommitAndContinueMerge() }
-                    catch (err) { setError(err instanceof Error ? err.message : String(err)) }
-                    finally { setCommitting(false) }
-                  }}
-                >
-                  {committing ? 'Committing...' : 'Commit & Continue Merge'}
-                </Button>
-              ) : (
-                <Button
-                  variant="default"
-                  size="sm"
-                  className="w-full h-7 text-xs"
-                  disabled={!commitMessage.trim() || stagedEntries.length === 0 || committing}
-                  onClick={handleCommit}
-                >
-                  {committing ? 'Committing...' : `Commit${stagedEntries.length > 0 ? ` (${stagedEntries.length} staged)` : ''}`}
-                </Button>
-              )}
-            </div>
+            {/* Commit input — pinned to bottom of sidebar */}
+            {commitInputBlock}
           </div>
+          )}
 
           {/* Resize handle */}
-          <HorizontalResizeHandle onDrag={handleResize} />
+          {!diffTreeCollapsed && <HorizontalResizeHandle onDrag={handleResize} />}
 
           {/* Right: diff viewer */}
           <div className="flex-1 min-w-0 min-h-0 flex flex-col">
-            {!selectedFile && (
-              <div className="flex-1 flex items-center justify-center p-6">
-                <div className="flex flex-col items-center gap-3 text-muted-foreground">
-                  <FileDiff className="size-10 opacity-30" />
-                  <div className="text-center">
-                    <p className="text-base font-medium text-foreground/60">No file selected</p>
-                    <p className="text-sm mt-0.5 opacity-60">Pick a file from the list to view its diff</p>
+            {/* Intra-pane header: file path / count + Full file (single-mode only) */}
+            {(diffContinuousFlow || selectedFile) && (
+              <div className="shrink-0 h-[30px] px-3 text-[11px] font-medium text-muted-foreground uppercase tracking-wide bg-muted border-b z-10 flex items-center justify-between select-none">
+                <span className="truncate">
+                  {diffContinuousFlow
+                    ? `${flatEntries.length} changed file${flatEntries.length === 1 ? '' : 's'}`
+                    : selectedFile?.path}
+                </span>
+              </div>
+            )}
+            {/* Body */}
+            {diffContinuousFlow ? (
+              <div className="flex-1 min-h-0 flex flex-col pt-2">
+                <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden px-2 pb-2 space-y-2">
+                {flatEntries.length === 0 ? (
+                  <div className="h-full flex items-center justify-center p-6">
+                    <p className="text-xs text-muted-foreground">No changes</p>
                   </div>
+                ) : flatEntries.map((entry) => {
+                  const diff = getDiffForEntry(entry)
+                  if (!diff) return null
+                  const key = `${entry.source}:${entry.path}`
+                  const collapsed = collapsedFiles.has(key)
+                  return (
+                    <div
+                      key={key}
+                      ref={(el) => { sectionRefs.current.set(key, el) }}
+                      className="rounded-lg bg-card shadow-sm"
+                    >
+                      <div
+                        className="h-10 px-3 text-xs font-medium bg-muted border border-border flex items-center gap-2 cursor-pointer select-none hover:bg-muted/80 sticky top-0 z-20 rounded-t-lg"
+                        onClick={() => setCollapsedFiles((prev) => {
+                          const next = new Set(prev)
+                          if (next.has(key)) next.delete(key); else next.add(key)
+                          return next
+                        })}
+                      >
+                        <ChevronRight className={cn('size-3 shrink-0 transition-transform text-muted-foreground', !collapsed && 'rotate-90')} />
+                        <span className={cn('font-bold', STATUS_COLORS[entry.status])}>{entry.status}</span>
+                        <span className="truncate">{entry.path}</span>
+                        <span className="ml-auto text-[10px] text-muted-foreground tabular-nums space-x-1">
+                          {diff.additions > 0 && <span className="text-green-600 dark:text-green-400">+{diff.additions}</span>}
+                          {diff.deletions > 0 && <span className="text-red-600 dark:text-red-400">-{diff.deletions}</span>}
+                        </span>
+                      </div>
+                      {!collapsed && (
+                        <div className="overflow-hidden rounded-b-lg border-x border-b border-border">
+                          <DiffView diff={diff} sideBySide={diffSideBySide} wrap={diffWrap} contextLines={diffContextLines} />
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
                 </div>
               </div>
-            )}
-            {selectedFile && !selectedDiff && (
-              <div className="flex-1 flex items-center justify-center p-6">
-                <p className="text-xs text-muted-foreground">
-                  {flatEntries.find((f) => f.path === selectedFile.path && f.source === selectedFile.source)?.status === '?'
-                    ? 'Loading...'
-                    : 'No diff content'}
-                </p>
-              </div>
-            )}
-            {selectedFile && selectedDiff && (
+            ) : (
               <>
-                <div className="shrink-0 h-[30px] px-3 text-[11px] font-medium text-muted-foreground uppercase tracking-wide bg-muted border-b sticky top-0 z-10 flex items-center justify-between select-none">
-                  <span className="truncate">{selectedFile.path}</span>
-                  <button
-                    className={cn(
-                      'flex items-center gap-1 px-1.5 rounded text-[11px] transition-colors',
-                      showFullFile
-                        ? 'bg-primary/15 text-primary'
-                        : 'text-muted-foreground hover:text-foreground hover:bg-muted'
-                    )}
-                    onClick={() => setShowFullFile((v) => !v)}
-                    title={showFullFile ? 'Show diff only' : 'Show full file'}
-                  >
-                    <FileText className="size-3" />
-                    Full file
-                  </button>
-                </div>
-                <div className="flex-1 min-h-0 overflow-auto">
-                  <DiffView diff={selectedDiff} />
-                </div>
+                {!selectedFile && (
+                  <div className="flex-1 flex items-center justify-center p-6">
+                    <div className="flex flex-col items-center gap-3 text-muted-foreground">
+                      <FileDiff className="size-10 opacity-30" />
+                      <div className="text-center">
+                        <p className="text-base font-medium text-foreground/60">No file selected</p>
+                        <p className="text-sm mt-0.5 opacity-60">Pick a file from the list to view its diff</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+                {selectedFile && !selectedDiff && (
+                  <div className="flex-1 flex items-center justify-center p-6">
+                    <p className="text-xs text-muted-foreground">
+                      {flatEntries.find((f) => f.path === selectedFile.path && f.source === selectedFile.source)?.status === '?'
+                        ? 'Loading...'
+                        : 'No diff content'}
+                    </p>
+                  </div>
+                )}
+                {selectedFile && selectedDiff && (
+                  <div className="flex-1 min-h-0 overflow-auto">
+                    <DiffView diff={selectedDiff} sideBySide={diffSideBySide} wrap={diffWrap} contextLines={diffContextLines} />
+                  </div>
+                )}
               </>
             )}
           </div>
+        </div>
+      )}
+
+      {/* Floating commit bar — when tree collapsed, sidebar (which holds commit input) is hidden */}
+      {targetPath && !error && snapshot && hasAnyChanges && diffTreeCollapsed && (
+        <div className="shrink-0 p-2 border-t space-y-1.5">
+          <textarea
+            className="w-full resize-none rounded border bg-transparent px-2 py-1.5 text-xs font-mono placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+            style={{ maxHeight: 120 }}
+            placeholder="Commit message"
+            rows={2}
+            value={commitMessage}
+            onChange={(e) => {
+              setCommitMessage(e.target.value)
+              const el = e.target
+              el.style.height = 'auto'
+              el.style.height = `${Math.min(el.scrollHeight, 120)}px`
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+                e.preventDefault()
+                handleCommit()
+              }
+            }}
+          />
+          {isMergeMode && onCommitAndContinueMerge ? (
+            <Button
+              variant="default"
+              size="sm"
+              className="w-full h-7 text-xs"
+              disabled={committing}
+              onClick={async () => {
+                setCommitting(true)
+                try { await onCommitAndContinueMerge() }
+                catch (err) { setError(err instanceof Error ? err.message : String(err)) }
+                finally { setCommitting(false) }
+              }}
+            >
+              {committing ? 'Committing...' : 'Commit & Continue Merge'}
+            </Button>
+          ) : (
+            <Button
+              variant="default"
+              size="sm"
+              className="w-full h-7 text-xs"
+              disabled={!commitMessage.trim() || stagedEntries.length === 0 || committing}
+              onClick={handleCommit}
+            >
+              {committing ? 'Committing...' : `Commit${stagedEntries.length > 0 ? ` (${stagedEntries.length} staged)` : ''}`}
+            </Button>
+          )}
         </div>
       )}
 

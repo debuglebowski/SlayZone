@@ -768,3 +768,64 @@
   color: var(--color-search-match-active-foreground) !important;
   outline: 1px solid var(--color-search-match-active);
 }
+
+/* Diff syntax highlighting (lezer classHighlighter) — light defaults, .dark overrides */
+.tok-keyword,
+.tok-controlKeyword,
+.tok-moduleKeyword,
+.tok-operatorKeyword { color: #a626a4; }
+.tok-string, .tok-string2,
+.tok-character,
+.tok-attributeValue { color: #50a14f; }
+.tok-comment, .tok-lineComment, .tok-blockComment, .tok-docComment { color: #a0a1a7; font-style: italic; }
+.tok-number, .tok-integer, .tok-float,
+.tok-bool, .tok-null, .tok-atom,
+.tok-attributeName,
+.tok-regexp { color: #986801; }
+.tok-typeName, .tok-className { color: #c18401; }
+.tok-propertyName,
+.tok-tagName,
+.tok-heading { color: #e45649; }
+.tok-variableName, .tok-local { color: #383a42; }
+.tok-function.tok-variableName,
+.tok-function.tok-propertyName,
+.tok-definition.tok-variableName,
+.tok-definition.tok-propertyName,
+.tok-link, .tok-url { color: #4078f2; }
+.tok-operator, .tok-derefOperator, .tok-arithmeticOperator, .tok-logicOperator, .tok-bitwiseOperator, .tok-compareOperator, .tok-updateOperator, .tok-definitionOperator,
+.tok-meta, .tok-processingInstruction, .tok-annotation,
+.tok-escape, .tok-special.tok-string { color: #0184bc; }
+.tok-punctuation, .tok-bracket, .tok-paren, .tok-brace, .tok-squareBracket, .tok-angleBracket, .tok-separator { color: #383a42; }
+.tok-link, .tok-url { text-decoration: underline; }
+.tok-emphasis { font-style: italic; }
+.tok-strong, .tok-heading { font-weight: 600; }
+.tok-invalid { color: #e45649; text-decoration: underline wavy; }
+
+/* Dark theme */
+.dark .tok-keyword,
+.dark .tok-controlKeyword,
+.dark .tok-moduleKeyword,
+.dark .tok-operatorKeyword { color: #c678dd; }
+.dark .tok-string, .dark .tok-string2,
+.dark .tok-character,
+.dark .tok-attributeValue { color: #98c379; }
+.dark .tok-comment, .dark .tok-lineComment, .dark .tok-blockComment, .dark .tok-docComment { color: #7f848e; }
+.dark .tok-number, .dark .tok-integer, .dark .tok-float,
+.dark .tok-bool, .dark .tok-null, .dark .tok-atom,
+.dark .tok-attributeName,
+.dark .tok-regexp { color: #d19a66; }
+.dark .tok-typeName, .dark .tok-className { color: #e5c07b; }
+.dark .tok-propertyName,
+.dark .tok-tagName,
+.dark .tok-heading { color: #e06c75; }
+.dark .tok-variableName, .dark .tok-local { color: #abb2bf; }
+.dark .tok-function.tok-variableName,
+.dark .tok-function.tok-propertyName,
+.dark .tok-definition.tok-variableName,
+.dark .tok-definition.tok-propertyName,
+.dark .tok-link, .dark .tok-url { color: #61afef; }
+.dark .tok-operator, .dark .tok-derefOperator, .dark .tok-arithmeticOperator, .dark .tok-logicOperator, .dark .tok-bitwiseOperator, .dark .tok-compareOperator, .dark .tok-updateOperator, .dark .tok-definitionOperator,
+.dark .tok-meta, .dark .tok-processingInstruction, .dark .tok-annotation,
+.dark .tok-escape, .dark .tok-special.tok-string { color: #56b6c2; }
+.dark .tok-punctuation, .dark .tok-bracket, .dark .tok-paren, .dark .tok-brace, .dark .tok-squareBracket, .dark .tok-angleBracket, .dark .tok-separator { color: #abb2bf; }
+.dark .tok-invalid { color: #e06c75; }

@@ -14,7 +14,10 @@ export interface DiffLine {
 export interface DiffHunk {
   header: string
   oldStart: number
+  oldLen: number
   newStart: number
+  newLen: number
+  label: string
   lines: DiffLine[]
 }
 
@@ -29,7 +32,7 @@ export interface FileDiff {
   deletions: number
 }
 
-const HUNK_HEADER = /^@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@(.*)$/
+const HUNK_HEADER = /^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@(.*)$/
 
 export function computeInlineHighlights(
   oldContent: string,
@@ -166,7 +169,10 @@ export function parseUnifiedDiff(patch: string): FileDiff[] {
       const hunk: DiffHunk = {
         header: lines[i],
         oldStart: parseInt(hunkMatch[1], 10),
-        newStart: parseInt(hunkMatch[2], 10),
+        oldLen: hunkMatch[2] != null ? parseInt(hunkMatch[2], 10) : 1,
+        newStart: parseInt(hunkMatch[3], 10),
+        newLen: hunkMatch[4] != null ? parseInt(hunkMatch[4], 10) : 1,
+        label: (hunkMatch[5] ?? '').trim(),
         lines: []
       }
 
