@@ -106,9 +106,8 @@ export const TerminalContainer = forwardRef<TerminalContainerHandle, TerminalCon
   const shortcutActive = hasShortcutFocus ?? isActive
 
   // Manager mode: optional left sidebar showing subtask tree; selecting a subtask
-  // swaps the output area to that subtask's main PTY session. Gated by labs flag.
+  // swaps the output area to that subtask's main PTY session.
   // Persisted per-task via tasks.manager_mode column.
-  const agentManagerEnabled = window.api.app.isAgentManagerEnabledSync
   const [managerMode, setManagerMode] = useState<boolean>(initialManagerMode ?? false)
   const [managerSelectedTask, setManagerSelectedTask] = useState<ManagerTask | null>(null)
   const handleManagerToggle = useCallback(() => {
@@ -428,7 +427,7 @@ export const TerminalContainer = forwardRef<TerminalContainerHandle, TerminalCon
 
   return (
     <div className="h-full flex" style={terminalPanelStyle as React.CSSProperties | undefined}>
-      {agentManagerEnabled && managerMode && (
+      {managerMode && (
         <ManagerSidebar
           rootTaskId={taskId}
           rootTitle={taskTitle ?? 'Main'}
@@ -454,8 +453,8 @@ export const TerminalContainer = forwardRef<TerminalContainerHandle, TerminalCon
           onPaneMove={movePane}
           onGroupRename={renameTab}
           rightContent={rightContent}
-          managerModeActive={agentManagerEnabled && managerMode}
-          onManagerToggle={agentManagerEnabled && hasSubtasks ? handleManagerToggle : undefined}
+          managerModeActive={managerMode}
+          onManagerToggle={hasSubtasks ? handleManagerToggle : undefined}
         />
         <div className="flex-1 min-h-0 relative">
           {isManagerResizing ? (

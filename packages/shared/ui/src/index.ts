@@ -24,7 +24,6 @@ export { WORKTREE_COLORS, hashStr, assignWorktreeColors, assignNewWorktreeColors
 export { useAppearance, AppearanceContext, appearanceDefaults, type AppearanceSettings, type BrowserDeviceDefaults } from './AppearanceContext'
 export { getTerminalStateStyle, type TerminalStateStyle } from './terminal-state'
 export { TerminalProgressDot, type TerminalProgressDotProps } from './terminal-progress-dot'
-export { getAgentPanelLabel } from './agent-panel-label'
 export {
   getTaskStatusStyle,
   getColumnStatusStyle,

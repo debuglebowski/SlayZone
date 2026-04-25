@@ -69,7 +69,7 @@ import { markSkipCache, usePty, useTerminalModes, getVisibleModes, getModeLabel,
 import type { LoopConfig } from '@slayzone/terminal/shared'
 import { TerminalContainer, type TerminalContainerHandle, ConfirmDisplayModeDialog, type TabDisplayMode, isChatSupported } from '@slayzone/task-terminals'
 import { UnifiedGitPanel, type UnifiedGitPanelHandle, type GitTabId } from '@slayzone/worktrees'
-import { buildStatusOptions, cn, getColumnStatusStyle, PriorityIcon, useAppearance, matchesShortcut, useShortcutStore, useShortcutDisplay, withModalGuard, getThemeEditorColors, getAgentPanelLabel, type EditorThemeColors } from '@slayzone/ui'
+import { buildStatusOptions, cn, getColumnStatusStyle, PriorityIcon, useAppearance, matchesShortcut, useShortcutStore, useShortcutDisplay, withModalGuard, getThemeEditorColors, type EditorThemeColors } from '@slayzone/ui'
 import { BrowserPanel, type BrowserPanelHandle } from '@slayzone/task-browser'
 import { FileEditorView, type FileEditorViewHandle } from '@slayzone/file-editor/client'
 import type { EditorOpenFilesState, OpenFileOptions } from '@slayzone/file-editor/shared'
@@ -1813,7 +1813,7 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
               <PanelToggle
                 panels={(() => {
                   const entries: Record<string, { id: string; icon: typeof Globe; label: string; shortcut?: string | null }> = {
-                    terminal: { id: 'terminal', icon: TerminalIcon, label: getAgentPanelLabel(), shortcut: panelTerminalShortcut },
+                    terminal: { id: 'terminal', icon: TerminalIcon, label: 'Agent', shortcut: panelTerminalShortcut },
                     browser: { id: 'browser', icon: Globe, label: 'Browser', shortcut: panelBrowserShortcut },
                     editor: { id: 'editor', icon: FileCode, label: 'Editor', shortcut: panelEditorShortcut },
                     assets: { id: 'assets', icon: Paperclip, label: 'Assets', shortcut: panelAssetsShortcut },

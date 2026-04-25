@@ -3,7 +3,7 @@ import { ChevronRight, Cpu, FileCode, GitCompare, Globe, GripVertical, Paperclip
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core'
 import { SortableContext, sortableKeyboardCoordinates, useSortable, arrayMove, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { Button, Input, Label, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectSeparator, Switch, Tooltip, TooltipContent, TooltipTrigger, IconButton, getAgentPanelLabel } from '@slayzone/ui'
+import { Button, Input, Label, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectSeparator, Switch, Tooltip, TooltipContent, TooltipTrigger, IconButton } from '@slayzone/ui'
 import type { PanelConfig, PanelView, WebPanelDefinition, GitTabId, GitTabVisibility } from '@slayzone/task/shared'
 import type { TerminalMode, TerminalModeInfo } from '@slayzone/terminal/shared'
 import { DEFAULT_PANEL_CONFIG, DEFAULT_GIT_TAB_ORDER, GIT_TAB_LABELS, isGitTabEnabled, isPanelEnabled, inferHostScopeFromUrl, inferProtocolFromUrl, mergePanelOrder, mergePredefinedWebPanels, normalizeDesktopProtocol, normalizeGitTabOrder, normalizeGitTabVisibility, validatePanelShortcut } from '@slayzone/task/shared'
@@ -35,7 +35,7 @@ function buildPanelRowDescriptors(
 ): Map<string, PanelRowDescriptor> {
   const m = new Map<string, PanelRowDescriptor>()
   m.set('terminal', {
-    icon: SquareTerminal, label: getAgentPanelLabel(),
+    icon: SquareTerminal, label: 'Agent',
     homeToggle: null,
     taskToggle: { enabled: isPanelEnabled(panelConfig, 'terminal', 'task'), onChange: c => togglePanel('terminal', 'task', c) },
     onClick: () => navigateTo('panels/terminal'),
@@ -526,9 +526,9 @@ export function PanelsSettingsTab({ activeTab, navigateTo, modes, defaultTermina
 
       {activeTab === 'panels/terminal' && (
         <div className="rounded-lg border p-5 space-y-6">
-          <PanelBreadcrumb label={getAgentPanelLabel()} onBack={() => navigateTo('panels')} />
+          <PanelBreadcrumb label="Agent" onBack={() => navigateTo('panels')} />
           <div className="flex items-center justify-between">
-            <Label className="text-base font-semibold">{getAgentPanelLabel()}</Label>
+            <Label className="text-base font-semibold">Agent</Label>
             <Switch checked={isPanelEnabled(panelConfig, 'terminal', 'task')} onCheckedChange={(c) => togglePanel('terminal', 'task', c)} />
           </div>
           <div className="space-y-3">

@@ -420,10 +420,6 @@ export interface ElectronAPI {
     isJiraIntegrationEnabledSync: boolean
     isLoopModeEnabled: () => Promise<boolean>
     isLoopModeEnabledSync: boolean
-    isAgentManagerEnabled: () => Promise<boolean>
-    isAgentManagerEnabledSync: boolean
-    isAgentPanelLabelEnabled: () => Promise<boolean>
-    isAgentPanelLabelEnabledSync: boolean
     getZoomFactor: () => Promise<number>
     adjustZoom: (command: 'in' | 'out' | 'reset') => Promise<number>
     isPlaywright: boolean
