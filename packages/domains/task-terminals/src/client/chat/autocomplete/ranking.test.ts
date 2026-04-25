@@ -70,6 +70,18 @@ test('alphabetical tiebreak in same score bucket', () => {
   assertEqual(out[0].name, 'caveman-commit')
 })
 
+test('fuzzy match — non-contiguous chars', () => {
+  const out = rankByName(pool, 'cmt', { getName: (i) => i.name })
+  // 'commit' and 'caveman-commit' both contain c…m…t fuzzily
+  assertEqual(out.some((i) => i.name === 'commit'), true)
+  assertEqual(out.some((i) => i.name === 'caveman-commit'), true)
+})
+
+test('fuzzy match — case-insensitive', () => {
+  const out = rankByName(pool, 'CAVE', { getName: (i) => i.name })
+  assertEqual(out[0].name, 'caveman')
+})
+
 console.log('\ntransformCommandSubmit')
 
 function cmd(name: string, body: string): CommandInfo {

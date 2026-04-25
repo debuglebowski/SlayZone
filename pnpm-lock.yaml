@@ -986,6 +986,9 @@ importers:
       electron:
         specifier: ^41.0.0
         version: 41.0.3
+      fzf:
+        specifier: ^0.5.2
+        version: 0.5.2
       lucide-react:
         specifier: ^0.562.0
         version: 0.562.0(react@19.2.3)

@@ -1,10 +1,18 @@
 /**
- * Generic prefix > substring > description scoring, alphabetical tiebreak.
- * Shared by skills / commands / agents / builtins sources.
+ * Fuzzy ranking via fzf — name matches outrank description matches,
+ * alphabetical tiebreak. Shared by skills / commands / agents / builtins.
  */
+import { Fzf } from 'fzf'
+
 export interface RankAccessors<Item> {
   getName: (item: Item) => string
   getDescription?: (item: Item) => string
+}
+
+// fzf's `U extends string` conditional options typing breaks under generics — safe cast.
+function makeFzf<T>(items: T[], selector: (t: T) => string): Fzf<readonly T[]> {
+  type AnyCtor = new (list: readonly T[], opts: unknown) => Fzf<readonly T[]>
+  return new (Fzf as unknown as AnyCtor)(items, { selector, casing: 'case-insensitive' })
 }
 
 export function rankByName<Item>(
@@ -12,23 +20,29 @@ export function rankByName<Item>(
   query: string,
   accessors: RankAccessors<Item>
 ): Item[] {
-  if (!query) {
-    return [...items].sort((a, b) =>
-      accessors.getName(a).localeCompare(accessors.getName(b))
-    )
-  }
-  const q = query.toLowerCase()
   const { getName, getDescription } = accessors
-  return items
-    .map((item) => {
-      const name = getName(item).toLowerCase()
-      let score = 0
-      if (name.startsWith(q)) score = 3
-      else if (name.includes(q)) score = 2
-      else if (getDescription && getDescription(item).toLowerCase().includes(q)) score = 1
-      return { item, score, name: getName(item) }
-    })
-    .filter((x) => x.score > 0)
-    .sort((a, b) => b.score - a.score || a.name.localeCompare(b.name))
-    .map((x) => x.item)
+
+  if (!query) {
+    return [...items].sort((a, b) => getName(a).localeCompare(getName(b)))
+  }
+
+  const nameHits = makeFzf(items, getName).find(query)
+  const matched = new Set<Item>(nameHits.map((h) => h.item))
+
+  const merged: { item: Item; score: number }[] = nameHits.map((h) => ({
+    item: h.item,
+    score: h.score,
+  }))
+
+  if (getDescription) {
+    const pool = items.filter((i) => !matched.has(i))
+    for (const h of makeFzf(pool, getDescription).find(query)) {
+      merged.push({ item: h.item, score: 0 })
+    }
+  }
+
+  merged.sort(
+    (a, b) => b.score - a.score || getName(a.item).localeCompare(getName(b.item))
+  )
+  return merged.map((m) => m.item)
 }
