@@ -16,7 +16,7 @@ import type { RenderMode, TaskAsset, AssetFolder } from '@slayzone/task/shared'
 import { getEffectiveRenderMode, getExtensionFromTitle, RENDER_MODE_INFO, isBinaryRenderMode, canExportAsPdf, canExportAsPng, canExportAsHtml } from '@slayzone/task/shared'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
-import { mermaidCodeOverride } from '@slayzone/markdown/client'
+import { MermaidBlock, mermaidCodeOverride } from '@slayzone/markdown/client'
 
 const markdownComponents = { code: mermaidCodeOverride }
 import { useAppearance, getThemeEditorColors, type EditorThemeColors } from '@slayzone/ui'
@@ -444,22 +444,6 @@ function AssetContentEditor({ asset, viewMode, zoomLevel, onZoom, readContent, s
 // --- Preview pane ---
 
 function AssetPreview({ renderMode, content, zoomLevel = 1, onZoom }: { renderMode: RenderMode; content: string; zoomLevel?: number; onZoom?: (fn: (z: number) => number) => void }) {
-  const [mermaidSvg, setMermaidSvg] = useState<string | null>(null)
-
-  useEffect(() => {
-    if (renderMode !== 'mermaid-preview' || !content.trim()) { setMermaidSvg(null); return }
-    let cancelled = false
-    import('mermaid').then(async (mod) => {
-      const mermaid = mod.default
-      mermaid.initialize({ startOnLoad: false, theme: 'dark' })
-      try {
-        const { svg } = await mermaid.render(`mermaid-preview-${Date.now()}`, content)
-        if (!cancelled) setMermaidSvg(svg)
-      } catch { if (!cancelled) setMermaidSvg(null) }
-    }).catch(() => {})
-    return () => { cancelled = true }
-  }, [renderMode, content])
-
   const handleWheel = useCallback((e: React.WheelEvent) => {
     if (!e.metaKey && !e.ctrlKey) return
     e.preventDefault()
@@ -471,7 +455,7 @@ function AssetPreview({ renderMode, content, zoomLevel = 1, onZoom }: { renderMo
   const zoomStyle = zoomLevel !== 1 ? { transform: `scale(${zoomLevel})`, transformOrigin: 'top left' } : undefined
 
   if (renderMode === 'svg-preview') return <div className="flex-1 p-4 overflow-auto" onWheel={handleWheel}><div style={zoomStyle} dangerouslySetInnerHTML={{ __html: content }} /></div>
-  if (renderMode === 'mermaid-preview' && mermaidSvg) return <div className="flex-1 p-4 overflow-auto" onWheel={handleWheel}><div style={zoomStyle} dangerouslySetInnerHTML={{ __html: mermaidSvg }} /></div>
+  if (renderMode === 'mermaid-preview' && content.trim()) return <div className="flex-1 p-4 overflow-auto" onWheel={handleWheel}><div style={zoomStyle}><MermaidBlock code={content} /></div></div>
   return null
 }
 
