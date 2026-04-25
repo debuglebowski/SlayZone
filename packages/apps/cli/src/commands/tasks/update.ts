@@ -1,4 +1,5 @@
-import { openDb, notifyApp } from '../../db'
+import { openDb } from '../../db'
+import { apiPatch } from '../../api'
 import { resolveStatusId } from '@slayzone/projects/shared'
 import { validateReparent, reparentErrorMessage, type ReparentTaskRow } from '@slayzone/task/shared/reparent-validation'
 import { getProjectColumnsConfig, resolveId } from './_shared'
@@ -54,8 +55,6 @@ export async function updateAction(idPrefix: string | undefined, opts: UpdateOpt
       process.exit(1)
     }
   }
-  const sets: string[] = ['updated_at = :now']
-  const params: Record<string, string | number | null> = { ':now': new Date().toISOString(), ':id': task.id }
 
   let resolvedParentId: string | null | undefined
   if (opts.parent === false) {
@@ -90,18 +89,18 @@ export async function updateAction(idPrefix: string | undefined, opts: UpdateOpt
     }
   }
 
-  if (opts.title)       { sets.push('title = :title');             params[':title'] = opts.title }
-  if (opts.description !== undefined) { sets.push('description = :description'); params[':description'] = opts.description || null }
-  if (opts.appendDescription) { sets.push('description = :description'); params[':description'] = (task.description ?? '') + '\n' + opts.appendDescription }
-  if (resolvedStatus)   { sets.push('status = :status');           params[':status'] = resolvedStatus }
-  if (opts.priority)    { sets.push('priority = :priority');       params[':priority'] = parseInt(opts.priority, 10) }
-  if (typeof opts.due === 'string') { sets.push('due_date = :dueDate'); params[':dueDate'] = opts.due }
-  else if (opts.due === false)      { sets.push('due_date = NULL') }
-  if (resolvedParentId !== undefined) { sets.push('parent_id = :parentId'); params[':parentId'] = resolvedParentId }
-  if (opts.permanent)   { sets.push('is_temporary = 0') }
+  const body: Record<string, unknown> = {}
+  if (opts.title !== undefined) body.title = opts.title
+  if (opts.description !== undefined) body.description = opts.description || null
+  if (opts.appendDescription !== undefined) body.description = (task.description ?? '') + '\n' + opts.appendDescription
+  if (resolvedStatus) body.status = resolvedStatus
+  if (opts.priority) body.priority = parseInt(opts.priority, 10)
+  if (typeof opts.due === 'string') body.dueDate = opts.due
+  else if (opts.due === false) body.dueDate = null
+  if (resolvedParentId !== undefined) body.parentId = resolvedParentId
+  if (opts.permanent) body.isTemporary = false
 
-  db.run(`UPDATE tasks SET ${sets.join(', ')} WHERE id = :id`, params)
   db.close()
-  await notifyApp()
+  await apiPatch<{ ok: boolean; data: { id: string; title: string } }>(`/api/tasks/${task.id}`, body)
   console.log(`Updated: ${task.id.slice(0, 8)}  ${opts.title ?? task.title}`)
 }

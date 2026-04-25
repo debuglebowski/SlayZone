@@ -1,4 +1,5 @@
-import { openDb, notifyApp } from '../../db'
+import { openDb } from '../../db'
+import { apiPost } from '../../api'
 
 export async function archiveAction(idPrefix: string): Promise<void> {
   const db = openDb()
@@ -15,12 +16,8 @@ export async function archiveAction(idPrefix: string): Promise<void> {
   }
 
   const task = tasks[0]
-  db.run(`UPDATE tasks SET archived_at = :now, updated_at = :now WHERE id = :id`, {
-    ':now': new Date().toISOString(),
-    ':id': task.id,
-  })
-
   db.close()
-  await notifyApp()
+
+  await apiPost<{ ok: boolean; data: { id: string; title: string } }>(`/api/tasks/${task.id}/archive`, {})
   console.log(`Archived: ${task.id.slice(0, 8)}  ${task.title}`)
 }

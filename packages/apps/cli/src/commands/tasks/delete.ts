@@ -1,4 +1,7 @@
-import { openDb, notifyApp } from '../../db'
+import { openDb } from '../../db'
+import { apiDelete } from '../../api'
+
+type DeleteTaskOutput = boolean | { blocked: true; reason: 'linked_to_provider' }
 
 export async function deleteAction(idPrefix: string): Promise<void> {
   const db = openDb()
@@ -15,8 +18,14 @@ export async function deleteAction(idPrefix: string): Promise<void> {
   }
 
   const task = tasks[0]
-  db.run(`DELETE FROM tasks WHERE id = :id`, { ':id': task.id })
   db.close()
-  await notifyApp()
+
+  const { data } = await apiDelete<{ ok: true; data: DeleteTaskOutput }>(`/api/tasks/${task.id}`)
+
+  if (typeof data === 'object' && data.blocked) {
+    console.error(`Cannot delete: linked to external provider. Unlink first.`)
+    process.exit(1)
+  }
+
   console.log(`Deleted: ${task.id.slice(0, 8)}  ${task.title}`)
 }

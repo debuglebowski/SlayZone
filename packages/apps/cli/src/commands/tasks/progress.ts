@@ -1,4 +1,5 @@
-import { openDb, notifyApp } from '../../db'
+import { openDb } from '../../db'
+import { apiPatch } from '../../api'
 import { resolveId } from './_shared'
 
 export async function progressAction(idOrValue: string, value: string | undefined): Promise<void> {
@@ -21,6 +22,7 @@ export async function progressAction(idOrValue: string, value: string | undefine
     `SELECT id, title FROM tasks WHERE id LIKE :prefix || '%' LIMIT 2`,
     { ':prefix': idPrefix }
   )
+  db.close()
   if (tasks.length === 0) { console.error(`Task not found: ${idPrefix}`); process.exit(1) }
   if (tasks.length > 1) {
     console.error(`Ambiguous id prefix "${idPrefix}". Matches: ${tasks.map((t) => t.id.slice(0, 8)).join(', ')}`)
@@ -28,11 +30,6 @@ export async function progressAction(idOrValue: string, value: string | undefine
   }
   const task = tasks[0]
 
-  db.run(
-    `UPDATE tasks SET progress = :p, updated_at = :now WHERE id = :id`,
-    { ':p': n, ':now': new Date().toISOString(), ':id': task.id }
-  )
-  db.close()
-  await notifyApp()
+  await apiPatch(`/api/tasks/${task.id}`, { progress: n })
   console.log(`Progress ${n}%: ${task.id.slice(0, 8)}  ${task.title}`)
 }

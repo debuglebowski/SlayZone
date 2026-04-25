@@ -1,4 +1,5 @@
-import { openDb, notifyApp, postJson, getMcpPort } from '../../db'
+import { openDb, postJson, getMcpPort } from '../../db'
+import { apiPatch } from '../../api'
 import { getDoneStatus } from '@slayzone/projects/shared'
 import { getProjectColumnsConfig, resolveId } from './_shared'
 
@@ -27,14 +28,9 @@ export async function doneAction(idPrefix: string | undefined, opts: DoneOpts): 
   const task = tasks[0]
   const projectColumns = getProjectColumnsConfig(db, task.project_id)
   const doneStatus = getDoneStatus(projectColumns)
-  db.run(`UPDATE tasks SET status = :status, updated_at = :now WHERE id = :id`, {
-    ':status': doneStatus,
-    ':now': new Date().toISOString(),
-    ':id': task.id,
-  })
-
   db.close()
-  await notifyApp()
+
+  await apiPatch(`/api/tasks/${task.id}`, { status: doneStatus })
   console.log(`Done: ${task.id.slice(0, 8)}  ${task.title}`)
 
   if (opts.close) {

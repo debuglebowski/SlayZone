@@ -39,6 +39,14 @@ export function apiPost<T>(path: string, body: Record<string, unknown>): Promise
   })
 }
 
+export function apiPatch<T>(path: string, body: Record<string, unknown>): Promise<T> {
+  return request<T>(path, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+}
+
 export function apiDelete<T>(path: string): Promise<T> {
   return request<T>(path, { method: 'DELETE' })
 }
