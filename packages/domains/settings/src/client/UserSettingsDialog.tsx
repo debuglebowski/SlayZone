@@ -29,6 +29,8 @@ function TelemetrySettingsTab() {
   )
 }
 
+export type DefaultDisplayMode = 'xterm' | 'chat'
+
 interface UserSettingsDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
@@ -49,18 +51,46 @@ export function UserSettingsDialog({
   
   const [activeTab, setActiveTab] = useState(initialTab)
   const [defaultTerminalMode, setDefaultTerminalMode] = useState<TerminalMode>('claude-code')
+  const [defaultTabDisplayMode, setDefaultTabDisplayMode] = useState<DefaultDisplayMode>('xterm')
+  const [providerSupportsChat, setProviderSupportsChat] = useState(false)
 
   useEffect(() => {
     if (open) {
       window.api.settings.get('default_terminal_mode').then(m => {
         if (m) setDefaultTerminalMode(m as TerminalMode)
       })
+      window.api.settings.get('default_tab_display_mode').then(m => {
+        if (m === 'chat' || m === 'xterm') setDefaultTabDisplayMode(m)
+      })
     }
   }, [open])
+
+  useEffect(() => {
+    let cancelled = false
+    window.api.chat.supports(defaultTerminalMode).then(supported => {
+      if (cancelled) return
+      setProviderSupportsChat(supported)
+    })
+    return () => { cancelled = true }
+  }, [defaultTerminalMode])
+
+  useEffect(() => {
+    if (!providerSupportsChat && defaultTabDisplayMode === 'chat') {
+      setDefaultTabDisplayMode('xterm')
+      window.api.settings.set('default_tab_display_mode', 'xterm')
+      window.dispatchEvent(new CustomEvent('sz:settings-changed'))
+    }
+  }, [providerSupportsChat, defaultTabDisplayMode])
 
   const onDefaultTerminalModeChange = useCallback((mode: TerminalMode) => {
     setDefaultTerminalMode(mode)
     window.api.settings.set('default_terminal_mode', mode)
+    window.dispatchEvent(new CustomEvent('sz:settings-changed'))
+  }, [])
+
+  const onDefaultTabDisplayModeChange = useCallback((mode: DefaultDisplayMode) => {
+    setDefaultTabDisplayMode(mode)
+    window.api.settings.set('default_tab_display_mode', mode)
     window.dispatchEvent(new CustomEvent('sz:settings-changed'))
   }, [])
 
@@ -139,6 +169,9 @@ export function UserSettingsDialog({
                 modes={modes}
                 defaultTerminalMode={defaultTerminalMode}
                 onDefaultTerminalModeChange={onDefaultTerminalModeChange}
+                defaultTabDisplayMode={defaultTabDisplayMode}
+                onDefaultTabDisplayModeChange={onDefaultTabDisplayModeChange}
+                providerSupportsChat={providerSupportsChat}
               />
             )}
 
