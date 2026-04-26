@@ -73,7 +73,6 @@
     "fzf": "^0.5.2",
     "lucide-react": "^0.562.0",
     "node-pty": "^1.1.0",
-    "posix": "^4.2.0",
     "react": "^19.2.1",
     "react-dom": "^19.2.1",
     "react-hotkeys-hook": "^5.2.3",
@@ -108,5 +107,8 @@
     "typescript": "^5.9.3",
     "vite": "^7.2.6",
     "vitest": "^4.1.0"
+  },
+  "optionalDependencies": {
+    "posix": "^4.2.0"
   }
 }
