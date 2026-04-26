@@ -55,9 +55,7 @@
     "ignore": "^5.3.2",
     "lezer-toml": "^1.0.0",
     "lucide-react": "^0.562.0",
-    "react-markdown": "^10.1.0",
-    "remark-frontmatter": "^5.0.0",
-    "remark-gfm": "^4.0.1"
+    "remark-frontmatter": "^5.0.0"
   },
   "peerDependencies": {
     "electron": "^41.0.0",

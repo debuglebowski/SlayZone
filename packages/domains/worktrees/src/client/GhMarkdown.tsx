@@ -1,7 +1,4 @@
-import ReactMarkdown from 'react-markdown'
-import remarkGfm from 'remark-gfm'
-import rehypeRaw from 'rehype-raw'
-import { mermaidCodeOverride } from '@slayzone/markdown/client'
+import { Markdown } from '@slayzone/markdown/client'
 
 const PROSE_CLASSES = `prose prose-sm dark:prose-invert max-w-none
   [&>*:first-child]:mt-0 [&>*:last-child]:mb-0
@@ -24,14 +21,10 @@ const PROSE_CLASSES = `prose prose-sm dark:prose-invert max-w-none
   [&_th:last-child]:border-r-0 [&_td:last-child]:border-r-0
   [&_tr:last-child_td]:border-b-0`
 
-const components = { code: mermaidCodeOverride }
-
 export function GhMarkdown({ children }: { children: string }) {
   return (
     <div className={PROSE_CLASSES}>
-      <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]} components={components}>
-        {children}
-      </ReactMarkdown>
+      <Markdown>{children}</Markdown>
     </div>
   )
 }
