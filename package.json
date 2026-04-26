@@ -17,6 +17,13 @@
     },
     "patchedDependencies": {
       "@convex-dev/auth@0.0.90": "patches/@convex-dev__auth@0.0.90.patch"
+    },
+    "packageExtensions": {
+      "posix": {
+        "os": [
+          "!win32"
+        ]
+      }
     }
   },
   "scripts": {

@@ -9,6 +9,8 @@ overrides:
   d3-shape>d3-path: ^3.1.0
   node-abi: ^4.28.0
 
+packageExtensionsChecksum: sha256-jUk5VF9qbi99TkQDCY+e7pqw0r20hfZY+RnkrVX6uFY=
+
 patchedDependencies:
   '@convex-dev/auth@0.0.90':
     hash: 0c3e8e26d92487746d8386f64a1cbe43ed88dfae62fa69fb4738e07d90520256
