@@ -590,15 +590,9 @@ importers:
       lucide-react:
         specifier: ^0.562.0
         version: 0.562.0(react@19.2.3)
-      react-markdown:
-        specifier: ^10.1.0
-        version: 10.1.0(@types/react@19.2.8)(react@19.2.3)
       remark-frontmatter:
         specifier: ^5.0.0
         version: 5.0.0
-      remark-gfm:
-        specifier: ^4.0.1
-        version: 4.0.1
     devDependencies:
       '@testing-library/react':
         specifier: ^16.3.0
@@ -903,12 +897,6 @@ importers:
       react-hook-form:
         specifier: ^7.71.1
         version: 7.71.1(react@19.2.3)
-      react-markdown:
-        specifier: ^10.1.0
-        version: 10.1.0(@types/react@19.2.8)(react@19.2.3)
-      remark-gfm:
-        specifier: ^4.0.1
-        version: 4.0.1
       zod:
         specifier: ^4
         version: 4.3.5
@@ -1296,15 +1284,6 @@ importers:
       react:
         specifier: ^19.0.0
         version: 19.2.3
-      react-markdown:
-        specifier: ^10.1.0
-        version: 10.1.0(@types/react@19.2.8)(react@19.2.3)
-      rehype-raw:
-        specifier: ^7.0.0
-        version: 7.0.0
-      remark-gfm:
-        specifier: ^4.0.1
-        version: 4.0.1
     devDependencies:
       '@types/better-sqlite3':
         specifier: ^7.6.13
@@ -1392,6 +1371,15 @@ importers:
       mermaid:
         specifier: ^11.13.0
         version: 11.13.0
+      react-markdown:
+        specifier: ^10.1.0
+        version: 10.1.0(@types/react@19.2.8)(react@19.2.3)
+      rehype-raw:
+        specifier: ^7.0.0
+        version: 7.0.0
+      remark-gfm:
+        specifier: ^4.0.1
+        version: 4.0.1
     devDependencies:
       '@testing-library/react':
         specifier: ^16.3.0

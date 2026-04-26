@@ -50,8 +50,6 @@
     "lucide-react": "^0.562.0",
     "marked": "^15.0.0",
     "react-hook-form": "^7.71.1",
-    "react-markdown": "^10.1.0",
-    "remark-gfm": "^4.0.1",
     "zod": "^4.3.5"
   },
   "peerDependencies": {

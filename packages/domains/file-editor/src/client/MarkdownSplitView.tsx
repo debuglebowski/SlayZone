@@ -1,12 +1,8 @@
-import ReactMarkdown from 'react-markdown'
-import remarkGfm from 'remark-gfm'
 import { useState, useEffect, type CSSProperties } from 'react'
-import { mermaidCodeOverride } from '@slayzone/markdown/client'
+import { Markdown } from '@slayzone/markdown/client'
 import { useTheme } from '@slayzone/settings/client'
 import { getThemeEditorColors, useAppearance } from '@slayzone/ui'
 import { CodeEditor } from './CodeEditor'
-
-const markdownComponents = { code: mermaidCodeOverride }
 
 interface MarkdownSplitViewProps {
   filePath: string
@@ -59,9 +55,7 @@ export function MarkdownSplitView({ filePath, content, onChange, onSave, version
         <div className="mk-doc" data-readability={notesReadability} data-width={notesWidth} style={themeStyle}>
           <div className="mk-doc-scroll">
             <div className="mk-doc-body">
-              <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
-                {previewContent}
-              </ReactMarkdown>
+              <Markdown>{previewContent}</Markdown>
             </div>
           </div>
         </div>
