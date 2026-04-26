@@ -256,7 +256,8 @@ jobs:
         shell: bash
         run: |
           node -e "const fs=require('fs'),p='packages/apps/app/package.json',pkg=JSON.parse(fs.readFileSync(p));if(pkg.optionalDependencies)delete pkg.optionalDependencies.posix;if(pkg.dependencies)delete pkg.dependencies.posix;fs.writeFileSync(p,JSON.stringify(pkg,null,2)+'\n')"
-          rm -rf packages/apps/app/node_modules/posix node_modules/.pnpm/posix@*
+          find node_modules -name posix -prune -exec rm -rf {} + 2>/dev/null || true
+          find packages/apps/app/node_modules -name posix -prune -exec rm -rf {} + 2>/dev/null || true
 
       - name: Package
         shell: bash
