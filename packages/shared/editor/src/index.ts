@@ -1,4 +1,6 @@
 export { RichTextEditor, type Editor } from './rich-text-editor'
+export { useImagePasteDrop, extractImageFilesFromDataTransfer, type UseImagePasteDropOpts, type UseImagePasteDropReturn } from './use-image-paste-drop'
+export { useAssetUpload, type AssetRef, type UseAssetUploadReturn } from './use-asset-upload'
 export { taskListPlugin } from './milkdown-task-list'
 export {
   createSearchHighlightPlugin,

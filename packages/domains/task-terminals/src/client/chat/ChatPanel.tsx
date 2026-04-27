@@ -17,6 +17,7 @@ import { cn, toast } from '@slayzone/ui'
 import { ConfirmDisplayModeDialog } from '../ConfirmDisplayModeDialog'
 import type { TabDisplayMode } from '../../shared/types'
 import { useChatSession, PulseGrid, type TimelineItem } from '@slayzone/terminal/client'
+import { useImagePasteDrop, useAssetUpload, type AssetRef } from '@slayzone/editor'
 import { AutocompleteMenu } from './autocomplete/AutocompleteMenu'
 import { useAutocomplete } from './autocomplete/useAutocomplete'
 import { createSkillsSource } from './autocomplete/sources/skills'
@@ -109,8 +110,17 @@ export function ChatPanel(props: ChatPanelProps) {
   const [collapseSignal, setCollapseSignal] = useState(0)
   const [finalOnly, setFinalOnly] = useState(false)
   const [queuedMessages, setQueuedMessages] = useState<string[]>([])
+  const [attachments, setAttachments] = useState<AssetRef[]>([])
   const listRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+
+  const { uploadFiles: uploadImageFiles, getFilePath: getAssetFilePath } = useAssetUpload(taskId)
+
+  const imagePasteDrop = useImagePasteDrop<AssetRef>({
+    onUpload: uploadImageFiles,
+    onInsert: (results) => setAttachments((prev) => [...prev, ...results]),
+    onError: (err) => toast(`Image upload failed: ${err instanceof Error ? err.message : String(err)}`),
+  })
 
   const chatApi = useMemo<ChatActions>(() => {
     const api = (window as unknown as {
@@ -308,7 +318,8 @@ export function ChatPanel(props: ChatPanelProps) {
 
   const handleSend = useCallback(async () => {
     const text = draft.trim()
-    if (!text || state.sessionEnded) return
+    if (state.sessionEnded) return
+    if (!text && attachments.length === 0) return
 
     // Builtin `/effort <level>` — update session flags + restart. Doesn't send to chat.
     const effortMatch = /^\/effort\s+(\S+)\s*$/.exec(text)
@@ -338,8 +349,29 @@ export function ChatPanel(props: ChatPanelProps) {
 
     // Allow sources (e.g. commands) to transform `/cmdname args` into expanded template.
     const transform = autocomplete.transformSubmit(text)
-    const toSend = transform?.send ?? text
+    let toSend = transform?.send ?? text
+
+    // Materialize image attachments to abs filesystem paths and prepend to message.
+    if (attachments.length > 0) {
+      const resolved = await Promise.all(
+        attachments.map(async (a) => {
+          const p = await getAssetFilePath(a.id)
+          return { ref: a, path: p }
+        })
+      )
+      const missing = resolved.filter((r) => r.path === null)
+      if (missing.length > 0) {
+        toast(`${missing.length} image${missing.length === 1 ? '' : 's'} no longer available — skipping`)
+      }
+      const imageRefs = resolved
+        .filter((r): r is { ref: AssetRef; path: string } => r.path !== null)
+        .map((r) => `![${r.ref.title}](${r.path})`)
+        .join('\n')
+      toSend = imageRefs + (toSend ? `\n\n${toSend}` : '')
+    }
+
     setDraft('')
+    setAttachments([])
     if (!toSend) return
     // If a turn is in flight, queue for later. Drain effect flushes when inFlight drops.
     if (inFlight) {
@@ -347,7 +379,7 @@ export function ChatPanel(props: ChatPanelProps) {
       return
     }
     await sendMessage(toSend)
-  }, [draft, inFlight, state.sessionEnded, sendMessage, autocomplete, chatApi, tabId, taskId, mode, cwd, providerFlagsOverride])
+  }, [draft, attachments, getAssetFilePath, inFlight, state.sessionEnded, sendMessage, autocomplete, chatApi, tabId, taskId, mode, cwd, providerFlagsOverride])
 
   // Drain queue: when the active turn finishes, send the next queued message.
   useEffect(() => {
@@ -522,13 +554,66 @@ export function ChatPanel(props: ChatPanelProps) {
             </ul>
           </div>
         )}
+        {attachments.length > 0 && (
+          <div className="flex flex-wrap gap-1.5 mb-1.5 px-1">
+            {attachments.map((a, i) => (
+              <span
+                key={`${a.id}-${i}`}
+                className="inline-flex items-center gap-1 rounded-md border border-border/60 bg-muted/40 px-1.5 py-0.5 text-[11px] text-muted-foreground"
+                title={a.title}
+              >
+                <span className="max-w-[160px] truncate">{a.title}</span>
+                <button
+                  type="button"
+                  onClick={() => setAttachments((prev) => prev.filter((_, idx) => idx !== i))}
+                  className="rounded p-0.5 hover:bg-destructive/15 hover:text-destructive transition-colors"
+                  aria-label="Remove attachment"
+                >
+                  <XIcon className="size-2.5" />
+                </button>
+              </span>
+            ))}
+            {imagePasteDrop.isUploading && (
+              <span className="text-[11px] text-muted-foreground/60">uploading…</span>
+            )}
+          </div>
+        )}
         <div
           className={cn(
             'relative flex items-center gap-2 rounded-2xl bg-muted/40 ring-1 ring-border/60 px-3 py-1.5 transition-shadow',
             'focus-within:ring-2 focus-within:ring-primary/40 focus-within:bg-background',
-            displaySessionEnded && 'opacity-50 pointer-events-none'
+            displaySessionEnded && 'opacity-50 pointer-events-none',
+            imagePasteDrop.isDragging && 'ring-2 ring-primary/60 bg-primary/5'
           )}
+          onDragEnter={(e) => {
+            if (e.dataTransfer?.types.includes('Files')) {
+              e.preventDefault()
+              imagePasteDrop.onDragEnter()
+            }
+          }}
+          onDragOver={(e) => {
+            if (e.dataTransfer?.types.includes('Files')) e.preventDefault()
+          }}
+          onDragLeave={() => imagePasteDrop.onDragLeave()}
+          onDrop={(e) => {
+            const files = imagePasteDrop.extractImageFiles(e.dataTransfer)
+            imagePasteDrop.resetDrag()
+            if (files.length === 0) return
+            e.preventDefault()
+            void imagePasteDrop.handleFiles(files)
+          }}
+          onPaste={(e) => {
+            const files = imagePasteDrop.extractImageFiles(e.clipboardData)
+            if (files.length === 0) return
+            e.preventDefault()
+            void imagePasteDrop.handleFiles(files)
+          }}
         >
+          {imagePasteDrop.isDragging && (
+            <div className="absolute inset-0 z-10 flex items-center justify-center pointer-events-none rounded-2xl text-xs text-primary/80">
+              Drop image…
+            </div>
+          )}
           {autocomplete.show && autocomplete.active && (
             <AutocompleteMenu
               active={autocomplete.active}
@@ -578,10 +663,10 @@ export function ChatPanel(props: ChatPanelProps) {
               onClick={() => {
                 void handleSend()
               }}
-              disabled={!draft.trim() || displaySessionEnded}
+              disabled={(!draft.trim() && attachments.length === 0) || displaySessionEnded || imagePasteDrop.isUploading}
               className={cn(
                 'shrink-0 size-8 rounded-full flex items-center justify-center transition-colors',
-                draft.trim() && !displaySessionEnded
+                (draft.trim() || attachments.length > 0) && !displaySessionEnded && !imagePasteDrop.isUploading
                   ? 'bg-primary text-primary-foreground hover:bg-primary/90'
                   : 'bg-muted text-muted-foreground cursor-not-allowed'
               )}

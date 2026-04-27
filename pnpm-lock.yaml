@@ -963,6 +963,9 @@ importers:
 
   packages/domains/task-terminals:
     dependencies:
+      '@slayzone/editor':
+        specifier: workspace:*
+        version: link:../../shared/editor
       '@slayzone/settings':
         specifier: workspace:*
         version: link:../settings

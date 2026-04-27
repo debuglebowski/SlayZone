@@ -170,3 +170,23 @@ export function createAssetLinkPlugin(
 
   return { assetLinkDecoPlugin, assetMentionPlugin, insertAssetLink }
 }
+
+/** Insert an asset link at the current selection without needing mention state. */
+export function insertAssetLinkAtCursor(view: EditorView, assetId: string, assetTitle: string): void {
+  const { state } = view
+  const { from, to } = state.selection
+  const href = `${ASSET_LINK_PREFIX}${assetId}`
+  const linkMark = state.schema.marks.link?.create({ href })
+  if (linkMark) {
+    const tr = state.tr
+      .delete(from, to)
+      .insertText(assetTitle, from)
+      .addMark(from, from + assetTitle.length, linkMark)
+    view.dispatch(tr)
+  } else {
+    const linkMarkdown = `[${assetTitle}](${href})`
+    const tr = state.tr.replaceWith(from, to, state.schema.text(linkMarkdown))
+    view.dispatch(tr)
+  }
+  view.focus()
+}

@@ -310,6 +310,7 @@ export interface ElectronAPI {
     getMtime: (id: string) => Promise<number | null>
     onContentChanged: (callback: (assetId: string) => void) => () => void
     upload: (data: { taskId: string; sourcePath: string; title?: string }) => Promise<TaskAsset>
+    uploadBlob: (data: { taskId: string; title: string; bytes: Uint8Array; folderId?: string | null }) => Promise<TaskAsset | null>
     pasteFiles: (data: { sourcePaths: string[]; destTaskId: string; destFolderId: string | null }) => Promise<TaskAsset[]>
     getFileSize: (id: string) => Promise<number | null>
     cleanupTask: (taskId: string) => Promise<void>

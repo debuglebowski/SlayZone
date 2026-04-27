@@ -4,6 +4,7 @@ import { IconArrowsVertical, IconArrowsMaximize } from '@tabler/icons-react'
 import { DescriptionDialog } from './DescriptionDialog'
 import { AssetsPanel, type AssetsPanelHandle } from './AssetsPanel'
 import { useAssets } from './useAssets'
+import { useAssetUpload } from '@slayzone/editor'
 import { DndContext, PointerSensor, useSensors, useSensor, closestCenter } from '@dnd-kit/core'
 import { SortableContext, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
@@ -302,6 +303,11 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
 
   // Assets
   const { assets } = useAssets(task?.id)
+  const { uploadFiles: uploadImageFiles } = useAssetUpload(task?.id)
+  const handleUploadImages = useCallback(async (files: File[]) => {
+    const uploaded = await uploadImageFiles(files)
+    return uploaded.map((a) => ({ id: a.id, title: a.title }))
+  }, [uploadImageFiles])
   const [addingSubTask, setAddingSubTask] = useState(false)
   const [subTaskTitle, setSubTaskTitle] = useState('')
   const subTaskInputRef = useRef<HTMLInputElement>(null)
@@ -2511,6 +2517,7 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
                     if (!panelVisibility.assets) handlePanelToggle('assets', true)
                     assetsPanelRef.current?.selectAsset(assetId)
                   }}
+                  onUploadImages={handleUploadImages}
                 />
               </div>
             )}
@@ -2850,6 +2857,7 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
           if (!panelVisibility.assets) handlePanelToggle('assets', true)
           assetsPanelRef.current?.selectAsset(assetId)
         }}
+        onUploadImages={handleUploadImages}
       />
 
     </div>

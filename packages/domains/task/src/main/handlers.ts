@@ -415,6 +415,46 @@ export function registerTaskHandlers(ipcMain: IpcMain, db: Database, onMutation?
     return statSync(filePath).size
   })
 
+  ipcMain.handle('db:assets:uploadBlob', (_, data: { taskId: string; title: string; bytes: Uint8Array; folderId?: string | null }): TaskAsset | null => {
+    const id = randomUUID()
+    const folderId = data.folderId ?? null
+
+    const siblingTitles = new Set<string>(
+      (db.prepare(
+        folderId
+          ? 'SELECT title FROM task_assets WHERE task_id = ? AND folder_id = ?'
+          : 'SELECT title FROM task_assets WHERE task_id = ? AND folder_id IS NULL'
+      ).all(...(folderId ? [data.taskId, folderId] : [data.taskId])) as { title: string }[]).map((r) => r.title)
+    )
+    const title = uniqueName(data.title, siblingTitles)
+
+    const maxOrder = (db.prepare(
+      folderId
+        ? 'SELECT MAX("order") as m FROM task_assets WHERE task_id = ? AND folder_id = ?'
+        : 'SELECT MAX("order") as m FROM task_assets WHERE task_id = ? AND folder_id IS NULL'
+    ).get(...(folderId ? [data.taskId, folderId] : [data.taskId])) as { m: number | null }).m ?? -1
+
+    db.prepare(`
+      INSERT INTO task_assets (id, task_id, folder_id, title, "order")
+      VALUES (?, ?, ?, ?, ?)
+    `).run(id, data.taskId, folderId, title, maxOrder + 1)
+
+    const filePath = getAssetFilePath(data.taskId, id, title)
+    mkdirSync(path.dirname(filePath), { recursive: true })
+    const buf = Buffer.from(data.bytes)
+    writeFileSync(filePath, buf)
+
+    createVersion(db, versionTxn, blobStore, {
+      assetId: id,
+      bytes: buf,
+      author: uiAuthor,
+    })
+
+    onMutation?.()
+    const row = db.prepare('SELECT * FROM task_assets WHERE id = ?').get(id) as Record<string, unknown> | undefined
+    return parseAsset(row)
+  })
+
   ipcMain.handle('db:assets:uploadDir', (_, data: { taskId: string; dirPath: string; parentFolderId: string | null }) => {
     const createdFolders: ReturnType<typeof parseFolder>[] = []
     const createdAssets: ReturnType<typeof parseAsset>[] = []

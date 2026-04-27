@@ -88,6 +88,7 @@ const api: ElectronAPI = {
       return () => ipcRenderer.removeListener('assets:content-changed', handler)
     },
     upload: (data) => ipcRenderer.invoke('db:assets:upload', data),
+    uploadBlob: (data) => ipcRenderer.invoke('db:assets:uploadBlob', data),
     pasteFiles: (data) => ipcRenderer.invoke('db:assets:pasteFiles', data),
     getFileSize: (id) => ipcRenderer.invoke('db:assets:getFileSize', id),
     cleanupTask: (taskId) => ipcRenderer.invoke('db:assets:cleanupTask', taskId),

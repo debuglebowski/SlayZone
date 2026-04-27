@@ -13,7 +13,8 @@ import { createPlaceholderPlugin } from './milkdown-placeholder'
 import { listItemMovePlugin } from './milkdown-list-move'
 import { escapeBlurPlugin } from './milkdown-escape-blur'
 import { taskListPlugin } from './milkdown-task-list'
-import { createAssetLinkPlugin, type AssetMentionState } from './milkdown-asset-link'
+import { createAssetLinkPlugin, insertAssetLinkAtCursor, type AssetMentionState } from './milkdown-asset-link'
+import { extractImageFilesFromDataTransfer } from './use-image-paste-drop'
 import { createSearchHighlightPlugin, setSearch as setMilkdownSearch } from './milkdown-search-highlight'
 import { AssetPicker, type AssetPickerItem } from './AssetPicker'
 
@@ -118,6 +119,8 @@ interface RichTextEditorProps {
   searchRegex?: boolean
   /** Called when the number of matches changes. */
   onSearchMatchCountChange?: (count: number) => void
+  /** Called when image files are pasted/dropped. Return inserted asset refs in order. */
+  onUploadImages?: (files: File[]) => Promise<Array<{ id: string; title: string }>>
 }
 
 export function RichTextEditor({
@@ -147,6 +150,7 @@ export function RichTextEditor({
   searchMatchCase = false,
   searchRegex = false,
   onSearchMatchCountChange,
+  onUploadImages,
 }: RichTextEditorProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const editorInstanceRef = useRef<Editor | null>(null)
@@ -162,6 +166,8 @@ export function RichTextEditor({
   const assetsRef = useRef(assets)
   const onSearchMatchCountChangeRef = useRef(onSearchMatchCountChange)
   onSearchMatchCountChangeRef.current = onSearchMatchCountChange
+  const onUploadImagesRef = useRef(onUploadImages)
+  onUploadImagesRef.current = onUploadImages
   const insertAssetLinkRef = useRef<((view: import('@milkdown/prose/view').EditorView, assetId: string, assetTitle: string) => void) | null>(null)
   onAssetClickRef.current = onAssetClick
   assetsRef.current = assets
@@ -212,6 +218,34 @@ export function RichTextEditor({
       onMatchCountChange: (n) => onSearchMatchCountChangeRef.current?.(n),
     })
 
+    const imagePastePlugin = $prose(() => new Plugin({
+      key: new PluginKey('imagePasteDrop'),
+      props: {
+        handlePaste: (view, event) => {
+          const upload = onUploadImagesRef.current
+          if (!upload) return false
+          const files = extractImageFilesFromDataTransfer(event.clipboardData)
+          if (files.length === 0) return false
+          event.preventDefault()
+          void upload(files).then((results) => {
+            for (const r of results) insertAssetLinkAtCursor(view, r.id, r.title)
+          })
+          return true
+        },
+        handleDrop: (view, event) => {
+          const upload = onUploadImagesRef.current
+          if (!upload) return false
+          const files = extractImageFilesFromDataTransfer(event.dataTransfer)
+          if (files.length === 0) return false
+          event.preventDefault()
+          void upload(files).then((results) => {
+            for (const r of results) insertAssetLinkAtCursor(view, r.id, r.title)
+          })
+          return true
+        },
+      },
+    }))
+
     const editor = Editor.make()
       .config((ctx) => {
         ctx.set(rootCtx, containerRef.current!)
@@ -241,6 +275,7 @@ export function RichTextEditor({
       .use(assetPlugins.assetLinkDecoPlugin)
       .use(assetPlugins.assetMentionPlugin)
       .use(searchPlugin)
+      .use(imagePastePlugin)
 
     editor.create().then((e) => {
       editorInstanceRef.current = e

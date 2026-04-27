@@ -18,6 +18,7 @@ interface DescriptionDialogProps {
   themeColors?: EditorThemeColors
   assets?: AssetPickerItem[]
   onAssetClick?: (assetId: string) => void
+  onUploadImages?: (files: File[]) => Promise<Array<{ id: string; title: string }>>
 }
 
 function getWordCount(editor: Editor | null): number {
@@ -29,7 +30,7 @@ function getWordCount(editor: Editor | null): number {
   } catch { return 0 }
 }
 
-export function DescriptionDialog({ open, onOpenChange, value, onChange, onSave, fontFamily, readability, width, checkedHighlight, showToolbar, spellcheck, themeColors, assets, onAssetClick }: DescriptionDialogProps) {
+export function DescriptionDialog({ open, onOpenChange, value, onChange, onSave, fontFamily, readability, width, checkedHighlight, showToolbar, spellcheck, themeColors, assets, onAssetClick, onUploadImages }: DescriptionDialogProps) {
   const editorRef = useRef<Editor | null>(null)
   const [wordCount, setWordCount] = useState(0)
 
@@ -77,6 +78,7 @@ export function DescriptionDialog({ open, onOpenChange, value, onChange, onSave,
           themeColors={themeColors}
           assets={assets}
           onAssetClick={onAssetClick}
+          onUploadImages={onUploadImages}
         />
       </DialogContent>
     </Dialog>
