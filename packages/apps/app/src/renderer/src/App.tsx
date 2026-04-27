@@ -123,6 +123,7 @@ function App(): React.JSX.Element {
     updateTask, moveTask, reorderTasks,
     archiveTask: rawArchiveTask, archiveTasks: rawArchiveTasks,
     deleteTask: rawDeleteTask, contextMenuUpdate: rawContextMenuUpdate,
+    clearBlockers,
     updateProject, reorderProjects, deleteProject
   } = useTasksData()
 
@@ -1271,7 +1272,7 @@ function App(): React.JSX.Element {
                                     <KanbanBoard tasks={displayTasks} columns={selectedProject?.columns_config} viewConfig={getViewConfig(filter)} isActive={tabs[activeTabIndex]?.type === 'home'}
                                       onTaskMove={handleTaskMove} onTaskReorder={reorderTasks} onTaskClick={handleTaskClick}
                                       projectsMap={projectsMap} showProjectDot={false} cardProperties={filter.cardProperties} taskTags={taskTags} tags={projectTags} onTaskTagsChange={handleTaskTagsChange} blockedTaskIds={blockedTaskIds}
-                                      allProjects={projects} onUpdateTask={contextMenuUpdate} onArchiveTask={archiveTask} onDeleteTask={deleteTask} onArchiveAllTasks={archiveTasks} />
+                                      allProjects={projects} onUpdateTask={contextMenuUpdate} onClearBlockers={clearBlockers} onArchiveTask={archiveTask} onDeleteTask={deleteTask} onArchiveAllTasks={archiveTasks} />
                                   )}
                                   {id === 'kanban' && filter.viewMode === 'list' && (
                                     <KanbanListView tasks={displayTasks} columns={selectedProject?.columns_config} viewConfig={getViewConfig(filter)}

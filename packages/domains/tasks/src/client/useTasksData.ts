@@ -30,6 +30,7 @@ interface UseTasksDataReturn {
   archiveTasks: (taskIds: string[]) => Promise<void>
   deleteTask: (taskId: string) => Promise<void>
   contextMenuUpdate: (taskId: string, updates: Partial<Task>) => Promise<void>
+  clearBlockers: (taskId: string) => Promise<void>
 
   // Project handlers
   updateProject: (project: Project) => void
@@ -246,6 +247,17 @@ export function useTasksData(): UseTasksDataReturn {
     }
   }, [])
 
+  // Clear all dependency blockers (used when dragging out of __blocked__ col)
+  const clearBlockers = useCallback(async (taskId: string) => {
+    await window.api.taskDependencies.setBlockers(taskId, [])
+    setBlockedTaskIds(prev => {
+      const next = new Set(prev)
+      next.delete(taskId)
+      return next
+    })
+    window.dispatchEvent(new CustomEvent('slayzone:blocked-changed'))
+  }, [])
+
   // Reorder projects
   const reorderProjects = useCallback((projectIds: string[]) => {
     let snapshot: Project[] = []
@@ -307,6 +319,7 @@ export function useTasksData(): UseTasksDataReturn {
     archiveTasks,
     deleteTask,
     contextMenuUpdate,
+    clearBlockers,
     updateProject,
     reorderProjects,
     deleteProject

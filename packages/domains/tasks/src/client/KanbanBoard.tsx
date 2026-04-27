@@ -46,6 +46,7 @@ interface KanbanBoardProps {
   // Context menu props
   allProjects?: Project[]
   onUpdateTask?: (taskId: string, updates: Partial<Task>) => void
+  onClearBlockers?: (taskId: string) => void
   onArchiveTask?: (taskId: string) => void
   onDeleteTask?: (taskId: string) => void
   onArchiveAllTasks?: (taskIds: string[]) => void
@@ -68,6 +69,7 @@ export function KanbanBoard({
   blockedTaskIds,
   allProjects,
   onUpdateTask,
+  onClearBlockers,
   onArchiveTask,
   onDeleteTask,
   onArchiveAllTasks
@@ -177,7 +179,16 @@ export function KanbanBoard({
       targetIndex = targetColumn.tasks.findIndex((t) => t.id === overId)
     }
 
-    if (targetColumn.id.startsWith('__')) return // skip __unknown__, __blocked__, __snoozed__
+    // Drop into virtual __blocked__ col → set is_blocked flag (don't move/reorder)
+    if (targetColumn.id === '__blocked__') {
+      if (currentColumn.id === '__blocked__') return
+      track('kanban_drag_drop')
+      track('task_blocked', {})
+      onUpdateTask?.(taskId, { is_blocked: true } as Partial<Task>)
+      return
+    }
+
+    if (targetColumn.id.startsWith('__')) return // skip __unknown__, __snoozed__
 
     const isSameColumn = currentColumn.id === targetColumn.id
 
@@ -215,6 +226,12 @@ export function KanbanBoard({
       // Clear snooze when dragging out of snoozed column
       if (currentColumn.id === '__snoozed__' && onUpdateTask) {
         onUpdateTask(taskId, { snoozed_until: null } as Partial<Task>)
+      }
+      // Clear blocked flag + dependency blockers when dragging out of blocked column
+      if (currentColumn.id === '__blocked__') {
+        track('task_unblocked')
+        onUpdateTask?.(taskId, { is_blocked: false, blocked_comment: null } as Partial<Task>)
+        onClearBlockers?.(taskId)
       }
     }
   }
