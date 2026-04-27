@@ -1,8 +1,8 @@
 import { useState, useEffect, useCallback, useRef, useImperativeHandle, forwardRef, useMemo, type CSSProperties, type DragEvent } from 'react'
-import { Upload, Download, Trash2, FileText, Code, Globe, Image, GitBranch, Eye, Code2, Columns2, ZoomIn, ZoomOut, FolderPlus, Pencil, FilePlus, FolderOpen, Folder, ArrowRight, Copy, Search, Files, PanelLeftClose, PanelLeft, ImageDown, FileCode, Archive, Rows2, Rows3, Maximize2, AlignCenter, History, type LucideIcon } from 'lucide-react'
+import { Upload, Download, Trash2, FileText, Code, Globe, Image, GitBranch, Eye, Code2, Columns2, ZoomIn, ZoomOut, FolderPlus, Pencil, FilePlus, FolderOpen, Folder, ArrowRight, Copy, Search, Files, PanelLeftClose, PanelLeft, ImageDown, FileCode, Archive, Rows2, Rows3, Maximize2, AlignCenter, History, Scissors, ClipboardPaste, CopyPlus, type LucideIcon } from 'lucide-react'
 import {
   cn, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Button, Input,
-  ContextMenu, ContextMenuTrigger, ContextMenuContent, ContextMenuItem, ContextMenuSeparator, ContextMenuSub, ContextMenuSubTrigger, ContextMenuSubContent,
+  ContextMenu, ContextMenuTrigger, ContextMenuContent, ContextMenuItem, ContextMenuSeparator, ContextMenuShortcut, ContextMenuSub, ContextMenuSubTrigger, ContextMenuSubContent,
   DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuSub, DropdownMenuSubTrigger, DropdownMenuSubContent,
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,
   Tabs, TabsList, TabsTrigger,
@@ -495,6 +495,16 @@ export const AssetsPanel = forwardRef<AssetsPanelHandle, AssetsPanelProps>(funct
     }
   }, [selectedId, onActiveAssetIdChange])
 
+  // Keep multi-select in sync with single-select changes from outside (imperative handle, search panel)
+  useEffect(() => {
+    setSelectedIds((prev) => {
+      if (selectedId == null) return prev
+      if (prev.size === 1 && prev.has(selectedId)) return prev
+      if (prev.size > 1 && prev.has(selectedId)) return prev
+      return new Set([selectedId])
+    })
+  }, [selectedId])
+
   const { editorMarkdownViewMode, notesReadability, notesWidth } = useAppearance()
   const assetDefaultViewMode = editorMarkdownViewMode === 'code' ? 'raw' : editorMarkdownViewMode === 'split' ? 'split' : 'preview'
   const [viewMode, setViewMode] = useState<'preview' | 'split' | 'raw'>('preview')
@@ -502,7 +512,7 @@ export const AssetsPanel = forwardRef<AssetsPanelHandle, AssetsPanelProps>(funct
   const [assetStats, setAssetStats] = useState<AssetStats>({ fileSize: null, words: 0, lines: 0 })
   const [dragOver, setDragOver] = useState(false)
   const [dropTargetFolder, setDropTargetFolder] = useState<string | null>(null)
-  const dragAssetIdRef = useRef<string | null>(null)
+  const dragAssetIdsRef = useRef<string[]>([])
 
   // Search state
   const [sidebarMode, setSidebarMode] = useState<'tree' | 'search'>('tree')
@@ -576,6 +586,15 @@ export const AssetsPanel = forwardRef<AssetsPanelHandle, AssetsPanelProps>(funct
   const [creating, setCreating] = useState<{ parentFolderId: string | null; type: 'file' | 'folder' } | null>(null)
   const [renaming, setRenaming] = useState<{ id: string; type: 'asset' | 'folder' } | null>(null)
   const [renameValue, setRenameValue] = useState('')
+
+  // Multi-select for asset rows + internal clipboard
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const lastClickedRef = useRef<string | null>(null)
+  const [clipboard, setClipboard] = useState<{ ids: string[]; mode: 'copy' | 'cut' } | null>(null)
+  const [osHasFiles, setOsHasFiles] = useState(false)
+  const refreshOsClipboard = useCallback(() => {
+    window.api.clipboard.hasFiles().then(setOsHasFiles).catch(() => setOsHasFiles(false))
+  }, [])
   const willCreateRef = useRef(false)
   const createInputRef = useCallback((node: HTMLInputElement | null) => {
     if (node) requestAnimationFrame(() => node.focus())
@@ -689,7 +708,7 @@ export const AssetsPanel = forwardRef<AssetsPanelHandle, AssetsPanelProps>(funct
   const handleFileDrop = useCallback(async (e: DragEvent) => {
     e.preventDefault()
     setDragOver(false)
-    if (dragAssetIdRef.current) return
+    if (dragAssetIdsRef.current.length) return
     const filePaths = window.api.files.getDropPaths()
     for (const fp of filePaths) {
       try {
@@ -703,13 +722,15 @@ export const AssetsPanel = forwardRef<AssetsPanelHandle, AssetsPanelProps>(funct
   // --- Drag-to-folder handlers ---
 
   const handleAssetDragStart = useCallback((assetId: string) => (e: React.DragEvent) => {
-    dragAssetIdRef.current = assetId
-    e.dataTransfer.setData('text/plain', assetId)
+    const ids = selectedIds.has(assetId) && selectedIds.size > 1 ? [...selectedIds] : [assetId]
+    dragAssetIdsRef.current = ids
+    e.dataTransfer.setData('application/x-slayzone-asset-ids', JSON.stringify(ids))
+    e.dataTransfer.setData('text/plain', ids.join(','))
     e.dataTransfer.effectAllowed = 'move'
-  }, [])
+  }, [selectedIds])
 
   const handleFolderDragOver = useCallback((folderId: string) => (e: React.DragEvent) => {
-    if (!dragAssetIdRef.current) return
+    if (!dragAssetIdsRef.current.length) return
     e.preventDefault()
     e.stopPropagation()
     e.dataTransfer.dropEffect = 'move'
@@ -724,14 +745,14 @@ export const AssetsPanel = forwardRef<AssetsPanelHandle, AssetsPanelProps>(funct
     e.preventDefault()
     e.stopPropagation()
     setDropTargetFolder(null)
-    const assetId = dragAssetIdRef.current
-    dragAssetIdRef.current = null
-    if (!assetId) return
-    moveAssetToFolder(assetId, folderId)
+    const ids = dragAssetIdsRef.current
+    dragAssetIdsRef.current = []
+    if (!ids.length) return
+    for (const id of ids) moveAssetToFolder(id, folderId)
   }, [moveAssetToFolder])
 
   const handleRootDragOver = useCallback((e: React.DragEvent) => {
-    if (!dragAssetIdRef.current) return
+    if (!dragAssetIdsRef.current.length) return
     e.preventDefault()
     e.dataTransfer.dropEffect = 'move'
     setDropTargetFolder('__root__')
@@ -740,31 +761,18 @@ export const AssetsPanel = forwardRef<AssetsPanelHandle, AssetsPanelProps>(funct
   const handleRootDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault()
     setDropTargetFolder(null)
-    const assetId = dragAssetIdRef.current
-    dragAssetIdRef.current = null
-    if (!assetId) return
-    moveAssetToFolder(assetId, null)
+    const ids = dragAssetIdsRef.current
+    dragAssetIdsRef.current = []
+    if (!ids.length) return
+    for (const id of ids) moveAssetToFolder(id, null)
   }, [moveAssetToFolder])
 
   const handleDragEnd = useCallback(() => {
-    dragAssetIdRef.current = null
+    dragAssetIdsRef.current = []
     setDropTargetFolder(null)
   }, [])
 
   // --- Search handlers ---
-
-  const handlePanelKeyDown = useCallback((e: React.KeyboardEvent) => {
-    if ((e.metaKey || e.ctrlKey) && e.key === 'f') {
-      e.preventDefault()
-      e.stopPropagation()
-      const rm = selectedAsset ? getEffectiveRenderMode(selectedAsset.title, selectedAsset.render_mode) : null
-      if (selectedAsset && rm && !isBinaryRenderMode(rm)) {
-        setFindOpen(true)
-        // Bump so the find bar pulls focus even when already open.
-        setFindFocusToken(t => t + 1)
-      }
-    }
-  }, [selectedAsset])
 
   const handleSearchResult = useCallback((assetId: string, payload: { query: string; matchCase: boolean; useRegex: boolean; matchIndex: number }) => {
     setSelectedId(assetId)
@@ -825,6 +833,182 @@ export const AssetsPanel = forwardRef<AssetsPanelHandle, AssetsPanelProps>(funct
     const fp = await getFilePath(assetId)
     if (fp) navigator.clipboard.writeText(fp)
   }, [getFilePath])
+
+  // --- Multi-select + clipboard ---
+
+  const flatAssetIds = useMemo(() => {
+    const out: string[] = []
+    function walk(parentId: string | null) {
+      const subFolders = childFolders.get(parentId) ?? []
+      for (const f of subFolders) {
+        const expanded = expandedFolders?.has(f.id) ?? true
+        if (expanded) walk(f.id)
+      }
+      const subAssets = assetsByFolder.get(parentId) ?? []
+      for (const a of subAssets) out.push(a.id)
+    }
+    walk(null)
+    return out
+  }, [childFolders, assetsByFolder, expandedFolders])
+
+  const handleAssetClick = useCallback((e: React.MouseEvent, assetId: string) => {
+    const isMeta = e.metaKey || e.ctrlKey
+    const isShift = e.shiftKey
+    if (isMeta) {
+      setSelectedIds((prev) => {
+        const next = new Set(prev)
+        if (next.has(assetId)) next.delete(assetId)
+        else next.add(assetId)
+        return next
+      })
+      lastClickedRef.current = assetId
+      setSelectedId(assetId)
+      return
+    }
+    if (isShift && lastClickedRef.current) {
+      const startIdx = flatAssetIds.indexOf(lastClickedRef.current)
+      const endIdx = flatAssetIds.indexOf(assetId)
+      if (startIdx >= 0 && endIdx >= 0) {
+        const [lo, hi] = startIdx < endIdx ? [startIdx, endIdx] : [endIdx, startIdx]
+        setSelectedIds(new Set(flatAssetIds.slice(lo, hi + 1)))
+        setSelectedId(assetId)
+        return
+      }
+    }
+    setSelectedIds(new Set([assetId]))
+    lastClickedRef.current = assetId
+    setSelectedId(assetId)
+  }, [flatAssetIds, setSelectedId])
+
+  const getEffectiveAssetIds = useCallback((assetId: string): string[] => {
+    if (selectedIds.has(assetId) && selectedIds.size > 1) return [...selectedIds]
+    return [assetId]
+  }, [selectedIds])
+
+  const writeAssetsToOsClipboard = useCallback(async (ids: string[]) => {
+    const paths = (await Promise.all(ids.map((id) => getFilePath(id)))).filter((p): p is string => !!p)
+    await window.api.clipboard.writeFilePaths(paths)
+  }, [getFilePath])
+
+  const handleAssetCopy = useCallback((ids: string[]) => {
+    if (!ids.length) return
+    setClipboard({ ids, mode: 'copy' })
+    void writeAssetsToOsClipboard(ids)
+  }, [writeAssetsToOsClipboard])
+
+  const handleAssetCut = useCallback((ids: string[]) => {
+    if (!ids.length) return
+    setClipboard({ ids, mode: 'cut' })
+    void writeAssetsToOsClipboard(ids)
+  }, [writeAssetsToOsClipboard])
+
+  const handleAssetPaste = useCallback(async (destFolderId: string | null) => {
+    const osPaths = await window.api.clipboard.readFilePaths()
+    if (!osPaths.length) return
+    const created = await window.api.assets.pasteFiles({ sourcePaths: osPaths, destTaskId: taskId, destFolderId })
+    // Cut-mode source delete only if internal clipboard markers still match OS clipboard
+    if (clipboard?.mode === 'cut') {
+      const sourcePathSet = new Set(osPaths)
+      const internalPaths = (await Promise.all(clipboard.ids.map((id) => getFilePath(id)))).filter((p): p is string => !!p)
+      const matchesInternal = internalPaths.length === osPaths.length && internalPaths.every((p) => sourcePathSet.has(p))
+      if (matchesInternal) {
+        for (const id of clipboard.ids) {
+          await deleteAsset(id)
+        }
+        setClipboard(null)
+      }
+    }
+    if (created.length) {
+      setSelectedIds(new Set(created.map((a) => a.id)))
+      setSelectedId(created[created.length - 1].id)
+      lastClickedRef.current = created[created.length - 1].id
+    }
+  }, [clipboard, taskId, getFilePath, deleteAsset, setSelectedId])
+
+  const handleAssetDuplicate = useCallback(async (ids: string[]) => {
+    if (!ids.length) return
+    const paths = (await Promise.all(ids.map((id) => getFilePath(id)))).filter((p): p is string => !!p)
+    if (!paths.length) return
+    const sourceAsset = assets.find((a) => a.id === ids[0])
+    const destFolderId = sourceAsset?.folder_id ?? null
+    await window.api.assets.pasteFiles({ sourcePaths: paths, destTaskId: taskId, destFolderId })
+  }, [getFilePath, assets, taskId])
+
+  const handleDeleteSelected = useCallback(async (ids: string[]) => {
+    for (const id of ids) await deleteAsset(id)
+    setSelectedIds(new Set())
+  }, [deleteAsset])
+
+  const handleSelectAll = useCallback(() => {
+    setSelectedIds(new Set(flatAssetIds))
+  }, [flatAssetIds])
+
+  const handlePanelKeyDown = useCallback((e: React.KeyboardEvent) => {
+    const meta = e.metaKey || e.ctrlKey
+    const target = e.target as HTMLElement
+    const inEditableField =
+      target.tagName === 'INPUT' ||
+      target.tagName === 'TEXTAREA' ||
+      target.isContentEditable
+    const inSidebar = target.closest('[data-testid="assets-sidebar"]') !== null
+
+    if (meta && e.key === 'f') {
+      e.preventDefault()
+      e.stopPropagation()
+      const rm = selectedAsset ? getEffectiveRenderMode(selectedAsset.title, selectedAsset.render_mode) : null
+      if (selectedAsset && rm && !isBinaryRenderMode(rm)) {
+        setFindOpen(true)
+        setFindFocusToken(t => t + 1)
+      }
+      return
+    }
+
+    if (!inSidebar || inEditableField) return
+
+    if (meta && e.key === 'c') {
+      const ids = selectedIds.size > 0 ? [...selectedIds] : selectedId ? [selectedId] : []
+      if (ids.length) {
+        e.preventDefault()
+        handleAssetCopy(ids)
+      }
+      return
+    }
+    if (meta && e.key === 'x') {
+      const ids = selectedIds.size > 0 ? [...selectedIds] : selectedId ? [selectedId] : []
+      if (ids.length) {
+        e.preventDefault()
+        handleAssetCut(ids)
+      }
+      return
+    }
+    if (meta && e.key === 'v') {
+      e.preventDefault()
+      const focusedAsset = selectedId ? assets.find(a => a.id === selectedId) : null
+      void handleAssetPaste(focusedAsset?.folder_id ?? null)
+      return
+    }
+    if (meta && e.key === 'd') {
+      const ids = selectedIds.size > 0 ? [...selectedIds] : selectedId ? [selectedId] : []
+      if (ids.length) {
+        e.preventDefault()
+        void handleAssetDuplicate(ids)
+      }
+      return
+    }
+    if (meta && e.key === 'a') {
+      e.preventDefault()
+      handleSelectAll()
+      return
+    }
+    if ((e.key === 'Backspace' || e.key === 'Delete') && (selectedIds.size > 0 || selectedId)) {
+      const ids = selectedIds.size > 0 ? [...selectedIds] : selectedId ? [selectedId] : []
+      if (ids.length) {
+        e.preventDefault()
+        void handleDeleteSelected(ids)
+      }
+      return
+    }
+  }, [selectedAsset, selectedId, selectedIds, assets, handleAssetCopy, handleAssetCut, handleAssetPaste, handleAssetDuplicate, handleDeleteSelected, handleSelectAll])
 
   // --- Render inline input ---
 
@@ -909,6 +1093,15 @@ export const AssetsPanel = forwardRef<AssetsPanelHandle, AssetsPanelProps>(funct
                   <ContextMenuItem onSelect={() => { willCreateRef.current = true; setCreating({ parentFolderId: folder.id, type: 'folder' }) }}>
                     <FolderPlus className="size-3 mr-2" /> New Folder
                   </ContextMenuItem>
+                  {(clipboard || osHasFiles) && (
+                    <>
+                      <ContextMenuSeparator />
+                      <ContextMenuItem onSelect={() => void handleAssetPaste(folder.id)}>
+                        <ClipboardPaste className="size-3 mr-2" /> Paste
+                        <ContextMenuShortcut>⌘V</ContextMenuShortcut>
+                      </ContextMenuItem>
+                    </>
+                  )}
                   <ContextMenuSeparator />
                   <ContextMenuItem onSelect={() => startRenameFolder(folder)}>
                     <Pencil className="size-3 mr-2" /> Rename
@@ -952,9 +1145,12 @@ export const AssetsPanel = forwardRef<AssetsPanelHandle, AssetsPanelProps>(funct
                           'group/asset flex w-full flex-col gap-0.5 rounded-md border px-2.5 py-2 text-left text-xs cursor-pointer transition-colors',
                           asset.id === selectedId
                             ? 'border-primary/40 bg-primary/[0.08] text-foreground'
-                            : 'border-border/60 bg-card/50 text-muted-foreground hover:text-foreground hover:bg-muted/50 hover:border-border',
+                            : selectedIds.has(asset.id)
+                              ? 'border-primary/30 bg-primary/[0.04] text-foreground'
+                              : 'border-border/60 bg-card/50 text-muted-foreground hover:text-foreground hover:bg-muted/50 hover:border-border',
+                          clipboard?.mode === 'cut' && clipboard.ids.includes(asset.id) && 'opacity-50',
                         )}
-                        onClick={() => setSelectedId(asset.id)}
+                        onClick={(e) => handleAssetClick(e, asset.id)}
                         draggable={!isRenaming}
                         onDragStart={handleAssetDragStart(asset.id)}
                       >
@@ -992,7 +1188,29 @@ export const AssetsPanel = forwardRef<AssetsPanelHandle, AssetsPanelProps>(funct
                       </button>
                     </ContextMenuTrigger>
                     <ContextMenuContent>
-                      <ContextMenuItem onSelect={() => startRenameAsset(asset)}>
+                      <ContextMenuItem onSelect={() => handleAssetCut(getEffectiveAssetIds(asset.id))}>
+                        <Scissors className="size-3 mr-2" /> Cut
+                        <ContextMenuShortcut>⌘X</ContextMenuShortcut>
+                      </ContextMenuItem>
+                      <ContextMenuItem onSelect={() => handleAssetCopy(getEffectiveAssetIds(asset.id))}>
+                        <Copy className="size-3 mr-2" /> Copy
+                        <ContextMenuShortcut>⌘C</ContextMenuShortcut>
+                      </ContextMenuItem>
+                      {(clipboard || osHasFiles) && (
+                        <ContextMenuItem onSelect={() => void handleAssetPaste(asset.folder_id)}>
+                          <ClipboardPaste className="size-3 mr-2" /> Paste
+                          <ContextMenuShortcut>⌘V</ContextMenuShortcut>
+                        </ContextMenuItem>
+                      )}
+                      <ContextMenuItem onSelect={() => void handleAssetDuplicate(getEffectiveAssetIds(asset.id))}>
+                        <CopyPlus className="size-3 mr-2" /> Duplicate
+                        <ContextMenuShortcut>⌘D</ContextMenuShortcut>
+                      </ContextMenuItem>
+                      <ContextMenuSeparator />
+                      <ContextMenuItem
+                        onSelect={() => startRenameAsset(asset)}
+                        disabled={selectedIds.size > 1 && selectedIds.has(asset.id)}
+                      >
                         <Pencil className="size-3 mr-2" /> Rename
                       </ContextMenuItem>
                       {moveToFolders.length > 0 && (
@@ -1050,7 +1268,7 @@ export const AssetsPanel = forwardRef<AssetsPanelHandle, AssetsPanelProps>(funct
                         </ContextMenuSub>
                       )}
                       <ContextMenuSeparator />
-                      <ContextMenuItem variant="destructive" onSelect={() => deleteAsset(asset.id)}>
+                      <ContextMenuItem variant="destructive" onSelect={() => void handleDeleteSelected(getEffectiveAssetIds(asset.id))}>
                         <Trash2 className="size-3 mr-2" /> Delete
                       </ContextMenuItem>
                     </ContextMenuContent>
@@ -1311,10 +1529,19 @@ export const AssetsPanel = forwardRef<AssetsPanelHandle, AssetsPanelProps>(funct
                 <ContextMenuTrigger asChild>
                   <div
                     data-testid="assets-sidebar"
-                    className={cn("flex-1 overflow-y-auto p-1.5 select-none text-sm", dropTargetFolder === '__root__' && 'bg-primary/10')}
+                    tabIndex={-1}
+                    className={cn("flex-1 overflow-y-auto p-1.5 select-none text-sm outline-none", dropTargetFolder === '__root__' && 'bg-primary/10')}
                     onDragOver={handleRootDragOver}
                     onDragLeave={handleFolderDragLeave}
                     onDrop={handleRootDrop}
+                    onMouseEnter={refreshOsClipboard}
+                    onFocus={refreshOsClipboard}
+                    onClick={(e) => {
+                      // Click on empty area clears selection (matches editor pattern)
+                      if (e.target === e.currentTarget) {
+                        setSelectedIds(new Set())
+                      }
+                    }}
                   >
                     {assets.length > 0 || folders.length > 0 ? (
                       <>
@@ -1337,6 +1564,15 @@ export const AssetsPanel = forwardRef<AssetsPanelHandle, AssetsPanelProps>(funct
                   <ContextMenuItem onSelect={() => { willCreateRef.current = true; setCreating({ parentFolderId: null, type: 'folder' }) }}>
                     <FolderPlus className="size-3 mr-2" /> New Folder
                   </ContextMenuItem>
+                  {(clipboard || osHasFiles) && (
+                    <>
+                      <ContextMenuSeparator />
+                      <ContextMenuItem onSelect={() => void handleAssetPaste(null)}>
+                        <ClipboardPaste className="size-3 mr-2" /> Paste
+                        <ContextMenuShortcut>⌘V</ContextMenuShortcut>
+                      </ContextMenuItem>
+                    </>
+                  )}
                   {assets.length > 0 && (
                     <>
                       <ContextMenuSeparator />

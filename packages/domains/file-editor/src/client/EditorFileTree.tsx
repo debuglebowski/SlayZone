@@ -35,6 +35,7 @@ import {
   Input
 } from '@slayzone/ui'
 import type { DirEntry, GitFileStatus } from '../shared'
+import { uniqueName, duplicateName } from '../shared'
 import { FileIcon } from './FileIcon'
 
 const INDENT_PX = 20
@@ -163,6 +164,10 @@ export const EditorFileTree = forwardRef<EditorFileTreeHandle, EditorFileTreePro
 
   // --- Internal clipboard for copy/cut ---
   const [clipboard, setClipboard] = useState<{ paths: string[]; mode: 'copy' | 'cut' } | null>(null)
+  const [osHasFiles, setOsHasFiles] = useState(false)
+  const refreshOsClipboard = useCallback(() => {
+    window.api.clipboard.hasFiles().then(setOsHasFiles).catch(() => setOsHasFiles(false))
+  }, [])
 
   // --- Git status ---
   const [gitStatus, setGitStatus] = useState<Map<string, GitFileStatus>>(new Map())
@@ -438,72 +443,101 @@ export const EditorFileTree = forwardRef<EditorFileTreeHandle, EditorFileTreePro
     return [entry.path]
   }, [selectedPaths])
 
+  const writeOsClipboard = useCallback((relPaths: string[]) => {
+    const absolute = relPaths.map((p) => `${projectPath}/${p}`)
+    void window.api.clipboard.writeFilePaths(absolute)
+  }, [projectPath])
+
   const handleCopy = useCallback((paths: string[]) => {
     setClipboard({ paths, mode: 'copy' })
+    writeOsClipboard(paths)
     track('file_copied')
-  }, [])
+  }, [writeOsClipboard])
 
   const handleCut = useCallback((paths: string[]) => {
     setClipboard({ paths, mode: 'cut' })
+    writeOsClipboard(paths)
     track('file_cut')
-  }, [])
+  }, [writeOsClipboard])
 
-  const resolveCollision = useCallback((basePath: string, parentDir: string): string => {
+  const resolveCollisionPath = useCallback((rawDest: string, parentDir: string): string => {
     const siblings = dirContents.get(parentDir) ?? []
-    const names = new Set(siblings.map(s => s.name))
-    const name = basePath.includes('/') ? basePath.slice(basePath.lastIndexOf('/') + 1) : basePath
-    if (!names.has(name)) return basePath
-
-    const ext = name.includes('.') ? name.slice(name.lastIndexOf('.')) : ''
-    const stem = name.includes('.') ? name.slice(0, name.lastIndexOf('.')) : name
-    for (let i = 1; ; i++) {
-      const candidate = `${stem} (${i})${ext}`
-      if (!names.has(candidate)) return parentDir ? `${parentDir}/${candidate}` : candidate
-    }
+    const names = new Set(siblings.map((s) => s.name))
+    const name = rawDest.includes('/') ? rawDest.slice(rawDest.lastIndexOf('/') + 1) : rawDest
+    const unique = uniqueName(name, names)
+    if (unique === name) return rawDest
+    return parentDir ? `${parentDir}/${unique}` : unique
   }, [dirContents])
 
   const handlePaste = useCallback(async (targetDir: string) => {
-    if (!clipboard) return
-    // Ensure target dir is loaded
     if (!dirContents.has(targetDir)) await loadDir(targetDir)
     const dirsToReload = new Set<string>([targetDir])
-    for (const srcPath of clipboard.paths) {
-      const name = srcPath.includes('/') ? srcPath.slice(srcPath.lastIndexOf('/') + 1) : srcPath
-      const rawDest = targetDir ? `${targetDir}/${name}` : name
-      const destPath = resolveCollision(rawDest, targetDir)
-      try {
-        if (clipboard.mode === 'copy') {
-          await window.api.fs.copy(projectPath, srcPath, destPath)
-        } else {
-          await window.api.fs.rename(projectPath, srcPath, destPath)
-          onFileRenamed?.(srcPath, destPath)
-          const srcParent = srcPath.includes('/') ? srcPath.slice(0, srcPath.lastIndexOf('/')) : ''
-          dirsToReload.add(srcParent)
+    const projectPrefix = projectPath.endsWith('/') ? projectPath : projectPath + '/'
+
+    let internalUsed = false
+    if (clipboard) {
+      // Verify OS clipboard still matches our internal state (cut paths weren't overwritten externally).
+      const osPaths = await window.api.clipboard.readFilePaths()
+      const osRelative = osPaths
+        .filter((p) => p === projectPath || p.startsWith(projectPrefix))
+        .map((p) => p === projectPath ? '' : p.slice(projectPrefix.length))
+      const internalSet = new Set(clipboard.paths)
+      const stillMatches = osRelative.length === clipboard.paths.length && osRelative.every((p) => internalSet.has(p))
+
+      if (stillMatches) {
+        internalUsed = true
+        for (const srcPath of clipboard.paths) {
+          const name = srcPath.includes('/') ? srcPath.slice(srcPath.lastIndexOf('/') + 1) : srcPath
+          const rawDest = targetDir ? `${targetDir}/${name}` : name
+          const destPath = resolveCollisionPath(rawDest, targetDir)
+          try {
+            if (clipboard.mode === 'copy') {
+              await window.api.fs.copy(projectPath, srcPath, destPath)
+            } else {
+              await window.api.fs.rename(projectPath, srcPath, destPath)
+              onFileRenamed?.(srcPath, destPath)
+              const srcParent = srcPath.includes('/') ? srcPath.slice(0, srcPath.lastIndexOf('/')) : ''
+              dirsToReload.add(srcParent)
+            }
+          } catch (err) {
+            console.error('Paste failed:', err)
+          }
         }
-      } catch (err) {
-        console.error('Paste failed:', err)
+        if (clipboard.mode === 'cut') setClipboard(null)
       }
     }
-    if (clipboard.mode === 'cut') setClipboard(null)
+
+    if (!internalUsed) {
+      const osPaths = await window.api.clipboard.readFilePaths()
+      for (const abs of osPaths) {
+        try {
+          if (abs === projectPath || abs.startsWith(projectPrefix)) {
+            const srcRel = abs === projectPath ? '' : abs.slice(projectPrefix.length)
+            if (!srcRel) continue
+            const name = srcRel.includes('/') ? srcRel.slice(srcRel.lastIndexOf('/') + 1) : srcRel
+            const rawDest = targetDir ? `${targetDir}/${name}` : name
+            const destPath = resolveCollisionPath(rawDest, targetDir)
+            await window.api.fs.copy(projectPath, srcRel, destPath)
+          } else {
+            await window.api.fs.copyIn(projectPath, abs, targetDir)
+          }
+        } catch (err) {
+          console.error('External paste failed:', err)
+        }
+      }
+    }
+
     track('file_pasted')
     for (const dir of dirsToReload) await loadDir(dir)
-  }, [clipboard, projectPath, loadDir, resolveCollision, onFileRenamed, dirContents])
+  }, [clipboard, projectPath, loadDir, resolveCollisionPath, onFileRenamed, dirContents])
 
   const handleDuplicate = useCallback(async (entries: DirEntry[]) => {
     const dirsToReload = new Set<string>()
     for (const entry of entries) {
       const parentDir = entry.path.includes('/') ? entry.path.slice(0, entry.path.lastIndexOf('/')) : ''
-      const ext = entry.name.includes('.') ? entry.name.slice(entry.name.lastIndexOf('.')) : ''
-      const stem = entry.name.includes('.') ? entry.name.slice(0, entry.name.lastIndexOf('.')) : entry.name
       const siblings = dirContents.get(parentDir) ?? []
-      const names = new Set(siblings.map(s => s.name))
-      let destName = `${stem} (copy)${ext}`
-      if (names.has(destName)) {
-        for (let i = 2; ; i++) {
-          destName = `${stem} (copy ${i})${ext}`
-          if (!names.has(destName)) break
-        }
-      }
+      const names = new Set(siblings.map((s) => s.name))
+      const destName = duplicateName(entry.name, names)
       const destPath = parentDir ? `${parentDir}/${destName}` : destName
       try {
         await window.api.fs.copy(projectPath, entry.path, destPath)
@@ -700,7 +734,6 @@ export const EditorFileTree = forwardRef<EditorFileTreeHandle, EditorFileTreePro
 
     if (meta && e.key === 'v') {
       e.preventDefault()
-      if (!clipboard) return
       let targetDir = ''
       if (focusedPath) {
         const focused = visibleEntries.find(v => v.entry.path === focusedPath)
@@ -836,7 +869,7 @@ export const EditorFileTree = forwardRef<EditorFileTreeHandle, EditorFileTreePro
           <Copy className="size-3 mr-2" /> Copy
           <ContextMenuShortcut>⌘C</ContextMenuShortcut>
         </ContextMenuItem>
-        {clipboard && (
+        {(clipboard || osHasFiles) && (
           <ContextMenuItem onSelect={() => handlePaste(isFolder ? entry.path : parentDir)}>
             <ClipboardPaste className="size-3 mr-2" /> Paste
             <ContextMenuShortcut>⌘V</ContextMenuShortcut>
@@ -866,7 +899,7 @@ export const EditorFileTree = forwardRef<EditorFileTreeHandle, EditorFileTreePro
         </ContextMenuItem>
       </>
     )
-  }, [getEffectiveSelection, visibleEntries, clipboard, handleCut, handleCopy, handlePaste, handleDuplicate, handleCopyPath, handleRevealInFinder, handleDeleteSelected, startCreate, startRename])
+  }, [getEffectiveSelection, visibleEntries, clipboard, osHasFiles, handleCut, handleCopy, handlePaste, handleDuplicate, handleCopyPath, handleRevealInFinder, handleDeleteSelected, startCreate, startRename])
 
   const renderRenameInput = (entryPath: string) => (
     <Input
@@ -1025,6 +1058,8 @@ export const EditorFileTree = forwardRef<EditorFileTreeHandle, EditorFileTreePro
         ref={treeContainerRef}
         tabIndex={0}
         onKeyDown={handleKeyDown}
+        onFocus={refreshOsClipboard}
+        onMouseEnter={refreshOsClipboard}
         className={cn(
           'h-full overflow-auto py-1 select-none text-sm bg-surface-1 outline-none',
           isRootDropHover && 'bg-primary/5 ring-1 ring-inset ring-primary/20 rounded'
@@ -1081,7 +1116,7 @@ export const EditorFileTree = forwardRef<EditorFileTreeHandle, EditorFileTreePro
         <ContextMenuItem onSelect={() => startCreate('', 'directory')}>
           <FolderPlus className="size-3 mr-2" /> New folder
         </ContextMenuItem>
-        {clipboard && (
+        {(clipboard || osHasFiles) && (
           <>
             <ContextMenuSeparator />
             <ContextMenuItem onSelect={() => handlePaste('')}>

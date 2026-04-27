@@ -13,6 +13,7 @@ import type {
   UpdateAssetFolderInput,
 } from '@slayzone/task/shared'
 import { getExtensionFromTitle, getEffectiveRenderMode, canExportAsPdf, canExportAsPng, canExportAsHtml } from '@slayzone/task/shared'
+import { uniqueName } from '@slayzone/file-editor/shared'
 import path from 'path'
 import { existsSync, mkdirSync, writeFileSync, readFileSync, unlinkSync, rmSync, copyFileSync, statSync, readdirSync, createWriteStream } from 'fs'
 import { randomUUID } from 'crypto'
@@ -334,6 +335,76 @@ export function registerTaskHandlers(ipcMain: IpcMain, db: Database, onMutation?
     onMutation?.()
     const row = db.prepare('SELECT * FROM task_assets WHERE id = ?').get(id) as Record<string, unknown> | undefined
     return parseAsset(row)
+  })
+
+  ipcMain.handle('db:assets:pasteFiles', (_, data: { sourcePaths: string[]; destTaskId: string; destFolderId: string | null }) => {
+    const { sourcePaths, destTaskId, destFolderId } = data
+    if (!sourcePaths.length) return []
+
+    const assetsRootPrefix = assetsDir + path.sep
+    const created: TaskAsset[] = []
+
+    db.transaction(() => {
+      for (const srcPath of sourcePaths) {
+        if (!existsSync(srcPath)) continue
+        const stat = statSync(srcPath)
+        if (!stat.isFile()) continue
+
+        const newId = randomUUID()
+        let title = path.basename(srcPath)
+        let renderMode: string | null = null
+        let language: string | null = null
+
+        if (srcPath.startsWith(assetsRootPrefix)) {
+          const idMatch = path.basename(srcPath).match(/^([0-9a-f-]{36})\./)
+          if (idMatch) {
+            const sourceRow = db.prepare('SELECT * FROM task_assets WHERE id = ?').get(idMatch[1]) as Record<string, unknown> | undefined
+            if (sourceRow) {
+              title = sourceRow.title as string
+              renderMode = (sourceRow.render_mode as string | null) ?? null
+              language = (sourceRow.language as string | null) ?? null
+            }
+          }
+        }
+
+        const siblingTitles = new Set<string>(
+          (db.prepare(
+            destFolderId
+              ? 'SELECT title FROM task_assets WHERE task_id = ? AND folder_id = ?'
+              : 'SELECT title FROM task_assets WHERE task_id = ? AND folder_id IS NULL'
+          ).all(...(destFolderId ? [destTaskId, destFolderId] : [destTaskId])) as { title: string }[]).map((r) => r.title)
+        )
+        title = uniqueName(title, siblingTitles)
+
+        const maxOrder = (db.prepare(
+          destFolderId
+            ? 'SELECT MAX("order") as m FROM task_assets WHERE task_id = ? AND folder_id = ?'
+            : 'SELECT MAX("order") as m FROM task_assets WHERE task_id = ? AND folder_id IS NULL'
+        ).get(...(destFolderId ? [destTaskId, destFolderId] : [destTaskId])) as { m: number | null }).m ?? -1
+
+        db.prepare(`
+          INSERT INTO task_assets (id, task_id, folder_id, title, render_mode, language, "order")
+          VALUES (?, ?, ?, ?, ?, ?, ?)
+        `).run(newId, destTaskId, destFolderId, title, renderMode, language, maxOrder + 1)
+
+        const destFilePath = getAssetFilePath(destTaskId, newId, title)
+        mkdirSync(path.dirname(destFilePath), { recursive: true })
+        copyFileSync(srcPath, destFilePath)
+
+        createVersion(db, versionTxn, blobStore, {
+          assetId: newId,
+          bytes: readFileSync(destFilePath),
+          author: uiAuthor,
+        })
+
+        const row = db.prepare('SELECT * FROM task_assets WHERE id = ?').get(newId) as Record<string, unknown> | undefined
+        const parsed = parseAsset(row)
+        if (parsed) created.push(parsed)
+      }
+    })()
+
+    onMutation?.()
+    return created
   })
 
   ipcMain.handle('db:assets:getFileSize', (_, id: string) => {

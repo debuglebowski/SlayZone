@@ -310,6 +310,7 @@ export interface ElectronAPI {
     getMtime: (id: string) => Promise<number | null>
     onContentChanged: (callback: (assetId: string) => void) => () => void
     upload: (data: { taskId: string; sourcePath: string; title?: string }) => Promise<TaskAsset>
+    pasteFiles: (data: { sourcePaths: string[]; destTaskId: string; destFolderId: string | null }) => Promise<TaskAsset[]>
     getFileSize: (id: string) => Promise<number | null>
     cleanupTask: (taskId: string) => Promise<void>
     uploadDir: (data: { taskId: string; dirPath: string; parentFolderId: string | null }) => Promise<{ folders: AssetFolder[]; assets: TaskAsset[] }>
@@ -475,6 +476,11 @@ export interface ElectronAPI {
     pathExists: (path: string) => Promise<boolean>
     getDropPaths: () => string[]
     getPastePaths: () => string[]
+  }
+  clipboard: {
+    writeFilePaths: (paths: string[]) => Promise<void>
+    readFilePaths: () => Promise<string[]>
+    hasFiles: () => Promise<boolean>
   }
   pty: {
     create: (opts: PtyCreateOptions) => Promise<{ success: boolean; error?: string }>
@@ -753,7 +759,7 @@ export interface ElectronAPI {
     rename: (rootPath: string, oldPath: string, newPath: string) => Promise<void>
     delete: (rootPath: string, targetPath: string) => Promise<void>
     copy: (rootPath: string, srcPath: string, destPath: string) => Promise<void>
-    copyIn: (rootPath: string, absoluteSrc: string) => Promise<string>
+    copyIn: (rootPath: string, absoluteSrc: string, targetDir?: string) => Promise<string>
     showInFinder: (rootPath: string, targetPath: string) => Promise<void>
     listAllFiles: (rootPath: string) => Promise<string[]>
     searchFiles: (rootPath: string, query: string, options?: SearchFilesOptions) => Promise<FileSearchResult[]>

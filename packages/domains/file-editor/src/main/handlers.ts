@@ -238,21 +238,26 @@ export function registerFileEditorHandlers(ipcMain: IpcMain): void {
     fs.rmSync(abs, { recursive: true })
   })
 
-  ipcMain.handle('fs:copyIn', (_event, rootPath: string, absoluteSrc: string): string => {
+  ipcMain.handle('fs:copyIn', (_event, rootPath: string, absoluteSrc: string, targetDir?: string): string => {
     const srcResolved = path.resolve(absoluteSrc)
     if (!fs.existsSync(srcResolved) || !fs.statSync(srcResolved).isFile()) {
       throw new Error('Source is not a file')
     }
     const ext = path.extname(srcResolved)
-    const name = path.basename(srcResolved, ext)
-    let relPath = path.basename(srcResolved)
+    const stem = path.basename(srcResolved, ext)
+    const baseName = path.basename(srcResolved)
+    const dirRel = (targetDir ?? '').trim()
+    if (dirRel) assertWithinRoot(rootPath, dirRel)
+    let relPath = dirRel ? `${dirRel}/${baseName}` : baseName
     let dest = assertWithinRoot(rootPath, relPath)
     let i = 1
     while (fs.existsSync(dest)) {
-      relPath = `${name} (${i})${ext}`
+      const candidate = `${stem} (${i})${ext}`
+      relPath = dirRel ? `${dirRel}/${candidate}` : candidate
       dest = assertWithinRoot(rootPath, relPath)
       i++
     }
+    fs.mkdirSync(path.dirname(dest), { recursive: true })
     fs.copyFileSync(srcResolved, dest)
     return relPath
   })

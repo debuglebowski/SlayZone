@@ -124,6 +124,7 @@ import { registerTestPanelHandlers } from '@slayzone/test-panel/main'
 import { registerAutomationHandlers, AutomationEngine } from '@slayzone/automations/main'
 import { registerUsageAnalyticsHandlers } from '@slayzone/usage-analytics/main'
 import { registerScreenshotHandlers } from './screenshot'
+import { registerClipboardHandlers } from './clipboard-handlers'
 import { setProcessManagerWindow, initProcessManager, createProcess, spawnProcess, updateProcess, stopProcess, killProcess, restartProcess, listForTask, listAllProcesses, killTaskProcesses, killAllProcesses } from './process-manager'
 import { createStatsPoller } from './pid-stats'
 import { registerExportImportHandlers } from './export-import'
@@ -1147,6 +1148,7 @@ app.whenReady().then(async () => {
   registerAiConfigHandlers(ipcMain, db)
   const integrationHandles = registerIntegrationHandlers(ipcMain, db, { enableTestChannels: isPlaywright })
   registerFileEditorHandlers(ipcMain)
+  registerClipboardHandlers(ipcMain)
   registerScreenshotHandlers(browserViewManager)
   registerExportImportHandlers(ipcMain, db, isPlaywright)
   registerLeaderboardHandlers(ipcMain, db)

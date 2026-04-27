@@ -88,6 +88,7 @@ const api: ElectronAPI = {
       return () => ipcRenderer.removeListener('assets:content-changed', handler)
     },
     upload: (data) => ipcRenderer.invoke('db:assets:upload', data),
+    pasteFiles: (data) => ipcRenderer.invoke('db:assets:pasteFiles', data),
     getFileSize: (id) => ipcRenderer.invoke('db:assets:getFileSize', id),
     cleanupTask: (taskId) => ipcRenderer.invoke('db:assets:cleanupTask', taskId),
     uploadDir: (data) => ipcRenderer.invoke('db:assets:uploadDir', data),
@@ -342,6 +343,11 @@ const api: ElectronAPI = {
       lastPastePaths = []
       return paths
     }
+  },
+  clipboard: {
+    writeFilePaths: (paths) => ipcRenderer.invoke('clipboard:writeFilePaths', paths),
+    readFilePaths: () => ipcRenderer.invoke('clipboard:readFilePaths'),
+    hasFiles: () => ipcRenderer.invoke('clipboard:hasFiles')
   },
   pty: {
     create: (opts) => ipcRenderer.invoke('pty:create', opts),
@@ -736,7 +742,7 @@ const api: ElectronAPI = {
     rename: (rootPath, oldPath, newPath) => ipcRenderer.invoke('fs:rename', rootPath, oldPath, newPath),
     delete: (rootPath, targetPath) => ipcRenderer.invoke('fs:delete', rootPath, targetPath),
     copy: (rootPath, srcPath, destPath) => ipcRenderer.invoke('fs:copy', rootPath, srcPath, destPath),
-    copyIn: (rootPath, absoluteSrc) => ipcRenderer.invoke('fs:copyIn', rootPath, absoluteSrc),
+    copyIn: (rootPath, absoluteSrc, targetDir) => ipcRenderer.invoke('fs:copyIn', rootPath, absoluteSrc, targetDir),
     showInFinder: (rootPath, targetPath) => ipcRenderer.invoke('fs:showInFinder', rootPath, targetPath),
     listAllFiles: (rootPath) => ipcRenderer.invoke('fs:listAllFiles', rootPath),
     searchFiles: (rootPath, query, opts) => ipcRenderer.invoke('fs:searchFiles', rootPath, query, opts),
