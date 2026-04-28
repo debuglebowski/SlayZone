@@ -13,6 +13,7 @@ import { createPlaceholderPlugin } from './milkdown-placeholder'
 import { listItemMovePlugin } from './milkdown-list-move'
 import { escapeBlurPlugin } from './milkdown-escape-blur'
 import { taskListPlugin } from './milkdown-task-list'
+import { htmlRenderPlugin } from './milkdown-html-render'
 import { createAssetLinkPlugin, insertAssetLinkAtCursor, type AssetMentionState } from './milkdown-asset-link'
 import { extractImageFilesFromDataTransfer } from './use-image-paste-drop'
 import { createSearchHighlightPlugin, setSearch as setMilkdownSearch } from './milkdown-search-highlight'
@@ -262,6 +263,7 @@ export function RichTextEditor({
       })
       .use(commonmark)
       .use(gfm)
+      .use(htmlRenderPlugin())
       .use(history)
       .use(indent)
       .use(listener)

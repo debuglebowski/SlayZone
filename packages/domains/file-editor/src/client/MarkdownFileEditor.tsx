@@ -6,7 +6,7 @@ import { history } from '@milkdown/plugin-history'
 import { indent } from '@milkdown/plugin-indent'
 import { listener, listenerCtx } from '@milkdown/plugin-listener'
 import { replaceAll } from '@milkdown/utils'
-import { taskListPlugin } from '@slayzone/editor'
+import { taskListPlugin, htmlRenderPlugin } from '@slayzone/editor'
 import { remarkFrontmatterPlugin, frontmatterSchema, frontmatterView } from './milkdown-frontmatter'
 import { useTheme } from '@slayzone/settings/client'
 import { getThemeEditorColors, useAppearance } from '@slayzone/ui'
@@ -20,9 +20,35 @@ interface MarkdownFileEditorProps {
   onSave: () => void
   /** Bump to replace editor content from external source (e.g. disk reload) */
   version?: number
+  /** Absolute path of the project root — required for resolving relative HTML img/href to slz-file URLs. */
+  projectPath: string
+  /** Open another file in the editor (used for in-editor `.md` link nav). */
+  onOpenFile?: (filePath: string) => void
 }
 
-export function MarkdownFileEditor({ filePath, content, onChange, onSave, version }: MarkdownFileEditorProps) {
+const TEXT_EXTENSIONS = new Set([
+  'md', 'mdx', 'markdown', 'txt', 'rst',
+  'js', 'jsx', 'ts', 'tsx', 'mjs', 'cjs',
+  'json', 'yaml', 'yml', 'toml', 'xml', 'html', 'css', 'scss',
+  'py', 'rb', 'go', 'rs', 'java', 'c', 'cpp', 'h', 'hpp', 'sh', 'env',
+])
+
+function posixDirname(p: string): string {
+  const i = p.lastIndexOf('/')
+  return i < 0 ? '' : p.slice(0, i)
+}
+
+function posixResolve(...parts: string[]): string {
+  const segments: string[] = []
+  for (const part of parts.join('/').split('/')) {
+    if (part === '' || part === '.') continue
+    if (part === '..') segments.pop()
+    else segments.push(part)
+  }
+  return '/' + segments.join('/')
+}
+
+export function MarkdownFileEditor({ filePath, content, onChange, onSave, version, projectPath, onOpenFile }: MarkdownFileEditorProps) {
   const { editorThemeId, contentVariant } = useTheme()
   const themeColors = useMemo(() => getThemeEditorColors(editorThemeId, contentVariant), [editorThemeId, contentVariant])
   const { notesReadability, notesWidth } = useAppearance()
@@ -33,10 +59,49 @@ export function MarkdownFileEditor({ filePath, content, onChange, onSave, versio
   const onSaveRef = useRef(onSave)
   const contentRef = useRef(content)
   const suppressOnChange = useRef(false)
+  const onOpenFileRef = useRef(onOpenFile)
 
   onChangeRef.current = onChange
   onSaveRef.current = onSave
   contentRef.current = content
+  onOpenFileRef.current = onOpenFile
+
+  // Build resolver + click handler for HTML rendering.
+  // Stable across renders within the same file — closes over filePath/projectPath
+  // (only change when editor remounts via key={filePath}).
+  const fileDirAbs = posixResolve(projectPath, posixDirname(filePath))
+  const resolveSrc = (src: string): string => {
+    if (src.startsWith('/')) return `slz-file://${src}`
+    return `slz-file://${posixResolve(fileDirAbs, src)}`
+  }
+  const onLinkClick = (resolvedHref: string) => {
+    if (!resolvedHref) return
+    if (resolvedHref.startsWith('#')) {
+      // In-doc anchor — let browser handle scroll if target exists
+      const id = resolvedHref.slice(1)
+      const el = id ? containerRef.current?.querySelector(`#${CSS.escape(id)}`) : null
+      el?.scrollIntoView({ block: 'center' })
+      return
+    }
+    if (/^(https?:|mailto:)/i.test(resolvedHref)) {
+      void window.api.shell.openExternal(resolvedHref)
+      return
+    }
+    if (resolvedHref.startsWith('slz-file://')) {
+      const absPath = resolvedHref.replace(/^slz-file:\/\//, '').replace(/\?.*$/, '').replace(/#.*$/, '')
+      const projectPrefix = projectPath.endsWith('/') ? projectPath : projectPath + '/'
+      // Inside project + text-y file → open in editor; otherwise shell out.
+      if (absPath.startsWith(projectPrefix)) {
+        const relPath = absPath.slice(projectPrefix.length)
+        const ext = relPath.split('.').pop()?.toLowerCase() ?? ''
+        if (TEXT_EXTENSIONS.has(ext) && onOpenFileRef.current) {
+          onOpenFileRef.current(relPath)
+          return
+        }
+      }
+      void window.api.shell.openPath(absPath)
+    }
+  }
 
   // Create editor
   useEffect(() => {
@@ -58,6 +123,7 @@ export function MarkdownFileEditor({ filePath, content, onChange, onSave, versio
       })
       .use(commonmark)
       .use(gfm)
+      .use(htmlRenderPlugin({ resolveSrc, onLinkClick }))
       .use(history)
       .use(indent)
       .use(listener)

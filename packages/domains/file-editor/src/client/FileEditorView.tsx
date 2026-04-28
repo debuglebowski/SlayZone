@@ -406,10 +406,12 @@ export const FileEditorView = forwardRef<FileEditorViewHandle, FileEditorViewPro
                 <MarkdownFileEditor
                   key={activeFile.path}
                   filePath={activeFile.path}
+                  projectPath={projectPath}
                   content={activeFile.content}
                   onChange={(content) => updateContent(activeFile.path, content)}
                   onSave={() => saveFile(activeFile.path)}
                   version={fileVersions.get(activeFile.path)}
+                  onOpenFile={openFile}
                 />
               ) : isMarkdown && viewMode === 'split' ? (
                 <MarkdownSplitView
