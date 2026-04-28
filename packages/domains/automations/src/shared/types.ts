@@ -24,11 +24,29 @@ export interface ConditionConfig {
 
 // -- Action --
 
-export type ActionType = 'run_command'
+export type ActionType = 'run_command' | 'ai'
 
 export interface ActionConfig {
   type: ActionType
   params: Record<string, unknown>
+}
+
+export interface RunCommandActionParams {
+  command: string
+  cwd?: string
+}
+
+/**
+ * AI action — run a configured AI provider in headless mode with a prompt.
+ *
+ * `provider` is a terminal mode id (e.g. 'claude-code', 'codex'). The engine
+ * derives the non-interactive shell invocation from the provider's type.
+ */
+export interface AiActionParams {
+  provider: string
+  prompt: string
+  flags?: string
+  cwd?: string
 }
 
 // -- Automation --

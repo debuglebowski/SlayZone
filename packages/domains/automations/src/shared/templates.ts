@@ -20,7 +20,8 @@ export interface TemplateContext {
   }
 }
 
-export function resolveTemplate(template: string, ctx: TemplateContext): string {
+export function resolveTemplate(template: unknown, ctx: TemplateContext): string {
+  if (typeof template !== 'string') return ''
   return template.replace(/\{\{(\w+)\.(\w+)\}\}/g, (_match, group: string, key: string) => {
     const obj = ctx[group as keyof TemplateContext]
     if (!obj || typeof obj !== 'object') return ''

@@ -5,8 +5,14 @@ import {
   Select, SelectTrigger, SelectValue, SelectContent, SelectItem, SelectGroup, SelectLabel,
   taskStatusOptions,
 } from '@slayzone/ui'
-import { Plus, Trash2 } from 'lucide-react'
-import { TEMPLATE_VARIABLES, type Automation, type TriggerConfig, type ConditionConfig, type ActionConfig, type CreateAutomationInput, type UpdateAutomationInput } from '@slayzone/automations/shared'
+import { Plus, Trash2, Sparkles, Terminal } from 'lucide-react'
+import { TEMPLATE_VARIABLES, getHeadlessPattern, type Automation, type TriggerConfig, type ConditionConfig, type ActionConfig, type ActionType, type CreateAutomationInput, type UpdateAutomationInput } from '@slayzone/automations/shared'
+
+interface AiProviderOption {
+  id: string
+  label: string
+  type: string
+}
 
 interface AutomationDialogProps {
   open: boolean
@@ -84,14 +90,34 @@ function toggleValue(arr: string[], val: string): string[] {
 }
 
 const EMPTY_TRIGGER: TriggerConfig = { type: 'task_status_change', params: {} }
+const EMPTY_RUN_COMMAND: ActionConfig = { type: 'run_command', params: { command: '' } }
+
+function actionIsValid(action: ActionConfig): boolean {
+  if (action.type === 'ai') {
+    return !!(action.params.provider as string)?.trim() && !!(action.params.prompt as string)?.trim()
+  }
+  return !!(action.params.command as string)?.trim()
+}
 
 export function AutomationDialog({ open, onOpenChange, automation, projectId, tags, onSave }: AutomationDialogProps) {
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
   const [trigger, setTrigger] = useState<TriggerConfig>(EMPTY_TRIGGER)
   const [conditions, setConditions] = useState<ConditionConfig[]>([])
-  const [actions, setActions] = useState<ActionConfig[]>([{ type: 'run_command', params: { command: '' } }])
+  const [actions, setActions] = useState<ActionConfig[]>([{ ...EMPTY_RUN_COMMAND }])
   const [showAllVars, setShowAllVars] = useState(false)
+  const [providers, setProviders] = useState<AiProviderOption[]>([])
+
+  useEffect(() => {
+    if (!open) return
+    window.api.terminalModes.list().then((modes: { id: string; label: string; type: string; enabled: boolean }[]) => {
+      setProviders(
+        modes
+          .filter(m => m.enabled && getHeadlessPattern(m.type))
+          .map(m => ({ id: m.id, label: m.label, type: m.type }))
+      )
+    }).catch(() => setProviders([]))
+  }, [open])
 
   useEffect(() => {
     if (automation) {
@@ -99,19 +125,19 @@ export function AutomationDialog({ open, onOpenChange, automation, projectId, ta
       setDescription(automation.description ?? '')
       setTrigger(automation.trigger_config)
       setConditions(automation.conditions)
-      setActions(automation.actions.length > 0 ? automation.actions : [{ type: 'run_command', params: { command: '' } }])
+      setActions(automation.actions.length > 0 ? automation.actions : [{ ...EMPTY_RUN_COMMAND }])
     } else {
       setName('')
       setDescription('')
       setTrigger({ ...EMPTY_TRIGGER })
       setConditions([])
-      setActions([{ type: 'run_command', params: { command: '' } }])
+      setActions([{ ...EMPTY_RUN_COMMAND }])
     }
   }, [automation, open])
 
   const handleSave = () => {
     if (!name.trim()) return
-    const validActions = actions.filter((a: ActionConfig) => (a.params.command as string)?.trim())
+    const validActions = actions.filter(actionIsValid)
     if (validActions.length === 0) return
 
     if (automation) {
@@ -336,26 +362,94 @@ export function AutomationDialog({ open, onOpenChange, automation, projectId, ta
           <div className="rounded-lg border border-border/40 bg-muted/50 p-3 space-y-4">
             <div className="flex items-center justify-between">
               <Label className="text-xs uppercase tracking-wider text-muted-foreground">Then</Label>
-              <Button variant="ghost" size="sm" className="h-6 text-xs" onClick={() => setActions((prev: ActionConfig[]) => [...prev, { type: 'run_command' as const, params: { command: '' } }])}>
-                <Plus className="w-3 h-3 mr-1" /> Add
-              </Button>
+              <div className="flex items-center gap-1">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 text-xs"
+                  onClick={() => setActions((prev: ActionConfig[]) => [...prev, { ...EMPTY_RUN_COMMAND }])}
+                >
+                  <Terminal className="w-3 h-3 mr-1" /> Command
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 text-xs"
+                  disabled={providers.length === 0}
+                  onClick={() => setActions((prev: ActionConfig[]) => [...prev, { type: 'ai', params: { provider: providers[0]?.id ?? '', prompt: '', flags: '' } }])}
+                >
+                  <Sparkles className="w-3 h-3 mr-1" /> AI
+                </Button>
+              </div>
             </div>
 
-            {actions.map((action, i) => (
-              <div key={i} className="flex items-center gap-2">
-                <Textarea
-                  value={(action.params.command as string) ?? ''}
-                  onChange={(e) => setActions((prev: ActionConfig[]) => prev.map((a: ActionConfig, j: number) => j === i ? { ...a, params: { ...a.params, command: e.target.value } } : a))}
-                  placeholder="echo {{task.name}}"
-                  className="font-mono text-xs flex-1 min-h-[60px] resize-y"
-                />
-                {actions.length > 1 && (
-                  <Button variant="ghost" size="sm" className="h-6 w-6 p-0 shrink-0" onClick={() => setActions((prev: ActionConfig[]) => prev.filter((_: ActionConfig, j: number) => j !== i))}>
-                    <Trash2 className="w-3 h-3" />
-                  </Button>
-                )}
-              </div>
-            ))}
+            {actions.map((action, i) => {
+              const updateParam = (key: string, value: string) =>
+                setActions((prev: ActionConfig[]) => prev.map((a: ActionConfig, j: number) => j === i ? { ...a, params: { ...a.params, [key]: value } } : a))
+              const changeType = (newType: ActionType) =>
+                setActions((prev: ActionConfig[]) => prev.map((a: ActionConfig, j: number) => {
+                  if (j !== i) return a
+                  if (newType === a.type) return a
+                  return newType === 'ai'
+                    ? { type: 'ai', params: { provider: providers[0]?.id ?? '', prompt: '', flags: '' } }
+                    : { ...EMPTY_RUN_COMMAND }
+                }))
+
+              return (
+                <div key={i} className="rounded-md border border-border/40 bg-background/40 p-2 space-y-2">
+                  <div className="flex items-center gap-2">
+                    <Select value={action.type} onValueChange={(v) => changeType(v as ActionType)}>
+                      <SelectTrigger size="sm" className="w-32 shrink-0"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="run_command">Run command</SelectItem>
+                        <SelectItem value="ai" disabled={providers.length === 0}>Run AI</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    {action.type === 'ai' && (
+                      <Select
+                        value={(action.params.provider as string) || providers[0]?.id || ''}
+                        onValueChange={(v) => updateParam('provider', v)}
+                      >
+                        <SelectTrigger size="sm" className="flex-1"><SelectValue placeholder="Pick provider" /></SelectTrigger>
+                        <SelectContent>
+                          {providers.map(p => <SelectItem key={p.id} value={p.id}>{p.label}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    )}
+                    <div className="flex-1" />
+                    {actions.length > 1 && (
+                      <Button variant="ghost" size="sm" className="h-6 w-6 p-0 shrink-0" onClick={() => setActions((prev: ActionConfig[]) => prev.filter((_: ActionConfig, j: number) => j !== i))}>
+                        <Trash2 className="w-3 h-3" />
+                      </Button>
+                    )}
+                  </div>
+
+                  {action.type === 'run_command' ? (
+                    <Textarea
+                      value={(action.params.command as string) ?? ''}
+                      onChange={(e) => updateParam('command', e.target.value)}
+                      placeholder="echo {{task.name}}"
+                      className="font-mono text-xs w-full min-h-[60px] resize-y"
+                    />
+                  ) : (
+                    <>
+                      <Textarea
+                        value={(action.params.prompt as string) ?? ''}
+                        onChange={(e) => updateParam('prompt', e.target.value)}
+                        placeholder="Summarize {{task.name}} and post to PR"
+                        className="font-mono text-xs w-full min-h-[60px] resize-y"
+                      />
+                      <Input
+                        value={(action.params.flags as string) ?? ''}
+                        onChange={(e) => updateParam('flags', e.target.value)}
+                        placeholder="extra flags (optional, overrides provider defaults)"
+                        className="font-mono text-[11px] h-7"
+                      />
+                    </>
+                  )}
+                </div>
+              )
+            })}
 
             <table className="w-full text-xs mt-2 border-collapse border border-border/40 rounded">
               <thead>
@@ -381,7 +475,7 @@ export function AutomationDialog({ open, onOpenChange, automation, projectId, ta
 
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-          <Button onClick={handleSave} disabled={!name.trim() || actions.every((a: ActionConfig) => !(a.params.command as string)?.trim())}>
+          <Button onClick={handleSave} disabled={!name.trim() || !actions.some(actionIsValid)}>
             {automation ? 'Save' : 'Create'}
           </Button>
         </DialogFooter>
