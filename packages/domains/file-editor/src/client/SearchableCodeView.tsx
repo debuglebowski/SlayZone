@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from 'react'
+import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef } from 'react'
 import { useTheme } from '@slayzone/settings/client'
 import { getThemeEditorColors } from '@slayzone/ui'
 import { EditorView, lineNumbers, highlightActiveLineGutter, highlightActiveLine, drawSelection, dropCursor } from '@codemirror/view'
@@ -122,13 +122,17 @@ export interface SearchableCodeViewProps {
   placeholder?: string
 }
 
-export function SearchableCodeView({
+export interface SearchableCodeViewHandle {
+  focusLine: (line: number) => void
+}
+
+export const SearchableCodeView = forwardRef<SearchableCodeViewHandle, SearchableCodeViewProps>(function SearchableCodeView({
   value, onChange, fileExt, version,
   searchQuery = '', searchActiveIndex = 0, searchMatchCase = false, searchRegex = false,
   onSearchMatchCountChange,
   fontSize = 12,
   placeholder,
-}: SearchableCodeViewProps) {
+}, ref) {
   const { editorThemeId, contentVariant } = useTheme()
   const themeExt = useMemo(
     () => buildCodeMirrorTheme(getThemeEditorColors(editorThemeId, contentVariant), contentVariant === 'dark'),
@@ -241,7 +245,22 @@ export function SearchableCodeView({
     }
   }, [searchQuery, searchActiveIndex, searchMatchCase, searchRegex])
 
+  useImperativeHandle(ref, () => ({
+    focusLine: (line: number) => {
+      const view = viewRef.current
+      if (!view) return
+      const total = view.state.doc.lines
+      const target = Math.max(1, Math.min(total, line))
+      const from = view.state.doc.line(target).from
+      view.dispatch({
+        selection: { anchor: from },
+        effects: EditorView.scrollIntoView(from, { y: 'center' }),
+      })
+      view.focus()
+    },
+  }), [])
+
   return (
     <div ref={containerRef} className="h-full w-full overflow-hidden" data-placeholder={placeholder} />
   )
-}
+})

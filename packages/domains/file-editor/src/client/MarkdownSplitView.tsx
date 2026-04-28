@@ -27,6 +27,13 @@ export function MarkdownSplitView({ filePath, content, onChange, onSave, version
     return () => clearTimeout(timer)
   }, [content])
 
+  const [previewClickPos, setPreviewClickPos] = useState<{ line: number; col: number } | null>(null)
+  const effectiveGoTo = previewClickPos ?? goToPosition
+  const handleGoToApplied = () => {
+    if (previewClickPos) setPreviewClickPos(null)
+    else onGoToPositionApplied?.()
+  }
+
   const themeStyle = {
     '--mk-bg': colors.background,
     '--mk-fg': colors.foreground,
@@ -47,15 +54,22 @@ export function MarkdownSplitView({ filePath, content, onChange, onSave, version
           onChange={onChange}
           onSave={onSave}
           version={version}
-          goToPosition={goToPosition}
-          onGoToPositionApplied={onGoToPositionApplied}
+          goToPosition={effectiveGoTo}
+          onGoToPositionApplied={handleGoToApplied}
         />
       </div>
-      <div className="flex-1 border-l border-border min-w-0 min-h-0">
+      <div
+        className="flex-1 border-l border-border min-w-0 min-h-0"
+        onClick={(e) => {
+          const el = (e.target as HTMLElement).closest('[data-source-line]')
+          const line = el ? parseInt(el.getAttribute('data-source-line') || '1', 10) : 1
+          setPreviewClickPos({ line: Number.isFinite(line) ? line : 1, col: 0 })
+        }}
+      >
         <div className="mk-doc" data-readability={notesReadability} data-width={notesWidth} style={themeStyle}>
           <div className="mk-doc-scroll">
             <div className="mk-doc-body">
-              <Markdown>{previewContent}</Markdown>
+              <Markdown attachSourceLines>{previewContent}</Markdown>
             </div>
           </div>
         </div>

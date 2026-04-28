@@ -17,7 +17,7 @@ import { getEffectiveRenderMode, getExtensionFromTitle, RENDER_MODE_INFO, isBina
 import { Markdown, MermaidBlock } from '@slayzone/markdown/client'
 import { useAppearance, getThemeEditorColors, type EditorThemeColors } from '@slayzone/ui'
 import { useTheme } from '@slayzone/settings/client'
-import { SearchableCodeView } from '@slayzone/file-editor/client/SearchableCodeView'
+import { SearchableCodeView, type SearchableCodeViewHandle } from '@slayzone/file-editor/client/SearchableCodeView'
 import { useAssets } from './useAssets'
 import { AssetFindBar } from './AssetFindBar'
 import { AssetSearchPanel } from './AssetSearchPanel'
@@ -184,11 +184,19 @@ function AssetContentEditor({ asset, viewMode, zoomLevel, onZoom, readContent, s
   const [loading, setLoading] = useState(true)
   const [isDirty, setIsDirty] = useState(false)
   const [externalChangePending, setExternalChangePending] = useState(false)
-  const [contentVersion, setContentVersion] = useState(0)
+  // Two counters with distinct purposes:
+  // - editorReloadVersion: bumps only on external reload (loadFromDisk). Drives
+  //   CodeMirror replaceAll in SearchableCodeView. Never bumped on save → caret
+  //   survives save round-trips.
+  // - previewVersion: bumps on save AND external reload. Cache-busts preview
+  //   iframes (HTML/PDF/image) so they refetch from disk.
+  const [editorReloadVersion, setEditorReloadVersion] = useState(0)
+  const [previewVersion, setPreviewVersion] = useState(0)
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const baselineMtimeRef = useRef<number | null>(null)
   const contentRef = useRef(content)
   const isDirtyRef = useRef(false)
+  const splitCodeRef = useRef<SearchableCodeViewHandle>(null)
   contentRef.current = content
   isDirtyRef.current = isDirty
   const fileExt = getExtensionFromTitle(asset.title) || undefined
@@ -206,7 +214,8 @@ function AssetContentEditor({ asset, viewMode, zoomLevel, onZoom, readContent, s
     baselineMtimeRef.current = mtime
     setIsDirty(false)
     setExternalChangePending(false)
-    setContentVersion(v => v + 1)
+    setEditorReloadVersion(v => v + 1)
+    setPreviewVersion(v => v + 1)
   }, [asset.id, readContent])
 
   // Load on mount / asset change. Flush pending save on unmount (with mtime guard).
@@ -214,7 +223,7 @@ function AssetContentEditor({ asset, viewMode, zoomLevel, onZoom, readContent, s
     if (isBinary) {
       setLoading(false)
       window.api.assets.getMtime(asset.id).then((m) => { baselineMtimeRef.current = m })
-      setContentVersion(v => v + 1)
+      setPreviewVersion(v => v + 1)
       return
     }
     setLoading(true)
@@ -267,8 +276,9 @@ function AssetContentEditor({ asset, viewMode, zoomLevel, onZoom, readContent, s
       const newMtime = await window.api.assets.getMtime(asset.id)
       baselineMtimeRef.current = newMtime
       setIsDirty(false)
-      // Bump version so HTML/PDF/Image preview iframes reload from disk after save
-      setContentVersion(v => v + 1)
+      // Cache-bust preview iframes only. Editor must NOT see this bump or
+      // CodeMirror replaceAll resets the caret mid-typing.
+      setPreviewVersion(v => v + 1)
     }, 500)
   }, [asset.id, saveContent])
 
@@ -294,8 +304,8 @@ function AssetContentEditor({ asset, viewMode, zoomLevel, onZoom, readContent, s
   }, [asset.id, saveContent])
 
   const banner = externalChangePending ? (
-    <div className="shrink-0 flex items-center gap-2 border-b border-border bg-amber-500/10 px-3 py-1.5 text-[11px]" data-testid="asset-conflict-banner">
-      <span className="flex-1 text-muted-foreground">File changed externally.</span>
+    <div className="absolute bottom-3 right-3 z-10 flex items-center gap-2 rounded-md border border-border bg-amber-500/10 px-3 py-1.5 text-[11px] shadow-md backdrop-blur-sm" data-testid="asset-conflict-banner">
+      <span className="text-muted-foreground">File changed externally.</span>
       <Button variant="outline" size="sm" className="!h-6 text-[10px] px-2" onClick={handleReloadFromDisk} data-testid="asset-conflict-reload">Reload</Button>
       <Button variant="outline" size="sm" className="!h-6 text-[10px] px-2" onClick={handleKeepMine} data-testid="asset-conflict-keep">Keep mine</Button>
     </div>
@@ -303,30 +313,29 @@ function AssetContentEditor({ asset, viewMode, zoomLevel, onZoom, readContent, s
 
   const inner = ((): React.ReactElement => {
     if (loading) return <div className="flex-1 flex items-center justify-center text-xs text-muted-foreground">Loading...</div>
-    if (renderMode === 'image') return <ImageViewer assetId={asset.id} contentVersion={contentVersion} zoomLevel={zoomLevel} onZoom={onZoom} getFilePath={getFilePath} />
-    if (renderMode === 'pdf') return <PdfViewer assetId={asset.id} contentVersion={contentVersion} getFilePath={getFilePath} />
+    if (renderMode === 'image') return <ImageViewer assetId={asset.id} contentVersion={previewVersion} zoomLevel={zoomLevel} onZoom={onZoom} getFilePath={getFilePath} />
+    if (renderMode === 'pdf') return <PdfViewer assetId={asset.id} contentVersion={previewVersion} getFilePath={getFilePath} />
 
     const hasPreview = renderMode === 'markdown' || renderMode === 'html-preview' || renderMode === 'svg-preview' || renderMode === 'mermaid-preview'
 
     if (renderMode === 'markdown' && viewMode === 'preview') {
       return (
-        <div className="flex-1 overflow-y-auto">
-          <RichTextEditor
-            value={content ?? ''}
-            onChange={handleChange}
-            placeholder="Write markdown..."
-            readability={effectiveReadability}
-            width={effectiveWidth}
-            fontFamily={notesFontFamily}
-            checkedHighlight={notesCheckedHighlight}
-            showToolbar={notesShowToolbar}
-            spellcheck={notesSpellcheck}
-            themeColors={themeColors}
-            searchQuery={searchQuery}
-            searchActiveIndex={searchActiveIndex}
-            onSearchMatchCountChange={onSearchMatchCountChange}
-          />
-        </div>
+        <RichTextEditor
+          className="flex-1 min-h-0"
+          value={content ?? ''}
+          onChange={handleChange}
+          placeholder="Write markdown..."
+          readability={effectiveReadability}
+          width={effectiveWidth}
+          fontFamily={notesFontFamily}
+          checkedHighlight={notesCheckedHighlight}
+          showToolbar={notesShowToolbar}
+          spellcheck={notesSpellcheck}
+          themeColors={themeColors}
+          searchQuery={searchQuery}
+          searchActiveIndex={searchActiveIndex}
+          onSearchMatchCountChange={onSearchMatchCountChange}
+        />
       )
     }
 
@@ -335,10 +344,11 @@ function AssetContentEditor({ asset, viewMode, zoomLevel, onZoom, readContent, s
         <div className="flex-1 flex flex-row overflow-hidden">
           <div className="flex-1 min-w-0">
             <SearchableCodeView
+              ref={splitCodeRef}
               value={content ?? ''}
               onChange={handleChange}
               fileExt={fileExt}
-              version={contentVersion}
+              version={editorReloadVersion}
               searchQuery={searchQuery}
               searchActiveIndex={searchActiveIndex}
               searchMatchCase={searchMatchCase}
@@ -347,11 +357,18 @@ function AssetContentEditor({ asset, viewMode, zoomLevel, onZoom, readContent, s
               placeholder="Write markdown..."
             />
           </div>
-          <div className="flex-1 border-l border-border min-w-0 min-h-0">
+          <div
+            className="flex-1 border-l border-border min-w-0 min-h-0"
+            onClick={(e) => {
+              const el = (e.target as HTMLElement).closest('[data-source-line]')
+              const line = el ? parseInt(el.getAttribute('data-source-line') || '1', 10) : 1
+              splitCodeRef.current?.focusLine(Number.isFinite(line) ? line : 1)
+            }}
+          >
             <div className="mk-doc" data-readability={effectiveReadability} data-width={effectiveWidth} style={themeStyle}>
               <div className="mk-doc-scroll">
                 <div className="mk-doc-body">
-                  <Markdown>{content ?? ''}</Markdown>
+                  <Markdown attachSourceLines>{content ?? ''}</Markdown>
                 </div>
               </div>
             </div>
@@ -361,7 +378,7 @@ function AssetContentEditor({ asset, viewMode, zoomLevel, onZoom, readContent, s
     }
 
     if (hasPreview && viewMode === 'preview') {
-      return <div className="flex-1 flex flex-col overflow-hidden"><AssetPreview renderMode={renderMode} content={content ?? ''} assetId={asset.id} contentVersion={contentVersion} getFilePath={getFilePath} zoomLevel={zoomLevel} onZoom={onZoom} /></div>
+      return <div className="flex-1 flex flex-col overflow-hidden"><AssetPreview renderMode={renderMode} content={content ?? ''} assetId={asset.id} contentVersion={previewVersion} getFilePath={getFilePath} zoomLevel={zoomLevel} onZoom={onZoom} /></div>
     }
 
     if (hasPreview && viewMode === 'split') {
@@ -372,7 +389,7 @@ function AssetContentEditor({ asset, viewMode, zoomLevel, onZoom, readContent, s
               value={content ?? ''}
               onChange={handleChange}
               fileExt={fileExt}
-              version={contentVersion}
+              version={editorReloadVersion}
               searchQuery={searchQuery}
               searchActiveIndex={searchActiveIndex}
               searchMatchCase={searchMatchCase}
@@ -382,7 +399,7 @@ function AssetContentEditor({ asset, viewMode, zoomLevel, onZoom, readContent, s
             />
           </div>
           <div className="flex-1 flex flex-col border-l border-border overflow-hidden min-w-0">
-            <AssetPreview renderMode={renderMode} content={content ?? ''} assetId={asset.id} contentVersion={contentVersion} getFilePath={getFilePath} zoomLevel={zoomLevel} onZoom={onZoom} />
+            <AssetPreview renderMode={renderMode} content={content ?? ''} assetId={asset.id} contentVersion={previewVersion} getFilePath={getFilePath} zoomLevel={zoomLevel} onZoom={onZoom} />
           </div>
         </div>
       )
@@ -394,7 +411,7 @@ function AssetContentEditor({ asset, viewMode, zoomLevel, onZoom, readContent, s
           value={content ?? ''}
           onChange={handleChange}
           fileExt={fileExt}
-          version={contentVersion}
+          version={editorReloadVersion}
           searchQuery={searchQuery}
           searchActiveIndex={searchActiveIndex}
           onSearchMatchCountChange={onSearchMatchCountChange}
@@ -405,9 +422,9 @@ function AssetContentEditor({ asset, viewMode, zoomLevel, onZoom, readContent, s
   })()
 
   return (
-    <div className="flex-1 flex flex-col min-h-0">
-      {banner}
+    <div className="relative flex-1 flex flex-col min-h-0">
       {inner}
+      {banner}
     </div>
   )
 }
@@ -788,8 +805,9 @@ export const AssetsPanel = forwardRef<AssetsPanelHandle, AssetsPanelProps>(funct
       arr.push(a)
       ab.set(a.folder_id, arr)
     }
-    for (const arr of cf.values()) arr.sort((a, b) => a.name.localeCompare(b.name))
-    for (const arr of ab.values()) arr.sort((a, b) => a.title.localeCompare(b.title))
+    const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' })
+    for (const arr of cf.values()) arr.sort((a, b) => collator.compare(a.name, b.name))
+    for (const arr of ab.values()) arr.sort((a, b) => collator.compare(a.title, b.title))
     return { childFolders: cf, assetsByFolder: ab }
   }, [folders, assets])
 
