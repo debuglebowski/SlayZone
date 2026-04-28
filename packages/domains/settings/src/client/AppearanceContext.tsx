@@ -59,6 +59,8 @@ export function AppearanceProvider({
       window.api.settings.get('notes_show_toolbar'),
       window.api.settings.get('notes_spellcheck'),
       window.api.settings.get('editor_markdown_view_mode'),
+      window.api.settings.get('assets_settings_banner_open'),
+      window.api.settings.get('editor_settings_banner_open'),
     ]).then(([
       termSize, editorSize, reduceMotion, colorTints,
       wordWrap, tabSize, indentTabs, renderWs,
@@ -69,6 +71,7 @@ export function AppearanceProvider({
       sidebarBadge,
       notesFontFamily, notesReadability, legacyNotesLineSpacing, notesWidth, notesCheckedHighlight, notesShowToolbar, notesSpellcheck,
       mdViewMode,
+      assetsBannerOpen, editorBannerOpen,
     ]) => {
       // One-shot migration: notes_line_spacing → notes_readability
       let readabilityValue = notesReadability
@@ -107,6 +110,8 @@ export function AppearanceProvider({
         notesShowToolbar: notesShowToolbar === '1',
         notesSpellcheck: notesSpellcheck !== '0',
         editorMarkdownViewMode: (mdViewMode === 'split' || mdViewMode === 'code') ? mdViewMode : 'rich',
+        assetsSettingsBannerOpen: assetsBannerOpen === '1',
+        editorSettingsBannerOpen: editorBannerOpen === '1',
       })
     })
   }, [settingsRevision, localRevision])

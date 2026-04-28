@@ -41,6 +41,9 @@ export interface AppearanceSettings {
   sidebarBadgeMode: 'none' | 'blob' | 'count'
   // Markdown
   editorMarkdownViewMode: 'rich' | 'split' | 'code'
+  // Markdown settings banner open state (per consumer)
+  assetsSettingsBannerOpen: boolean
+  editorSettingsBannerOpen: boolean
 }
 
 export const appearanceDefaults: AppearanceSettings = {
@@ -71,6 +74,8 @@ export const appearanceDefaults: AppearanceSettings = {
   notesSpellcheck: true,
   sidebarBadgeMode: 'blob',
   editorMarkdownViewMode: 'rich',
+  assetsSettingsBannerOpen: false,
+  editorSettingsBannerOpen: false,
 }
 
 export const AppearanceContext = createContext<AppearanceSettings>(appearanceDefaults)

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef, useImperativeHandle, forwardRef, useMemo, type CSSProperties, type DragEvent } from 'react'
-import { Upload, Download, Trash2, FileText, Code, Globe, Image, GitBranch, Eye, Code2, Columns2, ZoomIn, ZoomOut, FolderPlus, Pencil, FilePlus, FolderOpen, Folder, ArrowRight, Copy, Search, Files, PanelLeftClose, PanelLeft, ImageDown, FileCode, Archive, Rows2, Rows3, Maximize2, AlignCenter, History, Scissors, ClipboardPaste, CopyPlus, type LucideIcon } from 'lucide-react'
+import { Upload, Download, Trash2, FileText, Code, Globe, Image, GitBranch, Eye, Code2, Columns2, ZoomIn, ZoomOut, FolderPlus, Pencil, FilePlus, FolderOpen, Folder, ArrowRight, Copy, Search, Files, PanelLeftClose, PanelLeft, ImageDown, FileCode, Archive, Rows2, Rows3, Maximize2, AlignCenter, History, Scissors, ClipboardPaste, CopyPlus, Settings2, Type } from 'lucide-react'
 import {
   cn, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Button, Input,
   ContextMenu, ContextMenuTrigger, ContextMenuContent, ContextMenuItem, ContextMenuSeparator, ContextMenuShortcut, ContextMenuSub, ContextMenuSubTrigger, ContextMenuSubContent,
@@ -11,7 +11,7 @@ import {
   PulseGrid,
 } from '@slayzone/ui'
 import type { AssetVersion, DiffResult } from '@slayzone/task-assets/shared'
-import { RichTextEditor } from '@slayzone/editor'
+import { RichTextEditor, MarkdownSettingsBanner } from '@slayzone/editor'
 import type { RenderMode, TaskAsset, AssetFolder } from '@slayzone/task/shared'
 import { getEffectiveRenderMode, getExtensionFromTitle, RENDER_MODE_INFO, isBinaryRenderMode, canExportAsPdf, canExportAsPng, canExportAsHtml } from '@slayzone/task/shared'
 import { Markdown, MermaidBlock } from '@slayzone/markdown/client'
@@ -55,40 +55,9 @@ function getAssetIcon(asset: TaskAsset): typeof FileText {
   return RENDER_MODE_ICONS[mode] ?? Code
 }
 
-function hasPreviewToggle(mode: RenderMode): boolean {
-  return mode === 'markdown' || mode === 'html-preview' || mode === 'svg-preview' || mode === 'mermaid-preview'
-}
-
 function hasZoom(mode: RenderMode): boolean {
   return mode === 'image' || mode === 'svg-preview' || mode === 'mermaid-preview'
 }
-
-function IconToggleButton({ icon: Icon, active, onClick, tooltip }: {
-  icon: LucideIcon
-  active: boolean
-  onClick: () => void
-  tooltip: React.ReactNode
-}) {
-  return (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <button
-          aria-pressed={active}
-          className={cn(
-            'flex items-center justify-center size-6 rounded transition-colors',
-            active ? 'bg-muted text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
-          )}
-          onClick={onClick}
-        >
-          <Icon className="size-3.5" />
-        </button>
-      </TooltipTrigger>
-      <TooltipContent side="bottom">{tooltip}</TooltipContent>
-    </Tooltip>
-  )
-}
-
-const TOGGLE_PILL_CLASS = 'flex items-center shrink-0 bg-surface-1 border border-border rounded-md p-0.5 gap-0.5'
 
 // --- Image viewer ---
 
@@ -495,7 +464,11 @@ export const AssetsPanel = forwardRef<AssetsPanelHandle, AssetsPanelProps>(funct
     })
   }, [selectedId])
 
-  const { editorMarkdownViewMode, notesReadability, notesWidth } = useAppearance()
+  const { editorMarkdownViewMode, notesReadability, notesWidth, notesFontFamily, assetsSettingsBannerOpen } = useAppearance()
+  const setBannerOpen = useCallback((open: boolean) => {
+    void window.api.settings.set('assets_settings_banner_open', open ? '1' : '0')
+    window.dispatchEvent(new Event('sz:settings-changed'))
+  }, [])
   const assetDefaultViewMode = editorMarkdownViewMode === 'code' ? 'raw' : editorMarkdownViewMode === 'split' ? 'split' : 'preview'
   const [viewMode, setViewMode] = useState<'preview' | 'split' | 'raw'>('preview')
   const [zoomLevel, setZoomLevel] = useState(1)
@@ -1357,50 +1330,22 @@ export const AssetsPanel = forwardRef<AssetsPanelHandle, AssetsPanelProps>(funct
                     <button type="button" className="size-6 flex items-center justify-center rounded-md hover:bg-muted text-muted-foreground hover:text-foreground" onClick={() => setZoomLevel(z => Math.min(4, z + 0.25))}><ZoomIn className="size-3.5" /></button>
                   </div>
                 )}
-                {selectedRenderMode === 'markdown' && viewMode !== 'raw' && (
-                  <>
-                    <div className={TOGGLE_PILL_CLASS}>
-                      <IconToggleButton
-                        icon={effectiveReadability === 'compact' ? Rows2 : Rows3}
-                        active={effectiveReadability === 'compact'}
-                        onClick={() => {
-                          const next = effectiveReadability === 'compact' ? 'normal' : 'compact'
-                          const override = next === notesReadability ? null : next
-                          updateAsset({ id: selectedAsset.id, readabilityOverride: override })
-                        }}
-                        tooltip={`Readability: ${effectiveReadability === 'compact' ? 'Compact' : 'Normal'}${selectedAsset.readability_override ? ' (override)' : ''}`}
-                      />
-                    </div>
-                    <div className={TOGGLE_PILL_CLASS}>
-                      <IconToggleButton
-                        icon={effectiveWidth === 'wide' ? Maximize2 : AlignCenter}
-                        active={effectiveWidth === 'wide'}
-                        onClick={() => {
-                          const next = effectiveWidth === 'wide' ? 'narrow' : 'wide'
-                          const override = next === notesWidth ? null : next
-                          updateAsset({ id: selectedAsset.id, widthOverride: override })
-                        }}
-                        tooltip={`Width: ${effectiveWidth === 'wide' ? 'Wide' : 'Narrow'}${selectedAsset.width_override ? ' (override)' : ''}`}
-                      />
-                    </div>
-                  </>
-                )}
-                {hasPreviewToggle(selectedRenderMode) && (
-                  <div className={TOGGLE_PILL_CLASS}>
-                    {([
-                      { mode: 'preview' as const, icon: Eye, title: 'Preview' },
-                      { mode: 'split' as const, icon: Columns2, title: 'Split view' },
-                      { mode: 'raw' as const, icon: Code2, title: 'Raw' },
-                    ]).map(({ mode, icon, title }) => (
-                      <IconToggleButton
-                        key={mode}
-                        icon={icon}
-                        active={viewMode === mode}
-                        onClick={() => { setViewMode(mode); updateAsset({ id: selectedAsset.id, viewMode: mode }) }}
-                        tooltip={title}
-                      />
-                    ))}
-                  </div>
+                {selectedRenderMode === 'markdown' && viewMode === 'preview' && (
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button
+                        aria-pressed={assetsSettingsBannerOpen}
+                        className={cn(
+                          'flex items-center justify-center size-7 rounded-md transition-colors shrink-0',
+                          assetsSettingsBannerOpen ? 'bg-muted text-foreground' : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+                        )}
+                        onClick={() => setBannerOpen(!assetsSettingsBannerOpen)}
+                      >
+                        <Settings2 className="size-3.5" />
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom">Markdown settings</TooltipContent>
+                  </Tooltip>
                 )}
                 <Select
                   value={selectedAsset.render_mode ?? '__auto__'}
@@ -1589,6 +1534,114 @@ export const AssetsPanel = forwardRef<AssetsPanelHandle, AssetsPanelProps>(funct
             />
           )}
           {(isResizing || sidebarDragging) && <div className="absolute inset-0 z-10" />}
+          {selectedAsset && selectedRenderMode === 'markdown' && (
+            <MarkdownSettingsBanner open={assetsSettingsBannerOpen} onOpenChange={setBannerOpen}>
+              <div className="flex items-center bg-surface-1 border border-border rounded-md p-0.5 gap-0.5">
+                {([
+                  { mode: 'preview' as const, icon: Eye, title: 'Preview' },
+                  { mode: 'split' as const, icon: Columns2, title: 'Split view' },
+                  { mode: 'raw' as const, icon: Code2, title: 'Raw' },
+                ]).map(({ mode, icon: Icon, title }) => (
+                  <Tooltip key={mode}>
+                    <TooltipTrigger asChild>
+                      <button
+                        aria-pressed={viewMode === mode}
+                        className={cn(
+                          'flex items-center justify-center size-6 rounded transition-colors',
+                          viewMode === mode ? 'bg-muted text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
+                        )}
+                        onClick={() => { setViewMode(mode); updateAsset({ id: selectedAsset.id, viewMode: mode }) }}
+                      >
+                        <Icon className="size-3.5" />
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom">{title}</TooltipContent>
+                  </Tooltip>
+                ))}
+              </div>
+              <div className="flex items-center bg-surface-1 border border-border rounded-md p-0.5 gap-0.5">
+                {([
+                  { value: 'compact' as const, icon: Rows2, title: 'Compact' },
+                  { value: 'normal' as const, icon: Rows3, title: 'Normal' },
+                ]).map(({ value, icon: Icon, title }) => {
+                  const active = effectiveReadability === value
+                  return (
+                    <Tooltip key={value}>
+                      <TooltipTrigger asChild>
+                        <button
+                          aria-pressed={active}
+                          className={cn(
+                            'flex items-center justify-center size-6 rounded transition-colors',
+                            active ? 'bg-muted text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
+                          )}
+                          onClick={() => {
+                            const override = value === notesReadability ? null : value
+                            updateAsset({ id: selectedAsset.id, readabilityOverride: override })
+                          }}
+                        >
+                          <Icon className="size-3.5" />
+                        </button>
+                      </TooltipTrigger>
+                      <TooltipContent side="bottom">{`${title}${selectedAsset.readability_override ? ' (override)' : ''}`}</TooltipContent>
+                    </Tooltip>
+                  )
+                })}
+              </div>
+              <div className="flex items-center bg-surface-1 border border-border rounded-md p-0.5 gap-0.5">
+                {([
+                  { value: 'narrow' as const, icon: AlignCenter, title: 'Narrow' },
+                  { value: 'wide' as const, icon: Maximize2, title: 'Wide' },
+                ]).map(({ value, icon: Icon, title }) => {
+                  const active = effectiveWidth === value
+                  return (
+                    <Tooltip key={value}>
+                      <TooltipTrigger asChild>
+                        <button
+                          aria-pressed={active}
+                          className={cn(
+                            'flex items-center justify-center size-6 rounded transition-colors',
+                            active ? 'bg-muted text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
+                          )}
+                          onClick={() => {
+                            const override = value === notesWidth ? null : value
+                            updateAsset({ id: selectedAsset.id, widthOverride: override })
+                          }}
+                        >
+                          <Icon className="size-3.5" />
+                        </button>
+                      </TooltipTrigger>
+                      <TooltipContent side="bottom">{`${title}${selectedAsset.width_override ? ' (override)' : ''}`}</TooltipContent>
+                    </Tooltip>
+                  )
+                })}
+              </div>
+              <div className="flex items-center bg-surface-1 border border-border rounded-md p-0.5 gap-0.5">
+                {([
+                  { value: 'sans' as const, icon: Type, title: 'Sans' },
+                  { value: 'mono' as const, icon: Code, title: 'Mono' },
+                ]).map(({ value, icon: Icon, title }) => (
+                  <Tooltip key={value}>
+                    <TooltipTrigger asChild>
+                      <button
+                        aria-pressed={notesFontFamily === value}
+                        className={cn(
+                          'flex items-center justify-center size-6 rounded transition-colors',
+                          notesFontFamily === value ? 'bg-muted text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
+                        )}
+                        onClick={() => {
+                          void window.api.settings.set('notes_font_family', value)
+                          window.dispatchEvent(new Event('sz:settings-changed'))
+                        }}
+                      >
+                        <Icon className="size-3.5" />
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom">{title}</TooltipContent>
+                  </Tooltip>
+                ))}
+              </div>
+            </MarkdownSettingsBanner>
+          )}
           {findOpen && selectedAsset && selectedRenderMode && !isBinaryRenderMode(selectedRenderMode) && (
             <AssetFindBar
               query={findQuery}
