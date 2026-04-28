@@ -104,6 +104,24 @@ test('gemini -p pattern', () => {
   expect(cmd).toBe(`gemini -p 'go' --yolo`)
 })
 
+test('literal {flags} in prompt does not corrupt flags placeholder', () => {
+  const cmd = buildAiHeadlessCommand(
+    { provider: 'claude-code', prompt: 'use {flags} here', flags: '--verbose' },
+    { id: 'claude-code', type: 'claude-code', defaultFlags: null },
+  )
+  // Prompt stays literal (still inside single quotes), flags placeholder
+  // gets the actual flags — not the prompt's text.
+  expect(cmd).toBe(`claude -p 'use {flags} here' --verbose`)
+})
+
+test('literal {prompt} in flags does not break substitution', () => {
+  const cmd = buildAiHeadlessCommand(
+    { provider: 'claude-code', prompt: 'hi', flags: '--note={prompt}' },
+    { id: 'claude-code', type: 'claude-code', defaultFlags: null },
+  )
+  expect(cmd).toBe(`claude -p 'hi' --note={prompt}`)
+})
+
 test('escapes single quote in prompt', () => {
   const cmd = buildAiHeadlessCommand(
     { provider: 'claude-code', prompt: `it's broken` },

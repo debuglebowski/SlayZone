@@ -51,9 +51,14 @@ export function buildAiHeadlessCommand(
   // defaultFlags so users see what's running, and clearing the field is the
   // signal to opt out of defaults.
   const flags = (params.flags ?? provider.defaultFlags ?? '').trim()
+  // Single-pass substitution — sequential .replace would let prompt content
+  // containing the literal text "{flags}" corrupt the second placeholder.
+  const replacements: Record<string, string> = {
+    '{prompt}': shellSingleQuote(params.prompt),
+    '{flags}': flags,
+  }
   return pattern
-    .replace('{prompt}', shellSingleQuote(params.prompt))
-    .replace('{flags}', flags)
+    .replace(/\{prompt\}|\{flags\}/g, (m) => replacements[m])
     .replace(/\s+/g, ' ')
     .trim()
 }
