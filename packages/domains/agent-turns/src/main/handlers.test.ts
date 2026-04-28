@@ -341,6 +341,69 @@ await describe('list filters empty-diff turns + re-threads prev_snapshot_sha', (
     const list = (await h.invoke('agent-turns:list', repo)) as AgentTurnRange[]
     expect(list).toHaveLength(1)
   })
+
+  test('BUG: external commit on unrelated file orphans turn whose work is uncommitted', async () => {
+    // User-reported repro:
+    //   1. Agent records turn touching dirty.txt — never committed
+    //   2. Some OTHER actor commits an unrelated file (advances HEAD)
+    //   3. dirty.txt is still dirty in working tree
+    //   Expected: chip row shows the turn (work hasn't landed)
+    //   Actual:   rule 1 (head_sha_at_snap !== current HEAD) drops it
+    //
+    // Distinct from existing ghost-resurrect tests above: those commit the
+    // turn's own work, then re-edit. Here the turn's work is never committed —
+    // HEAD moves around it via unrelated changes.
+    const { tabId, repo } = freshTask()
+    const dirty = path.join(repo, 'dirty.txt')
+    const unrelated = path.join(repo, 'unrelated.txt')
+
+    fs.writeFileSync(dirty, 'agent work in progress')
+    await recordTurnBoundary(h.db, tabId, 'agent-turn')
+
+    // Sanity: visible at current HEAD
+    let list = (await h.invoke('agent-turns:list', repo)) as AgentTurnRange[]
+    expect(list).toHaveLength(1)
+    expect(list[0].prompt_preview).toBe('agent-turn')
+
+    // External actor commits an UNRELATED file — advances HEAD without
+    // touching dirty.txt. Turn's own work remains uncommitted.
+    fs.writeFileSync(unrelated, 'unrelated change')
+    git(repo, 'add', 'unrelated.txt')
+    git(repo, 'commit', '-m', 'unrelated commit')
+
+    list = (await h.invoke('agent-turns:list', repo)) as AgentTurnRange[]
+    // Turn's work (dirty.txt) still uncommitted → turn should remain visible.
+    expect(list).toHaveLength(1)
+    expect(list[0].prompt_preview).toBe('agent-turn')
+  })
+
+  test('BUG: multiple session turns orphaned by external commit cycle (user repro)', async () => {
+    // Closer to user's actual repro: a session records N turns at HEAD0, all
+    // touching files still in working tree. External actor commits while user
+    // works (e.g. another agent / pull). HEAD advances past every snap.
+    // Expected: all N turns still visible (their work never landed).
+    // Actual:   all dropped by rule 1.
+    const { tabId, repo } = freshTask()
+    const fileA = path.join(repo, 'a.txt')
+    const fileB = path.join(repo, 'b.txt')
+    const externalFile = path.join(repo, 'ext.txt')
+
+    fs.writeFileSync(fileA, 'a-v1'); await recordTurnBoundary(h.db, tabId, 't1')
+    fs.writeFileSync(fileA, 'a-v2'); await recordTurnBoundary(h.db, tabId, 't2')
+    fs.writeFileSync(fileB, 'b-v1'); await recordTurnBoundary(h.db, tabId, 't3')
+
+    let list = (await h.invoke('agent-turns:list', repo)) as AgentTurnRange[]
+    expect(list).toHaveLength(3)
+
+    // Two external commits while session continues — HEAD advances twice.
+    fs.writeFileSync(externalFile, 'e1'); git(repo, 'add', 'ext.txt'); git(repo, 'commit', '-m', 'ext1')
+    fs.writeFileSync(externalFile, 'e2'); git(repo, 'add', 'ext.txt'); git(repo, 'commit', '-m', 'ext2')
+
+    // a.txt and b.txt are still dirty (never committed by this session).
+    list = (await h.invoke('agent-turns:list', repo)) as AgentTurnRange[]
+    expect(list).toHaveLength(3)
+    expect(list.map((t) => t.prompt_preview)).toEqual(['t1', 't2', 't3'])
+  })
 })
 
 // Cleanup

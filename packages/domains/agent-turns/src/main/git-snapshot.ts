@@ -142,6 +142,7 @@ export function diffIsEmptyCached(repoPath: string, fromSha: string, toSha: stri
 export function _resetDiffEmptyCacheForTests(): void {
   diffEmptyCache.clear()
   turnFilesCache.clear()
+  treeBlobsCache.clear()
 }
 
 /**
@@ -170,6 +171,54 @@ export function listTurnFilesCached(repoPath: string, fromSha: string, toSha: st
     if (oldestKey !== undefined) turnFilesCache.delete(oldestKey)
   }
   return files
+}
+
+/**
+ * Per-path blob SHA map for a tree-ish (commit or tree). Pure function of
+ * `(repoPath, treeIsh)` once `treeIsh` resolves to a content-addressed object,
+ * so cache forever within the bounded LRU. Returns null on ls-tree failure
+ * (GC'd snap, missing ref, broken repo) — callers fail-closed on null. Caching
+ * the null result is intentional so a missing snap doesn't re-spawn ls-tree
+ * on every poll.
+ */
+const TREE_BLOBS_CACHE_MAX = 2000
+const treeBlobsCache = new Map<string, Map<string, string> | null>()
+
+export function listTreeBlobsCached(repoPath: string, treeIsh: string): Map<string, string> | null {
+  const key = `${repoPath}\x00${treeIsh}`
+  if (treeBlobsCache.has(key)) {
+    const hit = treeBlobsCache.get(key) ?? null
+    treeBlobsCache.delete(key)
+    treeBlobsCache.set(key, hit)
+    return hit
+  }
+  const r = spawnSync('git', ['ls-tree', '-r', '-z', treeIsh], { cwd: repoPath, encoding: 'utf-8' })
+  let result: Map<string, string> | null
+  if (r.status !== 0) {
+    result = null
+  } else {
+    const map = new Map<string, string>()
+    // ls-tree -r -z: each NUL-terminated record = `<mode> <type> <obj>\t<path>`
+    const records = r.stdout.split('\0')
+    for (const rec of records) {
+      if (!rec) continue
+      const tabIdx = rec.indexOf('\t')
+      if (tabIdx < 0) continue
+      const meta = rec.slice(0, tabIdx)
+      const path = rec.slice(tabIdx + 1)
+      const parts = meta.split(' ')
+      // Skip non-blobs (submodules show as 'commit', symlinks/dirs handled by -r).
+      if (parts.length < 3 || parts[1] !== 'blob') continue
+      map.set(path, parts[2])
+    }
+    result = map
+  }
+  treeBlobsCache.set(key, result)
+  if (treeBlobsCache.size > TREE_BLOBS_CACHE_MAX) {
+    const oldestKey = treeBlobsCache.keys().next().value
+    if (oldestKey !== undefined) treeBlobsCache.delete(oldestKey)
+  }
+  return result
 }
 
 /**
