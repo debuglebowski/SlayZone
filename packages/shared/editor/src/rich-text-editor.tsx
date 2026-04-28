@@ -6,7 +6,7 @@ import { history } from '@milkdown/plugin-history'
 import { indent } from '@milkdown/plugin-indent'
 import { listener, listenerCtx } from '@milkdown/plugin-listener'
 import { callCommand, replaceAll, $prose, $command } from '@milkdown/utils'
-import { Plugin, PluginKey } from '@milkdown/prose/state'
+import { Plugin, PluginKey, TextSelection } from '@milkdown/prose/state'
 import { cn } from '@slayzone/ui'
 import type { EditorThemeColors } from './editor-themes'
 import { createPlaceholderPlugin } from './milkdown-placeholder'
@@ -14,12 +14,22 @@ import { listItemMovePlugin } from './milkdown-list-move'
 import { escapeBlurPlugin } from './milkdown-escape-blur'
 import { taskListPlugin } from './milkdown-task-list'
 import { htmlRenderPlugin } from './milkdown-html-render'
+import { remarkFrontmatterPlugin, frontmatterSchema, frontmatterView } from './milkdown-frontmatter'
 import { createAssetLinkPlugin, insertAssetLinkAtCursor, type AssetMentionState } from './milkdown-asset-link'
 import { extractImageFilesFromDataTransfer } from './use-image-paste-drop'
 import { createSearchHighlightPlugin, setSearch as setMilkdownSearch } from './milkdown-search-highlight'
 import { AssetPicker, type AssetPickerItem } from './AssetPicker'
 
 export type { Editor }
+
+/** Get the editor's root DOM node (for scoped queries like in-doc anchor lookups). */
+export function getEditorViewDOM(editor: Editor): HTMLElement | null {
+  try {
+    return editor.ctx.get(editorViewCtx).dom as HTMLElement
+  } catch {
+    return null
+  }
+}
 
 interface FormatState {
   bold: boolean
@@ -122,6 +132,14 @@ interface RichTextEditorProps {
   onSearchMatchCountChange?: (count: number) => void
   /** Called when image files are pasted/dropped. Return inserted asset refs in order. */
   onUploadImages?: (files: File[]) => Promise<Array<{ id: string; title: string }>>
+  /** Enable YAML frontmatter parsing/rendering (`--- ... ---` blocks at top of doc). */
+  frontmatter?: boolean
+  /** Resolve relative `src`/`href` of inline HTML to absolute URLs (e.g. `slz-file://...`). */
+  htmlResolveSrc?: (src: string) => string
+  /** Click handler for inline HTML links + images. Receives the resolved href. */
+  htmlOnLinkClick?: (resolvedHref: string) => void
+  /** Cmd+S / Ctrl+S handler installed on the editor DOM. */
+  onSave?: () => void
 }
 
 export function RichTextEditor({
@@ -152,8 +170,13 @@ export function RichTextEditor({
   searchRegex = false,
   onSearchMatchCountChange,
   onUploadImages,
+  frontmatter,
+  htmlResolveSrc,
+  htmlOnLinkClick,
+  onSave,
 }: RichTextEditorProps) {
   const containerRef = useRef<HTMLDivElement>(null)
+  const rootRef = useRef<HTMLDivElement>(null)
   const editorInstanceRef = useRef<Editor | null>(null)
   const onChangeRef = useRef(onChange)
   const onBlurRef = useRef(onBlur)
@@ -172,6 +195,13 @@ export function RichTextEditor({
   const insertAssetLinkRef = useRef<((view: import('@milkdown/prose/view').EditorView, assetId: string, assetTitle: string) => void) | null>(null)
   onAssetClickRef.current = onAssetClick
   assetsRef.current = assets
+
+  const onSaveRef = useRef(onSave)
+  const htmlResolveSrcRef = useRef(htmlResolveSrc)
+  const htmlOnLinkClickRef = useRef(htmlOnLinkClick)
+  onSaveRef.current = onSave
+  htmlResolveSrcRef.current = htmlResolveSrc
+  htmlOnLinkClickRef.current = htmlOnLinkClick
 
   onChangeRef.current = onChange
   onBlurRef.current = onBlur
@@ -247,7 +277,14 @@ export function RichTextEditor({
       },
     }))
 
-    const editor = Editor.make()
+    const htmlOpts = (htmlResolveSrcRef.current || htmlOnLinkClickRef.current)
+      ? {
+          ...(htmlResolveSrcRef.current ? { resolveSrc: (src: string) => htmlResolveSrcRef.current!(src) } : {}),
+          ...(htmlOnLinkClickRef.current ? { onLinkClick: (href: string) => htmlOnLinkClickRef.current!(href) } : {}),
+        }
+      : undefined
+
+    let editor = Editor.make()
       .config((ctx) => {
         ctx.set(rootCtx, containerRef.current!)
         ctx.set(defaultValueCtx, contentRef.current)
@@ -263,7 +300,7 @@ export function RichTextEditor({
       })
       .use(commonmark)
       .use(gfm)
-      .use(htmlRenderPlugin())
+      .use(htmlRenderPlugin(htmlOpts))
       .use(history)
       .use(indent)
       .use(listener)
@@ -279,6 +316,15 @@ export function RichTextEditor({
       .use(searchPlugin)
       .use(imagePastePlugin)
 
+    if (frontmatter) {
+      editor = editor
+        .use(remarkFrontmatterPlugin)
+        .use(frontmatterSchema)
+        .use(frontmatterView)
+    }
+
+    let saveKeydownTeardown: (() => void) | null = null
+
     editor.create().then((e) => {
       editorInstanceRef.current = e
       if (externalEditorRef) externalEditorRef.current = e
@@ -290,17 +336,60 @@ export function RichTextEditor({
         view.focus()
       }
 
+      // Cmd+S / Ctrl+S — install on editor DOM only when host opts in
+      if (onSaveRef.current) {
+        const view = e.ctx.get(editorViewCtx)
+        const handler = (event: KeyboardEvent) => {
+          if ((event.metaKey || event.ctrlKey) && event.key === 's') {
+            event.preventDefault()
+            onSaveRef.current?.()
+          }
+        }
+        view.dom.addEventListener('keydown', handler)
+        saveKeydownTeardown = () => view.dom.removeEventListener('keydown', handler)
+      }
+
       onReadyRef.current?.(e)
     }).catch((err) => {
       console.error('[RichTextEditor] Failed to create editor:', err)
     })
 
     return () => {
+      saveKeydownTeardown?.()
       editor.destroy().catch(() => {})
       editorInstanceRef.current = null
       if (externalEditorRef) externalEditorRef.current = null
     }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Click anywhere within .mk-doc → focus editor + place caret near click coords.
+  // Skips clicks on text descendants of .ProseMirror (PM handles natively) and on buttons.
+  // Capture phase + native listener bypasses any React delegation timing or PM stopPropagation.
+  useEffect(() => {
+    const node = rootRef.current
+    if (!node || !editorReady) return
+    const handler = (e: MouseEvent) => {
+      const target = e.target as HTMLElement
+      const pm = target.closest('.ProseMirror')
+      if (pm && pm !== target) return
+      if (target.closest('button, [role="button"]')) return
+      if (e.shiftKey || e.metaKey || e.ctrlKey || e.altKey) return
+      const editor = editorInstanceRef.current
+      if (!editor) return
+      e.preventDefault()
+      try {
+        const view = editor.ctx.get(editorViewCtx)
+        const result = view.posAtCoords({ left: e.clientX, top: e.clientY })
+        const selection = result
+          ? TextSelection.near(view.state.doc.resolve(result.pos))
+          : TextSelection.atEnd(view.state.doc)
+        view.dispatch(view.state.tr.setSelection(selection))
+        view.focus()
+      } catch { /* editor not ready */ }
+    }
+    node.addEventListener('mousedown', handler, true)
+    return () => node.removeEventListener('mousedown', handler, true)
+  }, [editorReady])
 
   // Sync external value changes
   useEffect(() => {
@@ -356,6 +445,7 @@ export function RichTextEditor({
       data-themed={themeColors ? 'true' : undefined}
       style={themeStyle}
       spellCheck={spellcheck !== false}
+      ref={rootRef}
     >
       {showToolbar && editorReady && (
         <EditorToolbar

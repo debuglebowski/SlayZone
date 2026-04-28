@@ -17,17 +17,40 @@ import {
   TooltipTrigger,
   getThemeChrome,
   getChromeStyleOverrides,
+  getThemeEditorColors,
   useAppearance,
 } from '@slayzone/ui'
+import { RichTextEditor, getEditorViewDOM, type Editor as MilkdownEditor } from '@slayzone/editor'
 import { useTheme } from '@slayzone/settings/client'
 import type { EditorOpenFilesState, MarkdownViewMode, OpenFileOptions } from '@slayzone/file-editor/shared'
 import { useFileEditor } from './useFileEditor'
 import { EditorFileTree, type EditorFileTreeHandle } from './EditorFileTree'
 import { EditorTabBar } from './EditorTabBar'
 import { CodeEditor } from './CodeEditor'
-import { MarkdownFileEditor } from './MarkdownFileEditor'
 import { MarkdownSplitView } from './MarkdownSplitView'
 import { SearchPanel } from './SearchPanel'
+
+const MARKDOWN_FILE_TEXT_EXTENSIONS = new Set([
+  'md', 'mdx', 'markdown', 'txt', 'rst',
+  'js', 'jsx', 'ts', 'tsx', 'mjs', 'cjs',
+  'json', 'yaml', 'yml', 'toml', 'xml', 'html', 'css', 'scss',
+  'py', 'rb', 'go', 'rs', 'java', 'c', 'cpp', 'h', 'hpp', 'sh', 'env',
+])
+
+function posixDirname(p: string): string {
+  const i = p.lastIndexOf('/')
+  return i < 0 ? '' : p.slice(0, i)
+}
+
+function posixResolve(...parts: string[]): string {
+  const segments: string[] = []
+  for (const part of parts.join('/').split('/')) {
+    if (part === '' || part === '.') continue
+    if (part === '..') segments.pop()
+    else segments.push(part)
+  }
+  return '/' + segments.join('/')
+}
 
 export interface FileEditorViewHandle {
   openFile: (filePath: string, options?: OpenFileOptions) => void
@@ -44,6 +67,72 @@ interface FileEditorViewProps {
 function formatSize(bytes: number): string {
   if (bytes >= 1024 * 1024) return `${(bytes / 1024 / 1024).toFixed(1)} MB`
   return `${(bytes / 1024).toFixed(0)} KB`
+}
+
+interface MarkdownFilePaneProps {
+  filePath: string
+  projectPath: string
+  content: string
+  onChange: (content: string) => void
+  onSave: () => void
+  onOpenFile: (filePath: string) => void
+  themeColors: ReturnType<typeof getThemeEditorColors>
+  readability: 'compact' | 'normal'
+  width: 'narrow' | 'wide'
+}
+
+function MarkdownFilePane({ filePath, projectPath, content, onChange, onSave, onOpenFile, themeColors, readability, width }: MarkdownFilePaneProps) {
+  const editorRef = useRef<MilkdownEditor | null>(null)
+  const fileDirAbs = posixResolve(projectPath, posixDirname(filePath))
+
+  const resolveSrc = useCallback((src: string): string => {
+    if (src.startsWith('/')) return `slz-file://${src}`
+    return `slz-file://${posixResolve(fileDirAbs, src)}`
+  }, [fileDirAbs])
+
+  const handleLinkClick = useCallback((resolvedHref: string) => {
+    if (!resolvedHref) return
+    if (resolvedHref.startsWith('#')) {
+      const id = resolvedHref.slice(1)
+      const root = editorRef.current ? getEditorViewDOM(editorRef.current) : null
+      const el = id ? (root ?? document).querySelector(`#${CSS.escape(id)}`) : null
+      el?.scrollIntoView({ block: 'center' })
+      return
+    }
+    if (/^(https?:|mailto:)/i.test(resolvedHref)) {
+      void window.api.shell.openExternal(resolvedHref)
+      return
+    }
+    if (resolvedHref.startsWith('slz-file://')) {
+      const absPath = resolvedHref.replace(/^slz-file:\/\//, '').replace(/\?.*$/, '').replace(/#.*$/, '')
+      const projectPrefix = projectPath.endsWith('/') ? projectPath : projectPath + '/'
+      if (absPath.startsWith(projectPrefix)) {
+        const relPath = absPath.slice(projectPrefix.length)
+        const ext = relPath.split('.').pop()?.toLowerCase() ?? ''
+        if (MARKDOWN_FILE_TEXT_EXTENSIONS.has(ext)) {
+          onOpenFile(relPath)
+          return
+        }
+      }
+      void window.api.shell.openPath(absPath)
+    }
+  }, [projectPath, onOpenFile])
+
+  return (
+    <RichTextEditor
+      value={content}
+      onChange={onChange}
+      onSave={onSave}
+      editorRef={editorRef}
+      variant="page"
+      readability={readability}
+      width={width}
+      themeColors={themeColors}
+      frontmatter
+      htmlResolveSrc={resolveSrc}
+      htmlOnLinkClick={handleLinkClick}
+    />
+  )
 }
 
 export const FileEditorView = forwardRef<FileEditorViewHandle, FileEditorViewProps>(function FileEditorView({ projectPath, initialEditorState, onEditorStateChange }, ref) {
@@ -69,11 +158,15 @@ export const FileEditorView = forwardRef<FileEditorViewHandle, FileEditorViewPro
     clearGoToPosition
   } = useFileEditor(projectPath, initialEditorState)
 
-  const { editorOverrideThemeId, contentVariant } = useTheme()
+  const { editorOverrideThemeId, editorThemeId, contentVariant } = useTheme()
   const editorPanelStyle = useMemo(() => {
     if (!editorOverrideThemeId) return undefined
     return getChromeStyleOverrides(getThemeChrome(editorOverrideThemeId, contentVariant))
   }, [editorOverrideThemeId, contentVariant])
+  const markdownThemeColors = useMemo(
+    () => getThemeEditorColors(editorThemeId, contentVariant),
+    [editorThemeId, contentVariant]
+  )
 
   const [treeWidth, setTreeWidth] = useState(initialEditorState?.treeWidth ?? 250)
   const [treeVisible, setTreeVisible] = useState(initialEditorState?.treeVisible ?? true)
@@ -86,7 +179,7 @@ export const FileEditorView = forwardRef<FileEditorViewHandle, FileEditorViewPro
   const [fileViewModes, setFileViewModes] = useState<Record<string, MarkdownViewMode>>(
     initialEditorState?.fileViewModes ?? {}
   )
-  const { editorMarkdownViewMode } = useAppearance()
+  const { editorMarkdownViewMode, notesReadability, notesWidth } = useAppearance()
   const viewMode: MarkdownViewMode = (activeFilePath ? fileViewModes[activeFilePath] : undefined) ?? editorMarkdownViewMode
   const setViewModeForFile = useCallback((mode: MarkdownViewMode) => {
     if (!activeFilePath) return
@@ -403,15 +496,17 @@ export const FileEditorView = forwardRef<FileEditorViewHandle, FileEditorViewPro
           <div className="flex-1 min-h-0 flex">
             <div className="flex-1 min-w-0">
               {isMarkdown && viewMode === 'rich' ? (
-                <MarkdownFileEditor
+                <MarkdownFilePane
                   key={activeFile.path}
                   filePath={activeFile.path}
                   projectPath={projectPath}
                   content={activeFile.content}
                   onChange={(content) => updateContent(activeFile.path, content)}
                   onSave={() => saveFile(activeFile.path)}
-                  version={fileVersions.get(activeFile.path)}
                   onOpenFile={openFile}
+                  themeColors={markdownThemeColors}
+                  readability={notesReadability}
+                  width={notesWidth}
                 />
               ) : isMarkdown && viewMode === 'split' ? (
                 <MarkdownSplitView

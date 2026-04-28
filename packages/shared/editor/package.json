@@ -24,6 +24,7 @@
     "@milkdown/utils": "^7.19.2",
     "@slayzone/ui": "workspace:*",
     "dompurify": "^3.3.1",
+    "remark-frontmatter": "^5.0.0",
     "unist-util-visit": "^5.0.0"
   },
   "peerDependencies": {

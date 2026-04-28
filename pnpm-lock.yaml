@@ -524,36 +524,6 @@ importers:
       '@lezer/highlight':
         specifier: ^1.0.0
         version: 1.2.3
-      '@milkdown/core':
-        specifier: ^7.19.2
-        version: 7.19.2
-      '@milkdown/ctx':
-        specifier: ^7.19.2
-        version: 7.19.2
-      '@milkdown/plugin-history':
-        specifier: ^7.19.2
-        version: 7.19.2
-      '@milkdown/plugin-indent':
-        specifier: ^7.19.2
-        version: 7.19.2
-      '@milkdown/plugin-listener':
-        specifier: ^7.19.2
-        version: 7.19.2
-      '@milkdown/preset-commonmark':
-        specifier: ^7.19.2
-        version: 7.19.2
-      '@milkdown/preset-gfm':
-        specifier: ^7.19.2
-        version: 7.19.2
-      '@milkdown/prose':
-        specifier: ^7.19.2
-        version: 7.19.2
-      '@milkdown/transformer':
-        specifier: ^7.19.2
-        version: 7.19.2
-      '@milkdown/utils':
-        specifier: ^7.19.2
-        version: 7.19.2
       '@slayzone/editor':
         specifier: workspace:*
         version: link:../../shared/editor
@@ -590,9 +560,6 @@ importers:
       lucide-react:
         specifier: ^0.562.0
         version: 0.562.0(react@19.2.3)
-      remark-frontmatter:
-        specifier: ^5.0.0
-        version: 5.0.0
     devDependencies:
       '@testing-library/react':
         specifier: ^16.3.0
@@ -1339,6 +1306,9 @@ importers:
       react:
         specifier: ^19.0.0
         version: 19.2.3
+      remark-frontmatter:
+        specifier: ^5.0.0
+        version: 5.0.0
       unist-util-visit:
         specifier: ^5.0.0
         version: 5.1.0
