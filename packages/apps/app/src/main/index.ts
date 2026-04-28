@@ -1861,6 +1861,11 @@ div{text-align:center}h1{font-size:14px;font-weight:500;color:#aaa}p{font-size:1
     const linkText = typeof payload?.linkText === 'string' ? payload.linkText : undefined
     browserViewManager.emitCreateTaskFromLinkForWebContents(event.sender.id, { url, linkText, source: 'modified-link-click' })
   })
+  ipcMain.on('browser:request-open-link-externally', (_event, payload: { url?: unknown }) => {
+    const url = typeof payload?.url === 'string' ? payload.url : ''
+    if (!/^https?:\/\//i.test(url)) return
+    void shell.openExternal(url)
+  })
 
   // DevTools
   ipcMain.handle('browser:open-devtools', (_, viewId: string, mode: 'bottom' | 'right' | 'undocked' | 'detach') => browserViewManager.openDevTools(viewId, mode))

@@ -10,6 +10,14 @@ export {
   buildBrowserCreateTaskFromLinkCaptureScript,
 }
 
+export type BrowserModifiedLinkIntent = 'create-task' | 'open-external'
+
+export interface BrowserModifiedLinkPayload {
+  intent: BrowserModifiedLinkIntent
+  url: string
+  linkText?: string
+}
+
 export interface BrowserCreateTaskFromLinkCapturePayload {
   url: string
   linkText?: string
@@ -58,9 +66,12 @@ function findNearestAnchor(event: MouseEvent): Element | null {
   return null
 }
 
-export function extractCreateTaskFromLinkPayload(event: MouseEvent): BrowserCreateTaskFromLinkCapturePayload | null {
-  if (!event.altKey || !event.shiftKey || event.metaKey || event.ctrlKey) return null
+export function extractModifiedLinkPayload(event: MouseEvent): BrowserModifiedLinkPayload | null {
   if (event.button !== 0) return null
+  if (event.ctrlKey) return null
+  const altShift = event.altKey && event.shiftKey && !event.metaKey
+  const metaShift = event.metaKey && event.shiftKey && !event.altKey
+  if (!altShift && !metaShift) return null
 
   const anchor = findNearestAnchor(event)
   if (!anchor) return null
@@ -81,9 +92,16 @@ export function extractCreateTaskFromLinkPayload(event: MouseEvent): BrowserCrea
   }
 
   return {
+    intent: altShift ? 'create-task' : 'open-external',
     url: href,
     linkText: linkText.replace(/\s+/g, ' ').trim() || undefined,
   }
+}
+
+export function extractCreateTaskFromLinkPayload(event: MouseEvent): BrowserCreateTaskFromLinkCapturePayload | null {
+  const payload = extractModifiedLinkPayload(event)
+  if (!payload || payload.intent !== 'create-task') return null
+  return { url: payload.url, linkText: payload.linkText }
 }
 
 export function installBrowserCreateTaskFromLinkCapture(bridgeKey: string, installedKey: string): void {
@@ -92,8 +110,8 @@ export function installBrowserCreateTaskFromLinkCapture(bridgeKey: string, insta
 
   let lastForwardedSignature = ''
   let lastForwardedAt = 0
-  const forwardPayload = (payload: BrowserCreateTaskFromLinkCapturePayload): void => {
-    const signature = `${payload.url}::${payload.linkText ?? ''}`
+  const forwardPayload = (payload: BrowserModifiedLinkPayload): void => {
+    const signature = `${payload.intent}::${payload.url}::${payload.linkText ?? ''}`
     const now = Date.now()
     if (signature === lastForwardedSignature && now - lastForwardedAt < 750) return
     lastForwardedSignature = signature
@@ -101,23 +119,23 @@ export function installBrowserCreateTaskFromLinkCapture(bridgeKey: string, insta
 
     const bridge = bridgeWindow[bridgeKey]
     if (typeof bridge === 'function') {
-      ;(bridge as (payload: BrowserCreateTaskFromLinkCapturePayload) => void)(payload)
+      ;(bridge as (payload: BrowserModifiedLinkPayload) => void)(payload)
     }
   }
 
   document.addEventListener('mousedown', (event) => {
-    const payload = extractCreateTaskFromLinkPayload(event)
+    const payload = extractModifiedLinkPayload(event)
     if (!payload) return
 
     // Chromium can decide modifier-based link actions on mouse down.
-    // Prevent here so Alt+Shift+Click never escapes into a new BrowserWindow.
+    // Prevent here so the modified click never escapes into a new BrowserWindow / tab.
     event.preventDefault()
     event.stopPropagation()
     forwardPayload(payload)
   }, true)
 
   document.addEventListener('click', (event) => {
-    const payload = extractCreateTaskFromLinkPayload(event)
+    const payload = extractModifiedLinkPayload(event)
     if (!payload) return
 
     event.preventDefault()

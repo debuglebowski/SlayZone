@@ -46,9 +46,12 @@ const BROWSER_CREATE_TASK_FROM_LINK_CAPTURE_SCRIPT_TEMPLATE = `
     return null;
   };
 
-  const extractCreateTaskFromLinkPayload = (event) => {
-    if (!event.altKey || !event.shiftKey || event.metaKey || event.ctrlKey) return null;
+  const extractModifiedLinkPayload = (event) => {
     if (event.button !== 0) return null;
+    if (event.ctrlKey) return null;
+    const altShift = event.altKey && event.shiftKey && !event.metaKey;
+    const metaShift = event.metaKey && event.shiftKey && !event.altKey;
+    if (!altShift && !metaShift) return null;
 
     const anchor = findNearestAnchor(event);
     if (!anchor) return null;
@@ -69,6 +72,7 @@ const BROWSER_CREATE_TASK_FROM_LINK_CAPTURE_SCRIPT_TEMPLATE = `
     }
 
     return {
+      intent: altShift ? 'create-task' : 'open-external',
       url: href,
       linkText: linkText.replace(/\\s+/g, ' ').trim() || undefined,
     };
@@ -77,7 +81,7 @@ const BROWSER_CREATE_TASK_FROM_LINK_CAPTURE_SCRIPT_TEMPLATE = `
   let lastForwardedSignature = '';
   let lastForwardedAt = 0;
   const forwardPayload = (payload) => {
-    const signature = payload.url + '::' + (payload.linkText || '');
+    const signature = payload.intent + '::' + payload.url + '::' + (payload.linkText || '');
     const now = Date.now();
     if (signature === lastForwardedSignature && now - lastForwardedAt < 750) return;
     lastForwardedSignature = signature;
@@ -90,11 +94,11 @@ const BROWSER_CREATE_TASK_FROM_LINK_CAPTURE_SCRIPT_TEMPLATE = `
   };
 
   const onMouse = (event) => {
-    const payload = extractCreateTaskFromLinkPayload(event);
+    const payload = extractModifiedLinkPayload(event);
     if (!payload) return;
 
     // Chromium can decide modifier-based link actions on mouse down.
-    // Prevent here so Alt+Shift+Click never escapes into a new BrowserWindow.
+    // Prevent here so the modified click never escapes into a new BrowserWindow / tab.
     event.preventDefault();
     event.stopPropagation();
     forwardPayload(payload);

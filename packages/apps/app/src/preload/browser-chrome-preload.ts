@@ -11,16 +11,20 @@
 import { contextBridge, ipcRenderer, webFrame } from 'electron'
 import {
   BROWSER_CREATE_TASK_FROM_LINK_BRIDGE_KEY,
-  type BrowserCreateTaskFromLinkCapturePayload,
+  type BrowserModifiedLinkPayload,
 } from './browser-link-task-capture'
 
 webFrame.setVisualZoomLevelLimits(1, 3)
 
-function sendTaskLinkPayload(payload: BrowserCreateTaskFromLinkCapturePayload): void {
-  ipcRenderer.send('browser:request-create-task-from-link', payload)
+function sendModifiedLinkPayload(payload: BrowserModifiedLinkPayload): void {
+  if (payload.intent === 'open-external') {
+    ipcRenderer.send('browser:request-open-link-externally', { url: payload.url })
+    return
+  }
+  ipcRenderer.send('browser:request-create-task-from-link', { url: payload.url, linkText: payload.linkText })
 }
 
-contextBridge.exposeInMainWorld(BROWSER_CREATE_TASK_FROM_LINK_BRIDGE_KEY, sendTaskLinkPayload)
+contextBridge.exposeInMainWorld(BROWSER_CREATE_TASK_FROM_LINK_BRIDGE_KEY, sendModifiedLinkPayload)
 
 if ('executeInMainWorld' in contextBridge) {
   contextBridge.executeInMainWorld({
