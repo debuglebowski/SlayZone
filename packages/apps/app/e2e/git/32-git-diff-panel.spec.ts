@@ -58,7 +58,7 @@ test.describe('Git diff panel', () => {
 
   const refresh = async (page: import('@playwright/test').Page) => {
     // Refresh button is in the UnifiedGitPanel header (outside git-diff-panel)
-    await page.getByTestId('task-git-panel').locator('button[title="Refresh"]').click()
+    await page.getByTestId('task-git-panel').locator('button[aria-label="Refresh"]').click()
   }
 
   test('no changes shows empty state', async ({ mainWindow }) => {
@@ -166,6 +166,54 @@ test.describe('Git diff panel', () => {
     // ArrowUp goes back
     await mainWindow.keyboard.press('ArrowUp')
     await expect(firstEntry).toHaveClass(/bg-primary\/10/)
+  })
+
+  test('turns chip row stays mounted across clean ↔ dirty transitions (continuous-flow)', async ({ mainWindow }) => {
+    // Regression: chip row used to live inside the snapshot-gated main-content
+    // branch, so it unmounted on every snapshot=null transition (turn click,
+    // working-tree-clean state) — losing horizontal scroll position. Now hoisted
+    // to panel level. Verify it survives a dirty → clean → dirty cycle.
+
+    // Enable continuous-flow mode
+    await mainWindow.evaluate(async () => {
+      await window.api.settings.set('diff_continuous_flow', '1')
+      window.dispatchEvent(new Event('sz:settings-changed'))
+    })
+
+    const p = panel(mainWindow)
+    const chipRow = p.getByRole('button', { name: 'All turns' })
+
+    // Dirty state: chip row visible
+    writeFileSync(path.join(gitDir, 'base.txt'), 'line1\nline2 modified\nline3\nextra\n')
+    await refresh(mainWindow)
+    await expect(chipRow).toBeVisible({ timeout: 5_000 })
+
+    // Capture chip row DOM element identity
+    const chipRowHandle = await chipRow.elementHandle()
+    expect(chipRowHandle).not.toBeNull()
+
+    // Clean working tree: previously chip row would unmount (replaced by
+    // "Working tree clean" empty state inside the same conditional). With the
+    // fix it persists at panel level.
+    git('git checkout -- base.txt')
+    await refresh(mainWindow)
+    await expect(p.getByText('Working tree clean')).toBeVisible({ timeout: 5_000 })
+    await expect(chipRow).toBeVisible()
+
+    // Same DOM node — no remount happened
+    const stillSame = await mainWindow.evaluate(
+      (el) => document.body.contains(el),
+      chipRowHandle
+    )
+    expect(stillSame).toBe(true)
+
+    // Restore for subsequent tests + disable continuous-flow
+    writeFileSync(path.join(gitDir, 'base.txt'), 'line1\nline2 modified\nline3\nextra\n')
+    await refresh(mainWindow)
+    await mainWindow.evaluate(async () => {
+      await window.api.settings.set('diff_continuous_flow', '0')
+      window.dispatchEvent(new Event('sz:settings-changed'))
+    })
   })
 
   test('polling picks up file changes', async ({ mainWindow }) => {

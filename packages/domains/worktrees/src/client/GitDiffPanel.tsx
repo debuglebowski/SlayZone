@@ -824,6 +824,95 @@ export const GitDiffPanel = forwardRef<GitDiffPanelHandle, GitDiffPanelProps>(fu
         </div>
       )}
 
+      {/* Turns chip row — panel-level so its DOM identity (and horizontal scroll
+          position) survives snapshot key changes that swap the main-content branch
+          below (selecting a turn re-keys useGitDiffSnapshot → momentary snapshot=null
+          → main split unmounts). */}
+      {targetPath && diffContinuousFlow && (
+        <TooltipProvider delayDuration={300}>
+        <div className="shrink-0 h-9 flex items-center px-2 bg-muted/30 border-b">
+          <div className="flex-1 min-w-0 flex items-center gap-1.5 overflow-x-auto scrollbar-hide">
+          <button
+            onClick={() => setSelectedTurnId('all')}
+            className={cn(
+              'shrink-0 inline-flex items-center justify-center px-3 h-6 rounded-full text-[11px] leading-none font-medium border transition-colors',
+              selectedTurnId === 'all'
+                ? 'bg-muted text-foreground border-foreground/30'
+                : 'bg-background hover:bg-muted text-muted-foreground border-border'
+            )}
+          >
+            All turns
+          </button>
+          {[...turns].reverse().map((t, idx) => {
+            // Newest = highest number. With turns sorted oldest→newest,
+            // reversed iteration starts at newest (idx 0) → n = length - idx.
+            const n = turns.length - idx
+            const active = selectedTurnId === t.id
+            const promptClean = t.prompt_preview ? cleanPromptForDisplay(t.prompt_preview) : ''
+            const hasTip = !!(t.task_title || promptClean)
+            return (
+              <Tooltip key={t.id}>
+                <TooltipTrigger asChild>
+                  <button
+                    onClick={() => setSelectedTurnId(t.id)}
+                    className={cn(
+                      'shrink-0 inline-flex items-center justify-center px-3 h-6 rounded-full text-[11px] leading-none font-medium border transition-colors',
+                      active
+                        ? 'bg-muted text-foreground border-foreground/30'
+                        : 'bg-background hover:bg-muted text-muted-foreground border-border'
+                    )}
+                  >
+                    Turn {n}
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" align="start" className="max-w-xs">
+                  {hasTip ? (
+                    <>
+                      {t.task_title && <p className="text-sm font-semibold">{t.task_title}</p>}
+                      {promptClean && (
+                        <p className={cn('text-xs italic line-clamp-4 break-words', t.task_title && 'mt-1')}>
+                          {promptClean}
+                        </p>
+                      )}
+                    </>
+                  ) : (
+                    <p className="text-sm font-semibold">Turn {n}</p>
+                  )}
+                </TooltipContent>
+              </Tooltip>
+            )
+          })}
+          </div>
+          {flatEntries.length > 0 && (
+            <div className="shrink-0 flex items-center gap-0.5 pl-8">
+              <button
+                onClick={() => {
+                  // Mark every current file as user-toggled so auto-collapse
+                  // of huge files stays overridden after Expand all.
+                  for (const e of flatEntries) userToggledFilesRef.current.add(`${e.source}:${e.path}`)
+                  setCollapsedFiles(new Set())
+                }}
+                title="Expand all files"
+                className="size-6 inline-flex items-center justify-center rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <UnfoldVertical className="size-3.5" />
+              </button>
+              <button
+                onClick={() => {
+                  for (const e of flatEntries) userToggledFilesRef.current.add(`${e.source}:${e.path}`)
+                  setCollapsedFiles(new Set(flatEntries.map((e) => `${e.source}:${e.path}`)))
+                }}
+                title="Collapse all files"
+                className="size-6 inline-flex items-center justify-center rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <FoldVertical className="size-3.5" />
+              </button>
+            </div>
+          )}
+        </div>
+        </TooltipProvider>
+      )}
+
       {/* Empty states */}
       {!targetPath && (
         <div className="flex-1 flex items-center justify-center p-4">
@@ -959,91 +1048,6 @@ export const GitDiffPanel = forwardRef<GitDiffPanelHandle, GitDiffPanelProps>(fu
 
           {/* Right: diff viewer */}
           <div className="flex-1 min-w-0 min-h-0 flex flex-col">
-            {/* Turns chip row — replaces the legacy "X changed files" header. Always
-                rendered when in continuous-flow or with a selected file, so the user
-                always has an All toggle even before any turn snapshots exist. */}
-            {diffContinuousFlow && (
-              <TooltipProvider delayDuration={300}>
-              <div className="shrink-0 h-9 flex items-center px-2 bg-muted/30 border-b">
-                <div className="flex-1 min-w-0 flex items-center gap-1.5 overflow-x-auto scrollbar-hide">
-                <button
-                  onClick={() => setSelectedTurnId('all')}
-                  className={cn(
-                    'shrink-0 inline-flex items-center justify-center px-3 h-6 rounded-full text-[11px] leading-none font-medium border transition-colors',
-                    selectedTurnId === 'all'
-                      ? 'bg-muted text-foreground border-foreground/30'
-                      : 'bg-background hover:bg-muted text-muted-foreground border-border'
-                  )}
-                >
-                  All turns
-                </button>
-                {[...turns].reverse().map((t, idx) => {
-                  // Newest = highest number. With turns sorted oldest→newest,
-                  // reversed iteration starts at newest (idx 0) → n = length - idx.
-                  const n = turns.length - idx
-                  const active = selectedTurnId === t.id
-                  const promptClean = t.prompt_preview ? cleanPromptForDisplay(t.prompt_preview) : ''
-                  const hasTip = !!(t.task_title || promptClean)
-                  return (
-                    <Tooltip key={t.id}>
-                      <TooltipTrigger asChild>
-                        <button
-                          onClick={() => setSelectedTurnId(t.id)}
-                          className={cn(
-                            'shrink-0 inline-flex items-center justify-center px-3 h-6 rounded-full text-[11px] leading-none font-medium border transition-colors',
-                            active
-                              ? 'bg-muted text-foreground border-foreground/30'
-                              : 'bg-background hover:bg-muted text-muted-foreground border-border'
-                          )}
-                        >
-                          Turn {n}
-                        </button>
-                      </TooltipTrigger>
-                      <TooltipContent side="bottom" align="start" className="max-w-xs">
-                        {hasTip ? (
-                          <>
-                            {t.task_title && <p className="text-sm font-semibold">{t.task_title}</p>}
-                            {promptClean && (
-                              <p className={cn('text-xs italic line-clamp-4 break-words', t.task_title && 'mt-1')}>
-                                {promptClean}
-                              </p>
-                            )}
-                          </>
-                        ) : (
-                          <p className="text-sm font-semibold">Turn {n}</p>
-                        )}
-                      </TooltipContent>
-                    </Tooltip>
-                  )
-                })}
-                </div>
-                <div className="shrink-0 flex items-center gap-0.5 pl-8">
-                  <button
-                    onClick={() => {
-                      // Mark every current file as user-toggled so auto-collapse
-                      // of huge files stays overridden after Expand all.
-                      for (const e of flatEntries) userToggledFilesRef.current.add(`${e.source}:${e.path}`)
-                      setCollapsedFiles(new Set())
-                    }}
-                    title="Expand all files"
-                    className="size-6 inline-flex items-center justify-center rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
-                  >
-                    <UnfoldVertical className="size-3.5" />
-                  </button>
-                  <button
-                    onClick={() => {
-                      for (const e of flatEntries) userToggledFilesRef.current.add(`${e.source}:${e.path}`)
-                      setCollapsedFiles(new Set(flatEntries.map((e) => `${e.source}:${e.path}`)))
-                    }}
-                    title="Collapse all files"
-                    className="size-6 inline-flex items-center justify-center rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
-                  >
-                    <FoldVertical className="size-3.5" />
-                  </button>
-                </div>
-              </div>
-              </TooltipProvider>
-            )}
             {/* Body */}
             {diffContinuousFlow ? (
               <div className="flex-1 min-h-0 flex flex-col pt-2">
