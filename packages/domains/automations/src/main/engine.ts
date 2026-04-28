@@ -1,14 +1,15 @@
 import type { IpcMain } from 'electron'
 import type { Database } from 'better-sqlite3'
-import type { Automation, AutomationEvent, AutomationRow, AutomationRun } from '@slayzone/automations/shared'
+import type { ActionConfig, Automation, AutomationEvent, AutomationRow, AutomationRun } from '@slayzone/automations/shared'
 import { finishAutomationActionRun, recordActivityEvent, startAutomationActionRun, trimOutputTail } from '@slayzone/history/main'
 import { parseAutomationRow } from '@slayzone/automations/shared'
-import { resolveTemplate, type TemplateContext } from '@slayzone/automations/shared'
+import { buildAiHeadlessCommand, resolveTemplate, type TemplateContext } from '@slayzone/automations/shared'
 import { taskEvents } from '@slayzone/task/main'
 import { exec } from 'child_process'
 
 const MAX_DEPTH = 5
 const ACTION_TIMEOUT_MS = 30_000
+const AI_ACTION_TIMEOUT_MS = 5 * 60_000
 const MAX_RUNS_PER_AUTOMATION = 100
 
 class AutomationCommandError extends Error {
@@ -218,7 +219,7 @@ export class AutomationEngine {
       this.currentDepth = depth + 1
       for (let i = 0; i < automation.actions.length; i++) {
         const action = automation.actions[i]
-        const { command } = this.resolveActionExecution(action.params, ctx)
+        const resolved = this.resolveAction(action, ctx)
         const actionRunId = startAutomationActionRun(this.db, {
           runId,
           automationId: automation.id,
@@ -226,12 +227,12 @@ export class AutomationEngine {
           projectId: event.projectId ?? null,
           actionIndex: i,
           actionType: action.type,
-          command,
+          command: resolved.command,
         })
         const actionStart = Date.now()
 
         try {
-          const result = await this.executeAction(action.params, ctx)
+          const result = await this.runResolvedAction(resolved)
           finishAutomationActionRun(this.db, actionRunId, {
             status: 'success',
             outputTail: result.outputTail,
@@ -277,27 +278,60 @@ export class AutomationEngine {
     this.notifyRenderer()
   }
 
-  private resolveActionExecution(params: Record<string, unknown>, ctx: TemplateContext): { command: string; cwd?: string } {
-    return {
-      command: resolveTemplate(params.command as string, ctx),
-      cwd: params.cwd ? resolveTemplate(params.cwd as string, ctx) : ctx.project?.path,
+  private resolveAction(action: ActionConfig, ctx: TemplateContext): { command: string; cwd?: string; timeoutMs: number } {
+    const params = action.params
+    const cwd = params.cwd ? resolveTemplate(params.cwd as string, ctx) : ctx.project?.path
+
+    if (action.type === 'ai') {
+      const providerId = typeof params.provider === 'string' ? params.provider.trim() : ''
+      if (!providerId) throw new Error('AI action missing provider')
+      const row = this.db.prepare(
+        'SELECT id, type, default_flags FROM terminal_modes WHERE id = ?'
+      ).get(providerId) as { id: string; type: string; default_flags: string | null } | undefined
+      if (!row) throw new Error(`AI action references unknown provider "${providerId}"`)
+
+      const resolvedPrompt = resolveTemplate(params.prompt, ctx)
+      if (!resolvedPrompt.trim()) throw new Error('AI action missing prompt')
+      // Flags are NOT template-resolved — they're inserted unquoted into the
+      // shell command, so allowing user-controlled task/project text in there
+      // would be a shell-injection vector. Templates belong in the prompt
+      // (which is shell-quoted).
+      const rawFlags = typeof params.flags === 'string' ? params.flags : undefined
+      if (rawFlags?.includes('{{')) {
+        throw new Error('AI action: template variables are not allowed in flags — put them in the prompt')
+      }
+      const command = buildAiHeadlessCommand(
+        { provider: providerId, prompt: resolvedPrompt, flags: rawFlags },
+        { id: row.id, type: row.type, defaultFlags: row.default_flags },
+      )
+      if (!command) {
+        throw new Error(`AI action: provider type "${row.type}" has no headless command pattern`)
+      }
+      return { command, cwd, timeoutMs: AI_ACTION_TIMEOUT_MS }
     }
+
+    if (action.type === 'run_command') {
+      const command = resolveTemplate(params.command, ctx)
+      if (!command.trim()) throw new Error('run_command action missing command')
+      return { command, cwd, timeoutMs: ACTION_TIMEOUT_MS }
+    }
+
+    throw new Error(`Unknown action type: "${action.type}"`)
   }
 
-  private async executeAction(params: Record<string, unknown>, ctx: TemplateContext): Promise<{ outputTail: string | null }> {
-    const { command, cwd } = this.resolveActionExecution(params, ctx)
-    const result = await this.runCommand(command, cwd)
+  private async runResolvedAction(resolved: { command: string; cwd?: string; timeoutMs: number }): Promise<{ outputTail: string | null }> {
+    const result = await this.runCommand(resolved.command, resolved.cwd, resolved.timeoutMs)
     return { outputTail: trimOutputTail(`${result.stdout}${result.stderr}`) }
   }
 
-  private runCommand(command: string, cwd?: string): Promise<{ stdout: string; stderr: string }> {
+  private runCommand(command: string, cwd: string | undefined, timeoutMs: number): Promise<{ stdout: string; stderr: string }> {
     return new Promise((resolve, reject) => {
-      const child = exec(command, { cwd, timeout: ACTION_TIMEOUT_MS }, (err, stdout, stderr) => {
+      const child = exec(command, { cwd, timeout: timeoutMs }, (err, stdout, stderr) => {
         const outputTail = trimOutputTail(`${stdout}${stderr}`)
         if (err) reject(new AutomationCommandError(`Command failed: ${err.message}\n${stderr}`, outputTail))
         else resolve({ stdout, stderr })
       })
-      setTimeout(() => child.kill(), ACTION_TIMEOUT_MS + 1000)
+      setTimeout(() => child.kill(), timeoutMs + 1000)
     })
   }
 
