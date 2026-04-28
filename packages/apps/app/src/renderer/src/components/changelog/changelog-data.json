@@ -1,5 +1,97 @@
 [
   {
+    "version": "0.24.0",
+    "date": "2026-04-29",
+    "tagline": "Clipboard, tags & turns",
+    "items": [
+      {
+        "category": "feature",
+        "title": "Copy/paste files via OS clipboard",
+        "description": "Copy and paste files between the editor, assets panel, and your OS clipboard."
+      },
+      {
+        "category": "feature",
+        "title": "Paste/drop images into editor",
+        "description": "Drop or paste images directly into the description editor and chat input."
+      },
+      {
+        "category": "feature",
+        "title": "Per-project tag colors",
+        "description": "Tags now get a unique color per project, with automatic dedup on migration."
+      },
+      {
+        "category": "feature",
+        "title": "Blocked column drag",
+        "description": "Drag tasks to or from the blocked column on the kanban board to toggle the flag."
+      },
+      {
+        "category": "feature",
+        "title": "Click preview to focus source",
+        "description": "Click the read-only markdown preview to jump the editor to the matching source line."
+      },
+      {
+        "category": "feature",
+        "title": "Inline HTML in markdown",
+        "description": "Render inline HTML in the markdown editor with proper src and link resolution."
+      },
+      {
+        "category": "feature",
+        "title": "Markdown editor settings banner",
+        "description": "Tweak markdown editor behavior from a persistent banner above the editor."
+      },
+      {
+        "category": "feature",
+        "title": "Cmd+Shift-click external open",
+        "description": "Cmd+Shift-click links in the browser panel to open them in your default browser."
+      },
+      {
+        "category": "feature",
+        "title": "Per-tab browser CLI",
+        "description": "slay browser commands now target individual tabs instead of the active tab."
+      },
+      {
+        "category": "feature",
+        "title": "Cron catchup on start",
+        "description": "Automations catch up on missed cron fires when the app starts after being closed."
+      },
+      {
+        "category": "improvement",
+        "title": "Faster worktree clones",
+        "description": "Worktree creation uses APFS clone (cp -cR) for instant copy of ignored files on macOS."
+      },
+      {
+        "category": "improvement",
+        "title": "Tags nested under Tasks",
+        "description": "Project settings now nests Tags under Tasks and renames the Templates section."
+      },
+      {
+        "category": "improvement",
+        "title": "Cleaner assets toolbar",
+        "description": "Removed size, words, and line count stats from the assets toolbar."
+      },
+      {
+        "category": "fix",
+        "title": "Pinch zoom across tabs",
+        "description": "Pinch zoom now works on every browser panel tab, not only the first."
+      },
+      {
+        "category": "fix",
+        "title": "No task switch on CLI open",
+        "description": "Opening an asset from the CLI no longer switches the active task tab."
+      },
+      {
+        "category": "fix",
+        "title": "Stable diff turns chip row",
+        "description": "Turns chip row stays visible regardless of snapshot state in the diff panel."
+      },
+      {
+        "category": "fix",
+        "title": "Smarter agent turn consumption",
+        "description": "Agent turns are marked consumed by content match instead of HEAD equality."
+      }
+    ]
+  },
+  {
     "version": "0.23.2",
     "date": "2026-04-27",
     "tagline": "Tab cycle & HTML preview",

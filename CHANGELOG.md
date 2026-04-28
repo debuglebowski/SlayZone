@@ -1,6 +1,58 @@
 # Changelog
 
 
+## v0.24.0
+
+[compare changes](https://github.com/debuglebowski/slayzone/compare/v0.23.2...v0.24.0)
+
+### 🚀 Enhancements
+
+- **tags:** Unique color per project + dedup migration ([44b0a629](https://github.com/debuglebowski/slayzone/commit/44b0a629))
+- **kanban:** Drag to/from blocked column toggles flag ([f33126d0](https://github.com/debuglebowski/slayzone/commit/f33126d0))
+- **clipboard:** Copy/paste files in editor + assets via OS clipboard ([6d8f88b7](https://github.com/debuglebowski/slayzone/commit/6d8f88b7))
+- **assets:** Paste/drop images into description editor + chat ([3eb8b07e](https://github.com/debuglebowski/slayzone/commit/3eb8b07e))
+- **editor:** Render HTML in markdown editor with src/link resolution ([3978d0de](https://github.com/debuglebowski/slayzone/commit/3978d0de))
+- **editor:** Click read-only markdown preview to focus source line ([2f64eea3](https://github.com/debuglebowski/slayzone/commit/2f64eea3))
+- **browser:** Cmd+shift-click → external open ([8f803268](https://github.com/debuglebowski/slayzone/commit/8f803268))
+- **editor:** Add markdown settings banner w/ persistent open state ([ca6d44a8](https://github.com/debuglebowski/slayzone/commit/ca6d44a8))
+- **browser:** Per-tab targeting for slay browser CLI ([0b39e4f1](https://github.com/debuglebowski/slayzone/commit/0b39e4f1))
+- **automations:** Catchup-on-start for missed cron fires ([d4e849af](https://github.com/debuglebowski/slayzone/commit/d4e849af))
+
+### 🔥 Performance
+
+- **worktrees:** Clone via APFS cp -cR for ignored-file copy ([1e92a642](https://github.com/debuglebowski/slayzone/commit/1e92a642))
+
+### 🩹 Fixes
+
+- **task:** Html asset preview executes scripts via slz-file:// ([ab64502e](https://github.com/debuglebowski/slayzone/commit/ab64502e))
+- **tabs:** Exclude context manager from Ctrl+Tab cycle ([2804cb8c](https://github.com/debuglebowski/slayzone/commit/2804cb8c))
+- **task:** Html asset preview executes scripts via slz-file:// ([64e65a70](https://github.com/debuglebowski/slayzone/commit/64e65a70))
+- **tabs:** Exclude context manager from Ctrl+Tab cycle ([a40a0d78](https://github.com/debuglebowski/slayzone/commit/a40a0d78))
+- **assets:** No task switch on CLI open-asset ([3034424f](https://github.com/debuglebowski/slayzone/commit/3034424f))
+- **browser:** Pinch zoom on all WCV tabs ([cc60d920](https://github.com/debuglebowski/slayzone/commit/cc60d920))
+- **diff-panel:** Hoist turns chip row out of snapshot-gated block ([38eaae95](https://github.com/debuglebowski/slayzone/commit/38eaae95))
+- **agent-turns:** Swap HEAD-equality for content-based consumed check ([6430d6ae](https://github.com/debuglebowski/slayzone/commit/6430d6ae))
+
+### 💅 Refactors
+
+- **agent-turns:** Store HEAD-at-snap on row, drop git-spawn filter ([c391e721](https://github.com/debuglebowski/slayzone/commit/c391e721))
+- **agent-turns:** Store HEAD-at-snap on row, drop git-spawn filter ([9ec2c0ee](https://github.com/debuglebowski/slayzone/commit/9ec2c0ee))
+- **project-settings:** Nest Tags under Tasks, rename Templates ([43b44fb6](https://github.com/debuglebowski/slayzone/commit/43b44fb6))
+- **assets:** Drop size/words/lines stats from toolbar ([08fada6a](https://github.com/debuglebowski/slayzone/commit/08fada6a))
+- **editor:** Consolidate markdown editors into RichTextEditor ([ef4f5ec1](https://github.com/debuglebowski/slayzone/commit/ef4f5ec1))
+
+### 🏡 Chore
+
+- **nix:** Update sources to 0.23.1 ([52b379ac](https://github.com/debuglebowski/slayzone/commit/52b379ac))
+
+### ✅ Tests
+
+- **assets:** Cover sync banner positioning + caret survival ([eeec8710](https://github.com/debuglebowski/slayzone/commit/eeec8710))
+
+### ❤️ Contributors
+
+- Debuglebowski
+
 ## v0.23.2
 
 [compare changes](https://github.com/debuglebowski/slayzone/compare/v0.23.1...v0.23.2)
