@@ -187,6 +187,7 @@ export class BrowserViewManager {
 
     this.attachEventListeners(viewId, view)
     this.applySpoofing(view.webContents, entry)
+    this.applyVisualZoomLimits(view.webContents)
 
     // Register tab with Chrome extension system (browser tabs only)
     if (kind !== 'web-panel' && this.chromeExtensions && win) {
@@ -371,6 +372,18 @@ export class BrowserViewManager {
     const wc = this.getWebContents(viewId)
     if (!wc) return
     wc.setZoomFactor(factor)
+  }
+
+  private applyVisualZoomLimits(wc: Electron.WebContents): void {
+    const apply = () => {
+      if (wc.isDestroyed()) return
+      void wc.setVisualZoomLevelLimits(1, 3).catch(() => {})
+    }
+    apply()
+    // Re-apply on each navigation — visual zoom limits are per-frame and reset
+    // when a new main frame document is committed.
+    wc.on('did-finish-load', apply)
+    wc.on('did-frame-finish-load', (_e, isMainFrame) => { if (isMainFrame) apply() })
   }
 
   focus(viewId: string): void {
