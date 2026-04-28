@@ -23,12 +23,14 @@
 <br />
 
 **Homebrew** (macOS):
+
 ```bash
 brew tap debuglebowski/slayzone
 brew install --cask slayzone
 ```
 
 **Nix** (macOS / Linux):
+
 ```bash
 nix profile install github:debuglebowski/slayzone
 ```
@@ -45,37 +47,37 @@ nix profile install github:debuglebowski/slayzone
 
 <br />
 
----
+***
 
 <br />
 
-### &nbsp;&#x1F916;&nbsp; Integrated AI agents
+###  🤖  Integrated AI agents
 
 Claude Code, Codex, Gemini, and more — running inside task terminals. Spin up as many as you need per task. Real PTY sessions, not sandboxed previews.
 
-### &nbsp;&#x1F9E9;&nbsp; Agent-Kanban interaction
+###  🧩  Agent-Kanban interaction
 
 Use SlayZone's MCP server so agents can read task context and update tasks, statuses, and subtasks from the terminal. Or use the `slay` CLI to manage tasks directly from any shell.
 
-### &nbsp;&#x1F310;&nbsp; Embedded browser panels
+###  🌐  Embedded browser panels
 
 Docs, PRs, and previews inside tasks — without leaving the app.
 
-### &nbsp;&#x1F50D;&nbsp; Automatic status tracking
+###  🔍  Automatic status tracking
 
 SlayZone watches your agents and tracks each task's status automatically — idle, working, or waiting for input.
 
-### &nbsp;&#x1F33F;&nbsp; Git worktree per task
+###  🌿  Git worktree per task
 
 Isolated branches with built-in diff, conflict resolution, and commit UI. One branch per task, no more stashing half-finished work.
 
-### &nbsp;&#x1F512;&nbsp; Fully local
+###  🔒  Fully local
 
 Your agents run locally on your machine — SlayZone is just the interface.
 
 <br />
 
----
+***
 
 ### `slay` CLI
 
@@ -106,19 +108,21 @@ Install via **SlayZone → Settings → About → Install**, or manually:
 sudo ln -sf /Applications/SlayZone.app/Contents/Resources/bin/slay /usr/local/bin/slay
 ```
 
----
+***
 
 ### Known bugs
 
-- Terminal sync works perfectly 99% of the time. Cmd+R is a current workaround for the other situations.
-- Auto-status tracking only fully works for Claude Code — Codex, Cursor, and OpenCode adapters are partial
-- Large kanban boards (100+ cards) can feel sluggish during drag-and-drop
+* Terminal sync works perfectly 99% of the time. Cmd+R is a current workaround for the other situations.
 
----
+* Auto-status tracking only fully works for Claude Code — Codex, Cursor, and OpenCode adapters are partial
+
+* Large kanban boards (100+ cards) can feel sluggish during drag-and-drop
+
+***
 
 ### Built with
 
-Electron &middot; React &middot; SQLite &middot; node-pty &middot; xterm.js
+Electron · React · SQLite · node-pty · xterm.js
 
 ### Get involved
 
@@ -130,18 +134,16 @@ cd slayzone && pnpm install
 pnpm dev
 ```
 
-| Command | |
-|---|---|
-| `pnpm dev` | Start dev server |
+| Command             | <br />                                                        |
+| ------------------- | ------------------------------------------------------------- |
+| `pnpm dev`          | Start dev server                                              |
 | `pnpm dev:protocol` | Start dev server with deep-link protocol handler registration |
-| `pnpm build` | Production build |
-| `pnpm typecheck` | Typecheck all packages |
-| `pnpm test:e2e` | Run E2E tests (build first) |
+| `pnpm build`        | Production build                                              |
+| `pnpm typecheck`    | Typecheck all packages                                        |
+| `pnpm test:e2e`     | Run E2E tests (build first)                                   |
 
----
+***
 
 <p align="center">
   <img src="assets/star-history.jpg" width="100%" alt="Star History" />
 </p>
- 
- 
