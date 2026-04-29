@@ -1048,7 +1048,7 @@ function App(): React.JSX.Element {
   }, [selectedProjectId, projects, updateProject, validateProjectPath])
 
   const handleProjectDeleted = (): void => { if (deletingProject) { deleteProject(deletingProject.id, selectedProjectId, setSelectedProjectId); useDialogStore.getState().closeDeleteProject() } }
-  const handleSidebarSelectProject = (projectId: string): void => { track('project_switched'); setSelectedProjectId(projectId); setActiveTabIndex(0) }
+  const handleSidebarSelectProject = (projectId: string): void => { track('project_switched'); useTabStore.getState().selectProject(projectId) }
   const handleOpenSettings = (): void => { setSettingsInitialTab('appearance'); setSettingsInitialAiConfigSection(null); setSettingsOpen(true) }
 
   // Custom event listeners for settings

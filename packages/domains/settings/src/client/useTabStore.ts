@@ -43,6 +43,8 @@ interface TabState {
   closedTabs: TaskTab[]
   projectScopedTabs: boolean
   isLoaded: boolean
+  // projectId → taskId of last active task tab, or 'home' if home tab was last active
+  projectLastActiveTab: Record<string, string>
 
   // Internal — synced by App.tsx, not subscribed to by components
   _taskLookup: TaskLookup
@@ -51,6 +53,7 @@ interface TabState {
   setActiveTabIndex: (index: number) => void
   setActiveView: (view: ActiveView) => void
   setSelectedProjectId: (id: string) => void
+  selectProject: (projectId: string) => void
   setProjectScopedTabs: (enabled: boolean) => void
   toggleProjectScopedTabs: () => void
   setTabs: (tabs: Tab[]) => void
@@ -63,7 +66,7 @@ interface TabState {
   reopenClosedTab: () => void
 
   // Internal
-  _loadState: (state: { tabs: Tab[]; activeTabIndex: number; activeView?: ActiveView; selectedProjectId: string; projectScopedTabs?: boolean }) => void
+  _loadState: (state: { tabs: Tab[]; activeTabIndex: number; activeView?: ActiveView; selectedProjectId: string; projectScopedTabs?: boolean; projectLastActiveTab?: Record<string, string> }) => void
 }
 
 function findWorktreeInsertIndex(taskId: string, tabs: Tab[], lookup: TaskLookup): number {
@@ -97,6 +100,7 @@ export const useTabStore = create<TabState>()(
     closedTabs: [],
     projectScopedTabs: false,
     isLoaded: false,
+    projectLastActiveTab: {},
     _taskLookup: { tasks: [], projects: [] },
 
     setActiveTabIndex: (index) => set({ activeTabIndex: index, activeView: 'tabs' }),
@@ -104,6 +108,23 @@ export const useTabStore = create<TabState>()(
     setActiveView: (view) => set({ activeView: view }),
 
     setSelectedProjectId: (id) => set({ selectedProjectId: id }),
+
+    selectProject: (projectId) => {
+      const { selectedProjectId, projectLastActiveTab, tabs } = get()
+      if (selectedProjectId === projectId) {
+        set({ activeTabIndex: 0, activeView: 'tabs' })
+        return
+      }
+      const last = projectLastActiveTab[projectId]
+      if (last && last !== 'home') {
+        const idx = tabs.findIndex((t) => t.type === 'task' && t.taskId === last)
+        if (idx >= 0) {
+          set({ selectedProjectId: projectId, activeTabIndex: idx, activeView: 'tabs' })
+          return
+        }
+      }
+      set({ selectedProjectId: projectId, activeTabIndex: 0, activeView: 'tabs' })
+    },
 
     setProjectScopedTabs: (enabled) => set({ projectScopedTabs: enabled }),
 
@@ -226,6 +247,7 @@ export const useTabStore = create<TabState>()(
         activeView,
         selectedProjectId: typeof state.selectedProjectId === 'string' ? state.selectedProjectId : '',
         projectScopedTabs: !!state.projectScopedTabs,
+        projectLastActiveTab: state.projectLastActiveTab && typeof state.projectLastActiveTab === 'object' ? state.projectLastActiveTab : {},
         isLoaded: true
       })
     }
@@ -262,13 +284,36 @@ export const tabStoreReady: Promise<void> = (typeof window !== 'undefined' && wi
 let _debounceTimer: ReturnType<typeof setTimeout> | null = null
 
 useTabStore.subscribe(
-  (state) => ({ tabs: state.tabs, activeTabIndex: state.activeTabIndex, activeView: state.activeView, selectedProjectId: state.selectedProjectId, projectScopedTabs: state.projectScopedTabs }),
+  (state) => ({ tabs: state.tabs, activeTabIndex: state.activeTabIndex, activeView: state.activeView, selectedProjectId: state.selectedProjectId, projectScopedTabs: state.projectScopedTabs, projectLastActiveTab: state.projectLastActiveTab }),
   (slice) => {
     if (!useTabStore.getState().isLoaded) return
     if (_debounceTimer) clearTimeout(_debounceTimer)
     _debounceTimer = setTimeout(() => {
       window.api.settings.set('viewState', JSON.stringify(slice))
     }, 500)
+  },
+  { equalityFn: shallow }
+)
+
+// Record last active tab per project. Fires when active tab, tabs list,
+// or selected project changes. Writes taskId for task tabs, 'home' for home.
+useTabStore.subscribe(
+  (state) => ({ activeTabIndex: state.activeTabIndex, tabs: state.tabs, selectedProjectId: state.selectedProjectId, _taskLookup: state._taskLookup }),
+  ({ activeTabIndex, tabs, selectedProjectId, _taskLookup }) => {
+    if (!useTabStore.getState().isLoaded) return
+    const tab = tabs[activeTabIndex]
+    if (!tab) return
+    const current = useTabStore.getState().projectLastActiveTab
+    if (tab.type === 'task') {
+      const projectId = _taskLookup.tasks.find((t) => t.id === tab.taskId)?.project_id
+      if (!projectId) return
+      if (current[projectId] === tab.taskId) return
+      useTabStore.setState({ projectLastActiveTab: { ...current, [projectId]: tab.taskId } })
+    } else if (tab.type === 'home') {
+      if (!selectedProjectId) return
+      if (current[selectedProjectId] === 'home') return
+      useTabStore.setState({ projectLastActiveTab: { ...current, [selectedProjectId]: 'home' } })
+    }
   },
   { equalityFn: shallow }
 )
