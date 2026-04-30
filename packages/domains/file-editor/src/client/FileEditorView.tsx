@@ -1,5 +1,6 @@
 import { useState, useCallback, useRef, useEffect, useMemo, useImperativeHandle, forwardRef } from 'react'
 import { AlignCenter, Code, Columns2, Eye, FileCode, Files, Maximize2, RefreshCw, Rows2, Rows3, Search, Settings2, Type } from 'lucide-react'
+import type { EditorView as CMEditorView } from '@codemirror/view'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -30,6 +31,9 @@ import { EditorTabBar } from './EditorTabBar'
 import { CodeEditor } from './CodeEditor'
 import { MarkdownSplitView } from './MarkdownSplitView'
 import { SearchPanel } from './SearchPanel'
+import { EditorToc } from './EditorToc'
+import type { MarkdownHeading } from './markdown-headings'
+import { MarkdownEditorToggles } from './MarkdownEditorToggles'
 
 const MARKDOWN_FILE_TEXT_EXTENSIONS = new Set([
   'md', 'mdx', 'markdown', 'txt', 'rst',
@@ -70,6 +74,10 @@ function formatSize(bytes: number): string {
   return `${(bytes / 1024).toFixed(0)} KB`
 }
 
+export interface MarkdownFilePaneHandle {
+  scrollToHeadingIndex: (index: number) => void
+}
+
 interface MarkdownFilePaneProps {
   filePath: string
   projectPath: string
@@ -81,10 +89,24 @@ interface MarkdownFilePaneProps {
   readability: 'compact' | 'normal'
   width: 'narrow' | 'wide'
   fontFamily: 'sans' | 'mono'
+  handleRef?: React.MutableRefObject<MarkdownFilePaneHandle | null>
 }
 
-function MarkdownFilePane({ filePath, projectPath, content, onChange, onSave, onOpenFile, themeColors, readability, width, fontFamily }: MarkdownFilePaneProps) {
+function MarkdownFilePane({ filePath, projectPath, content, onChange, onSave, onOpenFile, themeColors, readability, width, fontFamily, handleRef }: MarkdownFilePaneProps) {
   const editorRef = useRef<MilkdownEditor | null>(null)
+  useEffect(() => {
+    if (!handleRef) return
+    handleRef.current = {
+      scrollToHeadingIndex: (index: number) => {
+        const root = editorRef.current ? getEditorViewDOM(editorRef.current) : null
+        if (!root) return
+        const headings = root.querySelectorAll('h1,h2,h3,h4,h5,h6')
+        const target = headings[index] as HTMLElement | undefined
+        target?.scrollIntoView({ block: 'start', behavior: 'smooth' })
+      },
+    }
+    return () => { if (handleRef) handleRef.current = null }
+  }, [handleRef])
   const fileDirAbs = posixResolve(projectPath, posixDirname(filePath))
 
   const resolveSrc = useCallback((src: string): string => {
@@ -182,7 +204,10 @@ export const FileEditorView = forwardRef<FileEditorViewHandle, FileEditorViewPro
   const [fileViewModes, setFileViewModes] = useState<Record<string, MarkdownViewMode>>(
     initialEditorState?.fileViewModes ?? {}
   )
-  const { editorMarkdownViewMode, notesReadability, notesWidth, notesFontFamily, editorSettingsBannerOpen } = useAppearance()
+  const { editorMarkdownViewMode, notesReadability, notesWidth, notesFontFamily, editorSettingsBannerOpen, editorMinimapEnabled, editorTocEnabled } = useAppearance()
+  const [tocWidth, setTocWidth] = useState(initialEditorState?.tocWidth ?? 220)
+  const cmViewRef = useRef<CMEditorView | null>(null)
+  const richPaneRef = useRef<MarkdownFilePaneHandle | null>(null)
   const viewMode: MarkdownViewMode = (activeFilePath ? fileViewModes[activeFilePath] : undefined) ?? editorMarkdownViewMode
   const setViewModeForFile = useCallback((mode: MarkdownViewMode) => {
     if (!activeFilePath) return
@@ -223,9 +248,10 @@ export const FileEditorView = forwardRef<FileEditorViewHandle, FileEditorViewPro
       treeWidth,
       treeVisible,
       expandedFolders: [...expandedFolders],
-      fileViewModes: Object.keys(modes).length > 0 ? modes : undefined
+      fileViewModes: Object.keys(modes).length > 0 ? modes : undefined,
+      tocWidth,
     })
-  }, [filePathsKey, activeFilePath, treeWidth, treeVisible, expandedFolders, isRestoring, fileViewModesKey])
+  }, [filePathsKey, activeFilePath, treeWidth, treeVisible, expandedFolders, isRestoring, fileViewModesKey, tocWidth])
 
   // Auto-reveal active file in tree when it changes
   useEffect(() => {
@@ -248,6 +274,19 @@ export const FileEditorView = forwardRef<FileEditorViewHandle, FileEditorViewPro
     const ext = activeFilePath?.split('.').pop()?.toLowerCase()
     return ext === 'md' || ext === 'mdx'
   }, [activeFilePath])
+
+  const handleTocJump = useCallback((heading: MarkdownHeading) => {
+    if (viewMode === 'rich') {
+      richPaneRef.current?.scrollToHeadingIndex(heading.index)
+      return
+    }
+    const view = cmViewRef.current
+    if (!view) return
+    const line = Math.max(1, Math.min(heading.line, view.state.doc.lines))
+    const lineObj = view.state.doc.line(line)
+    view.dispatch({ selection: { anchor: lineObj.from }, scrollIntoView: true })
+    view.focus()
+  }, [viewMode])
 
   const isImage = activeFile?.binary ?? false
 
@@ -475,6 +514,14 @@ export const FileEditorView = forwardRef<FileEditorViewHandle, FileEditorViewPro
         </TooltipProvider>
         {isMarkdown && activeFile?.content != null && !activeFile?.deleted && (
           <MarkdownSettingsBanner open={editorSettingsBannerOpen} onOpenChange={setBannerOpen}>
+            <MarkdownEditorToggles
+              tocEnabled={editorTocEnabled}
+              minimapEnabled={editorMinimapEnabled}
+              minimapDisabled={viewMode === 'rich'}
+              minimapDisabledLabel="Minimap (not in rich mode)"
+              onToggleToc={() => writeAppearance('editor_toc_enabled', editorTocEnabled ? '0' : '1')}
+              onToggleMinimap={() => writeAppearance('editor_minimap_enabled', editorMinimapEnabled ? '0' : '1')}
+            />
             <div className="flex items-center bg-surface-1 border border-border rounded-md p-0.5 gap-0.5">
               {([
                 { mode: 'rich' as const, icon: Eye, title: 'Rich text' },
@@ -598,7 +645,7 @@ export const FileEditorView = forwardRef<FileEditorViewHandle, FileEditorViewPro
             </div>
           </div>
         ) : activeFile?.content != null ? (
-          <div className="flex-1 min-h-0 flex">
+          <div className="relative flex-1 min-h-0 flex">
             <div className="flex-1 min-w-0">
               {isMarkdown && viewMode === 'rich' ? (
                 <MarkdownFilePane
@@ -613,6 +660,7 @@ export const FileEditorView = forwardRef<FileEditorViewHandle, FileEditorViewPro
                   readability={notesReadability}
                   width={notesWidth}
                   fontFamily={notesFontFamily}
+                  handleRef={richPaneRef}
                 />
               ) : isMarkdown && viewMode === 'split' ? (
                 <MarkdownSplitView
@@ -624,6 +672,8 @@ export const FileEditorView = forwardRef<FileEditorViewHandle, FileEditorViewPro
                   version={fileVersions.get(activeFile.path)}
                   goToPosition={goToPosition?.filePath === activeFile.path ? goToPosition : null}
                   onGoToPositionApplied={clearGoToPosition}
+                  minimap={editorMinimapEnabled}
+                  viewHandleRef={cmViewRef}
                 />
               ) : (
                 <CodeEditor
@@ -635,9 +685,20 @@ export const FileEditorView = forwardRef<FileEditorViewHandle, FileEditorViewPro
                   version={fileVersions.get(activeFile.path)}
                   goToPosition={goToPosition?.filePath === activeFile.path ? goToPosition : null}
                   onGoToPositionApplied={clearGoToPosition}
+                  minimap={editorMinimapEnabled}
+                  viewHandleRef={cmViewRef}
                 />
               )}
             </div>
+            {isMarkdown && editorTocEnabled && (
+              <EditorToc
+                content={activeFile.content}
+                width={tocWidth}
+                onWidthChange={setTocWidth}
+                onJump={handleTocJump}
+                minimapVisible={editorMinimapEnabled && viewMode !== 'rich'}
+              />
+            )}
           </div>
         ) : (
           <div className="flex-1 flex items-center justify-center text-muted-foreground">

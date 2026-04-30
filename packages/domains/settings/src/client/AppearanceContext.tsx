@@ -59,6 +59,8 @@ export function AppearanceProvider({
       window.api.settings.get('notes_show_toolbar'),
       window.api.settings.get('notes_spellcheck'),
       window.api.settings.get('editor_markdown_view_mode'),
+      window.api.settings.get('editor_minimap_enabled'),
+      window.api.settings.get('editor_toc_enabled'),
       window.api.settings.get('assets_settings_banner_open'),
       window.api.settings.get('editor_settings_banner_open'),
     ]).then(([
@@ -70,7 +72,7 @@ export function AppearanceProvider({
       browserZoom, browserUrl, browserDevices,
       sidebarBadge,
       notesFontFamily, notesReadability, legacyNotesLineSpacing, notesWidth, notesCheckedHighlight, notesShowToolbar, notesSpellcheck,
-      mdViewMode,
+      mdViewMode, minimapEnabled, tocEnabled,
       assetsBannerOpen, editorBannerOpen,
     ]) => {
       // One-shot migration: notes_line_spacing → notes_readability
@@ -110,6 +112,8 @@ export function AppearanceProvider({
         notesShowToolbar: notesShowToolbar === '1',
         notesSpellcheck: notesSpellcheck !== '0',
         editorMarkdownViewMode: (mdViewMode === 'split' || mdViewMode === 'code') ? mdViewMode : 'rich',
+        editorMinimapEnabled: minimapEnabled === '1',
+        editorTocEnabled: tocEnabled === '1',
         assetsSettingsBannerOpen: assetsBannerOpen === '1',
         editorSettingsBannerOpen: editorBannerOpen === '1',
       })

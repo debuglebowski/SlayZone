@@ -12,12 +12,16 @@ import {
 } from '@slayzone/ui'
 import type { AssetVersion, DiffResult } from '@slayzone/task-assets/shared'
 import { RichTextEditor, MarkdownSettingsBanner } from '@slayzone/editor'
+import type { EditorView as CMEditorView } from '@codemirror/view'
 import type { RenderMode, TaskAsset, AssetFolder } from '@slayzone/task/shared'
 import { getEffectiveRenderMode, getExtensionFromTitle, RENDER_MODE_INFO, isBinaryRenderMode, canExportAsPdf, canExportAsPng, canExportAsHtml } from '@slayzone/task/shared'
 import { Markdown, MermaidBlock } from '@slayzone/markdown/client'
 import { useAppearance, getThemeEditorColors, type EditorThemeColors } from '@slayzone/ui'
 import { useTheme } from '@slayzone/settings/client'
 import { SearchableCodeView, type SearchableCodeViewHandle } from '@slayzone/file-editor/client/SearchableCodeView'
+import { EditorToc } from '@slayzone/file-editor/client/EditorToc'
+import { type MarkdownHeading } from '@slayzone/file-editor/client/markdown-headings'
+import { MarkdownEditorToggles } from '@slayzone/file-editor/client/MarkdownEditorToggles'
 import { useAssets } from './useAssets'
 import { AssetFindBar } from './AssetFindBar'
 import { AssetSearchPanel } from './AssetSearchPanel'
@@ -133,7 +137,7 @@ function AssetContentEditor({ asset, viewMode, zoomLevel, onZoom, readContent, s
   searchRegex: boolean
   onSearchMatchCountChange: (count: number) => void
 }) {
-  const { notesFontFamily, notesCheckedHighlight, notesShowToolbar, notesSpellcheck } = useAppearance()
+  const { notesFontFamily, notesCheckedHighlight, notesShowToolbar, notesSpellcheck, editorMinimapEnabled, editorTocEnabled } = useAppearance()
   const { editorThemeId, contentVariant } = useTheme()
   const themeColors: EditorThemeColors = useMemo(
     () => getThemeEditorColors(editorThemeId, contentVariant),
@@ -166,6 +170,9 @@ function AssetContentEditor({ asset, viewMode, zoomLevel, onZoom, readContent, s
   const contentRef = useRef(content)
   const isDirtyRef = useRef(false)
   const splitCodeRef = useRef<SearchableCodeViewHandle>(null)
+  const cmViewRef = useRef<CMEditorView | null>(null)
+  const contentAreaRef = useRef<HTMLDivElement>(null)
+  const [tocWidth, setTocWidth] = useState(220)
   contentRef.current = content
   isDirtyRef.current = isDirty
   const fileExt = getExtensionFromTitle(asset.title) || undefined
@@ -324,6 +331,8 @@ function AssetContentEditor({ asset, viewMode, zoomLevel, onZoom, readContent, s
               searchRegex={searchRegex}
               onSearchMatchCountChange={onSearchMatchCountChange}
               placeholder="Write markdown..."
+              minimap={editorMinimapEnabled}
+              viewHandleRef={cmViewRef}
             />
           </div>
           <div
@@ -365,6 +374,8 @@ function AssetContentEditor({ asset, viewMode, zoomLevel, onZoom, readContent, s
               searchRegex={searchRegex}
               onSearchMatchCountChange={onSearchMatchCountChange}
               placeholder={`Write ${fileExt || 'content'}...`}
+              minimap={editorMinimapEnabled}
+              viewHandleRef={cmViewRef}
             />
           </div>
           <div className="flex-1 flex flex-col border-l border-border overflow-hidden min-w-0">
@@ -385,15 +396,46 @@ function AssetContentEditor({ asset, viewMode, zoomLevel, onZoom, readContent, s
           searchActiveIndex={searchActiveIndex}
           onSearchMatchCountChange={onSearchMatchCountChange}
           placeholder={`Write ${fileExt || 'content'}...`}
+          minimap={editorMinimapEnabled}
+          viewHandleRef={cmViewRef}
         />
       </div>
     )
   })()
 
+  const handleTocJump = (heading: MarkdownHeading) => {
+    if (viewMode === 'preview') {
+      const root = contentAreaRef.current
+      if (!root) return
+      const headings = root.querySelectorAll('h1,h2,h3,h4,h5,h6')
+      const target = headings[heading.index] as HTMLElement | undefined
+      target?.scrollIntoView({ block: 'start', behavior: 'smooth' })
+      return
+    }
+    const view = cmViewRef.current
+    if (!view) return
+    const line = Math.max(1, Math.min(heading.line, view.state.doc.lines))
+    const lineObj = view.state.doc.line(line)
+    view.dispatch({ selection: { anchor: lineObj.from }, scrollIntoView: true })
+    view.focus()
+  }
+
+  const showToc = renderMode === 'markdown' && editorTocEnabled && content != null
   return (
-    <div className="relative flex-1 flex flex-col min-h-0">
-      {inner}
-      {banner}
+    <div className="relative flex-1 flex flex-row min-h-0">
+      <div ref={contentAreaRef} className="relative flex-1 flex flex-col min-h-0 min-w-0">
+        {inner}
+        {banner}
+      </div>
+      {showToc && (
+        <EditorToc
+          content={content ?? ''}
+          width={tocWidth}
+          onWidthChange={setTocWidth}
+          onJump={handleTocJump}
+          minimapVisible={editorMinimapEnabled && viewMode !== 'preview'}
+        />
+      )}
     </div>
   )
 }
@@ -464,7 +506,7 @@ export const AssetsPanel = forwardRef<AssetsPanelHandle, AssetsPanelProps>(funct
     })
   }, [selectedId])
 
-  const { editorMarkdownViewMode, notesReadability, notesWidth, notesFontFamily, assetsSettingsBannerOpen } = useAppearance()
+  const { editorMarkdownViewMode, notesReadability, notesWidth, notesFontFamily, assetsSettingsBannerOpen, editorMinimapEnabled, editorTocEnabled } = useAppearance()
   const setBannerOpen = useCallback((open: boolean) => {
     void window.api.settings.set('assets_settings_banner_open', open ? '1' : '0')
     window.dispatchEvent(new Event('sz:settings-changed'))
@@ -1536,6 +1578,20 @@ export const AssetsPanel = forwardRef<AssetsPanelHandle, AssetsPanelProps>(funct
           {(isResizing || sidebarDragging) && <div className="absolute inset-0 z-10" />}
           {selectedAsset && selectedRenderMode === 'markdown' && (
             <MarkdownSettingsBanner open={assetsSettingsBannerOpen} onOpenChange={setBannerOpen}>
+              <MarkdownEditorToggles
+                tocEnabled={editorTocEnabled}
+                minimapEnabled={editorMinimapEnabled}
+                minimapDisabled={viewMode === 'preview'}
+                minimapDisabledLabel="Minimap (not in preview)"
+                onToggleToc={() => {
+                  void window.api.settings.set('editor_toc_enabled', editorTocEnabled ? '0' : '1')
+                  window.dispatchEvent(new Event('sz:settings-changed'))
+                }}
+                onToggleMinimap={() => {
+                  void window.api.settings.set('editor_minimap_enabled', editorMinimapEnabled ? '0' : '1')
+                  window.dispatchEvent(new Event('sz:settings-changed'))
+                }}
+              />
               <div className="flex items-center bg-surface-1 border border-border rounded-md p-0.5 gap-0.5">
                 {([
                   { mode: 'preview' as const, icon: Eye, title: 'Preview' },

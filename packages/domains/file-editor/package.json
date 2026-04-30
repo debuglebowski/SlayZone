@@ -12,7 +12,10 @@
     "./client": "./src/client/index.ts",
     "./client/FileEditorView": "./src/client/FileEditorView.tsx",
     "./client/useWatchedFile": "./src/client/useWatchedFile.ts",
-    "./client/SearchableCodeView": "./src/client/SearchableCodeView.tsx"
+    "./client/SearchableCodeView": "./src/client/SearchableCodeView.tsx",
+    "./client/EditorToc": "./src/client/EditorToc.tsx",
+    "./client/markdown-headings": "./src/client/markdown-headings.ts",
+    "./client/MarkdownEditorToggles": "./src/client/MarkdownEditorToggles.tsx"
   },
   "scripts": {
     "typecheck": "tsgo --noEmit",
@@ -34,6 +37,7 @@
     "@codemirror/state": "^6.5.2",
     "@codemirror/view": "^6.36.5",
     "@lezer/highlight": "^1.0.0",
+    "@replit/codemirror-minimap": "0.5.2",
     "@slayzone/editor": "workspace:*",
     "@slayzone/icons": "workspace:*",
     "@slayzone/markdown": "workspace:*",

@@ -1,3 +1,3 @@
 export { FileEditorView, type FileEditorViewHandle } from './FileEditorView'
 export { useWatchedFile, type UseWatchedFileOptions, type UseWatchedFileResult } from './useWatchedFile'
-export { SearchableCodeView, type SearchableCodeViewProps } from './SearchableCodeView'
+export { SearchableCodeView, type SearchableCodeViewProps, type SearchableCodeViewHandle } from './SearchableCodeView'

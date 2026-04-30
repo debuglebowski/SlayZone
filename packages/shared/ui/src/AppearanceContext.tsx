@@ -41,6 +41,8 @@ export interface AppearanceSettings {
   sidebarBadgeMode: 'none' | 'blob' | 'count'
   // Markdown
   editorMarkdownViewMode: 'rich' | 'split' | 'code'
+  editorMinimapEnabled: boolean
+  editorTocEnabled: boolean
   // Markdown settings banner open state (per consumer)
   assetsSettingsBannerOpen: boolean
   editorSettingsBannerOpen: boolean
@@ -74,6 +76,8 @@ export const appearanceDefaults: AppearanceSettings = {
   notesSpellcheck: true,
   sidebarBadgeMode: 'blob',
   editorMarkdownViewMode: 'rich',
+  editorMinimapEnabled: false,
+  editorTocEnabled: false,
   assetsSettingsBannerOpen: false,
   editorSettingsBannerOpen: false,
 }

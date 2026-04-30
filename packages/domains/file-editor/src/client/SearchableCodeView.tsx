@@ -1,8 +1,9 @@
-import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef } from 'react'
+import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, type MutableRefObject } from 'react'
 import { useTheme } from '@slayzone/settings/client'
 import { getThemeEditorColors } from '@slayzone/ui'
 import { EditorView, lineNumbers, highlightActiveLineGutter, highlightActiveLine, drawSelection, dropCursor } from '@codemirror/view'
 import { EditorState, Compartment, StateField, StateEffect, RangeSetBuilder } from '@codemirror/state'
+import { buildMinimap as buildMinimapExt, cmScrollbarTheme } from './cm-shared-themes'
 import { Decoration } from '@codemirror/view'
 import { SearchCursor, RegExpCursor } from '@codemirror/search'
 import { history, defaultKeymap, historyKeymap, indentWithTab } from '@codemirror/commands'
@@ -120,6 +121,8 @@ export interface SearchableCodeViewProps {
   onSearchMatchCountChange?: (count: number) => void
   fontSize?: number
   placeholder?: string
+  minimap?: boolean
+  viewHandleRef?: MutableRefObject<EditorView | null>
 }
 
 export interface SearchableCodeViewHandle {
@@ -132,6 +135,8 @@ export const SearchableCodeView = forwardRef<SearchableCodeViewHandle, Searchabl
   onSearchMatchCountChange,
   fontSize = 12,
   placeholder,
+  minimap,
+  viewHandleRef,
 }, ref) {
   const { editorThemeId, contentVariant } = useTheme()
   const themeExt = useMemo(
@@ -140,7 +145,6 @@ export const SearchableCodeView = forwardRef<SearchableCodeViewHandle, Searchabl
   )
   const sizeTheme = useMemo(() => EditorView.theme({
     '&': { height: '100%', fontSize: `${fontSize}px` },
-    '.cm-scroller': { overflow: 'auto' },
     '.cm-content': { fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace' },
   }), [fontSize])
 
@@ -156,6 +160,7 @@ export const SearchableCodeView = forwardRef<SearchableCodeViewHandle, Searchabl
   contentRef.current = value
 
   const themeComp = useRef(new Compartment())
+  const minimapComp = useRef(new Compartment())
 
   // Create editor on mount / language change
   useEffect(() => {
@@ -181,6 +186,8 @@ export const SearchableCodeView = forwardRef<SearchableCodeViewHandle, Searchabl
       indentUnit.of('  '),
       keymap.of([...defaultKeymap, ...historyKeymap, ...foldKeymap, indentWithTab]),
       themeComp.current.of(themeExt),
+      cmScrollbarTheme,
+      minimapComp.current.of(minimap ? buildMinimapExt() : []),
       sizeTheme,
       searchField,
       searchDecorations(searchField),
@@ -200,10 +207,12 @@ export const SearchableCodeView = forwardRef<SearchableCodeViewHandle, Searchabl
     const state = EditorState.create({ doc: value, extensions })
     const view = new EditorView({ state, parent: containerRef.current })
     viewRef.current = view
+    if (viewHandleRef) viewHandleRef.current = view
 
     return () => {
       view.destroy()
       viewRef.current = null
+      if (viewHandleRef) viewHandleRef.current = null
       searchFieldRef.current = null
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -215,6 +224,13 @@ export const SearchableCodeView = forwardRef<SearchableCodeViewHandle, Searchabl
     if (!view) return
     view.dispatch({ effects: [themeComp.current.reconfigure(themeExt)] })
   }, [themeExt])
+
+  // Reconfigure minimap at runtime
+  useEffect(() => {
+    const view = viewRef.current
+    if (!view) return
+    view.dispatch({ effects: [minimapComp.current.reconfigure(minimap ? buildMinimapExt() : [])] })
+  }, [minimap])
 
   // Replace editor content when version bumps
   useEffect(() => {

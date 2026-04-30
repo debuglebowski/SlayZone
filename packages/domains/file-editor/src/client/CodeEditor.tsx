@@ -1,10 +1,11 @@
-import { useEffect, useMemo, useRef } from 'react'
+import { useEffect, useMemo, useRef, type MutableRefObject } from 'react'
 import { useAppearance } from '@slayzone/settings/client'
 import { useTheme } from '@slayzone/settings/client'
 import { getThemeEditorColors } from '@slayzone/ui'
 import { EditorView, basicSetup } from 'codemirror'
 import { EditorState, Compartment } from '@codemirror/state'
 import { keymap, highlightWhitespace } from '@codemirror/view'
+import { buildMinimap, cmScrollbarTheme } from './cm-shared-themes'
 import { indentMore, indentLess } from '@codemirror/commands'
 import { indentUnit, LRLanguage, LanguageSupport } from '@codemirror/language'
 import { javascript } from '@codemirror/lang-javascript'
@@ -74,9 +75,13 @@ interface CodeEditorProps {
   /** Navigate to line/col and focus editor */
   goToPosition?: { line: number; col: number } | null
   onGoToPositionApplied?: () => void
+  /** Show right-side minimap gutter */
+  minimap?: boolean
+  /** External handle to underlying CM EditorView (for TOC jump etc.) */
+  viewHandleRef?: MutableRefObject<EditorView | null>
 }
 
-export function CodeEditor({ filePath, content, onChange, onSave, version, goToPosition, onGoToPositionApplied }: CodeEditorProps) {
+export function CodeEditor({ filePath, content, onChange, onSave, version, goToPosition, onGoToPositionApplied, minimap, viewHandleRef }: CodeEditorProps) {
   const { editorThemeId, contentVariant } = useTheme()
   const {
     editorFontSize, editorWordWrap, editorTabSize, editorIndentTabs, editorRenderWhitespace,
@@ -90,7 +95,6 @@ export function CodeEditor({ filePath, content, onChange, onSave, version, goToP
 
   const sizeTheme = useMemo(() => EditorView.theme({
     '&': { height: '100%', fontSize: `${editorFontSize}px` },
-    '.cm-scroller': { overflow: 'auto' },
     '.cm-content': { fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace' },
   }), [editorFontSize])
   const containerRef = useRef<HTMLDivElement>(null)
@@ -109,6 +113,7 @@ export function CodeEditor({ filePath, content, onChange, onSave, version, goToP
   const indentComp = useRef(new Compartment())
   const wrapComp = useRef(new Compartment())
   const whitespaceComp = useRef(new Compartment())
+  const minimapComp = useRef(new Compartment())
 
   // Create editor on mount / filePath change
   useEffect(() => {
@@ -118,6 +123,7 @@ export function CodeEditor({ filePath, content, onChange, onSave, version, goToP
     const extensions = [
       basicSetup,
       sizeTheme,
+      cmScrollbarTheme,
       themeComp.current.of(cmThemeExt),
       keymap.of([
         {
@@ -148,16 +154,19 @@ export function CodeEditor({ filePath, content, onChange, onSave, version, goToP
       indentComp.current.of(indentUnit.of(editorIndentTabs ? '\t' : ' '.repeat(editorTabSize))),
       wrapComp.current.of(editorWordWrap === 'on' ? EditorView.lineWrapping : []),
       whitespaceComp.current.of(editorRenderWhitespace !== 'none' ? highlightWhitespace() : []),
+      minimapComp.current.of(minimap ? buildMinimap() : []),
     ]
     if (lang) extensions.splice(1, 0, lang)
 
     const state = EditorState.create({ doc: content, extensions })
     const view = new EditorView({ state, parent: containerRef.current })
     viewRef.current = view
+    if (viewHandleRef) viewHandleRef.current = view
 
     return () => {
       view.destroy()
       viewRef.current = null
+      if (viewHandleRef) viewHandleRef.current = null
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filePath, sizeTheme])
@@ -186,6 +195,13 @@ export function CodeEditor({ filePath, content, onChange, onSave, version, goToP
     if (!view) return
     view.dispatch({ effects: [themeComp.current.reconfigure(cmThemeExt)] })
   }, [cmThemeExt])
+
+  // Reconfigure minimap at runtime
+  useEffect(() => {
+    const view = viewRef.current
+    if (!view) return
+    view.dispatch({ effects: [minimapComp.current.reconfigure(minimap ? buildMinimap() : [])] })
+  }, [minimap])
 
   // Reconfigure editor settings at runtime without destroying the view
   useEffect(() => {

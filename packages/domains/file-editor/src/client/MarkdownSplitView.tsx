@@ -1,7 +1,8 @@
-import { useState, useEffect, type CSSProperties } from 'react'
+import { useState, useEffect, type CSSProperties, type MutableRefObject } from 'react'
 import { Markdown } from '@slayzone/markdown/client'
 import { useTheme } from '@slayzone/settings/client'
 import { getThemeEditorColors, useAppearance } from '@slayzone/ui'
+import type { EditorView } from '@codemirror/view'
 import { CodeEditor } from './CodeEditor'
 
 interface MarkdownSplitViewProps {
@@ -12,9 +13,11 @@ interface MarkdownSplitViewProps {
   version?: number
   goToPosition?: { line: number; col: number } | null
   onGoToPositionApplied?: () => void
+  minimap?: boolean
+  viewHandleRef?: MutableRefObject<EditorView | null>
 }
 
-export function MarkdownSplitView({ filePath, content, onChange, onSave, version, goToPosition, onGoToPositionApplied }: MarkdownSplitViewProps) {
+export function MarkdownSplitView({ filePath, content, onChange, onSave, version, goToPosition, onGoToPositionApplied, minimap, viewHandleRef }: MarkdownSplitViewProps) {
   const { editorThemeId, contentVariant } = useTheme()
   const colors = getThemeEditorColors(editorThemeId, contentVariant)
   const { notesReadability, notesWidth } = useAppearance()
@@ -56,6 +59,8 @@ export function MarkdownSplitView({ filePath, content, onChange, onSave, version
           version={version}
           goToPosition={effectiveGoTo}
           onGoToPositionApplied={handleGoToApplied}
+          minimap={minimap}
+          viewHandleRef={viewHandleRef}
         />
       </div>
       <div

@@ -60,4 +60,5 @@ export interface EditorOpenFilesState {
   treeVisible?: boolean
   expandedFolders?: string[]
   fileViewModes?: Record<string, MarkdownViewMode>
+  tocWidth?: number
 }
