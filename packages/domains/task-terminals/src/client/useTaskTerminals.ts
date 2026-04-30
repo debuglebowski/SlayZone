@@ -103,6 +103,14 @@ export function useTaskTerminals(taskId: string, defaultMode: TerminalMode): Use
         if (!skipKill) {
           await window.api.pty.kill(sessionId)
         }
+        // Reap chat session for this tab regardless of displayMode — chat:remove is
+        // a no-op when no session exists. Without this, a chat-mode tab's claude
+        // subprocess + in-memory session map entry leak until app shutdown.
+        try {
+          await window.api.chat?.remove(tabId)
+        } catch {
+          /* ignore — chat session may not exist */
+        }
 
         setTabs(prev => {
           const remaining = prev.filter(t => t.id !== tabId)
