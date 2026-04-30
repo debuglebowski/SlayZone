@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useVirtualizer } from '@tanstack/react-virtual'
+import { useStickToBottom } from 'use-stick-to-bottom'
 import {
   ArrowUp,
   Square,
@@ -106,12 +107,14 @@ export function ChatPanel(props: ChatPanelProps) {
   const [sessionIdCopied, setSessionIdCopied] = useState(false)
   const [permissionNotice, setPermissionNotice] = useState<string | null>(overrideNotice ?? null)
   const [noticeDismissed, setNoticeDismissed] = useState(false)
-  const [isAtBottom, setIsAtBottom] = useState(true)
   const [collapseSignal, setCollapseSignal] = useState(0)
   const [finalOnly, setFinalOnly] = useState(false)
   const [queuedMessages, setQueuedMessages] = useState<string[]>([])
   const [attachments, setAttachments] = useState<AssetRef[]>([])
-  const listRef = useRef<HTMLDivElement>(null)
+  const { scrollRef, contentRef, isAtBottom, scrollToBottom } = useStickToBottom({
+    initial: 'instant',
+    resize: 'instant',
+  })
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
   const { uploadFiles: uploadImageFiles, getFilePath: getAssetFilePath } = useAssetUpload(taskId)
@@ -266,9 +269,9 @@ export function ChatPanel(props: ChatPanelProps) {
 
   const virtualizer = useVirtualizer({
     count: displayedTimeline.length,
-    getScrollElement: () => listRef.current,
-    estimateSize: () => 64,
-    overscan: 8,
+    getScrollElement: () => scrollRef.current as HTMLElement | null,
+    estimateSize: () => 120,
+    overscan: 4,
     getItemKey: (index) => {
       const item = displayedTimeline[index]
       if (!item) return index
@@ -283,29 +286,6 @@ export function ChatPanel(props: ChatPanelProps) {
 
 
   const chatView = useMemo(() => ({ collapseSignal, finalOnly }), [collapseSignal, finalOnly])
-
-  // Track scroll position to show/hide "jump to latest".
-  useEffect(() => {
-    const el = listRef.current
-    if (!el) return
-    const onScroll = (): void => {
-      const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight
-      setIsAtBottom(distanceFromBottom < 80)
-    }
-    el.addEventListener('scroll', onScroll, { passive: true })
-    onScroll()
-    return () => el.removeEventListener('scroll', onScroll)
-  }, [])
-
-  // Auto-scroll to bottom when at bottom.
-  useEffect(() => {
-    if (!isAtBottom) return
-    const el = listRef.current
-    if (!el) return
-    requestAnimationFrame(() => {
-      el.scrollTop = el.scrollHeight
-    })
-  }, [displayedTimeline.length, isAtBottom, inFlight])
 
   // Autosize textarea. Height follows scrollHeight up to 240px; no artificial min —
   // an empty draft renders as a single-line input.
@@ -444,13 +424,6 @@ export function ChatPanel(props: ChatPanelProps) {
     }
   }, [resetting, inFlight, chatApi, tabId, taskId, mode, cwd, providerFlagsOverride, resetTimeline])
 
-  const scrollToBottom = useCallback(() => {
-    const el = listRef.current
-    if (el) {
-      el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' })
-    }
-  }, [])
-
   const items = virtualizer.getVirtualItems()
   const isEmpty = timeline.length === 0 || (timeline.length === 1 && timeline[0].kind === 'session-start')
 
@@ -473,7 +446,7 @@ export function ChatPanel(props: ChatPanelProps) {
 
       {/* Timeline */}
       <div className="relative flex-1 min-h-0">
-        <div ref={listRef} className="h-full overflow-y-auto pt-4">
+        <div ref={scrollRef} className="h-full overflow-y-auto pt-4">
           {hydrating ? (
             <HydratingState />
           ) : isEmpty && !inFlight ? (
@@ -483,7 +456,7 @@ export function ChatPanel(props: ChatPanelProps) {
               }}
             />
           ) : (
-            <div style={{ height: virtualizer.getTotalSize(), position: 'relative' }}>
+            <div ref={contentRef} style={{ height: virtualizer.getTotalSize(), position: 'relative' }}>
               {items.map((v) => {
                 const item = displayedTimeline[v.index]
                 const rendered = renderTimelineItem(item, v.index)
@@ -513,7 +486,7 @@ export function ChatPanel(props: ChatPanelProps) {
         {/* Jump-to-latest button */}
         {!isAtBottom && (
           <button
-            onClick={scrollToBottom}
+            onClick={() => void scrollToBottom()}
             className="absolute bottom-3 left-1/2 -translate-x-1/2 flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-background border border-border shadow-md text-xs hover:bg-muted transition-colors"
           >
             <ArrowDown className="size-3" />

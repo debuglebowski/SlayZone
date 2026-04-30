@@ -524,6 +524,9 @@ importers:
       '@lezer/highlight':
         specifier: ^1.0.0
         version: 1.2.3
+      '@replit/codemirror-minimap':
+        specifier: 0.5.2
+        version: 0.5.2(@codemirror/language@6.12.2)(@codemirror/lint@6.9.3)(@codemirror/state@6.5.4)(@codemirror/view@6.39.12)(@lezer/common@1.5.1)(@lezer/highlight@1.2.3)
       '@slayzone/editor':
         specifier: workspace:*
         version: link:../../shared/editor
@@ -963,6 +966,9 @@ importers:
       react:
         specifier: ^19.0.0
         version: 19.2.3
+      use-stick-to-bottom:
+        specifier: ^1.1.3
+        version: 1.1.3(react@19.2.3)
     devDependencies:
       '@types/better-sqlite3':
         specifier: ^7.6.13
@@ -3752,6 +3758,16 @@ packages:
 
   '@radix-ui/rect@1.1.1':
     resolution: {integrity: sha512-HPwpGIzkl28mWyZqG52jiqDJ12waP11Pa1lGoiyUkIEuMLBP0oeK/C89esbXrxsky5we7dfd8U58nm0SgAWpVw==}
+
+  '@replit/codemirror-minimap@0.5.2':
+    resolution: {integrity: sha512-eNAtpr0hOG09/5zqAQ5PkgZEb3V/MHi30zentCxiR73r+utR2m9yVMCpBmfsWbb8mWxUWhMGPiHxM5hFtnscQA==}
+    peerDependencies:
+      '@codemirror/language': ^6.9.1
+      '@codemirror/lint': ^6.4.2
+      '@codemirror/state': ^6.3.1
+      '@codemirror/view': ^6.21.3
+      '@lezer/common': ^1.1.0
+      '@lezer/highlight': ^1.1.6
 
   '@rolldown/pluginutils@1.0.0-beta.53':
     resolution: {integrity: sha512-vENRlFU4YbrwVqNDZ7fLvy+JR1CRkyr01jhSiDpE1u6py3OMzQfztQU2jxykW3ALNxO4kSlqIDeYyD0Y9RcQeQ==}
@@ -8360,6 +8376,11 @@ packages:
       '@types/react':
         optional: true
 
+  use-stick-to-bottom@1.1.3:
+    resolution: {integrity: sha512-GgRLdeGhxBxpcbrBbEIEoOKUQ9d46/eaSII+wyv1r9Du+NbCn1W/OE+VddefvRP4+5w/1kATN/6g2/BAC/yowQ==}
+    peerDependencies:
+      react: ^16.8.0 || ^17.0.0 || ^18.0.0 || ^19.0.0
+
   use-sync-external-store@1.6.0:
     resolution: {integrity: sha512-Pp6GSwGP/NrPIrxVFAIkOQeyw8lFenOHijQWkUTrDvrF4ALqylP2C/KCkeS9dpUM3KvYRQhna5vt7IL95+ZQ9w==}
     peerDependencies:
@@ -10795,6 +10816,16 @@ snapshots:
       '@types/react-dom': 19.2.3(@types/react@19.2.8)
 
   '@radix-ui/rect@1.1.1': {}
+
+  '@replit/codemirror-minimap@0.5.2(@codemirror/language@6.12.2)(@codemirror/lint@6.9.3)(@codemirror/state@6.5.4)(@codemirror/view@6.39.12)(@lezer/common@1.5.1)(@lezer/highlight@1.2.3)':
+    dependencies:
+      '@codemirror/language': 6.12.2
+      '@codemirror/lint': 6.9.3
+      '@codemirror/state': 6.5.4
+      '@codemirror/view': 6.39.12
+      '@lezer/common': 1.5.1
+      '@lezer/highlight': 1.2.3
+      crelt: 1.0.6
 
   '@rolldown/pluginutils@1.0.0-beta.53': {}
 
@@ -16356,6 +16387,10 @@ snapshots:
       tslib: 2.8.1
     optionalDependencies:
       '@types/react': 19.2.8
+
+  use-stick-to-bottom@1.1.3(react@19.2.3):
+    dependencies:
+      react: 19.2.3
 
   use-sync-external-store@1.6.0(react@19.2.3):
     dependencies:
