@@ -10,13 +10,14 @@ export interface ResetChatOptions {
 }
 
 /**
- * Kill the current chat session and immediately create a fresh one w/ the same
- * tab/task/mode/cwd (and providerFlags override if set). Shared by the reset button
- * and the `/clear` builtin to keep both paths in sync.
+ * Kill the current chat session and immediately spawn a fresh one w/ the same
+ * tab/task/mode/cwd (and providerFlags override if set). Shared by the reset
+ * button and the `/clear` builtin so both stay in sync.
  *
- * Must `remove` between kill and create: otherwise createChat sees the still-alive
- * old session in its map and returns it unchanged (early-return guard), so the reset
- * becomes a no-op.
+ * Single atomic IPC: kill + wipe persisted events + clear stored conversation id
+ * + spawn fresh all happen on the main side in one handler. Earlier versions
+ * orchestrated this client-side across multiple awaits, which let the dying
+ * child's exit broadcast leak between IPCs and stick "Session ended".
  */
 export async function resetChat(
   chat: ChatActions,
@@ -31,9 +32,7 @@ export async function resetChat(
     }
   }
   try {
-    await chat.kill(session.tabId)
-    await chat.remove(session.tabId)
-    await chat.create({
+    await chat.reset({
       tabId: session.tabId,
       taskId: session.taskId,
       mode: session.mode,

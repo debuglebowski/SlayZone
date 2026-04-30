@@ -531,6 +531,19 @@ export interface ElectronAPI {
     interrupt: (tabId: string) => Promise<void>
     kill: (tabId: string) => Promise<void>
     remove: (tabId: string) => Promise<void>
+    /**
+     * Atomic reset: kills the current session, wipes persisted events + stored
+     * conversation id, and spawns a fresh session in one IPC. Replaces the older
+     * client-orchestrated kill→remove→create sequence which had a race where a
+     * stale exit could leak between awaits.
+     */
+    reset: (opts: {
+      tabId: string
+      taskId: string
+      mode: string
+      cwd: string
+      providerFlagsOverride?: string | null
+    }) => Promise<ChatSessionInfo>
     getBufferSince: (
       tabId: string,
       afterSeq: number
@@ -551,7 +564,12 @@ export interface ElectronAPI {
     listFiles: (cwd: string, query: string, limit?: number) => Promise<FileMatch[]>
     onEvent: (callback: (tabId: string, event: AgentEvent, seq: number) => void) => () => void
     onExit: (
-      callback: (tabId: string, code: number | null, signal: string | null) => void
+      callback: (
+        tabId: string,
+        sessionId: string,
+        code: number | null,
+        signal: string | null
+      ) => void
     ) => () => void
   }
   terminalModes: {

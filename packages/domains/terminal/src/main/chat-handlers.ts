@@ -141,6 +141,53 @@ export function inspectPermissionFlags(flags: string[]): {
   }
 }
 
+/**
+ * Shared opts builder for `chat:create` + `chat:reset`. `fresh: true` forces a new
+ * session id (skips --resume) — used by reset to guarantee a clean thread regardless
+ * of whatever was previously stored. PATH enrichment + MCP env are identical across
+ * both paths, so factoring here prevents drift.
+ */
+function buildCreateOpts(
+  db: Database,
+  opts: ChatCreateOpts,
+  { fresh }: { fresh: boolean }
+): Parameters<typeof createChat>[0] {
+  const providerCfg = readProviderConfig(db, opts.taskId, opts.mode)
+  const flagsString =
+    opts.providerFlagsOverride ??
+    providerCfg.flags ??
+    readTaskModeDefaultFlags(db, opts.mode) ??
+    ''
+  const providerFlags = parseShellArgs(flagsString)
+
+  const initialBuffer = fresh ? [] : loadChatEvents(db, opts.tabId)
+  const initialNextSeq = fresh ? 0 : getNextSeqForTab(db, opts.tabId)
+
+  const enrichedPath = getEnrichedPath()
+  const subprocessEnv: Record<string, string> = {
+    ...buildMcpEnv(db, opts.taskId),
+    ...(enrichedPath ? { PATH: enrichedPath } : {}),
+  }
+
+  return {
+    tabId: opts.tabId,
+    taskId: opts.taskId,
+    mode: opts.mode,
+    cwd: opts.cwd,
+    conversationId: fresh ? null : providerCfg.chatConversationId ?? null,
+    providerFlags,
+    env: subprocessEnv,
+    initialBuffer,
+    initialNextSeq,
+    onPersistSessionId: (id) => {
+      writeChatConversationId(db, opts.taskId, opts.mode, id)
+    },
+    onInvalidResume: () => {
+      clearChatConversationId(db, opts.taskId, opts.mode)
+    },
+  }
+}
+
 export function registerChatHandlers(ipcMain: IpcMain, db: Database, opts: ChatHandlerOpts = {}): void {
   // Wire SQLite persistence into the transport. Default deps had a no-op
   // persistEvent; configureTransport keeps spawn/whichBinary/broadcast* untouched.
@@ -164,46 +211,7 @@ export function registerChatHandlers(ipcMain: IpcMain, db: Database, opts: ChatH
   ipcMain.handle('chat:supports', (_, mode: string): boolean => supportsChatMode(mode))
 
   ipcMain.handle('chat:create', async (_, opts: ChatCreateOpts): Promise<ChatSessionInfo> => {
-    const providerCfg = readProviderConfig(db, opts.taskId, opts.mode)
-    const flagsString =
-      opts.providerFlagsOverride ??
-      providerCfg.flags ??
-      readTaskModeDefaultFlags(db, opts.mode) ??
-      ''
-    const providerFlags = parseShellArgs(flagsString)
-
-    // Restore persisted history so chat panel re-fills immediately after app reload.
-    // Empty arrays for fresh tabs — no extra cost, single SELECT each.
-    const initialBuffer = loadChatEvents(db, opts.tabId)
-    const initialNextSeq = getNextSeqForTab(db, opts.tabId)
-
-    // Match PTY behavior: chat SDK subprocess + its nested Bash tool need the user's
-    // enriched PATH so they find pnpm/nvm/asdf-installed binaries (slay, node, etc).
-    // Electron's bare PATH would otherwise hide them.
-    const enrichedPath = getEnrichedPath()
-    const subprocessEnv: Record<string, string> = {
-      ...buildMcpEnv(db, opts.taskId),
-      ...(enrichedPath ? { PATH: enrichedPath } : {}),
-    }
-
-    const info = await createChat({
-      tabId: opts.tabId,
-      taskId: opts.taskId,
-      mode: opts.mode,
-      cwd: opts.cwd,
-      conversationId: providerCfg.chatConversationId ?? null,
-      providerFlags,
-      env: subprocessEnv,
-      initialBuffer,
-      initialNextSeq,
-      onPersistSessionId: (id) => {
-        writeChatConversationId(db, opts.taskId, opts.mode, id)
-      },
-      onInvalidResume: () => {
-        clearChatConversationId(db, opts.taskId, opts.mode)
-      },
-    })
-    return info
+    return createChat(buildCreateOpts(db, opts, { fresh: false }))
   })
 
   ipcMain.handle('chat:send', (_, tabId: string, text: string): boolean => {
@@ -228,6 +236,28 @@ export function registerChatHandlers(ipcMain: IpcMain, db: Database, opts: ChatH
     } catch (err) {
       console.error('[chat-handlers] clearChatEventsForTab failed:', err)
     }
+  })
+
+  // Reset = atomic kill+wipe+spawn-fresh in a single IPC. Doing this client-side
+  // (kill → remove → create across multiple awaits) opened a race window where the
+  // old child's exit broadcast could leak between IPCs and stick "Session ended"
+  // in the renderer. Inlining the whole sequence on the main side closes that
+  // window: SIGTERM is sent + the session is removed from the map sync'ly, so any
+  // exit event the OS later delivers is swallowed by the identity guard in
+  // chat-transport-manager's child.on('exit') handler.
+  ipcMain.handle('chat:reset', async (_, opts: ChatCreateOpts): Promise<ChatSessionInfo> => {
+    removeSession(opts.tabId)
+    try {
+      clearChatEventsForTab(db, opts.tabId)
+    } catch (err) {
+      console.error('[chat-handlers] clearChatEventsForTab failed:', err)
+    }
+    try {
+      clearChatConversationId(db, opts.taskId, opts.mode)
+    } catch (err) {
+      console.error('[chat-handlers] clearChatConversationId failed:', err)
+    }
+    return createChat(buildCreateOpts(db, opts, { fresh: true }))
   })
 
   ipcMain.handle('chat:getBufferSince', (_, tabId: string, afterSeq: number) => {

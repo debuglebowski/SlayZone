@@ -26,6 +26,17 @@ export interface ChatActions {
   kill: (tabId: string) => Promise<void>
   /** Delete the session from the main-side map so a subsequent `create` spawns fresh. */
   remove: (tabId: string) => Promise<void>
+  /**
+   * Atomic reset: kill + wipe persisted events + clear stored conversation id +
+   * spawn a fresh thread, all in one IPC. Caller passes the same opts as `create`.
+   */
+  reset: (opts: {
+    tabId: string
+    taskId: string
+    mode: string
+    cwd: string
+    providerFlagsOverride?: string | null
+  }) => Promise<unknown>
   create: (opts: {
     tabId: string
     taskId: string

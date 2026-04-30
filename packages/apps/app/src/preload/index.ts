@@ -455,6 +455,8 @@ const api: ElectronAPI = {
     interrupt: (tabId: string) => ipcRenderer.invoke('chat:interrupt', tabId),
     kill: (tabId: string) => ipcRenderer.invoke('chat:kill', tabId),
     remove: (tabId: string) => ipcRenderer.invoke('chat:remove', tabId),
+    reset: (opts: { tabId: string; taskId: string; mode: string; cwd: string; providerFlagsOverride?: string | null }) =>
+      ipcRenderer.invoke('chat:reset', opts),
     getBufferSince: (tabId: string, afterSeq: number) =>
       ipcRenderer.invoke('chat:getBufferSince', tabId, afterSeq),
     getInfo: (tabId: string) => ipcRenderer.invoke('chat:getInfo', tabId),
@@ -473,9 +475,21 @@ const api: ElectronAPI = {
         ipcRenderer.removeListener('chat:event', handler)
       }
     }) as ElectronAPI['chat']['onEvent'],
-    onExit: (callback: (tabId: string, code: number | null, signal: string | null) => void) => {
-      const handler = (_e: unknown, tabId: string, code: number | null, signal: string | null) =>
-        callback(tabId, code, signal)
+    onExit: (
+      callback: (
+        tabId: string,
+        sessionId: string,
+        code: number | null,
+        signal: string | null
+      ) => void
+    ) => {
+      const handler = (
+        _e: unknown,
+        tabId: string,
+        sessionId: string,
+        code: number | null,
+        signal: string | null
+      ): void => callback(tabId, sessionId, code, signal)
       ipcRenderer.on('chat:exit', handler)
       return () => {
         ipcRenderer.removeListener('chat:exit', handler)

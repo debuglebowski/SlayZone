@@ -142,11 +142,26 @@ test('inFlight: true if more user messages than results (two-turn interleave)', 
   expect(isInFlight(s)).toBe(false)
 })
 
-test('process-exit sets sessionEnded', () => {
+test('process-exit sets sessionEnded when sessionId matches current session', () => {
   let s = initialState()
-  s = reducer(s, { type: 'process-exit', code: 0, signal: null })
+  s = reducer(s, { type: 'event', event: ev.turnInit('sid-live') })
+  s = reducer(s, { type: 'process-exit', sessionId: 'sid-live', code: 0, signal: null })
   expect(s.sessionEnded).toBe(true)
   expect(s.exitCode).toBe(0)
+})
+
+test('process-exit with mismatched sessionId is dropped (stale exit guard)', () => {
+  let s = initialState()
+  s = reducer(s, { type: 'event', event: ev.turnInit('sid-current') })
+  s = reducer(s, { type: 'process-exit', sessionId: 'sid-old', code: 137, signal: 'SIGKILL' })
+  expect(s.sessionEnded).toBe(false)
+  expect(s.exitCode).toBe(null)
+})
+
+test('process-exit before any turn-init is dropped (sessionId still null)', () => {
+  let s = initialState()
+  s = reducer(s, { type: 'process-exit', sessionId: 'sid-zombie', code: 0, signal: null })
+  expect(s.sessionEnded).toBe(false)
 })
 
 test('replay determinism: live vs getBuffer yields identical timeline (timestamp-stripped)', () => {
@@ -187,26 +202,26 @@ test('unknown event is dropped from timeline', () => {
   expect(unknown.length).toBe(0)
 })
 
-test('reset race: process-exit arriving between reset and new turn-init must not stick sessionEnded', () => {
+test('reset race: stale exit between reset and new turn-init is dropped at reducer', () => {
   // Timeline simulating a Reset click:
   // 1. Client dispatches `reset` → state cleared.
-  // 2. Old session's late exit event arrives (was in flight when kill was issued).
-  // 3. New session spawns, turn-init arrives.
-  // After turn-init, sessionEnded must be false — the user should see a live session.
+  // 2. Old session's late exit (sessionId='old-sid') arrives.
+  // 3. New session spawns, turn-init('new-sid') arrives.
+  // The reducer drops the stale exit because state.sessionId is null right after reset,
+  // so sessionEnded never flips on. Belt-and-suspenders alongside the main-side guard
+  // that already swallows stale exits when sessions.get(tabId) !== dyingSession.
   let s = initialState()
   s = reducer(s, { type: 'event', event: ev.turnInit('old-sid') })
   s = reducer(s, { type: 'event', event: ev.text('m-1', 'from old session') })
 
-  // User clicks Reset → timeline cleared first.
   s = reducer(s, { type: 'reset' })
   expect(s.sessionEnded).toBe(false)
 
-  // Old process's exit event arrives AFTER reset but BEFORE new turn-init.
-  s = reducer(s, { type: 'process-exit', code: 0, signal: null })
-  expect(s.sessionEnded).toBe(true)
+  // Stale exit from old session arrives — state.sessionId is null → dropped.
+  s = reducer(s, { type: 'process-exit', sessionId: 'old-sid', code: 0, signal: null })
+  expect(s.sessionEnded).toBe(false)
 
-  // New session's turn-init arrives. sessionStarted was false (from reset), so this
-  // hits the fresh-init path. Must clear sessionEnded.
+  // New session's turn-init arrives.
   s = reducer(s, { type: 'event', event: ev.turnInit('new-sid') })
   expect(s.sessionEnded).toBe(false)
   expect(s.sessionStarted).toBe(true)

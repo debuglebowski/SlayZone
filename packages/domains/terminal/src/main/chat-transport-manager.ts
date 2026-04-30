@@ -16,7 +16,16 @@ export interface TransportDeps {
   spawn: (cmd: string, args: string[], opts: SpawnOptions) => ChildProcess
   whichBinary: (name: string) => Promise<string | null>
   broadcastEvent: (tabId: string, event: AgentEvent, seq: number) => void
-  broadcastExit: (tabId: string, code: number | null, signal: string | null) => void
+  /**
+   * sessionId tags the dying session so the renderer reducer can drop stale
+   * exits (e.g. an old session that died while a new one is starting after reset).
+   */
+  broadcastExit: (
+    tabId: string,
+    sessionId: string,
+    code: number | null,
+    signal: string | null
+  ) => void
   /** Broadcast state transitions on `pty:state-change` so the existing UI reflects chat activity. */
   broadcastStateChange: (sessionId: string, newState: ChatTerminalState, oldState: ChatTerminalState) => void
   /**
@@ -53,8 +62,8 @@ const defaultDeps: TransportDeps = {
   broadcastEvent: (tabId, event, seq) => {
     electronBroadcast('chat:event')(tabId, event, seq)
   },
-  broadcastExit: (tabId, code, signal) => {
-    electronBroadcast('chat:exit')(tabId, code, signal)
+  broadcastExit: (tabId, sessionId, code, signal) => {
+    electronBroadcast('chat:exit')(tabId, sessionId, code, signal)
   },
   broadcastStateChange: (sessionId, newState, oldState) => {
     electronBroadcast('pty:state-change')(sessionId, newState, oldState)
@@ -288,7 +297,31 @@ export async function createChat(opts: CreateChatOpts): Promise<ChatSessionInfo>
   // Refuse duplicate sessions for one tab.
   const existing = sessions.get(opts.tabId)
   if (existing && !existing.ended) {
-    return toInfo(existing)
+    // Invariant: a tabId must only ever back ONE (taskId, cwd, mode) tuple. If the
+    // caller asks to create a chat with the same tabId but a different identity, the
+    // prior session is a zombie (e.g. tab was closed without chat:remove). Returning
+    // it would stream another task's events into the new panel — exactly the symptom
+    // of the cross-task chat leak. Tear it down and spawn fresh.
+    if (
+      existing.taskId !== opts.taskId ||
+      existing.cwd !== opts.cwd ||
+      existing.mode !== opts.mode
+    ) {
+      console.warn(
+        `[chat-transport] zombie session for tabId=${opts.tabId} ` +
+          `had (taskId=${existing.taskId}, cwd=${existing.cwd}, mode=${existing.mode}); ` +
+          `replacing with (taskId=${opts.taskId}, cwd=${opts.cwd}, mode=${opts.mode})`
+      )
+      try {
+        existing.child.kill('SIGTERM')
+      } catch {
+        /* already dead */
+      }
+      sessions.delete(opts.tabId)
+      // Fall through to fresh spawn below.
+    } else {
+      return toInfo(existing)
+    }
   }
 
   const adapter = getAdapter(opts.mode)
@@ -391,7 +424,7 @@ export async function createChat(opts: CreateChatOpts): Promise<ChatSessionInfo>
       return
     }
     handleEvent(session, { kind: 'process-exit', code, signal })
-    deps.broadcastExit(opts.tabId, code, signal)
+    deps.broadcastExit(opts.tabId, session.sessionId, code, signal)
     // Leave session in map so reattach can read buffer; consumer deletes on tab close.
   })
 

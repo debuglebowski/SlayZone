@@ -18,6 +18,13 @@ interface ChatApi {
     cwd: string
     providerFlagsOverride?: string | null
   }) => Promise<unknown>
+  reset: (opts: {
+    tabId: string
+    taskId: string
+    mode: string
+    cwd: string
+    providerFlagsOverride?: string | null
+  }) => Promise<unknown>
   send: (tabId: string, text: string) => Promise<boolean>
   interrupt: (tabId: string) => Promise<void>
   kill: (tabId: string) => Promise<void>
@@ -36,7 +43,9 @@ interface ChatApi {
     permissionModeValue: string | null
   }>
   onEvent: (cb: (tabId: string, event: AgentEvent, seq: number) => void) => () => void
-  onExit: (cb: (tabId: string, code: number | null, signal: string | null) => void) => () => void
+  onExit: (
+    cb: (tabId: string, sessionId: string, code: number | null, signal: string | null) => void
+  ) => () => void
 }
 
 function getChatApi(): ChatApi {
@@ -94,9 +103,9 @@ export function useChatSession(opts: UseChatSessionOpts): UseChatSessionResult {
       dispatch({ type: 'event', event })
     })
 
-    const offExit = chat.onExit((tabId, code, signal) => {
+    const offExit = chat.onExit((tabId, sessionId, code, signal) => {
       if (cancelled || tabId !== opts.tabId) return
-      dispatch({ type: 'process-exit', code, signal })
+      dispatch({ type: 'process-exit', sessionId, code, signal })
     })
 
     // Serialize: AWAIT create, THEN replay. The create handler awaits

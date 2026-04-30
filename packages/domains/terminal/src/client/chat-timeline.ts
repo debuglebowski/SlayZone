@@ -99,7 +99,7 @@ export function initialState(): ChatTimelineState {
 export type Action =
   | { type: 'event'; event: AgentEvent }
   | { type: 'user-sent'; text: string }
-  | { type: 'process-exit'; code: number | null; signal: string | null }
+  | { type: 'process-exit'; sessionId: string; code: number | null; signal: string | null }
   | { type: 'reset' }
 
 export function reducer(state: ChatTimelineState, action: Action): ChatTimelineState {
@@ -118,13 +118,21 @@ export function reducer(state: ChatTimelineState, action: Action): ChatTimelineS
         userMessagesSent: state.userMessagesSent + 1,
       }
     }
-    case 'process-exit':
+    case 'process-exit': {
+      // Drop stale exits: if no session has emitted turn-init yet (sessionId=null)
+      // OR the exit's sessionId belongs to a prior, already-replaced session, the
+      // event is leakage from the kill+respawn race (e.g. reset). The current
+      // session is still alive and will emit its own turn-init/exit.
+      if (state.sessionId === null || state.sessionId !== action.sessionId) {
+        return state
+      }
       return {
         ...state,
         sessionEnded: true,
         exitCode: action.code,
         exitSignal: action.signal,
       }
+    }
     case 'event':
       return applyEvent(state, action.event)
   }

@@ -302,7 +302,7 @@ await test('exit event: fires process-exit + chat:exit broadcast', async () => {
     whichBinary: async () => '/fake/claude',
     spawn: () => fake as unknown as ChildProcess,
     broadcastEvent: (_tab, event) => eventKinds.push(event.kind),
-    broadcastExit: (_tab, code, signal) => exits.push({ code, signal }),
+    broadcastExit: (_tab, _sid, code, signal) => exits.push({ code, signal }),
   })
   await mgr.createChat({
     tabId: 'tab-exit',
@@ -317,6 +317,30 @@ await test('exit event: fires process-exit + chat:exit broadcast', async () => {
   expect(eventKinds.includes('process-exit')).toBeTruthy()
   expect(exits.length).toBe(1)
   expect(exits[0].code).toBe(0)
+})
+
+await test('exit event: chat:exit broadcast carries dying session sessionId', async () => {
+  await setup()
+  const fake = makeFakeChild()
+  const exits: Array<{ sessionId: string }> = []
+  mgr.setTransportDepsForTests({
+    whichBinary: async () => '/fake/claude',
+    spawn: () => fake as unknown as ChildProcess,
+    broadcastEvent: () => {},
+    broadcastExit: (_tab, sessionId) => exits.push({ sessionId }),
+  })
+  const info = await mgr.createChat({
+    tabId: 'tab-exit-sid',
+    taskId: 'task-test',
+    mode: 'claude-code',
+    cwd: '/tmp',
+    conversationId: 'sid-known',
+    providerFlags: [],
+  })
+  ;(fake as unknown as EventEmitter).emit('exit', 0, null)
+  await new Promise((r) => setTimeout(r, 10))
+  expect(exits.length).toBe(1)
+  expect(exits[0].sessionId).toBe(info.sessionId)
 })
 
 await test('reset race: old session exit fires after removeSession — broadcast swallowed', async () => {
@@ -334,7 +358,7 @@ await test('reset race: old session exit fires after removeSession — broadcast
       return f as unknown as ChildProcess
     },
     broadcastEvent: (_tab, event) => events.push(event.kind),
-    broadcastExit: (_tab, code) => exits.push({ code }),
+    broadcastExit: (_tab, _sid, code) => exits.push({ code }),
     broadcastStateChange: () => {},
   })
 
@@ -384,7 +408,7 @@ await test('reset race: live session exit (not stale) still broadcasts', async (
     whichBinary: async () => '/fake/claude',
     spawn: () => fake as unknown as ChildProcess,
     broadcastEvent: (_tab, event) => events.push(event.kind),
-    broadcastExit: (_tab, code) => exits.push({ code }),
+    broadcastExit: (_tab, _sid, code) => exits.push({ code }),
     broadcastStateChange: () => {},
   })
   await mgr.createChat({
@@ -400,6 +424,89 @@ await test('reset race: live session exit (not stale) still broadcasts', async (
   await new Promise((r) => setTimeout(r, 10))
   expect(exits.length).toBe(1)
   expect(events.includes('process-exit')).toBeTruthy()
+})
+
+await test('createChat: same tabId with different (taskId,cwd) → tears down zombie + spawns fresh', async () => {
+  await setup()
+  const fakeOld = makeFakeChild()
+  const fakeNew = makeFakeChild()
+  let spawnCount = 0
+  let oldKilled = false
+  fakeOld.kill = (_sig?: string) => {
+    oldKilled = true
+    return true
+  }
+  const events: Array<{ tabId: string; kind: string }> = []
+  mgr.setTransportDepsForTests({
+    whichBinary: async () => '/fake/claude',
+    spawn: () => {
+      spawnCount++
+      return (spawnCount === 1 ? fakeOld : fakeNew) as unknown as ChildProcess
+    },
+    broadcastEvent: (tabId, event) => events.push({ tabId, kind: event.kind }),
+    broadcastExit: () => {},
+    broadcastStateChange: () => {},
+  })
+  // First create: taskA, cwd /a
+  await mgr.createChat({
+    tabId: 'shared-tab',
+    taskId: 'taskA',
+    mode: 'claude-code',
+    cwd: '/a',
+    conversationId: null,
+    providerFlags: [],
+  })
+  expect(spawnCount).toBe(1)
+
+  // Second create on same tabId but different identity → must tear down + respawn
+  await mgr.createChat({
+    tabId: 'shared-tab',
+    taskId: 'taskB',
+    mode: 'claude-code',
+    cwd: '/b',
+    conversationId: null,
+    providerFlags: [],
+  })
+  expect(spawnCount).toBe(2)
+  expect(oldKilled).toBe(true)
+
+  // New session emits events; assert broadcast carries the (now sole) live tabId
+  fakeNew._stdout.write(readFileSync(resolve(fixtureDir(), 'bash.ndjson'), 'utf8'))
+  await new Promise((r) => setTimeout(r, 30))
+  expect(events.some((e) => e.kind === 'turn-init')).toBeTruthy()
+})
+
+await test('createChat: same tabId AND same identity → returns existing session (idempotent)', async () => {
+  await setup()
+  const fake = makeFakeChild()
+  let spawnCount = 0
+  mgr.setTransportDepsForTests({
+    whichBinary: async () => '/fake/claude',
+    spawn: () => {
+      spawnCount++
+      return fake as unknown as ChildProcess
+    },
+    broadcastEvent: () => {},
+    broadcastExit: () => {},
+    broadcastStateChange: () => {},
+  })
+  await mgr.createChat({
+    tabId: 'idem-tab',
+    taskId: 'taskA',
+    mode: 'claude-code',
+    cwd: '/a',
+    conversationId: null,
+    providerFlags: [],
+  })
+  await mgr.createChat({
+    tabId: 'idem-tab',
+    taskId: 'taskA',
+    mode: 'claude-code',
+    cwd: '/a',
+    conversationId: null,
+    providerFlags: [],
+  })
+  expect(spawnCount).toBe(1)
 })
 
 console.log(`\n${passed} passed, ${failed} failed`)

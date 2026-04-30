@@ -131,6 +131,13 @@ export function ChatPanel(props: ChatPanelProps) {
         chat?: {
           kill: (tabId: string) => Promise<void>
           remove: (tabId: string) => Promise<void>
+          reset: (opts: {
+            tabId: string
+            taskId: string
+            mode: string
+            cwd: string
+            providerFlagsOverride?: string | null
+          }) => Promise<unknown>
           create: (opts: {
             tabId: string
             taskId: string
@@ -147,6 +154,7 @@ export function ChatPanel(props: ChatPanelProps) {
     return {
       kill: (id) => chat?.kill(id) ?? Promise.resolve(),
       remove: (id) => chat?.remove(id) ?? Promise.resolve(),
+      reset: (opts) => chat?.reset(opts) ?? Promise.resolve(null),
       create: (opts) => chat?.create(opts) ?? Promise.resolve(null),
       send: (id, text) => chat?.send(id, text) ?? Promise.resolve(false),
       interrupt: (id) => chat?.interrupt(id) ?? Promise.resolve(),
