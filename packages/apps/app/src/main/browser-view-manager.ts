@@ -224,8 +224,10 @@ export class BrowserViewManager {
     this.views.delete(viewId)
     this.removeFromWindow(entry)
 
-    // Restore focus to main renderer after removing native view
-    if (this.mainWindow && !this.mainWindow.isDestroyed()) {
+    // Restore focus to main renderer after removing native view.
+    // Skip when window is backgrounded — webContents.focus() on a non-focused
+    // window can surface the app on macOS.
+    if (this.mainWindow && !this.mainWindow.isDestroyed() && this.mainWindow.isFocused()) {
       this.mainWindow.webContents.focus()
     }
 
@@ -303,8 +305,10 @@ export class BrowserViewManager {
       hidden++
     }
 
-    // Restore focus to renderer so dialogs can receive keyboard input
-    if (this.mainWindow && !this.mainWindow.isDestroyed()) {
+    // Restore focus to renderer so dialogs can receive keyboard input.
+    // Skip when window is backgrounded — webContents.focus() on a non-focused
+    // window can surface the app on macOS.
+    if (this.mainWindow && !this.mainWindow.isDestroyed() && this.mainWindow.isFocused()) {
       this.mainWindow.webContents.focus()
     }
   }
