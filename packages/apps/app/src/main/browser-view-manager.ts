@@ -847,8 +847,9 @@ export class BrowserViewManager {
     })
 
     // Intercept keyboard shortcuts before the page gets them.
-    // When passthrough is OFF (default), Cmd/Ctrl shortcuts are forwarded to
-    // the main renderer as synthetic KeyboardEvents so app shortcuts (Cmd+B, etc.) work.
+    // When passthrough is OFF (default), Cmd/Ctrl shortcuts (and bare Escape)
+    // are forwarded to the main renderer as synthetic KeyboardEvents so app
+    // shortcuts (Cmd+B, browser-find Esc, etc.) work.
     // Keys that the main process handles directly (Cmd+R, Cmd+,, etc.) are sent as
     // the same IPC the main process handler would emit.
     // Modified-link task creation intentionally has two paths:
@@ -865,6 +866,27 @@ export class BrowserViewManager {
 
       if (entry.keyboardPassthrough) return
       if (input.type !== 'keyDown') return
+
+      // Forward bare Escape so renderer-side scope-aware shortcuts (e.g.
+      // browser-escape closing the find bar) fire when WCV has focus. Do NOT
+      // preventDefault — the page should still see Escape natively (exit
+      // fullscreen, dismiss native popups, cancel pointer lock).
+      if (input.key === 'Escape' && !input.control && !input.meta && !input.alt) {
+        const win = this.mainWindow
+        if (win && !win.isDestroyed()) {
+          win.webContents.send('browser-view:shortcut', {
+            viewId,
+            key: 'Escape',
+            shift: Boolean(input.shift),
+            alt: false,
+            meta: false,
+            control: false,
+            kind: entry.kind,
+          })
+        }
+        return
+      }
+
       if (!(input.control || input.meta)) return
 
       const key = input.key.toLowerCase()

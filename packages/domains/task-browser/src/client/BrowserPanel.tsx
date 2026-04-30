@@ -982,31 +982,19 @@ export const BrowserPanel = forwardRef<BrowserPanelHandle, BrowserPanelProps>(fu
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tabs.activeTabId])
 
-  // Cmd+F / Cmd+G keyboard handler (not gated by captureShortcuts)
-  useEffect(() => {
-    const container = containerRef.current
-    if (!container) return
-
-    const handleFindKeyDown = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === 'f') {
-        e.preventDefault()
-        e.stopPropagation()
-        if (findMode) {
-          findInputRef.current?.focus()
-          findInputRef.current?.select()
-        } else {
-          openFindMode()
-        }
-      }
-      if ((e.metaKey || e.ctrlKey) && e.key === 'g' && findMode) {
-        e.preventDefault()
-        findNext(!e.shiftKey)
-      }
+  // Find shortcuts via scope-aware registry. Routes from both DOM focus
+  // ([data-browser-panel] focusin) and WCV focus (browser-view:shortcut IPC).
+  useShortcutAction('browser-find', () => {
+    if (findMode) {
+      findInputRef.current?.focus()
+      findInputRef.current?.select()
+    } else {
+      openFindMode()
     }
-
-    container.addEventListener('keydown', handleFindKeyDown)
-    return () => container.removeEventListener('keydown', handleFindKeyDown)
-  }, [findMode, openFindMode, findNext])
+  })
+  useShortcutAction('browser-find-next', () => findNext(true), { enabled: findMode })
+  useShortcutAction('browser-find-prev', () => findNext(false), { enabled: findMode })
+  useShortcutAction('browser-escape', closeFindMode, { enabled: findMode })
 
   useImperativeHandle(ref, () => ({
     focus: () => containerRef.current?.focus(),
