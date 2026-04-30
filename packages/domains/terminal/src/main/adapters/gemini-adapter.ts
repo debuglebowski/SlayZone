@@ -1,4 +1,4 @@
-import type { TerminalAdapter, PromptInfo, ActivityState, ErrorInfo, ValidationResult } from './types'
+import { defaultEncodeSubmit, type TerminalAdapter, type PromptInfo, type ActivityState, type ErrorInfo, type ValidationResult } from './types'
 import { whichBinary, validateShellEnv } from '../shell-env'
 
 /**
@@ -12,6 +12,8 @@ export class GeminiAdapter implements TerminalAdapter {
   // Gemini's Ink TUI + Node.js bundle takes 7+ seconds to produce first output
   readonly startupTimeoutMs = 20_000
   readonly sessionIdCommand = '/stats'
+
+  encodeSubmit = defaultEncodeSubmit
 
   private static stripAnsi(data: string): string {
     return data

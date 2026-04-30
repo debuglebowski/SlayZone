@@ -1,4 +1,4 @@
-import type { TerminalAdapter, PromptInfo, ActivityState, ErrorInfo } from './types'
+import { defaultEncodeSubmit, type TerminalAdapter, type PromptInfo, type ActivityState, type ErrorInfo } from './types'
 
 /**
  * Adapter for raw terminal/shell and custom providers.
@@ -15,6 +15,9 @@ export class ShellAdapter implements TerminalAdapter {
       error?: string | null
     }
   ) {}
+
+  // Plain shell — \r is Enter; line discipline handles any LF-vs-CR translation.
+  encodeSubmit = defaultEncodeSubmit
 
   private static stripAnsi(data: string): string {
     return data

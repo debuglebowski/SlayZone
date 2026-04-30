@@ -1,4 +1,4 @@
-import type { TerminalAdapter, PromptInfo, ActivityState, ErrorInfo, ValidationResult } from './types'
+import { defaultEncodeSubmit, type TerminalAdapter, type PromptInfo, type ActivityState, type ErrorInfo, type ValidationResult } from './types'
 import { whichBinary, validateShellEnv } from '../shell-env'
 
 /**
@@ -11,6 +11,8 @@ export class CursorAdapter implements TerminalAdapter {
   readonly idleTimeoutMs = 2500
   // Full-screen TUI constantly redraws — detect working from user input, not output
   readonly transitionOnInput = true
+
+  encodeSubmit = defaultEncodeSubmit
 
   detectActivity(_data: string, _current: ActivityState): ActivityState | null {
     // Activity detected via transitionOnInput + idle timeout.

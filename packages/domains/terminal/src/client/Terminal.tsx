@@ -33,11 +33,8 @@ import { useTheme, useAppearance } from '@slayzone/settings/client'
 import { getThemeTerminalColors } from '@slayzone/ui'
 import { TerminalSearchBar } from './TerminalSearchBar'
 import type { TerminalMode, TerminalState } from '@slayzone/terminal/shared'
-import { stripUnderlineCodes } from '@slayzone/terminal/shared'
+import { stripUnderlineCodes, KITTY_SHIFT_ENTER } from '@slayzone/terminal/shared'
 import { track } from '@slayzone/telemetry/client'
-
-// Kitty keyboard protocol CSI u: keycode 13 (Enter), modifier 2 (Shift)
-const KITTY_SHIFT_ENTER = '\x1b[13;2u'
 
 // Wait for container to have non-zero dimensions before opening terminal
 function waitForDimensions(

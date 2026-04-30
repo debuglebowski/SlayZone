@@ -1344,6 +1344,20 @@ export async function createPty(opts: CreatePtyOptions): Promise<{ success: bool
 }
 
 
+/**
+ * Submit a user-typed prompt to the PTY. Routes through the adapter's
+ * `encodeSubmit` so per-mode wire-byte encoding (Kitty Shift+Enter for
+ * claude-code, plain CR for shells, etc.) lives in one place.
+ *
+ * Single canonical entry for "fire prompt" — used by REST `/submit`, IPC
+ * `pty:submit`, future MCP submit tool. Differs from `writePty`, which is raw.
+ */
+export function submitPty(sessionId: string, text: string): boolean {
+  const session = sessions.get(sessionId)
+  if (!session) return false
+  return writePty(sessionId, session.adapter.encodeSubmit(text))
+}
+
 export function writePty(sessionId: string, data: string): boolean {
   const session = sessions.get(sessionId)
   if (!session) return false

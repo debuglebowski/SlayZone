@@ -1,5 +1,6 @@
 import type { TerminalAdapter, PromptInfo, ActivityState, ErrorInfo, ValidationResult } from './types'
 import { whichBinary, validateShellEnv } from '../shell-env'
+import { KITTY_SHIFT_ENTER, ENTER } from '@slayzone/terminal/shared'
 
 /**
  * Adapter for Claude Code CLI.
@@ -8,6 +9,12 @@ import { whichBinary, validateShellEnv } from '../shell-env'
 export class ClaudeAdapter implements TerminalAdapter {
   readonly mode = 'claude-code' as const
   readonly idleTimeoutMs = null // use default 60s
+
+  /** Claude Code enables Kitty keyboard protocol; internal newlines must be
+   *  encoded as Shift+Enter so they're treated as newline-in-input (not submit). */
+  encodeSubmit(text: string): string {
+    return text.replace(/[\r\n]+$/, '').replace(/\n/g, KITTY_SHIFT_ENTER) + ENTER
+  }
 
   detectActivity(data: string, _current: ActivityState): ActivityState | null {
     // Strip ANSI escape codes for pattern matching

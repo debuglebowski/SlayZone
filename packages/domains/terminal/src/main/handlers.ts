@@ -3,7 +3,7 @@ import type { IpcMain } from 'electron'
 import type { Database } from 'better-sqlite3'
 import { execFile } from 'child_process'
 import { promisify } from 'util'
-import { createPty, writePty, resizePty, killPty, hasPty, getBuffer, clearBuffer, getBufferSince, listPtys, getState, setDatabase, dismissAllNotifications, setTerminalTheme, testExecutionContext } from './pty-manager'
+import { createPty, writePty, submitPty, resizePty, killPty, hasPty, getBuffer, clearBuffer, getBufferSince, listPtys, getState, setDatabase, dismissAllNotifications, setTerminalTheme, testExecutionContext } from './pty-manager'
 
 const execFileAsync = promisify(execFile)
 import { getAdapter, type ExecutionContext } from './adapters'
@@ -275,6 +275,10 @@ export function registerPtyHandlers(ipcMain: IpcMain, db: Database): void {
 
   ipcMain.handle('pty:write', (_, sessionId: string, data: string) => {
     return writePty(sessionId, data)
+  })
+
+  ipcMain.handle('pty:submit', (_, sessionId: string, text: string) => {
+    return submitPty(sessionId, text)
   })
 
 ipcMain.handle('pty:resize', (_, sessionId: string, cols: number, rows: number) => {

@@ -10,9 +10,6 @@ interface PtyInfo {
   lastOutputTime: number
 }
 
-const KITTY_SHIFT_ENTER = '\x1b[13;2u'
-const KITTY_MODES = new Set(['claude-code'])
-
 function resolveSession(sessions: PtyInfo[], idPrefix: string): PtyInfo {
   const matches = sessions.filter(s => s.sessionId.startsWith(idPrefix))
   if (matches.length === 0) {
@@ -182,7 +179,7 @@ export function ptyCommand(): Command {
   // slay pty submit <id> [text]
   cmd
     .command('submit <id> [text]')
-    .description('Submit text to PTY — handles newlines for AI modes (id prefix supported)')
+    .description('Submit text to PTY — adapter handles per-mode encoding (id prefix supported)')
     .option('--wait', 'Wait for attention state before sending (default for AI modes)')
     .option('--no-wait', 'Send immediately without waiting')
     .option('--timeout <ms>', 'Timeout for --wait in milliseconds', '60000')
@@ -190,8 +187,8 @@ export function ptyCommand(): Command {
       const sessions = await apiGet<PtyInfo[]>('/api/pty')
       const session = resolveSession(sessions, idPrefix)
 
-      // Default: wait for AI modes, send immediately for plain terminals
-      const shouldWait = opts.wait ?? KITTY_MODES.has(session.mode)
+      // Default: wait for AI modes (anything that's not the plain shell)
+      const shouldWait = opts.wait ?? session.mode !== 'terminal'
 
       // Read from stdin if no text argument
       if (!text) {
@@ -204,15 +201,9 @@ export function ptyCommand(): Command {
         await waitForState(session.sessionId, 'attention', parseInt(opts.timeout, 10))
       }
 
-      // For AI modes that support Kitty protocol, encode internal newlines
-      let data: string
-      if (KITTY_MODES.has(session.mode)) {
-        data = text.replace(/\n/g, KITTY_SHIFT_ENTER) + '\n'
-      } else {
-        data = text + '\n'
-      }
-
-      await apiPost<{ ok: boolean }>(`/api/pty/${encodedId(session.sessionId)}/write`, { data })
+      // Per-mode wire encoding (Kitty Shift+Enter, plain CR, etc.) lives in the
+      // adapter on the server. CLI just hands over the raw text.
+      await apiPost<{ ok: boolean }>(`/api/pty/${encodedId(session.sessionId)}/submit`, { text })
     })
 
   // slay pty wait <id>

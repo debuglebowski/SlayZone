@@ -1,4 +1,4 @@
-import type { TerminalAdapter, PromptInfo, ActivityState, ErrorInfo, ValidationResult } from './types'
+import { defaultEncodeSubmit, type TerminalAdapter, type PromptInfo, type ActivityState, type ErrorInfo, type ValidationResult } from './types'
 import { whichBinary, validateShellEnv } from '../shell-env'
 
 /**
@@ -9,6 +9,8 @@ export class CopilotAdapter implements TerminalAdapter {
   readonly mode = 'copilot' as const
   readonly idleTimeoutMs = 2500
   readonly transitionOnInput = true
+
+  encodeSubmit = defaultEncodeSubmit
 
   private static stripAnsi(data: string): string {
     return data

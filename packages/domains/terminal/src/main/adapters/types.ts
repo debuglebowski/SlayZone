@@ -120,4 +120,31 @@ export interface TerminalAdapter {
    * Returns a list of check results with fix instructions for failed checks.
    */
   validate?(): Promise<ValidationResult[]>
+
+  /**
+   * Encode a user-submitted prompt into PTY wire bytes.
+   *
+   * Scope: "submit" = fire the prompt (CLI `slay pty submit`, loop-mode
+   * replay, future MCP submit tool). NOT for raw keystrokes, NOT for clipboard
+   * paste — paste is staged via xterm bracketed-paste then user fires Enter
+   * separately, a different semantic handled by the renderer.
+   *
+   * Trailing CR/LF MUST be stripped from `text` before encoding (callers may
+   * pass stdin with trailing newline). Final byte must trigger Enter on the
+   * target TUI — typically `\r` (LF/`\n` is Ctrl+J on raw stdin and treated
+   * as newline-in-input by most readline-style libraries).
+   *
+   * REQUIRED — no default fallback. Each adapter MUST pick a strategy:
+   *   - Plain shell: bind `defaultEncodeSubmit` (strip trailing, append \r)
+   *   - Ink TUI w/ Kitty protocol: replace internal \n with KITTY_SHIFT_ENTER
+   *   - Other multi-line strategies (bracketed paste, etc.): implement here
+   */
+  encodeSubmit(text: string): string
+}
+
+/** Default submit encoding: strip trailing CR/LF, append CR. Internal newlines
+ *  pass through unchanged — adapters whose TUI mishandles raw \n should
+ *  override (see ClaudeAdapter for Kitty Shift+Enter example). */
+export function defaultEncodeSubmit(text: string): string {
+  return text.replace(/[\r\n]+$/, '') + '\r'
 }

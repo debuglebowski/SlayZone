@@ -1,4 +1,4 @@
-import type { TerminalAdapter, PromptInfo, ActivityState, ErrorInfo, ValidationResult } from './types'
+import { defaultEncodeSubmit, type TerminalAdapter, type PromptInfo, type ActivityState, type ErrorInfo, type ValidationResult } from './types'
 import { whichBinary, validateShellEnv } from '../shell-env'
 
 /**
@@ -9,6 +9,8 @@ import { whichBinary, validateShellEnv } from '../shell-env'
 export class CcsAdapter implements TerminalAdapter {
   readonly mode = 'ccs' as const
   readonly idleTimeoutMs = null // same as Claude (CCS runs Claude underneath)
+
+  encodeSubmit = defaultEncodeSubmit
 
   // CCS runs Claude Code underneath — reuse Claude's activity patterns
   detectActivity(data: string, _current: ActivityState): ActivityState | null {

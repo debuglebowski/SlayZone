@@ -1,4 +1,4 @@
-import type { TerminalAdapter, PromptInfo, ActivityState, ErrorInfo, ValidationResult } from './types'
+import { defaultEncodeSubmit, type TerminalAdapter, type PromptInfo, type ActivityState, type ErrorInfo, type ValidationResult } from './types'
 import { whichBinary, validateShellEnv } from '../shell-env'
 
 /**
@@ -13,6 +13,8 @@ import { whichBinary, validateShellEnv } from '../shell-env'
 export class QwenAdapter implements TerminalAdapter {
   readonly mode = 'qwen-code' as const
   readonly idleTimeoutMs = null // default 60 s
+
+  encodeSubmit = defaultEncodeSubmit
 
   private static stripAnsi(data: string): string {
     return data

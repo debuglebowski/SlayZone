@@ -354,6 +354,7 @@ const api: ElectronAPI = {
     testExecutionContext: (context) => ipcRenderer.invoke('pty:testExecutionContext', context),
     ccsListProfiles: () => ipcRenderer.invoke('pty:ccsListProfiles'),
     write: (sessionId, data) => ipcRenderer.invoke('pty:write', sessionId, data),
+    submit: (sessionId, text) => ipcRenderer.invoke('pty:submit', sessionId, text),
     setTheme: (theme) => ipcRenderer.invoke('pty:set-theme', theme),
     setShellOverride: (value) => ipcRenderer.invoke('pty:setShellOverride', value),
     resize: (sessionId, cols, rows) => ipcRenderer.invoke('pty:resize', sessionId, cols, rows),

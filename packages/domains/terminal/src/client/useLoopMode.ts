@@ -67,7 +67,8 @@ export function useLoopMode({ sessionId, config, onConfigChange }: UseLoopModeOp
     setStatus('running')
 
     seqRef.current = getLastSeq(sid)
-    window.api.pty.write(sid, configRef.current.prompt + '\r')
+    // Use submit (adapter-encoded) so multi-line prompts work for any mode.
+    window.api.pty.submit(sid, configRef.current.prompt)
   }, [getLastSeq])
 
   const handleStateChange = useCallback((newState: TerminalState) => {

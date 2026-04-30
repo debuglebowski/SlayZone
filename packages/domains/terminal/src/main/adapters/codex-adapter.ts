@@ -1,7 +1,7 @@
 import { open, readdir, stat } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
-import type { TerminalAdapter, PromptInfo, ActivityState, ErrorInfo, ValidationResult } from './types'
+import { defaultEncodeSubmit, type TerminalAdapter, type PromptInfo, type ActivityState, type ErrorInfo, type ValidationResult } from './types'
 import { whichBinary, validateShellEnv } from '../shell-env'
 
 /**
@@ -15,6 +15,8 @@ export class CodexAdapter implements TerminalAdapter {
   // let a short idle timeout decide when activity has stopped.
   readonly idleTimeoutMs = 2500
   readonly sessionIdCommand = '/status'
+
+  encodeSubmit = defaultEncodeSubmit
 
   private static stripAnsi(data: string): string {
     return data
