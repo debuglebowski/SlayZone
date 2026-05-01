@@ -38,6 +38,20 @@ import { defaultMultiDeviceConfig } from './device-presets'
 import { MultiDeviceGrid } from './MultiDeviceGrid'
 import { buildDomElementSnippet, type PickedDomPayload } from './dom-picker'
 import { DOM_PICKER_SCRIPT, DOM_PICKER_CANCEL_SCRIPT } from './dom-picker-runtime'
+import {
+  DndContext,
+  closestCenter,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent
+} from '@dnd-kit/core'
+import {
+  SortableContext,
+  useSortable,
+  horizontalListSortingStrategy
+} from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
 
 const SLOT_BUTTONS: { slot: DeviceSlot; icon: typeof Monitor; label: string }[] = [
   { slot: 'desktop', icon: Monitor, label: 'Desktop' },
@@ -354,6 +368,60 @@ function ExtensionsManagerView({
     </div>
   )
 }
+
+interface SortableBrowserTabProps {
+  tab: BrowserTab
+  isActive: boolean
+  isPickingElement: boolean
+  onSwitch: (id: string) => void
+  onClose: (id: string) => void
+}
+
+function SortableBrowserTab({ tab, isActive, isPickingElement, onSwitch, onClose }: SortableBrowserTabProps): React.JSX.Element {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: tab.id })
+  const style: React.CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    zIndex: isDragging ? 10 : undefined,
+    opacity: isDragging ? 0.5 : 1
+  }
+  const displayUrl = tab.url === 'about:blank' ? 'New Tab' : tab.url
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      {...attributes}
+      {...listeners}
+      onClick={() => onSwitch(tab.id)}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSwitch(tab.id) }
+      }}
+      onAuxClick={(e) => {
+        if (e.button === 1) { e.preventDefault(); onClose(tab.id) }
+      }}
+      className={cn(
+        'group flex items-center gap-1.5 h-7 px-3 rounded-md cursor-pointer transition-colors select-none flex-shrink-0',
+        'bg-surface-2 dark:bg-surface-2/50 hover:bg-accent/80 dark:hover:bg-accent/50',
+        'max-w-[300px]',
+        isActive ? 'bg-tab-active border border-border' : 'text-muted-foreground dark:text-muted-foreground',
+        isActive && isPickingElement && 'ring-2 ring-amber-500/70 border-amber-500/70'
+      )}
+      {...attributes}
+      {...listeners}
+    >
+      <span className="truncate text-sm">{displayUrl}</span>
+      <button
+        onClick={(e) => { e.stopPropagation(); onClose(tab.id) }}
+        onPointerDown={(e) => e.stopPropagation()}
+        onKeyDown={(e) => e.stopPropagation()}
+        className="h-4 w-4 rounded hover:bg-muted-foreground/20 flex items-center justify-center"
+      >
+        <X className="h-3 w-3" />
+      </button>
+    </div>
+  )
+}
+
 export const BrowserPanel = forwardRef<BrowserPanelHandle, BrowserPanelProps>(function BrowserPanel({
   className,
   tabs,
@@ -667,6 +735,28 @@ export const BrowserPanel = forwardRef<BrowserPanelHandle, BrowserPanelProps>(fu
   const switchToTab = useCallback((tabId: string) => {
     onTabsChange({ ...tabs, activeTabId: tabId })
   }, [tabs, onTabsChange])
+
+  const reorderTabs = useCallback((fromId: string, toId: string) => {
+    if (fromId === toId) return
+    const fromIdx = tabs.tabs.findIndex(t => t.id === fromId)
+    const toIdx = tabs.tabs.findIndex(t => t.id === toId)
+    if (fromIdx === -1 || toIdx === -1) return
+    const next = [...tabs.tabs]
+    const [moved] = next.splice(fromIdx, 1)
+    next.splice(toIdx, 0, moved)
+    onTabsChange({ ...tabs, tabs: next })
+    track('web_panel_tab_reordered')
+  }, [tabs, onTabsChange])
+
+  const tabSensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
+  )
+
+  const handleTabDragEnd = useCallback((event: DragEndEvent) => {
+    const { active, over } = event
+    if (!over) return
+    reorderTabs(active.id as string, over.id as string)
+  }, [reorderTabs])
 
   const switchToNextTab = useCallback(() => {
     const idx = tabs.tabs.findIndex(t => t.id === tabs.activeTabId)
@@ -1038,39 +1128,24 @@ export const BrowserPanel = forwardRef<BrowserPanelHandle, BrowserPanelProps>(fu
     >
       {/* Tab Bar */}
       <div className="shrink-0 flex items-center h-10 px-2 gap-1 border-b border-border bg-surface-1 overflow-x-auto scrollbar-hide">
-        {tabs.tabs.map(tab => {
-          const isActive = tab.id === tabs.activeTabId
-          const displayUrl = tab.url === 'about:blank' ? 'New Tab' : tab.url
-          return (
-            <div
-              key={tab.id}
-              role="button"
-              tabIndex={0}
-              onClick={() => switchToTab(tab.id)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); switchToTab(tab.id) }
-              }}
-              onAuxClick={(e) => {
-                if (e.button === 1) { e.preventDefault(); closeTab(tab.id) }
-              }}
-              className={cn(
-                'group flex items-center gap-1.5 h-7 px-3 rounded-md cursor-pointer transition-colors select-none flex-shrink-0',
-                'bg-surface-2 dark:bg-surface-2/50 hover:bg-accent/80 dark:hover:bg-accent/50',
-                'max-w-[300px]',
-                isActive ? 'bg-tab-active border border-border' : 'text-muted-foreground dark:text-muted-foreground',
-                isActive && isPickingElement && 'ring-2 ring-amber-500/70 border-amber-500/70'
-              )}
-            >
-              <span className="truncate text-sm">{displayUrl}</span>
-              <button
-                onClick={(e) => { e.stopPropagation(); closeTab(tab.id) }}
-                className="h-4 w-4 rounded hover:bg-muted-foreground/20 flex items-center justify-center"
-              >
-                <X className="h-3 w-3" />
-              </button>
-            </div>
-          )
-        })}
+        <DndContext
+          sensors={tabSensors}
+          collisionDetection={closestCenter}
+          onDragEnd={handleTabDragEnd}
+        >
+          <SortableContext items={tabs.tabs.map(t => t.id)} strategy={horizontalListSortingStrategy}>
+            {tabs.tabs.map(tab => (
+              <SortableBrowserTab
+                key={tab.id}
+                tab={tab}
+                isActive={tab.id === tabs.activeTabId}
+                isPickingElement={isPickingElement}
+                onSwitch={switchToTab}
+                onClose={closeTab}
+              />
+            ))}
+          </SortableContext>
+        </DndContext>
         <button
           onClick={() => createNewTab()}
           className="h-7 px-2 rounded-md hover:bg-accent/80 dark:hover:bg-accent/50 text-muted-foreground dark:text-muted-foreground flex items-center"

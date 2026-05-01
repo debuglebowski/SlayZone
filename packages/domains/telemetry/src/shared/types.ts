@@ -93,6 +93,7 @@ export type TelemetryEventName =
   // Browser panel
   | 'web_panel_opened'
   | 'web_panel_tab_added'
+  | 'web_panel_tab_reordered'
   | 'browser_tab_closed'
   | 'browser_navigated'
   | 'browser_devtools_toggled'
@@ -223,6 +224,7 @@ export interface TelemetryEventProps {
   // Browser panel
   web_panel_opened: Record<string, never>
   web_panel_tab_added: { predefined_vs_custom: 'predefined' | 'custom' }
+  web_panel_tab_reordered: Record<string, never>
   browser_tab_closed: Record<string, never>
   browser_navigated: Record<string, never>
   browser_devtools_toggled: Record<string, never>
