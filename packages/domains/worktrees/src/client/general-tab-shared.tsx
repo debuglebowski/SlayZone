@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { GitBranch, GitMerge, GitPullRequest, FolderTree, Link2, Loader2, AlertTriangle, ChevronDown, Trash2 } from 'lucide-react'
+import { GitBranch, GitMerge, GitPullRequest, FolderTree, FolderGit2, Link2, Loader2, AlertTriangle, ChevronDown, Trash2 } from 'lucide-react'
 import {
   Button, Tooltip, TooltipContent, TooltipTrigger,
   Popover, PopoverContent, PopoverTrigger,
@@ -23,10 +23,13 @@ export function CheckingFallback() {
 
 export function NotGitRepoFallback({ onInit, initializing }: { onInit: () => void; initializing: boolean }) {
   return (
-    <div className="p-4 space-y-2">
-      <p className="text-xs text-muted-foreground">Not a git repository</p>
-      <Button variant="outline" size="sm" onClick={onInit} disabled={initializing} className="gap-2">
-        {initializing ? 'Initializing...' : 'Initialize Git'}
+    <div className="h-full flex flex-col items-center justify-center gap-4 p-8 text-center">
+      <div className="rounded-full bg-muted p-4">
+        <FolderGit2 className="size-8 text-muted-foreground" />
+      </div>
+      <p className="text-sm font-medium">Not a git repository</p>
+      <Button variant="default" size="sm" onClick={onInit} disabled={initializing} className="gap-2">
+        {initializing ? <><Loader2 className="size-3.5 animate-spin" />Initializing...</> : 'Initialize Git'}
       </Button>
     </div>
   )
