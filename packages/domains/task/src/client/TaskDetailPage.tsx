@@ -69,7 +69,7 @@ import { useTheme, useDialogStore, type SearchFileContext } from '@slayzone/sett
 import { markSkipCache, usePty, useTerminalModes, getVisibleModes, getModeLabel, groupTerminalModes, useLoopMode, isLoopActive, stripAnsi, serializeTerminalHistory, LoopModeBanner, LoopModeDialog, SlayNudgeBanner, useSlayNudge, PtyStateDot, PtyProgressDot } from '@slayzone/terminal'
 import type { LoopConfig } from '@slayzone/terminal/shared'
 import { TerminalContainer, type TerminalContainerHandle, ConfirmDisplayModeDialog, type TabDisplayMode, isChatSupported } from '@slayzone/task-terminals'
-import { UnifiedGitPanel, type UnifiedGitPanelHandle, type GitTabId } from '@slayzone/worktrees'
+import { UnifiedGitPanel, type UnifiedGitPanelHandle, type GitTabId, useProjectRepos } from '@slayzone/worktrees'
 import { buildStatusOptions, cn, getColumnStatusStyle, PriorityIcon, useAppearance, matchesShortcut, useShortcutStore, useShortcutDisplay, withModalGuard, getThemeEditorColors, type EditorThemeColors } from '@slayzone/ui'
 import { BrowserPanel, type BrowserPanelHandle } from '@slayzone/task-browser'
 import { FileEditorView, type FileEditorViewHandle } from '@slayzone/file-editor/client'
@@ -316,20 +316,36 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
   // Project path validation
   const [projectPathMissing, setProjectPathMissing] = useState(initialData?.projectPathMissing ?? false)
 
-  // Multi-repo detection
+  // Multi-repo detection (drives the *task-bound* axis: terminal cwd, editor root, browser, worktree creation)
   const detectedRepos = useDetectedRepos(project?.path ?? null)
+  // Task-bound repo name: only what the user has explicitly bound to this task or to the project default.
+  // Intentionally NO fallback to first-detected — wrapper folder stays wrapper folder for the bound axis,
+  // so the terminal/editor don't silently jump into an arbitrary child repo.
+  const effectiveRepoName = task?.repo_name ?? project?.selected_repo ?? null
   const resolvedRepo = useMemo(
-    () => resolveRepoPath(project?.path ?? null, detectedRepos, task?.repo_name ?? null),
-    [project?.path, detectedRepos, task?.repo_name]
+    () => resolveRepoPath(project?.path ?? null, detectedRepos, effectiveRepoName),
+    [project?.path, detectedRepos, effectiveRepoName]
   )
-  // Effective repo path (worktree > resolved child repo > project path)
+  // Effective repo path (worktree > resolved child repo > project path) — drives terminal/editor/browser/worktree.
   const effectiveRepoPath = task?.worktree_path ?? task?.base_dir ?? resolvedRepo.path
+
+  // Git-panel viewing axis: ephemeral, repo selection here does NOT change the task-bound path.
+  // Default = task-bound; if that resolves to a non-git wrapper folder, default to first discovered repo.
+  const taskBoundRepoForView = task?.worktree_path ?? resolvedRepo.path  // worktree if present, else resolved child / project root
+  const { repos: viewableRepos } = useProjectRepos(project?.path ?? null, taskBoundRepoForView)
+  const [gitViewRepoPath, setGitViewRepoPath] = useState<string | null>(null)
+  // Resolve the active git-panel target. Prefer explicit user pick; fall back to task-bound if it's a real git repo;
+  // else first viewable repo (covers wrapper-folder projects). Recomputed on each render so disk changes self-heal.
+  const resolvedGitViewPath = useMemo(() => {
+    if (gitViewRepoPath && viewableRepos.some(r => r.path === gitViewRepoPath)) return gitViewRepoPath
+    if (taskBoundRepoForView && viewableRepos.some(r => r.path === taskBoundRepoForView)) return taskBoundRepoForView
+    return viewableRepos[0]?.path ?? taskBoundRepoForView
+  }, [gitViewRepoPath, viewableRepos, taskBoundRepoForView])
   const handleRepoChange = useCallback((repoName: string) => {
-    if (!task) return
-    window.api.db.updateTask({ id: task.id, repoName }).then((updated) => {
-      onTaskUpdated(updated)
-    })
-  }, [task?.id, onTaskUpdated])
+    // Ephemeral: pick by name from discovered repos. Does NOT persist to task.repo_name.
+    const match = viewableRepos.find(r => r.name === repoName)
+    if (match) setGitViewRepoPath(match.path)
+  }, [viewableRepos])
 
   // PTY context for buffer management
   const { resetTaskState, subscribeSessionDetected, subscribeDevServer, getQuickRunPrompt, clearQuickRunPrompt } = usePty()
@@ -2416,23 +2432,33 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
         {/* Git Panel */}
         {!compact && panelVisibility.diff && (
           <div data-panel-id="diff" data-testid="task-git-panel" className={cn("shrink-0 rounded-md bg-surface-1 border border-border overflow-hidden flex flex-col transition-shadow duration-200", multipleVisiblePanels && focusedPanel === 'diff' && "shadow-[0_0_18px_rgba(255,255,255,0.25)]")} style={{ width: resolvedWidths.diff, ...panelOrderStyle('diff') }}>
-            <UnifiedGitPanel
-              ref={gitPanelRef}
-              task={task}
-              projectId={task.project_id}
-              projectPath={resolvedRepo.path}
-              completedStatus={completedStatus}
-              visible={panelVisibility.diff}
-              defaultTab={gitDefaultTab}
-              onTabChange={handleGitTabChange}
-              pollIntervalMs={5000}
-              onUpdateTask={updateTaskAndNotify}
-              onTaskUpdated={handleTaskUpdate}
-              detectedRepos={detectedRepos}
-              selectedRepoName={task.repo_name}
-              isRepoStale={resolvedRepo.stale}
-              onRepoChange={handleRepoChange}
-            />
+            {ownership.hasOtherOwner('diff') ? (
+              <PanelOwnerStub
+                panelLabel="Git"
+                icon={GitBranch}
+                activeElsewhere
+                onActivate={() => ownership.claim('diff')}
+                onActivateAndClose={() => ownership.claimAndCloseOther('diff')}
+              />
+            ) : (
+              <UnifiedGitPanel
+                ref={gitPanelRef}
+                task={task}
+                projectId={task.project_id}
+                projectPath={resolvedGitViewPath}
+                completedStatus={completedStatus}
+                visible={panelVisibility.diff}
+                defaultTab={gitDefaultTab}
+                onTabChange={handleGitTabChange}
+                pollIntervalMs={5000}
+                onUpdateTask={updateTaskAndNotify}
+                onTaskUpdated={handleTaskUpdate}
+                detectedRepos={viewableRepos.map(r => ({ name: r.name, path: r.path }))}
+                selectedRepoName={viewableRepos.find(r => r.path === resolvedGitViewPath)?.name ?? null}
+                isRepoStale={false}
+                onRepoChange={handleRepoChange}
+              />
+            )}
           </div>
         )}
 

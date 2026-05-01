@@ -338,6 +338,29 @@ export interface StashApplyResult {
   error?: string
 }
 
+// --- Repo discovery (multi-repo + submodules) ---
+
+export type RepoKind = 'project-root' | 'child-repo' | 'submodule'
+
+export interface RepoEntry {
+  /** Absolute path */
+  path: string
+  /** Display name: relative-from-projectPath, falling back to basename */
+  name: string
+  kind: RepoKind
+  /** Submodule → containing repo absolute path; null otherwise */
+  parentPath: string | null
+  /** True if this entry matches the task's resolved repo (worktree or selected child) */
+  isTaskBound: boolean
+  /** Has a .gitmodules file (cheap hint for "init submodules" affordance) */
+  hasGitmodules: boolean
+}
+
+export interface ListProjectReposOpts {
+  /** Path of the task's worktree (or task-bound child repo). Used to flip isTaskBound. */
+  taskBoundPath?: string | null
+}
+
 export interface GitDiffSnapshot {
   targetPath: string
   files: string[]

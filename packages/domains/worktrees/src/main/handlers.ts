@@ -75,6 +75,7 @@ import {
   getStashDiff
 } from './git-worktree'
 import { runAiCommand } from './merge-ai'
+import { listProjectRepos } from './list-project-repos'
 import { ensureColors } from './color-registry'
 import {
   checkGhInstalled,
@@ -220,6 +221,10 @@ export function registerWorktreeHandlers(ipcMain: IpcMain, db: Database): void {
   })
 
   const pendingDetections = new Map<string, Promise<{ name: string; path: string }[]>>()
+
+  ipcMain.handle('git:listProjectRepos', (_, projectPath: string, opts?: { taskBoundPath?: string | null }) => {
+    return listProjectRepos(projectPath, opts ?? {})
+  })
 
   ipcMain.handle('git:detectChildRepos', (_, projectPath: string) => {
     // Return cached result if fresh

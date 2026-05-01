@@ -510,6 +510,7 @@ const api: ElectronAPI = {
   git: {
     isGitRepo: (path) => ipcRenderer.invoke('git:isGitRepo', path),
     detectChildRepos: (projectPath) => ipcRenderer.invoke('git:detectChildRepos', projectPath),
+    listProjectRepos: (projectPath, opts) => ipcRenderer.invoke('git:listProjectRepos', projectPath, opts),
     detectWorktrees: (repoPath) => ipcRenderer.invoke('git:detectWorktrees', repoPath),
     createWorktree: (opts) =>
       ipcRenderer.invoke('git:createWorktree', opts),
