@@ -9,6 +9,9 @@ import { registerIntegrationHandlers } from './handlers'
 import { _mock } from '../../../../shared/test-utils/mock-linear-client.js'
 import { storeCredential } from './credentials'
 import type { LinearIssueSummary } from '../shared'
+import { execSync } from 'node:child_process'
+import * as fs from 'node:fs'
+import * as path from 'node:path'
 
 process.env.SLAYZONE_ALLOW_PLAINTEXT_CREDENTIALS = '1'
 
@@ -416,6 +419,103 @@ try {
   expect(result.errors[0]).toBeTruthy()
   ok('records error when API throws')
 } catch (e) { no('records error when API throws', e) }
+
+// ── auto-create-worktree on import (issue #84) ────────────────────────────
+console.log('\nintegrations:import-linear-issues — auto-create-worktree')
+
+function gitInRepo(repoPath: string, cmd: string): void {
+  execSync(cmd, {
+    cwd: repoPath,
+    stdio: 'pipe',
+    env: {
+      ...process.env,
+      GIT_AUTHOR_NAME: 'Test', GIT_AUTHOR_EMAIL: 't@t',
+      GIT_COMMITTER_NAME: 'Test', GIT_COMMITTER_EMAIL: 't@t',
+    }
+  })
+}
+
+function setupGitProject(db: import('better-sqlite3').Database, projectId: string): string {
+  const tmp = h.tmpDir()
+  const repo = path.join(tmp, 'repo')
+  fs.mkdirSync(repo)
+  gitInRepo(repo, 'git init -b main')
+  fs.writeFileSync(path.join(repo, 'README.md'), '# Test')
+  gitInRepo(repo, 'git add -A')
+  gitInRepo(repo, "git -c commit.gpgsign=false commit -m initial")
+  db.prepare(`INSERT OR REPLACE INTO projects (id, name, color, path, created_at, updated_at)
+    VALUES (?, 'WT Test', '#888888', ?, datetime('now'), datetime('now'))`).run(projectId, repo)
+  db.prepare(`INSERT OR REPLACE INTO settings (key, value) VALUES ('worktree_base_path', ?)`)
+    .run(path.join(repo, '.worktrees'))
+  return repo
+}
+
+try {
+  const wtProjectId = 'proj-wt-on'
+  const repo = setupGitProject(h.db, wtProjectId)
+  // Enable auto-create-worktree GLOBALLY
+  h.db.prepare(`INSERT OR REPLACE INTO settings (key, value) VALUES ('auto_create_worktree_on_task_create', '1')`).run()
+  // Map the project + Linear connection
+  await h.invoke('integrations:set-project-mapping', {
+    projectId: wtProjectId, provider: 'linear', connectionId: connId,
+    externalTeamId: 'team-1', externalTeamKey: 'ENG',
+    externalProjectId: null, syncMode: 'one_way'
+  })
+
+  _mock.listIssues = async () => ({ issues: [{ ...FIXTURES.normal, id: 'LIN-WT-1' }], nextCursor: null })
+  await h.invoke('integrations:import-linear-issues', {
+    projectId: wtProjectId, connectionId: connId, teamId: 'team-1'
+  })
+
+  const task = h.db.prepare('SELECT worktree_path FROM tasks WHERE project_id = ?').get(wtProjectId) as any
+  expect(task).toBeTruthy()
+  expect(typeof task.worktree_path === 'string' && task.worktree_path.length > 0).toBe(true)
+  expect(task.worktree_path.startsWith(path.join(repo, '.worktrees'))).toBe(true)
+  expect(fs.existsSync(task.worktree_path)).toBe(true)
+  ok('Linear import provisions worktree when setting=1 (issue #84)')
+} catch (e) { no('Linear import provisions worktree when setting=1 (issue #84)', e) }
+
+try {
+  const wtProjectId = 'proj-wt-off'
+  setupGitProject(h.db, wtProjectId)
+  // Setting OFF
+  h.db.prepare(`INSERT OR REPLACE INTO settings (key, value) VALUES ('auto_create_worktree_on_task_create', '0')`).run()
+  await h.invoke('integrations:set-project-mapping', {
+    projectId: wtProjectId, provider: 'linear', connectionId: connId,
+    externalTeamId: 'team-1', externalTeamKey: 'ENG',
+    externalProjectId: null, syncMode: 'one_way'
+  })
+
+  _mock.listIssues = async () => ({ issues: [{ ...FIXTURES.normal, id: 'LIN-WT-2' }], nextCursor: null })
+  await h.invoke('integrations:import-linear-issues', {
+    projectId: wtProjectId, connectionId: connId, teamId: 'team-1'
+  })
+
+  const task = h.db.prepare('SELECT worktree_path FROM tasks WHERE project_id = ?').get(wtProjectId) as any
+  expect(task).toBeTruthy()
+  expect(task.worktree_path == null || task.worktree_path === '').toBe(true)
+  ok('Linear import skips worktree when setting=0')
+} catch (e) { no('Linear import skips worktree when setting=0', e) }
+
+try {
+  // Re-import existing → UPDATE branch, no new worktree side effect
+  const wtProjectId = 'proj-wt-on'
+  // Setting back on
+  h.db.prepare(`INSERT OR REPLACE INTO settings (key, value) VALUES ('auto_create_worktree_on_task_create', '1')`).run()
+  const before = h.db.prepare('SELECT worktree_path FROM tasks WHERE project_id = ?').get(wtProjectId) as any
+  _mock.listIssues = async () => ({ issues: [{ ...FIXTURES.normal, id: 'LIN-WT-1', title: 'Re-imported' }], nextCursor: null })
+  await h.invoke('integrations:import-linear-issues', {
+    projectId: wtProjectId, connectionId: connId, teamId: 'team-1'
+  })
+  const after = h.db.prepare('SELECT worktree_path, title FROM tasks WHERE project_id = ?').get(wtProjectId) as any
+  expect(after.title).toBe('Re-imported')
+  expect(after.worktree_path).toBe(before.worktree_path)
+  ok('Re-import updates existing task without disturbing worktree')
+} catch (e) { no('Re-import updates existing task without disturbing worktree', e) }
+
+// Reset to avoid bleeding into later test runs (defensive even though file ends here)
+h.db.prepare(`DELETE FROM settings WHERE key = 'auto_create_worktree_on_task_create'`).run()
+h.db.prepare(`DELETE FROM settings WHERE key = 'worktree_base_path'`).run()
 
 h.cleanup()
 console.log(`\n${pass} passed, ${fail} failed`)

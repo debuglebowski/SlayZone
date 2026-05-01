@@ -84,6 +84,7 @@ import {
   type WorkflowCategory
 } from '@slayzone/workflow'
 import { onTaskReachedTerminal } from '@slayzone/terminal/main'
+import { createImportedTaskOp } from '@slayzone/task/main'
 import { getAdapter, getRegisteredProviders, normalizeGithubIssue } from './adapters'
 import type { NormalizedIssue, ProviderAdapter } from './adapters'
 
@@ -516,7 +517,11 @@ function upsertLinkForIssue(
   return db.prepare('SELECT * FROM external_links WHERE id = ?').get(id) as ExternalLink
 }
 
-function upsertTaskFromIssue(db: Database, localProjectId: string, issue: LinearIssueSummary): string {
+async function upsertTaskFromIssue(
+  db: Database,
+  localProjectId: string,
+  issue: LinearIssueSummary
+): Promise<{ outcome: 'created' | 'updated'; taskId: string }> {
   const projectColumns = getProjectColumns(db, localProjectId)
   const byLink = db.prepare(`
     SELECT task_id FROM external_links
@@ -540,29 +545,20 @@ function upsertTaskFromIssue(db: Database, localProjectId: string, issue: Linear
       issue.updatedAt,
       byLink.task_id
     )
-    return byLink.task_id
+    return { outcome: 'updated', taskId: byLink.task_id }
   }
 
-  const id = crypto.randomUUID()
-  db.prepare(`
-    INSERT INTO tasks (
-      id, project_id, title, description, status, priority, assignee,
-      terminal_mode, provider_config, claude_flags, codex_flags, created_at, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, 'claude-code',
-      '{"claude-code":{"flags":"--allow-dangerously-skip-permissions"},"codex":{"flags":"--full-auto --search"},"cursor-agent":{"flags":"--force"},"gemini":{"flags":"--yolo"},"opencode":{"flags":""},"qwen-code":{"flags":"--yolo"}}',
-      '--allow-dangerously-skip-permissions', '--full-auto --search', datetime('now'), ?)
-  `).run(
-    id,
-    localProjectId,
-    issue.title,
-    descHtml,
-    linearStateToTaskStatus(issue.state.type, projectColumns),
-    linearPriorityToLocal(issue.priority),
-    issue.assignee?.name ?? null,
-    issue.updatedAt
-  )
-
-  return id
+  const task = await createImportedTaskOp(db, {
+    projectId: localProjectId,
+    title: issue.title,
+    descriptionHtml: descHtml,
+    status: linearStateToTaskStatus(issue.state.type, projectColumns),
+    priority: linearPriorityToLocal(issue.priority),
+    assignee: issue.assignee?.name ?? null,
+    externalUpdatedAt: issue.updatedAt,
+  })
+  if (!task) throw new Error('Failed to create imported Linear task')
+  return { outcome: 'created', taskId: task.id }
 }
 
 function upsertLinkForGitHubIssue(
@@ -597,11 +593,11 @@ function upsertLinkForGitHubIssue(
   return db.prepare('SELECT * FROM external_links WHERE id = ?').get(id) as ExternalLink
 }
 
-function upsertTaskFromGitHubIssue(
+async function upsertTaskFromGitHubIssue(
   db: Database,
   localProjectId: string,
   issue: GithubIssueSummary
-): GithubImportUpsertResult {
+): Promise<GithubImportUpsertResult> {
   const projectColumns = getProjectColumns(db, localProjectId)
   const byLink = db.prepare(`
     SELECT l.task_id, t.project_id
@@ -639,29 +635,17 @@ function upsertTaskFromGitHubIssue(
     }
   }
 
-  const id = crypto.randomUUID()
-  db.prepare(`
-    INSERT INTO tasks (
-      id, project_id, title, description, status, priority, assignee,
-      terminal_mode, provider_config, claude_flags, codex_flags, created_at, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, 'claude-code',
-      '{"claude-code":{"flags":"--allow-dangerously-skip-permissions"},"codex":{"flags":"--full-auto --search"},"cursor-agent":{"flags":"--force"},"gemini":{"flags":"--yolo"},"opencode":{"flags":""},"qwen-code":{"flags":"--yolo"}}',
-      '--allow-dangerously-skip-permissions', '--full-auto --search', datetime('now'), ?)
-  `).run(
-    id,
-    localProjectId,
-    issue.title,
-    descHtml,
-    githubStateToLocal(issue.state, projectColumns),
-    3,
-    issue.assignee?.login ?? null,
-    issue.updatedAt
-  )
-
-  return {
-    outcome: 'created',
-    taskId: id
-  }
+  const task = await createImportedTaskOp(db, {
+    projectId: localProjectId,
+    title: issue.title,
+    descriptionHtml: descHtml,
+    status: githubStateToLocal(issue.state, projectColumns),
+    priority: 3,
+    assignee: issue.assignee?.login ?? null,
+    externalUpdatedAt: issue.updatedAt,
+  })
+  if (!task) throw new Error('Failed to create imported GitHub task')
+  return { outcome: 'created', taskId: task.id }
 }
 
 type GenericUpsertResult = {
@@ -669,13 +653,13 @@ type GenericUpsertResult = {
   taskId: string
 }
 
-function upsertTaskFromNormalizedIssue(
+async function upsertTaskFromNormalizedIssue(
   db: Database,
   adapter: ProviderAdapter,
   localProjectId: string,
   issue: NormalizedIssue,
   projectColumns: ColumnConfig[] | null
-): GenericUpsertResult {
+): Promise<GenericUpsertResult> {
   const byLink = db.prepare(`
     SELECT l.task_id, t.project_id
     FROM external_links l
@@ -706,25 +690,17 @@ function upsertTaskFromNormalizedIssue(
     return { outcome: 'updated', taskId: byLink.task_id }
   }
 
-  const id = crypto.randomUUID()
-  db.prepare(`
-    INSERT INTO tasks (
-      id, project_id, title, description, status, priority, assignee,
-      terminal_mode, provider_config, claude_flags, codex_flags, created_at, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, 'claude-code',
-      '{"claude-code":{"flags":"--allow-dangerously-skip-permissions"},"codex":{"flags":"--full-auto --search"},"cursor-agent":{"flags":"--force"},"gemini":{"flags":"--yolo"},"opencode":{"flags":""},"qwen-code":{"flags":"--yolo"}}',
-      '--allow-dangerously-skip-permissions', '--full-auto --search', datetime('now'), ?)
-  `).run(
-    id,
-    localProjectId,
-    issue.title,
-    descHtml,
-    localStatus,
-    3, // default priority
-    issue.assignee?.name ?? null,
-    issue.updatedAt
-  )
-  return { outcome: 'created', taskId: id }
+  const task = await createImportedTaskOp(db, {
+    projectId: localProjectId,
+    title: issue.title,
+    descriptionHtml: descHtml,
+    status: localStatus,
+    priority: 3,
+    assignee: issue.assignee?.name ?? null,
+    externalUpdatedAt: issue.updatedAt,
+  })
+  if (!task) throw new Error(`Failed to create imported ${adapter.provider} task`)
+  return { outcome: 'created', taskId: task.id }
 }
 
 function upsertLinkForNormalizedIssue(
@@ -1614,7 +1590,7 @@ export function registerIntegrationHandlers(
 
     for (const issue of data.issues) {
       if (selectedIds && !selectedIds.has(issue.id)) continue
-      const upsert = upsertTaskFromGitHubIssue(db, input.projectId, issue)
+      const upsert = await upsertTaskFromGitHubIssue(db, input.projectId, issue)
       if (upsert.outcome === 'skipped_already_linked') {
         skippedAlreadyLinked += 1
         continue
@@ -1680,7 +1656,7 @@ export function registerIntegrationHandlers(
 
     for (const issue of data.issues) {
       if (selectedIds && !selectedIds.has(issue.id)) continue
-      const upsert = upsertTaskFromGitHubIssue(db, input.projectId, issue)
+      const upsert = await upsertTaskFromGitHubIssue(db, input.projectId, issue)
       if (upsert.outcome === 'skipped_already_linked') {
         skippedAlreadyLinked += 1
         continue
@@ -1739,8 +1715,8 @@ export function registerIntegrationHandlers(
 
     for (const issue of data.issues) {
       if (selectedIds && !selectedIds.has(issue.id)) continue
-      const taskId = upsertTaskFromIssue(db, input.projectId, issue)
-      upsertLinkForIssue(db, issue, input.connectionId, taskId)
+      const upsert = await upsertTaskFromIssue(db, input.projectId, issue)
+      upsertLinkForIssue(db, issue, input.connectionId, upsert.taskId)
       imported += 1
       linked += 1
     }
@@ -1851,7 +1827,7 @@ export function registerIntegrationHandlers(
     for (const issue of data.issues) {
       if (selectedIds && !selectedIds.has(issue.id)) continue
 
-      const result = upsertTaskFromNormalizedIssue(db, adapter, input.projectId, issue, projectColumns)
+      const result = await upsertTaskFromNormalizedIssue(db, adapter, input.projectId, issue, projectColumns)
       if (result.outcome === 'skipped_already_linked') {
         skippedAlreadyLinked += 1
         continue

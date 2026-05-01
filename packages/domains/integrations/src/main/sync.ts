@@ -12,8 +12,7 @@ import {
   toMs,
   getProjectColumns,
   normalizeMarkdown,
-  upsertFieldState,
-  buildDefaultProviderConfig
+  upsertFieldState
 } from './sync-helpers'
 import {
   getColumnById,
@@ -26,6 +25,7 @@ import {
   type WorkflowCategory
 } from '@slayzone/workflow'
 import { onTaskReachedTerminal } from '@slayzone/terminal/main'
+import { createImportedTaskOp } from '@slayzone/task/main'
 import { getAdapter, getRegisteredProviders } from './adapters'
 import type { NormalizedIssue, ProviderAdapter } from './adapters'
 
@@ -518,14 +518,13 @@ export async function pushTaskAfterEdit(
 
 // --- Unified task creation from normalized issue ---
 
-function createLocalTaskFromNormalizedIssue(
+async function createLocalTaskFromNormalizedIssue(
   db: Database,
   adapter: ProviderAdapter,
   projectId: string,
   issue: NormalizedIssue
-): string {
+): Promise<string> {
   const columns = getProjectColumns(db, projectId)
-  const defaults = buildDefaultProviderConfig(db)
   const category = adapter.remoteStatusToCategory({
     id: issue.status.id,
     name: issue.status.name,
@@ -534,22 +533,17 @@ function createLocalTaskFromNormalizedIssue(
   })
   const status = resolveStatusByCategory(category, columns)
   const priority = resolvePriorityFromExtras(issue.extras, 3)
-  const id = crypto.randomUUID()
-  db.prepare(`
-    INSERT INTO tasks (
-      id, project_id, title, description, status, priority, assignee,
-      terminal_mode, provider_config, claude_flags, codex_flags, created_at, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, 'claude-code', ?, ?, ?, datetime('now'), ?)
-  `).run(
-    id, projectId, issue.title,
-    issue.description ? markdownToHtml(issue.description) : null,
+  const task = await createImportedTaskOp(db, {
+    projectId,
+    title: issue.title,
+    descriptionHtml: issue.description ? markdownToHtml(issue.description) : null,
     status,
     priority,
-    issue.assignee?.name ?? null,
-    defaults.json, defaults.claudeFlags, defaults.codexFlags,
-    issue.updatedAt
-  )
-  return id
+    assignee: issue.assignee?.name ?? null,
+    externalUpdatedAt: issue.updatedAt,
+  })
+  if (!task) throw new Error(`Failed to create imported ${adapter.provider} task`)
+  return task.id
 }
 
 // --- Unified push functions ---
@@ -733,7 +727,7 @@ async function discoverIssues(
       if (linked) continue
 
       try {
-        const taskId = createLocalTaskFromNormalizedIssue(db, adapter, mapping.project_id, issue)
+        const taskId = await createLocalTaskFromNormalizedIssue(db, adapter, mapping.project_id, issue)
         const externalKey = adapter.buildExternalKey(issue)
         const linkId = createExternalLink(
           db, mapping.provider as IntegrationProvider, mapping.connection_id,
