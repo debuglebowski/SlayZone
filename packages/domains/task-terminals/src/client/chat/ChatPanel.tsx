@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type Key } from 'react'
 import { useStickToBottom } from 'use-stick-to-bottom'
 import {
   ArrowUp,
@@ -235,7 +235,7 @@ export function ChatPanel(props: ChatPanelProps) {
   const search = useChatSearch(displayedTimeline)
 
   // Stable per-item keys so streaming text updates re-render the same DOM node.
-  const itemKey = useCallback((item: TimelineItem, index: number): React.Key => {
+  const itemKey = useCallback((item: TimelineItem, index: number): Key => {
     if (item.kind === 'text' || item.kind === 'thinking') return `${item.kind}:${item.messageId}`
     if (item.kind === 'tool') return `tool:${item.invocation.id}`
     if (item.kind === 'session-start') return `session:${item.sessionId}`
@@ -484,7 +484,6 @@ export function ChatPanel(props: ChatPanelProps) {
     }
   }, [resetting, inFlight, chatApi, tabId, taskId, mode, cwd, providerFlagsOverride, resetTimeline])
 
-  const items = virtualizer.getVirtualItems()
   const isEmpty = timeline.length === 0 || (timeline.length === 1 && timeline[0].kind === 'session-start')
 
   return (
@@ -597,24 +596,12 @@ export function ChatPanel(props: ChatPanelProps) {
               }}
             />
           ) : (
-            <div ref={contentRef} style={{ height: virtualizer.getTotalSize(), position: 'relative' }}>
-              {items.map((v) => {
-                const item = displayedTimeline[v.index]
-                const rendered = renderTimelineItem(item, v.index)
+            <div ref={contentRef}>
+              {displayedTimeline.map((item, index) => {
+                const rendered = renderTimelineItem(item, index)
                 if (rendered === null) return null
                 return (
-                  <div
-                    key={v.key}
-                    data-index={v.index}
-                    ref={virtualizer.measureElement}
-                    style={{
-                      position: 'absolute',
-                      top: 0,
-                      left: 0,
-                      right: 0,
-                      transform: `translateY(${v.start}px)`,
-                    }}
-                  >
+                  <div key={itemKey(item, index)} data-index={index}>
                     {rendered}
                   </div>
                 )
