@@ -75,7 +75,7 @@
   .hero-wave .wave-back { animation: waveDrift 8s ease-in-out infinite; }
   .hero-wave .wave-front { animation: waveDrift 6s ease-in-out infinite reverse; }
   @keyframes waveDrift { 0%,100% { transform: translateX(0); } 50% { transform: translateX(3%); } }
-  .hero-wrap > *:not(.hero-bow):not(.click-float) {
+  .hero-wrap > *:not(.hero-bow):not(.click-float):not(.anim-isolated) {
     position: relative;
     z-index: 1;
   }

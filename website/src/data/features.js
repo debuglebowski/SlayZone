@@ -325,11 +325,7 @@ export const features = [
 ]
 
 export function featurePath(feature) {
-  return `/features/${feature.slug}/`
-}
-
-export function featureDemoPath(feature) {
-  return `/features/demo/${feature.slug}/`
+  return `/features/${feature.slug}`
 }
 
 export function findFeatureBySlug(slug) {

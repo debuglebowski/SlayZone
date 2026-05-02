@@ -1,9 +1,35 @@
 ---
 import BaseLayout from '../../layouts/BaseLayout.astro'
-import FeatureAnimation from '../../components/FeatureAnimation.astro'
 import SiteFooter from '../../components/SiteFooter.astro'
 import SiteNav from '../../components/SiteNav.astro'
+import FeaturesHelpers from '../../components/features/FeaturesHelpers.astro'
 import { featurePath, features, findFeatureBySlug } from '../../data/features.js'
+
+import Board from '../../components/features/visuals/board.astro'
+import Terminals from '../../components/features/visuals/terminals.astro'
+import EmbeddedBrowser from '../../components/features/visuals/embedded-browser.astro'
+import Worktrees from '../../components/features/visuals/worktrees.astro'
+import GitWorkflow from '../../components/features/visuals/git-workflow.astro'
+import DiffViewer from '../../components/features/visuals/diff-viewer.astro'
+import CommitGraph from '../../components/features/visuals/commit-graph.astro'
+import PullRequests from '../../components/features/visuals/pull-requests.astro'
+import NotesEditor from '../../components/features/visuals/notes-editor.astro'
+import DevServers from '../../components/features/visuals/dev-servers.astro'
+import UsageMeter from '../../components/features/visuals/usage-meter.astro'
+import UsageReports from '../../components/features/visuals/usage-reports.astro'
+import IssueSync from '../../components/features/visuals/issue-sync.astro'
+import ExplodeMode from '../../components/features/visuals/explode-mode.astro'
+import AttentionPanel from '../../components/features/visuals/attention-panel.astro'
+import McpBoard from '../../components/features/visuals/mcp-board.astro'
+
+const visuals: Record<string, any> = {
+  'board': Board, 'terminals': Terminals, 'embedded-browser': EmbeddedBrowser,
+  'worktrees': Worktrees, 'git-workflow': GitWorkflow, 'diff-viewer': DiffViewer,
+  'commit-graph': CommitGraph, 'pull-requests': PullRequests, 'notes-editor': NotesEditor,
+  'dev-servers': DevServers, 'usage-meter': UsageMeter, 'usage-reports': UsageReports,
+  'issue-sync': IssueSync, 'explode-mode': ExplodeMode, 'attention-panel': AttentionPanel,
+  'mcp-board': McpBoard,
+}
 
 export function getStaticPaths() {
   return features.map((feature) => ({
@@ -15,6 +41,11 @@ const feature = findFeatureBySlug(Astro.params.slug)
 
 if (!feature) {
   throw new Error(`Unknown feature slug: ${Astro.params.slug}`)
+}
+
+const Visual = visuals[feature.slug]
+if (!Visual) {
+  throw new Error(`No visual registered for slug: ${feature.slug}`)
 }
 
 const currentIndex = features.findIndex((item) => item.slug === feature.slug)
@@ -34,15 +65,35 @@ const nextFeature = currentIndex < features.length - 1 ? features[currentIndex +
 
   <section class="feature-hero">
     <div class="hero-copy">
-      <a href="/features/" class="back-link">← Back to all features</a>
+      <a href="/features" class="back-link">← Back to all features</a>
       <h1>{feature.title}</h1>
       <p class="hero-summary">{feature.shortDescription}</p>
     </div>
   </section>
 
   <section class="feature-demo">
-    <FeatureAnimation feature={feature} />
+    <FeaturesHelpers />
+    <div class="feature-demo-frame" id={feature.legacyId}>
+      <div class="scale-wrap">
+        <Visual />
+      </div>
+    </div>
   </section>
+
+  <script is:inline>
+    (function() {
+      const wrap = document.querySelector('.feature-demo-frame .scale-wrap');
+      if (!wrap) return;
+      function update() {
+        const c = wrap.parentElement;
+        const s = c.offsetWidth / 720;
+        wrap.style.transform = 'scale(' + s + ')';
+        c.style.height = (540 * s) + 'px';
+      }
+      update();
+      window.addEventListener('resize', update);
+    })();
+  </script>
 
   <section class="feature-context">
     <div class="context-main">
@@ -59,7 +110,7 @@ const nextFeature = currentIndex < features.length - 1 ? features[currentIndex +
   </section>
 
   <section class="feature-faq-cta">
-    <p>Have a question about how this works in practice? Check the <a href="/faq/">SlayZone FAQ</a> or read about <a href="/features/">all features</a>.</p>
+    <p>Have a question about how this works in practice? Check the <a href="/faq">SlayZone FAQ</a> or read about <a href="/features">all features</a>.</p>
   </section>
 
   <section class="feature-nav">
@@ -120,6 +171,24 @@ const nextFeature = currentIndex < features.length - 1 ? features[currentIndex +
   }
   .feature-demo {
     margin: 0 0 32px;
+  }
+  .feature-demo-frame {
+    position: relative;
+    width: 100%;
+    border-radius: 20px;
+    overflow: hidden;
+    background: #f3f4f8;
+  }
+  .feature-demo-frame .scale-wrap {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 720px;
+    height: 540px;
+    transform-origin: top left;
+  }
+  @media (max-width: 640px) {
+    .feature-demo-frame { border-radius: 16px; }
   }
   .feature-context {
     margin: 0 0 40px;

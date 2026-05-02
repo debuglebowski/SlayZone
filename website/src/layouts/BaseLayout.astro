@@ -1,4 +1,6 @@
 ---
+import '../styles/anim-base.css'
+
 const {
   title,
   description,
@@ -6,7 +8,8 @@ const {
   bare = false,
 } = Astro.props
 
-const canonicalUrl = new URL(canonicalPath, 'https://slay.zone').toString()
+const SITE_ORIGIN = 'https://slay.zone'
+const canonicalUrl = canonicalPath === '/' ? SITE_ORIGIN : `${SITE_ORIGIN}${canonicalPath}`
 const bodyClass = bare ? 'bare' : ''
 ---
 

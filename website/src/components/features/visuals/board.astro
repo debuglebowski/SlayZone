@@ -1,3 +1,4 @@
+<div class="anim anim-board">
         <div class="app-frame" style="flex-direction:row;position:relative;">
           <div class="fk-cursor" id="fk-cursor"><svg viewBox="0 0 24 24" fill="none"><path d="M5 3l14 8.5L12 14l-2 7L5 3z" fill="white" stroke="black" stroke-width="1.5" stroke-linejoin="round"/></svg></div>
           <div class="fk-click-ripple" id="fk-ripple"></div>
@@ -48,6 +49,7 @@
         </div>
         </div>
       </div>
+</div>
 
 <script is:inline>
 (function() {
@@ -192,7 +194,7 @@
       frame.removeChild(floater);
       var clone = document.createElement('div');
       clone.className = 'fk-card fk-card-moved landed';
-      clone.innerHTML = '<span class="fk-card-icon">⫸</span><div class="fk-card-body"><div class="fk-card-title">Fix "quick fix" from Friday</div></div><div class="fk-card-dot attention" style="animation:pulse 2s ease infinite"></div>';
+      clone.innerHTML = '<span class="fk-card-icon">⫸</span><div class="fk-card-body"><div class="fk-card-title">Fix "quick fix" from Friday</div></div><div class="fk-card-dot attention"></div>';
       colProgress.appendChild(clone);
       click(dropPos.x, dropY);
       cntTodo.textContent = '2'; cntProgress.textContent = '3';
