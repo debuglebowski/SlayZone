@@ -312,17 +312,21 @@ export const UnifiedGitPanel = forwardRef<UnifiedGitPanelHandle, UnifiedGitPanel
           >
             <SelectTrigger
               className={cn(
-                'h-7 w-auto max-w-[160px] text-xs gap-1 px-2',
+                'h-7 w-auto text-xs gap-1 px-2',
                 isRepoStale && 'border-amber-500/60 text-amber-500'
               )}
               data-size="sm"
             >
               <SelectValue />
             </SelectTrigger>
-            <SelectContent>
+            <SelectContent position="popper" className="w-auto overflow-x-visible">
               {detectedRepos.map((repo) => (
-                <SelectItem key={repo.name} value={repo.name} className="text-xs">
-                  {repo.name}
+                <SelectItem
+                  key={repo.name}
+                  value={repo.name}
+                  className="text-xs pl-7 pr-2 [&_[data-slot=select-item-indicator]]:right-auto [&_[data-slot=select-item-indicator]]:left-2"
+                >
+                  <span className="whitespace-nowrap">{repo.name}</span>
                 </SelectItem>
               ))}
             </SelectContent>
