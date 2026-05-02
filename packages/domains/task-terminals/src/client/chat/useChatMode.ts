@@ -62,7 +62,6 @@ export function useChatMode({ taskId, mode, tabId, cwd }: UseChatModeOpts) {
     setModeChanging(true)
     try {
       await getApi().setMode({ tabId, taskId, mode, cwd, chatMode: next })
-      toast(`Mode → ${next}`)
     } catch (err) {
       toast(`Mode change failed: ${err instanceof Error ? err.message : String(err)}`)
     } finally {

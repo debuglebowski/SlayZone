@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type Key } from 'react'
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState, type Key } from 'react'
 import { useStickToBottom } from 'use-stick-to-bottom'
 import {
   ArrowUp,
@@ -45,6 +45,10 @@ import { resetChat } from './autocomplete/chat-actions'
 import { mergeEffortFlag } from './autocomplete/flags'
 import { renderTimelineItem, isRenderable } from './renderers'
 
+export interface ChatPanelHandle {
+  focus: () => void
+}
+
 export interface ChatPanelProps {
   tabId: string
   taskId: string
@@ -67,7 +71,7 @@ const SUGGESTED_PROMPTS = [
   'What are the main dependencies?',
 ]
 
-export function ChatPanel(props: ChatPanelProps) {
+export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function ChatPanel(props, ref) {
   const { tabId, taskId, mode, cwd, providerFlagsOverride, permissionNotice: overrideNotice, onSetDisplayMode, loopConfig, onLoopConfigChange, onOpenLoopDialog } = props
   const { state, timeline, inFlight, hydrating, sendMessage, interrupt, reset: resetTimeline } = useChatSession({
     tabId,
@@ -102,6 +106,10 @@ export function ChatPanel(props: ChatPanelProps) {
   })
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const panelRef = useRef<HTMLDivElement>(null)
+
+  useImperativeHandle(ref, () => ({
+    focus: () => textareaRef.current?.focus(),
+  }))
 
   const { uploadFiles: uploadImageFiles, getFilePath: getAssetFilePath } = useAssetUpload(taskId)
 
@@ -402,11 +410,23 @@ export function ChatPanel(props: ChatPanelProps) {
         e.preventDefault()
         const el = scrollRef.current
         if (el) el.scrollTo({ top: el.scrollHeight })
+        return
+      }
+      // Shift+Tab cycles agent permission mode whenever the chat panel owns
+      // focus — terminal-mode parity. Skipped while a turn is in flight (mode
+      // change kills + respawns the subprocess) or while autocomplete consumes
+      // Tab to accept the current selection.
+      if (e.key === 'Tab' && e.shiftKey && !mod && !e.altKey) {
+        if (autocomplete.show) return
+        e.preventDefault()
+        if (inFlight) return
+        const next = nextAgentMode(chatMode, autoCapability.optedIn)
+        void handleModeChange(next)
       }
     }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
-  }, [scrollRef])
+  }, [scrollRef, search, inFlight, chatMode, handleModeChange, autoCapability.optedIn, autocomplete.show])
 
   // Scroll to the active match.
   useEffect(() => {
@@ -447,22 +467,12 @@ export function ChatPanel(props: ChatPanelProps) {
   const onKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
       if (autocomplete.handleKeyDown(e)) return
-      // Shift+Tab cycles agent mode when input is empty — terminal-mode parity.
-      // Ignored when user is mid-typing so Tab/Shift+Tab still works for indentation
-      // or focus traversal in the rare case the textarea has actual content.
-      if (e.key === 'Tab' && e.shiftKey && draft.length === 0) {
-        e.preventDefault()
-        if (inFlight) return
-        const next = nextAgentMode(chatMode, autoCapability.optedIn)
-        void handleModeChange(next)
-        return
-      }
       if (e.key === 'Enter' && !e.shiftKey && !e.metaKey && !e.ctrlKey) {
         e.preventDefault()
         void handleSend()
       }
     },
-    [handleSend, autocomplete, draft, chatMode, handleModeChange, autoCapability.optedIn, inFlight]
+    [handleSend, autocomplete]
   )
 
   const copySessionId = useCallback(() => {
@@ -885,7 +895,7 @@ export function ChatPanel(props: ChatPanelProps) {
     </div>
     </ChatViewContext.Provider>
   )
-}
+})
 
 function HydratingState() {
   return (
