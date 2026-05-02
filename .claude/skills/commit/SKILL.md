@@ -6,16 +6,23 @@ trigger: auto
 
 Prepare a git commit for the current task. User context: $ARGUMENTS
 
+## Default scope: this session only
+
+**Unless the user says otherwise, commit ONLY the changes made in the current session.** Do not include pre-existing modifications, untracked files from earlier work, or edits the user made manually outside this session — even if they are staged or in the working tree.
+
+Override signals (commit broader scope only when user explicitly says): "commit everything", "commit all", "include the other changes", "stage X too", or names specific files outside the session set.
+
 ## Workflow
 
 1. Inspect repository state.
 - Run `git status --short`.
 - Run `git diff --name-only` and `git diff --cached --name-only`.
+- Cross-reference against this session's tool-call history (Edit/Write/MultiEdit targets) to identify which files this session actually touched.
 
-2. Build a candidate set from current-task work only.
-- Include files and hunks created or edited for the current request.
-- Exclude pre-existing, unrelated, or user-authored edits that were not part of this task.
-- If confidence is not high for any file or hunk, mark it as uncertain.
+2. Build a candidate set from this session's work only.
+- Include only files and hunks this session created or edited.
+- Exclude pre-existing, unrelated, or user-authored edits that were not part of this session — even if they appear in `git status`.
+- If confidence is not high for any file or hunk (e.g. session edited part of a file, but other hunks predate session), mark it as uncertain.
 
 3. Resolve uncertainty before staging.
 - If any file or hunk is uncertain, stop and ask the user exactly what to include.
@@ -29,7 +36,7 @@ Prepare a git commit for the current task. User context: $ARGUMENTS
 
 5. Validate staged content.
 - Run `git diff --cached`.
-- Confirm staged hunks are only the current-task edits and do not include accidental or unrelated changes.
+- Confirm staged hunks are only this session's edits and do not include accidental or unrelated changes.
 
 6. Write a Conventional Commit message.
 - Use one type: `feat`, `fix`, `chore`, `refactor`, `docs`, `test`.
