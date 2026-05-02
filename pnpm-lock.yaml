@@ -780,6 +780,9 @@ importers:
 
   packages/domains/task:
     dependencies:
+      '@codemirror/view':
+        specifier: ^6.36.5
+        version: 6.39.12
       '@dnd-kit/core':
         specifier: ^6.3.1
         version: 6.3.1(react-dom@19.2.3(react@19.2.3))(react@19.2.3)
