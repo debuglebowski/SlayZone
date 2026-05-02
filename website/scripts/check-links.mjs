@@ -31,15 +31,16 @@ for (const file of await walk(dist)) {
     const [path] = href.split(/[?#]/)
     if (!path) continue
     if (SKIP_EXT.has(extname(path).toLowerCase())) continue
-    if (path.endsWith('/')) continue
+    if (path === '/') continue
+    if (!path.endsWith('/')) continue
     violations.push({ file: rel, href })
   }
 }
 
 if (violations.length) {
-  console.error(`[check-links] ${violations.length} internal href(s) missing trailing slash:`)
+  console.error(`[check-links] ${violations.length} internal href(s) with trailing slash:`)
   for (const v of violations) console.error(`  ${v.file}: ${v.href}`)
   process.exit(1)
 }
 
-console.log('[check-links] all internal hrefs have trailing slash')
+console.log('[check-links] no internal hrefs have trailing slash')

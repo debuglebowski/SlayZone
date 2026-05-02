@@ -14,8 +14,8 @@ export default defineConfig({
   image: {
     remotePatterns: [],
   },
-  trailingSlash: 'always',
+  trailingSlash: 'never',
   build: {
-    format: 'directory',
+    format: 'file',
   },
 })

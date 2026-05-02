@@ -135,8 +135,8 @@ const asciiArt = ` _  _    ___  _  _
         { type: 'cmd', text: '  sudo       — nice try' },
       ],
       home: () => { window.location.href = '/'; return [] },
-      docs: () => { window.location.href = '/docs/'; return [] },
-      faq: () => { window.location.href = '/faq/'; return [] },
+      docs: () => { window.location.href = '/docs'; return [] },
+      faq: () => { window.location.href = '/faq'; return [] },
       github: () => {
         window.open('https://github.com/debuglebowski/SlayZone', '_blank')
         return [{ type: 'ok', text: 'Opening GitHub...' }]

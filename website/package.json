@@ -3,12 +3,14 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "pnpm build:og && astro build && pnpm check:links",
+    "build": "pnpm build:og && astro build && pnpm build:redirects && pnpm check:links",
     "dev": "astro dev",
     "preview": "astro preview",
     "build:og": "node scripts/build-og.mjs",
+    "build:redirects": "node scripts/build-redirects.mjs",
     "check:links": "node scripts/check-links.mjs",
-    "check:urls": "node scripts/check-urls.mjs"
+    "check:urls": "node scripts/check-urls.mjs",
+    "test:redirects": "node scripts/test-redirects.mjs"
   },
   "devDependencies": {
     "astro": "^5.14.3",
