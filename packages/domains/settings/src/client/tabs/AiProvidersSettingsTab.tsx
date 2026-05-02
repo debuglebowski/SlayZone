@@ -946,6 +946,32 @@ export function AiProvidersSettingsTab(props: AiProvidersSettingsTabProps) {
                     )}
                   </div>
                 </div>
+                <div className="grid grid-cols-[140px_minmax(0,1fr)] items-start gap-4">
+                  <div className="space-y-0.5 pt-2">
+                    <Label className={`text-sm ${mode.isBuiltin ? 'text-muted-foreground' : ''}`}>Headless Command</Label>
+                    {!mode.isBuiltin && <p className="text-[10px] text-muted-foreground">Run for one-shot AI actions</p>}
+                  </div>
+                  <div className="space-y-1">
+                    {mode.isBuiltin ? (
+                      <Input
+                        className="font-mono text-xs bg-muted/50 cursor-not-allowed opacity-70"
+                        value={mode.headlessCommand ?? ''}
+                        readOnly
+                        disabled
+                      />
+                    ) : (
+                      <DebouncedInput
+                        className="font-mono text-xs"
+                        placeholder="e.g. my-cli -p {prompt} {flags}"
+                        value={mode.headlessCommand ?? ''}
+                        onValueCommit={(v) => updateMode(mode.id, { headlessCommand: v || null })}
+                      />
+                    )}
+                    <p className="text-[10px] text-muted-foreground">
+                      Optional. Use <code className="px-1 bg-muted rounded">{'{prompt}'}</code> (auto-quoted) and <code className="px-1 bg-muted rounded">{'{flags}'}</code>. Required to use this provider in automation AI actions.
+                    </p>
+                  </div>
+                </div>
                 <div className="grid grid-cols-[140px_minmax(0,1fr)] items-center gap-4">
                   <Label className="text-sm">Default Flags</Label>
                   <div className="space-y-1">
