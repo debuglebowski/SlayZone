@@ -16,6 +16,10 @@ interface PaneProps {
   providerFlags?: string
   executionContext?: import('@slayzone/terminal/shared').ExecutionContext | null
   permissionNotice?: string | null
+  /** Loop mode wiring — passed through to ChatPanel for chat-display tabs. */
+  loopConfig?: import('@slayzone/terminal/shared').LoopConfig | null
+  onLoopConfigChange?: (config: import('@slayzone/terminal/shared').LoopConfig | null) => void
+  onOpenLoopDialog?: () => void
   onConversationCreated?: (conversationId: string) => void
   onSessionInvalid?: () => void
   onReady?: (api: {
@@ -137,6 +141,9 @@ export const TerminalSplitGroup = forwardRef<TerminalSplitGroupHandle, TerminalS
           providerFlagsOverride={pane.providerFlags ?? null}
           permissionNotice={pane.permissionNotice ?? null}
           onSetDisplayMode={pane.onSetDisplayMode}
+          loopConfig={pane.loopConfig ?? null}
+          onLoopConfigChange={pane.onLoopConfigChange}
+          onOpenLoopDialog={pane.onOpenLoopDialog}
         />
       )
     }

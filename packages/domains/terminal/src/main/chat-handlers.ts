@@ -43,6 +43,31 @@ interface ChatCreateOpts {
   providerFlagsOverride?: string | null
 }
 
+/**
+ * Permission/operating mode for chat sessions. Chat lacks an interactive prompt
+ * mechanism over stream-json (verified via spike), so each mode resolves to a
+ * static set of CLI flags at spawn time:
+ *   - plan: read-only (`--permission-mode plan`)
+ *   - auto-accept: edits auto-approved (`--permission-mode acceptEdits`)
+ *   - bypass: all approvals skipped (`--allow-dangerously-skip-permissions`)
+ *
+ * "Normal" mode (interactive per-tool prompts) intentionally absent — would
+ * require swapping the CLI subprocess for the programmatic Anthropic SDK.
+ */
+export type ChatMode = 'plan' | 'auto-accept' | 'bypass'
+
+export const DEFAULT_CHAT_MODE_NEW_TASK: ChatMode = 'auto-accept'
+/** Pre-existing tasks (no chatMode) keep current behavior on first upgrade. */
+export const DEFAULT_CHAT_MODE_LEGACY: ChatMode = 'bypass'
+
+export function chatModeToFlags(mode: ChatMode): string[] {
+  switch (mode) {
+    case 'plan': return ['--permission-mode', 'plan']
+    case 'auto-accept': return ['--permission-mode', 'acceptEdits']
+    case 'bypass': return ['--allow-dangerously-skip-permissions']
+  }
+}
+
 interface ProviderConfigEntry {
   conversationId?: string | null
   /**
@@ -53,6 +78,8 @@ interface ProviderConfigEntry {
    */
   chatConversationId?: string | null
   flags?: string | null
+  /** Chat permission/operating mode. See `ChatMode`. */
+  chatMode?: ChatMode | null
 }
 
 function readProviderConfig(db: Database, taskId: string, mode: string): ProviderConfigEntry {
@@ -83,6 +110,75 @@ function writeChatConversationId(db: Database, taskId: string, mode: string, id:
   const existing = cfg[mode] ?? {}
   cfg[mode] = { ...existing, chatConversationId: id }
   db.prepare('UPDATE tasks SET provider_config = ? WHERE id = ?').run(JSON.stringify(cfg), taskId)
+}
+
+function writeChatMode(db: Database, taskId: string, mode: string, chatMode: ChatMode): void {
+  const row = db.prepare('SELECT provider_config FROM tasks WHERE id = ?').get(taskId) as
+    | { provider_config: string | null }
+    | undefined
+  let cfg: Record<string, ProviderConfigEntry> = {}
+  if (row?.provider_config) {
+    try {
+      cfg = JSON.parse(row.provider_config) as Record<string, ProviderConfigEntry>
+    } catch {
+      cfg = {}
+    }
+  }
+  const existing = cfg[mode] ?? {}
+  cfg[mode] = { ...existing, chatMode }
+  db.prepare('UPDATE tasks SET provider_config = ? WHERE id = ?').run(JSON.stringify(cfg), taskId)
+}
+
+/**
+ * One-shot backfill: every chat-capable task gets `chatMode='bypass'` set on
+ * its terminal_mode entry — preserving current default behavior
+ * (`--allow-dangerously-skip-permissions`) for pre-upgrade tasks. New tasks
+ * created after this migration runs get `auto-accept` by default via
+ * `buildCreateOpts`.
+ *
+ * Two categories of pre-existing tasks are covered:
+ *   1. Existing provider_config entry but no `chatMode` field — patched.
+ *   2. NULL provider_config (or missing entry for the task's terminal_mode) —
+ *      a fresh entry with `chatMode='bypass'` is created.
+ *
+ * Idempotent: skips entries that already have `chatMode` set. Safe to call
+ * on every app start. Only chat-capable modes (per `supportsChatMode`) are
+ * touched, leaving non-chat modes alone.
+ */
+export function backfillChatModes(db: Database): { scanned: number; updated: number } {
+  const rows = db.prepare('SELECT id, terminal_mode, provider_config FROM tasks').all() as
+    | { id: string; terminal_mode: string | null; provider_config: string | null }[]
+  let scanned = 0
+  let updated = 0
+  for (const row of rows) {
+    scanned++
+    let cfg: Record<string, ProviderConfigEntry> = {}
+    if (row.provider_config) {
+      try {
+        cfg = JSON.parse(row.provider_config) as Record<string, ProviderConfigEntry>
+      } catch {
+        continue
+      }
+    }
+    let dirty = false
+    // Patch existing entries.
+    for (const mode of Object.keys(cfg)) {
+      const entry = cfg[mode]
+      if (!entry || entry.chatMode != null) continue
+      cfg[mode] = { ...entry, chatMode: DEFAULT_CHAT_MODE_LEGACY }
+      dirty = true
+    }
+    // Ensure the task's primary terminal_mode has an entry if it's chat-capable.
+    if (row.terminal_mode && supportsChatMode(row.terminal_mode) && cfg[row.terminal_mode]?.chatMode == null) {
+      cfg[row.terminal_mode] = { ...(cfg[row.terminal_mode] ?? {}), chatMode: DEFAULT_CHAT_MODE_LEGACY }
+      dirty = true
+    }
+    if (dirty) {
+      db.prepare('UPDATE tasks SET provider_config = ? WHERE id = ?').run(JSON.stringify(cfg), row.id)
+      updated++
+    }
+  }
+  return { scanned, updated }
 }
 
 function clearChatConversationId(db: Database, taskId: string, mode: string): void {
@@ -153,12 +249,21 @@ function buildCreateOpts(
   { fresh }: { fresh: boolean }
 ): Parameters<typeof createChat>[0] {
   const providerCfg = readProviderConfig(db, opts.taskId, opts.mode)
-  const flagsString =
-    opts.providerFlagsOverride ??
-    providerCfg.flags ??
-    readTaskModeDefaultFlags(db, opts.mode) ??
-    ''
-  const providerFlags = parseShellArgs(flagsString)
+  // Flag-resolution priority for chat:
+  //   1. per-call override (`providerFlagsOverride`)
+  //   2. per-task explicit flags (`providerCfg.flags`)
+  //   3. chatMode-derived flags (default `auto-accept` for new, `bypass` after backfill)
+  // terminal_modes default_flags is intentionally NOT consulted for chat — chat owns
+  // its own permission UX through chatMode. Terminal still uses default_flags.
+  let providerFlags: string[]
+  if (opts.providerFlagsOverride) {
+    providerFlags = parseShellArgs(opts.providerFlagsOverride)
+  } else if (providerCfg.flags) {
+    providerFlags = parseShellArgs(providerCfg.flags)
+  } else {
+    const chatMode = providerCfg.chatMode ?? DEFAULT_CHAT_MODE_NEW_TASK
+    providerFlags = chatModeToFlags(chatMode)
+  }
 
   const initialBuffer = fresh ? [] : loadChatEvents(db, opts.tabId)
   const initialNextSeq = fresh ? 0 : getNextSeqForTab(db, opts.tabId)
@@ -273,6 +378,28 @@ export function registerChatHandlers(ipcMain: IpcMain, db: Database, opts: ChatH
       const flagsString =
         providerCfg.flags ?? readTaskModeDefaultFlags(db, mode) ?? ''
       return inspectPermissionFlags(parseShellArgs(flagsString))
+    }
+  )
+
+  ipcMain.handle(
+    'chat:getMode',
+    (_, taskId: string, mode: string): ChatMode => {
+      const cfg = readProviderConfig(db, taskId, mode)
+      return cfg.chatMode ?? DEFAULT_CHAT_MODE_NEW_TASK
+    }
+  )
+
+  ipcMain.handle(
+    'chat:setMode',
+    async (_, opts: ChatCreateOpts & { chatMode: ChatMode }): Promise<ChatSessionInfo> => {
+      writeChatMode(db, opts.taskId, opts.mode, opts.chatMode)
+      // Mode change requires a child-process restart (CLI flags are read at spawn).
+      // We DON'T wipe timeline or clear chatConversationId — the new child resumes
+      // the same conversation via `--resume <id>` (handled by adapter when
+      // `conversationId` is non-null in createChat opts). User keeps history;
+      // only the underlying subprocess is recycled.
+      removeSession(opts.tabId)
+      return createChat(buildCreateOpts(db, opts, { fresh: false }))
     }
   )
 

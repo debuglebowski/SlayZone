@@ -108,9 +108,10 @@ import { BlobStore, betterSqliteTxn, seedInitialVersions } from '@slayzone/task-
 import { getExtensionFromTitle } from '@slayzone/task/shared'
 import { registerTagHandlers } from '@slayzone/tags/main'
 import { registerSettingsHandlers, registerThemeHandlers } from '@slayzone/settings/main'
-import { registerPtyHandlers, registerUsageHandlers, killAllPtys, killPtysByTaskId, onTaskReachedTerminal, startIdleChecker, stopIdleChecker, dismissAllNotifications, syncTerminalModes, getPtyPids, onSessionChange, onGlobalStateChange, onPtyInputSubmit, registerChatHandlers, shutdownChatTransports, setOnHostKillHandler, broadcastRespawnRequest } from '@slayzone/terminal/main'
+import { registerPtyHandlers, registerUsageHandlers, killAllPtys, killPtysByTaskId, onTaskReachedTerminal, startIdleChecker, stopIdleChecker, dismissAllNotifications, syncTerminalModes, getPtyPids, onSessionChange, onGlobalStateChange, onPtyInputSubmit, registerChatHandlers, shutdownChatTransports, setOnHostKillHandler, broadcastRespawnRequest, backfillChatModes } from '@slayzone/terminal/main'
 import { setProviderLastKilledAt, type ProviderConfig } from '@slayzone/task/shared'
 import { attachFloatingAgent, setupFloatingAgent } from './floating-agent'
+import { attachTaskWindows, setupTaskWindows } from './task-windows'
 import { registerTerminalTabsHandlers } from '@slayzone/task-terminals/main'
 import { registerWorktreeHandlers, closeGitWatcher } from '@slayzone/worktrees/main'
 import { registerAgentTurnsHandlers, initChatTurnSubscriber, initPtyTurnSubscriber } from '@slayzone/agent-turns/main'
@@ -640,6 +641,7 @@ function createMainWindow(): void {
 
   // Floating agent panel: register main window with state machine adapter
   attachFloatingAgent(mainWindow)
+  attachTaskWindows(mainWindow)
 
   mainWindow.on('closed', () => {
     mainWindow = null
@@ -984,7 +986,15 @@ app.whenReady().then(async () => {
           {
             label: 'Close Tab',
             accelerator: getMenuAccelerator('close-tab', overrides),
-            click: () => mainWindow?.webContents.send('app:close-current-focus')
+            click: () => {
+              const focused = BrowserWindow.getFocusedWindow()
+              // Secondary task windows + floating agent etc: just close the window itself
+              if (focused && focused !== mainWindow) {
+                focused.close()
+                return
+              }
+              mainWindow?.webContents.send('app:close-current-focus')
+            }
           },
           {
             label: 'Close Task',
@@ -1095,6 +1105,7 @@ app.whenReady().then(async () => {
   registerUsageHandlers(ipcMain, db)
   registerPtyHandlers(ipcMain, db)
   setupFloatingAgent(() => currentOverrides)
+  setupTaskWindows()
 
   // Task automation: auto-move tasks on terminal state change
   onGlobalStateChange((sessionId, newState, oldState) => {
@@ -1140,6 +1151,17 @@ app.whenReady().then(async () => {
 
   registerTerminalTabsHandlers(ipcMain, db)
   registerChatHandlers(ipcMain, db, { onChatEvent: initChatTurnSubscriber(db) })
+  // One-shot: backfill `chatMode` for tasks that pre-date the chat-mode UI so
+  // upgraded users keep their current `--allow-dangerously-skip-permissions`
+  // behavior instead of suddenly hitting denials.
+  try {
+    const stats = backfillChatModes(db)
+    if (stats.updated > 0) {
+      console.log(`[chat-handlers] backfillChatModes: ${stats.updated}/${stats.scanned} tasks tagged 'bypass'`)
+    }
+  } catch (err) {
+    console.error('[chat-handlers] backfillChatModes failed:', err)
+  }
   registerFilesHandlers(ipcMain)
   registerWorktreeHandlers(ipcMain, db)
   registerAgentTurnsHandlers(ipcMain, db)
@@ -1832,6 +1854,12 @@ div{text-align:center}h1{font-size:14px;font-weight:500;color:#aaa}p{font-size:1
 
   // Lifecycle
   ipcMain.handle('browser:create-view', (_, opts: CreateViewOpts) => browserViewManager.createView(opts))
+  ipcMain.handle('browser:reparent-to-current-window', (event, viewId: string) => {
+    const win = BrowserWindow.fromWebContents(event.sender)
+    if (!win || win.isDestroyed()) return { ok: false }
+    const ok = browserViewManager.reparentView(viewId, win)
+    return { ok }
+  })
   ipcMain.handle('browser:destroy-view', (_, viewId: string) => browserViewManager.destroyView(viewId))
   ipcMain.handle('browser:destroy-all-for-task', (_, taskId: string) => browserViewManager.destroyAllForTask(taskId))
 
@@ -2051,6 +2079,7 @@ div{text-align:center}h1{font-size:14px;font-weight:500;color:#aaa}p{font-size:1
     )
     ipcMain.handle('browser:get-all-view-ids', () => browserViewManager.getAllViewIds())
     ipcMain.handle('browser:get-views-for-task', (_, taskId: string) => browserViewManager.getViewsForTask(taskId))
+    ipcMain.handle('browser:list-views', () => browserViewManager.listViews())
     ipcMain.handle('browser:is-focused', (_, viewId: string) => browserViewManager.isFocused(viewId))
     ipcMain.handle('browser:get-actual-native-bounds', (_, viewId: string) => browserViewManager.getActualNativeBounds(viewId))
     ipcMain.handle('browser:is-all-hidden', () => browserViewManager.isAllHidden())

@@ -69,6 +69,7 @@ export * from './panel-toggle'
 export * from './file-tree'
 export * from './textarea'
 export * from './tooltip'
+export * from './agent-mode-pill'
 
 // Toast
 export { Toaster, toast } from 'sonner'

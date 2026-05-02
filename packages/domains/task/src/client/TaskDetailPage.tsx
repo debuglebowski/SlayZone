@@ -501,7 +501,6 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
   }, [task?.id, onTaskUpdated])
   const { status: loopStatus, iteration: loopIteration, startLoop, pauseLoop, resumeLoop, stopLoop } = useLoopMode({
     sessionId: mainSessionId,
-    config: task?.loop_config ?? null,
     onConfigChange: handleLoopConfigChange
   })
 
@@ -2019,6 +2018,9 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
                   onOpenUrl={openDevServerInBrowser}
                   onOpenFile={handleQuickOpenFile}
                   onMainReset={handleResetTerminal}
+                  loopConfig={task.loop_config ?? null}
+                  onLoopConfigChange={handleLoopConfigChange}
+                  onOpenLoopDialog={() => setLoopDialogOpen(true)}
                   overlay={isActive && loopConfigured ? (
                     <LoopModeBanner
                       config={task.loop_config!}

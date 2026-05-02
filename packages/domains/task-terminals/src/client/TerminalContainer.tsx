@@ -55,6 +55,10 @@ interface TerminalContainerProps {
   taskProgress?: number
   /** Persisted orchestrator/manager-mode toggle state (from task.manager_mode). */
   initialManagerMode?: boolean
+  /** Loop config — passed through to chat-display panes for loop banner. */
+  loopConfig?: import('@slayzone/terminal/shared').LoopConfig | null
+  onLoopConfigChange?: (config: import('@slayzone/terminal/shared').LoopConfig | null) => void
+  onOpenLoopDialog?: () => void
 }
 
 export const TerminalContainer = forwardRef<TerminalContainerHandle, TerminalContainerProps>(function TerminalContainer({
@@ -87,6 +91,9 @@ export const TerminalContainer = forwardRef<TerminalContainerHandle, TerminalCon
   taskStatus,
   taskProgress,
   initialManagerMode,
+  loopConfig,
+  onLoopConfigChange,
+  onOpenLoopDialog,
 }: TerminalContainerProps, ref) {
   const {
     tabs,
@@ -195,6 +202,20 @@ export const TerminalContainer = forwardRef<TerminalContainerHandle, TerminalCon
       // Main tab prompt events could trigger task-level UI updates
     })
   }, [taskId, tabs, getSessionId, subscribePrompt])
+
+  // Multi-window: claim all task sessions for THIS window on mount + on focus.
+  // PTY output reroutes to the window currently rendering the terminal panel.
+  useEffect(() => {
+    const claimAll = () => {
+      for (const tab of tabs) {
+        const sid = getSessionId(tab.id)
+        if (sid) void window.api.pty.claimSession(sid)
+      }
+    }
+    claimAll()
+    window.addEventListener('focus', claimAll)
+    return () => window.removeEventListener('focus', claimAll)
+  }, [tabs, getSessionId])
 
   // Track terminal process titles for tab labels
   const [isManagerResizing, setIsManagerResizing] = useState(false)
@@ -417,10 +438,15 @@ export const TerminalContainer = forwardRef<TerminalContainerHandle, TerminalCon
         onRename: tab.isMain ? null : () => tabBarRef.current?.startRename(tab.id),
         onResetSession: tab.isMain && onMainReset ? onMainReset : null,
         onSetDisplayMode: (target: import('../shared/types').TabDisplayMode) =>
-          setTabDisplayMode(tab.id, target)
+          setTabDisplayMode(tab.id, target),
+        // Loop wiring — only meaningful for chat-display tabs, but passed
+        // unconditionally; ChatPanel ignores when loopConfig is null.
+        loopConfig: tab.isMain ? loopConfig ?? null : null,
+        onLoopConfigChange: tab.isMain ? onLoopConfigChange : undefined,
+        onOpenLoopDialog: tab.isMain ? onOpenLoopDialog : undefined,
       }
     })
-  }, [activeGroup, getSessionId, cwd, taskId, conversationId, existingConversationId, supportsSessionId, initialPrompt, providerFlags, executionContext, handleConversationCreated, onSessionInvalid, handleTerminalReady, onFirstInput, onRetry, handleSplitGroup, createTab, closeGroup, closeTab, onMainReset, setTabDisplayMode])
+  }, [activeGroup, getSessionId, cwd, taskId, conversationId, existingConversationId, supportsSessionId, initialPrompt, providerFlags, executionContext, handleConversationCreated, onSessionInvalid, handleTerminalReady, onFirstInput, onRetry, handleSplitGroup, createTab, closeGroup, closeTab, onMainReset, setTabDisplayMode, loopConfig, onLoopConfigChange, onOpenLoopDialog])
 
   const showingSubtaskPty = managerMode && managerSelectedTask && managerSelectedTask.id !== taskId
   const subtaskCwd = managerSelectedTask?.worktree_path ?? managerSelectedTask?.base_dir ?? cwd

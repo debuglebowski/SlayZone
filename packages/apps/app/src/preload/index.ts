@@ -327,6 +327,46 @@ const api: ElectronAPI = {
       return () => ipcRenderer.removeListener('floating-agent:collapse-changed', handler)
     },
   },
+  taskWindow: {
+    open: (taskId: string) => ipcRenderer.invoke('task-window:open', taskId),
+    close: (taskId: string) => ipcRenderer.invoke('task-window:close', taskId),
+    list: () => ipcRenderer.invoke('task-window:list'),
+    onListChanged: (callback: (taskIds: string[]) => void) => {
+      const handler = (_: unknown, ids: string[]) => callback(ids)
+      ipcRenderer.on('task-window:list-changed', handler)
+      return () => ipcRenderer.removeListener('task-window:list-changed', handler)
+    },
+    setPrimaryActive: (taskId: string | null) => ipcRenderer.invoke('task-window:set-primary-active', taskId),
+    getPrimaryActive: () => ipcRenderer.invoke('task-window:get-primary-active'),
+    onPrimaryActiveChanged: (callback: (taskId: string | null) => void) => {
+      const handler = (_: unknown, id: string | null) => callback(id)
+      ipcRenderer.on('task-window:primary-active-changed', handler)
+      return () => ipcRenderer.removeListener('task-window:primary-active-changed', handler)
+    }
+  },
+  panels: {
+    claim: (taskId: string, panelId: string) => ipcRenderer.invoke('panels:claim', taskId, panelId),
+    claimAndCloseOther: (taskId: string, panelId: string) => ipcRenderer.invoke('panels:claim-and-close-other', taskId, panelId),
+    release: (taskId: string, panelId: string) => ipcRenderer.invoke('panels:release', taskId, panelId),
+    releaseAllForTask: (taskId: string) => ipcRenderer.invoke('panels:release-all-for-task', taskId),
+    getOwnership: (taskId: string) => ipcRenderer.invoke('panels:get-ownership', taskId),
+    getWindowId: () => ipcRenderer.invoke('panels:get-window-id'),
+    onOwnershipChanged: (callback: (payload: { taskId: string; ownership: Array<{ panelId: string; ownerWindowId: number }> }) => void) => {
+      const handler = (_: unknown, payload: { taskId: string; ownership: Array<{ panelId: string; ownerWindowId: number }> }) => callback(payload)
+      ipcRenderer.on('panels:ownership-changed', handler)
+      return () => ipcRenderer.removeListener('panels:ownership-changed', handler)
+    },
+    onReleasedOnClose: (callback: (payload: { closedWindowId: number; released: Array<{ taskId: string; panelId: string }> }) => void) => {
+      const handler = (_: unknown, payload: { closedWindowId: number; released: Array<{ taskId: string; panelId: string }> }) => callback(payload)
+      ipcRenderer.on('panels:released-on-close', handler)
+      return () => ipcRenderer.removeListener('panels:released-on-close', handler)
+    },
+    onCloseRequest: (callback: (payload: { taskId: string; panelId: string }) => void) => {
+      const handler = (_: unknown, payload: { taskId: string; panelId: string }) => callback(payload)
+      ipcRenderer.on('panels:close-request', handler)
+      return () => ipcRenderer.removeListener('panels:close-request', handler)
+    }
+  },
   window: {
     close: () => ipcRenderer.invoke('window:close')
   },
@@ -357,6 +397,7 @@ const api: ElectronAPI = {
     submit: (sessionId, text) => ipcRenderer.invoke('pty:submit', sessionId, text),
     setTheme: (theme) => ipcRenderer.invoke('pty:set-theme', theme),
     setShellOverride: (value) => ipcRenderer.invoke('pty:setShellOverride', value),
+    claimSession: (sessionId: string) => ipcRenderer.invoke('pty:claim-session', sessionId),
     resize: (sessionId, cols, rows) => ipcRenderer.invoke('pty:resize', sessionId, cols, rows),
     kill: (sessionId) => ipcRenderer.invoke('pty:kill', sessionId),
     exists: (sessionId) => ipcRenderer.invoke('pty:exists', sessionId),
@@ -463,6 +504,10 @@ const api: ElectronAPI = {
     getInfo: (tabId: string) => ipcRenderer.invoke('chat:getInfo', tabId),
     inspectPermissions: (taskId: string, mode: string) =>
       ipcRenderer.invoke('chat:inspectPermissions', taskId, mode),
+    getMode: (taskId: string, mode: string) =>
+      ipcRenderer.invoke('chat:getMode', taskId, mode),
+    setMode: (opts: { tabId: string; taskId: string; mode: string; cwd: string; chatMode: 'plan' | 'auto-accept' | 'bypass' }) =>
+      ipcRenderer.invoke('chat:setMode', opts),
     listSkills: (cwd: string) => ipcRenderer.invoke('chat:listSkills', cwd),
     listCommands: (cwd: string) => ipcRenderer.invoke('chat:listCommands', cwd),
     listAgents: (cwd: string) => ipcRenderer.invoke('chat:listAgents', cwd),
@@ -820,8 +865,10 @@ const api: ElectronAPI = {
   },
   browser: {
     createView: (opts) => ipcRenderer.invoke('browser:create-view', opts),
+    reparentToCurrentWindow: (viewId: string) => ipcRenderer.invoke('browser:reparent-to-current-window', viewId),
     destroyView: (viewId) => ipcRenderer.invoke('browser:destroy-view', viewId),
     destroyAllForTask: (taskId) => ipcRenderer.invoke('browser:destroy-all-for-task', taskId),
+    listViews: () => ipcRenderer.invoke('browser:list-views'),
     setBounds: (viewId, bounds) => ipcRenderer.invoke('browser:set-bounds', viewId, bounds),
     setVisible: (viewId, visible) => ipcRenderer.invoke('browser:set-visible', viewId, visible),
     hideAll: () => ipcRenderer.invoke('browser:hide-all'),

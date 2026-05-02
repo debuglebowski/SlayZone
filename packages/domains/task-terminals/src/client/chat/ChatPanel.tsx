@@ -14,10 +14,34 @@ import {
   Filter,
 } from 'lucide-react'
 import { ChatViewContext } from './ChatViewContext'
-import { cn, toast } from '@slayzone/ui'
+import { ChatSearchBar } from './ChatSearchBar'
+import { useChatMode } from './useChatMode'
+import { useChatSearch } from './useChatSearch'
+import {
+  cn,
+  toast,
+  AgentModePill,
+  nextAgentMode,
+  type AgentMode,
+  ContextMenu,
+  ContextMenuTrigger,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuSeparator,
+  useAppearance,
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@slayzone/ui'
 import { ConfirmDisplayModeDialog } from '../ConfirmDisplayModeDialog'
 import type { TabDisplayMode } from '../../shared/types'
-import { useChatSession, PulseGrid, type TimelineItem } from '@slayzone/terminal/client'
+import { useChatSession, useChatLoop, LoopModeBanner, PulseGrid, type TimelineItem } from '@slayzone/terminal/client'
+import type { LoopConfig } from '@slayzone/terminal/shared'
 import { useImagePasteDrop, useAssetUpload, type AssetRef } from '@slayzone/editor'
 import { AutocompleteMenu } from './autocomplete/AutocompleteMenu'
 import { useAutocomplete } from './autocomplete/useAutocomplete'
@@ -49,6 +73,12 @@ export interface ChatPanelProps {
   providerFlagsOverride?: string | null
   permissionNotice?: string | null
   onSetDisplayMode?: (target: TabDisplayMode) => void
+  /** Persisted loop config (`tasks.loop_config`). Null = unconfigured. */
+  loopConfig?: LoopConfig | null
+  /** Persist loop config back to the task. */
+  onLoopConfigChange?: (config: LoopConfig | null) => void
+  /** Open the LoopModeDialog (lives at TaskDetailPage level — shared with terminal). */
+  onOpenLoopDialog?: () => void
 }
 
 function renderTimelineItem(item: TimelineItem, key: React.Key): React.JSX.Element | null {
@@ -93,7 +123,7 @@ const SUGGESTED_PROMPTS = [
 ]
 
 export function ChatPanel(props: ChatPanelProps) {
-  const { tabId, taskId, mode, cwd, providerFlagsOverride, permissionNotice: overrideNotice, onSetDisplayMode } = props
+  const { tabId, taskId, mode, cwd, providerFlagsOverride, permissionNotice: overrideNotice, onSetDisplayMode, loopConfig, onLoopConfigChange, onOpenLoopDialog } = props
   const { state, timeline, inFlight, hydrating, sendMessage, interrupt, reset: resetTimeline } = useChatSession({
     tabId,
     taskId,
@@ -102,11 +132,22 @@ export function ChatPanel(props: ChatPanelProps) {
     providerFlagsOverride,
   })
 
+  const appearance = useAppearance()
+
+
+  const loop = useChatLoop({
+    timeline,
+    inFlight,
+    sessionEnded: state.sessionEnded,
+    sendMessage: (text) => { void sendMessage(text) },
+    onConfigChange: (cfg) => onLoopConfigChange?.(cfg),
+  })
+
   const [draft, setDraft] = useState('')
   const [cursorPos, setCursorPos] = useState(0)
   const [sessionIdCopied, setSessionIdCopied] = useState(false)
-  const [permissionNotice, setPermissionNotice] = useState<string | null>(overrideNotice ?? null)
-  const [noticeDismissed, setNoticeDismissed] = useState(false)
+  const { chatMode, modeChanging, handleModeChange } = useChatMode({ taskId, mode, tabId, cwd })
+  const [pendingMode, setPendingMode] = useState<AgentMode | null>(null)
   const [collapseSignal, setCollapseSignal] = useState(0)
   const [finalOnly, setFinalOnly] = useState(false)
   const [queuedMessages, setQueuedMessages] = useState<string[]>([])
@@ -116,6 +157,7 @@ export function ChatPanel(props: ChatPanelProps) {
     resize: 'instant',
   })
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const panelRef = useRef<HTMLDivElement>(null)
 
   const { uploadFiles: uploadImageFiles, getFilePath: getAssetFilePath } = useAssetUpload(taskId)
 
@@ -207,43 +249,6 @@ export function ChatPanel(props: ChatPanelProps) {
     },
   })
 
-  useEffect(() => {
-    if (overrideNotice !== undefined) {
-      setPermissionNotice(overrideNotice)
-      return
-    }
-    let cancelled = false
-    const api = (
-      window as unknown as {
-        api: {
-          chat: {
-            inspectPermissions: (
-              t: string,
-              m: string
-            ) => Promise<{ ok: boolean; hasSkipPerms: boolean; permissionModeValue: string | null }>
-          }
-        }
-      }
-    ).api
-    void api.chat
-      .inspectPermissions(taskId, mode)
-      .then((res) => {
-        if (cancelled) return
-        if (!res.ok) {
-          setPermissionNotice(
-            'Tool calls may fail: no non-interactive permission mode set. Add --allow-dangerously-skip-permissions or --permission-mode acceptEdits.'
-          )
-        } else {
-          setPermissionNotice(null)
-        }
-      })
-      .catch(() => {
-        /* ignore */
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [taskId, mode, overrideNotice])
 
   // When `finalOnly` is on, keep user msgs + session-start + result + the last assistant
   // text per turn. Drop thinking/tools/intermediate text/noise.
@@ -275,6 +280,8 @@ export function ChatPanel(props: ChatPanelProps) {
     return out
   }, [timeline, finalOnly])
 
+  const search = useChatSearch(displayedTimeline)
+
   const virtualizer = useVirtualizer({
     count: displayedTimeline.length,
     getScrollElement: () => scrollRef.current as HTMLElement | null,
@@ -293,7 +300,10 @@ export function ChatPanel(props: ChatPanelProps) {
   })
 
 
-  const chatView = useMemo(() => ({ collapseSignal, finalOnly }), [collapseSignal, finalOnly])
+  const chatView = useMemo(
+    () => ({ collapseSignal, finalOnly, search: { query: search.query, caseSensitive: search.caseSensitive } }),
+    [collapseSignal, finalOnly, search.query, search.caseSensitive],
+  )
 
   // Autosize textarea. Height follows scrollHeight up to 240px; no artificial min —
   // an empty draft renders as a single-line input.
@@ -384,15 +394,112 @@ export function ChatPanel(props: ChatPanelProps) {
     if (state.sessionEnded) setQueuedMessages([])
   }, [state.sessionEnded])
 
+  // Cmd+F / Ctrl+F opens search; Cmd+↑/↓ scrolls to top/bottom of the timeline.
+  // Scoped to the panel that owns keyboard focus — multiple chat tabs stay
+  // mounted (display:none) and a window-level listener would otherwise fire in
+  // every panel simultaneously.
+  useEffect(() => {
+    const isFocusedHere = (): boolean => {
+      const root = panelRef.current
+      if (!root) return false
+      const active = document.activeElement
+      // Active element inside the panel? OR the panel itself has focus?
+      // Also accept body-focus (no element focused) when the panel is the only
+      // visible chat panel — heuristic: treat panel as "owner" when no other
+      // chat panel sibling is currently focus-receiving.
+      if (active && root.contains(active)) return true
+      if (active === document.body) {
+        // Find the closest visible ChatPanel ancestor of any input — if none,
+        // and this panel is visible, claim ownership.
+        const visibleSelf = root.offsetParent !== null
+        if (!visibleSelf) return false
+        const others = document.querySelectorAll('[data-chat-panel]')
+        for (const o of Array.from(others)) {
+          if (o === root) continue
+          const el = o as HTMLElement
+          if (el.offsetParent !== null) return false // another panel also visible — defer
+        }
+        return true
+      }
+      return false
+    }
+    const handler = (e: KeyboardEvent): void => {
+      if (!isFocusedHere()) return
+      const mod = e.metaKey || e.ctrlKey
+      if (mod && (e.key === 'f' || e.key === 'F')) {
+        e.preventDefault()
+        search.requestOpen()
+        return
+      }
+      if (mod && e.key === 'ArrowUp') {
+        e.preventDefault()
+        if (displayedTimeline.length > 0) virtualizer.scrollToIndex(0, { align: 'start' })
+        return
+      }
+      if (mod && e.key === 'ArrowDown') {
+        e.preventDefault()
+        if (displayedTimeline.length > 0) virtualizer.scrollToIndex(displayedTimeline.length - 1, { align: 'end' })
+      }
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [displayedTimeline.length, virtualizer])
+
+  // Scroll virtualizer to the active match.
+  useEffect(() => {
+    if (search.activeItemIdx < 0) return
+    virtualizer.scrollToIndex(search.activeItemIdx, { align: 'center' })
+  }, [search.activeItemIdx, virtualizer])
+
+  const copyAllMessages = useCallback(() => {
+    const text = displayedTimeline
+      .map((it) => {
+        switch (it.kind) {
+          case 'user-text': return `> ${it.text}`
+          case 'text': return it.text
+          case 'thinking': return `[thinking] ${it.text}`
+          case 'result': return it.text ?? ''
+          case 'tool': return `[tool: ${it.invocation.name}]`
+          default: return ''
+        }
+      })
+      .filter(Boolean)
+      .join('\n\n')
+    void navigator.clipboard.writeText(text)
+    toast('Conversation copied')
+  }, [displayedTimeline])
+
+  const copyLastResponse = useCallback(() => {
+    const last = [...displayedTimeline].reverse().find((it) => it.kind === 'text')
+    if (last && last.kind === 'text') {
+      void navigator.clipboard.writeText(last.text)
+      toast('Last response copied')
+    } else {
+      toast('No response to copy')
+    }
+  }, [displayedTimeline])
+
+
   const onKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
       if (autocomplete.handleKeyDown(e)) return
+      // Shift+Tab cycles agent mode when input is empty — terminal-mode parity.
+      // Ignored when user is mid-typing so Tab/Shift+Tab still works for indentation
+      // or focus traversal in the rare case the textarea has actual content.
+      if (e.key === 'Tab' && e.shiftKey && draft.length === 0) {
+        e.preventDefault()
+        const next = nextAgentMode(chatMode)
+        const hasContent = inFlight || timeline.some((t) => t.kind === 'user-text' || t.kind === 'text')
+        if (hasContent) setPendingMode(next)
+        else void handleModeChange(next)
+        return
+      }
       if (e.key === 'Enter' && !e.shiftKey && !e.metaKey && !e.ctrlKey) {
         e.preventDefault()
         void handleSend()
       }
     },
-    [handleSend, autocomplete]
+    [handleSend, autocomplete, draft, chatMode, handleModeChange, inFlight, timeline]
   )
 
   const copySessionId = useCallback(() => {
@@ -437,22 +544,85 @@ export function ChatPanel(props: ChatPanelProps) {
 
   return (
     <ChatViewContext.Provider value={chatView}>
-    <div className="flex flex-col h-full bg-background">
-      {/* Permission warning */}
-      {permissionNotice && !noticeDismissed && (
-        <div className="px-4 py-2 text-xs bg-amber-500/10 border-b border-amber-500/30 text-amber-800 dark:text-amber-300 flex items-start gap-2">
-          <span className="flex-1">{permissionNotice}</span>
-          <button
-            onClick={() => setNoticeDismissed(true)}
-            className="shrink-0 opacity-70 hover:opacity-100"
-            aria-label="Dismiss"
-          >
-            <XIcon className="size-3" />
-          </button>
+    <div
+      ref={panelRef}
+      data-chat-panel
+      className="relative flex flex-col h-full bg-background"
+      style={{ fontSize: `${appearance.terminalFontSize}px` }}
+      onClickCapture={(e) => {
+        // Event-delegated link interception: any `<a href="http...">` rendered
+        // inside chat (markdown auto-links, etc.) → route to shell.openExternal
+        // instead of letting Electron navigate the renderer to the URL.
+        const target = e.target as HTMLElement | null
+        const anchor = target?.closest('a[href]') as HTMLAnchorElement | null
+        if (!anchor) return
+        const href = anchor.getAttribute('href') ?? ''
+        if (/^https?:\/\//i.test(href)) {
+          e.preventDefault()
+          navigate.openExternal(href)
+        }
+      }}
+    >
+      {/* Header: mode pill + (override notice if explicitly passed by parent) */}
+      {overrideNotice && (
+        <div className="px-4 py-2 text-xs bg-amber-500/10 border-b border-amber-500/30 text-amber-800 dark:text-amber-300">
+          {overrideNotice}
+        </div>
+      )}
+      <div className="flex items-center justify-end gap-2 px-3 py-1.5 border-b border-border/50">
+        <AgentModePill
+          mode={chatMode}
+          onChange={(next) => {
+            // Confirm when there's a live conversation that the respawn would
+            // disrupt — in-flight stream or any user/assistant content.
+            const hasContent = inFlight || timeline.some((t) => t.kind === 'user-text' || t.kind === 'text')
+            if (hasContent) setPendingMode(next)
+            else void handleModeChange(next)
+          }}
+          disabled={modeChanging}
+          compact
+        />
+      </div>
+
+      {/* Search bar — Cmd+F overlay */}
+      {search.open && (
+        <ChatSearchBar
+          query={search.query}
+          onQueryChange={search.setQuery}
+          caseSensitive={search.caseSensitive}
+          onCaseSensitiveChange={search.setCaseSensitive}
+          resultCount={search.matchCount}
+          resultIndex={search.activeIdx}
+          onPrev={search.prev}
+          onNext={search.next}
+          onClose={search.close}
+          focusToken={search.focusToken}
+        />
+      )}
+
+      {/* Loop banner — overlay top-right of timeline area (below mode-pill header).
+          Wrap in a positioned shell so the banner's `absolute top-6 right-6` clears
+          the header bar instead of overlapping it. */}
+      {loopConfig && loopConfig.prompt && loopConfig.criteriaPattern && onOpenLoopDialog && (
+        <div className="pointer-events-none absolute inset-x-0 top-12 bottom-0 z-20">
+          <div className="pointer-events-auto relative h-full">
+            <LoopModeBanner
+              config={loopConfig}
+              status={loop.status}
+              iteration={loop.iteration}
+              onStart={loop.startLoop}
+              onPause={loop.pauseLoop}
+              onResume={loop.resumeLoop}
+              onStop={loop.stopLoop}
+              onEditConfig={onOpenLoopDialog}
+            />
+          </div>
         </div>
       )}
 
       {/* Timeline */}
+      <ContextMenu>
+        <ContextMenuTrigger asChild>
       <div className="relative flex-1 min-h-0">
         <div ref={scrollRef} className="h-full overflow-y-auto pt-4">
           {hydrating ? (
@@ -502,6 +672,24 @@ export function ChatPanel(props: ChatPanelProps) {
           </button>
         )}
       </div>
+        </ContextMenuTrigger>
+        <ContextMenuContent>
+          <ContextMenuItem onSelect={copyLastResponse}>Copy last response</ContextMenuItem>
+          <ContextMenuItem onSelect={copyAllMessages}>Copy entire conversation</ContextMenuItem>
+          {state.sessionId && (
+            <ContextMenuItem onSelect={copySessionId}>
+              Copy session id
+            </ContextMenuItem>
+          )}
+          <ContextMenuSeparator />
+          <ContextMenuItem onSelect={search.requestOpen}>
+            Find in chat… (⌘F)
+          </ContextMenuItem>
+          <ContextMenuItem onSelect={() => { void handleReset() }} disabled={resetting}>
+            Reset chat
+          </ContextMenuItem>
+        </ContextMenuContent>
+      </ContextMenu>
 
       {/* Composer */}
       <div className="bg-background px-4 pt-3 pb-1">
@@ -720,6 +908,31 @@ export function ChatPanel(props: ChatPanelProps) {
           )}
         </div>
       </div>
+
+      <AlertDialog open={pendingMode !== null} onOpenChange={(open) => { if (!open) setPendingMode(null) }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Switch to {pendingMode} mode?</AlertDialogTitle>
+            <AlertDialogDescription>
+              The chat subprocess restarts with the new permission flags. Conversation
+              history is preserved via <code className="font-mono text-xs">--resume</code>,
+              but any in-flight tool call is interrupted.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setPendingMode(null)}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                const next = pendingMode
+                setPendingMode(null)
+                if (next) void handleModeChange(next)
+              }}
+            >
+              Switch mode
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <ConfirmDisplayModeDialog
         open={pendingChatDisable}

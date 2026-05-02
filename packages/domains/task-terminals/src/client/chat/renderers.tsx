@@ -23,6 +23,8 @@ import { cn } from '@slayzone/ui'
 import { DiffView, GhMarkdown } from '@slayzone/worktrees/client'
 import type { TimelineItem, ToolInvocation } from '@slayzone/terminal/client'
 import { claudeEditResultToFileDiff } from './claude-patch-to-filediff'
+import { LinkifiedText } from './LinkifiedText'
+import { HighlightedText } from './HighlightedText'
 
 // --- Helpers ---
 
@@ -51,7 +53,7 @@ export function UserMessage({ item }: { item: Extract<TimelineItem, { kind: 'use
   return (
     <div className="px-4 py-2 flex justify-end">
       <div className="max-w-[85%] min-w-0 rounded-lg border border-primary/25 bg-primary/5 shadow-sm px-3 py-2 text-sm text-foreground whitespace-pre-wrap break-words">
-        {item.text}
+        <HighlightedText text={item.text} />
       </div>
     </div>
   )
@@ -111,7 +113,7 @@ export function ThinkingBlock({ item }: { item: Extract<TimelineItem, { kind: 't
       </button>
       {open && (
         <pre className="mt-1 text-xs text-muted-foreground/80 whitespace-pre-wrap italic pl-5 border-l border-border/40 ml-1">
-          {display}
+          <HighlightedText text={display} />
         </pre>
       )}
     </div>
@@ -193,7 +195,7 @@ export function ApiRetryBanner({ item }: { item: Extract<TimelineItem, { kind: '
 export function StderrBlock({ item }: { item: Extract<TimelineItem, { kind: 'stderr' }> }) {
   return (
     <pre className="mx-4 my-1 px-3 py-1.5 text-xs rounded-md border border-destructive/40 bg-destructive/5 text-destructive whitespace-pre-wrap font-mono">
-      {item.text}
+      <HighlightedText text={item.text} />
     </pre>
   )
 }
@@ -320,7 +322,7 @@ export function ToolCallRead({ invocation }: ToolProps) {
     >
       {structured?.file?.content && (
         <pre className="p-3 text-xs font-mono whitespace-pre overflow-x-auto max-h-64 bg-muted/30">
-          {structured.file.content}
+          <LinkifiedText text={structured.file.content} />
         </pre>
       )}
     </ToolShell>
@@ -370,7 +372,7 @@ export function ToolCallBash({ invocation }: ToolProps) {
       )}
       {resultText && (
         <pre className="px-3 pb-2 pt-1 text-xs font-mono whitespace-pre-wrap text-muted-foreground max-h-64 overflow-y-auto">
-          {resultText}
+          <LinkifiedText text={resultText} />
         </pre>
       )}
     </ToolShell>
@@ -392,7 +394,7 @@ export function ToolCallGlob({ invocation }: ToolProps) {
       {structured?.filenames && (
         <ul className="p-3 text-xs font-mono grid gap-0.5 max-h-48 overflow-y-auto">
           {structured.filenames.map((f) => (
-            <li key={f}>{f}</li>
+            <li key={f}><LinkifiedText text={f} /></li>
           ))}
         </ul>
       )}
@@ -416,13 +418,13 @@ export function ToolCallGrep({ invocation }: ToolProps) {
     <ToolShell icon={<Search className="size-3" />} title="Grep" status={invocation.status} summary={summary}>
       {structured?.content && (
         <pre className="p-3 text-xs font-mono whitespace-pre overflow-x-auto max-h-48 bg-muted/30">
-          {structured.content}
+          <LinkifiedText text={structured.content} />
         </pre>
       )}
       {!structured?.content && structured?.filenames && (
         <ul className="p-3 text-xs font-mono grid gap-0.5 max-h-48 overflow-y-auto">
           {structured.filenames.map((f) => (
-            <li key={f}>{f}</li>
+            <li key={f}><LinkifiedText text={f} /></li>
           ))}
         </ul>
       )}

@@ -559,6 +559,14 @@ export interface ElectronAPI {
       hasPermissionMode: boolean
       permissionModeValue: string | null
     }>
+    getMode: (taskId: string, mode: string) => Promise<'plan' | 'auto-accept' | 'bypass'>
+    setMode: (opts: {
+      tabId: string
+      taskId: string
+      mode: string
+      cwd: string
+      chatMode: 'plan' | 'auto-accept' | 'bypass'
+    }) => Promise<ChatSessionInfo>
     listSkills: (cwd: string) => Promise<SkillInfo[]>
     listCommands: (cwd: string) => Promise<CommandInfo[]>
     listAgents: (cwd: string) => Promise<AgentInfo[]>
