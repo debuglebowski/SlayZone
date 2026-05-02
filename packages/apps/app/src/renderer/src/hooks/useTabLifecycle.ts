@@ -122,23 +122,6 @@ export function useTabLifecycle({
     })
   }, [tasks])
 
-  // Startup cleanup: delete orphaned temporary tasks (no open tab)
-  const didCleanupRef = useRef(false)
-  useEffect(() => {
-    if (didCleanupRef.current || tasks.length === 0) return
-    didCleanupRef.current = true
-    const openTabTaskIds = new Set(
-      tabs.filter((t): t is Extract<typeof t, { type: 'task' }> => t.type === 'task').map((t) => t.taskId)
-    )
-    for (const task of tasks) {
-      if (task.is_temporary && !openTabTaskIds.has(task.id)) {
-        window.api.pty.kill(`${task.id}:${task.id}`)
-        window.api.db.deleteTask(task.id)
-        setTasks((prev) => prev.filter((t) => t.id !== task.id))
-      }
-    }
-  }, [tasks, tabs, setTasks])
-
   // Track page views on tab switch
   const prevTabIndexRef = useRef(-1)
   useEffect(() => {

@@ -84,6 +84,29 @@ export function registerTaskHandlers(ipcMain: IpcMain, db: Database, onMutation?
     console.log(`Purged ${stale.length} soft-deleted task(s)`)
   }
 
+  // Purge orphaned temporary tasks (untouched for >24h — likely left behind by a
+  // crash/unclean shutdown). Renderer's tab-list-based cleanup is unreliable
+  // because tab persistence is debounced and may lose recent changes on quit.
+  const staleTemp = db.prepare(
+    `SELECT id FROM tasks
+     WHERE is_temporary = 1
+       AND deleted_at IS NULL
+       AND updated_at < datetime('now', '-24 hours')`
+  ).all() as { id: string }[]
+  void (async () => {
+    for (const { id } of staleTemp) {
+      await cleanupTaskFull(db, id)
+    }
+  })()
+  if (staleTemp.length > 0) {
+    const placeholders = staleTemp.map(() => '?').join(',')
+    db.prepare(`DELETE FROM tasks WHERE id IN (${placeholders})`).run(...staleTemp.map((r) => r.id))
+    for (const { id } of staleTemp) {
+      db.prepare(`DELETE FROM settings WHERE key = ?`).run(`commit_graph:task:${id}`)
+    }
+    console.log(`Purged ${staleTemp.length} stale temporary task(s)`)
+  }
+
   const deps = { ipcMain, onMutation }
 
   // Task CRUD
