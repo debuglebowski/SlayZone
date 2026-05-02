@@ -460,6 +460,33 @@ export class BrowserViewManager {
     return ids
   }
 
+  /** Diagnostic snapshot of every WCV currently registered. */
+  listViews(): Array<{
+    viewId: string
+    taskId: string
+    tabId: string
+    kind: ViewKind
+    visible: boolean
+    url: string
+    partition: string
+  }> {
+    const out: ReturnType<BrowserViewManager['listViews']> = []
+    for (const [viewId, entry] of this.views) {
+      let url = ''
+      try { url = entry.view.webContents.isDestroyed() ? '<destroyed>' : entry.view.webContents.getURL() } catch { /* ignore */ }
+      out.push({
+        viewId,
+        taskId: entry.taskId,
+        tabId: entry.tabId,
+        kind: entry.kind,
+        visible: entry.visible,
+        url,
+        partition: entry.partition,
+      })
+    }
+    return out
+  }
+
   isFocused(viewId: string): boolean {
     const wc = this.getWebContents(viewId)
     return wc?.isFocused() ?? false

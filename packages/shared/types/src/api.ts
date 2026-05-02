@@ -844,6 +844,15 @@ export interface ElectronAPI {
     }) => Promise<string>
     destroyView: (viewId: string) => Promise<void>
     destroyAllForTask: (taskId: string) => Promise<void>
+    listViews: () => Promise<Array<{
+      viewId: string
+      taskId: string
+      tabId: string
+      kind: 'browser-tab' | 'web-panel'
+      visible: boolean
+      url: string
+      partition: string
+    }>>
 
     // Bounds & visibility
     setBounds: (viewId: string, bounds: { x: number; y: number; width: number; height: number }) => Promise<void>
