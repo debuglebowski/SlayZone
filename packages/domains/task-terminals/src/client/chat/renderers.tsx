@@ -12,6 +12,7 @@ import {
   Pencil,
   Search,
   CheckSquare,
+  ClipboardList,
   FilePlus,
   HelpCircle,
   Sparkles,
@@ -480,6 +481,32 @@ export function ToolCallTodoWrite({ invocation }: ToolProps) {
   )
 }
 
+export function ToolCallExitPlanMode({ invocation }: ToolProps) {
+  const input = invocation.input as { plan?: string } | null
+  const plan = input?.plan ?? ''
+  return (
+    <div className="px-4 py-3">
+      <div className="flex gap-3 items-start">
+        <div className="shrink-0 size-7 rounded-full bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center text-white shadow-sm">
+          <ClipboardList className="size-3.5" />
+        </div>
+        <div className="min-w-0 flex-1 max-w-[90%] rounded-lg border border-amber-500/40 bg-amber-500/5 shadow-sm overflow-hidden">
+          <div className="flex items-center gap-2 border-b border-amber-500/20 bg-amber-500/10 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-amber-700 dark:text-amber-300">
+            <ClipboardList className="size-3" />
+            <span>Plan</span>
+            <span className="ml-auto"><StatusIcon status={invocation.status} /></span>
+          </div>
+          {plan && (
+            <div className="px-3 py-2 text-sm leading-relaxed [&_p]:my-2 [&_p:first-child]:mt-0 [&_p:last-child]:mb-0 [&_pre]:my-3 [&_ul]:my-2 [&_ol]:my-2 [&_h1]:text-base [&_h1]:font-semibold [&_h1]:mt-4 [&_h2]:text-sm [&_h2]:font-semibold [&_h2]:mt-3 [&_h3]:text-sm [&_h3]:font-medium [&_code]:font-mono [&_code]:text-[0.85em]">
+              <GhMarkdown>{plan}</GhMarkdown>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export function ToolCallGeneric({ invocation }: ToolProps) {
   const result = invocation.result?.rawContent
   const resultText =
@@ -524,6 +551,7 @@ export const toolRenderers: Record<string, React.FC<ToolProps>> = {
   Glob: ToolCallGlob,
   Grep: ToolCallGrep,
   TodoWrite: ToolCallTodoWrite,
+  ExitPlanMode: ToolCallExitPlanMode,
 }
 
 export function renderTool(invocation: ToolInvocation): React.JSX.Element {

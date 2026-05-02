@@ -223,6 +223,9 @@ export function ChatPanel(props: ChatPanelProps) {
         out.push(item)
       } else if (item.kind === 'text' && item.role === 'assistant') {
         pendingFinal = item
+      } else if (item.kind === 'tool' && item.invocation.name === 'ExitPlanMode') {
+        flushPending()
+        out.push(item)
       } else if (item.kind === 'result') {
         flushPending()
         out.push(item)
