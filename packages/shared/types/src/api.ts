@@ -591,14 +591,21 @@ export interface ElectronAPI {
       hasPermissionMode: boolean
       permissionModeValue: string | null
     }>
-    getMode: (taskId: string, mode: string) => Promise<'plan' | 'auto-accept' | 'bypass'>
+    getMode: (taskId: string, mode: string) => Promise<'plan' | 'auto-accept' | 'auto' | 'bypass'>
     setMode: (opts: {
       tabId: string
       taskId: string
       mode: string
       cwd: string
-      chatMode: 'plan' | 'auto-accept' | 'bypass'
+      chatMode: 'plan' | 'auto-accept' | 'auto' | 'bypass'
     }) => Promise<ChatSessionInfo>
+    /**
+     * Detect whether `--permission-mode auto` is usable. Reads `~/.claude.json` +
+     * `~/.claude/settings.json` to determine plan eligibility (Max/Team/Enterprise)
+     * and one-time opt-in status. UI hides the option when not eligible and
+     * disables it when eligible-but-not-opted-in.
+     */
+    getAutoEligibility: () => Promise<{ eligible: boolean; optedIn: boolean }>
     listSkills: (cwd: string) => Promise<SkillInfo[]>
     listCommands: (cwd: string) => Promise<CommandInfo[]>
     listAgents: (cwd: string) => Promise<AgentInfo[]>

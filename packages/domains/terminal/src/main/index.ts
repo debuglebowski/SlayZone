@@ -4,4 +4,5 @@ export { killAllPtys, killPty, killPtysByTaskId, onTaskReachedTerminal, startIdl
 export { resolveUserShell, getShellStartupArgs, whichBinary, getEnrichedPath } from './shell-env'
 export { syncTerminalModes } from './startup-sync'
 export { registerChatHandlers, shutdownChatTransports, inspectPermissionFlags, backfillChatModes, chatModeToFlags, type ChatMode } from './chat-handlers'
+export { getAutoModeEligibility, type AutoModeEligibility } from './auto-mode-eligibility'
 export { supportsChatMode } from './agents/registry'

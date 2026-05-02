@@ -507,8 +507,9 @@ const api: ElectronAPI = {
       ipcRenderer.invoke('chat:inspectPermissions', taskId, mode),
     getMode: (taskId: string, mode: string) =>
       ipcRenderer.invoke('chat:getMode', taskId, mode),
-    setMode: (opts: { tabId: string; taskId: string; mode: string; cwd: string; chatMode: 'plan' | 'auto-accept' | 'bypass' }) =>
+    setMode: (opts: { tabId: string; taskId: string; mode: string; cwd: string; chatMode: 'plan' | 'auto-accept' | 'auto' | 'bypass' }) =>
       ipcRenderer.invoke('chat:setMode', opts),
+    getAutoEligibility: () => ipcRenderer.invoke('chat:getAutoEligibility'),
     listSkills: (cwd: string) => ipcRenderer.invoke('chat:listSkills', cwd),
     listCommands: (cwd: string) => ipcRenderer.invoke('chat:listCommands', cwd),
     listAgents: (cwd: string) => ipcRenderer.invoke('chat:listAgents', cwd),

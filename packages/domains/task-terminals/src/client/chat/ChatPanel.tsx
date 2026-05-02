@@ -91,7 +91,7 @@ export function ChatPanel(props: ChatPanelProps) {
   const [draft, setDraft] = useState('')
   const [cursorPos, setCursorPos] = useState(0)
   const [sessionIdCopied, setSessionIdCopied] = useState(false)
-  const { chatMode, modeChanging, handleModeChange } = useChatMode({ taskId, mode, tabId, cwd })
+  const { chatMode, modeChanging, handleModeChange, autoCapability } = useChatMode({ taskId, mode, tabId, cwd })
   const [collapseSignal, setCollapseSignal] = useState(0)
   const [finalOnly, setFinalOnly] = useState(false)
   const [queuedMessages, setQueuedMessages] = useState<string[]>([])
@@ -450,7 +450,7 @@ export function ChatPanel(props: ChatPanelProps) {
       if (e.key === 'Tab' && e.shiftKey && draft.length === 0) {
         e.preventDefault()
         if (inFlight) return
-        const next = nextAgentMode(chatMode)
+        const next = nextAgentMode(chatMode, autoCapability.optedIn)
         void handleModeChange(next)
         return
       }
@@ -459,7 +459,7 @@ export function ChatPanel(props: ChatPanelProps) {
         void handleSend()
       }
     },
-    [handleSend, autocomplete, draft, chatMode, handleModeChange, inFlight]
+    [handleSend, autocomplete, draft, chatMode, handleModeChange, autoCapability.optedIn, inFlight]
   )
 
   const copySessionId = useCallback(() => {
@@ -806,6 +806,7 @@ export function ChatPanel(props: ChatPanelProps) {
             onChange={(next) => { void handleModeChange(next) }}
             disabled={modeChanging || inFlight}
             compact
+            autoCapability={autoCapability}
           />
           <span>
             {inFlight

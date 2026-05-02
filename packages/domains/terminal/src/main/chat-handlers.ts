@@ -21,6 +21,7 @@ import { parseShellArgs } from './adapters/flag-parser'
 import { buildMcpEnv } from './mcp-env'
 import { getEnrichedPath } from './shell-env'
 import { supportsChatMode } from './agents/registry'
+import { getAutoModeEligibility, type AutoModeEligibility } from './auto-mode-eligibility'
 import { listSkills } from './skills'
 import { listCommands } from './commands'
 import { listAgents } from './agents-registry'
@@ -48,12 +49,17 @@ interface ChatCreateOpts {
  * static set of CLI flags at spawn time:
  *   - plan: read-only (`--permission-mode plan`)
  *   - auto-accept: edits auto-approved (`--permission-mode acceptEdits`)
+ *   - auto: continuous autonomous execution (`--permission-mode auto`)
  *   - bypass: all approvals skipped (`--allow-dangerously-skip-permissions`)
  *
  * "Normal" mode (interactive per-tool prompts) intentionally absent — would
  * require swapping the CLI subprocess for the programmatic Anthropic SDK.
+ *
+ * `auto` requires Max/Team/Enterprise + a one-time opt-in. Capability is
+ * detected via `chat:getAutoEligibility` (reads ~/.claude.json + settings.json);
+ * the UI hides the option when ineligible and disables it when not opted in.
  */
-export type ChatMode = 'plan' | 'auto-accept' | 'bypass'
+export type ChatMode = 'plan' | 'auto-accept' | 'auto' | 'bypass'
 
 export const DEFAULT_CHAT_MODE_NEW_TASK: ChatMode = 'auto-accept'
 /** Pre-existing tasks (no chatMode) keep current behavior on first upgrade. */
@@ -63,8 +69,23 @@ export function chatModeToFlags(mode: ChatMode): string[] {
   switch (mode) {
     case 'plan': return ['--permission-mode', 'plan']
     case 'auto-accept': return ['--permission-mode', 'acceptEdits']
+    case 'auto': return ['--permission-mode', 'auto']
     case 'bypass': return ['--allow-dangerously-skip-permissions']
   }
+}
+
+/**
+ * Downgrade `auto` to `auto-accept` when the user is no longer eligible / opted
+ * in. Covers a real edge case: a task saved with `chatMode: 'auto'` survives a
+ * plan downgrade or opt-in revocation. Without the downgrade, `chatModeToFlags`
+ * would still emit `--permission-mode auto`, which `claude-code` rejects → the
+ * child crashes immediately on every chat spawn for that task. All other modes
+ * pass through untouched.
+ */
+async function resolveSafeChatMode(stored: ChatMode): Promise<ChatMode> {
+  if (stored !== 'auto') return stored
+  const cap = await getAutoModeEligibility()
+  return cap.optedIn ? 'auto' : 'auto-accept'
 }
 
 interface ProviderConfigEntry {
@@ -242,11 +263,11 @@ export function inspectPermissionFlags(flags: string[]): {
  * of whatever was previously stored. PATH enrichment + MCP env are identical across
  * both paths, so factoring here prevents drift.
  */
-function buildCreateOpts(
+async function buildCreateOpts(
   db: Database,
   opts: ChatCreateOpts,
   { fresh }: { fresh: boolean }
-): Parameters<typeof createChat>[0] {
+): Promise<Parameters<typeof createChat>[0]> {
   const providerCfg = readProviderConfig(db, opts.taskId, opts.mode)
   // Flag-resolution priority for chat:
   //   1. per-call override (`providerFlagsOverride`)
@@ -260,8 +281,9 @@ function buildCreateOpts(
   } else if (providerCfg.flags) {
     providerFlags = parseShellArgs(providerCfg.flags)
   } else {
-    const chatMode = providerCfg.chatMode ?? DEFAULT_CHAT_MODE_NEW_TASK
-    providerFlags = chatModeToFlags(chatMode)
+    const stored = providerCfg.chatMode ?? DEFAULT_CHAT_MODE_NEW_TASK
+    const safe = await resolveSafeChatMode(stored)
+    providerFlags = chatModeToFlags(safe)
   }
 
   const initialBuffer = fresh ? [] : loadChatEvents(db, opts.tabId)
@@ -315,7 +337,7 @@ export function registerChatHandlers(ipcMain: IpcMain, db: Database, opts: ChatH
   ipcMain.handle('chat:supports', (_, mode: string): boolean => supportsChatMode(mode))
 
   ipcMain.handle('chat:create', async (_, opts: ChatCreateOpts): Promise<ChatSessionInfo> => {
-    return createChat(buildCreateOpts(db, opts, { fresh: false }))
+    return createChat(await buildCreateOpts(db, opts, { fresh: false }))
   })
 
   ipcMain.handle('chat:send', (_, tabId: string, text: string): boolean => {
@@ -330,7 +352,7 @@ export function registerChatHandlers(ipcMain: IpcMain, db: Database, opts: ChatH
   // "Session ended". Mirrors `chat:setMode` (which also kill+resume on flag change).
   ipcMain.handle('chat:interrupt', async (_, opts: ChatCreateOpts): Promise<ChatSessionInfo> => {
     removeSession(opts.tabId)
-    return createChat(buildCreateOpts(db, opts, { fresh: false }))
+    return createChat(await buildCreateOpts(db, opts, { fresh: false }))
   })
 
   ipcMain.handle('chat:kill', (_, tabId: string): void => {
@@ -368,7 +390,7 @@ export function registerChatHandlers(ipcMain: IpcMain, db: Database, opts: ChatH
     } catch (err) {
       console.error('[chat-handlers] clearChatConversationId failed:', err)
     }
-    return createChat(buildCreateOpts(db, opts, { fresh: true }))
+    return createChat(await buildCreateOpts(db, opts, { fresh: true }))
   })
 
   ipcMain.handle('chat:getBufferSince', (_, tabId: string, afterSeq: number) => {
@@ -389,23 +411,35 @@ export function registerChatHandlers(ipcMain: IpcMain, db: Database, opts: ChatH
 
   ipcMain.handle(
     'chat:getMode',
-    (_, taskId: string, mode: string): ChatMode => {
+    async (_, taskId: string, mode: string): Promise<ChatMode> => {
       const cfg = readProviderConfig(db, taskId, mode)
-      return cfg.chatMode ?? DEFAULT_CHAT_MODE_NEW_TASK
+      const stored = cfg.chatMode ?? DEFAULT_CHAT_MODE_NEW_TASK
+      // Hide stale `auto` from UI when capability is gone — pill would otherwise
+      // show violet, and the next mode change would attempt a forbidden flag.
+      return resolveSafeChatMode(stored)
     }
+  )
+
+  ipcMain.handle(
+    'chat:getAutoEligibility',
+    (): Promise<AutoModeEligibility> => getAutoModeEligibility()
   )
 
   ipcMain.handle(
     'chat:setMode',
     async (_, opts: ChatCreateOpts & { chatMode: ChatMode }): Promise<ChatSessionInfo> => {
-      writeChatMode(db, opts.taskId, opts.mode, opts.chatMode)
+      // Server-side guard: ignore `auto` when capability is missing. Renderer
+      // already filters in the pill, but a stale renderer or a direct IPC call
+      // shouldn't be able to persist a forbidden mode.
+      const safe = await resolveSafeChatMode(opts.chatMode)
+      writeChatMode(db, opts.taskId, opts.mode, safe)
       // Mode change requires a child-process restart (CLI flags are read at spawn).
       // We DON'T wipe timeline or clear chatConversationId — the new child resumes
       // the same conversation via `--resume <id>` (handled by adapter when
       // `conversationId` is non-null in createChat opts). User keeps history;
       // only the underlying subprocess is recycled.
       removeSession(opts.tabId)
-      return createChat(buildCreateOpts(db, opts, { fresh: false }))
+      return createChat(await buildCreateOpts(db, opts, { fresh: false }))
     }
   )
 

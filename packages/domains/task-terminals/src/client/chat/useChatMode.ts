@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { toast, type AgentMode } from '@slayzone/ui'
+import { toast, type AgentMode, type AutoModeCapability } from '@slayzone/ui'
 
 interface UseChatModeOpts {
   taskId: string
@@ -11,6 +11,7 @@ interface UseChatModeOpts {
 interface ChatModeApi {
   setMode: (opts: { tabId: string; taskId: string; mode: string; cwd: string; chatMode: AgentMode }) => Promise<unknown>
   getMode: (taskId: string, mode: string) => Promise<AgentMode>
+  getAutoEligibility?: () => Promise<AutoModeCapability>
 }
 
 function getApi(): ChatModeApi {
@@ -20,7 +21,9 @@ function getApi(): ChatModeApi {
 /**
  * Owns chat-permission-mode state: hydration on mount via `chat:getMode`, mode
  * cycling via `chat:setMode` (which kills + respawns the subprocess with the
- * resolved flags, preserving conversation via `--resume`).
+ * resolved flags, preserving conversation via `--resume`). Also fetches
+ * auto-mode capability once per mount to decide whether the `auto` option is
+ * shown / enabled in the UI.
  *
  * Extracted from ChatPanel to keep the panel component focused on layout and
  * keep mode wiring testable in isolation.
@@ -28,6 +31,7 @@ function getApi(): ChatModeApi {
 export function useChatMode({ taskId, mode, tabId, cwd }: UseChatModeOpts) {
   const [chatMode, setChatModeState] = useState<AgentMode>('auto-accept')
   const [modeChanging, setModeChanging] = useState(false)
+  const [autoCapability, setAutoCapability] = useState<AutoModeCapability>({ eligible: false, optedIn: false })
 
   useEffect(() => {
     let cancelled = false
@@ -38,8 +42,22 @@ export function useChatMode({ taskId, mode, tabId, cwd }: UseChatModeOpts) {
     return () => { cancelled = true }
   }, [taskId, mode])
 
+  useEffect(() => {
+    let cancelled = false
+    const fn = getApi().getAutoEligibility
+    if (!fn) return
+    void fn()
+      .then((cap) => { if (!cancelled) setAutoCapability(cap) })
+      .catch(() => { /* keep default (hidden) */ })
+    return () => { cancelled = true }
+  }, [])
+
   const handleModeChange = useCallback(async (next: AgentMode) => {
     if (next === chatMode || modeChanging) return
+    if (next === 'auto' && !autoCapability.optedIn) {
+      toast('Auto mode requires Max/Team/Enterprise + opt-in via `claude` CLI')
+      return
+    }
     setChatModeState(next)
     setModeChanging(true)
     try {
@@ -50,7 +68,7 @@ export function useChatMode({ taskId, mode, tabId, cwd }: UseChatModeOpts) {
     } finally {
       setModeChanging(false)
     }
-  }, [chatMode, modeChanging, tabId, taskId, mode, cwd])
+  }, [chatMode, modeChanging, autoCapability.optedIn, tabId, taskId, mode, cwd])
 
-  return { chatMode, modeChanging, handleModeChange }
+  return { chatMode, modeChanging, handleModeChange, autoCapability }
 }
