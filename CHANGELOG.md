@@ -1,6 +1,77 @@
 # Changelog
 
 
+## v0.25.0
+
+[compare changes](https://github.com/debuglebowski/slayzone/compare/v0.24.0...v0.25.0)
+
+### 🚀 Enhancements
+
+- **sidebar:** Restore last active tab on project switch ([d833ef18](https://github.com/debuglebowski/slayzone/commit/d833ef18))
+- **browser:** Wire Cmd+F find via scope-aware shortcut registry ([81836a1e](https://github.com/debuglebowski/slayzone/commit/81836a1e))
+- **file-editor:** TOC outline + minimap toggles for markdown ([44177980](https://github.com/debuglebowski/slayzone/commit/44177980))
+- **browser:** Drag-reorder tabs in browser panel ([99d36251](https://github.com/debuglebowski/slayzone/commit/99d36251))
+- **worktrees:** Per-repo+submodule git panel discovery ([5bf9e81a](https://github.com/debuglebowski/slayzone/commit/5bf9e81a))
+- **chat:** Mode UI, loop, search, links, context menu ([63865538](https://github.com/debuglebowski/slayzone/commit/63865538))
+- **chat:** Focus composer on background click ([6829583b](https://github.com/debuglebowski/slayzone/commit/6829583b))
+- **browser:** Add listViews diagnostic for WCV inventory ([91640f5a](https://github.com/debuglebowski/slayzone/commit/91640f5a))
+- **task-windows:** Detach task into secondary window w/ panel claim ([e4332883](https://github.com/debuglebowski/slayzone/commit/e4332883))
+- **browser:** Rename tab via double-click, fix drag skew ([b8033afb](https://github.com/debuglebowski/slayzone/commit/b8033afb))
+- **git-panel:** Repo dropdown dynamic width + nowrap items, check left ([98c97a96](https://github.com/debuglebowski/slayzone/commit/98c97a96))
+- **automations:** AI action type w/ DB-backed headless templates ([ceaf48e3](https://github.com/debuglebowski/slayzone/commit/ceaf48e3))
+- **context-manager:** Rename Disk/App/Config labels to File/Database ([5e070db7](https://github.com/debuglebowski/slayzone/commit/5e070db7))
+- **settings:** Headless command field on AI provider editor ([5a44e840](https://github.com/debuglebowski/slayzone/commit/5a44e840))
+- **chat:** Block mode switch during stream, drop confirm modal ([db9ccc78](https://github.com/debuglebowski/slayzone/commit/db9ccc78))
+- **chat-autocomplete:** Merge-rank across sources at same trigger ([61e2080c](https://github.com/debuglebowski/slayzone/commit/61e2080c))
+- **worktrees:** Submodule pill, hide repo selector when single repo ([c69dacd6](https://github.com/debuglebowski/slayzone/commit/c69dacd6))
+- **website:** Footer nav links on site + home ([b399cd5f](https://github.com/debuglebowski/slayzone/commit/b399cd5f))
+- **website:** Expand explode mode copy + key points aside on feature pages ([0a786cf8](https://github.com/debuglebowski/slayzone/commit/0a786cf8))
+- **chat:** Paginate timeline with "Show earlier" button ([6ccf3347](https://github.com/debuglebowski/slayzone/commit/6ccf3347))
+- **chat:** Add `auto` permission mode w/ eligibility detection ([899e25a7](https://github.com/debuglebowski/slayzone/commit/899e25a7))
+- **chat:** Render ExitPlanMode plan as prominent card ([855c8089](https://github.com/debuglebowski/slayzone/commit/855c8089))
+- **chat:** Shift+Tab cycles agent mode panel-wide ([1039c38e](https://github.com/debuglebowski/slayzone/commit/1039c38e))
+- **task-terminals:** Focus chat input on tab activate ([4437c419](https://github.com/debuglebowski/slayzone/commit/4437c419))
+- **website:** Pricing page + Product schema ([0ed705a2](https://github.com/debuglebowski/slayzone/commit/0ed705a2))
+- **website:** Dynamic /comparison/[competitor] from canon editorial ([bb17cd82](https://github.com/debuglebowski/slayzone/commit/bb17cd82))
+
+### 🩹 Fixes
+
+- **chat:** Replace hand-rolled stick-to-bottom w/ use-stick-to-bottom ([dac75dd9](https://github.com/debuglebowski/slayzone/commit/dac75dd9))
+- **git-diff:** Hide turns header when no diffs ([9543a74c](https://github.com/debuglebowski/slayzone/commit/9543a74c))
+- **chat:** Atomic reset + sessionId-tagged exits ([e7a4bb87](https://github.com/debuglebowski/slayzone/commit/e7a4bb87))
+- **chat:** Reap chat session on tab close ([88e8af97](https://github.com/debuglebowski/slayzone/commit/88e8af97))
+- **pty:** Adapter-encoded submit; CR not LF for Enter ([9723e726](https://github.com/debuglebowski/slayzone/commit/9723e726))
+- **browser-views:** Skip wc.focus() when window bgnd ([515da487](https://github.com/debuglebowski/slayzone/commit/515da487))
+- **worktrees:** Match task init-git screen to home ([2d9cca0b](https://github.com/debuglebowski/slayzone/commit/2d9cca0b))
+- **integrations:** Provision worktree on imported task creation ([#84](https://github.com/debuglebowski/slayzone/pull/84))
+- **chat:** Stop button preserves session via kill+resume ([d17e9d8e](https://github.com/debuglebowski/slayzone/commit/d17e9d8e))
+- **website:** Use trailing-slash URLs to match dir-format build ([aec3eca9](https://github.com/debuglebowski/slayzone/commit/aec3eca9))
+- **website:** Exclude iframe-only demo pages from sitemap + noindex ([af242dc5](https://github.com/debuglebowski/slayzone/commit/af242dc5))
+- **chat:** Filter non-renderable timeline items so virtualizer matches DOM ([9ef9cbfe](https://github.com/debuglebowski/slayzone/commit/9ef9cbfe))
+- **task:** Age-based temp task cleanup (was tab-list) ([4b46ece3](https://github.com/debuglebowski/slayzone/commit/4b46ece3))
+- **chat:** Sync UI mode pill with subprocess permission mode ([f6635481](https://github.com/debuglebowski/slayzone/commit/f6635481))
+
+### 💅 Refactors
+
+- **chat:** Drop virtualizer, render timeline directly ([036f7185](https://github.com/debuglebowski/slayzone/commit/036f7185))
+- **website:** Isolate anims, drop iframe ([7b01e14f](https://github.com/debuglebowski/slayzone/commit/7b01e14f))
+- **website:** Switch URLs to no-trailing-slash ([f359cb41](https://github.com/debuglebowski/slayzone/commit/f359cb41))
+
+### 📖 Documentation
+
+- **skills:** Commit skill defaults to session-only scope ([92cadac4](https://github.com/debuglebowski/slayzone/commit/92cadac4))
+
+### 🏡 Chore
+
+- **nix:** Update sources to 0.24.0 ([bafb560e](https://github.com/debuglebowski/slayzone/commit/bafb560e))
+- **website:** Add SEO regression checks ([35880c5d](https://github.com/debuglebowski/slayzone/commit/35880c5d))
+- **chat:** Perf baseline scaffold + replay harness ([c7c9076c](https://github.com/debuglebowski/slayzone/commit/c7c9076c))
+- **chat:** Drop @tanstack/react-virtual dep ([0ba7440c](https://github.com/debuglebowski/slayzone/commit/0ba7440c))
+
+### ❤️ Contributors
+
+- Debuglebowski
+
 ## v0.24.0
 
 [compare changes](https://github.com/debuglebowski/slayzone/compare/v0.23.2...v0.24.0)

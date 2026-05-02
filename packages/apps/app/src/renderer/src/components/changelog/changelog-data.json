@@ -1,5 +1,127 @@
 [
   {
+    "version": "0.25.0",
+    "date": "2026-05-03",
+    "tagline": "Chat modes & detach",
+    "items": [
+      {
+        "category": "feature",
+        "title": "Detach task into separate window",
+        "description": "Pop a task out into its own window with panel claim and handoff between windows."
+      },
+      {
+        "category": "feature",
+        "title": "Auto permission mode for chat",
+        "description": "New `auto` permission mode auto-approves eligible actions based on detection."
+      },
+      {
+        "category": "feature",
+        "title": "Show earlier in chat timeline",
+        "description": "Paginate older messages with a Show earlier button instead of loading the full history."
+      },
+      {
+        "category": "feature",
+        "title": "ExitPlanMode plan card",
+        "description": "Render the agent's proposed plan as a prominent card in the chat timeline."
+      },
+      {
+        "category": "feature",
+        "title": "Shift+Tab cycles agent mode",
+        "description": "Cycle through agent modes from anywhere in the chat panel with Shift+Tab."
+      },
+      {
+        "category": "feature",
+        "title": "Chat mode UI overhaul",
+        "description": "New mode picker with loop, search, links, and a context menu."
+      },
+      {
+        "category": "feature",
+        "title": "Cmd+F find in browser panel",
+        "description": "Scope-aware Cmd+F now triggers in-page find inside the browser panel."
+      },
+      {
+        "category": "feature",
+        "title": "Drag-reorder browser tabs",
+        "description": "Reorder tabs in the browser panel by dragging them."
+      },
+      {
+        "category": "feature",
+        "title": "Double-click to rename browser tab",
+        "description": "Rename a browser panel tab inline via double-click."
+      },
+      {
+        "category": "feature",
+        "title": "TOC outline + minimap for markdown",
+        "description": "Toggle a table-of-contents outline and minimap in the markdown editor."
+      },
+      {
+        "category": "feature",
+        "title": "Restore last active tab per project",
+        "description": "Each project remembers its last open tab and restores it on switch."
+      },
+      {
+        "category": "feature",
+        "title": "AI action type for automations",
+        "description": "Automations can now run AI agents via DB-backed headless templates."
+      },
+      {
+        "category": "feature",
+        "title": "Headless command on AI providers",
+        "description": "Configure a custom headless command per AI provider in settings."
+      },
+      {
+        "category": "feature",
+        "title": "Per-repo + submodule git discovery",
+        "description": "Git panel discovers worktrees per repo and submodule, with a submodule pill on the picker."
+      },
+      {
+        "category": "feature",
+        "title": "Auto-focus chat composer",
+        "description": "Chat input auto-focuses on background click and on tab activate."
+      },
+      {
+        "category": "improvement",
+        "title": "Smoother chat timeline scrolling",
+        "description": "Replaced the virtualizer with direct render and use-stick-to-bottom for stable scroll."
+      },
+      {
+        "category": "improvement",
+        "title": "Block mode switch during stream",
+        "description": "Switching agent modes is blocked mid-stream, removing the confirmation modal."
+      },
+      {
+        "category": "improvement",
+        "title": "Better chat autocomplete ranking",
+        "description": "Autocomplete now merge-ranks results across sources at the same trigger."
+      },
+      {
+        "category": "improvement",
+        "title": "Cleaner context manager labels",
+        "description": "Renamed Disk/App/Config tabs to File/Database for clarity."
+      },
+      {
+        "category": "fix",
+        "title": "Stop button keeps chat session alive",
+        "description": "Stop now kills and resumes the subprocess, preserving the session id."
+      },
+      {
+        "category": "fix",
+        "title": "Sync chat permission pill",
+        "description": "Mode pill in the chat UI stays in sync with the actual subprocess permission mode."
+      },
+      {
+        "category": "fix",
+        "title": "Worktree provisioned on import",
+        "description": "Imported tasks now get a worktree provisioned on creation."
+      },
+      {
+        "category": "fix",
+        "title": "Hide turns header when no diffs",
+        "description": "Turns chip header in the git diff panel hides cleanly when there are no diffs."
+      }
+    ]
+  },
+  {
     "version": "0.24.0",
     "date": "2026-04-29",
     "tagline": "Clipboard, tags & turns",
