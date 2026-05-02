@@ -269,14 +269,17 @@ export const features = [
     metaDescription:
       'Cmd+Shift+E explodes SlayZone chrome and shows only open tasks at full width. Built for supervising six parallel AI coding agents without visual noise.',
     details: [
-      'Explode mode strips the interface down to the active work so you can focus on the tasks already in motion. It is useful when the board itself becomes secondary to active supervision.',
-      'The mode is intentionally blunt: less chrome, more workspace, faster scanning across the tasks that currently matter.',
-      'It is a small feature with a large payoff for anyone spending long stretches coordinating multiple live agents.',
+      'Explode mode is a single keyboard shortcut — Cmd+Shift+E — that hides every piece of SlayZone UI except the tasks you currently have open. The sidebar, board, project switcher, status rails, and search bar all disappear. What remains is a tiled grid of live task panels at full width: terminals, browsers, editors, and agent output.',
+      'The feature exists because supervising five or six parallel coding agents is fundamentally different from triaging a backlog. Once tasks are running, the board becomes secondary. What you actually need is dense, simultaneous visibility into in-flight terminals — which agent is blocked, which one finished, which one is hallucinating tests. Explode mode prioritizes that view over everything else.',
+      'The shortcut is reversible: press Cmd+Shift+E again and the full UI returns with every panel and selection preserved. It is designed for short, intense supervision sessions rather than as a permanent layout. Many operators flip in and out of it dozens of times an hour as they cycle between board planning and active coordination.',
+      'It pairs naturally with the attention panel and terminal state machine: even with chrome hidden, agents that need human input still surface visibly. Combined, they cut the cost of running many agents from "constant polling" down to "respond when something pings."',
     ],
     highlights: [
-      'One shortcut to reduce chrome and maximize active workspaces',
-      'Built for dense supervision rather than board management',
-      'Makes multi-agent monitoring less visually noisy',
+      'Cmd+Shift+E toggle hides chrome, leaves only open task panels',
+      'Tiled full-width view of live terminals, browsers, and editors',
+      'Reversible — UI state, selections, and scrollback are preserved on toggle',
+      'Designed for dense multi-agent supervision, not board triage',
+      'Pairs with attention panel so blocked agents still surface',
     ],
   },
   {
