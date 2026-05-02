@@ -375,25 +375,53 @@ interface SortableBrowserTabProps {
   isPickingElement: boolean
   onSwitch: (id: string) => void
   onClose: (id: string) => void
+  onRename: (id: string, name: string) => void
 }
 
-function SortableBrowserTab({ tab, isActive, isPickingElement, onSwitch, onClose }: SortableBrowserTabProps): React.JSX.Element {
+function SortableBrowserTab({ tab, isActive, isPickingElement, onSwitch, onClose, onRename }: SortableBrowserTabProps): React.JSX.Element {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: tab.id })
+  const [isEditing, setIsEditing] = useState(false)
+  const [draft, setDraft] = useState('')
+  const inputRef = useRef<HTMLInputElement>(null)
   const style: React.CSSProperties = {
-    transform: CSS.Transform.toString(transform),
+    transform: CSS.Translate.toString(transform),
     transition,
     zIndex: isDragging ? 10 : undefined,
     opacity: isDragging ? 0.5 : 1
   }
-  const displayUrl = tab.url === 'about:blank' ? 'New Tab' : tab.url
+  const displayName = tab.customName || (tab.url === 'about:blank' ? 'New Tab' : tab.url)
+
+  const startEdit = (): void => {
+    setDraft(tab.customName || '')
+    setIsEditing(true)
+  }
+  const commit = (): void => {
+    const trimmed = draft.trim()
+    onRename(tab.id, trimmed)
+    setIsEditing(false)
+  }
+  const cancel = (): void => {
+    setIsEditing(false)
+  }
+
+  useEffect(() => {
+    if (isEditing) {
+      inputRef.current?.focus()
+      inputRef.current?.select()
+    }
+  }, [isEditing])
+
+  const dragProps = isEditing ? {} : { ...attributes, ...listeners }
+
   return (
     <div
       ref={setNodeRef}
       style={style}
-      {...attributes}
-      {...listeners}
-      onClick={() => onSwitch(tab.id)}
+      {...dragProps}
+      onClick={() => { if (!isEditing) onSwitch(tab.id) }}
+      onDoubleClick={(e) => { e.preventDefault(); e.stopPropagation(); startEdit() }}
       onKeyDown={(e) => {
+        if (isEditing) return
         if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSwitch(tab.id) }
       }}
       onAuxClick={(e) => {
@@ -406,10 +434,26 @@ function SortableBrowserTab({ tab, isActive, isPickingElement, onSwitch, onClose
         isActive ? 'bg-tab-active border border-border' : 'text-muted-foreground dark:text-muted-foreground',
         isActive && isPickingElement && 'ring-2 ring-amber-500/70 border-amber-500/70'
       )}
-      {...attributes}
-      {...listeners}
     >
-      <span className="truncate text-sm">{displayUrl}</span>
+      {isEditing ? (
+        <input
+          ref={inputRef}
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onBlur={commit}
+          onClick={(e) => e.stopPropagation()}
+          onPointerDown={(e) => e.stopPropagation()}
+          onKeyDown={(e) => {
+            e.stopPropagation()
+            if (e.key === 'Enter') { e.preventDefault(); commit() }
+            else if (e.key === 'Escape') { e.preventDefault(); cancel() }
+          }}
+          placeholder={tab.url === 'about:blank' ? 'New Tab' : tab.url}
+          className="flex-1 min-w-0 bg-transparent outline-none text-sm text-foreground"
+        />
+      ) : (
+        <span className="truncate text-sm" title="Double-click to rename">{displayName}</span>
+      )}
       <button
         onClick={(e) => { e.stopPropagation(); onClose(tab.id) }}
         onPointerDown={(e) => e.stopPropagation()}
@@ -736,6 +780,13 @@ export const BrowserPanel = forwardRef<BrowserPanelHandle, BrowserPanelProps>(fu
     onTabsChange({ ...tabs, activeTabId: tabId })
   }, [tabs, onTabsChange])
 
+  const renameTab = useCallback((tabId: string, name: string) => {
+    const next = tabs.tabs.map(t =>
+      t.id === tabId ? { ...t, customName: name || undefined } : t
+    )
+    onTabsChange({ ...tabs, tabs: next })
+  }, [tabs, onTabsChange])
+
   const reorderTabs = useCallback((fromId: string, toId: string) => {
     if (fromId === toId) return
     const fromIdx = tabs.tabs.findIndex(t => t.id === fromId)
@@ -749,7 +800,7 @@ export const BrowserPanel = forwardRef<BrowserPanelHandle, BrowserPanelProps>(fu
   }, [tabs, onTabsChange])
 
   const tabSensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
+    useSensor(PointerSensor, { activationConstraint: { distance: 3 } })
   )
 
   const handleTabDragEnd = useCallback((event: DragEndEvent) => {
@@ -1142,6 +1193,7 @@ export const BrowserPanel = forwardRef<BrowserPanelHandle, BrowserPanelProps>(fu
                 isPickingElement={isPickingElement}
                 onSwitch={switchToTab}
                 onClose={closeTab}
+                onRename={renameTab}
               />
             ))}
           </SortableContext>

@@ -26,6 +26,7 @@ export interface BrowserTab {
   id: string
   url: string
   title: string
+  customName?: string
   favicon?: string
   themeMode?: BrowserTabTheme
   multiDeviceMode?: boolean
