@@ -10,7 +10,9 @@
     "./shared": "./src/shared/index.ts",
     "./main": "./src/main/index.ts",
     "./client": "./src/client/index.ts",
-    "./client/Terminal": "./src/client/Terminal.tsx"
+    "./client/Terminal": "./src/client/Terminal.tsx",
+    "./agents": "./src/main/agents/index.ts",
+    "./reducer": "./src/client/chat-timeline.ts"
   },
   "scripts": {
     "typecheck": "tsgo --noEmit"

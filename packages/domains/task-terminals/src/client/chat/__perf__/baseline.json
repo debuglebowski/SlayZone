@@ -1,0 +1,122 @@
+[
+  {
+    "fixture": "bash.ndjson",
+    "events": 6,
+    "iterations": 1000,
+    "finalTimelineLength": 4,
+    "longestReducerMs": 0,
+    "p99ReducerMs": 0,
+    "meanReducerMs": 0,
+    "totalReducerMs": 0.889
+  },
+  {
+    "fixture": "edit.ndjson",
+    "events": 9,
+    "iterations": 1000,
+    "finalTimelineLength": 6,
+    "longestReducerMs": 0,
+    "p99ReducerMs": 0,
+    "meanReducerMs": 0,
+    "totalReducerMs": 1.432
+  },
+  {
+    "fixture": "glob.ndjson",
+    "events": 6,
+    "iterations": 1000,
+    "finalTimelineLength": 4,
+    "longestReducerMs": 0,
+    "p99ReducerMs": 0,
+    "meanReducerMs": 0,
+    "totalReducerMs": 0.902
+  },
+  {
+    "fixture": "grep.ndjson",
+    "events": 10,
+    "iterations": 1000,
+    "finalTimelineLength": 7,
+    "longestReducerMs": 0,
+    "p99ReducerMs": 0,
+    "meanReducerMs": 0,
+    "totalReducerMs": 1.636
+  },
+  {
+    "fixture": "multi-tool.ndjson",
+    "events": 11,
+    "iterations": 1000,
+    "finalTimelineLength": 7,
+    "longestReducerMs": 0,
+    "p99ReducerMs": 0,
+    "meanReducerMs": 0,
+    "totalReducerMs": 1.825
+  },
+  {
+    "fixture": "read.ndjson",
+    "events": 7,
+    "iterations": 1000,
+    "finalTimelineLength": 5,
+    "longestReducerMs": 0,
+    "p99ReducerMs": 0,
+    "meanReducerMs": 0,
+    "totalReducerMs": 1.032
+  },
+  {
+    "fixture": "streaming-long.ndjson",
+    "events": 31,
+    "iterations": 1000,
+    "finalTimelineLength": 3,
+    "longestReducerMs": 0,
+    "p99ReducerMs": 0,
+    "meanReducerMs": 0,
+    "totalReducerMs": 4.488
+  },
+  {
+    "fixture": "streaming-short.ndjson",
+    "events": 10,
+    "iterations": 1000,
+    "finalTimelineLength": 3,
+    "longestReducerMs": 0,
+    "p99ReducerMs": 0,
+    "meanReducerMs": 0,
+    "totalReducerMs": 1.528
+  },
+  {
+    "fixture": "streaming-tool-heavy.ndjson",
+    "events": 98,
+    "iterations": 1000,
+    "finalTimelineLength": 9,
+    "longestReducerMs": 0.001,
+    "p99ReducerMs": 0,
+    "meanReducerMs": 0,
+    "totalReducerMs": 20.743
+  },
+  {
+    "fixture": "thinking.ndjson",
+    "events": 5,
+    "iterations": 1000,
+    "finalTimelineLength": 4,
+    "longestReducerMs": 0,
+    "p99ReducerMs": 0,
+    "meanReducerMs": 0,
+    "totalReducerMs": 0.713
+  },
+  {
+    "fixture": "todowrite.ndjson",
+    "events": 9,
+    "iterations": 1000,
+    "finalTimelineLength": 6,
+    "longestReducerMs": 0,
+    "p99ReducerMs": 0,
+    "meanReducerMs": 0,
+    "totalReducerMs": 1.416
+  },
+  {
+    "fixture": "write.ndjson",
+    "events": 6,
+    "iterations": 1000,
+    "finalTimelineLength": 4,
+    "longestReducerMs": 0,
+    "p99ReducerMs": 0,
+    "meanReducerMs": 0,
+    "totalReducerMs": 0.916
+  }
+]
