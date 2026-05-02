@@ -1,0 +1,334 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro'
+import SiteNav from '../components/SiteNav.astro'
+import SiteFooter from '../components/SiteFooter.astro'
+import ProductSchema from '../components/seo/ProductSchema.astro'
+import SoftwareApplicationSchema from '../components/seo/SoftwareApplicationSchema.astro'
+import { DEFAULT_DOWNLOAD_URL } from '../data/downloadUrls'
+
+const includedFeatures = [
+  'Unlimited tasks, projects, and worktrees',
+  'Every AI agent CLI: Claude Code, Codex, Gemini, OpenCode, Cursor, Qwen, Aider',
+  'Embedded PTY terminals, browser, code editor, git diff, PR workflow',
+  'MCP server + slay CLI for agent and shell automation',
+  'Local-first SQLite — no cloud account, no telemetry account',
+  'macOS, Windows, and Linux builds',
+  'Full source code (GPL-3.0) — fork it, audit it, ship it',
+]
+
+const pricingFaq = [
+  {
+    q: 'Will SlayZone ever introduce a paid tier?',
+    a: 'No. SlayZone is fully free and open source under GPL-3.0. There is no Pro, no Premium, no Team plan, no usage caps, no feature gating. The entire app is the free version.',
+  },
+  {
+    q: 'Do I need to create an account?',
+    a: 'No account required. SlayZone runs entirely on your machine. Your tasks, terminals, and git worktrees live in a local SQLite database. Nothing is uploaded.',
+  },
+  {
+    q: 'How is this sustainable without revenue?',
+    a: 'SlayZone is built in the open as a focused, single-purpose tool. The work that would go into billing, plan tiers, license checks, and account management is spent on shipping features instead.',
+  },
+  {
+    q: 'Can I use SlayZone commercially?',
+    a: 'Yes. GPL-3.0 permits commercial use. Use it inside your company, on client work, or as part of a paid product — the license terms apply to the SlayZone source itself, not to the code you write inside SlayZone.',
+  },
+  {
+    q: 'Do I pay for the AI agents?',
+    a: 'SlayZone itself is free. The AI agent CLIs you run inside it (Claude Code, Codex, Gemini, etc.) are billed by their respective providers. SlayZone takes no cut and never sees your API keys — they stay in your shell environment.',
+  },
+]
+
+const pricingFaqSchema = {
+  '@context': 'https://schema.org',
+  '@type': 'FAQPage',
+  mainEntity: pricingFaq.map((item) => ({
+    '@type': 'Question',
+    name: item.q,
+    acceptedAnswer: { '@type': 'Answer', text: item.a },
+  })),
+}
+const pricingFaqSchemaJson = JSON.stringify(pricingFaqSchema).replace(/</g, '\\u003c')
+---
+
+<BaseLayout
+  title="SlayZone — Pricing"
+  description="SlayZone is free and open source under GPL-3.0. No paid tier, no account, no usage caps. Desktop kanban for AI coding agents — every feature included."
+  canonicalPath="/pricing"
+>
+  <Fragment slot="head">
+    <ProductSchema />
+    <SoftwareApplicationSchema />
+    <script type="application/ld+json" set:html={pricingFaqSchemaJson} />
+  </Fragment>
+  <Fragment slot="nav"><SiteNav current="pricing" /></Fragment>
+
+  <section class="pricing-intro">
+    <h1>Free. <span class="gradient">Forever.</span></h1>
+    <p class="subtitle">
+      SlayZone is fully open source under GPL-3.0. No paid tier, no account, no caps.
+    </p>
+  </section>
+
+  <section class="price-card" aria-labelledby="plan-title">
+    <header>
+      <p class="plan-eyebrow">The only plan</p>
+      <h2 id="plan-title">SlayZone</h2>
+      <p class="price"><span class="amount">$0</span><span class="cadence"> / forever</span></p>
+      <p class="plan-blurb">Every feature, every platform. No login. No upgrade nag.</p>
+    </header>
+    <ul class="feature-list">
+      {includedFeatures.map((feature) => (
+        <li>
+          <span class="check" aria-hidden="true">✓</span>
+          <span>{feature}</span>
+        </li>
+      ))}
+    </ul>
+    <div class="cta-row">
+      <a href={DEFAULT_DOWNLOAD_URL} class="btn btn-primary">Download for Mac</a>
+      <a href="https://github.com/debuglebowski/SlayZone" target="_blank" rel="noopener" class="btn btn-ghost">View source on GitHub</a>
+    </div>
+    <p class="meta-row">
+      <span>GPL-3.0 licensed</span>
+      <span aria-hidden="true">·</span>
+      <span>Local-first SQLite</span>
+      <span aria-hidden="true">·</span>
+      <span>No telemetry account</span>
+    </p>
+  </section>
+
+  <section class="why-free">
+    <h2>Why is it free?</h2>
+    <div class="why-grid">
+      <article>
+        <h3>Built in the open</h3>
+        <p>The full source lives on GitHub. You can read it, fork it, audit it, or ship a private build. The license is GPL-3.0 — the same one that backs Linux, GIMP, and Inkscape.</p>
+      </article>
+      <article>
+        <h3>No billing surface</h3>
+        <p>There is no plan picker, no seat counter, no quota meter. Every release ships every feature to every user. The design space is smaller because the product is smaller.</p>
+      </article>
+      <article>
+        <h3>Your data stays local</h3>
+        <p>Tasks, terminals, and git worktrees live on your disk in SQLite. SlayZone never asks for your API keys — they stay in your shell. There is no cloud account to monetise later.</p>
+      </article>
+    </div>
+  </section>
+
+  <section class="pricing-faq" aria-labelledby="faq-heading">
+    <h2 id="faq-heading">Pricing FAQ</h2>
+    <dl>
+      {pricingFaq.map((item) => (
+        <div class="faq-row">
+          <dt>{item.q}</dt>
+          <dd>{item.a}</dd>
+        </div>
+      ))}
+    </dl>
+  </section>
+
+  <Fragment slot="footer"><SiteFooter /></Fragment>
+</BaseLayout>
+
+<style>
+  .pricing-intro {
+    text-align: center;
+    margin: 60px 0 40px;
+  }
+  h1 {
+    font-size: 48px;
+    font-weight: 700;
+    letter-spacing: -2px;
+    margin: 0 0 12px;
+  }
+  .subtitle {
+    color: #888;
+    font-size: 18px;
+    max-width: 640px;
+    margin: 0 auto;
+  }
+  .gradient {
+    background: linear-gradient(135deg, var(--accent), #e8850f);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .price-card {
+    max-width: 640px;
+    margin: 32px auto 80px;
+    padding: 40px;
+    border: 1px solid #ececf3;
+    border-radius: 16px;
+    background: #ffffff;
+    box-shadow: 0 8px 32px rgba(17, 20, 40, 0.06);
+  }
+  .price-card header { text-align: center; margin-bottom: 28px; }
+  .plan-eyebrow {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin: 0 0 8px;
+  }
+  .price-card h2 {
+    font-size: 28px;
+    font-weight: 700;
+    margin: 0 0 12px;
+    letter-spacing: -0.6px;
+  }
+  .price { margin: 0 0 8px; }
+  .price .amount {
+    font-size: 56px;
+    font-weight: 700;
+    letter-spacing: -2px;
+    color: #1a1a2e;
+  }
+  .price .cadence { color: #888; font-size: 16px; }
+  .plan-blurb { color: #666; margin: 0; font-size: 15px; }
+
+  .feature-list {
+    list-style: none;
+    margin: 0 0 28px;
+    padding: 0;
+    display: grid;
+    gap: 12px;
+  }
+  .feature-list li {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    font-size: 15px;
+    color: #2d2d3a;
+  }
+  .feature-list .check {
+    flex-shrink: 0;
+    width: 22px;
+    height: 22px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    background: var(--accent-dim, rgba(244, 104, 23, 0.12));
+    color: var(--accent);
+    font-weight: 700;
+    font-size: 13px;
+  }
+
+  .cta-row {
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 22px;
+    border-radius: 999px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    font-weight: 700;
+    text-decoration: none;
+    border: 1px solid transparent;
+    transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease, color 0.15s ease;
+  }
+  .btn-primary {
+    background: var(--accent);
+    color: #ffffff;
+  }
+  .btn-primary:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 8px 18px rgba(244, 104, 23, 0.32);
+  }
+  .btn-ghost {
+    background: transparent;
+    color: #1a1a2e;
+    border-color: #d6d6e1;
+  }
+  .btn-ghost:hover { border-color: var(--accent); color: var(--accent); }
+
+  .meta-row {
+    margin: 20px 0 0;
+    text-align: center;
+    color: #888;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    display: flex;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+
+  .why-free {
+    max-width: 960px;
+    margin: 0 auto 80px;
+  }
+  .why-free h2 {
+    font-size: 26px;
+    font-weight: 700;
+    text-align: center;
+    margin: 0 0 32px;
+    letter-spacing: -0.8px;
+  }
+  .why-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 24px;
+  }
+  .why-grid article {
+    padding: 24px;
+    border: 1px solid #ececf3;
+    border-radius: 12px;
+    background: #fafafa;
+  }
+  .why-grid h3 {
+    font-size: 16px;
+    font-weight: 700;
+    margin: 0 0 8px;
+    color: #1a1a2e;
+  }
+  .why-grid p { margin: 0; color: #555; font-size: 14px; line-height: 1.6; }
+
+  .pricing-faq {
+    max-width: 760px;
+    margin: 0 auto 80px;
+  }
+  .pricing-faq h2 {
+    font-size: 26px;
+    font-weight: 700;
+    text-align: center;
+    margin: 0 0 32px;
+    letter-spacing: -0.8px;
+  }
+  .pricing-faq dl { margin: 0; }
+  .faq-row {
+    padding: 20px 0;
+    border-top: 1px solid #ececf3;
+  }
+  .faq-row:last-child { border-bottom: 1px solid #ececf3; }
+  .faq-row dt {
+    font-size: 16px;
+    font-weight: 700;
+    color: #1a1a2e;
+    margin: 0 0 6px;
+  }
+  .faq-row dd {
+    margin: 0;
+    color: #555;
+    font-size: 15px;
+    line-height: 1.6;
+  }
+
+  @media (max-width: 800px) {
+    h1 { font-size: 36px; }
+    .subtitle { font-size: 16px; }
+    .price-card { padding: 28px; margin: 24px auto 56px; }
+    .price .amount { font-size: 44px; }
+    .why-grid { grid-template-columns: 1fr; }
+  }
+</style>

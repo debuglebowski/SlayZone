@@ -1,0 +1,35 @@
+---
+import rootPkg from '../../../../package.json'
+
+const schema = {
+  '@context': 'https://schema.org',
+  '@type': 'Product',
+  name: 'SlayZone',
+  description:
+    'Desktop kanban for AI coding agents. Run Claude Code, Codex, Gemini, OpenCode, and Cursor in parallel. Every task gets a terminal, browser, and git worktree. Local-first. Free and open source under GPL-3.0.',
+  url: 'https://slay.zone/pricing',
+  image: 'https://slay.zone/assets/og-preview.jpg',
+  category: 'DeveloperApplication',
+  brand: {
+    '@type': 'Brand',
+    name: 'SlayZone',
+  },
+  offers: {
+    '@type': 'Offer',
+    price: '0',
+    priceCurrency: 'USD',
+    availability: 'https://schema.org/InStock',
+    url: 'https://slay.zone/pricing',
+    priceValidUntil: '2099-12-31',
+    seller: {
+      '@type': 'Organization',
+      name: 'SlayZone',
+      url: 'https://slay.zone',
+    },
+  },
+  license: 'https://www.gnu.org/licenses/gpl-3.0.en.html',
+  releaseNotes: `https://github.com/debuglebowski/SlayZone/releases/tag/v${rootPkg.version}`,
+}
+---
+
+<script type="application/ld+json" set:html={JSON.stringify(schema)} />
