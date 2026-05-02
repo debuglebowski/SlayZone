@@ -21,7 +21,6 @@
     "@slayzone/terminal": "workspace:*",
     "@slayzone/ui": "workspace:*",
     "@slayzone/worktrees": "workspace:*",
-    "@tanstack/react-virtual": "^3.13.22",
     "fzf": "^0.5.2",
     "lucide-react": "^0.562.0",
     "use-stick-to-bottom": "^1.1.3"
