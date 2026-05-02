@@ -549,6 +549,16 @@ export function ChatPanel(props: ChatPanelProps) {
       data-chat-panel
       className="relative flex flex-col h-full bg-background"
       style={{ fontSize: `${appearance.terminalFontSize}px` }}
+      onMouseUp={(e) => {
+        // Click on panel background → focus composer. Skip if user clicked an
+        // interactive element (button/link/input) or completed a text selection.
+        const target = e.target as HTMLElement | null
+        if (!target) return
+        if (target.closest('button, a, input, textarea, select, [role="button"], [role="menuitem"], [contenteditable="true"]')) return
+        const sel = window.getSelection()
+        if (sel && !sel.isCollapsed) return
+        textareaRef.current?.focus()
+      }}
       onClickCapture={(e) => {
         // Event-delegated link interception: any `<a href="http...">` rendered
         // inside chat (markdown auto-links, etc.) → route to shell.openExternal
