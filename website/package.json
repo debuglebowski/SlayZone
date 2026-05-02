@@ -3,10 +3,12 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "pnpm build:og && astro build",
+    "build": "pnpm build:og && astro build && pnpm check:links",
     "dev": "astro dev",
     "preview": "astro preview",
-    "build:og": "node scripts/build-og.mjs"
+    "build:og": "node scripts/build-og.mjs",
+    "check:links": "node scripts/check-links.mjs",
+    "check:urls": "node scripts/check-urls.mjs"
   },
   "devDependencies": {
     "astro": "^5.14.3",
