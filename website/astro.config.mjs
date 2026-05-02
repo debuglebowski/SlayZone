@@ -6,7 +6,11 @@ export default defineConfig({
   output: 'static',
   outDir: './dist',
   publicDir: './public',
-  integrations: [sitemap()],
+  integrations: [
+    sitemap({
+      filter: (page) => !page.includes('/features/demo/'),
+    }),
+  ],
   image: {
     remotePatterns: [],
   },
