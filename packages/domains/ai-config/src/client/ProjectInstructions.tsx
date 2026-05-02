@@ -297,7 +297,7 @@ export function ProjectInstructions({
                   <div className="flex items-center justify-between gap-2 border-b border-amber-500/30 bg-amber-500/5 px-3 py-1.5 text-xs">
                     <div className="flex items-center gap-1.5 text-amber-500">
                       <RefreshCw className="size-3" />
-                      <span>File changed on disk</span>
+                      <span>File changed</span>
                     </div>
                     <Button
                       size="sm"

@@ -469,7 +469,7 @@ export function McpFlatSection({ projectPath, enabledProviders, onOpenContextMan
                                 data-testid={`mcp-sync-all-${server.key}`}
                               >
                                 {syncingServerKey === server.key && <Loader2 className="size-3.5 animate-spin" />}
-                                Config → All Files
+                                Database → All Files
                               </Button>
                             )}
                           </div>

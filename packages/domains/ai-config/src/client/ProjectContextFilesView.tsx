@@ -26,7 +26,7 @@ function SyncBadge({ entry }: { entry: ContextTreeEntry }) {
   }
   if (health !== 'unmanaged') return null
   return (
-    <span className="text-muted-foreground" title="Unmanaged (exists on disk but not linked in config)" aria-label="Unmanaged file">
+    <span className="text-muted-foreground" title="Unmanaged (File exists but not linked in Database)" aria-label="Unmanaged file">
       <Circle className="size-3" />
     </span>
   )
@@ -95,7 +95,7 @@ export function ProjectContextFilesView({ projectPath, projectId }: ProjectConte
     if (!entry.exists) {
       setSelectedPath(entry.path)
       setSelectedContent('')
-      setMessage('This file is not created on disk yet')
+      setMessage('This File is not created yet')
       return
     }
     setLoadingFile(true)
@@ -125,12 +125,12 @@ export function ProjectContextFilesView({ projectPath, projectId }: ProjectConte
       >
         {entry.exists
           ? (
-            <span title="File exists on disk" aria-label="File exists on disk">
+            <span title="File exists" aria-label="File exists">
               <File className="size-3.5 shrink-0" />
             </span>
             )
           : (
-            <span title="File is not created on disk" aria-label="File is not created on disk">
+            <span title="File not created" aria-label="File not created">
               <FilePlus className="size-3.5 shrink-0" />
             </span>
             )

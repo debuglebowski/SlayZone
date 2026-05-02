@@ -217,7 +217,7 @@ test.describe.skip('Context manager file sync', () => {
       }, { timeout: 5_000 }).toBe(instructionsV2)
     })
 
-    test('Config → File pushes to specific provider', async ({ mainWindow }) => {
+    test('Database → File pushes to specific provider', async ({ mainWindow }) => {
       await setInstructionsContent(mainWindow, projectId, instructionsV2)
       const dialog = await openInstructionsDialog(mainWindow)
       const textarea = dialog.getByTestId('instructions-textarea')
@@ -242,7 +242,7 @@ test.describe.skip('Context manager file sync', () => {
       await expect(card).toContainText('Synced', { timeout: 5_000 })
     })
 
-    test('Config → All Files pushes to all providers', async ({ mainWindow }) => {
+    test('Database → All Files pushes to all providers', async ({ mainWindow }) => {
       await setInstructionsContent(mainWindow, projectId, instructionsV2)
       const dialog = await openInstructionsDialog(mainWindow)
       const textarea = dialog.getByTestId('instructions-textarea')
@@ -291,7 +291,7 @@ test.describe.skip('Context manager file sync', () => {
       await expect(dialog.getByTestId('instructions-pull-claude')).toBeVisible({ timeout: 5_000 })
     })
 
-    test('File → Config pulls from disk', async ({ mainWindow }) => {
+    test('File → Database pulls from File', async ({ mainWindow }) => {
       const dialog = await ensureInstructionsV2AndSyncAll(mainWindow)
       const diskContent = '# Externally modified\n'
       fs.writeFileSync(claudeInstructionsPath(), diskContent)
@@ -348,7 +348,7 @@ test.describe.skip('Context manager file sync', () => {
       await closeTopDialog(mainWindow)
     })
 
-    test('Config → File pushes skill to specific provider', async ({ mainWindow }) => {
+    test('Database → File pushes skill to specific provider', async ({ mainWindow }) => {
       const pendingBody = `# File sync skill provider push\n\n${Date.now()}\n`
       const pendingContent = skillDocument(skillSlug, pendingBody)
       const dialog = await openProjectContextSection(mainWindow, projectAbbrev, 'skills')
@@ -382,7 +382,7 @@ test.describe.skip('Context manager file sync', () => {
       await closeTopDialog(mainWindow)
     })
 
-    test('Config → All Files pushes to all providers', async ({ mainWindow }) => {
+    test('Database → All Files pushes to all providers', async ({ mainWindow }) => {
       const pendingBody = `# File sync skill push all\n\n${Date.now()}\n`
       const pendingContent = skillDocument(skillSlug, pendingBody)
       const dialog = await openProjectContextSection(mainWindow, projectAbbrev, 'skills')
@@ -456,7 +456,7 @@ test.describe.skip('Context manager file sync', () => {
       await closeTopDialog(mainWindow)
     })
 
-    test('File → Config pulls from disk and keeps raw frontmatter', async ({ mainWindow }) => {
+    test('File → Database pulls from File and keeps raw frontmatter', async ({ mainWindow }) => {
       const modified = '---\nname: modified\n---\n# Modified externally\n'
       fs.writeFileSync(claudeSkillPath(), modified)
 
@@ -554,7 +554,7 @@ test.describe.skip('Context manager file sync', () => {
       await closeTopDialog(mainWindow)
     })
 
-    test('Config → File after pull re-syncs to disk', async ({ mainWindow }) => {
+    test('Database → File after pull re-syncs File', async ({ mainWindow }) => {
       const resyncedBody = '# Re-synced after pull\n'
       const resyncedContent = skillDocument(skillSlug, resyncedBody)
       await mainWindow.evaluate(async ({ slug, content }) => {

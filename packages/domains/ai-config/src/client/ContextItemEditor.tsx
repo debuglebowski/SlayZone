@@ -225,11 +225,11 @@ export function ContextItemEditor({ item, validationState, onUpdate, onDelete, o
                               data-testid={`context-item-editor-pull-provider-${testSuffix}`}
                             >
                               <ArrowDownCircle className="size-3" />
-                              {thisPulling ? 'Pulling...' : 'Sync from file'}
+                              {thisPulling ? 'Pulling...' : 'File → Database'}
                             </Button>
                           </TooltipTrigger>
                           <TooltipContent>
-                            Overwrite skill content in SlayZone with the contents of {label}'s on-disk file.
+                            Overwrite skill content in the Database with the contents of {label}'s File.
                           </TooltipContent>
                         </Tooltip>
                       )}
@@ -245,11 +245,11 @@ export function ContextItemEditor({ item, validationState, onUpdate, onDelete, o
                               data-testid={`context-item-editor-sync-provider-${testSuffix}`}
                             >
                               <ArrowUpCircle className="size-3" />
-                              {thisSyncing ? 'Syncing...' : 'Sync to file'}
+                              {thisSyncing ? 'Syncing...' : 'Database → File'}
                             </Button>
                           </TooltipTrigger>
                           <TooltipContent>
-                            Overwrite {label}'s on-disk file with the current skill content from SlayZone.
+                            Overwrite {label}'s File with the current skill content from the Database.
                           </TooltipContent>
                         </Tooltip>
                       )}
@@ -448,13 +448,13 @@ export function ContextItemEditor({ item, validationState, onUpdate, onDelete, o
             <DiffView
               left={activeDiffDisk}
               right={item.content}
-              leftLabel="On disk"
-              rightLabel="In app"
+              leftLabel="File"
+              rightLabel="Database"
               className="flex-1 min-h-0"
             />
           ) : (
             <div className="flex-1 flex items-center justify-center rounded border border-dashed px-3 py-4 text-center text-xs text-muted-foreground">
-              File missing on disk. Click Sync to write it.
+              File missing. Click Sync to write it.
             </div>
           )
         ) : (

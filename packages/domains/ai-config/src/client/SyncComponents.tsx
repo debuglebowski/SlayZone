@@ -101,7 +101,7 @@ export function ProviderFileCard({
                 onClick={(e) => { e.stopPropagation(); onPull() }}
               >
                 {isPulling && <Loader2 className="size-3.5 animate-spin" />}
-                File → Config
+                File → Database
               </Button>
             </TooltipTrigger>
             <TooltipContent>Pull from {path}</TooltipContent>
@@ -118,7 +118,7 @@ export function ProviderFileCard({
                 onClick={(e) => { e.stopPropagation(); onPush() }}
               >
                 {isPushing && <Loader2 className="size-3.5 animate-spin" />}
-                Config → File
+                Database → File
               </Button>
             </TooltipTrigger>
             <TooltipContent>Push to {path}</TooltipContent>
@@ -135,7 +135,7 @@ export function ProviderFileCard({
           <div data-testid={`${testIdPrefix}-diff-${provider}${suffix}`}>
             <DiffView
               left={disk} right={expected}
-              leftLabel={`${path} (on disk)`}
+              leftLabel={`${path} (File)`}
               rightLabel={rightLabel}
               className="border-t border-x-0 border-b-0 rounded-none"
             />

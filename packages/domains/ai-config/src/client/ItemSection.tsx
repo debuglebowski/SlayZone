@@ -411,13 +411,13 @@ function SkillItemDetail({ item, providers, enabledProviders, isLocal, projectId
                       disabled={sk.syncingAll || !!sk.syncingProvider || sk.hasValidationErrors}
                     >
                       {sk.syncingAll && <Loader2 className="size-3.5 animate-spin" />}
-                      Config → All Files
+                      Database → All Files
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent>
                     {sk.hasValidationErrors
                       ? 'Fix frontmatter errors before syncing to files.'
-                      : 'Overwrite all provider skill files on disk'}
+                      : 'Overwrite all provider skill Files'}
                   </TooltipContent>
                 </Tooltip>
               )}
