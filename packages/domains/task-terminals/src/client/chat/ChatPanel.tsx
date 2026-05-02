@@ -234,6 +234,21 @@ export function ChatPanel(props: ChatPanelProps) {
 
   const search = useChatSearch(displayedTimeline)
 
+  // Paginate older items: show last `visibleCount`, expose "Show more" at top.
+  const PAGE_SIZE = 100
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE)
+  const hiddenCount = Math.max(0, displayedTimeline.length - visibleCount)
+  const visibleStart = displayedTimeline.length - Math.min(visibleCount, displayedTimeline.length)
+  const visibleItems = displayedTimeline.slice(visibleStart)
+
+  // Auto-expand window if a search match lands above it.
+  useEffect(() => {
+    if (search.activeItemIdx < 0) return
+    if (search.activeItemIdx < visibleStart) {
+      setVisibleCount(displayedTimeline.length - search.activeItemIdx)
+    }
+  }, [search.activeItemIdx, visibleStart, displayedTimeline.length])
+
   // Stable per-item keys so streaming text updates re-render the same DOM node.
   const itemKey = useCallback((item: TimelineItem, index: number): Key => {
     if (item.kind === 'text' || item.kind === 'thinking') return `${item.kind}:${item.messageId}`
@@ -597,7 +612,19 @@ export function ChatPanel(props: ChatPanelProps) {
             />
           ) : (
             <div ref={contentRef}>
-              {displayedTimeline.map((item, index) => {
+              {hiddenCount > 0 && (
+                <div className="flex justify-center py-2">
+                  <button
+                    onClick={() => setVisibleCount((c) => c + PAGE_SIZE)}
+                    className="text-xs text-muted-foreground hover:text-foreground rounded-md px-3 py-1 border border-border/50 hover:bg-muted/60 transition-colors"
+                  >
+                    Show {Math.min(PAGE_SIZE, hiddenCount)} earlier
+                    {hiddenCount > PAGE_SIZE ? ` (${hiddenCount} hidden)` : ''}
+                  </button>
+                </div>
+              )}
+              {visibleItems.map((item, i) => {
+                const index = visibleStart + i
                 const rendered = renderTimelineItem(item, index)
                 if (rendered === null) return null
                 return (
