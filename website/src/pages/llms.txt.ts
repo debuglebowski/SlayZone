@@ -16,7 +16,7 @@ export const GET = ({ site }: APIContext) => {
     .join('\n')
 
   const headToHeadLines = headToHeadPages
-    .map((page) => `- [${page.title}](${url(`/${page.slug}`)}): ${oneLine(page.summary)}`)
+    .map((page) => `- [${page.title}](${url(`/${page.slug}/`)}): ${oneLine(page.summary)}`)
     .join('\n')
 
   const body = `# SlayZone
@@ -26,15 +26,15 @@ export const GET = ({ site }: APIContext) => {
 SlayZone treats the kanban board as the primary control surface for parallel agent work. Each task owns a real PTY session, an embedded browser pane, an isolated git worktree, and task-local diff, commit, and PR workflows. The app runs fully on your machine with no mandatory account or cloud sync, and exposes an MCP server plus a \`slay\` CLI so agents and shell tooling can read and drive task state.
 
 ## Docs
-- [Documentation](${url('/docs')}): Install, projects, kanban, terminals, browser, git, AI modes, \`slay\` CLI, Linear sync, privacy
-- [FAQ](${url('/faq')}): Common questions about SlayZone
+- [Documentation](${url('/docs/')}): Install, projects, kanban, terminals, browser, git, AI modes, \`slay\` CLI, Linear sync, privacy
+- [FAQ](${url('/faq/')}): Common questions about SlayZone
 
 ## Features
-- [All features](${url('/features')}): Overview of SlayZone's feature surface
+- [All features](${url('/features/')}): Overview of SlayZone's feature surface
 ${featureLines}
 
 ## Comparison
-- [Comparison matrix](${url('/comparison')}): SlayZone vs the field — Cursor, VibeKanban, Devin, and others
+- [Comparison matrix](${url('/comparison/')}): SlayZone vs the field — Cursor, VibeKanban, Devin, and others
 ${headToHeadLines}
 
 ## Optional
