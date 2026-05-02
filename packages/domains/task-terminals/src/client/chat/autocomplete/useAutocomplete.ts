@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { AcceptCtx, AutocompleteSource, FetchCtx, TriggerMatch } from './types'
+import { rankAcrossSources, type MergedEntry } from './ranking'
 
 export interface UseAutocompleteOptions {
   sources: AutocompleteSource[]
@@ -10,10 +11,11 @@ export interface UseAutocompleteOptions {
   fetchCtx: FetchCtx
 }
 
-export interface ActiveMatch<Item = unknown> {
-  source: AutocompleteSource<Item>
+export interface ActiveMatch {
   match: TriggerMatch
-  filtered: Item[]
+  entries: MergedEntry[]
+  /** Lead source — used for menu data attribute and Esc-dismiss tracking. */
+  leadSourceId: string
 }
 
 export interface UseAutocompleteResult {
@@ -66,33 +68,57 @@ export function useAutocomplete(opts: UseAutocompleteOptions): UseAutocompleteRe
     }
   }, [sources, fetchCtx.cwd])
 
-  // Detect which source is active. Iterate in registration order; first source whose
-  // trigger matches AND yields a non-empty filtered list wins. Sources that trigger but
-  // produce zero results fall through so later sources (e.g. built-ins) can display.
+  // Detect active sources. All sources whose `detect()` returns the same token range as the
+  // first match merge into one cross-source-ranked list (via fzf on the union). This avoids
+  // a high-priority source's results shadowing later sources at the same trigger position.
+  // Sources with a different token range OR no matches at all are skipped.
   const active = useMemo<ActiveMatch | null>(() => {
+    let leadMatch: TriggerMatch | null = null
+    let leadSourceId: string | null = null
+    const groups: { source: AutocompleteSource; items: unknown[] }[] = []
     for (const src of sources) {
       const match = src.detect(draft, cursorPos)
       if (!match) continue
-      if (
-        dismissed &&
-        dismissed.source === src.id &&
-        dismissed.match.tokenStart === match.tokenStart
+      if (!leadMatch) {
+        if (
+          dismissed &&
+          dismissed.source === src.id &&
+          dismissed.match.tokenStart === match.tokenStart
+        ) {
+          continue
+        }
+        leadMatch = match
+        leadSourceId = src.id
+      } else if (
+        match.tokenStart !== leadMatch.tokenStart ||
+        match.tokenEnd !== leadMatch.tokenEnd
       ) {
         continue
       }
       const items = itemsBySource[src.id] ?? []
-      const filtered = src.filter(items, match.query)
-      if (filtered.length === 0) continue
-      return { source: src, match, filtered }
+      groups.push({ source: src, items })
     }
-    return null
+    if (!leadMatch || !leadSourceId || groups.length === 0) return null
+
+    let entries: MergedEntry[]
+    if (groups.some((g) => g.source.getName)) {
+      entries = rankAcrossSources(groups, leadMatch.query)
+    } else {
+      entries = []
+      for (const g of groups) {
+        const filtered = g.source.filter(g.items, leadMatch.query)
+        for (const item of filtered) entries.push({ item, source: g.source })
+      }
+    }
+    if (entries.length === 0) return null
+    return { match: leadMatch, entries, leadSourceId }
   }, [sources, draft, cursorPos, itemsBySource, dismissed])
 
   const show = active !== null
 
   useEffect(() => {
     setSelectedIndex(0)
-  }, [active?.source.id, active?.match.tokenStart, active?.match.query])
+  }, [active?.leadSourceId, active?.match.tokenStart, active?.match.query])
 
   // Clear dismissal on any draft/cursor change — Esc closes current state; next keystroke reopens.
   useEffect(() => {
@@ -102,9 +128,9 @@ export function useAutocomplete(opts: UseAutocompleteOptions): UseAutocompleteRe
   const accept = useCallback(
     (index: number) => {
       if (!active) return
-      const item = active.filtered[index]
-      if (!item) return
-      void active.source.accept(item, {
+      const entry = active.entries[index]
+      if (!entry) return
+      void entry.source.accept(entry.item, {
         ...acceptCtx,
         draft,
         setDraft,
@@ -116,7 +142,7 @@ export function useAutocomplete(opts: UseAutocompleteOptions): UseAutocompleteRe
   )
 
   const close = useCallback(() => {
-    if (active) setDismissed({ source: active.source.id, match: active.match })
+    if (active) setDismissed({ source: active.leadSourceId, match: active.match })
   }, [active])
 
   const handleKeyDown = useCallback(
@@ -124,7 +150,7 @@ export function useAutocomplete(opts: UseAutocompleteOptions): UseAutocompleteRe
       if (!active) return false
       if (e.key === 'ArrowDown') {
         e.preventDefault()
-        setSelectedIndex((i) => Math.min(i + 1, active.filtered.length - 1))
+        setSelectedIndex((i) => Math.min(i + 1, active.entries.length - 1))
         return true
       }
       if (e.key === 'ArrowUp') {

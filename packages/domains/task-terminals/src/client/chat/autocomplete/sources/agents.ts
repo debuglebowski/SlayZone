@@ -31,6 +31,8 @@ export function createAgentsSource(): AutocompleteSource<AgentInfo> {
     filter: filterAgents,
     getKey: (a) => `${a.source}:${a.name}`,
     render: renderAgentItem,
+    getName: (a) => a.name,
+    getDescription: (a) => a.description,
     accept(agent, ctx) {
       const next = spliceReplace(
         ctx.draft,

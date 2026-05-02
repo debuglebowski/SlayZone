@@ -59,6 +59,8 @@ export function createCommandsSource(
     getKey: (c) => `${c.source}:${c.name}`,
     render: renderCommandItem,
     transformSubmit: transformCommandSubmit,
+    getName: (c) => c.name,
+    getDescription: (c) => c.description,
     async accept(cmd, ctx) {
       const rawAfter = ctx.draft.slice(ctx.tokenEnd).trimStart()
       const needsArgs = /\$ARGUMENTS/.test(cmd.body)

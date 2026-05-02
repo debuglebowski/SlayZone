@@ -18,6 +18,8 @@ export function createBuiltinsSource(): AutocompleteSource<BuiltinCommand> {
     filter: (_items, query) => filterBuiltins(query),
     getKey: (b) => `builtin:${b.name}`,
     render: renderBuiltinItem,
+    getName: (b) => b.name,
+    getDescription: (b) => b.description,
     async accept(cmd, ctx) {
       // Clear the draft, then run side effect.
       const next = spliceReplace(ctx.draft, ctx.tokenStart, ctx.draft.length, '')

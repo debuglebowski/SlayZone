@@ -93,6 +93,13 @@ export interface AutocompleteSource<Item = unknown> {
    * Use for slash commands that expand templates on Enter (e.g. `/review $ARGUMENTS`).
    */
   transformSubmit?: (draft: string, items: Item[]) => SubmitTransform | null
+  /**
+   * Accessors for cross-source merge ranking. When two or more sources detect at the same
+   * token range AND expose `getName`, useAutocomplete merges their items into one fzf-ranked
+   * list instead of letting the first source's results shadow the rest.
+   */
+  getName?: (item: Item) => string
+  getDescription?: (item: Item) => string
 }
 
 export type AnyItem = SkillInfo | CommandInfo | AgentInfo | BuiltinCommand | FileMatch

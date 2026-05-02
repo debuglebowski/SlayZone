@@ -23,15 +23,16 @@ export function AutocompleteMenu(props: AutocompleteMenuProps) {
       ref={listRef}
       className="absolute bottom-full left-0 right-0 mb-2 max-h-64 overflow-y-auto rounded-lg border border-border bg-popover shadow-lg z-10"
       role="listbox"
-      data-source={active.source.id}
+      data-source={active.leadSourceId}
     >
-      {active.filtered.map((item, i) => {
+      {active.entries.map((entry, i) => {
         const selected = i === selectedIndex
-        const key = active.source.getKey(item)
+        const key = `${entry.source.id}:${entry.source.getKey(entry.item)}`
         return (
           <div
             key={key}
             data-idx={i}
+            data-source={entry.source.id}
             role="option"
             aria-selected={selected}
             onMouseDown={(e) => {
@@ -44,7 +45,7 @@ export function AutocompleteMenu(props: AutocompleteMenuProps) {
               selected && 'bg-accent text-accent-foreground'
             )}
           >
-            {active.source.render(item, selected)}
+            {entry.source.render(entry.item, selected)}
           </div>
         )
       })}

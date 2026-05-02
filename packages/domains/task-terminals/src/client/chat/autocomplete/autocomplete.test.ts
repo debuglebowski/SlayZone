@@ -7,6 +7,8 @@ import { createFilesSource } from './sources/files'
 import { expandCommandBody } from './sources/commands'
 import { filterBuiltins } from './builtins-registry'
 import { spliceReplace } from './useAutocomplete'
+import { rankAcrossSources } from './ranking'
+import type { AutocompleteSource } from './types'
 
 let passed = 0
 let failed = 0
@@ -111,6 +113,74 @@ test('prefix match ranked above description match', () => {
 
 test('no match returns empty', () => {
   assertEqual(filterBuiltins('zzzz-none').length, 0)
+})
+
+console.log('\nrankAcrossSources — no shadowing across sources at same trigger')
+
+interface Named {
+  name: string
+  description: string
+}
+function fakeSrc(id: string): AutocompleteSource<Named> {
+  return {
+    id,
+    detect: () => null,
+    fetch: async () => [],
+    filter: () => [],
+    getKey: (i) => `${id}:${i.name}`,
+    render: () => null,
+    accept: () => undefined,
+    getName: (i) => i.name,
+    getDescription: (i) => i.description,
+  }
+}
+
+test('union ranks all sources together — name hits beat desc-only hits', () => {
+  const builtins = fakeSrc('builtins')
+  const skills = fakeSrc('skills')
+  const result = rankAcrossSources(
+    [
+      { source: builtins as AutocompleteSource, items: [{ name: 'help', description: 'Show available slash commands' }] },
+      {
+        source: skills as AutocompleteSource,
+        items: [
+          { name: 'commit', description: 'Commit changes' },
+          { name: 'commit-and-done', description: 'Commit and mark done' },
+          { name: 'comparison-page', description: 'Make comparison page' },
+        ],
+      },
+    ],
+    'comm'
+  )
+  // Repro: previously builtins (id='builtins') won alone via desc match on 'commands' word.
+  // Now skills name-match items appear too — and rank above the builtins desc-only hit.
+  const names = result.map((e) => (e.item as Named).name)
+  assertEqual(names.includes('commit'), true, 'commit included')
+  assertEqual(names.includes('commit-and-done'), true, 'commit-and-done included')
+  assertEqual(names.includes('help'), true, 'help included via desc')
+  // First entry must be a name-match (skills), not the desc-only builtin.
+  assertEqual(names[0] === 'commit' || names[0] === 'commit-and-done', true, 'name match leads')
+})
+
+test('longer query that drops desc match still surfaces name matches', () => {
+  const builtins = fakeSrc('builtins')
+  const skills = fakeSrc('skills')
+  const result = rankAcrossSources(
+    [
+      { source: builtins as AutocompleteSource, items: [{ name: 'help', description: 'Show available slash commands' }] },
+      {
+        source: skills as AutocompleteSource,
+        items: [
+          { name: 'commit', description: 'Commit changes' },
+          { name: 'commit-and-done', description: 'Commit and mark done' },
+        ],
+      },
+    ],
+    'commi'
+  )
+  const names = result.map((e) => (e.item as Named).name)
+  assertEqual(names.includes('commit'), true)
+  assertEqual(names.includes('commit-and-done'), true)
 })
 
 console.log(`\n${passed} passed, ${failed} failed`)

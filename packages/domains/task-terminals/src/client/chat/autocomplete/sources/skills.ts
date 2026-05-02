@@ -24,6 +24,8 @@ export function createSkillsSource(): AutocompleteSource<SkillInfo> {
     filter: filterSkills,
     getKey: (s) => `${s.source}:${s.name}`,
     render: renderSkillItem,
+    getName: (s) => s.name,
+    getDescription: (s) => s.description,
     accept(skill, ctx) {
       const next = spliceReplace(ctx.draft, ctx.tokenStart, ctx.tokenEnd, `/${skill.name} `)
       ctx.setDraft(next)
