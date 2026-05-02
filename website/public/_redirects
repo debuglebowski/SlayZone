@@ -1,11 +1,12 @@
 https://www.slay.zone/* https://slay.zone/:splat 301
 
+# Page moves (must precede wildcard to avoid 2-hop chains)
+/superset /comparison/superset 301
+/superset/ /comparison/superset 301
+/superset.html /comparison/superset 301
+
 # Strip trailing slashes from any URL → canonical no-slash form
 /*/ /:splat 301
-
-# Page moves
-/superset /comparison/superset 301
-/superset.html /comparison/superset 301
 
 # Root + 404 (file-format quirks)
 /index.html / 301
