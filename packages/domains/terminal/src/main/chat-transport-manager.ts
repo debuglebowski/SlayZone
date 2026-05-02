@@ -91,6 +91,7 @@ export function resetTransportDeps(): void {
 export interface ChatSessionInfo {
   sessionId: string
   tabId: string
+  taskId: string
   mode: string
   cwd: string
   pid: number | null
@@ -494,6 +495,7 @@ function toInfo(session: Session): ChatSessionInfo {
   return {
     sessionId: session.sessionId,
     tabId: session.tabId,
+    taskId: session.taskId,
     mode: session.mode,
     cwd: session.cwd,
     pid: session.child.pid ?? null,

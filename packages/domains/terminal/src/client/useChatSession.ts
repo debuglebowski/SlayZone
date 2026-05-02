@@ -65,6 +65,14 @@ export interface UseChatSessionResult {
   inFlight: boolean
   /** True until the initial buffer replay resolves (on mount / tab reopen). */
   hydrating: boolean
+  /**
+   * Live permission mode reported by the running subprocess (raw CLI value,
+   * e.g. 'plan' | 'acceptEdits' | 'auto' | 'bypassPermissions' | 'default').
+   * Null until the first turn-init has been observed. Subprocess is the source
+   * of truth — UI mode pill should follow this when it differs from the cached
+   * DB value.
+   */
+  permissionMode: string | null
   sendMessage: (text: string) => Promise<void>
   interrupt: () => Promise<void>
   kill: () => Promise<void>
@@ -196,6 +204,7 @@ export function useChatSession(opts: UseChatSessionOpts): UseChatSessionResult {
     timeline: state.timeline,
     inFlight: isInFlight(state),
     hydrating,
+    permissionMode: state.permissionMode,
     sendMessage,
     interrupt,
     kill,

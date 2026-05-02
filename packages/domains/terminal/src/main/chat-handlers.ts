@@ -28,6 +28,7 @@ import { listAgents } from './agents-registry'
 import { listProjectFiles } from './files-scan'
 import type { SkillInfo, CommandInfo, AgentInfo, FileMatch } from '../shared/types'
 import type { AgentEvent } from '../shared/agent-events'
+import { rawPermissionModeToChatMode, chatModeToFlags as chatModeToFlagsShared, type ChatMode as ChatModeShared } from '../shared/chat-mode'
 
 export interface ChatHandlerOpts {
   /** Optional secondary subscriber to every persisted chat event. Used by the
@@ -46,11 +47,8 @@ interface ChatCreateOpts {
 /**
  * Permission/operating mode for chat sessions. Chat lacks an interactive prompt
  * mechanism over stream-json (verified via spike), so each mode resolves to a
- * static set of CLI flags at spawn time:
- *   - plan: read-only (`--permission-mode plan`)
- *   - auto-accept: edits auto-approved (`--permission-mode acceptEdits`)
- *   - auto: continuous autonomous execution (`--permission-mode auto`)
- *   - bypass: all approvals skipped (`--allow-dangerously-skip-permissions`)
+ * static set of CLI flags at spawn time. See `shared/chat-mode.ts` for the
+ * canonical type + mapping.
  *
  * "Normal" mode (interactive per-tool prompts) intentionally absent — would
  * require swapping the CLI subprocess for the programmatic Anthropic SDK.
@@ -59,20 +57,13 @@ interface ChatCreateOpts {
  * detected via `chat:getAutoEligibility` (reads ~/.claude.json + settings.json);
  * the UI hides the option when ineligible and disables it when not opted in.
  */
-export type ChatMode = 'plan' | 'auto-accept' | 'auto' | 'bypass'
+export type ChatMode = ChatModeShared
 
 export const DEFAULT_CHAT_MODE_NEW_TASK: ChatMode = 'auto-accept'
 /** Pre-existing tasks (no chatMode) keep current behavior on first upgrade. */
 export const DEFAULT_CHAT_MODE_LEGACY: ChatMode = 'bypass'
 
-export function chatModeToFlags(mode: ChatMode): string[] {
-  switch (mode) {
-    case 'plan': return ['--permission-mode', 'plan']
-    case 'auto-accept': return ['--permission-mode', 'acceptEdits']
-    case 'auto': return ['--permission-mode', 'auto']
-    case 'bypass': return ['--allow-dangerously-skip-permissions']
-  }
-}
+export const chatModeToFlags = chatModeToFlagsShared
 
 /**
  * Downgrade `auto` to `auto-accept` when the user is no longer eligible / opted
@@ -145,9 +136,14 @@ function writeChatMode(db: Database, taskId: string, mode: string, chatMode: Cha
     }
   }
   const existing = cfg[mode] ?? {}
+  // Idempotent: skip the write when nothing changed. Persisted chat events
+  // tick this on every turn-init (live sync); no-op writes would burn I/O for
+  // the common case where mode hasn't moved.
+  if (existing.chatMode === chatMode) return
   cfg[mode] = { ...existing, chatMode }
   db.prepare('UPDATE tasks SET provider_config = ? WHERE id = ?').run(JSON.stringify(cfg), taskId)
 }
+
 
 /**
  * One-shot backfill: every chat-capable task gets `chatMode='bypass'` set on
@@ -323,6 +319,22 @@ export function registerChatHandlers(ipcMain: IpcMain, db: Database, opts: ChatH
         persistChatEvent(db, tabId, seq, event)
       } catch (err) {
         console.error('[chat-handlers] persistChatEvent failed:', err)
+      }
+      // Subprocess is the source of truth for permission mode. Cache it back
+      // into provider_config whenever turn-init carries a recognized mode so
+      // cold-start spawn flags match the last observed live value.
+      if (event.kind === 'turn-init') {
+        const mapped = rawPermissionModeToChatMode(event.permissionMode)
+        if (mapped) {
+          const info = getSessionInfo(tabId)
+          if (info) {
+            try {
+              writeChatMode(db, info.taskId, info.mode, mapped)
+            } catch (err) {
+              console.error('[chat-handlers] writeChatMode (live sync) failed:', err)
+            }
+          }
+        }
       }
       if (opts.onChatEvent) {
         try {

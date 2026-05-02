@@ -30,8 +30,15 @@ export interface ToolInvocation {
   id: string
   name: string
   input: unknown
-  status: 'pending' | 'done' | 'error'
+  status: 'pending' | 'done' | 'error' | 'denied'
   result?: { rawContent: unknown; structured: unknown; isError: boolean }
+  /**
+   * True when the SDK denied the tool call due to permission policy. Sourced
+   * from `result.permissionDenials` (authoritative — the closing `result`
+   * event lists every tool the SDK refused this turn). Distinct from generic
+   * errors: denial means the tool never ran.
+   */
+  denied?: boolean
 }
 
 export interface OpenBlock {
@@ -76,6 +83,13 @@ export interface ChatTimelineState {
    * Atomic `assistant-text` / `assistant-thinking` events for these are suppressed as redundant.
    */
   streamedMessageIds: Set<string>
+  /**
+   * Live permission mode reported by the running subprocess. Sourced from
+   * `turn-init.permissionMode` (one per session start / kill+respawn).
+   * Subprocess is the source of truth — DB caches it via main-side persistence.
+   * Raw CLI value: 'plan' | 'acceptEdits' | 'auto' | 'bypassPermissions' | 'default' | 'dontAsk'.
+   */
+  permissionMode: string | null
 }
 
 export function initialState(): ChatTimelineState {
@@ -94,6 +108,7 @@ export function initialState(): ChatTimelineState {
     currentStreamMessageId: null,
     openBlocks: new Map(),
     streamedMessageIds: new Set(),
+    permissionMode: null,
   }
 }
 
@@ -191,10 +206,16 @@ function applyEvent(state: ChatTimelineState, event: AgentEvent): ChatTimelineSt
           sessionStarted: true,
           sessionId: event.sessionId,
           model: event.model,
+          permissionMode: event.permissionMode ?? null,
         }
       }
       if (state.sessionStarted) {
-        return { ...state, sessionId: event.sessionId, model: event.model }
+        return {
+          ...state,
+          sessionId: event.sessionId,
+          model: event.model,
+          permissionMode: event.permissionMode ?? state.permissionMode,
+        }
       }
       const item: TimelineItem = {
         kind: 'session-start',
@@ -217,6 +238,7 @@ function applyEvent(state: ChatTimelineState, event: AgentEvent): ChatTimelineSt
         sessionEnded: false,
         exitCode: null,
         exitSignal: null,
+        permissionMode: event.permissionMode ?? state.permissionMode,
       }
     }
     case 'assistant-text': {
@@ -488,9 +510,27 @@ function applyEvent(state: ChatTimelineState, event: AgentEvent): ChatTimelineSt
         copyText,
         timestamp: ts,
       }
+      // Mark any tools the SDK denied this turn — `result.permissionDenials`
+      // is the authoritative source (e.g. `ExitPlanMode` in plan mode).
+      let nextTimeline = [...state.timeline, item]
+      const denials = Array.isArray(event.permissionDenials) ? event.permissionDenials : []
+      for (const denial of denials) {
+        const id = (denial as { tool_use_id?: string } | null)?.tool_use_id
+        if (!id) continue
+        const idx = state.toolIndex.get(id)
+        if (idx === undefined) continue
+        const target = nextTimeline[idx]
+        if (target?.kind !== 'tool' || target.invocation.denied) continue
+        nextTimeline = nextTimeline.slice()
+        nextTimeline[idx] = {
+          kind: 'tool',
+          invocation: { ...target.invocation, status: 'denied', denied: true },
+          timestamp: target.timestamp,
+        }
+      }
       return {
         ...state,
-        timeline: [...state.timeline, item],
+        timeline: nextTimeline,
         lastResult: item,
         resultCount: state.resultCount + 1,
       }

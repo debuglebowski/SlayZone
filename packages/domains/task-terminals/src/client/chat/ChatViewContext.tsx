@@ -1,4 +1,5 @@
 import { createContext, useContext } from 'react'
+import type { AgentMode } from '@slayzone/ui'
 
 export interface ChatViewState {
   /**
@@ -18,6 +19,14 @@ export interface ChatViewState {
     query: string
     caseSensitive: boolean
   }
+  /**
+   * Switch the chat's permission mode. Wired by ChatPanel to `useChatMode`'s
+   * handleModeChange. Renderers consume it for inline approval flows — e.g.
+   * the ExitPlanMode tool exposes an "Approve & exit plan" button that calls
+   * `setChatMode('auto-accept')`, which kills + respawns the subprocess with
+   * the new flag.
+   */
+  setChatMode?: (next: AgentMode) => void
 }
 
 export const ChatViewContext = createContext<ChatViewState>({

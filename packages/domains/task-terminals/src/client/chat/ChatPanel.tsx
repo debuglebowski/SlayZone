@@ -73,7 +73,7 @@ const SUGGESTED_PROMPTS = [
 
 export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function ChatPanel(props, ref) {
   const { tabId, taskId, mode, cwd, providerFlagsOverride, permissionNotice: overrideNotice, onSetDisplayMode, loopConfig, onLoopConfigChange, onOpenLoopDialog } = props
-  const { state, timeline, inFlight, hydrating, sendMessage, interrupt, reset: resetTimeline } = useChatSession({
+  const { state, timeline, inFlight, hydrating, permissionMode, sendMessage, interrupt, reset: resetTimeline } = useChatSession({
     tabId,
     taskId,
     mode,
@@ -95,7 +95,9 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
   const [draft, setDraft] = useState('')
   const [cursorPos, setCursorPos] = useState(0)
   const [sessionIdCopied, setSessionIdCopied] = useState(false)
-  const { chatMode, modeChanging, handleModeChange, autoCapability } = useChatMode({ taskId, mode, tabId, cwd })
+  const { chatMode, modeChanging, handleModeChange, autoCapability } = useChatMode({
+    taskId, mode, tabId, cwd, livePermissionMode: permissionMode,
+  })
   const [collapseSignal, setCollapseSignal] = useState(0)
   const [finalOnly, setFinalOnly] = useState(false)
   const [queuedMessages, setQueuedMessages] = useState<string[]>([])
@@ -271,8 +273,13 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
 
 
   const chatView = useMemo(
-    () => ({ collapseSignal, finalOnly, search: { query: search.query, caseSensitive: search.caseSensitive } }),
-    [collapseSignal, finalOnly, search.query, search.caseSensitive],
+    () => ({
+      collapseSignal,
+      finalOnly,
+      search: { query: search.query, caseSensitive: search.caseSensitive },
+      setChatMode: (next: typeof chatMode) => { void handleModeChange(next) },
+    }),
+    [collapseSignal, finalOnly, search.query, search.caseSensitive, handleModeChange],
   )
 
   // Autosize textarea. Height follows scrollHeight up to 240px; no artificial min —

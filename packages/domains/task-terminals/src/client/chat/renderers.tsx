@@ -277,6 +277,7 @@ function ToolShell({
 function StatusIcon({ status }: { status: ToolInvocation['status'] }) {
   if (status === 'pending') return <Loader2 className="size-3 animate-spin text-muted-foreground shrink-0" />
   if (status === 'error') return <CircleX className="size-3 text-destructive shrink-0" />
+  if (status === 'denied') return <CircleX className="size-3 text-amber-500 shrink-0" />
   return <CircleCheck className="size-3 text-emerald-500 shrink-0" />
 }
 
@@ -484,6 +485,8 @@ export function ToolCallTodoWrite({ invocation }: ToolProps) {
 export function ToolCallExitPlanMode({ invocation }: ToolProps) {
   const input = invocation.input as { plan?: string } | null
   const plan = input?.plan ?? ''
+  const denied = invocation.denied === true
+  const { setChatMode } = useChatView()
   return (
     <div className="px-4 py-3">
       <div className="flex gap-3 items-start">
@@ -499,6 +502,22 @@ export function ToolCallExitPlanMode({ invocation }: ToolProps) {
           {plan && (
             <div className="px-3 py-2 text-sm leading-relaxed [&_p]:my-2 [&_p:first-child]:mt-0 [&_p:last-child]:mb-0 [&_pre]:my-3 [&_ul]:my-2 [&_ol]:my-2 [&_h1]:text-base [&_h1]:font-semibold [&_h1]:mt-4 [&_h2]:text-sm [&_h2]:font-semibold [&_h2]:mt-3 [&_h3]:text-sm [&_h3]:font-medium [&_code]:font-mono [&_code]:text-[0.85em]">
               <GhMarkdown>{plan}</GhMarkdown>
+            </div>
+          )}
+          {denied && (
+            <div className="border-t border-amber-500/20 bg-amber-500/10 px-3 py-2 flex items-center gap-2 text-xs text-amber-800 dark:text-amber-300">
+              <span className="flex-1">
+                Plan-mode exit blocked — the SDK requires explicit approval.
+                Approve to switch to auto-accept and re-run the plan.
+              </span>
+              {setChatMode && (
+                <button
+                  onClick={() => setChatMode('auto-accept')}
+                  className="shrink-0 rounded-md border border-amber-500/40 bg-amber-500/20 hover:bg-amber-500/30 px-2 py-1 font-medium text-amber-900 dark:text-amber-200 transition-colors"
+                >
+                  Approve & exit plan
+                </button>
+              )}
             </div>
           )}
         </div>
