@@ -37,6 +37,7 @@ function mapModeRow(row: any): TerminalModeInfo {
     type: row.type,
     initialCommand: row.initial_command,
     resumeCommand: row.resume_command,
+    headlessCommand: row.headless_command ?? null,
     defaultFlags: row.default_flags,
     enabled: Boolean(row.enabled),
     isBuiltin: Boolean(row.is_builtin),
@@ -84,14 +85,15 @@ export function registerPtyHandlers(ipcMain: IpcMain, db: Database): void {
   ipcMain.handle('terminalModes:create', async (_, input: CreateTerminalModeInput) => {
     const id = input.id
     db.prepare(`
-      INSERT INTO terminal_modes (id, label, type, initial_command, resume_command, default_flags, enabled, is_builtin, "order", pattern_attention, pattern_working, pattern_error, usage_config)
-      VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?)
+      INSERT INTO terminal_modes (id, label, type, initial_command, resume_command, headless_command, default_flags, enabled, is_builtin, "order", pattern_attention, pattern_working, pattern_error, usage_config)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?)
     `).run(
       id,
       input.label,
       input.type,
       input.initialCommand ?? null,
       input.resumeCommand ?? null,
+      input.headlessCommand ?? null,
       input.defaultFlags ?? null,
       input.enabled !== false ? 1 : 0,
       input.order ?? 0,
@@ -126,6 +128,10 @@ export function registerPtyHandlers(ipcMain: IpcMain, db: Database): void {
     if (updates.resumeCommand !== undefined && !isBuiltin) {
       sets.push('resume_command = ?')
       params.push(updates.resumeCommand ?? null)
+    }
+    if (updates.headlessCommand !== undefined) {
+      sets.push('headless_command = ?')
+      params.push(updates.headlessCommand ?? null)
     }
     if (updates.defaultFlags !== undefined) {
       sets.push('default_flags = ?')
@@ -178,8 +184,8 @@ export function registerPtyHandlers(ipcMain: IpcMain, db: Database): void {
   ipcMain.handle('terminalModes:restoreDefaults', async () => {
     db.transaction(() => {
       const insertStmt = db.prepare(`
-        INSERT OR IGNORE INTO terminal_modes (id, label, type, initial_command, resume_command, default_flags, enabled, is_builtin, "order")
-        VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?)
+        INSERT OR IGNORE INTO terminal_modes (id, label, type, initial_command, resume_command, headless_command, default_flags, enabled, is_builtin, "order")
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?)
       `)
       for (const mode of DEFAULT_TERMINAL_MODES) {
         insertStmt.run(
@@ -188,6 +194,7 @@ export function registerPtyHandlers(ipcMain: IpcMain, db: Database): void {
           mode.type,
           mode.initialCommand ?? null,
           mode.resumeCommand ?? null,
+          mode.headlessCommand ?? null,
           mode.defaultFlags ?? null,
           mode.enabled ? 1 : 0,
           mode.order
@@ -200,8 +207,8 @@ export function registerPtyHandlers(ipcMain: IpcMain, db: Database): void {
     db.transaction(() => {
       db.prepare('DELETE FROM terminal_modes').run()
       const insertStmt = db.prepare(`
-        INSERT INTO terminal_modes (id, label, type, initial_command, resume_command, default_flags, enabled, is_builtin, "order")
-        VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?)
+        INSERT INTO terminal_modes (id, label, type, initial_command, resume_command, headless_command, default_flags, enabled, is_builtin, "order")
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?)
       `)
       for (const mode of DEFAULT_TERMINAL_MODES) {
         insertStmt.run(
@@ -210,6 +217,7 @@ export function registerPtyHandlers(ipcMain: IpcMain, db: Database): void {
           mode.type,
           mode.initialCommand ?? null,
           mode.resumeCommand ?? null,
+          mode.headlessCommand ?? null,
           mode.defaultFlags ?? null,
           mode.enabled ? 1 : 0,
           mode.order

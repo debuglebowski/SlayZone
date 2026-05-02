@@ -17,6 +17,12 @@ export interface TerminalModeInfo {
   type: string
   initialCommand?: string | null
   resumeCommand?: string | null
+  /**
+   * Non-interactive invocation template w/ `{prompt}` + `{flags}` slots.
+   * Null = mode has no headless capability (e.g. plain `terminal`).
+   * Powers automations' AI action — see @slayzone/automations/shared `buildAiHeadlessCommand`.
+   */
+  headlessCommand?: string | null
   defaultFlags?: string | null
   enabled: boolean
   isBuiltin: boolean
@@ -33,6 +39,7 @@ export interface CreateTerminalModeInput {
   type: string
   initialCommand?: string | null
   resumeCommand?: string | null
+  headlessCommand?: string | null
   defaultFlags?: string | null
   enabled?: boolean
   order?: number
@@ -47,6 +54,7 @@ export interface UpdateTerminalModeInput {
   type?: string
   initialCommand?: string | null
   resumeCommand?: string | null
+  headlessCommand?: string | null
   defaultFlags?: string | null
   enabled?: boolean
   order?: number
@@ -73,14 +81,14 @@ export const DETECTION_ENGINES: DetectionEngine[] = [
 ]
 
 export const DEFAULT_TERMINAL_MODES: TerminalModeInfo[] = [
-  { id: BuiltinTerminalMode.ClaudeCode, label: 'Claude', type: 'claude-code', initialCommand: 'claude --session-id {id} {flags}', resumeCommand: 'claude --resume {id} {flags}', defaultFlags: '--allow-dangerously-skip-permissions', enabled: true, isBuiltin: true, order: 0 },
-  { id: BuiltinTerminalMode.Codex, label: 'Codex', type: 'codex', initialCommand: 'codex {flags}', resumeCommand: 'codex {flags} resume {id}', defaultFlags: '--full-auto --search', enabled: true, isBuiltin: true, order: 1 },
-  { id: BuiltinTerminalMode.Gemini, label: 'Gemini', type: 'gemini', initialCommand: 'gemini {flags}', resumeCommand: 'gemini --resume latest {flags}', defaultFlags: '--yolo', enabled: true, isBuiltin: true, order: 2 },
-  { id: BuiltinTerminalMode.CursorAgent, label: 'Cursor', type: 'cursor-agent', initialCommand: 'cursor-agent {flags}', resumeCommand: 'cursor-agent --resume {id} {flags}', defaultFlags: '--force', enabled: true, isBuiltin: true, order: 3 },
-  { id: BuiltinTerminalMode.OpenCode, label: 'OpenCode', type: 'opencode', initialCommand: 'opencode {flags}', resumeCommand: 'opencode --session {id} {flags}', defaultFlags: '', enabled: true, isBuiltin: true, order: 4 },
-  { id: BuiltinTerminalMode.QwenCode, label: 'Qwen', type: 'qwen-code', initialCommand: 'qwen --session-id {id} {flags}', resumeCommand: 'qwen --resume {id} {flags}', defaultFlags: '--yolo', enabled: true, isBuiltin: true, order: 6 },
-  { id: BuiltinTerminalMode.Copilot, label: 'Copilot', type: 'copilot', initialCommand: 'copilot --resume={id} {flags}', resumeCommand: 'copilot --resume={id} {flags}', defaultFlags: '--allow-all-tools', enabled: true, isBuiltin: true, order: 7 },
-  { id: 'terminal', label: 'Terminal', type: 'terminal', initialCommand: null, resumeCommand: null, defaultFlags: null, enabled: true, isBuiltin: true, order: 8 },
+  { id: BuiltinTerminalMode.ClaudeCode, label: 'Claude', type: 'claude-code', initialCommand: 'claude --session-id {id} {flags}', resumeCommand: 'claude --resume {id} {flags}', headlessCommand: 'claude -p {prompt} {flags}', defaultFlags: '--allow-dangerously-skip-permissions', enabled: true, isBuiltin: true, order: 0 },
+  { id: BuiltinTerminalMode.Codex, label: 'Codex', type: 'codex', initialCommand: 'codex {flags}', resumeCommand: 'codex {flags} resume {id}', headlessCommand: 'codex exec {flags} {prompt}', defaultFlags: '--full-auto --search', enabled: true, isBuiltin: true, order: 1 },
+  { id: BuiltinTerminalMode.Gemini, label: 'Gemini', type: 'gemini', initialCommand: 'gemini {flags}', resumeCommand: 'gemini --resume latest {flags}', headlessCommand: 'gemini -p {prompt} {flags}', defaultFlags: '--yolo', enabled: true, isBuiltin: true, order: 2 },
+  { id: BuiltinTerminalMode.CursorAgent, label: 'Cursor', type: 'cursor-agent', initialCommand: 'cursor-agent {flags}', resumeCommand: 'cursor-agent --resume {id} {flags}', headlessCommand: 'cursor-agent -p {prompt} {flags}', defaultFlags: '--force', enabled: true, isBuiltin: true, order: 3 },
+  { id: BuiltinTerminalMode.OpenCode, label: 'OpenCode', type: 'opencode', initialCommand: 'opencode {flags}', resumeCommand: 'opencode --session {id} {flags}', headlessCommand: 'opencode run {flags} {prompt}', defaultFlags: '', enabled: true, isBuiltin: true, order: 4 },
+  { id: BuiltinTerminalMode.QwenCode, label: 'Qwen', type: 'qwen-code', initialCommand: 'qwen --session-id {id} {flags}', resumeCommand: 'qwen --resume {id} {flags}', headlessCommand: 'qwen -p {prompt} {flags}', defaultFlags: '--yolo', enabled: true, isBuiltin: true, order: 6 },
+  { id: BuiltinTerminalMode.Copilot, label: 'Copilot', type: 'copilot', initialCommand: 'copilot --resume={id} {flags}', resumeCommand: 'copilot --resume={id} {flags}', headlessCommand: 'copilot -p {prompt} {flags}', defaultFlags: '--allow-all-tools', enabled: true, isBuiltin: true, order: 7 },
+  { id: 'terminal', label: 'Terminal', type: 'terminal', initialCommand: null, resumeCommand: null, headlessCommand: null, defaultFlags: null, enabled: true, isBuiltin: true, order: 8 },
 ]
 
 // Duplicated from @slayzone/projects/shared — neither domain can depend on the

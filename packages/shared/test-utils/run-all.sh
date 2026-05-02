@@ -39,6 +39,7 @@ run_test packages/domains/integrations/src/main/handlers.api.test.ts
 run_test packages/domains/integrations/src/main/handlers.analyze.test.ts
 run_test packages/domains/automations/src/shared/templates.test.ts
 run_test packages/domains/automations/src/shared/types.test.ts
+run_test packages/domains/automations/src/shared/ai.test.ts
 run_test packages/domains/automations/src/main/handlers.test.ts
 run_test packages/domains/automations/src/main/engine.test.ts
 

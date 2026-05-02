@@ -2304,6 +2304,19 @@ const migrations: Migration[] = [
     up: (db) => {
       db.exec(`ALTER TABLE automations ADD COLUMN catchup_on_start INTEGER NOT NULL DEFAULT 1;`)
     }
+  },
+  {
+    version: 125,
+    up: (db) => {
+      // Headless command template per terminal mode — recipe for non-interactive
+      // CLI invocation w/ {prompt} + {flags} slots. Powers automations' AI action.
+      // Null = mode does not support headless mode (e.g. plain 'terminal').
+      // Builtins seeded by startup-sync; users can edit per-row for custom modes.
+      const cols = db.prepare("PRAGMA table_info(terminal_modes)").all() as { name: string }[]
+      if (!cols.some(c => c.name === 'headless_command')) {
+        db.exec(`ALTER TABLE terminal_modes ADD COLUMN headless_command TEXT;`)
+      }
+    }
   }
 ]
 

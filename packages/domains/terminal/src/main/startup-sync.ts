@@ -9,13 +9,13 @@ import { DEFAULT_TERMINAL_MODES } from '../shared/types'
 export function syncTerminalModes(db: Database): void {
   db.transaction(() => {
     const insertStmt = db.prepare(`
-      INSERT INTO terminal_modes (id, label, type, initial_command, resume_command, default_flags, enabled, is_builtin, "order")
-      VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?)
+      INSERT INTO terminal_modes (id, label, type, initial_command, resume_command, headless_command, default_flags, enabled, is_builtin, "order")
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?)
     `)
 
     const updateStmt = db.prepare(`
       UPDATE terminal_modes
-      SET label = ?, type = ?, initial_command = ?, resume_command = ?, is_builtin = 1, updated_at = datetime('now')
+      SET label = ?, type = ?, initial_command = ?, resume_command = ?, headless_command = ?, is_builtin = 1, updated_at = datetime('now')
       WHERE id = ?
     `)
 
@@ -41,6 +41,7 @@ export function syncTerminalModes(db: Database): void {
           mode.type,
           mode.initialCommand ?? null,
           mode.resumeCommand ?? null,
+          mode.headlessCommand ?? null,
           mode.id
         )
       } else {
@@ -51,6 +52,7 @@ export function syncTerminalModes(db: Database): void {
           mode.type,
           mode.initialCommand ?? null,
           mode.resumeCommand ?? null,
+          mode.headlessCommand ?? null,
           mode.defaultFlags ?? null,
           mode.enabled ? 1 : 0,
           mode.order
