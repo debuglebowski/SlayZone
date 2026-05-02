@@ -122,12 +122,10 @@ export function ThinkingBlock({ item }: { item: Extract<TimelineItem, { kind: 't
 
 export function SystemInit({ item }: { item: Extract<TimelineItem, { kind: 'session-start' }> }) {
   return (
-    <div className="px-4 py-3 flex items-center gap-2 text-[11px] text-muted-foreground/60">
-      <div className="flex-1 h-px bg-border/40" />
+    <div className="px-4 py-3 flex items-center justify-center gap-2 text-[11px] text-muted-foreground/60">
       <span className="font-mono">{item.model}</span>
       <span>·</span>
       <span>{item.tools.length} tools</span>
-      <div className="flex-1 h-px bg-border/40" />
     </div>
   )
 }
@@ -531,4 +529,52 @@ export const toolRenderers: Record<string, React.FC<ToolProps>> = {
 export function renderTool(invocation: ToolInvocation): React.JSX.Element {
   const R = toolRenderers[invocation.name] ?? ToolCallGeneric
   return <R invocation={invocation} />
+}
+
+/**
+ * Items the dispatcher renders as `null`. Virtualized lists must filter these
+ * before counting, otherwise reserved slot heights leave ghost gaps.
+ */
+export function isRenderable(item: TimelineItem): boolean {
+  if (item.kind === 'session-start') return false
+  if (item.kind === 'rate-limit' && item.status === 'allowed') return false
+  return true
+}
+
+/** Single dispatcher used by ChatPanel + the dev harness. */
+export function renderTimelineItem(item: TimelineItem, key: React.Key): React.JSX.Element | null {
+  switch (item.kind) {
+    case 'user-text':
+      return <UserMessage key={key} item={item} />
+    case 'text':
+      return <AssistantText key={key} item={item} />
+    case 'thinking':
+      return <ThinkingBlock key={key} item={item} />
+    case 'tool':
+      return <div key={key}>{renderTool(item.invocation)}</div>
+    case 'session-start':
+      return null
+    case 'result':
+      return <ResultFooter key={key} item={item} />
+    case 'api-retry':
+      return <ApiRetryBanner key={key} item={item} />
+    case 'rate-limit':
+      return item.status === 'allowed' ? null : (
+        <div key={key} className="mx-4 my-1 text-[11px] text-amber-600">
+          rate limit: {item.status}
+        </div>
+      )
+    case 'sub-agent':
+      return (
+        <div key={key} className="mx-4 my-1 text-[11px] text-muted-foreground/70">
+          sub-agent: {item.phase}
+        </div>
+      )
+    case 'stderr':
+      return <StderrBlock key={key} item={item} />
+    case 'interrupted':
+      return <InterruptedBlock key={key} item={item} />
+    case 'unknown':
+      return <UnknownBlock key={key} item={item} />
+  }
 }

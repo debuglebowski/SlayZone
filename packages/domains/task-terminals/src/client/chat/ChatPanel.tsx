@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useVirtualizer } from '@tanstack/react-virtual'
 import { useStickToBottom } from 'use-stick-to-bottom'
 import {
   ArrowUp,
@@ -44,7 +43,7 @@ import { createFilesSource } from './autocomplete/sources/files'
 import type { AutocompleteSource, ChatActions, NavigateActions } from './autocomplete/types'
 import { resetChat } from './autocomplete/chat-actions'
 import { mergeEffortFlag } from './autocomplete/flags'
-import { renderTimelineItem } from './renderers'
+import { renderTimelineItem, isRenderable } from './renderers'
 
 export interface ChatPanelProps {
   tabId: string
@@ -204,10 +203,11 @@ export function ChatPanel(props: ChatPanelProps) {
   })
 
 
-  // When `finalOnly` is on, keep user msgs + session-start + result + the last assistant
+  // When `finalOnly` is on, keep user msgs + result + the last assistant
   // text per turn. Drop thinking/tools/intermediate text/noise.
+  // Always filter non-renderable items so virtualizer count matches visible DOM.
   const displayedTimeline = useMemo<TimelineItem[]>(() => {
-    if (!finalOnly) return timeline
+    if (!finalOnly) return timeline.filter(isRenderable)
     const out: TimelineItem[] = []
     // Track the most recent assistant-text index per turn, flushed on result or next user.
     let pendingFinal: TimelineItem | null = null
@@ -221,8 +221,6 @@ export function ChatPanel(props: ChatPanelProps) {
       if (item.kind === 'user-text') {
         flushPending()
         out.push(item)
-      } else if (item.kind === 'session-start') {
-        out.push(item)
       } else if (item.kind === 'text' && item.role === 'assistant') {
         pendingFinal = item
       } else if (item.kind === 'result') {
@@ -231,27 +229,19 @@ export function ChatPanel(props: ChatPanelProps) {
       }
     }
     flushPending()
-    return out
+    return out.filter(isRenderable)
   }, [timeline, finalOnly])
 
   const search = useChatSearch(displayedTimeline)
 
-  const virtualizer = useVirtualizer({
-    count: displayedTimeline.length,
-    getScrollElement: () => scrollRef.current as HTMLElement | null,
-    estimateSize: () => 120,
-    overscan: 4,
-    getItemKey: (index) => {
-      const item = displayedTimeline[index]
-      if (!item) return index
-      // Stable per-item keys so streaming text updates re-measure the same DOM node.
-      if (item.kind === 'text' || item.kind === 'thinking') return `${item.kind}:${item.messageId}`
-      if (item.kind === 'tool') return `tool:${item.invocation.id}`
-      if (item.kind === 'session-start') return `session:${item.sessionId}`
-      if (item.kind === 'result') return `result:${item.timestamp}`
-      return `${item.kind}:${index}`
-    },
-  })
+  // Stable per-item keys so streaming text updates re-render the same DOM node.
+  const itemKey = useCallback((item: TimelineItem, index: number): React.Key => {
+    if (item.kind === 'text' || item.kind === 'thinking') return `${item.kind}:${item.messageId}`
+    if (item.kind === 'tool') return `tool:${item.invocation.id}`
+    if (item.kind === 'session-start') return `session:${item.sessionId}`
+    if (item.kind === 'result') return `result:${item.timestamp}`
+    return `${item.kind}:${index}`
+  }, [])
 
 
   const chatView = useMemo(
@@ -387,23 +377,25 @@ export function ChatPanel(props: ChatPanelProps) {
       }
       if (mod && e.key === 'ArrowUp') {
         e.preventDefault()
-        if (displayedTimeline.length > 0) virtualizer.scrollToIndex(0, { align: 'start' })
+        scrollRef.current?.scrollTo({ top: 0 })
         return
       }
       if (mod && e.key === 'ArrowDown') {
         e.preventDefault()
-        if (displayedTimeline.length > 0) virtualizer.scrollToIndex(displayedTimeline.length - 1, { align: 'end' })
+        const el = scrollRef.current
+        if (el) el.scrollTo({ top: el.scrollHeight })
       }
     }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
-  }, [displayedTimeline.length, virtualizer])
+  }, [scrollRef])
 
-  // Scroll virtualizer to the active match.
+  // Scroll to the active match.
   useEffect(() => {
     if (search.activeItemIdx < 0) return
-    virtualizer.scrollToIndex(search.activeItemIdx, { align: 'center' })
-  }, [search.activeItemIdx, virtualizer])
+    const el = scrollRef.current?.querySelector<HTMLElement>(`[data-index="${search.activeItemIdx}"]`)
+    el?.scrollIntoView({ block: 'center' })
+  }, [search.activeItemIdx, scrollRef])
 
   const copyAllMessages = useCallback(() => {
     const text = displayedTimeline
