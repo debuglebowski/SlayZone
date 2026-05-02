@@ -204,6 +204,50 @@ comparison_axes:
       - github-license-pr
     last_checked: 2026-03-27
 
+editorial:
+  eyebrow: Head-to-head / core competitor
+  title: SlayZone vs Superset.sh
+  summary: Same desktop-agent DNA. Different product thesis. SlayZone optimizes for task-first orchestration; Superset optimizes for workspace-first agent execution.
+  verdict: Pick SlayZone if you want parallel agent work to stay legible on a board. Pick Superset if you already think in worktrees, terminals, and branch-first desktop shells.
+  verdict_tag: Closest architectural competitor
+  about_heading: Workspace-first agent execution
+  about_kicker: About Superset
+  what: Desktop terminal multiplexer for orchestrating parallel CLI coding agents across isolated git worktrees. Workspace-first — the organizational primitive is the worktree, not the task card. Ships with real PTY, CodeMirror diff viewer, embedded browser, and cloud-synced task table.
+  strengths:
+    - Daemon-based terminal session persistence across crashes — genuinely better than most competitors.
+    - Near-daily release cadence (~100+ releases in 5 months) shows strong execution velocity.
+    - Two MCP servers (26 tools) provide rich external integration surface.
+    - Automatic worktree creation with configurable setup/teardown scripts and port allocation.
+    - Enterprise logos (Microsoft, OpenAI, Netflix, Google) suggest real adoption traction.
+  weaknesses:
+    - Mandatory login for local worktree access — "local-first" marketing is misleading given cloud auth dependency.
+    - No kanban board or visual project management — workspace sidebar is not a PM tool.
+    - ELv2 license (source-available, not OSS) — was previously misrepresented as Apache 2.0.
+    - macOS-primary. Linux via AppImage (Feb 2026), Windows not yet shipped.
+    - Mastra chat routes through Fly.io — privacy gap for users expecting local-only operation.
+  pick_slayzone:
+    - Your work lives on a kanban board — tasks, statuses, subtasks, drag-and-drop.
+    - You need the app to run fully offline with no account or cloud sync.
+    - You sync issues with Linear, GitHub Issues, or Jira and want them tied to task cards.
+    - You want Windows and Linux support, not just macOS.
+  pick_competitor:
+    - You want terminal sessions to survive app crashes via a persistent daemon process.
+    - Your team is already on Clerk auth and cloud-synced tasks via ElectricSQL.
+    - You rely on the 26-tool MCP surface for browser automation and task tooling.
+    - You want per-workspace port allocation and configurable setup/teardown scripts.
+  scorecard_axes:
+    - kanban_board
+    - local_first
+    - real_terminal
+    - embedded_browser
+    - git_worktree_isolation
+    - mcp_server
+  slayzone_weaknesses:
+    - No daemon-based terminal persistence — Superset's crash-recovery session model is stronger here.
+    - Fewer MCP tools (growing) vs Superset's 26-tool surface.
+    - No enterprise positioning or team/org features yet.
+    - Younger community — smaller star count and less third-party coverage.
+
 assets:
   - path: assets/homepage-hero.png
     caption: Homepage hero showing workspace sidebar, terminal with Claude Code, and changes panel.

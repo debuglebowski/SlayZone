@@ -95,7 +95,7 @@ comparison_axes:
   git_worktree_isolation:
     verdict: yes
     confidence: high
-    note: First-class since v2.1.50. `claude --worktree` creates isolated git worktree with own branch. Subagents can use `isolation: worktree` in frontmatter.
+    note: "First-class since v2.1.50. `claude --worktree` creates isolated git worktree with own branch. Subagents can use `isolation: worktree` in frontmatter."
     source_ids:
       - docs-workflows
     last_checked: 2026-03-27

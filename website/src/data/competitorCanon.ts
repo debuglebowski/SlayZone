@@ -1,4 +1,4 @@
-import { readFile } from 'node:fs/promises'
+import { readFile, readdir } from 'node:fs/promises'
 import path from 'node:path'
 import yaml from 'js-yaml'
 
@@ -18,6 +18,23 @@ export interface CompetitorAsset {
   proves: string
   source_url: string
   captured_on: string
+}
+
+export interface CompetitorEditorial {
+  eyebrow: string
+  title: string
+  summary: string
+  verdict: string
+  verdict_tag: string
+  about_heading: string
+  about_kicker: string
+  what: string
+  strengths: string[]
+  weaknesses: string[]
+  pick_slayzone: string[]
+  pick_competitor: string[]
+  scorecard_axes: string[]
+  slayzone_weaknesses: string[]
 }
 
 export interface CompetitorCanon {
@@ -41,6 +58,7 @@ export interface CompetitorCanon {
   }
   comparison_axes: Record<string, ComparisonAxis>
   assets?: CompetitorAsset[]
+  editorial?: CompetitorEditorial
 }
 
 const frontmatterPattern = /^---\n([\s\S]*?)\n---\n/
@@ -81,4 +99,22 @@ export async function getCompetitorCanon(slug: string): Promise<CompetitorCanon>
   const parsed = yaml.load(match[1])
   assertCanon(parsed, slug)
   return normalizeDates(parsed)
+}
+
+// Returns slugs for every competitor folder in `comparison/` that has an
+// `index.md`. Skips legacy/template/research/asset folders (those start with `_`).
+export async function listCompetitorSlugs(): Promise<string[]> {
+  const root = path.resolve(process.cwd(), '..', 'comparison')
+  const entries = await readdir(root, { withFileTypes: true })
+  return entries
+    .filter((e) => e.isDirectory() && !e.name.startsWith('_') && e.name !== 'assets')
+    .map((e) => e.name)
+}
+
+// Returns canons for every competitor that has an `editorial` block —
+// i.e. is ready to render a head-to-head page.
+export async function listEditorialCompetitors(): Promise<CompetitorCanon[]> {
+  const slugs = await listCompetitorSlugs()
+  const canons = await Promise.all(slugs.map(getCompetitorCanon))
+  return canons.filter((c) => c.editorial)
 }

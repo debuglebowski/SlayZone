@@ -111,15 +111,6 @@ const axisConfig: Record<HeadToHeadAxisKey, SlayZoneAxis> = {
   },
 }
 
-export const supersetScorecardKeys: HeadToHeadAxisKey[] = [
-  'kanban_board',
-  'local_first',
-  'real_terminal',
-  'embedded_browser',
-  'git_worktree_isolation',
-  'mcp_server',
-]
-
 const axisOrder: HeadToHeadAxisKey[] = [
   'kanban_board',
   'local_first',
@@ -133,74 +124,6 @@ const axisOrder: HeadToHeadAxisKey[] = [
   'pr_review_workflow',
   'native_desktop',
   'cli_companion',
-]
-
-export interface HeadToHeadPage {
-  slug: string
-  title: string
-  summary: string
-}
-
-export const supersetEditorial = {
-  eyebrow: 'Head-to-head / core competitor',
-  title: 'SlayZone vs Superset.sh',
-  summary:
-    'Same desktop-agent DNA. Different product thesis. SlayZone optimizes for task-first orchestration; Superset optimizes for workspace-first agent execution.',
-  verdict:
-    'Pick SlayZone if you want parallel agent work to stay legible on a board. Pick Superset if you already think in worktrees, terminals, and branch-first desktop shells.',
-  pickSlayzone: [
-    'Your work lives on a kanban board — tasks, statuses, subtasks, drag-and-drop.',
-    'You need the app to run fully offline with no account or cloud sync.',
-    'You sync issues with Linear, GitHub Issues, or Jira and want them tied to task cards.',
-    'You want Windows and Linux support, not just macOS.',
-  ],
-  pickCompetitor: [
-    'You want terminal sessions to survive app crashes via a persistent daemon process.',
-    'Your team is already on Clerk auth and cloud-synced tasks via ElectricSQL.',
-    'You rely on the 26-tool MCP surface for browser automation and task tooling.',
-    'You want per-workspace port allocation and configurable setup/teardown scripts.',
-  ],
-  slayzone: {
-    what: 'Desktop kanban for AI coding agents. Every card hides a terminal, browser, git worktree, and code editor. Task-first orchestration — the board is the control surface, and each task owns its own isolated workspace.',
-    strengths: [
-      'Kanban board is primary UX — task visibility, status flow, drag-and-drop, subtasks, dependencies.',
-      'Fully local-first: no login, no cloud sync, no mandatory account. SQLite on your machine.',
-      'Per-task isolation: each card owns its own terminal sessions, browser pane, worktree, and editor.',
-      'CLI companion (`slay`) mirrors task and browser workflows from any shell.',
-      'Issue sync with Linear, GitHub Issues, and Jira for teams that plan externally.',
-    ],
-    weaknesses: [
-      'No daemon-based terminal persistence — Superset\'s crash-recovery session model is stronger here.',
-      'Fewer MCP tools (growing) vs Superset\'s 26-tool surface.',
-      'No enterprise positioning or team/org features yet.',
-      'Younger community — smaller star count and less third-party coverage.',
-    ],
-  },
-  superset: {
-    what: 'Desktop terminal multiplexer for orchestrating parallel CLI coding agents across isolated git worktrees. Workspace-first — the organizational primitive is the worktree, not the task card. Ships with real PTY, CodeMirror diff viewer, embedded browser, and cloud-synced task table.',
-    strengths: [
-      'Daemon-based terminal session persistence across crashes — genuinely better than most competitors.',
-      'Near-daily release cadence (~100+ releases in 5 months) shows strong execution velocity.',
-      'Two MCP servers (26 tools) provide rich external integration surface.',
-      'Automatic worktree creation with configurable setup/teardown scripts and port allocation.',
-      'Enterprise logos (Microsoft, OpenAI, Netflix, Google) suggest real adoption traction.',
-    ],
-    weaknesses: [
-      'Mandatory login for local worktree access — "local-first" marketing is misleading given cloud auth dependency.',
-      'No kanban board or visual project management — workspace sidebar is not a PM tool.',
-      'ELv2 license (source-available, not OSS) — was previously misrepresented as Apache 2.0.',
-      'macOS-primary. Linux via AppImage (Feb 2026), Windows not yet shipped.',
-      'Mastra chat routes through Fly.io — privacy gap for users expecting local-only operation.',
-    ],
-  },
-}
-
-export const headToHeadPages: HeadToHeadPage[] = [
-  {
-    slug: 'superset',
-    title: supersetEditorial.title,
-    summary: supersetEditorial.summary,
-  },
 ]
 
 export function buildHeadToHeadRows(

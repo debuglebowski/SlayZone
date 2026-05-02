@@ -1,42 +1,79 @@
 ---
-import BaseLayout from '../layouts/BaseLayout.astro'
-import SiteNav from '../components/SiteNav.astro'
-import SiteFooter from '../components/SiteFooter.astro'
-import VerdictBadge from '../components/comparison/VerdictBadge.astro'
-import HeadToHeadMatrix from '../components/comparison/HeadToHeadMatrix.astro'
-import { getCompetitorCanon } from '../data/competitorCanon'
-import { buildHeadToHeadRows, supersetEditorial, supersetScorecardKeys } from '../data/headToHead'
-import supersetHero from '../../../comparison/superset/assets/homepage-hero.png'
-import slayzoneHero from '../../../comparison/assets/slayzone-homepage-hero.png'
+import type { ImageMetadata } from 'astro'
+import type { GetStaticPaths } from 'astro'
+import BaseLayout from '../../layouts/BaseLayout.astro'
+import SiteNav from '../../components/SiteNav.astro'
+import SiteFooter from '../../components/SiteFooter.astro'
+import VerdictBadge from '../../components/comparison/VerdictBadge.astro'
+import HeadToHeadMatrix from '../../components/comparison/HeadToHeadMatrix.astro'
+import { listEditorialCompetitors, type CompetitorCanon } from '../../data/competitorCanon'
+import { buildHeadToHeadRows, type HeadToHeadAxisKey } from '../../data/headToHead'
+import { slayzoneClaims } from '../../data/slayzoneClaims'
+import slayzoneHero from '../../../../comparison/assets/slayzone-homepage-hero.png'
 
-const competitor = await getCompetitorCanon('superset')
+export const getStaticPaths = (async () => {
+  const canons = await listEditorialCompetitors()
+  return canons.map((canon) => ({
+    params: { competitor: canon.slug },
+    props: { canon },
+  }))
+}) satisfies GetStaticPaths
+
+interface Props {
+  canon: CompetitorCanon
+}
+
+const { canon: competitor } = Astro.props as Props
+const editorial = competitor.editorial!
+
+const competitorHeroes = import.meta.glob<{ default: ImageMetadata }>(
+  '../../../../comparison/*/assets/homepage-hero.png',
+  { eager: true },
+)
+const competitorHeroPath = `../../../../comparison/${competitor.slug}/assets/homepage-hero.png`
+const competitorHero = competitorHeroes[competitorHeroPath]?.default
+if (!competitorHero) {
+  throw new Error(`Missing hero image at ${competitorHeroPath}`)
+}
+const competitorHeroAsset = competitor.assets?.[0]
+
 const allRows = buildHeadToHeadRows(competitor)
-const scorecardRows = buildHeadToHeadRows(competitor, supersetScorecardKeys)
+const scorecardRows = buildHeadToHeadRows(
+  competitor,
+  editorial.scorecard_axes as HeadToHeadAxisKey[],
+)
 const factBadges = [`Last checked ${competitor.last_checked}`]
+
+const issueTitle = `Comparison correction: SlayZone vs ${competitor.name}`
+const issueBody = 'Which claim is wrong or outdated?\n\nSource:\n\nSuggested fix:'
+const issueUrl = `https://github.com/debuglebowski/SlayZone/issues/new?title=${encodeURIComponent(issueTitle)}&body=${encodeURIComponent(issueBody)}`
+
+const pageTitle = `${editorial.title}`
+const pageDescription = editorial.summary
 ---
 
 <BaseLayout
-  title="SlayZone vs Superset.sh"
-  description="SlayZone vs Superset.sh compared: board-first AI agent orchestration, local-first kanban, real PTY terminals, embedded browser, MCP server, git worktrees."
-  canonicalPath="/superset/"
+  title={pageTitle}
+  description={pageDescription}
+  canonicalPath={`/comparison/${competitor.slug}`}
 >
   <Fragment slot="nav"><SiteNav current="comparison" /></Fragment>
 
   <!-- 1. Title card with screenshots, verdict, freshness -->
   <section class="hero">
     <div class="hero-copy">
-      <p class="eyebrow">{supersetEditorial.eyebrow}</p>
-      <h1>{supersetEditorial.title}</h1>
-      <p class="summary">{supersetEditorial.summary}</p>
+      <p class="eyebrow">{editorial.eyebrow}</p>
+      <h1>{editorial.title}</h1>
+      <p class="summary">{editorial.summary}</p>
       <div class="fact-badges">
         {factBadges.map((badge) => <span>{badge}</span>)}
       </div>
     </div>
     <aside class="verdict-card">
       <p class="verdict-label">Quick verdict</p>
-      <p class="verdict-text">{supersetEditorial.verdict}</p>
+      <p class="verdict-text">{editorial.verdict}</p>
       <div class="verdict-tags">
-        <span class="verdict-tag">Closest architectural competitor</span>
+        <span class="verdict-tag">{editorial.verdict_tag}</span>
       </div>
     </aside>
   </section>
@@ -48,23 +85,23 @@ const factBadges = [`Last checked ${competitor.last_checked}`]
           src={slayzoneHero.src}
           width={slayzoneHero.width}
           height={slayzoneHero.height}
-          alt="SlayZone homepage — kanban with terminals, card to terminal to agent workflow."
+          alt={slayzoneClaims.hero_alt}
           loading="eager"
         />
       </div>
-      <figcaption>SlayZone — kanban board with per-task terminals, browser, and worktree isolation.</figcaption>
+      <figcaption>{slayzoneClaims.hero_caption}</figcaption>
     </figure>
     <figure class="screenshot-fig competitor-fig">
       <div class="screenshot-media">
         <img
-          src={supersetHero.src}
-          width={supersetHero.width}
-          height={supersetHero.height}
-          alt="Superset workspace UI with terminal, workspace sidebar, and review panel."
+          src={competitorHero.src}
+          width={competitorHero.width}
+          height={competitorHero.height}
+          alt={competitorHeroAsset?.caption ?? `${competitor.name} product screenshot.`}
           loading="eager"
         />
       </div>
-      <figcaption>Superset — workspace sidebar, live agent terminal, and change-review panel.</figcaption>
+      {competitorHeroAsset && <figcaption>{competitor.name} — {competitorHeroAsset.caption}</figcaption>}
     </figure>
   </section>
 
@@ -73,13 +110,13 @@ const factBadges = [`Last checked ${competitor.last_checked}`]
     <article class="difference-card slayzone-card">
       <p class="card-kicker">Pick SlayZone if</p>
       <ul>
-        {supersetEditorial.pickSlayzone.map((item) => <li>{item}</li>)}
+        {editorial.pick_slayzone.map((item) => <li>{item}</li>)}
       </ul>
     </article>
     <article class="difference-card competitor-card">
-      <p class="card-kicker">Pick Superset if</p>
+      <p class="card-kicker">Pick {competitor.name} if</p>
       <ul>
-        {supersetEditorial.pickCompetitor.map((item) => <li>{item}</li>)}
+        {editorial.pick_competitor.map((item) => <li>{item}</li>)}
       </ul>
     </article>
   </section>
@@ -87,40 +124,40 @@ const factBadges = [`Last checked ${competitor.last_checked}`]
   <!-- 3. Per-product sections -->
   <section class="product-sections">
     <article class="product-block slayzone-block">
-      <p class="section-kicker">About SlayZone</p>
-      <h2>Task-first agent orchestration</h2>
-      <p class="product-what">{supersetEditorial.slayzone.what}</p>
+      <p class="section-kicker">{slayzoneClaims.about_kicker}</p>
+      <h2>{slayzoneClaims.about_heading}</h2>
+      <p class="product-what">{slayzoneClaims.what}</p>
       <div class="strengths-weaknesses">
         <div class="sw-col">
           <p class="sw-label strengths-label">Strengths</p>
           <ul>
-            {supersetEditorial.slayzone.strengths.map((s) => <li>{s}</li>)}
+            {slayzoneClaims.strengths.map((s) => <li>{s}</li>)}
           </ul>
         </div>
         <div class="sw-col">
           <p class="sw-label weaknesses-label">Weaknesses</p>
           <ul>
-            {supersetEditorial.slayzone.weaknesses.map((w) => <li>{w}</li>)}
+            {editorial.slayzone_weaknesses.map((w) => <li>{w}</li>)}
           </ul>
         </div>
       </div>
     </article>
 
     <article class="product-block competitor-block">
-      <p class="section-kicker">About Superset</p>
-      <h2>Workspace-first agent execution</h2>
-      <p class="product-what">{supersetEditorial.superset.what}</p>
+      <p class="section-kicker">{editorial.about_kicker}</p>
+      <h2>{editorial.about_heading}</h2>
+      <p class="product-what">{editorial.what}</p>
       <div class="strengths-weaknesses">
         <div class="sw-col">
           <p class="sw-label strengths-label">Strengths</p>
           <ul>
-            {supersetEditorial.superset.strengths.map((s) => <li>{s}</li>)}
+            {editorial.strengths.map((s) => <li>{s}</li>)}
           </ul>
         </div>
         <div class="sw-col">
           <p class="sw-label weaknesses-label">Weaknesses</p>
           <ul>
-            {supersetEditorial.superset.weaknesses.map((w) => <li>{w}</li>)}
+            {editorial.weaknesses.map((w) => <li>{w}</li>)}
           </ul>
         </div>
       </div>
@@ -159,12 +196,7 @@ const factBadges = [`Last checked ${competitor.last_checked}`]
   <section class="section-block" id="matrix">
     <div class="section-copy">
       <p class="section-kicker">Full matrix</p>
-      <h2>Where SlayZone leads, where Superset leads, where both are already table stakes.</h2>
-      <p>
-        Superset is strong wherever branch-first desktop execution matters: real PTY, browser, review surface,
-        worktrees, and agent breadth. SlayZone wins where task visibility, board ergonomics, and local-first
-        orchestration matter more than workspace polish.
-      </p>
+      <h2>Where SlayZone leads, where {competitor.name} leads, where both are already table stakes.</h2>
     </div>
     <HeadToHeadMatrix rows={allRows} competitorName={competitor.name} />
   </section>
@@ -174,10 +206,10 @@ const factBadges = [`Last checked ${competitor.last_checked}`]
     <div class="pricing-grid">
       <div class="pricing-item">
         <p class="pricing-label">SlayZone pricing</p>
-        <p>Free and open source. No account required.</p>
+        <p>{slayzoneClaims.pricing_summary}</p>
       </div>
       <div class="pricing-item">
-        <p class="pricing-label">Superset pricing</p>
+        <p class="pricing-label">{competitor.name} pricing</p>
         <p>{competitor.pricing.summary}</p>
       </div>
     </div>
@@ -190,7 +222,7 @@ const factBadges = [`Last checked ${competitor.last_checked}`]
       <h2>Try both. Pick the one that fits your workflow.</h2>
     </div>
     <div class="cta-links">
-      <a href="/comparison/" class="cta-link ghost">Back to field comparison</a>
+      <a href="/comparison" class="cta-link ghost">Back to field comparison</a>
       <a href="/" class="cta-link">See SlayZone homepage</a>
     </div>
   </section>
@@ -202,7 +234,7 @@ const factBadges = [`Last checked ${competitor.last_checked}`]
       We strive to keep this comparison as objective as possible. If a claim is wrong, outdated, or unfair to either side, tell us.
     </p>
     <a
-      href="https://github.com/debuglebowski/SlayZone/issues/new?title=Comparison%20correction%3A%20SlayZone%20vs%20Superset&body=Which%20claim%20is%20wrong%20or%20outdated%3F%0A%0ASource%3A%0A%0ASuggested%20fix%3A"
+      href={issueUrl}
       target="_blank"
       rel="noopener"
       class="feedback-btn"
