@@ -1,10 +1,30 @@
 ---
 import SocialLinks from './SocialLinks.astro'
+import { navLinks } from '../data/navLinks'
 ---
 
 <footer class="site-footer">
   <div class="left">slay.zone — made with <span class="robot">🤖</span> in Stockholm</div>
+  <nav class="footer-links" aria-label="Footer">
+    {navLinks.map((link) => <a href={link.href}>{link.label}</a>)}
+  </nav>
   <div class="social-links" aria-label="Social links">
     <SocialLinks />
   </div>
 </footer>
+
+<style>
+  .site-footer .footer-links {
+    display: flex;
+    gap: 18px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+  }
+  .site-footer .footer-links a {
+    color: #666;
+    text-decoration: none;
+  }
+  .site-footer .footer-links a:hover {
+    color: var(--accent);
+  }
+</style>
