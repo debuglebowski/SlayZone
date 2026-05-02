@@ -26,7 +26,13 @@ interface ChatApi {
     providerFlagsOverride?: string | null
   }) => Promise<unknown>
   send: (tabId: string, text: string) => Promise<boolean>
-  interrupt: (tabId: string) => Promise<void>
+  interrupt: (opts: {
+    tabId: string
+    taskId: string
+    mode: string
+    cwd: string
+    providerFlagsOverride?: string | null
+  }) => Promise<unknown>
   kill: (tabId: string) => Promise<void>
   remove: (tabId: string) => Promise<void>
   getBufferSince: (
@@ -162,7 +168,17 @@ export function useChatSession(opts: UseChatSessionOpts): UseChatSessionResult {
 
   const interrupt = async (): Promise<void> => {
     const chat = getChatApi()
-    await chat.interrupt(opts.tabId)
+    // Mark the in-flight turn as cancelled locally so the composer re-enables
+    // immediately. The main side will kill + respawn the subprocess via
+    // --resume; identity guard swallows the dying child's exit.
+    dispatch({ type: 'turn-interrupted' })
+    await chat.interrupt({
+      tabId: opts.tabId,
+      taskId: opts.taskId,
+      mode: opts.mode,
+      cwd: opts.cwd,
+      providerFlagsOverride: opts.providerFlagsOverride ?? null,
+    })
   }
 
   const kill = async (): Promise<void> => {

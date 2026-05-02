@@ -494,7 +494,8 @@ const api: ElectronAPI = {
     create: (opts: { tabId: string; taskId: string; mode: string; cwd: string; providerFlagsOverride?: string | null }) =>
       ipcRenderer.invoke('chat:create', opts),
     send: (tabId: string, text: string) => ipcRenderer.invoke('chat:send', tabId, text),
-    interrupt: (tabId: string) => ipcRenderer.invoke('chat:interrupt', tabId),
+    interrupt: (opts: { tabId: string; taskId: string; mode: string; cwd: string; providerFlagsOverride?: string | null }) =>
+      ipcRenderer.invoke('chat:interrupt', opts),
     kill: (tabId: string) => ipcRenderer.invoke('chat:kill', tabId),
     remove: (tabId: string) => ipcRenderer.invoke('chat:remove', tabId),
     reset: (opts: { tabId: string; taskId: string; mode: string; cwd: string; providerFlagsOverride?: string | null }) =>

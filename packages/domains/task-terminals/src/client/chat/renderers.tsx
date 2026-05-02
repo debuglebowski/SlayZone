@@ -200,6 +200,15 @@ export function StderrBlock({ item }: { item: Extract<TimelineItem, { kind: 'std
   )
 }
 
+export function InterruptedBlock(_props: { item: Extract<TimelineItem, { kind: 'interrupted' }> }) {
+  return (
+    <div className="mx-4 my-2 flex items-center gap-2 px-3 py-1 text-[11px] rounded-md border border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-300">
+      <span className="inline-block size-1.5 rounded-full bg-amber-500" />
+      Turn interrupted
+    </div>
+  )
+}
+
 export function UnknownBlock({ item }: { item: Extract<TimelineItem, { kind: 'unknown' }> }) {
   return (
     <div className="mx-4 my-1 px-3 py-1.5 text-[11px] rounded-md border border-border/50 bg-muted/30 text-muted-foreground">

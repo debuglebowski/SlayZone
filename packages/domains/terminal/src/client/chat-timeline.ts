@@ -23,6 +23,7 @@ export type TimelineItem =
   | { kind: 'rate-limit'; status: string; timestamp: number }
   | { kind: 'sub-agent'; phase: 'started' | 'updated' | 'notification'; timestamp: number }
   | { kind: 'stderr'; text: string; timestamp: number }
+  | { kind: 'interrupted'; timestamp: number }
   | { kind: 'unknown'; reason: string; timestamp: number }
 
 export interface ToolInvocation {
@@ -100,12 +101,27 @@ export type Action =
   | { type: 'event'; event: AgentEvent }
   | { type: 'user-sent'; text: string }
   | { type: 'process-exit'; sessionId: string; code: number | null; signal: string | null }
+  | { type: 'turn-interrupted' }
   | { type: 'reset' }
 
 export function reducer(state: ChatTimelineState, action: Action): ChatTimelineState {
   switch (action.type) {
     case 'reset':
       return initialState()
+    case 'turn-interrupted': {
+      // User clicked Stop. The transport kills the subprocess + respawns with
+      // --resume; the dying child's process-exit broadcast is swallowed by the
+      // identity guard, so `sessionEnded` stays false. Locally we balance
+      // resultCount against userMessagesSent so `isInFlight` drops, and append
+      // a marker item so the timeline shows where the turn was cut.
+      if (!isInFlight(state)) return state
+      const item: TimelineItem = { kind: 'interrupted', timestamp: Date.now() }
+      return {
+        ...state,
+        timeline: [...state.timeline, item],
+        resultCount: state.resultCount + 1,
+      }
+    }
     case 'user-sent': {
       const item: TimelineItem = {
         kind: 'user-text',

@@ -529,7 +529,18 @@ export interface ElectronAPI {
       providerFlagsOverride?: string | null
     }) => Promise<ChatSessionInfo>
     send: (tabId: string, text: string) => Promise<boolean>
-    interrupt: (tabId: string) => Promise<void>
+    /**
+     * Stop the current turn but keep the session. Implemented as kill + respawn
+     * with --resume on the main side: history + chat conversation id survive,
+     * the subprocess restarts ready for the next user message.
+     */
+    interrupt: (opts: {
+      tabId: string
+      taskId: string
+      mode: string
+      cwd: string
+      providerFlagsOverride?: string | null
+    }) => Promise<ChatSessionInfo>
     kill: (tabId: string) => Promise<void>
     remove: (tabId: string) => Promise<void>
     /**

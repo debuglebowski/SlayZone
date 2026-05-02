@@ -26,7 +26,13 @@ export async function resetChat(
 ): Promise<void> {
   if (opts.interruptFirst) {
     try {
-      await chat.interrupt(session.tabId)
+      await chat.interrupt({
+        tabId: session.tabId,
+        taskId: session.taskId,
+        mode: session.mode,
+        cwd: session.cwd,
+        providerFlagsOverride: session.providerFlagsOverride ?? null,
+      })
     } catch {
       /* ignore — interrupt is best-effort */
     }

@@ -57,10 +57,10 @@ import {
   UserMessage,
   AssistantText,
   ThinkingBlock,
-  SystemInit,
   ResultFooter,
   ApiRetryBanner,
   StderrBlock,
+  InterruptedBlock,
   UnknownBlock,
   renderTool,
 } from './renderers'
@@ -111,6 +111,8 @@ function renderTimelineItem(item: TimelineItem, key: React.Key): React.JSX.Eleme
       )
     case 'stderr':
       return <StderrBlock key={key} item={item} />
+    case 'interrupted':
+      return <InterruptedBlock key={key} item={item} />
     case 'unknown':
       return <UnknownBlock key={key} item={item} />
   }
@@ -188,7 +190,13 @@ export function ChatPanel(props: ChatPanelProps) {
             providerFlagsOverride?: string | null
           }) => Promise<unknown>
           send: (tabId: string, text: string) => Promise<boolean>
-          interrupt: (tabId: string) => Promise<void>
+          interrupt: (opts: {
+            tabId: string
+            taskId: string
+            mode: string
+            cwd: string
+            providerFlagsOverride?: string | null
+          }) => Promise<unknown>
         }
       }
     }).api
@@ -199,7 +207,7 @@ export function ChatPanel(props: ChatPanelProps) {
       reset: (opts) => chat?.reset(opts) ?? Promise.resolve(null),
       create: (opts) => chat?.create(opts) ?? Promise.resolve(null),
       send: (id, text) => chat?.send(id, text) ?? Promise.resolve(false),
-      interrupt: (id) => chat?.interrupt(id) ?? Promise.resolve(),
+      interrupt: (o) => chat?.interrupt(o) ?? Promise.resolve(null),
     }
   }, [])
 

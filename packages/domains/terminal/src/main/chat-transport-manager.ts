@@ -449,14 +449,6 @@ export function sendUserMessage(tabId: string, text: string): boolean {
   return true
 }
 
-/**
- * Interrupt semantics per Spike C: SIGINT unreliable. Default strategy = kill + respawn.
- * Caller (hook) orchestrates respawn via --resume; this method just terminates.
- */
-export function interrupt(tabId: string): void {
-  kill(tabId)
-}
-
 export function kill(tabId: string): void {
   const session = sessions.get(tabId)
   if (!session) return

@@ -4,7 +4,6 @@ import {
   createChat,
   sendUserMessage,
   kill as killChat,
-  interrupt as interruptChat,
   removeSession,
   getEventBufferSince,
   getSessionInfo,
@@ -323,8 +322,15 @@ export function registerChatHandlers(ipcMain: IpcMain, db: Database, opts: ChatH
     return sendUserMessage(tabId, text)
   })
 
-  ipcMain.handle('chat:interrupt', (_, tabId: string): void => {
-    interruptChat(tabId)
+  // Interrupt = stop the current turn but keep the session. SIGINT is unreliable
+  // on claude-code (Spike C), so we kill + respawn with --resume: timeline + chat
+  // conversation id are preserved, the subprocess restarts fresh ready for the
+  // next user message. The identity guard in the transport's exit handler swallows
+  // the dying child's process-exit broadcast so the renderer doesn't flash
+  // "Session ended". Mirrors `chat:setMode` (which also kill+resume on flag change).
+  ipcMain.handle('chat:interrupt', async (_, opts: ChatCreateOpts): Promise<ChatSessionInfo> => {
+    removeSession(opts.tabId)
+    return createChat(buildCreateOpts(db, opts, { fresh: false }))
   })
 
   ipcMain.handle('chat:kill', (_, tabId: string): void => {
