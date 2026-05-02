@@ -2,7 +2,7 @@ import { useState, useCallback, useRef, forwardRef, useImperativeHandle } from '
 import { Terminal, type TerminalHandle } from '@slayzone/terminal/client/Terminal'
 import type { TabDisplayMode, TerminalTab } from '../shared/types'
 import { TerminalContextMenu } from './TerminalContextMenu'
-import { ChatPanel } from './chat/ChatPanel'
+import { ChatPanel, type ChatPanelHandle } from './chat/ChatPanel'
 
 interface PaneProps {
   tab: TerminalTab
@@ -58,10 +58,18 @@ export const TerminalSplitGroup = forwardRef<TerminalSplitGroupHandle, TerminalS
   const containerRef = useRef<HTMLDivElement>(null)
   const draggingRef = useRef<{ index: number; startX: number; startSizes: number[] } | null>(null)
   const paneRefs = useRef<Record<string, React.RefObject<TerminalHandle | null>>>({})
+  const chatRefs = useRef<Record<string, React.RefObject<ChatPanelHandle | null>>>({})
+
+  const isChatPane = (pane: PaneProps): boolean =>
+    pane.tab.displayMode === 'chat' && pane.tab.mode === 'claude-code'
 
   // Ensure a ref exists for each pane
   for (const pane of panes) {
-    if (!paneRefs.current[pane.sessionId]) {
+    if (isChatPane(pane)) {
+      if (!chatRefs.current[pane.tab.id]) {
+        chatRefs.current[pane.tab.id] = { current: null }
+      }
+    } else if (!paneRefs.current[pane.sessionId]) {
       paneRefs.current[pane.sessionId] = { current: null }
     }
   }
@@ -69,7 +77,13 @@ export const TerminalSplitGroup = forwardRef<TerminalSplitGroupHandle, TerminalS
   useImperativeHandle(ref, () => ({
     focus: (sessionId?: string) => {
       const id = sessionId ?? panes[0]?.sessionId
-      if (id) paneRefs.current[id]?.current?.focus()
+      if (!id) return
+      const pane = panes.find(p => p.sessionId === id)
+      if (pane && isChatPane(pane)) {
+        chatRefs.current[pane.tab.id]?.current?.focus()
+      } else {
+        paneRefs.current[id]?.current?.focus()
+      }
     }
   }))
 
@@ -129,10 +143,10 @@ export const TerminalSplitGroup = forwardRef<TerminalSplitGroupHandle, TerminalS
   }, [sizes])
 
   const renderPane = (pane: PaneProps) => {
-    const useChat = pane.tab.displayMode === 'chat' && pane.tab.mode === 'claude-code'
-    if (useChat) {
+    if (isChatPane(pane)) {
       return (
         <ChatPanel
+          ref={chatRefs.current[pane.tab.id]}
           key={pane.tab.id}
           tabId={pane.tab.id}
           taskId={pane.taskId}
