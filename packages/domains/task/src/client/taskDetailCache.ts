@@ -27,7 +27,9 @@ async function checkProjectPathExists(path: string): Promise<boolean> {
   return true
 }
 
-export async function fetchTaskDetail(taskId: string): Promise<TaskDetailData | null> {
+export { fetchTaskDetail }
+
+async function fetchTaskDetail(taskId: string): Promise<TaskDetailData | null> {
   // Task fetch is critical — let it throw. Secondary data uses defaults on failure.
   const [loadedTask, loadedTags, loadedTaskTags, projects, loadedSubTasks] = await Promise.all([
     window.api.db.getTask(taskId),

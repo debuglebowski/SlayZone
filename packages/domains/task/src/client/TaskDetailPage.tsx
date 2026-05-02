@@ -78,6 +78,9 @@ import { track } from '@slayzone/telemetry/client'
 import { usePanelSizes, resolveWidths } from './usePanelSizes'
 import { usePanelConfig } from './usePanelConfig'
 import { useSubTasks } from './useSubTasks'
+import { usePanelOwnership } from './usePanelOwnership'
+import { PanelOwnerStub } from './PanelOwnerStub'
+import { SquareArrowOutUpRight } from 'lucide-react'
 import { useTaskTagIds } from './useTaskTagIds'
 import { WebPanelView } from './WebPanelView'
 import { ResizeHandle } from './ResizeHandle'
@@ -242,6 +245,11 @@ export interface TaskDetailPageProps {
   isSidePanelResizing?: boolean
   /** Pre-fetched data from Suspense cache. Provided by TaskDetailDataLoader. */
   initialData: TaskDetailData | null
+  /** True when this TaskDetailPage is mounted inside a secondary "Open in new window" frame. */
+  isSecondaryWindow?: boolean
+  /** When provided, called on every panelVisibility change. Lifts state to parent so it
+   *  survives remounts triggered by Follow-current-tab swaps. */
+  onPanelVisibilityChange?: (visibility: PanelVisibility) => void
 }
 
 export const TaskDetailPage = React.memo(function TaskDetailPage({
@@ -264,6 +272,8 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
   onTerminalFocusRequestHandled,
   isSidePanelResizing,
   initialData,
+  isSecondaryWindow = false,
+  onPanelVisibilityChange,
 }: TaskDetailPageProps): React.JSX.Element {
   // Prefer live global state; fall back to suspense-cached data for subtask race window
   const task = taskProp ?? initialData?.task ?? null
@@ -412,9 +422,41 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
   const [ccsProfiles, setCcsProfiles] = useState<string[]>([])
   const flagsInputRef = useRef<HTMLInputElement>(null)
 
-  // Panel visibility state
-  const defaultPanelVisibility: PanelVisibility = { terminal: true, browser: false, diff: false, settings: true, editor: false, assets: false, processes: false }
-  const [panelVisibility, setPanelVisibility] = useState<PanelVisibility>(initialData?.panelVisibility ?? defaultPanelVisibility)
+  // Panel visibility state. Initial value sourced from initialData (secondary lifts via parent).
+  const defaultPanelVisibility: PanelVisibility = isSecondaryWindow
+    ? { terminal: false, browser: false, diff: false, settings: false, editor: false, assets: false, processes: false }
+    : { terminal: true, browser: false, diff: false, settings: true, editor: false, assets: false, processes: false }
+  const [panelVisibility, setPanelVisibility] = useState<PanelVisibility>(
+    initialData?.panelVisibility ?? defaultPanelVisibility
+  )
+
+  // Notify parent on every visibility change (used by SecondaryTaskWindow to persist
+  // panel layout across Follow-current-tab swaps that remount this component).
+  useEffect(() => {
+    onPanelVisibilityChange?.(panelVisibility)
+  }, [panelVisibility, onPanelVisibilityChange])
+
+  // Secondary: release all panel ownership for this task on unmount (Follow-current-tab
+  // swaps unmount + remount with a new taskId; without this, primary keeps seeing
+  // "active in other window" stubs for the previous task).
+  useEffect(() => {
+    if (!isSecondaryWindow || !task?.id) return
+    const releasingTaskId = task.id
+    return () => { void window.api.panels.releaseAllForTask(releasingTaskId) }
+  }, [isSecondaryWindow, task?.id])
+
+  // Panel ownership across windows (multi-window support)
+  const ownership = usePanelOwnership(task?.id)
+
+  // Track open secondary task windows so primary hides Detach when secondary exists
+  const [openTaskWindowIds, setOpenTaskWindowIds] = useState<string[]>([])
+  useEffect(() => {
+    let alive = true
+    window.api.taskWindow.list().then((ids) => { if (alive) setOpenTaskWindowIds(ids) })
+    const unsub = window.api.taskWindow.onListChanged((ids) => setOpenTaskWindowIds(ids))
+    return () => { alive = false; unsub() }
+  }, [])
+  const hasOpenSecondary = !!task && openTaskWindowIds.includes(task.id)
 
   // Sync title/description from global state when changed externally
   useEffect(() => {
@@ -444,7 +486,45 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
     return m
   }, [orderedTaskIds])
   const panelOrderStyle = (id: string): { order: number } => ({ order: panelOrderIdx[id] ?? 0 })
-  const getFirstVisibleTaskPanelId = (): string | null => orderedTaskIds.find(id => panelVisibility[id]) ?? null
+  const getFirstVisibleTaskPanelId = (): string | null => orderedTaskIds.find(id => panelVisibility[id] && !ownership.hasOtherOwner(id)) ?? null
+
+  // Auto-claim panels for this window when visible AND no current owner.
+  // First-owner priority: subsequent windows opening same panel render a
+  // stub w/ Take over buttons until user explicitly takes over.
+  useEffect(() => {
+    if (!task || ownership.windowId == null) return
+    const claimableIds = ['terminal', 'browser', 'editor', 'diff', 'assets', 'processes', 'settings'] as const
+    for (const id of claimableIds) {
+      if (panelVisibility[id] && ownership.ownerOf(id) == null) ownership.claim(id)
+    }
+    for (const wp of enabledWebPanels) {
+      if (panelVisibility[wp.id] && ownership.ownerOf(wp.id) == null) ownership.claim(wp.id)
+    }
+  }, [task?.id, ownership.windowId, panelVisibility, enabledWebPanels, ownership]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // When a secondary window closes, primary's renderer flips local visibility off for the
+  // panels it owned — they must NOT auto-pop back open here. User clicks toggle to reopen.
+  useEffect(() => {
+    if (!ownership.releasedOnClose || ownership.releasedOnClose.length === 0) return
+    const ids = ownership.releasedOnClose.map((r) => r.panelId)
+    setPanelVisibility((prev) => {
+      const next = { ...prev }
+      let changed = false
+      for (const id of ids) {
+        if (next[id]) { next[id] = false; changed = true }
+      }
+      return changed ? next : prev
+    })
+    ownership.consumeReleasedOnClose()
+  }, [ownership.releasedOnClose, ownership])
+
+  // "Take over and close" from another window: flip local visibility false (no DB write)
+  useEffect(() => {
+    return window.api.panels.onCloseRequest((payload) => {
+      if (!task || payload.taskId !== task.id) return
+      setPanelVisibility((prev) => prev[payload.panelId] ? { ...prev, [payload.panelId]: false } : prev)
+    })
+  }, [task?.id])
 
   // Panel sizes for resizable panels
   const [panelSizes, updatePanelSizes, resetPanelSize, resetAllPanels] = usePanelSizes()
@@ -1143,6 +1223,15 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
       if (active) resetPanelSize(panelId)
       const newVisibility = { ...panelVisibility, [panelId]: active }
       setPanelVisibility(newVisibility)
+      // Multi-window: claim ownership only if no one owns yet (or already mine).
+      // If another window owns, opening here renders a stub w/ Take over buttons —
+      // first owner keeps priority until user explicitly takes over or releases.
+      if (active) {
+        const owner = ownership.ownerOf(panelId)
+        if (owner == null || owner === ownership.windowId) ownership.claim(panelId)
+      } else {
+        if (ownership.isOwnedByMe(panelId)) ownership.release(panelId)
+      }
       // Auto-focus panel content so scope tracker detects the right scope
       if (panelId === 'browser' && active) {
         requestAnimationFrame(() => {
@@ -1153,14 +1242,15 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
           browserPanelRef.current?.focus()
         })
       }
-      // Persist to DB
+      // Persist to DB only for primary window — secondary's visibility is local-only
+      if (isSecondaryWindow) return
       const updated = await window.api.db.updateTask({
         id: task.id,
         panelVisibility: newVisibility
       })
       onTaskUpdated(updated)
     },
-    [task, panelVisibility, onTaskUpdated, resetPanelSize]
+    [task, panelVisibility, onTaskUpdated, resetPanelSize, ownership, isSecondaryWindow]
   )
   handlePanelToggleRef.current = handlePanelToggle
 
@@ -1836,7 +1926,21 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
             )}
 
 
-            <div className="min-w-0">
+            <div className="flex items-center gap-1 min-w-0">
+              {task && (isSecondaryWindow || !hasOpenSecondary) && (
+                <button
+                  type="button"
+                  aria-label={isSecondaryWindow ? 'Reattach task' : 'Detach task to new window'}
+                  onClick={() => {
+                    if (isSecondaryWindow) window.api.window.close()
+                    else window.api.taskWindow.open(task.id)
+                  }}
+                  className="shrink-0 flex items-center gap-1.5 rounded-full bg-muted/50 hover:bg-muted px-2.5 py-1 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  <SquareArrowOutUpRight className="size-3.5" />
+                  {isSecondaryWindow ? 'Reattach' : 'Detach'}
+                </button>
+              )}
               <PanelToggle
                 panels={(() => {
                   const entries: Record<string, { id: string; icon: typeof Globe; label: string; shortcut?: string | null }> = {
@@ -1855,6 +1959,8 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
                     .map(id => entries[id])
                     .filter((e): e is NonNullable<typeof e> => !!e)
                     .filter(p => {
+                      // PERMANENT: Agent (terminal) toggle MUST NEVER appear in secondary window. User explicit.
+                      if (isSecondaryWindow && p.id === 'terminal') return false
                       const isBuiltin = ['terminal', 'browser', 'editor', 'assets', 'diff', 'processes', 'settings'].includes(p.id)
                       if (isBuiltin) return isBuiltinEnabled(p.id, 'task') && !(task.is_temporary && p.id === 'settings')
                       return true // web panels already filtered by enabledWebPanels
@@ -1911,6 +2017,15 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
           )}
           style={compact ? { flex: 1 } : containerWidth > 0 ? { width: resolvedWidths.terminal, order: panelOrderIdx.terminal ?? 0 } : { flex: 1, order: panelOrderIdx.terminal ?? 0 }}
         >
+          {ownership.hasOtherOwner('terminal') ? (
+            <PanelOwnerStub
+              panelLabel="Agent"
+              icon={TerminalIcon}
+              activeElsewhere
+              onActivate={() => ownership.claim('terminal')}
+              onActivateAndClose={() => ownership.claimAndCloseOther('terminal')}
+            />
+          ) : (<>
           {projectPathMissing && project?.path && (
             <div className="shrink-0 bg-amber-500/10 border-b border-amber-500/20 px-4 py-2 flex items-center gap-2">
               <AlertTriangle className="h-4 w-4 text-amber-500" />
@@ -2300,6 +2415,7 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
                 </div>
               )}
           </div>
+          </>)}
         </div>
         )}
 
@@ -2319,20 +2435,30 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
         {/* Browser Panel */}
         {!compact && panelVisibility.browser && (
           <div data-panel-id="browser" className={cn("shrink-0 rounded-md bg-surface-1 border border-border overflow-hidden transition-shadow duration-200", multipleVisiblePanels && focusedPanel === 'browser' && "shadow-[0_0_18px_rgba(255,255,255,0.25)]")} style={{ width: resolvedWidths.browser, ...panelOrderStyle('browser') }}>
-            <BrowserPanel
-              ref={browserPanelRef}
-              className="h-full"
-              tabs={browserTabs}
-              onTabsChange={handleBrowserTabsChange}
-              onRequestHide={() => handlePanelToggle('browser', false)}
-              taskId={task.id}
-              projectId={task.project_id}
-              isResizing={isResizing}
-              isActive={isActive}
-              onElementSnippet={handleInsertElementSnippet}
-              onScreenshot={handleScreenshot}
-              canUseDomPicker={panelVisibility.terminal}
-            />
+            {ownership.hasOtherOwner('browser') ? (
+              <PanelOwnerStub
+                panelLabel="Browser"
+                icon={Globe}
+                activeElsewhere
+                onActivate={() => ownership.claim('browser')}
+                onActivateAndClose={() => ownership.claimAndCloseOther('browser')}
+              />
+            ) : (
+              <BrowserPanel
+                ref={browserPanelRef}
+                className="h-full"
+                tabs={browserTabs}
+                onTabsChange={handleBrowserTabsChange}
+                onRequestHide={() => handlePanelToggle('browser', false)}
+                taskId={task.id}
+                projectId={task.project_id}
+                isResizing={isResizing}
+                isActive={isActive}
+                onElementSnippet={handleInsertElementSnippet}
+                onScreenshot={handleScreenshot}
+                canUseDomPicker={panelVisibility.terminal}
+              />
+            )}
           </div>
         )}
 
@@ -2350,14 +2476,24 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
         )}
 
         {/* File Editor Panel */}
-        {!compact && panelVisibility.editor && effectiveRepoPath && (
+        {!compact && panelVisibility.editor && (
           <div data-panel-id="editor" className={cn("shrink-0 overflow-hidden rounded-md bg-surface-1 border border-border transition-shadow duration-200", multipleVisiblePanels && focusedPanel === 'editor' && "shadow-[0_0_18px_rgba(255,255,255,0.25)]")} style={{ width: resolvedWidths.editor, ...panelOrderStyle('editor') }}>
-            <FileEditorView
-              ref={fileEditorRefCallback}
-              projectPath={effectiveRepoPath}
-              initialEditorState={task.editor_open_files}
-              onEditorStateChange={handleEditorStateChange}
-            />
+            {ownership.hasOtherOwner('editor') ? (
+              <PanelOwnerStub
+                panelLabel="Editor"
+                icon={FileCode}
+                activeElsewhere
+                onActivate={() => ownership.claim('editor')}
+                onActivateAndClose={() => ownership.claimAndCloseOther('editor')}
+              />
+            ) : effectiveRepoPath ? (
+              <FileEditorView
+                ref={fileEditorRefCallback}
+                projectPath={effectiveRepoPath}
+                initialEditorState={task.editor_open_files}
+                onEditorStateChange={handleEditorStateChange}
+              />
+            ) : null}
           </div>
         )}
 
@@ -2377,7 +2513,17 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
         {/* Assets Panel */}
         {!compact && panelVisibility.assets && (
           <div data-panel-id="assets" className={cn("shrink-0 rounded-md bg-surface-1 border border-border overflow-hidden flex flex-col transition-shadow duration-200", multipleVisiblePanels && focusedPanel === 'assets' && "shadow-[0_0_18px_rgba(255,255,255,0.25)]")} style={{ width: resolvedWidths.assets, ...panelOrderStyle('assets') }}>
-            <AssetsPanel ref={assetsPanelRef} taskId={task.id} isResizing={isResizing} initialActiveAssetId={task.active_asset_id} onActiveAssetIdChange={handleActiveAssetIdChange} />
+            {ownership.hasOtherOwner('assets') ? (
+              <PanelOwnerStub
+                panelLabel="Assets"
+                icon={Paperclip}
+                activeElsewhere
+                onActivate={() => ownership.claim('assets')}
+                onActivateAndClose={() => ownership.claimAndCloseOther('assets')}
+              />
+            ) : (
+              <AssetsPanel ref={assetsPanelRef} taskId={task.id} isResizing={isResizing} initialActiveAssetId={task.active_asset_id} onActiveAssetIdChange={handleActiveAssetIdChange} />
+            )}
           </div>
         )}
 
@@ -2399,20 +2545,30 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
                 />
               )}
               <div data-panel-id={wp.id} className={cn("shrink-0 rounded-md bg-surface-1 border border-border overflow-hidden transition-shadow duration-200", multipleVisiblePanels && focusedPanel === wp.id && "shadow-[0_0_18px_rgba(255,255,255,0.25)]")} style={{ width: resolvedWidths[wp.id], ...panelOrderStyle(wp.id) }}>
-                <WebPanelView
-                  taskId={task.id}
-                  panelId={wp.id}
-                  url={task.web_panel_urls?.[wp.id] || wp.baseUrl}
-                  baseUrl={wp.baseUrl}
-                  name={wp.name}
-                  blockDesktopHandoff={wp.blockDesktopHandoff === true}
-                  handoffProtocol={wp.handoffProtocol}
-                  handoffHostScope={wp.handoffHostScope}
-                  onUrlChange={handleWebPanelUrlChange}
-                  onFaviconChange={handleWebPanelFaviconChange}
-                  isResizing={isResizing}
-                  isActive={isActive}
-                />
+                {ownership.hasOtherOwner(wp.id) ? (
+                  <PanelOwnerStub
+                    panelLabel={wp.name}
+                    icon={Globe}
+                    activeElsewhere
+                    onActivate={() => ownership.claim(wp.id)}
+                    onActivateAndClose={() => ownership.claimAndCloseOther(wp.id)}
+                  />
+                ) : (
+                  <WebPanelView
+                    taskId={task.id}
+                    panelId={wp.id}
+                    url={task.web_panel_urls?.[wp.id] || wp.baseUrl}
+                    baseUrl={wp.baseUrl}
+                    name={wp.name}
+                    blockDesktopHandoff={wp.blockDesktopHandoff === true}
+                    handoffProtocol={wp.handoffProtocol}
+                    handoffHostScope={wp.handoffHostScope}
+                    onUrlChange={handleWebPanelUrlChange}
+                    onFaviconChange={handleWebPanelFaviconChange}
+                    isResizing={isResizing}
+                    isActive={isActive}
+                  />
+                )}
               </div>
             </div>
           )
@@ -2455,7 +2611,7 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
                 pollIntervalMs={5000}
                 onUpdateTask={updateTaskAndNotify}
                 onTaskUpdated={handleTaskUpdate}
-                detectedRepos={viewableRepos.map(r => ({ name: r.name, path: r.path }))}
+                detectedRepos={viewableRepos.map(r => ({ name: r.name, path: r.path, kind: r.kind }))}
                 selectedRepoName={viewableRepos.find(r => r.path === resolvedGitViewPath)?.name ?? null}
                 isRepoStale={false}
                 onRepoChange={handleRepoChange}
@@ -2480,6 +2636,15 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
         {/* Settings Panel */}
         {!compact && panelVisibility.settings && (
         <div data-panel-id="settings" data-testid="task-settings-panel" className={cn("shrink-0 rounded-md bg-surface-1 border border-border p-3 flex flex-col gap-4 overflow-y-auto transition-shadow duration-200", multipleVisiblePanels && focusedPanel === 'settings' && "shadow-[0_0_18px_rgba(255,255,255,0.25)]")} style={{ width: resolvedWidths.settings, ...panelOrderStyle('settings') }}>
+          {ownership.hasOtherOwner('settings') ? (
+            <PanelOwnerStub
+              panelLabel="Settings"
+              icon={Settings2}
+              activeElsewhere
+              onActivate={() => ownership.claim('settings')}
+              onActivateAndClose={() => ownership.claimAndCloseOther('settings')}
+            />
+          ) : (
           <TaskSettingsPanel
             taskId={task.id}
             renderDefaultContent={() => {
@@ -2766,6 +2931,7 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
               )
             }}
           />
+          )}
 
         </div>
         )}
@@ -2786,7 +2952,17 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
         {/* Processes Panel */}
         {!compact && panelVisibility.processes && (
           <div data-panel-id="processes" className={cn("shrink-0 rounded-md bg-surface-1 border border-border overflow-hidden flex flex-col transition-shadow duration-200", multipleVisiblePanels && focusedPanel === 'processes' && "shadow-[0_0_18px_rgba(255,255,255,0.25)]")} style={{ width: resolvedWidths.processes, ...panelOrderStyle('processes') }}>
-            <ProcessesPanel taskId={task.id} projectId={project?.id ?? null} cwd={effectiveRepoPath || project?.path} terminalSessionId={getMainSessionId(task.id)} onOpenUrl={openDevServerInBrowser} />
+            {ownership.hasOtherOwner('processes') ? (
+              <PanelOwnerStub
+                panelLabel="Processes"
+                icon={Cpu}
+                activeElsewhere
+                onActivate={() => ownership.claim('processes')}
+                onActivateAndClose={() => ownership.claimAndCloseOther('processes')}
+              />
+            ) : (
+              <ProcessesPanel taskId={task.id} projectId={project?.id ?? null} cwd={effectiveRepoPath || project?.path} terminalSessionId={getMainSessionId(task.id)} onOpenUrl={openDevServerInBrowser} />
+            )}
           </div>
         )}
       </div>

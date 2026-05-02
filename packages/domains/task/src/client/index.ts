@@ -11,3 +11,5 @@ export { SnoozePicker, CustomSnoozeDialog, getSnoozePresets, type SnoozePreset }
 export { TaskProgressPopover } from './TaskProgressPopover'
 export { AssetsPanel, type AssetsPanelHandle } from './AssetsPanel'
 export { useAssets, type UseAssetsReturn } from './useAssets'
+export { usePanelOwnership } from './usePanelOwnership'
+export { PanelOwnerStub } from './PanelOwnerStub'

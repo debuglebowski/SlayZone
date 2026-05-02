@@ -51,6 +51,16 @@ export function useBrowserView(opts: UseBrowserViewOpts) {
     void window.api.browser.setHandoffPolicy(viewId, desktopHandoffPolicy ?? null)
   }, [viewId, desktopHandoffPolicy])
 
+  // Multi-window: ensure WCV is parented to THIS window. Called on mount + on window focus
+  // so the view follows whichever window currently renders the BrowserPanel.
+  useEffect(() => {
+    if (!viewId) return
+    void window.api.browser.reparentToCurrentWindow(viewId)
+    const onFocus = () => { void window.api.browser.reparentToCurrentWindow(viewId) }
+    window.addEventListener('focus', onFocus)
+    return () => window.removeEventListener('focus', onFocus)
+  }, [viewId])
+
   // Handle web-panel:popup-request events
   const onPopupRouteRef = useRef(onPopupRoute)
   onPopupRouteRef.current = onPopupRoute

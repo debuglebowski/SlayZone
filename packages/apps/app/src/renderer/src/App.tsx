@@ -22,7 +22,7 @@ import {
 import { ResizeHandle } from '@slayzone/task/client/ResizeHandle'
 import { usePanelSizes } from '@slayzone/task/client/usePanelSizes'
 import { usePanelConfig } from '@slayzone/task/client/usePanelConfig'
-import { useDetectedRepos } from '@slayzone/projects/client/useDetectedRepos'
+import { useProjectRepos } from '@slayzone/worktrees'
 import type { ProjectCreationContext, ProjectStartMode } from '@slayzone/projects'
 import { ProjectLockPopover, ProjectLockScreen, isRateLimited, recordTaskOpen, isProjectLocked, PROJECT_LOCKED_TOAST, hasActiveLockOverride, clearLockOverrides } from '@slayzone/projects'
 import { useTabStore, useDialogStore, AppearanceProvider, type SearchFileContext } from '@slayzone/settings'
@@ -195,7 +195,12 @@ function App(): React.JSX.Element {
 
   // Multi-repo detection for home tab
   const homeSelectedProject = useMemo(() => projects.find(p => p.id === selectedProjectId), [projects, selectedProjectId])
-  const homeDetectedRepos = useDetectedRepos(homeSelectedProject?.path ?? null)
+  // Same data source as task git panel — flat list of project-root + child repos + recursive submodules.
+  const { repos: homeViewableRepos } = useProjectRepos(homeSelectedProject?.path ?? null, null)
+  const homeDetectedRepos = useMemo(
+    () => homeViewableRepos.map(r => ({ name: r.name, path: r.path, kind: r.kind })),
+    [homeViewableRepos]
+  )
   const homeResolvedRepo = useMemo(
     () => resolveRepoPath(homeSelectedProject?.path ?? null, homeDetectedRepos, homeSelectedProject?.selected_repo ?? null),
     [homeSelectedProject?.path, homeDetectedRepos, homeSelectedProject?.selected_repo]
@@ -393,6 +398,12 @@ function App(): React.JSX.Element {
   // Auto-switch project when activating a task tab
   const activeTab = tabs[activeTabIndex]
   const activeTaskProjectId = activeTab?.type === 'task' ? tasksMap.get(activeTab.taskId)?.project_id : undefined
+
+  // Broadcast primary's active task ID so secondary windows in "Follow current tab" mode swap
+  useEffect(() => {
+    const id = activeTab?.type === 'task' ? activeTab.taskId : null
+    void window.api.taskWindow.setPrimaryActive(id)
+  }, [activeTab])
   useEffect(() => {
     if (activeTaskProjectId && activeTaskProjectId !== selectedProjectId) setSelectedProjectId(activeTaskProjectId)
   }, [activeTaskProjectId, selectedProjectId, setSelectedProjectId])

@@ -59,6 +59,8 @@ interface ViewEntry {
   keyboardPassthrough: boolean
   kind: ViewKind
   desktopHandoffPolicy: DesktopHandoffPolicy | null
+  /** Window currently hosting this WCV. null = use the manager's mainWindow. */
+  currentWindow: BrowserWindow | null
 }
 
 interface BrowserViewEvent {
@@ -171,12 +173,13 @@ export class BrowserViewManager {
       keyboardPassthrough: false,
       kind,
       desktopHandoffPolicy: initialPolicy,
+      currentWindow: null,
     }
 
     this.views.set(viewId, entry)
 
     // Always add to window first so the view is properly initialized
-    win.contentView.addChildView(view)
+    this.addToWindow(entry)
     view.setBounds(this.normalizeViewBounds(opts.bounds))
 
     if (this.allHidden) {
@@ -467,11 +470,18 @@ export class BrowserViewManager {
     tabId: string
     kind: ViewKind
     visible: boolean
+    nativelyAttached: boolean
+    currentWindowId: number | null
     url: string
     partition: string
   }> {
     const out: ReturnType<BrowserViewManager['listViews']> = []
     for (const [viewId, entry] of this.views) {
+      const win = entry.currentWindow && !entry.currentWindow.isDestroyed() ? entry.currentWindow : this.mainWindow
+      let nativelyAttached = false
+      try {
+        nativelyAttached = !!win && !win.isDestroyed() && win.contentView.children.includes(entry.view)
+      } catch { /* ignore */ }
       let url = ''
       try { url = entry.view.webContents.isDestroyed() ? '<destroyed>' : entry.view.webContents.getURL() } catch { /* ignore */ }
       out.push({
@@ -480,6 +490,8 @@ export class BrowserViewManager {
         tabId: entry.tabId,
         kind: entry.kind,
         visible: entry.visible,
+        nativelyAttached,
+        currentWindowId: entry.currentWindow ? entry.currentWindow.webContents.id : null,
         url,
         partition: entry.partition,
       })
@@ -766,8 +778,14 @@ export class BrowserViewManager {
     return entry.view.webContents
   }
 
+  /** Resolves the BrowserWindow currently hosting this view (defaults to mainWindow). */
+  private windowFor(entry: ViewEntry): BrowserWindow | null {
+    if (entry.currentWindow && !entry.currentWindow.isDestroyed()) return entry.currentWindow
+    return this.mainWindow
+  }
+
   private addToWindow(entry: ViewEntry): void {
-    const win = this.mainWindow
+    const win = this.windowFor(entry)
     if (!win || win.isDestroyed()) return
     try {
       // addChildView is a no-op if already a child (just reorders to top)
@@ -776,11 +794,29 @@ export class BrowserViewManager {
   }
 
   private removeFromWindow(entry: ViewEntry): void {
-    const win = this.mainWindow
+    const win = this.windowFor(entry)
     if (!win || win.isDestroyed()) return
     try {
       win.contentView.removeChildView(entry.view)
     } catch { /* view may already be removed */ }
+  }
+
+  /**
+   * Move a WCV from its current host window to a new BrowserWindow. Used when
+   * the renderer in another window claims this view (multi-window task).
+   */
+  reparentView(viewId: string, newWindow: BrowserWindow): boolean {
+    const entry = this.views.get(viewId)
+    if (!entry || newWindow.isDestroyed()) return false
+    const oldWin = this.windowFor(entry)
+    if (oldWin && !oldWin.isDestroyed() && oldWin !== newWindow) {
+      try { oldWin.contentView.removeChildView(entry.view) } catch { /* ignore */ }
+    }
+    entry.currentWindow = newWindow
+    try { newWindow.contentView.addChildView(entry.view) } catch { return false }
+    // Re-apply bounds in new window's coord space
+    try { entry.view.setBounds(this.normalizeViewBounds(entry.bounds)) } catch { /* ignore */ }
+    return true
   }
 
   private normalizeViewBounds(bounds: ViewBounds): Electron.Rectangle {
@@ -820,8 +856,9 @@ export class BrowserViewManager {
     const wc = view.webContents
     const entry = this.views.get(viewId)!
     const send = (event: BrowserViewEvent) => {
-      if (this.mainWindow && !this.mainWindow.isDestroyed()) {
-        this.mainWindow.webContents.send('browser:event', event)
+      const win = this.windowFor(entry)
+      if (win && !win.isDestroyed()) {
+        win.webContents.send('browser:event', event)
       }
     }
 

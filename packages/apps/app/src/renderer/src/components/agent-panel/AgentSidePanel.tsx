@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { Terminal } from '@slayzone/terminal/client/Terminal'
 import {
   useTerminalModes,
@@ -65,6 +66,17 @@ export function AgentSidePanel({
   const { modes } = useTerminalModes()
   const visibleModes = getVisibleModes(modes, mode)
   const { builtin, custom } = groupTerminalModes(visibleModes)
+
+  // Multi-window: claim PTY routing when this window becomes active or regains focus.
+  // Without this, secondary window mounts AgentSidePanel but PTY output keeps flowing to
+  // the previously-bound window. Claim redirects the session + replays buffer here.
+  useEffect(() => {
+    if (!isActive || !sessionId) return
+    window.api.pty.claimSession(sessionId)
+    const onFocus = () => { window.api.pty.claimSession(sessionId) }
+    window.addEventListener('focus', onFocus)
+    return () => window.removeEventListener('focus', onFocus)
+  }, [isActive, sessionId])
 
   return (
     <div className="relative h-full rounded-md bg-surface-1 border border-border overflow-hidden flex flex-col" style={{ width }}>

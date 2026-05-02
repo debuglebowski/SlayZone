@@ -465,6 +465,26 @@ export interface ElectronAPI {
     onSessionChanged: (callback: () => void) => () => void
     onCollapseChanged: (callback: (collapsed: boolean) => void) => () => void
   }
+  taskWindow: {
+    open: (taskId: string) => Promise<{ ok: boolean; focused?: boolean }>
+    close: (taskId: string) => Promise<{ ok: boolean; closed: number }>
+    list: () => Promise<string[]>
+    onListChanged: (callback: (taskIds: string[]) => void) => () => void
+    setPrimaryActive: (taskId: string | null) => Promise<{ ok: boolean }>
+    getPrimaryActive: () => Promise<string | null>
+    onPrimaryActiveChanged: (callback: (taskId: string | null) => void) => () => void
+  }
+  panels: {
+    claim: (taskId: string, panelId: string) => Promise<{ ok: boolean; unchanged?: boolean }>
+    claimAndCloseOther: (taskId: string, panelId: string) => Promise<{ ok: boolean }>
+    release: (taskId: string, panelId: string) => Promise<{ ok: boolean; unchanged?: boolean; reason?: string }>
+    releaseAllForTask: (taskId: string) => Promise<{ ok: boolean; released: number }>
+    getOwnership: (taskId: string) => Promise<Array<{ panelId: string; ownerWindowId: number }>>
+    getWindowId: () => Promise<number>
+    onOwnershipChanged: (callback: (payload: { taskId: string; ownership: Array<{ panelId: string; ownerWindowId: number }> }) => void) => () => void
+    onReleasedOnClose: (callback: (payload: { closedWindowId: number; released: Array<{ taskId: string; panelId: string }> }) => void) => () => void
+    onCloseRequest: (callback: (payload: { taskId: string; panelId: string }) => void) => () => void
+  }
   window: {
     close: () => Promise<void>
   }
@@ -518,6 +538,7 @@ export interface ElectronAPI {
     validate: (mode: TerminalMode) => Promise<ValidationResult[]>
     setTheme: (theme: { foreground: string; background: string; cursor: string; ansi?: readonly string[] }) => Promise<void>
     setShellOverride: (value: string | null) => Promise<void>
+    claimSession: (sessionId: string) => Promise<{ ok: boolean }>
   }
   chat: {
     supports: (mode: string) => Promise<boolean>
@@ -855,12 +876,15 @@ export interface ElectronAPI {
     }) => Promise<string>
     destroyView: (viewId: string) => Promise<void>
     destroyAllForTask: (taskId: string) => Promise<void>
+    reparentToCurrentWindow: (viewId: string) => Promise<{ ok: boolean }>
     listViews: () => Promise<Array<{
       viewId: string
       taskId: string
       tabId: string
       kind: 'browser-tab' | 'web-panel'
       visible: boolean
+      nativelyAttached: boolean
+      currentWindowId: number | null
       url: string
       partition: string
     }>>

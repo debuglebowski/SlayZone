@@ -8,11 +8,14 @@ import { UndoProvider } from '@slayzone/ui'
 import { taskDetailCache } from '@slayzone/task/client/taskDetailCache'
 import App from './App'
 import { FloatingAgentPanel } from './components/agent-panel/FloatingAgentPanel'
+import { SecondaryTaskWindow } from './components/SecondaryTaskWindow'
 import { getDiagnosticsContext } from './lib/diagnosticsClient'
 import { ConvexAuthBootstrap } from './lib/convexAuth'
 import { MaybeProfiler } from './lib/perfProfiler'
 
-const isFloatingAgent = new URLSearchParams(window.location.search).get('floating') === 'agent'
+const params = new URLSearchParams(window.location.search)
+const isFloatingAgent = params.get('floating') === 'agent'
+const taskWindowId = params.get('taskWindow')
 
 window.addEventListener('error', (event) => {
   window.api.diagnostics.recordClientError({
@@ -44,6 +47,17 @@ if (isFloatingAgent) {
     <PtyProvider>
       <ThemeProvider>
         <FloatingAgentPanel />
+      </ThemeProvider>
+    </PtyProvider>
+  )
+} else if (taskWindowId) {
+  // Secondary task window: full TaskDetailPage scoped to one task. No tab store / sidebar.
+  createRoot(document.getElementById('root')!).render(
+    <PtyProvider>
+      <ThemeProvider>
+        <UndoProvider>
+          <SecondaryTaskWindow taskId={taskWindowId} />
+        </UndoProvider>
       </ThemeProvider>
     </PtyProvider>
   )
