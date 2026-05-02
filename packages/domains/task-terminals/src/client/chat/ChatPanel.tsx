@@ -22,21 +22,12 @@ import {
   toast,
   AgentModePill,
   nextAgentMode,
-  type AgentMode,
   ContextMenu,
   ContextMenuTrigger,
   ContextMenuContent,
   ContextMenuItem,
   ContextMenuSeparator,
   useAppearance,
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
 } from '@slayzone/ui'
 import { ConfirmDisplayModeDialog } from '../ConfirmDisplayModeDialog'
 import type { TabDisplayMode } from '../../shared/types'
@@ -53,17 +44,7 @@ import { createFilesSource } from './autocomplete/sources/files'
 import type { AutocompleteSource, ChatActions, NavigateActions } from './autocomplete/types'
 import { resetChat } from './autocomplete/chat-actions'
 import { mergeEffortFlag } from './autocomplete/flags'
-import {
-  UserMessage,
-  AssistantText,
-  ThinkingBlock,
-  ResultFooter,
-  ApiRetryBanner,
-  StderrBlock,
-  InterruptedBlock,
-  UnknownBlock,
-  renderTool,
-} from './renderers'
+import { renderTimelineItem } from './renderers'
 
 export interface ChatPanelProps {
   tabId: string
@@ -79,43 +60,6 @@ export interface ChatPanelProps {
   onLoopConfigChange?: (config: LoopConfig | null) => void
   /** Open the LoopModeDialog (lives at TaskDetailPage level — shared with terminal). */
   onOpenLoopDialog?: () => void
-}
-
-function renderTimelineItem(item: TimelineItem, key: React.Key): React.JSX.Element | null {
-  switch (item.kind) {
-    case 'user-text':
-      return <UserMessage key={key} item={item} />
-    case 'text':
-      return <AssistantText key={key} item={item} />
-    case 'thinking':
-      return <ThinkingBlock key={key} item={item} />
-    case 'tool':
-      return <div key={key}>{renderTool(item.invocation)}</div>
-    case 'session-start':
-      return <SystemInit key={key} item={item} />
-    case 'result':
-      return <ResultFooter key={key} item={item} />
-    case 'api-retry':
-      return <ApiRetryBanner key={key} item={item} />
-    case 'rate-limit':
-      return item.status === 'allowed' ? null : (
-        <div key={key} className="mx-4 my-1 text-[11px] text-amber-600">
-          rate limit: {item.status}
-        </div>
-      )
-    case 'sub-agent':
-      return (
-        <div key={key} className="mx-4 my-1 text-[11px] text-muted-foreground/70">
-          sub-agent: {item.phase}
-        </div>
-      )
-    case 'stderr':
-      return <StderrBlock key={key} item={item} />
-    case 'interrupted':
-      return <InterruptedBlock key={key} item={item} />
-    case 'unknown':
-      return <UnknownBlock key={key} item={item} />
-  }
 }
 
 const SUGGESTED_PROMPTS = [
@@ -149,7 +93,6 @@ export function ChatPanel(props: ChatPanelProps) {
   const [cursorPos, setCursorPos] = useState(0)
   const [sessionIdCopied, setSessionIdCopied] = useState(false)
   const { chatMode, modeChanging, handleModeChange } = useChatMode({ taskId, mode, tabId, cwd })
-  const [pendingMode, setPendingMode] = useState<AgentMode | null>(null)
   const [collapseSignal, setCollapseSignal] = useState(0)
   const [finalOnly, setFinalOnly] = useState(false)
   const [queuedMessages, setQueuedMessages] = useState<string[]>([])
@@ -165,7 +108,10 @@ export function ChatPanel(props: ChatPanelProps) {
 
   const imagePasteDrop = useImagePasteDrop<AssetRef>({
     onUpload: uploadImageFiles,
-    onInsert: (results) => setAttachments((prev) => [...prev, ...results]),
+    onInsert: (results) => {
+      setAttachments((prev) => [...prev, ...results])
+      textareaRef.current?.focus()
+    },
     onError: (err) => toast(`Image upload failed: ${err instanceof Error ? err.message : String(err)}`),
   })
 
@@ -496,10 +442,9 @@ export function ChatPanel(props: ChatPanelProps) {
       // or focus traversal in the rare case the textarea has actual content.
       if (e.key === 'Tab' && e.shiftKey && draft.length === 0) {
         e.preventDefault()
+        if (inFlight) return
         const next = nextAgentMode(chatMode)
-        const hasContent = inFlight || timeline.some((t) => t.kind === 'user-text' || t.kind === 'text')
-        if (hasContent) setPendingMode(next)
-        else void handleModeChange(next)
+        void handleModeChange(next)
         return
       }
       if (e.key === 'Enter' && !e.shiftKey && !e.metaKey && !e.ctrlKey) {
@@ -507,7 +452,7 @@ export function ChatPanel(props: ChatPanelProps) {
         void handleSend()
       }
     },
-    [handleSend, autocomplete, draft, chatMode, handleModeChange, inFlight, timeline]
+    [handleSend, autocomplete, draft, chatMode, handleModeChange, inFlight]
   )
 
   const copySessionId = useCallback(() => {
@@ -557,6 +502,23 @@ export function ChatPanel(props: ChatPanelProps) {
       data-chat-panel
       className="relative flex flex-col h-full bg-background"
       style={{ fontSize: `${appearance.terminalFontSize}px` }}
+      onDragEnter={(e) => {
+        if (e.dataTransfer?.types.includes('Files')) {
+          e.preventDefault()
+          imagePasteDrop.onDragEnter()
+        }
+      }}
+      onDragOver={(e) => {
+        if (e.dataTransfer?.types.includes('Files')) e.preventDefault()
+      }}
+      onDragLeave={() => imagePasteDrop.onDragLeave()}
+      onDrop={(e) => {
+        const files = imagePasteDrop.extractImageFiles(e.dataTransfer)
+        imagePasteDrop.resetDrag()
+        if (files.length === 0) return
+        e.preventDefault()
+        void imagePasteDrop.handleFiles(files)
+      }}
       onMouseUp={(e) => {
         // Click on panel background → focus composer. Skip if user clicked an
         // interactive element (button/link/input) or completed a text selection.
@@ -581,27 +543,18 @@ export function ChatPanel(props: ChatPanelProps) {
         }
       }}
     >
+      {/* Panel-wide drop overlay */}
+      {imagePasteDrop.isDragging && (
+        <div className="pointer-events-none absolute inset-0 z-30 flex items-center justify-center bg-primary/5 ring-2 ring-inset ring-primary/60 text-sm text-primary/80">
+          Drop image…
+        </div>
+      )}
       {/* Header: mode pill + (override notice if explicitly passed by parent) */}
       {overrideNotice && (
         <div className="px-4 py-2 text-xs bg-amber-500/10 border-b border-amber-500/30 text-amber-800 dark:text-amber-300">
           {overrideNotice}
         </div>
       )}
-      <div className="flex items-center justify-end gap-2 px-3 py-1.5 border-b border-border/50">
-        <AgentModePill
-          mode={chatMode}
-          onChange={(next) => {
-            // Confirm when there's a live conversation that the respawn would
-            // disrupt — in-flight stream or any user/assistant content.
-            const hasContent = inFlight || timeline.some((t) => t.kind === 'user-text' || t.kind === 'text')
-            if (hasContent) setPendingMode(next)
-            else void handleModeChange(next)
-          }}
-          disabled={modeChanging}
-          compact
-        />
-      </div>
-
       {/* Search bar — Cmd+F overlay */}
       {search.open && (
         <ChatSearchBar
@@ -622,7 +575,7 @@ export function ChatPanel(props: ChatPanelProps) {
           Wrap in a positioned shell so the banner's `absolute top-6 right-6` clears
           the header bar instead of overlapping it. */}
       {loopConfig && loopConfig.prompt && loopConfig.criteriaPattern && onOpenLoopDialog && (
-        <div className="pointer-events-none absolute inset-x-0 top-12 bottom-0 z-20">
+        <div className="pointer-events-none absolute inset-x-0 top-0 bottom-0 z-20">
           <div className="pointer-events-auto relative h-full">
             <LoopModeBanner
               config={loopConfig}
@@ -769,26 +722,8 @@ export function ChatPanel(props: ChatPanelProps) {
           className={cn(
             'relative flex items-center gap-2 rounded-2xl bg-muted/40 ring-1 ring-border/60 px-3 py-1.5 transition-shadow',
             'focus-within:ring-2 focus-within:ring-primary/40 focus-within:bg-background',
-            displaySessionEnded && 'opacity-50 pointer-events-none',
-            imagePasteDrop.isDragging && 'ring-2 ring-primary/60 bg-primary/5'
+            displaySessionEnded && 'opacity-50 pointer-events-none'
           )}
-          onDragEnter={(e) => {
-            if (e.dataTransfer?.types.includes('Files')) {
-              e.preventDefault()
-              imagePasteDrop.onDragEnter()
-            }
-          }}
-          onDragOver={(e) => {
-            if (e.dataTransfer?.types.includes('Files')) e.preventDefault()
-          }}
-          onDragLeave={() => imagePasteDrop.onDragLeave()}
-          onDrop={(e) => {
-            const files = imagePasteDrop.extractImageFiles(e.dataTransfer)
-            imagePasteDrop.resetDrag()
-            if (files.length === 0) return
-            e.preventDefault()
-            void imagePasteDrop.handleFiles(files)
-          }}
           onPaste={(e) => {
             const files = imagePasteDrop.extractImageFiles(e.clipboardData)
             if (files.length === 0) return
@@ -796,11 +731,6 @@ export function ChatPanel(props: ChatPanelProps) {
             void imagePasteDrop.handleFiles(files)
           }}
         >
-          {imagePasteDrop.isDragging && (
-            <div className="absolute inset-0 z-10 flex items-center justify-center pointer-events-none rounded-2xl text-xs text-primary/80">
-              Drop image…
-            </div>
-          )}
           {autocomplete.show && autocomplete.active && (
             <AutocompleteMenu
               active={autocomplete.active}
@@ -865,6 +795,12 @@ export function ChatPanel(props: ChatPanelProps) {
           )}
         </div>
         <div className="flex items-center gap-3 mt-1.5 px-1 text-[10px] text-muted-foreground/60">
+          <AgentModePill
+            mode={chatMode}
+            onChange={(next) => { void handleModeChange(next) }}
+            disabled={modeChanging || inFlight}
+            compact
+          />
           <span>
             {inFlight
               ? 'Enter to queue · Shift+Enter for newline'
@@ -926,31 +862,6 @@ export function ChatPanel(props: ChatPanelProps) {
           )}
         </div>
       </div>
-
-      <AlertDialog open={pendingMode !== null} onOpenChange={(open) => { if (!open) setPendingMode(null) }}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Switch to {pendingMode} mode?</AlertDialogTitle>
-            <AlertDialogDescription>
-              The chat subprocess restarts with the new permission flags. Conversation
-              history is preserved via <code className="font-mono text-xs">--resume</code>,
-              but any in-flight tool call is interrupted.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => setPendingMode(null)}>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => {
-                const next = pendingMode
-                setPendingMode(null)
-                if (next) void handleModeChange(next)
-              }}
-            >
-              Switch mode
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
 
       <ConfirmDisplayModeDialog
         open={pendingChatDisable}
