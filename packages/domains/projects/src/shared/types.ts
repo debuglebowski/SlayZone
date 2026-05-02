@@ -68,6 +68,7 @@ export interface Project {
 export interface DetectedRepo {
   name: string
   path: string
+  kind?: 'project-root' | 'child-repo' | 'submodule'
 }
 
 export interface CreateProjectInput {

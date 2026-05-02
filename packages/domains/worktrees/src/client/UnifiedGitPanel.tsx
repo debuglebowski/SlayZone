@@ -16,6 +16,15 @@ import { ProjectPrTab } from './ProjectPrTab'
 import { StashTab, type StashTabHandle } from './StashTab'
 export type { GitTabId } from '@slayzone/task/shared'
 
+function RepoKindPill({ kind }: { kind: NonNullable<DetectedRepo['kind']> }) {
+  if (kind !== 'submodule') return null
+  return (
+    <span className="inline-flex items-center rounded-sm border border-border bg-muted px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground leading-none">
+      Submodule
+    </span>
+  )
+}
+
 type UnifiedGitPanelProps = {
   task?: Task | null
   projectId: string
@@ -305,32 +314,35 @@ export const UnifiedGitPanel = forwardRef<UnifiedGitPanelHandle, UnifiedGitPanel
 
         {/* Right-aligned actions */}
         <div className="flex-1" />
-        {detectedRepos.length > 0 && onRepoChange && (
-          <Select
-            value={selectedRepoName ?? detectedRepos[0]?.name ?? ''}
-            onValueChange={onRepoChange}
-          >
-            <SelectTrigger
-              className={cn(
-                'h-7 w-auto text-xs gap-1 px-2',
-                isRepoStale && 'border-amber-500/60 text-amber-500'
-              )}
-              data-size="sm"
-            >
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent position="popper" className="w-auto overflow-x-visible">
-              {detectedRepos.map((repo) => (
-                <SelectItem
-                  key={repo.name}
-                  value={repo.name}
-                  className="text-xs pl-7 pr-2 [&_[data-slot=select-item-indicator]]:right-auto [&_[data-slot=select-item-indicator]]:left-2"
+        {detectedRepos.length > 1 && onRepoChange && (
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs text-muted-foreground">Repo</span>
+            <Select value={selectedRepoName ?? detectedRepos[0]?.name ?? ''} onValueChange={onRepoChange}>
+                <SelectTrigger
+                  className={cn(
+                    'h-7! w-auto text-xs gap-1 px-2 py-0',
+                    isRepoStale && 'border-amber-500/60 text-amber-500'
+                  )}
                 >
-                  <span className="whitespace-nowrap">{repo.name}</span>
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent position="popper" className="w-auto overflow-x-visible">
+                  {detectedRepos.map((repo) => (
+                    <SelectItem
+                      key={repo.name}
+                      value={repo.name}
+                      className="text-xs pl-7 pr-2 [&_[data-slot=select-item-indicator]]:right-auto [&_[data-slot=select-item-indicator]]:left-2"
+                    >
+                      <span className="flex w-full items-center gap-1.5 whitespace-nowrap">
+                        <span className="whitespace-nowrap">{repo.name}</span>
+                        <span className="flex-1" />
+                        {repo.kind && <RepoKindPill kind={repo.kind} />}
+                      </span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+            </Select>
+          </div>
         )}
         {activeTab === 'changes' && (
           <>
