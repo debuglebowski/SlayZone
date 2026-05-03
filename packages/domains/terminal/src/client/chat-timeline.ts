@@ -593,3 +593,118 @@ function applyEvent(state: ChatTimelineState, event: AgentEvent): ChatTimelineSt
 export function isInFlight(state: ChatTimelineState): boolean {
   return state.userMessagesSent > state.resultCount
 }
+
+/**
+ * Derive a short status label to show next to the in-flight loading animation.
+ * Returns null when there's nothing meaningful to show (caller falls back to
+ * generic indicator).
+ *
+ * Priority (top wins):
+ *  1. Latest api-retry / rate-limit in current turn — explains stalls.
+ *  2. Latest open stream block — current phase (thinking / writing / tool).
+ *  3. Latest meaningful timeline item in current turn — keeps the label
+ *     sticky across `stream-block-stop` / `stream-message-stop` gaps so the
+ *     indicator never blanks while inFlight.
+ */
+export function deriveLoadingLabel(state: ChatTimelineState): string | null {
+  for (let i = state.timeline.length - 1; i >= 0; i--) {
+    const item = state.timeline[i]
+    if (item.kind === 'user-text') break
+    if (item.kind === 'api-retry') {
+      const sec = Math.max(1, Math.round(item.delayMs / 1000))
+      return `Retrying (${item.attempt}/${item.maxRetries}) in ${sec}s…`
+    }
+    if (item.kind === 'rate-limit') {
+      return `Rate limited (${item.status})`
+    }
+  }
+
+  let latestOpen: OpenBlock | null = null
+  let latestKey = -1
+  for (const [k, v] of state.openBlocks) {
+    if (k > latestKey) {
+      latestKey = k
+      latestOpen = v
+    }
+  }
+  if (latestOpen) {
+    if (latestOpen.blockType === 'tool_use') {
+      const item =
+        latestOpen.timelineIndex >= 0 ? state.timeline[latestOpen.timelineIndex] : null
+      return formatToolLabel(latestOpen.toolName, item)
+    }
+    if (latestOpen.blockType === 'thinking') return 'Thinking…'
+    if (latestOpen.blockType === 'text') return 'Writing…'
+  }
+
+  for (let i = state.timeline.length - 1; i >= 0; i--) {
+    const item = state.timeline[i]
+    if (item.kind === 'user-text') break
+    if (item.kind === 'tool') {
+      return formatToolLabel(item.invocation.name, item)
+    }
+    if (item.kind === 'thinking') return 'Thinking…'
+    if (item.kind === 'text') return 'Writing…'
+    if (item.kind === 'sub-agent') return 'Sub-agent…'
+  }
+
+  return null
+}
+
+function formatToolLabel(name: string | undefined, item: TimelineItem | null): string {
+  const verb = toolVerb(name)
+  const target = item?.kind === 'tool' ? extractToolTarget(item.invocation.input) : null
+  return target ? `${verb} ${target}` : `${verb}…`
+}
+
+function toolVerb(name: string | undefined): string {
+  if (!name) return 'Working'
+  switch (name) {
+    case 'Read':
+    case 'Glob':
+    case 'Grep':
+    case 'NotebookRead':
+      return 'Read'
+    case 'Edit':
+    case 'Write':
+    case 'MultiEdit':
+    case 'NotebookEdit':
+      return 'Edit'
+    case 'Bash':
+    case 'BashOutput':
+    case 'KillShell':
+      return 'Run'
+    case 'WebFetch':
+    case 'WebSearch':
+      return 'Fetch'
+    case 'Task':
+      return 'Sub-agent'
+    case 'TodoWrite':
+      return 'Plan'
+    default:
+      return name
+  }
+}
+
+function extractToolTarget(input: unknown): string | null {
+  if (!input || typeof input !== 'object') return null
+  const obj = input as Record<string, unknown>
+  if (typeof obj.file_path === 'string') return basename(obj.file_path)
+  if (typeof obj.path === 'string') return basename(obj.path)
+  if (typeof obj.command === 'string') return truncate(obj.command, 32)
+  if (typeof obj.pattern === 'string') return truncate(obj.pattern, 32)
+  if (typeof obj.url === 'string') return truncate(obj.url, 32)
+  if (typeof obj.query === 'string') return truncate(obj.query, 32)
+  if (typeof obj.description === 'string') return truncate(obj.description, 32)
+  return null
+}
+
+function basename(p: string): string {
+  const idx = p.lastIndexOf('/')
+  return idx === -1 ? p : p.slice(idx + 1)
+}
+
+function truncate(s: string, max: number): string {
+  if (s.length <= max) return s
+  return `${s.slice(0, Math.max(1, max - 1))}…`
+}

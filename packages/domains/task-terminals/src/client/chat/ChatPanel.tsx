@@ -30,7 +30,7 @@ import {
 } from '@slayzone/ui'
 import { ConfirmDisplayModeDialog } from '../ConfirmDisplayModeDialog'
 import type { TabDisplayMode } from '../../shared/types'
-import { useChatSession, useChatLoop, LoopModeBanner, PulseGrid, type TimelineItem } from '@slayzone/terminal/client'
+import { useChatSession, useChatLoop, LoopModeBanner, PulseGrid, deriveLoadingLabel, type TimelineItem } from '@slayzone/terminal/client'
 import type { LoopConfig } from '@slayzone/terminal/shared'
 import { useImagePasteDrop, useAssetUpload, type AssetRef } from '@slayzone/editor'
 import { AutocompleteMenu } from './autocomplete/AutocompleteMenu'
@@ -655,7 +655,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
               })}
             </div>
           )}
-          {inFlight && <TypingIndicator />}
+          {inFlight && <TypingIndicator label={deriveLoadingLabel(state)} />}
         </div>
 
         {/* Jump-to-latest button */}
@@ -937,7 +937,7 @@ function EmptyState({ onPick }: { onPick: (text: string) => void }) {
   )
 }
 
-function TypingIndicator() {
+function TypingIndicator({ label }: { label?: string | null }) {
   return (
     <div className="px-4 py-2 flex gap-3 items-center">
       <div className="shrink-0 size-7 rounded-full bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center text-white shadow-sm">
@@ -948,6 +948,9 @@ function TypingIndicator() {
         <span className="size-1.5 rounded-full bg-foreground/40 animate-bounce" style={{ animationDelay: '150ms' }} />
         <span className="size-1.5 rounded-full bg-foreground/40 animate-bounce" style={{ animationDelay: '300ms' }} />
       </div>
+      {label && (
+        <span className="text-xs text-muted-foreground truncate max-w-[60ch]">{label}</span>
+      )}
     </div>
   )
 }

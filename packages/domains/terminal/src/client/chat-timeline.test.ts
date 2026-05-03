@@ -3,7 +3,7 @@
  * Run with: pnpm dlx tsx packages/domains/terminal/src/client/chat-timeline.test.ts
  */
 import type { AgentEvent } from '../shared/agent-events'
-import { initialState, reducer, isInFlight } from './chat-timeline'
+import { initialState, reducer, isInFlight, deriveLoadingLabel } from './chat-timeline'
 
 let passed = 0
 let failed = 0
@@ -422,6 +422,125 @@ test('signature_delta flips hasSignature on thinking item', () => {
   if (thinking[0].kind !== 'thinking') throw new Error('wrong')
   expect(thinking[0].text).toBe('pondering')
   expect(thinking[0].hasSignature).toBe(true)
+})
+
+test('deriveLoadingLabel: null when idle', () => {
+  const s = initialState()
+  expect(deriveLoadingLabel(s)).toBe(null)
+})
+
+test('deriveLoadingLabel: "Thinking…" while thinking block open', () => {
+  let s = initialState()
+  s = reducer(s, { type: 'event', event: ev.turnInit() })
+  s = reducer(s, { type: 'event', event: { kind: 'stream-message-start', messageId: 'm' } })
+  s = reducer(s, {
+    type: 'event',
+    event: { kind: 'stream-block-start', blockIndex: 0, blockType: 'thinking' },
+  })
+  expect(deriveLoadingLabel(s)).toBe('Thinking…')
+})
+
+test('deriveLoadingLabel: "Writing…" while text block open', () => {
+  let s = initialState()
+  s = reducer(s, { type: 'event', event: ev.turnInit() })
+  s = reducer(s, { type: 'event', event: { kind: 'stream-message-start', messageId: 'm' } })
+  s = reducer(s, {
+    type: 'event',
+    event: { kind: 'stream-block-start', blockIndex: 0, blockType: 'text' },
+  })
+  expect(deriveLoadingLabel(s)).toBe('Writing…')
+})
+
+test('deriveLoadingLabel: tool with file_path → verb + basename', () => {
+  let s = initialState()
+  s = reducer(s, { type: 'event', event: ev.turnInit() })
+  s = reducer(s, {
+    type: 'event',
+    event: { kind: 'tool-call', id: 't', name: 'Read', input: { file_path: '/a/b/foo.ts' } },
+  })
+  expect(deriveLoadingLabel(s)).toBe('Read foo.ts')
+})
+
+test('deriveLoadingLabel: Bash command target', () => {
+  let s = initialState()
+  s = reducer(s, { type: 'event', event: ev.turnInit() })
+  s = reducer(s, {
+    type: 'event',
+    event: { kind: 'tool-call', id: 't', name: 'Bash', input: { command: 'pnpm build' } },
+  })
+  expect(deriveLoadingLabel(s)).toBe('Run pnpm build')
+})
+
+test('deriveLoadingLabel: long command truncated', () => {
+  let s = initialState()
+  s = reducer(s, { type: 'event', event: ev.turnInit() })
+  s = reducer(s, {
+    type: 'event',
+    event: {
+      kind: 'tool-call',
+      id: 't',
+      name: 'Bash',
+      input: { command: 'a'.repeat(60) },
+    },
+  })
+  const label = deriveLoadingLabel(s)
+  expect(label?.startsWith('Run ')).toBeTruthy()
+  expect((label?.length ?? 0) <= 'Run '.length + 32).toBeTruthy()
+})
+
+test('deriveLoadingLabel: api-retry overrides open block', () => {
+  let s = initialState()
+  s = reducer(s, { type: 'event', event: ev.turnInit() })
+  s = reducer(s, { type: 'user-sent', text: 'hi' })
+  s = reducer(s, { type: 'event', event: { kind: 'stream-message-start', messageId: 'm' } })
+  s = reducer(s, {
+    type: 'event',
+    event: { kind: 'stream-block-start', blockIndex: 0, blockType: 'text' },
+  })
+  s = reducer(s, {
+    type: 'event',
+    event: { kind: 'api-retry', attempt: 2, maxRetries: 5, delayMs: 3000, error: '529' },
+  })
+  expect(deriveLoadingLabel(s)).toBe('Retrying (2/5) in 3s…')
+})
+
+test('deriveLoadingLabel: tool label sticks after tool-result completes', () => {
+  let s = initialState()
+  s = reducer(s, { type: 'event', event: ev.turnInit() })
+  s = reducer(s, {
+    type: 'event',
+    event: { kind: 'tool-call', id: 't', name: 'Edit', input: { file_path: '/x/App.tsx' } },
+  })
+  s = reducer(s, { type: 'event', event: ev.result('t') })
+  s = reducer(s, { type: 'event', event: { kind: 'stream-message-stop' } })
+  expect(deriveLoadingLabel(s)).toBe('Edit App.tsx')
+})
+
+test('deriveLoadingLabel: text label sticky after stream-block-stop', () => {
+  let s = initialState()
+  s = reducer(s, { type: 'event', event: ev.turnInit() })
+  s = reducer(s, { type: 'event', event: { kind: 'stream-message-start', messageId: 'm' } })
+  s = reducer(s, {
+    type: 'event',
+    event: { kind: 'stream-block-start', blockIndex: 0, blockType: 'text' },
+  })
+  s = reducer(s, {
+    type: 'event',
+    event: { kind: 'stream-block-delta', blockIndex: 0, deltaType: 'text', text: 'hi' },
+  })
+  s = reducer(s, { type: 'event', event: { kind: 'stream-block-stop', blockIndex: 0 } })
+  expect(deriveLoadingLabel(s)).toBe('Writing…')
+})
+
+test('deriveLoadingLabel: stops scanning at user-text boundary', () => {
+  let s = initialState()
+  s = reducer(s, { type: 'event', event: ev.turnInit() })
+  s = reducer(s, {
+    type: 'event',
+    event: { kind: 'api-retry', attempt: 1, maxRetries: 3, delayMs: 1000, error: 'x' },
+  })
+  s = reducer(s, { type: 'user-sent', text: 'next turn' })
+  expect(deriveLoadingLabel(s)).toBe(null)
 })
 
 console.log(`\n${passed} passed, ${failed} failed`)
