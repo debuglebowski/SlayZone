@@ -16,6 +16,7 @@ import {
   ensureBrowserPanelHidden,
   openTaskViaSearch,
   getViewsForTask,
+  testInvoke,
 } from '../fixtures/browser-view'
 
 test.describe('Browser panel — WCV cleanup', () => {
@@ -100,6 +101,35 @@ test.describe('Browser panel — WCV cleanup', () => {
     // Inactive task's WCVs should remain allocated (hide-only semantics)
     const aCount = (await getViewsForTask(mainWindow, taskA)).length
     expect(aCount).toBe(2)
+  })
+
+  test('window focus does not re-attach hidden background-task WCVs', async ({ mainWindow }) => {
+    // Regression: reparentView (added in secondary-window feat) used to call
+    // addChildView unconditionally, surfacing hidden background WCVs on top of
+    // the active task on every renderer-window focus event.
+    const taskA = await newTaskAndOpen(mainWindow, 'Background WCV task')
+    await ensureBrowserPanelVisible(mainWindow)
+    await newTabBtn(mainWindow).click()
+    await expect.poll(async () => (await getViewsForTask(mainWindow, taskA)).length, { timeout: 10_000 }).toBe(2)
+    const aViewIds = await getViewsForTask(mainWindow, taskA)
+
+    // Switch to another task → A's BrowserPanel goes display:none and its WCVs hide
+    await newTaskAndOpen(mainWindow, 'Foreground task')
+
+    // Hidden WCVs should not be natively attached
+    await expect.poll(async () => {
+      const list = (await testInvoke(mainWindow, 'browser:list-views')) as Array<{ viewId: string; nativelyAttached: boolean }>
+      return list.filter((v) => aViewIds.includes(v.viewId)).every((v) => !v.nativelyAttached)
+    }, { timeout: 10_000 }).toBe(true)
+
+    // Simulate the user clicking out of and back into the app (window focus event)
+    await mainWindow.evaluate(() => { window.dispatchEvent(new FocusEvent('focus')) })
+    await mainWindow.waitForTimeout(200)
+
+    // A's hidden WCVs must STILL not be attached after the focus event
+    const list = (await testInvoke(mainWindow, 'browser:list-views')) as Array<{ viewId: string; nativelyAttached: boolean }>
+    const reattached = list.filter((v) => aViewIds.includes(v.viewId) && v.nativelyAttached)
+    expect(reattached, 'hidden background-task WCVs leaked back onto the active window').toEqual([])
   })
 
   test('closing then reopening a task does not leave orphan WCVs from the prior session', async ({ mainWindow }) => {

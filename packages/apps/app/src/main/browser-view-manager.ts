@@ -813,9 +813,13 @@ export class BrowserViewManager {
       try { oldWin.contentView.removeChildView(entry.view) } catch { /* ignore */ }
     }
     entry.currentWindow = newWindow
-    try { newWindow.contentView.addChildView(entry.view) } catch { return false }
-    // Re-apply bounds in new window's coord space
-    try { entry.view.setBounds(this.normalizeViewBounds(entry.bounds)) } catch { /* ignore */ }
+    // Only attach when the view is logically shown. Force-attaching a hidden
+    // WCV (e.g. background-task panel under display:none) on every window-focus
+    // event surfaces it on top of the active task's UI.
+    if (entry.visible && !this.allHidden) {
+      try { newWindow.contentView.addChildView(entry.view) } catch { return false }
+      try { entry.view.setBounds(this.normalizeViewBounds(entry.bounds)) } catch { /* ignore */ }
+    }
     return true
   }
 
