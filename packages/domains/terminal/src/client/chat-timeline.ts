@@ -21,7 +21,19 @@ export type TimelineItem =
     }
   | { kind: 'api-retry'; attempt: number; maxRetries: number; delayMs: number; error: string; timestamp: number }
   | { kind: 'rate-limit'; status: string; timestamp: number }
-  | { kind: 'sub-agent'; phase: 'started' | 'updated' | 'notification'; timestamp: number }
+  | {
+      kind: 'sub-agent'
+      /** Pairs `started` with the matching `notification`. One row per Task call. */
+      toolUseId: string
+      phase: 'started' | 'updated' | 'notification'
+      description?: string
+      status?: string
+      summary?: string
+      durationMs?: number
+      toolUses?: number
+      totalTokens?: number
+      timestamp: number
+    }
   | { kind: 'stderr'; text: string; timestamp: number }
   | { kind: 'interrupted'; timestamp: number }
   | { kind: 'unknown'; reason: string; timestamp: number }
@@ -62,6 +74,8 @@ export interface ChatTimelineState {
   timeline: TimelineItem[]
   /** tool_use_id → index into `timeline` for paired mutation. */
   toolIndex: Map<string, number>
+  /** Sub-agent tool_use_id → timeline index. Lets `notification` merge into the row started by `task_started`. */
+  subAgentIndex: Map<string, number>
   /** True once first turn-init seen. Subsequent turn-inits are treated as turn boundaries (ignored in timeline). */
   sessionStarted: boolean
   sessionId: string | null
@@ -96,6 +110,7 @@ export function initialState(): ChatTimelineState {
   return {
     timeline: [],
     toolIndex: new Map(),
+    subAgentIndex: new Map(),
     sessionStarted: false,
     sessionId: null,
     model: null,
@@ -558,11 +573,52 @@ function applyEvent(state: ChatTimelineState, event: AgentEvent): ChatTimelineSt
         ...state,
         timeline: [...state.timeline, { kind: 'rate-limit', status: event.status, timestamp: ts }],
       }
-    case 'sub-agent':
+    case 'sub-agent': {
+      // Pair `started` + later `notification` (same tool_use_id) into ONE
+      // timeline row that fills in description / status / usage as events
+      // arrive. Avoids the prior "sub-agent: started" + "sub-agent: notification"
+      // double-row that read like a status banner with no content.
+      const id = event.toolUseId
+      const existingIdx = id ? state.subAgentIndex.get(id) : undefined
+      if (existingIdx !== undefined) {
+        const target = state.timeline[existingIdx]
+        if (target?.kind === 'sub-agent') {
+          const next: TimelineItem = {
+            ...target,
+            // Latest phase wins so the renderer can show "in flight" vs "done".
+            phase: event.phase,
+            description: event.description ?? target.description,
+            status: event.status ?? target.status,
+            summary: event.summary ?? target.summary,
+            durationMs: event.usage?.durationMs ?? target.durationMs,
+            toolUses: event.usage?.toolUses ?? target.toolUses,
+            totalTokens: event.usage?.totalTokens ?? target.totalTokens,
+          }
+          const t = state.timeline.slice()
+          t[existingIdx] = next
+          return { ...state, timeline: t }
+        }
+      }
+      const item: TimelineItem = {
+        kind: 'sub-agent',
+        toolUseId: id,
+        phase: event.phase,
+        description: event.description,
+        status: event.status,
+        summary: event.summary,
+        durationMs: event.usage?.durationMs,
+        toolUses: event.usage?.toolUses,
+        totalTokens: event.usage?.totalTokens,
+        timestamp: ts,
+      }
+      const nextIdx = new Map(state.subAgentIndex)
+      if (id) nextIdx.set(id, state.timeline.length)
       return {
         ...state,
-        timeline: [...state.timeline, { kind: 'sub-agent', phase: event.phase, timestamp: ts }],
+        timeline: [...state.timeline, item],
+        subAgentIndex: nextIdx,
       }
+    }
     case 'compact-boundary':
       return state
     case 'stderr':

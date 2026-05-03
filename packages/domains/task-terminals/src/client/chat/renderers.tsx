@@ -217,6 +217,61 @@ export function UnknownBlock({ item }: { item: Extract<TimelineItem, { kind: 'un
   )
 }
 
+export function SubAgentRow({ item }: { item: Extract<TimelineItem, { kind: 'sub-agent' }> }) {
+  const inFlight = item.phase !== 'notification'
+  const errored = item.status === 'failed' || item.status === 'error'
+  const seconds = item.durationMs != null ? (item.durationMs / 1000).toFixed(1) : null
+  const tokens = item.totalTokens != null ? formatTokens(item.totalTokens) : null
+  return (
+    <div className="mx-4 my-1 px-3 py-1.5 flex items-center gap-2 text-[11px] rounded-md border border-border/50 bg-muted/20 text-muted-foreground">
+      {inFlight ? (
+        <Loader2 className="size-3 shrink-0 animate-spin text-violet-500" />
+      ) : errored ? (
+        <CircleX className="size-3 shrink-0 text-destructive" />
+      ) : (
+        <CircleCheck className="size-3 shrink-0 text-emerald-500" />
+      )}
+      <span className="font-medium text-foreground/80">Sub-agent</span>
+      {item.description && (
+        <>
+          <span className="text-muted-foreground/40">·</span>
+          <span className="truncate max-w-[40ch]">{item.description}</span>
+        </>
+      )}
+      {item.status && (
+        <>
+          <span className="text-muted-foreground/40">·</span>
+          <span className={cn(errored && 'text-destructive')}>{item.status}</span>
+        </>
+      )}
+      {seconds && (
+        <>
+          <span className="text-muted-foreground/40">·</span>
+          <span>{seconds}s</span>
+        </>
+      )}
+      {item.toolUses != null && item.toolUses > 0 && (
+        <>
+          <span className="text-muted-foreground/40">·</span>
+          <span>{item.toolUses} tool{item.toolUses === 1 ? '' : 's'}</span>
+        </>
+      )}
+      {tokens && (
+        <>
+          <span className="text-muted-foreground/40">·</span>
+          <span>{tokens} tok</span>
+        </>
+      )}
+    </div>
+  )
+}
+
+function formatTokens(n: number): string {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`
+  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`
+  return String(n)
+}
+
 // --- Tool renderers ---
 
 interface ToolProps {
@@ -612,11 +667,7 @@ export function renderTimelineItem(item: TimelineItem, key: React.Key): React.JS
         </div>
       )
     case 'sub-agent':
-      return (
-        <div key={key} className="mx-4 my-1 text-[11px] text-muted-foreground/70">
-          sub-agent: {item.phase}
-        </div>
-      )
+      return <SubAgentRow key={key} item={item} />
     case 'stderr':
       return <StderrBlock key={key} item={item} />
     case 'interrupted':

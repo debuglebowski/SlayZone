@@ -165,6 +165,20 @@ export interface CompactBoundaryEvent {
 export interface SubAgentEvent {
   kind: 'sub-agent'
   phase: 'started' | 'updated' | 'notification'
+  /** SDK tool_use_id of the parent Task call. Pairs `started` with subsequent `notification`. */
+  toolUseId: string
+  /** Human-readable label from `task_started` (e.g. "Find chat history parsing logic"). */
+  description?: string
+  /** From `task_notification` — e.g. 'completed', 'failed'. */
+  status?: string
+  /** From `task_notification` — short result summary. */
+  summary?: string
+  /** From `task_notification.usage`. Aggregated work the sub-agent did. */
+  usage?: {
+    totalTokens: number
+    toolUses: number
+    durationMs: number
+  }
   raw: unknown
 }
 

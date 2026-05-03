@@ -424,6 +424,57 @@ test('signature_delta flips hasSignature on thinking item', () => {
   expect(thinking[0].hasSignature).toBe(true)
 })
 
+test('sub-agent: paired started + notification merges into ONE timeline row', () => {
+  let s = initialState()
+  s = reducer(s, { type: 'event', event: ev.turnInit() })
+  s = reducer(s, {
+    type: 'event',
+    event: {
+      kind: 'sub-agent',
+      phase: 'started',
+      toolUseId: 'tu_a',
+      description: 'Investigate X',
+      raw: {},
+    },
+  })
+  s = reducer(s, {
+    type: 'event',
+    event: {
+      kind: 'sub-agent',
+      phase: 'notification',
+      toolUseId: 'tu_a',
+      status: 'completed',
+      summary: 'Investigate X',
+      usage: { totalTokens: 1234, toolUses: 5, durationMs: 6789 },
+      raw: {},
+    },
+  })
+  const subAgents = s.timeline.filter((i) => i.kind === 'sub-agent')
+  expect(subAgents.length).toBe(1)
+  if (subAgents[0].kind !== 'sub-agent') throw new Error('wrong')
+  expect(subAgents[0].description).toBe('Investigate X')
+  expect(subAgents[0].status).toBe('completed')
+  expect(subAgents[0].toolUses).toBe(5)
+  expect(subAgents[0].durationMs).toBe(6789)
+  expect(subAgents[0].totalTokens).toBe(1234)
+  expect(subAgents[0].phase).toBe('notification')
+})
+
+test('sub-agent: distinct toolUseIds get their own rows', () => {
+  let s = initialState()
+  s = reducer(s, { type: 'event', event: ev.turnInit() })
+  s = reducer(s, {
+    type: 'event',
+    event: { kind: 'sub-agent', phase: 'started', toolUseId: 'a', description: 'A', raw: {} },
+  })
+  s = reducer(s, {
+    type: 'event',
+    event: { kind: 'sub-agent', phase: 'started', toolUseId: 'b', description: 'B', raw: {} },
+  })
+  const subAgents = s.timeline.filter((i) => i.kind === 'sub-agent')
+  expect(subAgents.length).toBe(2)
+})
+
 test('deriveLoadingLabel: null when idle', () => {
   const s = initialState()
   expect(deriveLoadingLabel(s)).toBe(null)

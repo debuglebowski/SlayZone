@@ -150,7 +150,7 @@ function parseStreamEvent(obj: Record<string, unknown>): AgentEvent | null {
   }
 }
 
-function parseSystem(obj: Record<string, unknown>): AgentEvent {
+function parseSystem(obj: Record<string, unknown>): AgentEvent | null {
   const subtype = obj.subtype as string | undefined
   if (subtype === 'init') {
     return {
@@ -166,11 +166,25 @@ function parseSystem(obj: Record<string, unknown>): AgentEvent {
     return { kind: 'compact-boundary' }
   }
   if (subtype === 'task_started' || subtype === 'task_updated' || subtype === 'task_notification') {
+    const usageRaw = (obj.usage ?? null) as Record<string, unknown> | null
+    const usage =
+      usageRaw && (usageRaw.total_tokens != null || usageRaw.tool_uses != null || usageRaw.duration_ms != null)
+        ? {
+            totalTokens: toNum(usageRaw.total_tokens),
+            toolUses: toNum(usageRaw.tool_uses),
+            durationMs: toNum(usageRaw.duration_ms),
+          }
+        : undefined
     return {
       kind: 'sub-agent',
       phase: subtype === 'task_started' ? 'started'
         : subtype === 'task_updated' ? 'updated'
         : 'notification',
+      toolUseId: (obj.tool_use_id as string) ?? '',
+      description: typeof obj.description === 'string' ? obj.description : undefined,
+      status: typeof obj.status === 'string' ? obj.status : undefined,
+      summary: typeof obj.summary === 'string' ? obj.summary : undefined,
+      usage,
       raw: obj,
     }
   }
@@ -182,6 +196,13 @@ function parseSystem(obj: Record<string, unknown>): AgentEvent {
       delayMs: (obj.retry_delay_ms as number) ?? 0,
       error: (obj.error as string) ?? '',
     }
+  }
+  // Drop noise that has no surface in the chat UI: per-tool hook events, plus
+  // sub-agent progress ticks (the surrounding `task_started` / `task_notification`
+  // already carry the user-visible signal). Returning null here avoids buffering
+  // and persisting events that would otherwise render as "unsupported event".
+  if (subtype === 'hook_started' || subtype === 'hook_response' || subtype === 'task_progress') {
+    return null
   }
   return { kind: 'unknown', reason: 'unknown-type', raw: obj }
 }
@@ -235,7 +256,7 @@ function parseAssistant(obj: Record<string, unknown>): AgentEvent {
   return { kind: 'unknown', reason: 'unknown-type', raw: obj }
 }
 
-function parseUser(obj: Record<string, unknown>): AgentEvent {
+function parseUser(obj: Record<string, unknown>): AgentEvent | null {
   const message = obj.message as { content?: RawContentBlock[] } | undefined
   const toolUseResult = obj.tool_use_result
   if (!message || !Array.isArray(message.content)) {
@@ -243,6 +264,10 @@ function parseUser(obj: Record<string, unknown>): AgentEvent {
   }
   const block = message.content[0]
   if (block?.type !== 'tool_result' || !block.tool_use_id) {
+    // SDK echoes the user's prompt back as a `user`/text record; we already
+    // emit a synthetic `user-message` for that send, so the echo is a dup.
+    // Drop it here instead of letting it become an "unsupported event" row.
+    if (block?.type === 'text') return null
     return { kind: 'unknown', reason: 'shape-mismatch', raw: obj }
   }
   const rawContent = block.content

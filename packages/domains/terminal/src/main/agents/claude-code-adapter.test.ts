@@ -226,6 +226,62 @@ test('serializeUserMessage emits a single NDJSON object (no newline)', () => {
   expect(parsed.message.content).toBe('hello')
 })
 
+test('hook_started / hook_response / task_progress → null (drop noise)', () => {
+  for (const subtype of ['hook_started', 'hook_response', 'task_progress']) {
+    const out = claudeCodeAdapter.parseLine(
+      JSON.stringify({ type: 'system', subtype, hook_id: 'x' })
+    )
+    expect(out).toBe(null)
+  }
+})
+
+test('user/text record → null (dup of synthetic user-message)', () => {
+  const out = claudeCodeAdapter.parseLine(
+    JSON.stringify({
+      type: 'user',
+      message: { role: 'user', content: [{ type: 'text', text: 'hi' }] },
+    })
+  )
+  expect(out).toBe(null)
+})
+
+test('task_started: sub-agent event carries toolUseId + description', () => {
+  const ev = claudeCodeAdapter.parseLine(
+    JSON.stringify({
+      type: 'system',
+      subtype: 'task_started',
+      tool_use_id: 'tu_42',
+      description: 'Find chat history parsing logic',
+      task_type: 'local_agent',
+      prompt: 'Find …',
+    })
+  )
+  if (!ev || ev.kind !== 'sub-agent') throw new Error('expected sub-agent')
+  expect(ev.phase).toBe('started')
+  expect(ev.toolUseId).toBe('tu_42')
+  expect(ev.description).toBe('Find chat history parsing logic')
+})
+
+test('task_notification: sub-agent event carries status + usage', () => {
+  const ev = claudeCodeAdapter.parseLine(
+    JSON.stringify({
+      type: 'system',
+      subtype: 'task_notification',
+      tool_use_id: 'tu_42',
+      status: 'completed',
+      summary: 'Find chat history parsing logic',
+      usage: { total_tokens: 63119, tool_uses: 23, duration_ms: 52641 },
+    })
+  )
+  if (!ev || ev.kind !== 'sub-agent') throw new Error('expected sub-agent')
+  expect(ev.phase).toBe('notification')
+  expect(ev.toolUseId).toBe('tu_42')
+  expect(ev.status).toBe('completed')
+  expect(ev.usage?.totalTokens).toBe(63119)
+  expect(ev.usage?.toolUses).toBe(23)
+  expect(ev.usage?.durationMs).toBe(52641)
+})
+
 test('extractSessionId: pulls from turn-init, null otherwise', () => {
   const init: AgentEvent = {
     kind: 'turn-init',
