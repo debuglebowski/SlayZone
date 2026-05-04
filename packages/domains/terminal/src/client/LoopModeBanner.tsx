@@ -13,6 +13,12 @@ interface LoopModeBannerProps {
   onResume: () => void
   onStop: () => void
   onEditConfig: () => void
+  /**
+   * When true (default), the banner self-positions at top-right of its parent
+   * via `absolute top-6 right-6`. When false, the caller owns positioning —
+   * useful for stacking with other banners in a shared column container.
+   */
+  floating?: boolean
 }
 
 const STATUS_LABELS: Record<LoopStatus, string> = {
@@ -45,14 +51,14 @@ function truncate(s: string, max: number): string {
   return s.length > max ? s.slice(0, max) + '\u2026' : s
 }
 
-export function LoopModeBanner({ config, status, iteration, onStart, onPause, onResume, onStop, onEditConfig }: LoopModeBannerProps) {
+export function LoopModeBanner({ config, status, iteration, onStart, onPause, onResume, onStop, onEditConfig, floating = true }: LoopModeBannerProps) {
   const active = isLoopActive(status)
   const showStatus = status !== 'idle'
   const progress = config.maxIterations > 0 ? (iteration / config.maxIterations) * 100 : 0
 
   return (
     <div
-      className={`absolute top-6 right-6 z-10 w-72 rounded-xl border-2 ${active ? 'border-orange-500/60' : 'border-border'} bg-surface-1 backdrop-blur-md text-xs overflow-hidden transition-all duration-300`}
+      className={`${floating ? 'absolute top-6 right-6 z-10 ' : ''}w-72 rounded-xl border-2 ${active ? 'border-orange-500/60' : 'border-border'} bg-surface-1 backdrop-blur-md text-xs overflow-hidden transition-all duration-300`}
       style={{
         boxShadow: active
           ? '0 0 20px 0 rgba(249,115,22,0.4), 0 0 60px 0 rgba(249,115,22,0.15)'

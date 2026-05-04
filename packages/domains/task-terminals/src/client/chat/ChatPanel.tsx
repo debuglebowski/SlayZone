@@ -30,7 +30,7 @@ import {
 } from '@slayzone/ui'
 import { ConfirmDisplayModeDialog } from '../ConfirmDisplayModeDialog'
 import type { TabDisplayMode } from '../../shared/types'
-import { useChatSession, useChatLoop, LoopModeBanner, PulseGrid, deriveLoadingLabel, type TimelineItem } from '@slayzone/terminal/client'
+import { useChatSession, useChatLoop, LoopModeBanner, BackgroundJobsBanner, PulseGrid, deriveLoadingLabel, type TimelineItem } from '@slayzone/terminal/client'
 import type { LoopConfig } from '@slayzone/terminal/shared'
 import { useImagePasteDrop, useAssetUpload, type AssetRef } from '@slayzone/editor'
 import { AutocompleteMenu } from './autocomplete/AutocompleteMenu'
@@ -655,25 +655,42 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
         />
       )}
 
-      {/* Loop banner — overlay top-right of timeline area (below mode-pill header).
-          Wrap in a positioned shell so the banner's `absolute top-6 right-6` clears
-          the header bar instead of overlapping it. */}
-      {loopConfig && loopConfig.prompt && loopConfig.criteriaPattern && onOpenLoopDialog && (
-        <div className="pointer-events-none absolute inset-x-0 top-0 bottom-0 z-20">
-          <div className="pointer-events-auto relative h-full">
-            <LoopModeBanner
-              config={loopConfig}
-              status={loop.status}
-              iteration={loop.iteration}
-              onStart={loop.startLoop}
-              onPause={loop.pauseLoop}
-              onResume={loop.resumeLoop}
-              onStop={loop.stopLoop}
-              onEditConfig={onOpenLoopDialog}
-            />
+      {/* Banner stack — single positioned column at top-right of the timeline
+          area. Each banner is non-floating; the column owns layout so adding
+          a third banner in the future is one line. */}
+      {(() => {
+        const showLoop = Boolean(loopConfig?.prompt && loopConfig?.criteriaPattern && onOpenLoopDialog)
+        const showBgJobs = state.bgShells.size > 0
+        if (!showLoop && !showBgJobs) return null
+        return (
+          <div className="pointer-events-none absolute top-6 right-6 z-20 flex flex-col gap-3">
+            {showLoop && (
+              <div className="pointer-events-auto">
+                <LoopModeBanner
+                  floating={false}
+                  config={loopConfig!}
+                  status={loop.status}
+                  iteration={loop.iteration}
+                  onStart={loop.startLoop}
+                  onPause={loop.pauseLoop}
+                  onResume={loop.resumeLoop}
+                  onStop={loop.stopLoop}
+                  onEditConfig={onOpenLoopDialog!}
+                />
+              </div>
+            )}
+            {showBgJobs && (
+              <div className="pointer-events-auto">
+                <BackgroundJobsBanner
+                  floating={false}
+                  shells={state.bgShells}
+                  order={state.bgShellOrder}
+                />
+              </div>
+            )}
           </div>
-        </div>
-      )}
+        )
+      })()}
 
       {/* Timeline */}
       <ContextMenu>

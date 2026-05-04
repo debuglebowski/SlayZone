@@ -638,5 +638,186 @@ test('user-message-popped: replay-safe (user-message + popped → empty timeline
   expect(s.timeline.filter((i) => i.kind === 'user-text').length).toBe(0)
 })
 
+// ---- bg-shells -------------------------------------------------------
+
+const bgCall = (
+  id: string,
+  name: string,
+  input: unknown,
+): AgentEvent => ({ kind: 'tool-call', id, name, input })
+const bgResult = (
+  toolUseId: string,
+  rawContent: unknown,
+  structured: unknown = null,
+  isError = false,
+): AgentEvent => ({ kind: 'tool-result', toolUseId, isError, rawContent, structured })
+
+test('bg-shells: spawn registers a pending shell with command', () => {
+  let s = initialState()
+  s = reducer(s, { type: 'event', event: ev.turnInit() })
+  s = reducer(s, {
+    type: 'event',
+    event: bgCall('spawn-1', 'Bash', { command: 'pnpm dev', run_in_background: true }),
+  })
+  expect(s.bgShells.size).toBe(1)
+  const shell = s.bgShells.get('spawn-1')!
+  expect(shell.status).toBe('pending')
+  expect(shell.command).toBe('pnpm dev')
+  expect(shell.shellId).toBe(null)
+})
+
+test('bg-shells: spawn result assigns shell id + flips to running', () => {
+  let s = initialState()
+  s = reducer(s, { type: 'event', event: ev.turnInit() })
+  s = reducer(s, {
+    type: 'event',
+    event: bgCall('spawn-1', 'Bash', { command: 'pnpm dev', run_in_background: true }),
+  })
+  s = reducer(s, {
+    type: 'event',
+    event: bgResult('spawn-1', 'Command running in background with shell ID: bash_1'),
+  })
+  const shell = s.bgShells.get('spawn-1')!
+  expect(shell.shellId).toBe('bash_1')
+  expect(shell.status).toBe('running')
+})
+
+test('bg-shells: BashOutput poll updates status + lastPolledAt + tail', () => {
+  let s = initialState()
+  s = reducer(s, { type: 'event', event: ev.turnInit() })
+  s = reducer(s, {
+    type: 'event',
+    event: bgCall('spawn-1', 'Bash', { command: 'long', run_in_background: true }),
+  })
+  s = reducer(s, { type: 'event', event: bgResult('spawn-1', '', { shellId: 'bash_2' }) })
+  s = reducer(s, { type: 'event', event: bgCall('poll-1', 'BashOutput', { bash_id: 'bash_2' }) })
+  s = reducer(s, {
+    type: 'event',
+    event: bgResult('poll-1', '', { status: 'running', stdout: 'tick\n' }),
+  })
+  const shell = s.bgShells.get('spawn-1')!
+  expect(shell.status).toBe('running')
+  expect(shell.latestStdout).toBe('tick\n')
+  expect(shell.lastPolledAt !== null).toBe(true)
+})
+
+test('bg-shells: completed BashOutput sets exit code + status', () => {
+  let s = initialState()
+  s = reducer(s, { type: 'event', event: ev.turnInit() })
+  s = reducer(s, {
+    type: 'event',
+    event: bgCall('spawn-1', 'Bash', { command: 'one-shot', run_in_background: true }),
+  })
+  s = reducer(s, { type: 'event', event: bgResult('spawn-1', '', { shellId: 'bash_3' }) })
+  s = reducer(s, { type: 'event', event: bgCall('poll-1', 'BashOutput', { bash_id: 'bash_3' }) })
+  s = reducer(s, {
+    type: 'event',
+    event: bgResult('poll-1', '', { status: 'completed', exitCode: 0, stdout: 'done\n' }),
+  })
+  const shell = s.bgShells.get('spawn-1')!
+  expect(shell.status).toBe('completed')
+  expect(shell.exitCode).toBe(0)
+})
+
+test('bg-shells: KillShell ack without explicit status still flips to killed', () => {
+  let s = initialState()
+  s = reducer(s, { type: 'event', event: ev.turnInit() })
+  s = reducer(s, {
+    type: 'event',
+    event: bgCall('spawn-1', 'Bash', { command: 'never-ends', run_in_background: true }),
+  })
+  s = reducer(s, { type: 'event', event: bgResult('spawn-1', '', { shellId: 'bash_42' }) })
+  s = reducer(s, { type: 'event', event: bgCall('kill-1', 'KillShell', { shell_id: 'bash_42' }) })
+  s = reducer(s, { type: 'event', event: bgResult('kill-1', 'shell killed') })
+  const shell = s.bgShells.get('spawn-1')!
+  expect(shell.status).toBe('killed')
+})
+
+test('bg-shells: KillShell call+result marks shell killed', () => {
+  let s = initialState()
+  s = reducer(s, { type: 'event', event: ev.turnInit() })
+  s = reducer(s, {
+    type: 'event',
+    event: bgCall('spawn-1', 'Bash', { command: 'never-ends', run_in_background: true }),
+  })
+  s = reducer(s, { type: 'event', event: bgResult('spawn-1', '', { shellId: 'bash_9' }) })
+  s = reducer(s, { type: 'event', event: bgCall('kill-1', 'KillShell', { shell_id: 'bash_9' }) })
+  s = reducer(s, {
+    type: 'event',
+    event: bgResult('kill-1', '', { status: 'killed' }),
+  })
+  const shell = s.bgShells.get('spawn-1')!
+  expect(shell.status).toBe('killed')
+})
+
+test('bg-shells: non-bg Bash call does not register a shell', () => {
+  let s = initialState()
+  s = reducer(s, { type: 'event', event: ev.turnInit() })
+  s = reducer(s, {
+    type: 'event',
+    event: bgCall('spawn-1', 'Bash', { command: 'ls', run_in_background: false }),
+  })
+  expect(s.bgShells.size).toBe(0)
+})
+
+test('bg-shells: order preserved across multiple spawns', () => {
+  let s = initialState()
+  s = reducer(s, { type: 'event', event: ev.turnInit() })
+  s = reducer(s, {
+    type: 'event',
+    event: bgCall('a', 'Bash', { command: 'one', run_in_background: true }),
+  })
+  s = reducer(s, {
+    type: 'event',
+    event: bgCall('b', 'Bash', { command: 'two', run_in_background: true }),
+  })
+  expect(s.bgShellOrder.join(',')).toBe('a,b')
+})
+
+test('bg-shells: eviction caps terminal-status history but keeps active shells', () => {
+  let s = initialState()
+  s = reducer(s, { type: 'event', event: ev.turnInit() })
+  // Spawn 35 shells, all completed (over the 30-keep limit).
+  for (let i = 0; i < 35; i++) {
+    const id = `t${i}`
+    s = reducer(s, {
+      type: 'event',
+      event: bgCall(id, 'Bash', { command: `cmd${i}`, run_in_background: true }),
+    })
+    s = reducer(s, { type: 'event', event: bgResult(id, '', { shellId: `bash_${i}` }) })
+    s = reducer(s, { type: 'event', event: bgCall(`p${i}`, 'BashOutput', { bash_id: `bash_${i}` }) })
+    s = reducer(s, {
+      type: 'event',
+      event: bgResult(`p${i}`, '', { status: 'completed', exitCode: 0 }),
+    })
+  }
+  // Plus one still-running shell that must survive.
+  s = reducer(s, {
+    type: 'event',
+    event: bgCall('alive', 'Bash', { command: 'streaming', run_in_background: true }),
+  })
+  s = reducer(s, { type: 'event', event: bgResult('alive', '', { shellId: 'bash_alive' }) })
+  // Terminal count capped at 30, active always kept → 31 total.
+  expect(s.bgShells.size).toBe(31)
+  expect(s.bgShells.has('alive')).toBe(true)
+  // Oldest evicted (t0..t4).
+  expect(s.bgShells.has('t0')).toBe(false)
+  expect(s.bgShells.has('t4')).toBe(false)
+  expect(s.bgShells.has('t5')).toBe(true)
+  expect(s.bgShellOrder.includes('t0')).toBe(false)
+})
+
+test('bg-shells: reset clears shells', () => {
+  let s = initialState()
+  s = reducer(s, { type: 'event', event: ev.turnInit() })
+  s = reducer(s, {
+    type: 'event',
+    event: bgCall('a', 'Bash', { command: 'one', run_in_background: true }),
+  })
+  s = reducer(s, { type: 'reset' })
+  expect(s.bgShells.size).toBe(0)
+  expect(s.bgShellOrder.length).toBe(0)
+})
+
 console.log(`\n${passed} passed, ${failed} failed`)
 process.exit(failed > 0 ? 1 : 0)
