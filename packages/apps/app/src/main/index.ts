@@ -8,7 +8,7 @@ import { raiseFdLimit } from './raise-fd-limit'
 const fdLimitResult = raiseFdLimit()
 console.log('[fd-limit]', JSON.stringify(fdLimitResult))
 
-import { app, shell, BrowserWindow, ipcMain, nativeTheme, session, webContents, dialog, Menu, protocol, screen, powerMonitor } from 'electron'
+import { app, shell, BrowserWindow, ipcMain, nativeTheme, session, webContents, dialog, Menu, protocol, screen, powerMonitor, crashReporter } from 'electron'
 import { join, extname, normalize, sep, resolve } from 'path'
 import { homedir } from 'os'
 import { readFileSync, promises as fsp, mkdirSync } from 'fs'
@@ -55,6 +55,15 @@ protocol.registerSchemesAsPrivileged([
 // Use consistent app name for userData path (paired with legacy DB migration)
 app.name = 'slayzone'
 const isPlaywright = process.env.PLAYWRIGHT === '1'
+
+// Start crash reporter before any windows or native modules can fault.
+// Local-only: minidumps land in app.getPath('crashDumps'); next boot scans + logs them.
+crashReporter.start({
+  uploadToServer: false,
+  productName: 'slayzone',
+  companyName: 'slayzone',
+  ignoreSystemCrashHandler: false
+})
 
 // Strip Electron/app tokens from the global UA fallback so ALL sessions, popups, and
 // subrequests present as vanilla Chromium — not just the explicitly-configured sessions.
@@ -116,6 +125,8 @@ import { registerTerminalTabsHandlers } from '@slayzone/task-terminals/main'
 import { registerWorktreeHandlers, closeGitWatcher } from '@slayzone/worktrees/main'
 import { registerAgentTurnsHandlers, initChatTurnSubscriber, initPtyTurnSubscriber } from '@slayzone/agent-turns/main'
 import { registerDiagnosticsHandlers, registerProcessDiagnostics, recordDiagnosticEvent, stopDiagnostics, setIpcSuccessHook } from '@slayzone/diagnostics/main'
+import { detectPreviousCrash, writeBootStub, writeCleanShutdownSentinel, scanCrashDumps } from './lifecycle/sentinel'
+import { acquireLockWithSelfHeal, lockOutcomeIsAcquired, type LockOutcome } from './lifecycle/single-instance'
 import { IPC_TELEMETRY_MAP } from '@slayzone/telemetry/shared'
 import { registerAiConfigHandlers } from '@slayzone/ai-config/main'
 import { registerIntegrationHandlers, ensureIntegrationSchema, startSyncPoller, pushTaskAfterEdit, pushNewTaskToProviders, pushArchiveToProviders, pushUnarchiveToProviders, startDiscoveryPoller, resetSyncFlags } from '@slayzone/integrations/main'
@@ -491,9 +502,13 @@ function handleOAuthDeepLinkFromArgv(argv: string[]): void {
 }
 
 const shouldEnforceSingleInstanceLock = !isPlaywright && !is.dev
-const gotSingleInstanceLock = !shouldEnforceSingleInstanceLock || app.requestSingleInstanceLock()
+let lockOutcome: LockOutcome = { kind: 'acquired' }
+if (shouldEnforceSingleInstanceLock) {
+  lockOutcome = acquireLockWithSelfHeal()
+}
+const gotSingleInstanceLock = !shouldEnforceSingleInstanceLock || lockOutcomeIsAcquired(lockOutcome)
 if (!gotSingleInstanceLock) {
-  console.error('[app] Failed to acquire single-instance lock; quitting duplicate instance')
+  console.error('[app] Failed to acquire single-instance lock; quitting duplicate instance', lockOutcome)
   app.quit()
 } else if (shouldEnforceSingleInstanceLock) {
   app.on('second-instance', (_event, argv) => {
@@ -834,6 +849,36 @@ app.whenReady().then(async () => {
   }
   logBoot('database init complete')
 
+  // Lifecycle: detect prior crash via boot sentinel + arm sentinel for this run.
+  // Pure fs (no DB needed). recordDiagnosticEvent buffers until handlers register.
+  const { crashed: previousCrashed, prevBoot } = detectPreviousCrash()
+  writeBootStub()
+  recordDiagnosticEvent({
+    level: 'info', source: 'main', event: 'app.boot.start',
+    payload: { version: app.getVersion(), pid: process.pid, platform: process.platform }
+  })
+  if (previousCrashed && prevBoot) {
+    const minidumps = scanCrashDumps(prevBoot.ts)
+    recordDiagnosticEvent({
+      level: 'error', source: 'main', event: 'app.crash.detected_on_next_boot',
+      payload: {
+        prevBootTs: prevBoot.ts,
+        prevPid: prevBoot.pid,
+        prevVersion: prevBoot.version,
+        currentVersion: app.getVersion(),
+        minidumps
+      }
+    })
+  }
+  if (lockOutcome.kind !== 'acquired') {
+    recordDiagnosticEvent({
+      level: lockOutcome.kind === 'recovered' ? 'warn' : 'info',
+      source: 'main',
+      event: `app.singleinstance.${lockOutcome.kind}`,
+      payload: lockOutcome
+    })
+  }
+
   // Skip onboarding in Playwright — tested explicitly in 02-onboarding.spec.ts
   if (isPlaywright) {
     db.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('onboarding_completed', 'true')").run()
@@ -1031,6 +1076,7 @@ app.whenReady().then(async () => {
   })
 
   // Register diagnostics first so IPC handlers below are instrumented.
+  // Flushes any events buffered before this point (boot.start, crash detect, lock outcome).
   registerDiagnosticsHandlers(ipcMain, db, diagDb)
   setIpcSuccessHook((channel, args, result) => {
     const entry = IPC_TELEMETRY_MAP[channel]
@@ -2166,6 +2212,11 @@ div{text-align:center}h1{font-size:14px;font-weight:500;color:#aaa}p{font-size:1
   logBoot('windows created')
   if (mainWindow) setProcessManagerWindow(mainWindow)
 
+  recordDiagnosticEvent({
+    level: 'info', source: 'main', event: 'app.boot.ready',
+    payload: { version: app.getVersion() }
+  })
+
   // PTY stats poller — lazy start/stop via session lifecycle
   const ptyStatsPoller = createStatsPoller(
     () => getPtyPids(),
@@ -2388,6 +2439,13 @@ app.on('will-quit', () => {
     discoveryPoller = null
   }
   mcpCleanup?.()
+  // Record completion BEFORE closing diagnostics DB; a row written here is the last
+  // event of the session and proves the chain ran. stopDiagnostics() can clear timers
+  // safely after.
+  recordDiagnosticEvent({
+    level: 'info', source: 'main', event: 'app.will-quit.complete',
+    payload: { version: app.getVersion() }
+  })
   stopDiagnostics()
   stopIdleChecker()
   stopAutoBackup()
@@ -2398,6 +2456,9 @@ app.on('will-quit', () => {
   killAllProcesses()
   closeDatabase()
   closeDiagnosticsDatabase()
+  // Sentinel last: presence on next boot ⇒ clean shutdown reached this line.
+  // Pure fs (no DB needed), so survives any prior close failure.
+  writeCleanShutdownSentinel()
 })
 
 // In this file you can include the rest of your app's specific main process

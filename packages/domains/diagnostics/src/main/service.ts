@@ -45,6 +45,12 @@ let diagnosticsDb: Database | null = null  // separate diagnostics-only DB — w
 let isIpcInstrumented = false
 let cachedConfig: DiagnosticsConfig | null = null
 
+// Pre-registration buffer: events recorded before registerDiagnosticsHandlers
+// runs are queued here and flushed on registration. Bounded to prevent
+// unbounded memory if registration never happens.
+const PENDING_EVENTS_CAP = 1000
+const pendingEvents: DiagnosticEvent[] = []
+
 const electronRuntime = electron as unknown as Partial<typeof import('electron')>
 const app = electronRuntime.app as App | undefined
 const dialog = electronRuntime.dialog
@@ -165,7 +171,14 @@ function buildPayloadJson(payload: unknown): string | null {
 }
 
 export function recordDiagnosticEvent(event: DiagnosticEvent): void {
-  if (!diagnosticsDb) return
+  if (!diagnosticsDb) {
+    // Buffer until registerDiagnosticsHandlers wires the DB. Stamp tsMs at
+    // queue time so events retain their original timestamp on flush.
+    if (pendingEvents.length < PENDING_EVENTS_CAP) {
+      pendingEvents.push({ ...event, tsMs: event.tsMs ?? Date.now() })
+    }
+    return
+  }
 
   const config = getDiagnosticsConfig()
   if (!config.enabled) return
@@ -560,6 +573,13 @@ export function registerDiagnosticsHandlers(ipcMain: IpcMain, db: Database, even
   settingsDb = db      // main DB — for config settings reads/writes
   diagnosticsDb = eventsDb  // separate diagnostics DB — writes to slayzone.dev.diagnostics.sqlite
   cachedConfig = null
+
+  // Flush events buffered before registration. Splice out so re-registration
+  // (tests) doesn't double-write, and recordDiagnosticEvent now writes directly.
+  if (pendingEvents.length > 0) {
+    const queued = pendingEvents.splice(0, pendingEvents.length)
+    for (const ev of queued) recordDiagnosticEvent(ev)
+  }
 
   instrumentIpcMain(ipcMain)
 
