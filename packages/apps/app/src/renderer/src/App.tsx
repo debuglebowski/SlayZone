@@ -44,7 +44,7 @@ import {
   TooltipContent,
   Toaster,
   toast,
-  UpdateToast
+  UpdateButton
 } from '@slayzone/ui'
 import { SidebarProvider, cn, PanelToggle, useUndo, matchesShortcut, useShortcutStore, shortcutDefinitions, useShortcutDisplay, withShortcut, withModalGuard, scopeTracker } from '@slayzone/ui'
 import { AppSidebar } from '@/components/sidebar/AppSidebar'
@@ -1168,6 +1168,7 @@ function App(): React.JSX.Element {
                   }} />
                   <AgentPanelButton active={agentPanelState.isOpen} disabled={!selectedProjectId} onClick={() => setAgentPanelState({ isOpen: !agentPanelState.isOpen })} shortcutHint={agentPanelShortcut} />
                   <NotificationButton active={notificationState.isLocked} count={attentionTasks.length} onClick={() => setNotificationState({ isLocked: !notificationState.isLocked })} shortcutHint={attentionPanelShortcut} />
+                  <UpdateButton version={updateVersion} onRestart={() => window.api.app.restartForUpdate()} />
                 </div>
               }
             />
@@ -1424,7 +1425,6 @@ function App(): React.JSX.Element {
           <AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Complete Task</AlertDialogTitle><AlertDialogDescription>Mark as complete and close tab?</AlertDialogDescription></AlertDialogHeader>
           <AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction autoFocus onClick={handleCompleteTaskConfirm}>Complete</AlertDialogAction></AlertDialogFooter></AlertDialogContent>
         </AlertDialog>
-        <UpdateToast version={updateVersion} onRestart={() => window.api.app.restartForUpdate()} onDismiss={() => setUpdateVersion(null)} />
         <Toaster position="bottom-right" theme="dark" closeButton />
       </div>
     </SidebarProvider>

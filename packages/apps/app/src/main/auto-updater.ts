@@ -48,7 +48,7 @@ function getAutoUpdater() {
   return autoUpdater
 }
 
-const CHECK_INTERVAL_MS = 4 * 60 * 60 * 1000 // 4 hours
+const CHECK_INTERVAL_MS = 60 * 60 * 1000 // 1 hour
 
 export function initAutoUpdater(): void {
   if (is.dev) return
