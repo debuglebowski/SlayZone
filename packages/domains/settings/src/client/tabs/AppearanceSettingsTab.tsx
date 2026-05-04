@@ -63,6 +63,7 @@ export function AppearanceSettingsTab() {
   const [notesCheckedHighlight, setNotesCheckedHighlight] = useState(false)
   const [notesShowToolbar, setNotesShowToolbar] = useState(false)
   const [notesSpellcheck, setNotesSpellcheck] = useState(true)
+  const [chatWidth, setChatWidth] = useState<'narrow' | 'wide'>('narrow')
 
   useEffect(() => {
     window.api.settings.get('project_color_tints_enabled').then(val => setProjectColorTints(val !== '0'))
@@ -83,6 +84,7 @@ export function AppearanceSettingsTab() {
     window.api.settings.get('notes_checked_highlight').then(val => setNotesCheckedHighlight(val === '1'))
     window.api.settings.get('notes_show_toolbar').then(val => setNotesShowToolbar(val === '1'))
     window.api.settings.get('notes_spellcheck').then(val => setNotesSpellcheck(val !== '0'))
+    window.api.settings.get('chat_width').then(val => setChatWidth(val === 'wide' ? 'wide' : 'narrow'))
   }, [])
 
   return (
@@ -250,6 +252,27 @@ export function AppearanceSettingsTab() {
                 window.api.settings.set('notes_spellcheck', checked ? '1' : '0')
               }}
             />
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Chat */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Chat</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="grid grid-cols-[220px_minmax(0,1fr)] items-center gap-4">
+            <SettingLabel tip="Horizontal width of agent chat — message column and composer max-width">Width</SettingLabel>
+            <Select value={chatWidth} onValueChange={(v) => { setChatWidth(v as 'narrow' | 'wide'); window.api.settings.set('chat_width', v) }}>
+              <SelectTrigger className="w-48">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent position="popper" side="bottom" className="max-h-none">
+                <SelectItem value="narrow">Narrow</SelectItem>
+                <SelectItem value="wide">Wide</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
         </CardContent>
       </Card>

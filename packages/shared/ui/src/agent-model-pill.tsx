@@ -45,18 +45,22 @@ export interface AgentModelPillProps {
   onChange: (next: AgentModel) => void
   disabled?: boolean
   compact?: boolean
+  /** Visual style. `pill` = chip (default). `text` = plain inline text. */
+  variant?: 'pill' | 'text'
   className?: string
 }
 
-export function AgentModelPill({ model, onChange, disabled, compact, className }: AgentModelPillProps) {
+export function AgentModelPill({ model, onChange, disabled, compact, variant = 'pill', className }: AgentModelPillProps) {
   const meta = MODEL_META[model]
   return (
     <DropdownMenu>
       <DropdownMenuTrigger
         disabled={disabled}
         className={cn(
-          'inline-flex items-center gap-1.5 rounded-full ring-1 px-2 py-0.5 text-[11px] font-medium transition-colors',
-          'bg-muted/40 text-muted-foreground ring-border hover:bg-muted/60 hover:text-foreground',
+          'inline-flex items-center transition-colors',
+          variant === 'pill'
+            ? 'gap-1.5 rounded-full ring-1 px-2 py-0.5 text-[11px] font-medium bg-muted/40 text-muted-foreground ring-border hover:bg-muted/60 hover:text-foreground'
+            : 'gap-1 rounded px-1 py-0.5 text-[10px] text-muted-foreground/80 hover:bg-muted/60 hover:text-foreground',
           disabled && 'opacity-50 cursor-not-allowed',
           className,
         )}

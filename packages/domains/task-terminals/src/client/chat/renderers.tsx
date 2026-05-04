@@ -243,8 +243,10 @@ export function SubAgentRow({ item }: { item: Extract<TimelineItem, { kind: 'sub
   }, [collapseSignal])
 
   return (
-    <div className="mx-4 my-1 pl-[2.75rem]" data-testid="sub-agent-row">
-      <div className="rounded-md border border-border/50 bg-muted/20 overflow-hidden">
+    <div className="px-4 py-1" data-testid="sub-agent-row">
+      <div className="flex gap-3 items-start">
+        <div className="shrink-0 size-7" aria-hidden />
+        <div className="min-w-0 flex-1 max-w-[90%] rounded-md border border-border/50 bg-muted/20 overflow-hidden">
         <button
           type="button"
           onClick={() => hasChildren && setOpen((v) => !v)}
@@ -308,6 +310,7 @@ export function SubAgentRow({ item }: { item: Extract<TimelineItem, { kind: 'sub
             })}
           </div>
         )}
+        </div>
       </div>
     </div>
   )
@@ -347,8 +350,10 @@ function ToolShell({
   }, [collapseSignal])
   const canOpen = Boolean(children)
   return (
-    <div className="mx-4 my-1 pl-[2.75rem]">
-      <div className="rounded-lg border border-border/50 bg-card/40 overflow-hidden shadow-sm">
+    <div className="px-4 py-1">
+      <div className="flex gap-3 items-start">
+        <div className="shrink-0 size-7" aria-hidden />
+        <div className="min-w-0 flex-1 max-w-[90%] rounded-lg border border-border/50 bg-card/40 overflow-hidden shadow-sm">
         <button
           onClick={() => canOpen && setOpen(!open)}
           disabled={!canOpen}
@@ -371,6 +376,7 @@ function ToolShell({
           )}
         </button>
         {open && canOpen && <div className="border-t border-border/40 bg-background/40">{children}</div>}
+        </div>
       </div>
     </div>
   )
@@ -391,6 +397,7 @@ function shortenPath(p?: string): string {
 
 export function ToolCallEdit({ invocation }: ToolProps) {
   const input = invocation.input as { file_path?: string; old_string?: string; new_string?: string } | null
+  const { fileEditsOpenByDefault } = useChatView()
   const fileDiff = useMemo(() => {
     return invocation.result ? claudeEditResultToFileDiff(invocation.result.structured) : null
   }, [invocation.result])
@@ -400,7 +407,7 @@ export function ToolCallEdit({ invocation }: ToolProps) {
       title="Edit"
       status={invocation.status}
       summary={shortenPath(input?.file_path)}
-      defaultOpen
+      defaultOpen={fileEditsOpenByDefault}
     >
       {fileDiff ? (
         <div className="p-1">
@@ -442,12 +449,14 @@ export function ToolCallRead({ invocation }: ToolProps) {
 
 export function ToolCallWrite({ invocation }: ToolProps) {
   const input = invocation.input as { file_path?: string; content?: string } | null
+  const { fileEditsOpenByDefault } = useChatView()
   return (
     <ToolShell
       icon={<FilePlus className="size-3" />}
       title="Write"
       status={invocation.status}
       summary={shortenPath(input?.file_path)}
+      defaultOpen={fileEditsOpenByDefault}
     >
       {input?.content && (
         <pre className="p-3 text-xs font-mono whitespace-pre overflow-x-auto max-h-64 bg-muted/30">

@@ -24,6 +24,8 @@ interface ModeMeta {
   chip: string
   /** Hover background for trigger. */
   chipHover: string
+  /** Foreground-only color for text variant. */
+  text: string
 }
 
 const MODE_META: Record<AgentMode, ModeMeta> = {
@@ -34,6 +36,7 @@ const MODE_META: Record<AgentMode, ModeMeta> = {
     icon: Eye,
     chip: 'bg-sky-500/15 text-sky-600 dark:text-sky-300 ring-sky-500/30',
     chipHover: 'hover:bg-sky-500/25',
+    text: 'text-sky-600 dark:text-sky-300',
   },
   'auto-accept': {
     label: 'Auto-accept edits',
@@ -42,6 +45,7 @@ const MODE_META: Record<AgentMode, ModeMeta> = {
     icon: ShieldCheck,
     chip: 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-300 ring-emerald-500/30',
     chipHover: 'hover:bg-emerald-500/25',
+    text: 'text-emerald-600 dark:text-emerald-300',
   },
   auto: {
     label: 'Auto mode',
@@ -50,6 +54,7 @@ const MODE_META: Record<AgentMode, ModeMeta> = {
     icon: Zap,
     chip: 'bg-violet-500/15 text-violet-600 dark:text-violet-300 ring-violet-500/30',
     chipHover: 'hover:bg-violet-500/25',
+    text: 'text-violet-600 dark:text-violet-300',
   },
   bypass: {
     label: 'Bypass permissions',
@@ -58,6 +63,7 @@ const MODE_META: Record<AgentMode, ModeMeta> = {
     icon: AlertTriangle,
     chip: 'bg-amber-500/15 text-amber-700 dark:text-amber-300 ring-amber-500/30',
     chipHover: 'hover:bg-amber-500/25',
+    text: 'text-amber-700 dark:text-amber-300',
   },
 }
 
@@ -77,6 +83,8 @@ export interface AgentModePillProps {
   disabled?: boolean
   /** Compact variant — icon + short label only. */
   compact?: boolean
+  /** Visual style. `pill` = colored chip (default). `text` = plain inline text. */
+  variant?: 'pill' | 'text'
   className?: string
   /**
    * Auto-mode capability. When omitted or `eligible: false`, the `auto` option
@@ -86,7 +94,7 @@ export interface AgentModePillProps {
   autoCapability?: AutoModeCapability
 }
 
-export function AgentModePill({ mode, onChange, disabled, compact, className, autoCapability }: AgentModePillProps) {
+export function AgentModePill({ mode, onChange, disabled, compact, variant = 'pill', className, autoCapability }: AgentModePillProps) {
   const meta = MODE_META[mode]
   const Icon = meta.icon
   const visibleModes = MODE_ORDER.filter((m) => m !== 'auto' || autoCapability?.eligible === true)
@@ -95,9 +103,10 @@ export function AgentModePill({ mode, onChange, disabled, compact, className, au
       <DropdownMenuTrigger
         disabled={disabled}
         className={cn(
-          'inline-flex items-center gap-1.5 rounded-full ring-1 px-2 py-0.5 text-[11px] font-medium transition-colors',
-          meta.chip,
-          meta.chipHover,
+          'inline-flex items-center gap-1 transition-colors',
+          variant === 'pill'
+            ? cn('gap-1.5 rounded-full ring-1 px-2 py-0.5 text-[11px] font-medium', meta.chip, meta.chipHover)
+            : cn('rounded px-1 py-0.5 text-[10px] hover:bg-muted/60', meta.text),
           disabled && 'opacity-50 cursor-not-allowed',
           className,
         )}

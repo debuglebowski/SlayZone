@@ -10,6 +10,8 @@ export interface ChatViewState {
   collapseSignal: number
   /** When true, timeline filters down to user messages + final assistant reply per turn. */
   finalOnly: boolean
+  /** When true, file-edit tool cards (Edit/Write) start expanded. */
+  fileEditsOpenByDefault: boolean
   /**
    * Search highlight metadata. When `query` is non-empty, plain-text renderers
    * (UserMessage, ThinkingBlock, StderrBlock, ResultFooter expanded text, tool
@@ -50,6 +52,7 @@ export interface ChatViewState {
 export const ChatViewContext = createContext<ChatViewState>({
   collapseSignal: 0,
   finalOnly: false,
+  fileEditsOpenByDefault: true,
   search: { query: '', caseSensitive: false },
   timeline: [],
   childIndex: new Map(),

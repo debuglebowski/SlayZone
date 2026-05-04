@@ -187,8 +187,9 @@ test.describe('Terminal mode switching', () => {
     const tasks = await mainWindow.evaluate(() => window.api.db.getTasks())
     expect(tasks.some((t) => t.id === temp.id)).toBe(true)
 
-    // Now toggle back to xterm via ChatPanel's "Disable chat" button.
-    await mainWindow.getByRole('button', { name: 'Disable chat' }).click()
+    // Now toggle back to xterm via the header menu's "Disable chat" item.
+    await mainWindow.locator('[data-testid="terminal-menu-trigger"]:visible').first().click()
+    await mainWindow.getByRole('menuitem', { name: /Disable chat/ }).click()
     await mainWindow.getByRole('button', { name: 'Disable' }).click()
 
     await expect.poll(async () => {

@@ -3,13 +3,10 @@ import { useStickToBottom } from 'use-stick-to-bottom'
 import {
   ArrowUp,
   Square,
-  Copy,
-  Check,
   X as XIcon,
   Sparkles,
   ArrowDown,
   RotateCcw,
-  ChevronsDownUp,
   Filter,
 } from 'lucide-react'
 import { ChatViewContext } from './ChatViewContext'
@@ -27,7 +24,16 @@ import {
   ContextMenuTrigger,
   ContextMenuContent,
   ContextMenuItem,
+  ContextMenuSub,
+  ContextMenuSubTrigger,
+  ContextMenuSubContent,
+  ContextMenuRadioGroup,
+  ContextMenuRadioItem,
   ContextMenuSeparator,
+  Popover,
+  PopoverTrigger,
+  PopoverContent,
+  Switch,
   useAppearance,
 } from '@slayzone/ui'
 import { ConfirmDisplayModeDialog } from '../ConfirmDisplayModeDialog'
@@ -88,6 +94,8 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
   })
 
   const appearance = useAppearance()
+  const widthClass = appearance.chatWidth === 'wide' ? 'max-w-none' : 'max-w-4xl'
+  const composerWidthClass = appearance.chatWidth === 'wide' ? 'max-w-4xl' : 'max-w-2xl'
 
 
   const loop = useChatLoop({
@@ -100,7 +108,6 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
 
   const [draft, setDraft] = useState('')
   const [cursorPos, setCursorPos] = useState(0)
-  const [sessionIdCopied, setSessionIdCopied] = useState(false)
   const { chatMode, modeChanging, handleModeChange, autoCapability } = useChatMode({
     taskId, mode, tabId, cwd, livePermissionMode: permissionMode,
   })
@@ -108,7 +115,8 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
     taskId, mode, tabId, cwd,
   })
   const [collapseSignal, setCollapseSignal] = useState(0)
-  const [finalOnly, setFinalOnly] = useState(false)
+  const finalOnly = !appearance.chatShowTools
+  const showLastMessageTools = appearance.chatShowLastMessageTools
   /** Send-text + original draft kept paired so usage bumps on drain see the
    * raw `/<token>` even when commands expanded the body before queueing. */
   const [queuedMessages, setQueuedMessages] = useState<Array<{ send: string; original: string }>>([])
@@ -235,11 +243,21 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
   // Always filter non-renderable items so virtualizer count matches visible DOM.
   // Also drop items with `parentToolUseId` set — those are sub-agent children,
   // rendered nested inside their parent SubAgentRow, not at the chat root.
+  // When `showLastMessageTools` is on, tools after the last user message are
+  // preserved so the user sees what the agent is doing right now.
   const displayedTimeline = useMemo<TimelineItem[]>(() => {
     const isRoot = (item: TimelineItem): boolean => item.parentToolUseId == null
     if (!finalOnly) return timeline.filter((item) => isRoot(item) && isRenderable(item))
+    let lastUserIdx = -1
+    if (showLastMessageTools) {
+      for (let i = timeline.length - 1; i >= 0; i--) {
+        if (isRoot(timeline[i]) && timeline[i].kind === 'user-text') {
+          lastUserIdx = i
+          break
+        }
+      }
+    }
     const out: TimelineItem[] = []
-    // Track the most recent assistant-text index per turn, flushed on result or next user.
     let pendingFinal: TimelineItem | null = null
     const flushPending = (): void => {
       if (pendingFinal) {
@@ -247,7 +265,8 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
         pendingFinal = null
       }
     }
-    for (const item of timeline) {
+    for (let i = 0; i < timeline.length; i++) {
+      const item = timeline[i]
       if (!isRoot(item)) continue
       if (item.kind === 'user-text') {
         flushPending()
@@ -257,6 +276,12 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
       } else if (item.kind === 'tool' && item.invocation.name === 'ExitPlanMode') {
         flushPending()
         out.push(item)
+      } else if (item.kind === 'tool' && showLastMessageTools && i > lastUserIdx) {
+        flushPending()
+        out.push(item)
+      } else if (item.kind === 'thinking' && showLastMessageTools && i > lastUserIdx) {
+        flushPending()
+        out.push(item)
       } else if (item.kind === 'result') {
         flushPending()
         out.push(item)
@@ -264,7 +289,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
     }
     flushPending()
     return out.filter(isRenderable)
-  }, [timeline, finalOnly])
+  }, [timeline, finalOnly, showLastMessageTools])
 
   const search = useChatSearch(displayedTimeline)
 
@@ -306,6 +331,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
     () => ({
       collapseSignal,
       finalOnly,
+      fileEditsOpenByDefault: appearance.chatFileEditsOpenByDefault,
       search: { query: search.query, caseSensitive: search.caseSensitive },
       setChatMode: (next: typeof chatMode) => { void handleModeChange(next) },
       timeline,
@@ -313,7 +339,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
       onOpenUrl,
       onOpenFile: handleOpenFile,
     }),
-    [collapseSignal, finalOnly, search.query, search.caseSensitive, handleModeChange, timeline, state.childIndex, onOpenUrl, handleOpenFile],
+    [collapseSignal, finalOnly, appearance.chatFileEditsOpenByDefault, search.query, search.caseSensitive, handleModeChange, timeline, state.childIndex, onOpenUrl, handleOpenFile],
   )
 
   // Autosize textarea. Height follows scrollHeight up to 240px; no artificial min —
@@ -569,8 +595,6 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
   const copySessionId = useCallback(() => {
     if (!state.sessionId) return
     void navigator.clipboard.writeText(state.sessionId)
-    setSessionIdCopied(true)
-    setTimeout(() => setSessionIdCopied(false), 1500)
   }, [state.sessionId])
 
   const [resetting, setResetting] = useState(false)
@@ -732,40 +756,42 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
         <ContextMenuTrigger asChild>
       <div className="relative flex-1 min-h-0">
         <div ref={scrollRef} className="h-full overflow-y-auto pt-4">
-          {hydrating ? (
-            <HydratingState />
-          ) : isEmpty && !inFlight ? (
-            <EmptyState
-              onPick={(text) => {
-                void sendMessage(text)
-              }}
-            />
-          ) : (
-            <div ref={contentRef}>
-              {hiddenCount > 0 && (
-                <div className="flex justify-center py-2">
-                  <button
-                    onClick={() => setVisibleCount((c) => c + PAGE_SIZE)}
-                    className="text-xs text-muted-foreground hover:text-foreground rounded-md px-3 py-1 border border-border/50 hover:bg-muted/60 transition-colors"
-                  >
-                    Show {Math.min(PAGE_SIZE, hiddenCount)} earlier
-                    {hiddenCount > PAGE_SIZE ? ` (${hiddenCount} hidden)` : ''}
-                  </button>
-                </div>
-              )}
-              {visibleItems.map((item, i) => {
-                const index = visibleStart + i
-                const rendered = renderTimelineItem(item, index)
-                if (rendered === null) return null
-                return (
-                  <div key={itemKey(item, index)} data-index={index}>
-                    {rendered}
+          <div className={cn('mx-auto w-full', widthClass)}>
+            {hydrating ? (
+              <HydratingState />
+            ) : isEmpty && !inFlight ? (
+              <EmptyState
+                onPick={(text) => {
+                  void sendMessage(text)
+                }}
+              />
+            ) : (
+              <div ref={contentRef}>
+                {hiddenCount > 0 && (
+                  <div className="flex justify-center py-2">
+                    <button
+                      onClick={() => setVisibleCount((c) => c + PAGE_SIZE)}
+                      className="text-xs text-muted-foreground hover:text-foreground rounded-md px-3 py-1 border border-border/50 hover:bg-muted/60 transition-colors"
+                    >
+                      Show {Math.min(PAGE_SIZE, hiddenCount)} earlier
+                      {hiddenCount > PAGE_SIZE ? ` (${hiddenCount} hidden)` : ''}
+                    </button>
                   </div>
-                )
-              })}
-            </div>
-          )}
-          {inFlight && <TypingIndicator label={deriveLoadingLabel(state)} />}
+                )}
+                {visibleItems.map((item, i) => {
+                  const index = visibleStart + i
+                  const rendered = renderTimelineItem(item, index)
+                  if (rendered === null) return null
+                  return (
+                    <div key={itemKey(item, index)} data-index={index}>
+                      {rendered}
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+            {inFlight && <TypingIndicator label={deriveLoadingLabel(state)} />}
+          </div>
         </div>
 
         {/* Jump-to-latest button */}
@@ -792,14 +818,41 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
           <ContextMenuItem onSelect={search.requestOpen}>
             Find in chat… (⌘F)
           </ContextMenuItem>
+          <ContextMenuItem onSelect={() => setCollapseSignal((n) => n + 1)}>
+            Collapse all expanded blocks
+          </ContextMenuItem>
+          <ContextMenuSub>
+            <ContextMenuSubTrigger>Width</ContextMenuSubTrigger>
+            <ContextMenuSubContent>
+              <ContextMenuRadioGroup
+                value={appearance.chatWidth}
+                onValueChange={(v) => {
+                  window.api.settings.set('chat_width', v)
+                  window.dispatchEvent(new CustomEvent('sz:settings-changed'))
+                }}
+              >
+                <ContextMenuRadioItem value="narrow">Narrow</ContextMenuRadioItem>
+                <ContextMenuRadioItem value="wide">Wide</ContextMenuRadioItem>
+              </ContextMenuRadioGroup>
+            </ContextMenuSubContent>
+          </ContextMenuSub>
           <ContextMenuItem onSelect={() => { void handleReset() }} disabled={resetting}>
             Reset chat
           </ContextMenuItem>
+          {onSetDisplayMode && (
+            <>
+              <ContextMenuSeparator />
+              <ContextMenuItem onSelect={() => setPendingChatDisable(true)}>
+                Disable chat
+              </ContextMenuItem>
+            </>
+          )}
         </ContextMenuContent>
       </ContextMenu>
 
       {/* Composer */}
       <div className="bg-background px-4 pt-3 pb-1">
+        <div className={cn('mx-auto w-full', composerWidthClass)}>
         {queuedMessages.length > 0 && (
           <div className="mb-2">
             <div className="px-1 mb-1 text-[10px] uppercase tracking-wide text-muted-foreground/60">
@@ -857,7 +910,6 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
         <div
           className={cn(
             'relative flex items-center gap-2 rounded-2xl bg-muted/40 ring-1 ring-border/60 px-3 py-1.5 transition-shadow',
-            'focus-within:ring-2 focus-within:ring-primary/40 focus-within:bg-background',
             displaySessionEnded && 'opacity-50 pointer-events-none'
           )}
           onPaste={(e) => {
@@ -936,6 +988,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
             onChange={(next) => { void handleModeChange(next) }}
             disabled={modeChanging || inFlight}
             compact
+            variant="text"
             autoCapability={autoCapability}
           />
           <AgentModelPill
@@ -943,46 +996,63 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
             onChange={(next) => { void handleModelChange(next) }}
             disabled={modelChanging || inFlight}
             compact
+            variant="text"
           />
-          <span>
-            {inFlight
-              ? 'Enter to queue · Shift+Enter for newline'
-              : 'Enter to send · Shift+Enter for newline'}
-          </span>
-          <div className="flex-1" />
-          {state.sessionId && (
-            <button
-              onClick={copySessionId}
-              className="flex items-center gap-1 hover:text-foreground"
-              title="Copy session id"
-            >
-              <span className="font-mono">{state.sessionId.slice(0, 8)}</span>
-              {sessionIdCopied ? <Check className="size-3" /> : <Copy className="size-3 opacity-60" />}
-            </button>
+          {appearance.chatWidth === 'wide' && (
+            <span>
+              {inFlight
+                ? 'Enter to queue · Shift+Enter for newline'
+                : 'Enter to send · Shift+Enter for newline'}
+            </span>
           )}
+          <div className="flex-1" />
           {displaySessionEnded && <span className="text-destructive">Session ended</span>}
-          <button
-            onClick={() => setCollapseSignal((n) => n + 1)}
-            className="flex items-center gap-1 px-1.5 py-0.5 rounded-md hover:bg-muted/60 hover:text-foreground transition-colors"
-            title="Collapse all expanded blocks"
-          >
-            <ChevronsDownUp className="size-3" />
-            Collapse
-          </button>
-          <button
-            onClick={() => setFinalOnly((v) => !v)}
-            className={cn(
-              'flex items-center gap-1 px-1.5 py-0.5 rounded-md transition-colors',
-              finalOnly
-                ? 'bg-primary/15 text-foreground'
-                : 'hover:bg-muted/60 hover:text-foreground'
-            )}
-            title={finalOnly ? 'Show all messages' : 'Show only final replies'}
-            aria-pressed={finalOnly}
-          >
-            <Filter className="size-3" />
-            {finalOnly ? 'Showing final' : 'Final only'}
-          </button>
+          <Popover>
+            <PopoverTrigger asChild>
+              <button
+                className={cn(
+                  'flex items-center gap-1 px-1.5 py-0.5 rounded-md transition-colors',
+                  finalOnly
+                    ? 'bg-primary/15 text-foreground'
+                    : 'hover:bg-muted/60 hover:text-foreground'
+                )}
+                title="Display options"
+              >
+                <Filter className="size-3" />
+                Display
+              </button>
+            </PopoverTrigger>
+            <PopoverContent align="end" className="w-72 p-3 space-y-3">
+              <DisplayOptionRow
+                label="Show tools"
+                description="Show all tool calls inline. When off, only user messages + final assistant reply per turn."
+                checked={appearance.chatShowTools}
+                onCheckedChange={(c) => {
+                  window.api.settings.set('chat_show_tools', c ? '1' : '0')
+                  window.dispatchEvent(new CustomEvent('sz:settings-changed'))
+                }}
+              />
+              <DisplayOptionRow
+                label="Show last message tools"
+                description="When tools are hidden, still show tools after the most recent user message."
+                checked={showLastMessageTools}
+                disabled={appearance.chatShowTools}
+                onCheckedChange={(c) => {
+                  window.api.settings.set('chat_show_last_message_tools', c ? '1' : '0')
+                  window.dispatchEvent(new CustomEvent('sz:settings-changed'))
+                }}
+              />
+              <DisplayOptionRow
+                label="File edits opened by default"
+                description="Auto-expand Edit and Write tool cards."
+                checked={appearance.chatFileEditsOpenByDefault}
+                onCheckedChange={(c) => {
+                  window.api.settings.set('chat_file_edits_open_by_default', c ? '1' : '0')
+                  window.dispatchEvent(new CustomEvent('sz:settings-changed'))
+                }}
+              />
+            </PopoverContent>
+          </Popover>
           <button
             onClick={() => {
               void handleReset()
@@ -994,15 +1064,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
             <RotateCcw className={cn('size-3', resetting && 'animate-spin')} />
             Reset
           </button>
-          {onSetDisplayMode && (
-            <button
-              onClick={() => setPendingChatDisable(true)}
-              className="flex items-center gap-1 px-1.5 py-0.5 rounded-md hover:bg-muted/60 hover:text-foreground transition-colors"
-              title="Disable chat view — switch back to terminal"
-            >
-              Disable chat
-            </button>
-          )}
+        </div>
         </div>
       </div>
 
@@ -1019,6 +1081,30 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
     </ChatViewContext.Provider>
   )
 })
+
+function DisplayOptionRow({
+  label,
+  description,
+  checked,
+  disabled,
+  onCheckedChange,
+}: {
+  label: string
+  description: string
+  checked: boolean
+  disabled?: boolean
+  onCheckedChange: (next: boolean) => void
+}) {
+  return (
+    <div className={cn('flex items-start gap-3', disabled && 'opacity-50')}>
+      <div className="flex-1 min-w-0">
+        <div className="text-xs font-medium text-foreground">{label}</div>
+        <div className="text-[11px] text-muted-foreground leading-snug mt-0.5">{description}</div>
+      </div>
+      <Switch checked={checked} disabled={disabled} onCheckedChange={onCheckedChange} className="mt-0.5" />
+    </div>
+  )
+}
 
 function HydratingState() {
   return (

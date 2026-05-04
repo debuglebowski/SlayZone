@@ -37,6 +37,11 @@ export interface AppearanceSettings {
   notesCheckedHighlight: boolean
   notesShowToolbar: boolean
   notesSpellcheck: boolean
+  // Chat
+  chatWidth: 'narrow' | 'wide'
+  chatShowTools: boolean
+  chatShowLastMessageTools: boolean
+  chatFileEditsOpenByDefault: boolean
   // Sidebar
   sidebarBadgeMode: 'none' | 'blob' | 'count'
   // Markdown
@@ -74,6 +79,10 @@ export const appearanceDefaults: AppearanceSettings = {
   notesCheckedHighlight: false,
   notesShowToolbar: false,
   notesSpellcheck: true,
+  chatWidth: 'narrow',
+  chatShowTools: true,
+  chatShowLastMessageTools: true,
+  chatFileEditsOpenByDefault: true,
   sidebarBadgeMode: 'blob',
   editorMarkdownViewMode: 'rich',
   editorMinimapEnabled: false,

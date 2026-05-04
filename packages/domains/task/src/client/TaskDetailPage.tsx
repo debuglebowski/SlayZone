@@ -615,6 +615,7 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
   const terminalContainerRef = useRef<TerminalContainerHandle>(null)
   const [mainTabDisplayMode, setMainTabDisplayMode] = useState<TabDisplayMode>('xterm')
   const [pendingChatEnable, setPendingChatEnable] = useState(false)
+  const [pendingChatDisable, setPendingChatDisable] = useState(false)
   const browserPanelRef = useRef<BrowserPanelHandle>(null)
   const assetsPanelRef = useRef<AssetsPanelHandle>(null)
   const pendingEditorFileRef = useRef<string | null>(null)
@@ -2402,6 +2403,14 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
                                   </DropdownMenuItem>
                                 </>
                               )}
+                              {isChatSupported(task.terminal_mode) && mainTabDisplayMode === 'chat' && (
+                                <>
+                                  <DropdownMenuSeparator />
+                                  <DropdownMenuItem onClick={() => setPendingChatDisable(true)}>
+                                    Disable chat
+                                  </DropdownMenuItem>
+                                </>
+                              )}
                             </DropdownMenuContent>
                           </DropdownMenu>
                           <ConfirmDisplayModeDialog
@@ -2412,6 +2421,15 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
                               setPendingChatEnable(false)
                             }}
                             onCancel={() => setPendingChatEnable(false)}
+                          />
+                          <ConfirmDisplayModeDialog
+                            open={pendingChatDisable}
+                            target="xterm"
+                            onConfirm={() => {
+                              void terminalContainerRef.current?.setMainDisplayMode('xterm')
+                              setPendingChatDisable(false)
+                            }}
+                            onCancel={() => setPendingChatDisable(false)}
                           />
                         </div>
                       </TooltipTrigger>
