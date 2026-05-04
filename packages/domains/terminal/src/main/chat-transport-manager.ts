@@ -6,6 +6,7 @@ import type { AgentAdapter } from './agents/types'
 import { getAdapter } from './agents/registry'
 import { whichBinary as realWhichBinary } from './shell-env'
 import type { BufferedEvent } from './chat-events-store'
+import type { ChatMode } from '../shared/chat-mode'
 
 export type { BufferedEvent } from './chat-events-store'
 
@@ -97,6 +98,14 @@ export interface ChatSessionInfo {
   pid: number | null
   startedAt: string
   ended: boolean
+  /**
+   * Resolved permission mode this session was spawned with. In-memory truth
+   * — fresher than DB cache because it's set synchronously at spawn time
+   * (DB persistence may lag behind). Optional because non-claude adapters
+   * don't track a permission mode. Renderer prefers this over `chat:getMode`
+   * (DB cache) on mount when a session exists.
+   */
+  chatMode?: ChatMode | null
 }
 
 interface Session {
@@ -121,6 +130,8 @@ interface Session {
   retryScheduled: boolean
   /** Opts needed to respawn. */
   respawnOpts: CreateChatOpts
+  /** Resolved chat permission mode this session was spawned with. */
+  chatMode: ChatMode | null
   onPersistSessionId?: (id: string) => void
   onInvalidResume?: () => void
 }
@@ -292,6 +303,12 @@ export interface CreateChatOpts {
    * rows for this tab so newly-appended events don't collide with restored ones.
    */
   initialNextSeq?: number
+  /**
+   * Resolved chat permission mode this spawn corresponds to. Stored on the
+   * Session and surfaced via ChatSessionInfo. When null, adapter doesn't
+   * use a permission-mode concept (non-claude agents).
+   */
+  chatMode?: ChatMode | null
 }
 
 export async function createChat(opts: CreateChatOpts): Promise<ChatSessionInfo> {
@@ -378,6 +395,7 @@ export async function createChat(opts: CreateChatOpts): Promise<ChatSessionInfo>
     sawHealthyTurn: false,
     retryScheduled: false,
     respawnOpts: opts,
+    chatMode: opts.chatMode ?? null,
     onPersistSessionId: opts.onPersistSessionId,
     onInvalidResume: opts.onInvalidResume,
   }
@@ -566,6 +584,7 @@ function toInfo(session: Session): ChatSessionInfo {
     pid: session.child.pid ?? null,
     startedAt: session.startedAt,
     ended: session.ended,
+    chatMode: session.chatMode,
   }
 }
 

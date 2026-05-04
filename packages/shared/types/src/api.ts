@@ -31,6 +31,14 @@ export interface ChatSessionInfo {
   pid: number | null
   startedAt: string
   ended: boolean
+  /**
+   * Resolved chat permission mode this session was spawned with. In-memory
+   * truth from the running subprocess — fresher than the DB cache because
+   * it's set synchronously at spawn time. Renderer prefers this over
+   * `chat:getMode` (DB) on mount when a session exists. Optional because
+   * non-claude adapters don't track a permission mode.
+   */
+  chatMode?: 'plan' | 'auto-accept' | 'auto' | 'bypass' | null
 }
 import type { TerminalTab, CreateTerminalTabInput, UpdateTerminalTabInput } from '@slayzone/task-terminals/shared'
 import type { Theme, ThemePreference } from '@slayzone/settings/shared'

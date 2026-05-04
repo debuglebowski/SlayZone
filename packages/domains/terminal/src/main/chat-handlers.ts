@@ -256,32 +256,46 @@ export function inspectPermissionFlags(flags: string[]): {
 }
 
 /**
- * Shared opts builder for `chat:create` + `chat:reset`. `fresh: true` forces a new
- * session id (skips --resume) — used by reset to guarantee a clean thread regardless
- * of whatever was previously stored. PATH enrichment + MCP env are identical across
- * both paths, so factoring here prevents drift.
+ * Shared opts builder for `chat:create` + `chat:reset` + `chat:setMode`.
+ *
+ * `fresh: true` forces a new session id (skips --resume) — used by reset to
+ * guarantee a clean thread regardless of whatever was previously stored. PATH
+ * enrichment + MCP env are identical across both paths, so factoring here
+ * prevents drift.
+ *
+ * `chatModeOverride` short-circuits the DB lookup of provider_config.chatMode —
+ * used by `chat:setMode` so the spawn flags reflect the user's intent before
+ * the DB cache is updated. Lets us run the DB write *after* spawn succeeds
+ * (transactional) without a race where buildCreateOpts re-reads stale DB.
  */
 async function buildCreateOpts(
   db: Database,
   opts: ChatCreateOpts,
-  { fresh }: { fresh: boolean }
+  { fresh, chatModeOverride }: { fresh: boolean; chatModeOverride?: ChatMode }
 ): Promise<Parameters<typeof createChat>[0]> {
   const providerCfg = readProviderConfig(db, opts.taskId, opts.mode)
   // Flag-resolution priority for chat:
   //   1. per-call override (`providerFlagsOverride`)
   //   2. per-task explicit flags (`providerCfg.flags`)
-  //   3. chatMode-derived flags (default `auto-accept` for new, `bypass` after backfill)
+  //   3. chatMode (override > DB-cached > default)
   // terminal_modes default_flags is intentionally NOT consulted for chat — chat owns
   // its own permission UX through chatMode. Terminal still uses default_flags.
   let providerFlags: string[]
-  if (opts.providerFlagsOverride) {
+  let resolvedChatMode: ChatMode | null = null
+  if (chatModeOverride) {
+    // Explicit chatMode change (chat:setMode): override wins over both per-call
+    // flag overrides and providerCfg.flags — the user explicitly asked for a
+    // mode, and chatMode-derived flags must take effect for the spawn.
+    resolvedChatMode = await resolveSafeChatMode(chatModeOverride)
+    providerFlags = chatModeToFlags(resolvedChatMode)
+  } else if (opts.providerFlagsOverride) {
     providerFlags = parseShellArgs(opts.providerFlagsOverride)
   } else if (providerCfg.flags) {
     providerFlags = parseShellArgs(providerCfg.flags)
   } else {
     const stored = providerCfg.chatMode ?? DEFAULT_CHAT_MODE_NEW_TASK
-    const safe = await resolveSafeChatMode(stored)
-    providerFlags = chatModeToFlags(safe)
+    resolvedChatMode = await resolveSafeChatMode(stored)
+    providerFlags = chatModeToFlags(resolvedChatMode)
   }
 
   const initialBuffer = fresh ? [] : loadChatEvents(db, opts.tabId)
@@ -303,6 +317,7 @@ async function buildCreateOpts(
     env: subprocessEnv,
     initialBuffer,
     initialNextSeq,
+    chatMode: resolvedChatMode,
     onPersistSessionId: (id) => {
       writeChatConversationId(db, opts.taskId, opts.mode, id)
     },
@@ -465,14 +480,19 @@ export function registerChatHandlers(ipcMain: IpcMain, db: Database, opts: ChatH
       // already filters in the pill, but a stale renderer or a direct IPC call
       // shouldn't be able to persist a forbidden mode.
       const safe = await resolveSafeChatMode(opts.chatMode)
-      writeChatMode(db, opts.taskId, opts.mode, safe)
-      // Mode change requires a child-process restart (CLI flags are read at spawn).
-      // We DON'T wipe timeline or clear chatConversationId — the new child resumes
-      // the same conversation via `--resume <id>` (handled by adapter when
-      // `conversationId` is non-null in createChat opts). User keeps history;
-      // only the underlying subprocess is recycled.
+      // Transactional: spawn first, persist DB after spawn succeeds. If
+      // createChat throws, DB stays at previous mode (no orphan persist).
+      // chatModeOverride bypasses DB read so the new child uses `safe` flags
+      // even though provider_config still has the old value.
       removeSession(opts.tabId)
-      return createChat(await buildCreateOpts(db, opts, { fresh: false }))
+      const created = await createChat(
+        await buildCreateOpts(db, opts, { fresh: false, chatModeOverride: safe })
+      )
+      writeChatMode(db, opts.taskId, opts.mode, safe)
+      // Returned ChatSessionInfo carries `chatMode: safe` via Session.chatMode,
+      // so renderer trusts the server's resolved value (e.g. auto → auto-accept
+      // downgrade) instead of its optimistic guess.
+      return created
     }
   )
 
