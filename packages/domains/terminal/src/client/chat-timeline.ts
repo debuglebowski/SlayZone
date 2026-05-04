@@ -1,4 +1,11 @@
-import type { AgentEvent } from '../shared/agent-events'
+import type { AgentEvent, ToolCallEvent, ToolResultEvent } from '../shared/agent-events'
+import {
+  extractBgShellSpawn,
+  extractShellIdFromSpawnResult,
+  extractBashOutputCall,
+  extractKillShellCall,
+  extractBashOutputResult,
+} from '../shared/bg-shell-helpers'
 
 /** Render-ready item produced by the reducer. Tool calls are pre-paired with results. */
 export type TimelineItem =
@@ -70,6 +77,26 @@ export interface OpenBlock {
   partialJson?: string
 }
 
+export type BgShellStatus = 'pending' | 'running' | 'completed' | 'killed' | 'failed' | 'unknown'
+
+export interface BgShell {
+  /** tool_use_id of the original Bash spawn (`run_in_background: true`). Stable key. */
+  spawnToolUseId: string
+  /** Claude-assigned shell id (e.g. `bash_1`). Null until spawn's tool_result arrives. */
+  shellId: string | null
+  command: string
+  description?: string
+  status: BgShellStatus
+  exitCode: number | null
+  /** Wall-clock ms when the spawn tool-call entered the timeline. */
+  spawnedAt: number
+  /** Wall-clock ms of the most recent BashOutput poll, or null. */
+  lastPolledAt: number | null
+  /** Most recent stdout/stderr chunks observed via BashOutput. Truncated by caller if large. */
+  latestStdout: string
+  latestStderr: string
+}
+
 export interface ChatTimelineState {
   timeline: TimelineItem[]
   /** tool_use_id → index into `timeline` for paired mutation. */
@@ -104,6 +131,21 @@ export interface ChatTimelineState {
    * Raw CLI value: 'plan' | 'acceptEdits' | 'auto' | 'bypassPermissions' | 'default' | 'dontAsk'.
    */
   permissionMode: string | null
+  /**
+   * Background shells spawned via the Bash tool with `run_in_background: true`.
+   * Keyed by the SPAWN tool_use_id (stable across the lifecycle); shell_id is
+   * filled in on the spawn's tool_result. Order of insertion is preserved by
+   * `bgShellOrder` so the UI can render newest-first or oldest-first cheaply.
+   */
+  bgShells: Map<string, BgShell>
+  bgShellOrder: string[]
+  /**
+   * Maps a `BashOutput`/`KillShell` tool_use_id back to the spawn tool_use_id
+   * (and the kind of poll) so the poll's tool_result can be attributed to the
+   * right shell, and a successful KillShell can flip status to 'killed' even
+   * when the result payload has no explicit status field.
+   */
+  bgShellPollIndex: Map<string, { spawnToolUseId: string; kind: 'output' | 'kill' }>
 }
 
 export function initialState(): ChatTimelineState {
@@ -124,6 +166,9 @@ export function initialState(): ChatTimelineState {
     openBlocks: new Map(),
     streamedMessageIds: new Set(),
     permissionMode: null,
+    bgShells: new Map(),
+    bgShellOrder: [],
+    bgShellPollIndex: new Map(),
   }
 }
 
@@ -135,6 +180,22 @@ export type Action =
   | { type: 'reset' }
 
 export function reducer(state: ChatTimelineState, action: Action): ChatTimelineState {
+  const next = applyAction(state, action)
+  // Bg-shell tracking is a pure derived view over the same event stream, kept
+  // alongside the timeline so it replays from buffered history without a second
+  // subscription. We post-process AgentEvents here so the timeline pass stays
+  // focused on rendering and bg-shell logic stays in one place.
+  if (action.type === 'event') {
+    return applyBgShellEvent(next, action.event)
+  }
+  if (action.type === 'reset') {
+    // initialState already cleared bg-shells; nothing more to do.
+    return next
+  }
+  return next
+}
+
+function applyAction(state: ChatTimelineState, action: Action): ChatTimelineState {
   switch (action.type) {
     case 'reset':
       return initialState()
@@ -798,4 +859,178 @@ function basename(p: string): string {
 function truncate(s: string, max: number): string {
   if (s.length <= max) return s
   return `${s.slice(0, Math.max(1, max - 1))}…`
+}
+
+/** Cap kept stdout/stderr to bound memory under chatty bg processes. */
+const BG_OUTPUT_KEEP = 4_000
+
+/**
+ * Soft cap on retained terminal-status (completed/killed/failed/unknown)
+ * shells. Active shells (pending/running) are always kept. Long sessions can
+ * accumulate dozens of one-shot bg jobs — without eviction the map grows
+ * unboundedly. Oldest terminal entries are evicted first (FIFO over
+ * `bgShellOrder`).
+ */
+const BG_TERMINAL_HISTORY_KEEP = 30
+
+const TERMINAL_BG_STATUSES: ReadonlySet<BgShellStatus> = new Set([
+  'completed',
+  'killed',
+  'failed',
+  'unknown',
+])
+
+function tail(s: string, max: number): string {
+  return s.length > max ? s.slice(s.length - max) : s
+}
+
+function evictTerminalShells(
+  shells: Map<string, BgShell>,
+  order: string[],
+  pollIndex: Map<string, { spawnToolUseId: string; kind: 'output' | 'kill' }>,
+): {
+  shells: Map<string, BgShell>
+  order: string[]
+  pollIndex: Map<string, { spawnToolUseId: string; kind: 'output' | 'kill' }>
+} {
+  let terminalCount = 0
+  for (const s of shells.values()) {
+    if (TERMINAL_BG_STATUSES.has(s.status)) terminalCount++
+  }
+  if (terminalCount <= BG_TERMINAL_HISTORY_KEEP) {
+    return { shells, order, pollIndex }
+  }
+  let toEvict = terminalCount - BG_TERMINAL_HISTORY_KEEP
+  const evicted = new Set<string>()
+  for (const id of order) {
+    if (toEvict <= 0) break
+    const shell = shells.get(id)
+    if (shell && TERMINAL_BG_STATUSES.has(shell.status)) {
+      evicted.add(id)
+      toEvict--
+    }
+  }
+  if (evicted.size === 0) return { shells, order, pollIndex }
+  const nextShells = new Map<string, BgShell>()
+  for (const [k, v] of shells) if (!evicted.has(k)) nextShells.set(k, v)
+  const nextOrder = order.filter((id) => !evicted.has(id))
+  const nextPollIndex = new Map<string, { spawnToolUseId: string; kind: 'output' | 'kill' }>()
+  for (const [pollId, ref] of pollIndex) {
+    if (!evicted.has(ref.spawnToolUseId)) nextPollIndex.set(pollId, ref)
+  }
+  return { shells: nextShells, order: nextOrder, pollIndex: nextPollIndex }
+}
+
+function setBgShell(state: ChatTimelineState, shell: BgShell): ChatTimelineState {
+  const isNew = !state.bgShells.has(shell.spawnToolUseId)
+  const shellMap = new Map(state.bgShells)
+  shellMap.set(shell.spawnToolUseId, shell)
+  const order = isNew
+    ? [...state.bgShellOrder, shell.spawnToolUseId]
+    : state.bgShellOrder
+  // Eviction runs on every setBgShell so terminal-history bound holds across
+  // both new spawns AND status transitions (running→completed bumps count).
+  const evicted = evictTerminalShells(shellMap, order, state.bgShellPollIndex)
+  return {
+    ...state,
+    bgShells: evicted.shells,
+    bgShellOrder: evicted.order,
+    bgShellPollIndex: evicted.pollIndex,
+  }
+}
+
+function applyBgShellEvent(state: ChatTimelineState, event: AgentEvent): ChatTimelineState {
+  if (event.kind === 'tool-call') return applyBgShellToolCall(state, event)
+  if (event.kind === 'tool-result') return applyBgShellToolResult(state, event)
+  return state
+}
+
+function applyBgShellToolCall(state: ChatTimelineState, event: ToolCallEvent): ChatTimelineState {
+  // 1. Bash with run_in_background=true → register a new shell (status pending).
+  const spawn = extractBgShellSpawn(event)
+  if (spawn) {
+    if (state.bgShells.has(spawn.toolUseId)) return state
+    const shell: BgShell = {
+      spawnToolUseId: spawn.toolUseId,
+      shellId: null,
+      command: spawn.command,
+      description: spawn.description,
+      status: 'pending',
+      exitCode: null,
+      spawnedAt: Date.now(),
+      lastPolledAt: null,
+      latestStdout: '',
+      latestStderr: '',
+    }
+    return setBgShell(state, shell)
+  }
+  // 2. BashOutput / KillShell — remember which spawn this poll targets so the
+  //    poll's tool_result can be attributed correctly.
+  const output = extractBashOutputCall(event)
+  const kill = extractKillShellCall(event)
+  const poll = output ?? kill
+  if (poll) {
+    const owner = findShellByShellId(state, poll.shellId)
+    if (!owner) return state
+    const nextIdx = new Map(state.bgShellPollIndex)
+    nextIdx.set(event.id, {
+      spawnToolUseId: owner.spawnToolUseId,
+      kind: kill ? 'kill' : 'output',
+    })
+    return { ...state, bgShellPollIndex: nextIdx }
+  }
+  return state
+}
+
+function applyBgShellToolResult(state: ChatTimelineState, event: ToolResultEvent): ChatTimelineState {
+  // 1. Spawn result → assign shell id.
+  const spawnOwner = state.bgShells.get(event.toolUseId)
+  if (spawnOwner && spawnOwner.shellId === null) {
+    const shellId = extractShellIdFromSpawnResult(event)
+    const next: BgShell = {
+      ...spawnOwner,
+      shellId: shellId ?? spawnOwner.shellId,
+      // Spawn ack means the shell was accepted; promote pending → running.
+      status: event.isError ? 'failed' : 'running',
+    }
+    return setBgShell(state, next)
+  }
+  // 2. BashOutput / KillShell result → update status/output for the owning shell.
+  const ref = state.bgShellPollIndex.get(event.toolUseId)
+  if (!ref) return state
+  const owner = state.bgShells.get(ref.spawnToolUseId)
+  if (!owner) return state
+  const sig = extractBashOutputResult(event)
+  // KillShell tool_results often omit explicit status. When the originating
+  // call was a KillShell and the result wasn't an error, force 'killed' so
+  // the UI doesn't perpetually show 'running' for a terminated shell.
+  let nextStatus = pickStatus(owner.status, sig.status)
+  if (ref.kind === 'kill' && !event.isError && nextStatus !== 'killed') {
+    nextStatus = 'killed'
+  }
+  const next: BgShell = {
+    ...owner,
+    status: nextStatus,
+    exitCode: sig.exitCode ?? owner.exitCode,
+    lastPolledAt: Date.now(),
+    latestStdout: sig.stdout ? tail(sig.stdout, BG_OUTPUT_KEEP) : owner.latestStdout,
+    latestStderr: sig.stderr ? tail(sig.stderr, BG_OUTPUT_KEEP) : owner.latestStderr,
+  }
+  return setBgShell(state, next)
+}
+
+function pickStatus(prev: BgShellStatus, incoming: BgShellStatusSignal): BgShellStatus {
+  if (incoming) return incoming
+  // No status from this result. Don't downgrade a terminal status to running.
+  if (prev === 'completed' || prev === 'killed' || prev === 'failed') return prev
+  return prev === 'pending' ? 'running' : prev
+}
+
+type BgShellStatusSignal = ReturnType<typeof extractBashOutputResult>['status']
+
+function findShellByShellId(state: ChatTimelineState, shellId: string): BgShell | null {
+  for (const shell of state.bgShells.values()) {
+    if (shell.shellId === shellId) return shell
+  }
+  return null
 }
