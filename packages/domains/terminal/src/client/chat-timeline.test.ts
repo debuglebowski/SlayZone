@@ -475,6 +475,97 @@ test('sub-agent: distinct toolUseIds get their own rows', () => {
   expect(subAgents.length).toBe(2)
 })
 
+test('sub-agent children: parentToolUseId on tool-call routes into childIndex', () => {
+  let s = initialState()
+  s = reducer(s, { type: 'event', event: ev.turnInit() })
+  s = reducer(s, {
+    type: 'event',
+    event: { kind: 'sub-agent', phase: 'started', toolUseId: 'tu_TASK', description: 'find', raw: {} },
+  })
+  // Sub-agent's inner tool call carries parent_tool_use_id pointing at the Task.
+  s = reducer(s, {
+    type: 'event',
+    event: { kind: 'tool-call', id: 'tu_INNER', name: 'Grep', input: { pattern: 'x' }, parentToolUseId: 'tu_TASK' },
+  })
+  // Result for the inner tool also carries parent.
+  s = reducer(s, {
+    type: 'event',
+    event: { kind: 'tool-result', toolUseId: 'tu_INNER', isError: false, rawContent: 'matches', structured: null, parentToolUseId: 'tu_TASK' },
+  })
+  // Inner tool item exists in flat timeline (one of the items, not first since session-start + sub-agent precede).
+  const tools = s.timeline.filter((i) => i.kind === 'tool')
+  expect(tools.length).toBe(1)
+  const inner = tools[0]
+  if (inner.kind !== 'tool') throw new Error('wrong kind')
+  expect(inner.parentToolUseId).toBe('tu_TASK')
+  expect(inner.invocation.status).toBe('done')
+  // childIndex contains the inner tool's timeline index under tu_TASK.
+  const children = s.childIndex.get('tu_TASK')
+  if (!children) throw new Error('expected childIndex entry')
+  expect(children.length).toBe(1)
+  const childIdx = children[0]
+  expect(s.timeline[childIdx].kind).toBe('tool')
+})
+
+test('sub-agent children: assistant-text + thinking are routed by parentToolUseId', () => {
+  let s = initialState()
+  s = reducer(s, { type: 'event', event: ev.turnInit() })
+  s = reducer(s, {
+    type: 'event',
+    event: { kind: 'sub-agent', phase: 'started', toolUseId: 'tu_TASK', description: 'reason', raw: {} },
+  })
+  s = reducer(s, {
+    type: 'event',
+    event: { kind: 'assistant-text', messageId: 'm-inner', text: 'thinking aloud', parentToolUseId: 'tu_TASK' },
+  })
+  s = reducer(s, {
+    type: 'event',
+    event: { kind: 'assistant-thinking', messageId: 'm-inner-2', text: 'private', hasSignature: false, parentToolUseId: 'tu_TASK' },
+  })
+  const children = s.childIndex.get('tu_TASK') ?? []
+  expect(children.length).toBe(2)
+  const kinds = children.map((i) => s.timeline[i].kind).sort()
+  expect(kinds.join(',')).toBe('text,thinking')
+})
+
+test('sub-agent children: events without parent stay at root (childIndex empty)', () => {
+  let s = initialState()
+  s = reducer(s, { type: 'event', event: ev.turnInit() })
+  s = reducer(s, { type: 'event', event: ev.call('t-1', 'Bash') })
+  s = reducer(s, { type: 'event', event: ev.result('t-1') })
+  expect(s.childIndex.size).toBe(0)
+  // Tool item itself has no parentToolUseId.
+  const tool = s.timeline.find((i) => i.kind === 'tool')
+  if (!tool || tool.kind !== 'tool') throw new Error('wrong')
+  expect(tool.parentToolUseId).toBe(undefined)
+})
+
+test('sub-agent children: nested sub-agent inside sub-agent registers under outer parent', () => {
+  let s = initialState()
+  s = reducer(s, { type: 'event', event: ev.turnInit() })
+  s = reducer(s, {
+    type: 'event',
+    event: { kind: 'sub-agent', phase: 'started', toolUseId: 'tu_OUTER', description: 'outer', raw: {} },
+  })
+  s = reducer(s, {
+    type: 'event',
+    event: {
+      kind: 'sub-agent',
+      phase: 'started',
+      toolUseId: 'tu_INNER',
+      description: 'inner',
+      parentToolUseId: 'tu_OUTER',
+      raw: {},
+    },
+  })
+  const outerChildren = s.childIndex.get('tu_OUTER') ?? []
+  expect(outerChildren.length).toBe(1)
+  const innerItem = s.timeline[outerChildren[0]]
+  if (innerItem.kind !== 'sub-agent') throw new Error('wrong kind')
+  expect(innerItem.toolUseId).toBe('tu_INNER')
+  expect(innerItem.parentToolUseId).toBe('tu_OUTER')
+})
+
 test('deriveLoadingLabel: null when idle', () => {
   const s = initialState()
   expect(deriveLoadingLabel(s)).toBe(null)

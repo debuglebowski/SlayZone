@@ -65,6 +65,10 @@ export interface ChatPanelProps {
   onLoopConfigChange?: (config: LoopConfig | null) => void
   /** Open the LoopModeDialog (lives at TaskDetailPage level — shared with terminal). */
   onOpenLoopDialog?: () => void
+  /** Cmd+Click on a URL → in-app slay browser. Cmd+Shift+Click always external. */
+  onOpenUrl?: (url: string) => void
+  /** Cmd+Click on a file:line:col reference → editor pane. */
+  onOpenFile?: (filePath: string, options?: { position?: { line: number; col?: number } }) => void
 }
 
 const SUGGESTED_PROMPTS = [
@@ -74,7 +78,7 @@ const SUGGESTED_PROMPTS = [
 ]
 
 export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function ChatPanel(props, ref) {
-  const { tabId, taskId, mode, cwd, providerFlagsOverride, permissionNotice: overrideNotice, onSetDisplayMode, loopConfig, onLoopConfigChange, onOpenLoopDialog } = props
+  const { tabId, taskId, mode, cwd, providerFlagsOverride, permissionNotice: overrideNotice, onSetDisplayMode, loopConfig, onLoopConfigChange, onOpenLoopDialog, onOpenUrl, onOpenFile } = props
   const { state, timeline, inFlight, hydrating, permissionMode, sendMessage, abortAndPop, reset: resetTimeline } = useChatSession({
     tabId,
     taskId,
@@ -229,8 +233,11 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
   // When `finalOnly` is on, keep user msgs + result + the last assistant
   // text per turn. Drop thinking/tools/intermediate text/noise.
   // Always filter non-renderable items so virtualizer count matches visible DOM.
+  // Also drop items with `parentToolUseId` set — those are sub-agent children,
+  // rendered nested inside their parent SubAgentRow, not at the chat root.
   const displayedTimeline = useMemo<TimelineItem[]>(() => {
-    if (!finalOnly) return timeline.filter(isRenderable)
+    const isRoot = (item: TimelineItem): boolean => item.parentToolUseId == null
+    if (!finalOnly) return timeline.filter((item) => isRoot(item) && isRenderable(item))
     const out: TimelineItem[] = []
     // Track the most recent assistant-text index per turn, flushed on result or next user.
     let pendingFinal: TimelineItem | null = null
@@ -241,6 +248,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
       }
     }
     for (const item of timeline) {
+      if (!isRoot(item)) continue
       if (item.kind === 'user-text') {
         flushPending()
         out.push(item)
@@ -285,14 +293,27 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
   }, [])
 
 
+  // Adapt the `(path, { position })` signature used by host wiring to the flat
+  // `(path, line, col)` shape LinkifiedText expects.
+  const handleOpenFile = useMemo(() => {
+    if (!onOpenFile) return undefined
+    return (path: string, line?: number, col?: number) => {
+      onOpenFile(path, line != null ? { position: { line, col } } : undefined)
+    }
+  }, [onOpenFile])
+
   const chatView = useMemo(
     () => ({
       collapseSignal,
       finalOnly,
       search: { query: search.query, caseSensitive: search.caseSensitive },
       setChatMode: (next: typeof chatMode) => { void handleModeChange(next) },
+      timeline,
+      childIndex: state.childIndex,
+      onOpenUrl,
+      onOpenFile: handleOpenFile,
     }),
-    [collapseSignal, finalOnly, search.query, search.caseSensitive, handleModeChange],
+    [collapseSignal, finalOnly, search.query, search.caseSensitive, handleModeChange, timeline, state.childIndex, onOpenUrl, handleOpenFile],
   )
 
   // Autosize textarea. Height follows scrollHeight up to 240px; no artificial min —
@@ -619,17 +640,26 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
         textareaRef.current?.focus()
       }}
       onClickCapture={(e) => {
-        // Event-delegated link interception: any `<a href="http...">` rendered
-        // inside chat (markdown auto-links, etc.) → route to shell.openExternal
-        // instead of letting Electron navigate the renderer to the URL.
+        // Event-delegated link interception for markdown-rendered anchors only.
+        // Skip LinkifiedText anchors — they own their click semantics via
+        // `data-linkified` and would otherwise double-fire (capture-phase parent
+        // before child onClick).
+        // Mirrors terminal modifier semantics:
+        //   ⌘+Click       → in-app slay browser (onOpenUrl)
+        //   ⌘+Shift+Click → external
+        //   bare click    → external (markdown anchors are click affordances;
+        //                  doing nothing on bare click would feel broken).
         const target = e.target as HTMLElement | null
         const anchor = target?.closest('a[href]') as HTMLAnchorElement | null
         if (!anchor) return
+        if (anchor.dataset.linkified === 'true') return
         const href = anchor.getAttribute('href') ?? ''
-        if (/^https?:\/\//i.test(href)) {
-          e.preventDefault()
-          navigate.openExternal(href)
-        }
+        if (!/^https?:\/\//i.test(href)) return
+        e.preventDefault()
+        const mod = e.metaKey || e.ctrlKey
+        if (mod && e.shiftKey) navigate.openExternal(href)
+        else if (mod && onOpenUrl) onOpenUrl(href)
+        else navigate.openExternal(href)
       }}
     >
       {/* Panel-wide drop overlay */}

@@ -25,6 +25,16 @@ import { DiffView, GhMarkdown } from '@slayzone/worktrees/client'
 import type { TimelineItem, ToolInvocation } from '@slayzone/terminal/client'
 import { claudeEditResultToFileDiff } from './claude-patch-to-filediff'
 import { LinkifiedText } from './LinkifiedText'
+
+/**
+ * Context-bound LinkifiedText. Pulls `onOpenUrl`/`onOpenFile` from ChatViewContext
+ * so renderers don't have to thread them per call site. When unset, falls back to
+ * shell.openExternal / shell.openPath.
+ */
+function LinkText({ text }: { text: string }) {
+  const { onOpenUrl, onOpenFile } = useChatView()
+  return <LinkifiedText text={text} onOpenUrl={onOpenUrl} onOpenFile={onOpenFile} />
+}
 import { HighlightedText } from './HighlightedText'
 
 // --- Helpers ---
@@ -217,50 +227,88 @@ export function UnknownBlock({ item }: { item: Extract<TimelineItem, { kind: 'un
 }
 
 export function SubAgentRow({ item }: { item: Extract<TimelineItem, { kind: 'sub-agent' }> }) {
+  const { collapseSignal, timeline, childIndex } = useChatView()
   const inFlight = item.phase !== 'notification'
   const errored = item.status === 'failed' || item.status === 'error'
   const seconds = item.durationMs != null ? (item.durationMs / 1000).toFixed(1) : null
   const tokens = item.totalTokens != null ? formatTokens(item.totalTokens) : null
+
+  const childIndices = childIndex.get(item.toolUseId) ?? []
+  const hasChildren = childIndices.length > 0
+  // Mirror ToolShell convention: errored items default open so the user sees what failed;
+  // everything else stays collapsed. collapseSignal forces all back to closed.
+  const [open, setOpen] = useState(errored)
+  useEffect(() => {
+    setOpen(false)
+  }, [collapseSignal])
+
   return (
-    <div className="mx-4 my-1 ml-[2.75rem] px-3 py-1.5 flex items-center gap-2 text-[11px] rounded-md border border-border/50 bg-muted/20 text-muted-foreground">
-      {inFlight ? (
-        <Loader2 className="size-3 shrink-0 animate-spin text-violet-500" />
-      ) : errored ? (
-        <CircleX className="size-3 shrink-0 text-destructive" />
-      ) : (
-        <CircleCheck className="size-3 shrink-0 text-emerald-500" />
-      )}
-      <span className="font-medium text-foreground/80">Sub-agent</span>
-      {item.description && (
-        <>
-          <span className="text-muted-foreground/40">·</span>
-          <span className="truncate max-w-[40ch]">{item.description}</span>
-        </>
-      )}
-      {item.status && (
-        <>
-          <span className="text-muted-foreground/40">·</span>
-          <span className={cn(errored && 'text-destructive')}>{item.status}</span>
-        </>
-      )}
-      {seconds && (
-        <>
-          <span className="text-muted-foreground/40">·</span>
-          <span>{seconds}s</span>
-        </>
-      )}
-      {item.toolUses != null && item.toolUses > 0 && (
-        <>
-          <span className="text-muted-foreground/40">·</span>
-          <span>{item.toolUses} tool{item.toolUses === 1 ? '' : 's'}</span>
-        </>
-      )}
-      {tokens && (
-        <>
-          <span className="text-muted-foreground/40">·</span>
-          <span>{tokens} tok</span>
-        </>
-      )}
+    <div className="mx-4 my-1 pl-[2.75rem]" data-testid="sub-agent-row">
+      <div className="rounded-md border border-border/50 bg-muted/20 overflow-hidden">
+        <button
+          type="button"
+          onClick={() => hasChildren && setOpen((v) => !v)}
+          disabled={!hasChildren}
+          className={cn(
+            'w-full flex items-center gap-2 px-3 py-1.5 text-[11px] text-muted-foreground text-left',
+            hasChildren && 'hover:bg-muted/40 cursor-pointer',
+            !hasChildren && 'cursor-default',
+          )}
+        >
+          {inFlight ? (
+            <Loader2 className="size-3 shrink-0 animate-spin text-violet-500" />
+          ) : errored ? (
+            <CircleX className="size-3 shrink-0 text-destructive" />
+          ) : (
+            <CircleCheck className="size-3 shrink-0 text-emerald-500" />
+          )}
+          <span className="font-medium text-foreground/80">Sub-agent</span>
+          {item.description && (
+            <>
+              <span className="text-muted-foreground/40">·</span>
+              <span className="truncate max-w-[40ch]">{item.description}</span>
+            </>
+          )}
+          {item.status && (
+            <>
+              <span className="text-muted-foreground/40">·</span>
+              <span className={cn(errored && 'text-destructive')}>{item.status}</span>
+            </>
+          )}
+          {seconds && (
+            <>
+              <span className="text-muted-foreground/40">·</span>
+              <span>{seconds}s</span>
+            </>
+          )}
+          {item.toolUses != null && item.toolUses > 0 && (
+            <>
+              <span className="text-muted-foreground/40">·</span>
+              <span>{item.toolUses} tool{item.toolUses === 1 ? '' : 's'}</span>
+            </>
+          )}
+          {tokens && (
+            <>
+              <span className="text-muted-foreground/40">·</span>
+              <span>{tokens} tok</span>
+            </>
+          )}
+          {hasChildren && (
+            <span className="ml-auto shrink-0 text-muted-foreground">
+              {open ? <ChevronDown className="size-3" /> : <ChevronRight className="size-3" />}
+            </span>
+          )}
+        </button>
+        {open && hasChildren && (
+          <div className="border-t border-border/40 bg-background/40 py-1" data-testid="sub-agent-children">
+            {childIndices.map((idx) => {
+              const child = timeline[idx]
+              if (!child) return null
+              return renderTimelineItem(child, `${item.toolUseId}:${idx}`)
+            })}
+          </div>
+        )}
+      </div>
     </div>
   )
 }
@@ -385,7 +433,7 @@ export function ToolCallRead({ invocation }: ToolProps) {
     >
       {structured?.file?.content && (
         <pre className="p-3 text-xs font-mono whitespace-pre overflow-x-auto max-h-64 bg-muted/30">
-          <LinkifiedText text={structured.file.content} />
+          <LinkText text={structured.file.content} />
         </pre>
       )}
     </ToolShell>
@@ -435,7 +483,7 @@ export function ToolCallBash({ invocation }: ToolProps) {
       )}
       {resultText && (
         <pre className="px-3 pb-2 pt-1 text-xs font-mono whitespace-pre-wrap text-muted-foreground max-h-64 overflow-y-auto">
-          <LinkifiedText text={resultText} />
+          <LinkText text={resultText} />
         </pre>
       )}
     </ToolShell>
@@ -457,7 +505,7 @@ export function ToolCallGlob({ invocation }: ToolProps) {
       {structured?.filenames && (
         <ul className="p-3 text-xs font-mono grid gap-0.5 max-h-48 overflow-y-auto">
           {structured.filenames.map((f) => (
-            <li key={f}><LinkifiedText text={f} /></li>
+            <li key={f}><LinkText text={f} /></li>
           ))}
         </ul>
       )}
@@ -481,13 +529,13 @@ export function ToolCallGrep({ invocation }: ToolProps) {
     <ToolShell icon={<Search className="size-3" />} title="Grep" status={invocation.status} summary={summary}>
       {structured?.content && (
         <pre className="p-3 text-xs font-mono whitespace-pre overflow-x-auto max-h-48 bg-muted/30">
-          <LinkifiedText text={structured.content} />
+          <LinkText text={structured.content} />
         </pre>
       )}
       {!structured?.content && structured?.filenames && (
         <ul className="p-3 text-xs font-mono grid gap-0.5 max-h-48 overflow-y-auto">
           {structured.filenames.map((f) => (
-            <li key={f}><LinkifiedText text={f} /></li>
+            <li key={f}><LinkText text={f} /></li>
           ))}
         </ul>
       )}

@@ -158,6 +158,8 @@ export const TerminalSplitGroup = forwardRef<TerminalSplitGroupHandle, TerminalS
           loopConfig={pane.loopConfig ?? null}
           onLoopConfigChange={pane.onLoopConfigChange}
           onOpenLoopDialog={pane.onOpenLoopDialog}
+          onOpenUrl={onOpenUrl}
+          onOpenFile={onOpenFile}
         />
       )
     }

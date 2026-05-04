@@ -1,5 +1,6 @@
 import { createContext, useContext } from 'react'
 import type { AgentMode } from '@slayzone/ui'
+import type { TimelineItem } from '@slayzone/terminal/client'
 
 export interface ChatViewState {
   /**
@@ -27,12 +28,31 @@ export interface ChatViewState {
    * the new flag.
    */
   setChatMode?: (next: AgentMode) => void
+  /**
+   * Full flat timeline + parent→children index, exposed so SubAgentRow can
+   * render the items emitted while it ran (parentToolUseId === toolUseId).
+   * Empty defaults are safe for harnesses that don't construct sub-agents.
+   */
+  timeline: TimelineItem[]
+  childIndex: Map<string, number[]>
+  /**
+   * Cmd+Click on URL → in-app slay browser. Mirrors terminal pane wiring.
+   * Cmd+Shift+Click always goes external regardless. Bare click does nothing.
+   * Falls back to `shell.openExternal` when undefined.
+   */
+  onOpenUrl?: (url: string) => void
+  /**
+   * Cmd+Click on file path → editor pane. Falls back to `shell.openPath`.
+   */
+  onOpenFile?: (filePath: string, line?: number, col?: number) => void
 }
 
 export const ChatViewContext = createContext<ChatViewState>({
   collapseSignal: 0,
   finalOnly: false,
   search: { query: '', caseSensitive: false },
+  timeline: [],
+  childIndex: new Map(),
 })
 
 export function useChatView(): ChatViewState {

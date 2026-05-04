@@ -282,6 +282,94 @@ test('task_notification: sub-agent event carries status + usage', () => {
   expect(ev.usage?.durationMs).toBe(52641)
 })
 
+test('parent_tool_use_id propagates through assistant tool_use, text, thinking', () => {
+  const tool = claudeCodeAdapter.parseLine(
+    JSON.stringify({
+      type: 'assistant',
+      message: { id: 'm1', content: [{ type: 'tool_use', id: 'tu_inner', name: 'Grep', input: { pattern: 'x' } }] },
+      parent_tool_use_id: 'tu_TASK',
+    })
+  )
+  if (!tool || tool.kind !== 'tool-call') throw new Error('expected tool-call')
+  expect(tool.parentToolUseId).toBe('tu_TASK')
+
+  const text = claudeCodeAdapter.parseLine(
+    JSON.stringify({
+      type: 'assistant',
+      message: { id: 'm2', content: [{ type: 'text', text: 'hi' }] },
+      parent_tool_use_id: 'tu_TASK',
+    })
+  )
+  if (!text || text.kind !== 'assistant-text') throw new Error('expected assistant-text')
+  expect(text.parentToolUseId).toBe('tu_TASK')
+
+  const think = claudeCodeAdapter.parseLine(
+    JSON.stringify({
+      type: 'assistant',
+      message: { id: 'm3', content: [{ type: 'thinking', thinking: '...' }] },
+      parent_tool_use_id: 'tu_TASK',
+    })
+  )
+  if (!think || think.kind !== 'assistant-thinking') throw new Error('expected assistant-thinking')
+  expect(think.parentToolUseId).toBe('tu_TASK')
+})
+
+test('parent_tool_use_id propagates through tool_result', () => {
+  const ev = claudeCodeAdapter.parseLine(
+    JSON.stringify({
+      type: 'user',
+      message: { role: 'user', content: [{ type: 'tool_result', tool_use_id: 'tu_inner', content: 'ok' }] },
+      parent_tool_use_id: 'tu_TASK',
+    })
+  )
+  if (!ev || ev.kind !== 'tool-result') throw new Error('expected tool-result')
+  expect(ev.parentToolUseId).toBe('tu_TASK')
+})
+
+test('parent_tool_use_id propagates through stream events (block-start, delta, stop)', () => {
+  const start = claudeCodeAdapter.parseLine(
+    JSON.stringify({
+      type: 'stream_event',
+      event: { type: 'content_block_start', index: 0, content_block: { type: 'tool_use', id: 'tu_inner', name: 'Bash' } },
+      parent_tool_use_id: 'tu_TASK',
+    })
+  )
+  if (!start || start.kind !== 'stream-block-start') throw new Error('expected stream-block-start')
+  expect(start.parentToolUseId).toBe('tu_TASK')
+
+  const delta = claudeCodeAdapter.parseLine(
+    JSON.stringify({
+      type: 'stream_event',
+      event: { type: 'content_block_delta', index: 0, delta: { type: 'text_delta', text: 'a' } },
+      parent_tool_use_id: 'tu_TASK',
+    })
+  )
+  if (!delta || delta.kind !== 'stream-block-delta') throw new Error('expected stream-block-delta')
+  expect(delta.parentToolUseId).toBe('tu_TASK')
+
+  const stop = claudeCodeAdapter.parseLine(
+    JSON.stringify({
+      type: 'stream_event',
+      event: { type: 'content_block_stop', index: 0 },
+      parent_tool_use_id: 'tu_TASK',
+    })
+  )
+  if (!stop || stop.kind !== 'stream-block-stop') throw new Error('expected stream-block-stop')
+  expect(stop.parentToolUseId).toBe('tu_TASK')
+})
+
+test('null parent_tool_use_id → undefined parentToolUseId (top-level events)', () => {
+  const ev = claudeCodeAdapter.parseLine(
+    JSON.stringify({
+      type: 'assistant',
+      message: { id: 'm1', content: [{ type: 'text', text: 'hi' }] },
+      parent_tool_use_id: null,
+    })
+  )
+  if (!ev || ev.kind !== 'assistant-text') throw new Error('expected assistant-text')
+  expect(ev.parentToolUseId).toBe(undefined)
+})
+
 test('extractSessionId: pulls from turn-init, null otherwise', () => {
   const init: AgentEvent = {
     kind: 'turn-init',

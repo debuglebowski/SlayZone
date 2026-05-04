@@ -120,8 +120,10 @@ export function ChatPanelHarness({
       collapseSignal: 0,
       finalOnly: false,
       search: { query: '', caseSensitive: false },
+      timeline: state.timeline,
+      childIndex: state.childIndex,
     }),
-    [],
+    [state.timeline, state.childIndex],
   )
 
   return (
@@ -160,7 +162,9 @@ export function ChatPanelHarness({
           </div>
         </header>
         <div className="min-h-0 flex-1 overflow-auto">
-          {state.timeline.map((item, i) => renderTimelineItem(item, i))}
+          {state.timeline.map((item, i) =>
+            item.parentToolUseId == null ? renderTimelineItem(item, i) : null,
+          )}
         </div>
       </div>
     </ChatViewContext.Provider>

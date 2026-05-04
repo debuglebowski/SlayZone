@@ -7,13 +7,19 @@ import {
   extractBashOutputResult,
 } from '../shared/bg-shell-helpers'
 
-/** Render-ready item produced by the reducer. Tool calls are pre-paired with results. */
+/**
+ * Render-ready item produced by the reducer. Tool calls are pre-paired with results.
+ *
+ * `parentToolUseId` links items emitted by a sub-agent (Task tool) back to that
+ * sub-agent's tool_use_id. Items with this set live in the flat `timeline` array
+ * but are rendered nested inside their parent SubAgentRow, not at the chat root.
+ */
 export type TimelineItem =
-  | { kind: 'user-text'; text: string; timestamp: number }
-  | { kind: 'text'; role: 'assistant'; messageId: string; text: string; timestamp: number }
-  | { kind: 'thinking'; messageId: string; text: string; hasSignature: boolean; timestamp: number }
-  | { kind: 'tool'; invocation: ToolInvocation; timestamp: number }
-  | { kind: 'session-start'; sessionId: string; model: string; cwd: string; tools: string[]; timestamp: number }
+  | { kind: 'user-text'; text: string; timestamp: number; parentToolUseId?: string }
+  | { kind: 'text'; role: 'assistant'; messageId: string; text: string; timestamp: number; parentToolUseId?: string }
+  | { kind: 'thinking'; messageId: string; text: string; hasSignature: boolean; timestamp: number; parentToolUseId?: string }
+  | { kind: 'tool'; invocation: ToolInvocation; timestamp: number; parentToolUseId?: string }
+  | { kind: 'session-start'; sessionId: string; model: string; cwd: string; tools: string[]; timestamp: number; parentToolUseId?: string }
   | {
       kind: 'result'
       subtype: string
@@ -25,9 +31,10 @@ export type TimelineItem =
       /** Concatenated assistant-text from this turn, for the footer Copy button. */
       copyText: string | null
       timestamp: number
+      parentToolUseId?: string
     }
-  | { kind: 'api-retry'; attempt: number; maxRetries: number; delayMs: number; error: string; timestamp: number }
-  | { kind: 'rate-limit'; status: string; timestamp: number }
+  | { kind: 'api-retry'; attempt: number; maxRetries: number; delayMs: number; error: string; timestamp: number; parentToolUseId?: string }
+  | { kind: 'rate-limit'; status: string; timestamp: number; parentToolUseId?: string }
   | {
       kind: 'sub-agent'
       /** Pairs `started` with the matching `notification`. One row per Task call. */
@@ -40,10 +47,11 @@ export type TimelineItem =
       toolUses?: number
       totalTokens?: number
       timestamp: number
+      parentToolUseId?: string
     }
-  | { kind: 'stderr'; text: string; timestamp: number }
-  | { kind: 'interrupted'; timestamp: number }
-  | { kind: 'unknown'; reason: string; timestamp: number }
+  | { kind: 'stderr'; text: string; timestamp: number; parentToolUseId?: string }
+  | { kind: 'interrupted'; timestamp: number; parentToolUseId?: string }
+  | { kind: 'unknown'; reason: string; timestamp: number; parentToolUseId?: string }
 
 export interface ToolInvocation {
   id: string
@@ -103,6 +111,13 @@ export interface ChatTimelineState {
   toolIndex: Map<string, number>
   /** Sub-agent tool_use_id → timeline index. Lets `notification` merge into the row started by `task_started`. */
   subAgentIndex: Map<string, number>
+  /**
+   * Parent sub-agent tool_use_id → ordered list of timeline indices for items
+   * emitted while that sub-agent ran. Built incrementally during reducer
+   * insertion so replay rebuilds it deterministically. Read by SubAgentRow to
+   * render nested children when expanded.
+   */
+  childIndex: Map<string, number[]>
   /** True once first turn-init seen. Subsequent turn-inits are treated as turn boundaries (ignored in timeline). */
   sessionStarted: boolean
   sessionId: string | null
@@ -153,6 +168,7 @@ export function initialState(): ChatTimelineState {
     timeline: [],
     toolIndex: new Map(),
     subAgentIndex: new Map(),
+    childIndex: new Map(),
     sessionStarted: false,
     sessionId: null,
     model: null,
@@ -192,6 +208,22 @@ export function reducer(state: ChatTimelineState, action: Action): ChatTimelineS
     // initialState already cleared bg-shells; nothing more to do.
     return next
   }
+  return next
+}
+
+/**
+ * Append `newIdx` to the children list keyed by `parentId`, returning a new map.
+ * No-op when `parentId` is undefined (item is a top-level row, not a sub-agent child).
+ */
+function registerChild(
+  state: ChatTimelineState,
+  newIdx: number,
+  parentId: string | undefined
+): Map<string, number[]> {
+  if (!parentId) return state.childIndex
+  const next = new Map(state.childIndex)
+  const arr = next.get(parentId) ?? []
+  next.set(parentId, [...arr, newIdx])
   return next
 }
 
@@ -361,8 +393,10 @@ function applyEvent(state: ChatTimelineState, event: AgentEvent): ChatTimelineSt
         messageId: event.messageId,
         text: event.text,
         timestamp: ts,
+        parentToolUseId: event.parentToolUseId,
       }
-      return { ...state, timeline: [...state.timeline, item] }
+      const childIndex = registerChild(state, state.timeline.length, event.parentToolUseId)
+      return { ...state, timeline: [...state.timeline, item], childIndex }
     }
     case 'assistant-thinking': {
       if (state.streamedMessageIds.has(event.messageId)) return state
@@ -372,24 +406,25 @@ function applyEvent(state: ChatTimelineState, event: AgentEvent): ChatTimelineSt
         text: event.text,
         hasSignature: event.hasSignature,
         timestamp: ts,
+        parentToolUseId: event.parentToolUseId,
       }
-      return { ...state, timeline: [...state.timeline, item] }
+      const childIndex = registerChild(state, state.timeline.length, event.parentToolUseId)
+      return { ...state, timeline: [...state.timeline, item], childIndex }
     }
     case 'tool-call': {
       // If already created via streaming (block-start), just fill in input (stream path may have
-      // failed to parse partial_json) and leave status pending.
+      // failed to parse partial_json) and leave status pending. Preserve parentToolUseId on target.
       const existingIdx = state.toolIndex.get(event.id)
       if (existingIdx !== undefined) {
         const target = state.timeline[existingIdx]
         if (target?.kind === 'tool') {
           const next: TimelineItem = {
-            kind: 'tool',
+            ...target,
             invocation: {
               ...target.invocation,
               name: target.invocation.name || event.name,
               input: target.invocation.input ?? event.input,
             },
-            timestamp: target.timestamp,
           }
           const t = state.timeline.slice()
           t[existingIdx] = next
@@ -402,13 +437,15 @@ function applyEvent(state: ChatTimelineState, event: AgentEvent): ChatTimelineSt
         input: event.input,
         status: 'pending',
       }
-      const item: TimelineItem = { kind: 'tool', invocation, timestamp: ts }
+      const item: TimelineItem = { kind: 'tool', invocation, timestamp: ts, parentToolUseId: event.parentToolUseId }
       const newIndex = new Map(state.toolIndex)
       newIndex.set(event.id, state.timeline.length)
+      const childIndex = registerChild(state, state.timeline.length, event.parentToolUseId)
       return {
         ...state,
         timeline: [...state.timeline, item],
         toolIndex: newIndex,
+        childIndex,
       }
     }
     case 'stream-message-start': {
@@ -433,7 +470,7 @@ function applyEvent(state: ChatTimelineState, event: AgentEvent): ChatTimelineSt
           input: null,
           status: 'pending',
         }
-        const item: TimelineItem = { kind: 'tool', invocation, timestamp: ts }
+        const item: TimelineItem = { kind: 'tool', invocation, timestamp: ts, parentToolUseId: event.parentToolUseId }
         const timelineIndex = state.timeline.length
         const nextOpen = new Map(state.openBlocks)
         nextOpen.set(event.blockIndex, {
@@ -449,11 +486,13 @@ function applyEvent(state: ChatTimelineState, event: AgentEvent): ChatTimelineSt
           nextToolIndex = new Map(state.toolIndex)
           nextToolIndex.set(event.toolUseId, timelineIndex)
         }
+        const childIndex = registerChild(state, timelineIndex, event.parentToolUseId)
         return {
           ...state,
           timeline: [...state.timeline, item],
           openBlocks: nextOpen,
           toolIndex: nextToolIndex,
+          childIndex,
         }
       }
 
@@ -483,14 +522,17 @@ function applyEvent(state: ChatTimelineState, event: AgentEvent): ChatTimelineSt
             messageId,
             text: event.text,
             timestamp: ts,
+            parentToolUseId: event.parentToolUseId,
           }
           const nextOpen = new Map(state.openBlocks)
           nextOpen.set(event.blockIndex, { ...open, timelineIndex: state.timeline.length })
+          const childIndex = registerChild(state, state.timeline.length, event.parentToolUseId)
           return {
             ...state,
             timeline: [...state.timeline, item],
             openBlocks: nextOpen,
             streamedMessageIds: nextStreamed,
+            childIndex,
           }
         }
         if (open.blockType === 'thinking' && event.deltaType === 'thinking') {
@@ -500,14 +542,17 @@ function applyEvent(state: ChatTimelineState, event: AgentEvent): ChatTimelineSt
             text: event.text,
             hasSignature: false,
             timestamp: ts,
+            parentToolUseId: event.parentToolUseId,
           }
           const nextOpen = new Map(state.openBlocks)
           nextOpen.set(event.blockIndex, { ...open, timelineIndex: state.timeline.length })
+          const childIndex = registerChild(state, state.timeline.length, event.parentToolUseId)
           return {
             ...state,
             timeline: [...state.timeline, item],
             openBlocks: nextOpen,
             streamedMessageIds: nextStreamed,
+            childIndex,
           }
         }
         return state
@@ -558,9 +603,8 @@ function applyEvent(state: ChatTimelineState, event: AgentEvent): ChatTimelineSt
             /* keep raw string as best-effort */
           }
           const next: TimelineItem = {
-            kind: 'tool',
+            ...target,
             invocation: { ...target.invocation, input: parsed },
-            timestamp: target.timestamp,
           }
           const t = state.timeline.slice()
           t[open.timelineIndex] = next
@@ -581,10 +625,11 @@ function applyEvent(state: ChatTimelineState, event: AgentEvent): ChatTimelineSt
           status: event.isError ? 'error' : 'done',
           result: { rawContent: event.rawContent, structured: event.structured, isError: event.isError },
         }
-        const item: TimelineItem = { kind: 'tool', invocation, timestamp: ts }
+        const item: TimelineItem = { kind: 'tool', invocation, timestamp: ts, parentToolUseId: event.parentToolUseId }
         const newIndex = new Map(state.toolIndex)
         newIndex.set(event.toolUseId, state.timeline.length)
-        return { ...state, timeline: [...state.timeline, item], toolIndex: newIndex }
+        const childIndex = registerChild(state, state.timeline.length, event.parentToolUseId)
+        return { ...state, timeline: [...state.timeline, item], toolIndex: newIndex, childIndex }
       }
       const target = state.timeline[idx]
       if (target.kind !== 'tool') return state
@@ -598,7 +643,7 @@ function applyEvent(state: ChatTimelineState, event: AgentEvent): ChatTimelineSt
         },
       }
       const nextTimeline = state.timeline.slice()
-      nextTimeline[idx] = { kind: 'tool', invocation: nextInvocation, timestamp: target.timestamp }
+      nextTimeline[idx] = { ...target, invocation: nextInvocation }
       return { ...state, timeline: nextTimeline }
     }
     case 'result': {
@@ -634,9 +679,8 @@ function applyEvent(state: ChatTimelineState, event: AgentEvent): ChatTimelineSt
         if (target?.kind !== 'tool' || target.invocation.denied) continue
         nextTimeline = nextTimeline.slice()
         nextTimeline[idx] = {
-          kind: 'tool',
+          ...target,
           invocation: { ...target.invocation, status: 'denied', denied: true },
-          timestamp: target.timestamp,
         }
       }
       return {
@@ -706,13 +750,16 @@ function applyEvent(state: ChatTimelineState, event: AgentEvent): ChatTimelineSt
         toolUses: event.usage?.toolUses,
         totalTokens: event.usage?.totalTokens,
         timestamp: ts,
+        parentToolUseId: event.parentToolUseId,
       }
       const nextIdx = new Map(state.subAgentIndex)
       if (id) nextIdx.set(id, state.timeline.length)
+      const childIndex = registerChild(state, state.timeline.length, event.parentToolUseId)
       return {
         ...state,
         timeline: [...state.timeline, item],
         subAgentIndex: nextIdx,
+        childIndex,
       }
     }
     case 'compact-boundary':

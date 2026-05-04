@@ -47,20 +47,25 @@ export const claudeCodeAdapter: AgentAdapter = {
       return { kind: 'unknown', reason: 'shape-mismatch', raw: obj }
     }
 
+    // Every Claude Code envelope (system / assistant / user / stream_event) carries
+    // `parent_tool_use_id` at the top level. When non-null, the event was emitted by
+    // a sub-agent spawned via the Task tool — used downstream to nest in the timeline.
+    const parent = typeof obj.parent_tool_use_id === 'string' ? obj.parent_tool_use_id : undefined
+
     const type = obj.type
     switch (type) {
       case 'system':
-        return parseSystem(obj)
+        return parseSystem(obj, parent)
       case 'assistant':
-        return parseAssistant(obj)
+        return parseAssistant(obj, parent)
       case 'user':
-        return parseUser(obj)
+        return parseUser(obj, parent)
       case 'result':
         return parseResult(obj)
       case 'rate_limit_event':
         return parseRateLimit(obj)
       case 'stream_event':
-        return parseStreamEvent(obj)
+        return parseStreamEvent(obj, parent)
       default:
         return { kind: 'unknown', reason: 'unknown-type', raw: obj }
     }
@@ -85,14 +90,14 @@ export const claudeCodeAdapter: AgentAdapter = {
  * Parse Claude Code's stream_event wrapper which envelopes one Anthropic SSE event.
  * Shape: `{"type":"stream_event","event":{...anthropic...},"parent_tool_use_id":null,"session_id":"..."}`.
  */
-function parseStreamEvent(obj: Record<string, unknown>): AgentEvent | null {
+function parseStreamEvent(obj: Record<string, unknown>, parent: string | undefined): AgentEvent | null {
   const inner = obj.event as Record<string, unknown> | undefined
   if (!inner || typeof inner !== 'object') return null
   const t = inner.type
   switch (t) {
     case 'message_start': {
       const message = inner.message as { id?: string } | undefined
-      return { kind: 'stream-message-start', messageId: message?.id ?? '' }
+      return { kind: 'stream-message-start', messageId: message?.id ?? '', parentToolUseId: parent }
     }
     case 'content_block_start': {
       const block = inner.content_block as
@@ -101,10 +106,10 @@ function parseStreamEvent(obj: Record<string, unknown>): AgentEvent | null {
       const index = typeof inner.index === 'number' ? inner.index : 0
       if (!block) return null
       if (block.type === 'text') {
-        return { kind: 'stream-block-start', blockIndex: index, blockType: 'text' }
+        return { kind: 'stream-block-start', blockIndex: index, blockType: 'text', parentToolUseId: parent }
       }
       if (block.type === 'thinking') {
-        return { kind: 'stream-block-start', blockIndex: index, blockType: 'thinking' }
+        return { kind: 'stream-block-start', blockIndex: index, blockType: 'thinking', parentToolUseId: parent }
       }
       if (block.type === 'tool_use') {
         return {
@@ -113,6 +118,7 @@ function parseStreamEvent(obj: Record<string, unknown>): AgentEvent | null {
           blockType: 'tool_use',
           toolUseId: block.id,
           toolName: block.name,
+          parentToolUseId: parent,
         }
       }
       return null
@@ -124,25 +130,25 @@ function parseStreamEvent(obj: Record<string, unknown>): AgentEvent | null {
       const index = typeof inner.index === 'number' ? inner.index : 0
       if (!d) return null
       if (d.type === 'text_delta') {
-        return { kind: 'stream-block-delta', blockIndex: index, deltaType: 'text', text: d.text ?? '' }
+        return { kind: 'stream-block-delta', blockIndex: index, deltaType: 'text', text: d.text ?? '', parentToolUseId: parent }
       }
       if (d.type === 'thinking_delta') {
-        return { kind: 'stream-block-delta', blockIndex: index, deltaType: 'thinking', text: d.thinking ?? '' }
+        return { kind: 'stream-block-delta', blockIndex: index, deltaType: 'thinking', text: d.thinking ?? '', parentToolUseId: parent }
       }
       if (d.type === 'signature_delta') {
-        return { kind: 'stream-block-delta', blockIndex: index, deltaType: 'signature', text: d.signature ?? '' }
+        return { kind: 'stream-block-delta', blockIndex: index, deltaType: 'signature', text: d.signature ?? '', parentToolUseId: parent }
       }
       if (d.type === 'input_json_delta') {
-        return { kind: 'stream-block-delta', blockIndex: index, deltaType: 'input_json', text: d.partial_json ?? '' }
+        return { kind: 'stream-block-delta', blockIndex: index, deltaType: 'input_json', text: d.partial_json ?? '', parentToolUseId: parent }
       }
       return null
     }
     case 'content_block_stop': {
       const index = typeof inner.index === 'number' ? inner.index : 0
-      return { kind: 'stream-block-stop', blockIndex: index }
+      return { kind: 'stream-block-stop', blockIndex: index, parentToolUseId: parent }
     }
     case 'message_stop':
-      return { kind: 'stream-message-stop' }
+      return { kind: 'stream-message-stop', parentToolUseId: parent }
     case 'message_delta':
       return null
     default:
@@ -150,7 +156,7 @@ function parseStreamEvent(obj: Record<string, unknown>): AgentEvent | null {
   }
 }
 
-function parseSystem(obj: Record<string, unknown>): AgentEvent | null {
+function parseSystem(obj: Record<string, unknown>, parent: string | undefined): AgentEvent | null {
   const subtype = obj.subtype as string | undefined
   if (subtype === 'init') {
     return {
@@ -181,6 +187,7 @@ function parseSystem(obj: Record<string, unknown>): AgentEvent | null {
         : subtype === 'task_updated' ? 'updated'
         : 'notification',
       toolUseId: (obj.tool_use_id as string) ?? '',
+      parentToolUseId: parent,
       description: typeof obj.description === 'string' ? obj.description : undefined,
       status: typeof obj.status === 'string' ? obj.status : undefined,
       summary: typeof obj.summary === 'string' ? obj.summary : undefined,
@@ -219,7 +226,7 @@ interface RawContentBlock {
   content?: unknown
 }
 
-function parseAssistant(obj: Record<string, unknown>): AgentEvent {
+function parseAssistant(obj: Record<string, unknown>, parent: string | undefined): AgentEvent {
   const message = obj.message as { id?: string; content?: RawContentBlock[] } | undefined
   if (!message) return { kind: 'unknown', reason: 'shape-mismatch', raw: obj }
   const messageId = message.id ?? ''
@@ -235,6 +242,7 @@ function parseAssistant(obj: Record<string, unknown>): AgentEvent {
       kind: 'assistant-text',
       messageId,
       text: block.text ?? '',
+      parentToolUseId: parent,
     }
   }
   if (block.type === 'thinking') {
@@ -243,6 +251,7 @@ function parseAssistant(obj: Record<string, unknown>): AgentEvent {
       messageId,
       text: block.thinking ?? '',
       hasSignature: Boolean(block.signature),
+      parentToolUseId: parent,
     }
   }
   if (block.type === 'tool_use') {
@@ -251,12 +260,13 @@ function parseAssistant(obj: Record<string, unknown>): AgentEvent {
       id: block.id ?? '',
       name: block.name ?? '',
       input: block.input,
+      parentToolUseId: parent,
     }
   }
   return { kind: 'unknown', reason: 'unknown-type', raw: obj }
 }
 
-function parseUser(obj: Record<string, unknown>): AgentEvent | null {
+function parseUser(obj: Record<string, unknown>, parent: string | undefined): AgentEvent | null {
   const message = obj.message as { content?: RawContentBlock[] } | undefined
   const toolUseResult = obj.tool_use_result
   if (!message || !Array.isArray(message.content)) {
@@ -279,6 +289,7 @@ function parseUser(obj: Record<string, unknown>): AgentEvent | null {
     isError,
     rawContent: rawContent ?? null,
     structured: toolUseResult ?? null,
+    parentToolUseId: parent,
   }
 }
 

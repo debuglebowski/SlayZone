@@ -38,6 +38,8 @@ export type AgentEvent =
 export interface StreamMessageStartEvent {
   kind: 'stream-message-start'
   messageId: string
+  /** Set when this message belongs to a sub-agent spawned by a Task tool call. */
+  parentToolUseId?: string
 }
 
 export type StreamBlockType = 'text' | 'thinking' | 'tool_use'
@@ -49,6 +51,7 @@ export interface StreamBlockStartEvent {
   /** Only for tool_use blocks. */
   toolUseId?: string
   toolName?: string
+  parentToolUseId?: string
 }
 
 export type StreamDeltaType = 'text' | 'thinking' | 'signature' | 'input_json'
@@ -59,15 +62,18 @@ export interface StreamBlockDeltaEvent {
   deltaType: StreamDeltaType
   /** For text/thinking: the chunk. For signature: signature string. For input_json: partial JSON. */
   text: string
+  parentToolUseId?: string
 }
 
 export interface StreamBlockStopEvent {
   kind: 'stream-block-stop'
   blockIndex: number
+  parentToolUseId?: string
 }
 
 export interface StreamMessageStopEvent {
   kind: 'stream-message-stop'
+  parentToolUseId?: string
 }
 
 /** Synthetic event emitted by the main process when the user sends a message. Buffered so it survives replay. */
@@ -89,6 +95,8 @@ export interface AssistantTextEvent {
   kind: 'assistant-text'
   messageId: string
   text: string
+  /** Set when this text was emitted by a sub-agent spawned by a Task tool call. */
+  parentToolUseId?: string
 }
 
 export interface AssistantThinkingEvent {
@@ -96,6 +104,7 @@ export interface AssistantThinkingEvent {
   messageId: string
   text: string
   hasSignature: boolean
+  parentToolUseId?: string
 }
 
 export interface ToolCallEvent {
@@ -103,6 +112,7 @@ export interface ToolCallEvent {
   id: string
   name: string
   input: unknown
+  parentToolUseId?: string
 }
 
 export interface ToolResultEvent {
@@ -111,6 +121,7 @@ export interface ToolResultEvent {
   isError: boolean
   rawContent: unknown
   structured: unknown
+  parentToolUseId?: string
 }
 
 export interface ResultEvent {
@@ -169,6 +180,8 @@ export interface SubAgentEvent {
   phase: 'started' | 'updated' | 'notification'
   /** SDK tool_use_id of the parent Task call. Pairs `started` with subsequent `notification`. */
   toolUseId: string
+  /** Set when this sub-agent was spawned by another sub-agent (nested Task). */
+  parentToolUseId?: string
   /** Human-readable label from `task_started` (e.g. "Find chat history parsing logic"). */
   description?: string
   /** From `task_notification` — e.g. 'completed', 'failed'. */
