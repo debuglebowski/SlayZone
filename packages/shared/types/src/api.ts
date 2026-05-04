@@ -39,6 +39,8 @@ export interface ChatSessionInfo {
    * non-claude adapters don't track a permission mode.
    */
   chatMode?: 'plan' | 'auto-accept' | 'auto' | 'bypass' | null
+  /** Resolved chat model alias this session was spawned with. */
+  chatModel?: 'default' | 'sonnet' | 'opus' | 'haiku' | null
 }
 import type { TerminalTab, CreateTerminalTabInput, UpdateTerminalTabInput } from '@slayzone/task-terminals/shared'
 import type { Theme, ThemePreference } from '@slayzone/settings/shared'
@@ -621,6 +623,14 @@ export interface ElectronAPI {
       mode: string
       cwd: string
       chatMode: 'plan' | 'auto-accept' | 'auto' | 'bypass'
+    }) => Promise<ChatSessionInfo>
+    getModel: (taskId: string, mode: string) => Promise<'default' | 'sonnet' | 'opus' | 'haiku'>
+    setModel: (opts: {
+      tabId: string
+      taskId: string
+      mode: string
+      cwd: string
+      chatModel: 'default' | 'sonnet' | 'opus' | 'haiku'
     }) => Promise<ChatSessionInfo>
     /**
      * Detect whether `--permission-mode auto` is usable. Reads `~/.claude.json` +

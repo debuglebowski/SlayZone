@@ -70,6 +70,7 @@ export * from './file-tree'
 export * from './textarea'
 export * from './tooltip'
 export * from './agent-mode-pill'
+export * from './agent-model-pill'
 
 // Toast
 export { Toaster, toast } from 'sonner'

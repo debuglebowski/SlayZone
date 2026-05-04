@@ -32,6 +32,7 @@ import { bumpAutocompleteUsage, getAutocompleteUsage, type UsageMap } from './au
 import type { SkillInfo, CommandInfo, AgentInfo, FileMatch } from '../shared/types'
 import type { AgentEvent } from '../shared/agent-events'
 import { rawPermissionModeToChatMode, chatModeToFlags as chatModeToFlagsShared, type ChatMode as ChatModeShared } from '../shared/chat-mode'
+import { chatModelToFlags, DEFAULT_CHAT_MODEL, isChatModel, type ChatModel } from '../shared/chat-model'
 
 export interface ChatHandlerOpts {
   /** Optional secondary subscriber to every persisted chat event. Used by the
@@ -94,6 +95,8 @@ interface ProviderConfigEntry {
   flags?: string | null
   /** Chat permission/operating mode. See `ChatMode`. */
   chatMode?: ChatMode | null
+  /** Claude model alias for chat. See `ChatModel`. */
+  chatModel?: ChatModel | null
 }
 
 function readProviderConfig(db: Database, taskId: string, mode: string): ProviderConfigEntry {
@@ -123,6 +126,24 @@ function writeChatConversationId(db: Database, taskId: string, mode: string, id:
   }
   const existing = cfg[mode] ?? {}
   cfg[mode] = { ...existing, chatConversationId: id }
+  db.prepare('UPDATE tasks SET provider_config = ? WHERE id = ?').run(JSON.stringify(cfg), taskId)
+}
+
+function writeChatModel(db: Database, taskId: string, mode: string, chatModel: ChatModel): void {
+  const row = db.prepare('SELECT provider_config FROM tasks WHERE id = ?').get(taskId) as
+    | { provider_config: string | null }
+    | undefined
+  let cfg: Record<string, ProviderConfigEntry> = {}
+  if (row?.provider_config) {
+    try {
+      cfg = JSON.parse(row.provider_config) as Record<string, ProviderConfigEntry>
+    } catch {
+      cfg = {}
+    }
+  }
+  const existing = cfg[mode] ?? {}
+  if (existing.chatModel === chatModel) return
+  cfg[mode] = { ...existing, chatModel }
   db.prepare('UPDATE tasks SET provider_config = ? WHERE id = ?').run(JSON.stringify(cfg), taskId)
 }
 
@@ -272,7 +293,7 @@ export function inspectPermissionFlags(flags: string[]): {
 async function buildCreateOpts(
   db: Database,
   opts: ChatCreateOpts,
-  { fresh, chatModeOverride }: { fresh: boolean; chatModeOverride?: ChatMode }
+  { fresh, chatModeOverride, chatModelOverride }: { fresh: boolean; chatModeOverride?: ChatMode; chatModelOverride?: ChatModel }
 ): Promise<Parameters<typeof createChat>[0]> {
   const providerCfg = readProviderConfig(db, opts.taskId, opts.mode)
   // Flag-resolution priority for chat:
@@ -299,6 +320,17 @@ async function buildCreateOpts(
     providerFlags = chatModeToFlags(resolvedChatMode)
   }
 
+  // Append --model when set. Override > stored > default. providerFlags from
+  // explicit `flags` may already contain --model; we don't dedupe — that path
+  // is power-user override and the chat model dropdown is hidden behind the
+  // chatModel field. When `flags` is set, chatModel is not appended (the
+  // explicit flag string is the source of truth).
+  const resolvedChatModel: ChatModel = chatModelOverride ?? providerCfg.chatModel ?? DEFAULT_CHAT_MODEL
+  const usedExplicitFlags = !chatModeOverride && (opts.providerFlagsOverride || providerCfg.flags)
+  if (!usedExplicitFlags) {
+    providerFlags = [...providerFlags, ...chatModelToFlags(resolvedChatModel)]
+  }
+
   const initialBuffer = fresh ? [] : loadChatEvents(db, opts.tabId)
   const initialNextSeq = fresh ? 0 : getNextSeqForTab(db, opts.tabId)
 
@@ -319,6 +351,7 @@ async function buildCreateOpts(
     initialBuffer,
     initialNextSeq,
     chatMode: resolvedChatMode,
+    chatModel: resolvedChatModel,
     onPersistSessionId: (id) => {
       writeChatConversationId(db, opts.taskId, opts.mode, id)
     },
@@ -493,6 +526,33 @@ export function registerChatHandlers(ipcMain: IpcMain, db: Database, opts: ChatH
       // Returned ChatSessionInfo carries `chatMode: safe` via Session.chatMode,
       // so renderer trusts the server's resolved value (e.g. auto → auto-accept
       // downgrade) instead of its optimistic guess.
+      return created
+    }
+  )
+
+  ipcMain.handle(
+    'chat:getModel',
+    (_, taskId: string, mode: string): ChatModel => {
+      const cfg = readProviderConfig(db, taskId, mode)
+      const stored = cfg.chatModel
+      return isChatModel(stored) ? stored : DEFAULT_CHAT_MODEL
+    }
+  )
+
+  ipcMain.handle(
+    'chat:setModel',
+    async (_, opts: ChatCreateOpts & { chatModel: ChatModel }): Promise<ChatSessionInfo> => {
+      if (!isChatModel(opts.chatModel)) {
+        throw new Error(`Invalid chat model: ${String(opts.chatModel)}`)
+      }
+      // Same kill+respawn pattern as chat:setMode — model flag only takes
+      // effect on a fresh process. chatModelOverride bypasses DB so the new
+      // child uses the requested model before we persist.
+      removeSession(opts.tabId)
+      const created = await createChat(
+        await buildCreateOpts(db, opts, { fresh: false, chatModelOverride: opts.chatModel })
+      )
+      writeChatModel(db, opts.taskId, opts.mode, opts.chatModel)
       return created
     }
   )

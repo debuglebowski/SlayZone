@@ -245,5 +245,194 @@ await test('chat:reset still wipes events + clears conv id when no live session 
   expect(evCount.c).toBe(0)
 })
 
+console.log('\nchat:setModel / chat:getModel IPC handler tests\n')
+
+await test('chat:getModel returns "default" when nothing stored', async () => {
+  mgr.__resetForTests()
+  mgr.resetTransportDeps()
+  const db = setupDb()
+  const taskId = 'task-model-1'
+  const mode = 'claude-code'
+  db.prepare('INSERT INTO tasks (id, provider_config) VALUES (?, ?)').run(taskId, null)
+
+  const ipc = createMockIpcMain()
+  registerChatHandlers(ipc as unknown as Parameters<typeof registerChatHandlers>[0], db)
+
+  const got = (await ipc.invoke('chat:getModel', taskId, mode)) as string
+  expect(got).toBe('default')
+})
+
+await test('chat:getModel returns stored value', async () => {
+  mgr.__resetForTests()
+  mgr.resetTransportDeps()
+  const db = setupDb()
+  const taskId = 'task-model-2'
+  const mode = 'claude-code'
+  db.prepare('INSERT INTO tasks (id, provider_config) VALUES (?, ?)').run(
+    taskId,
+    JSON.stringify({ [mode]: { chatModel: 'opus' } })
+  )
+
+  const ipc = createMockIpcMain()
+  registerChatHandlers(ipc as unknown as Parameters<typeof registerChatHandlers>[0], db)
+
+  const got = (await ipc.invoke('chat:getModel', taskId, mode)) as string
+  expect(got).toBe('opus')
+})
+
+await test('chat:getModel falls back to "default" for unknown stored value', async () => {
+  mgr.__resetForTests()
+  mgr.resetTransportDeps()
+  const db = setupDb()
+  const taskId = 'task-model-3'
+  const mode = 'claude-code'
+  db.prepare('INSERT INTO tasks (id, provider_config) VALUES (?, ?)').run(
+    taskId,
+    JSON.stringify({ [mode]: { chatModel: 'gpt-5' } })
+  )
+
+  const ipc = createMockIpcMain()
+  registerChatHandlers(ipc as unknown as Parameters<typeof registerChatHandlers>[0], db)
+
+  const got = (await ipc.invoke('chat:getModel', taskId, mode)) as string
+  expect(got).toBe('default')
+})
+
+await test('chat:setModel persists to provider_config + respawns with --model flag', async () => {
+  mgr.__resetForTests()
+  mgr.resetTransportDeps()
+  const db = setupDb()
+  const taskId = 'task-model-4'
+  const tabId = 'tab-model-4'
+  const mode = 'claude-code'
+  db.prepare('INSERT INTO tasks (id, provider_config) VALUES (?, ?)').run(taskId, null)
+
+  const spawnArgsLog: string[][] = []
+  mgr.setTransportDepsForTests({
+    whichBinary: async () => '/fake/claude',
+    spawn: (_cmd, args) => { spawnArgsLog.push(args); return makeFakeChild() },
+    broadcastEvent: () => {},
+    broadcastExit: () => {},
+    broadcastStateChange: () => {},
+  })
+
+  const ipc = createMockIpcMain()
+  registerChatHandlers(ipc as unknown as Parameters<typeof registerChatHandlers>[0], db)
+
+  // Initial create — no model stored yet, should NOT carry --model.
+  await ipc.invoke('chat:create', { tabId, taskId, mode, cwd: '/tmp', providerFlagsOverride: null })
+  expect(spawnArgsLog.length).toBe(1)
+  expect(spawnArgsLog[0].includes('--model')).toBeFalsy()
+
+  // setModel → kill+respawn with --model sonnet.
+  await ipc.invoke('chat:setModel', { tabId, taskId, mode, cwd: '/tmp', chatModel: 'sonnet' })
+  expect(spawnArgsLog.length).toBe(2)
+  const second = spawnArgsLog[1]
+  const idx = second.indexOf('--model')
+  expect(idx >= 0).toBe(true)
+  expect(second[idx + 1]).toBe('sonnet')
+
+  // DB persisted.
+  const cfgRow = db.prepare('SELECT provider_config FROM tasks WHERE id = ?').get(taskId) as
+    | { provider_config: string }
+    | undefined
+  const cfg = JSON.parse(cfgRow!.provider_config) as Record<string, { chatModel?: string }>
+  expect(cfg[mode]?.chatModel).toBe('sonnet')
+})
+
+await test('chat:setModel rejects invalid model id', async () => {
+  mgr.__resetForTests()
+  mgr.resetTransportDeps()
+  const db = setupDb()
+  const taskId = 'task-model-5'
+  const tabId = 'tab-model-5'
+  const mode = 'claude-code'
+  db.prepare('INSERT INTO tasks (id, provider_config) VALUES (?, ?)').run(taskId, null)
+
+  mgr.setTransportDepsForTests({
+    whichBinary: async () => '/fake/claude',
+    spawn: () => makeFakeChild(),
+    broadcastEvent: () => {},
+    broadcastExit: () => {},
+    broadcastStateChange: () => {},
+  })
+
+  const ipc = createMockIpcMain()
+  registerChatHandlers(ipc as unknown as Parameters<typeof registerChatHandlers>[0], db)
+
+  let threw = false
+  try {
+    await ipc.invoke('chat:setModel', { tabId, taskId, mode, cwd: '/tmp', chatModel: 'gpt-5' })
+  } catch {
+    threw = true
+  }
+  expect(threw).toBe(true)
+})
+
+await test('chat:create reads stored chatModel and adds --model on cold spawn', async () => {
+  mgr.__resetForTests()
+  mgr.resetTransportDeps()
+  const db = setupDb()
+  const taskId = 'task-model-6'
+  const tabId = 'tab-model-6'
+  const mode = 'claude-code'
+  db.prepare('INSERT INTO tasks (id, provider_config) VALUES (?, ?)').run(
+    taskId,
+    JSON.stringify({ [mode]: { chatModel: 'haiku' } })
+  )
+
+  const spawnArgsLog: string[][] = []
+  mgr.setTransportDepsForTests({
+    whichBinary: async () => '/fake/claude',
+    spawn: (_cmd, args) => { spawnArgsLog.push(args); return makeFakeChild() },
+    broadcastEvent: () => {},
+    broadcastExit: () => {},
+    broadcastStateChange: () => {},
+  })
+
+  const ipc = createMockIpcMain()
+  registerChatHandlers(ipc as unknown as Parameters<typeof registerChatHandlers>[0], db)
+
+  await ipc.invoke('chat:create', { tabId, taskId, mode, cwd: '/tmp', providerFlagsOverride: null })
+  expect(spawnArgsLog.length).toBe(1)
+  const args = spawnArgsLog[0]
+  const idx = args.indexOf('--model')
+  expect(idx >= 0).toBe(true)
+  expect(args[idx + 1]).toBe('haiku')
+})
+
+await test('explicit providerFlagsOverride suppresses --model injection', async () => {
+  mgr.__resetForTests()
+  mgr.resetTransportDeps()
+  const db = setupDb()
+  const taskId = 'task-model-7'
+  const tabId = 'tab-model-7'
+  const mode = 'claude-code'
+  // Stored chatModel = sonnet; override should still win.
+  db.prepare('INSERT INTO tasks (id, provider_config) VALUES (?, ?)').run(
+    taskId,
+    JSON.stringify({ [mode]: { chatModel: 'sonnet' } })
+  )
+
+  const spawnArgsLog: string[][] = []
+  mgr.setTransportDepsForTests({
+    whichBinary: async () => '/fake/claude',
+    spawn: (_cmd, args) => { spawnArgsLog.push(args); return makeFakeChild() },
+    broadcastEvent: () => {},
+    broadcastExit: () => {},
+    broadcastStateChange: () => {},
+  })
+
+  const ipc = createMockIpcMain()
+  registerChatHandlers(ipc as unknown as Parameters<typeof registerChatHandlers>[0], db)
+
+  await ipc.invoke('chat:create', {
+    tabId, taskId, mode, cwd: '/tmp',
+    providerFlagsOverride: '--allow-dangerously-skip-permissions',
+  })
+  expect(spawnArgsLog.length).toBe(1)
+  expect(spawnArgsLog[0].includes('--model')).toBeFalsy()
+})
+
 console.log(`\n${passed} passed, ${failed} failed`)
 process.exit(failed > 0 ? 1 : 0)

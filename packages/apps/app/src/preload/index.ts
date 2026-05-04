@@ -521,6 +521,10 @@ const api: ElectronAPI = {
       ipcRenderer.invoke('chat:getMode', taskId, mode),
     setMode: (opts: { tabId: string; taskId: string; mode: string; cwd: string; chatMode: 'plan' | 'auto-accept' | 'auto' | 'bypass' }) =>
       ipcRenderer.invoke('chat:setMode', opts),
+    getModel: (taskId: string, mode: string) =>
+      ipcRenderer.invoke('chat:getModel', taskId, mode),
+    setModel: (opts: { tabId: string; taskId: string; mode: string; cwd: string; chatModel: 'default' | 'sonnet' | 'opus' | 'haiku' }) =>
+      ipcRenderer.invoke('chat:setModel', opts),
     getAutoEligibility: () => ipcRenderer.invoke('chat:getAutoEligibility'),
     listSkills: (cwd: string) => ipcRenderer.invoke('chat:listSkills', cwd),
     listCommands: (cwd: string) => ipcRenderer.invoke('chat:listCommands', cwd),

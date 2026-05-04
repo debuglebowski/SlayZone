@@ -15,11 +15,13 @@ import {
 import { ChatViewContext } from './ChatViewContext'
 import { ChatSearchBar } from './ChatSearchBar'
 import { useChatMode } from './useChatMode'
+import { useChatModel } from './useChatModel'
 import { useChatSearch } from './useChatSearch'
 import {
   cn,
   toast,
   AgentModePill,
+  AgentModelPill,
   nextAgentMode,
   ContextMenu,
   ContextMenuTrigger,
@@ -97,6 +99,9 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
   const [sessionIdCopied, setSessionIdCopied] = useState(false)
   const { chatMode, modeChanging, handleModeChange, autoCapability } = useChatMode({
     taskId, mode, tabId, cwd, livePermissionMode: permissionMode,
+  })
+  const { chatModel, modelChanging, handleModelChange } = useChatModel({
+    taskId, mode, tabId, cwd,
   })
   const [collapseSignal, setCollapseSignal] = useState(0)
   const [finalOnly, setFinalOnly] = useState(false)
@@ -902,6 +907,12 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
             disabled={modeChanging || inFlight}
             compact
             autoCapability={autoCapability}
+          />
+          <AgentModelPill
+            model={chatModel}
+            onChange={(next) => { void handleModelChange(next) }}
+            disabled={modelChanging || inFlight}
+            compact
           />
           <span>
             {inFlight

@@ -7,6 +7,7 @@ import { getAdapter } from './agents/registry'
 import { whichBinary as realWhichBinary } from './shell-env'
 import type { BufferedEvent } from './chat-events-store'
 import type { ChatMode } from '../shared/chat-mode'
+import type { ChatModel } from '../shared/chat-model'
 
 export type { BufferedEvent } from './chat-events-store'
 
@@ -106,6 +107,8 @@ export interface ChatSessionInfo {
    * (DB cache) on mount when a session exists.
    */
   chatMode?: ChatMode | null
+  /** Resolved chat model alias this session was spawned with. */
+  chatModel?: ChatModel | null
 }
 
 interface Session {
@@ -132,6 +135,8 @@ interface Session {
   respawnOpts: CreateChatOpts
   /** Resolved chat permission mode this session was spawned with. */
   chatMode: ChatMode | null
+  /** Resolved chat model alias this session was spawned with. */
+  chatModel: ChatModel | null
   onPersistSessionId?: (id: string) => void
   onInvalidResume?: () => void
 }
@@ -309,6 +314,8 @@ export interface CreateChatOpts {
    * use a permission-mode concept (non-claude agents).
    */
   chatMode?: ChatMode | null
+  /** Resolved chat model alias for the spawn (claude --model). */
+  chatModel?: ChatModel | null
 }
 
 export async function createChat(opts: CreateChatOpts): Promise<ChatSessionInfo> {
@@ -396,6 +403,7 @@ export async function createChat(opts: CreateChatOpts): Promise<ChatSessionInfo>
     retryScheduled: false,
     respawnOpts: opts,
     chatMode: opts.chatMode ?? null,
+    chatModel: opts.chatModel ?? null,
     onPersistSessionId: opts.onPersistSessionId,
     onInvalidResume: opts.onInvalidResume,
   }
@@ -585,6 +593,7 @@ function toInfo(session: Session): ChatSessionInfo {
     startedAt: session.startedAt,
     ended: session.ended,
     chatMode: session.chatMode,
+    chatModel: session.chatModel,
   }
 }
 
