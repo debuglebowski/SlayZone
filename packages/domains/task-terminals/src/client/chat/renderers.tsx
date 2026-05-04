@@ -111,7 +111,7 @@ export function ThinkingBlock({ item }: { item: Extract<TimelineItem, { kind: 't
   useEffect(() => {
     setOpen(false)
   }, [collapseSignal])
-  const display = item.text || (item.hasSignature ? '(encrypted extended thinking)' : '(empty)')
+  if (!item.text) return null
   return (
     <div className="px-4 pl-[4.25rem] py-0.5">
       <button
@@ -124,7 +124,7 @@ export function ThinkingBlock({ item }: { item: Extract<TimelineItem, { kind: 't
       </button>
       {open && (
         <pre className="mt-1 text-xs text-muted-foreground/80 whitespace-pre-wrap italic pl-5 border-l border-border/40 ml-1">
-          <HighlightedText text={display} />
+          <HighlightedText text={item.text} />
         </pre>
       )}
     </div>
