@@ -237,15 +237,75 @@ export const DEFAULT_PANEL_CONFIG: PanelConfig = {
 
 export type RenderMode = 'markdown' | 'code' | 'html-preview' | 'svg-preview' | 'mermaid-preview' | 'image' | 'pdf'
 
-/** Maps file extensions → default render mode. Unlisted extensions default to 'code'. */
+/** Maps file extensions → default render mode. Unlisted/no extension defaults to 'markdown'. */
 export const EXTENSION_RENDER_MODES: Record<string, RenderMode> = {
-  '.md': 'markdown', '.mdx': 'markdown',
+  // Markdown
+  '.md': 'markdown', '.mdx': 'markdown', '.markdown': 'markdown',
+
+  // HTML
   '.html': 'html-preview', '.htm': 'html-preview',
+
+  // SVG
   '.svg': 'svg-preview',
+
+  // Mermaid
   '.mmd': 'mermaid-preview', '.mermaid': 'mermaid-preview',
+
+  // Images
   '.png': 'image', '.jpg': 'image', '.jpeg': 'image',
   '.gif': 'image', '.webp': 'image', '.avif': 'image', '.bmp': 'image',
+  '.ico': 'image', '.tiff': 'image', '.tif': 'image', '.heic': 'image', '.heif': 'image',
+
+  // PDF
   '.pdf': 'pdf',
+
+  // Code — programming languages
+  '.ts': 'code', '.tsx': 'code', '.js': 'code', '.jsx': 'code', '.mjs': 'code', '.cjs': 'code',
+  '.py': 'code', '.pyw': 'code',
+  '.rs': 'code',
+  '.go': 'code',
+  '.java': 'code', '.kt': 'code', '.kts': 'code',
+  '.c': 'code', '.h': 'code', '.cpp': 'code', '.cc': 'code', '.cxx': 'code', '.hpp': 'code', '.hh': 'code',
+  '.cs': 'code',
+  '.swift': 'code',
+  '.m': 'code', '.mm': 'code',
+  '.rb': 'code',
+  '.php': 'code',
+  '.dart': 'code',
+  '.lua': 'code',
+  '.r': 'code',
+  '.scala': 'code',
+  '.clj': 'code', '.cljs': 'code',
+  '.ex': 'code', '.exs': 'code',
+  '.erl': 'code',
+  '.hs': 'code',
+  '.ml': 'code', '.mli': 'code',
+  '.fs': 'code', '.fsx': 'code',
+  '.zig': 'code',
+  '.nim': 'code',
+  '.sol': 'code',
+  '.vue': 'code', '.svelte': 'code', '.astro': 'code',
+
+  // Code — shells
+  '.sh': 'code', '.bash': 'code', '.zsh': 'code', '.fish': 'code', '.ps1': 'code', '.bat': 'code', '.cmd': 'code',
+
+  // Code — config / data
+  '.json': 'code', '.jsonc': 'code', '.json5': 'code',
+  '.yaml': 'code', '.yml': 'code',
+  '.toml': 'code',
+  '.ini': 'code', '.cfg': 'code', '.conf': 'code',
+  '.xml': 'code',
+  '.csv': 'code', '.tsv': 'code',
+  '.env': 'code',
+
+  // Code — styles
+  '.css': 'code', '.scss': 'code', '.sass': 'code', '.less': 'code', '.styl': 'code',
+
+  // Code — queries / schema
+  '.sql': 'code', '.graphql': 'code', '.gql': 'code', '.proto': 'code',
+
+  // Code — build / patch / log
+  '.tex': 'code', '.diff': 'code', '.patch': 'code', '.log': 'code',
 }
 
 export const RENDER_MODE_INFO: Record<RenderMode, { label: string }> = {
@@ -285,10 +345,10 @@ export function getExtensionFromTitle(title: string): string {
   return title.slice(dot).toLowerCase()
 }
 
-/** Determine effective render mode: use override if set and valid, else infer from extension. */
+/** Determine effective render mode: use override if set and valid, else infer from extension. Default 'markdown' for unknown/no extension (assets are typically prose). */
 export function getEffectiveRenderMode(title: string, override: RenderMode | null): RenderMode {
   if (override && override in RENDER_MODE_INFO) return override
-  return EXTENSION_RENDER_MODES[getExtensionFromTitle(title)] ?? 'code'
+  return EXTENSION_RENDER_MODES[getExtensionFromTitle(title)] ?? 'markdown'
 }
 
 export interface TaskAsset {
