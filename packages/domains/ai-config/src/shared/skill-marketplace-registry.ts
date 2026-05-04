@@ -268,6 +268,12 @@ Browser commands control the browser panel embedded in each task's detail view. 
   - Output columns: \`active | idx | id | title | url\`. The active tab is marked with \`*\`.
   - Tabs that haven't been loaded yet are marked \`(not loaded)\` — they exist in the task's saved state but their \`WebContentsView\` hasn't mounted (typically because the panel is closed).
 
+- \`slay tasks browser new [url] [--panel <state>] [--background] [--json]\` — create a new browser tab.
+  - Defaults to \`--panel visible\` (auto-opens the panel) and switches to the new tab.
+  - \`--background\` adds the tab without switching focus away from the active tab.
+  - Without \`url\`, the tab opens \`about:blank\`.
+  - Prints \`<idx>: <tabId>  <url>\` (or full JSON with \`--json\`). Use the returned id with \`--tab\` for follow-up commands.
+
 - \`slay tasks browser navigate <url> [--panel <state>] [--tab <idOrIdx>]\` — navigate the targeted tab to a URL.
   - The only command that auto-shows the browser panel.
   - With \`--tab\`, the panel auto-opens and switches to that tab before loading the URL.
@@ -305,7 +311,7 @@ A typical browser verification flow:
 3. \`click\` or \`type\` to interact
 4. \`screenshot\` to capture the result
 
-For multi-tab flows, run \`slay tasks browser tabs\` first, then pass \`--tab N\` (or the tab id) to subsequent commands.
+For multi-tab flows, use \`slay tasks browser new <url>\` to spawn additional tabs, then pass the printed tab id (or the index from \`tabs\`) via \`--tab\` to subsequent commands.
 `
   },
 

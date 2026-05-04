@@ -1672,6 +1672,21 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
     })
   }, [isActive, task?.id, openDevServerInBrowser, handlePanelToggle, handleBrowserTabsChange])
 
+  // CLI: create a new browser tab with a server-supplied tabId (slay tasks browser new)
+  useEffect(() => {
+    if (!isActive || !task) return
+    return window.api.app.onBrowserCreateTab(({ taskId, tabId, url, background }) => {
+      if (taskId !== task.id) return
+      handlePanelToggle('browser', true)
+      const tabUrl = url ?? 'about:blank'
+      const newTab = { id: tabId, url: tabUrl, title: tabUrl === 'about:blank' ? 'New Tab' : tabUrl }
+      const current = browserTabsRef.current
+      if (current.tabs.some(t => t.id === tabId)) return
+      const nextActive = background && current.tabs.length > 0 ? current.activeTabId : tabId
+      handleBrowserTabsChange({ tabs: [...current.tabs, newTab], activeTabId: nextActive })
+    })
+  }, [isActive, task?.id, handlePanelToggle, handleBrowserTabsChange])
+
   const handleTagsChange = (newTagIds: string[]): void => {
     setTaskTagIds(newTagIds)
   }

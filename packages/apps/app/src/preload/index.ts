@@ -244,6 +244,16 @@ const api: ElectronAPI = {
       ipcRenderer.on('browser:ensure-panel-open', handler)
       return () => ipcRenderer.removeListener('browser:ensure-panel-open', handler)
     },
+    onBrowserCreateTab: (
+      callback: (payload: { taskId: string; tabId: string; url?: string; background?: boolean }) => void,
+    ) => {
+      const handler = (
+        _: unknown,
+        payload: { taskId: string; tabId: string; url?: string; background?: boolean },
+      ) => callback(payload)
+      ipcRenderer.on('browser:create-tab', handler)
+      return () => ipcRenderer.removeListener('browser:create-tab', handler)
+    },
     onOpenTask: (callback: (taskId: string) => void) => {
       const handler = (_: unknown, taskId: string) => callback(taskId)
       ipcRenderer.on('app:open-task', handler)
