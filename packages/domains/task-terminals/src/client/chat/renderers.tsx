@@ -201,8 +201,7 @@ export function StderrBlock({ item }: { item: Extract<TimelineItem, { kind: 'std
 
 export function InterruptedBlock(_props: { item: Extract<TimelineItem, { kind: 'interrupted' }> }) {
   return (
-    <div className="mx-4 my-2 flex items-center gap-2 px-3 py-1 text-[11px] rounded-md border border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-300">
-      <span className="inline-block size-1.5 rounded-full bg-amber-500" />
+    <div className="px-4 pl-[4.25rem] py-0.5 text-[11px] text-amber-600 dark:text-amber-400">
       Turn interrupted
     </div>
   )
@@ -223,7 +222,7 @@ export function SubAgentRow({ item }: { item: Extract<TimelineItem, { kind: 'sub
   const seconds = item.durationMs != null ? (item.durationMs / 1000).toFixed(1) : null
   const tokens = item.totalTokens != null ? formatTokens(item.totalTokens) : null
   return (
-    <div className="mx-4 my-1 px-3 py-1.5 flex items-center gap-2 text-[11px] rounded-md border border-border/50 bg-muted/20 text-muted-foreground">
+    <div className="mx-4 my-1 ml-[2.75rem] px-3 py-1.5 flex items-center gap-2 text-[11px] rounded-md border border-border/50 bg-muted/20 text-muted-foreground">
       {inFlight ? (
         <Loader2 className="size-3 shrink-0 animate-spin text-violet-500" />
       ) : errored ? (
