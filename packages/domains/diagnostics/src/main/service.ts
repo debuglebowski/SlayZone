@@ -11,10 +11,9 @@ import type {
   DiagnosticsExportRequest,
   DiagnosticsExportResult
 } from '../shared'
+import { startRetentionScheduler, stopRetentionScheduler } from './retention'
 
 const REDACTION_VERSION = 1
-const RETENTION_SWEEP_MS = 6 * 60 * 60 * 1000
-const HARD_EVENT_CAP = 200_000
 
 const CONFIG_KEYS = {
   enabled: 'diagnostics_enabled',
@@ -43,7 +42,6 @@ const CRITICAL_SETTINGS_KEYS = new Set([
 
 let settingsDb: Database | null = null  // main DB — reads/writes diagnostics config from settings table
 let diagnosticsDb: Database | null = null  // separate diagnostics-only DB — writes events to slayzone.dev.diagnostics.sqlite
-let retentionTimer: NodeJS.Timeout | null = null
 let isIpcInstrumented = false
 let cachedConfig: DiagnosticsConfig | null = null
 
@@ -394,25 +392,6 @@ function instrumentIpcMain(ipcMain: IpcMain): void {
   ;(ipcMain as unknown as { handle: typeof ipcMain.handle }).handle = patchedHandle as typeof ipcMain.handle
 }
 
-function enforceRetention(): void {
-  if (!diagnosticsDb) return
-  const config = getDiagnosticsConfig()
-  const cutoff = Date.now() - config.retentionDays * 24 * 60 * 60 * 1000
-  diagnosticsDb.prepare('DELETE FROM diagnostics_events WHERE ts_ms < ?').run(cutoff)
-
-  const row = diagnosticsDb.prepare('SELECT COUNT(*) as count FROM diagnostics_events').get() as { count: number }
-  if (row.count > HARD_EVENT_CAP) {
-    diagnosticsDb.prepare(`
-      DELETE FROM diagnostics_events
-      WHERE id IN (
-        SELECT id FROM diagnostics_events
-        ORDER BY ts_ms ASC
-        LIMIT ?
-      )
-    `).run(row.count - HARD_EVENT_CAP)
-  }
-}
-
 function normalizeClientError(input: ClientErrorEventInput): DiagnosticEvent {
   return {
     level: 'error',
@@ -583,10 +562,13 @@ export function registerDiagnosticsHandlers(ipcMain: IpcMain, db: Database, even
   cachedConfig = null
 
   instrumentIpcMain(ipcMain)
-  setTimeout(enforceRetention, 5_000)
 
-  if (retentionTimer) clearInterval(retentionTimer)
-  retentionTimer = setInterval(enforceRetention, RETENTION_SWEEP_MS)
+  startRetentionScheduler({
+    getDb: () => diagnosticsDb,
+    getConfig: getDiagnosticsConfig,
+    getIdleSeconds: () =>
+      electronRuntime.powerMonitor?.getSystemIdleTime?.() ?? Number.MAX_SAFE_INTEGER
+  })
 
   ipcMain.handle('diagnostics:getConfig', () => getDiagnosticsConfig())
 
@@ -688,8 +670,5 @@ export function registerProcessDiagnostics(electronApp: App): void {
 }
 
 export function stopDiagnostics(): void {
-  if (retentionTimer) {
-    clearInterval(retentionTimer)
-    retentionTimer = null
-  }
+  stopRetentionScheduler()
 }
