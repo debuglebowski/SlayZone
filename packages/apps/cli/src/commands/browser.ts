@@ -64,6 +64,25 @@ export function browserCommand(): Command {
     .showHelpAfterError(true)
 
   cmd
+    .command('new [url]')
+    .description('Create a new browser tab. Default panel: visible.')
+    .option('--panel <state>', 'Panel visibility: visible or hidden (default: visible)')
+    .option('--background', 'Open in background (do not switch to the new tab)')
+    .option('--json', 'Output as JSON')
+    .action(async (url: string | undefined, opts: { panel?: 'visible' | 'hidden'; background?: boolean; json?: boolean }) => {
+      const taskId = resolveTaskId()
+      const result = await apiPost<{ ok: boolean; tabId: string; idx: number; url: string | null }>(
+        '/api/browser/tabs',
+        { taskId, url, panel: opts.panel ?? 'visible', background: !!opts.background },
+      )
+      if (opts.json) {
+        console.log(JSON.stringify(result, null, 2))
+        return
+      }
+      console.log(`${result.idx}: ${result.tabId}${result.url ? `  ${result.url}` : ''}`)
+    })
+
+  cmd
     .command('tabs')
     .description('List browser tabs for the current task')
     .option('--json', 'Output as JSON')
