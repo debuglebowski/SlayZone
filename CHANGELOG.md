@@ -1,6 +1,37 @@
 # Changelog
 
 
+## v0.26.0
+
+[compare changes](https://github.com/debuglebowski/slayzone/compare/v0.25.0...v0.26.0)
+
+### 🚀 Enhancements
+
+- **chat:** Live status label on typing indicator ([7f56d029](https://github.com/debuglebowski/slayzone/commit/7f56d029))
+- **chat:** Rich sub-agent rows + drop hook noise ([d013ca45](https://github.com/debuglebowski/slayzone/commit/d013ca45))
+- **chat:** Esc pops unanswered turn into input ([3cde615f](https://github.com/debuglebowski/slayzone/commit/3cde615f))
+- **chat:** Usage-based tiebreak in autocomplete ranking ([14e20ee7](https://github.com/debuglebowski/slayzone/commit/14e20ee7))
+
+### 🩹 Fixes
+
+- **browser:** Gate reparentView attach on visibility ([69e059a4](https://github.com/debuglebowski/slayzone/commit/69e059a4))
+- **cli:** Slay init accepts --project; modal passes id + dev flag ([802c3004](https://github.com/debuglebowski/slayzone/commit/802c3004))
+- **chat:** Plain interrupted text + indent sub-agent row ([f1b41e6d](https://github.com/debuglebowski/slayzone/commit/f1b41e6d))
+- **chat:** Server-authoritative chat-mode pill, no revert race ([7f4dc0e9](https://github.com/debuglebowski/slayzone/commit/7f4dc0e9))
+- **projects:** Init automation selects from project config ([fd6b3778](https://github.com/debuglebowski/slayzone/commit/fd6b3778))
+
+### 📖 Documentation
+
+- **claude.md:** Reformat lists and tables ([a7c1399d](https://github.com/debuglebowski/slayzone/commit/a7c1399d))
+
+### 🏡 Chore
+
+- **nix:** Update sources to 0.25.0 ([94b288d3](https://github.com/debuglebowski/slayzone/commit/94b288d3))
+
+### ❤️ Contributors
+
+- Debuglebowski
+
 ## v0.25.0
 
 [compare changes](https://github.com/debuglebowski/slayzone/compare/v0.24.0...v0.25.0)

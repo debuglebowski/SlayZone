@@ -1,5 +1,52 @@
 [
   {
+    "version": "0.26.0",
+    "date": "2026-05-04",
+    "tagline": "Chat polish",
+    "items": [
+      {
+        "category": "feature",
+        "title": "Live status label on typing indicator",
+        "description": "Typing indicator now shows what the agent is currently doing."
+      },
+      {
+        "category": "feature",
+        "title": "Rich sub-agent rows in chat",
+        "description": "Sub-agent activity renders as indented rows in the timeline with hook noise filtered out."
+      },
+      {
+        "category": "feature",
+        "title": "Esc pops unanswered turn into input",
+        "description": "Press Esc to pull the last unanswered prompt back into the composer for editing."
+      },
+      {
+        "category": "improvement",
+        "title": "Smarter autocomplete ranking",
+        "description": "Autocomplete suggestions now break ties by how often you've used each option."
+      },
+      {
+        "category": "fix",
+        "title": "Chat-mode pill no longer flickers",
+        "description": "The chat mode indicator is now server-authoritative and won't revert mid-flight."
+      },
+      {
+        "category": "fix",
+        "title": "Browser panel attach respects visibility",
+        "description": "WebContentsView reparenting now waits for the panel to be visible before attaching."
+      },
+      {
+        "category": "fix",
+        "title": "Project init picks up project config",
+        "description": "The init automation now selects defaults from the project's saved config."
+      },
+      {
+        "category": "fix",
+        "title": "slay init --project flag honored",
+        "description": "The init modal now passes the project id and dev flag through to the CLI."
+      }
+    ]
+  },
+  {
     "version": "0.25.0",
     "date": "2026-05-03",
     "tagline": "Chat modes & detach",
