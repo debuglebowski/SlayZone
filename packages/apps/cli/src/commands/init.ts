@@ -4,7 +4,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { BUILTIN_SKILLS, PROVIDER_PATHS, defaultProviderFromMode } from '@slayzone/ai-config/shared'
 import type { CliProvider } from '@slayzone/ai-config/shared'
-import { openDb, notifyApp, resolveProjectByPath } from '../db'
+import { openDb, notifyApp, resolveProject, resolveProjectByPath } from '../db'
 import type { SlayDb } from '../db'
 
 const INSTRUCTIONS = `\
@@ -174,9 +174,11 @@ function logSkillStats(stats: SkillStats, projectName: string): void {
   }
 }
 
-async function runInstall(opts: { writeInstructions: boolean }): Promise<void> {
+async function runInstall(opts: { writeInstructions: boolean; project?: string }): Promise<void> {
   const db = openDb()
-  const project = resolveProjectByPath(db, process.cwd())
+  const project = opts.project
+    ? resolveProject(db, opts.project)
+    : resolveProjectByPath(db, process.cwd())
   const providers = loadProviders(db, project.id)
 
   if (opts.writeInstructions && project.path) {
@@ -194,9 +196,10 @@ async function runInstall(opts: { writeInstructions: boolean }): Promise<void> {
 export function initCommand(): Command {
   const cmd = new Command('init')
     .description('Bootstrap SlayZone agent config (instructions + skills) for the current project')
+    .option('-p, --project <name|id>', 'Project name or ID (defaults to project resolved from cwd)')
     .showSuggestionAfterError(true)
     .showHelpAfterError(true)
-    .action(() => runInstall({ writeInstructions: true }))
+    .action((opts) => runInstall({ writeInstructions: true, project: opts.project }))
 
   cmd
     .command('instructions')
@@ -208,7 +211,8 @@ export function initCommand(): Command {
   cmd
     .command('skills')
     .description('Install all built-in slay skills for the current project')
-    .action(() => runInstall({ writeInstructions: false }))
+    .option('-p, --project <name|id>', 'Project name or ID (defaults to project resolved from cwd)')
+    .action((opts) => runInstall({ writeInstructions: false, project: opts.project }))
 
   return cmd
 }

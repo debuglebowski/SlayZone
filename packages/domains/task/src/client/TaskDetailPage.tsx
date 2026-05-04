@@ -2097,7 +2097,7 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
             </div>
           )}
           {showSlayNudge && (
-            <SlayNudgeBanner projectPath={effectiveRepoPath ?? project?.path ?? ''} onDismiss={dismissSlayNudge} onSetupComplete={recheckSlayNudge} />
+            <SlayNudgeBanner projectPath={effectiveRepoPath ?? project?.path ?? ''} projectId={task?.project_id ?? project?.id} onDismiss={dismissSlayNudge} onSetupComplete={recheckSlayNudge} />
           )}
           {/* Terminal + mode bar wrapper */}
           <div className="flex-1 min-h-0 overflow-hidden">

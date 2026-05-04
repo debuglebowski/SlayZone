@@ -58,9 +58,9 @@ export function resolveProjectArg(opt?: string): string {
   return val
 }
 
-export function resolveProject(db: SlayDb, proj: string): { id: string; name: string } {
-  const projects = db.query<{ id: string; name: string }>(
-    `SELECT id, name FROM projects WHERE id = :proj OR LOWER(name) LIKE :projLike LIMIT 10`,
+export function resolveProject(db: SlayDb, proj: string): { id: string; name: string; path: string | null } {
+  const projects = db.query<{ id: string; name: string; path: string | null }>(
+    `SELECT id, name, path FROM projects WHERE id = :proj OR LOWER(name) LIKE :projLike LIMIT 10`,
     { ':proj': proj, ':projLike': `%${proj.toLowerCase()}%` }
   )
 

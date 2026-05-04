@@ -781,7 +781,7 @@ const api: ElectronAPI = {
       ipcRenderer.invoke('ai-config:pull-provider-skill', projectId, projectPath, provider, itemId),
     getComputerFiles: () => ipcRenderer.invoke('ai-config:get-computer-files'),
     checkSlayConfigured: (projectPath) => ipcRenderer.invoke('ai-config:check-slay-configured', projectPath),
-    setupSlay: (projectPath) => ipcRenderer.invoke('ai-config:setup-slay', projectPath),
+    setupSlay: (projectPath, projectId) => ipcRenderer.invoke('ai-config:setup-slay', projectPath, projectId),
 
     marketplace: {
       listRegistries: () => ipcRenderer.invoke('ai-config:marketplace:list-registries'),

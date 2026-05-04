@@ -11,13 +11,14 @@ import {
 
 interface SlayNudgeBannerProps {
   projectPath: string
+  projectId?: string
   onDismiss: () => void
   onSetupComplete: () => void
 }
 
 type RunState = 'idle' | 'running' | 'done' | 'error'
 
-export function SlayNudgeBanner({ projectPath, onDismiss, onSetupComplete }: SlayNudgeBannerProps) {
+export function SlayNudgeBanner({ projectPath, projectId, onDismiss, onSetupComplete }: SlayNudgeBannerProps) {
   const [infoOpen, setInfoOpen] = useState(false)
   const [setupState, setSetupState] = useState<RunState>('idle')
   const [error, setError] = useState<string | null>(null)
@@ -25,7 +26,7 @@ export function SlayNudgeBanner({ projectPath, onDismiss, onSetupComplete }: Sla
   const runSetup = async () => {
     setSetupState('running')
     setError(null)
-    const result = await window.api.aiConfig.setupSlay(projectPath)
+    const result = await window.api.aiConfig.setupSlay(projectPath, projectId)
     if (result.ok) {
       setSetupState('done')
     } else {

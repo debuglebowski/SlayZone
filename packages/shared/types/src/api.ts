@@ -813,7 +813,7 @@ export interface ElectronAPI {
     pullProviderSkill: (projectId: string, projectPath: string, provider: CliProvider, itemId: string) => Promise<ProjectSkillStatus>
     getComputerFiles: () => Promise<ComputerFileEntry[]>
     checkSlayConfigured: (projectPath: string) => Promise<boolean>
-    setupSlay: (projectPath: string) => Promise<{ ok: boolean; error?: string }>
+    setupSlay: (projectPath: string, projectId?: string) => Promise<{ ok: boolean; error?: string }>
 
     // Marketplace
     marketplace: {

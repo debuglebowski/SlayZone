@@ -2128,13 +2128,17 @@ export function registerAiConfigHandlers(ipcMain: IpcMain, db: Database): void {
     return false
   })
 
-  ipcMain.handle('ai-config:setup-slay', (_event, projectPath: string): { ok: boolean; error?: string } => {
+  ipcMain.handle('ai-config:setup-slay', (_event, projectPath: string, projectId?: string): { ok: boolean; error?: string } => {
     try {
       const cwd = path.resolve(projectPath)
       const shell = process.env.SHELL || userInfo().shell || '/bin/zsh'
       const isFish = shell.endsWith('/fish')
       const shellArgs = isFish ? ['-i', '-l'] : ['-l']
-      execFileSync(shell, [...shellArgs, '-c', 'slay init'], { cwd, timeout: 10000 })
+      const quote = (s: string): string => `'${s.replace(/'/g, "'\\''")}'`
+      const devFlag = app.isPackaged ? '' : ' --dev'
+      const projectFlag = projectId ? ` --project ${quote(projectId)}` : ''
+      const cmd = `slay${devFlag} init${projectFlag}`
+      execFileSync(shell, [...shellArgs, '-c', cmd], { cwd, timeout: 10000 })
       return { ok: true }
     } catch (e) {
       return { ok: false, error: e instanceof Error ? e.message : String(e) }
