@@ -42,6 +42,7 @@ export interface AppearanceSettings {
   chatShowTools: boolean
   chatShowLastMessageTools: boolean
   chatFileEditsOpenByDefault: boolean
+  chatShowMessageMeta: boolean
   // Sidebar
   sidebarBadgeMode: 'none' | 'blob' | 'count'
   // Markdown
@@ -83,6 +84,7 @@ export const appearanceDefaults: AppearanceSettings = {
   chatShowTools: true,
   chatShowLastMessageTools: true,
   chatFileEditsOpenByDefault: true,
+  chatShowMessageMeta: true,
   sidebarBadgeMode: 'blob',
   editorMarkdownViewMode: 'rich',
   editorMinimapEnabled: false,

@@ -12,6 +12,8 @@ export interface ChatViewState {
   finalOnly: boolean
   /** When true, file-edit tool cards (Edit/Write) start expanded. */
   fileEditsOpenByDefault: boolean
+  /** When true, the per-turn meta footer (duration, cost, turn count) is shown. */
+  showMessageMeta: boolean
   /**
    * Search highlight metadata. When `query` is non-empty, plain-text renderers
    * (UserMessage, ThinkingBlock, StderrBlock, ResultFooter expanded text, tool
@@ -53,6 +55,7 @@ export const ChatViewContext = createContext<ChatViewState>({
   collapseSignal: 0,
   finalOnly: false,
   fileEditsOpenByDefault: true,
+  showMessageMeta: true,
   search: { query: '', caseSensitive: false },
   timeline: [],
   childIndex: new Map(),

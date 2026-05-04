@@ -332,6 +332,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
       collapseSignal,
       finalOnly,
       fileEditsOpenByDefault: appearance.chatFileEditsOpenByDefault,
+      showMessageMeta: appearance.chatShowMessageMeta,
       search: { query: search.query, caseSensitive: search.caseSensitive },
       setChatMode: (next: typeof chatMode) => { void handleModeChange(next) },
       timeline,
@@ -339,7 +340,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
       onOpenUrl,
       onOpenFile: handleOpenFile,
     }),
-    [collapseSignal, finalOnly, appearance.chatFileEditsOpenByDefault, search.query, search.caseSensitive, handleModeChange, timeline, state.childIndex, onOpenUrl, handleOpenFile],
+    [collapseSignal, finalOnly, appearance.chatFileEditsOpenByDefault, appearance.chatShowMessageMeta, search.query, search.caseSensitive, handleModeChange, timeline, state.childIndex, onOpenUrl, handleOpenFile],
   )
 
   // Autosize textarea. Height follows scrollHeight up to 240px; no artificial min —
@@ -1048,6 +1049,15 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
                 checked={appearance.chatFileEditsOpenByDefault}
                 onCheckedChange={(c) => {
                   window.api.settings.set('chat_file_edits_open_by_default', c ? '1' : '0')
+                  window.dispatchEvent(new CustomEvent('sz:settings-changed'))
+                }}
+              />
+              <DisplayOptionRow
+                label="Show message meta"
+                description="Per-turn footer with duration, cost, and turn count."
+                checked={appearance.chatShowMessageMeta}
+                onCheckedChange={(c) => {
+                  window.api.settings.set('chat_show_message_meta', c ? '1' : '0')
                   window.dispatchEvent(new CustomEvent('sz:settings-changed'))
                 }}
               />

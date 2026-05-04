@@ -120,6 +120,7 @@ export function ChatPanelHarness({
       collapseSignal: 0,
       finalOnly: false,
       fileEditsOpenByDefault: true,
+      showMessageMeta: true,
       search: { query: '', caseSensitive: false },
       timeline: state.timeline,
       childIndex: state.childIndex,

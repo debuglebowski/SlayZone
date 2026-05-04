@@ -143,11 +143,12 @@ export function SystemInit({ item }: { item: Extract<TimelineItem, { kind: 'sess
 
 export function ResultFooter({ item }: { item: Extract<TimelineItem, { kind: 'result' }> }) {
   const [expanded, setExpanded] = useState(false)
-  const { collapseSignal } = useChatView()
+  const { collapseSignal, showMessageMeta } = useChatView()
   useEffect(() => {
     setExpanded(false)
   }, [collapseSignal])
   const { copied, copy } = useCopy(item.copyText ?? '')
+  if (!showMessageMeta) return null
   return (
     <div className="group px-4 pl-[4.25rem] pb-2 flex items-center gap-2 flex-wrap">
       <button
