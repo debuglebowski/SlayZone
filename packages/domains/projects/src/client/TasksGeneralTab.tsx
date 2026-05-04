@@ -11,8 +11,12 @@ interface TasksGeneralTabProps {
 
 export function TasksGeneralTab({ project, onUpdated }: TasksGeneralTabProps) {
   const columns = resolveColumns(project.columns_config)
-  const [onActive, setOnActive] = useState<string>('none')
-  const [onIdle, setOnIdle] = useState<string>('none')
+  const [onActive, setOnActive] = useState<string>(
+    () => project.task_automation_config?.on_terminal_active ?? 'none'
+  )
+  const [onIdle, setOnIdle] = useState<string>(
+    () => project.task_automation_config?.on_terminal_idle ?? 'none'
+  )
   const [loading, setLoading] = useState(false)
 
   useEffect(() => {
