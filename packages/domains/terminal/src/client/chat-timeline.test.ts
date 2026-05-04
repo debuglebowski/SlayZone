@@ -594,5 +594,49 @@ test('deriveLoadingLabel: stops scanning at user-text boundary', () => {
   expect(deriveLoadingLabel(s)).toBe(null)
 })
 
+test('interrupted event: appends marker + drops inFlight (mirrors turn-interrupted)', () => {
+  let s = initialState()
+  s = reducer(s, { type: 'event', event: ev.turnInit() })
+  s = reducer(s, { type: 'event', event: { kind: 'user-message', text: 'hi' } })
+  expect(isInFlight(s)).toBe(true)
+  s = reducer(s, { type: 'event', event: { kind: 'interrupted' } })
+  expect(isInFlight(s)).toBe(false)
+  expect(s.timeline.some((i) => i.kind === 'interrupted')).toBe(true)
+})
+
+test('user-message-popped: removes matching user-text + drops inFlight', () => {
+  let s = initialState()
+  s = reducer(s, { type: 'event', event: ev.turnInit() })
+  s = reducer(s, { type: 'event', event: { kind: 'user-message', text: 'hello' } })
+  expect(isInFlight(s)).toBe(true)
+  expect(s.timeline.some((i) => i.kind === 'user-text')).toBe(true)
+  s = reducer(s, { type: 'event', event: { kind: 'user-message-popped', text: 'hello' } })
+  expect(isInFlight(s)).toBe(false)
+  expect(s.timeline.some((i) => i.kind === 'user-text')).toBe(false)
+})
+
+test('user-message-popped: refuses pop when assistant progress sits between', () => {
+  // Defensive replay safety. Main side gates emission, but if late events land
+  // out-of-order between renderer's request and the synthetic event, the pop
+  // must no-op rather than corrupt the timeline.
+  let s = initialState()
+  s = reducer(s, { type: 'event', event: ev.turnInit() })
+  s = reducer(s, { type: 'event', event: { kind: 'user-message', text: 'hi' } })
+  s = reducer(s, { type: 'event', event: ev.text('m-1', 'assistant reply') })
+  s = reducer(s, { type: 'event', event: { kind: 'user-message-popped', text: 'hi' } })
+  expect(s.timeline.some((i) => i.kind === 'user-text')).toBe(true)
+  expect(s.timeline.some((i) => i.kind === 'text')).toBe(true)
+})
+
+test('user-message-popped: replay-safe (user-message + popped → empty timeline)', () => {
+  // Buffer replay scenario: tab reopen reads chat_events in order. The popped
+  // user-message must NOT linger in the reconstructed timeline.
+  let s = initialState()
+  s = reducer(s, { type: 'event', event: ev.turnInit() })
+  s = reducer(s, { type: 'event', event: { kind: 'user-message', text: 'edit me' } })
+  s = reducer(s, { type: 'event', event: { kind: 'user-message-popped', text: 'edit me' } })
+  expect(s.timeline.filter((i) => i.kind === 'user-text').length).toBe(0)
+})
+
 console.log(`\n${passed} passed, ${failed} failed`)
 process.exit(failed > 0 ? 1 : 0)

@@ -5,6 +5,8 @@ import {
   sendUserMessage,
   kill as killChat,
   removeSession,
+  recordInterrupted,
+  popLastUserMessage,
   getEventBufferSince,
   getSessionInfo,
   killAll,
@@ -363,8 +365,27 @@ export function registerChatHandlers(ipcMain: IpcMain, db: Database, opts: ChatH
   // the dying child's process-exit broadcast so the renderer doesn't flash
   // "Session ended". Mirrors `chat:setMode` (which also kill+resume on flag change).
   ipcMain.handle('chat:interrupt', async (_, opts: ChatCreateOpts): Promise<ChatSessionInfo> => {
+    // Persist interrupted marker FIRST so replay sees the turn boundary.
+    // Order matters: recordInterrupted touches the live session; removeSession kills it.
+    recordInterrupted(opts.tabId)
     removeSession(opts.tabId)
     return createChat(await buildCreateOpts(db, opts, { fresh: false }))
+  })
+
+  // Stop-button / Esc path. Same kill+respawn as `chat:interrupt`, but if no
+  // assistant progress arrived since the trailing user-message we cancel that
+  // user-message instead of leaving an `interrupted` marker — Claude CLI parity
+  // for "abort an unanswered turn and edit the prompt". Authoritative verdict
+  // (`popped`) flows back to the caller so the renderer can restore the input.
+  ipcMain.handle('chat:abortAndPop', async (_, opts: ChatCreateOpts): Promise<{
+    popped: boolean
+    text: string | null
+  }> => {
+    const result = popLastUserMessage(opts.tabId)
+    if (!result.popped) recordInterrupted(opts.tabId)
+    removeSession(opts.tabId)
+    await createChat(await buildCreateOpts(db, opts, { fresh: false }))
+    return { popped: result.popped, text: result.text }
   })
 
   ipcMain.handle('chat:kill', (_, tabId: string): void => {

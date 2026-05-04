@@ -450,6 +450,71 @@ export function sendUserMessage(tabId: string, text: string): boolean {
   return true
 }
 
+/**
+ * Persist an `interrupted` marker into the session's event log. Called by
+ * `chat:interrupt` before kill+respawn so timeline replay sees a turn boundary
+ * even though the original turn never produced a `result`. No-op if the
+ * session is gone or already ended.
+ */
+export function recordInterrupted(tabId: string): void {
+  const session = sessions.get(tabId)
+  if (!session || session.ended) return
+  handleEvent(session, { kind: 'interrupted' })
+}
+
+/**
+ * Cancel the trailing `user-message` if no assistant progress arrived since.
+ * Emits a synthetic `user-message-popped` event into the buffer so the renderer
+ * (and any future replay) removes the user-text item from the timeline. Returns
+ * the popped text so the caller can restore it to the chat input field —
+ * Claude CLI parity for "pressing Esc on a turn that produced nothing".
+ *
+ * Authoritative: caller relies on this verdict over the renderer's local view
+ * to handle late-arriving events between renderer's check and this call.
+ */
+export function popLastUserMessage(tabId: string): { popped: boolean; text: string | null } {
+  const session = sessions.get(tabId)
+  if (!session || session.ended) return { popped: false, text: null }
+
+  let userText: string | null = null
+  for (let i = session.buffer.length - 1; i >= 0; i--) {
+    const e = session.buffer[i].event
+    if (e.kind === 'user-message') {
+      userText = e.text
+      break
+    }
+    if (e.kind === 'user-message-popped') return { popped: false, text: null }
+    if (isProgressEventKind(e.kind)) return { popped: false, text: null }
+    // Skip non-progress, non-user events (turn-init, error, unknown, compact-boundary).
+  }
+  if (userText === null) return { popped: false, text: null }
+  handleEvent(session, { kind: 'user-message-popped', text: userText })
+  return { popped: true, text: userText }
+}
+
+function isProgressEventKind(kind: AgentEvent['kind']): boolean {
+  switch (kind) {
+    case 'assistant-text':
+    case 'assistant-thinking':
+    case 'tool-call':
+    case 'tool-result':
+    case 'result':
+    case 'sub-agent':
+    case 'interrupted':
+    case 'stderr':
+    case 'api-retry':
+    case 'rate-limit':
+    case 'stream-message-start':
+    case 'stream-block-start':
+    case 'stream-block-delta':
+    case 'stream-block-stop':
+    case 'stream-message-stop':
+      return true
+    default:
+      return false
+  }
+}
+
 export function kill(tabId: string): void {
   const session = sessions.get(tabId)
   if (!session) return

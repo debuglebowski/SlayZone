@@ -33,6 +33,13 @@ interface ChatApi {
     cwd: string
     providerFlagsOverride?: string | null
   }) => Promise<unknown>
+  abortAndPop: (opts: {
+    tabId: string
+    taskId: string
+    mode: string
+    cwd: string
+    providerFlagsOverride?: string | null
+  }) => Promise<{ popped: boolean; text: string | null }>
   kill: (tabId: string) => Promise<void>
   remove: (tabId: string) => Promise<void>
   getBufferSince: (
@@ -75,6 +82,13 @@ export interface UseChatSessionResult {
   permissionMode: string | null
   sendMessage: (text: string) => Promise<void>
   interrupt: () => Promise<void>
+  /**
+   * Stop the current turn. If no assistant progress arrived since the user's
+   * last message, that message is cancelled instead of leaving an `interrupted`
+   * marker — Claude CLI parity. Returns `popped: true` + the cancelled text so
+   * the caller can restore it to the chat input field.
+   */
+  abortAndPop: () => Promise<{ popped: boolean; text: string | null }>
   kill: () => Promise<void>
   /** Clear timeline + ended-state immediately (UX). New turn-init refills on next session. */
   reset: () => void
@@ -176,11 +190,25 @@ export function useChatSession(opts: UseChatSessionOpts): UseChatSessionResult {
 
   const interrupt = async (): Promise<void> => {
     const chat = getChatApi()
-    // Mark the in-flight turn as cancelled locally so the composer re-enables
-    // immediately. The main side will kill + respawn the subprocess via
-    // --resume; identity guard swallows the dying child's exit.
-    dispatch({ type: 'turn-interrupted' })
+    // Main records an `interrupted` event into the session buffer before kill+respawn;
+    // the broadcast flows back via `chat:event` and the reducer appends the timeline
+    // marker. Single source of truth → replay sees the same boundary.
     await chat.interrupt({
+      tabId: opts.tabId,
+      taskId: opts.taskId,
+      mode: opts.mode,
+      cwd: opts.cwd,
+      providerFlagsOverride: opts.providerFlagsOverride ?? null,
+    })
+  }
+
+  const abortAndPop = async (): Promise<{ popped: boolean; text: string | null }> => {
+    const chat = getChatApi()
+    // Main is authoritative: walks its own buffer to decide pop vs marker. The
+    // synthetic event (`user-message-popped` or `interrupted`) flows back via
+    // `chat:event`; reducer mutates the timeline. Return value tells the caller
+    // whether to restore the popped text to the chat input field.
+    return chat.abortAndPop({
       tabId: opts.tabId,
       taskId: opts.taskId,
       mode: opts.mode,
@@ -207,6 +235,7 @@ export function useChatSession(opts: UseChatSessionOpts): UseChatSessionResult {
     permissionMode: state.permissionMode,
     sendMessage,
     interrupt,
+    abortAndPop,
     kill,
     reset,
   }

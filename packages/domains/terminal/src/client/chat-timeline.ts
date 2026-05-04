@@ -199,6 +199,41 @@ function applyEvent(state: ChatTimelineState, event: AgentEvent): ChatTimelineSt
         userMessagesSent: state.userMessagesSent + 1,
       }
     }
+    case 'interrupted': {
+      // Synthetic event persisted by main when the user clicks Stop. Mirrors
+      // the legacy `'turn-interrupted'` action: balance resultCount against
+      // userMessagesSent so isInFlight drops, and append a marker so the
+      // timeline shows where the turn was cut. Persisted into the buffer so
+      // replay reconstructs the boundary even if the renderer was offline.
+      if (!isInFlight(state)) return state
+      const item: TimelineItem = { kind: 'interrupted', timestamp: ts }
+      return {
+        ...state,
+        timeline: [...state.timeline, item],
+        resultCount: state.resultCount + 1,
+      }
+    }
+    case 'user-message-popped': {
+      // Cancel the trailing user-text whose content matches `event.text`. Skip
+      // session-start (boundary, not turn content); refuse if anything else
+      // sits between us and the matching user-text — main side gates emission
+      // so this is defensive replay-safety.
+      for (let i = state.timeline.length - 1; i >= 0; i--) {
+        const it = state.timeline[i]
+        if (it.kind === 'session-start') continue
+        if (it.kind === 'user-text' && it.text === event.text) {
+          const next = state.timeline.slice()
+          next.splice(i, 1)
+          return {
+            ...state,
+            timeline: next,
+            userMessagesSent: Math.max(0, state.userMessagesSent - 1),
+          }
+        }
+        return state
+      }
+      return state
+    }
     case 'turn-init': {
       // Restart detection: session previously ended, OR sessionId changed (new process spawned).
       // Kill+create cycle (reset chat, /clear builtin) produces a fresh turn-init — clear timeline

@@ -562,6 +562,20 @@ export interface ElectronAPI {
       cwd: string
       providerFlagsOverride?: string | null
     }) => Promise<ChatSessionInfo>
+    /**
+     * Stop the current turn. If no assistant progress arrived since the last
+     * user-message, cancels that user-message instead of leaving an `interrupted`
+     * marker — Claude CLI parity. Returns `popped: true` + the cancelled text so
+     * the renderer can restore the chat input. When `popped: false`, behaves
+     * identically to `interrupt`.
+     */
+    abortAndPop: (opts: {
+      tabId: string
+      taskId: string
+      mode: string
+      cwd: string
+      providerFlagsOverride?: string | null
+    }) => Promise<{ popped: boolean; text: string | null }>
     kill: (tabId: string) => Promise<void>
     remove: (tabId: string) => Promise<void>
     /**

@@ -73,7 +73,7 @@ const SUGGESTED_PROMPTS = [
 
 export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function ChatPanel(props, ref) {
   const { tabId, taskId, mode, cwd, providerFlagsOverride, permissionNotice: overrideNotice, onSetDisplayMode, loopConfig, onLoopConfigChange, onOpenLoopDialog } = props
-  const { state, timeline, inFlight, hydrating, permissionMode, sendMessage, interrupt, reset: resetTimeline } = useChatSession({
+  const { state, timeline, inFlight, hydrating, permissionMode, sendMessage, abortAndPop, reset: resetTimeline } = useChatSession({
     tabId,
     taskId,
     mode,
@@ -108,6 +108,12 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
   })
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const panelRef = useRef<HTMLDivElement>(null)
+  // Snapshot of the in-flight turn's raw input + attachments. Used by Stop/Esc
+  // to restore the chips + clean text (without inline image markdown) when the
+  // main side pops the turn. Updated only on user submits that go straight to
+  // the wire — queued submits don't overwrite it, so the snapshot stays aligned
+  // with the in-flight turn even when a queue exists.
+  const lastSentRef = useRef<{ text: string; attachments: AssetRef[] } | null>(null)
 
   useImperativeHandle(ref, () => ({
     focus: () => textareaRef.current?.focus(),
@@ -345,6 +351,10 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
       toSend = imageRefs + (toSend ? `\n\n${toSend}` : '')
     }
 
+    // Capture raw input + attachments BEFORE clearing — used by Stop/Esc to
+    // restore them if the turn is popped. Skip when queueing: lastSentRef must
+    // remain aligned with the in-flight turn, not the queued one.
+    const snapshot = { text, attachments: [...attachments] }
     setDraft('')
     setAttachments([])
     if (!toSend) return
@@ -353,6 +363,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
       setQueuedMessages((q) => [...q, toSend])
       return
     }
+    lastSentRef.current = snapshot
     await sendMessage(toSend)
   }, [draft, attachments, getAssetFilePath, inFlight, state.sessionEnded, sendMessage, autocomplete, chatApi, tabId, taskId, mode, cwd, providerFlagsOverride])
 
@@ -365,6 +376,27 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
     setQueuedMessages(rest)
     void sendMessage(next)
   }, [inFlight, queuedMessages, sendMessage, state.sessionEnded])
+
+  // Stop button + Esc shared path. Clears the queue (intentional: queued msgs
+  // are abandoned alongside the in-flight turn), aborts the turn on the main
+  // side, and — if no progress had arrived — restores the popped text +
+  // attachments to the composer for editing. Skips restore when the user has
+  // already started typing again (draft non-empty).
+  const handleStop = useCallback(async () => {
+    setQueuedMessages([])
+    const result = await abortAndPop()
+    if (!result.popped) return
+    if (draft.trim() !== '') return
+    const snap = lastSentRef.current
+    if (snap) {
+      setDraft(snap.text)
+      setAttachments(snap.attachments)
+    } else if (result.text) {
+      setDraft(result.text)
+    }
+    lastSentRef.current = null
+    textareaRef.current?.focus()
+  }, [abortAndPop, draft])
 
   // Clear queue on session end / reset.
   useEffect(() => {
@@ -430,10 +462,18 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
         const next = nextAgentMode(chatMode, autoCapability.optedIn)
         void handleModeChange(next)
       }
+      // Esc stops the in-flight turn — Claude CLI parity. Defers to autocomplete
+      // (which uses Esc to close itself). No-op when nothing is in flight.
+      if (e.key === 'Escape' && !mod && !e.altKey && !e.shiftKey) {
+        if (autocomplete.show) return
+        if (!inFlight) return
+        e.preventDefault()
+        void handleStop()
+      }
     }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
-  }, [scrollRef, search, inFlight, chatMode, handleModeChange, autoCapability.optedIn, autocomplete.show])
+  }, [scrollRef, search, inFlight, chatMode, handleModeChange, autoCapability.optedIn, autocomplete.show, handleStop])
 
   // Scroll to the active match.
   useEffect(() => {
@@ -792,11 +832,11 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
           {inFlight ? (
             <button
               onClick={() => {
-                void interrupt()
+                void handleStop()
               }}
               disabled={displaySessionEnded}
               className="shrink-0 size-8 rounded-full flex items-center justify-center bg-destructive text-destructive-foreground hover:bg-destructive/90 transition-colors disabled:opacity-50"
-              title="Stop generation"
+              title="Stop generation (Esc)"
               aria-label="Stop generation"
             >
               <Square className="size-3.5 fill-current" />

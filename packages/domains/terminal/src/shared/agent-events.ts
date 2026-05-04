@@ -20,6 +20,8 @@ export type AgentEvent =
   | SubAgentEvent
   | StderrEvent
   | ProcessExitEvent
+  | InterruptedEvent
+  | UserMessagePoppedEvent
   | ErrorEvent
   | UnknownEvent
   | StreamMessageStartEvent
@@ -191,6 +193,28 @@ export interface ProcessExitEvent {
   kind: 'process-exit'
   code: number | null
   signal: string | null
+}
+
+/**
+ * Synthetic event emitted when the user interrupts an in-flight turn (Stop
+ * button without pop, `chat:interrupt` IPC). Persisted alongside other events
+ * so timeline replay sees the turn boundary even though the original turn
+ * never produced a `result`.
+ */
+export interface InterruptedEvent {
+  kind: 'interrupted'
+}
+
+/**
+ * Synthetic event emitted when the user aborts an in-flight turn BEFORE any
+ * assistant progress arrived. Cancels the trailing `user-message` so the chat
+ * input field can re-receive the message for editing — Claude CLI parity.
+ * Persisted into the event log so replay sees the same cancellation.
+ */
+export interface UserMessagePoppedEvent {
+  kind: 'user-message-popped'
+  /** Text of the cancelled user-message (for replay matching). */
+  text: string
 }
 
 export interface ErrorEvent {
