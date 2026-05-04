@@ -1,6 +1,19 @@
 # Changelog
 
 
+## v0.26.1
+
+[compare changes](https://github.com/debuglebowski/slayzone/compare/v0.26.0...v0.26.1)
+
+### 🚀 Enhancements
+
+- **chat:** Display agent background shells in chat panel ([059ed83e](https://github.com/debuglebowski/slayzone/commit/059ed83e))
+- **browser:** Add CLI command to create new tabs ([5480260f](https://github.com/debuglebowski/slayzone/commit/5480260f))
+
+### ❤️ Contributors
+
+- Debuglebowski
+
 ## v0.26.0
 
 [compare changes](https://github.com/debuglebowski/slayzone/compare/v0.25.0...v0.26.0)

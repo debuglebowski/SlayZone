@@ -1,5 +1,22 @@
 [
   {
+    "version": "0.26.1",
+    "date": "2026-05-04",
+    "tagline": "Chat shells, browser tabs",
+    "items": [
+      {
+        "category": "feature",
+        "title": "Agent background shells in chat",
+        "description": "Background shells spawned by an agent now render inline in the chat panel."
+      },
+      {
+        "category": "feature",
+        "title": "Open browser tabs from CLI",
+        "description": "New CLI command to create browser tabs in the running app."
+      }
+    ]
+  },
+  {
     "version": "0.26.0",
     "date": "2026-05-04",
     "tagline": "Chat polish",
