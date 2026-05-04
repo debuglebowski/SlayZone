@@ -1,5 +1,52 @@
 [
   {
+    "version": "0.26.2",
+    "date": "2026-05-05",
+    "tagline": "Chat polish, self-heal",
+    "items": [
+      {
+        "category": "feature",
+        "title": "Model dropdown in chat footer",
+        "description": "Switch models directly from the chat input footer."
+      },
+      {
+        "category": "feature",
+        "title": "Chat width and display settings",
+        "description": "New popover lets you tune chat panel width and per-turn meta footer visibility."
+      },
+      {
+        "category": "feature",
+        "title": "Hourly update check with one-click restart",
+        "description": "App now checks for updates hourly and surfaces a restart button in the top-right when one is ready."
+      },
+      {
+        "category": "improvement",
+        "title": "Sub-agent rows nest under their parent",
+        "description": "Sub-agent activity in chat now renders nested under the spawning turn with cross-links."
+      },
+      {
+        "category": "improvement",
+        "title": "Empty thinking blocks hidden",
+        "description": "Chat no longer renders empty thinking placeholders."
+      },
+      {
+        "category": "improvement",
+        "title": "More file types open in the editor",
+        "description": "Unknown extensions default to markdown and the code extension map now covers more languages."
+      },
+      {
+        "category": "improvement",
+        "title": "Diagnostics retention runs on idle",
+        "description": "Old diagnostics events are pruned in idle chunks instead of one large pass."
+      },
+      {
+        "category": "fix",
+        "title": "Stale lock self-heal on boot",
+        "description": "Boot sentinel detects and clears stale singleton locks instead of failing to start."
+      }
+    ]
+  },
+  {
     "version": "0.26.1",
     "date": "2026-05-04",
     "tagline": "Chat shells, browser tabs",

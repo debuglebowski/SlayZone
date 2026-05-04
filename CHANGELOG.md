@@ -1,6 +1,34 @@
 # Changelog
 
 
+## v0.26.2
+
+[compare changes](https://github.com/debuglebowski/slayzone/compare/v0.26.1...v0.26.2)
+
+### 🚀 Enhancements
+
+- **chat:** Display agent background shells in chat panel ([059ed83e](https://github.com/debuglebowski/slayzone/commit/059ed83e))
+- **browser:** Add CLI command to create new tabs ([5480260f](https://github.com/debuglebowski/slayzone/commit/5480260f))
+- **chat:** Display agent background shells in chat panel ([245541cb](https://github.com/debuglebowski/slayzone/commit/245541cb))
+- **browser:** Add CLI command to create new tabs ([325b8e6a](https://github.com/debuglebowski/slayzone/commit/325b8e6a))
+- **updater:** Hourly check + top-right restart button ([3255cd84](https://github.com/debuglebowski/slayzone/commit/3255cd84))
+- **assets:** Default unknown ext to markdown, expand code ext map ([81fb30fd](https://github.com/debuglebowski/slayzone/commit/81fb30fd))
+- **diagnostics:** Idle-paced chunked retention ([1d1285d0](https://github.com/debuglebowski/slayzone/commit/1d1285d0))
+- **chat:** Add model dropdown to chat footer ([572297d9](https://github.com/debuglebowski/slayzone/commit/572297d9))
+- **lifecycle:** Boot sentinel, lock self-heal, update telemetry ([9ba41d55](https://github.com/debuglebowski/slayzone/commit/9ba41d55))
+- **chat:** Nest sub-agent children + link plumbing ([235acf38](https://github.com/debuglebowski/slayzone/commit/235acf38))
+- **chat:** Hide empty thinking blocks ([8c902b86](https://github.com/debuglebowski/slayzone/commit/8c902b86))
+- **chat:** Width setting, display popover, layout cleanup ([5fbd6b84](https://github.com/debuglebowski/slayzone/commit/5fbd6b84))
+- **chat:** Toggle for per-turn meta footer ([ef59f1c9](https://github.com/debuglebowski/slayzone/commit/ef59f1c9))
+
+### 🏡 Chore
+
+- **nix:** Update sources to 0.26.0 ([c5e4e6de](https://github.com/debuglebowski/slayzone/commit/c5e4e6de))
+
+### ❤️ Contributors
+
+- Debuglebowski
+
 ## v0.26.1
 
 [compare changes](https://github.com/debuglebowski/slayzone/compare/v0.26.0...v0.26.1)
