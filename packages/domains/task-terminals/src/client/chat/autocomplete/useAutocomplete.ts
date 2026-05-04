@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { AcceptCtx, AutocompleteSource, FetchCtx, TriggerMatch } from './types'
-import { rankAcrossSources, type MergedEntry } from './ranking'
+import { rankAcrossSources, type MergedEntry, type UsageLookup } from './ranking'
 
 export interface UseAutocompleteOptions {
   sources: AutocompleteSource[]
@@ -9,6 +9,17 @@ export interface UseAutocompleteOptions {
   cursorPos: number
   acceptCtx: Omit<AcceptCtx, 'draft' | 'setDraft' | 'tokenStart' | 'tokenEnd'>
   fetchCtx: FetchCtx
+}
+
+type UsageMap = Record<string, Record<string, number>>
+
+interface AutocompleteApi {
+  getAutocompleteUsage?: () => Promise<UsageMap>
+  bumpAutocompleteUsage?: (source: string, name: string) => Promise<void>
+}
+
+function getApi(): AutocompleteApi | undefined {
+  return (window as unknown as { api?: { chat?: AutocompleteApi } }).api?.chat
 }
 
 export interface ActiveMatch {
@@ -31,6 +42,14 @@ export interface UseAutocompleteResult {
    * source's transform result. Use to expand slash-command templates on Enter.
    */
   transformSubmit: (draft: string) => import('./types').SubmitTransform | null
+  /**
+   * Bump usage counters for all `/<name>` tokens in `text` that resolve to a known
+   * autocomplete item (skill / agent / command / builtin). Call AFTER a successful
+   * chat send. Refreshes the usage map afterwards so subsequent ranking sees the bump.
+   * Resolution preference: items the user explicitly accepted from the menu during this
+   * draft win over plain-typed matches; otherwise scans sources in registration order.
+   */
+  bumpUsageFromMessage: (text: string) => Promise<void>
 }
 
 /**
@@ -42,6 +61,20 @@ export function useAutocomplete(opts: UseAutocompleteOptions): UseAutocompleteRe
   const [selectedIndex, setSelectedIndex] = useState(0)
   const [itemsBySource, setItemsBySource] = useState<Record<string, unknown[]>>({})
   const [dismissed, setDismissed] = useState<{ source: string; match: TriggerMatch } | null>(null)
+  const [usage, setUsage] = useState<UsageMap>({})
+  /** Names the user explicitly accepted from the menu during the current draft. */
+  const pickedRef = useRef<Map<string, { sourceId: string; name: string }>>(new Map())
+
+  // Load usage map once on mount. Refreshed after each bump.
+  useEffect(() => {
+    let cancelled = false
+    const fn = getApi()?.getAutocompleteUsage
+    if (!fn) return
+    void fn().then((m) => {
+      if (!cancelled) setUsage(m ?? {})
+    }).catch(() => { /* ignore — usage is best-effort */ })
+    return () => { cancelled = true }
+  }, [])
 
   // Fetch items per source once (cwd-scoped). Sources are stable refs.
   const cwdRef = useRef(fetchCtx.cwd)
@@ -100,9 +133,10 @@ export function useAutocomplete(opts: UseAutocompleteOptions): UseAutocompleteRe
     }
     if (!leadMatch || !leadSourceId || groups.length === 0) return null
 
+    const usageLookup: UsageLookup = (sourceId, name) => usage[sourceId]?.[name] ?? 0
     let entries: MergedEntry[]
     if (groups.some((g) => g.source.getName)) {
-      entries = rankAcrossSources(groups, leadMatch.query)
+      entries = rankAcrossSources(groups, leadMatch.query, usageLookup)
     } else {
       entries = []
       for (const g of groups) {
@@ -112,7 +146,7 @@ export function useAutocomplete(opts: UseAutocompleteOptions): UseAutocompleteRe
     }
     if (entries.length === 0) return null
     return { match: leadMatch, entries, leadSourceId }
-  }, [sources, draft, cursorPos, itemsBySource, dismissed])
+  }, [sources, draft, cursorPos, itemsBySource, dismissed, usage])
 
   const show = active !== null
 
@@ -130,6 +164,8 @@ export function useAutocomplete(opts: UseAutocompleteOptions): UseAutocompleteRe
       if (!active) return
       const entry = active.entries[index]
       if (!entry) return
+      const name = entry.source.getName?.(entry.item)
+      if (name) pickedRef.current.set(name, { sourceId: entry.source.id, name })
       void entry.source.accept(entry.item, {
         ...acceptCtx,
         draft,
@@ -191,6 +227,60 @@ export function useAutocomplete(opts: UseAutocompleteOptions): UseAutocompleteRe
     [sources, itemsBySource]
   )
 
+  const bumpUsageFromMessage = useCallback(
+    async (text: string) => {
+      const fn = getApi()?.bumpAutocompleteUsage
+      if (!fn) return
+      // Match `/<token>` only at start-of-string or after whitespace; tokens are
+      // [a-zA-Z0-9_-]+, mirroring how skills/commands/agents/builtins name themselves.
+      const tokenRe = /(?:^|\s)\/([a-zA-Z0-9_-]+)/g
+      const tokens = new Set<string>()
+      for (const m of text.matchAll(tokenRe)) tokens.add(m[1])
+      if (tokens.size === 0) return
+
+      const bumps: Array<Promise<unknown>> = []
+      const bumped = new Set<string>() // dedup `${sourceId}:${name}`
+
+      for (const tok of tokens) {
+        let resolved: { sourceId: string; name: string } | null = null
+        // Prefer items the user accepted from the menu — disambiguates name collisions.
+        const picked = pickedRef.current.get(tok)
+        if (picked) {
+          resolved = picked
+        } else {
+          // Fallback: scan sources in registration order for a name match.
+          for (const src of sources) {
+            const items = itemsBySource[src.id] ?? []
+            const getName = src.getName
+            if (!getName) continue
+            const hit = items.find((it) => getName(it) === tok)
+            if (hit) {
+              resolved = { sourceId: src.id, name: tok }
+              break
+            }
+          }
+        }
+        if (!resolved) continue
+        const key = `${resolved.sourceId}:${resolved.name}`
+        if (bumped.has(key)) continue
+        bumped.add(key)
+        bumps.push(fn(resolved.sourceId, resolved.name).catch(() => undefined))
+      }
+      pickedRef.current.clear()
+      if (bumps.length === 0) return
+      await Promise.all(bumps)
+      // Refresh usage map so the next ranking sees the new counts.
+      const getFn = getApi()?.getAutocompleteUsage
+      if (getFn) {
+        try {
+          const m = await getFn()
+          setUsage(m ?? {})
+        } catch { /* best-effort */ }
+      }
+    },
+    [sources, itemsBySource]
+  )
+
   return {
     show,
     active,
@@ -200,6 +290,7 @@ export function useAutocomplete(opts: UseAutocompleteOptions): UseAutocompleteRe
     close,
     handleKeyDown,
     transformSubmit,
+    bumpUsageFromMessage,
   }
 }
 

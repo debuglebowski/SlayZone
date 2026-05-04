@@ -1,6 +1,7 @@
 /**
- * Fuzzy ranking via fzf — name matches outrank description matches,
- * alphabetical tiebreak. Shared by skills / commands / agents / builtins.
+ * Fuzzy ranking via fzf — name matches outrank description matches. Tiebreak chain:
+ * fzf score desc → usage count desc → alphabetical asc. Shared by skills / commands
+ * / agents / builtins.
  */
 import { Fzf } from 'fzf'
 import type { AutocompleteSource } from './types'
@@ -8,6 +9,8 @@ import type { AutocompleteSource } from './types'
 export interface RankAccessors<Item> {
   getName: (item: Item) => string
   getDescription?: (item: Item) => string
+  /** Per-item usage count. Used as tiebreak when fzf scores tie. Default 0. */
+  getUsage?: (item: Item) => number
 }
 
 // fzf's `U extends string` conditional options typing breaks under generics — safe cast.
@@ -21,10 +24,15 @@ export function rankByName<Item>(
   query: string,
   accessors: RankAccessors<Item>
 ): Item[] {
-  const { getName, getDescription } = accessors
+  const { getName, getDescription, getUsage } = accessors
+  const usage = getUsage ?? (() => 0)
 
   if (!query) {
-    return [...items].sort((a, b) => getName(a).localeCompare(getName(b)))
+    return [...items].sort(
+      (a, b) =>
+        usage(b) - usage(a) ||
+        getName(a).localeCompare(getName(b))
+    )
   }
 
   const nameHits = makeFzf(items, getName).find(query)
@@ -43,7 +51,10 @@ export function rankByName<Item>(
   }
 
   merged.sort(
-    (a, b) => b.score - a.score || getName(a.item).localeCompare(getName(b.item))
+    (a, b) =>
+      b.score - a.score ||
+      usage(b.item) - usage(a.item) ||
+      getName(a.item).localeCompare(getName(b.item))
   )
   return merged.map((m) => m.item)
 }
@@ -59,16 +70,26 @@ interface SourceGroup {
 }
 
 /**
+ * Optional usage lookup for cross-source ranking. Receives sourceId + item name,
+ * returns the persisted bump count (0 if unknown). Wired by useAutocomplete.
+ */
+export type UsageLookup = (sourceId: string, name: string) => number
+
+/**
  * Cross-source fzf ranking. Builds a single ranked list across multiple sources by running
  * fzf on the union (using each source's `getName` / `getDescription` accessors). Name hits
- * outrank description hits; ties broken alphabetically. Sources that lack `getName` are
- * appended in their own filter order at the end.
+ * outrank description hits. Tiebreak chain: fzf score desc → usage desc → alphabetical asc.
+ * Sources that lack `getName` are appended in their own filter order at the end.
  */
-export function rankAcrossSources(groups: SourceGroup[], query: string): MergedEntry[] {
+export function rankAcrossSources(
+  groups: SourceGroup[],
+  query: string,
+  getUsage?: UsageLookup
+): MergedEntry[] {
   const mergeable = groups.filter((g) => g.source.getName)
   const passthrough = groups.filter((g) => !g.source.getName)
 
-  type U = MergedEntry & { name: string; description: string }
+  type U = MergedEntry & { name: string; description: string; sourceId: string }
   const universe: U[] = []
   for (const g of mergeable) {
     const getName = g.source.getName as (i: unknown) => string
@@ -77,15 +98,21 @@ export function rankAcrossSources(groups: SourceGroup[], query: string): MergedE
       universe.push({
         item,
         source: g.source,
+        sourceId: g.source.id,
         name: getName(item),
         description: getDesc ? getDesc(item) : '',
       })
     }
   }
 
+  const usage = getUsage ?? (() => 0)
+  const u = (e: U) => usage(e.sourceId, e.name)
+
   let ranked: MergedEntry[]
   if (!query) {
-    ranked = [...universe].sort((a, b) => a.name.localeCompare(b.name))
+    ranked = [...universe]
+      .sort((a, b) => u(b) - u(a) || a.name.localeCompare(b.name))
+      .map((e) => ({ item: e.item, source: e.source }))
   } else {
     const nameHits = makeFzf(universe, (u) => u.name).find(query)
     const matched = new Set<U>(nameHits.map((h) => h.item))
@@ -93,12 +120,15 @@ export function rankAcrossSources(groups: SourceGroup[], query: string): MergedE
       entry: h.item,
       score: h.score,
     }))
-    const pool = universe.filter((u) => !matched.has(u) && u.description)
-    for (const h of makeFzf(pool, (u) => u.description).find(query)) {
+    const pool = universe.filter((e) => !matched.has(e) && e.description)
+    for (const h of makeFzf(pool, (e) => e.description).find(query)) {
       merged.push({ entry: h.item, score: 0 })
     }
     merged.sort(
-      (a, b) => b.score - a.score || a.entry.name.localeCompare(b.entry.name)
+      (a, b) =>
+        b.score - a.score ||
+        u(b.entry) - u(a.entry) ||
+        a.entry.name.localeCompare(b.entry.name)
     )
     ranked = merged.map((m) => ({ item: m.entry.item, source: m.entry.source }))
   }

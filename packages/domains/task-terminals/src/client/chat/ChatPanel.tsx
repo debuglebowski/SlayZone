@@ -100,7 +100,9 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
   })
   const [collapseSignal, setCollapseSignal] = useState(0)
   const [finalOnly, setFinalOnly] = useState(false)
-  const [queuedMessages, setQueuedMessages] = useState<string[]>([])
+  /** Send-text + original draft kept paired so usage bumps on drain see the
+   * raw `/<token>` even when commands expanded the body before queueing. */
+  const [queuedMessages, setQueuedMessages] = useState<Array<{ send: string; original: string }>>([])
   const [attachments, setAttachments] = useState<AssetRef[]>([])
   const { scrollRef, contentRef, isAtBottom, scrollToBottom } = useStickToBottom({
     initial: 'instant',
@@ -360,12 +362,25 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
     if (!toSend) return
     // If a turn is in flight, queue for later. Drain effect flushes when inFlight drops.
     if (inFlight) {
-      setQueuedMessages((q) => [...q, toSend])
+      setQueuedMessages((q) => [...q, { send: toSend, original: text }])
       return
     }
     lastSentRef.current = snapshot
     await sendMessage(toSend)
+    // Bump usage from the ORIGINAL `text` — slash tokens may not survive template
+    // expansion. Only fires after sendMessage resolves (closest signal we have to
+    // a successful send; sendMessage doesn't throw on failure). Read fn via ref
+    // so we don't add `autocomplete` to deps — its returned object is a fresh
+    // ref each render and would over-fire dependent effects.
+    void bumpUsageRef.current(text)
   }, [draft, attachments, getAssetFilePath, inFlight, state.sessionEnded, sendMessage, autocomplete, chatApi, tabId, taskId, mode, cwd, providerFlagsOverride])
+
+  // Stash bump fn in a ref. `autocomplete` is a fresh object every render
+  // (useAutocomplete returns an object literal), so depending on it in the
+  // drain useEffect would re-fire on every render and risk double-sends
+  // before `inFlight` propagates back from the IPC roundtrip.
+  const bumpUsageRef = useRef(autocomplete.bumpUsageFromMessage)
+  bumpUsageRef.current = autocomplete.bumpUsageFromMessage
 
   // Drain queue: when the active turn finishes, send the next queued message.
   useEffect(() => {
@@ -374,7 +389,10 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
     if (state.sessionEnded) return
     const [next, ...rest] = queuedMessages
     setQueuedMessages(rest)
-    void sendMessage(next)
+    void (async () => {
+      await sendMessage(next.send)
+      void bumpUsageRef.current(next.original)
+    })()
   }, [inFlight, queuedMessages, sendMessage, state.sessionEnded])
 
   // Stop button + Esc shared path. Clears the queue (intentional: queued msgs
@@ -744,7 +762,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
                   <span className="shrink-0 text-muted-foreground/50 font-mono text-[10px] tabular-nums">
                     {i + 1}.
                   </span>
-                  <span className="flex-1 min-w-0 truncate">{msg}</span>
+                  <span className="flex-1 min-w-0 truncate">{msg.send}</span>
                   <button
                     onClick={() =>
                       setQueuedMessages((q) => q.filter((_, idx) => idx !== i))

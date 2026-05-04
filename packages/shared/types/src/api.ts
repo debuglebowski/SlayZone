@@ -632,6 +632,13 @@ export interface ElectronAPI {
     listCommands: (cwd: string) => Promise<CommandInfo[]>
     listAgents: (cwd: string) => Promise<AgentInfo[]>
     listFiles: (cwd: string, query: string, limit?: number) => Promise<FileMatch[]>
+    /**
+     * Per-(source,name) usage map for chat autocomplete tiebreak ranking.
+     * Bumped on successful chat send for each /token resolved to a known item.
+     * Shape: `{ [sourceId]: { [name]: count } }`.
+     */
+    getAutocompleteUsage: () => Promise<Record<string, Record<string, number>>>
+    bumpAutocompleteUsage: (source: string, name: string) => Promise<void>
     onEvent: (callback: (tabId: string, event: AgentEvent, seq: number) => void) => () => void
     onExit: (
       callback: (

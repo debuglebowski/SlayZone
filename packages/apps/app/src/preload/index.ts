@@ -517,6 +517,9 @@ const api: ElectronAPI = {
     listAgents: (cwd: string) => ipcRenderer.invoke('chat:listAgents', cwd),
     listFiles: (cwd: string, query: string, limit?: number) =>
       ipcRenderer.invoke('chat:listFiles', cwd, query, limit),
+    bumpAutocompleteUsage: (source: string, name: string) =>
+      ipcRenderer.invoke('chat:bumpAutocompleteUsage', source, name),
+    getAutocompleteUsage: () => ipcRenderer.invoke('chat:getAutocompleteUsage'),
     onEvent: ((callback: (tabId: string, event: unknown, seq: number) => void) => {
       const handler = (_e: unknown, tabId: string, event: unknown, seq: number) =>
         callback(tabId, event, seq)

@@ -2317,6 +2317,22 @@ const migrations: Migration[] = [
         db.exec(`ALTER TABLE terminal_modes ADD COLUMN headless_command TEXT;`)
       }
     }
+  },
+  {
+    version: 126,
+    up: (db) => {
+      // Per-(source,name) usage counter for chat autocomplete ranking. Bumped
+      // on successful chat send for each /token that resolves to a known item.
+      // Used as fzf-tiebreak so most-used entries float above alphabetical.
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS autocomplete_usage (
+          source TEXT NOT NULL,
+          name   TEXT NOT NULL,
+          count  INTEGER NOT NULL DEFAULT 0,
+          PRIMARY KEY (source, name)
+        )
+      `)
+    }
   }
 ]
 

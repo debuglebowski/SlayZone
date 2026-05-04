@@ -2,8 +2,9 @@
  * Tests for shared rankByName helper.
  * Run with: pnpm exec tsx packages/domains/task-terminals/src/client/chat/autocomplete/ranking.test.ts
  */
-import { rankByName } from './ranking'
+import { rankByName, rankAcrossSources } from './ranking'
 import { transformCommandSubmit } from './sources/commands'
+import type { AutocompleteSource } from './types'
 import type { CommandInfo } from '@slayzone/terminal/shared'
 
 let passed = 0
@@ -80,6 +81,77 @@ test('fuzzy match — non-contiguous chars', () => {
 test('fuzzy match — case-insensitive', () => {
   const out = rankByName(pool, 'CAVE', { getName: (i) => i.name })
   assertEqual(out[0].name, 'caveman')
+})
+
+test('usage tiebreak — higher count beats alphabetical', () => {
+  // fzf scores 'commit' and 'caveman-commit' identically for query 'commit'.
+  // Alphabetical tiebreak normally puts 'caveman-commit' first ('ca' < 'co').
+  // When usage favors 'commit', it should overtake.
+  const usage: Record<string, number> = { commit: 5, 'caveman-commit': 0 }
+  const out = rankByName(pool, 'commit', {
+    getName: (i) => i.name,
+    getUsage: (i) => usage[i.name] ?? 0,
+  })
+  assertEqual(out[0].name, 'commit')
+  assertEqual(out[1].name, 'caveman-commit')
+})
+
+test('usage tiebreak — equal usage falls back to alphabetical', () => {
+  const usage: Record<string, number> = { commit: 3, 'caveman-commit': 3 }
+  const out = rankByName(pool, 'commit', {
+    getName: (i) => i.name,
+    getUsage: (i) => usage[i.name] ?? 0,
+  })
+  assertEqual(out[0].name, 'caveman-commit')
+  assertEqual(out[1].name, 'commit')
+})
+
+test('empty query — usage outranks alphabetical', () => {
+  const usage: Record<string, number> = { commit: 7 }
+  const out = rankByName(pool, '', {
+    getName: (i) => i.name,
+    getUsage: (i) => usage[i.name] ?? 0,
+  })
+  assertEqual(out[0].name, 'commit')
+})
+
+console.log('\nrankAcrossSources — usage tiebreak')
+
+interface NamedItem { name: string }
+
+function makeSource(id: string, items: NamedItem[]): { source: AutocompleteSource; items: unknown[] } {
+  const src: AutocompleteSource<NamedItem> = {
+    id,
+    detect: () => null,
+    fetch: async () => items,
+    filter: (i) => i,
+    getKey: (i) => i.name,
+    render: () => null,
+    accept: () => undefined,
+    getName: (i) => i.name,
+    getDescription: () => '',
+  }
+  return { source: src as AutocompleteSource, items: items as unknown[] }
+}
+
+test('cross-source usage tiebreak applies across source boundaries', () => {
+  const skills = makeSource('skills', [{ name: 'caveman-commit' }, { name: 'commit' }])
+  const out = rankAcrossSources([skills], 'commit', (sourceId, name) => {
+    if (sourceId === 'skills' && name === 'commit') return 10
+    return 0
+  })
+  assertEqual((out[0].item as NamedItem).name, 'commit')
+})
+
+test('cross-source — picks higher usage from one source over another', () => {
+  // Two sources, both contain 'commit'. Usage favors the one in 'commands'.
+  const skills = makeSource('skills', [{ name: 'commit' }])
+  const commands = makeSource('commands', [{ name: 'commit' }])
+  const out = rankAcrossSources([skills, commands], 'commit', (sourceId, name) => {
+    if (sourceId === 'commands' && name === 'commit') return 9
+    return 0
+  })
+  assertEqual(out[0].source.id, 'commands')
 })
 
 console.log('\ntransformCommandSubmit')

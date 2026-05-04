@@ -58,11 +58,13 @@ test('prefix match ranks above substring match', () => {
   if (lastIdx !== -1 && lastIdx < 3) throw new Error('description match ranked above prefix match')
 })
 
-test('substring match (not prefix) ranks below prefix match', () => {
+test('fzf-tied matches fall to alphabetical when no usage', () => {
+  // fzf scores both "commit" and "alpha-commit" identically for query "commit".
+  // With no usage data, alphabetical tiebreak orders them by name asc.
   const pool: SkillInfo[] = [skill('alpha-commit'), skill('commit')]
   const out = filterSkills(pool, 'commit')
-  assertEqual(out[0].name, 'commit')
-  assertEqual(out[1].name, 'alpha-commit')
+  assertEqual(out[0].name, 'alpha-commit')
+  assertEqual(out[1].name, 'commit')
 })
 
 test('description-only match still included but ranked last', () => {

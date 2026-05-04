@@ -28,6 +28,7 @@ import { listSkills } from './skills'
 import { listCommands } from './commands'
 import { listAgents } from './agents-registry'
 import { listProjectFiles } from './files-scan'
+import { bumpAutocompleteUsage, getAutocompleteUsage, type UsageMap } from './autocomplete-usage-store'
 import type { SkillInfo, CommandInfo, AgentInfo, FileMatch } from '../shared/types'
 import type { AgentEvent } from '../shared/agent-events'
 import { rawPermissionModeToChatMode, chatModeToFlags as chatModeToFlagsShared, type ChatMode as ChatModeShared } from '../shared/chat-mode'
@@ -512,6 +513,29 @@ export function registerChatHandlers(ipcMain: IpcMain, db: Database, opts: ChatH
     'chat:listFiles',
     async (_, cwd: string, query: string, limit?: number): Promise<FileMatch[]> => {
       return listProjectFiles(cwd, query, limit ?? 50)
+    }
+  )
+
+  ipcMain.handle(
+    'chat:bumpAutocompleteUsage',
+    (_, source: string, name: string): void => {
+      try {
+        bumpAutocompleteUsage(db, source, name)
+      } catch (err) {
+        console.error('[chat-handlers] bumpAutocompleteUsage failed:', err)
+      }
+    }
+  )
+
+  ipcMain.handle(
+    'chat:getAutocompleteUsage',
+    (): UsageMap => {
+      try {
+        return getAutocompleteUsage(db)
+      } catch (err) {
+        console.error('[chat-handlers] getAutocompleteUsage failed:', err)
+        return {}
+      }
     }
   )
 }
