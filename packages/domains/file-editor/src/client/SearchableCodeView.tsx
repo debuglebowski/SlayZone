@@ -39,8 +39,8 @@ function getLanguageByExt(ext: string | undefined) {
   }
 }
 
-const MATCH_CLASS = 'cm-asset-search-match'
-const MATCH_ACTIVE_CLASS = 'cm-asset-search-match-active'
+const MATCH_CLASS = 'cm-artifact-search-match'
+const MATCH_ACTIVE_CLASS = 'cm-artifact-search-match-active'
 
 interface SearchState {
   query: string

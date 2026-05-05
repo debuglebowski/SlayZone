@@ -194,7 +194,13 @@ function getAvailableExportTypes(mode: RenderMode): string[] {
 }
 
 export function artifactsSubcommand(): Command {
+  // Deprecated alias: `slay tasks assets` still works for one release.
+  if (process.argv[3] === 'assets') {
+    console.error('[deprecated] `slay tasks assets` is deprecated. Use `slay tasks artifacts`. Will be removed next release.')
+  }
+
   const cmd = new Command('artifacts')
+    .alias('assets')
     .description('Manage task artifacts')
     .showSuggestionAfterError(true)
     .showHelpAfterError(true)

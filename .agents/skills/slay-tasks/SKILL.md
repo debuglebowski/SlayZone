@@ -17,7 +17,7 @@ Task commands are the core of the slay CLI. Most commands accept an optional `[i
   - `--project` defaults to `$SLAYZONE_PROJECT_ID`
   - If `--template` is omitted, the project's default template auto-applies (if one exists). Templates set terminal mode, initial status, priority, and provider config
   - `--external-id` enables idempotent creation: if a task with the same `(project, provider, external_id)` exists, prints "Exists" and exits cleanly — useful for sync scripts
-  - Reference assets in descriptions via `[title](asset:<asset-id>)`
+  - Reference artifacts in descriptions via `[title](artifact:<artifact-id>)`
 
 - `slay tasks view [id]` — show task details including status, priority, description, tags, and subtasks.
 

@@ -756,14 +756,14 @@
    the Milkdown preview plugin, and the ReactMarkdown preview renderer.
    Colors come from theme tokens so they follow the active theme.
    ========================================================================== */
-.cm-asset-search-match,
-.asset-search-match {
+.cm-artifact-search-match,
+.artifact-search-match {
   background: var(--color-search-match);
   color: var(--color-search-match-foreground);
   border-radius: 2px;
 }
-.cm-asset-search-match-active,
-.asset-search-match-active {
+.cm-artifact-search-match-active,
+.artifact-search-match-active {
   background: var(--color-search-match-active) !important;
   color: var(--color-search-match-active-foreground) !important;
   outline: 1px solid var(--color-search-match-active);
