@@ -1,4 +1,5 @@
 import { test, expect, seed, resetApp, TEST_PROJECT_PATH } from '../fixtures/electron'
+import type { ElectronApplication } from '@playwright/test'
 import { openTaskTerminal, waitForPtySession } from '../fixtures/terminal'
 
 /**
@@ -8,7 +9,34 @@ import { openTaskTerminal, waitForPtySession } from '../fixtures/terminal'
  *   2. Auto-open the task tab (so TerminalContainer mounts → PTY spawns)
  *   3. Broadcast `tabs:changed` so any other window refreshes
  *   4. Return `{ tab, sessionId }` whose sessionId appears in `/api/pty`
+ *
+ * Note: fetch runs in the *main* process (electronApp.evaluate) — the renderer's
+ * CSP `connect-src 'self'` blocks http://127.0.0.1 fetches from the page.
  */
+
+interface RestResult {
+  status: number
+  body: unknown
+}
+
+async function rest(
+  electronApp: ElectronApplication,
+  port: number,
+  path: string,
+  body: Record<string, unknown>
+): Promise<RestResult> {
+  return electronApp.evaluate(async (_, args) => {
+    const r = await fetch(`http://127.0.0.1:${args.p}${args.url}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(args.b)
+    })
+    let parsed: unknown = null
+    try { parsed = await r.json() } catch { /* may be empty */ }
+    return { status: r.status, body: parsed }
+  }, { p: port, b: body, url: path })
+}
+
 test.describe('Tab create/split via REST', () => {
   let projectAbbrev: string
   let projectId: string
@@ -32,31 +60,19 @@ test.describe('Tab create/split via REST', () => {
     projectAbbrev = p.name.slice(0, 2).toUpperCase()
   })
 
-  test('REST 400 when taskId missing', async ({ mainWindow }) => {
-    const res = await mainWindow.evaluate(async ({ port }) => {
-      const r = await fetch(`http://127.0.0.1:${port}/api/tabs/create`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({})
-      })
-      return { status: r.status }
-    }, { port: mcpPort })
+  test('REST 400 when taskId missing', async ({ electronApp }) => {
+    const res = await rest(electronApp, mcpPort, '/api/tabs/create', {})
     expect(res.status).toBe(400)
   })
 
-  test('REST 404 when task does not exist', async ({ mainWindow }) => {
-    const res = await mainWindow.evaluate(async ({ port }) => {
-      const r = await fetch(`http://127.0.0.1:${port}/api/tabs/create`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ taskId: '00000000-0000-0000-0000-000000000000' })
-      })
-      return { status: r.status }
-    }, { port: mcpPort })
+  test('REST 404 when task does not exist', async ({ electronApp }) => {
+    const res = await rest(electronApp, mcpPort, '/api/tabs/create', {
+      taskId: '00000000-0000-0000-0000-000000000000'
+    })
     expect(res.status).toBe(404)
   })
 
-  test('create inserts tab row + spawns PTY when task is open', async ({ mainWindow }) => {
+  test('create inserts tab row + spawns PTY when task is open', async ({ electronApp, mainWindow }) => {
     const s = seed(mainWindow)
     const task = await s.createTask({ projectId, title: 'Tabs create spawn', status: 'in_progress' })
     await mainWindow.evaluate((id) => window.api.db.updateTask({ id, terminalMode: 'terminal' }), task.id)
@@ -65,25 +81,23 @@ test.describe('Tab create/split via REST', () => {
     // Open task so TerminalContainer is mounted and listens for tabs:changed.
     await openTaskTerminal(mainWindow, { projectAbbrev, taskTitle: 'Tabs create spawn' })
 
-    const result = await mainWindow.evaluate(async ({ taskId, port }) => {
-      const r = await fetch(`http://127.0.0.1:${port}/api/tabs/create`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ taskId, mode: 'terminal', label: 'CLI tab' })
-      })
-      return r.json() as Promise<{ tab: { id: string; label: string; mode: string }; sessionId: string }>
-    }, { taskId: task.id, port: mcpPort })
-
-    expect(result.tab.label).toBe('CLI tab')
-    expect(result.tab.mode).toBe('terminal')
-    expect(result.sessionId).toBe(`${task.id}:${result.tab.id}`)
+    const res = await rest(electronApp, mcpPort, '/api/tabs/create', {
+      taskId: task.id,
+      mode: 'terminal',
+      label: 'CLI tab'
+    })
+    expect(res.status).toBe(200)
+    const body = res.body as { tab: { id: string; label: string; mode: string }; sessionId: string }
+    expect(body.tab.label).toBe('CLI tab')
+    expect(body.tab.mode).toBe('terminal')
+    expect(body.sessionId).toBe(`${task.id}:${body.tab.id}`)
 
     // tabs:changed broadcast → renderer refetches → activeGroupId switches to
     // the new tab → TerminalSplitGroup mounts pane → PTY spawns.
-    await waitForPtySession(mainWindow, result.sessionId)
+    await waitForPtySession(mainWindow, body.sessionId)
   })
 
-  test('split adds pane in same group', async ({ mainWindow }) => {
+  test('split adds pane in same group', async ({ electronApp, mainWindow }) => {
     const s = seed(mainWindow)
     const task = await s.createTask({ projectId, title: 'Tabs split spawn', status: 'in_progress' })
     await mainWindow.evaluate((id) => window.api.db.updateTask({ id, terminalMode: 'terminal' }), task.id)
@@ -92,55 +106,35 @@ test.describe('Tab create/split via REST', () => {
     await openTaskTerminal(mainWindow, { projectAbbrev, taskTitle: 'Tabs split spawn' })
 
     // First create a non-main tab to split off of.
-    const firstResult = await mainWindow.evaluate(async ({ taskId, port }) => {
-      const r = await fetch(`http://127.0.0.1:${port}/api/tabs/create`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ taskId, mode: 'terminal' })
-      })
-      return r.json() as Promise<{ tab: { id: string; groupId: string }; sessionId: string }>
-    }, { taskId: task.id, port: mcpPort })
-
-    await waitForPtySession(mainWindow, firstResult.sessionId)
+    const createRes = await rest(electronApp, mcpPort, '/api/tabs/create', {
+      taskId: task.id,
+      mode: 'terminal'
+    })
+    expect(createRes.status).toBe(200)
+    const createBody = createRes.body as { tab: { id: string; groupId: string }; sessionId: string }
+    await waitForPtySession(mainWindow, createBody.sessionId)
 
     // Split it.
-    const splitResult = await mainWindow.evaluate(async ({ tabId, port }) => {
-      const r = await fetch(`http://127.0.0.1:${port}/api/tabs/split`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tabId })
-      })
-      return r.json() as Promise<{ tab: { id: string; groupId: string }; sessionId: string }>
-    }, { tabId: firstResult.tab.id, port: mcpPort })
+    const splitRes = await rest(electronApp, mcpPort, '/api/tabs/split', { tabId: createBody.tab.id })
+    expect(splitRes.status).toBe(200)
+    const splitBody = splitRes.body as { tab: { id: string; groupId: string }; sessionId: string }
 
     // New pane shares the original tab's group.
-    expect(splitResult.tab.groupId).toBe(firstResult.tab.groupId)
-    expect(splitResult.sessionId).toBe(`${task.id}:${splitResult.tab.id}`)
+    expect(splitBody.tab.groupId).toBe(createBody.tab.groupId)
+    expect(splitBody.sessionId).toBe(`${task.id}:${splitBody.tab.id}`)
 
-    await waitForPtySession(mainWindow, splitResult.sessionId)
+    await waitForPtySession(mainWindow, splitBody.sessionId)
   })
 
-  test('split returns 404 for unknown tab id', async ({ mainWindow }) => {
-    const res = await mainWindow.evaluate(async ({ port }) => {
-      const r = await fetch(`http://127.0.0.1:${port}/api/tabs/split`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tabId: '00000000-0000-0000-0000-000000000000' })
-      })
-      return { status: r.status }
-    }, { port: mcpPort })
+  test('split returns 404 for unknown tab id', async ({ electronApp }) => {
+    const res = await rest(electronApp, mcpPort, '/api/tabs/split', {
+      tabId: '00000000-0000-0000-0000-000000000000'
+    })
     expect(res.status).toBe(404)
   })
 
-  test('split 400 when tabId missing', async ({ mainWindow }) => {
-    const res = await mainWindow.evaluate(async ({ port }) => {
-      const r = await fetch(`http://127.0.0.1:${port}/api/tabs/split`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({})
-      })
-      return { status: r.status }
-    }, { port: mcpPort })
+  test('split 400 when tabId missing', async ({ electronApp }) => {
+    const res = await rest(electronApp, mcpPort, '/api/tabs/split', {})
     expect(res.status).toBe(400)
   })
 })
