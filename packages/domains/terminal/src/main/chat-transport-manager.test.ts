@@ -9,6 +9,7 @@ import { dirname, resolve } from 'node:path'
 import { readFileSync } from 'node:fs'
 import type { ChildProcess } from 'node:child_process'
 import * as mgr from './chat-transport-manager'
+import type { AgentEvent } from '../shared/agent-events'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
@@ -820,6 +821,87 @@ await test('createChat: initialBuffer with completed turn → no synthetic inter
     initialNextSeq: 3,
   })
   expect(events.some((e) => e.kind === 'interrupted')).toBe(false)
+})
+
+await test('permission-request ExitPlanMode → auto-deny on stdin, no broadcast', async () => {
+  await setup()
+  const events: AgentEvent[] = []
+  const fake = makeFakeChild()
+  mgr.setTransportDepsForTests({
+    whichBinary: async () => '/fake/claude',
+    spawn: () => fake as unknown as ChildProcess,
+    broadcastEvent: (_t, e) => events.push(e),
+    broadcastExit: () => {},
+  })
+  await mgr.createChat({
+    tabId: 'tab-exitplan',
+    taskId: 'task-test',
+    mode: 'claude-code',
+    cwd: '/tmp',
+    conversationId: null,
+    providerFlags: [],
+  })
+  // Reset stdin capture so we ignore the spawn-time control_request init.
+  fake._stdinRef.value = ''
+  fake._stdout.write(
+    JSON.stringify({
+      type: 'control_request',
+      request_id: 'cu_exit_1',
+      request: {
+        subtype: 'can_use_tool',
+        tool_name: 'ExitPlanMode',
+        tool_use_id: 'tu_exit_1',
+        input: { plan: 'do stuff' },
+      },
+    }) + '\n'
+  )
+  await new Promise((r) => setImmediate(r))
+  const written = fake._stdinRef.value.trim()
+  expect(written.length > 0).toBeTruthy()
+  const parsed = JSON.parse(written)
+  expect(parsed.type).toBe('control_response')
+  expect(parsed.response.subtype).toBe('success')
+  expect(parsed.response.request_id).toBe('cu_exit_1')
+  expect(parsed.response.response.behavior).toBe('deny')
+  // permission-request must NOT reach renderer — auto-handled at transport
+  expect(events.some((e) => e.kind === 'permission-request')).toBe(false)
+})
+
+await test('permission-request AskUserQuestion → broadcast, no auto-deny', async () => {
+  await setup()
+  const events: AgentEvent[] = []
+  const fake = makeFakeChild()
+  mgr.setTransportDepsForTests({
+    whichBinary: async () => '/fake/claude',
+    spawn: () => fake as unknown as ChildProcess,
+    broadcastEvent: (_t, e) => events.push(e),
+    broadcastExit: () => {},
+  })
+  await mgr.createChat({
+    tabId: 'tab-ask',
+    taskId: 'task-test',
+    mode: 'claude-code',
+    cwd: '/tmp',
+    conversationId: null,
+    providerFlags: [],
+  })
+  fake._stdinRef.value = ''
+  fake._stdout.write(
+    JSON.stringify({
+      type: 'control_request',
+      request_id: 'cu_ask_1',
+      request: {
+        subtype: 'can_use_tool',
+        tool_name: 'AskUserQuestion',
+        tool_use_id: 'tu_ask_1',
+        input: { questions: [] },
+      },
+    }) + '\n'
+  )
+  await new Promise((r) => setImmediate(r))
+  // No transport-level deny — renderer must answer.
+  expect(fake._stdinRef.value).toBe('')
+  expect(events.some((e) => e.kind === 'permission-request')).toBe(true)
 })
 
 console.log(`\n${passed} passed, ${failed} failed`)

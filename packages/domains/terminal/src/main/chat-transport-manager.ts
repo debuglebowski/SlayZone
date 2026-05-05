@@ -533,6 +533,32 @@ export async function createChat(opts: CreateChatOpts): Promise<ChatSessionInfo>
       }
       return
     }
+    // Plan-mode `ExitPlanMode` arrives via stdio permission-prompt because we
+    // pass `--permission-prompt-tool stdio` (claude-code-adapter.ts). The
+    // renderer's footer flow ("Approve & exit plan") is keyed off the SDK's
+    // `result.permissionDenials` — but the SDK only emits that AFTER receiving
+    // a control_response. Without an answer here the SDK blocks indefinitely
+    // and the chat sticks in `inFlight` with a "ExitPlanMode…" indicator.
+    // Auto-deny so the SDK delivers tool_result + result-with-denial; the
+    // existing renderer footer handles user approval (mode flip + re-send).
+    if (
+      ev.kind === 'permission-request' &&
+      ev.toolName === 'ExitPlanMode' &&
+      session.adapter.serializeControlResponse
+    ) {
+      const line = session.adapter.serializeControlResponse({
+        requestId: ev.requestId,
+        response: { behavior: 'deny', message: 'Plan mode requires explicit approval' },
+      })
+      if (line != null) {
+        try {
+          session.child.stdin?.write(line + '\n')
+        } catch {
+          /* best-effort; SDK timeout will surface via process exit */
+        }
+      }
+      return
+    }
     if (ev.kind === 'unknown' && ev.reason === 'unknown-type') {
       // Surface unknown top-level types once, tagged for log filtering.
       const raw = ev.raw as { type?: string } | null
