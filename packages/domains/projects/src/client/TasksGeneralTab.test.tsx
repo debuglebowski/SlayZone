@@ -79,8 +79,8 @@ afterEach(cleanup)
 describe('TasksGeneralTab', () => {
   it('renders two labeled select sections', () => {
     render(<TasksGeneralTab project={makeProject()} onUpdated={vi.fn()} />)
-    expect(screen.getByText('When terminal starts working')).toBeDefined()
-    expect(screen.getByText('When terminal becomes idle')).toBeDefined()
+    expect(screen.getByText('When Agent starts working')).toBeDefined()
+    expect(screen.getByText('When Agent becomes idle')).toBeDefined()
   })
 
   it('shows "Do nothing" as default option in both selects', () => {

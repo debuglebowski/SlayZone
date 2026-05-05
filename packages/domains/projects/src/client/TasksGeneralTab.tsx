@@ -48,11 +48,11 @@ export function TasksGeneralTab({ project, onUpdated }: TasksGeneralTabProps) {
     <div className="w-full space-y-6">
       <SettingsTabIntro
         title="General"
-        description="Configure automatic task behavior based on terminal activity."
+        description="Configure automatic task behavior based on agent activity."
       />
       <form onSubmit={handleSubmit} className="space-y-6">
         <div className="space-y-1">
-          <Label htmlFor="on-terminal-active">When terminal starts working</Label>
+          <Label htmlFor="on-terminal-active">When Agent starts working</Label>
           <Select value={onActive} onValueChange={setOnActive}>
             <SelectTrigger id="on-terminal-active" className="max-w-sm">
               <SelectValue />
@@ -65,12 +65,12 @@ export function TasksGeneralTab({ project, onUpdated }: TasksGeneralTabProps) {
             </SelectContent>
           </Select>
           <p className="text-xs text-muted-foreground">
-            Automatically move a task to this status when its terminal becomes active.
+            Automatically move a task to this status when its agent becomes active.
           </p>
         </div>
 
         <div className="space-y-1">
-          <Label htmlFor="on-terminal-idle">When terminal becomes idle</Label>
+          <Label htmlFor="on-terminal-idle">When Agent becomes idle</Label>
           <Select value={onIdle} onValueChange={setOnIdle}>
             <SelectTrigger id="on-terminal-idle" className="max-w-sm">
               <SelectValue />
@@ -83,7 +83,7 @@ export function TasksGeneralTab({ project, onUpdated }: TasksGeneralTabProps) {
             </SelectContent>
           </Select>
           <p className="text-xs text-muted-foreground">
-            Automatically move a task to this status when its terminal stops and waits for input.
+            Automatically move a task to this status when its agent stops and waits for input.
           </p>
         </div>
 
