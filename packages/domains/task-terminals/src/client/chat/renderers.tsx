@@ -360,27 +360,52 @@ interface ToolProps {
   invocation: ToolInvocation
 }
 
+function extractRawText(raw: unknown): string {
+  if (typeof raw === 'string') return raw
+  if (Array.isArray(raw)) {
+    return (raw as Array<{ text?: string }>).map((c) => c?.text ?? '').join('\n')
+  }
+  return ''
+}
+
 function ToolShell({
+  invocation,
   icon,
   title,
-  status,
   summary,
   children,
   defaultOpen,
 }: {
+  invocation: ToolInvocation
   icon: React.ReactNode
   title: React.ReactNode
-  status: ToolInvocation['status']
   summary?: React.ReactNode
   children?: React.ReactNode
   defaultOpen?: boolean
 }) {
+  const status = invocation.status
   const [open, setOpen] = useState(defaultOpen ?? status === 'error')
   const { collapseSignal } = useChatView()
   useEffect(() => {
     setOpen(false)
   }, [collapseSignal])
-  const canOpen = Boolean(children)
+  // Body fallback chain: per-tool rich children > rawContent text > pending placeholder.
+  // Keeps any tool card non-blank when structured data is missing or absent.
+  const rawText = useMemo(() => extractRawText(invocation.result?.rawContent), [invocation.result])
+  let body: React.ReactNode = children
+  if (!body && rawText) {
+    body = (
+      <pre className="p-3 text-xs font-mono whitespace-pre-wrap max-h-64 overflow-y-auto bg-muted/30 text-muted-foreground">
+        <LinkText text={rawText} />
+      </pre>
+    )
+  }
+  if (!body && status === 'pending') {
+    body = (
+      <div className="px-3 py-2 text-xs text-muted-foreground italic">Waiting for result…</div>
+    )
+  }
+  const canOpen = Boolean(body)
   return (
     <div className="pl-10 pr-[10%] py-1">
       <div className="flex gap-3 items-start">
@@ -407,7 +432,7 @@ function ToolShell({
             </span>
           )}
         </button>
-        {open && canOpen && <div className="border-t border-border/40 bg-background/40">{children}</div>}
+        {open && canOpen && <div className="border-t border-border/40 bg-background/40">{body}</div>}
         </div>
       </div>
     </div>
@@ -437,7 +462,7 @@ export function ToolCallEdit({ invocation }: ToolProps) {
     <ToolShell
       icon={<Pencil className="size-3" />}
       title="Edit"
-      status={invocation.status}
+      invocation={invocation}
       summary={shortenPath(input?.file_path)}
       defaultOpen={fileEditsOpenByDefault}
     >
@@ -467,7 +492,7 @@ export function ToolCallRead({ invocation }: ToolProps) {
     <ToolShell
       icon={<FileText className="size-3" />}
       title="Read"
-      status={invocation.status}
+      invocation={invocation}
       summary={summary}
     >
       {structured?.file?.content && (
@@ -486,7 +511,7 @@ export function ToolCallWrite({ invocation }: ToolProps) {
     <ToolShell
       icon={<FilePlus className="size-3" />}
       title="Write"
-      status={invocation.status}
+      invocation={invocation}
       summary={shortenPath(input?.file_path)}
       defaultOpen={fileEditsOpenByDefault}
     >
@@ -501,18 +526,12 @@ export function ToolCallWrite({ invocation }: ToolProps) {
 
 export function ToolCallBash({ invocation }: ToolProps) {
   const input = invocation.input as { command?: string; description?: string } | null
-  const result = invocation.result?.rawContent
-  const resultText =
-    typeof result === 'string'
-      ? result
-      : Array.isArray(result)
-        ? (result as Array<{ text?: string }>).map((c) => c?.text ?? '').join('\n')
-        : ''
+  const resultText = extractRawText(invocation.result?.rawContent)
   return (
     <ToolShell
       icon={<TerminalIcon className="size-3" />}
       title="Bash"
-      status={invocation.status}
+      invocation={invocation}
       summary={input?.description ?? input?.command}
       defaultOpen
     >
@@ -540,7 +559,7 @@ export function ToolCallGlob({ invocation }: ToolProps) {
     <ToolShell
       icon={<Search className="size-3" />}
       title="Glob"
-      status={invocation.status}
+      invocation={invocation}
       summary={`${input?.pattern ?? ''}${structured ? ` → ${structured.numFiles ?? 0} files` : ''}`}
     >
       {structured?.filenames && (
@@ -567,7 +586,7 @@ export function ToolCallGrep({ invocation }: ToolProps) {
         : ''
   }`
   return (
-    <ToolShell icon={<Search className="size-3" />} title="Grep" status={invocation.status} summary={summary}>
+    <ToolShell icon={<Search className="size-3" />} title="Grep" invocation={invocation} summary={summary}>
       {structured?.content && (
         <pre className="p-3 text-xs font-mono whitespace-pre overflow-x-auto max-h-48 bg-muted/30">
           <LinkText text={structured.content} />
@@ -595,7 +614,7 @@ export function ToolCallTodoWrite({ invocation }: ToolProps) {
     <ToolShell
       icon={<CheckSquare className="size-3" />}
       title="TodoWrite"
-      status={invocation.status}
+      invocation={invocation}
       summary={`${todos.length} todos${inProgress ? ` · ${inProgress.content}` : ''}`}
       defaultOpen
     >
@@ -643,8 +662,14 @@ export function ToolCallAskUserQuestion({ invocation }: ToolProps) {
   const [otherActive, setOtherActive] = useState<Set<number>>(() => new Set())
   const [otherText, setOtherText] = useState<Map<number, string>>(() => new Map())
 
-  const completed = invocation.status !== 'pending' || invocation.result != null
-  const locked = answered || completed
+  // SDK closes AskUserQuestion automatically in non-interactive print mode
+  // (synthetic tool_result + entry in `result.permissionDenials` because no
+  // `--permission-prompt-tool` is wired) — so by the time renderer mounts,
+  // both `invocation.status === 'done'` and `invocation.denied === true`
+  // are already set. Treating either as "locked" hides the buttons before
+  // the user can answer. Lock ONLY on explicit user submit; the user-msg
+  // path (handleSubmit) is what actually carries the answer to Claude.
+  const locked = answered
 
   const pickOption = (qi: number, label: string, multi: boolean): void => {
     if (locked) return
@@ -936,7 +961,7 @@ export function ToolCallGeneric({ invocation }: ToolProps) {
     <ToolShell
       icon={<HelpCircle className="size-3" />}
       title={invocation.name || 'Tool'}
-      status={invocation.status}
+      invocation={invocation}
       summary={inputPreview}
     >
       <div className="p-3 grid gap-2 text-xs font-mono">
