@@ -163,13 +163,13 @@ export function useChatSession(opts: UseChatSessionOpts): UseChatSessionResult {
 
   useEffect(() => {
     let cancelled = false
+    let hydrated = false
+    const liveQueue: Array<{ event: AgentEvent; seq: number }> = []
+    lastSeqRef.current = -1
     setHydrating(true)
     const chat = getChatApi()
 
-    // Subscribe BEFORE create so we don't miss events emitted between
-    // session spawn and the getBufferSince call below.
-    const offEvent = chat.onEvent((tabId, event, seq) => {
-      if (cancelled || tabId !== opts.tabId) return
+    const applyLive = (event: AgentEvent, seq: number): void => {
       if (seq <= lastSeqRef.current) return
       lastSeqRef.current = seq
       dispatch({ type: 'event', event })
@@ -196,6 +196,21 @@ export function useChatSession(opts: UseChatSessionOpts): UseChatSessionResult {
           return next
         })
       }
+    }
+
+    // Subscribe BEFORE create so we don't miss events emitted between
+    // session spawn and the getBufferSince call below. While hydrating,
+    // queue events instead of dispatching — `session-spawn` (and other
+    // events from the fresh subprocess) can race ahead of getBufferSince,
+    // advance lastSeqRef, and make the replay loop's `seq > lastSeqRef`
+    // filter drop the entire historical buffer. Drained after replay.
+    const offEvent = chat.onEvent((tabId, event, seq) => {
+      if (cancelled || tabId !== opts.tabId) return
+      if (!hydrated) {
+        liveQueue.push({ event, seq })
+        return
+      }
+      applyLive(event, seq)
     })
 
     const offExit = chat.onExit((tabId, sessionId, code, signal) => {
@@ -237,7 +252,14 @@ export function useChatSession(opts: UseChatSessionOpts): UseChatSessionResult {
       } catch {
         /* ignore replay failures */
       } finally {
-        if (!cancelled) setHydrating(false)
+        if (!cancelled) {
+          // Drain live events queued during hydration. Dedup via lastSeqRef
+          // so anything already covered by the replay buffer is skipped.
+          hydrated = true
+          for (const { event, seq } of liveQueue) applyLive(event, seq)
+          liveQueue.length = 0
+          setHydrating(false)
+        }
       }
     })()
 
