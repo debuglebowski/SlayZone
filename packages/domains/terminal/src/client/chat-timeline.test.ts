@@ -1017,5 +1017,157 @@ test('bg-shells: reset clears shells', () => {
   expect(s.bgShellOrder.length).toBe(0)
 })
 
+// ---- spawn-token scoping --------------------------------------------------
+
+const spawn = (spawnId: string): AgentEvent => ({ kind: 'session-spawn', spawnId })
+
+test('spawn-token: session-spawn sets currentSpawnId', () => {
+  let s = initialState()
+  expect(s.currentSpawnId).toBe(null)
+  s = reducer(s, { type: 'event', event: spawn('sp-1') })
+  expect(s.currentSpawnId).toBe('sp-1')
+})
+
+test('spawn-token: bg shell tags spawnedInSpawnId at creation', () => {
+  let s = initialState()
+  s = reducer(s, { type: 'event', event: spawn('sp-1') })
+  s = reducer(s, { type: 'event', event: ev.turnInit() })
+  s = reducer(s, {
+    type: 'event',
+    event: bgCall('shell-a', 'Bash', { command: 'pnpm dev', run_in_background: true }),
+  })
+  const shell = s.bgShells.get('shell-a')!
+  expect(shell.spawnedInSpawnId).toBe('sp-1')
+})
+
+test('spawn-token: new session-spawn flips active shells from prior spawn to unknown', () => {
+  let s = initialState()
+  s = reducer(s, { type: 'event', event: spawn('sp-1') })
+  s = reducer(s, { type: 'event', event: ev.turnInit('sid-r') })
+  s = reducer(s, {
+    type: 'event',
+    event: bgCall('shell-a', 'Bash', { command: 'pnpm dev', run_in_background: true }),
+  })
+  s = reducer(s, { type: 'event', event: bgResult('shell-a', '', { shellId: 'bash_1' }) })
+  expect(s.bgShells.get('shell-a')!.status).toBe('running')
+  // App restart simulated: same sessionId (--resume), brand-new spawnId.
+  s = reducer(s, { type: 'event', event: spawn('sp-2') })
+  expect(s.bgShells.get('shell-a')!.status).toBe('unknown')
+  expect(s.currentSpawnId).toBe('sp-2')
+})
+
+test('spawn-token: same spawnId twice does not flip own shells', () => {
+  let s = initialState()
+  s = reducer(s, { type: 'event', event: spawn('sp-1') })
+  s = reducer(s, { type: 'event', event: ev.turnInit() })
+  s = reducer(s, {
+    type: 'event',
+    event: bgCall('shell-a', 'Bash', { command: 'x', run_in_background: true }),
+  })
+  s = reducer(s, { type: 'event', event: bgResult('shell-a', '', { shellId: 'bash_1' }) })
+  // Re-emission of same spawnId (defensive — should be idempotent).
+  s = reducer(s, { type: 'event', event: spawn('sp-1') })
+  expect(s.bgShells.get('shell-a')!.status).toBe('running')
+})
+
+test('spawn-token: terminal-status shells (completed/killed) survive new spawn', () => {
+  let s = initialState()
+  s = reducer(s, { type: 'event', event: spawn('sp-1') })
+  s = reducer(s, { type: 'event', event: ev.turnInit() })
+  s = reducer(s, {
+    type: 'event',
+    event: bgCall('shell-a', 'Bash', { command: 'one-shot', run_in_background: true }),
+  })
+  s = reducer(s, { type: 'event', event: bgResult('shell-a', '', { shellId: 'bash_1' }) })
+  s = reducer(s, { type: 'event', event: bgCall('poll-a', 'BashOutput', { bash_id: 'bash_1' }) })
+  s = reducer(s, {
+    type: 'event',
+    event: bgResult('poll-a', '', { status: 'completed', exitCode: 0 }),
+  })
+  expect(s.bgShells.get('shell-a')!.status).toBe('completed')
+  s = reducer(s, { type: 'event', event: spawn('sp-2') })
+  // Completed history preserved — only active shells flip.
+  expect(s.bgShells.get('shell-a')!.status).toBe('completed')
+})
+
+test('spawn-token: legacy shells (no spawnedInSpawnId) flip on first session-spawn', () => {
+  // Migration scenario: user upgrades to a build that emits session-spawn,
+  // but persisted history was recorded by a prior build that did not. On first
+  // new spawn, the legacy active shells (spawnedInSpawnId=null) are stale by
+  // construction — the prior subprocess is dead.
+  let s = initialState()
+  s = reducer(s, { type: 'event', event: ev.turnInit() })
+  s = reducer(s, {
+    type: 'event',
+    event: bgCall('legacy-a', 'Bash', { command: 'old', run_in_background: true }),
+  })
+  s = reducer(s, { type: 'event', event: bgResult('legacy-a', '', { shellId: 'bash_legacy' }) })
+  expect(s.bgShells.get('legacy-a')!.spawnedInSpawnId).toBe(null)
+  s = reducer(s, { type: 'event', event: spawn('sp-new') })
+  expect(s.bgShells.get('legacy-a')!.status).toBe('unknown')
+})
+
+test('spawn-token: process-exit (agent event) flips active shells to unknown', () => {
+  let s = initialState()
+  s = reducer(s, { type: 'event', event: spawn('sp-1') })
+  s = reducer(s, { type: 'event', event: ev.turnInit('sid-x') })
+  s = reducer(s, {
+    type: 'event',
+    event: bgCall('shell-a', 'Bash', { command: 'long', run_in_background: true }),
+  })
+  s = reducer(s, { type: 'event', event: bgResult('shell-a', '', { shellId: 'bash_1' }) })
+  s = reducer(s, {
+    type: 'event',
+    event: { kind: 'process-exit', code: 0, signal: null },
+  })
+  expect(s.bgShells.get('shell-a')!.status).toBe('unknown')
+})
+
+test('spawn-token: process-exit (live IPC action) flips active shells when sessionId matches', () => {
+  let s = initialState()
+  s = reducer(s, { type: 'event', event: spawn('sp-1') })
+  s = reducer(s, { type: 'event', event: ev.turnInit('sid-live') })
+  s = reducer(s, {
+    type: 'event',
+    event: bgCall('shell-a', 'Bash', { command: 'long', run_in_background: true }),
+  })
+  s = reducer(s, { type: 'event', event: bgResult('shell-a', '', { shellId: 'bash_1' }) })
+  s = reducer(s, { type: 'process-exit', sessionId: 'sid-live', code: 0, signal: null })
+  expect(s.sessionEnded).toBe(true)
+  expect(s.bgShells.get('shell-a')!.status).toBe('unknown')
+})
+
+test('spawn-token: stale process-exit (mismatched sessionId) does NOT flip shells', () => {
+  let s = initialState()
+  s = reducer(s, { type: 'event', event: spawn('sp-1') })
+  s = reducer(s, { type: 'event', event: ev.turnInit('sid-current') })
+  s = reducer(s, {
+    type: 'event',
+    event: bgCall('shell-a', 'Bash', { command: 'long', run_in_background: true }),
+  })
+  s = reducer(s, { type: 'event', event: bgResult('shell-a', '', { shellId: 'bash_1' }) })
+  s = reducer(s, { type: 'process-exit', sessionId: 'sid-old', code: 137, signal: 'SIGKILL' })
+  // Stale exit is dropped → sessionEnded stays false → shells stay running.
+  expect(s.sessionEnded).toBe(false)
+  expect(s.bgShells.get('shell-a')!.status).toBe('running')
+})
+
+test('spawn-token: replay determinism across spawn-token boundary', () => {
+  // Simulates app restart: persisted history contains old spawn + old shell,
+  // then new spawn appended. Replay must converge on the same final state.
+  const events: AgentEvent[] = [
+    spawn('sp-old'),
+    ev.turnInit('sid-resume'),
+    bgCall('shell-a', 'Bash', { command: 'pnpm dev', run_in_background: true }),
+    bgResult('shell-a', '', { shellId: 'bash_1' }),
+    spawn('sp-new'),
+    ev.turnInit('sid-resume'),
+  ]
+  let s = initialState()
+  for (const e of events) s = reducer(s, { type: 'event', event: e })
+  expect(s.bgShells.get('shell-a')!.status).toBe('unknown')
+  expect(s.currentSpawnId).toBe('sp-new')
+})
+
 console.log(`\n${passed} passed, ${failed} failed`)
 process.exit(failed > 0 ? 1 : 0)

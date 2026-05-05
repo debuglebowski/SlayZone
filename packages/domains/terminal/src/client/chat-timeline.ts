@@ -103,6 +103,15 @@ export interface BgShell {
   /** Most recent stdout/stderr chunks observed via BashOutput. Truncated by caller if large. */
   latestStdout: string
   latestStderr: string
+  /**
+   * Opaque `spawnId` of the OS subprocess that owned this bg shell at spawn
+   * time, or null when the spawning process never emitted a `session-spawn`
+   * (legacy persisted history before the spawn-token landed). On any new
+   * `session-spawn` with a different id, active shells from prior spawnIds
+   * are flipped to 'unknown' — bg shells are children of the OS process, so
+   * they cannot outlive it.
+   */
+  spawnedInSpawnId: string | null
 }
 
 export interface ChatTimelineState {
@@ -161,6 +170,14 @@ export interface ChatTimelineState {
    * when the result payload has no explicit status field.
    */
   bgShellPollIndex: Map<string, { spawnToolUseId: string; kind: 'output' | 'kill' }>
+  /**
+   * Opaque id of the most recent OS subprocess that emitted a `session-spawn`
+   * event. Used to scope bg shells to the lifetime of the spawning OS process
+   * — bg shells inherit this id at creation; a new `session-spawn` with a
+   * different id invalidates any active shells from prior spawns. Null until
+   * the first `session-spawn` arrives (legacy buffers without the event).
+   */
+  currentSpawnId: string | null
 }
 
 export function initialState(): ChatTimelineState {
@@ -185,6 +202,7 @@ export function initialState(): ChatTimelineState {
     bgShells: new Map(),
     bgShellOrder: [],
     bgShellPollIndex: new Map(),
+    currentSpawnId: null,
   }
 }
 
@@ -204,6 +222,13 @@ export function reducer(state: ChatTimelineState, action: Action): ChatTimelineS
   // focused on rendering and bg-shell logic stays in one place.
   if (action.type === 'event') {
     return applyBgShellEvent(next, action.event)
+  }
+  if (action.type === 'process-exit') {
+    // Live `chat:exit` IPC path. Mirrors the agent-event path so bg shells
+    // flip to 'unknown' immediately on subprocess exit even when the
+    // persisted `process-exit` event hasn't replayed yet (e.g. live session).
+    if (next.sessionEnded) return invalidateActiveShells(next)
+    return next
   }
   if (action.type === 'reset') {
     // initialState already cleared bg-shells; nothing more to do.
@@ -833,6 +858,10 @@ function applyEvent(state: ChatTimelineState, event: AgentEvent): ChatTimelineSt
       // `respondPermission`. No timeline item materialized — the originating
       // tool_use already has its own card via the assistant stream.
       return state
+    case 'session-spawn':
+      // Bg-shell scoping bookkeeping (handled by applyBgShellEvent post-pass).
+      // No timeline item — this is process-lifecycle metadata, not chat content.
+      return { ...state, currentSpawnId: event.spawnId }
   }
 }
 
@@ -1037,7 +1066,64 @@ function setBgShell(state: ChatTimelineState, shell: BgShell): ChatTimelineState
 function applyBgShellEvent(state: ChatTimelineState, event: AgentEvent): ChatTimelineState {
   if (event.kind === 'tool-call') return applyBgShellToolCall(state, event)
   if (event.kind === 'tool-result') return applyBgShellToolResult(state, event)
+  if (event.kind === 'session-spawn') return invalidateForeignSpawnShells(state, event.spawnId)
+  if (event.kind === 'process-exit') return invalidateActiveShells(state)
   return state
+}
+
+const ACTIVE_BG_STATUSES: ReadonlySet<BgShellStatus> = new Set(['pending', 'running'])
+
+/**
+ * On a fresh `session-spawn`, flip any active (`pending`/`running`) bg shells
+ * whose `spawnedInSpawnId` differs from the new id to `'unknown'`. Bg shells
+ * are children of the OS process, so a new spawn implies the prior process
+ * (and its shells) are dead. Handles app-restart, force-quit, and resume —
+ * all of which produce a new spawn even when `sessionId` is preserved.
+ */
+function invalidateForeignSpawnShells(
+  state: ChatTimelineState,
+  newSpawnId: string,
+): ChatTimelineState {
+  let mutated = false
+  const next = new Map(state.bgShells)
+  for (const [id, shell] of state.bgShells) {
+    if (!ACTIVE_BG_STATUSES.has(shell.status)) continue
+    if (shell.spawnedInSpawnId === newSpawnId) continue
+    next.set(id, { ...shell, status: 'unknown' })
+    mutated = true
+  }
+  if (!mutated) return state
+  const evicted = evictTerminalShells(next, state.bgShellOrder, state.bgShellPollIndex)
+  return {
+    ...state,
+    bgShells: evicted.shells,
+    bgShellOrder: evicted.order,
+    bgShellPollIndex: evicted.pollIndex,
+  }
+}
+
+/**
+ * On `process-exit` for the current subprocess, flip any active bg shells to
+ * `'unknown'`. The OS reaped them with the parent — they are no longer
+ * running. Complements `invalidateForeignSpawnShells` for the in-session
+ * graceful-exit case (no follow-up spawn until the user reopens the chat).
+ */
+function invalidateActiveShells(state: ChatTimelineState): ChatTimelineState {
+  let mutated = false
+  const next = new Map(state.bgShells)
+  for (const [id, shell] of state.bgShells) {
+    if (!ACTIVE_BG_STATUSES.has(shell.status)) continue
+    next.set(id, { ...shell, status: 'unknown' })
+    mutated = true
+  }
+  if (!mutated) return state
+  const evicted = evictTerminalShells(next, state.bgShellOrder, state.bgShellPollIndex)
+  return {
+    ...state,
+    bgShells: evicted.shells,
+    bgShellOrder: evicted.order,
+    bgShellPollIndex: evicted.pollIndex,
+  }
 }
 
 function applyBgShellToolCall(state: ChatTimelineState, event: ToolCallEvent): ChatTimelineState {
@@ -1056,6 +1142,7 @@ function applyBgShellToolCall(state: ChatTimelineState, event: ToolCallEvent): C
       lastPolledAt: null,
       latestStdout: '',
       latestStderr: '',
+      spawnedInSpawnId: state.currentSpawnId,
     }
     return setBgShell(state, shell)
   }

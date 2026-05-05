@@ -31,6 +31,7 @@ export type AgentEvent =
   | StreamMessageStopEvent
   | ControlResponseEvent
   | PermissionRequestEvent
+  | SessionSpawnEvent
 
 /**
  * Streaming events from Claude Code's `--verbose` stream-json output.
@@ -273,4 +274,21 @@ export interface PermissionRequestEvent {
   toolUseId: string
   input: unknown
   permissionSuggestions?: unknown
+}
+
+/**
+ * Synthetic event emitted by the transport whenever a fresh OS subprocess is
+ * spawned for a chat tab. Carries an opaque `spawnId` (uuid per OS process)
+ * that scopes child resources — bg shells especially — to the lifetime of the
+ * spawning subprocess. Persisted into the event log as the FIRST event of each
+ * subprocess's contribution so replay rebuilds the same scoping.
+ *
+ * Why a separate token from `turn-init.sessionId`: --resume keeps the same
+ * Claude session id across kill+respawn cycles, but bg shells are children of
+ * the OS process and die with it. spawnId tracks OS-process identity, which
+ * is the actual lifetime of process-children resources.
+ */
+export interface SessionSpawnEvent {
+  kind: 'session-spawn'
+  spawnId: string
 }

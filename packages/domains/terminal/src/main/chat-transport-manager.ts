@@ -129,6 +129,13 @@ interface PendingControl {
 
 interface Session {
   sessionId: string
+  /**
+   * Opaque identifier for this OS subprocess instance. Distinct from
+   * `sessionId` (Claude SDK conversation id, which --resume preserves across
+   * kill+respawn). Emitted as the first event of each spawn so the renderer
+   * can scope process-children resources (bg shells) to the spawning process.
+   */
+  spawnId: string
   tabId: string
   /** Parent task id — used to key `pty:state-change` broadcasts matching the main terminal sessionId format `${taskId}:${tabId}`. */
   taskId: string
@@ -419,6 +426,7 @@ export async function createChat(opts: CreateChatOpts): Promise<ChatSessionInfo>
 
   const session: Session = {
     sessionId,
+    spawnId: randomUUID(),
     tabId: opts.tabId,
     taskId: opts.taskId,
     mode: opts.mode,
@@ -452,7 +460,14 @@ export async function createChat(opts: CreateChatOpts): Promise<ChatSessionInfo>
   // because handleEvent only transitions on user-message/turn-init/tool-call/
   // result/process-exit. The subprocess being alive is the canonical "ready"
   // signal — independent of what events the agent chooses to emit.
+  //
+  // Also emits a synthetic `session-spawn` event as the FIRST event of this
+  // subprocess's contribution so the renderer reducer can invalidate stale
+  // process-children resources (bg shells) from any prior subprocess on the
+  // same tab. Persisted alongside other events so replay rebuilds the same
+  // scoping deterministically.
   child.on('spawn', () => {
+    handleEvent(session, { kind: 'session-spawn', spawnId: session.spawnId })
     if (session.terminalState === 'starting') {
       transitionState(session, 'idle')
     }
