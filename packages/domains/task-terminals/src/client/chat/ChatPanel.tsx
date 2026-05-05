@@ -757,16 +757,16 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
         <ContextMenuTrigger asChild>
       <div className="relative flex-1 min-h-0">
         <div ref={scrollRef} className="h-full overflow-y-auto pt-4">
-          <div className={cn('mx-auto w-full', widthClass)}>
-            {hydrating ? (
-              <HydratingState />
-            ) : isEmpty && !inFlight ? (
-              <EmptyState
-                onPick={(text) => {
-                  void sendMessage(text)
-                }}
-              />
-            ) : (
+          {hydrating ? (
+            <HydratingState />
+          ) : isEmpty && !inFlight ? (
+            <EmptyState
+              onPick={(text) => {
+                void sendMessage(text)
+              }}
+            />
+          ) : (
+            <div className={cn('mx-auto w-full', widthClass)}>
               <div ref={contentRef}>
                 {hiddenCount > 0 && (
                   <div className="flex justify-center py-2">
@@ -790,9 +790,9 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
                   )
                 })}
               </div>
-            )}
-            {inFlight && <TypingIndicator label={deriveLoadingLabel(state)} />}
-          </div>
+              {inFlight && <TypingIndicator label={deriveLoadingLabel(state)} />}
+            </div>
+          )}
         </div>
 
         {/* Jump-to-latest button */}
