@@ -334,7 +334,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
       fileEditsOpenByDefault: appearance.chatFileEditsOpenByDefault,
       showMessageMeta: appearance.chatShowMessageMeta,
       search: { query: search.query, caseSensitive: search.caseSensitive },
-      setChatMode: (next: typeof chatMode) => { void handleModeChange(next) },
+      setChatMode: handleModeChange,
       timeline,
       childIndex: state.childIndex,
       onOpenUrl,
@@ -531,7 +531,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
         e.preventDefault()
         if (inFlight) return
         const next = nextAgentMode(chatMode, autoCapability.optedIn)
-        void handleModeChange(next)
+        handleModeChange(next).catch(() => { /* toast already shown by hook */ })
       }
       // Esc stops the in-flight turn — Claude CLI parity. Defers to autocomplete
       // (which uses Esc to close itself). No-op when nothing is in flight.
@@ -986,7 +986,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
         <div className="flex items-center gap-3 mt-1.5 px-1 text-[10px] text-muted-foreground/60">
           <AgentModePill
             mode={chatMode}
-            onChange={(next) => { void handleModeChange(next) }}
+            onChange={(next) => { handleModeChange(next).catch(() => { /* toast already shown by hook */ }) }}
             disabled={modeChanging || inFlight}
             compact
             variant="text"

@@ -31,7 +31,7 @@ export interface ChatViewState {
    * `setChatMode('auto-accept')`, which kills + respawns the subprocess with
    * the new flag.
    */
-  setChatMode?: (next: AgentMode) => void
+  setChatMode?: (next: AgentMode) => Promise<void>
   /**
    * Full flat timeline + parent→children index, exposed so SubAgentRow can
    * render the items emitted while it ran (parentToolUseId === toolUseId).

@@ -598,7 +598,7 @@ export function ToolCallExitPlanMode({ invocation }: ToolProps) {
   const input = invocation.input as { plan?: string } | null
   const plan = input?.plan ?? ''
   const denied = invocation.denied === true
-  const { setChatMode } = useChatView()
+  const { setChatMode, sendMessage } = useChatView()
   return (
     <div className="px-4 py-3">
       <div className="flex gap-3 items-start">
@@ -624,7 +624,14 @@ export function ToolCallExitPlanMode({ invocation }: ToolProps) {
               </span>
               {setChatMode && (
                 <button
-                  onClick={() => setChatMode('auto-accept')}
+                  onClick={async () => {
+                    try {
+                      await setChatMode('auto-accept')
+                    } catch {
+                      return
+                    }
+                    sendMessage?.('Approved')
+                  }}
                   className="shrink-0 rounded-md border border-amber-500/40 bg-amber-500/20 hover:bg-amber-500/30 px-2 py-1 font-medium text-amber-900 dark:text-amber-200 transition-colors"
                 >
                   Approve & exit plan

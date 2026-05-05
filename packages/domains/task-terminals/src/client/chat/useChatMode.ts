@@ -120,6 +120,10 @@ export function useChatMode({ taskId, mode, tabId, cwd, livePermissionMode }: Us
     } catch (err) {
       toast(`Mode change failed: ${err instanceof Error ? err.message : String(err)}`)
       // No state change on failure — chatMode stays at previous confirmed value.
+      // Re-throw so callers awaiting the mode change can branch on success
+      // (e.g. ExitPlanMode "Approve & exit" sends "Approved" only if the mode
+      // actually flipped).
+      throw err
     } finally {
       setModeChanging(false)
     }
