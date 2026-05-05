@@ -83,15 +83,30 @@ export function registerTaskHandlers(ipcMain: IpcMain, db: Database, onMutation?
     console.log(`Purged ${stale.length} soft-deleted task(s)`)
   }
 
-  // Purge orphaned temporary tasks (untouched for >24h — likely left behind by a
-  // crash/unclean shutdown). Renderer's tab-list-based cleanup is unreliable
-  // because tab persistence is debounced and may lose recent changes on quit.
-  const staleTemp = db.prepare(
+  // Purge orphaned temporary tasks (untouched for >24h AND not present in the
+  // persisted tab list). PTY activity does not bump tasks.updated_at, so the
+  // time gate alone purges actively-used scratch terminals after a quit/restart
+  // (notably auto-update). Cross-checking viewState protects open temp tasks
+  // even when their updated_at is stale; the 24h gate still catches true
+  // orphans (crash leaks, tabs closed without renderer cleanup).
+  const openTaskIds = new Set<string>()
+  try {
+    const row = db.prepare(`SELECT value FROM settings WHERE key = 'viewState'`).get() as { value: string } | undefined
+    if (row?.value) {
+      const parsed = JSON.parse(row.value) as { tabs?: Array<{ type?: string; taskId?: string }> }
+      for (const tab of parsed.tabs ?? []) {
+        if (tab?.type === 'task' && typeof tab.taskId === 'string') openTaskIds.add(tab.taskId)
+      }
+    }
+  } catch (err) {
+    console.warn('[task] Failed to read viewState for temp-task cleanup; falling back to time-only purge:', err)
+  }
+  const staleTemp = (db.prepare(
     `SELECT id FROM tasks
      WHERE is_temporary = 1
        AND deleted_at IS NULL
        AND updated_at < datetime('now', '-24 hours')`
-  ).all() as { id: string }[]
+  ).all() as { id: string }[]).filter(({ id }) => !openTaskIds.has(id))
   void (async () => {
     for (const { id } of staleTemp) {
       await cleanupTaskFull(db, id)
