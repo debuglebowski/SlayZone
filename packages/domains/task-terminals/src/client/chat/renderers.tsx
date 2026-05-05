@@ -819,7 +819,7 @@ export function ToolCallAskUserQuestion({ invocation }: ToolProps) {
               <span className="flex-1 min-w-0 truncate normal-case font-normal text-indigo-700/80 dark:text-indigo-300/80">
                 {locked && submittedText
                   ? submittedText.split('\n')[0]
-                  : (questions[0]?.header || questions[0]?.question || '')}
+                  : (questions[0]?.question || '')}
               </span>
             )}
             <span className="ml-auto shrink-0">
@@ -834,11 +834,6 @@ export function ToolCallAskUserQuestion({ invocation }: ToolProps) {
             const isOther = otherActive.has(qi)
             return (
               <div key={qi} className={cn('px-3 py-2', qi > 0 && 'border-t border-indigo-500/10')}>
-                {q.header && (
-                  <div className="mb-1 inline-block rounded-md bg-indigo-500/15 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-indigo-700 dark:text-indigo-300">
-                    {q.header}
-                  </div>
-                )}
                 <div className="text-sm font-medium text-foreground mb-2">{q.question}</div>
                 <div className="grid gap-1.5">
                   {q.options.map((opt) => {
