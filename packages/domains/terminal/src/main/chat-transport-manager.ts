@@ -485,6 +485,17 @@ export async function createChat(opts: CreateChatOpts): Promise<ChatSessionInfo>
   }
   sessions.set(opts.tabId, session)
 
+  // Restored history with an unfinished turn → emit synthetic `interrupted` so
+  // the renderer reducer rebalances userMessagesSent/resultCount. Otherwise the
+  // tab badge (idle, freshly spawned) and the chat panel's inFlight (true,
+  // counting stale persisted user-messages without matching results) drift
+  // apart. `interrupted` is not a state-transition trigger in handleEvent, so
+  // emitting it here keeps `terminalState='starting'` until the spawn handler
+  // moves it to idle.
+  if (tailIsUnfinishedTurn(seededBuffer)) {
+    handleEvent(session, { kind: 'interrupted' })
+  }
+
   // --- spawn: subprocess confirmed alive ---
   // Tie state machine to actual OS process lifecycle. `'spawn'` fires after the
   // kernel has the pid; before any agent event arrives. Without this, sessions
@@ -752,6 +763,33 @@ export function popLastUserMessage(tabId: string): { popped: boolean; text: stri
   if (userText === null) return { popped: false, text: null }
   handleEvent(session, { kind: 'user-message-popped', text: userText })
   return { popped: true, text: userText }
+}
+
+/**
+ * Scan a seeded buffer's tail to detect an unfinished turn — the last
+ * stateful event is a turn-starter (user-message/turn-init/tool-call) with
+ * no subsequent terminal marker (result/process-exit/interrupted/
+ * user-message-popped). Used by createChat to keep the renderer's
+ * userMessagesSent/resultCount balance honest after a restore: without a
+ * synthetic interrupted, inFlight would stay true forever even though the
+ * fresh subprocess (post --resume) sits idle waiting for input.
+ */
+function tailIsUnfinishedTurn(buffer: BufferedEvent[]): boolean {
+  for (let i = buffer.length - 1; i >= 0; i--) {
+    const k = buffer[i].event.kind
+    if (
+      k === 'result' ||
+      k === 'process-exit' ||
+      k === 'interrupted' ||
+      k === 'user-message-popped'
+    ) {
+      return false
+    }
+    if (k === 'user-message' || k === 'turn-init' || k === 'tool-call') {
+      return true
+    }
+  }
+  return false
 }
 
 function isProgressEventKind(kind: AgentEvent['kind']): boolean {

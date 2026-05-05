@@ -720,5 +720,107 @@ await test('onStateChange: fires alongside broadcastStateChange so global listen
   expect(globalNotices.some((g) => g.next === 'idle' && g.old === 'running')).toBeTruthy()
 })
 
+await test('createChat: initialBuffer with unfinished turn → emits synthetic interrupted', async () => {
+  await setup()
+  const fake = makeFakeChild()
+  const events: Array<{ tabId: string; kind: string; seq: number }> = []
+  mgr.setTransportDepsForTests({
+    whichBinary: async () => '/fake/claude',
+    spawn: () => fake as unknown as ChildProcess,
+    broadcastEvent: (tabId, event, seq) => events.push({ tabId, kind: event.kind, seq }),
+    broadcastExit: () => {},
+    broadcastStateChange: () => {},
+  })
+  // Seed: turn-init + user-message, NO result. Mid-turn crash scenario.
+  const seeded: mgr.BufferedEvent[] = [
+    {
+      seq: 0,
+      event: {
+        kind: 'turn-init',
+        sessionId: 'old',
+        model: 'sonnet',
+        cwd: '/tmp',
+        tools: [],
+      },
+    },
+    { seq: 1, event: { kind: 'user-message', text: 'hello' } },
+  ]
+  await mgr.createChat({
+    tabId: 'tab-restore-mid',
+    taskId: 'task-restore',
+    mode: 'claude-code',
+    cwd: '/tmp',
+    conversationId: 'old-session',
+    providerFlags: [],
+    initialBuffer: seeded,
+    initialNextSeq: 2,
+  })
+  // Synthetic interrupted should appear at seq 2, before any spawn event.
+  const interrupted = events.find((e) => e.kind === 'interrupted')
+  expect(interrupted !== undefined).toBeTruthy()
+  expect(interrupted!.tabId).toBe('tab-restore-mid')
+  expect(interrupted!.seq).toBe(2)
+})
+
+await test('createChat: initialBuffer with completed turn → no synthetic interrupted', async () => {
+  await setup()
+  const fake = makeFakeChild()
+  const events: Array<{ kind: string }> = []
+  mgr.setTransportDepsForTests({
+    whichBinary: async () => '/fake/claude',
+    spawn: () => fake as unknown as ChildProcess,
+    broadcastEvent: (_tabId, event) => events.push({ kind: event.kind }),
+    broadcastExit: () => {},
+    broadcastStateChange: () => {},
+  })
+  const seeded: mgr.BufferedEvent[] = [
+    {
+      seq: 0,
+      event: {
+        kind: 'turn-init',
+        sessionId: 'old',
+        model: 'sonnet',
+        cwd: '/tmp',
+        tools: [],
+      },
+    },
+    { seq: 1, event: { kind: 'user-message', text: 'hi' } },
+    {
+      seq: 2,
+      event: {
+        kind: 'result',
+        subtype: 'success',
+        isError: false,
+        durationMs: 0,
+        durationApiMs: 0,
+        numTurns: 1,
+        totalCostUsd: 0,
+        stopReason: null,
+        terminalReason: null,
+        text: null,
+        modelUsage: {},
+        usage: {
+          inputTokens: 0,
+          outputTokens: 0,
+          cacheReadInputTokens: 0,
+          cacheCreationInputTokens: 0,
+        },
+        permissionDenials: [],
+      },
+    },
+  ]
+  await mgr.createChat({
+    tabId: 'tab-restore-clean',
+    taskId: 'task-restore',
+    mode: 'claude-code',
+    cwd: '/tmp',
+    conversationId: 'old-session',
+    providerFlags: [],
+    initialBuffer: seeded,
+    initialNextSeq: 3,
+  })
+  expect(events.some((e) => e.kind === 'interrupted')).toBe(false)
+})
+
 console.log(`\n${passed} passed, ${failed} failed`)
 process.exit(failed > 0 ? 1 : 0)
