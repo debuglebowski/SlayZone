@@ -739,6 +739,11 @@ function createMainWindow(): void {
       event.preventDefault()
       mainWindow?.webContents.send('app:toggle-agent-panel')
     }
+
+    if (matchesElectronInput(ei, getEffectiveKeys('agent-status-panel', currentOverrides))) {
+      event.preventDefault()
+      mainWindow?.webContents.send('app:toggle-agent-status-panel')
+    }
   })
 
   // HMR for renderer base on electron-vite cli.

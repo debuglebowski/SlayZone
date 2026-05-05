@@ -133,6 +133,17 @@ export interface SessionInfo {
   kind: 'pty' | 'chat'
 }
 
+/** Snapshot of one live chat session (transport: streaming JSON to subprocess). */
+export interface ChatSessionStateEntry {
+  /** Broadcast format `${taskId}:${tabId}`. */
+  sessionId: string
+  taskId: string
+  mode: TerminalMode
+  /** Last event flow timestamp (ms). Same semantics as PtyInfo.lastOutputTime. */
+  lastOutputTime: number
+  state: TerminalState
+}
+
 // Buffer chunk with sequence number for ordering
 export interface BufferChunk {
   seq: number

@@ -52,6 +52,7 @@ interface AppSidebarProps {
   onTaskClick?: (taskId: string) => void
   zenMode?: boolean
   onboardingChecklist: OnboardingChecklistState
+  idleByProject?: Map<string, number>
   onReorderProjects: (projectIds: string[]) => void
 }
 
@@ -204,6 +205,7 @@ export function AppSidebar({
   onTaskClick,
   zenMode,
   onboardingChecklist,
+  idleByProject,
   onReorderProjects,
 }: AppSidebarProps) {
   const [shortcutsOpen, setShortcutsOpen] = useState(false)
@@ -323,6 +325,7 @@ export function AppSidebar({
                         onClick={() => onSelectProject(project.id)}
                         onSettings={() => onProjectSettings(project)}
                         onDelete={() => useDialogStore.getState().openDeleteProject(project)}
+                        idleCount={idleByProject?.get(project.id) ?? 0}
                       />
                     </SidebarMenuItem>
                   ))}

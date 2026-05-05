@@ -52,6 +52,15 @@ import { useChangelogAutoOpen } from '@/components/changelog/useChangelogAutoOpe
 import { useStaleSkillCount } from '@slayzone/ai-config/client'
 import { TabBar } from '@/components/tabs/TabBar'
 import { AgentPanelButton, AgentSidePanel, AGENT_PANEL_MIN_WIDTH, AGENT_PANEL_MAX_WIDTH, useAgentPanelState, DEFAULT_AGENT_PANEL_WIDTH } from '@/components/agent-panel'
+import {
+  AgentStatusButton,
+  AgentStatusSidePanel,
+  AGENT_STATUS_PANEL_MIN_WIDTH,
+  AGENT_STATUS_PANEL_MAX_WIDTH,
+  useIdleTasks,
+  useAgentStatusState,
+  DEFAULT_AGENT_STATUS_PANEL_WIDTH
+} from '@/components/agent-status'
 import { UsagePopover } from '@/components/usage/UsagePopover'
 import { BoostPill } from '@/components/usage/BoostPill'
 import { useUsage } from '@/components/usage/useUsage'
@@ -296,9 +305,10 @@ function App(): React.JSX.Element {
     }
   }, [onboardingOpen])
 
-  // Usage & agent panel state
+  // Usage, agent panel & agent-status panel state
   const { data: usageData, refresh: refreshUsage } = useUsage()
   const [agentPanelState, setAgentPanelState] = useAgentPanelState()
+  const [agentStatusState, setAgentStatusState] = useAgentStatusState()
   const [isSidePanelResizing, setIsSidePanelResizing] = useState(false)
   const agentPanelMountedRef = useRef(false)
   if (agentPanelState.isOpen) agentPanelMountedRef.current = true
@@ -309,6 +319,34 @@ function App(): React.JSX.Element {
       if (m) setAgentPanelState({ mode: m })
     })
   }, [agentPanelState.mode, setAgentPanelState])
+  const { idleTasks: rawIdleTasks } = useIdleTasks(tasks, null)
+  const [dismissedIdle, setDismissedIdle] = useState<Map<string, number>>(new Map())
+  const handleDismissIdle = useCallback((sessionId: string) => {
+    setDismissedIdle((prev) => {
+      const next = new Map(prev)
+      next.set(sessionId, Date.now())
+      return next
+    })
+  }, [])
+  const allIdleTasks = useMemo(
+    () => rawIdleTasks.filter((t) => {
+      const at = dismissedIdle.get(t.sessionId)
+      return at === undefined || t.lastOutputTime > at
+    }),
+    [rawIdleTasks, dismissedIdle]
+  )
+  const idleTasks = useMemo(
+    () => agentStatusState.filterCurrentProject
+      ? allIdleTasks.filter((t) => t.task.project_id === selectedProjectId)
+      : allIdleTasks,
+    [allIdleTasks, agentStatusState.filterCurrentProject, selectedProjectId]
+  )
+  const idleByProject = useMemo(() => {
+    const m = new Map<string, number>()
+    for (const t of allIdleTasks) m.set(t.task.project_id, (m.get(t.task.project_id) ?? 0) + 1)
+    return m
+  }, [allIdleTasks])
+
   const selectedProject = useMemo(() => projects.find((p) => p.id === selectedProjectId) ?? null, [projects, selectedProjectId])
 
   // Project lock guard — single chokepoint for task-open paths. Resolves the task's
@@ -500,6 +538,7 @@ function App(): React.JSX.Element {
   const panelTestsShortcut = useShortcutDisplay('panel-tests')
   const panelAutomationsShortcut = useShortcutDisplay('panel-automations')
   const agentPanelShortcut = useShortcutDisplay('agent-panel')
+  const agentStatusPanelShortcut = useShortcutDisplay('agent-status-panel')
   const agentSessionId = selectedProjectId ? `__agent-panel:${selectedProjectId}:${agentPanelState.sessionIndex}` : null
 
   const handleAgentNewSession = useCallback(async () => {
@@ -622,6 +661,11 @@ function App(): React.JSX.Element {
     })
   }, [selectedProjectId, agentPanelState.isOpen])
   useEffect(() => {
+    return window.api.app.onToggleAgentStatusPanel(() => {
+      setAgentStatusState({ isLocked: !agentStatusState.isLocked })
+    })
+  }, [agentStatusState.isLocked])
+  useEffect(() => {
     return window.api.app.onOpenSettings(() => {
       setSettingsInitialTab('appearance'); setSettingsInitialAiConfigSection(null); setSettingsOpen(true)
     })
@@ -699,6 +743,8 @@ function App(): React.JSX.Element {
   useGuardedHotkeys(getKeys('exit-zen-explode'), () => { if (explodeMode) setExplodeMode(false); else if (zenMode) setZenMode(false) }, { enableOnFormTags: true, enabled: !isRecording })
 
   useGuardedHotkeys(getKeys('agent-panel'), (e) => { e.preventDefault(); trackShortcut(getKeys('agent-panel')); if (selectedProjectId) setAgentPanelState({ isOpen: !agentPanelState.isOpen }) }, { enableOnFormTags: true, enabled: !isRecording })
+
+  useGuardedHotkeys(getKeys('agent-status-panel'), (e) => { e.preventDefault(); trackShortcut(getKeys('agent-status-panel')); setAgentStatusState({ isLocked: !agentStatusState.isLocked }) }, { enableOnFormTags: true, enabled: !isRecording })
 
   // Home tab panel shortcuts
   useEffect(() => {
@@ -1054,7 +1100,7 @@ function App(): React.JSX.Element {
           onSettings={handleOpenSettings}
           onLeaderboard={() => { useTabStore.getState().setActiveView('leaderboard') }}
           onUsageAnalytics={() => { useTabStore.getState().setActiveView('usage-analytics') }}
-          onTaskClick={openTask} zenMode={zenMode} onboardingChecklist={onboardingChecklist} onReorderProjects={reorderProjects}
+          onTaskClick={openTask} zenMode={zenMode} onboardingChecklist={onboardingChecklist} idleByProject={idleByProject} onReorderProjects={reorderProjects}
         />
 
         <div id="right-column" className={`flex-1 flex min-w-0 bg-sidebar pb-2 pr-2 ${zenMode ? 'pl-2' : ''}`}>
@@ -1131,6 +1177,7 @@ function App(): React.JSX.Element {
                   </TooltipTrigger><TooltipContent side="bottom" className="text-xs max-w-64">
                     {!selectedProjectId ? <p>Select a project first</p> : durationLocked ? <p>Project locked</p> : <div className="space-y-1"><p>{withShortcut('New temporary task', newTempTaskShortcut)}</p><p className="text-muted-foreground">Temporary tasks auto-delete on close.</p></div>}
                   </TooltipContent></Tooltip>
+                  <AgentStatusButton active={agentStatusState.isLocked} count={idleTasks.length} onClick={() => setAgentStatusState({ isLocked: !agentStatusState.isLocked })} shortcutHint={agentStatusPanelShortcut} />
                   <AgentPanelButton active={agentPanelState.isOpen} disabled={!selectedProjectId} onClick={() => setAgentPanelState({ isOpen: !agentPanelState.isOpen })} shortcutHint={agentPanelShortcut} />
                   <UpdateButton version={updateVersion} onRestart={() => window.api.app.restartForUpdate()} />
                 </div>
@@ -1243,7 +1290,7 @@ function App(): React.JSX.Element {
                             return (
                               <React.Fragment key={id}>
                                 {i > 0 && <ResizeHandle width={w} minWidth={id === 'kanban' ? 400 : 200} onWidthChange={w => updatePanelSizes({ [HOME_PANEL_SIZE_KEY[id]]: w })} onReset={() => resetPanelSize(HOME_PANEL_SIZE_KEY[id])} />}
-                                <div className={cn('shrink-0 min-h-0 overflow-hidden', cn('rounded-lg border border-border', id === 'kanban' && Object.values(homePanel.homePanelVisibility).filter(Boolean).length <= 1 && !agentPanelState.isOpen ? 'border-transparent' : id === 'kanban' ? 'bg-surface-1 p-3' : 'bg-surface-1'))} style={{ width: w }}>
+                                <div className={cn('shrink-0 min-h-0 overflow-hidden', cn('rounded-lg border border-border', id === 'kanban' && Object.values(homePanel.homePanelVisibility).filter(Boolean).length <= 1 && !agentPanelState.isOpen && !agentStatusState.isLocked ? 'border-transparent' : id === 'kanban' ? 'bg-surface-1 p-3' : 'bg-surface-1'))} style={{ width: w }}>
                                   {id === 'kanban' && filter.viewMode !== 'list' && (
                                     <KanbanBoard tasks={displayTasks} columns={selectedProject?.columns_config} viewConfig={getViewConfig(filter)} isActive={tabs[activeTabIndex]?.type === 'home'}
                                       onTaskMove={handleTaskMove} onTaskReorder={reorderTasks} onTaskClick={handleTaskClick}
@@ -1340,6 +1387,20 @@ function App(): React.JSX.Element {
                   onDetach={() => window.api.floatingAgent.detach()}
                   onReattach={() => window.api.floatingAgent.reattach()} />
               </div>
+            )}
+            {agentStatusState.isLocked && (
+              <ResizeHandle width={agentStatusState.panelWidth} minWidth={AGENT_STATUS_PANEL_MIN_WIDTH} maxWidth={AGENT_STATUS_PANEL_MAX_WIDTH}
+                onWidthChange={(w) => setAgentStatusState({ panelWidth: w })}
+                onDragStart={() => setIsSidePanelResizing(true)} onDragEnd={() => setIsSidePanelResizing(false)}
+                onReset={() => setAgentStatusState({ panelWidth: DEFAULT_AGENT_STATUS_PANEL_WIDTH })} />
+            )}
+            {agentStatusState.isLocked && (
+              <AgentStatusSidePanel width={agentStatusState.panelWidth}
+                idleTasks={idleTasks} projects={projects} filterCurrentProject={agentStatusState.filterCurrentProject}
+                onFilterToggle={() => setAgentStatusState({ filterCurrentProject: !agentStatusState.filterCurrentProject })}
+                onNavigate={openTask}
+                onDismiss={handleDismissIdle}
+                selectedProjectId={selectedProjectId} currentProjectName={projects.find((p) => p.id === selectedProjectId)?.name} />
             )}
             </div>
           </div>

@@ -22,6 +22,7 @@ export const shortcutDefinitions: ShortcutDefinition[] = [
   { id: 'explode-mode', label: 'Explode Mode', group: 'General', defaultKeys: 'mod+shift+e', scope: 'global' },
   { id: 'exit-zen-explode', label: 'Exit Zen / Explode', group: 'General', defaultKeys: 'escape', scope: 'global' },
   { id: 'agent-panel', label: 'Agent Panel', group: 'General', defaultKeys: 'mod+.', scope: 'global' },
+  { id: 'agent-status-panel', label: 'Agent Status Panel', group: 'General', defaultKeys: 'ctrl+.', scope: 'global' },
   { id: 'global-settings', label: 'Global Settings', group: 'General', defaultKeys: 'mod+,', scope: 'global' },
   { id: 'project-settings', label: 'Project Settings', group: 'General', defaultKeys: 'mod+shift+,', scope: 'global' },
   { id: 'go-home', label: 'Go Home', group: 'General', defaultKeys: 'mod+§', scope: 'global', platform: 'mac' },

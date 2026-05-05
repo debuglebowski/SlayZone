@@ -17,6 +17,7 @@ interface ProjectItemProps {
   onClick: () => void
   onSettings: () => void
   onDelete: () => void
+  idleCount?: number
 }
 
 export function ProjectItem({
@@ -24,7 +25,8 @@ export function ProjectItem({
   selected,
   onClick,
   onSettings,
-  onDelete
+  onDelete,
+  idleCount = 0
 }: ProjectItemProps) {
   const customLetters = project.icon_letters?.trim().toUpperCase()
   const fallbackLetters = project.name.slice(0, 2).toUpperCase()
@@ -84,6 +86,14 @@ export function ProjectItem({
         </ContextMenu>
         <TooltipContent side="right">{project.name}</TooltipContent>
       </Tooltip>
+      {idleCount > 0 && (
+        <span
+          aria-label={`${idleCount} idle agent${idleCount === 1 ? '' : 's'}`}
+          className="absolute -top-1.5 -right-1.5 z-50 min-w-4 rounded-full bg-primary border-2 border-background px-1 text-[10px] font-semibold leading-4 text-center text-primary-foreground pointer-events-none"
+        >
+          {idleCount}
+        </span>
+      )}
     </div>
   )
 }

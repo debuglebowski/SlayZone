@@ -204,6 +204,11 @@ const api: ElectronAPI = {
       ipcRenderer.on('app:toggle-agent-panel', handler)
       return () => ipcRenderer.removeListener('app:toggle-agent-panel', handler)
     },
+    onToggleAgentStatusPanel: (callback: () => void) => {
+      const handler = () => callback()
+      ipcRenderer.on('app:toggle-agent-status-panel', handler)
+      return () => ipcRenderer.removeListener('app:toggle-agent-status-panel', handler)
+    },
     onOpenSettings: (callback: () => void) => {
       const handler = () => callback()
       ipcRenderer.on('app:open-settings', handler)

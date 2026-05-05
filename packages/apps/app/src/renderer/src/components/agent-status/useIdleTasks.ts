@@ -1,0 +1,120 @@
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
+import type { PtyInfo, ChatSessionStateEntry, TerminalState } from '@slayzone/terminal/shared'
+import type { Task } from '@slayzone/task/shared'
+
+export interface IdleTask {
+  task: Task
+  sessionId: string
+  mode: string
+  lastOutputTime: number
+}
+
+/**
+ * Minimal shape for a session that may be idle. Both PTY (`pty.list()`) and
+ * chat (`chat.list()`) return rows that satisfy this — chat sessions live in
+ * a different transport but expose the same idle semantics.
+ */
+interface AgentSessionRow {
+  sessionId: string
+  taskId: string
+  mode: string
+  lastOutputTime: number
+  state: TerminalState
+}
+
+interface UseIdleTasksResult {
+  idleTasks: IdleTask[]
+  count: number
+  refresh: () => Promise<void>
+}
+
+const IDLE_AGE_THRESHOLD_MS = 2000
+const IDLE_AGE_RECHECK_DELAY_MS = IDLE_AGE_THRESHOLD_MS + 100
+
+export function buildIdleTasks(
+  rows: AgentSessionRow[],
+  tasks: Task[],
+  filterProjectId: string | null,
+  now: number = Date.now()
+): IdleTask[] {
+  const tasksById = new Map(tasks.map((task) => [task.id, task]))
+  const byTaskId = new Map<string, IdleTask>()
+
+  for (const row of rows) {
+    if (row.state !== 'idle') continue
+    if (row.mode === 'terminal') continue
+    if (now - row.lastOutputTime < IDLE_AGE_THRESHOLD_MS) continue
+
+    const task = tasksById.get(row.taskId)
+    if (!task) continue
+    if (filterProjectId && task.project_id !== filterProjectId) continue
+
+    const current = byTaskId.get(row.taskId)
+    if (!current || row.lastOutputTime > current.lastOutputTime) {
+      byTaskId.set(row.taskId, {
+        task,
+        sessionId: row.sessionId,
+        mode: row.mode,
+        lastOutputTime: row.lastOutputTime
+      })
+    }
+  }
+
+  return [...byTaskId.values()]
+}
+
+function ptyToRow(p: PtyInfo): AgentSessionRow {
+  return { sessionId: p.sessionId, taskId: p.taskId, mode: p.mode, lastOutputTime: p.lastOutputTime, state: p.state }
+}
+
+function chatToRow(c: ChatSessionStateEntry): AgentSessionRow {
+  return { sessionId: c.sessionId, taskId: c.taskId, mode: c.mode, lastOutputTime: c.lastOutputTime, state: c.state }
+}
+
+export function useIdleTasks(
+  tasks: Task[],
+  filterProjectId: string | null
+): UseIdleTasksResult {
+  const [rows, setRows] = useState<AgentSessionRow[]>([])
+  const recheckTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const refresh = useCallback(async () => {
+    const [ptys, chats] = await Promise.all([
+      window.api.pty.list(),
+      window.api.chat.list()
+    ])
+    setRows([...ptys.map(ptyToRow), ...chats.map(chatToRow)])
+  }, [])
+
+  useEffect(() => {
+    refresh()
+  }, [refresh])
+
+  useEffect(() => {
+    // pty:state-change carries both PTY and chat transitions (chat-transport-manager
+    // broadcasts on the same channel via session-registry).
+    const unsubStateChange = window.api.pty.onStateChange((_sessionId, newState: TerminalState) => {
+      refresh()
+      // Threshold means a freshly-idle session won't appear yet — recheck once threshold passes.
+      if (newState === 'idle') {
+        if (recheckTimerRef.current) clearTimeout(recheckTimerRef.current)
+        recheckTimerRef.current = setTimeout(refresh, IDLE_AGE_RECHECK_DELAY_MS)
+      }
+    })
+    return () => {
+      unsubStateChange()
+      if (recheckTimerRef.current) clearTimeout(recheckTimerRef.current)
+    }
+  }, [refresh])
+
+  const idleTasks: IdleTask[] = useMemo(
+    () => buildIdleTasks(rows, tasks, filterProjectId),
+    [rows, tasks, filterProjectId]
+  )
+
+  return {
+    idleTasks,
+    count: idleTasks.length,
+    refresh
+  }
+}

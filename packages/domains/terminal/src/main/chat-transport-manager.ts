@@ -2,6 +2,7 @@ import { spawn as realSpawn, type ChildProcess, type SpawnOptions } from 'node:c
 import { randomUUID } from 'node:crypto'
 import readline from 'node:readline'
 import type { AgentEvent } from '../shared/agent-events'
+import type { ChatSessionStateEntry } from '../shared/types'
 import type { AgentAdapter } from './agents/types'
 import { getAdapter } from './agents/registry'
 import { whichBinary as realWhichBinary } from './shell-env'
@@ -791,14 +792,7 @@ export function killAll(): void {
   for (const tabId of sessions.keys()) kill(tabId)
 }
 
-export interface ChatSessionStateEntry {
-  /** Format `${taskId}:${tabId}` — matches state-broadcast key in `transitionState`. */
-  sessionId: string
-  taskId: string
-  mode: string
-  lastOutputTime: number
-  state: ChatTerminalState
-}
+// ChatSessionStateEntry is exported from `../shared/types` so renderer + api types can reference it.
 
 /**
  * Snapshot of all live (non-ended) chat sessions, keyed by the broadcast-format

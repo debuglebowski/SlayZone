@@ -22,6 +22,7 @@ import type {
   CommandInfo,
   AgentInfo,
   FileMatch,
+  ChatSessionStateEntry,
 } from '@slayzone/terminal/shared'
 
 export interface ChatSessionInfo {
@@ -439,6 +440,7 @@ export interface ElectronAPI {
     isPlaywright: boolean
     onGoHome: (callback: () => void) => () => void
     onToggleAgentPanel: (callback: () => void) => () => void
+    onToggleAgentStatusPanel: (callback: () => void) => () => void
     onOpenSettings: (callback: () => void) => () => void
     onOpenProjectSettings: (callback: () => void) => () => void
     onNewTemporaryTask: (callback: () => void) => () => void
@@ -676,6 +678,7 @@ export interface ElectronAPI {
      * disables it when eligible-but-not-opted-in.
      */
     getAutoEligibility: () => Promise<{ eligible: boolean; optedIn: boolean }>
+    list: () => Promise<ChatSessionStateEntry[]>
     listSkills: (cwd: string) => Promise<SkillInfo[]>
     listCommands: (cwd: string) => Promise<CommandInfo[]>
     listAgents: (cwd: string) => Promise<AgentInfo[]>
@@ -812,6 +815,7 @@ export interface ElectronAPI {
     ensureMain: (taskId: string, mode: TerminalMode) => Promise<TerminalTab>
     split: (tabId: string) => Promise<TerminalTab | null>
     moveToGroup: (tabId: string, targetGroupId: string | null) => Promise<TerminalTab | null>
+    onChanged: (cb: (payload: { taskId: string; focusTabId?: string | null }) => void) => () => void
   }
   diagnostics: {
     getConfig: () => Promise<DiagnosticsConfig>

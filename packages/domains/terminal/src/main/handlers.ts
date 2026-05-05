@@ -5,6 +5,7 @@ import { execFile } from 'child_process'
 import { promisify } from 'util'
 import { createPty, writePty, submitPty, resizePty, killPty, hasPty, getBuffer, clearBuffer, getBufferSince, listPtys, getState, setDatabase, setTerminalTheme, testExecutionContext } from './pty-manager'
 import { listSessions, getSessionState } from './session-registry'
+import { listChatSessions } from './chat-transport-manager'
 
 const execFileAsync = promisify(execFile)
 import { getAdapter, type ExecutionContext } from './adapters'
@@ -309,6 +310,10 @@ ipcMain.handle('pty:resize', (_, sessionId: string, cols: number, rows: number) 
 
   ipcMain.handle('pty:list', () => {
     return listPtys()
+  })
+
+  ipcMain.handle('chat:list', () => {
+    return listChatSessions()
   })
 
   ipcMain.handle('pty:getState', (_, sessionId: string) => {
