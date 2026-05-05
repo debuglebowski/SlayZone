@@ -1074,55 +1074,57 @@ function applyBgShellEvent(state: ChatTimelineState, event: AgentEvent): ChatTim
 const ACTIVE_BG_STATUSES: ReadonlySet<BgShellStatus> = new Set(['pending', 'running'])
 
 /**
- * On a fresh `session-spawn`, flip any active (`pending`/`running`) bg shells
- * whose `spawnedInSpawnId` differs from the new id to `'unknown'`. Bg shells
- * are children of the OS process, so a new spawn implies the prior process
- * (and its shells) are dead. Handles app-restart, force-quit, and resume —
+ * On a fresh `session-spawn`, drop any active (`pending`/`running`) bg shells
+ * whose `spawnedInSpawnId` differs from the new id. Bg shells are children of
+ * the OS process, so a new spawn implies the prior process (and its shells)
+ * are dead — and we have no exit code, no output, no actionable state to
+ * preserve. Removing them entirely keeps the banner free of orphan rows the
+ * user can't dismiss or act on. Handles app-restart, force-quit, and resume —
  * all of which produce a new spawn even when `sessionId` is preserved.
  */
 function invalidateForeignSpawnShells(
   state: ChatTimelineState,
   newSpawnId: string,
 ): ChatTimelineState {
-  let mutated = false
-  const next = new Map(state.bgShells)
-  for (const [id, shell] of state.bgShells) {
-    if (!ACTIVE_BG_STATUSES.has(shell.status)) continue
-    if (shell.spawnedInSpawnId === newSpawnId) continue
-    next.set(id, { ...shell, status: 'unknown' })
-    mutated = true
-  }
-  if (!mutated) return state
-  const evicted = evictTerminalShells(next, state.bgShellOrder, state.bgShellPollIndex)
-  return {
-    ...state,
-    bgShells: evicted.shells,
-    bgShellOrder: evicted.order,
-    bgShellPollIndex: evicted.pollIndex,
-  }
+  return dropActiveShells(state, (shell) => shell.spawnedInSpawnId !== newSpawnId)
 }
 
 /**
- * On `process-exit` for the current subprocess, flip any active bg shells to
- * `'unknown'`. The OS reaped them with the parent — they are no longer
- * running. Complements `invalidateForeignSpawnShells` for the in-session
- * graceful-exit case (no follow-up spawn until the user reopens the chat).
+ * On `process-exit` for the current subprocess, drop any active bg shells.
+ * The OS reaped them with the parent — they are no longer running, and no
+ * useful exit/output state survived. Complements
+ * `invalidateForeignSpawnShells` for the in-session graceful-exit case (no
+ * follow-up spawn until the user reopens the chat).
  */
 function invalidateActiveShells(state: ChatTimelineState): ChatTimelineState {
-  let mutated = false
-  const next = new Map(state.bgShells)
+  return dropActiveShells(state, () => true)
+}
+
+function dropActiveShells(
+  state: ChatTimelineState,
+  predicate: (shell: BgShell) => boolean,
+): ChatTimelineState {
+  const toDrop = new Set<string>()
   for (const [id, shell] of state.bgShells) {
     if (!ACTIVE_BG_STATUSES.has(shell.status)) continue
-    next.set(id, { ...shell, status: 'unknown' })
-    mutated = true
+    if (!predicate(shell)) continue
+    toDrop.add(id)
   }
-  if (!mutated) return state
-  const evicted = evictTerminalShells(next, state.bgShellOrder, state.bgShellPollIndex)
+  if (toDrop.size === 0) return state
+  const nextShells = new Map<string, BgShell>()
+  for (const [id, shell] of state.bgShells) {
+    if (!toDrop.has(id)) nextShells.set(id, shell)
+  }
+  const nextOrder = state.bgShellOrder.filter((id) => !toDrop.has(id))
+  const nextPollIndex = new Map<string, { spawnToolUseId: string; kind: 'output' | 'kill' }>()
+  for (const [pollId, ref] of state.bgShellPollIndex) {
+    if (!toDrop.has(ref.spawnToolUseId)) nextPollIndex.set(pollId, ref)
+  }
   return {
     ...state,
-    bgShells: evicted.shells,
-    bgShellOrder: evicted.order,
-    bgShellPollIndex: evicted.pollIndex,
+    bgShells: nextShells,
+    bgShellOrder: nextOrder,
+    bgShellPollIndex: nextPollIndex,
   }
 }
 

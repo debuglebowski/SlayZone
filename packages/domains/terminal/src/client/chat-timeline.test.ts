@@ -1040,7 +1040,7 @@ test('spawn-token: bg shell tags spawnedInSpawnId at creation', () => {
   expect(shell.spawnedInSpawnId).toBe('sp-1')
 })
 
-test('spawn-token: new session-spawn flips active shells from prior spawn to unknown', () => {
+test('spawn-token: new session-spawn drops active shells from prior spawn', () => {
   let s = initialState()
   s = reducer(s, { type: 'event', event: spawn('sp-1') })
   s = reducer(s, { type: 'event', event: ev.turnInit('sid-r') })
@@ -1052,7 +1052,8 @@ test('spawn-token: new session-spawn flips active shells from prior spawn to unk
   expect(s.bgShells.get('shell-a')!.status).toBe('running')
   // App restart simulated: same sessionId (--resume), brand-new spawnId.
   s = reducer(s, { type: 'event', event: spawn('sp-2') })
-  expect(s.bgShells.get('shell-a')!.status).toBe('unknown')
+  expect(s.bgShells.has('shell-a')).toBe(false)
+  expect(s.bgShellOrder.includes('shell-a')).toBe(false)
   expect(s.currentSpawnId).toBe('sp-2')
 })
 
@@ -1090,7 +1091,7 @@ test('spawn-token: terminal-status shells (completed/killed) survive new spawn',
   expect(s.bgShells.get('shell-a')!.status).toBe('completed')
 })
 
-test('spawn-token: legacy shells (no spawnedInSpawnId) flip on first session-spawn', () => {
+test('spawn-token: legacy shells (no spawnedInSpawnId) drop on first session-spawn', () => {
   // Migration scenario: user upgrades to a build that emits session-spawn,
   // but persisted history was recorded by a prior build that did not. On first
   // new spawn, the legacy active shells (spawnedInSpawnId=null) are stale by
@@ -1104,10 +1105,10 @@ test('spawn-token: legacy shells (no spawnedInSpawnId) flip on first session-spa
   s = reducer(s, { type: 'event', event: bgResult('legacy-a', '', { shellId: 'bash_legacy' }) })
   expect(s.bgShells.get('legacy-a')!.spawnedInSpawnId).toBe(null)
   s = reducer(s, { type: 'event', event: spawn('sp-new') })
-  expect(s.bgShells.get('legacy-a')!.status).toBe('unknown')
+  expect(s.bgShells.has('legacy-a')).toBe(false)
 })
 
-test('spawn-token: process-exit (agent event) flips active shells to unknown', () => {
+test('spawn-token: process-exit (agent event) drops active shells', () => {
   let s = initialState()
   s = reducer(s, { type: 'event', event: spawn('sp-1') })
   s = reducer(s, { type: 'event', event: ev.turnInit('sid-x') })
@@ -1120,10 +1121,10 @@ test('spawn-token: process-exit (agent event) flips active shells to unknown', (
     type: 'event',
     event: { kind: 'process-exit', code: 0, signal: null },
   })
-  expect(s.bgShells.get('shell-a')!.status).toBe('unknown')
+  expect(s.bgShells.has('shell-a')).toBe(false)
 })
 
-test('spawn-token: process-exit (live IPC action) flips active shells when sessionId matches', () => {
+test('spawn-token: process-exit (live IPC action) drops active shells when sessionId matches', () => {
   let s = initialState()
   s = reducer(s, { type: 'event', event: spawn('sp-1') })
   s = reducer(s, { type: 'event', event: ev.turnInit('sid-live') })
@@ -1134,10 +1135,10 @@ test('spawn-token: process-exit (live IPC action) flips active shells when sessi
   s = reducer(s, { type: 'event', event: bgResult('shell-a', '', { shellId: 'bash_1' }) })
   s = reducer(s, { type: 'process-exit', sessionId: 'sid-live', code: 0, signal: null })
   expect(s.sessionEnded).toBe(true)
-  expect(s.bgShells.get('shell-a')!.status).toBe('unknown')
+  expect(s.bgShells.has('shell-a')).toBe(false)
 })
 
-test('spawn-token: stale process-exit (mismatched sessionId) does NOT flip shells', () => {
+test('spawn-token: stale process-exit (mismatched sessionId) does NOT drop shells', () => {
   let s = initialState()
   s = reducer(s, { type: 'event', event: spawn('sp-1') })
   s = reducer(s, { type: 'event', event: ev.turnInit('sid-current') })
@@ -1154,7 +1155,8 @@ test('spawn-token: stale process-exit (mismatched sessionId) does NOT flip shell
 
 test('spawn-token: replay determinism across spawn-token boundary', () => {
   // Simulates app restart: persisted history contains old spawn + old shell,
-  // then new spawn appended. Replay must converge on the same final state.
+  // then new spawn appended. Replay must converge on the same final state —
+  // active shells from the dead spawn dropped, no orphans left.
   const events: AgentEvent[] = [
     spawn('sp-old'),
     ev.turnInit('sid-resume'),
@@ -1165,7 +1167,7 @@ test('spawn-token: replay determinism across spawn-token boundary', () => {
   ]
   let s = initialState()
   for (const e of events) s = reducer(s, { type: 'event', event: e })
-  expect(s.bgShells.get('shell-a')!.status).toBe('unknown')
+  expect(s.bgShells.has('shell-a')).toBe(false)
   expect(s.currentSpawnId).toBe('sp-new')
 })
 
