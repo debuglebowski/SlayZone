@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { QueuedChatMessage } from '@slayzone/terminal/shared'
 
 /**
@@ -37,13 +37,14 @@ export function useChatQueue(
     return off
   }, [tabId, refetch])
 
+  const onDrainedRef = useRef(onDrained)
+  onDrainedRef.current = onDrained
   useEffect(() => {
-    if (!onDrained) return
     const off = window.api.chatQueue.onDrained((drainedTabId, original) => {
-      if (drainedTabId === tabId) onDrained(original)
+      if (drainedTabId === tabId) onDrainedRef.current?.(original)
     })
     return off
-  }, [tabId, onDrained])
+  }, [tabId])
 
   const push = useCallback(
     async (send: string, original: string) => {

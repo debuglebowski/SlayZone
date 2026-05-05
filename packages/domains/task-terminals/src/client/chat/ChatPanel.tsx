@@ -14,6 +14,7 @@ import { ChatSearchBar } from './ChatSearchBar'
 import { useChatMode } from './useChatMode'
 import { useChatModel } from './useChatModel'
 import { useChatEffort } from './useChatEffort'
+import { useChatQueue } from './useChatQueue'
 import { useChatSearch } from './useChatSearch'
 import { modelSupportsEffort } from '@slayzone/terminal/shared'
 import {
@@ -107,9 +108,26 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
   const [collapseSignal, setCollapseSignal] = useState(0)
   const finalOnly = !appearance.chatShowTools
   const showLastMessageTools = appearance.chatShowLastMessageTools
-  /** Send-text + original draft kept paired so usage bumps on drain see the
-   * raw `/<token>` even when commands expanded the body before queueing. */
-  const [queuedMessages, setQueuedMessages] = useState<Array<{ send: string; original: string }>>([])
+  // Forward-declared ref — wired to autocomplete.bumpUsageFromMessage further
+  // down once the autocomplete hook has run. The drain callback closes over
+  // this ref, so the assignment lands before the first onDrained fires.
+  const bumpUsageRef = useRef<(text: string) => Promise<void> | void>(() => {})
+  /**
+   * "Up next" queue lives in SQLite (table `chat_queue`) — survives reload,
+   * sync's across windows, drained main-side on session→idle. Hook is a
+   * subscriber + thin RPC facade. `onDrained` fires after the main process
+   * pops + dispatches; carry the raw `original` text into the autocomplete
+   * usage hook so /-token tiebreak counts bump exactly as the pre-backend
+   * implementation did.
+   */
+  const {
+    items: queuedMessages,
+    push: pushQueue,
+    remove: removeQueue,
+    clear: clearQueue,
+  } = useChatQueue(tabId, (original) => {
+    void bumpUsageRef.current(original)
+  })
   const [attachments, setAttachments] = useState<ArtifactRef[]>([])
   const { scrollRef, contentRef, isAtBottom, scrollToBottom } = useStickToBottom({
     initial: 'instant',
@@ -414,9 +432,12 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
     setAttachments([])
     void scrollToBottom()
     if (!toSend) return
-    // If a turn is in flight, queue for later. Drain effect flushes when inFlight drops.
-    if (inFlight) {
-      setQueuedMessages((q) => [...q, { send: toSend, original: text }])
+    // Queue when a turn is in flight OR a queue already exists (preserve FIFO
+    // even after reload — the renderer's `inFlight` mirror could be `false`
+    // while persisted queue items still need to flush in order). Backend
+    // drainer pops on session→idle.
+    if (inFlight || queuedMessages.length > 0) {
+      await pushQueue(toSend, text)
       return
     }
     lastSentRef.current = snapshot
@@ -427,35 +448,24 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
     // so we don't add `autocomplete` to deps — its returned object is a fresh
     // ref each render and would over-fire dependent effects.
     void bumpUsageRef.current(text)
-  }, [draft, attachments, getArtifactFilePath, inFlight, state.sessionEnded, sendMessage, autocomplete, chatApi, tabId, taskId, mode, cwd, providerFlagsOverride, scrollToBottom])
+  }, [draft, attachments, getArtifactFilePath, inFlight, queuedMessages.length, pushQueue, state.sessionEnded, sendMessage, autocomplete, chatApi, tabId, taskId, mode, cwd, providerFlagsOverride, scrollToBottom])
 
-  // Stash bump fn in a ref. `autocomplete` is a fresh object every render
-  // (useAutocomplete returns an object literal), so depending on it in the
-  // drain useEffect would re-fire on every render and risk double-sends
-  // before `inFlight` propagates back from the IPC roundtrip.
-  const bumpUsageRef = useRef(autocomplete.bumpUsageFromMessage)
+  // Wire the forward-declared bumpUsageRef now that autocomplete is in scope.
+  // `autocomplete` is a fresh object every render (useAutocomplete returns
+  // an object literal); reading via ref keeps the backend drain callback
+  // stable so onDrained subscribers don't churn.
   bumpUsageRef.current = autocomplete.bumpUsageFromMessage
 
-  // Drain queue: when the active turn finishes, send the next queued message.
-  useEffect(() => {
-    if (inFlight) return
-    if (queuedMessages.length === 0) return
-    if (state.sessionEnded) return
-    const [next, ...rest] = queuedMessages
-    setQueuedMessages(rest)
-    void (async () => {
-      await sendMessage(next.send)
-      void bumpUsageRef.current(next.original)
-    })()
-  }, [inFlight, queuedMessages, sendMessage, state.sessionEnded])
-
   // Stop button + Esc shared path. Clears the queue (intentional: queued msgs
-  // are abandoned alongside the in-flight turn), aborts the turn on the main
-  // side, and — if no progress had arrived — restores the popped text +
-  // attachments to the composer for editing. Skips restore when the user has
-  // already started typing again (draft non-empty).
+  // are abandoned alongside the in-flight turn — the main side wipes
+  // chat_queue inside chat:abortAndPop too, this client-side clear is a
+  // belt-and-suspenders for instant UI feedback before the broadcast lands).
+  // Aborts the turn on the main side and — if no progress had arrived —
+  // restores the popped text + attachments to the composer for editing.
+  // Skips restore when the user has already started typing again (draft
+  // non-empty).
   const handleStop = useCallback(async () => {
-    setQueuedMessages([])
+    void clearQueue()
     const result = await abortAndPop()
     if (!result.popped) return
     if (draft.trim() !== '') return
@@ -468,12 +478,12 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
     }
     lastSentRef.current = null
     textareaRef.current?.focus()
-  }, [abortAndPop, draft])
+  }, [abortAndPop, draft, clearQueue])
 
   // Clear queue on session end / reset.
   useEffect(() => {
-    if (state.sessionEnded) setQueuedMessages([])
-  }, [state.sessionEnded])
+    if (state.sessionEnded) void clearQueue()
+  }, [state.sessionEnded, clearQueue])
 
   // Cmd+F / Ctrl+F opens search; Cmd+↑/↓ scrolls to top/bottom of the timeline.
   // Scoped to the panel that owns keyboard focus — multiple chat tabs stay
@@ -610,7 +620,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
     // Clear timeline + ended-state immediately so UI re-enables input while new session spawns.
     resetTimeline()
     setDraft('')
-    setQueuedMessages([])
+    void clearQueue()
     try {
       await resetChat(
         chatApi,
@@ -627,7 +637,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
     } finally {
       setResetting(false)
     }
-  }, [resetting, inFlight, chatApi, tabId, taskId, mode, cwd, providerFlagsOverride, resetTimeline])
+  }, [resetting, inFlight, chatApi, tabId, taskId, mode, cwd, providerFlagsOverride, resetTimeline, clearQueue])
 
   const isEmpty = timeline.length === 0 || (timeline.length === 1 && timeline[0].kind === 'session-start')
 
@@ -838,7 +848,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
             <ul className="divide-y divide-border/40 rounded-md border border-border/40 overflow-hidden">
               {queuedMessages.map((msg, i) => (
                 <li
-                  key={i}
+                  key={msg.id}
                   className="group flex items-center gap-2 px-3 py-1.5 text-xs hover:bg-muted/30"
                 >
                   <span className="shrink-0 text-muted-foreground/50 font-mono text-[10px] tabular-nums">
@@ -846,9 +856,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
                   </span>
                   <span className="flex-1 min-w-0 truncate">{msg.send}</span>
                   <button
-                    onClick={() =>
-                      setQueuedMessages((q) => q.filter((_, idx) => idx !== i))
-                    }
+                    onClick={() => void removeQueue(msg.id)}
                     className="shrink-0 rounded p-0.5 opacity-50 hover:opacity-100 hover:bg-destructive/15 hover:text-destructive transition-colors"
                     aria-label="Cancel queued message"
                     title="Cancel"
