@@ -38,6 +38,10 @@ function LinkText({ text }: { text: string }) {
 }
 import { HighlightedText } from './HighlightedText'
 
+// Card indent for tool/sub-agent rows: aligns with assistant card position
+// (assistant uses pl-4 + size-7 avatar + gap-3 = 56px = pl-14).
+const CHAT_CARD_INDENT = 'pl-14'
+
 // --- Helpers ---
 
 function formatTime(ts: number): string {
@@ -258,7 +262,7 @@ export function SubAgentRow({ item }: { item: Extract<TimelineItem, { kind: 'sub
 
   return (
     <>
-      <div className="pl-14 pr-4 py-1" data-testid="sub-agent-row">
+      <div className={cn(CHAT_CARD_INDENT, 'pr-4 py-1')} data-testid="sub-agent-row">
         <div className="w-fit max-w-full rounded-md border border-border/50 bg-muted/20 overflow-hidden">
         <button
           type="button"
@@ -279,7 +283,7 @@ export function SubAgentRow({ item }: { item: Extract<TimelineItem, { kind: 'sub
           )}
           <Bot className="size-3 shrink-0 text-muted-foreground" />
           <span className="font-medium shrink-0">Sub-agent</span>
-          <span className="text-muted-foreground truncate flex-1 font-mono text-[11px] flex items-center gap-2 min-w-0">
+          <span className="text-muted-foreground truncate min-w-0 font-mono text-[11px] flex items-center gap-2">
             {item.description && (
               <>
                 <span className="text-muted-foreground/40">·</span>
@@ -404,7 +408,7 @@ function ToolShell({
   }
   const canOpen = Boolean(body)
   return (
-    <div className="pl-14 pr-4 py-1">
+    <div className={cn(CHAT_CARD_INDENT, 'pr-4 py-1')}>
       <div className="w-fit max-w-full rounded-lg border border-border/50 bg-card/40 overflow-hidden shadow-sm">
         <button
           onClick={() => canOpen && setOpen(!open)}
@@ -785,7 +789,7 @@ export function ToolCallAskUserQuestion({ invocation }: ToolProps) {
   }
 
   return (
-    <div className="pl-4 pr-[10%] py-3">
+    <div className="pl-4 pr-4 py-3">
       <div className="flex gap-3 items-start">
         <div className="shrink-0 size-7 rounded-full bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center text-white shadow-sm">
           <HelpCircle className="size-3.5" />
@@ -966,7 +970,7 @@ export function ToolCallExitPlanMode({ invocation }: ToolProps) {
   }, [timeline, invocation.id])
   const showApproveFooter = denied && isLastMessage
   return (
-    <div className="pl-4 pr-[10%] py-3">
+    <div className="pl-4 pr-4 py-3">
       <div className="flex gap-3 items-start">
         <div className="shrink-0 size-7 rounded-full bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center text-white shadow-sm">
           <ClipboardList className="size-3.5" />

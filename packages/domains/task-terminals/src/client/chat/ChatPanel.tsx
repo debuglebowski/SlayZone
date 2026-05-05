@@ -269,6 +269,9 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
       } else if (item.kind === 'tool' && showLastMessageTools && i > lastUserIdx) {
         flushPending()
         out.push(item)
+      } else if (item.kind === 'sub-agent' && showLastMessageTools && i > lastUserIdx) {
+        flushPending()
+        out.push(item)
       } else if (item.kind === 'thinking' && showLastMessageTools && i > lastUserIdx) {
         flushPending()
         out.push(item)
