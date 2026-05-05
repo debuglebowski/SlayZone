@@ -4,13 +4,13 @@ import type { Database } from 'better-sqlite3'
 import type {
   CreateTaskInput,
   UpdateTaskInput,
-  CreateAssetInput,
-  UpdateAssetInput,
-  TaskAsset,
+  CreateArtifactInput,
+  UpdateArtifactInput,
+  TaskArtifact,
   RenderMode,
-  AssetFolder,
-  CreateAssetFolderInput,
-  UpdateAssetFolderInput,
+  ArtifactFolder,
+  CreateArtifactFolderInput,
+  UpdateArtifactFolderInput,
 } from '@slayzone/task/shared'
 import { getExtensionFromTitle, getEffectiveRenderMode, canExportAsPdf, canExportAsPng, canExportAsHtml } from '@slayzone/task/shared'
 import { uniqueName } from '@slayzone/file-editor/shared'
@@ -18,8 +18,8 @@ import path from 'path'
 import { existsSync, mkdirSync, writeFileSync, readFileSync, unlinkSync, rmSync, copyFileSync, statSync, readdirSync, createWriteStream } from 'fs'
 import { randomUUID } from 'crypto'
 import archiver from 'archiver'
-import { buildPdfHtml, buildMermaidPdfHtml, buildPngHtml, renderToPdf, renderToPng } from './asset-export'
-import { startAssetWatcher } from './asset-watcher'
+import { buildPdfHtml, buildMermaidPdfHtml, buildPngHtml, renderToPdf, renderToPng } from './artifact-export'
+import { startArtifactWatcher } from './artifact-watcher'
 import {
   BlobStore,
   betterSqliteTxn,
@@ -33,8 +33,8 @@ import {
   pruneVersions,
   diffVersions,
   isVersionError,
-} from '@slayzone/task-assets/main'
-import type { AuthorContext, VersionRef } from '@slayzone/task-assets/shared'
+} from '@slayzone/task-artifacts/main'
+import type { AuthorContext, VersionRef } from '@slayzone/task-artifacts/shared'
 import {
   addBlockerOp,
   archiveManyTasksOp,
@@ -44,7 +44,6 @@ import {
   deleteTaskOp,
   getAllBlockedTaskIdsOp,
   getAllTasksOp,
-  getArchivedTasksOp,
   getBlockersOp,
   getBlockingOp,
   getByProjectOp,
@@ -122,7 +121,6 @@ export function registerTaskHandlers(ipcMain: IpcMain, db: Database, onMutation?
   ipcMain.handle('db:tasks:archive', (_, id: string) => archiveTaskOp(db, id, deps))
   ipcMain.handle('db:tasks:archiveMany', (_, ids: string[]) => archiveManyTasksOp(db, ids, deps))
   ipcMain.handle('db:tasks:unarchive', (_, id: string) => unarchiveTaskOp(db, id, deps))
-  ipcMain.handle('db:tasks:getArchived', () => getArchivedTasksOp(db))
   ipcMain.handle('db:tasks:reorder', (_, taskIds: string[]) => reorderTasksOp(db, taskIds))
 
   // Task Dependencies
@@ -145,21 +143,21 @@ export function registerTaskHandlers(ipcMain: IpcMain, db: Database, onMutation?
   // Batched load for board data — single IPC round-trip instead of 5
   ipcMain.handle('db:loadBoardData', () => loadBoardDataOp(db))
 
-  // --- Task Assets ---
+  // --- Task Artifacts ---
 
   const dataDir = process.env.SLAYZONE_DB_DIR || app.getPath('userData')
-  const assetsDir = path.join(dataDir, 'assets')
+  const artifactsDir = path.join(dataDir, 'artifacts')
   const blobStore = new BlobStore(dataDir)
   const versionTxn = betterSqliteTxn(db)
   const uiAuthor: AuthorContext = { type: 'user', id: null }
-  startAssetWatcher(assetsDir)
+  startArtifactWatcher(artifactsDir)
 
-  function getAssetFilePath(taskId: string, assetId: string, title: string): string {
+  function getArtifactFilePath(taskId: string, artifactId: string, title: string): string {
     const ext = getExtensionFromTitle(title) || '.txt'
-    return path.join(assetsDir, taskId, `${assetId}${ext}`)
+    return path.join(artifactsDir, taskId, `${artifactId}${ext}`)
   }
 
-  function parseAsset(row: Record<string, unknown> | undefined): TaskAsset | null {
+  function parseArtifact(row: Record<string, unknown> | undefined): TaskArtifact | null {
     if (!row) return null
     return {
       id: row.id as string,
@@ -178,7 +176,7 @@ export function registerTaskHandlers(ipcMain: IpcMain, db: Database, onMutation?
     }
   }
 
-  function parseFolder(row: Record<string, unknown> | undefined): AssetFolder | null {
+  function parseFolder(row: Record<string, unknown> | undefined): ArtifactFolder | null {
     if (!row) return null
     return {
       id: row.id as string,
@@ -190,48 +188,48 @@ export function registerTaskHandlers(ipcMain: IpcMain, db: Database, onMutation?
     }
   }
 
-  ipcMain.handle('db:assets:getByTask', (_, taskId: string) => {
+  ipcMain.handle('db:artifacts:getByTask', (_, taskId: string) => {
     const rows = db
-      .prepare('SELECT * FROM task_assets WHERE task_id = ? ORDER BY "order" ASC, created_at ASC')
+      .prepare('SELECT * FROM task_artifacts WHERE task_id = ? ORDER BY "order" ASC, created_at ASC')
       .all(taskId) as Record<string, unknown>[]
-    return rows.map(parseAsset).filter(Boolean)
+    return rows.map(parseArtifact).filter(Boolean)
   })
 
-  ipcMain.handle('db:assets:get', (_, id: string) => {
-    const row = db.prepare('SELECT * FROM task_assets WHERE id = ?').get(id) as Record<string, unknown> | undefined
-    return parseAsset(row)
+  ipcMain.handle('db:artifacts:get', (_, id: string) => {
+    const row = db.prepare('SELECT * FROM task_artifacts WHERE id = ?').get(id) as Record<string, unknown> | undefined
+    return parseArtifact(row)
   })
 
-  ipcMain.handle('db:assets:create', (_, data: CreateAssetInput) => {
+  ipcMain.handle('db:artifacts:create', (_, data: CreateArtifactInput) => {
     const id = randomUUID()
     const folderId = data.folderId ?? null
     const maxOrder = (db.prepare(
       folderId
-        ? 'SELECT MAX("order") as m FROM task_assets WHERE task_id = ? AND folder_id = ?'
-        : 'SELECT MAX("order") as m FROM task_assets WHERE task_id = ? AND folder_id IS NULL'
+        ? 'SELECT MAX("order") as m FROM task_artifacts WHERE task_id = ? AND folder_id = ?'
+        : 'SELECT MAX("order") as m FROM task_artifacts WHERE task_id = ? AND folder_id IS NULL'
     ).get(...(folderId ? [data.taskId, folderId] : [data.taskId])) as { m: number | null }).m ?? -1
 
     db.prepare(`
-      INSERT INTO task_assets (id, task_id, folder_id, title, render_mode, language, "order")
+      INSERT INTO task_artifacts (id, task_id, folder_id, title, render_mode, language, "order")
       VALUES (?, ?, ?, ?, ?, ?, ?)
     `).run(id, data.taskId, folderId, data.title, data.renderMode ?? null, data.language ?? null, maxOrder + 1)
 
     // Write content to disk
-    const filePath = getAssetFilePath(data.taskId, id, data.title)
+    const filePath = getArtifactFilePath(data.taskId, id, data.title)
     mkdirSync(path.dirname(filePath), { recursive: true })
     const initialBytes = Buffer.from(data.content ?? '', 'utf-8')
     writeFileSync(filePath, initialBytes)
 
-    // Seed v1 for the new asset.
-    createVersion(db, versionTxn, blobStore, { assetId: id, bytes: initialBytes, author: uiAuthor })
+    // Seed v1 for the new artifact.
+    createVersion(db, versionTxn, blobStore, { artifactId: id, bytes: initialBytes, author: uiAuthor })
 
     onMutation?.()
-    const row = db.prepare('SELECT * FROM task_assets WHERE id = ?').get(id) as Record<string, unknown> | undefined
-    return parseAsset(row)
+    const row = db.prepare('SELECT * FROM task_artifacts WHERE id = ?').get(id) as Record<string, unknown> | undefined
+    return parseArtifact(row)
   })
 
-  ipcMain.handle('db:assets:update', (_, data: UpdateAssetInput & { mutateVersion?: boolean }) => {
-    const existing = db.prepare('SELECT * FROM task_assets WHERE id = ?').get(data.id) as Record<string, unknown> | undefined
+  ipcMain.handle('db:artifacts:update', (_, data: UpdateArtifactInput & { mutateVersion?: boolean }) => {
+    const existing = db.prepare('SELECT * FROM task_artifacts WHERE id = ?').get(data.id) as Record<string, unknown> | undefined
     if (!existing) return null
 
     const sets: string[] = []
@@ -246,7 +244,7 @@ export function registerTaskHandlers(ipcMain: IpcMain, db: Database, onMutation?
     if (sets.length > 0) {
       sets.push('updated_at = datetime(\'now\')')
       values.push(data.id)
-      db.prepare(`UPDATE task_assets SET ${sets.join(', ')} WHERE id = ?`).run(...values)
+      db.prepare(`UPDATE task_artifacts SET ${sets.join(', ')} WHERE id = ?`).run(...values)
     }
 
     // If title changed and extension changed, rename file on disk
@@ -257,8 +255,8 @@ export function registerTaskHandlers(ipcMain: IpcMain, db: Database, onMutation?
       const oldExt = getExtensionFromTitle(oldTitle) || '.txt'
       const newExt = getExtensionFromTitle(newTitle) || '.txt'
       if (oldExt !== newExt) {
-        const oldPath = path.join(assetsDir, taskId, `${data.id}${oldExt}`)
-        const newPath = path.join(assetsDir, taskId, `${data.id}${newExt}`)
+        const oldPath = path.join(artifactsDir, taskId, `${data.id}${oldExt}`)
+        const newPath = path.join(artifactsDir, taskId, `${data.id}${newExt}`)
         if (existsSync(oldPath)) {
           const content = readFileSync(oldPath, 'utf-8')
           writeFileSync(newPath, content, 'utf-8')
@@ -271,62 +269,62 @@ export function registerTaskHandlers(ipcMain: IpcMain, db: Database, onMutation?
     // (tip + unnamed) or auto-branches when locked. Explicit "Create
     // version" still uses `createVersion` to always create a row.
     if (data.content !== undefined) {
-      const filePath = getAssetFilePath(taskId, data.id, newTitle)
+      const filePath = getArtifactFilePath(taskId, data.id, newTitle)
       mkdirSync(path.dirname(filePath), { recursive: true })
       const bytes = Buffer.from(data.content, 'utf-8')
       writeFileSync(filePath, bytes)
       if (data.mutateVersion) {
-        saveCurrent(db, versionTxn, blobStore, { assetId: data.id, bytes, author: uiAuthor })
+        saveCurrent(db, versionTxn, blobStore, { artifactId: data.id, bytes, author: uiAuthor })
       } else {
-        createVersion(db, versionTxn, blobStore, { assetId: data.id, bytes, author: uiAuthor })
+        createVersion(db, versionTxn, blobStore, { artifactId: data.id, bytes, author: uiAuthor })
       }
     }
 
     onMutation?.()
-    const row = db.prepare('SELECT * FROM task_assets WHERE id = ?').get(data.id) as Record<string, unknown> | undefined
-    return parseAsset(row)
+    const row = db.prepare('SELECT * FROM task_artifacts WHERE id = ?').get(data.id) as Record<string, unknown> | undefined
+    return parseArtifact(row)
   })
 
-  ipcMain.handle('db:assets:delete', (_, id: string) => {
-    const existing = db.prepare('SELECT * FROM task_assets WHERE id = ?').get(id) as Record<string, unknown> | undefined
+  ipcMain.handle('db:artifacts:delete', (_, id: string) => {
+    const existing = db.prepare('SELECT * FROM task_artifacts WHERE id = ?').get(id) as Record<string, unknown> | undefined
     if (!existing) return false
 
-    const filePath = getAssetFilePath(existing.task_id as string, id, existing.title as string)
+    const filePath = getArtifactFilePath(existing.task_id as string, id, existing.title as string)
     if (existsSync(filePath)) unlinkSync(filePath)
 
-    db.prepare('DELETE FROM task_assets WHERE id = ?').run(id)
+    db.prepare('DELETE FROM task_artifacts WHERE id = ?').run(id)
     onMutation?.()
     return true
   })
 
-  ipcMain.handle('db:assets:reorder', (_, data: string[] | { folderId: string | null; assetIds: string[] }) => {
-    const assetIds = Array.isArray(data) ? data : data.assetIds
-    const stmt = db.prepare('UPDATE task_assets SET "order" = ? WHERE id = ?')
+  ipcMain.handle('db:artifacts:reorder', (_, data: string[] | { folderId: string | null; artifactIds: string[] }) => {
+    const artifactIds = Array.isArray(data) ? data : data.artifactIds
+    const stmt = db.prepare('UPDATE task_artifacts SET "order" = ? WHERE id = ?')
     db.transaction(() => {
-      assetIds.forEach((id, index) => {
+      artifactIds.forEach((id, index) => {
         stmt.run(index, id)
       })
     })()
   })
 
-  ipcMain.handle('db:assets:readContent', (_, id: string) => {
-    const existing = db.prepare('SELECT * FROM task_assets WHERE id = ?').get(id) as Record<string, unknown> | undefined
+  ipcMain.handle('db:artifacts:readContent', (_, id: string) => {
+    const existing = db.prepare('SELECT * FROM task_artifacts WHERE id = ?').get(id) as Record<string, unknown> | undefined
     if (!existing) return null
-    const filePath = getAssetFilePath(existing.task_id as string, id, existing.title as string)
+    const filePath = getArtifactFilePath(existing.task_id as string, id, existing.title as string)
     if (!existsSync(filePath)) return ''
     return readFileSync(filePath, 'utf-8')
   })
 
-  ipcMain.handle('db:assets:getFilePath', (_, id: string) => {
-    const existing = db.prepare('SELECT * FROM task_assets WHERE id = ?').get(id) as Record<string, unknown> | undefined
+  ipcMain.handle('db:artifacts:getFilePath', (_, id: string) => {
+    const existing = db.prepare('SELECT * FROM task_artifacts WHERE id = ?').get(id) as Record<string, unknown> | undefined
     if (!existing) return null
-    return getAssetFilePath(existing.task_id as string, id, existing.title as string)
+    return getArtifactFilePath(existing.task_id as string, id, existing.title as string)
   })
 
-  ipcMain.handle('db:assets:getMtime', (_, id: string) => {
-    const existing = db.prepare('SELECT * FROM task_assets WHERE id = ?').get(id) as Record<string, unknown> | undefined
+  ipcMain.handle('db:artifacts:getMtime', (_, id: string) => {
+    const existing = db.prepare('SELECT * FROM task_artifacts WHERE id = ?').get(id) as Record<string, unknown> | undefined
     if (!existing) return null
-    const filePath = getAssetFilePath(existing.task_id as string, id, existing.title as string)
+    const filePath = getArtifactFilePath(existing.task_id as string, id, existing.title as string)
     try {
       return statSync(filePath).mtimeMs
     } catch {
@@ -334,38 +332,38 @@ export function registerTaskHandlers(ipcMain: IpcMain, db: Database, onMutation?
     }
   })
 
-  ipcMain.handle('db:assets:upload', (_, data: { taskId: string; sourcePath: string; title?: string }) => {
+  ipcMain.handle('db:artifacts:upload', (_, data: { taskId: string; sourcePath: string; title?: string }) => {
     const id = randomUUID()
     const title = data.title ?? path.basename(data.sourcePath)
-    const maxOrder = (db.prepare('SELECT MAX("order") as m FROM task_assets WHERE task_id = ?').get(data.taskId) as { m: number | null }).m ?? -1
+    const maxOrder = (db.prepare('SELECT MAX("order") as m FROM task_artifacts WHERE task_id = ?').get(data.taskId) as { m: number | null }).m ?? -1
 
     db.prepare(`
-      INSERT INTO task_assets (id, task_id, title, "order")
+      INSERT INTO task_artifacts (id, task_id, title, "order")
       VALUES (?, ?, ?, ?)
     `).run(id, data.taskId, title, maxOrder + 1)
 
-    const filePath = getAssetFilePath(data.taskId, id, title)
+    const filePath = getArtifactFilePath(data.taskId, id, title)
     mkdirSync(path.dirname(filePath), { recursive: true })
     copyFileSync(data.sourcePath, filePath)
 
     // Seed v1 from uploaded bytes.
     createVersion(db, versionTxn, blobStore, {
-      assetId: id,
+      artifactId: id,
       bytes: readFileSync(filePath),
       author: uiAuthor,
     })
 
     onMutation?.()
-    const row = db.prepare('SELECT * FROM task_assets WHERE id = ?').get(id) as Record<string, unknown> | undefined
-    return parseAsset(row)
+    const row = db.prepare('SELECT * FROM task_artifacts WHERE id = ?').get(id) as Record<string, unknown> | undefined
+    return parseArtifact(row)
   })
 
-  ipcMain.handle('db:assets:pasteFiles', (_, data: { sourcePaths: string[]; destTaskId: string; destFolderId: string | null }) => {
+  ipcMain.handle('db:artifacts:pasteFiles', (_, data: { sourcePaths: string[]; destTaskId: string; destFolderId: string | null }) => {
     const { sourcePaths, destTaskId, destFolderId } = data
     if (!sourcePaths.length) return []
 
-    const assetsRootPrefix = assetsDir + path.sep
-    const created: TaskAsset[] = []
+    const artifactsRootPrefix = artifactsDir + path.sep
+    const created: TaskArtifact[] = []
 
     db.transaction(() => {
       for (const srcPath of sourcePaths) {
@@ -378,10 +376,10 @@ export function registerTaskHandlers(ipcMain: IpcMain, db: Database, onMutation?
         let renderMode: string | null = null
         let language: string | null = null
 
-        if (srcPath.startsWith(assetsRootPrefix)) {
+        if (srcPath.startsWith(artifactsRootPrefix)) {
           const idMatch = path.basename(srcPath).match(/^([0-9a-f-]{36})\./)
           if (idMatch) {
-            const sourceRow = db.prepare('SELECT * FROM task_assets WHERE id = ?').get(idMatch[1]) as Record<string, unknown> | undefined
+            const sourceRow = db.prepare('SELECT * FROM task_artifacts WHERE id = ?').get(idMatch[1]) as Record<string, unknown> | undefined
             if (sourceRow) {
               title = sourceRow.title as string
               renderMode = (sourceRow.render_mode as string | null) ?? null
@@ -393,35 +391,35 @@ export function registerTaskHandlers(ipcMain: IpcMain, db: Database, onMutation?
         const siblingTitles = new Set<string>(
           (db.prepare(
             destFolderId
-              ? 'SELECT title FROM task_assets WHERE task_id = ? AND folder_id = ?'
-              : 'SELECT title FROM task_assets WHERE task_id = ? AND folder_id IS NULL'
+              ? 'SELECT title FROM task_artifacts WHERE task_id = ? AND folder_id = ?'
+              : 'SELECT title FROM task_artifacts WHERE task_id = ? AND folder_id IS NULL'
           ).all(...(destFolderId ? [destTaskId, destFolderId] : [destTaskId])) as { title: string }[]).map((r) => r.title)
         )
         title = uniqueName(title, siblingTitles)
 
         const maxOrder = (db.prepare(
           destFolderId
-            ? 'SELECT MAX("order") as m FROM task_assets WHERE task_id = ? AND folder_id = ?'
-            : 'SELECT MAX("order") as m FROM task_assets WHERE task_id = ? AND folder_id IS NULL'
+            ? 'SELECT MAX("order") as m FROM task_artifacts WHERE task_id = ? AND folder_id = ?'
+            : 'SELECT MAX("order") as m FROM task_artifacts WHERE task_id = ? AND folder_id IS NULL'
         ).get(...(destFolderId ? [destTaskId, destFolderId] : [destTaskId])) as { m: number | null }).m ?? -1
 
         db.prepare(`
-          INSERT INTO task_assets (id, task_id, folder_id, title, render_mode, language, "order")
+          INSERT INTO task_artifacts (id, task_id, folder_id, title, render_mode, language, "order")
           VALUES (?, ?, ?, ?, ?, ?, ?)
         `).run(newId, destTaskId, destFolderId, title, renderMode, language, maxOrder + 1)
 
-        const destFilePath = getAssetFilePath(destTaskId, newId, title)
+        const destFilePath = getArtifactFilePath(destTaskId, newId, title)
         mkdirSync(path.dirname(destFilePath), { recursive: true })
         copyFileSync(srcPath, destFilePath)
 
         createVersion(db, versionTxn, blobStore, {
-          assetId: newId,
+          artifactId: newId,
           bytes: readFileSync(destFilePath),
           author: uiAuthor,
         })
 
-        const row = db.prepare('SELECT * FROM task_assets WHERE id = ?').get(newId) as Record<string, unknown> | undefined
-        const parsed = parseAsset(row)
+        const row = db.prepare('SELECT * FROM task_artifacts WHERE id = ?').get(newId) as Record<string, unknown> | undefined
+        const parsed = parseArtifact(row)
         if (parsed) created.push(parsed)
       }
     })()
@@ -430,49 +428,49 @@ export function registerTaskHandlers(ipcMain: IpcMain, db: Database, onMutation?
     return created
   })
 
-  ipcMain.handle('db:assets:uploadBlob', (_, data: { taskId: string; title: string; bytes: Uint8Array; folderId?: string | null }): TaskAsset | null => {
+  ipcMain.handle('db:artifacts:uploadBlob', (_, data: { taskId: string; title: string; bytes: Uint8Array; folderId?: string | null }): TaskArtifact | null => {
     const id = randomUUID()
     const folderId = data.folderId ?? null
 
     const siblingTitles = new Set<string>(
       (db.prepare(
         folderId
-          ? 'SELECT title FROM task_assets WHERE task_id = ? AND folder_id = ?'
-          : 'SELECT title FROM task_assets WHERE task_id = ? AND folder_id IS NULL'
+          ? 'SELECT title FROM task_artifacts WHERE task_id = ? AND folder_id = ?'
+          : 'SELECT title FROM task_artifacts WHERE task_id = ? AND folder_id IS NULL'
       ).all(...(folderId ? [data.taskId, folderId] : [data.taskId])) as { title: string }[]).map((r) => r.title)
     )
     const title = uniqueName(data.title, siblingTitles)
 
     const maxOrder = (db.prepare(
       folderId
-        ? 'SELECT MAX("order") as m FROM task_assets WHERE task_id = ? AND folder_id = ?'
-        : 'SELECT MAX("order") as m FROM task_assets WHERE task_id = ? AND folder_id IS NULL'
+        ? 'SELECT MAX("order") as m FROM task_artifacts WHERE task_id = ? AND folder_id = ?'
+        : 'SELECT MAX("order") as m FROM task_artifacts WHERE task_id = ? AND folder_id IS NULL'
     ).get(...(folderId ? [data.taskId, folderId] : [data.taskId])) as { m: number | null }).m ?? -1
 
     db.prepare(`
-      INSERT INTO task_assets (id, task_id, folder_id, title, "order")
+      INSERT INTO task_artifacts (id, task_id, folder_id, title, "order")
       VALUES (?, ?, ?, ?, ?)
     `).run(id, data.taskId, folderId, title, maxOrder + 1)
 
-    const filePath = getAssetFilePath(data.taskId, id, title)
+    const filePath = getArtifactFilePath(data.taskId, id, title)
     mkdirSync(path.dirname(filePath), { recursive: true })
     const buf = Buffer.from(data.bytes)
     writeFileSync(filePath, buf)
 
     createVersion(db, versionTxn, blobStore, {
-      assetId: id,
+      artifactId: id,
       bytes: buf,
       author: uiAuthor,
     })
 
     onMutation?.()
-    const row = db.prepare('SELECT * FROM task_assets WHERE id = ?').get(id) as Record<string, unknown> | undefined
-    return parseAsset(row)
+    const row = db.prepare('SELECT * FROM task_artifacts WHERE id = ?').get(id) as Record<string, unknown> | undefined
+    return parseArtifact(row)
   })
 
-  ipcMain.handle('db:assets:uploadDir', (_, data: { taskId: string; dirPath: string; parentFolderId: string | null }) => {
+  ipcMain.handle('db:artifacts:uploadDir', (_, data: { taskId: string; dirPath: string; parentFolderId: string | null }) => {
     const createdFolders: ReturnType<typeof parseFolder>[] = []
-    const createdAssets: ReturnType<typeof parseAsset>[] = []
+    const createdArtifacts: ReturnType<typeof parseArtifact>[] = []
 
     function walkDir(dirPath: string, parentFolderId: string | null) {
       const entries = readdirSync(dirPath, { withFileTypes: true })
@@ -482,38 +480,38 @@ export function registerTaskHandlers(ipcMain: IpcMain, db: Database, onMutation?
           const folderId = randomUUID()
           const maxOrder = (db.prepare(
             parentFolderId
-              ? 'SELECT MAX("order") as m FROM asset_folders WHERE task_id = ? AND parent_id = ?'
-              : 'SELECT MAX("order") as m FROM asset_folders WHERE task_id = ? AND parent_id IS NULL'
+              ? 'SELECT MAX("order") as m FROM artifact_folders WHERE task_id = ? AND parent_id = ?'
+              : 'SELECT MAX("order") as m FROM artifact_folders WHERE task_id = ? AND parent_id IS NULL'
           ).get(...(parentFolderId ? [data.taskId, parentFolderId] : [data.taskId])) as { m: number | null }).m ?? -1
 
           db.prepare(`
-            INSERT INTO asset_folders (id, task_id, parent_id, name, "order")
+            INSERT INTO artifact_folders (id, task_id, parent_id, name, "order")
             VALUES (?, ?, ?, ?, ?)
           `).run(folderId, data.taskId, parentFolderId, entry.name, maxOrder + 1)
 
-          const row = db.prepare('SELECT * FROM asset_folders WHERE id = ?').get(folderId) as Record<string, unknown> | undefined
+          const row = db.prepare('SELECT * FROM artifact_folders WHERE id = ?').get(folderId) as Record<string, unknown> | undefined
           createdFolders.push(parseFolder(row))
           walkDir(fullPath, folderId)
         } else if (entry.isFile()) {
-          const assetId = randomUUID()
+          const artifactId = randomUUID()
           const title = entry.name
           const maxOrder = (db.prepare(
             parentFolderId
-              ? 'SELECT MAX("order") as m FROM task_assets WHERE task_id = ? AND folder_id = ?'
-              : 'SELECT MAX("order") as m FROM task_assets WHERE task_id = ? AND folder_id IS NULL'
+              ? 'SELECT MAX("order") as m FROM task_artifacts WHERE task_id = ? AND folder_id = ?'
+              : 'SELECT MAX("order") as m FROM task_artifacts WHERE task_id = ? AND folder_id IS NULL'
           ).get(...(parentFolderId ? [data.taskId, parentFolderId] : [data.taskId])) as { m: number | null }).m ?? -1
 
           db.prepare(`
-            INSERT INTO task_assets (id, task_id, folder_id, title, "order")
+            INSERT INTO task_artifacts (id, task_id, folder_id, title, "order")
             VALUES (?, ?, ?, ?, ?)
-          `).run(assetId, data.taskId, parentFolderId, title, maxOrder + 1)
+          `).run(artifactId, data.taskId, parentFolderId, title, maxOrder + 1)
 
-          const filePath = getAssetFilePath(data.taskId, assetId, title)
+          const filePath = getArtifactFilePath(data.taskId, artifactId, title)
           mkdirSync(path.dirname(filePath), { recursive: true })
           copyFileSync(fullPath, filePath)
 
-          const row = db.prepare('SELECT * FROM task_assets WHERE id = ?').get(assetId) as Record<string, unknown> | undefined
-          createdAssets.push(parseAsset(row))
+          const row = db.prepare('SELECT * FROM task_artifacts WHERE id = ?').get(artifactId) as Record<string, unknown> | undefined
+          createdArtifacts.push(parseArtifact(row))
         }
       }
     }
@@ -523,16 +521,16 @@ export function registerTaskHandlers(ipcMain: IpcMain, db: Database, onMutation?
     })()
 
     onMutation?.()
-    return { folders: createdFolders.filter(Boolean), assets: createdAssets.filter(Boolean) }
+    return { folders: createdFolders.filter(Boolean), artifacts: createdArtifacts.filter(Boolean) }
   })
 
-  // Cleanup asset files when a task is permanently deleted
-  ipcMain.handle('db:assets:cleanupTask', (_, taskId: string) => {
-    const taskDir = path.join(assetsDir, taskId)
+  // Cleanup artifact files when a task is permanently deleted
+  ipcMain.handle('db:artifacts:cleanupTask', (_, taskId: string) => {
+    const taskDir = path.join(artifactsDir, taskId)
     if (existsSync(taskDir)) rmSync(taskDir, { recursive: true, force: true })
   })
 
-  // --- Asset Versions ---
+  // --- Artifact Versions ---
 
   function wrapVersionError<T>(fn: () => T): T {
     try {
@@ -546,26 +544,26 @@ export function registerTaskHandlers(ipcMain: IpcMain, db: Database, onMutation?
     }
   }
 
-  ipcMain.handle('db:assets:versions:list', (_, data: { assetId: string; limit?: number; offset?: number }) => {
-    return listVersions(db, data.assetId, { limit: data.limit, offset: data.offset })
+  ipcMain.handle('db:artifacts:versions:list', (_, data: { artifactId: string; limit?: number; offset?: number }) => {
+    return listVersions(db, data.artifactId, { limit: data.limit, offset: data.offset })
   })
 
-  ipcMain.handle('db:assets:versions:read', (_, data: { assetId: string; versionRef: VersionRef }) => {
+  ipcMain.handle('db:artifacts:versions:read', (_, data: { artifactId: string; versionRef: VersionRef }) => {
     return wrapVersionError(() => {
-      const v = resolveVersionRef(db, data.assetId, data.versionRef)
+      const v = resolveVersionRef(db, data.artifactId, data.versionRef)
       const buf = readVersionContent(blobStore, v)
       return buf.toString('utf-8')
     })
   })
 
-  ipcMain.handle('db:assets:versions:create', (_, data: { assetId: string; name?: string | null }) => {
+  ipcMain.handle('db:artifacts:versions:create', (_, data: { artifactId: string; name?: string | null }) => {
     return wrapVersionError(() => {
-      const existing = db.prepare('SELECT * FROM task_assets WHERE id = ?').get(data.assetId) as Record<string, unknown> | undefined
-      if (!existing) throw new Error('Asset not found')
-      const filePath = getAssetFilePath(existing.task_id as string, data.assetId, existing.title as string)
+      const existing = db.prepare('SELECT * FROM task_artifacts WHERE id = ?').get(data.artifactId) as Record<string, unknown> | undefined
+      if (!existing) throw new Error('Artifact not found')
+      const filePath = getArtifactFilePath(existing.task_id as string, data.artifactId, existing.title as string)
       const bytes = existsSync(filePath) ? readFileSync(filePath) : Buffer.alloc(0)
       return createVersion(db, versionTxn, blobStore, {
-        assetId: data.assetId,
+        artifactId: data.artifactId,
         bytes,
         name: data.name ?? null,
         honorUnchanged: true,
@@ -574,17 +572,17 @@ export function registerTaskHandlers(ipcMain: IpcMain, db: Database, onMutation?
     })
   })
 
-  ipcMain.handle('db:assets:versions:rename', (_, data: { assetId: string; versionRef: VersionRef; newName: string | null }) => {
-    return wrapVersionError(() => renameVersion(db, versionTxn, data.assetId, data.versionRef, data.newName))
+  ipcMain.handle('db:artifacts:versions:rename', (_, data: { artifactId: string; versionRef: VersionRef; newName: string | null }) => {
+    return wrapVersionError(() => renameVersion(db, versionTxn, data.artifactId, data.versionRef, data.newName))
   })
 
-  ipcMain.handle('db:assets:versions:diff', (_, data: { assetId: string; a: VersionRef; b?: VersionRef }) => {
-    return wrapVersionError(() => diffVersions(db, blobStore, { assetId: data.assetId, a: data.a, b: data.b }))
+  ipcMain.handle('db:artifacts:versions:diff', (_, data: { artifactId: string; a: VersionRef; b?: VersionRef }) => {
+    return wrapVersionError(() => diffVersions(db, blobStore, { artifactId: data.artifactId, a: data.a, b: data.b }))
   })
 
-  ipcMain.handle('db:assets:versions:prune', (_, data: { assetId: string; keepLast?: number; keepNamed?: boolean; keepCurrent?: boolean; dryRun?: boolean }) => {
+  ipcMain.handle('db:artifacts:versions:prune', (_, data: { artifactId: string; keepLast?: number; keepNamed?: boolean; keepCurrent?: boolean; dryRun?: boolean }) => {
     return wrapVersionError(() =>
-      pruneVersions(db, versionTxn, blobStore, data.assetId, {
+      pruneVersions(db, versionTxn, blobStore, data.artifactId, {
         keepLast: data.keepLast,
         keepNamed: data.keepNamed,
         keepCurrent: data.keepCurrent,
@@ -593,16 +591,16 @@ export function registerTaskHandlers(ipcMain: IpcMain, db: Database, onMutation?
     )
   })
 
-  ipcMain.handle('db:assets:versions:setCurrent', (_, data: { assetId: string; versionRef: VersionRef }) => {
+  ipcMain.handle('db:artifacts:versions:setCurrent', (_, data: { artifactId: string; versionRef: VersionRef }) => {
     return wrapVersionError(() => {
-      const existing = db.prepare('SELECT * FROM task_assets WHERE id = ?').get(data.assetId) as Record<string, unknown> | undefined
-      if (!existing) throw new Error('Asset not found')
-      const v = setCurrentVersion(db, versionTxn, data.assetId, data.versionRef)
+      const existing = db.prepare('SELECT * FROM task_artifacts WHERE id = ?').get(data.artifactId) as Record<string, unknown> | undefined
+      if (!existing) throw new Error('Artifact not found')
+      const v = setCurrentVersion(db, versionTxn, data.artifactId, data.versionRef)
       // Flush the switched version's bytes to disk so the editor reloads
       // the correct content. Without this, the on-disk file still reflects
       // the prior current and saves would diff against stale bytes.
       const bytes = readVersionContent(blobStore, v)
-      const filePath = getAssetFilePath(existing.task_id as string, data.assetId, existing.title as string)
+      const filePath = getArtifactFilePath(existing.task_id as string, data.artifactId, existing.title as string)
       mkdirSync(path.dirname(filePath), { recursive: true })
       writeFileSync(filePath, bytes)
       onMutation?.()
@@ -610,27 +608,27 @@ export function registerTaskHandlers(ipcMain: IpcMain, db: Database, onMutation?
     })
   })
 
-  // --- Asset Download ---
+  // --- Artifact Download ---
 
-  ipcMain.handle('db:assets:downloadFile', async (_, id: string) => {
-    const existing = db.prepare('SELECT * FROM task_assets WHERE id = ?').get(id) as Record<string, unknown> | undefined
+  ipcMain.handle('db:artifacts:downloadFile', async (_, id: string) => {
+    const existing = db.prepare('SELECT * FROM task_artifacts WHERE id = ?').get(id) as Record<string, unknown> | undefined
     if (!existing) return false
-    const srcPath = getAssetFilePath(existing.task_id as string, id, existing.title as string)
+    const srcPath = getArtifactFilePath(existing.task_id as string, id, existing.title as string)
     if (!existsSync(srcPath)) return false
 
     const defaultPath = path.join(app.getPath('downloads'), existing.title as string)
     const win = BrowserWindow.getFocusedWindow()
     const result = win
-      ? await dialog.showSaveDialog(win, { title: 'Download Asset', defaultPath })
-      : await dialog.showSaveDialog({ title: 'Download Asset', defaultPath })
+      ? await dialog.showSaveDialog(win, { title: 'Download Artifact', defaultPath })
+      : await dialog.showSaveDialog({ title: 'Download Artifact', defaultPath })
     if (result.canceled || !result.filePath) return false
 
     copyFileSync(srcPath, result.filePath)
     return true
   })
 
-  ipcMain.handle('db:assets:downloadFolder', async (_, folderId: string) => {
-    const folder = db.prepare('SELECT * FROM asset_folders WHERE id = ?').get(folderId) as Record<string, unknown> | undefined
+  ipcMain.handle('db:artifacts:downloadFolder', async (_, folderId: string) => {
+    const folder = db.prepare('SELECT * FROM artifact_folders WHERE id = ?').get(folderId) as Record<string, unknown> | undefined
     if (!folder) return false
 
     const win = BrowserWindow.getFocusedWindow()
@@ -643,7 +641,7 @@ export function registerTaskHandlers(ipcMain: IpcMain, db: Database, onMutation?
     const taskId = folder.task_id as string
 
     // Build folder path map: folderId -> name segments
-    const allFolders = db.prepare('SELECT * FROM asset_folders WHERE task_id = ?').all(taskId) as Record<string, unknown>[]
+    const allFolders = db.prepare('SELECT * FROM artifact_folders WHERE task_id = ?').all(taskId) as Record<string, unknown>[]
     const byId = new Map(allFolders.map(f => [f.id as string, f]))
     function folderPath(id: string): string {
       const f = byId.get(id)
@@ -677,13 +675,13 @@ export function registerTaskHandlers(ipcMain: IpcMain, db: Database, onMutation?
       mkdirSync(path.join(destRoot, rel), { recursive: true })
     }
 
-    // Copy assets in target folders
-    const assets = db.prepare('SELECT * FROM task_assets WHERE task_id = ? AND folder_id IN (' + [...targetIds].map(() => '?').join(',') + ')').all(taskId, ...targetIds) as Record<string, unknown>[]
-    for (const asset of assets) {
-      const srcPath = getAssetFilePath(taskId, asset.id as string, asset.title as string)
+    // Copy artifacts in target folders
+    const artifacts = db.prepare('SELECT * FROM task_artifacts WHERE task_id = ? AND folder_id IN (' + [...targetIds].map(() => '?').join(',') + ')').all(taskId, ...targetIds) as Record<string, unknown>[]
+    for (const artifact of artifacts) {
+      const srcPath = getArtifactFilePath(taskId, artifact.id as string, artifact.title as string)
       if (!existsSync(srcPath)) continue
-      const folderRel = rootParentPath === '.' ? folderPath(asset.folder_id as string) : path.relative(rootParentPath, folderPath(asset.folder_id as string))
-      copyFileSync(srcPath, path.join(destRoot, folderRel, asset.title as string))
+      const folderRel = rootParentPath === '.' ? folderPath(artifact.folder_id as string) : path.relative(rootParentPath, folderPath(artifact.folder_id as string))
+      copyFileSync(srcPath, path.join(destRoot, folderRel, artifact.title as string))
     }
 
     return true
@@ -691,15 +689,15 @@ export function registerTaskHandlers(ipcMain: IpcMain, db: Database, onMutation?
 
   // --- Download as PDF ---
 
-  ipcMain.handle('db:assets:downloadAsPdf', async (_, id: string) => {
-    const existing = db.prepare('SELECT * FROM task_assets WHERE id = ?').get(id) as Record<string, unknown> | undefined
+  ipcMain.handle('db:artifacts:downloadAsPdf', async (_, id: string) => {
+    const existing = db.prepare('SELECT * FROM task_artifacts WHERE id = ?').get(id) as Record<string, unknown> | undefined
     if (!existing) return false
 
     const title = existing.title as string
     const mode = getEffectiveRenderMode(title, (existing.render_mode as string | null) as any)
     if (!canExportAsPdf(mode)) return false
 
-    const srcPath = getAssetFilePath(existing.task_id as string, id, title)
+    const srcPath = getArtifactFilePath(existing.task_id as string, id, title)
     if (!existsSync(srcPath)) return false
     const content = readFileSync(srcPath, 'utf-8')
 
@@ -722,15 +720,15 @@ export function registerTaskHandlers(ipcMain: IpcMain, db: Database, onMutation?
 
   // --- Download as PNG ---
 
-  ipcMain.handle('db:assets:downloadAsPng', async (_, id: string) => {
-    const existing = db.prepare('SELECT * FROM task_assets WHERE id = ?').get(id) as Record<string, unknown> | undefined
+  ipcMain.handle('db:artifacts:downloadAsPng', async (_, id: string) => {
+    const existing = db.prepare('SELECT * FROM task_artifacts WHERE id = ?').get(id) as Record<string, unknown> | undefined
     if (!existing) return false
 
     const title = existing.title as string
     const mode = getEffectiveRenderMode(title, (existing.render_mode as string | null) as any)
     if (!canExportAsPng(mode)) return false
 
-    const srcPath = getAssetFilePath(existing.task_id as string, id, title)
+    const srcPath = getArtifactFilePath(existing.task_id as string, id, title)
     if (!existsSync(srcPath)) return false
     const content = readFileSync(srcPath, 'utf-8')
 
@@ -753,15 +751,15 @@ export function registerTaskHandlers(ipcMain: IpcMain, db: Database, onMutation?
 
   // --- Download as HTML ---
 
-  ipcMain.handle('db:assets:downloadAsHtml', async (_, id: string) => {
-    const existing = db.prepare('SELECT * FROM task_assets WHERE id = ?').get(id) as Record<string, unknown> | undefined
+  ipcMain.handle('db:artifacts:downloadAsHtml', async (_, id: string) => {
+    const existing = db.prepare('SELECT * FROM task_artifacts WHERE id = ?').get(id) as Record<string, unknown> | undefined
     if (!existing) return false
 
     const title = existing.title as string
     const mode = getEffectiveRenderMode(title, (existing.render_mode as string | null) as any)
     if (!canExportAsHtml(mode)) return false
 
-    const srcPath = getAssetFilePath(existing.task_id as string, id, title)
+    const srcPath = getArtifactFilePath(existing.task_id as string, id, title)
     if (!existsSync(srcPath)) return false
     const content = readFileSync(srcPath, 'utf-8')
 
@@ -783,11 +781,11 @@ export function registerTaskHandlers(ipcMain: IpcMain, db: Database, onMutation?
 
   // --- Download All as ZIP ---
 
-  ipcMain.handle('db:assets:downloadAllAsZip', async (_, taskId: string) => {
-    const allAssets = db.prepare('SELECT * FROM task_assets WHERE task_id = ?').all(taskId) as Record<string, unknown>[]
-    if (allAssets.length === 0) return false
+  ipcMain.handle('db:artifacts:downloadAllAsZip', async (_, taskId: string) => {
+    const allArtifacts = db.prepare('SELECT * FROM task_artifacts WHERE task_id = ?').all(taskId) as Record<string, unknown>[]
+    if (allArtifacts.length === 0) return false
 
-    const allFolders = db.prepare('SELECT * FROM asset_folders WHERE task_id = ?').all(taskId) as Record<string, unknown>[]
+    const allFolders = db.prepare('SELECT * FROM artifact_folders WHERE task_id = ?').all(taskId) as Record<string, unknown>[]
     const byId = new Map(allFolders.map(f => [f.id as string, f]))
     function folderPath(id: string): string {
       const f = byId.get(id)
@@ -797,7 +795,7 @@ export function registerTaskHandlers(ipcMain: IpcMain, db: Database, onMutation?
     }
 
     const win = BrowserWindow.getFocusedWindow()
-    const defaultPath = path.join(app.getPath('downloads'), 'assets.zip')
+    const defaultPath = path.join(app.getPath('downloads'), 'artifacts.zip')
     const result = win
       ? await dialog.showSaveDialog(win, { title: 'Download All as ZIP', defaultPath, filters: [{ name: 'ZIP', extensions: ['zip'] }] })
       : await dialog.showSaveDialog({ title: 'Download All as ZIP', defaultPath, filters: [{ name: 'ZIP', extensions: ['zip'] }] })
@@ -807,11 +805,11 @@ export function registerTaskHandlers(ipcMain: IpcMain, db: Database, onMutation?
     const archive = archiver('zip', { zlib: { level: 9 } })
     archive.pipe(output)
 
-    for (const asset of allAssets) {
-      const srcPath = getAssetFilePath(taskId, asset.id as string, asset.title as string)
+    for (const artifact of allArtifacts) {
+      const srcPath = getArtifactFilePath(taskId, artifact.id as string, artifact.title as string)
       if (!existsSync(srcPath)) continue
-      const folderId = asset.folder_id as string | null
-      const rel = folderId ? path.join(folderPath(folderId), asset.title as string) : (asset.title as string)
+      const folderId = artifact.folder_id as string | null
+      const rel = folderId ? path.join(folderPath(folderId), artifact.title as string) : (artifact.title as string)
       archive.file(srcPath, { name: rel })
     }
 
@@ -825,36 +823,36 @@ export function registerTaskHandlers(ipcMain: IpcMain, db: Database, onMutation?
     return true
   })
 
-  // --- Asset Folders ---
+  // --- Artifact Folders ---
 
-  ipcMain.handle('db:assetFolders:getByTask', (_, taskId: string) => {
+  ipcMain.handle('db:artifactFolders:getByTask', (_, taskId: string) => {
     const rows = db
-      .prepare('SELECT * FROM asset_folders WHERE task_id = ? ORDER BY "order" ASC, created_at ASC')
+      .prepare('SELECT * FROM artifact_folders WHERE task_id = ? ORDER BY "order" ASC, created_at ASC')
       .all(taskId) as Record<string, unknown>[]
     return rows.map(parseFolder).filter(Boolean)
   })
 
-  ipcMain.handle('db:assetFolders:create', (_, data: CreateAssetFolderInput) => {
+  ipcMain.handle('db:artifactFolders:create', (_, data: CreateArtifactFolderInput) => {
     const id = randomUUID()
     const parentId = data.parentId ?? null
     const maxOrder = (db.prepare(
       parentId
-        ? 'SELECT MAX("order") as m FROM asset_folders WHERE task_id = ? AND parent_id = ?'
-        : 'SELECT MAX("order") as m FROM asset_folders WHERE task_id = ? AND parent_id IS NULL'
+        ? 'SELECT MAX("order") as m FROM artifact_folders WHERE task_id = ? AND parent_id = ?'
+        : 'SELECT MAX("order") as m FROM artifact_folders WHERE task_id = ? AND parent_id IS NULL'
     ).get(...(parentId ? [data.taskId, parentId] : [data.taskId])) as { m: number | null }).m ?? -1
 
     db.prepare(`
-      INSERT INTO asset_folders (id, task_id, parent_id, name, "order")
+      INSERT INTO artifact_folders (id, task_id, parent_id, name, "order")
       VALUES (?, ?, ?, ?, ?)
     `).run(id, data.taskId, parentId, data.name, maxOrder + 1)
 
     onMutation?.()
-    const row = db.prepare('SELECT * FROM asset_folders WHERE id = ?').get(id) as Record<string, unknown> | undefined
+    const row = db.prepare('SELECT * FROM artifact_folders WHERE id = ?').get(id) as Record<string, unknown> | undefined
     return parseFolder(row)
   })
 
-  ipcMain.handle('db:assetFolders:update', (_, data: UpdateAssetFolderInput) => {
-    const existing = db.prepare('SELECT * FROM asset_folders WHERE id = ?').get(data.id) as Record<string, unknown> | undefined
+  ipcMain.handle('db:artifactFolders:update', (_, data: UpdateArtifactFolderInput) => {
+    const existing = db.prepare('SELECT * FROM artifact_folders WHERE id = ?').get(data.id) as Record<string, unknown> | undefined
     if (!existing) return null
 
     const sets: string[] = []
@@ -863,24 +861,24 @@ export function registerTaskHandlers(ipcMain: IpcMain, db: Database, onMutation?
     if (data.parentId !== undefined) { sets.push('parent_id = ?'); values.push(data.parentId) }
     if (sets.length > 0) {
       values.push(data.id)
-      db.prepare(`UPDATE asset_folders SET ${sets.join(', ')} WHERE id = ?`).run(...values)
+      db.prepare(`UPDATE artifact_folders SET ${sets.join(', ')} WHERE id = ?`).run(...values)
     }
 
     onMutation?.()
-    const row = db.prepare('SELECT * FROM asset_folders WHERE id = ?').get(data.id) as Record<string, unknown> | undefined
+    const row = db.prepare('SELECT * FROM artifact_folders WHERE id = ?').get(data.id) as Record<string, unknown> | undefined
     return parseFolder(row)
   })
 
-  ipcMain.handle('db:assetFolders:delete', (_, id: string) => {
-    const existing = db.prepare('SELECT * FROM asset_folders WHERE id = ?').get(id) as Record<string, unknown> | undefined
+  ipcMain.handle('db:artifactFolders:delete', (_, id: string) => {
+    const existing = db.prepare('SELECT * FROM artifact_folders WHERE id = ?').get(id) as Record<string, unknown> | undefined
     if (!existing) return false
-    db.prepare('DELETE FROM asset_folders WHERE id = ?').run(id)
+    db.prepare('DELETE FROM artifact_folders WHERE id = ?').run(id)
     onMutation?.()
     return true
   })
 
-  ipcMain.handle('db:assetFolders:reorder', (_, data: { parentId: string | null; folderIds: string[] }) => {
-    const stmt = db.prepare('UPDATE asset_folders SET "order" = ? WHERE id = ?')
+  ipcMain.handle('db:artifactFolders:reorder', (_, data: { parentId: string | null; folderIds: string[] }) => {
+    const stmt = db.prepare('UPDATE artifact_folders SET "order" = ? WHERE id = ?')
     db.transaction(() => {
       data.folderIds.forEach((id, index) => {
         stmt.run(index, id)

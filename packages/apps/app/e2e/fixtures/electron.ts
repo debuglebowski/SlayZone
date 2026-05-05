@@ -470,22 +470,22 @@ export function seed(page: Page) {
     setTheme: (theme: 'light' | 'dark' | 'system') =>
       page.evaluate((t) => window.api.theme.set(t), theme),
 
-    // --- Assets ---
+    // --- Artifacts ---
 
-    createAsset: (data: { taskId: string; title: string; content?: string; folderId?: string | null }) =>
-      page.evaluate((d) => window.api.assets.create(d), data),
+    createArtifact: (data: { taskId: string; title: string; content?: string; folderId?: string | null }) =>
+      page.evaluate((d) => window.api.artifacts.create(d), data),
 
-    getAssets: (taskId: string) =>
-      page.evaluate((id) => window.api.assets.getByTask(id), taskId),
+    getArtifacts: (taskId: string) =>
+      page.evaluate((id) => window.api.artifacts.getByTask(id), taskId),
 
-    deleteAsset: (id: string) =>
-      page.evaluate((i) => window.api.assets.delete(i), id),
+    deleteArtifact: (id: string) =>
+      page.evaluate((i) => window.api.artifacts.delete(i), id),
 
-    createAssetFolder: (data: { taskId: string; name: string; parentId?: string | null }) =>
-      page.evaluate((d) => window.api.assetFolders.create(d), data),
+    createArtifactFolder: (data: { taskId: string; name: string; parentId?: string | null }) =>
+      page.evaluate((d) => window.api.artifactFolders.create(d), data),
 
-    getAssetFolders: (taskId: string) =>
-      page.evaluate((id) => window.api.assetFolders.getByTask(id), taskId),
+    getArtifactFolders: (taskId: string) =>
+      page.evaluate((id) => window.api.artifactFolders.getByTask(id), taskId),
 
     /** Re-fetch all data from DB into React state */
     refreshData: () =>

@@ -16,7 +16,7 @@ import { tagAction } from './tasks/tag'
 import { blockersAction } from './tasks/blockers'
 import { blockingAction } from './tasks/blocking'
 import { blockedAction } from './tasks/blocked'
-import { assetsSubcommand } from './tasks/assets'
+import { artifactsSubcommand } from './tasks/artifacts'
 
 export function tasksCommand(): Command {
   const cmd = new Command('tasks')
@@ -40,7 +40,7 @@ export function tasksCommand(): Command {
     .command('create <title>')
     .description('Create a new task')
     .option('--project <name|id>', 'Project name (partial, case-insensitive) or ID (defaults to $SLAYZONE_PROJECT_ID)')
-    .option('--description <text>', 'Task description (reference task specific assets via `[title](asset:<asset-id>)`)')
+    .option('--description <text>', 'Task description (reference task specific artifacts via `[title](artifact:<artifact-id>)`)')
     .option('--status <status>', 'Initial status key')
     .option('--priority <n>', 'Priority 1-5 (1=highest)')
     .option('--due <date>', 'Due date (YYYY-MM-DD or ISO 8601)')
@@ -67,7 +67,7 @@ export function tasksCommand(): Command {
     .command('update [id]')
     .description('Update a task (id prefix supported; defaults to $SLAYZONE_TASK_ID)')
     .option('--title <title>', 'New title')
-    .option('--description <text>', 'New description (reference task specific assets via `[title](asset:<asset-id>)`)')
+    .option('--description <text>', 'New description (reference task specific artifacts via `[title](artifact:<artifact-id>)`)')
     .option('--append-description <text>', 'Append to existing description')
     .option('--status <status>', 'New status key')
     .option('--priority <n>', 'New priority 1-5')
@@ -172,7 +172,7 @@ export function tasksCommand(): Command {
     .action(blockedAction)
 
   cmd.addCommand(browserCommand())
-  cmd.addCommand(assetsSubcommand())
+  cmd.addCommand(artifactsSubcommand())
 
   return cmd
 }

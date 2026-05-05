@@ -258,16 +258,14 @@ export function SubAgentRow({ item }: { item: Extract<TimelineItem, { kind: 'sub
 
   return (
     <>
-      <div className="pl-10 pr-[10%] py-1" data-testid="sub-agent-row">
-      <div className="flex gap-3 items-start">
-        <div className="shrink-0 size-7" aria-hidden />
-        <div className="min-w-0 flex-1 rounded-md border border-border/50 bg-muted/20 overflow-hidden">
+      <div className="pl-14 pr-4 py-1" data-testid="sub-agent-row">
+        <div className="w-fit max-w-full rounded-md border border-border/50 bg-muted/20 overflow-hidden">
         <button
           type="button"
           onClick={() => hasChildren && setOpen((v) => !v)}
           disabled={!hasChildren}
           className={cn(
-            'w-full flex items-center gap-2 px-3 py-1.5 text-xs text-left',
+            'flex items-center gap-2 px-3 py-1.5 text-xs text-left max-w-full',
             hasChildren && 'hover:bg-muted/40 cursor-pointer',
             !hasChildren && 'cursor-default',
           )}
@@ -320,7 +318,6 @@ export function SubAgentRow({ item }: { item: Extract<TimelineItem, { kind: 'sub
           )}
         </button>
         </div>
-      </div>
       </div>
       {open && hasChildren && (
         <div className="pl-4" data-testid="sub-agent-children">
@@ -407,15 +404,13 @@ function ToolShell({
   }
   const canOpen = Boolean(body)
   return (
-    <div className="pl-10 pr-[10%] py-1">
-      <div className="flex gap-3 items-start">
-        <div className="shrink-0 size-7" aria-hidden />
-        <div className="min-w-0 flex-1 rounded-lg border border-border/50 bg-card/40 overflow-hidden shadow-sm">
+    <div className="pl-14 pr-4 py-1">
+      <div className="w-fit max-w-full rounded-lg border border-border/50 bg-card/40 overflow-hidden shadow-sm">
         <button
           onClick={() => canOpen && setOpen(!open)}
           disabled={!canOpen}
           className={cn(
-            'w-full flex items-center gap-2 px-3 py-1.5 text-xs text-left',
+            'flex items-center gap-2 px-3 py-1.5 text-xs text-left max-w-full',
             canOpen && 'hover:bg-muted/40 cursor-pointer',
             !canOpen && 'cursor-default'
           )}
@@ -424,7 +419,7 @@ function ToolShell({
           <span className="shrink-0 text-muted-foreground">{icon}</span>
           <span className="font-medium shrink-0">{title}</span>
           {summary !== undefined && summary !== '' && (
-            <span className="text-muted-foreground truncate flex-1 font-mono text-[11px]">{summary}</span>
+            <span className="text-muted-foreground truncate min-w-0 font-mono text-[11px]">{summary}</span>
           )}
           {canOpen && (
             <span className="shrink-0 text-muted-foreground">
@@ -433,7 +428,6 @@ function ToolShell({
           )}
         </button>
         {open && canOpen && <div className="border-t border-border/40 bg-background/40">{body}</div>}
-        </div>
       </div>
     </div>
   )

@@ -267,3 +267,20 @@ export interface FileMatch {
   path: string
   isDirectory: boolean
 }
+
+/**
+ * Backend-persisted "Up next" chat queue row. Source-of-truth for messages
+ * the user has lined up while a turn is in flight. Survives reload + sync'd
+ * across windows. Drained main-side on state→idle.
+ *
+ * `send` is the wire-ready text (post `transformSubmit`); `original` is the
+ * raw composer input retained so usage bumps see the user's `/cmd` token.
+ */
+export interface QueuedChatMessage {
+  id: string
+  tabId: string
+  send: string
+  original: string
+  position: number
+  createdAt: string
+}

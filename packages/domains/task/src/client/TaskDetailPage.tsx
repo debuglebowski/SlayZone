@@ -2,9 +2,9 @@ import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { MoreHorizontal, Archive, Trash2, AlertTriangle, Loader2, Terminal as TerminalIcon, Globe, Settings2, GitBranch, FileCode, ChevronRight, Plus, GripVertical, X, Info, CheckCircle2, XCircle, Stethoscope, Cpu, Circle, Repeat, LayoutTemplate, Paperclip } from 'lucide-react'
 import { IconArrowsVertical, IconArrowsMaximize } from '@tabler/icons-react'
 import { DescriptionDialog } from './DescriptionDialog'
-import { AssetsPanel, type AssetsPanelHandle } from './AssetsPanel'
-import { useAssets } from './useAssets'
-import { useAssetUpload } from '@slayzone/editor'
+import { ArtifactsPanel, type ArtifactsPanelHandle } from './ArtifactsPanel'
+import { useArtifacts } from './useArtifacts'
+import { useArtifactUpload } from '@slayzone/editor'
 import { DndContext, PointerSensor, useSensors, useSensor, closestCenter } from '@dnd-kit/core'
 import { SortableContext, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
@@ -311,9 +311,9 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
   // Sub-tasks
   const { subTasks, createSubTask, updateSubTask: handleUpdateSubTask, deleteSubTask: handleDeleteSubTask, handleDragEnd: handleSubTaskDragEnd } = useSubTasks(task?.id, initialData?.subTasks)
 
-  // Assets
-  const { assets } = useAssets(task?.id)
-  const { uploadFiles: uploadImageFiles } = useAssetUpload(task?.id)
+  // Artifacts
+  const { artifacts } = useArtifacts(task?.id)
+  const { uploadFiles: uploadImageFiles } = useArtifactUpload(task?.id)
   const handleUploadImages = useCallback(async (files: File[]) => {
     const uploaded = await uploadImageFiles(files)
     return uploaded.map((a) => ({ id: a.id, title: a.title }))
@@ -367,7 +367,7 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
   const panelGitShortcut = useShortcutDisplay('panel-git')
   const panelProcessesShortcut = useShortcutDisplay('panel-processes')
   const panelSettingsShortcut = useShortcutDisplay('panel-settings')
-  const panelAssetsShortcut = useShortcutDisplay('panel-assets')
+  const panelArtifactsShortcut = useShortcutDisplay('panel-artifacts')
 
   const terminalInjectTitleShortcut = useShortcutDisplay('terminal-inject-title')
   const terminalInjectDescShortcut = useShortcutDisplay('terminal-inject-desc')
@@ -398,7 +398,7 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
   const [descriptionExpanded, setDescriptionExpanded] = useState(false)
   const [descriptionOpen, setDescriptionOpen] = useState(true)
   const [subTasksOpen, setSubTasksOpen] = useState(true)
-  const [assetsOpen, setAssetsOpen] = useState(true)
+  const [artifactsOpen, setArtifactsOpen] = useState(true)
   const [detailsOpen, setDetailsOpen] = useState(true)
 
   // Doctor dialog state
@@ -424,8 +424,8 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
 
   // Panel visibility state. Initial value sourced from initialData (secondary lifts via parent).
   const defaultPanelVisibility: PanelVisibility = isSecondaryWindow
-    ? { terminal: false, browser: false, diff: false, settings: false, editor: false, assets: false, processes: false }
-    : { terminal: true, browser: false, diff: false, settings: true, editor: false, assets: false, processes: false }
+    ? { terminal: false, browser: false, diff: false, settings: false, editor: false, artifacts: false, processes: false }
+    : { terminal: true, browser: false, diff: false, settings: true, editor: false, artifacts: false, processes: false }
   const [panelVisibility, setPanelVisibility] = useState<PanelVisibility>(
     initialData?.panelVisibility ?? defaultPanelVisibility
   )
@@ -493,7 +493,7 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
   // stub w/ Take over buttons until user explicitly takes over.
   useEffect(() => {
     if (!task || ownership.windowId == null) return
-    const claimableIds = ['terminal', 'browser', 'editor', 'diff', 'assets', 'processes', 'settings'] as const
+    const claimableIds = ['terminal', 'browser', 'editor', 'diff', 'artifacts', 'processes', 'settings'] as const
     for (const id of claimableIds) {
       if (panelVisibility[id] && ownership.ownerOf(id) == null) ownership.claim(id)
     }
@@ -617,7 +617,7 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
   const [pendingChatEnable, setPendingChatEnable] = useState(false)
   const [pendingChatDisable, setPendingChatDisable] = useState(false)
   const browserPanelRef = useRef<BrowserPanelHandle>(null)
-  const assetsPanelRef = useRef<AssetsPanelHandle>(null)
+  const artifactsPanelRef = useRef<ArtifactsPanelHandle>(null)
   const pendingEditorFileRef = useRef<string | null>(null)
   const pendingSearchToggleRef = useRef(false)
   const fileEditorRefCallback = useCallback((handle: FileEditorViewHandle | null) => {
@@ -1255,13 +1255,13 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
   )
   handlePanelToggleRef.current = handlePanelToggle
 
-  const openAssetRef = useRef<(taskId: string, assetId: string) => void>(() => {})
-  openAssetRef.current = (targetTaskId, assetId) => {
+  const openArtifactRef = useRef<(taskId: string, artifactId: string) => void>(() => {})
+  openArtifactRef.current = (targetTaskId, artifactId) => {
     if (!task || targetTaskId !== task.id) return
-    if (!panelVisibility.assets) handlePanelToggle('assets', true)
-    assetsPanelRef.current?.selectAsset(assetId)
+    if (!panelVisibility.artifacts) handlePanelToggle('artifacts', true)
+    artifactsPanelRef.current?.selectArtifact(artifactId)
   }
-  useEffect(() => window.api.app.onOpenAsset((tid, aid) => openAssetRef.current(tid, aid)), [])
+  useEffect(() => window.api.app.onOpenArtifact((tid, aid) => openArtifactRef.current(tid, aid)), [])
 
   const handleQuickOpenFile = useCallback((filePath: string, options?: OpenFileOptions) => {
     if (fileEditorRef.current) {
@@ -1373,9 +1373,9 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
         handlePanelToggle('tests', !panelVisibility.tests)
         return
       }
-      if (matchesShortcut(e, keys('panel-assets')) && isBuiltinEnabled('assets', 'task')) {
+      if (matchesShortcut(e, keys('panel-artifacts')) && isBuiltinEnabled('artifacts', 'task')) {
         e.preventDefault()
-        handlePanelToggle('assets', !panelVisibility.assets)
+        handlePanelToggle('artifacts', !panelVisibility.artifacts)
         return
       }
       // Skip shortcuts inside CodeMirror / contenteditable so editor bindings (e.g. Mod+B) win
@@ -1554,22 +1554,22 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
     }
   }, [])
 
-  // Active asset persistence — debounced, ref-based
-  const activeAssetIdTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // Active artifact persistence — debounced, ref-based
+  const activeArtifactIdTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  const flushPendingActiveAssetSave = useCallback(() => {
-    if (activeAssetIdTimerRef.current) {
-      clearTimeout(activeAssetIdTimerRef.current)
-      activeAssetIdTimerRef.current = null
+  const flushPendingActiveArtifactSave = useCallback(() => {
+    if (activeArtifactIdTimerRef.current) {
+      clearTimeout(activeArtifactIdTimerRef.current)
+      activeArtifactIdTimerRef.current = null
     }
   }, [])
 
-  const handleActiveAssetIdChange = useCallback((id: string | null) => {
-    if (activeAssetIdTimerRef.current) clearTimeout(activeAssetIdTimerRef.current)
+  const handleActiveArtifactIdChange = useCallback((id: string | null) => {
+    if (activeArtifactIdTimerRef.current) clearTimeout(activeArtifactIdTimerRef.current)
     const taskId = taskIdRef.current
-    activeAssetIdTimerRef.current = setTimeout(async () => {
+    activeArtifactIdTimerRef.current = setTimeout(async () => {
       if (!taskId) return
-      await window.api.db.updateTask({ id: taskId, activeAssetId: id })
+      await window.api.db.updateTask({ id: taskId, activeArtifactId: id })
     }, 500)
   }, [])
 
@@ -1594,15 +1594,15 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
   useEffect(() => {
     flushPendingUrlSave()
     flushPendingEditorSave()
-    flushPendingActiveAssetSave()
+    flushPendingActiveArtifactSave()
     taskIdRef.current = task?.id ?? null
     if (task?.web_panel_urls) webPanelUrlsRef.current = { ...task.web_panel_urls }
     else webPanelUrlsRef.current = {}
-  }, [task?.id, flushPendingUrlSave, flushPendingEditorSave, flushPendingActiveAssetSave])
+  }, [task?.id, flushPendingUrlSave, flushPendingEditorSave, flushPendingActiveArtifactSave])
 
   // Flush pending saves on unmount
   useEffect(() => {
-    return () => { flushPendingUrlSave(); flushPendingEditorSave(); flushPendingActiveAssetSave() }
+    return () => { flushPendingUrlSave(); flushPendingEditorSave(); flushPendingActiveArtifactSave() }
   }, [flushPendingUrlSave, flushPendingEditorSave])
 
   const handleWebPanelUrlChange = useCallback((panelId: string, url: string) => {
@@ -1963,7 +1963,7 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
                     terminal: { id: 'terminal', icon: TerminalIcon, label: 'Agent', shortcut: panelTerminalShortcut },
                     browser: { id: 'browser', icon: Globe, label: 'Browser', shortcut: panelBrowserShortcut },
                     editor: { id: 'editor', icon: FileCode, label: 'Editor', shortcut: panelEditorShortcut },
-                    assets: { id: 'assets', icon: Paperclip, label: 'Assets', shortcut: panelAssetsShortcut },
+                    artifacts: { id: 'artifacts', icon: Paperclip, label: 'Artifacts', shortcut: panelArtifactsShortcut },
                     diff: { id: 'diff', icon: GitBranch, label: 'Git', shortcut: panelGitShortcut },
                     processes: { id: 'processes', icon: Cpu, label: 'Processes', shortcut: panelProcessesShortcut },
                     settings: { id: 'settings', icon: Settings2, label: 'Settings', shortcut: panelSettingsShortcut },
@@ -1977,7 +1977,7 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
                     .filter(p => {
                       // PERMANENT: Agent (terminal) toggle MUST NEVER appear in secondary window. User explicit.
                       if (isSecondaryWindow && p.id === 'terminal') return false
-                      const isBuiltin = ['terminal', 'browser', 'editor', 'assets', 'diff', 'processes', 'settings'].includes(p.id)
+                      const isBuiltin = ['terminal', 'browser', 'editor', 'artifacts', 'diff', 'processes', 'settings'].includes(p.id)
                       if (isBuiltin) return isBuiltinEnabled(p.id, 'task') && !(task.is_temporary && p.id === 'settings')
                       return true // web panels already filtered by enabledWebPanels
                     })
@@ -2527,32 +2527,32 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
           </div>
         )}
 
-        {/* Resize handle before Assets */}
-        {!compact && panelVisibility.assets && getFirstVisibleTaskPanelId() !== 'assets' && (
+        {/* Resize handle before Artifacts */}
+        {!compact && panelVisibility.artifacts && getFirstVisibleTaskPanelId() !== 'artifacts' && (
           <ResizeHandle
-            width={resolvedWidths.assets ?? 300}
+            width={resolvedWidths.artifacts ?? 300}
             minWidth={200}
-            onWidthChange={(w) => updatePanelSizes({ assets: w })}
+            onWidthChange={(w) => updatePanelSizes({ artifacts: w })}
             onDragStart={() => setIsResizing(true)}
             onDragEnd={() => setIsResizing(false)}
             onReset={resetAllPanels}
-            style={panelOrderStyle('assets')}
+            style={panelOrderStyle('artifacts')}
           />
         )}
 
-        {/* Assets Panel */}
-        {!compact && panelVisibility.assets && (
-          <div data-panel-id="assets" className={cn("shrink-0 rounded-md bg-surface-1 border border-border overflow-hidden flex flex-col transition-shadow duration-200", multipleVisiblePanels && focusedPanel === 'assets' && "shadow-[0_0_18px_rgba(255,255,255,0.25)]")} style={{ width: resolvedWidths.assets, ...panelOrderStyle('assets') }}>
-            {ownership.hasOtherOwner('assets') ? (
+        {/* Artifacts Panel */}
+        {!compact && panelVisibility.artifacts && (
+          <div data-panel-id="artifacts" className={cn("shrink-0 rounded-md bg-surface-1 border border-border overflow-hidden flex flex-col transition-shadow duration-200", multipleVisiblePanels && focusedPanel === 'artifacts' && "shadow-[0_0_18px_rgba(255,255,255,0.25)]")} style={{ width: resolvedWidths.artifacts, ...panelOrderStyle('artifacts') }}>
+            {ownership.hasOtherOwner('artifacts') ? (
               <PanelOwnerStub
-                panelLabel="Assets"
+                panelLabel="Artifacts"
                 icon={Paperclip}
                 activeElsewhere
-                onActivate={() => ownership.claim('assets')}
-                onActivateAndClose={() => ownership.claimAndCloseOther('assets')}
+                onActivate={() => ownership.claim('artifacts')}
+                onActivateAndClose={() => ownership.claimAndCloseOther('artifacts')}
               />
             ) : (
-              <AssetsPanel ref={assetsPanelRef} taskId={task.id} isResizing={isResizing} initialActiveAssetId={task.active_asset_id} onActiveAssetIdChange={handleActiveAssetIdChange} />
+              <ArtifactsPanel ref={artifactsPanelRef} taskId={task.id} isResizing={isResizing} initialActiveArtifactId={task.active_artifact_id} onActiveArtifactIdChange={handleActiveArtifactIdChange} />
             )}
           </div>
         )}
@@ -2683,7 +2683,7 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
               // Units in rem so values track Tailwind scale directly:
               //   gap-4 = 1rem, min-h-8 (card header) = 2rem.
               // Share = (container − closed×header − total-gap) / openCount
-              const openCount = [descriptionOpen, subTasksOpen, assetsOpen].filter(Boolean).length
+              const openCount = [descriptionOpen, subTasksOpen, artifactsOpen].filter(Boolean).length
               const closedCount = 3 - openCount
               const share = openCount > 0
                 ? `calc((100% - ${closedCount * 2}rem - 2rem) / ${openCount})`
@@ -2692,7 +2692,7 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
               const cardRows = [
                 rowFor(descriptionOpen),
                 rowFor(subTasksOpen),
-                rowFor(assetsOpen),
+                rowFor(artifactsOpen),
               ].join(' ')
               return (
               <>
@@ -2713,7 +2713,7 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
               <div className="ml-auto flex items-center gap-0.5">
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <IconButton type="button" variant="ghost" aria-label={descriptionExpanded ? "Default height" : "Full height"} className={cn("size-5 hover:text-foreground", descriptionExpanded ? "text-foreground bg-muted" : "text-muted-foreground")} onClick={() => setDescriptionExpanded((v) => { if (!v) { setDetailsOpen(false); setSubTasksOpen(false); setAssetsOpen(false) } else { setDetailsOpen(true); setSubTasksOpen(true); setAssetsOpen(true) } return !v })}>
+                    <IconButton type="button" variant="ghost" aria-label={descriptionExpanded ? "Default height" : "Full height"} className={cn("size-5 hover:text-foreground", descriptionExpanded ? "text-foreground bg-muted" : "text-muted-foreground")} onClick={() => setDescriptionExpanded((v) => { if (!v) { setDetailsOpen(false); setSubTasksOpen(false); setArtifactsOpen(false) } else { setDetailsOpen(true); setSubTasksOpen(true); setArtifactsOpen(true) } return !v })}>
                       <IconArrowsVertical size={12} />
                     </IconButton>
                   </TooltipTrigger>
@@ -2743,10 +2743,10 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
                   showToolbar={notesShowToolbar}
                   spellcheck={notesSpellcheck}
                   themeColors={notesThemeColors}
-                  assets={assets.map(a => ({ id: a.id, title: a.title, type: RENDER_MODE_INFO[getEffectiveRenderMode(a.title, a.render_mode)].label }))}
-                  onAssetClick={(assetId) => {
-                    if (!panelVisibility.assets) handlePanelToggle('assets', true)
-                    assetsPanelRef.current?.selectAsset(assetId)
+                  artifacts={artifacts.map(a => ({ id: a.id, title: a.title, type: RENDER_MODE_INFO[getEffectiveRenderMode(a.title, a.render_mode)].label }))}
+                  onArtifactClick={(artifactId) => {
+                    if (!panelVisibility.artifacts) handlePanelToggle('artifacts', true)
+                    artifactsPanelRef.current?.selectArtifact(artifactId)
                   }}
                   onUploadImages={handleUploadImages}
                 />
@@ -2813,44 +2813,44 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
             </CollapsibleContent>
           </Collapsible>
 
-          {/* Assets */}
-          <Collapsible data-testid="settings-assets-card" open={assetsOpen} onOpenChange={setAssetsOpen} className="group/assets rounded-md border border-border overflow-hidden flex flex-col min-h-0">
-            <div className="flex w-full items-center gap-1.5 bg-muted/50 px-2.5 py-1.5 min-h-8 text-xs font-medium text-muted-foreground group-data-[state=open]/assets:border-b border-border">
+          {/* Artifacts */}
+          <Collapsible data-testid="settings-artifacts-card" open={artifactsOpen} onOpenChange={setArtifactsOpen} className="group/artifacts rounded-md border border-border overflow-hidden flex flex-col min-h-0">
+            <div className="flex w-full items-center gap-1.5 bg-muted/50 px-2.5 py-1.5 min-h-8 text-xs font-medium text-muted-foreground group-data-[state=open]/artifacts:border-b border-border">
               <CollapsibleTrigger className="flex items-center gap-1.5 hover:text-foreground transition-colors [&[data-state=open]>svg:first-child]:rotate-90">
                 <ChevronRight className="size-3 transition-transform" />
-                Assets
+                Artifacts
               </CollapsibleTrigger>
-              {assets.length > 0 && (
-                <span className="ml-auto text-muted-foreground/60 text-[10px]">{assets.length}</span>
+              {artifacts.length > 0 && (
+                <span className="ml-auto text-muted-foreground/60 text-[10px]">{artifacts.length}</span>
               )}
             </div>
             <CollapsibleContent className="p-2 flex flex-col flex-1 min-h-0">
               <div className="flex flex-col gap-0.5 flex-1 min-h-0 overflow-y-auto overscroll-contain">
-                {assets.map(asset => (
+                {artifacts.map(artifact => (
                   <button
-                    key={asset.id}
+                    key={artifact.id}
                     type="button"
                     className="flex items-center gap-2 py-1 px-1 rounded text-xs text-muted-foreground hover:text-foreground hover:bg-muted/50 text-left"
                     onClick={() => {
-                      if (!panelVisibility.assets) handlePanelToggle('assets', true)
-                      assetsPanelRef.current?.selectAsset(asset.id)
+                      if (!panelVisibility.artifacts) handlePanelToggle('artifacts', true)
+                      artifactsPanelRef.current?.selectArtifact(artifact.id)
                     }}
                   >
                     <Paperclip className="size-3 shrink-0" />
-                    <span className="truncate">{asset.title}</span>
-                    <span className="ml-auto text-[10px] opacity-60">{getExtensionFromTitle(asset.title) || 'file'}</span>
+                    <span className="truncate">{artifact.title}</span>
+                    <span className="ml-auto text-[10px] opacity-60">{getExtensionFromTitle(artifact.title) || 'file'}</span>
                   </button>
                 ))}
                 <button
                   type="button"
                   onClick={() => {
-                    if (!panelVisibility.assets) handlePanelToggle('assets', true)
-                    assetsPanelRef.current?.createAsset()
+                    if (!panelVisibility.artifacts) handlePanelToggle('artifacts', true)
+                    artifactsPanelRef.current?.createArtifact()
                   }}
                   className="flex items-center gap-1.5 py-1 px-1 rounded text-xs text-muted-foreground hover:text-foreground hover:bg-muted/50 mt-1"
                 >
                   <Plus className="size-3" />
-                  Add asset
+                  Add artifact
                 </button>
               </div>
             </CollapsibleContent>
@@ -3094,10 +3094,10 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
         showToolbar={notesShowToolbar}
         spellcheck={notesSpellcheck}
         themeColors={notesThemeColors}
-        assets={assets.map(a => ({ id: a.id, title: a.title, type: RENDER_MODE_INFO[getEffectiveRenderMode(a.title, a.render_mode)].label }))}
-        onAssetClick={(assetId) => {
-          if (!panelVisibility.assets) handlePanelToggle('assets', true)
-          assetsPanelRef.current?.selectAsset(assetId)
+        artifacts={artifacts.map(a => ({ id: a.id, title: a.title, type: RENDER_MODE_INFO[getEffectiveRenderMode(a.title, a.render_mode)].label }))}
+        onArtifactClick={(artifactId) => {
+          if (!panelVisibility.artifacts) handlePanelToggle('artifacts', true)
+          artifactsPanelRef.current?.selectArtifact(artifactId)
         }}
         onUploadImages={handleUploadImages}
       />

@@ -1,6 +1,6 @@
 import { useRef, useCallback, useState } from 'react'
 import { Dialog, DialogContent } from '@slayzone/ui'
-import { RichTextEditor, type Editor, type EditorThemeColors, type AssetPickerItem } from '@slayzone/editor'
+import { RichTextEditor, type Editor, type EditorThemeColors, type ArtifactPickerItem } from '@slayzone/editor'
 import { editorViewCtx } from '@milkdown/core'
 
 interface DescriptionDialogProps {
@@ -16,8 +16,8 @@ interface DescriptionDialogProps {
   showToolbar?: boolean
   spellcheck?: boolean
   themeColors?: EditorThemeColors
-  assets?: AssetPickerItem[]
-  onAssetClick?: (assetId: string) => void
+  artifacts?: ArtifactPickerItem[]
+  onArtifactClick?: (artifactId: string) => void
   onUploadImages?: (files: File[]) => Promise<Array<{ id: string; title: string }>>
 }
 
@@ -30,7 +30,7 @@ function getWordCount(editor: Editor | null): number {
   } catch { return 0 }
 }
 
-export function DescriptionDialog({ open, onOpenChange, value, onChange, onSave, fontFamily, readability, width, checkedHighlight, showToolbar, spellcheck, themeColors, assets, onAssetClick, onUploadImages }: DescriptionDialogProps) {
+export function DescriptionDialog({ open, onOpenChange, value, onChange, onSave, fontFamily, readability, width, checkedHighlight, showToolbar, spellcheck, themeColors, artifacts, onArtifactClick, onUploadImages }: DescriptionDialogProps) {
   const editorRef = useRef<Editor | null>(null)
   const [wordCount, setWordCount] = useState(0)
 
@@ -76,8 +76,8 @@ export function DescriptionDialog({ open, onOpenChange, value, onChange, onSave,
           showToolbar={showToolbar}
           spellcheck={spellcheck}
           themeColors={themeColors}
-          assets={assets}
-          onAssetClick={onAssetClick}
+          artifacts={artifacts}
+          onArtifactClick={onArtifactClick}
           onUploadImages={onUploadImages}
         />
       </DialogContent>

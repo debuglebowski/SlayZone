@@ -1,7 +1,7 @@
 import { openDb, type SlayDb } from '../../db'
 import { parseColumnsConfig } from '@slayzone/projects/shared'
 import { DEFAULT_TERMINAL_MODES } from '@slayzone/terminal/shared'
-import type { AuthorContext } from '@slayzone/task-assets/shared'
+import type { AuthorContext } from '@slayzone/task-artifacts/shared'
 
 export function cliAuthor(): AuthorContext {
   const mode = process.env.SLAYZONE_AGENT_MODE

@@ -1,6 +1,6 @@
 import type { Project, CreateProjectInput, UpdateProjectInput, ExecutionContext } from '@slayzone/projects/shared'
-import type { Task, CreateTaskInput, UpdateTaskInput, DesktopHandoffPolicy, TaskTemplate, CreateTaskTemplateInput, UpdateTaskTemplateInput, TaskAsset, CreateAssetInput, UpdateAssetInput, AssetFolder, CreateAssetFolderInput, UpdateAssetFolderInput } from '@slayzone/task/shared'
-import type { AssetVersion, VersionRef, DiffResult, PruneReport } from '@slayzone/task-assets/shared'
+import type { Task, CreateTaskInput, UpdateTaskInput, DesktopHandoffPolicy, TaskTemplate, CreateTaskTemplateInput, UpdateTaskTemplateInput, TaskArtifact, CreateArtifactInput, UpdateArtifactInput, ArtifactFolder, CreateArtifactFolderInput, UpdateArtifactFolderInput } from '@slayzone/task/shared'
+import type { ArtifactVersion, VersionRef, DiffResult, PruneReport } from '@slayzone/task-artifacts/shared'
 import type { Tag, CreateTagInput, UpdateTagInput } from '@slayzone/tags/shared'
 import type { AgentTurnRange } from '@slayzone/agent-turns/shared'
 import type {
@@ -23,6 +23,7 @@ import type {
   AgentInfo,
   FileMatch,
   ChatSessionStateEntry,
+  QueuedChatMessage,
 } from '@slayzone/terminal/shared'
 
 export interface ChatSessionInfo {
@@ -293,7 +294,6 @@ export interface ElectronAPI {
     archiveTask: (id: string) => Promise<Task>
     archiveTasks: (ids: string[]) => Promise<void>
     unarchiveTask: (id: string) => Promise<Task>
-    getArchivedTasks: () => Promise<Task[]>
     reorderTasks: (taskIds: string[]) => Promise<void>
   }
   tags: {
@@ -312,22 +312,22 @@ export interface ElectronAPI {
     getTagsForTask: (taskId: string) => Promise<Tag[]>
     setTagsForTask: (taskId: string, tagIds: string[]) => Promise<void>
   }
-  assets: {
-    getByTask: (taskId: string) => Promise<TaskAsset[]>
-    get: (id: string) => Promise<TaskAsset | null>
-    create: (data: CreateAssetInput) => Promise<TaskAsset>
-    update: (data: UpdateAssetInput & { mutateVersion?: boolean }) => Promise<TaskAsset | null>
+  artifacts: {
+    getByTask: (taskId: string) => Promise<TaskArtifact[]>
+    get: (id: string) => Promise<TaskArtifact | null>
+    create: (data: CreateArtifactInput) => Promise<TaskArtifact>
+    update: (data: UpdateArtifactInput & { mutateVersion?: boolean }) => Promise<TaskArtifact | null>
     delete: (id: string) => Promise<boolean>
-    reorder: (data: string[] | { folderId: string | null; assetIds: string[] }) => Promise<void>
+    reorder: (data: string[] | { folderId: string | null; artifactIds: string[] }) => Promise<void>
     readContent: (id: string) => Promise<string | null>
     getFilePath: (id: string) => Promise<string | null>
     getMtime: (id: string) => Promise<number | null>
-    onContentChanged: (callback: (assetId: string) => void) => () => void
-    upload: (data: { taskId: string; sourcePath: string; title?: string }) => Promise<TaskAsset>
-    uploadBlob: (data: { taskId: string; title: string; bytes: Uint8Array; folderId?: string | null }) => Promise<TaskAsset | null>
-    pasteFiles: (data: { sourcePaths: string[]; destTaskId: string; destFolderId: string | null }) => Promise<TaskAsset[]>
+    onContentChanged: (callback: (artifactId: string) => void) => () => void
+    upload: (data: { taskId: string; sourcePath: string; title?: string }) => Promise<TaskArtifact>
+    uploadBlob: (data: { taskId: string; title: string; bytes: Uint8Array; folderId?: string | null }) => Promise<TaskArtifact | null>
+    pasteFiles: (data: { sourcePaths: string[]; destTaskId: string; destFolderId: string | null }) => Promise<TaskArtifact[]>
     cleanupTask: (taskId: string) => Promise<void>
-    uploadDir: (data: { taskId: string; dirPath: string; parentFolderId: string | null }) => Promise<{ folders: AssetFolder[]; assets: TaskAsset[] }>
+    uploadDir: (data: { taskId: string; dirPath: string; parentFolderId: string | null }) => Promise<{ folders: ArtifactFolder[]; artifacts: TaskArtifact[] }>
     downloadFile: (id: string) => Promise<boolean>
     downloadFolder: (id: string) => Promise<boolean>
     downloadAsPdf: (id: string) => Promise<boolean>
@@ -335,19 +335,19 @@ export interface ElectronAPI {
     downloadAsHtml: (id: string) => Promise<boolean>
     downloadAllAsZip: (taskId: string) => Promise<boolean>
     versions: {
-      list: (data: { assetId: string; limit?: number; offset?: number }) => Promise<AssetVersion[]>
-      read: (data: { assetId: string; versionRef: VersionRef }) => Promise<string>
-      create: (data: { assetId: string; name?: string | null }) => Promise<AssetVersion>
-      rename: (data: { assetId: string; versionRef: VersionRef; newName: string | null }) => Promise<AssetVersion>
-      diff: (data: { assetId: string; a: VersionRef; b?: VersionRef }) => Promise<DiffResult>
-      prune: (data: { assetId: string; keepLast?: number; keepNamed?: boolean; keepCurrent?: boolean; dryRun?: boolean }) => Promise<PruneReport>
-      setCurrent: (data: { assetId: string; versionRef: VersionRef }) => Promise<AssetVersion>
+      list: (data: { artifactId: string; limit?: number; offset?: number }) => Promise<ArtifactVersion[]>
+      read: (data: { artifactId: string; versionRef: VersionRef }) => Promise<string>
+      create: (data: { artifactId: string; name?: string | null }) => Promise<ArtifactVersion>
+      rename: (data: { artifactId: string; versionRef: VersionRef; newName: string | null }) => Promise<ArtifactVersion>
+      diff: (data: { artifactId: string; a: VersionRef; b?: VersionRef }) => Promise<DiffResult>
+      prune: (data: { artifactId: string; keepLast?: number; keepNamed?: boolean; keepCurrent?: boolean; dryRun?: boolean }) => Promise<PruneReport>
+      setCurrent: (data: { artifactId: string; versionRef: VersionRef }) => Promise<ArtifactVersion>
     }
   }
-  assetFolders: {
-    getByTask: (taskId: string) => Promise<AssetFolder[]>
-    create: (data: CreateAssetFolderInput) => Promise<AssetFolder>
-    update: (data: UpdateAssetFolderInput) => Promise<AssetFolder | null>
+  artifactFolders: {
+    getByTask: (taskId: string) => Promise<ArtifactFolder[]>
+    create: (data: CreateArtifactFolderInput) => Promise<ArtifactFolder>
+    update: (data: UpdateArtifactFolderInput) => Promise<ArtifactFolder | null>
     delete: (id: string) => Promise<boolean>
     reorder: (data: { parentId: string | null; folderIds: string[] }) => Promise<void>
   }
@@ -450,7 +450,7 @@ export interface ElectronAPI {
     onBrowserEnsurePanelOpen: (callback: (taskId: string, url?: string, tabId?: string) => void) => () => void
     onBrowserCreateTab: (callback: (payload: { taskId: string; tabId: string; url?: string; background?: boolean }) => void) => () => void
     onOpenTask: (callback: (taskId: string) => void) => () => void
-    onOpenAsset: (callback: (taskId: string, assetId: string) => void) => () => void
+    onOpenArtifact: (callback: (taskId: string, artifactId: string) => void) => () => void
     onScreenshotTrigger: (callback: () => void) => () => void
     onUpdateStatus: (callback: (status: UpdateStatus) => void) => () => void
     onCloseCurrent: (callback: () => void) => () => void
@@ -699,6 +699,30 @@ export interface ElectronAPI {
         signal: string | null
       ) => void
     ) => () => void
+  }
+  /**
+   * Backend-persisted "Up next" chat queue. Source-of-truth lives in SQLite
+   * so queued messages survive reload/crash and stay sync'd across windows.
+   * Drained main-side on session→idle transitions; renderer is purely a
+   * subscriber + dispatcher.
+   */
+  chatQueue: {
+    list: (tabId: string) => Promise<QueuedChatMessage[]>
+    /**
+     * Append to tail. `send` is the post-`transformSubmit` text that goes
+     * over the wire; `original` is the raw composer input retained so the
+     * autocomplete usage hook can bump tiebreak counts on drain.
+     */
+    push: (tabId: string, send: string, original: string) => Promise<QueuedChatMessage>
+    remove: (id: string) => Promise<boolean>
+    clear: (tabId: string) => Promise<number>
+    /** Fires after any list mutation (push/remove/clear/drain). Renderer refetches. */
+    onChanged: (callback: (tabId: string) => void) => () => void
+    /**
+     * Fires after the drainer pops + dispatches. Carries the `original` text
+     * so renderer can call its usage-bump hook with the raw `/cmd` token.
+     */
+    onDrained: (callback: (tabId: string, original: string) => void) => () => void
   }
   terminalModes: {
     list: () => Promise<TerminalModeInfo[]>

@@ -20,7 +20,7 @@ export interface SetSearchMeta {
   regex: boolean
 }
 
-export const searchHighlightKey = new PluginKey<SearchHighlightState>('slayzoneAssetSearch')
+export const searchHighlightKey = new PluginKey<SearchHighlightState>('slayzoneArtifactSearch')
 
 function findMatches(doc: ProseNode, query: string, matchCase: boolean, regex: boolean): Array<{ from: number; to: number }> {
   if (!query.trim()) return []
@@ -50,7 +50,7 @@ function buildDecorations(doc: ProseNode, matches: Array<{ from: number; to: num
   if (matches.length === 0) return DecorationSet.empty
   const mod = ((activeIndex % matches.length) + matches.length) % matches.length
   const decos = matches.map((m, i) => Decoration.inline(m.from, m.to, {
-    class: i === mod ? 'asset-search-match asset-search-match-active' : 'asset-search-match',
+    class: i === mod ? 'artifact-search-match artifact-search-match-active' : 'artifact-search-match',
   }))
   return DecorationSet.create(doc, decos)
 }

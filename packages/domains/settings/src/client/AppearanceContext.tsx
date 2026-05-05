@@ -78,7 +78,7 @@ export function AppearanceProvider({
       chatWidth,
       chatShowTools, chatShowLastMessageTools, chatFileEditsOpenByDefault, chatShowMessageMeta,
       mdViewMode, minimapEnabled, tocEnabled,
-      assetsBannerOpen, editorBannerOpen,
+      artifactsBannerOpen, editorBannerOpen,
     ]) => {
       // One-shot migration: notes_line_spacing → notes_readability
       let readabilityValue = notesReadability
@@ -123,7 +123,7 @@ export function AppearanceProvider({
         editorMarkdownViewMode: (mdViewMode === 'split' || mdViewMode === 'code') ? mdViewMode : 'rich',
         editorMinimapEnabled: minimapEnabled === '1',
         editorTocEnabled: tocEnabled === '1',
-        assetsSettingsBannerOpen: assetsBannerOpen === '1',
+        artifactsSettingsBannerOpen: artifactsBannerOpen === '1',
         editorSettingsBannerOpen: editorBannerOpen === '1',
       })
     })

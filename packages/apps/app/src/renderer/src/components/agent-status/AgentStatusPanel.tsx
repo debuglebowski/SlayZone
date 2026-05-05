@@ -1,12 +1,10 @@
 import { X } from 'lucide-react'
-import { IconButton, cn, Tooltip, TooltipTrigger, TooltipContent } from '@slayzone/ui'
+import { IconButton, cn, Tooltip, TooltipTrigger, TooltipContent, getTerminalStateStyle } from '@slayzone/ui'
 import { track } from '@slayzone/telemetry/client'
 import type { IdleTask } from './useIdleTasks'
-import type { Project } from '@slayzone/projects/shared'
 
 interface AgentStatusPanelProps {
   idleTasks: IdleTask[]
-  projects: Project[]
   filterCurrentProject: boolean
   onFilterToggle: () => void
   onNavigate: (taskId: string) => void
@@ -14,6 +12,10 @@ interface AgentStatusPanelProps {
   selectedProjectId: string
   currentProjectName?: string
 }
+
+// Panel only ever surfaces idle agents, so the dot is always the canonical
+// idle-state color. If state changes, useIdleTasks drops the row.
+const IDLE_DOT_COLOR = getTerminalStateStyle('idle')!.color
 
 function formatIdleTime(lastOutputTime: number): string {
   const seconds = Math.floor((Date.now() - lastOutputTime) / 1000)
@@ -26,7 +28,6 @@ function formatIdleTime(lastOutputTime: number): string {
 
 export function AgentStatusPanel({
   idleTasks,
-  projects,
   filterCurrentProject,
   onFilterToggle,
   onNavigate,
@@ -35,11 +36,6 @@ export function AgentStatusPanel({
   currentProjectName
 }: AgentStatusPanelProps) {
   const sortedTasks = [...idleTasks].sort((a, b) => b.lastOutputTime - a.lastOutputTime)
-
-  const getProjectColor = (projectId: string | null): string | undefined => {
-    if (!projectId) return undefined
-    return projects.find((p) => p.id === projectId)?.color
-  }
 
   return (
     <div className="flex flex-col h-full">
@@ -85,12 +81,10 @@ export function AgentStatusPanel({
               }}
             >
               <div className="flex items-start gap-2">
-                {!filterCurrentProject && (
-                  <span
-                    className={cn('w-2 h-2 rounded-full flex-shrink-0 mt-1.5')}
-                    style={{ backgroundColor: getProjectColor(task.project_id) || '#888' }}
-                  />
-                )}
+                <span
+                  aria-label="Idle"
+                  className={cn('w-2 h-2 rounded-full flex-shrink-0 mt-1.5', IDLE_DOT_COLOR)}
+                />
                 <div className="flex-1 min-w-0">
                   <div className="text-sm font-medium">{task.title}</div>
                 </div>

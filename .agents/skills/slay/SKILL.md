@@ -5,7 +5,7 @@ depends_on:
   - slay-context
   - slay-tasks
   - slay-browser
-  - slay-assets
+  - slay-artifacts
   - slay-automations
   - slay-projects
   - slay-processes
@@ -26,7 +26,7 @@ All ID arguments support prefix matching (e.g., `a1b2` matches the full UUID sta
 | slay-context | — | Ensure root instruction files include SlayZone context |
 | slay-tasks | `slay tasks`, `slay tags`, `slay templates` | Task lifecycle, subtasks, tags, templates |
 | slay-browser | `slay tasks browser` | Control the task browser panel |
-| slay-assets | `slay tasks assets` | Manage files and folders attached to tasks |
+| slay-artifacts | `slay tasks artifacts` | Manage files and folders attached to tasks |
 | slay-automations | `slay automations` | Event-driven and cron automations |
 | slay-projects | `slay projects` | Project CRUD |
 | slay-processes | `slay processes` | Inspect and control running processes |

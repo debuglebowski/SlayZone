@@ -48,7 +48,7 @@ export interface AppearanceSettings {
   editorMinimapEnabled: boolean
   editorTocEnabled: boolean
   // Markdown settings banner open state (per consumer)
-  assetsSettingsBannerOpen: boolean
+  artifactsSettingsBannerOpen: boolean
   editorSettingsBannerOpen: boolean
 }
 
@@ -86,7 +86,7 @@ export const appearanceDefaults: AppearanceSettings = {
   editorMarkdownViewMode: 'rich',
   editorMinimapEnabled: false,
   editorTocEnabled: false,
-  assetsSettingsBannerOpen: false,
+  artifactsSettingsBannerOpen: false,
   editorSettingsBannerOpen: false,
 }
 

@@ -575,15 +575,6 @@ describe('db:tasks:unarchive', () => {
   })
 })
 
-describe('db:tasks:getArchived', () => {
-  test('returns only archived tasks', () => {
-    const archived = h.invoke('db:tasks:getArchived') as Task[]
-    for (const t of archived) {
-      expect(t.archived_at).toBeTruthy()
-    }
-  })
-})
-
 // --- Reorder ---
 
 describe('db:tasks:reorder', () => {

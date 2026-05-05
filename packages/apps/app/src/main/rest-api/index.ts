@@ -13,10 +13,10 @@ import { registerCreateTaskRoute } from './tasks/create'
 import { registerDeleteTaskRoute } from './tasks/delete'
 import { registerUnarchiveTaskRoute } from './tasks/unarchive'
 import { registerUpdateTaskRoute } from './tasks/update'
-import { registerOpenAssetRoute } from './assets/open'
-import { registerAssetsExportPdfRoute } from './assets/export-pdf'
-import { registerAssetsExportPngRoute } from './assets/export-png'
-import { registerAssetsExportHtmlRoute } from './assets/export-html'
+import { registerOpenArtifactRoute } from './artifacts/open'
+import { registerArtifactsExportPdfRoute } from './artifacts/export-pdf'
+import { registerArtifactsExportPngRoute } from './artifacts/export-png'
+import { registerArtifactsExportHtmlRoute } from './artifacts/export-html'
 import { registerAutomationsRunRoute } from './automations/run'
 import { registerPtyListRoute } from './pty/list'
 import { registerPtyBufferRoute } from './pty/buffer'
@@ -60,11 +60,11 @@ export function registerRestApi(app: Express, deps: RestApiDeps): void {
   registerArchiveManyTaskRoute(app, deps)
   registerUnarchiveTaskRoute(app, deps)
 
-  // Assets
-  registerOpenAssetRoute(app, deps)
-  registerAssetsExportPdfRoute(app, deps)
-  registerAssetsExportPngRoute(app, deps)
-  registerAssetsExportHtmlRoute(app, deps)
+  // Artifacts
+  registerOpenArtifactRoute(app, deps)
+  registerArtifactsExportPdfRoute(app, deps)
+  registerArtifactsExportPngRoute(app, deps)
+  registerArtifactsExportHtmlRoute(app, deps)
 
   // Automations
   registerAutomationsRunRoute(app, deps)

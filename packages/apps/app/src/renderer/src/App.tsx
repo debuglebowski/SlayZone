@@ -1294,13 +1294,13 @@ function App(): React.JSX.Element {
                                   {id === 'kanban' && filter.viewMode !== 'list' && (
                                     <KanbanBoard tasks={displayTasks} columns={selectedProject?.columns_config} viewConfig={getViewConfig(filter)} isActive={tabs[activeTabIndex]?.type === 'home'}
                                       onTaskMove={handleTaskMove} onTaskReorder={reorderTasks} onTaskClick={handleTaskClick}
-                                      projectsMap={projectsMap} showProjectDot={false} cardProperties={filter.cardProperties} taskTags={taskTags} tags={projectTags} onTaskTagsChange={handleTaskTagsChange} blockedTaskIds={blockedTaskIds}
+                                      cardProperties={filter.cardProperties} taskTags={taskTags} tags={projectTags} onTaskTagsChange={handleTaskTagsChange} blockedTaskIds={blockedTaskIds}
                                       allProjects={projects} onUpdateTask={contextMenuUpdate} onClearBlockers={clearBlockers} onArchiveTask={archiveTask} onDeleteTask={deleteTask} onArchiveAllTasks={archiveTasks} />
                                   )}
                                   {id === 'kanban' && filter.viewMode === 'list' && (
                                     <KanbanListView tasks={displayTasks} columns={selectedProject?.columns_config} viewConfig={getViewConfig(filter)}
                                       onTaskMove={handleTaskMove} onTaskReorder={reorderTasks} onTaskClick={handleTaskClick}
-                                      projectsMap={projectsMap} showProjectDot={false} cardProperties={filter.cardProperties} blockedTaskIds={blockedTaskIds}
+                                      cardProperties={filter.cardProperties} blockedTaskIds={blockedTaskIds}
                                       allProjects={projects} onUpdateTask={contextMenuUpdate} onArchiveTask={archiveTask} onDeleteTask={deleteTask}
                                       tags={projectTags} taskTags={taskTags} onTaskTagsChange={handleTaskTagsChange} />
                                   )}
@@ -1396,7 +1396,7 @@ function App(): React.JSX.Element {
             )}
             {agentStatusState.isLocked && (
               <AgentStatusSidePanel width={agentStatusState.panelWidth}
-                idleTasks={idleTasks} projects={projects} filterCurrentProject={agentStatusState.filterCurrentProject}
+                idleTasks={idleTasks} filterCurrentProject={agentStatusState.filterCurrentProject}
                 onFilterToggle={() => setAgentStatusState({ filterCurrentProject: !agentStatusState.filterCurrentProject })}
                 onNavigate={openTask}
                 onDismiss={handleDismissIdle}

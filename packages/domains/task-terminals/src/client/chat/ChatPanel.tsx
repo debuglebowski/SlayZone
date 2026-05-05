@@ -42,7 +42,7 @@ import {
 import { ConfirmDisplayModeDialog } from '../ConfirmDisplayModeDialog'
 import type { TabDisplayMode } from '../../shared/types'
 import { useChatSession, BackgroundJobsBanner, PulseGrid, deriveLoadingLabel, type TimelineItem } from '@slayzone/terminal/client'
-import { useImagePasteDrop, useAssetUpload, type AssetRef } from '@slayzone/editor'
+import { useImagePasteDrop, useArtifactUpload, type ArtifactRef } from '@slayzone/editor'
 import { AutocompleteMenu } from './autocomplete/AutocompleteMenu'
 import { useAutocomplete } from './autocomplete/useAutocomplete'
 import { createSkillsSource } from './autocomplete/sources/skills'
@@ -110,7 +110,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
   /** Send-text + original draft kept paired so usage bumps on drain see the
    * raw `/<token>` even when commands expanded the body before queueing. */
   const [queuedMessages, setQueuedMessages] = useState<Array<{ send: string; original: string }>>([])
-  const [attachments, setAttachments] = useState<AssetRef[]>([])
+  const [attachments, setAttachments] = useState<ArtifactRef[]>([])
   const { scrollRef, contentRef, isAtBottom, scrollToBottom } = useStickToBottom({
     initial: 'instant',
     resize: 'instant',
@@ -122,15 +122,15 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
   // main side pops the turn. Updated only on user submits that go straight to
   // the wire — queued submits don't overwrite it, so the snapshot stays aligned
   // with the in-flight turn even when a queue exists.
-  const lastSentRef = useRef<{ text: string; attachments: AssetRef[] } | null>(null)
+  const lastSentRef = useRef<{ text: string; attachments: ArtifactRef[] } | null>(null)
 
   useImperativeHandle(ref, () => ({
     focus: () => textareaRef.current?.focus(),
   }))
 
-  const { uploadFiles: uploadImageFiles, getFilePath: getAssetFilePath } = useAssetUpload(taskId)
+  const { uploadFiles: uploadImageFiles, getFilePath: getArtifactFilePath } = useArtifactUpload(taskId)
 
-  const imagePasteDrop = useImagePasteDrop<AssetRef>({
+  const imagePasteDrop = useImagePasteDrop<ArtifactRef>({
     onUpload: uploadImageFiles,
     onInsert: (results) => {
       setAttachments((prev) => [...prev, ...results])
@@ -388,7 +388,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
     if (attachments.length > 0) {
       const resolved = await Promise.all(
         attachments.map(async (a) => {
-          const p = await getAssetFilePath(a.id)
+          const p = await getArtifactFilePath(a.id)
           return { ref: a, path: p }
         })
       )
@@ -397,7 +397,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
         toast(`${missing.length} image${missing.length === 1 ? '' : 's'} no longer available — skipping`)
       }
       const imageRefs = resolved
-        .filter((r): r is { ref: AssetRef; path: string } => r.path !== null)
+        .filter((r): r is { ref: ArtifactRef; path: string } => r.path !== null)
         .map((r) => `![${r.ref.title}](${r.path})`)
         .join('\n')
       toSend = imageRefs + (toSend ? `\n\n${toSend}` : '')
@@ -424,7 +424,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
     // so we don't add `autocomplete` to deps — its returned object is a fresh
     // ref each render and would over-fire dependent effects.
     void bumpUsageRef.current(text)
-  }, [draft, attachments, getAssetFilePath, inFlight, state.sessionEnded, sendMessage, autocomplete, chatApi, tabId, taskId, mode, cwd, providerFlagsOverride, scrollToBottom])
+  }, [draft, attachments, getArtifactFilePath, inFlight, state.sessionEnded, sendMessage, autocomplete, chatApi, tabId, taskId, mode, cwd, providerFlagsOverride, scrollToBottom])
 
   // Stash bump fn in a ref. `autocomplete` is a fresh object every render
   // (useAutocomplete returns an object literal), so depending on it in the
@@ -762,8 +762,8 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
                     </div>
                   )
                 })}
+                {inFlight && <TypingIndicator label={deriveLoadingLabel(state)} />}
               </div>
-              {inFlight && <TypingIndicator label={deriveLoadingLabel(state)} />}
             </div>
           )}
         </div>

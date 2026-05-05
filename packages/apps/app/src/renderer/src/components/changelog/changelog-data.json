@@ -240,7 +240,7 @@
       {
         "category": "feature",
         "title": "Copy/paste files via OS clipboard",
-        "description": "Copy and paste files between the editor, assets panel, and your OS clipboard."
+        "description": "Copy and paste files between the editor, artifacts panel, and your OS clipboard."
       },
       {
         "category": "feature",
@@ -299,8 +299,8 @@
       },
       {
         "category": "improvement",
-        "title": "Cleaner assets toolbar",
-        "description": "Removed size, words, and line count stats from the assets toolbar."
+        "title": "Cleaner artifacts toolbar",
+        "description": "Removed size, words, and line count stats from the artifacts toolbar."
       },
       {
         "category": "fix",
@@ -310,7 +310,7 @@
       {
         "category": "fix",
         "title": "No task switch on CLI open",
-        "description": "Opening an asset from the CLI no longer switches the active task tab."
+        "description": "Opening an artifact from the CLI no longer switches the active task tab."
       },
       {
         "category": "fix",
@@ -331,8 +331,8 @@
     "items": [
       {
         "category": "fix",
-        "title": "HTML asset preview scripts",
-        "description": "HTML asset previews now execute scripts via the slz-file:// protocol."
+        "title": "HTML artifact preview scripts",
+        "description": "HTML artifact previews now execute scripts via the slz-file:// protocol."
       },
       {
         "category": "fix",
@@ -354,7 +354,7 @@
       {
         "category": "fix",
         "title": "HTML in markdown editor",
-        "description": "Render inline HTML in the markdown editor and asset previews."
+        "description": "Render inline HTML in the markdown editor and artifact previews."
       },
       {
         "category": "fix",
@@ -376,12 +376,12 @@
       {
         "category": "feature",
         "title": "Side-by-side worktree diff viewer",
-        "description": "Revamped diff viewer with side-by-side mode for files and asset versions, synced scrolling, and newest-first turn numbering."
+        "description": "Revamped diff viewer with side-by-side mode for files and artifact versions, synced scrolling, and newest-first turn numbering."
       },
       {
         "category": "feature",
         "title": "Mermaid diagrams in markdown",
-        "description": "Render mermaid diagrams inline in the markdown split view and asset previews."
+        "description": "Render mermaid diagrams inline in the markdown split view and artifact previews."
       },
       {
         "category": "feature",
@@ -415,8 +415,8 @@
       },
       {
         "category": "improvement",
-        "title": "Assets panel loading state",
-        "description": "Assets panel shows a loading indicator while files are scanned."
+        "title": "Artifacts panel loading state",
+        "description": "Artifacts panel shows a loading indicator while files are scanned."
       },
       {
         "category": "improvement",
@@ -502,8 +502,8 @@
       },
       {
         "category": "improvement",
-        "title": "Persistent assets folder state",
-        "description": "The assets panel remembers which folders are expanded per task."
+        "title": "Persistent artifacts folder state",
+        "description": "The artifacts panel remembers which folders are expanded per task."
       },
       {
         "category": "improvement",
@@ -535,11 +535,11 @@
   {
     "version": "0.21.0",
     "date": "2026-04-21",
-    "tagline": "Asset history & chat",
+    "tagline": "Artifact history & chat",
     "items": [
       {
         "category": "feature",
-        "title": "Versioned task assets",
+        "title": "Versioned task artifacts",
         "description": "Content-addressed version history with a version tree, current pointer, lock rule, and CLI set-current."
       },
       {
@@ -574,7 +574,7 @@
       },
       {
         "category": "feature",
-        "title": "In-asset search",
+        "title": "In-artifact search",
         "description": "Highlight and jump through matches in both raw and preview modes."
       },
       {
@@ -614,8 +614,8 @@
       },
       {
         "category": "improvement",
-        "title": "CLI opens asset in UI",
-        "description": "Creating or uploading an asset via CLI now opens it in the app."
+        "title": "CLI opens artifact in UI",
+        "description": "Creating or uploading an artifact via CLI now opens it in the app."
       },
       {
         "category": "improvement",
@@ -692,7 +692,7 @@
   {
     "version": "0.20.0",
     "date": "2026-04-15",
-    "tagline": "Locks graduate, assets live",
+    "tagline": "Locks graduate, artifacts live",
     "items": [
       {
         "category": "improvement",
@@ -711,8 +711,8 @@
       },
       {
         "category": "fix",
-        "title": "Live asset UI",
-        "description": "Task asset panel now refreshes when file content changes on disk."
+        "title": "Live artifact UI",
+        "description": "Task artifact panel now refreshes when file content changes on disk."
       },
       {
         "category": "fix",
@@ -786,7 +786,7 @@
       {
         "category": "feature",
         "title": "Markdown split mode in editor",
-        "description": "Toggle between source and preview with per-file and per-asset view persistence, plus Notion-like typography."
+        "description": "Toggle between source and preview with per-file and per-artifact view persistence, plus Notion-like typography."
       },
       {
         "category": "feature",
@@ -968,8 +968,8 @@
       },
       {
         "category": "feature",
-        "title": "Asset downloads",
-        "description": "Download assets as PDF, PNG, HTML, or ZIP from a restructured download menu."
+        "title": "Artifact downloads",
+        "description": "Download artifacts as PDF, PNG, HTML, or ZIP from a restructured download menu."
       },
       {
         "category": "feature",
@@ -1025,13 +1025,13 @@
     "items": [
       {
         "category": "feature",
-        "title": "Asset folders",
-        "description": "Organize task assets into folders with drag-and-drop, context menus, and inline renaming."
+        "title": "Artifact folders",
+        "description": "Organize task artifacts into folders with drag-and-drop, context menus, and inline renaming."
       },
       {
         "category": "feature",
-        "title": "Asset search",
-        "description": "Find assets with a local search bar and global search panel integration."
+        "title": "Artifact search",
+        "description": "Find artifacts with a local search bar and global search panel integration."
       },
       {
         "category": "feature",
@@ -1040,13 +1040,13 @@
       },
       {
         "category": "improvement",
-        "title": "Asset card styling",
-        "description": "Asset sidebar items and folders now render as styled cards."
+        "title": "Artifact card styling",
+        "description": "Artifact sidebar items and folders now render as styled cards."
       },
       {
         "category": "improvement",
-        "title": "Auto-refresh assets",
-        "description": "Asset content refreshes automatically when updated via CLI."
+        "title": "Auto-refresh artifacts",
+        "description": "Artifact content refreshes automatically when updated via CLI."
       },
       {
         "category": "fix",
@@ -1073,17 +1073,17 @@
   {
     "version": "0.15.0",
     "date": "2026-04-07",
-    "tagline": "Assets & automation",
+    "tagline": "Artifacts & automation",
     "items": [
       {
         "category": "feature",
-        "title": "Task assets",
-        "description": "Attach files, images, and documents to tasks with a dedicated assets panel."
+        "title": "Task artifacts",
+        "description": "Attach files, images, and documents to tasks with a dedicated artifacts panel."
       },
       {
         "category": "feature",
-        "title": "Asset mentions in editor",
-        "description": "Link assets inline with @-mention picker and visual chips in the editor."
+        "title": "Artifact mentions in editor",
+        "description": "Link artifacts inline with @-mention picker and visual chips in the editor."
       },
       {
         "category": "feature",
@@ -1092,8 +1092,8 @@
       },
       {
         "category": "feature",
-        "title": "Asset CLI commands",
-        "description": "Create, list, and manage task assets from the Slay CLI."
+        "title": "Artifact CLI commands",
+        "description": "Create, list, and manage task artifacts from the Slay CLI."
       },
       {
         "category": "improvement",

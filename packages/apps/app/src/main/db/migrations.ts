@@ -2333,6 +2333,64 @@ const migrations: Migration[] = [
         )
       `)
     }
+  },
+  {
+    version: 127,
+    up: (db) => {
+      // Rename "assets" feature to "artifacts" — terminology change only.
+      // Tables, columns, and indexes renamed. SQLite >= 3.25 auto-rewrites
+      // foreign-key references in dependent tables on RENAME TO.
+      db.exec(`
+        ALTER TABLE task_assets RENAME TO task_artifacts;
+        ALTER TABLE asset_folders RENAME TO artifact_folders;
+        ALTER TABLE asset_versions RENAME TO artifact_versions;
+        ALTER TABLE asset_blobs RENAME TO artifact_blobs;
+
+        ALTER TABLE artifact_versions RENAME COLUMN asset_id TO artifact_id;
+        ALTER TABLE tasks RENAME COLUMN active_asset_id TO active_artifact_id;
+
+        DROP INDEX IF EXISTS idx_task_assets_task;
+        DROP INDEX IF EXISTS idx_asset_folders_task;
+        DROP INDEX IF EXISTS idx_asset_folders_parent;
+        DROP INDEX IF EXISTS idx_asset_versions_num;
+        DROP INDEX IF EXISTS idx_asset_versions_name;
+        DROP INDEX IF EXISTS idx_asset_versions_hash;
+        DROP INDEX IF EXISTS idx_asset_versions_parent;
+
+        CREATE INDEX IF NOT EXISTS idx_task_artifacts_task ON task_artifacts(task_id);
+        CREATE INDEX IF NOT EXISTS idx_artifact_folders_task ON artifact_folders(task_id);
+        CREATE INDEX IF NOT EXISTS idx_artifact_folders_parent ON artifact_folders(parent_id);
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_artifact_versions_num ON artifact_versions(artifact_id, version_num);
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_artifact_versions_name ON artifact_versions(artifact_id, name) WHERE name IS NOT NULL;
+        CREATE INDEX IF NOT EXISTS idx_artifact_versions_hash ON artifact_versions(content_hash);
+        CREATE INDEX IF NOT EXISTS idx_artifact_versions_parent ON artifact_versions(parent_id);
+      `)
+
+      // Settings keys (idempotent, no-op if no matches).
+      db.exec(`
+        UPDATE settings SET key = REPLACE(key, 'Asset', 'Artifact') WHERE key LIKE '%Asset%';
+        UPDATE settings SET key = REPLACE(key, 'asset', 'artifact') WHERE key LIKE '%asset%';
+      `)
+    }
+  },
+  {
+    version: 128,
+    up: (db) => {
+      // Backend-persisted chat "Up next" queue. Source-of-truth moved out of
+      // React state so queued messages survive reload/crash and stay in sync
+      // across windows. FK ON DELETE CASCADE clears queue when tab deleted.
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS chat_queue (
+          id          TEXT PRIMARY KEY,
+          tab_id      TEXT NOT NULL REFERENCES terminal_tabs(id) ON DELETE CASCADE,
+          send        TEXT NOT NULL,
+          original    TEXT NOT NULL,
+          position    INTEGER NOT NULL,
+          created_at  TEXT DEFAULT (datetime('now'))
+        );
+        CREATE INDEX IF NOT EXISTS idx_chat_queue_tab ON chat_queue(tab_id, position);
+      `)
+    }
   }
 ]
 

@@ -12,8 +12,8 @@ const descriptionCard = (page: Page): Locator =>
 const subtasksCard = (page: Page): Locator =>
   settingsPanel(page).getByTestId('settings-subtasks-card')
 
-const assetsCard = (page: Page): Locator =>
-  settingsPanel(page).getByTestId('settings-assets-card')
+const artifactsCard = (page: Page): Locator =>
+  settingsPanel(page).getByTestId('settings-artifacts-card')
 
 const cardsGrid = (page: Page): Locator =>
   settingsPanel(page).getByTestId('settings-cards-grid')
@@ -99,30 +99,30 @@ test.describe('Settings panel card sizing', () => {
   test('all cards closed: each card is roughly header-height', async ({ mainWindow }) => {
     await setCardOpen(descriptionCard(mainWindow), false)
     await setCardOpen(subtasksCard(mainWindow), false)
-    await setCardOpen(assetsCard(mainWindow), false)
+    await setCardOpen(artifactsCard(mainWindow), false)
 
     expect(await cardHeight(descriptionCard(mainWindow))).toBeLessThan(60)
     expect(await cardHeight(subtasksCard(mainWindow))).toBeLessThan(60)
-    expect(await cardHeight(assetsCard(mainWindow))).toBeLessThan(60)
+    expect(await cardHeight(artifactsCard(mainWindow))).toBeLessThan(60)
   })
 
   test('only subtasks open + 0 subtasks: subtasks card is small (content-sized)', async ({ mainWindow }) => {
     await setCardOpen(descriptionCard(mainWindow), false)
     await setCardOpen(subtasksCard(mainWindow), true)
-    await setCardOpen(assetsCard(mainWindow), false)
+    await setCardOpen(artifactsCard(mainWindow), false)
 
     // Just header + "Add subtask" button
     expect(await cardHeight(subtasksCard(mainWindow))).toBeLessThan(120)
     // Closed peers stay small
     expect(await cardHeight(descriptionCard(mainWindow))).toBeLessThan(60)
-    expect(await cardHeight(assetsCard(mainWindow))).toBeLessThan(60)
+    expect(await cardHeight(artifactsCard(mainWindow))).toBeLessThan(60)
   })
 
   test('only subtasks open + 25 subtasks: card caps at share, does not overflow grid', async ({ mainWindow }) => {
     await createSubtasks(mainWindow, taskId, projectId, 25)
     await setCardOpen(descriptionCard(mainWindow), false)
     await setCardOpen(subtasksCard(mainWindow), true)
-    await setCardOpen(assetsCard(mainWindow), false)
+    await setCardOpen(artifactsCard(mainWindow), false)
 
     const gridH = await cardHeight(cardsGrid(mainWindow))
     const subH = await cardHeight(subtasksCard(mainWindow))
@@ -133,42 +133,42 @@ test.describe('Settings panel card sizing', () => {
     expect(subH).toBeLessThanOrEqual(gridH + 1)
   })
 
-  test('all open + 25 subtasks: subtasks caps, description + assets stay content-sized', async ({ mainWindow }) => {
+  test('all open + 25 subtasks: subtasks caps, description + artifacts stay content-sized', async ({ mainWindow }) => {
     await createSubtasks(mainWindow, taskId, projectId, 25)
     await setCardOpen(descriptionCard(mainWindow), true)
     await setCardOpen(subtasksCard(mainWindow), true)
-    await setCardOpen(assetsCard(mainWindow), true)
+    await setCardOpen(artifactsCard(mainWindow), true)
 
     const descH = await cardHeight(descriptionCard(mainWindow))
     const subH = await cardHeight(subtasksCard(mainWindow))
-    const assetsH = await cardHeight(assetsCard(mainWindow))
+    const artifactsH = await cardHeight(artifactsCard(mainWindow))
 
     // Subtasks should be much bigger than both other cards
     expect(subH).toBeGreaterThan(descH)
-    expect(subH).toBeGreaterThan(assetsH)
-    // Description + assets stay small (content-sized — empty editor + "Add asset" button)
-    expect(assetsH).toBeLessThan(120)
+    expect(subH).toBeGreaterThan(artifactsH)
+    // Description + artifacts stay small (content-sized — empty editor + "Add artifact" button)
+    expect(artifactsH).toBeLessThan(120)
   })
 
   test('all open + empty: cards are content-sized, total < grid', async ({ mainWindow }) => {
     await setCardOpen(descriptionCard(mainWindow), true)
     await setCardOpen(subtasksCard(mainWindow), true)
-    await setCardOpen(assetsCard(mainWindow), true)
+    await setCardOpen(artifactsCard(mainWindow), true)
 
     const gridH = await cardHeight(cardsGrid(mainWindow))
     const descH = await cardHeight(descriptionCard(mainWindow))
     const subH = await cardHeight(subtasksCard(mainWindow))
-    const assetsH = await cardHeight(assetsCard(mainWindow))
+    const artifactsH = await cardHeight(artifactsCard(mainWindow))
 
     // Three small cards + two gaps should be well under grid height (leftover at bottom)
-    const total = descH + subH + assetsH + 32 // 2 × 16px gap
+    const total = descH + subH + artifactsH + 32 // 2 × 16px gap
     expect(total).toBeLessThan(gridH - 50)
   })
 
   test('only description open: description content-sized, peers tiny', async ({ mainWindow }) => {
     await setCardOpen(descriptionCard(mainWindow), true)
     await setCardOpen(subtasksCard(mainWindow), false)
-    await setCardOpen(assetsCard(mainWindow), false)
+    await setCardOpen(artifactsCard(mainWindow), false)
 
     const descH = await cardHeight(descriptionCard(mainWindow))
     const gridH = await cardHeight(cardsGrid(mainWindow))
@@ -176,19 +176,19 @@ test.describe('Settings panel card sizing', () => {
     // Empty description editor: small, not filling entire grid
     expect(descH).toBeLessThan(gridH - 100)
     expect(await cardHeight(subtasksCard(mainWindow))).toBeLessThan(60)
-    expect(await cardHeight(assetsCard(mainWindow))).toBeLessThan(60)
+    expect(await cardHeight(artifactsCard(mainWindow))).toBeLessThan(60)
   })
 
-  test('only assets open: assets content-sized, peers tiny', async ({ mainWindow }) => {
+  test('only artifacts open: artifacts content-sized, peers tiny', async ({ mainWindow }) => {
     await setCardOpen(descriptionCard(mainWindow), false)
     await setCardOpen(subtasksCard(mainWindow), false)
-    await setCardOpen(assetsCard(mainWindow), true)
+    await setCardOpen(artifactsCard(mainWindow), true)
 
-    const assetsH = await cardHeight(assetsCard(mainWindow))
+    const artifactsH = await cardHeight(artifactsCard(mainWindow))
     const gridH = await cardHeight(cardsGrid(mainWindow))
 
-    // Empty assets: small, not filling
-    expect(assetsH).toBeLessThan(gridH - 100)
+    // Empty artifacts: small, not filling
+    expect(artifactsH).toBeLessThan(gridH - 100)
     expect(await cardHeight(descriptionCard(mainWindow))).toBeLessThan(60)
     expect(await cardHeight(subtasksCard(mainWindow))).toBeLessThan(60)
   })
@@ -207,7 +207,7 @@ test.describe('Settings panel card sizing', () => {
     await createSubtasks(mainWindow, taskId, projectId, 25)
     await setCardOpen(descriptionCard(mainWindow), true)
     await setCardOpen(subtasksCard(mainWindow), true)
-    await setCardOpen(assetsCard(mainWindow), true)
+    await setCardOpen(artifactsCard(mainWindow), true)
 
     const panel = settingsPanel(mainWindow)
     const panelH = await cardHeight(panel)

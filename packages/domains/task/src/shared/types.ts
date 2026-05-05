@@ -73,7 +73,7 @@ export interface PanelVisibility extends Record<string, boolean> {
   diff: boolean
   settings: boolean
   editor: boolean
-  assets: boolean
+  artifacts: boolean
   processes: boolean
 }
 
@@ -109,7 +109,7 @@ export interface PanelConfig {
   webPanels: WebPanelDefinition[]
   deletedPredefined?: string[] // IDs of predefined panels the user removed
   // Unified reorder across home + task views. IDs use settings-modal style:
-  // 'terminal', 'browser', 'editor', 'assets', 'git', 'settings', 'processes', 'web:*'.
+  // 'terminal', 'browser', 'editor', 'artifacts', 'git', 'settings', 'processes', 'web:*'.
   // 'git' maps to task panel 'diff' and home panel 'git'. Task-only panels are skipped on home.
   order?: string[]
 }
@@ -122,11 +122,11 @@ export function isPanelEnabled(config: PanelConfig, id: string, view: PanelView)
 // Per-task URL state (panelId → current URL)
 export type WebPanelUrls = Record<string, string>
 
-export const BUILTIN_PANEL_IDS = ['terminal', 'browser', 'editor', 'assets', 'diff', 'settings', 'processes'] as const
+export const BUILTIN_PANEL_IDS = ['terminal', 'browser', 'editor', 'artifacts', 'diff', 'settings', 'processes'] as const
 
 // IDs used in PanelConfig.order (settings-modal style). 'git' is the shared row that
 // maps to 'diff' on task view and 'git' on home view.
-export const PANEL_ORDER_IDS = ['terminal', 'browser', 'editor', 'assets', 'git', 'settings', 'processes'] as const
+export const PANEL_ORDER_IDS = ['terminal', 'browser', 'editor', 'artifacts', 'git', 'settings', 'processes'] as const
 export type PanelOrderId = typeof PANEL_ORDER_IDS[number] | `web:${string}`
 
 /** Map a PanelConfig.order ID to its task-view panel ID. */
@@ -136,7 +136,7 @@ export function orderIdToTaskId(id: string): string {
 
 /** Map a PanelConfig.order ID to its home-view panel ID, or null if task-only. */
 export function orderIdToHomeId(id: string): string | null {
-  if (id === 'terminal' || id === 'browser' || id === 'assets' || id === 'settings') return null
+  if (id === 'terminal' || id === 'browser' || id === 'artifacts' || id === 'settings') return null
   return id // 'git', 'editor', 'processes', 'web:*'
 }
 
@@ -158,7 +158,7 @@ export const PREDEFINED_WEB_PANELS: WebPanelDefinition[] = [
 ]
 
 export const DEFAULT_PANEL_ORDER: string[] = [
-  'terminal', 'browser', 'editor', 'assets', 'git', 'settings', 'processes',
+  'terminal', 'browser', 'editor', 'artifacts', 'git', 'settings', 'processes',
   ...PREDEFINED_WEB_PANELS.map(wp => wp.id),
 ]
 
@@ -233,7 +233,7 @@ export const DEFAULT_PANEL_CONFIG: PanelConfig = {
   order: [...DEFAULT_PANEL_ORDER],
 }
 
-// --- Task Assets ---
+// --- Task Artifacts ---
 
 export type RenderMode = 'markdown' | 'code' | 'html-preview' | 'svg-preview' | 'mermaid-preview' | 'image' | 'pdf'
 
@@ -318,7 +318,7 @@ export const RENDER_MODE_INFO: Record<RenderMode, { label: string }> = {
   'pdf': { label: 'PDF' },
 }
 
-/** Whether a render mode represents a binary (non-text) asset. */
+/** Whether a render mode represents a binary (non-text) artifact. */
 export function isBinaryRenderMode(mode: RenderMode): boolean {
   return mode === 'image' || mode === 'pdf'
 }
@@ -345,13 +345,13 @@ export function getExtensionFromTitle(title: string): string {
   return title.slice(dot).toLowerCase()
 }
 
-/** Determine effective render mode: use override if set and valid, else infer from extension. Default 'markdown' for unknown/no extension (assets are typically prose). */
+/** Determine effective render mode: use override if set and valid, else infer from extension. Default 'markdown' for unknown/no extension (artifacts are typically prose). */
 export function getEffectiveRenderMode(title: string, override: RenderMode | null): RenderMode {
   if (override && override in RENDER_MODE_INFO) return override
   return EXTENSION_RENDER_MODES[getExtensionFromTitle(title)] ?? 'markdown'
 }
 
-export interface TaskAsset {
+export interface TaskArtifact {
   id: string
   task_id: string
   folder_id: string | null
@@ -367,7 +367,7 @@ export interface TaskAsset {
   current_version_id: string | null
 }
 
-export interface CreateAssetInput {
+export interface CreateArtifactInput {
   taskId: string
   title: string
   folderId?: string | null
@@ -376,7 +376,7 @@ export interface CreateAssetInput {
   language?: string | null
 }
 
-export interface UpdateAssetInput {
+export interface UpdateArtifactInput {
   id: string
   title?: string
   folderId?: string | null
@@ -388,7 +388,7 @@ export interface UpdateAssetInput {
   language?: string | null
 }
 
-export interface AssetFolder {
+export interface ArtifactFolder {
   id: string
   task_id: string
   parent_id: string | null
@@ -397,13 +397,13 @@ export interface AssetFolder {
   created_at: string
 }
 
-export interface CreateAssetFolderInput {
+export interface CreateArtifactFolderInput {
   taskId: string
   name: string
   parentId?: string | null
 }
 
-export interface UpdateAssetFolderInput {
+export interface UpdateArtifactFolderInput {
   id: string
   name?: string
   parentId?: string | null
@@ -477,8 +477,8 @@ export interface Task {
   blocked_comment: string | null
   // Pull request
   pr_url: string | null
-  // Active asset selection (persisted across task switches)
-  active_asset_id: string | null
+  // Active artifact selection (persisted across task switches)
+  active_artifact_id: string | null
   // Multi-repo: folder name of the child repo this task is scoped to
   repo_name: string | null
   // External link (populated via JOIN)
@@ -581,8 +581,8 @@ export interface UpdateTaskInput {
   // Blocked
   isBlocked?: boolean
   blockedComment?: string | null
-  // Active asset
-  activeAssetId?: string | null
+  // Active artifact
+  activeArtifactId?: string | null
   // Multi-repo
   repoName?: string | null
   // Reparent: undefined = no change, null = detach to root, string = new parent id

@@ -49,7 +49,6 @@ const api: ElectronAPI = {
     archiveTask: (id) => ipcRenderer.invoke('db:tasks:archive', id),
     archiveTasks: (ids) => ipcRenderer.invoke('db:tasks:archiveMany', ids),
     unarchiveTask: (id) => ipcRenderer.invoke('db:tasks:unarchive', id),
-    getArchivedTasks: () => ipcRenderer.invoke('db:tasks:getArchived'),
     reorderTasks: (taskIds) => ipcRenderer.invoke('db:tasks:reorder', taskIds)
   },
   tags: {
@@ -72,48 +71,48 @@ const api: ElectronAPI = {
     getTagsForTask: (taskId) => ipcRenderer.invoke('db:taskTags:getForTask', taskId),
     setTagsForTask: (taskId, tagIds) => ipcRenderer.invoke('db:taskTags:setForTask', taskId, tagIds)
   },
-  assets: {
-    getByTask: (taskId) => ipcRenderer.invoke('db:assets:getByTask', taskId),
-    get: (id) => ipcRenderer.invoke('db:assets:get', id),
-    create: (data) => ipcRenderer.invoke('db:assets:create', data),
-    update: (data) => ipcRenderer.invoke('db:assets:update', data),
-    delete: (id) => ipcRenderer.invoke('db:assets:delete', id),
-    reorder: (data) => ipcRenderer.invoke('db:assets:reorder', data),
-    readContent: (id) => ipcRenderer.invoke('db:assets:readContent', id),
-    getFilePath: (id) => ipcRenderer.invoke('db:assets:getFilePath', id),
-    getMtime: (id) => ipcRenderer.invoke('db:assets:getMtime', id),
-    onContentChanged: (callback: (assetId: string) => void) => {
-      const handler = (_: unknown, assetId: string) => callback(assetId)
-      ipcRenderer.on('assets:content-changed', handler)
-      return () => ipcRenderer.removeListener('assets:content-changed', handler)
+  artifacts: {
+    getByTask: (taskId) => ipcRenderer.invoke('db:artifacts:getByTask', taskId),
+    get: (id) => ipcRenderer.invoke('db:artifacts:get', id),
+    create: (data) => ipcRenderer.invoke('db:artifacts:create', data),
+    update: (data) => ipcRenderer.invoke('db:artifacts:update', data),
+    delete: (id) => ipcRenderer.invoke('db:artifacts:delete', id),
+    reorder: (data) => ipcRenderer.invoke('db:artifacts:reorder', data),
+    readContent: (id) => ipcRenderer.invoke('db:artifacts:readContent', id),
+    getFilePath: (id) => ipcRenderer.invoke('db:artifacts:getFilePath', id),
+    getMtime: (id) => ipcRenderer.invoke('db:artifacts:getMtime', id),
+    onContentChanged: (callback: (artifactId: string) => void) => {
+      const handler = (_: unknown, artifactId: string) => callback(artifactId)
+      ipcRenderer.on('artifacts:content-changed', handler)
+      return () => ipcRenderer.removeListener('artifacts:content-changed', handler)
     },
-    upload: (data) => ipcRenderer.invoke('db:assets:upload', data),
-    uploadBlob: (data) => ipcRenderer.invoke('db:assets:uploadBlob', data),
-    pasteFiles: (data) => ipcRenderer.invoke('db:assets:pasteFiles', data),
-    cleanupTask: (taskId) => ipcRenderer.invoke('db:assets:cleanupTask', taskId),
-    uploadDir: (data) => ipcRenderer.invoke('db:assets:uploadDir', data),
-    downloadFile: (id) => ipcRenderer.invoke('db:assets:downloadFile', id),
-    downloadFolder: (id) => ipcRenderer.invoke('db:assets:downloadFolder', id),
-    downloadAsPdf: (id) => ipcRenderer.invoke('db:assets:downloadAsPdf', id),
-    downloadAsPng: (id) => ipcRenderer.invoke('db:assets:downloadAsPng', id),
-    downloadAsHtml: (id) => ipcRenderer.invoke('db:assets:downloadAsHtml', id),
-    downloadAllAsZip: (taskId) => ipcRenderer.invoke('db:assets:downloadAllAsZip', taskId),
+    upload: (data) => ipcRenderer.invoke('db:artifacts:upload', data),
+    uploadBlob: (data) => ipcRenderer.invoke('db:artifacts:uploadBlob', data),
+    pasteFiles: (data) => ipcRenderer.invoke('db:artifacts:pasteFiles', data),
+    cleanupTask: (taskId) => ipcRenderer.invoke('db:artifacts:cleanupTask', taskId),
+    uploadDir: (data) => ipcRenderer.invoke('db:artifacts:uploadDir', data),
+    downloadFile: (id) => ipcRenderer.invoke('db:artifacts:downloadFile', id),
+    downloadFolder: (id) => ipcRenderer.invoke('db:artifacts:downloadFolder', id),
+    downloadAsPdf: (id) => ipcRenderer.invoke('db:artifacts:downloadAsPdf', id),
+    downloadAsPng: (id) => ipcRenderer.invoke('db:artifacts:downloadAsPng', id),
+    downloadAsHtml: (id) => ipcRenderer.invoke('db:artifacts:downloadAsHtml', id),
+    downloadAllAsZip: (taskId) => ipcRenderer.invoke('db:artifacts:downloadAllAsZip', taskId),
     versions: {
-      list: (data) => ipcRenderer.invoke('db:assets:versions:list', data),
-      read: (data) => ipcRenderer.invoke('db:assets:versions:read', data),
-      create: (data) => ipcRenderer.invoke('db:assets:versions:create', data),
-      rename: (data) => ipcRenderer.invoke('db:assets:versions:rename', data),
-      diff: (data) => ipcRenderer.invoke('db:assets:versions:diff', data),
-      prune: (data) => ipcRenderer.invoke('db:assets:versions:prune', data),
-      setCurrent: (data) => ipcRenderer.invoke('db:assets:versions:setCurrent', data),
+      list: (data) => ipcRenderer.invoke('db:artifacts:versions:list', data),
+      read: (data) => ipcRenderer.invoke('db:artifacts:versions:read', data),
+      create: (data) => ipcRenderer.invoke('db:artifacts:versions:create', data),
+      rename: (data) => ipcRenderer.invoke('db:artifacts:versions:rename', data),
+      diff: (data) => ipcRenderer.invoke('db:artifacts:versions:diff', data),
+      prune: (data) => ipcRenderer.invoke('db:artifacts:versions:prune', data),
+      setCurrent: (data) => ipcRenderer.invoke('db:artifacts:versions:setCurrent', data),
     },
   },
-  assetFolders: {
-    getByTask: (taskId) => ipcRenderer.invoke('db:assetFolders:getByTask', taskId),
-    create: (data) => ipcRenderer.invoke('db:assetFolders:create', data),
-    update: (data) => ipcRenderer.invoke('db:assetFolders:update', data),
-    delete: (id) => ipcRenderer.invoke('db:assetFolders:delete', id),
-    reorder: (data) => ipcRenderer.invoke('db:assetFolders:reorder', data),
+  artifactFolders: {
+    getByTask: (taskId) => ipcRenderer.invoke('db:artifactFolders:getByTask', taskId),
+    create: (data) => ipcRenderer.invoke('db:artifactFolders:create', data),
+    update: (data) => ipcRenderer.invoke('db:artifactFolders:update', data),
+    delete: (id) => ipcRenderer.invoke('db:artifactFolders:delete', id),
+    reorder: (data) => ipcRenderer.invoke('db:artifactFolders:reorder', data),
   },
   taskTemplates: {
     getByProject: (projectId) => ipcRenderer.invoke('db:taskTemplates:getByProject', projectId),
@@ -259,10 +258,10 @@ const api: ElectronAPI = {
       ipcRenderer.on('app:open-task', handler)
       return () => ipcRenderer.removeListener('app:open-task', handler)
     },
-    onOpenAsset: (callback: (taskId: string, assetId: string) => void) => {
-      const handler = (_: unknown, payload: { taskId: string; assetId: string }) => callback(payload.taskId, payload.assetId)
-      ipcRenderer.on('app:open-asset', handler)
-      return () => ipcRenderer.removeListener('app:open-asset', handler)
+    onOpenArtifact: (callback: (taskId: string, artifactId: string) => void) => {
+      const handler = (_: unknown, payload: { taskId: string; artifactId: string }) => callback(payload.taskId, payload.artifactId)
+      ipcRenderer.on('app:open-artifact', handler)
+      return () => ipcRenderer.removeListener('app:open-artifact', handler)
     },
     onScreenshotTrigger: (callback: () => void) => {
       const handler = () => callback()
@@ -577,6 +576,23 @@ const api: ElectronAPI = {
       return () => {
         ipcRenderer.removeListener('chat:exit', handler)
       }
+    },
+  },
+  chatQueue: {
+    list: (tabId: string) => ipcRenderer.invoke('chat:queue:list', tabId),
+    push: (tabId: string, send: string, original: string) =>
+      ipcRenderer.invoke('chat:queue:push', tabId, send, original),
+    remove: (id: string) => ipcRenderer.invoke('chat:queue:remove', id),
+    clear: (tabId: string) => ipcRenderer.invoke('chat:queue:clear', tabId),
+    onChanged: (callback: (tabId: string) => void) => {
+      const handler = (_: unknown, tabId: string) => callback(tabId)
+      ipcRenderer.on('chat:queue-changed', handler)
+      return () => ipcRenderer.removeListener('chat:queue-changed', handler)
+    },
+    onDrained: (callback: (tabId: string, original: string) => void) => {
+      const handler = (_: unknown, tabId: string, original: string) => callback(tabId, original)
+      ipcRenderer.on('chat:queue-drained', handler)
+      return () => ipcRenderer.removeListener('chat:queue-drained', handler)
     },
   },
   terminalModes: {

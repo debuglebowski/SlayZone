@@ -14,7 +14,7 @@ interface Props {
 }
 
 const DEFAULT_PANEL_VIS: PanelVisibility = {
-  terminal: false, browser: false, diff: false, settings: false, editor: false, assets: false, processes: false,
+  terminal: false, browser: false, diff: false, settings: false, editor: false, artifacts: false, processes: false,
 }
 
 export function SecondaryTaskWindow({ taskId: initialTaskId }: Props) {

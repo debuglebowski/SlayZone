@@ -1,11 +1,9 @@
 import { AgentStatusPanel } from './AgentStatusPanel'
 import type { IdleTask } from './useIdleTasks'
-import type { Project } from '@slayzone/projects/shared'
 
 interface AgentStatusSidePanelProps {
   width: number
   idleTasks: IdleTask[]
-  projects: Project[]
   filterCurrentProject: boolean
   onFilterToggle: () => void
   onNavigate: (taskId: string) => void
@@ -20,7 +18,6 @@ export const AGENT_STATUS_PANEL_MAX_WIDTH = 480
 export function AgentStatusSidePanel({
   width,
   idleTasks,
-  projects,
   filterCurrentProject,
   onFilterToggle,
   onNavigate,
@@ -36,7 +33,6 @@ export function AgentStatusSidePanel({
       <div className="flex-1 min-h-0">
         <AgentStatusPanel
           idleTasks={idleTasks}
-          projects={projects}
           filterCurrentProject={filterCurrentProject}
           onFilterToggle={onFilterToggle}
           onNavigate={onNavigate}

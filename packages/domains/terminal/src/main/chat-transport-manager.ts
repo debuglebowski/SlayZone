@@ -204,6 +204,38 @@ function transitionState(session: Session, next: ChatTerminalState): void {
   const stateSessionId = `${session.taskId}:${session.tabId}`
   deps.broadcastStateChange(stateSessionId, next, old)
   deps.onStateChange?.(stateSessionId, next, old)
+  // Edge-trigger: any time we land in `idle` (post-result, post-spawn, etc.)
+  // give the queue drainer a chance to push the next user-message. Scheduled
+  // via setImmediate so the drain's sendUserMessage path doesn't re-enter
+  // handleEvent inside the current event tick.
+  if (next === 'idle' && queueDrainer) {
+    const tabId = session.tabId
+    const drain = queueDrainer
+    setImmediate(() => drain(tabId))
+  }
+}
+
+let queueDrainer: ((tabId: string) => void) | null = null
+
+/**
+ * Wire a drain callback the transport invokes whenever a session transitions
+ * into `idle`. The callback is responsible for popping the head of the
+ * persisted chat queue (if any) and calling `sendUserMessage` to dispatch it.
+ * Called from chat-queue-handlers at registration time. Single global slot —
+ * registering twice replaces.
+ */
+export function registerChatQueueDrainer(fn: (tabId: string) => void): void {
+  queueDrainer = fn
+}
+
+/**
+ * Read the current terminal state for a tab. Used by the queue drainer to
+ * gate "should I pop?" — sendUserMessage during a running turn would
+ * interleave with the in-flight assistant response on the subprocess's stdin.
+ */
+export function getSessionTerminalState(tabId: string): ChatTerminalState | null {
+  const s = sessions.get(tabId)
+  return s ? s.terminalState : null
 }
 
 function handleEvent(session: Session, event: AgentEvent): void {

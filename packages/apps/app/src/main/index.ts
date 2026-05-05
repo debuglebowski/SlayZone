@@ -11,7 +11,7 @@ console.log('[fd-limit]', JSON.stringify(fdLimitResult))
 import { app, shell, BrowserWindow, ipcMain, nativeTheme, session, webContents, dialog, Menu, protocol, screen, powerMonitor, crashReporter } from 'electron'
 import { join, extname, normalize, sep, resolve } from 'path'
 import { homedir } from 'os'
-import { readFileSync, promises as fsp, mkdirSync } from 'fs'
+import { readFileSync, promises as fsp, mkdirSync, existsSync, renameSync } from 'fs'
 import { electronApp, is } from '@electron-toolkit/utils'
 import { ElectronChromeExtensions } from 'electron-chrome-extensions'
 import { installChromeWebStore } from 'electron-chrome-web-store'
@@ -112,8 +112,8 @@ import { normalizeProjectStatusData } from './db/status-normalization'
 import { registerBackupHandlers, startAutoBackup, stopAutoBackup, createPreMigrationBackup } from './backup'
 // Domain handlers
 import { registerProjectHandlers, handleTerminalStateChange } from '@slayzone/projects/main'
-import { configureTaskRuntimeAdapters, registerTaskHandlers, registerTaskTemplateHandlers, registerFilesHandlers, closeAssetWatcher } from '@slayzone/task/main'
-import { BlobStore, betterSqliteTxn, seedInitialVersions } from '@slayzone/task-assets/main'
+import { configureTaskRuntimeAdapters, registerTaskHandlers, registerTaskTemplateHandlers, registerFilesHandlers, closeArtifactWatcher } from '@slayzone/task/main'
+import { BlobStore, betterSqliteTxn, seedInitialVersions } from '@slayzone/task-artifacts/main'
 import { getExtensionFromTitle } from '@slayzone/task/shared'
 import { registerTagHandlers } from '@slayzone/tags/main'
 import { registerSettingsHandlers, registerThemeHandlers } from '@slayzone/settings/main'
@@ -825,20 +825,35 @@ app.whenReady().then(async () => {
   runMigrations(db)
   normalizeProjectStatusData(db)
 
-  // Seed initial asset versions (v1) for any assets without history. Idempotent.
+  // v127 disk-dir rename: artifacts/ → artifacts/. Idempotent. Runs after migrations.
   {
     const dataDir = process.env.SLAYZONE_DB_DIR || app.getPath('userData')
-    const assetsDir = join(dataDir, 'assets')
+    const oldDir = join(dataDir, 'artifacts')
+    const newDir = join(dataDir, 'artifacts')
+    try {
+      if (existsSync(oldDir) && !existsSync(newDir)) {
+        renameSync(oldDir, newDir)
+        console.log('[migration v127] renamed userData/artifacts/ → userData/artifacts/')
+      }
+    } catch (e) {
+      console.error('[migration v127] disk dir rename failed', e)
+    }
+  }
+
+  // Seed initial artifact versions (v1) for any artifacts without history. Idempotent.
+  {
+    const dataDir = process.env.SLAYZONE_DB_DIR || app.getPath('userData')
+    const artifactsDir = join(dataDir, 'artifacts')
     const blobStore = new BlobStore(dataDir)
     const txnRunner = betterSqliteTxn(db)
     const seedReport = seedInitialVersions(db, txnRunner, blobStore, {
       resolveFilePath: (row) => {
         const ext = getExtensionFromTitle(row.title) || '.txt'
-        return join(assetsDir, row.task_id, `${row.id}${ext}`)
+        return join(artifactsDir, row.task_id, `${row.id}${ext}`)
       }
     })
     if (seedReport.seeded > 0 || seedReport.skippedMissing > 0) {
-      console.log(`[asset-versions] seeded=${seedReport.seeded} skippedMissing=${seedReport.skippedMissing}`)
+      console.log(`[artifact-versions] seeded=${seedReport.seeded} skippedMissing=${seedReport.skippedMissing}`)
     }
   }
   const diagDb = getDiagnosticsDatabase()
@@ -2158,7 +2173,7 @@ div{text-align:center}h1{font-size:14px;font-weight:500;color:#aaa}p{font-size:1
 
       // 4. Close file watchers
       closeAllWatchers()
-      closeAssetWatcher()
+      closeArtifactWatcher()
       closeGitWatcher()
 
       // 5. Clear registries + flags + browser view manager
@@ -2447,7 +2462,7 @@ app.on('will-quit', () => {
   stopDiagnostics()
   stopIdleChecker()
   stopAutoBackup()
-  closeAssetWatcher()
+  closeArtifactWatcher()
   closeGitWatcher()
   killAllPtys()
   shutdownChatTransports()

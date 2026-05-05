@@ -15,10 +15,10 @@ import { escapeBlurPlugin } from './milkdown-escape-blur'
 import { taskListPlugin } from './milkdown-task-list'
 import { htmlRenderPlugin } from './milkdown-html-render'
 import { remarkFrontmatterPlugin, frontmatterSchema, frontmatterView } from './milkdown-frontmatter'
-import { createAssetLinkPlugin, insertAssetLinkAtCursor, type AssetMentionState } from './milkdown-asset-link'
+import { createArtifactLinkPlugin, insertArtifactLinkAtCursor, type ArtifactMentionState } from './milkdown-artifact-link'
 import { extractImageFilesFromDataTransfer } from './use-image-paste-drop'
 import { createSearchHighlightPlugin, setSearch as setMilkdownSearch } from './milkdown-search-highlight'
-import { AssetPicker, type AssetPickerItem } from './AssetPicker'
+import { ArtifactPicker, type ArtifactPickerItem } from './ArtifactPicker'
 
 export type { Editor }
 
@@ -118,8 +118,8 @@ interface RichTextEditorProps {
   showToolbar?: boolean
   spellcheck?: boolean
   themeColors?: EditorThemeColors
-  assets?: AssetPickerItem[]
-  onAssetClick?: (assetId: string) => void
+  artifacts?: ArtifactPickerItem[]
+  onArtifactClick?: (artifactId: string) => void
   /** In-editor search query. Non-empty values highlight matches. */
   searchQuery?: string
   /** Index of the active match (used to scroll into view and paint the active color). */
@@ -130,7 +130,7 @@ interface RichTextEditorProps {
   searchRegex?: boolean
   /** Called when the number of matches changes. */
   onSearchMatchCountChange?: (count: number) => void
-  /** Called when image files are pasted/dropped. Return inserted asset refs in order. */
+  /** Called when image files are pasted/dropped. Return inserted artifact refs in order. */
   onUploadImages?: (files: File[]) => Promise<Array<{ id: string; title: string }>>
   /** Enable YAML frontmatter parsing/rendering (`--- ... ---` blocks at top of doc). */
   frontmatter?: boolean
@@ -162,8 +162,8 @@ export function RichTextEditor({
   showToolbar,
   spellcheck,
   themeColors,
-  assets,
-  onAssetClick,
+  artifacts,
+  onArtifactClick,
   searchQuery = '',
   searchActiveIndex = 0,
   searchMatchCase = false,
@@ -185,16 +185,16 @@ export function RichTextEditor({
   const suppressOnChange = useRef(false)
   const [formatState, setFormatState] = useState<FormatState>(emptyFormatState)
   const [editorReady, setEditorReady] = useState(false)
-  const [mentionState, setMentionState] = useState<AssetMentionState | null>(null)
-  const onAssetClickRef = useRef(onAssetClick)
-  const assetsRef = useRef(assets)
+  const [mentionState, setMentionState] = useState<ArtifactMentionState | null>(null)
+  const onArtifactClickRef = useRef(onArtifactClick)
+  const artifactsRef = useRef(artifacts)
   const onSearchMatchCountChangeRef = useRef(onSearchMatchCountChange)
   onSearchMatchCountChangeRef.current = onSearchMatchCountChange
   const onUploadImagesRef = useRef(onUploadImages)
   onUploadImagesRef.current = onUploadImages
-  const insertAssetLinkRef = useRef<((view: import('@milkdown/prose/view').EditorView, assetId: string, assetTitle: string) => void) | null>(null)
-  onAssetClickRef.current = onAssetClick
-  assetsRef.current = assets
+  const insertArtifactLinkRef = useRef<((view: import('@milkdown/prose/view').EditorView, artifactId: string, artifactTitle: string) => void) | null>(null)
+  onArtifactClickRef.current = onArtifactClick
+  artifactsRef.current = artifacts
 
   const onSaveRef = useRef(onSave)
   const htmlResolveSrcRef = useRef(htmlResolveSrc)
@@ -238,12 +238,12 @@ export function RichTextEditor({
 
     const placeholderPlugin = createPlaceholderPlugin(placeholder)
 
-    // Asset link plugins (only when assets prop is provided)
-    const assetPlugins = createAssetLinkPlugin(
-      (assetId) => onAssetClickRef.current?.(assetId),
+    // Artifact link plugins (only when artifacts prop is provided)
+    const artifactPlugins = createArtifactLinkPlugin(
+      (artifactId) => onArtifactClickRef.current?.(artifactId),
       (state) => setMentionState(state),
     )
-    insertAssetLinkRef.current = assetPlugins.insertAssetLink
+    insertArtifactLinkRef.current = artifactPlugins.insertArtifactLink
 
     const searchPlugin = createSearchHighlightPlugin({
       onMatchCountChange: (n) => onSearchMatchCountChangeRef.current?.(n),
@@ -259,7 +259,7 @@ export function RichTextEditor({
           if (files.length === 0) return false
           event.preventDefault()
           void upload(files).then((results) => {
-            for (const r of results) insertAssetLinkAtCursor(view, r.id, r.title)
+            for (const r of results) insertArtifactLinkAtCursor(view, r.id, r.title)
           })
           return true
         },
@@ -270,7 +270,7 @@ export function RichTextEditor({
           if (files.length === 0) return false
           event.preventDefault()
           void upload(files).then((results) => {
-            for (const r of results) insertAssetLinkAtCursor(view, r.id, r.title)
+            for (const r of results) insertArtifactLinkAtCursor(view, r.id, r.title)
           })
           return true
         },
@@ -311,8 +311,8 @@ export function RichTextEditor({
       .use(toggleTaskListCommand)
       .use(formatStatePlugin)
       .use(blurHandlerPlugin)
-      .use(assetPlugins.assetLinkDecoPlugin)
-      .use(assetPlugins.assetMentionPlugin)
+      .use(artifactPlugins.artifactLinkDecoPlugin)
+      .use(artifactPlugins.artifactMentionPlugin)
       .use(searchPlugin)
       .use(imagePastePlugin)
 
@@ -454,16 +454,16 @@ export function RichTextEditor({
         />
       )}
       <div ref={containerRef} className="mk-doc-scroll" />
-      {mentionState?.active && mentionState.coords && assetsRef.current && assetsRef.current.length > 0 && (
-        <AssetPicker
-          items={assetsRef.current}
+      {mentionState?.active && mentionState.coords && artifactsRef.current && artifactsRef.current.length > 0 && (
+        <ArtifactPicker
+          items={artifactsRef.current}
           query={mentionState.query}
           coords={mentionState.coords}
           onSelect={(item) => {
             const editor = editorInstanceRef.current
             if (editor) {
               const view = editor.ctx.get(editorViewCtx)
-              insertAssetLinkRef.current?.(view, item.id, item.title)
+              insertArtifactLinkRef.current?.(view, item.id, item.title)
             }
           }}
           onClose={() => setMentionState(null)}

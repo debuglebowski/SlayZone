@@ -102,9 +102,9 @@ export async function notifyApp(): Promise<void> {
   }
 }
 
-export function getAssetsDir(): string {
+export function getArtifactsDir(): string {
   const dir = process.env.SLAYZONE_DB_DIR ?? defaultDir()
-  return path.join(dir, 'assets')
+  return path.join(dir, 'artifacts')
 }
 
 export function openDb(): SlayDb {

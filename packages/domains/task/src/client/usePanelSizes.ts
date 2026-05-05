@@ -11,7 +11,7 @@ const DEFAULT_SIZES: PanelSizes = {
   diff: 'auto',
   settings: 440,
   editor: 'auto',
-  assets: 'auto',
+  artifacts: 'auto',
   processes: 600
 }
 
@@ -21,7 +21,7 @@ const HANDLE_WIDTH = 16 // w-4 = 1rem
 const STORAGE_VERSION = 5
 
 // Built-in order: terminal, browser, editor, [web panels inserted here], diff, processes, settings
-const BUILTIN_ORDER = ['terminal', 'browser', 'editor', 'assets', 'diff', 'processes', 'settings']
+const BUILTIN_ORDER = ['terminal', 'browser', 'editor', 'artifacts', 'diff', 'processes', 'settings']
 
 /** Build ordered panel list: built-ins in fixed order, web panels between editor and diff */
 export function buildPanelOrder(visibility: PanelVisibility): string[] {

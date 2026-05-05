@@ -24,6 +24,8 @@ import {
   getNextSeqForTab,
   clearChatEventsForTab,
 } from './chat-events-store'
+import { registerChatQueueHandlers } from './chat-queue-handlers'
+import { clearChatQueue } from './chat-queue-store'
 import { notifyGlobalStateListeners } from './pty-manager'
 import { parseShellArgs } from './adapters/flag-parser'
 import { buildMcpEnv } from './mcp-env'
@@ -439,6 +441,8 @@ export function registerChatHandlers(ipcMain: IpcMain, db: Database, opts: ChatH
     },
   })
 
+  registerChatQueueHandlers(ipcMain, db)
+
   ipcMain.handle('chat:supports', (_, mode: string): boolean => supportsChatMode(mode))
 
   ipcMain.handle('chat:create', async (_, opts: ChatCreateOpts): Promise<ChatSessionInfo> => {
@@ -523,6 +527,13 @@ export function registerChatHandlers(ipcMain: IpcMain, db: Database, opts: ChatH
   }> => {
     const result = popLastUserMessage(opts.tabId)
     if (!result.popped) recordInterrupted(opts.tabId)
+    // Stop button discards queued follow-ups alongside the in-flight turn —
+    // matches pre-backend behavior where handleStop did `setQueuedMessages([])`.
+    try {
+      clearChatQueue(db, opts.tabId)
+    } catch (err) {
+      console.error('[chat-handlers] clearChatQueue failed:', err)
+    }
     removeSession(opts.tabId)
     await createChat(await buildCreateOpts(db, opts, { fresh: false }))
     return { popped: result.popped, text: result.text }
@@ -534,13 +545,18 @@ export function registerChatHandlers(ipcMain: IpcMain, db: Database, opts: ChatH
 
   ipcMain.handle('chat:remove', (_, tabId: string): void => {
     removeSession(tabId)
-    // Tab is gone — drop persisted history. (FK ON DELETE CASCADE also clears
-    // it when the terminal_tabs row itself is deleted, but chat:remove can be
-    // invoked before the tab row is gone, so be explicit.)
+    // Tab is gone — drop persisted history + queue. (FK ON DELETE CASCADE
+    // also clears them when the terminal_tabs row itself is deleted, but
+    // chat:remove can be invoked before the tab row is gone, so be explicit.)
     try {
       clearChatEventsForTab(db, tabId)
     } catch (err) {
       console.error('[chat-handlers] clearChatEventsForTab failed:', err)
+    }
+    try {
+      clearChatQueue(db, tabId)
+    } catch (err) {
+      console.error('[chat-handlers] clearChatQueue failed:', err)
     }
   })
 
@@ -557,6 +573,11 @@ export function registerChatHandlers(ipcMain: IpcMain, db: Database, opts: ChatH
       clearChatEventsForTab(db, opts.tabId)
     } catch (err) {
       console.error('[chat-handlers] clearChatEventsForTab failed:', err)
+    }
+    try {
+      clearChatQueue(db, opts.tabId)
+    } catch (err) {
+      console.error('[chat-handlers] clearChatQueue failed:', err)
     }
     try {
       clearChatConversationId(db, opts.taskId, opts.mode)

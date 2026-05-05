@@ -56,10 +56,10 @@ function buildPanelRowDescriptors(
     taskToggle: { enabled: isPanelEnabled(panelConfig, 'editor', 'task'), onChange: c => togglePanel('editor', 'task', c) },
     onClick: () => navigateTo('panels/editor'),
   })
-  m.set('assets', {
-    icon: Paperclip, label: 'Assets',
+  m.set('artifacts', {
+    icon: Paperclip, label: 'Artifacts',
     homeToggle: null,
-    taskToggle: { enabled: isPanelEnabled(panelConfig, 'assets', 'task'), onChange: c => togglePanel('assets', 'task', c) },
+    taskToggle: { enabled: isPanelEnabled(panelConfig, 'artifacts', 'task'), onChange: c => togglePanel('artifacts', 'task', c) },
   })
   m.set('git', {
     icon: GitCompare, label: 'Git',

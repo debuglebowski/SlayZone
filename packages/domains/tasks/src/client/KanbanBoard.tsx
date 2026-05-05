@@ -36,8 +36,6 @@ interface KanbanBoardProps {
   onTaskMove: (taskId: string, newColumnId: string, targetIndex: number) => void
   onTaskReorder: (taskIds: string[]) => void
   onTaskClick?: (task: Task, e: { metaKey: boolean }) => void
-  projectsMap?: Map<string, Project>
-  showProjectDot?: boolean
   cardProperties?: CardProperties
   taskTags?: Map<string, string[]>
   tags?: Tag[]
@@ -60,8 +58,6 @@ export function KanbanBoard({
   onTaskMove,
   onTaskReorder,
   onTaskClick,
-  projectsMap,
-  showProjectDot,
   cardProperties,
   taskTags,
   tags,
@@ -255,8 +251,6 @@ export function KanbanBoard({
             overColumnId={overColumnId}
             onTaskClick={onTaskClick}
             onCreateTask={handleCreateTask}
-            projectsMap={projectsMap}
-            showProjectDot={showProjectDot}
             disableDrag={disableDrag}
             cardProperties={cardProperties}
             taskTags={taskTags}
@@ -289,8 +283,6 @@ export function KanbanBoard({
               task={activeTask}
               columns={projectColumns}
               isDragging
-              project={showProjectDot ? projectsMap?.get(activeTask.project_id) : undefined}
-              showProject={showProjectDot}
             />
           </motion.div>
         ) : null}

@@ -69,8 +69,8 @@ export const updateTaskInputSchema = z
     isBlocked: z.boolean().optional(),
     blockedComment: z.string().nullable().optional(),
 
-    // Active asset
-    activeAssetId: z.string().nullable().optional(),
+    // Active artifact
+    activeArtifactId: z.string().nullable().optional(),
 
     // Multi-repo
     repoName: z.string().nullable().optional(),

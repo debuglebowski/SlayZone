@@ -23,7 +23,7 @@
     "@slayzone/settings": "workspace:*",
     "@slayzone/tags": "workspace:*",
     "@slayzone/task": "workspace:*",
-    "@slayzone/task-assets": "workspace:*",
+    "@slayzone/task-artifacts": "workspace:*",
     "@slayzone/task-terminals": "workspace:*",
     "@slayzone/terminal": "workspace:*",
     "@slayzone/test-panel": "workspace:*",

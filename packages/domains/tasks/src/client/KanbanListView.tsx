@@ -49,8 +49,6 @@ interface KanbanListViewProps {
   onTaskMove: (taskId: string, newColumnId: string, targetIndex: number) => void
   onTaskReorder: (taskIds: string[]) => void
   onTaskClick?: (task: Task, e: { metaKey: boolean }) => void
-  projectsMap?: Map<string, Project>
-  showProjectDot?: boolean
   cardProperties?: CardProperties
   blockedTaskIds?: Set<string>
   allProjects?: Project[]
@@ -106,8 +104,6 @@ interface ListRowProps {
   columns?: ColumnConfig[] | null
   cp?: CardProperties
   onClick?: (task: Task, e: { metaKey: boolean }) => void
-  project?: Project
-  showProject?: boolean
   isBlocked?: boolean
   subTaskCount?: { done: number; total: number }
   disableDrag?: boolean
@@ -167,8 +163,6 @@ function ListRowContent({
   columns,
   cp,
   onClick,
-  project,
-  showProject,
   isBlocked,
   subTaskCount,
   isDragging
@@ -185,14 +179,6 @@ function ListRowContent({
       )}
       onClick={(e) => onClick?.(task, e)}
     >
-      {/* Project dot */}
-      {showProject && project && (
-        <span className="h-1.5 w-1.5 rounded-full shrink-0" style={{ backgroundColor: project.color }} title={project.name} />
-      )}
-      {showProject && !project && (
-        <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/30 shrink-0" />
-      )}
-
       {/* Priority bar */}
       {(cp?.priority ?? true) && <PriorityBar priority={task.priority} />}
 
@@ -284,8 +270,6 @@ interface GroupSectionProps {
   onCreateTask?: (column: Column) => void
   cp?: CardProperties
   onTaskClick?: (task: Task, e: { metaKey: boolean }) => void
-  projectsMap?: Map<string, Project>
-  showProjectDot?: boolean
   disableDrag?: boolean
   blockedTaskIds?: Set<string>
   subTaskCounts: Map<string, { done: number; total: number }>
@@ -308,8 +292,6 @@ function GroupSection({
   onCreateTask,
   cp,
   onTaskClick,
-  projectsMap,
-  showProjectDot,
   disableDrag,
   blockedTaskIds,
   subTaskCounts,
@@ -365,8 +347,6 @@ function GroupSection({
                   columns={columns}
                   cp={cp}
                   onClick={onTaskClick}
-                  project={showProjectDot ? projectsMap?.get(task.project_id) : undefined}
-                  showProject={showProjectDot}
                   disableDrag={disableDrag}
                   isBlocked={blockedTaskIds?.has(task.id)}
                   subTaskCount={subTaskCounts.get(task.id)}
@@ -396,8 +376,6 @@ export function KanbanListView({
   onTaskMove,
   onTaskReorder,
   onTaskClick,
-  projectsMap,
-  showProjectDot,
   cardProperties,
   blockedTaskIds,
   allProjects,
@@ -541,8 +519,6 @@ export function KanbanListView({
             onCreateTask={handleCreateTask}
             cp={cardProperties}
             onTaskClick={onTaskClick}
-            projectsMap={projectsMap}
-            showProjectDot={showProjectDot}
             disableDrag={disableDrag}
             blockedTaskIds={blockedTaskIds}
             subTaskCounts={subTaskCounts}

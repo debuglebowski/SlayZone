@@ -5,7 +5,7 @@ trigger: manual
 depends_on:
   - slay-tasks
   - slay-pty
-  - slay-assets
+  - slay-artifacts
 ---
 
 Orchestrate any set of slay tasks toward completion. The user tells you *which* tasks to supervise (free-form: ids, tags, a project, a filter, or a description like "all refactor tasks in backlog"); you dispatch each to its own PTY, review plans, keep agents unblocked, and drive them to done. Works equally well for top-level tasks and subtasks — the skill does not care.
@@ -19,9 +19,9 @@ Orchestrate any set of slay tasks toward completion. The user tells you *which* 
 3. If **zero** tasks match, stop and tell the user no tasks were found for that selector. Do not guess or expand scope.
 4. List matched tasks (id + title) back to the user as confirmation, then proceed.
 
-## 2. Create the progress log asset
+## 2. Create the progress log artifact
 
-Create an asset on the orchestrator's own task (`$SLAYZONE_TASK_ID`) named `orchestration-log.md`. Use a markdown table:
+Create an artifact on the orchestrator's own task (`$SLAYZONE_TASK_ID`) named `orchestration-log.md`. Use a markdown table:
 
 ```markdown
 # Orchestration log
@@ -32,12 +32,12 @@ Create an asset on the orchestrator's own task (`$SLAYZONE_TASK_ID`) named `orch
 
 Create once:
 ```bash
-printf '# Orchestration log\n\n| time | task | event | note |\n|------|------|-------|------|\n' | slay --dev tasks assets create "orchestration-log.md"
+printf '# Orchestration log\n\n| time | task | event | note |\n|------|------|-------|------|\n' | slay --dev tasks artifacts create "orchestration-log.md"
 ```
 
 Append rows throughout the run:
 ```bash
-printf '| %s | %s | %s | %s |\n' "$(date -u +%FT%TZ)" "<taskId>" "<event>" "<note>" | slay --dev tasks assets append <assetId>
+printf '| %s | %s | %s | %s |\n' "$(date -u +%FT%TZ)" "<taskId>" "<event>" "<note>" | slay --dev tasks artifacts append <artifactId>
 ```
 
 Event vocabulary: `started`, `plan-ready`, `plan-refined`, `plan-approved`, `question`, `stuck`, `done`, `error`.
@@ -94,7 +94,7 @@ Feedback should be specific ("use shared helper X instead of inlining", "preserv
 When all target tasks are `done` (or blocked on user), append a final summary row to the log and report back to the user:
 
 - count done / count blocked / count errored
-- link to the log asset (`[log](asset:<id>)`)
+- link to the log artifact (`[log](artifact:<id>)`)
 - outstanding questions for the user, if any
 
 **Do not commit. Do not open PRs. Do not mark the orchestrator task done** — the user does that.

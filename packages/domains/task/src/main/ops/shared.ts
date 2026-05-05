@@ -99,7 +99,7 @@ export function parseTask(row: Record<string, unknown> | undefined): Task | null
     loop_config: safeJsonParse(row.loop_config),
     is_temporary: Boolean(row.is_temporary),
     is_blocked: Boolean(row.is_blocked),
-    active_asset_id: (row.active_asset_id as string) ?? null,
+    active_artifact_id: (row.active_artifact_id as string) ?? null,
     manager_mode: Boolean(row.manager_mode)
   } as Task
 }
@@ -194,13 +194,13 @@ export function cleanupTaskImmediate(taskId: string): void {
   runtimeAdapters.killPtysByTaskId(taskId)
 }
 
-/** Kill PTY + processes + remove worktree + asset files — used for archive and hard purge */
+/** Kill PTY + processes + remove worktree + artifact files — used for archive and hard purge */
 export async function cleanupTaskFull(db: Database, taskId: string): Promise<void> {
   cleanupTaskImmediate(taskId)
   runtimeAdapters.killTaskProcesses(taskId)
-  // Clean up asset files on disk
-  const assetsBaseDir = path.join(process.env.SLAYZONE_DB_DIR || app.getPath('userData'), 'assets', taskId)
-  if (existsSync(assetsBaseDir)) rmSync(assetsBaseDir, { recursive: true, force: true })
+  // Clean up artifact files on disk
+  const artifactsBaseDir = path.join(process.env.SLAYZONE_DB_DIR || app.getPath('userData'), 'artifacts', taskId)
+  if (existsSync(artifactsBaseDir)) rmSync(artifactsBaseDir, { recursive: true, force: true })
 
   const task = db.prepare(
     'SELECT worktree_path, project_id FROM tasks WHERE id = ?'
@@ -539,7 +539,7 @@ export function updateTask(db: Database, data: UpdateTaskInput): Task | null {
   if (data.isBlocked !== undefined) { fields.push('is_blocked = ?'); values.push(data.isBlocked ? 1 : 0) }
   if (data.blockedComment !== undefined) { fields.push('blocked_comment = ?'); values.push(data.blockedComment) }
   if (data.repoName !== undefined) { fields.push('repo_name = ?'); values.push(data.repoName) }
-  if (data.activeAssetId !== undefined) { fields.push('active_asset_id = ?'); values.push(data.activeAssetId) }
+  if (data.activeArtifactId !== undefined) { fields.push('active_artifact_id = ?'); values.push(data.activeArtifactId) }
 
   if (fields.length === 0) {
     const row = db.prepare('SELECT * FROM tasks WHERE id = ?').get(data.id) as Record<string, unknown> | undefined

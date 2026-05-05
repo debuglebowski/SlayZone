@@ -3,7 +3,6 @@ import { useEffect, useRef, useState } from 'react'
 import type { Task } from '@slayzone/task/shared'
 import type { Tag } from '@slayzone/tags/shared'
 import { TagSelector } from '@slayzone/tags/client'
-import type { Project } from '@slayzone/projects/shared'
 import type { ColumnConfig } from '@slayzone/projects/shared'
 import { isCompletedStatus, isTerminalStatus } from '@slayzone/projects/shared'
 import { TaskProgressPopover } from '@slayzone/task/client'
@@ -33,8 +32,6 @@ interface KanbanCardProps {
   isDragging?: boolean
   isFocused?: boolean
   onClick?: (e: React.MouseEvent) => void
-  project?: Project
-  showProject?: boolean
   isBlocked?: boolean
   subTaskCount?: { done: number; total: number }
   cardProperties?: CardProperties
@@ -51,8 +48,6 @@ export function KanbanCard({
   isDragging,
   isFocused,
   onClick,
-  project,
-  showProject,
   isBlocked,
   subTaskCount,
   cardProperties: cp,
@@ -118,16 +113,6 @@ export function KanbanCard({
       >
       <CardContent className={cn("px-2.5 pt-5", resolvedTags.length > 0 || (subTaskCount && subTaskCount.total > 0) || ((cp?.dueDate ?? true) && task.due_date) || ((cp?.blocked ?? true) && isBlocked) ? "pb-3" : "pb-5")}>
         <div className="flex items-start gap-3">
-          {/* Project color dot - shown in All view */}
-          {showProject && project ? (
-            <div
-              className="h-1.5 w-1.5 rounded-full shrink-0 mt-1"
-              style={{ backgroundColor: project.color }}
-              title={project.name}
-            />
-          ) : showProject ? (
-            <div className="h-1.5 w-1.5 rounded-full bg-muted-foreground/30 shrink-0 mt-1" />
-          ) : null}
           <div className="flex-1 min-w-0">
             {/* Title row */}
             <div className="flex items-start gap-1.5">

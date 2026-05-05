@@ -25,8 +25,6 @@ interface SortableKanbanCardProps {
   task: Task
   columns?: ColumnConfig[] | null
   onTaskClick?: (task: Task, e: { metaKey: boolean }) => void
-  project?: Project
-  showProject?: boolean
   disableDrag?: boolean
   cardProperties?: CardProperties
   isBlocked?: boolean
@@ -48,8 +46,6 @@ function SortableKanbanCard({
   task,
   columns,
   onTaskClick,
-  project,
-  showProject,
   disableDrag,
   cardProperties,
   isBlocked,
@@ -97,8 +93,6 @@ function SortableKanbanCard({
         isDragging={isDragging}
         isFocused={isFocused}
         onClick={(e) => onTaskClick?.(task, e)}
-        project={project}
-        showProject={showProject}
         isBlocked={isBlocked}
         subTaskCount={subTaskCount}
         cardProperties={cardProperties}
@@ -140,8 +134,6 @@ interface KanbanColumnProps {
   overColumnId?: string | null
   onTaskClick?: (task: Task, e: { metaKey: boolean }) => void
   onCreateTask?: (column: Column) => void
-  projectsMap?: Map<string, Project>
-  showProjectDot?: boolean
   disableDrag?: boolean
   cardProperties?: CardProperties
   taskTags?: Map<string, string[]>
@@ -167,8 +159,6 @@ export function KanbanColumn({
   overColumnId,
   onTaskClick,
   onCreateTask,
-  projectsMap,
-  showProjectDot,
   disableDrag,
   cardProperties,
   taskTags,
@@ -258,8 +248,6 @@ export function KanbanColumn({
                 task={task}
                 columns={columns}
                 onTaskClick={onTaskClick}
-                project={showProjectDot ? projectsMap?.get(task.project_id) : undefined}
-                showProject={showProjectDot}
                 disableDrag={disableDrag}
                 cardProperties={cardProperties}
                 taskTagIds={taskTags?.get(task.id)}
