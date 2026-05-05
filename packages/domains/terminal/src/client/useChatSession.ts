@@ -194,9 +194,18 @@ export function useChatSession(opts: UseChatSessionOpts): UseChatSessionResult {
 
   const sendMessage = async (text: string): Promise<void> => {
     const chat = getChatApi()
-    // Main emits a `user-message` event to the session buffer which flows back via chat:event.
-    // Single source of truth → survives tab reload / buffer replay.
-    await chat.send(opts.tabId, text)
+    // Optimistic: paint the user-text immediately so the UI doesn't lag the IPC
+    // roundtrip. Main still emits the canonical `user-message` event and the
+    // reducer confirms-in-place (FIFO) when it arrives — single source of truth
+    // for replay. `user-sent` is renderer-only; never persisted.
+    dispatch({ type: 'user-sent', text })
+    try {
+      const ok = await chat.send(opts.tabId, text)
+      if (!ok) dispatch({ type: 'user-send-failed' })
+    } catch (err) {
+      dispatch({ type: 'user-send-failed' })
+      throw err
+    }
   }
 
   const sendToolResult = async (args: {

@@ -729,6 +729,113 @@ test('user-message-popped: replay-safe (user-message + popped → empty timeline
   expect(s.timeline.filter((i) => i.kind === 'user-text').length).toBe(0)
 })
 
+// ---- optimistic send -------------------------------------------------
+
+test('optimistic: user-sent flags item as optimistic', () => {
+  let s = initialState()
+  s = reducer(s, { type: 'event', event: ev.turnInit() })
+  s = reducer(s, { type: 'user-sent', text: 'hi' })
+  const items = s.timeline.filter((i) => i.kind === 'user-text')
+  expect(items.length).toBe(1)
+  if (items[0].kind !== 'user-text') throw new Error('wrong kind')
+  expect(items[0].optimistic === true).toBe(true)
+  expect(s.userMessagesSent).toBe(1)
+})
+
+test('optimistic: user-message confirms in place, no duplicate, no double-bump', () => {
+  let s = initialState()
+  s = reducer(s, { type: 'event', event: ev.turnInit() })
+  s = reducer(s, { type: 'user-sent', text: 'hi' })
+  s = reducer(s, { type: 'event', event: { kind: 'user-message', text: 'hi' } })
+  const items = s.timeline.filter((i) => i.kind === 'user-text')
+  expect(items.length).toBe(1)
+  if (items[0].kind !== 'user-text') throw new Error('wrong kind')
+  expect(items[0].optimistic === true).toBe(false)
+  expect(s.userMessagesSent).toBe(1)
+})
+
+test('optimistic: two rapid sends → both confirmed FIFO in order', () => {
+  let s = initialState()
+  s = reducer(s, { type: 'event', event: ev.turnInit() })
+  s = reducer(s, { type: 'user-sent', text: 'first' })
+  s = reducer(s, { type: 'user-sent', text: 'second' })
+  s = reducer(s, { type: 'event', event: { kind: 'user-message', text: 'first' } })
+  s = reducer(s, { type: 'event', event: { kind: 'user-message', text: 'second' } })
+  const items = s.timeline.filter((i) => i.kind === 'user-text')
+  expect(items.length).toBe(2)
+  if (items[0].kind !== 'user-text' || items[1].kind !== 'user-text') throw new Error('wrong kind')
+  expect(items[0].text).toBe('first')
+  expect(items[1].text).toBe('second')
+  expect(items[0].optimistic === true).toBe(false)
+  expect(items[1].optimistic === true).toBe(false)
+  expect(s.userMessagesSent).toBe(2)
+})
+
+test('optimistic: user-send-failed removes oldest optimistic + decrements count', () => {
+  let s = initialState()
+  s = reducer(s, { type: 'event', event: ev.turnInit() })
+  s = reducer(s, { type: 'user-sent', text: 'hi' })
+  s = reducer(s, { type: 'user-send-failed' })
+  expect(s.timeline.filter((i) => i.kind === 'user-text').length).toBe(0)
+  expect(s.userMessagesSent).toBe(0)
+})
+
+test('optimistic: user-send-failed only removes optimistic, not confirmed items', () => {
+  let s = initialState()
+  s = reducer(s, { type: 'event', event: ev.turnInit() })
+  s = reducer(s, { type: 'user-sent', text: 'sent' })
+  s = reducer(s, { type: 'event', event: { kind: 'user-message', text: 'sent' } })
+  s = reducer(s, { type: 'user-sent', text: 'failing' })
+  s = reducer(s, { type: 'user-send-failed' })
+  const items = s.timeline.filter((i) => i.kind === 'user-text')
+  expect(items.length).toBe(1)
+  if (items[0].kind !== 'user-text') throw new Error('wrong kind')
+  expect(items[0].text).toBe('sent')
+  expect(items[0].optimistic === true).toBe(false)
+  expect(s.userMessagesSent).toBe(1)
+})
+
+test('optimistic: replay path (no prior user-sent) appends user-message normally', () => {
+  let s = initialState()
+  s = reducer(s, { type: 'event', event: ev.turnInit() })
+  s = reducer(s, { type: 'event', event: { kind: 'user-message', text: 'replayed' } })
+  const items = s.timeline.filter((i) => i.kind === 'user-text')
+  expect(items.length).toBe(1)
+  if (items[0].kind !== 'user-text') throw new Error('wrong kind')
+  expect(items[0].text).toBe('replayed')
+  expect(items[0].optimistic === true).toBe(false)
+  expect(s.userMessagesSent).toBe(1)
+})
+
+test('optimistic: user-send-failed with no optimistic items is a no-op', () => {
+  let s = initialState()
+  s = reducer(s, { type: 'event', event: ev.turnInit() })
+  s = reducer(s, { type: 'user-send-failed' })
+  expect(s.userMessagesSent).toBe(0)
+  expect(s.timeline.filter((i) => i.kind === 'user-text').length).toBe(0)
+})
+
+test('optimistic: replay determinism after dedup matches direct user-message append', () => {
+  // Live path: user-sent → user-message confirms in place
+  let live = initialState()
+  live = reducer(live, { type: 'event', event: ev.turnInit() })
+  live = reducer(live, { type: 'user-sent', text: 'hi' })
+  live = reducer(live, { type: 'event', event: { kind: 'user-message', text: 'hi' } })
+  // Replay path: only user-message arrives (optimistic dispatch is renderer-only)
+  let replay = initialState()
+  replay = reducer(replay, { type: 'event', event: ev.turnInit() })
+  replay = reducer(replay, { type: 'event', event: { kind: 'user-message', text: 'hi' } })
+  // userMessagesSent + visible timeline must match (timestamps/optimistic flag aside)
+  expect(live.userMessagesSent).toBe(replay.userMessagesSent)
+  expect(live.timeline.length).toBe(replay.timeline.length)
+  const liveText = live.timeline.find((i) => i.kind === 'user-text')
+  const replayText = replay.timeline.find((i) => i.kind === 'user-text')
+  if (liveText?.kind !== 'user-text' || replayText?.kind !== 'user-text') throw new Error('missing')
+  expect(liveText.text).toBe(replayText.text)
+  expect(liveText.optimistic === true).toBe(false)
+  expect(replayText.optimistic === true).toBe(false)
+})
+
 // ---- bg-shells -------------------------------------------------------
 
 const bgCall = (

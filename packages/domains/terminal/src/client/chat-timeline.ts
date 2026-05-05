@@ -15,7 +15,7 @@ import {
  * but are rendered nested inside their parent SubAgentRow, not at the chat root.
  */
 export type TimelineItem =
-  | { kind: 'user-text'; text: string; timestamp: number; parentToolUseId?: string }
+  | { kind: 'user-text'; text: string; timestamp: number; parentToolUseId?: string; optimistic?: boolean }
   | { kind: 'text'; role: 'assistant'; messageId: string; text: string; timestamp: number; parentToolUseId?: string }
   | { kind: 'thinking'; messageId: string; text: string; hasSignature: boolean; timestamp: number; parentToolUseId?: string }
   | { kind: 'tool'; invocation: ToolInvocation; timestamp: number; parentToolUseId?: string }
@@ -191,6 +191,7 @@ export function initialState(): ChatTimelineState {
 export type Action =
   | { type: 'event'; event: AgentEvent }
   | { type: 'user-sent'; text: string }
+  | { type: 'user-send-failed' }
   | { type: 'process-exit'; sessionId: string; code: number | null; signal: string | null }
   | { type: 'turn-interrupted' }
   | { type: 'reset' }
@@ -246,16 +247,38 @@ function applyAction(state: ChatTimelineState, action: Action): ChatTimelineStat
       }
     }
     case 'user-sent': {
+      // Optimistic dispatch from the renderer (useChatSession.sendMessage). The
+      // matching `user-message` event flowing back from main confirms in place
+      // — see the dedup branch in applyEvent('user-message').
       const item: TimelineItem = {
         kind: 'user-text',
         text: action.text,
         timestamp: Date.now(),
+        optimistic: true,
       }
       return {
         ...state,
         timeline: [...state.timeline, item],
         userMessagesSent: state.userMessagesSent + 1,
       }
+    }
+    case 'user-send-failed': {
+      // Revert the oldest unconfirmed optimistic user-text. CLI ordering
+      // guarantees FIFO: the first user-sent that has no matching user-message
+      // back is the one that failed.
+      for (let i = 0; i < state.timeline.length; i++) {
+        const it = state.timeline[i]
+        if (it.kind === 'user-text' && it.optimistic) {
+          const next = state.timeline.slice()
+          next.splice(i, 1)
+          return {
+            ...state,
+            timeline: next,
+            userMessagesSent: Math.max(0, state.userMessagesSent - 1),
+          }
+        }
+      }
+      return state
     }
     case 'process-exit': {
       // Drop stale exits: if no session has emitted turn-init yet (sessionId=null)
@@ -281,6 +304,18 @@ function applyEvent(state: ChatTimelineState, event: AgentEvent): ChatTimelineSt
   const ts = Date.now()
   switch (event.kind) {
     case 'user-message': {
+      // Confirm the oldest optimistic user-text in place (FIFO — CLI processes
+      // sends in order, so the first unconfirmed optimistic item is this one).
+      // Replay path (cold reattach, no prior `user-sent` dispatch) finds none
+      // and falls through to append.
+      for (let i = 0; i < state.timeline.length; i++) {
+        const it = state.timeline[i]
+        if (it.kind === 'user-text' && it.optimistic) {
+          const next = state.timeline.slice()
+          next[i] = { ...it, text: event.text, timestamp: ts, optimistic: false }
+          return { ...state, timeline: next }
+        }
+      }
       const item: TimelineItem = {
         kind: 'user-text',
         text: event.text,
