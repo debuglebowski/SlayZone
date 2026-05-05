@@ -54,7 +54,7 @@ test.describe.skip('Cursor Agent CLI integration', () => {
     await waitForBufferContains(mainWindow, sessionId, 'hello', 60_000)
   })
 
-  test('detects working → attention state transition', async ({ mainWindow }) => {
+  test('detects working → idle state transition', async ({ mainWindow }) => {
     const sessionId = getMainSessionId(taskId)
 
     // Send a prompt to trigger work
@@ -66,8 +66,8 @@ test.describe.skip('Cursor Agent CLI integration', () => {
     // Should transition to 'running' (working)
     await waitForPtyState(mainWindow, sessionId, 'running', 15_000)
 
-    // Should transition back to 'attention' when done
+    // Should transition back to 'idle' when done
     // Idle checker runs every 10s, timeout is 2.5s → worst case ~12.5s
-    await waitForPtyState(mainWindow, sessionId, 'attention', 25_000)
+    await waitForPtyState(mainWindow, sessionId, 'idle', 25_000)
   })
 })

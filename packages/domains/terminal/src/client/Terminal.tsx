@@ -207,7 +207,7 @@ export const Terminal = forwardRef<TerminalHandle, TerminalProps>(function Termi
   const executionContextRef = useRef(executionContext)
   executionContextRef.current = executionContext
 
-  const { subscribe, subscribeExit, subscribeSessionInvalid, subscribeAttention, subscribeState, getState, getCrashOutput, resetTaskState, cleanupTask } = usePty()
+  const { subscribe, subscribeExit, subscribeSessionInvalid, subscribeState, getState, getCrashOutput, resetTaskState, cleanupTask } = usePty()
   const { terminalThemeId, contentVariant } = useTheme()
   const { terminalFontSize, terminalFontFamily, terminalScrollback } = useAppearance()
 
@@ -769,21 +769,14 @@ export const Terminal = forwardRef<TerminalHandle, TerminalProps>(function Termi
       onSessionInvalidRef.current?.()
     })
 
-    const unsubAttention = subscribeAttention(sessionId, () => {
-      // Hibernation disabled - caused sync loss when returning to tab
-      // (terminalRef became null but nothing triggered reinit)
-      // Memory tradeoff: ~5-20MB per inactive terminal, worth it for reliability
-    })
-
     return () => {
       if (rafId !== null) cancelAnimationFrame(rafId)
       flush()
       unsubData()
       unsubExit()
       unsubSessionInvalid()
-      unsubAttention()
     }
-  }, [sessionId, subscribe, subscribeExit, subscribeSessionInvalid, subscribeAttention, getCrashOutput, cleanupTask])
+  }, [sessionId, subscribe, subscribeExit, subscribeSessionInvalid, getCrashOutput, cleanupTask])
 
 
   // Replay missed PTY data when task becomes active

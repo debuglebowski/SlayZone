@@ -10,7 +10,6 @@ export class ShellAdapter implements TerminalAdapter {
 
   constructor(
     private readonly patterns?: {
-      attention?: string | null
       working?: string | null
       error?: string | null
     }
@@ -40,10 +39,6 @@ export class ShellAdapter implements TerminalAdapter {
     if (!this.patterns) return null
     const stripped = ShellAdapter.stripAnsi(data)
 
-    if (ShellAdapter.safeRegexTest(this.patterns.attention, stripped)) {
-      return 'attention'
-    }
-
     if (ShellAdapter.safeRegexTest(this.patterns.working, stripped)) {
       return 'working'
     }
@@ -66,18 +61,7 @@ export class ShellAdapter implements TerminalAdapter {
     return null
   }
 
-  detectPrompt(data: string): PromptInfo | null {
-    if (!this.patterns?.attention) return null
-    const stripped = ShellAdapter.stripAnsi(data)
-
-    if (ShellAdapter.safeRegexTest(this.patterns.attention, stripped)) {
-      return {
-        type: 'input',
-        text: data,
-        position: data.length
-      }
-    }
-
+  detectPrompt(_data: string): PromptInfo | null {
     return null
   }
 }

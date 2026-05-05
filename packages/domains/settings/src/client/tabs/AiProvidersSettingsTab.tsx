@@ -437,7 +437,6 @@ export function AiProvidersSettingsTab(props: AiProvidersSettingsTabProps) {
   const [newResumeCommand, setNewResumeCommand] = useState('')
   const [newDefaultFlags, setNewDefaultFlags] = useState('')
   const [newDetectionEngine, setNewDetectionEngine] = useState('terminal')
-  const [newPatternAttention, setNewPatternAttention] = useState('')
   const [newPatternWorking, setNewPatternWorking] = useState('')
   const [newPatternError, setNewPatternError] = useState('')
 
@@ -449,7 +448,6 @@ export function AiProvidersSettingsTab(props: AiProvidersSettingsTabProps) {
     setNewResumeCommand(mode.resumeCommand || '')
     setNewDefaultFlags(mode.defaultFlags || '')
     setNewDetectionEngine(mode.type || 'terminal')
-    setNewPatternAttention(mode.patternAttention || '')
     setNewPatternWorking(mode.patternWorking || '')
     setNewPatternError(mode.patternError || '')
     setShowAddForm(true)
@@ -732,16 +730,7 @@ export function AiProvidersSettingsTab(props: AiProvidersSettingsTabProps) {
                   </Select>
                 </div>
                 {newDetectionEngine === 'terminal' && (
-                  <div className="grid grid-cols-3 gap-3">
-                    <div className="space-y-1">
-                      <Label className="text-[10px] uppercase text-muted-foreground">Attention</Label>
-                      <Input
-                        className="h-8 text-xs font-mono"
-                        placeholder="e.g. \? $"
-                        value={newPatternAttention}
-                        onChange={(e) => setNewPatternAttention(e.target.value)}
-                      />
-                    </div>
+                  <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-1">
                       <Label className="text-[10px] uppercase text-muted-foreground">Working</Label>
                       <Input
@@ -778,7 +767,6 @@ export function AiProvidersSettingsTab(props: AiProvidersSettingsTabProps) {
                     resumeCommand: newResumeCommand || null,
                     defaultFlags: newDefaultFlags || null,
                     enabled: true,
-                    patternAttention: newPatternAttention || null,
                     patternWorking: newPatternWorking || null,
                     patternError: newPatternError || null,
                   }).then(() => {
@@ -787,7 +775,6 @@ export function AiProvidersSettingsTab(props: AiProvidersSettingsTabProps) {
                     setNewResumeCommand('')
                     setNewDefaultFlags('')
                     setNewDetectionEngine('terminal')
-                    setNewPatternAttention('')
                     setNewPatternWorking('')
                     setNewPatternError('')
                     setShowAddForm(false)
@@ -992,7 +979,7 @@ export function AiProvidersSettingsTab(props: AiProvidersSettingsTabProps) {
                       <div className="space-y-1">
                         <h4 className="text-sm font-semibold">Status Detection</h4>
                         <p className="text-xs text-muted-foreground leading-relaxed">
-                          Controls how the terminal state (thinking, needs attention, error) is detected from output.
+                          Controls how the terminal state (working, error) is detected from output.
                         </p>
                       </div>
 
@@ -1013,24 +1000,6 @@ export function AiProvidersSettingsTab(props: AiProvidersSettingsTabProps) {
 
                         {mode.type === 'terminal' && (
                           <>
-                            <div className="grid grid-cols-[140px_minmax(0,1fr)] items-center gap-4">
-                              <div className="space-y-0.5">
-                                <Label className="text-xs font-medium">Attention Pattern</Label>
-                                <p className="text-[10px] text-muted-foreground">User input required</p>
-                              </div>
-                              <div className="space-y-1">
-                                <DebouncedInput
-                                  className="font-mono text-xs"
-                                  placeholder="e.g. (?:\?|❯)\s*$"
-                                  value={mode.patternAttention ?? ''}
-                                  onValueCommit={(v) => updateMode(mode.id, { patternAttention: v || null })}
-                                />
-                                {mode.patternAttention && !isValidRegex(mode.patternAttention) && (
-                                  <p className="text-[10px] text-destructive">Invalid regular expression</p>
-                                )}
-                              </div>
-                            </div>
-
                             <div className="grid grid-cols-[140px_minmax(0,1fr)] items-center gap-4">
                               <div className="space-y-0.5">
                                 <Label className="text-xs font-medium">Working Pattern</Label>

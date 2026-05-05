@@ -55,7 +55,7 @@ PTY Process (node-pty)
 
 ```typescript
 type TerminalMode = 'claude-code' | 'codex' | 'terminal'
-type TerminalState = 'starting' | 'running' | 'attention' | 'error' | 'dead'
+type TerminalState = 'starting' | 'running' | 'idle' | 'error' | 'dead'
 type CodeMode = 'normal' | 'plan' | 'accept-edits' | 'bypass'
 
 interface BufferChunk { seq: number; data: string }
@@ -71,29 +71,17 @@ interface BufferSinceResult { chunks: BufferChunk[]; currentSeq: number }
 
 ### Activity Detection (Claude Code)
 
-The `ClaudeAdapter` detects terminal state from PTY output patterns:
+The `ClaudeAdapter` detects `'working'` from spinner glyphs. When no spinner is detected
+within `idleTimeoutMs`, the session transitions to `'idle'`.
 
 | Pattern | State | Description |
 |---------|-------|-------------|
-| `❯ 1.` or `❯1.` | attention | Numbered menu selection |
-| `❯Option` (no space) | attention | Menu item with cursor |
-| `[Y/n]` or `[y/N]` | attention | Permission prompt |
-| `❯ ` (with space) | attention | Input prompt ready |
-| `·✻✽✶✳✢` + `for Xm Ys` | attention | Completion summary |
 | `·✻✽✶✳✢` at line start | running | Spinner animation (working) |
-
-**Note:** Only `❯` (special prompt char) triggers attention, not `>` (markdown blockquote).
-
-**Priority order:** attention patterns checked before spinner patterns.
 
 ### State Transition Debouncing
 
-State transitions use asymmetric debouncing to prevent UI flicker:
-
 - **`running`**: Immediate transition (work resumed, show it right away)
-- **`attention`/`error`/`dead`**: 100ms debounce (prevents flicker during output gaps)
-
-This handles the case where PTY output briefly doesn't match spinner pattern mid-output.
+- **`idle`/`error`/`dead`**: 100ms debounce (coalesces rapid bursts)
 
 ## Client (client/)
 

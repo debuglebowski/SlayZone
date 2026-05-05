@@ -596,7 +596,7 @@ All commands support ID prefix matching.
   - If no text argument is given, reads from stdin (pipe-friendly)
   - Appends a trailing newline to submit
   - For AI modes like \`claude-code\`, internal newlines are encoded as Kitty shift-enter sequences (\`\\x1b[13;2u\`) so multi-line text is submitted as a single input
-  - **Wait behavior:** by default waits for the session to reach the \`attention\` state (= AI CLI ready for input) before sending. Automatic for AI modes. Use \`--no-wait\` to send immediately (default for plain terminal modes)
+  - **Wait behavior:** by default waits for the session to reach the \`idle\` state (= AI CLI ready for input) before sending. Automatic for AI modes. Use \`--no-wait\` to send immediately (default for plain terminal modes)
   - Timeout defaults to 60 seconds
 
 - \`slay pty type <id> <data>\` (alias: \`write\`) — send raw bytes to PTY stdin. **Use only when \`submit\` is wrong** — e.g. appending text mid-prompt without submitting, or sending exact byte sequences. No newline added, no encoding.
@@ -609,7 +609,7 @@ All commands support ID prefix matching.
   - \`cancel\` — Ctrl+C interrupt
 
 - \`slay pty wait <id> [--state <state>] [--timeout <ms>] [--json]\` — block until a session reaches a specific state.
-  - Default state: \`attention\` (AI ready for input)
+  - Default state: \`idle\` (AI ready for input)
   - Default timeout: 60 seconds
   - Exit codes: 0 = reached state, 2 = timeout, 1 = session died
 
@@ -622,7 +622,7 @@ All commands support ID prefix matching.
 Submit a prompt to a Claude Code session and wait for completion:
 \`\`\`bash
 slay pty submit <id> "Fix the failing tests in src/auth.ts"
-slay pty wait <id> --state attention --timeout 300000
+slay pty wait <id> --state idle --timeout 300000
 slay pty buffer <id>  # read the result
 \`\`\`
 

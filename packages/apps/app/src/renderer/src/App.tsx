@@ -51,16 +51,6 @@ import { AppSidebar } from '@/components/sidebar/AppSidebar'
 import { useChangelogAutoOpen } from '@/components/changelog/useChangelogAutoOpen'
 import { useStaleSkillCount } from '@slayzone/ai-config/client'
 import { TabBar } from '@/components/tabs/TabBar'
-import {
-  DesktopNotificationToggle,
-  NotificationButton,
-  NotificationSidePanel,
-  NOTIFICATION_PANEL_MIN_WIDTH,
-  NOTIFICATION_PANEL_MAX_WIDTH,
-  useAttentionTasks,
-  useNotificationState,
-  DEFAULT_NOTIFICATION_PANEL_WIDTH
-} from '@/components/notifications'
 import { AgentPanelButton, AgentSidePanel, AGENT_PANEL_MIN_WIDTH, AGENT_PANEL_MAX_WIDTH, useAgentPanelState, DEFAULT_AGENT_PANEL_WIDTH } from '@/components/agent-panel'
 import { UsagePopover } from '@/components/usage/UsagePopover'
 import { BoostPill } from '@/components/usage/BoostPill'
@@ -306,9 +296,8 @@ function App(): React.JSX.Element {
     }
   }, [onboardingOpen])
 
-  // Usage, notification & agent panel state
+  // Usage & agent panel state
   const { data: usageData, refresh: refreshUsage } = useUsage()
-  const [notificationState, setNotificationState] = useNotificationState()
   const [agentPanelState, setAgentPanelState] = useAgentPanelState()
   const [isSidePanelResizing, setIsSidePanelResizing] = useState(false)
   const agentPanelMountedRef = useRef(false)
@@ -320,19 +309,6 @@ function App(): React.JSX.Element {
       if (m) setAgentPanelState({ mode: m })
     })
   }, [agentPanelState.mode, setAgentPanelState])
-  const { attentionTasks: allAttentionTasks, refresh: refreshAttentionTasks } = useAttentionTasks(tasks, null)
-  const attentionTasks = useMemo(
-    () => notificationState.filterCurrentProject
-      ? allAttentionTasks.filter((at) => at.task.project_id === selectedProjectId)
-      : allAttentionTasks,
-    [allAttentionTasks, notificationState.filterCurrentProject, selectedProjectId]
-  )
-  const attentionByProject = useMemo(() => {
-    const map = new Map<string, number>()
-    for (const at of allAttentionTasks) map.set(at.task.project_id, (map.get(at.task.project_id) ?? 0) + 1)
-    return map
-  }, [allAttentionTasks])
-
   const selectedProject = useMemo(() => projects.find((p) => p.id === selectedProjectId) ?? null, [projects, selectedProjectId])
 
   // Project lock guard — single chokepoint for task-open paths. Resolves the task's
@@ -496,7 +472,7 @@ function App(): React.JSX.Element {
   }
 
   // Diagnostics (extracted — fire-and-forget side effects)
-  useDiagnosticsSync({ tabs, activeTabIndex, activeView, selectedProjectId, projects, tasks, displayTaskCount: displayTasks.length, notificationState, projectPathMissing })
+  useDiagnosticsSync({ tabs, activeTabIndex, activeView, selectedProjectId, projects, tasks, displayTaskCount: displayTasks.length, projectPathMissing })
 
   // Shortcut store (dynamic hotkey bindings)
   const overrides = useShortcutStore((s) => s.overrides)
@@ -523,7 +499,6 @@ function App(): React.JSX.Element {
   const panelProcessesShortcut = useShortcutDisplay('panel-processes')
   const panelTestsShortcut = useShortcutDisplay('panel-tests')
   const panelAutomationsShortcut = useShortcutDisplay('panel-automations')
-  const attentionPanelShortcut = useShortcutDisplay('attention-panel')
   const agentPanelShortcut = useShortcutDisplay('agent-panel')
   const agentSessionId = selectedProjectId ? `__agent-panel:${selectedProjectId}:${agentPanelState.sessionIndex}` : null
 
@@ -642,11 +617,6 @@ function App(): React.JSX.Element {
     })
   }, [])
   useEffect(() => {
-    return window.api.app.onToggleAttentionPanel(() => {
-      setNotificationState({ isLocked: !notificationState.isLocked })
-    })
-  }, [notificationState.isLocked])
-  useEffect(() => {
     return window.api.app.onToggleAgentPanel(() => {
       if (selectedProjectId) setAgentPanelState({ isOpen: !agentPanelState.isOpen })
     })
@@ -728,7 +698,6 @@ function App(): React.JSX.Element {
 
   useGuardedHotkeys(getKeys('exit-zen-explode'), () => { if (explodeMode) setExplodeMode(false); else if (zenMode) setZenMode(false) }, { enableOnFormTags: true, enabled: !isRecording })
 
-  useGuardedHotkeys(getKeys('attention-panel'), (e) => { e.preventDefault(); trackShortcut(getKeys('attention-panel')); setNotificationState({ isLocked: !notificationState.isLocked }) }, { enableOnFormTags: true, enabled: !isRecording })
   useGuardedHotkeys(getKeys('agent-panel'), (e) => { e.preventDefault(); trackShortcut(getKeys('agent-panel')); if (selectedProjectId) setAgentPanelState({ isOpen: !agentPanelState.isOpen }) }, { enableOnFormTags: true, enabled: !isRecording })
 
   // Home tab panel shortcuts
@@ -1085,7 +1054,7 @@ function App(): React.JSX.Element {
           onSettings={handleOpenSettings}
           onLeaderboard={() => { useTabStore.getState().setActiveView('leaderboard') }}
           onUsageAnalytics={() => { useTabStore.getState().setActiveView('usage-analytics') }}
-          onTaskClick={openTask} zenMode={zenMode} onboardingChecklist={onboardingChecklist} attentionByProject={attentionByProject} onReorderProjects={reorderProjects}
+          onTaskClick={openTask} zenMode={zenMode} onboardingChecklist={onboardingChecklist} onReorderProjects={reorderProjects}
         />
 
         <div id="right-column" className={`flex-1 flex min-w-0 bg-sidebar pb-2 pr-2 ${zenMode ? 'pl-2' : ''}`}>
@@ -1162,12 +1131,7 @@ function App(): React.JSX.Element {
                   </TooltipTrigger><TooltipContent side="bottom" className="text-xs max-w-64">
                     {!selectedProjectId ? <p>Select a project first</p> : durationLocked ? <p>Project locked</p> : <div className="space-y-1"><p>{withShortcut('New temporary task', newTempTaskShortcut)}</p><p className="text-muted-foreground">Temporary tasks auto-delete on close.</p></div>}
                   </TooltipContent></Tooltip>
-                  <DesktopNotificationToggle enabled={notificationState.desktopEnabled} onToggle={() => {
-                    if (notificationState.desktopEnabled) window.api.pty.dismissAllNotifications()
-                    setNotificationState({ desktopEnabled: !notificationState.desktopEnabled })
-                  }} />
                   <AgentPanelButton active={agentPanelState.isOpen} disabled={!selectedProjectId} onClick={() => setAgentPanelState({ isOpen: !agentPanelState.isOpen })} shortcutHint={agentPanelShortcut} />
-                  <NotificationButton active={notificationState.isLocked} count={attentionTasks.length} onClick={() => setNotificationState({ isLocked: !notificationState.isLocked })} shortcutHint={attentionPanelShortcut} />
                   <UpdateButton version={updateVersion} onRestart={() => window.api.app.restartForUpdate()} />
                 </div>
               }
@@ -1279,7 +1243,7 @@ function App(): React.JSX.Element {
                             return (
                               <React.Fragment key={id}>
                                 {i > 0 && <ResizeHandle width={w} minWidth={id === 'kanban' ? 400 : 200} onWidthChange={w => updatePanelSizes({ [HOME_PANEL_SIZE_KEY[id]]: w })} onReset={() => resetPanelSize(HOME_PANEL_SIZE_KEY[id])} />}
-                                <div className={cn('shrink-0 min-h-0 overflow-hidden', cn('rounded-lg border border-border', id === 'kanban' && Object.values(homePanel.homePanelVisibility).filter(Boolean).length <= 1 && !agentPanelState.isOpen && !notificationState.isLocked ? 'border-transparent' : id === 'kanban' ? 'bg-surface-1 p-3' : 'bg-surface-1'))} style={{ width: w }}>
+                                <div className={cn('shrink-0 min-h-0 overflow-hidden', cn('rounded-lg border border-border', id === 'kanban' && Object.values(homePanel.homePanelVisibility).filter(Boolean).length <= 1 && !agentPanelState.isOpen ? 'border-transparent' : id === 'kanban' ? 'bg-surface-1 p-3' : 'bg-surface-1'))} style={{ width: w }}>
                                   {id === 'kanban' && filter.viewMode !== 'list' && (
                                     <KanbanBoard tasks={displayTasks} columns={selectedProject?.columns_config} viewConfig={getViewConfig(filter)} isActive={tabs[activeTabIndex]?.type === 'home'}
                                       onTaskMove={handleTaskMove} onTaskReorder={reorderTasks} onTaskClick={handleTaskClick}
@@ -1376,19 +1340,6 @@ function App(): React.JSX.Element {
                   onDetach={() => window.api.floatingAgent.detach()}
                   onReattach={() => window.api.floatingAgent.reattach()} />
               </div>
-            )}
-            {notificationState.isLocked && (
-              <ResizeHandle width={notificationState.panelWidth} minWidth={NOTIFICATION_PANEL_MIN_WIDTH} maxWidth={NOTIFICATION_PANEL_MAX_WIDTH}
-                onWidthChange={(w) => setNotificationState({ panelWidth: w })}
-                onDragStart={() => setIsSidePanelResizing(true)} onDragEnd={() => setIsSidePanelResizing(false)}
-                onReset={() => setNotificationState({ panelWidth: DEFAULT_NOTIFICATION_PANEL_WIDTH })} />
-            )}
-            {notificationState.isLocked && (
-              <NotificationSidePanel width={notificationState.panelWidth}
-                attentionTasks={attentionTasks} projects={projects} filterCurrentProject={notificationState.filterCurrentProject}
-                onFilterToggle={() => setNotificationState({ filterCurrentProject: !notificationState.filterCurrentProject })}
-                onNavigate={openTask} onCloseTerminal={async (sessionId) => { await window.api.pty.kill(sessionId); refreshAttentionTasks() }}
-                selectedProjectId={selectedProjectId} currentProjectName={projects.find((p) => p.id === selectedProjectId)?.name} />
             )}
             </div>
           </div>

@@ -17,25 +17,12 @@ export class ClaudeAdapter implements TerminalAdapter {
   }
 
   detectActivity(data: string, _current: ActivityState): ActivityState | null {
-    // Strip ANSI escape codes for pattern matching
     const stripped = data
-      .replace(/\x1b\]([^\x07\x1b]|\x1b(?!\\))*(\x07|\x1b\\|\x9c)/g, '')  // OSC sequences (BEL or ST)
-      .replace(/\x1b\[[?0-9;]*[A-Za-z]/g, '')  // CSI (including ?)
-      .replace(/\x1b[()][AB012]/g, '')  // Character set
-      .trimStart()  // Remove leading whitespace including \r (keep trailing for prompt detection)
+      .replace(/\x1b\]([^\x07\x1b]|\x1b(?!\\))*(\x07|\x1b\\|\x9c)/g, '')
+      .replace(/\x1b\[[?0-9;]*[A-Za-z]/g, '')
+      .replace(/\x1b[()][AB012]/g, '')
+      .trimStart()
 
-    // 1. Attention: user needs to respond (menus, prompts, ready for input)
-    // - Numbered menu: ❯ 1. or ❯1.
-    // - Menu selection: ❯Option (no space after)
-    // - Y/n prompts
-    // - Prompt with space (ready for user input)
-    if (/(?:^|\n|\r)❯\s*\d+\./.test(stripped)) return 'attention'
-    if (/(?:^|\n|\r)❯[A-Za-z]/.test(stripped)) return 'attention'
-    if (/\[Y\/n\]|\[y\/N\]/i.test(stripped)) return 'attention'
-    if (/(?:^|\n|\r)❯\s/.test(stripped)) return 'attention'
-
-    // 2. Working: spinner at start (but not "X for Ym Zs" completion summary)
-    if (/^[·✻✽✶✳✢].*\bfor \d+[smh]/m.test(stripped)) return 'attention'
     if (/^[·✻✽✶✳✢]/m.test(stripped)) return 'working'
 
     return null

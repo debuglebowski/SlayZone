@@ -38,9 +38,9 @@ export function TerminalStatusPopover({ tasks, onTaskClick }: TerminalStatusPopo
     return undefined
   }, [open, refreshPtys])
 
-  // Also refresh on attention events
+  // Refresh on state-change events
   useEffect(() => {
-    const unsub = window.api.pty.onAttention(() => {
+    const unsub = window.api.pty.onStateChange(() => {
       refreshPtys()
     })
     return unsub

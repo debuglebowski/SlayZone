@@ -4,7 +4,7 @@ export type TerminalMode = string
 export type { ExecutionContext }
 
 // Activity states for CLI tools
-export type ActivityState = 'attention' | 'working' | 'unknown'
+export type ActivityState = 'working' | 'unknown'
 
 // Error info from CLI
 export interface ErrorInfo {
@@ -75,7 +75,7 @@ export interface TerminalAdapter {
   /**
    * If true, pty-manager transitions to 'working' when user presses Enter.
    * Useful for full-screen TUIs that constantly redraw (making output-based
-   * detection unreliable). Paired with idleTimeoutMs for return to 'attention'.
+   * detection unreliable). Paired with idleTimeoutMs for return to 'idle'.
    */
   readonly transitionOnInput?: boolean
 

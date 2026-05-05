@@ -75,7 +75,7 @@ test.describe('Terminal state transitions', () => {
     await s.refreshData()
   })
 
-  test('reaches attention after startup and stays healthy after command execution', async ({ mainWindow }) => {
+  test('reaches idle after startup and stays healthy after command execution', async ({ mainWindow }) => {
     const marker = `STATE_${Date.now()}`
 
     await openTaskTerminal(mainWindow, { projectAbbrev, taskTitle: 'State transition task' })
@@ -84,16 +84,16 @@ test.describe('Terminal state transitions', () => {
     await waitForPtySession(mainWindow, sessionId)
 
     const initialState = await mainWindow.evaluate((id) => window.api.pty.getState(id), sessionId)
-    expect(['starting', 'attention']).toContain(initialState)
+    expect(['starting', 'idle']).toContain(initialState)
 
-    await waitForPtyState(mainWindow, sessionId, 'attention')
+    await waitForPtyState(mainWindow, sessionId, 'idle')
 
     await runCommand(mainWindow, sessionId, `echo ${marker}`)
     await waitForBufferContains(mainWindow, sessionId, marker)
 
     await expect
       .poll(async () => mainWindow.evaluate((id) => window.api.pty.getState(id), sessionId))
-      .toBe('attention')
+      .toBe('idle')
   })
 })
 
@@ -231,7 +231,7 @@ test.describe('Terminal clear buffer', () => {
     await runCommand(mainWindow, sessionId, `echo ${markerA}`)
     await waitForBufferContains(mainWindow, sessionId, markerA)
     // Wait for shell to be idle (prompt displayed = all PTY output flushed)
-    await waitForPtyState(mainWindow, sessionId, 'attention')
+    await waitForPtyState(mainWindow, sessionId, 'idle')
 
     await mainWindow.evaluate((id) => window.api.pty.clearBuffer(id), sessionId)
 
@@ -282,7 +282,7 @@ test.describe('Terminal restart shortcut', () => {
     await waitForPtySession(mainWindow, sessionId)
     await runCommand(mainWindow, sessionId, `echo ${marker}`)
     await waitForBufferContains(mainWindow, sessionId, marker)
-    await waitForPtyState(mainWindow, sessionId, 'attention')
+    await waitForPtyState(mainWindow, sessionId, 'idle')
 
     // Focus terminal so shortcut reaches the handler
     await mainWindow.evaluate(() => {
@@ -295,7 +295,7 @@ test.describe('Terminal restart shortcut', () => {
 
     // PTY should respawn — wait for a fresh session
     await waitForPtySession(mainWindow, sessionId)
-    await waitForPtyState(mainWindow, sessionId, 'attention')
+    await waitForPtyState(mainWindow, sessionId, 'idle')
 
     // Old buffer content should be gone
     const buffer = await readFullBuffer(mainWindow, sessionId)

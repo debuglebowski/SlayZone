@@ -25,14 +25,13 @@ interface PtyState {
 type DataCallback = (data: string, seq: number) => void
 type ExitCallback = (exitCode: number) => void
 type SessionInvalidCallback = () => void
-type AttentionCallback = () => void
 type StateChangeCallback = (newState: TerminalState, oldState: TerminalState) => void
 type PromptCallback = (prompt: PromptInfo) => void
 type SessionDetectedCallback = (sessionId: string) => void
 type DevServerCallback = (url: string) => void
 type TitleChangeCallback = (title: string) => void
 
-const ALIVE_STATES: Set<TerminalState> = new Set(['running', 'attention', 'idle'])
+const ALIVE_STATES: Set<TerminalState> = new Set(['running', 'idle'])
 
 function taskIdFromSessionId(sessionId: string): string {
   const idx = sessionId.indexOf(':')
@@ -71,7 +70,6 @@ interface PtyContextValue {
   subscribe: (sessionId: string, cb: DataCallback) => () => void
   subscribeExit: (sessionId: string, cb: ExitCallback) => () => void
   subscribeSessionInvalid: (sessionId: string, cb: SessionInvalidCallback) => () => void
-  subscribeAttention: (sessionId: string, cb: AttentionCallback) => () => void
   subscribeState: (sessionId: string, cb: StateChangeCallback) => () => void
   subscribePrompt: (sessionId: string, cb: PromptCallback) => () => void
   subscribeSessionDetected: (sessionId: string, cb: SessionDetectedCallback) => () => void
@@ -105,7 +103,6 @@ export function PtyProvider({ children }: { children: ReactNode }) {
   const dataSubsRef = useRef<Map<string, Set<DataCallback>>>(new Map())
   const exitSubsRef = useRef<Map<string, Set<ExitCallback>>>(new Map())
   const sessionInvalidSubsRef = useRef<Map<string, Set<SessionInvalidCallback>>>(new Map())
-  const attentionSubsRef = useRef<Map<string, Set<AttentionCallback>>>(new Map())
   const stateSubsRef = useRef<Map<string, Set<StateChangeCallback>>>(new Map())
   const promptSubsRef = useRef<Map<string, Set<PromptCallback>>>(new Map())
   const sessionDetectedSubsRef = useRef<Map<string, Set<SessionDetectedCallback>>>(new Map())
@@ -118,7 +115,7 @@ export function PtyProvider({ children }: { children: ReactNode }) {
   const pendingPromptTaskIdsRef = useRef(pendingPromptTaskIds)
   pendingPromptTaskIdsRef.current = pendingPromptTaskIds
 
-  // Track task IDs with alive terminals (running or attention)
+  // Track task IDs with alive terminals (running or idle)
   const [activeTaskIds, setActiveTaskIds] = useState<Set<string>>(new Set())
 
   /** Recompute activeTaskIds from statesRef. Only triggers re-render if the set actually changed. */
@@ -213,7 +210,6 @@ export function PtyProvider({ children }: { children: ReactNode }) {
       dataSubsRef.current.delete(sessionId)
       exitSubsRef.current.delete(sessionId)
       sessionInvalidSubsRef.current.delete(sessionId)
-      attentionSubsRef.current.delete(sessionId)
       stateSubsRef.current.delete(sessionId)
       promptSubsRef.current.delete(sessionId)
       sessionDetectedSubsRef.current.delete(sessionId)
@@ -229,13 +225,6 @@ export function PtyProvider({ children }: { children: ReactNode }) {
       state.sessionInvalid = true
 
       const subs = sessionInvalidSubsRef.current.get(sessionId)
-      if (subs) {
-        subs.forEach((cb) => cb())
-      }
-    })
-
-    const unsubAttention = window.api.pty.onAttention((sessionId) => {
-      const subs = attentionSubsRef.current.get(sessionId)
       if (subs) {
         subs.forEach((cb) => cb())
       }
@@ -258,8 +247,8 @@ export function PtyProvider({ children }: { children: ReactNode }) {
       const isAlive = ALIVE_STATES.has(newState as TerminalState)
       if (wasAlive !== isAlive) refreshActiveTaskIds()
 
-      // Clear pending prompt when state changes from attention
-      if (oldState === 'attention' && newState !== 'attention') {
+      // Clear pending prompt when state leaves the alive set (e.g. dead/error)
+      if (ALIVE_STATES.has(oldState as TerminalState) && !ALIVE_STATES.has(newState as TerminalState)) {
         state.pendingPrompt = undefined
         setPendingPromptTaskIds((prev) => {
           const next = new Set(prev)
@@ -309,7 +298,6 @@ export function PtyProvider({ children }: { children: ReactNode }) {
       unsubData()
       unsubExit()
       unsubSessionNotFound()
-      unsubAttention()
       unsubStateChange()
       unsubPrompt()
       unsubSessionDetected()
@@ -359,18 +347,6 @@ export function PtyProvider({ children }: { children: ReactNode }) {
     },
     []
   )
-
-  const subscribeAttention = useCallback((sessionId: string, cb: AttentionCallback): (() => void) => {
-    let subs = attentionSubsRef.current.get(sessionId)
-    if (!subs) {
-      subs = new Set()
-      attentionSubsRef.current.set(sessionId, subs)
-    }
-    subs.add(cb)
-    return () => {
-      subs!.delete(cb)
-    }
-  }, [])
 
   const subscribeState = useCallback((sessionId: string, cb: StateChangeCallback): (() => void) => {
     // Ensure state exists so onStateChange doesn't drop events
@@ -523,7 +499,6 @@ export function PtyProvider({ children }: { children: ReactNode }) {
     dataSubsRef.current.delete(sessionId)
     exitSubsRef.current.delete(sessionId)
     sessionInvalidSubsRef.current.delete(sessionId)
-    attentionSubsRef.current.delete(sessionId)
     stateSubsRef.current.delete(sessionId)
     promptSubsRef.current.delete(sessionId)
     sessionDetectedSubsRef.current.delete(sessionId)
@@ -557,7 +532,6 @@ export function PtyProvider({ children }: { children: ReactNode }) {
     subscribe,
     subscribeExit,
     subscribeSessionInvalid,
-    subscribeAttention,
     subscribeState,
     subscribePrompt,
     subscribeSessionDetected,
@@ -580,7 +554,6 @@ export function PtyProvider({ children }: { children: ReactNode }) {
     subscribe,
     subscribeExit,
     subscribeSessionInvalid,
-    subscribeAttention,
     subscribeState,
     subscribePrompt,
     subscribeSessionDetected,
@@ -628,7 +601,7 @@ export function usePendingPrompts(): string[] {
 }
 
 /**
- * Reactive set of task IDs with alive terminals (running or attention).
+ * Reactive set of task IDs with alive terminals (running or idle).
  * Uses a separate context so changes only re-render consumers of this hook,
  * not all usePty() consumers.
  */

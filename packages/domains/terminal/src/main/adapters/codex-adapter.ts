@@ -6,8 +6,8 @@ import { whichBinary, validateShellEnv } from '../shell-env'
 
 /**
  * Adapter for OpenAI Codex.
- * Codex uses a full-screen Ratatui TUI. State detection is binary:
- * working (shows interrupt/cancel hints) vs attention (idle timeout fallback).
+ * Codex uses a full-screen Ratatui TUI. Detects 'working' from interrupt/cancel hints;
+ * idle timeout returns to 'idle'.
  */
 export class CodexAdapter implements TerminalAdapter {
   readonly mode = 'codex' as const
@@ -34,16 +34,9 @@ export class CodexAdapter implements TerminalAdapter {
       || /\b(?:ctrl\s*\+\s*c|control-c)\s+to\s+(?:interrupt|cancel|stop)\b/i.test(text)
   }
 
-  detectActivity(data: string, current: ActivityState): ActivityState | null {
+  detectActivity(data: string, _current: ActivityState): ActivityState | null {
     const stripped = CodexAdapter.normalizeText(CodexAdapter.stripAnsi(data))
-
-    // Codex shows an interrupt hint while the agent is actively working.
-    // This can arrive fragmented across many redraw chunks, so when we are
-    // already in "working", don't force "attention" on non-matching chunks.
     if (CodexAdapter.hasWorkingIndicator(stripped)) return 'working'
-
-    if (current === 'working') return null
-
     return null
   }
 

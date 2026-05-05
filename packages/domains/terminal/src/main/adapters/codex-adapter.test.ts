@@ -48,7 +48,6 @@ test('keeps working latched when chunk lacks indicator', () => {
 
 test('returns null for text when not currently working', () => {
   expect(adapter.detectActivity('Some random text', 'unknown')).toBe(null)
-  expect(adapter.detectActivity('Some random text', 'attention')).toBe(null)
 })
 
 test('returns null for whitespace-only output when working', () => {

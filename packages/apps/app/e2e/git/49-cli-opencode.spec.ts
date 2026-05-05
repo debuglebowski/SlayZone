@@ -88,7 +88,7 @@ test.describe('OpenCode CLI integration', () => {
       .toBe(true)
   })
 
-  test('detects working → attention state transition', async ({ mainWindow }) => {
+  test('detects working → idle state transition', async ({ mainWindow }) => {
     const sessionId = getMainSessionId(taskId)
 
     // Send a prompt to trigger work
@@ -100,7 +100,7 @@ test.describe('OpenCode CLI integration', () => {
     // Should transition to 'running' (working)
     await waitForPtyState(mainWindow, sessionId, 'running', 15_000)
 
-    // Should transition back to 'attention' when done (within 15s, not 60s)
-    await waitForPtyState(mainWindow, sessionId, 'attention', 15_000)
+    // Should transition back to 'idle' when done (within 15s, not 60s)
+    await waitForPtyState(mainWindow, sessionId, 'idle', 15_000)
   })
 })

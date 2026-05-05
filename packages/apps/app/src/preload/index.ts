@@ -199,11 +199,6 @@ const api: ElectronAPI = {
       ipcRenderer.on('app:go-home', handler)
       return () => ipcRenderer.removeListener('app:go-home', handler)
     },
-    onToggleAttentionPanel: (callback: () => void) => {
-      const handler = () => callback()
-      ipcRenderer.on('app:toggle-attention-panel', handler)
-      return () => ipcRenderer.removeListener('app:toggle-attention-panel', handler)
-    },
     onToggleAgentPanel: (callback: () => void) => {
       const handler = () => callback()
       ipcRenderer.on('app:toggle-agent-panel', handler)
@@ -415,7 +410,6 @@ const api: ElectronAPI = {
     clearBuffer: (sessionId) => ipcRenderer.invoke('pty:clearBuffer', sessionId),
     getBufferSince: (sessionId, afterSeq) => ipcRenderer.invoke('pty:getBufferSince', sessionId, afterSeq),
     list: () => ipcRenderer.invoke('pty:list'),
-    dismissAllNotifications: () => ipcRenderer.invoke('pty:dismissAllNotifications'),
     onData: (callback: (sessionId: string, data: string, seq: number) => void) => {
       const handler = (_event: unknown, sessionId: string, data: string, seq: number) => callback(sessionId, data, seq)
       ipcRenderer.on('pty:data', handler)
@@ -444,11 +438,6 @@ const api: ElectronAPI = {
       const handler = (_event: unknown, sessionId: string) => callback(sessionId)
       ipcRenderer.on('pty:session-not-found', handler)
       return () => ipcRenderer.removeListener('pty:session-not-found', handler)
-    },
-    onAttention: (callback: (sessionId: string) => void) => {
-      const handler = (_event: unknown, sessionId: string) => callback(sessionId)
-      ipcRenderer.on('pty:attention', handler)
-      return () => ipcRenderer.removeListener('pty:attention', handler)
     },
     onStateChange: (
       callback: (sessionId: string, newState: TerminalState, oldState: TerminalState) => void

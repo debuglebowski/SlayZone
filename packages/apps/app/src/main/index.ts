@@ -117,7 +117,7 @@ import { BlobStore, betterSqliteTxn, seedInitialVersions } from '@slayzone/task-
 import { getExtensionFromTitle } from '@slayzone/task/shared'
 import { registerTagHandlers } from '@slayzone/tags/main'
 import { registerSettingsHandlers, registerThemeHandlers } from '@slayzone/settings/main'
-import { registerPtyHandlers, registerUsageHandlers, killAllPtys, killPtysByTaskId, onTaskReachedTerminal, startIdleChecker, stopIdleChecker, dismissAllNotifications, syncTerminalModes, getPtyPids, onSessionChange, onGlobalStateChange, onPtyInputSubmit, registerChatHandlers, shutdownChatTransports, setOnHostKillHandler, broadcastRespawnRequest, backfillChatModes } from '@slayzone/terminal/main'
+import { registerPtyHandlers, registerUsageHandlers, killAllPtys, killPtysByTaskId, onTaskReachedTerminal, startIdleChecker, stopIdleChecker, syncTerminalModes, getPtyPids, onSessionChange, onGlobalStateChange, onPtyInputSubmit, registerChatHandlers, shutdownChatTransports, setOnHostKillHandler, broadcastRespawnRequest, backfillChatModes } from '@slayzone/terminal/main'
 import { setProviderLastKilledAt, type ProviderConfig } from '@slayzone/task/shared'
 import { attachFloatingAgent, setupFloatingAgent } from './floating-agent'
 import { attachTaskWindows, setupTaskWindows } from './task-windows'
@@ -735,11 +735,6 @@ function createMainWindow(): void {
       mainWindow?.webContents.send('app:reload-app')
     }
 
-    if (matchesElectronInput(ei, getEffectiveKeys('attention-panel', currentOverrides))) {
-      event.preventDefault()
-      mainWindow?.webContents.send('app:toggle-attention-panel')
-    }
-
     if (matchesElectronInput(ei, getEffectiveKeys('agent-panel', currentOverrides))) {
       event.preventDefault()
       mainWindow?.webContents.send('app:toggle-agent-panel')
@@ -1184,7 +1179,6 @@ app.whenReady().then(async () => {
         'pty:getBufferSince',
         'pty:list',
         'pty:getState',
-        'pty:dismissAllNotifications',
         'pty:set-theme',
         'pty:validate',
         'pty:setShellOverride',
@@ -2144,7 +2138,6 @@ div{text-align:center}h1{font-size:14px;font-weight:500;color:#aaa}p{font-size:1
       // 1. Kill running processes
       killAllPtys()
       shutdownChatTransports()
-      dismissAllNotifications()
       stopIdleChecker()
       killAllProcesses()
 

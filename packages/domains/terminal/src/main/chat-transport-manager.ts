@@ -11,7 +11,7 @@ import type { ChatModel } from '../shared/chat-model'
 
 export type { BufferedEvent } from './chat-events-store'
 
-export type ChatTerminalState = 'starting' | 'running' | 'attention' | 'idle' | 'error' | 'dead'
+export type ChatTerminalState = 'starting' | 'running' | 'idle' | 'error' | 'dead'
 
 /** Dependency-injection seam for tests AND for production wiring (event persistence). */
 export interface TransportDeps {
@@ -176,10 +176,10 @@ function handleEvent(session: Session, event: AgentEvent): void {
   // Feed chat activity into the shared terminal-state channel so tab indicators,
   // kanban cards, and task automations react to chat sessions the same way as PTY.
   // Semantics:
-  //   running   — mid-turn (processing user msg or tool call)
-  //   idle      — turn finished, waiting on user (distinct from PTY 'attention' which implies a prompt)
-  //   error     — result came back with isError
-  //   dead      — process exited
+  //   running — mid-turn (processing user msg or tool call)
+  //   idle    — turn finished, waiting on user
+  //   error   — result came back with isError
+  //   dead    — process exited
   if (event.kind === 'user-message' || event.kind === 'turn-init' || event.kind === 'tool-call') {
     transitionState(session, 'running')
   } else if (event.kind === 'result') {

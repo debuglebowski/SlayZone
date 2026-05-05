@@ -1,7 +1,7 @@
 import * as pty from 'node-pty'
 import { accessSync, constants as fsConstants, existsSync, writeSync } from 'fs'
 import { execFile } from 'child_process'
-import { app, BrowserWindow, Notification, nativeTheme, ipcMain } from 'electron'
+import { BrowserWindow, nativeTheme, ipcMain } from 'electron'
 import { homedir, platform, userInfo } from 'os'
 import type { Database } from 'better-sqlite3'
 import { DEV_SERVER_URL_PATTERN, extractOscTitle } from '@slayzone/terminal/shared'
@@ -19,77 +19,11 @@ import { filterBufferData } from './filter-buffer-data'
 import { buildMcpEnv } from './mcp-env'
 export { filterBufferData }
 
-// Database reference for notifications
+// Database reference (held for future use; legacy from notification feature)
 let db: Database | null = null
 
 export function setDatabase(database: Database): void {
   db = database
-}
-
-// Hold references to active notifications keyed by sessionId so we can dismiss them
-const activeNotifications = new Map<string, Notification>()
-
-function dismissNotification(sessionId: string): void {
-  const existing = activeNotifications.get(sessionId)
-  if (existing) {
-    existing.close()
-    activeNotifications.delete(sessionId)
-  }
-}
-
-export function dismissAllNotifications(): void {
-  for (const [, n] of activeNotifications) {
-    n.close()
-  }
-  activeNotifications.clear()
-}
-
-function showTaskAttentionNotification(sessionId: string): void {
-  if (!db) return
-
-  // Check if desktop notifications are enabled
-  const settingsRow = db.prepare('SELECT value FROM settings WHERE key = ?').get('notificationPanelState') as { value: string } | undefined
-  if (settingsRow?.value) {
-    try {
-      const state = JSON.parse(settingsRow.value)
-      if (!state.desktopEnabled) return
-    } catch {
-      return
-    }
-  } else {
-    return // No settings = disabled by default
-  }
-
-  dismissNotification(sessionId)
-
-  const session = sessions.get(sessionId)
-  const taskId = session?.taskId ?? taskIdFromSessionId(sessionId)
-  const taskRow = db.prepare('SELECT title FROM tasks WHERE id = ?').get(taskId) as { title: string } | undefined
-  if (taskRow?.title) {
-    let label = 'Terminal'
-    const modeInfo = db.prepare('SELECT label FROM terminal_modes WHERE id = ?').get(session?.mode ?? '') as { label: string } | undefined
-    if (modeInfo) {
-      label = modeInfo.label
-    }
-    
-    const notification = new Notification({
-      title: taskRow.title,
-      body: `${label} needs attention`
-    })
-    activeNotifications.set(sessionId, notification)
-    const cleanup = (): void => { activeNotifications.delete(sessionId) }
-    notification.on('click', () => {
-      cleanup()
-      app.focus({ steal: true })
-      if (mainWindow && !mainWindow.isDestroyed()) {
-        mainWindow.show()
-        mainWindow.focus()
-        mainWindow.webContents.send('app:open-task', taskId)
-      }
-    })
-    notification.on('close', cleanup)
-    notification.show()
-  }
 }
 
 export type { BufferChunk }
@@ -293,17 +227,9 @@ function emitStateChange(session: PtySession, sessionId: string, newState: Termi
     }
   })
 
-  if (oldState === 'running' && newState === 'attention') {
-    showTaskAttentionNotification(sessionId)
-  } else if (oldState === 'attention' && newState !== 'attention') {
-    dismissNotification(sessionId)
-  }
   if (session.win && !session.win.isDestroyed()) {
     try {
       session.win.webContents.send('pty:state-change', sessionId, newState, oldState)
-      if (newState === 'attention') {
-        session.win.webContents.send('pty:attention', sessionId)
-      }
     } catch { /* Window destroyed */ }
   }
 
@@ -318,7 +244,7 @@ function emitStateChange(session: PtySession, sessionId: string, newState: Termi
 }
 
 // Delegate state transitions to the extracted state machine
-// (asymmetric debounce: immediate for 'running', 500ms for running→attention, 100ms for others)
+// (immediate for 'running', 100ms debounce for others)
 function transitionState(sessionId: string, newState: TerminalState): void {
   const session = sessions.get(sessionId)
   if (!session) return
@@ -338,8 +264,8 @@ function checkInactiveSessions(): void {
     const timeout = session.adapter.idleTimeoutMs ?? IDLE_TIMEOUT_MS
     const inactiveTime = now - session.lastOutputTime
     if (inactiveTime >= timeout && session.state === 'running') {
-      session.activity = 'attention'
-      transitionState(sessionId, 'attention')
+      session.activity = 'unknown'
+      transitionState(sessionId, 'idle')
     }
   }
 }
@@ -496,7 +422,6 @@ export interface CreatePtyOptions {
   initialCommand?: string | null
   resumeCommand?: string | null
   defaultFlags?: string | null
-  patternAttention?: string | null
   patternWorking?: string | null
   patternError?: string | null
   cols?: number
@@ -504,7 +429,7 @@ export interface CreatePtyOptions {
 }
 
 export async function createPty(opts: CreatePtyOptions): Promise<{ success: boolean; error?: string }> {
-  const { win: originalWin, sessionId, cwd, conversationId, existingConversationId, mode, initialPrompt, providerArgs, executionContext, type, initialCommand, resumeCommand, defaultFlags, patternAttention, patternWorking, patternError } = opts
+  const { win: originalWin, sessionId, cwd, conversationId, existingConversationId, mode, initialPrompt, providerArgs, executionContext, type, initialCommand, resumeCommand, defaultFlags, patternWorking, patternError } = opts
   // Dynamic window lookup: allows redirectSessionWindow() to reroute events at runtime.
   const getWin = (): BrowserWindow => sessions.get(sessionId)?.win ?? originalWin
   const taskId = taskIdFromSessionId(sessionId)
@@ -522,7 +447,6 @@ export async function createPty(opts: CreatePtyOptions): Promise<{ success: bool
       initialCommand: initialCommand ?? null,
       resumeCommand: resumeCommand ?? null,
       defaultFlags: defaultFlags ?? null,
-      patternAttention: patternAttention ?? null,
       patternWorking: patternWorking ?? null,
       patternError: patternError ?? null,
       providerArgs: providerArgs ?? [],
@@ -548,7 +472,7 @@ export async function createPty(opts: CreatePtyOptions): Promise<{ success: bool
     const adapter = getAdapter({
       mode: terminalMode,
       type,
-      patterns: { attention: patternAttention, working: patternWorking, error: patternError }
+      patterns: { working: patternWorking, error: patternError }
     })
     const resuming = !!existingConversationId
     const effectiveConversationId = existingConversationId || conversationId
@@ -739,6 +663,17 @@ export async function createPty(opts: CreatePtyOptions): Promise<{ success: bool
     })
     notifySessionChange()
     stateMachine.register(sessionId, 'starting')
+    // node-pty.spawn is synchronous — pid is live by the time we get here.
+    // Flip to 'idle' on next microtask so the brief 'starting' window is
+    // observable for early-exit cases but the UI never gets stuck on
+    // 'starting' for processes that emit no immediate output. Adapter
+    // detection still drives idle→running on first spinner.
+    queueMicrotask(() => {
+      const live = sessions.get(sessionId)
+      if (live && live.state === 'starting') {
+        transitionState(sessionId, 'idle')
+      }
+    })
     let firstOutputTs: number | null = null
     let commandDispatchedTs: number | null = null
     let startupTimeout: NodeJS.Timeout | undefined
@@ -768,7 +703,6 @@ export async function createPty(opts: CreatePtyOptions): Promise<{ success: bool
         clearTimeout(exitSession.sessionIdAutoDetectTimer)
       }
       if (exitSession) stopTitlePolling(exitSession)
-      dismissNotification(sessionId)
       transitionState(sessionId, 'dead')
       recordDiagnosticEvent({
         level: 'info',
@@ -1000,14 +934,7 @@ export async function createPty(opts: CreatePtyOptions): Promise<{ success: bool
         // Map activity to TerminalState for backward compatibility
         const newState = activityToTerminalState(detectedActivity)
         if (newState) transitionState(sessionId, newState)
-      } else if (session.state === 'starting') {
-        // No spinner detected from 'starting' - assume attention (Claude showing prompt)
-        session.activity = 'attention'
-        transitionState(sessionId, 'attention')
       }
-      // Note: Don't auto-transition from 'attention' to 'running' on any output.
-      // Claude CLI outputs cursor/ANSI codes while waiting. Let detectActivity
-      // handle the transition when it sees actual work (spinner chars).
 
       // Use adapter for error detection
       const detectedError = session.adapter.detectError(data)

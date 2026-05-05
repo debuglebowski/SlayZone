@@ -17,8 +17,6 @@ interface ProjectItemProps {
   onClick: () => void
   onSettings: () => void
   onDelete: () => void
-  attentionCount: number
-  badgeMode: 'none' | 'blob' | 'count'
 }
 
 export function ProjectItem({
@@ -26,9 +24,7 @@ export function ProjectItem({
   selected,
   onClick,
   onSettings,
-  onDelete,
-  attentionCount,
-  badgeMode
+  onDelete
 }: ProjectItemProps) {
   const customLetters = project.icon_letters?.trim().toUpperCase()
   const fallbackLetters = project.name.slice(0, 2).toUpperCase()
@@ -88,18 +84,6 @@ export function ProjectItem({
         </ContextMenu>
         <TooltipContent side="right">{project.name}</TooltipContent>
       </Tooltip>
-      {attentionCount > 0 && badgeMode === 'blob' && (
-        <span
-          className="absolute -top-1.5 -right-1.5 z-50 size-3 rounded-full bg-primary border-2 border-background pointer-events-none"
-        />
-      )}
-      {attentionCount > 0 && badgeMode === 'count' && (
-        <span
-          className="absolute -top-1.5 -right-1.5 z-50 min-w-4 rounded-full bg-primary border-2 border-background px-1 text-[10px] font-semibold leading-4 text-center text-primary-foreground pointer-events-none"
-        >
-          {attentionCount}
-        </span>
-      )}
     </div>
   )
 }

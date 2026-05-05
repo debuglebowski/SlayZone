@@ -12,7 +12,6 @@ export class CcsAdapter implements TerminalAdapter {
 
   encodeSubmit = defaultEncodeSubmit
 
-  // CCS runs Claude Code underneath — reuse Claude's activity patterns
   detectActivity(data: string, _current: ActivityState): ActivityState | null {
     const stripped = data
       .replace(/\x1b\]([^\x07\x1b]|\x1b(?!\\))*(\x07|\x1b\\|\x9c)/g, '')
@@ -20,12 +19,6 @@ export class CcsAdapter implements TerminalAdapter {
       .replace(/\x1b[()][AB012]/g, '')
       .trimStart()
 
-    if (/(?:^|\n|\r)❯\s*\d+\./.test(stripped)) return 'attention'
-    if (/(?:^|\n|\r)❯[A-Za-z]/.test(stripped)) return 'attention'
-    if (/\[Y\/n\]|\[y\/N\]/i.test(stripped)) return 'attention'
-    if (/(?:^|\n|\r)❯\s/.test(stripped)) return 'attention'
-
-    if (/^[·✻✽✶✳✢].*\bfor \d+[smh]/m.test(stripped)) return 'attention'
     if (/^[·✻✽✶✳✢]/m.test(stripped)) return 'working'
 
     return null

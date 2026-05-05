@@ -35,7 +35,7 @@ export function useLoopMode({ sessionId, onConfigChange }: UseLoopModeOptions) {
           return result.chunks.map(c => c.data).join('')
         },
         subscribeIdle: (cb) => subscribeState(sessionId, (newState) => {
-          if (newState === 'attention') cb()
+          if (newState === 'idle') cb()
         }),
         subscribeExit: (cb) => subscribeExit(sessionId, () => cb()),
       },

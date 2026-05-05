@@ -15,8 +15,7 @@ export function handleTerminalStateChange(
 ): void {
   let targetField: 'on_terminal_active' | 'on_terminal_idle' | null = null
   if (newState === 'running') targetField = 'on_terminal_active'
-  // Both PTY 'attention' (prompt awaiting) and chat 'idle' (turn complete) count as work-done.
-  else if (oldState === 'running' && (newState === 'attention' || newState === 'idle')) targetField = 'on_terminal_idle'
+  else if (oldState === 'running' && newState === 'idle') targetField = 'on_terminal_idle'
   if (!targetField) return
 
   try {

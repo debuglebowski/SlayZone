@@ -52,7 +52,7 @@ test.describe('Dev server URL detection', () => {
 
     await openTaskTerminal(mainWindow, { projectAbbrev, taskTitle: 'Dev server task' })
     await waitForPtySession(mainWindow, sessionId)
-    await waitForPtyState(mainWindow, sessionId, 'attention')
+    await waitForPtyState(mainWindow, sessionId, 'idle')
   })
 
   test('toast appears when localhost URL printed in terminal', async ({ mainWindow }) => {
@@ -128,7 +128,7 @@ test.describe('Dev server detection — toast disabled', () => {
 
     await openTaskTerminal(mainWindow, { projectAbbrev: 'NO', taskTitle: 'No toast task' })
     await waitForPtySession(mainWindow, sessionId)
-    await waitForPtyState(mainWindow, sessionId, 'attention')
+    await waitForPtyState(mainWindow, sessionId, 'idle')
   })
 
   test.afterAll(async ({ mainWindow }) => {
@@ -164,7 +164,7 @@ test.describe('Dev server detection — auto-open browser', () => {
 
     await openTaskTerminal(mainWindow, { projectAbbrev: 'AU', taskTitle: 'Auto open task' })
     await waitForPtySession(mainWindow, sessionId)
-    await waitForPtyState(mainWindow, sessionId, 'attention')
+    await waitForPtyState(mainWindow, sessionId, 'idle')
   })
 
   test.afterAll(async ({ mainWindow }) => {

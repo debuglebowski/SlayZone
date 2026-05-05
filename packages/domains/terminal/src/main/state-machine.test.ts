@@ -58,7 +58,6 @@ function useFakeTimers() {
 function advanceTimersByTime(ms: number) {
   const target = now + ms
   while (true) {
-    // Find next timer that would fire within target
     const next = pendingTimers
       .filter(t => t.scheduledAt + t.delay <= target)
       .sort((a, b) => (a.scheduledAt + a.delay) - (b.scheduledAt + b.delay))[0]
@@ -83,105 +82,65 @@ test('running transition is immediate', () => {
   useFakeTimers()
   const changes: [string, TerminalState, TerminalState][] = []
   const sm = new StateMachine((id, n, o) => changes.push([id, n, o]))
-  sm.register('s1', 'attention')
+  sm.register('s1', 'idle')
 
   sm.transition('s1', 'running')
 
   expect(changes.length).toBe(1)
-  expect(changes[0]).toEqual(['s1', 'running', 'attention'])
+  expect(changes[0]).toEqual(['s1', 'running', 'idle'])
   expect(sm.getState('s1')).toBe('running')
   sm.dispose()
   useRealTimers()
 })
 
-test('attention transition is debounced (not immediate)', () => {
+test('non-running transition is debounced (not immediate)', () => {
   useFakeTimers()
   const changes: [string, TerminalState, TerminalState][] = []
   const sm = new StateMachine((id, n, o) => changes.push([id, n, o]))
   sm.register('s1', 'running')
 
-  sm.transition('s1', 'attention')
+  sm.transition('s1', 'idle')
 
-  expect(changes.length).toBe(0)  // not yet
-  expect(sm.getState('s1')).toBe('running')  // still running
+  expect(changes.length).toBe(0)
+  expect(sm.getState('s1')).toBe('running')
   sm.dispose()
   useRealTimers()
 })
 
-test('running→attention debounces at 500ms', () => {
+test('non-running transition fires at 100ms', () => {
   useFakeTimers()
   const changes: [string, TerminalState, TerminalState][] = []
   const sm = new StateMachine((id, n, o) => changes.push([id, n, o]))
   sm.register('s1', 'running')
 
-  sm.transition('s1', 'attention')
+  sm.transition('s1', 'idle')
 
   advanceTimersByTime(99)
   expect(changes.length).toBe(0)
 
-  advanceTimersByTime(300)  // now at 399ms
-  expect(changes.length).toBe(0)
-
-  advanceTimersByTime(101)  // now at 500ms
+  advanceTimersByTime(1)
   expect(changes.length).toBe(1)
-  expect(changes[0]).toEqual(['s1', 'attention', 'running'])
+  expect(changes[0]).toEqual(['s1', 'idle', 'running'])
   sm.dispose()
   useRealTimers()
 })
 
-test('running→attention cancelled if running detected within 500ms', () => {
+test('pending non-running transition cancelled by running', () => {
   useFakeTimers()
   const changes: [string, TerminalState, TerminalState][] = []
   const sm = new StateMachine((id, n, o) => changes.push([id, n, o]))
   sm.register('s1', 'running')
 
-  sm.transition('s1', 'attention')
-  advanceTimersByTime(200)
+  sm.transition('s1', 'idle')
+  advanceTimersByTime(50)
   expect(changes.length).toBe(0)
 
-  // Spinner detected again — cancel pending attention
   sm.transition('s1', 'running')
-  expect(changes.length).toBe(0)  // already running, no-op
+  expect(changes.length).toBe(0)
   expect(sm.getState('s1')).toBe('running')
 
-  // Let original timer window pass — should NOT fire
   advanceTimersByTime(500)
   expect(changes.length).toBe(0)
-  sm.dispose()
-  useRealTimers()
-})
-
-test('rapid flicker: running→attention→running→attention settles correctly', () => {
-  useFakeTimers()
-  const changes: [string, TerminalState, TerminalState][] = []
-  const sm = new StateMachine((id, n, o) => changes.push([id, n, o]))
-  sm.register('s1', 'running')
-
-  // Flicker cycle 1
-  sm.transition('s1', 'attention')
-  advanceTimersByTime(100)
-  sm.transition('s1', 'running')  // cancel pending attention
-  advanceTimersByTime(50)
-
-  // Flicker cycle 2
-  sm.transition('s1', 'attention')
-  advanceTimersByTime(100)
-  sm.transition('s1', 'running')  // cancel again
-  advanceTimersByTime(50)
-
-  // Flicker cycle 3
-  sm.transition('s1', 'attention')
-  advanceTimersByTime(100)
-  sm.transition('s1', 'running')  // cancel again
-
-  // No state changes should have occurred (stayed running the whole time)
-  expect(changes.length).toBe(0)
-
-  // Now truly idle — attention sticks
-  sm.transition('s1', 'attention')
-  advanceTimersByTime(500)
-  expect(changes.length).toBe(1)
-  expect(changes[0]).toEqual(['s1', 'attention', 'running'])
   sm.dispose()
   useRealTimers()
 })
@@ -200,7 +159,7 @@ test('same-state transition is no-op', () => {
   useRealTimers()
 })
 
-test('error transition debounces at 100ms (not 500ms)', () => {
+test('error transition debounces at 100ms', () => {
   useFakeTimers()
   const changes: [string, TerminalState, TerminalState][] = []
   const sm = new StateMachine((id, n, o) => changes.push([id, n, o]))
@@ -211,7 +170,7 @@ test('error transition debounces at 100ms (not 500ms)', () => {
   advanceTimersByTime(99)
   expect(changes.length).toBe(0)
 
-  advanceTimersByTime(1)  // at 100ms
+  advanceTimersByTime(1)
   expect(changes.length).toBe(1)
   expect(changes[0]).toEqual(['s1', 'error', 'running'])
   sm.dispose()
@@ -222,7 +181,7 @@ test('dead transition debounces at 100ms', () => {
   useFakeTimers()
   const changes: [string, TerminalState, TerminalState][] = []
   const sm = new StateMachine((id, n, o) => changes.push([id, n, o]))
-  sm.register('s1', 'attention')
+  sm.register('s1', 'idle')
 
   sm.transition('s1', 'dead')
 
@@ -231,25 +190,7 @@ test('dead transition debounces at 100ms', () => {
 
   advanceTimersByTime(1)
   expect(changes.length).toBe(1)
-  expect(changes[0]).toEqual(['s1', 'dead', 'attention'])
-  sm.dispose()
-  useRealTimers()
-})
-
-test('attention→attention (non-running source) debounces at 100ms', () => {
-  useFakeTimers()
-  const changes: [string, TerminalState, TerminalState][] = []
-  const sm = new StateMachine((id, n, o) => changes.push([id, n, o]))
-  sm.register('s1', 'starting')
-
-  sm.transition('s1', 'attention')
-
-  advanceTimersByTime(99)
-  expect(changes.length).toBe(0)
-
-  advanceTimersByTime(1)  // at 100ms
-  expect(changes.length).toBe(1)
-  expect(changes[0]).toEqual(['s1', 'attention', 'starting'])
+  expect(changes[0]).toEqual(['s1', 'dead', 'idle'])
   sm.dispose()
   useRealTimers()
 })
@@ -273,10 +214,10 @@ test('new transition replaces pending timer', () => {
   const sm = new StateMachine((id, n, o) => changes.push([id, n, o]))
   sm.register('s1', 'running')
 
-  sm.transition('s1', 'attention')  // starts 500ms timer
-  advanceTimersByTime(400)
+  sm.transition('s1', 'idle')
+  advanceTimersByTime(50)
 
-  sm.transition('s1', 'error')  // replaces with 100ms timer
+  sm.transition('s1', 'error')
   advanceTimersByTime(100)
 
   expect(changes.length).toBe(1)
@@ -291,14 +232,9 @@ test('working → running', () => {
   expect(activityToTerminalState('working')).toBe('running')
 })
 
-test('attention → attention', () => {
-  expect(activityToTerminalState('attention')).toBe('attention')
-})
-
 test('unknown → null', () => {
   expect(activityToTerminalState('unknown')).toBe(null)
 })
 
-// Summary
 console.log(`\n${passed} passed, ${failed} failed\n`)
 if (failed > 0) process.exitCode = 1

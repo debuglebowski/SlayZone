@@ -26,19 +26,7 @@ export class QwenAdapter implements TerminalAdapter {
 
   detectActivity(data: string, _current: ActivityState): ActivityState | null {
     const s = QwenAdapter.stripAnsi(data)
-
-    // Attention: interactive menus / prompts (identical to Claude Code)
-    if (/(?:^|\n|\r)❯\s*\d+\./.test(s)) return 'attention'
-    if (/(?:^|\n|\r)❯[A-Za-z]/.test(s)) return 'attention'
-    if (/\[Y\/n\]|\[y\/N\]/i.test(s)) return 'attention'
-    if (/(?:^|\n|\r)❯\s/.test(s)) return 'attention'
-
-    // Attention: spinner + completion summary (e.g. "⠏ for 2m 30s")
-    if (/^[⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏].*\bfor \d+[smh]/m.test(s)) return 'attention'
-
-    // Working: braille spinner character at line start (active generation)
     if (/^[⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏]/m.test(s)) return 'working'
-
     return null
   }
 

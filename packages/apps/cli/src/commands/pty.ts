@@ -180,7 +180,7 @@ export function ptyCommand(): Command {
   cmd
     .command('submit <id> [text]')
     .description('Submit text to PTY — adapter handles per-mode encoding (id prefix supported)')
-    .option('--wait', 'Wait for attention state before sending (default for AI modes)')
+    .option('--wait', 'Wait for idle state before sending (default for AI modes)')
     .option('--no-wait', 'Send immediately without waiting')
     .option('--timeout <ms>', 'Timeout for --wait in milliseconds', '60000')
     .action(async (idPrefix, text: string | undefined, opts: { wait?: boolean; timeout: string }) => {
@@ -198,7 +198,7 @@ export function ptyCommand(): Command {
       }
 
       if (shouldWait) {
-        await waitForState(session.sessionId, 'attention', parseInt(opts.timeout, 10))
+        await waitForState(session.sessionId, 'idle', parseInt(opts.timeout, 10))
       }
 
       // Per-mode wire encoding (Kitty Shift+Enter, plain CR, etc.) lives in the
@@ -210,7 +210,7 @@ export function ptyCommand(): Command {
   cmd
     .command('wait <id>')
     .description('Wait for a PTY session to reach a specific state (id prefix supported)')
-    .option('--state <state>', 'Target state to wait for', 'attention')
+    .option('--state <state>', 'Target state to wait for', 'idle')
     .option('--timeout <ms>', 'Timeout in milliseconds', '60000')
     .option('--json', 'Output as JSON')
     .action(async (idPrefix, opts: { state: string; timeout: string; json?: boolean }) => {

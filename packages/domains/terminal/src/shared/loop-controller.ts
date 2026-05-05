@@ -14,7 +14,7 @@ export interface LoopTransport<Marker> {
   send: (prompt: string) => void | Promise<void>
   /** Read the output produced since `marker`. May return null on transport error. */
   readOutputSince: (marker: Marker) => Promise<string | null>
-  /** Subscribe to "iteration complete" signal (terminal=attention state, chat=stream-end). */
+  /** Subscribe to "iteration complete" signal (terminal=idle state, chat=stream-end). */
   subscribeIdle: (cb: () => void) => () => void
   /** Subscribe to session exit. */
   subscribeExit: (cb: () => void) => () => void

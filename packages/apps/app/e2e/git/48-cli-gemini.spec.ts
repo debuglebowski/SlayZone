@@ -99,7 +99,7 @@ test.describe.skip('Gemini integration', () => {
     expect(buf).not.toContain('GEMINI_API_KEY environment variable not found')
   })
 
-  test('detects working → attention state transition', async ({ mainWindow }) => {
+  test('detects working → idle state transition', async ({ mainWindow }) => {
     const sessionId = getMainSessionId(taskId)
 
     // Wait for session to be ready
@@ -117,7 +117,7 @@ test.describe.skip('Gemini integration', () => {
     // Should transition to 'running' (working detected from TUI redraw burst)
     await waitForPtyState(mainWindow, sessionId, 'running', 15_000)
 
-    // Should transition back to 'attention' after idle timeout (~2.5s)
-    await waitForPtyState(mainWindow, sessionId, 'attention', 15_000)
+    // Should transition back to 'idle' after idle timeout (~2.5s)
+    await waitForPtyState(mainWindow, sessionId, 'idle', 15_000)
   })
 })

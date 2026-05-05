@@ -10,7 +10,6 @@ export function useDiagnosticsSync({
   projects,
   tasks,
   displayTaskCount,
-  notificationState,
   projectPathMissing
 }: {
   tabs: Tab[]
@@ -20,10 +19,8 @@ export function useDiagnosticsSync({
   projects: { id: string; name: string }[]
   tasks: { length: number }
   displayTaskCount: number
-  notificationState: { isLocked: boolean; filterCurrentProject: boolean }
   projectPathMissing: boolean
 }): void {
-  // Context sync
   useEffect(() => {
     const activeTab = tabs[activeTabIndex]
     updateDiagnosticsContext({
@@ -35,8 +32,6 @@ export function useDiagnosticsSync({
       selectedProjectName: projects.find((p) => p.id === selectedProjectId)?.name ?? null,
       taskCount: tasks.length,
       visibleTaskCount: displayTaskCount,
-      notificationPanelLocked: notificationState.isLocked,
-      notificationFilterCurrentProject: notificationState.filterCurrentProject,
       projectPathMissing
     })
   }, [
@@ -46,12 +41,9 @@ export function useDiagnosticsSync({
     projects,
     tasks.length,
     displayTaskCount,
-    notificationState.isLocked,
-    notificationState.filterCurrentProject,
     projectPathMissing
   ])
 
-  // Timeline: project changed
   const previousProjectRef = useRef(selectedProjectId)
   useEffect(() => {
     if (previousProjectRef.current === selectedProjectId) return
@@ -62,7 +54,6 @@ export function useDiagnosticsSync({
     previousProjectRef.current = selectedProjectId
   }, [selectedProjectId])
 
-  // Timeline: tab changed
   const previousActiveTabRef = useRef('home')
   useEffect(() => {
     let nextTabKey: string
@@ -80,26 +71,4 @@ export function useDiagnosticsSync({
     })
     previousActiveTabRef.current = nextTabKey
   }, [tabs, activeTabIndex, activeView])
-
-  // Timeline: notification lock changed
-  const previousNotificationLockedRef = useRef(notificationState.isLocked)
-  useEffect(() => {
-    if (previousNotificationLockedRef.current === notificationState.isLocked) return
-    recordDiagnosticsTimeline('notification_lock_changed', {
-      from: previousNotificationLockedRef.current,
-      to: notificationState.isLocked
-    })
-    previousNotificationLockedRef.current = notificationState.isLocked
-  }, [notificationState.isLocked])
-
-  // Timeline: notification filter changed
-  const previousNotificationProjectFilterRef = useRef(notificationState.filterCurrentProject)
-  useEffect(() => {
-    if (previousNotificationProjectFilterRef.current === notificationState.filterCurrentProject) return
-    recordDiagnosticsTimeline('notification_filter_project_changed', {
-      from: previousNotificationProjectFilterRef.current,
-      to: notificationState.filterCurrentProject
-    })
-    previousNotificationProjectFilterRef.current = notificationState.filterCurrentProject
-  }, [notificationState.filterCurrentProject])
 }

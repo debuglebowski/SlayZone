@@ -21,7 +21,6 @@ export const shortcutDefinitions: ShortcutDefinition[] = [
   { id: 'zen-mode', label: 'Zen Mode', group: 'General', defaultKeys: 'mod+shift+j', scope: 'global' },
   { id: 'explode-mode', label: 'Explode Mode', group: 'General', defaultKeys: 'mod+shift+e', scope: 'global' },
   { id: 'exit-zen-explode', label: 'Exit Zen / Explode', group: 'General', defaultKeys: 'escape', scope: 'global' },
-  { id: 'attention-panel', label: 'Attention Panel', group: 'General', defaultKeys: 'ctrl+.', scope: 'global' },
   { id: 'agent-panel', label: 'Agent Panel', group: 'General', defaultKeys: 'mod+.', scope: 'global' },
   { id: 'global-settings', label: 'Global Settings', group: 'General', defaultKeys: 'mod+,', scope: 'global' },
   { id: 'project-settings', label: 'Project Settings', group: 'General', defaultKeys: 'mod+shift+,', scope: 'global' },
@@ -90,7 +89,6 @@ export const shortcutDefinitions: ShortcutDefinition[] = [
  *  so users pick up the new default after a rebind. Append an entry on every
  *  default swap — pair with the new `defaultKeys` value above. */
 export const SHORTCUT_DEFAULT_MIGRATIONS: { id: string; oldDefault: string }[] = [
-  { id: 'attention-panel', oldDefault: 'mod+shift+a' }, // moved to ctrl+.
   { id: 'zen-mode',        oldDefault: 'mod+j' },       // moved to mod+shift+j
   { id: 'panel-settings',  oldDefault: 'mod+s' },       // moved to mod+j
 ]

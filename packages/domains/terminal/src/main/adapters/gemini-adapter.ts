@@ -24,15 +24,7 @@ export class GeminiAdapter implements TerminalAdapter {
 
   detectActivity(data: string, _current: ActivityState): ActivityState | null {
     const stripped = GeminiAdapter.stripAnsi(data).trimStart()
-
-    // Approval prompt — needs user input
-    if (/Approve\?\s*\(y\/n(\/always)?\)/i.test(stripped)) return 'attention'
-
-    // Ink TUI redraws entire screen in bursts during response streaming.
-    // Meaningful content (>50 chars after stripping ANSI) indicates active work.
-    // Small chunks are idle cursor/redraw noise.
     if (stripped.length > 50) return 'working'
-
     return null
   }
 

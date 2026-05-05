@@ -3,7 +3,7 @@ import type { IpcMain } from 'electron'
 import type { Database } from 'better-sqlite3'
 import { execFile } from 'child_process'
 import { promisify } from 'util'
-import { createPty, writePty, submitPty, resizePty, killPty, hasPty, getBuffer, clearBuffer, getBufferSince, listPtys, getState, setDatabase, dismissAllNotifications, setTerminalTheme, testExecutionContext } from './pty-manager'
+import { createPty, writePty, submitPty, resizePty, killPty, hasPty, getBuffer, clearBuffer, getBufferSince, listPtys, getState, setDatabase, setTerminalTheme, testExecutionContext } from './pty-manager'
 
 const execFileAsync = promisify(execFile)
 import { getAdapter, type ExecutionContext } from './adapters'
@@ -42,7 +42,6 @@ function mapModeRow(row: any): TerminalModeInfo {
     enabled: Boolean(row.enabled),
     isBuiltin: Boolean(row.is_builtin),
     order: row.order,
-    patternAttention: row.pattern_attention,
     patternWorking: row.pattern_working,
     patternError: row.pattern_error,
     usageConfig,
@@ -85,8 +84,8 @@ export function registerPtyHandlers(ipcMain: IpcMain, db: Database): void {
   ipcMain.handle('terminalModes:create', async (_, input: CreateTerminalModeInput) => {
     const id = input.id
     db.prepare(`
-      INSERT INTO terminal_modes (id, label, type, initial_command, resume_command, headless_command, default_flags, enabled, is_builtin, "order", pattern_attention, pattern_working, pattern_error, usage_config)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?)
+      INSERT INTO terminal_modes (id, label, type, initial_command, resume_command, headless_command, default_flags, enabled, is_builtin, "order", pattern_working, pattern_error, usage_config)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?)
     `).run(
       id,
       input.label,
@@ -97,7 +96,6 @@ export function registerPtyHandlers(ipcMain: IpcMain, db: Database): void {
       input.defaultFlags ?? null,
       input.enabled !== false ? 1 : 0,
       input.order ?? 0,
-      input.patternAttention ?? null,
       input.patternWorking ?? null,
       input.patternError ?? null,
       input.usageConfig ? JSON.stringify(input.usageConfig) : null
@@ -144,10 +142,6 @@ export function registerPtyHandlers(ipcMain: IpcMain, db: Database): void {
     if (updates.order !== undefined) {
       sets.push(' "order" = ?')
       params.push(updates.order)
-    }
-    if (updates.patternAttention !== undefined) {
-      sets.push('pattern_attention = ?')
-      params.push(updates.patternAttention ?? null)
     }
     if (updates.patternWorking !== undefined) {
       sets.push('pattern_working = ?')
@@ -259,7 +253,6 @@ export function registerPtyHandlers(ipcMain: IpcMain, db: Database): void {
         initialCommand: modeInfo?.initialCommand,
         resumeCommand: modeInfo?.resumeCommand,
         defaultFlags: modeInfo?.defaultFlags,
-        patternAttention: modeInfo?.patternAttention,
         patternWorking: modeInfo?.patternWorking,
         patternError: modeInfo?.patternError,
         cols: opts.cols,
@@ -321,10 +314,6 @@ ipcMain.handle('pty:resize', (_, sessionId: string, cols: number, rows: number) 
     return getState(sessionId)
   })
 
-  ipcMain.handle('pty:dismissAllNotifications', () => {
-    dismissAllNotifications()
-  })
-
   ipcMain.handle('pty:set-theme', (_, theme: { foreground: string; background: string; cursor: string; ansi?: readonly string[] }) => {
     setTerminalTheme(theme)
   })
@@ -336,7 +325,6 @@ ipcMain.handle('pty:resize', (_, sessionId: string, cols: number, rows: number) 
       mode,
       type: modeInfo?.type,
       patterns: {
-        attention: modeInfo?.patternAttention,
         working: modeInfo?.patternWorking,
         error: modeInfo?.patternError,
       },

@@ -7,7 +7,7 @@ export function registerPtyWaitRoute(app: Express, _deps: RestApiDeps): void {
     const id = req.params.id
     if (!hasPty(id)) { res.status(404).json({ error: 'PTY session not found' }); return }
 
-    const targetState = (req.query.state as string) || 'attention'
+    const targetState = (req.query.state as string) || 'idle'
     const timeout = Math.min(Math.max(parseInt(req.query.timeout as string, 10) || 60000, 1000), 300000)
 
     // Fast path: already in target state

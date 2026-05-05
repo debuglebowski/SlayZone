@@ -33,7 +33,7 @@ import {
 } from '@slayzone/ui'
 import { ProjectItem } from './ProjectItem'
 import { TerminalStatusPopover } from '@slayzone/terminal'
-import { cn, useAppearance, shortcutDefinitions, formatKeysForDisplay, useShortcutStore, type ShortcutDefinition } from '@slayzone/ui'
+import { cn, shortcutDefinitions, formatKeysForDisplay, useShortcutStore, type ShortcutDefinition } from '@slayzone/ui'
 import { useTabStore, useDialogStore } from '@slayzone/settings'
 import type { Task } from '@slayzone/task/shared'
 import type { Project } from '@slayzone/projects/shared'
@@ -52,7 +52,6 @@ interface AppSidebarProps {
   onTaskClick?: (taskId: string) => void
   zenMode?: boolean
   onboardingChecklist: OnboardingChecklistState
-  attentionByProject: Map<string, number>
   onReorderProjects: (projectIds: string[]) => void
 }
 
@@ -205,7 +204,6 @@ export function AppSidebar({
   onTaskClick,
   zenMode,
   onboardingChecklist,
-  attentionByProject,
   onReorderProjects,
 }: AppSidebarProps) {
   const [shortcutsOpen, setShortcutsOpen] = useState(false)
@@ -230,7 +228,6 @@ export function AppSidebar({
     onReorderProjects(newOrder.map((p) => p.id))
   }
 
-  const { sidebarBadgeMode } = useAppearance()
   const activeView = useTabStore((s) => s.activeView)
 
   const overrides = useShortcutStore((s) => s.overrides)
@@ -326,8 +323,6 @@ export function AppSidebar({
                         onClick={() => onSelectProject(project.id)}
                         onSettings={() => onProjectSettings(project)}
                         onDelete={() => useDialogStore.getState().openDeleteProject(project)}
-                        attentionCount={attentionByProject.get(project.id) ?? 0}
-                        badgeMode={sidebarBadgeMode}
                       />
                     </SidebarMenuItem>
                   ))}

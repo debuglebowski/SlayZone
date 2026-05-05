@@ -46,7 +46,6 @@ describe('load', () => {
   describe('default migrations', () => {
     it('clears user overrides matching retired defaults', async () => {
       mockSettings.get.mockResolvedValue(JSON.stringify({
-        'attention-panel': 'mod+shift+a',
         'zen-mode': 'mod+j',
         'panel-settings': 'mod+s',
         search: 'mod+shift+p', // unrelated, should persist

@@ -56,7 +56,6 @@ export function AppearanceSettingsTab() {
   const [terminalFontSize, setTerminalFontSize] = useState('13')
   const [editorFontSize, setEditorFontSize] = useState('13')
   const [reduceMotion, setReduceMotion] = useState(false)
-  const [sidebarBadgeMode, setSidebarBadgeMode] = useState<'none' | 'blob' | 'count'>('blob')
   const [notesFontFamily, setNotesFontFamily] = useState<'sans' | 'mono'>('sans')
   const [notesReadability, setNotesReadability] = useState<'compact' | 'normal'>('normal')
   const [notesWidth, setNotesWidth] = useState<'narrow' | 'wide'>('narrow')
@@ -71,7 +70,6 @@ export function AppearanceSettingsTab() {
     window.api.settings.get('terminal_font_size').then(val => setTerminalFontSize(val ?? '13'))
     window.api.settings.get('editor_font_size').then(val => setEditorFontSize(val ?? '13'))
     window.api.settings.get('reduce_motion').then(val => setReduceMotion(val === '1'))
-    window.api.settings.get('sidebar_badge_mode').then(val => setSidebarBadgeMode((val === 'none' || val === 'count') ? val : 'blob'))
     window.api.settings.get('notes_font_family').then(val => setNotesFontFamily(val === 'mono' ? 'mono' : 'sans'))
     Promise.all([
       window.api.settings.get('notes_readability'),
@@ -283,19 +281,6 @@ export function AppearanceSettingsTab() {
           <CardTitle>Other</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
-          <div className="grid grid-cols-[220px_minmax(0,1fr)] items-center gap-4">
-            <SettingLabel tip="How tasks needing attention are indicated in the sidebar">Task attention badges</SettingLabel>
-            <Select value={sidebarBadgeMode} onValueChange={(v) => { setSidebarBadgeMode(v as 'none' | 'blob' | 'count'); window.api.settings.set('sidebar_badge_mode', v) }}>
-              <SelectTrigger className="w-48">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent position="popper" side="bottom" className="max-h-none">
-                <SelectItem value="none">None</SelectItem>
-                <SelectItem value="blob">Blob</SelectItem>
-                <SelectItem value="count">Count</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
           <div className="grid grid-cols-[220px_minmax(0,1fr)] items-center gap-4">
             <SettingLabel tip="Tint the UI with each project's assigned color">Project color tints</SettingLabel>
             <Switch

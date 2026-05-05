@@ -100,7 +100,7 @@ test.describe.skip('Session ID consistency (real CLIs)', () => {
     await openTaskTerminal(mainWindow, { projectAbbrev, taskTitle: 'SIC gemini detect' })
     const sessionId = getMainSessionId(t.id)
     await waitForPtySession(mainWindow, sessionId, 60_000)
-    await waitForPtyState(mainWindow, sessionId, 'attention', 60_000)
+    await waitForPtyState(mainWindow, sessionId, 'idle', 60_000)
     await mainWindow.waitForTimeout(2000)
 
     // Text and \r must be separate writes (Ink TUI drops \r when concatenated with text)

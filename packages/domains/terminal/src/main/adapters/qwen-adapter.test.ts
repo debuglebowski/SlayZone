@@ -47,36 +47,6 @@ test('strips OSC sequences terminated by ST (ESC \\)', () => {
   expect(adapter.detectActivity(`${oscSt}⠙ generating…`, 'unknown')).toBe('working')
 })
 
-test('detects completion summary (spinner + "for Xm Ys") as attention', () => {
-  expect(adapter.detectActivity('⠏ for 2m 30s', 'working')).toBe('attention')
-  expect(adapter.detectActivity('⠋ for 45s', 'working')).toBe('attention')
-})
-
-test('completion summary takes priority over plain spinner', () => {
-  // "for \d+" should win over bare braille
-  expect(adapter.detectActivity('⠙ for 1m', 'working')).toBe('attention')
-})
-
-test('detects numbered menu as attention', () => {
-  const data = `Would you like to proceed?\n❯ 1. Yes\n  2. No`
-  expect(adapter.detectActivity(data, 'working')).toBe('attention')
-})
-
-test('detects Y/n prompt as attention', () => {
-  expect(adapter.detectActivity('Allow this action? [Y/n]', 'unknown')).toBe('attention')
-  expect(adapter.detectActivity('Continue? [y/N]', 'unknown')).toBe('attention')
-})
-
-test('detects bare ❯ prompt as attention', () => {
-  expect(adapter.detectActivity('❯ ', 'working')).toBe('attention')
-  expect(adapter.detectActivity('\n❯ ', 'working')).toBe('attention')
-})
-
-test('attention takes priority over braille spinner', () => {
-  const data = `⠙ Thinking...\n❯ 1. Yes\n  2. No`
-  expect(adapter.detectActivity(data, 'working')).toBe('attention')
-})
-
 test('returns null for unrecognized output', () => {
   expect(adapter.detectActivity('Some random output', 'unknown')).toBe(null)
 })

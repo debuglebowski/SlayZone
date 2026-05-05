@@ -1,5 +1,5 @@
 export type TerminalMode = string
-export type TerminalState = 'starting' | 'running' | 'attention' | 'idle' | 'error' | 'dead'
+export type TerminalState = 'starting' | 'running' | 'idle' | 'error' | 'dead'
 
 export const BuiltinTerminalMode = {
   ClaudeCode: 'claude-code',
@@ -27,7 +27,6 @@ export interface TerminalModeInfo {
   enabled: boolean
   isBuiltin: boolean
   order: number
-  patternAttention?: string | null
   patternWorking?: string | null
   patternError?: string | null
   usageConfig?: UsageProviderConfig | null
@@ -43,7 +42,6 @@ export interface CreateTerminalModeInput {
   defaultFlags?: string | null
   enabled?: boolean
   order?: number
-  patternAttention?: string | null
   patternWorking?: string | null
   patternError?: string | null
   usageConfig?: UsageProviderConfig | null
@@ -58,7 +56,6 @@ export interface UpdateTerminalModeInput {
   defaultFlags?: string | null
   enabled?: boolean
   order?: number
-  patternAttention?: string | null
   patternWorking?: string | null
   patternError?: string | null
   usageConfig?: UsageProviderConfig | null
@@ -99,7 +96,7 @@ export type ExecutionContext =
   | { type: 'ssh'; target: string; workdir?: string; shell?: string }
 
 // CLI activity states (more granular than TerminalState)
-export type ActivityState = 'attention' | 'working' | 'unknown'
+export type ActivityState = 'working' | 'unknown'
 
 // CLI error info
 export interface ErrorInfo {

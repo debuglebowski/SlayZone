@@ -27,7 +27,6 @@ export interface GetAdapterOptions {
   mode: string
   type?: string
   patterns?: {
-    attention?: string | null
     working?: string | null
     error?: string | null
   }
