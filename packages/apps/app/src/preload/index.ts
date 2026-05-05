@@ -488,6 +488,10 @@ const api: ElectronAPI = {
     getState: (sessionId: string) => ipcRenderer.invoke('pty:getState', sessionId),
     validate: (mode: string) => ipcRenderer.invoke('pty:validate', mode)
   },
+  session: {
+    list: () => ipcRenderer.invoke('session:list'),
+    getState: (sessionId: string) => ipcRenderer.invoke('session:getState', sessionId)
+  },
   chat: {
     supports: (mode: string) => ipcRenderer.invoke('chat:supports', mode),
     create: (opts: { tabId: string; taskId: string; mode: string; cwd: string; providerFlagsOverride?: string | null }) =>

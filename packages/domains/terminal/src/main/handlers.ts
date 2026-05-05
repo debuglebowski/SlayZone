@@ -4,6 +4,7 @@ import type { Database } from 'better-sqlite3'
 import { execFile } from 'child_process'
 import { promisify } from 'util'
 import { createPty, writePty, submitPty, resizePty, killPty, hasPty, getBuffer, clearBuffer, getBufferSince, listPtys, getState, setDatabase, setTerminalTheme, testExecutionContext } from './pty-manager'
+import { listSessions, getSessionState } from './session-registry'
 
 const execFileAsync = promisify(execFile)
 import { getAdapter, type ExecutionContext } from './adapters'
@@ -312,6 +313,14 @@ ipcMain.handle('pty:resize', (_, sessionId: string, cols: number, rows: number) 
 
   ipcMain.handle('pty:getState', (_, sessionId: string) => {
     return getState(sessionId)
+  })
+
+  ipcMain.handle('session:list', () => {
+    return listSessions()
+  })
+
+  ipcMain.handle('session:getState', (_, sessionId: string) => {
+    return getSessionState(sessionId)
   })
 
   ipcMain.handle('pty:set-theme', (_, theme: { foreground: string; background: string; cursor: string; ansi?: readonly string[] }) => {

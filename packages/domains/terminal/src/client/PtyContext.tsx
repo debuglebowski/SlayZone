@@ -131,18 +131,21 @@ export function PtyProvider({ children }: { children: ReactNode }) {
     })
   }, [])
 
-  // Seed from existing PTYs on mount
+  // Seed from existing sessions on mount. Use the unified session registry so
+  // both PTY and chat-transport sessions hydrate after a renderer reload — the
+  // legacy `pty.list()` only sees pty-manager sessions, leaving chat tabs
+  // stuck on the default 'starting' state.
   useEffect(() => {
     performance.mark('sz:pty:start')
-    window.api.pty.list().then((ptys) => {
-      for (const p of ptys) {
-        if (ALIVE_STATES.has(p.state)) {
-          const sid = p.sessionId
+    window.api.session.list().then((sessions) => {
+      for (const s of sessions) {
+        if (ALIVE_STATES.has(s.state)) {
+          const sid = s.sessionId
           const existing = statesRef.current.get(sid)
           if (existing) {
-            existing.state = p.state
+            existing.state = s.state
           } else {
-            statesRef.current.set(sid, { lastSeq: -1, sessionInvalid: false, state: p.state })
+            statesRef.current.set(sid, { lastSeq: -1, sessionInvalid: false, state: s.state })
           }
         }
       }
@@ -359,10 +362,12 @@ export function PtyProvider({ children }: { children: ReactNode }) {
     }
     subs.add(cb)
 
-    // Fetch initial state from backend if we don't have it yet
+    // Fetch initial state from backend if we don't have it yet. Goes through
+    // the session registry so chat-transport sessions resolve too — bare
+    // `pty.getState` returns null for chat tabs and leaves them stuck.
     const state = statesRef.current.get(sessionId)
     if (!state || state.state === 'starting') {
-      window.api.pty.getState(sessionId).then((backendState) => {
+      window.api.session.getState(sessionId).then((backendState) => {
         if (backendState) {
           const localState = getOrCreateState(sessionId)
           if (localState.state !== backendState) {

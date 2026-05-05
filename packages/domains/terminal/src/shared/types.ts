@@ -121,6 +121,18 @@ export interface PtyInfo {
   state: TerminalState
 }
 
+/**
+ * Discriminated union of any session that broadcasts on `pty:state-change` —
+ * PTY (`pty-manager`) or chat-transport (`chat-transport-manager`). Used by
+ * the renderer to rehydrate tab state on reload regardless of transport.
+ */
+export interface SessionInfo {
+  /** Broadcast key: `${taskId}` (PTY main), `${taskId}:${tabId}` (PTY pane / chat). */
+  sessionId: string
+  state: TerminalState
+  kind: 'pty' | 'chat'
+}
+
 // Buffer chunk with sequence number for ordering
 export interface BufferChunk {
   seq: number

@@ -7,6 +7,7 @@ import type {
   TerminalMode,
   TerminalState,
   PtyInfo,
+  SessionInfo,
   PromptInfo,
   BufferSinceResult,
   ProviderUsage,
@@ -549,6 +550,10 @@ export interface ElectronAPI {
     setTheme: (theme: { foreground: string; background: string; cursor: string; ansi?: readonly string[] }) => Promise<void>
     setShellOverride: (value: string | null) => Promise<void>
     claimSession: (sessionId: string) => Promise<{ ok: boolean }>
+  }
+  session: {
+    list: () => Promise<SessionInfo[]>
+    getState: (sessionId: string) => Promise<TerminalState | null>
   }
   chat: {
     supports: (mode: string) => Promise<boolean>

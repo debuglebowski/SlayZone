@@ -744,6 +744,38 @@ export function killAll(): void {
   for (const tabId of sessions.keys()) kill(tabId)
 }
 
+export interface ChatSessionStateEntry {
+  /** Format `${taskId}:${tabId}` — matches state-broadcast key in `transitionState`. */
+  sessionId: string
+  state: ChatTerminalState
+}
+
+/**
+ * Snapshot of all live (non-ended) chat sessions, keyed by the broadcast-format
+ * sessionId. Used by the session registry so renderer reload can rehydrate
+ * chat-tab state — pty-manager's listPtys is blind to chat sessions.
+ */
+export function listChatSessions(): ChatSessionStateEntry[] {
+  const result: ChatSessionStateEntry[] = []
+  for (const session of sessions.values()) {
+    if (session.ended) continue
+    result.push({
+      sessionId: `${session.taskId}:${session.tabId}`,
+      state: session.terminalState,
+    })
+  }
+  return result
+}
+
+/** Look up live state by broadcast-format sessionId (`${taskId}:${tabId}`). */
+export function getChatSessionState(sessionId: string): ChatTerminalState | null {
+  for (const session of sessions.values()) {
+    if (session.ended) continue
+    if (`${session.taskId}:${session.tabId}` === sessionId) return session.terminalState
+  }
+  return null
+}
+
 export class ChatTransportError extends Error {
   constructor(message: string) {
     super(message)
