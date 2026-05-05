@@ -80,7 +80,7 @@ const SUGGESTED_PROMPTS = [
 
 export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function ChatPanel(props, ref) {
   const { tabId, taskId, mode, cwd, providerFlagsOverride, permissionNotice: overrideNotice, onSetDisplayMode, onOpenUrl, onOpenFile } = props
-  const { state, timeline, inFlight, hydrating, permissionMode, sendMessage, sendToolResult, abortAndPop, reset: resetTimeline } = useChatSession({
+  const { state, timeline, inFlight, hydrating, permissionMode, permissionRequests, sendMessage, sendToolResult, respondPermission, abortAndPop, reset: resetTimeline } = useChatSession({
     tabId,
     taskId,
     mode,
@@ -95,7 +95,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
 
   const [draft, setDraft] = useState('')
   const [cursorPos, setCursorPos] = useState(0)
-  const { chatMode, modeChanging, handleModeChange, autoCapability } = useChatMode({
+  const { chatMode, handleModeChange, autoCapability } = useChatMode({
     taskId, mode, tabId, cwd, livePermissionMode: permissionMode,
   })
   const { chatModel, modelChanging, handleModelChange } = useChatModel({
@@ -327,12 +327,14 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
       setChatMode: handleModeChange,
       sendMessage: (text: string) => { void sendMessage(text) },
       sendToolResult,
+      permissionRequests,
+      respondPermission,
       timeline,
       childIndex: state.childIndex,
       onOpenUrl,
       onOpenFile: handleOpenFile,
     }),
-    [collapseSignal, finalOnly, appearance.chatFileEditsOpenByDefault, appearance.chatShowMessageMeta, search.query, search.caseSensitive, handleModeChange, sendMessage, sendToolResult, timeline, state.childIndex, onOpenUrl, handleOpenFile],
+    [collapseSignal, finalOnly, appearance.chatFileEditsOpenByDefault, appearance.chatShowMessageMeta, search.query, search.caseSensitive, handleModeChange, sendMessage, sendToolResult, permissionRequests, respondPermission, timeline, state.childIndex, onOpenUrl, handleOpenFile],
   )
 
   // Autosize textarea. Height follows scrollHeight up to 240px; no artificial min —
@@ -343,6 +345,18 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
     el.style.height = '0px'
     el.style.height = `${Math.min(el.scrollHeight, 240)}px`
   }, [draft])
+
+  // Snap timeline to bottom when user starts composing — empty→non-empty edge.
+  // Stick-to-bottom only auto-sticks when already at bottom; this forces re-stick
+  // so the latest history is visible while typing.
+  const wasDraftEmptyRef = useRef(true)
+  useEffect(() => {
+    const empty = draft.length === 0
+    if (wasDraftEmptyRef.current && !empty) {
+      void scrollToBottom()
+    }
+    wasDraftEmptyRef.current = empty
+  }, [draft, scrollToBottom])
 
   const handleSend = useCallback(async () => {
     const text = draft.trim()
@@ -395,6 +409,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
     const snapshot = { text, attachments: [...attachments] }
     setDraft('')
     setAttachments([])
+    void scrollToBottom()
     if (!toSend) return
     // If a turn is in flight, queue for later. Drain effect flushes when inFlight drops.
     if (inFlight) {
@@ -409,7 +424,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
     // so we don't add `autocomplete` to deps — its returned object is a fresh
     // ref each render and would over-fire dependent effects.
     void bumpUsageRef.current(text)
-  }, [draft, attachments, getAssetFilePath, inFlight, state.sessionEnded, sendMessage, autocomplete, chatApi, tabId, taskId, mode, cwd, providerFlagsOverride])
+  }, [draft, attachments, getAssetFilePath, inFlight, state.sessionEnded, sendMessage, autocomplete, chatApi, tabId, taskId, mode, cwd, providerFlagsOverride, scrollToBottom])
 
   // Stash bump fn in a ref. `autocomplete` is a fresh object every render
   // (useAutocomplete returns an object literal), so depending on it in the
@@ -945,7 +960,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
           <AgentModePill
             mode={chatMode}
             onChange={(next) => { handleModeChange(next).catch(() => { /* toast already shown by hook */ }) }}
-            disabled={modeChanging || inFlight}
+            disabled={inFlight}
             compact
             variant="text"
             autoCapability={autoCapability}
