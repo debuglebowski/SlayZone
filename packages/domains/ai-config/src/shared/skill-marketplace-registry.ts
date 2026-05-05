@@ -615,6 +615,17 @@ All commands support ID prefix matching.
 
 - \`slay pty respawn <task-id>\` — kill + remount a task's main PTY. Task must be open in the app. Task-id prefix supported.
 
+- \`slay pty create <task-id> [--mode <m>] [--label <l>] [--no-wait] [--timeout <ms>]\` — create a new terminal tab (new group) for a task.
+  - Auto-opens the task in the app (PTY only spawns when the renderer mounts the tab)
+  - \`--mode\` defaults to \`terminal\` (plain shell). Use \`claude-code\`, \`codex\`, etc. for agent tabs
+  - Waits for the PTY to appear in \`/api/pty\` by default (5s timeout). \`--no-wait\` returns immediately
+  - Prints the new session id
+
+- \`slay pty split <id> [--no-wait] [--timeout <ms>]\` — add a new pane to the same group as an existing tab/session.
+  - \`<id>\` accepts a full session id (\`taskId:tabId\`) or just the tab id; prefix matching supported
+  - New pane is always plain \`terminal\` mode
+  - Wait behavior identical to \`create\`
+
 - \`slay pty kill <id>\` — terminate a PTY session.
 
 ## Orchestration patterns

@@ -35,6 +35,75 @@ function rowToTab(row: TabRow): TerminalTab {
   }
 }
 
+/** Pure DB write — insert a new tab (new group). Used by both IPC handler
+ *  (`tabs:create`) and REST route (`POST /api/tabs/create`). Caller is
+ *  responsible for any IPC broadcast. */
+export function createTabRow(db: Database, input: CreateTerminalTabInput): TerminalTab {
+  const id = crypto.randomUUID()
+  const mode = input.mode || 'terminal'
+
+  const maxPos = db.prepare(
+    'SELECT COALESCE(MAX(position), -1) as max_pos FROM terminal_tabs WHERE task_id = ?'
+  ).get(input.taskId) as { max_pos: number }
+  const position = maxPos.max_pos + 1
+
+  const label = input.label ?? null
+  const displayMode = resolveDisplayMode(db, mode)
+
+  const now = new Date().toISOString()
+  db.prepare(`
+    INSERT INTO terminal_tabs (id, task_id, label, mode, display_mode, is_main, position, group_id, created_at)
+    VALUES (?, ?, ?, ?, ?, 0, ?, ?, ?)
+  `).run(id, input.taskId, label, mode, displayMode, position, id, now)
+
+  return {
+    id,
+    taskId: input.taskId,
+    groupId: id,
+    label,
+    mode: mode as TerminalTab['mode'],
+    displayMode,
+    isMain: false,
+    position,
+    createdAt: now
+  }
+}
+
+/** Pure DB write — insert a new pane in the same group as the target tab.
+ *  Returns null if target not found. Used by both IPC handler (`tabs:split`)
+ *  and REST route (`POST /api/tabs/split`). */
+export function splitTabRow(db: Database, tabId: string): TerminalTab | null {
+  const target = db.prepare('SELECT * FROM terminal_tabs WHERE id = ?').get(tabId) as TabRow | undefined
+  if (!target) return null
+
+  const groupId = target.group_id || target.id
+  const id = crypto.randomUUID()
+
+  const maxPos = db.prepare(
+    'SELECT COALESCE(MAX(position), -1) as max_pos FROM terminal_tabs WHERE task_id = ? AND group_id = ?'
+  ).get(target.task_id, groupId) as { max_pos: number }
+  const position = maxPos.max_pos + 1
+
+  const displayMode = resolveDisplayMode(db, 'terminal')
+  const now = new Date().toISOString()
+  db.prepare(`
+    INSERT INTO terminal_tabs (id, task_id, label, mode, display_mode, is_main, position, group_id, created_at)
+    VALUES (?, ?, NULL, 'terminal', ?, 0, ?, ?, ?)
+  `).run(id, target.task_id, displayMode, position, groupId, now)
+
+  return {
+    id,
+    taskId: target.task_id,
+    groupId,
+    label: null,
+    mode: 'terminal',
+    displayMode,
+    isMain: false,
+    position,
+    createdAt: now
+  }
+}
+
 export function registerTerminalTabsHandlers(ipcMain: IpcMain, db: Database): void {
   // List tabs for a task
   ipcMain.handle('tabs:list', (_, taskId: string): TerminalTab[] => {
@@ -47,69 +116,12 @@ export function registerTerminalTabsHandlers(ipcMain: IpcMain, db: Database): vo
 
   // Create a new tab (new group)
   ipcMain.handle('tabs:create', (_, input: CreateTerminalTabInput): TerminalTab => {
-    const id = crypto.randomUUID()
-    const mode = input.mode || 'terminal'
-
-    // Get next position
-    const maxPos = db.prepare(
-      'SELECT COALESCE(MAX(position), -1) as max_pos FROM terminal_tabs WHERE task_id = ?'
-    ).get(input.taskId) as { max_pos: number }
-    const position = maxPos.max_pos + 1
-
-    const label = input.label ?? null
-    const displayMode = resolveDisplayMode(db, mode)
-
-    const now = new Date().toISOString()
-    db.prepare(`
-      INSERT INTO terminal_tabs (id, task_id, label, mode, display_mode, is_main, position, group_id, created_at)
-      VALUES (?, ?, ?, ?, ?, 0, ?, ?, ?)
-    `).run(id, input.taskId, label, mode, displayMode, position, id, now)
-
-    return {
-      id,
-      taskId: input.taskId,
-      groupId: id,
-      label,
-      mode: mode as TerminalTab['mode'],
-      displayMode,
-      isMain: false,
-      position,
-      createdAt: now
-    }
+    return createTabRow(db, input)
   })
 
   // Split: create a new pane in the same group as the target tab
   ipcMain.handle('tabs:split', (_, tabId: string): TerminalTab | null => {
-    const target = db.prepare('SELECT * FROM terminal_tabs WHERE id = ?').get(tabId) as TabRow | undefined
-    if (!target) return null
-
-    const groupId = target.group_id || target.id
-    const id = crypto.randomUUID()
-
-    // Get next position within group
-    const maxPos = db.prepare(
-      'SELECT COALESCE(MAX(position), -1) as max_pos FROM terminal_tabs WHERE task_id = ? AND group_id = ?'
-    ).get(target.task_id, groupId) as { max_pos: number }
-    const position = maxPos.max_pos + 1
-
-    const displayMode = resolveDisplayMode(db, 'terminal')
-    const now = new Date().toISOString()
-    db.prepare(`
-      INSERT INTO terminal_tabs (id, task_id, label, mode, display_mode, is_main, position, group_id, created_at)
-      VALUES (?, ?, NULL, 'terminal', ?, 0, ?, ?, ?)
-    `).run(id, target.task_id, displayMode, position, groupId, now)
-
-    return {
-      id,
-      taskId: target.task_id,
-      groupId,
-      label: null,
-      mode: 'terminal',
-      displayMode,
-      isMain: false,
-      position,
-      createdAt: now
-    }
+    return splitTabRow(db, tabId)
   })
 
   // Move a tab to a different group (or create a new group if targetGroupId is null)

@@ -76,6 +76,24 @@ export function useTaskTerminals(taskId: string, defaultMode: TerminalMode): Use
     loadTabs()
   }, [taskId, defaultMode])
 
+  // Re-fetch when an external actor (CLI via REST, other window) mutates tabs.
+  // Optionally focus the new tab's group if `focusTabId` is provided.
+  useEffect(() => {
+    return window.api.tabs.onChanged(async ({ taskId: changedTaskId, focusTabId }) => {
+      if (changedTaskId !== taskId) return
+      try {
+        const loadedTabs = await window.api.tabs.list(taskId)
+        setTabs(loadedTabs)
+        if (focusTabId) {
+          const target = loadedTabs.find(t => t.id === focusTabId)
+          if (target) setActiveGroupId(target.groupId)
+        }
+      } catch (err) {
+        console.error('[useTaskTerminals] Failed to refresh tabs:', err)
+      }
+    })
+  }, [taskId])
+
   // Create a new group with one terminal
   const createTab = useCallback(async (mode?: TerminalMode): Promise<TerminalTab> => {
     const newTab = await window.api.tabs.create({ taskId, mode: mode || 'terminal' })

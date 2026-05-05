@@ -270,5 +270,70 @@ export function ptyCommand(): Command {
       console.log(`Killed: ${session.sessionId}`)
     })
 
+  // slay pty create <task-id>
+  cmd
+    .command('create <task-id>')
+    .description('Create a new terminal tab (new group) for a task. Auto-opens task in app')
+    .option('--mode <mode>', 'Terminal mode (terminal, claude-code, codex, ...)', 'terminal')
+    .option('--label <label>', 'Tab label')
+    .option('--no-wait', 'Return immediately without waiting for the PTY to spawn')
+    .option('--timeout <ms>', 'Wait timeout in milliseconds', '5000')
+    .action(async (taskId: string, opts: { mode: string; label?: string; wait?: boolean; timeout: string }) => {
+      const body: Record<string, string> = { taskId, mode: opts.mode }
+      if (opts.label) body.label = opts.label
+      const result = await apiPost<{ tab: { id: string }; sessionId: string }>('/api/tabs/create', body)
+
+      if (opts.wait !== false) {
+        await waitForSession(result.sessionId, parseInt(opts.timeout, 10))
+      }
+      console.log(result.sessionId)
+    })
+
+  // slay pty split <session-id-or-tab-id>
+  cmd
+    .command('split <id>')
+    .description('Split: add a new pane to the same group as the target tab/session (id prefix supported)')
+    .option('--no-wait', 'Return immediately without waiting for the PTY to spawn')
+    .option('--timeout <ms>', 'Wait timeout in milliseconds', '5000')
+    .action(async (idPrefix: string, opts: { wait?: boolean; timeout: string }) => {
+      // Accept either full session id (taskId:tabId) or tab id alone. If a colon
+      // is present, strip everything before it (= taskId) — splitTabRow only
+      // needs the tab id since it derives task + group from the row.
+      let tabId = idPrefix.includes(':') ? idPrefix.split(':').slice(1).join(':') : idPrefix
+
+      // Resolve prefix via active sessions when possible.
+      const sessions = await apiGet<PtyInfo[]>('/api/pty')
+      const matches = sessions.filter(s => {
+        const parts = s.sessionId.split(':')
+        const t = parts.length > 1 ? parts.slice(1).join(':') : parts[0]
+        return t.startsWith(tabId)
+      })
+      if (matches.length === 1) {
+        const parts = matches[0].sessionId.split(':')
+        tabId = parts.length > 1 ? parts.slice(1).join(':') : parts[0]
+      } else if (matches.length > 1) {
+        console.error(`Ambiguous id prefix "${idPrefix}". Matches: ${matches.map(s => s.sessionId).join(', ')}`)
+        process.exit(1)
+      }
+
+      const result = await apiPost<{ tab: { id: string }; sessionId: string }>('/api/tabs/split', { tabId })
+
+      if (opts.wait !== false) {
+        await waitForSession(result.sessionId, parseInt(opts.timeout, 10))
+      }
+      console.log(result.sessionId)
+    })
+
   return cmd
+}
+
+async function waitForSession(sessionId: string, timeoutMs: number): Promise<void> {
+  const deadline = Date.now() + timeoutMs
+  while (Date.now() < deadline) {
+    const sessions = await apiGet<PtyInfo[]>('/api/pty')
+    if (sessions.some(s => s.sessionId === sessionId)) return
+    await new Promise(r => setTimeout(r, 100))
+  }
+  console.error(`Timeout: PTY session ${sessionId} did not appear within ${timeoutMs}ms`)
+  process.exit(2)
 }

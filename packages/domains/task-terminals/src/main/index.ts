@@ -1,1 +1,1 @@
-export { registerTerminalTabsHandlers } from './handlers'
+export { registerTerminalTabsHandlers, createTabRow, splitTabRow } from './handlers'

@@ -701,7 +701,12 @@ const api: ElectronAPI = {
     delete: (tabId) => ipcRenderer.invoke('tabs:delete', tabId),
     ensureMain: (taskId, mode) => ipcRenderer.invoke('tabs:ensureMain', taskId, mode),
     split: (tabId) => ipcRenderer.invoke('tabs:split', tabId),
-    moveToGroup: (tabId, targetGroupId) => ipcRenderer.invoke('tabs:moveToGroup', tabId, targetGroupId)
+    moveToGroup: (tabId, targetGroupId) => ipcRenderer.invoke('tabs:moveToGroup', tabId, targetGroupId),
+    onChanged: (cb) => {
+      const handler = (_: unknown, payload: { taskId: string; focusTabId?: string | null }) => cb(payload)
+      ipcRenderer.on('tabs:changed', handler)
+      return () => { ipcRenderer.off('tabs:changed', handler) }
+    }
   },
   diagnostics: {
     getConfig: () => ipcRenderer.invoke('diagnostics:getConfig'),
