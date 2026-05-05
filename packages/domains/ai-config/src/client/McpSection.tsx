@@ -9,24 +9,20 @@ interface McpSectionProps {
 }
 
 export function McpSection({ level, projectId, projectPath }: McpSectionProps) {
-  if (level === 'computer') {
-    return <ComputerMcpView />
-  }
-
-  if (level === 'project') {
-    return (
-      <McpServersPanel
-        mode="project"
-        projectPath={projectPath ?? undefined}
-        projectId={projectId ?? undefined}
-      />
-    )
-  }
-
-  // Library = favorites from curated catalog
   return (
-    <McpServersPanel
-      mode="computer"
-    />
+    <div className="h-full overflow-y-auto">
+      {level === 'computer' ? (
+        <ComputerMcpView />
+      ) : level === 'project' ? (
+        <McpServersPanel
+          mode="project"
+          projectPath={projectPath ?? undefined}
+          projectId={projectId ?? undefined}
+        />
+      ) : (
+        // Library = favorites from curated catalog
+        <McpServersPanel mode="computer" />
+      )}
+    </div>
   )
 }
