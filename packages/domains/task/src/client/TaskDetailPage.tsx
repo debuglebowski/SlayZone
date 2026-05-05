@@ -1055,7 +1055,7 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
       // Cmd+W tracking (sticky ref, specific selectors)
       if (target?.classList.contains('xterm-helper-textarea') || target?.closest('.xterm')) {
         lastFocusedPanelRef.current = 'terminal'
-      } else if (target?.closest('.cm-editor')) {
+      } else if (target?.closest('[data-panel-id="editor"]')) {
         lastFocusedPanelRef.current = 'editor'
       } else if (target?.closest('[data-browser-panel]')) {
         lastFocusedPanelRef.current = 'browser'

@@ -22,6 +22,7 @@ async function sendIPC(electronApp: any, channel: string): Promise<void> {
 test.describe('Cmd+W / Cmd+Shift+W context-sensitive close', () => {
   let projectAbbrev: string
   const editorFixtureFile = 'cmdw-editor.ts'
+  const editorFixtureMd = 'cmdw-rich.md'
 
   /** All terminal group tabs in the visible terminal tab bar */
   const terminalGroupTabs = (page: Page) =>
@@ -105,6 +106,7 @@ test.describe('Cmd+W / Cmd+Shift+W context-sensitive close', () => {
   test.beforeAll(async ({ mainWindow }) => {
     await resetApp(mainWindow)
     fs.writeFileSync(path.join(TEST_PROJECT_PATH, editorFixtureFile), 'export const cmdwEditor = true\n')
+    fs.writeFileSync(path.join(TEST_PROJECT_PATH, editorFixtureMd), '# Cmd+W rich\n\nbody text\n')
     const s = seed(mainWindow)
     const p = await s.createProject({ name: 'CmdW Test', color: '#6366f1', path: TEST_PROJECT_PATH })
     projectAbbrev = p.name.slice(0, 2).toUpperCase()
@@ -185,6 +187,36 @@ test.describe('Cmd+W / Cmd+Shift+W context-sensitive close', () => {
       await sendIPC(electronApp, 'app:close-current-focus')
       await expect(mainWindow.locator('[data-panel-id="editor"]:visible')).toBeVisible({ timeout: 3_000 })
     }
+  })
+
+  test('Cmd+W closes active editor file when rich markdown pane is focused', async ({ mainWindow, electronApp }) => {
+    await closeOpenDialogs(mainWindow)
+    await goHome(mainWindow)
+    await clickProject(mainWindow, projectAbbrev)
+    await openTaskViaSearch(mainWindow, 'CmdW task')
+    // Open editor panel
+    await mainWindow.keyboard.press('Meta+e')
+    const editorPanel = mainWindow.locator('[data-panel-id="editor"]:visible').filter({ hasText: 'Files' })
+    if (!(await editorPanel.isVisible({ timeout: 5_000 }).catch(() => false))) return
+
+    // Open the markdown file (default view = rich)
+    await openEditorFile(mainWindow, editorFixtureMd)
+    const richPane = mainWindow.locator('[data-panel-id="editor"]:visible .ProseMirror').first()
+    if (!(await richPane.isVisible({ timeout: 5_000 }).catch(() => false))) return
+
+    // Focus the rich pane (no .cm-editor in this view)
+    await richPane.click()
+
+    const fileTab = editorTab(mainWindow, editorFixtureMd)
+    const taskTab = mainWindow.locator('input[value="CmdW task"]:visible')
+    const hadFileTab = await fileTab.isVisible({ timeout: 500 }).catch(() => false)
+    if (!hadFileTab) return
+
+    await sendIPC(electronApp, 'app:close-current-focus')
+
+    // File tab should be gone, task tab should still be present
+    await expect(fileTab).toHaveCount(0, { timeout: 3_000 })
+    await expect(taskTab).toHaveCount(1, { timeout: 1_000 })
   })
 
   // ── Browser tabs ─────────────────────────────────────────────────────────
