@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useGuardedHotkeys } from '@slayzone/ui'
 import type { Task } from '@slayzone/task/shared'
 import type { Column } from './kanban'
+import type { KanbanSelectionAPI } from './useKanbanSelection'
 
 export type PickerType = 'status' | 'priority'
 
@@ -14,8 +15,9 @@ interface UseKanbanKeyboardOptions {
   columns: Column[]
   isActive: boolean
   isDragging?: boolean
-  onTaskClick?: (task: Task, e: { metaKey: boolean }) => void
+  onTaskClick?: (task: Task, e: { metaKey: boolean; shiftKey?: boolean }) => void
   onUpdateTask?: (taskId: string, updates: Partial<Task>) => void
+  selection?: KanbanSelectionAPI
 }
 
 interface UseKanbanKeyboardReturn {
@@ -33,7 +35,8 @@ export function useKanbanKeyboard({
   isActive,
   isDragging,
   onTaskClick,
-  onUpdateTask
+  onUpdateTask,
+  selection
 }: UseKanbanKeyboardOptions): UseKanbanKeyboardReturn {
   // Keyboard focus only — mouse hover never touches this
   const [focusedTaskId, setFocusedTaskId] = useState<string | null>(null)
@@ -207,11 +210,28 @@ export function useKanbanKeyboard({
       pickerClosingRef.current = true
       setPickerState(null)
       requestAnimationFrame(() => { pickerClosingRef.current = false })
+    } else if (selection && selection.size > 0) {
+      e.preventDefault()
+      selection.clear()
     } else if (focusedTaskId && !pickerClosingRef.current) {
       e.preventDefault()
       setFocusedTaskId(null)
     }
   }, { enabled: isActive })
+
+  useGuardedHotkeys('mod+a', (e) => {
+    if (!selection) return
+    e.preventDefault()
+    const ids: string[] = []
+    for (const c of columns) for (const t of c.tasks) ids.push(t.id)
+    selection.selectAll(ids)
+  }, { enabled })
+
+  useGuardedHotkeys('x', (e) => {
+    if (!selection || !focusedTaskId) return
+    e.preventDefault()
+    selection.toggle(focusedTaskId)
+  }, { enabled })
 
   const setHoveredTaskId = useCallback((id: string | null) => {
     hoveredTaskIdRef.current = id

@@ -25,11 +25,14 @@ interface UseTasksDataReturn {
   // Task handlers
   updateTask: (task: Task | null | undefined) => void
   moveTask: (taskId: string, newColumnId: string, targetIndex: number, groupBy: GroupKey) => void
+  bulkMove: (taskIds: string[], newColumnId: string, targetIndex: number, groupBy: GroupKey) => void
   reorderTasks: (taskIds: string[]) => void
   archiveTask: (taskId: string) => Promise<void>
   archiveTasks: (taskIds: string[]) => Promise<void>
   deleteTask: (taskId: string) => Promise<void>
+  bulkDelete: (taskIds: string[]) => Promise<void>
   contextMenuUpdate: (taskId: string, updates: Partial<Task>) => Promise<void>
+  bulkContextMenuUpdate: (taskIds: string[], updates: Partial<Task>) => Promise<void>
   clearBlockers: (taskId: string) => Promise<void>
 
   // Project handlers
@@ -164,6 +167,61 @@ export function useTasksData(): UseTasksDataReturn {
     })
   }, [])
 
+  // Move multiple tasks to another column at targetIndex (cross-column).
+  // Inserts ids consecutively at targetIndex preserving their input order.
+  const bulkMove = useCallback((
+    taskIds: string[],
+    newColumnId: string,
+    targetIndex: number,
+    groupBy: GroupKey
+  ) => {
+    if (groupBy === 'due_date' || taskIds.length === 0) return
+
+    const idSet = new Set(taskIds)
+    const fieldUpdate =
+      groupBy === 'status'
+        ? { status: newColumnId as TaskStatus }
+        : { priority: parseInt(newColumnId.slice(1), 10) }
+
+    let snapshot: Task[] = []
+    let newColumnTaskIds: string[] = []
+
+    setTasks((prevTasks) => {
+      snapshot = prevTasks
+
+      const targetColumnTasks = prevTasks.filter((t) => {
+        if (idSet.has(t.id)) return false
+        if (groupBy === 'status') return t.status === newColumnId
+        return t.priority === parseInt(newColumnId.slice(1), 10)
+      })
+
+      newColumnTaskIds = [...targetColumnTasks.map((t) => t.id)]
+      newColumnTaskIds.splice(targetIndex, 0, ...taskIds)
+
+      return prevTasks.map((t) => {
+        if (idSet.has(t.id)) {
+          const newOrder = newColumnTaskIds.indexOf(t.id)
+          return { ...t, ...fieldUpdate, order: newOrder }
+        }
+        const newOrder = newColumnTaskIds.indexOf(t.id)
+        if (newOrder >= 0) return { ...t, order: newOrder }
+        return t
+      })
+    })
+
+    const updatePayload =
+      groupBy === 'status'
+        ? { status: newColumnId as TaskStatus }
+        : { priority: parseInt(newColumnId.slice(1), 10) }
+
+    Promise.all([
+      window.api.db.updateTasks({ ids: taskIds, updates: updatePayload }),
+      window.api.db.reorderTasks(newColumnTaskIds)
+    ]).catch(() => {
+      setTasks(snapshot)
+    })
+  }, [])
+
   // Reorder tasks within column
   const reorderTasks = useCallback((taskIds: string[]) => {
     let snapshot: Task[] = []
@@ -204,6 +262,22 @@ export function useTasksData(): UseTasksDataReturn {
     await window.api.db.deleteTask(taskId)
   }, [])
 
+  // Bulk delete
+  const bulkDelete = useCallback(async (taskIds: string[]) => {
+    if (taskIds.length === 0) return
+    const idSet = new Set(taskIds)
+    let snapshot: Task[] = []
+    setTasks((prev) => {
+      snapshot = prev
+      return prev.filter((t) => !idSet.has(t.id))
+    })
+    try {
+      await window.api.db.deleteTasks(taskIds)
+    } catch {
+      setTasks(snapshot)
+    }
+  }, [])
+
   // Context menu update (status, priority, project, blocked).
   // Snapshot pattern keeps deps empty so the callback ref stays stable across
   // renders — prevents fanout re-renders in consumers (e.g. useUndoableTaskActions).
@@ -241,6 +315,51 @@ export function useTasksData(): UseTasksDataReturn {
           const next = new Set(prev)
           if (updates.is_blocked) next.delete(taskId)
           else next.add(taskId)
+          return next
+        })
+      }
+    }
+  }, [])
+
+  // Bulk context-menu update (status, priority, project, blocked, ...)
+  const bulkContextMenuUpdate = useCallback(async (taskIds: string[], updates: Partial<Task>) => {
+    if (taskIds.length === 0) return
+    const idSet = new Set(taskIds)
+    let previousTasks: Task[] = []
+    setTasks((prev) => {
+      previousTasks = prev
+      return prev.map((t) => (idSet.has(t.id) ? { ...t, ...updates } : t))
+    })
+
+    if (updates.is_blocked !== undefined) {
+      setBlockedTaskIds(prev => {
+        const next = new Set(prev)
+        if (updates.is_blocked) for (const id of taskIds) next.add(id)
+        else for (const id of taskIds) next.delete(id)
+        return next
+      })
+    }
+
+    try {
+      await window.api.db.updateTasks({
+        ids: taskIds,
+        updates: {
+          status: updates.status,
+          priority: updates.priority,
+          progress: updates.progress,
+          projectId: updates.project_id,
+          snoozedUntil: updates.snoozed_until,
+          isBlocked: updates.is_blocked,
+          blockedComment: updates.blocked_comment
+        }
+      })
+    } catch {
+      setTasks(previousTasks)
+      if (updates.is_blocked !== undefined) {
+        setBlockedTaskIds(prev => {
+          const next = new Set(prev)
+          if (updates.is_blocked) for (const id of taskIds) next.delete(id)
+          else for (const id of taskIds) next.add(id)
           return next
         })
       }
@@ -314,11 +433,14 @@ export function useTasksData(): UseTasksDataReturn {
     setTaskTags,
     updateTask,
     moveTask,
+    bulkMove,
     reorderTasks,
     archiveTask,
     archiveTasks,
     deleteTask,
+    bulkDelete,
     contextMenuUpdate,
+    bulkContextMenuUpdate,
     clearBlockers,
     updateProject,
     reorderProjects,

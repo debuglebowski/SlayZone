@@ -14,7 +14,9 @@ interface TaskMutations {
   archiveTask: (taskId: string) => Promise<void>
   archiveTasks: (taskIds: string[]) => Promise<void>
   deleteTask: (taskId: string) => Promise<void>
+  bulkDelete: (taskIds: string[]) => Promise<void>
   contextMenuUpdate: (taskId: string, updates: Partial<Task>) => Promise<void>
+  bulkContextMenuUpdate: (taskIds: string[], updates: Partial<Task>) => Promise<void>
 }
 
 /**
@@ -22,7 +24,16 @@ interface TaskMutations {
  * Returns drop-in replacements that push onto the undo stack and show toast.
  */
 export function useUndoableTaskActions(mutations: TaskMutations, undo: UndoAPI) {
-  const { updateTask, setTasks, archiveTask: rawArchive, archiveTasks: rawArchiveMany, deleteTask: rawDelete, contextMenuUpdate: rawContextMenuUpdate } = mutations
+  const {
+    updateTask,
+    setTasks,
+    archiveTask: rawArchive,
+    archiveTasks: rawArchiveMany,
+    deleteTask: rawDelete,
+    bulkDelete: rawBulkDelete,
+    contextMenuUpdate: rawContextMenuUpdate,
+    bulkContextMenuUpdate: rawBulkContextMenuUpdate,
+  } = mutations
 
   // Ref avoids adding `tasks` to useCallback deps — keeps function references stable
   const tasksRef = useRef(mutations.tasks)
@@ -124,5 +135,69 @@ export function useUndoableTaskActions(mutations: TaskMutations, undo: UndoAPI) 
     [rawDelete, setTasks, undo]
   )
 
-  return { contextMenuUpdate, archiveTask, archiveTasks, deleteTask }
+  const bulkContextMenuUpdate = useCallback(
+    async (taskIds: string[], updates: Partial<Task>) => {
+      if (taskIds.length === 0) return
+      // Per-id snapshot of changed fields for restore
+      const prevById = new Map<string, Partial<Task>>()
+      for (const id of taskIds) {
+        const t = tasksRef.current.find((x) => x.id === id)
+        if (!t) continue
+        const prev: Partial<Task> = {}
+        for (const key of Object.keys(updates) as (keyof Task)[]) {
+          ;(prev as Record<string, unknown>)[key] = t[key]
+        }
+        prevById.set(id, prev)
+      }
+
+      await rawBulkContextMenuUpdate(taskIds, updates)
+
+      const desc = updates.status
+        ? `Changed ${taskIds.length} tasks → ${updates.status}`
+        : updates.is_blocked !== undefined
+          ? `${updates.is_blocked ? 'Blocked' : 'Unblocked'} ${taskIds.length} tasks`
+          : `Updated ${taskIds.length} tasks`
+
+      undo.push({
+        label: desc,
+        undo: async () => {
+          // Per-id restore — heterogeneous, so apply individually
+          for (const [id, prev] of prevById) {
+            await rawContextMenuUpdate(id, prev)
+          }
+        },
+        redo: () => rawBulkContextMenuUpdate(taskIds, updates),
+      })
+      toast(desc, {
+        action: { label: 'Undo', onClick: () => void undo.undo() },
+      })
+    },
+    [rawBulkContextMenuUpdate, rawContextMenuUpdate, undo]
+  )
+
+  const bulkDelete = useCallback(
+    async (taskIds: string[]) => {
+      if (taskIds.length === 0) return
+      const removed = tasksRef.current.filter((t) => taskIds.includes(t.id))
+      await rawBulkDelete(taskIds)
+      if (removed.length === 0) return
+
+      undo.push({
+        label: `Deleted ${removed.length} tasks`,
+        undo: async () => {
+          for (const id of taskIds) {
+            const restored = await window.api.db.restoreTask(id)
+            if (restored) setTasks((prev) => [restored, ...prev])
+          }
+        },
+        redo: () => rawBulkDelete(taskIds),
+      })
+      toast(`Deleted ${removed.length} tasks`, {
+        action: { label: 'Undo', onClick: () => void undo.undo() },
+      })
+    },
+    [rawBulkDelete, setTasks, undo]
+  )
+
+  return { contextMenuUpdate, archiveTask, archiveTasks, deleteTask, bulkContextMenuUpdate, bulkDelete }
 }

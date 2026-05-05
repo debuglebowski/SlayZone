@@ -12,6 +12,7 @@ import type { Column } from './kanban'
 import type { CardProperties } from './FilterState'
 import { KanbanCard } from './KanbanCard'
 import { TaskContextMenu } from './TaskContextMenu'
+import { BulkTaskContextMenu } from './BulkTaskContextMenu'
 import { IconButton } from '@slayzone/ui'
 import {
   DropdownMenu,
@@ -24,11 +25,17 @@ import { cn, getColumnStatusStyle } from '@slayzone/ui'
 interface SortableKanbanCardProps {
   task: Task
   columns?: ColumnConfig[] | null
-  onTaskClick?: (task: Task, e: { metaKey: boolean }) => void
+  onTaskClick?: (task: Task, e: { metaKey: boolean; shiftKey?: boolean }) => void
+  onContextMenu?: (taskId: string) => void
   disableDrag?: boolean
   cardProperties?: CardProperties
   isBlocked?: boolean
   isFocused?: boolean
+  isSelected?: boolean
+  isMultiDragGhost?: boolean
+  selectedTaskIds?: Set<string>
+  allTasks?: Task[]
+  taskTagsMap?: Map<string, string[]>
   onMouseEnter?: () => void
   cardRefs?: React.MutableRefObject<Map<string, HTMLDivElement>>
   subTaskCount?: { done: number; total: number }
@@ -38,18 +45,27 @@ interface SortableKanbanCardProps {
   // Context menu props
   allProjects?: Project[]
   onUpdateTask?: (taskId: string, updates: Partial<Task>) => void
+  onBulkUpdateTasks?: (taskIds: string[], updates: Partial<Task>) => void
   onArchiveTask?: (taskId: string) => void
+  onArchiveAllTasks?: (taskIds: string[]) => void
   onDeleteTask?: (taskId: string) => void
+  onBulkDeleteTasks?: (taskIds: string[]) => void
 }
 
 function SortableKanbanCard({
   task,
   columns,
   onTaskClick,
+  onContextMenu,
   disableDrag,
   cardProperties,
   isBlocked,
   isFocused,
+  isSelected,
+  isMultiDragGhost,
+  selectedTaskIds,
+  allTasks,
+  taskTagsMap,
   onMouseEnter,
   cardRefs,
   subTaskCount,
@@ -58,8 +74,11 @@ function SortableKanbanCard({
   onTaskTagsChange,
   allProjects,
   onUpdateTask,
+  onBulkUpdateTasks,
   onArchiveTask,
-  onDeleteTask
+  onArchiveAllTasks,
+  onDeleteTask,
+  onBulkDeleteTasks
 }: SortableKanbanCardProps): React.JSX.Element {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: task.id,
@@ -86,12 +105,20 @@ function SortableKanbanCard({
   const dragProps = disableDrag ? {} : { ...attributes, ...listeners }
 
   const card = (
-    <div ref={combinedRef} style={style} {...dragProps} onMouseEnter={onMouseEnter}>
+    <div
+      ref={combinedRef}
+      style={style}
+      {...dragProps}
+      onMouseEnter={onMouseEnter}
+      onContextMenuCapture={() => onContextMenu?.(task.id)}
+    >
       <KanbanCard
         task={task}
         columns={columns}
         isDragging={isDragging}
         isFocused={isFocused}
+        isSelected={isSelected}
+        isMultiDragGhost={isMultiDragGhost}
         onClick={(e) => onTaskClick?.(task, e)}
         isBlocked={isBlocked}
         subTaskCount={subTaskCount}
@@ -104,7 +131,30 @@ function SortableKanbanCard({
     </div>
   )
 
-  // Wrap with context menu if handlers provided
+  // Wrap with bulk context menu when current task is part of a multi-selection
+  const isInBulk = !!(isSelected && selectedTaskIds && selectedTaskIds.size > 1)
+  if (isInBulk && allProjects && onBulkUpdateTasks) {
+    const selectedIdArr = [...selectedTaskIds!]
+    const selectedTasks = (allTasks ?? []).filter((t) => selectedTaskIds!.has(t.id))
+    return (
+      <BulkTaskContextMenu
+        taskIds={selectedIdArr}
+        tasks={selectedTasks}
+        projects={allProjects}
+        columns={columns}
+        tags={tags}
+        taskTagsMap={taskTagsMap}
+        onBulkUpdate={onBulkUpdateTasks}
+        onBulkArchive={onArchiveAllTasks}
+        onBulkDelete={onBulkDeleteTasks}
+        onTaskTagsChange={onTaskTagsChange}
+      >
+        {card}
+      </BulkTaskContextMenu>
+    )
+  }
+
+  // Wrap with single-task context menu if handlers provided
   if (allProjects && onUpdateTask && onArchiveTask && onDeleteTask) {
     return (
       <TaskContextMenu
@@ -132,7 +182,8 @@ interface KanbanColumnProps {
   columns?: ColumnConfig[] | null
   activeColumnId?: string | null
   overColumnId?: string | null
-  onTaskClick?: (task: Task, e: { metaKey: boolean }) => void
+  onTaskClick?: (task: Task, e: { metaKey: boolean; shiftKey?: boolean }) => void
+  onCardContextMenu?: (taskId: string) => void
   onCreateTask?: (column: Column) => void
   disableDrag?: boolean
   cardProperties?: CardProperties
@@ -142,13 +193,17 @@ interface KanbanColumnProps {
   blockedTaskIds?: Set<string>
   subTaskCounts?: Map<string, { done: number; total: number }>
   focusedTaskId?: string | null
+  selectedTaskIds?: Set<string>
+  allTasks?: Task[]
   onCardMouseEnter?: (taskId: string) => void
   cardRefs?: React.MutableRefObject<Map<string, HTMLDivElement>>
   // Context menu props
   allProjects?: Project[]
   onUpdateTask?: (taskId: string, updates: Partial<Task>) => void
+  onBulkUpdateTasks?: (taskIds: string[], updates: Partial<Task>) => void
   onArchiveTask?: (taskId: string) => void
   onDeleteTask?: (taskId: string) => void
+  onBulkDeleteTasks?: (taskIds: string[]) => void
   onArchiveAllTasks?: (taskIds: string[]) => void
 }
 
@@ -158,6 +213,7 @@ export function KanbanColumn({
   activeColumnId,
   overColumnId,
   onTaskClick,
+  onCardContextMenu,
   onCreateTask,
   disableDrag,
   cardProperties,
@@ -167,12 +223,16 @@ export function KanbanColumn({
   blockedTaskIds,
   subTaskCounts,
   focusedTaskId,
+  selectedTaskIds,
+  allTasks,
   onCardMouseEnter,
   cardRefs,
   allProjects,
   onUpdateTask,
+  onBulkUpdateTasks,
   onArchiveTask,
   onDeleteTask,
+  onBulkDeleteTasks,
   onArchiveAllTasks
 }: KanbanColumnProps): React.JSX.Element {
   const columnConfig = getColumnById(column.id, columns)
@@ -248,6 +308,7 @@ export function KanbanColumn({
                 task={task}
                 columns={columns}
                 onTaskClick={onTaskClick}
+                onContextMenu={onCardContextMenu}
                 disableDrag={disableDrag}
                 cardProperties={cardProperties}
                 taskTagIds={taskTags?.get(task.id)}
@@ -255,13 +316,23 @@ export function KanbanColumn({
                 onTaskTagsChange={onTaskTagsChange}
                 isBlocked={blockedTaskIds?.has(task.id)}
                 isFocused={focusedTaskId === task.id}
+                isSelected={selectedTaskIds?.has(task.id)}
+                isMultiDragGhost={
+                  !!activeColumnId && (selectedTaskIds?.has(task.id) ?? false) && (selectedTaskIds?.size ?? 0) > 1
+                }
+                selectedTaskIds={selectedTaskIds}
+                allTasks={allTasks}
+                taskTagsMap={taskTags}
                 onMouseEnter={() => onCardMouseEnter?.(task.id)}
                 cardRefs={cardRefs}
                 subTaskCount={subTaskCounts?.get(task.id)}
                 allProjects={allProjects}
                 onUpdateTask={onUpdateTask}
+                onBulkUpdateTasks={onBulkUpdateTasks}
                 onArchiveTask={onArchiveTask}
+                onArchiveAllTasks={onArchiveAllTasks}
                 onDeleteTask={onDeleteTask}
+                onBulkDeleteTasks={onBulkDeleteTasks}
               />
             ))}
           </div>

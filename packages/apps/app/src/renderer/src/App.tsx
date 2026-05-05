@@ -119,9 +119,11 @@ function App(): React.JSX.Element {
   const {
     tasks, projects, tags, taskTags, blockedTaskIds,
     setTasks, setProjects, setTags, setTaskTags,
-    updateTask, moveTask, reorderTasks,
+    updateTask, moveTask, bulkMove, reorderTasks,
     archiveTask: rawArchiveTask, archiveTasks: rawArchiveTasks,
-    deleteTask: rawDeleteTask, contextMenuUpdate: rawContextMenuUpdate,
+    deleteTask: rawDeleteTask, bulkDelete: rawBulkDelete,
+    contextMenuUpdate: rawContextMenuUpdate,
+    bulkContextMenuUpdate: rawBulkContextMenuUpdate,
     clearBlockers,
     updateProject, reorderProjects, deleteProject
   } = useTasksData()
@@ -131,8 +133,14 @@ function App(): React.JSX.Element {
 
   // Undo/redo stack
   const { push: pushUndo, undo, redo } = useUndo()
-  const { contextMenuUpdate, archiveTask, archiveTasks, deleteTask } = useUndoableTaskActions(
-    { tasks, updateTask, setTasks, archiveTask: rawArchiveTask, archiveTasks: rawArchiveTasks, deleteTask: rawDeleteTask, contextMenuUpdate: rawContextMenuUpdate },
+  const { contextMenuUpdate, archiveTask, archiveTasks, deleteTask, bulkContextMenuUpdate, bulkDelete } = useUndoableTaskActions(
+    {
+      tasks, updateTask, setTasks,
+      archiveTask: rawArchiveTask, archiveTasks: rawArchiveTasks,
+      deleteTask: rawDeleteTask, bulkDelete: rawBulkDelete,
+      contextMenuUpdate: rawContextMenuUpdate,
+      bulkContextMenuUpdate: rawBulkContextMenuUpdate,
+    },
     { push: pushUndo, undo }
   )
 
@@ -1020,8 +1028,9 @@ function App(): React.JSX.Element {
   }, [updateTask])
 
   const handleTaskDeleted = (): void => { if (deletingTask) { deleteTask(deletingTask.id); useDialogStore.getState().closeDeleteTask() } }
-  const handleTaskClick = (task: Task, e: { metaKey: boolean }): void => { if (e.metaKey) guardedOpenTaskInBackground(task.id); else openTask(task.id) }
+  const handleTaskClick = (task: Task, e: { metaKey: boolean; shiftKey?: boolean }): void => { if (e.metaKey) guardedOpenTaskInBackground(task.id); else openTask(task.id) }
   const handleTaskMove = (taskId: string, newColumnId: string, targetIndex: number): void => { moveTask(taskId, newColumnId, targetIndex, getViewConfig(filter).groupBy) }
+  const handleTaskBulkMove = (taskIds: string[], newColumnId: string, targetIndex: number): void => { bulkMove(taskIds, newColumnId, targetIndex, getViewConfig(filter).groupBy) }
 
   useEffect(() => {
     ;(window as { __slayzone_moveTaskForTest?: (taskId: string, newColumnId: string, targetIndex: number) => void }).__slayzone_moveTaskForTest = handleTaskMove
@@ -1293,9 +1302,10 @@ function App(): React.JSX.Element {
                                 <div className={cn('shrink-0 min-h-0 overflow-hidden', cn('rounded-lg border border-border', id === 'kanban' && Object.values(homePanel.homePanelVisibility).filter(Boolean).length <= 1 && !agentPanelState.isOpen && !agentStatusState.isLocked ? 'border-transparent' : id === 'kanban' ? 'bg-surface-1 p-3' : 'bg-surface-1'))} style={{ width: w }}>
                                   {id === 'kanban' && filter.viewMode !== 'list' && (
                                     <KanbanBoard tasks={displayTasks} columns={selectedProject?.columns_config} viewConfig={getViewConfig(filter)} isActive={tabs[activeTabIndex]?.type === 'home'}
-                                      onTaskMove={handleTaskMove} onTaskReorder={reorderTasks} onTaskClick={handleTaskClick}
+                                      onTaskMove={handleTaskMove} onTaskBulkMove={handleTaskBulkMove} onTaskReorder={reorderTasks} onTaskClick={handleTaskClick}
                                       cardProperties={filter.cardProperties} taskTags={taskTags} tags={projectTags} onTaskTagsChange={handleTaskTagsChange} blockedTaskIds={blockedTaskIds}
-                                      allProjects={projects} onUpdateTask={contextMenuUpdate} onClearBlockers={clearBlockers} onArchiveTask={archiveTask} onDeleteTask={deleteTask} onArchiveAllTasks={archiveTasks} />
+                                      allProjects={projects} onUpdateTask={contextMenuUpdate} onBulkUpdateTasks={bulkContextMenuUpdate} onClearBlockers={clearBlockers} onArchiveTask={archiveTask} onDeleteTask={deleteTask} onBulkDeleteTasks={bulkDelete} onArchiveAllTasks={archiveTasks}
+                                      selectionResetKey={selectedProjectId} />
                                   )}
                                   {id === 'kanban' && filter.viewMode === 'list' && (
                                     <KanbanListView tasks={displayTasks} columns={selectedProject?.columns_config} viewConfig={getViewConfig(filter)}

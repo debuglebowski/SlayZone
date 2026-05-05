@@ -289,7 +289,9 @@ export interface ElectronAPI {
     getSubTasksRecursive: (rootId: string) => Promise<Task[]>
     createTask: (data: CreateTaskInput) => Promise<Task>
     updateTask: (data: UpdateTaskInput) => Promise<Task>
+    updateTasks: (data: { ids: string[]; updates: Omit<Partial<UpdateTaskInput>, 'id'> }) => Promise<Task[]>
     deleteTask: (id: string) => Promise<boolean>
+    deleteTasks: (ids: string[]) => Promise<{ deletedIds: string[]; blockedIds: string[] }>
     restoreTask: (id: string) => Promise<Task>
     archiveTask: (id: string) => Promise<Task>
     archiveTasks: (ids: string[]) => Promise<void>

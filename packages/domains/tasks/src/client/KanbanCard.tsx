@@ -31,6 +31,8 @@ interface KanbanCardProps {
   columns?: ColumnConfig[] | null
   isDragging?: boolean
   isFocused?: boolean
+  isSelected?: boolean
+  isMultiDragGhost?: boolean
   onClick?: (e: React.MouseEvent) => void
   isBlocked?: boolean
   subTaskCount?: { done: number; total: number }
@@ -47,6 +49,8 @@ export function KanbanCard({
   columns,
   isDragging,
   isFocused,
+  isSelected,
+  isMultiDragGhost,
   onClick,
   isBlocked,
   subTaskCount,
@@ -105,6 +109,8 @@ export function KanbanCard({
           'cursor-grab transition-colors duration-[400ms] hover:duration-[100ms] select-none py-0 gap-0 bg-surface-3 hover:bg-muted/50',
           isDragging && 'opacity-50 shadow-lg',
           isFocused && 'ring-2 ring-primary bg-muted/50',
+          isSelected && '!bg-primary/25 hover:!bg-primary/30',
+          isMultiDragGhost && 'opacity-30',
           isOverdue && 'border-destructive',
           task.linear_url && 'border-l-2 border-l-indigo-500'
         )}
