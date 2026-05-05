@@ -67,6 +67,20 @@ export interface AgentAdapter {
   }): string | null
 
   /**
+   * Produce ONE NDJSON `control_response` envelope replying to an inbound
+   * `control_request` (e.g. `subtype:'can_use_tool'` from `--permission-prompt-tool
+   * stdio`). Carries either a success payload (`response`) or an error.
+   * Transport writes this on stdin so the CLI unblocks the corresponding
+   * permission decision.
+   */
+  serializeControlResponse?(args: {
+    requestId: string
+    response?: Record<string, unknown>
+    isError?: boolean
+    error?: string
+  }): string | null
+
+  /**
    * If the event carries session/conversation id info, return it so the transport
    * can persist it via setProviderConversationId.
    */

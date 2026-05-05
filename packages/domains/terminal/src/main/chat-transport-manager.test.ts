@@ -350,6 +350,46 @@ await test('sendControlRequest: rejects on error subtype', async () => {
   expect(err?.message).toBe('rejected by SDK')
 })
 
+await test('respondToPermissionRequest: writes control_response success on stdin', async () => {
+  await setup()
+  const fake = makeFakeChild()
+  mgr.setTransportDepsForTests({
+    whichBinary: async () => '/fake/claude',
+    spawn: () => fake as unknown as ChildProcess,
+    broadcastEvent: () => {},
+    broadcastExit: () => {},
+  })
+  await mgr.createChat({
+    tabId: 'tab-perm',
+    taskId: 'task-test',
+    mode: 'claude-code',
+    cwd: '/tmp',
+    conversationId: null,
+    providerFlags: [],
+  })
+
+  const ok = mgr.respondToPermissionRequest('tab-perm', {
+    requestId: 'cu_42',
+    decision: { behavior: 'allow', updatedInput: { answers: { Q: 'A' } } },
+  })
+  expect(ok).toBe(true)
+  const line = fake._stdinRef.value.trim()
+  const parsed = JSON.parse(line)
+  expect(parsed.type).toBe('control_response')
+  expect(parsed.response.subtype).toBe('success')
+  expect(parsed.response.request_id).toBe('cu_42')
+  expect(parsed.response.response.behavior).toBe('allow')
+})
+
+await test('respondToPermissionRequest: false for unknown tab', async () => {
+  await setup()
+  const ok = mgr.respondToPermissionRequest('nonexistent-tab', {
+    requestId: 'x',
+    decision: { behavior: 'deny', message: 'no' },
+  })
+  expect(ok).toBe(false)
+})
+
 await test('sendControlRequest: rejects when adapter has no control channel', async () => {
   await setup()
   const fake = makeFakeChild()

@@ -501,6 +501,15 @@ const api: ElectronAPI = {
       tabId: string,
       args: { toolUseId: string; content: string; isError?: boolean }
     ) => ipcRenderer.invoke('chat:sendToolResult', tabId, args),
+    respondPermission: (
+      tabId: string,
+      args: {
+        requestId: string
+        decision:
+          | { behavior: 'allow'; updatedInput?: Record<string, unknown>; updatedPermissions?: unknown[] }
+          | { behavior: 'deny'; message: string; interrupt?: boolean }
+      }
+    ) => ipcRenderer.invoke('chat:respondPermission', tabId, args),
     interrupt: (opts: { tabId: string; taskId: string; mode: string; cwd: string; providerFlagsOverride?: string | null }) =>
       ipcRenderer.invoke('chat:interrupt', opts),
     abortAndPop: (opts: { tabId: string; taskId: string; mode: string; cwd: string; providerFlagsOverride?: string | null }) =>
@@ -527,6 +536,7 @@ const api: ElectronAPI = {
     setEffort: (opts: { tabId: string; taskId: string; mode: string; cwd: string; chatEffort: 'low' | 'medium' | 'high' | 'xhigh' | 'max' }) =>
       ipcRenderer.invoke('chat:setEffort', opts),
     getAutoEligibility: () => ipcRenderer.invoke('chat:getAutoEligibility'),
+    list: () => ipcRenderer.invoke('chat:list'),
     listSkills: (cwd: string) => ipcRenderer.invoke('chat:listSkills', cwd),
     listCommands: (cwd: string) => ipcRenderer.invoke('chat:listCommands', cwd),
     listAgents: (cwd: string) => ipcRenderer.invoke('chat:listAgents', cwd),

@@ -23,6 +23,15 @@ export const claudeCodeAdapter: AgentAdapter = {
       '--input-format', 'stream-json',
       '--output-format', 'stream-json',
       '--verbose',
+      // `stdio` is the SDK's sentinel value for permission_prompt_tool_name —
+      // it tells the CLI to route prompt-style tool calls (notably
+      // AskUserQuestion, plus any tool the active permission mode hasn't
+      // already auto-approved) via control_request on stdout instead of
+      // dispatching to an MCP tool. Host (transport) parses the inbound
+      // request, surfaces it to the renderer, and writes the user's answer
+      // back as a control_response with `behavior:'allow'` + `updatedInput`.
+      // Verified mechanism in claude-agent-sdk-python `_internal/client.py`.
+      '--permission-prompt-tool', 'stdio',
     ]
     if (opts.resume) {
       base.push('--resume', opts.sessionId)
@@ -68,6 +77,8 @@ export const claudeCodeAdapter: AgentAdapter = {
         return parseStreamEvent(obj, parent)
       case 'control_response':
         return parseControlResponse(obj)
+      case 'control_request':
+        return parseControlRequest(obj)
       default:
         return { kind: 'unknown', reason: 'unknown-type', raw: obj }
     }
@@ -85,6 +96,27 @@ export const claudeCodeAdapter: AgentAdapter = {
       type: 'control_request',
       request_id: requestId,
       request,
+    })
+  },
+
+  serializeControlResponse({ requestId, response, isError, error }): string {
+    if (isError) {
+      return JSON.stringify({
+        type: 'control_response',
+        response: {
+          subtype: 'error',
+          request_id: requestId,
+          error: error ?? 'unknown error',
+        },
+      })
+    }
+    return JSON.stringify({
+      type: 'control_response',
+      response: {
+        subtype: 'success',
+        request_id: requestId,
+        response: response ?? {},
+      },
     })
   },
 
@@ -353,6 +385,38 @@ function parseResult(obj: Record<string, unknown>): ResultEvent {
     modelUsage,
     usage: tokenUsage,
     permissionDenials: Array.isArray(obj.permission_denials) ? obj.permission_denials : [],
+  }
+}
+
+/**
+ * Inbound `{type:"control_request", request_id, request:{subtype:'can_use_tool', ...}}`.
+ * Surfaces under `--permission-prompt-tool stdio` whenever the CLI needs the
+ * host to decide a tool's fate (notably AskUserQuestion, and any tool the
+ * active permission mode hasn't already auto-approved).
+ *
+ * Schema (observed in claude-agent-sdk-python `_internal/query.py`):
+ *   - tool_name: which tool wants to run
+ *   - input: the args Claude proposed
+ *   - tool_use_id: the originating block id (correlates w/ the tool item in our timeline)
+ *   - permission_suggestions?: SDK-suggested permission rule additions
+ *
+ * Other subtypes (`hook_callback`, `mcp_message`) currently emit
+ * shape-mismatch — wire them when we host hooks or SDK MCP servers.
+ */
+function parseControlRequest(obj: Record<string, unknown>): AgentEvent {
+  const requestId = typeof obj.request_id === 'string' ? obj.request_id : ''
+  const request = (obj.request ?? {}) as Record<string, unknown>
+  const subtype = request.subtype
+  if (subtype !== 'can_use_tool' || !requestId) {
+    return { kind: 'unknown', reason: 'shape-mismatch', raw: obj }
+  }
+  return {
+    kind: 'permission-request',
+    requestId,
+    toolName: typeof request.tool_name === 'string' ? request.tool_name : '',
+    toolUseId: typeof request.tool_use_id === 'string' ? request.tool_use_id : '',
+    input: request.input ?? null,
+    permissionSuggestions: request.permission_suggestions,
   }
 }
 

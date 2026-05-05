@@ -576,6 +576,21 @@ export interface ElectronAPI {
       args: { toolUseId: string; content: string; isError?: boolean }
     ) => Promise<boolean>
     /**
+     * Reply to an inbound `can_use_tool` control_request (surfaces under
+     * `--permission-prompt-tool stdio`). The renderer gathered the user's
+     * decision (e.g. AskUserQuestion answers) — this IPC writes the matching
+     * control_response so the CLI unblocks the tool.
+     */
+    respondPermission: (
+      tabId: string,
+      args: {
+        requestId: string
+        decision:
+          | { behavior: 'allow'; updatedInput?: Record<string, unknown>; updatedPermissions?: unknown[] }
+          | { behavior: 'deny'; message: string; interrupt?: boolean }
+      }
+    ) => Promise<boolean>
+    /**
      * Stop the current turn but keep the session. Implemented as kill + respawn
      * with --resume on the main side: history + chat conversation id survive,
      * the subprocess restarts ready for the next user message.

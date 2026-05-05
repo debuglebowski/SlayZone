@@ -45,6 +45,25 @@ export interface ChatViewState {
    */
   sendToolResult?: (args: { toolUseId: string; content: string; isError?: boolean }) => Promise<boolean>
   /**
+   * Live `can_use_tool` permission requests keyed by `tool_use_id`. Set when
+   * the adapter runs with `--permission-prompt-tool stdio` and Claude calls
+   * a tool the active permission mode hasn't already auto-approved (notably
+   * AskUserQuestion). Renderers correlate by `tool_use_id` (matches the
+   * tool card's `invocation.id`) and resolve via `respondPermission`.
+   */
+  permissionRequests?: Map<string, { requestId: string; toolName: string; input: unknown }>
+  /**
+   * Reply to an inbound permission request. `behavior:'allow'` carries
+   * `updatedInput` (e.g. AskUserQuestion answers). `behavior:'deny'` blocks
+   * the tool with a message.
+   */
+  respondPermission?: (args: {
+    requestId: string
+    decision:
+      | { behavior: 'allow'; updatedInput?: Record<string, unknown>; updatedPermissions?: unknown[] }
+      | { behavior: 'deny'; message: string; interrupt?: boolean }
+  }) => Promise<boolean>
+  /**
    * Full flat timeline + parent→children index, exposed so SubAgentRow can
    * render the items emitted while it ran (parentToolUseId === toolUseId).
    * Empty defaults are safe for harnesses that don't construct sub-agents.

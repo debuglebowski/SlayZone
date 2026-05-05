@@ -826,6 +826,13 @@ function applyEvent(state: ChatTimelineState, event: AgentEvent): ChatTimelineSt
       // exists only for exhaustive-switch type-safety; reaching it would mean
       // transport leaked a control_response — defensive no-op.
       return state
+    case 'permission-request':
+      // Side-channel: inbound control_request from the CLI (e.g.
+      // AskUserQuestion under `--permission-prompt-tool stdio`). Renderer
+      // subscribes via a separate effect and resolves with
+      // `respondPermission`. No timeline item materialized — the originating
+      // tool_use already has its own card via the assistant stream.
+      return state
   }
 }
 

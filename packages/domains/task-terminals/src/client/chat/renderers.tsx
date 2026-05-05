@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from 'react'
+import { useEffect, useRef, useState, useMemo } from 'react'
 import { useChatView } from './ChatViewContext'
 import {
   ChevronDown,
@@ -654,8 +654,38 @@ type AskQuestion = {
 export function ToolCallAskUserQuestion({ invocation }: ToolProps) {
   const input = invocation.input as { questions?: AskQuestion[] } | null
   const questions = input?.questions ?? []
-  const { sendMessage } = useChatView()
-  const canRespond = Boolean(sendMessage)
+  const { sendMessage, permissionRequests, respondPermission, timeline, collapseSignal } = useChatView()
+  // Latest AskUserQuestion in the timeline stays expanded; older ones auto-collapse
+  // when a newer ask appears. User can still toggle manually.
+  const isLatestAsk = useMemo(() => {
+    for (let i = timeline.length - 1; i >= 0; i--) {
+      const it = timeline[i]
+      if (it.kind === 'tool' && it.invocation.name === 'AskUserQuestion') {
+        return it.invocation.id === invocation.id
+      }
+    }
+    return false
+  }, [timeline, invocation.id])
+  const [collapsed, setCollapsed] = useState(!isLatestAsk)
+  useEffect(() => {
+    setCollapsed(!isLatestAsk)
+  }, [isLatestAsk])
+  // Skip mount: initial state already honors latest-ask. Only react to
+  // user-triggered "Collapse all" bumps after mount.
+  const initialSignalRef = useRef(collapseSignal)
+  useEffect(() => {
+    if (collapseSignal !== initialSignalRef.current) {
+      setCollapsed(true)
+    }
+  }, [collapseSignal])
+  // Permission-prompt path: when the CLI was spawned with
+  // `--permission-prompt-tool stdio`, the SDK emits a control_request that
+  // we surface here. Resolving it with `behavior:'allow' + updatedInput.answers`
+  // lets the tool run and Claude continue from a real tool_result.
+  // Fallback: plain user-message (legacy path; loses tool_use linkage but
+  // still conveys the answer).
+  const pendingPrompt = permissionRequests?.get(invocation.id) ?? null
+  const canRespond = Boolean((pendingPrompt && respondPermission) || sendMessage)
   const [answered, setAnswered] = useState(false)
   const [submittedText, setSubmittedText] = useState<string | null>(null)
   const [selections, setSelections] = useState<Map<number, Set<string>>>(() => new Map())
@@ -719,26 +749,44 @@ export function ToolCallAskUserQuestion({ invocation }: ToolProps) {
 
   const handleSubmit = (): void => {
     if (!canSubmit || !canRespond || locked) return
-    const lines = questions.map((q, qi) => {
+    const answersByQuestion: Record<string, string> = {}
+    const lines: string[] = []
+    questions.forEach((q, qi) => {
       const ans = otherActive.has(qi)
         ? (otherText.get(qi) ?? '').trim()
         : Array.from(selections.get(qi) ?? []).join(', ')
+      answersByQuestion[q.question] = ans
       const prefix = q.header || q.question || `Q${qi + 1}`
-      return `${prefix}: ${ans}`
+      lines.push(`${prefix}: ${ans}`)
     })
     const text = lines.join('\n')
     setSubmittedText(text)
     setAnswered(true)
 
-    // Empirical (Claude Code 2.1.128, --print --input-format stream-json):
-    // the CLI auto-resolves AskUserQuestion's tool_use itself in non-interactive
-    // mode — a synthetic tool_result is written to the user-echo stream BEFORE
-    // any external handler can react. Sending our own `tool_result` afterward
-    // is treated as a fresh user turn with no live tool_use_id, spawning an
-    // empty $0.01+ result. So fall back to a plain user message: Claude reads
-    // the answer text and continues. If a future CLI version exposes
-    // `--permission-prompt-tool` / canUseTool wiring we can swap this back to
-    // `sendToolResult`.
+    // Primary: resolve the inbound `can_use_tool` permission request with
+    // `behavior:'allow'` + answers in `updatedInput`. The CLI then runs the
+    // tool with the merged input → emits a real tool_result → Claude reads
+    // the answers and continues. Single turn, no orphan tool_use, no
+    // synthetic "user declined" text.
+    // Fallback: when no pending prompt is wired (adapter without stdio
+    // permission routing or sub-agent context), send the answer as a plain
+    // user message so Claude can still read it from the next turn.
+    if (pendingPrompt && respondPermission) {
+      void respondPermission({
+        requestId: pendingPrompt.requestId,
+        decision: {
+          behavior: 'allow',
+          // Merge into the tool's original input so the CLI runs it with the
+          // populated `answers`. Spread original input first; our `answers`
+          // overrides any stale field of the same name.
+          updatedInput: {
+            ...((pendingPrompt.input as Record<string, unknown>) ?? {}),
+            answers: answersByQuestion,
+          },
+        },
+      })
+      return
+    }
     if (sendMessage) sendMessage(text)
   }
 
@@ -748,16 +796,40 @@ export function ToolCallAskUserQuestion({ invocation }: ToolProps) {
         <div className="shrink-0 size-7 rounded-full bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center text-white shadow-sm">
           <HelpCircle className="size-3.5" />
         </div>
-        <div className="min-w-0 flex-1 rounded-lg border border-indigo-500/40 bg-indigo-500/5 shadow-sm overflow-hidden">
-          <div className="flex items-center gap-2 border-b border-indigo-500/20 bg-indigo-500/10 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-indigo-700 dark:text-indigo-300">
-            <HelpCircle className="size-3" />
-            <span>Question</span>
-            <span className="ml-auto"><StatusIcon status={invocation.status} /></span>
-          </div>
-          {questions.length === 0 && (
+        <div
+          className={cn(
+            'min-w-0 flex-1 rounded-lg border border-indigo-500/40 bg-indigo-500/5 shadow-sm overflow-hidden transition-opacity',
+            locked && 'opacity-60',
+          )}
+        >
+          <button
+            type="button"
+            onClick={() => setCollapsed((c) => !c)}
+            className={cn(
+              'w-full flex items-center gap-2 bg-indigo-500/10 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-indigo-700 dark:text-indigo-300 hover:bg-indigo-500/15 transition-colors',
+              !collapsed && 'border-b border-indigo-500/20',
+            )}
+          >
+            <HelpCircle className="size-3 shrink-0" />
+            <span className="shrink-0">Question</span>
+            {/* StatusIcon intentionally omitted — SDK auto-marks AskUserQuestion
+                done/denied in non-interactive print mode, which would render a
+                red X next to "Question" while the user is still picking. */}
+            {collapsed && (
+              <span className="flex-1 min-w-0 truncate normal-case font-normal text-indigo-700/80 dark:text-indigo-300/80">
+                {locked && submittedText
+                  ? submittedText.split('\n')[0]
+                  : (questions[0]?.header || questions[0]?.question || '')}
+              </span>
+            )}
+            <span className="ml-auto shrink-0">
+              {collapsed ? <ChevronRight className="size-3" /> : <ChevronDown className="size-3" />}
+            </span>
+          </button>
+          {!collapsed && questions.length === 0 && (
             <div className="px-3 py-2 text-sm text-muted-foreground">No questions provided.</div>
           )}
-          {questions.map((q, qi) => {
+          {!collapsed && questions.map((q, qi) => {
             const sel = selections.get(qi) ?? new Set<string>()
             const isOther = otherActive.has(qi)
             return (
@@ -852,7 +924,7 @@ export function ToolCallAskUserQuestion({ invocation }: ToolProps) {
               </div>
             )
           })}
-          {questions.length > 0 && (
+          {!collapsed && questions.length > 0 && (
             <div className="border-t border-indigo-500/20 bg-indigo-500/10 px-3 py-2 flex items-center gap-2">
               {locked ? (
                 <span className="flex-1 text-xs text-muted-foreground whitespace-pre-wrap">
@@ -861,9 +933,11 @@ export function ToolCallAskUserQuestion({ invocation }: ToolProps) {
               ) : (
                 <>
                   <span className="flex-1 text-[11px] text-muted-foreground">
-                    {canRespond
-                      ? 'Answer is sent as your next chat message.'
-                      : 'Cannot submit — chat send unavailable.'}
+                    {!canRespond
+                      ? 'Cannot submit — chat send unavailable.'
+                      : pendingPrompt
+                        ? 'Submit resolves the tool with your answers.'
+                        : 'Answer is sent as your next chat message.'}
                   </span>
                   <button
                     type="button"

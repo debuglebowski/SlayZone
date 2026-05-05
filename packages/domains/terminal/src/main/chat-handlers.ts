@@ -5,7 +5,9 @@ import {
   sendUserMessage,
   sendToolResult,
   sendControlRequest,
+  respondToPermissionRequest,
   updateSessionChatMode,
+  updateSessionChatModel,
   kill as killChat,
   removeSession,
   recordInterrupted,
@@ -458,16 +460,54 @@ export function registerChatHandlers(ipcMain: IpcMain, db: Database, opts: ChatH
     }
   )
 
-  // Interrupt = stop the current turn but keep the session. SIGINT is unreliable
-  // on claude-code (Spike C), so we kill + respawn with --resume: timeline + chat
-  // conversation id are preserved, the subprocess restarts fresh ready for the
-  // next user message. The identity guard in the transport's exit handler swallows
-  // the dying child's process-exit broadcast so the renderer doesn't flash
-  // "Session ended". Mirrors `chat:setMode` (which also kill+resume on flag change).
+  // Reply to an inbound permission_request from the CLI (subtype:'can_use_tool',
+  // surfaces under `--permission-prompt-tool stdio`). The renderer collected
+  // the user's decision; this IPC writes the matching control_response so the
+  // CLI unblocks the tool. AskUserQuestion uses `behavior:'allow'` with
+  // `updatedInput.answers` populated; other tools the renderer decides
+  // independently.
+  ipcMain.handle(
+    'chat:respondPermission',
+    (
+      _,
+      tabId: string,
+      args: {
+        requestId: string
+        decision:
+          | { behavior: 'allow'; updatedInput?: Record<string, unknown>; updatedPermissions?: unknown[] }
+          | { behavior: 'deny'; message: string; interrupt?: boolean }
+      }
+    ): boolean => {
+      return respondToPermissionRequest(tabId, args)
+    }
+  )
+
+  // Interrupt = stop the current turn but keep the session. Fast path: live
+  // `interrupt` control_request preserves the warm subprocess + conversation
+  // state. Fallback: kill + respawn with --resume (legacy path; SIGINT was
+  // unreliable on claude-code per Spike C). The identity guard in the
+  // transport's exit handler swallows the dying child's process-exit
+  // broadcast on the fallback path so the renderer doesn't flash "Session
+  // ended". Mirrors `chat:setMode`.
   ipcMain.handle('chat:interrupt', async (_, opts: ChatCreateOpts): Promise<ChatSessionInfo> => {
-    // Persist interrupted marker FIRST so replay sees the turn boundary.
-    // Order matters: recordInterrupted touches the live session; removeSession kills it.
+    // Persist interrupted marker FIRST so replay sees the turn boundary
+    // regardless of which path resolves.
     recordInterrupted(opts.tabId)
+
+    // Fast path: control_request `interrupt` over stdin.
+    const liveInfo = getSessionInfo(opts.tabId)
+    if (liveInfo && !liveInfo.ended) {
+      try {
+        await sendControlRequest(opts.tabId, { subtype: 'interrupt' })
+        const refreshed = getSessionInfo(opts.tabId)
+        if (refreshed) return refreshed
+      } catch (err) {
+        console.warn('[chat-handlers] interrupt control_request failed, falling back to kill+respawn:', err)
+        // fall through
+      }
+    }
+
+    // Fallback: kill + respawn.
     removeSession(opts.tabId)
     return createChat(await buildCreateOpts(db, opts, { fresh: false }))
   })
@@ -630,8 +670,29 @@ export function registerChatHandlers(ipcMain: IpcMain, db: Database, opts: ChatH
       if (!isChatModel(opts.chatModel)) {
         throw new Error(`Invalid chat model: ${String(opts.chatModel)}`)
       }
-      // Same kill+respawn pattern as chat:setMode — model flag only takes
-      // effect on a fresh process. chatModelOverride bypasses DB so the new
+
+      // Fast path: `set_model` control_request — preserves warm subprocess +
+      // conversation state. Same shape as `chat:setMode` (subtype
+      // set_permission_mode). The CLI accepts the chat model alias directly
+      // (`opus`/`sonnet`/`haiku`) on `--model`; protocol mirrors that.
+      const liveInfo = getSessionInfo(opts.tabId)
+      if (liveInfo && !liveInfo.ended) {
+        try {
+          await sendControlRequest(opts.tabId, {
+            subtype: 'set_model',
+            model: opts.chatModel,
+          })
+          writeChatModel(db, opts.taskId, opts.mode, opts.chatModel)
+          updateSessionChatModel(opts.tabId, opts.chatModel)
+          const refreshed = getSessionInfo(opts.tabId)
+          if (refreshed) return refreshed
+        } catch (err) {
+          console.warn('[chat-handlers] set_model control_request failed, falling back to kill+respawn:', err)
+          // fall through
+        }
+      }
+
+      // Fallback: kill + respawn. chatModelOverride bypasses DB so the new
       // child uses the requested model before we persist.
       removeSession(opts.tabId)
       const created = await createChat(

@@ -30,6 +30,7 @@ export type AgentEvent =
   | StreamBlockStopEvent
   | StreamMessageStopEvent
   | ControlResponseEvent
+  | PermissionRequestEvent
 
 /**
  * Streaming events from Claude Code's `--verbose` stream-json output.
@@ -255,4 +256,21 @@ export interface ControlResponseEvent {
   isError: boolean
   data?: unknown
   error?: string
+}
+
+/**
+ * Inbound control_request from the CLI asking the host (us) to make a
+ * decision (`subtype: 'can_use_tool'`). Surfaces when running with
+ * `--permission-prompt-tool stdio`. Renderer responds via
+ * `chat:respondPermission(tabId, requestId, decision)`. Carries the
+ * originating tool's `tool_use_id` so the renderer can correlate the
+ * incoming prompt with the on-screen tool card (e.g. AskUserQuestion).
+ */
+export interface PermissionRequestEvent {
+  kind: 'permission-request'
+  requestId: string
+  toolName: string
+  toolUseId: string
+  input: unknown
+  permissionSuggestions?: unknown
 }

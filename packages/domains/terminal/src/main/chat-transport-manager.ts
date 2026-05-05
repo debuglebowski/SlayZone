@@ -139,6 +139,8 @@ interface Session {
   nextSeq: number
   ended: boolean
   startedAt: string
+  /** Last event flow timestamp (ms). Drives idle-age threshold in agent-status panel. */
+  lastOutputTime: number
   terminalState: ChatTerminalState
   /** True if this spawn used --resume (vs fresh --session-id). */
   usedResume: boolean
@@ -177,6 +179,7 @@ function appendToBuffer(session: Session, event: AgentEvent): number {
   if (session.buffer.length > MAX_BUFFER_EVENTS) {
     session.buffer.splice(0, session.buffer.length - MAX_BUFFER_EVENTS)
   }
+  session.lastOutputTime = Date.now()
   // Mirror to persistence layer (no-op if unconfigured).
   try {
     deps.persistEvent(session.tabId, seq, event)
@@ -425,6 +428,7 @@ export async function createChat(opts: CreateChatOpts): Promise<ChatSessionInfo>
     nextSeq: seededNextSeq,
     ended: false,
     startedAt: new Date().toISOString(),
+    lastOutputTime: Date.now(),
     terminalState: 'starting',
     usedResume: Boolean(opts.conversationId),
     sawHealthyTurn: false,
@@ -618,6 +622,49 @@ export function updateSessionChatMode(tabId: string, mode: ChatMode | null): voi
 }
 
 /**
+ * Mutate the in-memory `Session.chatModel`. Called after a successful
+ * `set_model` control_request so `getSessionInfo` reflects the new model
+ * without waiting for a turn-init drift sync.
+ */
+export function updateSessionChatModel(tabId: string, model: ChatModel | null): void {
+  const session = sessions.get(tabId)
+  if (!session) return
+  session.chatModel = model
+}
+
+/**
+ * Reply to an inbound `control_request` (e.g. `subtype:'can_use_tool'` from
+ * `--permission-prompt-tool stdio`). The renderer has surfaced the prompt
+ * to the user and gathered their decision; this writes the success/error
+ * `control_response` on stdin so the CLI unblocks the tool. Returns false
+ * when session/adapter can't carry the reply — caller handles fallback.
+ */
+export function respondToPermissionRequest(
+  tabId: string,
+  args: {
+    requestId: string
+    decision:
+      | { behavior: 'allow'; updatedInput?: Record<string, unknown>; updatedPermissions?: unknown[] }
+      | { behavior: 'deny'; message: string; interrupt?: boolean }
+  }
+): boolean {
+  const session = sessions.get(tabId)
+  if (!session || session.ended) return false
+  if (!session.adapter.serializeControlResponse) return false
+  const line = session.adapter.serializeControlResponse({
+    requestId: args.requestId,
+    response: args.decision as unknown as Record<string, unknown>,
+  })
+  if (line == null) return false
+  try {
+    session.child.stdin?.write(line + '\n')
+    return true
+  } catch {
+    return false
+  }
+}
+
+/**
  * Persist an `interrupted` marker into the session's event log. Called by
  * `chat:interrupt` before kill+respawn so timeline replay sees a turn boundary
  * even though the original turn never produced a `result`. No-op if the
@@ -747,6 +794,9 @@ export function killAll(): void {
 export interface ChatSessionStateEntry {
   /** Format `${taskId}:${tabId}` — matches state-broadcast key in `transitionState`. */
   sessionId: string
+  taskId: string
+  mode: string
+  lastOutputTime: number
   state: ChatTerminalState
 }
 
@@ -761,6 +811,9 @@ export function listChatSessions(): ChatSessionStateEntry[] {
     if (session.ended) continue
     result.push({
       sessionId: `${session.taskId}:${session.tabId}`,
+      taskId: session.taskId,
+      mode: session.mode,
+      lastOutputTime: session.lastOutputTime,
       state: session.terminalState,
     })
   }

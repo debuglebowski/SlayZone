@@ -417,6 +417,76 @@ test('serializeToolResult: emits user-envelope tool_result keyed by tool_use_id'
   expect('is_error' in block).toBe(false)
 })
 
+test('buildSpawnArgs: enables stdio permission_prompt_tool', () => {
+  const { args } = claudeCodeAdapter.buildSpawnArgs({
+    sessionId: 'abc',
+    resume: false,
+    cwd: '/tmp',
+    providerFlags: [],
+  })
+  const idx = args.indexOf('--permission-prompt-tool')
+  if (idx === -1) throw new Error('expected --permission-prompt-tool flag')
+  expect(args[idx + 1]).toBe('stdio')
+})
+
+test('parseLine: incoming control_request can_use_tool → permission-request event', () => {
+  const ev = claudeCodeAdapter.parseLine(
+    JSON.stringify({
+      type: 'control_request',
+      request_id: 'cu_1',
+      request: {
+        subtype: 'can_use_tool',
+        tool_name: 'AskUserQuestion',
+        input: { questions: [{ question: 'Pick one', header: 'P', multiSelect: false, options: [] }] },
+        tool_use_id: 'tu_42',
+      },
+    })
+  )
+  if (!ev || ev.kind !== 'permission-request') throw new Error('expected permission-request')
+  expect(ev.requestId).toBe('cu_1')
+  expect(ev.toolName).toBe('AskUserQuestion')
+  expect(ev.toolUseId).toBe('tu_42')
+})
+
+test('parseLine: control_request with unknown subtype → unknown shape-mismatch', () => {
+  const ev = claudeCodeAdapter.parseLine(
+    JSON.stringify({
+      type: 'control_request',
+      request_id: 'r_x',
+      request: { subtype: 'hook_callback', callback_id: 'h1' },
+    })
+  )
+  if (!ev || ev.kind !== 'unknown') throw new Error('expected unknown')
+  expect(ev.reason).toBe('shape-mismatch')
+})
+
+test('serializeControlResponse: success carries response payload', () => {
+  const out = claudeCodeAdapter.serializeControlResponse?.({
+    requestId: 'cu_1',
+    response: { behavior: 'allow', updatedInput: { answers: { Q: 'A' } } },
+  })
+  if (typeof out !== 'string') throw new Error('expected string')
+  const parsed = JSON.parse(out) as { response: Record<string, unknown> }
+  expect(parsed.response.subtype).toBe('success')
+  expect(parsed.response.request_id).toBe('cu_1')
+  const inner = parsed.response.response as { behavior: string; updatedInput: Record<string, unknown> }
+  expect(inner.behavior).toBe('allow')
+  const updatedInput = inner.updatedInput as { answers: Record<string, string> }
+  expect(updatedInput.answers.Q).toBe('A')
+})
+
+test('serializeControlResponse: error carries error subtype + message', () => {
+  const out = claudeCodeAdapter.serializeControlResponse?.({
+    requestId: 'cu_2',
+    isError: true,
+    error: 'user dismissed',
+  })
+  if (typeof out !== 'string') throw new Error('expected string')
+  const parsed = JSON.parse(out) as { response: Record<string, unknown> }
+  expect(parsed.response.subtype).toBe('error')
+  expect(parsed.response.error).toBe('user dismissed')
+})
+
 test('serializeControlRequest: wraps payload in control_request envelope', () => {
   const out = claudeCodeAdapter.serializeControlRequest?.({
     requestId: 'req_1_abc',

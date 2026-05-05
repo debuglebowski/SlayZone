@@ -30,6 +30,15 @@ interface ChatApi {
     tabId: string,
     args: { toolUseId: string; content: string; isError?: boolean }
   ) => Promise<boolean>
+  respondPermission: (
+    tabId: string,
+    args: {
+      requestId: string
+      decision:
+        | { behavior: 'allow'; updatedInput?: Record<string, unknown>; updatedPermissions?: unknown[] }
+        | { behavior: 'deny'; message: string; interrupt?: boolean }
+    }
+  ) => Promise<boolean>
   interrupt: (opts: {
     tabId: string
     taskId: string
@@ -84,6 +93,16 @@ export interface UseChatSessionResult {
    * DB value.
    */
   permissionMode: string | null
+  /**
+   * Live `can_use_tool` permission requests from the CLI, keyed by
+   * `tool_use_id` (one per pending tool). Populated when the adapter is run
+   * with `--permission-prompt-tool stdio` and Claude calls a tool the active
+   * permission mode hasn't already auto-approved (notably AskUserQuestion).
+   * Renderers correlate by `tool_use_id` from the on-screen tool card and
+   * resolve via `respondPermission`. Cleared automatically when the
+   * matching `tool-result` arrives (or on session exit).
+   */
+  permissionRequests: Map<string, { requestId: string; toolName: string; input: unknown }>
   sendMessage: (text: string) => Promise<void>
   /**
    * Resolve a pending `tool_use_id` (e.g. AskUserQuestion) with a `tool_result`
@@ -92,6 +111,17 @@ export interface UseChatSessionResult {
    * input channel — caller should fall back to `sendMessage`.
    */
   sendToolResult: (args: { toolUseId: string; content: string; isError?: boolean }) => Promise<boolean>
+  /**
+   * Reply to an inbound permission_request. `decision.behavior:'allow'` carries
+   * `updatedInput` (e.g. AskUserQuestion answers) — the CLI runs the tool
+   * with that mutated input. `behavior:'deny'` blocks the tool.
+   */
+  respondPermission: (args: {
+    requestId: string
+    decision:
+      | { behavior: 'allow'; updatedInput?: Record<string, unknown>; updatedPermissions?: unknown[] }
+      | { behavior: 'deny'; message: string; interrupt?: boolean }
+  }) => Promise<boolean>
   interrupt: () => Promise<void>
   /**
    * Stop the current turn. If no assistant progress arrived since the user's
@@ -127,6 +157,9 @@ export function useChatSession(opts: UseChatSessionOpts): UseChatSessionResult {
   const [state, dispatch] = useReducer(reducer, undefined, initialState)
   const [hydrating, setHydrating] = useState(true)
   const lastSeqRef = useRef<number>(-1)
+  const [permissionRequests, setPermissionRequests] = useState<
+    Map<string, { requestId: string; toolName: string; input: unknown }>
+  >(() => new Map())
 
   useEffect(() => {
     let cancelled = false
@@ -140,6 +173,29 @@ export function useChatSession(opts: UseChatSessionOpts): UseChatSessionResult {
       if (seq <= lastSeqRef.current) return
       lastSeqRef.current = seq
       dispatch({ type: 'event', event })
+
+      // Side-channel: track inbound permission requests so renderers can
+      // resolve them (e.g. AskUserQuestion answers). Drop them when the
+      // originating tool resolves (its tool_result lands) — keyed by
+      // tool_use_id so reload-after-answer doesn't resurface a stale prompt.
+      if (event.kind === 'permission-request') {
+        setPermissionRequests((prev) => {
+          const next = new Map(prev)
+          next.set(event.toolUseId, {
+            requestId: event.requestId,
+            toolName: event.toolName,
+            input: event.input,
+          })
+          return next
+        })
+      } else if (event.kind === 'tool-result') {
+        setPermissionRequests((prev) => {
+          if (!prev.has(event.toolUseId)) return prev
+          const next = new Map(prev)
+          next.delete(event.toolUseId)
+          return next
+        })
+      }
     })
 
     const offExit = chat.onExit((tabId, sessionId, code, signal) => {
@@ -217,6 +273,29 @@ export function useChatSession(opts: UseChatSessionOpts): UseChatSessionResult {
     return chat.sendToolResult(opts.tabId, args)
   }
 
+  const respondPermission = async (args: {
+    requestId: string
+    decision:
+      | { behavior: 'allow'; updatedInput?: Record<string, unknown>; updatedPermissions?: unknown[] }
+      | { behavior: 'deny'; message: string; interrupt?: boolean }
+  }): Promise<boolean> => {
+    const chat = getChatApi()
+    // Optimistic local clear so the renderer un-mounts the prompt UI as soon
+    // as the user clicks. The CLI's tool_result will follow shortly and
+    // confirm; the buffer-replay path also drops it via the tool-result
+    // listener above.
+    setPermissionRequests((prev) => {
+      let next: Map<string, { requestId: string; toolName: string; input: unknown }> | null = null
+      for (const [toolUseId, req] of prev) {
+        if (req.requestId !== args.requestId) continue
+        if (next === null) next = new Map(prev)
+        next.delete(toolUseId)
+      }
+      return next ?? prev
+    })
+    return chat.respondPermission(opts.tabId, args)
+  }
+
   const interrupt = async (): Promise<void> => {
     const chat = getChatApi()
     // Main records an `interrupted` event into the session buffer before kill+respawn;
@@ -262,8 +341,10 @@ export function useChatSession(opts: UseChatSessionOpts): UseChatSessionResult {
     inFlight: isInFlight(state),
     hydrating,
     permissionMode: state.permissionMode,
+    permissionRequests,
     sendMessage,
     sendToolResult,
+    respondPermission,
     interrupt,
     abortAndPop,
     kill,
