@@ -45,9 +45,10 @@ Add a new entry at the top of the JSON array for the new version:
 - `version`: the new version string (without `v` prefix)
 - `date`: today's date in `YYYY-MM-DD` format
 - `tagline`: a short, catchy 2-4 word tagline summarizing the release theme
-- `items`: user-facing changes only (features, improvements, fixes). Skip CI, docs, tests, chores, website-only changes. Keep descriptions concise (1 sentence). Match the tone and style of existing entries.
+- `items`: user-facing changes only (breaking changes, features, improvements, fixes). Skip CI, docs, tests, chores, website-only changes. Keep descriptions concise (1 sentence). Match the tone and style of existing entries. **List `breaking` items first**, then features, improvements, fixes.
 
 Categories:
+- `breaking` — backwards-incompatible changes that require user action (migrations, removed features, changed defaults, renamed settings)
 - `feature` — new user-facing capabilities
 - `improvement` — enhancements to existing features
 - `fix` — bug fixes users would notice
@@ -76,7 +77,7 @@ git push && git push origin v<new-version>
 
 Print a summary:
 - Previous version -> new version
-- Number of features/improvements/fixes in the in-app changelog
+- Number of breaking changes/features/improvements/fixes in the in-app changelog
 - Link to the GitHub Actions release run (https://github.com/debuglebowski/SlayZone/actions)
 
 ## Important
