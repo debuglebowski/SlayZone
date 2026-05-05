@@ -9,7 +9,7 @@ import {
   DialogDescription,
   cn,
 } from '@slayzone/ui'
-import { Sparkles, Zap, Bug, ChevronRight } from 'lucide-react'
+import { Sparkles, Zap, Bug, AlertTriangle, ChevronRight } from 'lucide-react'
 import { track } from '@slayzone/telemetry/client'
 import { CHANGELOG, type ChangelogEntry, type ChangeCategory } from './changelog-data'
 
@@ -20,6 +20,7 @@ interface Props {
 }
 
 const categoryConfig: Record<ChangeCategory, { label: string; icon: typeof Sparkles; color: string }> = {
+  breaking: { label: 'Breaking', icon: AlertTriangle, color: 'text-red-400' },
   feature: { label: 'New', icon: Sparkles, color: 'text-violet-400' },
   improvement: { label: 'Improved', icon: Zap, color: 'text-blue-400' },
   fix: { label: 'Fixed', icon: Bug, color: 'text-amber-400' },

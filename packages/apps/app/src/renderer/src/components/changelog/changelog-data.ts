@@ -1,6 +1,6 @@
 import data from './changelog-data.json'
 
-export type ChangeCategory = 'feature' | 'improvement' | 'fix'
+export type ChangeCategory = 'breaking' | 'feature' | 'improvement' | 'fix'
 
 export interface ChangeItem {
   category: ChangeCategory
