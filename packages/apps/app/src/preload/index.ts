@@ -516,14 +516,13 @@ const api: ElectronAPI = {
       ipcRenderer.invoke('chat:setMode', opts),
     getModel: (taskId: string, mode: string) =>
       ipcRenderer.invoke('chat:getModel', taskId, mode),
-    setModel: (opts: { tabId: string; taskId: string; mode: string; cwd: string; chatModel: 'default' | 'sonnet' | 'opus' | 'haiku' }) =>
+    setModel: (opts: { tabId: string; taskId: string; mode: string; cwd: string; chatModel: 'sonnet' | 'opus' | 'haiku' }) =>
       ipcRenderer.invoke('chat:setModel', opts),
     getEffort: (taskId: string, mode: string) =>
       ipcRenderer.invoke('chat:getEffort', taskId, mode),
     setEffort: (opts: { tabId: string; taskId: string; mode: string; cwd: string; chatEffort: 'low' | 'medium' | 'high' | 'xhigh' | 'max' }) =>
       ipcRenderer.invoke('chat:setEffort', opts),
     getAutoEligibility: () => ipcRenderer.invoke('chat:getAutoEligibility'),
-    getAccountDefaultModel: () => ipcRenderer.invoke('chat:getAccountDefaultModel'),
     listSkills: (cwd: string) => ipcRenderer.invoke('chat:listSkills', cwd),
     listCommands: (cwd: string) => ipcRenderer.invoke('chat:listCommands', cwd),
     listAgents: (cwd: string) => ipcRenderer.invoke('chat:listAgents', cwd),

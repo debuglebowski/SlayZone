@@ -42,7 +42,7 @@ import {
   chatModeToCliPermissionMode,
   type ChatMode as ChatModeShared,
 } from '../shared/chat-mode'
-import { chatModelToFlags, DEFAULT_CHAT_MODEL, isChatModel, type ChatModel } from '../shared/chat-model'
+import { chatModelToFlags, isChatModel, type ChatModel } from '../shared/chat-model'
 import { chatEffortToFlags, isChatEffort, type ChatEffort } from '../shared/chat-effort'
 
 export interface ChatHandlerOpts {
@@ -358,7 +358,9 @@ async function buildCreateOpts(
   // is power-user override and the chat model dropdown is hidden behind the
   // chatModel field. When `flags` is set, chatModel is not appended (the
   // explicit flag string is the source of truth).
-  const resolvedChatModel: ChatModel = chatModelOverride ?? providerCfg.chatModel ?? DEFAULT_CHAT_MODEL
+  const storedChatModel = isChatModel(providerCfg.chatModel) ? providerCfg.chatModel : null
+  const resolvedChatModel: ChatModel =
+    chatModelOverride ?? storedChatModel ?? (await resolveAccountDefaultModel())
   const resolvedChatEffort: ChatEffort | null =
     chatEffortOverride !== undefined ? chatEffortOverride : (providerCfg.chatEffort ?? null)
   const usedExplicitFlags = !chatModeOverride && (opts.providerFlagsOverride || providerCfg.flags)
@@ -556,7 +558,6 @@ export function registerChatHandlers(ipcMain: IpcMain, db: Database, opts: ChatH
     (): Promise<AutoModeEligibility> => getAutoModeEligibility()
   )
 
-  ipcMain.handle('chat:getAccountDefaultModel', () => resolveAccountDefaultModel())
 
   ipcMain.handle(
     'chat:setMode',
@@ -612,10 +613,14 @@ export function registerChatHandlers(ipcMain: IpcMain, db: Database, opts: ChatH
 
   ipcMain.handle(
     'chat:getModel',
-    (_, taskId: string, mode: string): ChatModel => {
+    async (_, taskId: string, mode: string): Promise<ChatModel> => {
       const cfg = readProviderConfig(db, taskId, mode)
       const stored = cfg.chatModel
-      return isChatModel(stored) ? stored : DEFAULT_CHAT_MODEL
+      if (isChatModel(stored)) return stored
+      // No (or legacy/invalid) stored value → fall back to account default
+      // resolved from `~/.claude/settings.json`. Pro accounts → sonnet,
+      // Max accounts → opus, etc. Hard fallback DEFAULT_CHAT_MODEL.
+      return resolveAccountDefaultModel()
     }
   )
 

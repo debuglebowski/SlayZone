@@ -7,8 +7,7 @@ import {
   DropdownMenuTrigger,
 } from './dropdown-menu'
 
-export type AgentModel = 'default' | 'sonnet' | 'opus' | 'haiku'
-export type ResolvedAgentModel = Exclude<AgentModel, 'default'>
+export type AgentModel = 'opus' | 'sonnet' | 'haiku'
 
 interface ModelMeta {
   label: string
@@ -17,20 +16,15 @@ interface ModelMeta {
 }
 
 const MODEL_META: Record<AgentModel, ModelMeta> = {
-  default: {
-    label: 'Default model',
-    short: 'Default model',
-    description: 'Inherit Claude account default. No --model flag.',
+  opus: {
+    label: 'Opus',
+    short: 'Opus',
+    description: 'Maximum capability. Slower, higher cost.',
   },
   sonnet: {
     label: 'Sonnet',
     short: 'Sonnet',
     description: 'Balanced speed + capability. Recommended for most chats.',
-  },
-  opus: {
-    label: 'Opus',
-    short: 'Opus',
-    description: 'Maximum capability. Slower, higher cost.',
   },
   haiku: {
     label: 'Haiku',
@@ -39,13 +33,7 @@ const MODEL_META: Record<AgentModel, ModelMeta> = {
   },
 }
 
-const RESOLVED_LABEL: Record<ResolvedAgentModel, string> = {
-  sonnet: 'Sonnet',
-  opus: 'Opus',
-  haiku: 'Haiku',
-}
-
-const MODEL_ORDER: AgentModel[] = ['default', 'sonnet', 'opus', 'haiku']
+const MODEL_ORDER: AgentModel[] = ['opus', 'sonnet', 'haiku']
 
 export interface AgentModelPillProps {
   model: AgentModel
@@ -55,16 +43,10 @@ export interface AgentModelPillProps {
   /** Visual style. `pill` = chip (default). `text` = plain inline text. */
   variant?: 'pill' | 'text'
   className?: string
-  /** Resolved value of "Default" — read from `~/.claude/settings.json`. When
-   * provided, dropdown row for `default` shows ` → Opus` (or matching label). */
-  accountDefaultModel?: ResolvedAgentModel | null
 }
 
-export function AgentModelPill({ model, onChange, disabled, compact, variant = 'pill', className, accountDefaultModel }: AgentModelPillProps) {
+export function AgentModelPill({ model, onChange, disabled, compact, variant = 'pill', className }: AgentModelPillProps) {
   const meta = MODEL_META[model]
-  const defaultDescSuffix = accountDefaultModel
-    ? ` → ${RESOLVED_LABEL[accountDefaultModel]}.`
-    : ''
   return (
     <DropdownMenu>
       <DropdownMenuTrigger
@@ -88,8 +70,6 @@ export function AgentModelPill({ model, onChange, disabled, compact, variant = '
         {MODEL_ORDER.map((m) => {
           const itemMeta = MODEL_META[m]
           const selected = m === model
-          const description =
-            m === 'default' ? `${itemMeta.description}${defaultDescSuffix}` : itemMeta.description
           return (
             <DropdownMenuItem
               key={m}
@@ -106,7 +86,7 @@ export function AgentModelPill({ model, onChange, disabled, compact, variant = '
               <div className="flex-1 min-w-0">
                 <div className="text-xs font-medium">{itemMeta.label}</div>
                 <div className="text-[11px] text-muted-foreground leading-snug">
-                  {description}
+                  {itemMeta.description}
                 </div>
               </div>
               {selected && (

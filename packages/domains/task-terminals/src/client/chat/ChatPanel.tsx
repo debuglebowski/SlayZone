@@ -113,7 +113,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
   const { chatMode, modeChanging, handleModeChange, autoCapability } = useChatMode({
     taskId, mode, tabId, cwd, livePermissionMode: permissionMode,
   })
-  const { chatModel, modelChanging, handleModelChange, accountDefaultModel } = useChatModel({
+  const { chatModel, modelChanging, handleModelChange } = useChatModel({
     taskId, mode, tabId, cwd,
   })
   const { chatEffort, effortChanging, handleEffortChange } = useChatEffort({
@@ -990,15 +990,16 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
             variant="text"
             autoCapability={autoCapability}
           />
-          <AgentModelPill
-            model={chatModel}
-            onChange={(next) => { void handleModelChange(next) }}
-            disabled={modelChanging || inFlight}
-            compact
-            variant="text"
-            accountDefaultModel={accountDefaultModel}
-          />
-          {modelSupportsEffort(chatModel) && (
+          {chatModel && (
+            <AgentModelPill
+              model={chatModel}
+              onChange={(next) => { void handleModelChange(next) }}
+              disabled={modelChanging || inFlight}
+              compact
+              variant="text"
+            />
+          )}
+          {chatModel && modelSupportsEffort(chatModel) && (
             <AgentEffortPill
               effort={chatEffort}
               onChange={(next) => { void handleEffortChange(next) }}

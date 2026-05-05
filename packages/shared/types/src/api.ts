@@ -40,7 +40,7 @@ export interface ChatSessionInfo {
    */
   chatMode?: 'plan' | 'auto-accept' | 'auto' | 'bypass' | null
   /** Resolved chat model alias this session was spawned with. */
-  chatModel?: 'default' | 'sonnet' | 'opus' | 'haiku' | null
+  chatModel?: 'sonnet' | 'opus' | 'haiku' | null
   /** Resolved reasoning effort this session was spawned with. `null` = inherit. */
   chatEffort?: 'low' | 'medium' | 'high' | 'xhigh' | 'max' | null
 }
@@ -633,13 +633,13 @@ export interface ElectronAPI {
       cwd: string
       chatMode: 'plan' | 'auto-accept' | 'auto' | 'bypass'
     }) => Promise<ChatSessionInfo>
-    getModel: (taskId: string, mode: string) => Promise<'default' | 'sonnet' | 'opus' | 'haiku'>
+    getModel: (taskId: string, mode: string) => Promise<'sonnet' | 'opus' | 'haiku'>
     setModel: (opts: {
       tabId: string
       taskId: string
       mode: string
       cwd: string
-      chatModel: 'default' | 'sonnet' | 'opus' | 'haiku'
+      chatModel: 'sonnet' | 'opus' | 'haiku'
     }) => Promise<ChatSessionInfo>
     getEffort: (taskId: string, mode: string) => Promise<'low' | 'medium' | 'high' | 'xhigh' | 'max' | null>
     setEffort: (opts: {
@@ -656,12 +656,6 @@ export interface ElectronAPI {
      * disables it when eligible-but-not-opted-in.
      */
     getAutoEligibility: () => Promise<{ eligible: boolean; optedIn: boolean }>
-    /**
-     * Resolve what model `claude` will pick when no `--model` flag is passed.
-     * Reads `~/.claude/settings.json` `model`; falls back to `'opus'`.
-     * Cached per-process — restart to refresh.
-     */
-    getAccountDefaultModel: () => Promise<'sonnet' | 'opus' | 'haiku'>
     listSkills: (cwd: string) => Promise<SkillInfo[]>
     listCommands: (cwd: string) => Promise<CommandInfo[]>
     listAgents: (cwd: string) => Promise<AgentInfo[]>

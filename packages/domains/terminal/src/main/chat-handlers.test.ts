@@ -247,7 +247,7 @@ await test('chat:reset still wipes events + clears conv id when no live session 
 
 console.log('\nchat:setModel / chat:getModel IPC handler tests\n')
 
-await test('chat:getModel returns "default" when nothing stored', async () => {
+await test('chat:getModel falls back to account default (or DEFAULT_CHAT_MODEL=opus) when nothing stored', async () => {
   mgr.__resetForTests()
   mgr.resetTransportDeps()
   const db = setupDb()
@@ -258,8 +258,11 @@ await test('chat:getModel returns "default" when nothing stored', async () => {
   const ipc = createMockIpcMain()
   registerChatHandlers(ipc as unknown as Parameters<typeof registerChatHandlers>[0], db)
 
+  // Resolution reads `~/.claude/settings.json` on the host. Result is one of
+  // the three concrete aliases — never `'default'`. We assert the union, not
+  // a specific value, so the test stays portable across machines.
   const got = (await ipc.invoke('chat:getModel', taskId, mode)) as string
-  expect(got).toBe('default')
+  expect(['opus', 'sonnet', 'haiku'].includes(got)).toBe(true)
 })
 
 await test('chat:getModel returns stored value', async () => {
@@ -280,22 +283,24 @@ await test('chat:getModel returns stored value', async () => {
   expect(got).toBe('opus')
 })
 
-await test('chat:getModel falls back to "default" for unknown stored value', async () => {
+await test('chat:getModel falls back to account default for unknown / legacy stored value', async () => {
   mgr.__resetForTests()
   mgr.resetTransportDeps()
   const db = setupDb()
   const taskId = 'task-model-3'
   const mode = 'claude-code'
+  // Includes legacy `'default'` from before the option was removed — must
+  // coerce to a concrete model rather than echo back.
   db.prepare('INSERT INTO tasks (id, provider_config) VALUES (?, ?)').run(
     taskId,
-    JSON.stringify({ [mode]: { chatModel: 'gpt-5' } })
+    JSON.stringify({ [mode]: { chatModel: 'default' } })
   )
 
   const ipc = createMockIpcMain()
   registerChatHandlers(ipc as unknown as Parameters<typeof registerChatHandlers>[0], db)
 
   const got = (await ipc.invoke('chat:getModel', taskId, mode)) as string
-  expect(got).toBe('default')
+  expect(['opus', 'sonnet', 'haiku'].includes(got)).toBe(true)
 })
 
 await test('chat:setModel persists to provider_config + respawns with --model flag', async () => {
@@ -319,10 +324,13 @@ await test('chat:setModel persists to provider_config + respawns with --model fl
   const ipc = createMockIpcMain()
   registerChatHandlers(ipc as unknown as Parameters<typeof registerChatHandlers>[0], db)
 
-  // Initial create — no model stored yet, should NOT carry --model.
+  // Initial create — no model stored. We always emit --model now, picking
+  // the account default from `~/.claude/settings.json` (or DEFAULT_CHAT_MODEL).
   await ipc.invoke('chat:create', { tabId, taskId, mode, cwd: '/tmp', providerFlagsOverride: null })
   expect(spawnArgsLog.length).toBe(1)
-  expect(spawnArgsLog[0].includes('--model')).toBeFalsy()
+  const firstIdx = spawnArgsLog[0].indexOf('--model')
+  expect(firstIdx >= 0).toBe(true)
+  expect(['opus', 'sonnet', 'haiku'].includes(spawnArgsLog[0][firstIdx + 1])).toBe(true)
 
   // setModel → kill+respawn with --model sonnet.
   await ipc.invoke('chat:setModel', { tabId, taskId, mode, cwd: '/tmp', chatModel: 'sonnet' })

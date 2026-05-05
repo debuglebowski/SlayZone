@@ -3,24 +3,25 @@ import * as os from 'node:os'
 import * as path from 'node:path'
 
 import {
-  FALLBACK_ACCOUNT_DEFAULT_MODEL,
+  DEFAULT_CHAT_MODEL,
   normalizeAccountModel,
-  type ResolvedChatModel,
+  type ChatModel,
 } from '../shared/chat-model'
 
 /**
- * Resolve what `claude` will pick when no `--model` flag is passed.
- * Reads `~/.claude/settings.json` `model` field. Falls back to opus when
- * the file is missing, unparseable, has no `model` key, or names a model
- * we don't recognize.
+ * Resolve what model the chat subprocess should default to when nothing is
+ * stored on the task. Reads `~/.claude/settings.json` `model` field so a
+ * Pro-tier user gets sonnet, a Max-tier user gets opus, etc. Falls back to
+ * `DEFAULT_CHAT_MODEL` ('opus') when the file is missing, unparseable, has
+ * no `model` key, or names a model we don't recognize.
  *
  * Caches result for the lifetime of the process — settings.json only
  * changes via `claude config` or manual edits, so a restart picks up
  * changes. Mirrors `auto-mode-eligibility.ts` precedent.
  */
-let cached: ResolvedChatModel | null = null
+let cached: ChatModel | null = null
 
-export async function resolveAccountDefaultModel(): Promise<ResolvedChatModel> {
+export async function resolveAccountDefaultModel(): Promise<ChatModel> {
   if (cached) return cached
   cached = await read()
   return cached
@@ -31,12 +32,12 @@ export function _resetAccountDefaultModelCache(): void {
   cached = null
 }
 
-async function read(): Promise<ResolvedChatModel> {
+async function read(): Promise<ChatModel> {
   const home = os.homedir()
   const raw = await safeRead(path.join(home, '.claude', 'settings.json'))
   const settings = parseJson(raw)
   const model = pickString(settings, ['model'])
-  if (model == null) return FALLBACK_ACCOUNT_DEFAULT_MODEL
+  if (model == null) return DEFAULT_CHAT_MODEL
   return normalizeAccountModel(model)
 }
 

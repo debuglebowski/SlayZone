@@ -2,7 +2,7 @@
  * chat-model unit tests
  * Run with: pnpm tsx packages/domains/terminal/src/shared/chat-model.test.ts
  */
-import { chatModelToFlags, isChatModel, CHAT_MODELS, DEFAULT_CHAT_MODEL, normalizeAccountModel, FALLBACK_ACCOUNT_DEFAULT_MODEL } from './chat-model.js'
+import { chatModelToFlags, isChatModel, CHAT_MODELS, DEFAULT_CHAT_MODEL, normalizeAccountModel } from './chat-model.js'
 
 let passed = 0
 let failed = 0
@@ -21,16 +21,12 @@ function expect<T>(v: T) {
 
 console.log('\nchat-model\n')
 
-test('default emits no flags (CLI inherits account default)', () => {
-  expect(chatModelToFlags('default')).toEqual([])
+test('opus emits --model opus', () => {
+  expect(chatModelToFlags('opus')).toEqual(['--model', 'opus'])
 })
 
 test('sonnet emits --model sonnet', () => {
   expect(chatModelToFlags('sonnet')).toEqual(['--model', 'sonnet'])
-})
-
-test('opus emits --model opus', () => {
-  expect(chatModelToFlags('opus')).toEqual(['--model', 'opus'])
 })
 
 test('haiku emits --model haiku', () => {
@@ -41,7 +37,8 @@ test('isChatModel accepts known aliases', () => {
   for (const m of CHAT_MODELS) expect(isChatModel(m)).toBe(true)
 })
 
-test('isChatModel rejects unknown strings', () => {
+test('isChatModel rejects "default" (legacy) and unknown strings', () => {
+  expect(isChatModel('default')).toBe(false)
   expect(isChatModel('gpt-5')).toBe(false)
   expect(isChatModel('claude-sonnet-4-5')).toBe(false)
   expect(isChatModel('')).toBe(false)
@@ -54,9 +51,12 @@ test('isChatModel rejects non-strings', () => {
   expect(isChatModel({})).toBe(false)
 })
 
-test('DEFAULT_CHAT_MODEL is the no-op default', () => {
-  expect(DEFAULT_CHAT_MODEL).toBe('default')
-  expect(chatModelToFlags(DEFAULT_CHAT_MODEL)).toEqual([])
+test('CHAT_MODELS order matches dropdown (opus, sonnet, haiku)', () => {
+  expect(CHAT_MODELS).toEqual(['opus', 'sonnet', 'haiku'])
+})
+
+test('DEFAULT_CHAT_MODEL is opus', () => {
+  expect(DEFAULT_CHAT_MODEL).toBe('opus')
 })
 
 test('normalizeAccountModel: short aliases', () => {
@@ -77,16 +77,16 @@ test('normalizeAccountModel: mixed case', () => {
   expect(normalizeAccountModel('SONNET')).toBe('sonnet')
 })
 
-test('normalizeAccountModel: unknown / null / empty → fallback opus', () => {
-  expect(normalizeAccountModel(null)).toBe(FALLBACK_ACCOUNT_DEFAULT_MODEL)
-  expect(normalizeAccountModel(undefined)).toBe(FALLBACK_ACCOUNT_DEFAULT_MODEL)
-  expect(normalizeAccountModel('')).toBe(FALLBACK_ACCOUNT_DEFAULT_MODEL)
-  expect(normalizeAccountModel('gpt-5')).toBe(FALLBACK_ACCOUNT_DEFAULT_MODEL)
-  expect(normalizeAccountModel('unknown-future-model')).toBe(FALLBACK_ACCOUNT_DEFAULT_MODEL)
+test('normalizeAccountModel: legacy "default" → fallback opus', () => {
+  expect(normalizeAccountModel('default')).toBe(DEFAULT_CHAT_MODEL)
 })
 
-test('FALLBACK_ACCOUNT_DEFAULT_MODEL is opus', () => {
-  expect(FALLBACK_ACCOUNT_DEFAULT_MODEL).toBe('opus')
+test('normalizeAccountModel: unknown / null / empty → fallback opus', () => {
+  expect(normalizeAccountModel(null)).toBe(DEFAULT_CHAT_MODEL)
+  expect(normalizeAccountModel(undefined)).toBe(DEFAULT_CHAT_MODEL)
+  expect(normalizeAccountModel('')).toBe(DEFAULT_CHAT_MODEL)
+  expect(normalizeAccountModel('gpt-5')).toBe(DEFAULT_CHAT_MODEL)
+  expect(normalizeAccountModel('unknown-future-model')).toBe(DEFAULT_CHAT_MODEL)
 })
 
 console.log(`\n${passed} passed, ${failed} failed`)

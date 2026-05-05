@@ -1,27 +1,27 @@
 /**
- * Claude model the chat subprocess targets. `default` = inherit account default
- * (no `--model` flag). Stored in `provider_config.<terminalMode>.chatModel`.
+ * Claude model the chat subprocess targets. Stored in
+ * `provider_config.<terminalMode>.chatModel`.
  *
  * Mirrors the `claude --model` CLI accepted aliases. Full Anthropic ids
  * (`claude-sonnet-4-5-...`) also work but the alias keeps task DB stable
  * across model rev-bumps.
+ *
+ * No `'default'` option — the UI surfaces only concrete picks. When nothing
+ * is stored, callers fall back to the account default resolved from
+ * `~/.claude/settings.json` (see `account-default-model.ts`); ultimate
+ * fallback is `DEFAULT_CHAT_MODEL`.
  */
-export type ChatModel = 'default' | 'sonnet' | 'opus' | 'haiku'
+export type ChatModel = 'opus' | 'sonnet' | 'haiku'
 
-/** Concrete resolved model — never `'default'`. Used to describe what the
- * Claude account default actually is (e.g. `~/.claude/settings.json` `model`). */
-export type ResolvedChatModel = Exclude<ChatModel, 'default'>
+/** Order matches the dropdown UI. */
+export const CHAT_MODELS: ChatModel[] = ['opus', 'sonnet', 'haiku']
 
-export const CHAT_MODELS: ChatModel[] = ['default', 'sonnet', 'opus', 'haiku']
+/** Hard fallback when neither DB nor `~/.claude/settings.json` resolves. */
+export const DEFAULT_CHAT_MODEL: ChatModel = 'opus'
 
-export const DEFAULT_CHAT_MODEL: ChatModel = 'default'
-
-/** Fallback when account default cannot be determined from settings. */
-export const FALLBACK_ACCOUNT_DEFAULT_MODEL: ResolvedChatModel = 'opus'
-
-/** CLI flags for a given ChatModel. `default` emits none → CLI picks. */
+/** CLI flags for a given ChatModel. Always `--model <alias>`. */
 export function chatModelToFlags(model: ChatModel): string[] {
-  return model === 'default' ? [] : ['--model', model]
+  return ['--model', model]
 }
 
 export function isChatModel(v: unknown): v is ChatModel {
@@ -29,16 +29,17 @@ export function isChatModel(v: unknown): v is ChatModel {
 }
 
 /**
- * Map a raw `model` string from `~/.claude/settings.json` (or similar) to
- * one of our concrete aliases. Accepts shortform aliases (`opus`, `sonnet`,
- * `haiku`) and full ids (`claude-opus-4-7`, `claude-3-5-sonnet-20241022`).
- * Returns `FALLBACK_ACCOUNT_DEFAULT_MODEL` for unknown / null / unparseable.
+ * Map a raw `model` string from `~/.claude/settings.json` (or a legacy
+ * stored value like `'default'`) to one of our concrete aliases. Accepts
+ * shortform aliases (`opus`, `sonnet`, `haiku`) and full ids
+ * (`claude-opus-4-7`, `claude-3-5-sonnet-20241022`).
+ * Returns `DEFAULT_CHAT_MODEL` for unknown / null / unparseable.
  */
-export function normalizeAccountModel(raw: string | null | undefined): ResolvedChatModel {
-  if (!raw || typeof raw !== 'string') return FALLBACK_ACCOUNT_DEFAULT_MODEL
+export function normalizeAccountModel(raw: string | null | undefined): ChatModel {
+  if (!raw || typeof raw !== 'string') return DEFAULT_CHAT_MODEL
   const s = raw.toLowerCase()
   if (s.includes('opus')) return 'opus'
   if (s.includes('sonnet')) return 'sonnet'
   if (s.includes('haiku')) return 'haiku'
-  return FALLBACK_ACCOUNT_DEFAULT_MODEL
+  return DEFAULT_CHAT_MODEL
 }
