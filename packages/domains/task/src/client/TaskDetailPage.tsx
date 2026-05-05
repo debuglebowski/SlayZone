@@ -1713,7 +1713,6 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
 
   const handleDeleteConfirm = (): void => {
     setDeleteDialogOpen(false)
-    onBack()
   }
 
   if (!task) {
