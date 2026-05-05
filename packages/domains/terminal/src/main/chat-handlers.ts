@@ -3,6 +3,9 @@ import type { Database } from 'better-sqlite3'
 import {
   createChat,
   sendUserMessage,
+  sendToolResult,
+  sendControlRequest,
+  updateSessionChatMode,
   kill as killChat,
   removeSession,
   recordInterrupted,
@@ -19,11 +22,13 @@ import {
   getNextSeqForTab,
   clearChatEventsForTab,
 } from './chat-events-store'
+import { notifyGlobalStateListeners } from './pty-manager'
 import { parseShellArgs } from './adapters/flag-parser'
 import { buildMcpEnv } from './mcp-env'
 import { getEnrichedPath } from './shell-env'
 import { supportsChatMode } from './agents/registry'
 import { getAutoModeEligibility, type AutoModeEligibility } from './auto-mode-eligibility'
+import { resolveAccountDefaultModel } from './account-default-model'
 import { listSkills } from './skills'
 import { listCommands } from './commands'
 import { listAgents } from './agents-registry'
@@ -31,8 +36,14 @@ import { listProjectFiles } from './files-scan'
 import { bumpAutocompleteUsage, getAutocompleteUsage, type UsageMap } from './autocomplete-usage-store'
 import type { SkillInfo, CommandInfo, AgentInfo, FileMatch } from '../shared/types'
 import type { AgentEvent } from '../shared/agent-events'
-import { rawPermissionModeToChatMode, chatModeToFlags as chatModeToFlagsShared, type ChatMode as ChatModeShared } from '../shared/chat-mode'
+import {
+  rawPermissionModeToChatMode,
+  chatModeToFlags as chatModeToFlagsShared,
+  chatModeToCliPermissionMode,
+  type ChatMode as ChatModeShared,
+} from '../shared/chat-mode'
 import { chatModelToFlags, DEFAULT_CHAT_MODEL, isChatModel, type ChatModel } from '../shared/chat-model'
+import { chatEffortToFlags, isChatEffort, type ChatEffort } from '../shared/chat-effort'
 
 export interface ChatHandlerOpts {
   /** Optional secondary subscriber to every persisted chat event. Used by the
@@ -49,13 +60,15 @@ interface ChatCreateOpts {
 }
 
 /**
- * Permission/operating mode for chat sessions. Chat lacks an interactive prompt
- * mechanism over stream-json (verified via spike), so each mode resolves to a
- * static set of CLI flags at spawn time. See `shared/chat-mode.ts` for the
- * canonical type + mapping.
+ * Permission/operating mode for chat sessions. Live mode flips ride a
+ * `control_request {subtype:'set_permission_mode', mode}` over stdin so the
+ * subprocess (and warm conversation state) survives — see `chat:setMode`.
+ * `bypass` still needs a kill+respawn because it's enabled via a separate
+ * `--allow-dangerously-skip-permissions` flag with no in-flight equivalent;
+ * the handler falls back to that path when control_request can't apply.
  *
- * "Normal" mode (interactive per-tool prompts) intentionally absent — would
- * require swapping the CLI subprocess for the programmatic Anthropic SDK.
+ * Inbound `tool_result` blocks (e.g. AskUserQuestion answer) ride the same
+ * stdin channel — `chat:sendToolResult`.
  *
  * `auto` requires Max/Team/Enterprise + a one-time opt-in. Capability is
  * detected via `chat:getAutoEligibility` (reads ~/.claude.json + settings.json);
@@ -97,6 +110,8 @@ interface ProviderConfigEntry {
   chatMode?: ChatMode | null
   /** Claude model alias for chat. See `ChatModel`. */
   chatModel?: ChatModel | null
+  /** Reasoning effort level. `null`/missing = inherit provider default. */
+  chatEffort?: ChatEffort | null
 }
 
 function readProviderConfig(db: Database, taskId: string, mode: string): ProviderConfigEntry {
@@ -144,6 +159,24 @@ function writeChatModel(db: Database, taskId: string, mode: string, chatModel: C
   const existing = cfg[mode] ?? {}
   if (existing.chatModel === chatModel) return
   cfg[mode] = { ...existing, chatModel }
+  db.prepare('UPDATE tasks SET provider_config = ? WHERE id = ?').run(JSON.stringify(cfg), taskId)
+}
+
+function writeChatEffort(db: Database, taskId: string, mode: string, chatEffort: ChatEffort | null): void {
+  const row = db.prepare('SELECT provider_config FROM tasks WHERE id = ?').get(taskId) as
+    | { provider_config: string | null }
+    | undefined
+  let cfg: Record<string, ProviderConfigEntry> = {}
+  if (row?.provider_config) {
+    try {
+      cfg = JSON.parse(row.provider_config) as Record<string, ProviderConfigEntry>
+    } catch {
+      cfg = {}
+    }
+  }
+  const existing = cfg[mode] ?? {}
+  if ((existing.chatEffort ?? null) === chatEffort) return
+  cfg[mode] = { ...existing, chatEffort }
   db.prepare('UPDATE tasks SET provider_config = ? WHERE id = ?').run(JSON.stringify(cfg), taskId)
 }
 
@@ -293,7 +326,7 @@ export function inspectPermissionFlags(flags: string[]): {
 async function buildCreateOpts(
   db: Database,
   opts: ChatCreateOpts,
-  { fresh, chatModeOverride, chatModelOverride }: { fresh: boolean; chatModeOverride?: ChatMode; chatModelOverride?: ChatModel }
+  { fresh, chatModeOverride, chatModelOverride, chatEffortOverride }: { fresh: boolean; chatModeOverride?: ChatMode; chatModelOverride?: ChatModel; chatEffortOverride?: ChatEffort | null }
 ): Promise<Parameters<typeof createChat>[0]> {
   const providerCfg = readProviderConfig(db, opts.taskId, opts.mode)
   // Flag-resolution priority for chat:
@@ -326,9 +359,12 @@ async function buildCreateOpts(
   // chatModel field. When `flags` is set, chatModel is not appended (the
   // explicit flag string is the source of truth).
   const resolvedChatModel: ChatModel = chatModelOverride ?? providerCfg.chatModel ?? DEFAULT_CHAT_MODEL
+  const resolvedChatEffort: ChatEffort | null =
+    chatEffortOverride !== undefined ? chatEffortOverride : (providerCfg.chatEffort ?? null)
   const usedExplicitFlags = !chatModeOverride && (opts.providerFlagsOverride || providerCfg.flags)
   if (!usedExplicitFlags) {
     providerFlags = [...providerFlags, ...chatModelToFlags(resolvedChatModel)]
+    providerFlags = [...providerFlags, ...chatEffortToFlags(resolvedChatEffort)]
   }
 
   const initialBuffer = fresh ? [] : loadChatEvents(db, opts.tabId)
@@ -352,6 +388,7 @@ async function buildCreateOpts(
     initialNextSeq,
     chatMode: resolvedChatMode,
     chatModel: resolvedChatModel,
+    chatEffort: resolvedChatEffort,
     onPersistSessionId: (id) => {
       writeChatConversationId(db, opts.taskId, opts.mode, id)
     },
@@ -365,6 +402,7 @@ export function registerChatHandlers(ipcMain: IpcMain, db: Database, opts: ChatH
   // Wire SQLite persistence into the transport. Default deps had a no-op
   // persistEvent; configureTransport keeps spawn/whichBinary/broadcast* untouched.
   configureTransport({
+    onStateChange: notifyGlobalStateListeners,
     persistEvent: (tabId, seq, event) => {
       try {
         persistChatEvent(db, tabId, seq, event)
@@ -406,6 +444,17 @@ export function registerChatHandlers(ipcMain: IpcMain, db: Database, opts: ChatH
   ipcMain.handle('chat:send', (_, tabId: string, text: string): boolean => {
     return sendUserMessage(tabId, text)
   })
+
+  // Inline tool-answer flows (e.g. AskUserQuestion). Resolves the pending
+  // tool_use_id with a tool_result content block so the SDK's turn machinery
+  // sees a normal completion. Returns false when the adapter lacks a
+  // structured-input channel — renderer falls back to chat:send.
+  ipcMain.handle(
+    'chat:sendToolResult',
+    (_, tabId: string, args: { toolUseId: string; content: string; isError?: boolean }): boolean => {
+      return sendToolResult(tabId, args)
+    }
+  )
 
   // Interrupt = stop the current turn but keep the session. SIGINT is unreliable
   // on claude-code (Spike C), so we kill + respawn with --resume: timeline + chat
@@ -507,6 +556,8 @@ export function registerChatHandlers(ipcMain: IpcMain, db: Database, opts: ChatH
     (): Promise<AutoModeEligibility> => getAutoModeEligibility()
   )
 
+  ipcMain.handle('chat:getAccountDefaultModel', () => resolveAccountDefaultModel())
+
   ipcMain.handle(
     'chat:setMode',
     async (_, opts: ChatCreateOpts & { chatMode: ChatMode }): Promise<ChatSessionInfo> => {
@@ -514,10 +565,39 @@ export function registerChatHandlers(ipcMain: IpcMain, db: Database, opts: ChatH
       // already filters in the pill, but a stale renderer or a direct IPC call
       // shouldn't be able to persist a forbidden mode.
       const safe = await resolveSafeChatMode(opts.chatMode)
-      // Transactional: spawn first, persist DB after spawn succeeds. If
-      // createChat throws, DB stays at previous mode (no orphan persist).
-      // chatModeOverride bypasses DB read so the new child uses `safe` flags
-      // even though provider_config still has the old value.
+
+      // Fast path: live `set_permission_mode` control_request. Preserves the
+      // warm subprocess + conversation state. Only available when the live
+      // session has a control channel AND the target maps to a CLI
+      // permission_mode value (bypass uses a separate flag → null → fallback).
+      const cliMode = chatModeToCliPermissionMode(safe)
+      const liveInfo = getSessionInfo(opts.tabId)
+      if (cliMode && liveInfo && !liveInfo.ended) {
+        try {
+          await sendControlRequest(opts.tabId, {
+            subtype: 'set_permission_mode',
+            mode: cliMode,
+          })
+          writeChatMode(db, opts.taskId, opts.mode, safe)
+          updateSessionChatMode(opts.tabId, safe)
+          const refreshed = getSessionInfo(opts.tabId)
+          if (refreshed) return refreshed
+        } catch (err) {
+          console.warn(
+            '[chat-handlers] set_permission_mode control_request failed, falling back to kill+respawn:',
+            err
+          )
+          // fall through to respawn path below
+        }
+      }
+
+      // Fallback: kill + respawn with new flags. Required for `bypass` (uses
+      // --allow-dangerously-skip-permissions, no live equivalent) and as a
+      // safety net when the control channel rejects/times out. Transactional:
+      // spawn first, persist DB after spawn succeeds. If createChat throws, DB
+      // stays at previous mode. chatModeOverride bypasses DB read so the new
+      // child uses `safe` flags even though provider_config still has the old
+      // value.
       removeSession(opts.tabId)
       const created = await createChat(
         await buildCreateOpts(db, opts, { fresh: false, chatModeOverride: safe })
@@ -553,6 +633,33 @@ export function registerChatHandlers(ipcMain: IpcMain, db: Database, opts: ChatH
         await buildCreateOpts(db, opts, { fresh: false, chatModelOverride: opts.chatModel })
       )
       writeChatModel(db, opts.taskId, opts.mode, opts.chatModel)
+      return created
+    }
+  )
+
+  ipcMain.handle(
+    'chat:getEffort',
+    (_, taskId: string, mode: string): ChatEffort | null => {
+      const cfg = readProviderConfig(db, taskId, mode)
+      const stored = cfg.chatEffort ?? null
+      return isChatEffort(stored) ? stored : null
+    }
+  )
+
+  ipcMain.handle(
+    'chat:setEffort',
+    async (_, opts: ChatCreateOpts & { chatEffort: ChatEffort }): Promise<ChatSessionInfo> => {
+      if (!isChatEffort(opts.chatEffort)) {
+        throw new Error(`Invalid chat effort: ${String(opts.chatEffort)}`)
+      }
+      // Same kill+respawn pattern as chat:setMode/setModel — effort flag only
+      // takes effect on a fresh process. chatEffortOverride bypasses DB so the
+      // new child uses the requested level before we persist.
+      removeSession(opts.tabId)
+      const created = await createChat(
+        await buildCreateOpts(db, opts, { fresh: false, chatEffortOverride: opts.chatEffort })
+      )
+      writeChatEffort(db, opts.taskId, opts.mode, opts.chatEffort)
       return created
     }
   )

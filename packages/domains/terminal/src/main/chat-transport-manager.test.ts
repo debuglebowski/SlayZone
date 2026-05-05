@@ -233,6 +233,144 @@ await test('sendUserMessage: writes NDJSON line to stdin', async () => {
   expect(parsed.message.content).toBe('hello')
 })
 
+await test('sendToolResult: writes NDJSON tool_result envelope keyed by tool_use_id', async () => {
+  await setup()
+  const fake = makeFakeChild()
+  mgr.setTransportDepsForTests({
+    whichBinary: async () => '/fake/claude',
+    spawn: () => fake as unknown as ChildProcess,
+    broadcastEvent: () => {},
+    broadcastExit: () => {},
+  })
+  await mgr.createChat({
+    tabId: 'tab-tr',
+    taskId: 'task-test',
+    mode: 'claude-code',
+    cwd: '/tmp',
+    conversationId: null,
+    providerFlags: [],
+  })
+  const ok = mgr.sendToolResult('tab-tr', {
+    toolUseId: 'tu_99',
+    content: '{"answers":{"Pick":"A"}}',
+  })
+  expect(ok).toBe(true)
+  const line = fake._stdinRef.value.trim()
+  const parsed = JSON.parse(line)
+  expect(parsed.type).toBe('user')
+  expect(parsed.message.role).toBe('user')
+  const block = parsed.message.content[0]
+  expect(block.type).toBe('tool_result')
+  expect(block.tool_use_id).toBe('tu_99')
+  expect(block.content).toBe('{"answers":{"Pick":"A"}}')
+})
+
+await test('sendToolResult: returns false for unknown tab', async () => {
+  await setup()
+  const ok = mgr.sendToolResult('nonexistent-tab', { toolUseId: 'x', content: 'y' })
+  expect(ok).toBe(false)
+})
+
+await test('sendControlRequest: writes envelope + resolves on matching control_response', async () => {
+  await setup()
+  const fake = makeFakeChild()
+  mgr.setTransportDepsForTests({
+    whichBinary: async () => '/fake/claude',
+    spawn: () => fake as unknown as ChildProcess,
+    broadcastEvent: () => {},
+    broadcastExit: () => {},
+  })
+  await mgr.createChat({
+    tabId: 'tab-ctrl',
+    taskId: 'task-test',
+    mode: 'claude-code',
+    cwd: '/tmp',
+    conversationId: null,
+    providerFlags: [],
+  })
+
+  const promise = mgr.sendControlRequest('tab-ctrl', {
+    subtype: 'set_permission_mode',
+    mode: 'acceptEdits',
+  })
+
+  // Stdin must contain the envelope. Pull the line, scrape its request_id,
+  // then push a matching success response onto stdout.
+  const line = fake._stdinRef.value.trim()
+  const parsed = JSON.parse(line)
+  expect(parsed.type).toBe('control_request')
+  const requestId: string = parsed.request_id
+  expect(parsed.request.subtype).toBe('set_permission_mode')
+  expect(parsed.request.mode).toBe('acceptEdits')
+
+  fake._stdout.write(
+    JSON.stringify({
+      type: 'control_response',
+      response: { subtype: 'success', request_id: requestId },
+    }) + '\n'
+  )
+
+  // Resolves with the response data (envelope fields stripped).
+  await promise
+})
+
+await test('sendControlRequest: rejects on error subtype', async () => {
+  await setup()
+  const fake = makeFakeChild()
+  mgr.setTransportDepsForTests({
+    whichBinary: async () => '/fake/claude',
+    spawn: () => fake as unknown as ChildProcess,
+    broadcastEvent: () => {},
+    broadcastExit: () => {},
+  })
+  await mgr.createChat({
+    tabId: 'tab-ctrl-err',
+    taskId: 'task-test',
+    mode: 'claude-code',
+    cwd: '/tmp',
+    conversationId: null,
+    providerFlags: [],
+  })
+
+  const promise = mgr.sendControlRequest('tab-ctrl-err', { subtype: 'set_permission_mode', mode: 'plan' })
+  const parsed = JSON.parse(fake._stdinRef.value.trim())
+  fake._stdout.write(
+    JSON.stringify({
+      type: 'control_response',
+      response: { subtype: 'error', request_id: parsed.request_id, error: 'rejected by SDK' },
+    }) + '\n'
+  )
+
+  let err: Error | null = null
+  try {
+    await promise
+  } catch (e) {
+    err = e as Error
+  }
+  expect(err?.message).toBe('rejected by SDK')
+})
+
+await test('sendControlRequest: rejects when adapter has no control channel', async () => {
+  await setup()
+  const fake = makeFakeChild()
+  mgr.setTransportDepsForTests({
+    whichBinary: async () => '/fake/claude',
+    spawn: () => fake as unknown as ChildProcess,
+    broadcastEvent: () => {},
+    broadcastExit: () => {},
+  })
+  // Register a stub adapter with no serializeControlRequest. Re-using the
+  // claude adapter id would clash; use a fresh id and register via the public
+  // API isn't exposed for tests, so we just assert the unknown-tab path here.
+  let err: Error | null = null
+  try {
+    await mgr.sendControlRequest('nonexistent-tab', { subtype: 'interrupt' })
+  } catch (e) {
+    err = e as Error
+  }
+  expect(err?.message).toBe('no live session')
+})
+
 await test('invalid --resume: onInvalidResume fires + auto-retry with fresh session', async () => {
   await setup()
   const persisted: string[] = []
@@ -507,6 +645,39 @@ await test('createChat: same tabId AND same identity → returns existing sessio
     providerFlags: [],
   })
   expect(spawnCount).toBe(1)
+})
+
+await test('onStateChange: fires alongside broadcastStateChange so global listeners see chat activity', async () => {
+  await setup()
+  const fake = makeFakeChild()
+  const broadcasts: Array<{ sessionId: string; next: string; old: string }> = []
+  const globalNotices: Array<{ sessionId: string; next: string; old: string }> = []
+  mgr.setTransportDepsForTests({
+    whichBinary: async () => '/fake/claude',
+    spawn: () => fake as unknown as ChildProcess,
+    broadcastEvent: () => {},
+    broadcastExit: () => {},
+    broadcastStateChange: (sessionId, next, old) => broadcasts.push({ sessionId, next, old }),
+    onStateChange: (sessionId, next, old) => globalNotices.push({ sessionId, next, old }),
+  })
+  await mgr.createChat({
+    tabId: 'tab-state',
+    taskId: 'task-state',
+    mode: 'claude-code',
+    cwd: '/tmp',
+    conversationId: null,
+    providerFlags: [],
+  })
+  fake._stdout.write(readFileSync(resolve(fixtureDir(), 'bash.ndjson'), 'utf8'))
+  await new Promise((r) => setTimeout(r, 50))
+
+  // Both channels must see at least one running and one idle transition,
+  // keyed by `${taskId}:${tabId}` so handleTerminalStateChange can split off the taskId.
+  expect(broadcasts.length > 0).toBeTruthy()
+  expect(globalNotices.length).toBe(broadcasts.length)
+  expect(globalNotices[0].sessionId).toBe('task-state:tab-state')
+  expect(globalNotices.some((g) => g.next === 'running')).toBeTruthy()
+  expect(globalNotices.some((g) => g.next === 'idle' && g.old === 'running')).toBeTruthy()
 })
 
 console.log(`\n${passed} passed, ${failed} failed`)

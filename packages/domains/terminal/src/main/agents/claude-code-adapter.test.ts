@@ -398,5 +398,76 @@ test('extractSessionId: pulls from turn-init, null otherwise', () => {
   expect(claudeCodeAdapter.extractSessionId(result)).toBe(null)
 })
 
+test('serializeToolResult: emits user-envelope tool_result keyed by tool_use_id', () => {
+  const out = claudeCodeAdapter.serializeToolResult?.({
+    toolUseId: 'tu_42',
+    content: '{"answers":{"Q":"A"}}',
+    sessionId: 'sid-1',
+  })
+  if (typeof out !== 'string') throw new Error('expected string')
+  const parsed = JSON.parse(out) as Record<string, unknown>
+  expect(parsed.type).toBe('user')
+  const message = parsed.message as { role: string; content: Array<Record<string, unknown>> }
+  expect(message.role).toBe('user')
+  const block = message.content[0]
+  expect(block.type).toBe('tool_result')
+  expect(block.tool_use_id).toBe('tu_42')
+  expect(block.content).toBe('{"answers":{"Q":"A"}}')
+  // is_error omitted when not set — keeps wire payload minimal.
+  expect('is_error' in block).toBe(false)
+})
+
+test('serializeControlRequest: wraps payload in control_request envelope', () => {
+  const out = claudeCodeAdapter.serializeControlRequest?.({
+    requestId: 'req_1_abc',
+    request: { subtype: 'set_permission_mode', mode: 'acceptEdits' },
+  })
+  if (typeof out !== 'string') throw new Error('expected string')
+  const parsed = JSON.parse(out) as Record<string, unknown>
+  expect(parsed.type).toBe('control_request')
+  expect(parsed.request_id).toBe('req_1_abc')
+  const req = parsed.request as Record<string, unknown>
+  expect(req.subtype).toBe('set_permission_mode')
+  expect(req.mode).toBe('acceptEdits')
+})
+
+test('parseLine: control_response success → control-response event with isError=false', () => {
+  const ev = claudeCodeAdapter.parseLine(
+    JSON.stringify({
+      type: 'control_response',
+      response: { subtype: 'success', request_id: 'req_42' },
+    })
+  )
+  if (!ev || ev.kind !== 'control-response') throw new Error('expected control-response')
+  expect(ev.requestId).toBe('req_42')
+  expect(ev.isError).toBe(false)
+})
+
+test('parseLine: control_response error → carries error message', () => {
+  const ev = claudeCodeAdapter.parseLine(
+    JSON.stringify({
+      type: 'control_response',
+      response: { subtype: 'error', request_id: 'req_99', error: 'bad mode' },
+    })
+  )
+  if (!ev || ev.kind !== 'control-response') throw new Error('expected control-response')
+  expect(ev.requestId).toBe('req_99')
+  expect(ev.isError).toBe(true)
+  expect(ev.error).toBe('bad mode')
+})
+
+test('serializeToolResult: includes is_error flag when set', () => {
+  const out = claudeCodeAdapter.serializeToolResult?.({
+    toolUseId: 'tu_err',
+    content: 'failed',
+    isError: true,
+    sessionId: 'sid-1',
+  })
+  if (typeof out !== 'string') throw new Error('expected string')
+  const parsed = JSON.parse(out) as Record<string, unknown>
+  const message = parsed.message as { content: Array<Record<string, unknown>> }
+  expect(message.content[0].is_error).toBe(true)
+})
+
 console.log(`\n${passed} passed, ${failed} failed`)
 process.exit(failed > 0 ? 1 : 0)

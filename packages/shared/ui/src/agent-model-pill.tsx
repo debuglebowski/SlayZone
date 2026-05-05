@@ -8,6 +8,7 @@ import {
 } from './dropdown-menu'
 
 export type AgentModel = 'default' | 'sonnet' | 'opus' | 'haiku'
+export type ResolvedAgentModel = Exclude<AgentModel, 'default'>
 
 interface ModelMeta {
   label: string
@@ -18,7 +19,7 @@ interface ModelMeta {
 const MODEL_META: Record<AgentModel, ModelMeta> = {
   default: {
     label: 'Default model',
-    short: 'Default',
+    short: 'Default model',
     description: 'Inherit Claude account default. No --model flag.',
   },
   sonnet: {
@@ -38,6 +39,12 @@ const MODEL_META: Record<AgentModel, ModelMeta> = {
   },
 }
 
+const RESOLVED_LABEL: Record<ResolvedAgentModel, string> = {
+  sonnet: 'Sonnet',
+  opus: 'Opus',
+  haiku: 'Haiku',
+}
+
 const MODEL_ORDER: AgentModel[] = ['default', 'sonnet', 'opus', 'haiku']
 
 export interface AgentModelPillProps {
@@ -48,10 +55,16 @@ export interface AgentModelPillProps {
   /** Visual style. `pill` = chip (default). `text` = plain inline text. */
   variant?: 'pill' | 'text'
   className?: string
+  /** Resolved value of "Default" — read from `~/.claude/settings.json`. When
+   * provided, dropdown row for `default` shows ` → Opus` (or matching label). */
+  accountDefaultModel?: ResolvedAgentModel | null
 }
 
-export function AgentModelPill({ model, onChange, disabled, compact, variant = 'pill', className }: AgentModelPillProps) {
+export function AgentModelPill({ model, onChange, disabled, compact, variant = 'pill', className, accountDefaultModel }: AgentModelPillProps) {
   const meta = MODEL_META[model]
+  const defaultDescSuffix = accountDefaultModel
+    ? ` → ${RESOLVED_LABEL[accountDefaultModel]}.`
+    : ''
   return (
     <DropdownMenu>
       <DropdownMenuTrigger
@@ -75,6 +88,8 @@ export function AgentModelPill({ model, onChange, disabled, compact, variant = '
         {MODEL_ORDER.map((m) => {
           const itemMeta = MODEL_META[m]
           const selected = m === model
+          const description =
+            m === 'default' ? `${itemMeta.description}${defaultDescSuffix}` : itemMeta.description
           return (
             <DropdownMenuItem
               key={m}
@@ -91,10 +106,14 @@ export function AgentModelPill({ model, onChange, disabled, compact, variant = '
               <div className="flex-1 min-w-0">
                 <div className="text-xs font-medium">{itemMeta.label}</div>
                 <div className="text-[11px] text-muted-foreground leading-snug">
-                  {itemMeta.description}
+                  {description}
                 </div>
               </div>
-              {selected && <span className="text-[10px] text-muted-foreground self-center">current</span>}
+              {selected && (
+                <span className="self-center rounded-full border border-border px-1.5 py-0.5 text-[10px] text-muted-foreground">
+                  current
+                </span>
+              )}
             </DropdownMenuItem>
           )
         })}

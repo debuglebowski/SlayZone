@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { toast, type AgentModel } from '@slayzone/ui'
+import { toast, type AgentModel, type ResolvedAgentModel } from '@slayzone/ui'
 
 interface SessionInfoLite {
   chatModel?: AgentModel | null
@@ -16,6 +16,7 @@ interface ChatModelApi {
   setModel: (opts: { tabId: string; taskId: string; mode: string; cwd: string; chatModel: AgentModel }) => Promise<SessionInfoLite>
   getModel: (taskId: string, mode: string) => Promise<AgentModel>
   getInfo: (tabId: string) => Promise<SessionInfoLite | null>
+  getAccountDefaultModel?: () => Promise<ResolvedAgentModel>
 }
 
 function getApi(): ChatModelApi {
@@ -30,6 +31,7 @@ function getApi(): ChatModelApi {
 export function useChatModel({ taskId, mode, tabId, cwd }: UseChatModelOpts) {
   const [chatModel, setChatModelState] = useState<AgentModel>('default')
   const [modelChanging, setModelChanging] = useState(false)
+  const [accountDefaultModel, setAccountDefaultModel] = useState<ResolvedAgentModel | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -50,6 +52,21 @@ export function useChatModel({ taskId, mode, tabId, cwd }: UseChatModelOpts) {
     return () => { cancelled = true }
   }, [taskId, mode, tabId])
 
+  useEffect(() => {
+    let cancelled = false
+    void (async () => {
+      try {
+        const fn = getApi().getAccountDefaultModel
+        if (!fn) return
+        const resolved = await fn()
+        if (!cancelled) setAccountDefaultModel(resolved)
+      } catch {
+        /* leave null — pill omits hint */
+      }
+    })()
+    return () => { cancelled = true }
+  }, [])
+
   const handleModelChange = useCallback(async (next: AgentModel) => {
     if (next === chatModel || modelChanging) return
     setModelChanging(true)
@@ -64,5 +81,5 @@ export function useChatModel({ taskId, mode, tabId, cwd }: UseChatModelOpts) {
     }
   }, [chatModel, modelChanging, tabId, taskId, mode, cwd])
 
-  return { chatModel, modelChanging, handleModelChange }
+  return { chatModel, modelChanging, handleModelChange, accountDefaultModel }
 }

@@ -32,3 +32,19 @@ export function chatModeToFlags(mode: ChatMode): string[] {
     case 'bypass': return ['--allow-dangerously-skip-permissions']
   }
 }
+
+/**
+ * Map our ChatMode to the raw CLI permission_mode string used by the SDK's
+ * `control_request {subtype:'set_permission_mode', mode}`. Returns null for
+ * `bypass` because that mode is enabled via the separate
+ * `--allow-dangerously-skip-permissions` flag (no in-flight control equivalent),
+ * so it requires a process restart instead.
+ */
+export function chatModeToCliPermissionMode(mode: ChatMode): string | null {
+  switch (mode) {
+    case 'plan': return 'plan'
+    case 'auto-accept': return 'acceptEdits'
+    case 'auto': return 'auto'
+    case 'bypass': return null
+  }
+}

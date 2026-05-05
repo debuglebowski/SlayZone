@@ -26,6 +26,10 @@ interface ChatApi {
     providerFlagsOverride?: string | null
   }) => Promise<unknown>
   send: (tabId: string, text: string) => Promise<boolean>
+  sendToolResult: (
+    tabId: string,
+    args: { toolUseId: string; content: string; isError?: boolean }
+  ) => Promise<boolean>
   interrupt: (opts: {
     tabId: string
     taskId: string
@@ -81,6 +85,13 @@ export interface UseChatSessionResult {
    */
   permissionMode: string | null
   sendMessage: (text: string) => Promise<void>
+  /**
+   * Resolve a pending `tool_use_id` (e.g. AskUserQuestion) with a `tool_result`
+   * content block instead of a plain user message. Returns true when the
+   * adapter accepted the structured result, false when it lacks a structured-
+   * input channel — caller should fall back to `sendMessage`.
+   */
+  sendToolResult: (args: { toolUseId: string; content: string; isError?: boolean }) => Promise<boolean>
   interrupt: () => Promise<void>
   /**
    * Stop the current turn. If no assistant progress arrived since the user's
@@ -188,6 +199,15 @@ export function useChatSession(opts: UseChatSessionOpts): UseChatSessionResult {
     await chat.send(opts.tabId, text)
   }
 
+  const sendToolResult = async (args: {
+    toolUseId: string
+    content: string
+    isError?: boolean
+  }): Promise<boolean> => {
+    const chat = getChatApi()
+    return chat.sendToolResult(opts.tabId, args)
+  }
+
   const interrupt = async (): Promise<void> => {
     const chat = getChatApi()
     // Main records an `interrupted` event into the session buffer before kill+respawn;
@@ -234,6 +254,7 @@ export function useChatSession(opts: UseChatSessionOpts): UseChatSessionResult {
     hydrating,
     permissionMode: state.permissionMode,
     sendMessage,
+    sendToolResult,
     interrupt,
     abortAndPop,
     kill,

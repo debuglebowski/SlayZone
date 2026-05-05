@@ -785,6 +785,12 @@ function applyEvent(state: ChatTimelineState, event: AgentEvent): ChatTimelineSt
       // Silently drop — already logged main-side as `[chat-parser] unknown event type=X`.
       // UI noise w/ no signal; wire the event in the adapter when we learn what it is.
       return state
+    case 'control-response':
+      // Transport intercepts these before they reach the timeline reducer to
+      // resolve the matching `sendControlRequest` promise. The case here
+      // exists only for exhaustive-switch type-safety; reaching it would mean
+      // transport leaked a control_response — defensive no-op.
+      return state
   }
 }
 

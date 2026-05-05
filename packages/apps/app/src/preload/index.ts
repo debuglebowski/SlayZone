@@ -493,6 +493,10 @@ const api: ElectronAPI = {
     create: (opts: { tabId: string; taskId: string; mode: string; cwd: string; providerFlagsOverride?: string | null }) =>
       ipcRenderer.invoke('chat:create', opts),
     send: (tabId: string, text: string) => ipcRenderer.invoke('chat:send', tabId, text),
+    sendToolResult: (
+      tabId: string,
+      args: { toolUseId: string; content: string; isError?: boolean }
+    ) => ipcRenderer.invoke('chat:sendToolResult', tabId, args),
     interrupt: (opts: { tabId: string; taskId: string; mode: string; cwd: string; providerFlagsOverride?: string | null }) =>
       ipcRenderer.invoke('chat:interrupt', opts),
     abortAndPop: (opts: { tabId: string; taskId: string; mode: string; cwd: string; providerFlagsOverride?: string | null }) =>
@@ -514,7 +518,12 @@ const api: ElectronAPI = {
       ipcRenderer.invoke('chat:getModel', taskId, mode),
     setModel: (opts: { tabId: string; taskId: string; mode: string; cwd: string; chatModel: 'default' | 'sonnet' | 'opus' | 'haiku' }) =>
       ipcRenderer.invoke('chat:setModel', opts),
+    getEffort: (taskId: string, mode: string) =>
+      ipcRenderer.invoke('chat:getEffort', taskId, mode),
+    setEffort: (opts: { tabId: string; taskId: string; mode: string; cwd: string; chatEffort: 'low' | 'medium' | 'high' | 'xhigh' | 'max' }) =>
+      ipcRenderer.invoke('chat:setEffort', opts),
     getAutoEligibility: () => ipcRenderer.invoke('chat:getAutoEligibility'),
+    getAccountDefaultModel: () => ipcRenderer.invoke('chat:getAccountDefaultModel'),
     listSkills: (cwd: string) => ipcRenderer.invoke('chat:listSkills', cwd),
     listCommands: (cwd: string) => ipcRenderer.invoke('chat:listCommands', cwd),
     listAgents: (cwd: string) => ipcRenderer.invoke('chat:listAgents', cwd),

@@ -8,6 +8,7 @@ import { whichBinary as realWhichBinary } from './shell-env'
 import type { BufferedEvent } from './chat-events-store'
 import type { ChatMode } from '../shared/chat-mode'
 import type { ChatModel } from '../shared/chat-model'
+import type { ChatEffort } from '../shared/chat-effort'
 
 export type { BufferedEvent } from './chat-events-store'
 
@@ -30,6 +31,12 @@ export interface TransportDeps {
   ) => void
   /** Broadcast state transitions on `pty:state-change` so the existing UI reflects chat activity. */
   broadcastStateChange: (sessionId: string, newState: ChatTerminalState, oldState: ChatTerminalState) => void
+  /**
+   * Notify main-process global state listeners (e.g. task-automation). Default
+   * no-op. chat-handlers wires this to pty-manager's listener set so chat
+   * activity drives the same auto-status rules as PTY sessions.
+   */
+  onStateChange?: (sessionId: string, newState: ChatTerminalState, oldState: ChatTerminalState) => void
   /**
    * Called for every event appended to a session's buffer. Default no-op.
    * chat-handlers wires this to persist events to SQLite so chat history
@@ -109,6 +116,14 @@ export interface ChatSessionInfo {
   chatMode?: ChatMode | null
   /** Resolved chat model alias this session was spawned with. */
   chatModel?: ChatModel | null
+  /** Resolved reasoning effort this session was spawned with. `null` = inherit. */
+  chatEffort?: ChatEffort | null
+}
+
+interface PendingControl {
+  resolve: (data: unknown) => void
+  reject: (err: Error) => void
+  timer: NodeJS.Timeout
 }
 
 interface Session {
@@ -137,6 +152,16 @@ interface Session {
   chatMode: ChatMode | null
   /** Resolved chat model alias this session was spawned with. */
   chatModel: ChatModel | null
+  /** Resolved reasoning effort this session was spawned with. */
+  chatEffort: ChatEffort | null
+  /**
+   * In-flight `control_request` promises, keyed by request_id. Transport
+   * resolves on matching `control_response` from the adapter. Cleared on
+   * session end / process exit (any pending promises reject).
+   */
+  pendingControl: Map<string, PendingControl>
+  /** Monotonic counter for generating unique request_ids per session. */
+  controlReqCounter: number
   onPersistSessionId?: (id: string) => void
   onInvalidResume?: () => void
 }
@@ -167,6 +192,7 @@ function transitionState(session: Session, next: ChatTerminalState): void {
   session.terminalState = next
   const stateSessionId = `${session.taskId}:${session.tabId}`
   deps.broadcastStateChange(stateSessionId, next, old)
+  deps.onStateChange?.(stateSessionId, next, old)
 }
 
 function handleEvent(session: Session, event: AgentEvent): void {
@@ -316,6 +342,8 @@ export interface CreateChatOpts {
   chatMode?: ChatMode | null
   /** Resolved chat model alias for the spawn (claude --model). */
   chatModel?: ChatModel | null
+  /** Resolved reasoning effort for the spawn (claude --effort). */
+  chatEffort?: ChatEffort | null
 }
 
 export async function createChat(opts: CreateChatOpts): Promise<ChatSessionInfo> {
@@ -404,16 +432,44 @@ export async function createChat(opts: CreateChatOpts): Promise<ChatSessionInfo>
     respawnOpts: opts,
     chatMode: opts.chatMode ?? null,
     chatModel: opts.chatModel ?? null,
+    chatEffort: opts.chatEffort ?? null,
+    pendingControl: new Map(),
+    controlReqCounter: 0,
     onPersistSessionId: opts.onPersistSessionId,
     onInvalidResume: opts.onInvalidResume,
   }
   sessions.set(opts.tabId, session)
+
+  // --- spawn: subprocess confirmed alive ---
+  // Tie state machine to actual OS process lifecycle. `'spawn'` fires after the
+  // kernel has the pid; before any agent event arrives. Without this, sessions
+  // that haven't received a user message stay stuck at `'starting'` forever
+  // because handleEvent only transitions on user-message/turn-init/tool-call/
+  // result/process-exit. The subprocess being alive is the canonical "ready"
+  // signal — independent of what events the agent chooses to emit.
+  child.on('spawn', () => {
+    if (session.terminalState === 'starting') {
+      transitionState(session, 'idle')
+    }
+  })
 
   // --- stdout: readline buffers partial lines for us ---
   const rl = readline.createInterface({ input: child.stdout!, crlfDelay: Infinity })
   rl.on('line', (line) => {
     const ev = adapter.parseLine(line)
     if (!ev) return
+    // Control responses route to the pending sender promise — they're transport
+    // plumbing, not chat timeline events. Skip broadcast/persist/buffer.
+    if (ev.kind === 'control-response') {
+      const pending = session.pendingControl.get(ev.requestId)
+      if (pending) {
+        clearTimeout(pending.timer)
+        session.pendingControl.delete(ev.requestId)
+        if (ev.isError) pending.reject(new Error(ev.error ?? 'control_request failed'))
+        else pending.resolve(ev.data)
+      }
+      return
+    }
     if (ev.kind === 'unknown' && ev.reason === 'unknown-type') {
       // Surface unknown top-level types once, tagged for log filtering.
       const raw = ev.raw as { type?: string } | null
@@ -445,6 +501,12 @@ export async function createChat(opts: CreateChatOpts): Promise<ChatSessionInfo>
       flushStderr()
     }
     session.ended = true
+    // Reject any in-flight control_request promises so callers don't hang.
+    for (const [id, pending] of session.pendingControl) {
+      clearTimeout(pending.timer)
+      pending.reject(new Error('session ended before control_response'))
+      session.pendingControl.delete(id)
+    }
     // If this session was already replaced in the tab (e.g. reset: kill+create raced and the
     // new session is already live), swallow the exit so the UI doesn't revert to "Session ended".
     if (sessions.get(opts.tabId) !== session) {
@@ -456,6 +518,7 @@ export async function createChat(opts: CreateChatOpts): Promise<ChatSessionInfo>
   })
 
   child.on('error', (err) => {
+    transitionState(session, 'error')
     handleEvent(session, {
       kind: 'error',
       message: err.message,
@@ -474,6 +537,84 @@ export function sendUserMessage(tabId: string, text: string): boolean {
   // Record into the session buffer so tab reloads / replay reconstruct user messages.
   handleEvent(session, { kind: 'user-message', text })
   return true
+}
+
+/**
+ * Resolve a pending `tool_use_id` by writing a `tool_result` content block on
+ * stdin. Used by inline-answer flows like AskUserQuestion so the SDK's turn
+ * machinery sees a normal completion instead of an orphaned tool_use that
+ * skews stop_reason / usage accounting. Returns false when the session is
+ * gone or the adapter lacks a structured-input channel — caller falls back
+ * to `sendUserMessage`.
+ */
+export function sendToolResult(
+  tabId: string,
+  args: { toolUseId: string; content: string; isError?: boolean }
+): boolean {
+  const session = sessions.get(tabId)
+  if (!session || session.ended) return false
+  if (!session.adapter.serializeToolResult) return false
+  const line = session.adapter.serializeToolResult({
+    toolUseId: args.toolUseId,
+    content: args.content,
+    isError: args.isError,
+    sessionId: session.sessionId,
+  })
+  if (line == null) return false
+  session.child.stdin?.write(line + '\n')
+  return true
+}
+
+/**
+ * Send a `control_request` over stdin and resolve when the matching
+ * `control_response` arrives (correlated by `request_id`). Rejects on adapter
+ * lacking a control channel, on timeout, on response `subtype:'error'`, or on
+ * session exit before a response arrives. Used to flip permission mode /
+ * model / interrupt without restarting the subprocess.
+ */
+export function sendControlRequest(
+  tabId: string,
+  request: Record<string, unknown>,
+  timeoutMs = 30_000
+): Promise<unknown> {
+  const session = sessions.get(tabId)
+  if (!session || session.ended) {
+    return Promise.reject(new Error('no live session'))
+  }
+  if (!session.adapter.serializeControlRequest) {
+    return Promise.reject(new Error('adapter has no control channel'))
+  }
+  session.controlReqCounter++
+  const requestId = `req_${session.controlReqCounter}_${Date.now().toString(36)}`
+  const line = session.adapter.serializeControlRequest({ requestId, request })
+  if (line == null) {
+    return Promise.reject(new Error('adapter refused to serialize control_request'))
+  }
+  return new Promise<unknown>((resolve, reject) => {
+    const timer = setTimeout(() => {
+      session.pendingControl.delete(requestId)
+      reject(new Error(`control_request timeout after ${timeoutMs}ms`))
+    }, timeoutMs)
+    session.pendingControl.set(requestId, { resolve, reject, timer })
+    try {
+      session.child.stdin?.write(line + '\n')
+    } catch (err) {
+      clearTimeout(timer)
+      session.pendingControl.delete(requestId)
+      reject(err instanceof Error ? err : new Error(String(err)))
+    }
+  })
+}
+
+/**
+ * Mutate the in-memory `Session.chatMode`. Called after a successful
+ * `set_permission_mode` control_request so `getSessionInfo` reflects the new
+ * mode without waiting for a turn-init drift sync.
+ */
+export function updateSessionChatMode(tabId: string, mode: ChatMode | null): void {
+  const session = sessions.get(tabId)
+  if (!session) return
+  session.chatMode = mode
 }
 
 /**
@@ -594,6 +735,7 @@ function toInfo(session: Session): ChatSessionInfo {
     ended: session.ended,
     chatMode: session.chatMode,
     chatModel: session.chatModel,
+    chatEffort: session.chatEffort,
   }
 }
 

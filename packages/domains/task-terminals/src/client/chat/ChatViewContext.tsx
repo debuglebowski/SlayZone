@@ -33,6 +33,18 @@ export interface ChatViewState {
    */
   setChatMode?: (next: AgentMode) => Promise<void>
   /**
+   * Send a user message into the chat session. Used as a fallback by inline
+   * answer flows when the adapter lacks a structured-input channel.
+   */
+  sendMessage?: (text: string) => void
+  /**
+   * Resolve a pending `tool_use_id` with a `tool_result` content block.
+   * Preferred path for AskUserQuestion's submit so the SDK's turn machinery
+   * sees a normal completion. Returns false when the adapter lacks a
+   * structured-input channel — caller should fall back to `sendMessage`.
+   */
+  sendToolResult?: (args: { toolUseId: string; content: string; isError?: boolean }) => Promise<boolean>
+  /**
    * Full flat timeline + parent→children index, exposed so SubAgentRow can
    * render the items emitted while it ran (parentToolUseId === toolUseId).
    * Empty defaults are safe for harnesses that don't construct sub-agents.

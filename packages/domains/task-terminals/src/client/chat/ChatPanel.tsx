@@ -13,12 +13,15 @@ import { ChatViewContext } from './ChatViewContext'
 import { ChatSearchBar } from './ChatSearchBar'
 import { useChatMode } from './useChatMode'
 import { useChatModel } from './useChatModel'
+import { useChatEffort } from './useChatEffort'
 import { useChatSearch } from './useChatSearch'
+import { modelSupportsEffort } from '@slayzone/terminal/shared'
 import {
   cn,
   toast,
   AgentModePill,
   AgentModelPill,
+  AgentEffortPill,
   nextAgentMode,
   ContextMenu,
   ContextMenuTrigger,
@@ -50,7 +53,6 @@ import { createBuiltinsSource } from './autocomplete/sources/builtins'
 import { createFilesSource } from './autocomplete/sources/files'
 import type { AutocompleteSource, ChatActions, NavigateActions } from './autocomplete/types'
 import { resetChat } from './autocomplete/chat-actions'
-import { mergeEffortFlag } from './autocomplete/flags'
 import { renderTimelineItem, isRenderable } from './renderers'
 
 export interface ChatPanelHandle {
@@ -85,7 +87,7 @@ const SUGGESTED_PROMPTS = [
 
 export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function ChatPanel(props, ref) {
   const { tabId, taskId, mode, cwd, providerFlagsOverride, permissionNotice: overrideNotice, onSetDisplayMode, loopConfig, onLoopConfigChange, onOpenLoopDialog, onOpenUrl, onOpenFile } = props
-  const { state, timeline, inFlight, hydrating, permissionMode, sendMessage, abortAndPop, reset: resetTimeline } = useChatSession({
+  const { state, timeline, inFlight, hydrating, permissionMode, sendMessage, sendToolResult, abortAndPop, reset: resetTimeline } = useChatSession({
     tabId,
     taskId,
     mode,
@@ -111,7 +113,10 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
   const { chatMode, modeChanging, handleModeChange, autoCapability } = useChatMode({
     taskId, mode, tabId, cwd, livePermissionMode: permissionMode,
   })
-  const { chatModel, modelChanging, handleModelChange } = useChatModel({
+  const { chatModel, modelChanging, handleModelChange, accountDefaultModel } = useChatModel({
+    taskId, mode, tabId, cwd,
+  })
+  const { chatEffort, effortChanging, handleEffortChange } = useChatEffort({
     taskId, mode, tabId, cwd,
   })
   const [collapseSignal, setCollapseSignal] = useState(0)
@@ -273,7 +278,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
         out.push(item)
       } else if (item.kind === 'text' && item.role === 'assistant') {
         pendingFinal = item
-      } else if (item.kind === 'tool' && item.invocation.name === 'ExitPlanMode') {
+      } else if (item.kind === 'tool' && (item.invocation.name === 'ExitPlanMode' || item.invocation.name === 'AskUserQuestion')) {
         flushPending()
         out.push(item)
       } else if (item.kind === 'tool' && showLastMessageTools && i > lastUserIdx) {
@@ -313,7 +318,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
     if (item.kind === 'text' || item.kind === 'thinking') return `${item.kind}:${item.messageId}`
     if (item.kind === 'tool') return `tool:${item.invocation.id}`
     if (item.kind === 'session-start') return `session:${item.sessionId}`
-    if (item.kind === 'result') return `result:${item.timestamp}`
+    if (item.kind === 'result') return `result:${item.timestamp}:${index}`
     return `${item.kind}:${index}`
   }, [])
 
@@ -335,12 +340,14 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
       showMessageMeta: appearance.chatShowMessageMeta,
       search: { query: search.query, caseSensitive: search.caseSensitive },
       setChatMode: handleModeChange,
+      sendMessage: (text: string) => { void sendMessage(text) },
+      sendToolResult,
       timeline,
       childIndex: state.childIndex,
       onOpenUrl,
       onOpenFile: handleOpenFile,
     }),
-    [collapseSignal, finalOnly, appearance.chatFileEditsOpenByDefault, appearance.chatShowMessageMeta, search.query, search.caseSensitive, handleModeChange, timeline, state.childIndex, onOpenUrl, handleOpenFile],
+    [collapseSignal, finalOnly, appearance.chatFileEditsOpenByDefault, appearance.chatShowMessageMeta, search.query, search.caseSensitive, handleModeChange, sendMessage, sendToolResult, timeline, state.childIndex, onOpenUrl, handleOpenFile],
   )
 
   // Autosize textarea. Height follows scrollHeight up to 240px; no artificial min —
@@ -357,29 +364,20 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
     if (state.sessionEnded) return
     if (!text && attachments.length === 0) return
 
-    // Builtin `/effort <level>` — update session flags + restart. Doesn't send to chat.
+    // Builtin `/effort <level>` — write enum to provider_config; setEffort
+    // handler kill+respawns. Mirrors the AgentEffortPill path; both UIs go
+    // through the same canonical field, no flag-string mutation.
     const effortMatch = /^\/effort\s+(\S+)\s*$/.exec(text)
     if (effortMatch) {
-      const level = effortMatch[1].toLowerCase()
-      const valid = ['low', 'medium', 'high', 'xhigh', 'max']
-      if (!valid.includes(level)) {
-        toast(`Invalid effort level "${level}". Use: ${valid.join(', ')}`)
+      const raw = effortMatch[1].toLowerCase()
+      const valid = ['low', 'medium', 'high', 'xhigh', 'max'] as const
+      if (!(valid as readonly string[]).includes(raw)) {
+        toast(`Invalid effort level "${raw}". Use: ${valid.join(', ')}`)
         return
       }
       setDraft('')
-      const nextFlags = mergeEffortFlag(providerFlagsOverride ?? null, level)
-      await resetChat(
-        chatApi,
-        { tabId, taskId, mode, cwd, providerFlagsOverride: nextFlags },
-        {
-          interruptFirst: inFlight,
-          onSuccess: () => toast(`Effort set to ${level}`),
-          onError: (err) =>
-            toast(`Effort change failed: ${err instanceof Error ? err.message : String(err)}`),
-        }
-      ).catch(() => {
-        /* handled via onError */
-      })
+      await handleEffortChange(raw as typeof valid[number])
+      toast(`Effort set to ${raw}`)
       return
     }
 
@@ -852,7 +850,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
       </ContextMenu>
 
       {/* Composer */}
-      <div className="bg-background px-4 pt-3 pb-1">
+      <div className="bg-background px-4 pt-6 pb-1">
         <div className={cn('mx-auto w-full', composerWidthClass)}>
         {queuedMessages.length > 0 && (
           <div className="mb-2">
@@ -998,7 +996,17 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
             disabled={modelChanging || inFlight}
             compact
             variant="text"
+            accountDefaultModel={accountDefaultModel}
           />
+          {modelSupportsEffort(chatModel) && (
+            <AgentEffortPill
+              effort={chatEffort}
+              onChange={(next) => { void handleEffortChange(next) }}
+              disabled={effortChanging || inFlight}
+              compact
+              variant="text"
+            />
+          )}
           {appearance.chatWidth === 'wide' && (
             <span>
               {inFlight

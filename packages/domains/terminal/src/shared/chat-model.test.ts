@@ -2,7 +2,7 @@
  * chat-model unit tests
  * Run with: pnpm tsx packages/domains/terminal/src/shared/chat-model.test.ts
  */
-import { chatModelToFlags, isChatModel, CHAT_MODELS, DEFAULT_CHAT_MODEL } from './chat-model.js'
+import { chatModelToFlags, isChatModel, CHAT_MODELS, DEFAULT_CHAT_MODEL, normalizeAccountModel, FALLBACK_ACCOUNT_DEFAULT_MODEL } from './chat-model.js'
 
 let passed = 0
 let failed = 0
@@ -57,6 +57,36 @@ test('isChatModel rejects non-strings', () => {
 test('DEFAULT_CHAT_MODEL is the no-op default', () => {
   expect(DEFAULT_CHAT_MODEL).toBe('default')
   expect(chatModelToFlags(DEFAULT_CHAT_MODEL)).toEqual([])
+})
+
+test('normalizeAccountModel: short aliases', () => {
+  expect(normalizeAccountModel('opus')).toBe('opus')
+  expect(normalizeAccountModel('sonnet')).toBe('sonnet')
+  expect(normalizeAccountModel('haiku')).toBe('haiku')
+})
+
+test('normalizeAccountModel: full ids', () => {
+  expect(normalizeAccountModel('claude-opus-4-7')).toBe('opus')
+  expect(normalizeAccountModel('claude-sonnet-4-6')).toBe('sonnet')
+  expect(normalizeAccountModel('claude-3-5-sonnet-20241022')).toBe('sonnet')
+  expect(normalizeAccountModel('claude-haiku-4-5-20251001')).toBe('haiku')
+})
+
+test('normalizeAccountModel: mixed case', () => {
+  expect(normalizeAccountModel('Claude-Opus-4-7')).toBe('opus')
+  expect(normalizeAccountModel('SONNET')).toBe('sonnet')
+})
+
+test('normalizeAccountModel: unknown / null / empty → fallback opus', () => {
+  expect(normalizeAccountModel(null)).toBe(FALLBACK_ACCOUNT_DEFAULT_MODEL)
+  expect(normalizeAccountModel(undefined)).toBe(FALLBACK_ACCOUNT_DEFAULT_MODEL)
+  expect(normalizeAccountModel('')).toBe(FALLBACK_ACCOUNT_DEFAULT_MODEL)
+  expect(normalizeAccountModel('gpt-5')).toBe(FALLBACK_ACCOUNT_DEFAULT_MODEL)
+  expect(normalizeAccountModel('unknown-future-model')).toBe(FALLBACK_ACCOUNT_DEFAULT_MODEL)
+})
+
+test('FALLBACK_ACCOUNT_DEFAULT_MODEL is opus', () => {
+  expect(FALLBACK_ACCOUNT_DEFAULT_MODEL).toBe('opus')
 })
 
 console.log(`\n${passed} passed, ${failed} failed`)

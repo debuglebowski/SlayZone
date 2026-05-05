@@ -99,6 +99,15 @@ export function onGlobalStateChange(cb: (sessionId: string, newState: TerminalSt
 }
 
 /**
+ * Fire global state-change listeners for a session not owned by pty-manager
+ * (e.g. chat-transport sessions). Lets task-automation and other main-side
+ * subscribers react to chat activity through the same channel as PTY.
+ */
+export function notifyGlobalStateListeners(sessionId: string, newState: TerminalState, oldState: TerminalState): void {
+  for (const cb of globalStateChangeListeners) cb(sessionId, newState, oldState)
+}
+
+/**
  * Fires when a PTY input line is submitted (Enter pressed) with non-empty
  * buffered input. Used by agent-turns to mark turn boundaries in xterm-mode
  * tabs (where structured agent events are unavailable).

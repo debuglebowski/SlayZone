@@ -29,6 +29,7 @@ export type AgentEvent =
   | StreamBlockDeltaEvent
   | StreamBlockStopEvent
   | StreamMessageStopEvent
+  | ControlResponseEvent
 
 /**
  * Streaming events from Claude Code's `--verbose` stream-json output.
@@ -240,4 +241,18 @@ export interface UnknownEvent {
   kind: 'unknown'
   reason: 'parse-error' | 'unknown-type' | 'shape-mismatch'
   raw: unknown
+}
+
+/**
+ * Reply to a control_request the SDK sent on stdin (e.g. set_permission_mode,
+ * interrupt, set_model). Transport intercepts these by `requestId` to resolve
+ * the pending sender promise — they are NOT broadcast or buffered as chat
+ * timeline events.
+ */
+export interface ControlResponseEvent {
+  kind: 'control-response'
+  requestId: string
+  isError: boolean
+  data?: unknown
+  error?: string
 }

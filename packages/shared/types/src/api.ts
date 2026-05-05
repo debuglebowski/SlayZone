@@ -41,6 +41,8 @@ export interface ChatSessionInfo {
   chatMode?: 'plan' | 'auto-accept' | 'auto' | 'bypass' | null
   /** Resolved chat model alias this session was spawned with. */
   chatModel?: 'default' | 'sonnet' | 'opus' | 'haiku' | null
+  /** Resolved reasoning effort this session was spawned with. `null` = inherit. */
+  chatEffort?: 'low' | 'medium' | 'high' | 'xhigh' | 'max' | null
 }
 import type { TerminalTab, CreateTerminalTabInput, UpdateTerminalTabInput } from '@slayzone/task-terminals/shared'
 import type { Theme, ThemePreference } from '@slayzone/settings/shared'
@@ -559,6 +561,16 @@ export interface ElectronAPI {
     }) => Promise<ChatSessionInfo>
     send: (tabId: string, text: string) => Promise<boolean>
     /**
+     * Resolve a pending `tool_use_id` with a `tool_result` content block.
+     * Used by inline-answer flows like AskUserQuestion so the SDK's turn
+     * machinery sees a normal completion. Returns false when the adapter
+     * lacks a structured-input channel — caller should fall back to `send`.
+     */
+    sendToolResult: (
+      tabId: string,
+      args: { toolUseId: string; content: string; isError?: boolean }
+    ) => Promise<boolean>
+    /**
      * Stop the current turn but keep the session. Implemented as kill + respawn
      * with --resume on the main side: history + chat conversation id survive,
      * the subprocess restarts ready for the next user message.
@@ -629,6 +641,14 @@ export interface ElectronAPI {
       cwd: string
       chatModel: 'default' | 'sonnet' | 'opus' | 'haiku'
     }) => Promise<ChatSessionInfo>
+    getEffort: (taskId: string, mode: string) => Promise<'low' | 'medium' | 'high' | 'xhigh' | 'max' | null>
+    setEffort: (opts: {
+      tabId: string
+      taskId: string
+      mode: string
+      cwd: string
+      chatEffort: 'low' | 'medium' | 'high' | 'xhigh' | 'max'
+    }) => Promise<ChatSessionInfo>
     /**
      * Detect whether `--permission-mode auto` is usable. Reads `~/.claude.json` +
      * `~/.claude/settings.json` to determine plan eligibility (Max/Team/Enterprise)
@@ -636,6 +656,12 @@ export interface ElectronAPI {
      * disables it when eligible-but-not-opted-in.
      */
     getAutoEligibility: () => Promise<{ eligible: boolean; optedIn: boolean }>
+    /**
+     * Resolve what model `claude` will pick when no `--model` flag is passed.
+     * Reads `~/.claude/settings.json` `model`; falls back to `'opus'`.
+     * Cached per-process — restart to refresh.
+     */
+    getAccountDefaultModel: () => Promise<'sonnet' | 'opus' | 'haiku'>
     listSkills: (cwd: string) => Promise<SkillInfo[]>
     listCommands: (cwd: string) => Promise<CommandInfo[]>
     listAgents: (cwd: string) => Promise<AgentInfo[]>

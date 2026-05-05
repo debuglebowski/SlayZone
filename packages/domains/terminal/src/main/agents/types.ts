@@ -24,6 +24,10 @@ export interface SpawnArgs {
  * - `parseLine` is stateless per-line (caller handles buffering via readline).
  * - Must never throw. On malformed/unknown input, return UnknownEvent.
  * - `serializeUserMessage` produces ONE NDJSON line (no trailing newline — caller appends).
+ * - `serializeToolResult` is optional — adapters that lack a structured-input
+ *   channel return null, and the transport falls back to a plain user-message
+ *   path. Resolves a pending `tool_use_id` (e.g. AskUserQuestion) instead of
+ *   leaving it orphaned in the SDK's turn machinery.
  */
 export interface AgentAdapter {
   readonly id: string
@@ -34,6 +38,33 @@ export interface AgentAdapter {
   parseLine(line: string): AgentEvent | null
 
   serializeUserMessage(text: string, sessionId: string): string
+
+  /**
+   * Produce ONE NDJSON line (no trailing newline) carrying a `tool_result`
+   * content block keyed by the original `tool_use_id`. Return null when the
+   * adapter's CLI doesn't support a structured-input channel — the transport
+   * uses that signal to fall back to `serializeUserMessage`.
+   */
+  serializeToolResult?(args: {
+    toolUseId: string
+    content: string
+    isError?: boolean
+    sessionId: string
+  }): string | null
+
+  /**
+   * Produce ONE NDJSON `control_request` envelope. Wraps the adapter-specific
+   * `request` payload (e.g. `{subtype:'set_permission_mode', mode:'acceptEdits'}`)
+   * with the routing fields (`type`, `request_id`) the CLI expects. Transport
+   * generates `requestId` and correlates it with the matching `control-response`
+   * event. Return null when the adapter lacks a control channel — transport
+   * surfaces that to callers so they can fall back to a coarser path
+   * (e.g. kill+respawn for mode changes).
+   */
+  serializeControlRequest?(args: {
+    requestId: string
+    request: Record<string, unknown>
+  }): string | null
 
   /**
    * If the event carries session/conversation id info, return it so the transport

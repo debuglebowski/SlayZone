@@ -66,6 +66,8 @@ export const claudeCodeAdapter: AgentAdapter = {
         return parseRateLimit(obj)
       case 'stream_event':
         return parseStreamEvent(obj, parent)
+      case 'control_response':
+        return parseControlResponse(obj)
       default:
         return { kind: 'unknown', reason: 'unknown-type', raw: obj }
     }
@@ -75,6 +77,31 @@ export const claudeCodeAdapter: AgentAdapter = {
     return JSON.stringify({
       type: 'user',
       message: { role: 'user', content: text },
+    })
+  },
+
+  serializeControlRequest({ requestId, request }): string {
+    return JSON.stringify({
+      type: 'control_request',
+      request_id: requestId,
+      request,
+    })
+  },
+
+  serializeToolResult({ toolUseId, content, isError }): string {
+    return JSON.stringify({
+      type: 'user',
+      message: {
+        role: 'user',
+        content: [
+          {
+            type: 'tool_result',
+            tool_use_id: toolUseId,
+            content,
+            ...(isError ? { is_error: true } : {}),
+          },
+        ],
+      },
     })
   },
 
@@ -326,6 +353,35 @@ function parseResult(obj: Record<string, unknown>): ResultEvent {
     modelUsage,
     usage: tokenUsage,
     permissionDenials: Array.isArray(obj.permission_denials) ? obj.permission_denials : [],
+  }
+}
+
+/**
+ * `{type:"control_response", response:{subtype:"success"|"error", request_id, ...}}`.
+ * Mirrors the SDK's stdin → stdout reply for control_request envelopes.
+ */
+function parseControlResponse(obj: Record<string, unknown>): AgentEvent | null {
+  const response = obj.response as Record<string, unknown> | undefined
+  if (!response || typeof response !== 'object') {
+    return { kind: 'unknown', reason: 'shape-mismatch', raw: obj }
+  }
+  const requestId = response.request_id
+  if (typeof requestId !== 'string') {
+    return { kind: 'unknown', reason: 'shape-mismatch', raw: obj }
+  }
+  const subtype = response.subtype
+  const isError = subtype === 'error'
+  const error = typeof response.error === 'string' ? response.error : undefined
+  // Strip envelope fields so `data` is just the payload (subtype/request_id are
+  // routing metadata, not user data).
+  const { subtype: _s, request_id: _r, error: _e, ...data } = response
+  void _s; void _r; void _e
+  return {
+    kind: 'control-response',
+    requestId,
+    isError,
+    data,
+    error,
   }
 }
 

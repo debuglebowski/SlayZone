@@ -19,6 +19,7 @@ import {
   Copy,
   Check as CheckIcon,
   User,
+  Bot,
 } from 'lucide-react'
 import { cn } from '@slayzone/ui'
 import { DiffView, GhMarkdown } from '@slayzone/worktrees/client'
@@ -70,13 +71,13 @@ export function UserMessage({ item }: { item: Extract<TimelineItem, { kind: 'use
   )
 }
 
-/** Assistant message — left-aligned avatar + card that sizes to content up to 85%. */
+/** Assistant message — left-aligned avatar + card. Right edge bounded by outer pr. */
 export function AssistantText({ item }: { item: Extract<TimelineItem, { kind: 'text' }> }) {
   return (
-    <div className="px-4 py-2">
+    <div className="pl-4 pr-[10%] py-2">
       <div className="flex gap-3 items-start">
         <AssistantAvatar />
-        <div className="min-w-0 max-w-[85%] rounded-lg border border-border/50 bg-card/40 shadow-sm px-3 py-2">
+        <div className="min-w-0 rounded-lg border border-border/50 bg-card/40 shadow-sm px-3 py-2">
           <div className="text-sm leading-relaxed [&_p]:my-2 [&_p:first-child]:mt-0 [&_p:last-child]:mb-0 [&_pre]:my-3 [&_ul]:my-2 [&_ol]:my-2 [&_h1]:text-base [&_h1]:font-semibold [&_h1]:mt-4 [&_h2]:text-sm [&_h2]:font-semibold [&_h2]:mt-3 [&_h3]:text-sm [&_h3]:font-medium [&_code]:font-mono [&_code]:text-[0.85em]">
             <GhMarkdown>{item.text}</GhMarkdown>
           </div>
@@ -235,7 +236,19 @@ export function SubAgentRow({ item }: { item: Extract<TimelineItem, { kind: 'sub
   const tokens = item.totalTokens != null ? formatTokens(item.totalTokens) : null
 
   const childIndices = childIndex.get(item.toolUseId) ?? []
-  const hasChildren = childIndices.length > 0
+  // The Agent/Task launcher tool that spawned this sub-agent — rendered inside
+  // the accordion so users can see the prompt + subagent_type after expanding.
+  const launcherTool = useMemo(
+    () =>
+      timeline.find(
+        (t) =>
+          t.kind === 'tool' &&
+          isAgentLauncherToolName(t.invocation.name) &&
+          t.invocation.id === item.toolUseId,
+      ),
+    [timeline, item.toolUseId],
+  )
+  const hasChildren = childIndices.length > 0 || launcherTool != null
   // Mirror ToolShell convention: errored items default open so the user sees what failed;
   // everything else stays collapsed. collapseSignal forces all back to closed.
   const [open, setOpen] = useState(errored)
@@ -244,16 +257,17 @@ export function SubAgentRow({ item }: { item: Extract<TimelineItem, { kind: 'sub
   }, [collapseSignal])
 
   return (
-    <div className="px-4 py-1" data-testid="sub-agent-row">
+    <>
+      <div className="pl-10 pr-[10%] py-1" data-testid="sub-agent-row">
       <div className="flex gap-3 items-start">
         <div className="shrink-0 size-7" aria-hidden />
-        <div className="min-w-0 flex-1 max-w-[90%] rounded-md border border-border/50 bg-muted/20 overflow-hidden">
+        <div className="min-w-0 flex-1 rounded-md border border-border/50 bg-muted/20 overflow-hidden">
         <button
           type="button"
           onClick={() => hasChildren && setOpen((v) => !v)}
           disabled={!hasChildren}
           className={cn(
-            'w-full flex items-center gap-2 px-3 py-1.5 text-[11px] text-muted-foreground text-left',
+            'w-full flex items-center gap-2 px-3 py-1.5 text-xs text-left',
             hasChildren && 'hover:bg-muted/40 cursor-pointer',
             !hasChildren && 'cursor-default',
           )}
@@ -265,55 +279,62 @@ export function SubAgentRow({ item }: { item: Extract<TimelineItem, { kind: 'sub
           ) : (
             <CircleCheck className="size-3 shrink-0 text-emerald-500" />
           )}
-          <span className="font-medium text-foreground/80">Sub-agent</span>
-          {item.description && (
-            <>
-              <span className="text-muted-foreground/40">·</span>
-              <span className="truncate max-w-[40ch]">{item.description}</span>
-            </>
-          )}
-          {item.status && (
-            <>
-              <span className="text-muted-foreground/40">·</span>
-              <span className={cn(errored && 'text-destructive')}>{item.status}</span>
-            </>
-          )}
-          {seconds && (
-            <>
-              <span className="text-muted-foreground/40">·</span>
-              <span>{seconds}s</span>
-            </>
-          )}
-          {item.toolUses != null && item.toolUses > 0 && (
-            <>
-              <span className="text-muted-foreground/40">·</span>
-              <span>{item.toolUses} tool{item.toolUses === 1 ? '' : 's'}</span>
-            </>
-          )}
-          {tokens && (
-            <>
-              <span className="text-muted-foreground/40">·</span>
-              <span>{tokens} tok</span>
-            </>
-          )}
+          <Bot className="size-3 shrink-0 text-muted-foreground" />
+          <span className="font-medium shrink-0">Sub-agent</span>
+          <span className="text-muted-foreground truncate flex-1 font-mono text-[11px] flex items-center gap-2 min-w-0">
+            {item.description && (
+              <>
+                <span className="text-muted-foreground/40">·</span>
+                <span className="truncate">{item.description}</span>
+              </>
+            )}
+            {item.status && (
+              <>
+                <span className="text-muted-foreground/40">·</span>
+                <span className={cn('shrink-0', errored && 'text-destructive')}>{item.status}</span>
+              </>
+            )}
+            {seconds && (
+              <>
+                <span className="text-muted-foreground/40">·</span>
+                <span className="shrink-0">{seconds}s</span>
+              </>
+            )}
+            {item.toolUses != null && item.toolUses > 0 && (
+              <>
+                <span className="text-muted-foreground/40">·</span>
+                <span className="shrink-0">{item.toolUses} tool{item.toolUses === 1 ? '' : 's'}</span>
+              </>
+            )}
+            {tokens && (
+              <>
+                <span className="text-muted-foreground/40">·</span>
+                <span className="shrink-0">{tokens} tok</span>
+              </>
+            )}
+          </span>
           {hasChildren && (
             <span className="ml-auto shrink-0 text-muted-foreground">
               {open ? <ChevronDown className="size-3" /> : <ChevronRight className="size-3" />}
             </span>
           )}
         </button>
-        {open && hasChildren && (
-          <div className="border-t border-border/40 bg-background/40 py-1" data-testid="sub-agent-children">
-            {childIndices.map((idx) => {
-              const child = timeline[idx]
-              if (!child) return null
-              return renderTimelineItem(child, `${item.toolUseId}:${idx}`)
-            })}
-          </div>
-        )}
         </div>
       </div>
-    </div>
+      </div>
+      {open && hasChildren && (
+        <div className="pl-4" data-testid="sub-agent-children">
+          {launcherTool && launcherTool.kind === 'tool' && (
+            <div key={`${item.toolUseId}:launcher`}>{renderTool(launcherTool.invocation)}</div>
+          )}
+          {childIndices.map((idx) => {
+            const child = timeline[idx]
+            if (!child) return null
+            return renderTimelineItem(child, `${item.toolUseId}:${idx}`)
+          })}
+        </div>
+      )}
+    </>
   )
 }
 
@@ -324,6 +345,16 @@ function formatTokens(n: number): string {
 }
 
 // --- Tool renderers ---
+
+/**
+ * Sub-agent launcher tool — `Agent` in current Claude Code SDK, `Task` in older
+ * versions. Paired with a `kind:'sub-agent'` timeline row that already shows
+ * status/usage; we render this card inside the SubAgentRow accordion instead of
+ * at root.
+ */
+function isAgentLauncherToolName(name: string | undefined): boolean {
+  return name === 'Agent' || name === 'Task'
+}
 
 interface ToolProps {
   invocation: ToolInvocation
@@ -351,10 +382,10 @@ function ToolShell({
   }, [collapseSignal])
   const canOpen = Boolean(children)
   return (
-    <div className="px-4 py-1">
+    <div className="pl-10 pr-[10%] py-1">
       <div className="flex gap-3 items-start">
         <div className="shrink-0 size-7" aria-hidden />
-        <div className="min-w-0 flex-1 max-w-[90%] rounded-lg border border-border/50 bg-card/40 overflow-hidden shadow-sm">
+        <div className="min-w-0 flex-1 rounded-lg border border-border/50 bg-card/40 overflow-hidden shadow-sm">
         <button
           onClick={() => canOpen && setOpen(!open)}
           disabled={!canOpen}
@@ -594,18 +625,265 @@ export function ToolCallTodoWrite({ invocation }: ToolProps) {
   )
 }
 
+type AskQuestion = {
+  question: string
+  header: string
+  multiSelect: boolean
+  options: Array<{ label: string; description: string; preview?: string }>
+}
+
+export function ToolCallAskUserQuestion({ invocation }: ToolProps) {
+  const input = invocation.input as { questions?: AskQuestion[] } | null
+  const questions = input?.questions ?? []
+  const { sendMessage } = useChatView()
+  const canRespond = Boolean(sendMessage)
+  const [answered, setAnswered] = useState(false)
+  const [submittedText, setSubmittedText] = useState<string | null>(null)
+  const [selections, setSelections] = useState<Map<number, Set<string>>>(() => new Map())
+  const [otherActive, setOtherActive] = useState<Set<number>>(() => new Set())
+  const [otherText, setOtherText] = useState<Map<number, string>>(() => new Map())
+
+  const completed = invocation.status !== 'pending' || invocation.result != null
+  const locked = answered || completed
+
+  const pickOption = (qi: number, label: string, multi: boolean): void => {
+    if (locked) return
+    setOtherActive((prev) => {
+      if (!prev.has(qi)) return prev
+      const next = new Set(prev)
+      next.delete(qi)
+      return next
+    })
+    setSelections((prev) => {
+      const next = new Map(prev)
+      const cur = new Set(next.get(qi) ?? [])
+      if (multi) {
+        if (cur.has(label)) cur.delete(label)
+        else cur.add(label)
+      } else {
+        cur.clear()
+        cur.add(label)
+      }
+      next.set(qi, cur)
+      return next
+    })
+  }
+
+  const pickOther = (qi: number): void => {
+    if (locked) return
+    setOtherActive((prev) => new Set(prev).add(qi))
+    setSelections((prev) => {
+      const next = new Map(prev)
+      next.set(qi, new Set())
+      return next
+    })
+  }
+
+  const setOther = (qi: number, value: string): void => {
+    setOtherText((prev) => {
+      const next = new Map(prev)
+      next.set(qi, value)
+      return next
+    })
+  }
+
+  const canSubmit = questions.length > 0 && questions.every((_q, qi) => {
+    if (otherActive.has(qi)) return (otherText.get(qi) ?? '').trim().length > 0
+    return (selections.get(qi)?.size ?? 0) > 0
+  })
+
+  const handleSubmit = (): void => {
+    if (!canSubmit || !canRespond || locked) return
+    const lines = questions.map((q, qi) => {
+      const ans = otherActive.has(qi)
+        ? (otherText.get(qi) ?? '').trim()
+        : Array.from(selections.get(qi) ?? []).join(', ')
+      const prefix = q.header || q.question || `Q${qi + 1}`
+      return `${prefix}: ${ans}`
+    })
+    const text = lines.join('\n')
+    setSubmittedText(text)
+    setAnswered(true)
+
+    // Empirical (Claude Code 2.1.128, --print --input-format stream-json):
+    // the CLI auto-resolves AskUserQuestion's tool_use itself in non-interactive
+    // mode — a synthetic tool_result is written to the user-echo stream BEFORE
+    // any external handler can react. Sending our own `tool_result` afterward
+    // is treated as a fresh user turn with no live tool_use_id, spawning an
+    // empty $0.01+ result. So fall back to a plain user message: Claude reads
+    // the answer text and continues. If a future CLI version exposes
+    // `--permission-prompt-tool` / canUseTool wiring we can swap this back to
+    // `sendToolResult`.
+    if (sendMessage) sendMessage(text)
+  }
+
+  return (
+    <div className="pl-4 pr-[10%] py-3">
+      <div className="flex gap-3 items-start">
+        <div className="shrink-0 size-7 rounded-full bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center text-white shadow-sm">
+          <HelpCircle className="size-3.5" />
+        </div>
+        <div className="min-w-0 flex-1 rounded-lg border border-indigo-500/40 bg-indigo-500/5 shadow-sm overflow-hidden">
+          <div className="flex items-center gap-2 border-b border-indigo-500/20 bg-indigo-500/10 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-indigo-700 dark:text-indigo-300">
+            <HelpCircle className="size-3" />
+            <span>Question</span>
+            <span className="ml-auto"><StatusIcon status={invocation.status} /></span>
+          </div>
+          {questions.length === 0 && (
+            <div className="px-3 py-2 text-sm text-muted-foreground">No questions provided.</div>
+          )}
+          {questions.map((q, qi) => {
+            const sel = selections.get(qi) ?? new Set<string>()
+            const isOther = otherActive.has(qi)
+            return (
+              <div key={qi} className={cn('px-3 py-2', qi > 0 && 'border-t border-indigo-500/10')}>
+                {q.header && (
+                  <div className="mb-1 inline-block rounded-md bg-indigo-500/15 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-indigo-700 dark:text-indigo-300">
+                    {q.header}
+                  </div>
+                )}
+                <div className="text-sm font-medium text-foreground mb-2">{q.question}</div>
+                <div className="grid gap-1.5">
+                  {q.options.map((opt) => {
+                    const active = sel.has(opt.label)
+                    return (
+                      <button
+                        key={opt.label}
+                        type="button"
+                        disabled={locked}
+                        onClick={() => pickOption(qi, opt.label, q.multiSelect)}
+                        className={cn(
+                          'text-left rounded-md border px-2.5 py-1.5 text-xs transition-colors',
+                          active
+                            ? 'border-indigo-500 bg-indigo-500/15 text-foreground'
+                            : 'border-border/60 bg-background/60 hover:bg-indigo-500/5 hover:border-indigo-500/40',
+                          locked && 'opacity-60 cursor-not-allowed',
+                        )}
+                      >
+                        <div className="flex items-start gap-2">
+                          <span
+                            className={cn(
+                              'mt-0.5 shrink-0 size-3.5 border flex items-center justify-center',
+                              q.multiSelect ? 'rounded-sm' : 'rounded-full',
+                              active ? 'border-indigo-500 bg-indigo-500 text-white' : 'border-border',
+                            )}
+                            aria-hidden
+                          >
+                            {active && <CheckIcon className="size-2.5" />}
+                          </span>
+                          <div className="min-w-0">
+                            <div className="font-medium">{opt.label}</div>
+                            {opt.description && (
+                              <div className="text-muted-foreground text-[11px] mt-0.5">{opt.description}</div>
+                            )}
+                          </div>
+                        </div>
+                      </button>
+                    )
+                  })}
+                  <button
+                    type="button"
+                    disabled={locked}
+                    onClick={() => pickOther(qi)}
+                    className={cn(
+                      'text-left rounded-md border px-2.5 py-1.5 text-xs transition-colors',
+                      isOther
+                        ? 'border-indigo-500 bg-indigo-500/15 text-foreground'
+                        : 'border-dashed border-border/60 bg-background/60 hover:bg-indigo-500/5 hover:border-indigo-500/40',
+                      locked && 'opacity-60 cursor-not-allowed',
+                    )}
+                  >
+                    <div className="flex items-center gap-2">
+                      <span
+                        className={cn(
+                          'shrink-0 size-3.5 rounded-full border flex items-center justify-center',
+                          isOther ? 'border-indigo-500 bg-indigo-500 text-white' : 'border-border',
+                        )}
+                        aria-hidden
+                      >
+                        {isOther && <CheckIcon className="size-2.5" />}
+                      </span>
+                      <span className="font-medium">Other…</span>
+                    </div>
+                  </button>
+                  {isOther && (
+                    <textarea
+                      autoFocus
+                      disabled={locked}
+                      value={otherText.get(qi) ?? ''}
+                      onChange={(e) => setOther(qi, e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+                          e.preventDefault()
+                          handleSubmit()
+                        }
+                      }}
+                      placeholder="Type your answer…"
+                      className="w-full rounded-md border border-input bg-input/30 px-2 py-1.5 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-indigo-500"
+                      rows={2}
+                    />
+                  )}
+                </div>
+              </div>
+            )
+          })}
+          {questions.length > 0 && (
+            <div className="border-t border-indigo-500/20 bg-indigo-500/10 px-3 py-2 flex items-center gap-2">
+              {locked ? (
+                <span className="flex-1 text-xs text-muted-foreground whitespace-pre-wrap">
+                  {submittedText ?? 'Answered.'}
+                </span>
+              ) : (
+                <>
+                  <span className="flex-1 text-[11px] text-muted-foreground">
+                    {canRespond
+                      ? 'Answer is sent as your next chat message.'
+                      : 'Cannot submit — chat send unavailable.'}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={handleSubmit}
+                    disabled={!canSubmit || !canRespond}
+                    className={cn(
+                      'shrink-0 rounded-md border px-2.5 py-1 text-xs font-medium transition-colors',
+                      canSubmit && canRespond
+                        ? 'border-indigo-500/40 bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-900 dark:text-indigo-100'
+                        : 'border-border/40 bg-muted/30 text-muted-foreground cursor-not-allowed',
+                    )}
+                  >
+                    Submit
+                  </button>
+                </>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export function ToolCallExitPlanMode({ invocation }: ToolProps) {
   const input = invocation.input as { plan?: string } | null
   const plan = input?.plan ?? ''
   const denied = invocation.denied === true
-  const { setChatMode, sendMessage } = useChatView()
+  const { setChatMode, sendMessage, timeline } = useChatView()
+  // Hide approve-footer once another chat message lands after this plan —
+  // either user typed something or a new assistant turn started. Keeps the
+  // footer from lingering on stale plan cards mid-scrollback.
+  const isLastMessage = useMemo(() => {
+    const idx = timeline.findIndex((t) => t.kind === 'tool' && t.invocation.id === invocation.id)
+    if (idx < 0) return true
+    return !timeline.slice(idx + 1).some((t) => t.kind === 'user-text' || t.kind === 'text')
+  }, [timeline, invocation.id])
+  const showApproveFooter = denied && isLastMessage
   return (
-    <div className="px-4 py-3">
+    <div className="pl-4 pr-[10%] py-3">
       <div className="flex gap-3 items-start">
         <div className="shrink-0 size-7 rounded-full bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center text-white shadow-sm">
           <ClipboardList className="size-3.5" />
         </div>
-        <div className="min-w-0 flex-1 max-w-[90%] rounded-lg border border-amber-500/40 bg-amber-500/5 shadow-sm overflow-hidden">
+        <div className="min-w-0 flex-1 rounded-lg border border-amber-500/40 bg-amber-500/5 shadow-sm overflow-hidden">
           <div className="flex items-center gap-2 border-b border-amber-500/20 bg-amber-500/10 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-amber-700 dark:text-amber-300">
             <ClipboardList className="size-3" />
             <span>Plan</span>
@@ -616,7 +894,7 @@ export function ToolCallExitPlanMode({ invocation }: ToolProps) {
               <GhMarkdown>{plan}</GhMarkdown>
             </div>
           )}
-          {denied && (
+          {showApproveFooter && (
             <div className="border-t border-amber-500/20 bg-amber-500/10 px-3 py-2 flex items-center gap-2 text-xs text-amber-800 dark:text-amber-300">
               <span className="flex-1">
                 Plan-mode exit blocked — the SDK requires explicit approval.
@@ -690,6 +968,7 @@ export const toolRenderers: Record<string, React.FC<ToolProps>> = {
   Grep: ToolCallGrep,
   TodoWrite: ToolCallTodoWrite,
   ExitPlanMode: ToolCallExitPlanMode,
+  AskUserQuestion: ToolCallAskUserQuestion,
 }
 
 export function renderTool(invocation: ToolInvocation): React.JSX.Element {
@@ -704,6 +983,8 @@ export function renderTool(invocation: ToolInvocation): React.JSX.Element {
 export function isRenderable(item: TimelineItem): boolean {
   if (item.kind === 'session-start') return false
   if (item.kind === 'rate-limit' && item.status === 'allowed') return false
+  // Launcher tool is rendered inside SubAgentRow's accordion, not at root.
+  if (item.kind === 'tool' && isAgentLauncherToolName(item.invocation.name)) return false
   return true
 }
 
