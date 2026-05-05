@@ -193,6 +193,118 @@ function getAvailableExportTypes(mode: RenderMode): string[] {
   return types
 }
 
+interface SearchMatcher {
+  test: (s: string) => boolean
+}
+
+interface SearchMatch {
+  type: 'title' | 'content'
+  line?: number
+  snippet: string
+  contextBefore?: string | null
+  contextAfter?: string | null
+}
+
+interface SearchResult {
+  artifactId: string
+  taskId: string
+  title: string
+  matches: SearchMatch[]
+}
+
+const MAX_SCAN_BYTES = 5_000_000
+const SNIPPET_MAX = 200
+
+function compileMatcher(query: string, opts: { regex?: boolean; caseSensitive?: boolean }): SearchMatcher {
+  if (opts.regex) {
+    try {
+      const re = new RegExp(query, opts.caseSensitive ? '' : 'i')
+      return { test: (s) => re.test(s) }
+    } catch (e) {
+      console.error(`Invalid regex: ${(e as Error).message}`)
+      process.exit(1)
+    }
+  }
+  if (opts.caseSensitive) {
+    return { test: (s) => s.includes(query) }
+  }
+  const q = query.toLowerCase()
+  return { test: (s) => s.toLowerCase().includes(q) }
+}
+
+function sanitizeSnippet(s: string): string {
+  // Replace tabs/control chars with spaces, truncate
+  const cleaned = s.replace(/[\t\x00-\x08\x0b-\x1f\x7f]/g, ' ')
+  return cleaned.length > SNIPPET_MAX ? cleaned.slice(0, SNIPPET_MAX) + '…' : cleaned
+}
+
+function scanContentForMatches(content: string, matcher: SearchMatcher, maxMatches: number): SearchMatch[] {
+  const lines = content.split('\n')
+  const out: SearchMatch[] = []
+  for (let i = 0; i < lines.length; i++) {
+    if (matcher.test(lines[i])) {
+      out.push({
+        type: 'content',
+        line: i + 1,
+        snippet: sanitizeSnippet(lines[i]),
+        contextBefore: i > 0 ? sanitizeSnippet(lines[i - 1]) : null,
+        contextAfter: i + 1 < lines.length ? sanitizeSnippet(lines[i + 1]) : null,
+      })
+      if (out.length >= maxMatches) break
+    }
+  }
+  return out
+}
+
+function loadArtifactContent(
+  raw: ReturnType<SlayDb['raw']>,
+  blobStore: BlobStore,
+  artifactId: string,
+  artifactLabel: string
+): string | null {
+  const version = getCurrentVersion(raw, artifactId)
+  if (!version) return null
+  if (version.size > MAX_SCAN_BYTES) {
+    process.stderr.write(`[skipped large artifact] ${artifactLabel} (${(version.size / 1_000_000).toFixed(1)}MB)\n`)
+    return null
+  }
+  try {
+    const buf = readVersionContent(blobStore, version)
+    return buf.toString('utf-8')
+  } catch {
+    return null
+  }
+}
+
+function printSearchResultsHuman(results: SearchResult[], scannedCount: number, truncated: boolean): void {
+  if (results.length === 0) {
+    console.log('No matches.')
+    return
+  }
+  let totalMatches = 0
+  for (const r of results) {
+    totalMatches += r.matches.length
+    console.log(`${r.artifactId.slice(0, 8)}  ${r.title}  (task: ${r.taskId.slice(0, 8)})`)
+    for (const m of r.matches) {
+      if (m.type === 'title') {
+        console.log(`  title: ${m.snippet}`)
+      } else {
+        if (m.contextBefore != null) console.log(`  L${(m.line ?? 0) - 1}:   ${m.contextBefore}`)
+        console.log(`  L${m.line}: > ${m.snippet}`)
+        if (m.contextAfter != null) console.log(`  L${(m.line ?? 0) + 1}:   ${m.contextAfter}`)
+      }
+    }
+    console.log('')
+  }
+  let footer = `Found ${results.length} artifact${results.length === 1 ? '' : 's'} (${totalMatches} match${totalMatches === 1 ? '' : 'es'}). Scanned ${scannedCount} artifact${scannedCount === 1 ? '' : 's'}.`
+  if (truncated) footer += ' (limit reached; increase --limit for more)'
+  console.log(footer)
+}
+
+function printSearchResultsJson(results: SearchResult[]): void {
+  console.log(JSON.stringify(results, null, 2))
+}
+
 export function artifactsSubcommand(): Command {
   // Deprecated alias: `slay tasks assets` still works for one release.
   if (process.argv[3] === 'assets') {
@@ -248,6 +360,100 @@ export function artifactsSubcommand(): Command {
         process.stdout.write(fs.readFileSync(fp))
       } else {
         process.stdout.write(fs.readFileSync(fp, 'utf-8'))
+      }
+    })
+
+  // slay tasks artifacts search <query>
+  cmd
+    .command('search <query>')
+    .description('Search artifact titles and contents')
+    .option('--task <id>', 'Task ID (or $SLAYZONE_TASK_ID)')
+    .option('--all-tasks', 'Search across every task (overrides --task / env)')
+    .option('--folder <id>', 'Filter by folder (requires --task)')
+    .option('--titles-only', 'Match titles only, skip content scan')
+    .option('--content-only', 'Match content only, skip title scan')
+    .option('--regex', 'Treat <query> as a JS RegExp')
+    .option('--case-sensitive', 'Case-sensitive match (default: insensitive)')
+    .option('--limit <n>', 'Max artifacts in result', '50')
+    .option('--max-matches <n>', 'Max content matches per artifact', '20')
+    .option('--json', 'Output as JSON')
+    .action(async (query: string, opts) => {
+      if (!query.trim()) {
+        console.error('Provide a non-empty query.')
+        process.exit(1)
+      }
+      if (opts.titlesOnly && opts.contentOnly) {
+        console.error('--titles-only and --content-only are mutually exclusive.')
+        process.exit(1)
+      }
+      if (opts.allTasks && (opts.task || opts.folder)) {
+        console.error('--all-tasks cannot combine with --task or --folder.')
+        process.exit(1)
+      }
+
+      const matcher = compileMatcher(query, opts)
+
+      const db = openDb()
+      let scopeTaskId: string | null = null
+      if (!opts.allTasks) {
+        const ref = opts.task ?? process.env.SLAYZONE_TASK_ID
+        if (!ref) {
+          console.error('Provide --task, set $SLAYZONE_TASK_ID, or pass --all-tasks.')
+          process.exit(1)
+        }
+        scopeTaskId = resolveTaskForArtifact(db, ref).id
+      }
+      const folderId = opts.folder ? resolveFolder(db, opts.folder).id : null
+
+      const sqlParts = ['SELECT * FROM task_artifacts WHERE 1=1']
+      const params: Record<string, string> = {}
+      if (scopeTaskId) {
+        sqlParts.push('AND task_id = :tid')
+        params[':tid'] = scopeTaskId
+      }
+      if (folderId) {
+        sqlParts.push('AND folder_id = :fid')
+        params[':fid'] = folderId
+      }
+      sqlParts.push('ORDER BY updated_at DESC')
+      const artifacts = db.query<ArtifactRow>(sqlParts.join(' '), params)
+      const raw = db.raw()
+      const blobStore = new BlobStore(getDataDir())
+
+      const limit = parseInt(opts.limit ?? '50', 10)
+      const maxMatches = parseInt(opts.maxMatches ?? '20', 10)
+      const results: SearchResult[] = []
+      let truncated = false
+
+      for (const a of artifacts) {
+        const matches: SearchMatch[] = []
+        if (!opts.contentOnly && matcher.test(a.title)) {
+          matches.push({ type: 'title', snippet: sanitizeSnippet(a.title) })
+        }
+        if (!opts.titlesOnly) {
+          const mode = getEffectiveRenderMode(a.title, a.render_mode as RenderMode | null)
+          if (!isBinaryRenderMode(mode)) {
+            const content = loadArtifactContent(raw, blobStore, a.id, a.title)
+            if (content != null) {
+              matches.push(...scanContentForMatches(content, matcher, maxMatches))
+            }
+          }
+        }
+        if (matches.length > 0) {
+          results.push({ artifactId: a.id, taskId: a.task_id, title: a.title, matches })
+          if (results.length >= limit) {
+            truncated = artifacts.length > results.length
+            break
+          }
+        }
+      }
+
+      db.close()
+
+      if (opts.json) {
+        printSearchResultsJson(results)
+      } else {
+        printSearchResultsHuman(results, artifacts.length, truncated)
       }
     })
 
