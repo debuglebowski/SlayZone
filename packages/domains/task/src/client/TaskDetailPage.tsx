@@ -2149,10 +2149,7 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
                   onOpenUrl={openDevServerInBrowser}
                   onOpenFile={handleQuickOpenFile}
                   onMainReset={handleResetTerminal}
-                  loopConfig={task.loop_config ?? null}
-                  onLoopConfigChange={handleLoopConfigChange}
-                  onOpenLoopDialog={() => setLoopDialogOpen(true)}
-                  overlay={isActive && loopConfigured ? (
+                  overlay={isActive && loopConfigured && mainTabDisplayMode !== 'chat' ? (
                     <LoopModeBanner
                       config={task.loop_config!}
                       status={loopStatus}
@@ -2321,7 +2318,7 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
                             )
                           )}
 
-                          {loopModeAvailable && task.terminal_mode !== 'terminal' && (
+                          {loopModeAvailable && task.terminal_mode !== 'terminal' && mainTabDisplayMode !== 'chat' && (
                             <Tooltip>
                               <TooltipTrigger asChild>
                                 <IconButton

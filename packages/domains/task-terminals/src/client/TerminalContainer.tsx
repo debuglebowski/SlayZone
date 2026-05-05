@@ -55,10 +55,6 @@ interface TerminalContainerProps {
   taskProgress?: number
   /** Persisted orchestrator/manager-mode toggle state (from task.manager_mode). */
   initialManagerMode?: boolean
-  /** Loop config — passed through to chat-display panes for loop banner. */
-  loopConfig?: import('@slayzone/terminal/shared').LoopConfig | null
-  onLoopConfigChange?: (config: import('@slayzone/terminal/shared').LoopConfig | null) => void
-  onOpenLoopDialog?: () => void
 }
 
 export const TerminalContainer = forwardRef<TerminalContainerHandle, TerminalContainerProps>(function TerminalContainer({
@@ -91,9 +87,6 @@ export const TerminalContainer = forwardRef<TerminalContainerHandle, TerminalCon
   taskStatus,
   taskProgress,
   initialManagerMode,
-  loopConfig,
-  onLoopConfigChange,
-  onOpenLoopDialog,
 }: TerminalContainerProps, ref) {
   const {
     tabs,
@@ -439,14 +432,9 @@ export const TerminalContainer = forwardRef<TerminalContainerHandle, TerminalCon
         onResetSession: tab.isMain && onMainReset ? onMainReset : null,
         onSetDisplayMode: (target: import('../shared/types').TabDisplayMode) =>
           setTabDisplayMode(tab.id, target),
-        // Loop wiring — only meaningful for chat-display tabs, but passed
-        // unconditionally; ChatPanel ignores when loopConfig is null.
-        loopConfig: tab.isMain ? loopConfig ?? null : null,
-        onLoopConfigChange: tab.isMain ? onLoopConfigChange : undefined,
-        onOpenLoopDialog: tab.isMain ? onOpenLoopDialog : undefined,
       }
     })
-  }, [activeGroup, getSessionId, cwd, taskId, conversationId, existingConversationId, supportsSessionId, initialPrompt, providerFlags, executionContext, handleConversationCreated, onSessionInvalid, handleTerminalReady, onFirstInput, onRetry, handleSplitGroup, createTab, closeGroup, closeTab, onMainReset, setTabDisplayMode, loopConfig, onLoopConfigChange, onOpenLoopDialog])
+  }, [activeGroup, getSessionId, cwd, taskId, conversationId, existingConversationId, supportsSessionId, initialPrompt, providerFlags, executionContext, handleConversationCreated, onSessionInvalid, handleTerminalReady, onFirstInput, onRetry, handleSplitGroup, createTab, closeGroup, closeTab, onMainReset, setTabDisplayMode])
 
   const showingSubtaskPty = managerMode && managerSelectedTask && managerSelectedTask.id !== taskId
   const subtaskCwd = managerSelectedTask?.worktree_path ?? managerSelectedTask?.base_dir ?? cwd

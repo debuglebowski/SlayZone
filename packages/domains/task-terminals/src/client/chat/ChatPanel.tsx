@@ -41,8 +41,7 @@ import {
 } from '@slayzone/ui'
 import { ConfirmDisplayModeDialog } from '../ConfirmDisplayModeDialog'
 import type { TabDisplayMode } from '../../shared/types'
-import { useChatSession, useChatLoop, LoopModeBanner, BackgroundJobsBanner, PulseGrid, deriveLoadingLabel, type TimelineItem } from '@slayzone/terminal/client'
-import type { LoopConfig } from '@slayzone/terminal/shared'
+import { useChatSession, BackgroundJobsBanner, PulseGrid, deriveLoadingLabel, type TimelineItem } from '@slayzone/terminal/client'
 import { useImagePasteDrop, useAssetUpload, type AssetRef } from '@slayzone/editor'
 import { AutocompleteMenu } from './autocomplete/AutocompleteMenu'
 import { useAutocomplete } from './autocomplete/useAutocomplete'
@@ -67,12 +66,6 @@ export interface ChatPanelProps {
   providerFlagsOverride?: string | null
   permissionNotice?: string | null
   onSetDisplayMode?: (target: TabDisplayMode) => void
-  /** Persisted loop config (`tasks.loop_config`). Null = unconfigured. */
-  loopConfig?: LoopConfig | null
-  /** Persist loop config back to the task. */
-  onLoopConfigChange?: (config: LoopConfig | null) => void
-  /** Open the LoopModeDialog (lives at TaskDetailPage level — shared with terminal). */
-  onOpenLoopDialog?: () => void
   /** Cmd+Click on a URL → in-app slay browser. Cmd+Shift+Click always external. */
   onOpenUrl?: (url: string) => void
   /** Cmd+Click on a file:line:col reference → editor pane. */
@@ -86,7 +79,7 @@ const SUGGESTED_PROMPTS = [
 ]
 
 export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function ChatPanel(props, ref) {
-  const { tabId, taskId, mode, cwd, providerFlagsOverride, permissionNotice: overrideNotice, onSetDisplayMode, loopConfig, onLoopConfigChange, onOpenLoopDialog, onOpenUrl, onOpenFile } = props
+  const { tabId, taskId, mode, cwd, providerFlagsOverride, permissionNotice: overrideNotice, onSetDisplayMode, onOpenUrl, onOpenFile } = props
   const { state, timeline, inFlight, hydrating, permissionMode, sendMessage, sendToolResult, abortAndPop, reset: resetTimeline } = useChatSession({
     tabId,
     taskId,
@@ -99,14 +92,6 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
   const widthClass = appearance.chatWidth === 'wide' ? 'max-w-none' : 'max-w-4xl'
   const composerWidthClass = appearance.chatWidth === 'wide' ? 'max-w-4xl' : 'max-w-2xl'
 
-
-  const loop = useChatLoop({
-    timeline,
-    inFlight,
-    sessionEnded: state.sessionEnded,
-    sendMessage: (text) => { void sendMessage(text) },
-    onConfigChange: (cfg) => onLoopConfigChange?.(cfg),
-  })
 
   const [draft, setDraft] = useState('')
   const [cursorPos, setCursorPos] = useState(0)
@@ -713,42 +698,17 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
         />
       )}
 
-      {/* Banner stack — single positioned column at top-right of the timeline
-          area. Each banner is non-floating; the column owns layout so adding
-          a third banner in the future is one line. */}
-      {(() => {
-        const showLoop = Boolean(loopConfig?.prompt && loopConfig?.criteriaPattern && onOpenLoopDialog)
-        const showBgJobs = state.bgShells.size > 0
-        if (!showLoop && !showBgJobs) return null
-        return (
-          <div className="pointer-events-none absolute top-6 right-6 z-20 flex flex-col gap-3">
-            {showLoop && (
-              <div className="pointer-events-auto">
-                <LoopModeBanner
-                  floating={false}
-                  config={loopConfig!}
-                  status={loop.status}
-                  iteration={loop.iteration}
-                  onStart={loop.startLoop}
-                  onPause={loop.pauseLoop}
-                  onResume={loop.resumeLoop}
-                  onStop={loop.stopLoop}
-                  onEditConfig={onOpenLoopDialog!}
-                />
-              </div>
-            )}
-            {showBgJobs && (
-              <div className="pointer-events-auto">
-                <BackgroundJobsBanner
-                  floating={false}
-                  shells={state.bgShells}
-                  order={state.bgShellOrder}
-                />
-              </div>
-            )}
+      {state.bgShells.size > 0 && (
+        <div className="pointer-events-none absolute top-6 right-6 z-20 flex flex-col gap-3">
+          <div className="pointer-events-auto">
+            <BackgroundJobsBanner
+              floating={false}
+              shells={state.bgShells}
+              order={state.bgShellOrder}
+            />
           </div>
-        )
-      })()}
+        </div>
+      )}
 
       {/* Timeline */}
       <ContextMenu>
