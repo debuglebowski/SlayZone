@@ -180,6 +180,11 @@ export function recordDiagnosticEvent(event: DiagnosticEvent): void {
     return
   }
 
+  // DB closed during shutdown — drop the event. Avoids fatal exception when
+  // an uncaughtException handler tries to log post-close. Diagnostics during
+  // shutdown are best-effort.
+  if (!diagnosticsDb.open) return
+
   const config = getDiagnosticsConfig()
   if (!config.enabled) return
 
@@ -187,28 +192,33 @@ export function recordDiagnosticEvent(event: DiagnosticEvent): void {
 
   const payloadJson = buildPayloadJson(event.payload)
 
-  diagnosticsDb
-    .prepare(`
-      INSERT INTO diagnostics_events (
-        id, ts_ms, level, source, event, trace_id, task_id, project_id,
-        session_id, channel, message, payload_json, redaction_version
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `)
-    .run(
-      event.id ?? crypto.randomUUID(),
-      event.tsMs ?? Date.now(),
-      event.level,
-      event.source,
-      event.event,
-      event.traceId ?? null,
-      event.taskId ?? null,
-      event.projectId ?? null,
-      event.sessionId ?? null,
-      event.channel ?? null,
-      event.message ?? null,
-      payloadJson,
-      REDACTION_VERSION
-    )
+  try {
+    diagnosticsDb
+      .prepare(`
+        INSERT INTO diagnostics_events (
+          id, ts_ms, level, source, event, trace_id, task_id, project_id,
+          session_id, channel, message, payload_json, redaction_version
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `)
+      .run(
+        event.id ?? crypto.randomUUID(),
+        event.tsMs ?? Date.now(),
+        event.level,
+        event.source,
+        event.event,
+        event.traceId ?? null,
+        event.taskId ?? null,
+        event.projectId ?? null,
+        event.sessionId ?? null,
+        event.channel ?? null,
+        event.message ?? null,
+        payloadJson,
+        REDACTION_VERSION
+      )
+  } catch {
+    // Race: DB may close between the .open check and .prepare. Swallow —
+    // diagnostics must never escalate to fatal.
+  }
 }
 
 function toErrorMessage(error: unknown): string {
