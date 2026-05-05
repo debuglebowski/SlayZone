@@ -903,6 +903,15 @@ export function killAll(): void {
   for (const tabId of sessions.keys()) kill(tabId)
 }
 
+/** Kill every live chat session bound to a given taskId. Mirrors
+ *  `killPtysByTaskId` for chat transports — invoked when a task reaches a
+ *  terminal status (e.g. `done`) so the agent panel can't keep showing it. */
+export function killByTaskId(taskId: string): void {
+  for (const [tabId, session] of sessions) {
+    if (session.taskId === taskId && !session.ended) kill(tabId)
+  }
+}
+
 // ChatSessionStateEntry is exported from `../shared/types` so renderer + api types can reference it.
 
 /**

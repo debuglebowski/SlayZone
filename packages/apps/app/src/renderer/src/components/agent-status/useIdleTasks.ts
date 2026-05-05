@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import type { PtyInfo, ChatSessionStateEntry, TerminalState } from '@slayzone/terminal/shared'
 import type { Task } from '@slayzone/task/shared'
+import { isTerminalStatus, type ColumnConfig } from '@slayzone/projects/shared'
 
 export interface IdleTask {
   task: Task
@@ -35,7 +36,8 @@ export function buildIdleTasks(
   rows: AgentSessionRow[],
   tasks: Task[],
   filterProjectId: string | null,
-  now: number = Date.now()
+  now: number = Date.now(),
+  columnsByProjectId?: Map<string, ColumnConfig[] | null>
 ): IdleTask[] {
   const tasksById = new Map(tasks.map((task) => [task.id, task]))
   const byTaskId = new Map<string, IdleTask>()
@@ -48,6 +50,10 @@ export function buildIdleTasks(
     const task = tasksById.get(row.taskId)
     if (!task) continue
     if (filterProjectId && task.project_id !== filterProjectId) continue
+    // Defensive: a done task should have its agent killed by `onTaskReachedTerminal`,
+    // but if a session leaks through (e.g. legacy sessions, race) suppress it here.
+    const columns = columnsByProjectId?.get(task.project_id) ?? null
+    if (isTerminalStatus(task.status, columns)) continue
 
     const current = byTaskId.get(row.taskId)
     if (!current || row.lastOutputTime > current.lastOutputTime) {
@@ -73,7 +79,8 @@ function chatToRow(c: ChatSessionStateEntry): AgentSessionRow {
 
 export function useIdleTasks(
   tasks: Task[],
-  filterProjectId: string | null
+  filterProjectId: string | null,
+  columnsByProjectId?: Map<string, ColumnConfig[] | null>
 ): UseIdleTasksResult {
   const [rows, setRows] = useState<AgentSessionRow[]>([])
   const recheckTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -108,8 +115,8 @@ export function useIdleTasks(
   }, [refresh])
 
   const idleTasks: IdleTask[] = useMemo(
-    () => buildIdleTasks(rows, tasks, filterProjectId),
-    [rows, tasks, filterProjectId]
+    () => buildIdleTasks(rows, tasks, filterProjectId, Date.now(), columnsByProjectId),
+    [rows, tasks, filterProjectId, columnsByProjectId]
   )
 
   return {

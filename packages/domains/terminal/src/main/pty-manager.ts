@@ -17,6 +17,7 @@ import { shouldShellFallback, shouldNotifySessionNotFound, buildRecoveryMessage 
 import { computeSyncQueryResponse, type TerminalTheme } from './sync-query-response'
 import { filterBufferData } from './filter-buffer-data'
 import { buildMcpEnv } from './mcp-env'
+import { killByTaskId as killChatsByTaskId } from './chat-transport-manager'
 export { filterBufferData }
 
 // Database reference (held for future use; legacy from notification feature)
@@ -1572,6 +1573,7 @@ export function requestForceRespawn(
  *  bulk remap, project automation). Add new side-effects here, not at call sites. */
 export function onTaskReachedTerminal(taskId: string): void {
   killPtysByTaskId(taskId)
+  killChatsByTaskId(taskId)
 }
 
 export function killPtysByTaskId(taskId: string): void {

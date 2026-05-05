@@ -215,6 +215,14 @@ test('keeps PTY row when older chat row exists for same task', () => {
   expect(result[0]?.sessionId).toBe('t1')
 })
 
+test('excludes tasks in terminal status (defensive: agent should already be killed)', () => {
+  const task = makeTask('t1', 'p1', 'Task 1')
+  task.status = 'done'
+  const ptys: AgentSessionRow[] = [makePty('s1', 't1', NOW - 5000)]
+  const result = buildIdleTasks(ptys, [task], null, NOW)
+  expect(result.length).toBe(0)
+})
+
 test('PTY + chat rows for different tasks both surface', () => {
   const task1 = makeTask('t1', 'p1', 'Task 1')
   const task2 = makeTask('t2', 'p1', 'Task 2')
