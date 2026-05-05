@@ -1,6 +1,69 @@
 # Changelog
 
 
+## v0.27.0
+
+[compare changes](https://github.com/debuglebowski/slayzone/compare/v0.26.2...v0.27.0)
+
+### 🚀 Enhancements
+
+- **chat:** Auto-send "Approved" on plan-mode approval ([e35e0d6f](https://github.com/debuglebowski/slayzone/commit/e35e0d6f))
+- **chat:** Tool_result + control_request stdin + reasoning effort ([ee15b6b1](https://github.com/debuglebowski/slayzone/commit/ee15b6b1))
+- **chat:** Drop "Default" model option, resolve account default at spawn ([25567aa6](https://github.com/debuglebowski/slayzone/commit/25567aa6))
+- **changelog:** Add 'breaking' category ([3409d72a](https://github.com/debuglebowski/slayzone/commit/3409d72a))
+- **chat:** Optimistic mode change + send ([c46b5581](https://github.com/debuglebowski/slayzone/commit/c46b5581))
+- **chat:** Permission_request + live mode/model/interrupt ([c2d80718](https://github.com/debuglebowski/slayzone/commit/c2d80718))
+- **cli:** Slay pty create/split + tabs REST ([617722db](https://github.com/debuglebowski/slayzone/commit/617722db))
+- **app:** Agent-status panel ([72c697b8](https://github.com/debuglebowski/slayzone/commit/72c697b8))
+- **chat:** Hide AskUserQuestion header pill ([a4bed333](https://github.com/debuglebowski/slayzone/commit/a4bed333))
+- **agent-status:** Resurrect panel using idle state ([ece43b3b](https://github.com/debuglebowski/slayzone/commit/ece43b3b))
+- **chat:** Align tool cards w/ msg indent + content-fit width ([05f9f23d](https://github.com/debuglebowski/slayzone/commit/05f9f23d))
+- **chat:** Wire ChatPanel to backend queue + E2E ([8f09d3de](https://github.com/debuglebowski/slayzone/commit/8f09d3de))
+- **artifacts:** Add slay tasks artifacts search ([eab22d2b](https://github.com/debuglebowski/slayzone/commit/eab22d2b))
+- **kanban:** Multi-select cards w/ bulk drag and bulk menu ([3fb65151](https://github.com/debuglebowski/slayzone/commit/3fb65151))
+
+### 🩹 Fixes
+
+- **chat:** Vertically center empty-state suggestions ([178a83b9](https://github.com/debuglebowski/slayzone/commit/178a83b9))
+- **chat:** Fallback tool body to rawContent ([f8b97a56](https://github.com/debuglebowski/slayzone/commit/f8b97a56))
+- **chat:** Rehydrate chat tab state on reload via session registry ([90076a10](https://github.com/debuglebowski/slayzone/commit/90076a10))
+- **chat:** Snap timeline to bottom on send and start typing ([0b5ff0f3](https://github.com/debuglebowski/slayzone/commit/0b5ff0f3))
+- **chat:** Scope bg shells to OS subprocess via spawn-token ([69536c3e](https://github.com/debuglebowski/slayzone/commit/69536c3e))
+- **chat:** Queue live events during hydration to preserve replay ([51578eb0](https://github.com/debuglebowski/slayzone/commit/51578eb0))
+- **chat:** Drop orphan bg shells instead of marking 'unknown' ([14e7f529](https://github.com/debuglebowski/slayzone/commit/14e7f529))
+- **task:** Cmd+W in editor closes file not task in non-cm views ([228cc532](https://github.com/debuglebowski/slayzone/commit/228cc532))
+- **task:** Danger-zone delete no longer closes neighbour tab ([61d372b4](https://github.com/debuglebowski/slayzone/commit/61d372b4))
+- **context-manager:** Scrollable MCP panel ([4d1e46a1](https://github.com/debuglebowski/slayzone/commit/4d1e46a1))
+- **chat:** Synth interrupted on restore w/ unfinished turn ([235de2f1](https://github.com/debuglebowski/slayzone/commit/235de2f1))
+- **task:** Preserve open scratch terminals across restart ([291dbbb1](https://github.com/debuglebowski/slayzone/commit/291dbbb1))
+- **chat:** Auto-deny ExitPlanMode permission so SDK unblocks ([53a71aae](https://github.com/debuglebowski/slayzone/commit/53a71aae))
+- **chat:** Break long inline code, scroll pre blocks ([479cff54](https://github.com/debuglebowski/slayzone/commit/479cff54))
+- **terminal:** Kill chat sessions on terminal status ([b396a655](https://github.com/debuglebowski/slayzone/commit/b396a655))
+- **diagnostics:** Guard recordDiagnosticEvent against closed DB ([ed784994](https://github.com/debuglebowski/slayzone/commit/ed784994))
+
+### 💅 Refactors
+
+- Drop 'attention' state + remove notification system ([a4b6d8d1](https://github.com/debuglebowski/slayzone/commit/a4b6d8d1))
+- **projects:** Rename terminal-activity automation labels to agent ([b065ba92](https://github.com/debuglebowski/slayzone/commit/b065ba92))
+- **chat:** Drop loop functionality in agent chat mode ([ccff30c7](https://github.com/debuglebowski/slayzone/commit/ccff30c7))
+- **artifacts:** Finish rename leftovers ([eafb7a92](https://github.com/debuglebowski/slayzone/commit/eafb7a92))
+
+### 📖 Documentation
+
+- **release:** Add breaking changelog category ([ffd33326](https://github.com/debuglebowski/slayzone/commit/ffd33326))
+
+### 🏡 Chore
+
+- **nix:** Update sources to 0.26.2 ([372f39dc](https://github.com/debuglebowski/slayzone/commit/372f39dc))
+
+### ✅ Tests
+
+- **e2e:** Fix tabs REST spec — fetch via main proc to bypass CSP ([b6281d16](https://github.com/debuglebowski/slayzone/commit/b6281d16))
+
+### ❤️ Contributors
+
+- Debuglebowski
+
 ## v0.26.2
 
 [compare changes](https://github.com/debuglebowski/slayzone/compare/v0.26.1...v0.26.2)

@@ -1,5 +1,87 @@
 [
   {
+    "version": "0.27.0",
+    "date": "2026-05-06",
+    "tagline": "Native chat, bulk kanban",
+    "items": [
+      {
+        "category": "breaking",
+        "title": "Notification system removed",
+        "description": "The 'attention' state and notification system are gone — agent activity surfaces via the agent-status panel and chat instead."
+      },
+      {
+        "category": "breaking",
+        "title": "Loop mode removed from agent chat",
+        "description": "Loop functionality has been dropped from agent chat mode; use scheduled or one-shot turns instead."
+      },
+      {
+        "category": "feature",
+        "title": "Native chat panel for agents",
+        "description": "Send turns, approve permissions, switch model/mode, and interrupt — all from the in-app chat panel without dropping to a terminal."
+      },
+      {
+        "category": "feature",
+        "title": "Agent-status panel",
+        "description": "New panel surfaces idle/working state for each agent at a glance."
+      },
+      {
+        "category": "feature",
+        "title": "Kanban multi-select with bulk actions",
+        "description": "Select multiple cards, drag them as a group, and apply bulk actions from a context menu."
+      },
+      {
+        "category": "feature",
+        "title": "Slay CLI: PTY split + tabs + artifacts search",
+        "description": "New CLI commands to create/split PTYs, manage tabs via REST, and search task artifacts."
+      },
+      {
+        "category": "improvement",
+        "title": "Account default model auto-resolved",
+        "description": "The 'Default' model option is gone — your account default resolves at spawn so the chosen model is always explicit."
+      },
+      {
+        "category": "improvement",
+        "title": "Reasoning effort control in chat",
+        "description": "Adjust reasoning effort per turn from the chat footer."
+      },
+      {
+        "category": "improvement",
+        "title": "Tool cards align with message indent",
+        "description": "Tool cards in chat now match message indentation and shrink to fit their content."
+      },
+      {
+        "category": "fix",
+        "title": "Cmd+W closes the open file, not the task",
+        "description": "When focus is in the editor (non-CodeMirror views), Cmd+W closes the active file instead of the whole task tab."
+      },
+      {
+        "category": "fix",
+        "title": "Deleting a task no longer closes the neighbour tab",
+        "description": "Danger-zone delete now closes only the deleted task, leaving adjacent tabs alone."
+      },
+      {
+        "category": "fix",
+        "title": "Open scratch terminals survive restart",
+        "description": "Scratch terminals reopen on restart instead of being lost."
+      },
+      {
+        "category": "fix",
+        "title": "MCP panel scrolls",
+        "description": "The MCP section in the context manager is now scrollable when long."
+      },
+      {
+        "category": "fix",
+        "title": "Long code wraps and scrolls in chat",
+        "description": "Long inline code breaks at character boundaries and pre blocks gain horizontal scroll."
+      },
+      {
+        "category": "fix",
+        "title": "Chat sessions exit when terminal closes",
+        "description": "Closing a terminal now properly kills its associated chat session."
+      }
+    ]
+  },
+  {
     "version": "0.26.2",
     "date": "2026-05-05",
     "tagline": "Chat polish, self-heal",
