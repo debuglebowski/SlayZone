@@ -44,7 +44,8 @@ import {
   TooltipContent,
   Toaster,
   toast,
-  UpdateButton
+  UpdateButton,
+  UpdateToast
 } from '@slayzone/ui'
 import { SidebarProvider, cn, PanelToggle, useUndo, matchesShortcut, useShortcutStore, shortcutDefinitions, useShortcutDisplay, withShortcut, withModalGuard, scopeTracker } from '@slayzone/ui'
 import { AppSidebar } from '@/components/sidebar/AppSidebar'
@@ -196,6 +197,7 @@ function App(): React.JSX.Element {
   const { isBuiltinEnabled: isHomePanelEnabled, getOrderedHomeIds } = usePanelConfig()
   const orderedHomeIds = useMemo(() => getOrderedHomeIds(), [getOrderedHomeIds])
   const [updateVersion, setUpdateVersion] = useState<string | null>(null)
+  const [updateToastDismissed, setUpdateToastDismissed] = useState(false)
 
   // Home panel state (extracted — owns its own state fully)
   const homePanel = useHomePanel(selectedProjectId, panelSizes, orderedHomeIds)
@@ -692,7 +694,7 @@ function App(): React.JSX.Element {
       switch (status.type) {
         case 'checking': toast.loading('Checking for updates...', { id: 'update-check' }); break
         case 'downloading': toast.loading(`Downloading update... ${status.percent}%`, { id: 'update-check' }); break
-        case 'downloaded': toast.dismiss('update-check'); setUpdateVersion(status.version); break
+        case 'downloaded': toast.dismiss('update-check'); setUpdateVersion(status.version); setUpdateToastDismissed(false); break
         case 'not-available': toast.success('You\'re on the latest version', { id: 'update-check' }); break
         case 'error': toast.dismiss('update-check'); toast.error(`Update failed: ${status.message}`, { duration: 8000 }); break
       }
@@ -1447,6 +1449,7 @@ function App(): React.JSX.Element {
           <AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Complete Task</AlertDialogTitle><AlertDialogDescription>Mark as complete and close tab?</AlertDialogDescription></AlertDialogHeader>
           <AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction autoFocus onClick={handleCompleteTaskConfirm}>Complete</AlertDialogAction></AlertDialogFooter></AlertDialogContent>
         </AlertDialog>
+        <UpdateToast version={updateToastDismissed ? null : updateVersion} onRestart={() => window.api.app.restartForUpdate()} onDismiss={() => setUpdateToastDismissed(true)} />
         <Toaster position="bottom-right" theme="dark" closeButton />
       </div>
     </SidebarProvider>
