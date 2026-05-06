@@ -11,6 +11,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const SLAY_JS = path.resolve(__dirname, '..', '..', '..', 'cli', 'dist', 'slay.js')
 
 test.describe('CLI: automation triggers (end-to-end)', () => {
+  let dbDir = ''
   let dbPath = ''
   let projectId = ''
   let mcpPort = 0
@@ -21,7 +22,7 @@ test.describe('CLI: automation triggers (end-to-end)', () => {
       throw new Error(`CLI not built. Run: pnpm --filter @slayzone/cli build\nExpected: ${SLAY_JS}`)
     }
 
-    const dbDir = await electronApp.evaluate(() => process.env.SLAYZONE_DB_DIR!)
+    dbDir = await electronApp.evaluate(() => process.env.SLAYZONE_STORE_DIR!)
     dbPath = path.join(dbDir, 'slayzone.dev.sqlite')
 
     mcpPort = await electronApp.evaluate(async () => {
@@ -42,7 +43,7 @@ test.describe('CLI: automation triggers (end-to-end)', () => {
 
   const runCli = (...args: string[]) =>
     spawnSync('node', [SLAY_JS, ...args], {
-      env: { ...process.env, SLAYZONE_DB_PATH: dbPath, SLAYZONE_MCP_PORT: String(mcpPort) },
+      env: { ...process.env, SLAYZONE_STORE_DIR: dbDir, SLAYZONE_DEV: '1', SLAYZONE_MCP_PORT: String(mcpPort) },
       encoding: 'utf8',
     })
 

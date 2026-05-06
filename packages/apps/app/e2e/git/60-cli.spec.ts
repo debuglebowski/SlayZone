@@ -9,7 +9,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const SLAY_JS = path.resolve(__dirname, '..', '..', '..', 'cli', 'dist', 'slay.js')
 
 test.describe('CLI: slay', () => {
-  let dbPath = ''
+  let dbDir = ''
   let projectId = ''
   let mcpPort = 0
   const PROJECT_ABBREV = 'CL'
@@ -20,10 +20,7 @@ test.describe('CLI: slay', () => {
       throw new Error(`CLI not built. Run: pnpm --filter @slayzone/cli build\nExpected: ${SLAY_JS}`)
     }
 
-    // Get the exact DB path the running app is using
-    const dbDir = await electronApp.evaluate(() => process.env.SLAYZONE_DB_DIR!)
-    // Tests always run non-packaged, so DB name is always slayzone.dev.sqlite
-    dbPath = path.join(dbDir, 'slayzone.dev.sqlite')
+    dbDir = await electronApp.evaluate(() => process.env.SLAYZONE_STORE_DIR!)
 
     // Discover dynamic MCP port
     mcpPort = await electronApp.evaluate(async () => {
@@ -49,11 +46,15 @@ test.describe('CLI: slay', () => {
     await clickProject(mainWindow, PROJECT_ABBREV)
   })
 
-  const runCli = (...args: string[]) =>
-    spawnSync('node', [SLAY_JS, ...args], {
-      env: { ...process.env, SLAYZONE_DB_PATH: dbPath, SLAYZONE_MCP_PORT: String(mcpPort) },
+  const runCli = (...args: string[]) => {
+    // Strip env vars that may leak from the parent shell (e.g. when the suite
+    // runs inside a SlayZone task terminal).
+    const { SLAYZONE_TASK_ID: _t, SLAYZONE_PROJECT_ID: _p, ...rest } = process.env
+    return spawnSync('node', [SLAY_JS, ...args], {
+      env: { ...rest, SLAYZONE_STORE_DIR: dbDir, SLAYZONE_DEV: '1', SLAYZONE_MCP_PORT: String(mcpPort) },
       encoding: 'utf8',
     })
+  }
 
   // --- slay tasks list ---
 
@@ -139,7 +140,7 @@ test.describe('CLI: slay', () => {
       // No SLAYZONE_MCP_PORT — CLI must read port from settings table (like production)
       const { SLAYZONE_MCP_PORT: _, ...envWithoutPort } = process.env
       const r = spawnSync('node', [SLAY_JS, 'tasks', 'create', title, '--project', 'cli test'], {
-        env: { ...envWithoutPort, SLAYZONE_DB_PATH: dbPath },
+        env: { ...envWithoutPort, SLAYZONE_STORE_DIR: dbDir, SLAYZONE_DEV: '1' },
         encoding: 'utf8',
       })
       expect(r.status).toBe(0)
@@ -371,11 +372,13 @@ test.describe('CLI: slay', () => {
       await new Promise((r) => setTimeout(r, 300))
     })
 
-    const runProcessesCli = (...args: string[]) =>
-      spawnSync('node', [SLAY_JS, ...args], {
-        env: { ...process.env, SLAYZONE_DB_PATH: dbPath, SLAYZONE_MCP_PORT: String(mcpPort) },
+    const runProcessesCli = (...args: string[]) => {
+      const { SLAYZONE_TASK_ID: _t, SLAYZONE_PROJECT_ID: _p, ...rest } = process.env
+      return spawnSync('node', [SLAY_JS, ...args], {
+        env: { ...rest, SLAYZONE_STORE_DIR: dbDir, SLAYZONE_DEV: '1', SLAYZONE_MCP_PORT: String(mcpPort) },
         encoding: 'utf8',
       })
+    }
 
     test('lists processes', () => {
       const r = runProcessesCli('processes', 'list')
@@ -405,7 +408,7 @@ test.describe('CLI: slay', () => {
 
     test('exits non-zero when app is not running', () => {
       const r = spawnSync('node', [SLAY_JS, 'processes', 'list'], {
-        env: { ...process.env, SLAYZONE_DB_PATH: dbPath, SLAYZONE_MCP_PORT: '1' },
+        env: { ...process.env, SLAYZONE_STORE_DIR: dbDir, SLAYZONE_DEV: '1', SLAYZONE_MCP_PORT: '1' },
         encoding: 'utf8',
       })
       expect(r.status).not.toBe(0)
@@ -415,7 +418,7 @@ test.describe('CLI: slay', () => {
     test('kill stops a process', () => {
       // Spawn a long-running process for this test
       const killId = spawnSync('node', [SLAY_JS, 'tasks', 'list'], {
-        env: { ...process.env, SLAYZONE_DB_PATH: dbPath },
+        env: { ...process.env, SLAYZONE_STORE_DIR: dbDir, SLAYZONE_DEV: '1' },
         encoding: 'utf8',
       }) // warmup — ignore result
       void killId
@@ -570,7 +573,8 @@ test.describe('CLI: slay', () => {
       const r = spawnSync('node', [SLAY_JS, 'tasks', 'subtask-add', title], {
         env: {
           ...process.env,
-          SLAYZONE_DB_PATH: dbPath,
+          SLAYZONE_STORE_DIR: dbDir,
+          SLAYZONE_DEV: '1',
           SLAYZONE_MCP_PORT: String(mcpPort),
           SLAYZONE_TASK_ID: parentTaskId,
         },

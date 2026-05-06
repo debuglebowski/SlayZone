@@ -96,10 +96,9 @@ test.describe('Kanban interactions', () => {
     const blockedCard = mainWindow.getByText('Kanban blocked').first()
     await expect(blockedCard).toBeVisible({ timeout: 5_000 })
 
-    // Blocked tasks show a Link2 icon
+    // Blocked tasks render a "Blocked" pill on the card.
     const cardContainer = blockedCard.locator('..').locator('..')
-    const hasBlockedIcon = await cardContainer.locator('.lucide-link-2, .lucide-link').isVisible().catch(() => false)
-    expect(hasBlockedIcon).toBe(true)
+    await expect(cardContainer.getByText('Blocked', { exact: true })).toBeVisible({ timeout: 3_000 })
   })
 
   test('bulk archive done tasks via API and verify hidden', async ({ mainWindow }) => {

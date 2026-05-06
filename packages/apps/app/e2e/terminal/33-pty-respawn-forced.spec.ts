@@ -54,14 +54,13 @@ test.describe('Forced PTY respawn via REST', () => {
       return id
     }, task.id)
 
-    const res = await mainWindow.evaluate(async ({ taskId, port }) => {
-      const r = await fetch(`http://127.0.0.1:${port}/api/pty/respawn`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ taskId })
-      })
-      return { ok: r.ok, status: r.status }
-    }, { taskId: task.id, port: mcpPort })
+    // Fetch from the renderer is blocked by CSP (connect-src does not include
+    // 127.0.0.1:*). Issue the request from the Playwright test context instead.
+    const res = await fetch(`http://127.0.0.1:${mcpPort}/api/pty/respawn`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ taskId: task.id })
+    })
     expect(res.ok).toBe(true)
 
     await expect.poll(async () =>
@@ -72,27 +71,21 @@ test.describe('Forced PTY respawn via REST', () => {
     ).toBeGreaterThan(0)
   })
 
-  test('REST 404 when task does not exist', async ({ mainWindow }) => {
-    const res = await mainWindow.evaluate(async ({ port }) => {
-      const r = await fetch(`http://127.0.0.1:${port}/api/pty/respawn`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ taskId: '00000000-0000-0000-0000-000000000000' })
-      })
-      return { status: r.status }
-    }, { port: mcpPort })
+  test('REST 404 when task does not exist', async () => {
+    const res = await fetch(`http://127.0.0.1:${mcpPort}/api/pty/respawn`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ taskId: '00000000-0000-0000-0000-000000000000' })
+    })
     expect(res.status).toBe(404)
   })
 
-  test('REST 400 when taskId missing', async ({ mainWindow }) => {
-    const res = await mainWindow.evaluate(async ({ port }) => {
-      const r = await fetch(`http://127.0.0.1:${port}/api/pty/respawn`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({})
-      })
-      return { status: r.status }
-    }, { port: mcpPort })
+  test('REST 400 when taskId missing', async () => {
+    const res = await fetch(`http://127.0.0.1:${mcpPort}/api/pty/respawn`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({})
+    })
     expect(res.status).toBe(400)
   })
 
@@ -112,13 +105,11 @@ test.describe('Forced PTY respawn via REST', () => {
       return list.find((s) => s.sessionId === id)?.createdAt ?? null
     }, sessionId)
 
-    await mainWindow.evaluate(async ({ taskId, port }) => {
-      await fetch(`http://127.0.0.1:${port}/api/pty/respawn`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ taskId })
-      })
-    }, { taskId: task.id, port: mcpPort })
+    await fetch(`http://127.0.0.1:${mcpPort}/api/pty/respawn`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ taskId: task.id })
+    })
 
     await expect.poll(async () =>
       mainWindow.evaluate(async (id) => {

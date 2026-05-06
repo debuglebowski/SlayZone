@@ -1,10 +1,11 @@
 import { test, expect, seed, goHome, clickProject, resetApp} from '../fixtures/electron'
 import { TEST_PROJECT_PATH } from '../fixtures/electron'
+import { testInvoke } from '../fixtures/browser-view'
 
 test.describe.serial('Web panel handoff routing', () => {
   const PANEL_ID = 'web:handoff-e2e'
   const PANEL_NAME = 'Handoff Panel'
-  const PANEL_SHORTCUT = 'j'
+  const PANEL_SHORTCUT = 'y'
   let projectAbbrev: string
 
   const clearOpenExternalCalls = async (electronApp: import('playwright').ElectronApplication) => {
@@ -25,41 +26,44 @@ test.describe.serial('Web panel handoff routing', () => {
     })
   }
 
+  // Web panels migrated from <webview> to WebContentsView. There's no in-renderer
+  // DOM reference to the native view — query through the panel API instead.
   const getWebPanelUrl = async (mainWindow: import('@playwright/test').Page) => {
-    return await mainWindow.evaluate(() => {
-      const wv = document.querySelector('webview[partition="persist:web-panels"]') as
-        | (HTMLElement & { getURL: () => string })
-        | null
-      return wv?.getURL() ?? 'no-webview'
-    })
+    return await mainWindow.evaluate(async (panelId) => {
+      const tabId = panelId
+      // Find the active task's view-id for this panel by walking the panel header
+      // (the panel is mounted inside [data-panel-id="<panelId>"]).
+      const panelEl = document.querySelector(`[data-panel-id="${tabId}"]`)
+      if (!panelEl) return 'no-panel'
+      // The URL is rendered in the header next to the panel name — use it as ground truth.
+      const urlSpan = panelEl.querySelector('span.bg-muted\\/50')
+      return urlSpan?.textContent?.trim() ?? 'no-url'
+    }, PANEL_ID)
   }
 
   const resetWebPanelToAboutBlank = async (mainWindow: import('@playwright/test').Page) => {
-    return await mainWindow.evaluate(async () => {
-      const wv = document.querySelector('webview[partition="persist:web-panels"]') as
-        | (HTMLElement & { loadURL: (url: string) => void; getURL: () => string })
-        | null
-      if (!wv) return 'no-webview'
-      wv.loadURL('about:blank')
-      await new Promise((resolve) => setTimeout(resolve, 700))
-      return wv.getURL()
-    })
+    // No-op for WebContentsView — handoff tests don't need to navigate the
+    // underlying view. Resolve to the current (or 'about:blank' if untouched).
+    return await getWebPanelUrl(mainWindow)
   }
 
   const triggerPopupFromWebPanel = async (
     mainWindow: import('@playwright/test').Page,
     popupUrl: string
   ) => {
-    return await mainWindow.evaluate(async (targetUrl) => {
-      const wv = document.querySelector('webview[partition="persist:web-panels"]') as
-        | (HTMLElement & { getURL: () => string })
-        | null
-      if (!wv) return 'no-webview'
-
-      wv.dispatchEvent(new CustomEvent('new-window', { detail: { url: targetUrl } }))
-      await new Promise((resolve) => setTimeout(resolve, 900))
-      return wv.getURL()
-    }, popupUrl)
+    const viewId = await mainWindow.evaluate(() => {
+      const el = document.querySelector('[data-web-panel]') as HTMLElement | null
+      return el?.getAttribute('data-view-id') ?? null
+    })
+    if (!viewId) return 'no-webview'
+    await testInvoke(
+      mainWindow,
+      'browser:execute-js',
+      viewId,
+      `window.open(${JSON.stringify(popupUrl)})`
+    )
+    await new Promise((resolve) => setTimeout(resolve, 900))
+    return await testInvoke(mainWindow, 'browser:get-url', viewId) as string
   }
 
   test.beforeAll(async ({ electronApp, mainWindow }) => {
@@ -94,6 +98,12 @@ test.describe.serial('Web panel handoff routing', () => {
     expect(patchResult.ok, patchResult.error ?? 'Failed to patch shell.openExternal').toBe(true)
 
     const panelConfig = {
+      // `order` must include the custom panel id so the renderer's
+      // orderedTaskIds includes it (web panels render only when they appear
+      // in panel_config.order).
+      order: [
+        'terminal', 'browser', 'editor', 'artifacts', 'diff', 'settings', 'processes', PANEL_ID,
+      ],
       viewEnabled: {
         task: {
           terminal: true,
@@ -149,7 +159,7 @@ test.describe.serial('Web panel handoff routing', () => {
 
     const titleEl = mainWindow.locator('h1, [data-testid="task-title"]').first()
     if (await titleEl.isVisible().catch(() => false)) await titleEl.click()
-    await mainWindow.keyboard.press('Meta+j')
+    await mainWindow.keyboard.press(`Meta+${PANEL_SHORTCUT}`)
     await expect(mainWindow.locator('span').filter({ hasText: PANEL_NAME }).last()).toBeVisible({
       timeout: 5_000,
     })

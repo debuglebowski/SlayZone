@@ -82,7 +82,7 @@ test.describe('Panel resize', () => {
       return
     }
     const parsed = JSON.parse(stored)
-    expect(parsed._v).toBe(4)
+    expect(parsed._v).toBe(5)
     expect(parsed.settings).toBeGreaterThanOrEqual(440)
   })
 

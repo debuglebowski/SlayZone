@@ -34,7 +34,7 @@ interface CliResult {
 
 test.describe('Browser CLI multi-tab targeting', () => {
   let taskId = ''
-  let dbPath = ''
+  let dbDir = ''
   let mcpPort = 0
 
   test.beforeAll(async ({ electronApp, mainWindow }) => {
@@ -43,8 +43,7 @@ test.describe('Browser CLI multi-tab targeting', () => {
       throw new Error(`CLI not built. Run: pnpm --filter @slayzone/cli build\nExpected: ${SLAY_JS}`)
     }
 
-    const dbDir = await electronApp.evaluate(() => process.env.SLAYZONE_DB_DIR!)
-    dbPath = path.join(dbDir, 'slayzone.dev.sqlite')
+    dbDir = await electronApp.evaluate(() => process.env.SLAYZONE_STORE_DIR!)
     mcpPort = await electronApp.evaluate(async () => {
       for (let i = 0; i < 20; i++) {
         const p = (globalThis as Record<string, unknown>).__mcpPort
@@ -72,7 +71,8 @@ test.describe('Browser CLI multi-tab targeting', () => {
     const r = spawnSync('node', [SLAY_JS, ...args], {
       env: {
         ...process.env,
-        SLAYZONE_DB_PATH: dbPath,
+        SLAYZONE_STORE_DIR: dbDir,
+        SLAYZONE_DEV: '1',
         SLAYZONE_MCP_PORT: String(mcpPort),
         SLAYZONE_TASK_ID: taskId,
       },

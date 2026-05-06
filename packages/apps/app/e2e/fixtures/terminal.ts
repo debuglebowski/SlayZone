@@ -95,7 +95,8 @@ export async function switchTerminalMode(page: Page, mode: TerminalMode): Promis
     const selectedLabel = (await optionByValue.textContent())?.trim()
     await optionByValue.click()
     if (selectedLabel) {
-      await expect(trigger).toContainText(selectedLabel)
+      // Mode change kills+remounts the PTY — allow up to 5s for trigger label to update.
+      await expect(trigger).toContainText(selectedLabel, { timeout: 5_000 })
       return
     }
   }
@@ -104,7 +105,7 @@ export async function switchTerminalMode(page: Page, mode: TerminalMode): Promis
     const option = page.getByRole('option', { name: label, exact: true })
     if (await option.isVisible({ timeout: 800 }).catch(() => false)) {
       await option.click()
-      await expect(trigger).toContainText(label)
+      await expect(trigger).toContainText(label, { timeout: 5_000 })
       return
     }
   }

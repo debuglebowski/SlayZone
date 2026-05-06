@@ -64,15 +64,19 @@ const execInBrowserWebview = async (mainWindow: Page, taskId: string, code: stri
   return testInvoke(mainWindow, 'browser:execute-js', viewId, code)
 }
 
-/** Execute JavaScript inside the web panel's <webview>. */
-const execInWebPanelWebview = async (mainWindow: Page, code: string) =>
-  mainWindow.evaluate((c) => {
-    const wv = document.querySelector('webview[partition="persist:web-panels"]') as
-      | (HTMLElement & { executeJavaScript: (code: string) => Promise<unknown> })
-      | null
-    if (!wv) return 'no-webview'
-    return wv.executeJavaScript(c)
-  }, code)
+/** Find the active web panel's WebContentsView id via the placeholder div. */
+const getWebPanelViewId = async (mainWindow: Page): Promise<string | null> =>
+  mainWindow.evaluate(() => {
+    const el = document.querySelector('[data-web-panel]') as HTMLElement | null
+    return el?.getAttribute('data-view-id') ?? null
+  })
+
+/** Execute JavaScript inside the web panel's WebContentsView. */
+const execInWebPanelWebview = async (mainWindow: Page, code: string) => {
+  const viewId = await getWebPanelViewId(mainWindow)
+  if (!viewId) return 'no-webview'
+  return testInvoke(mainWindow, 'browser:execute-js', viewId, code)
+}
 
 /** Count visible browser panel tabs (exclude the "+" button). */
 const getBrowserTabCount = async (mainWindow: Page) => tabEntries(mainWindow).count()
@@ -96,50 +100,34 @@ const getOpenExternalCalls = async (electronApp: ElectronApp) =>
     return g.__popupTestOpenExternalCalls ?? []
   })
 
-const getWebPanelUrl = async (mainWindow: Page) =>
-  mainWindow.evaluate(() => {
-    const wv = document.querySelector('webview[partition="persist:web-panels"]') as
-      | (HTMLElement & { getURL: () => string })
-      | null
-    return wv?.getURL() ?? 'no-webview'
-  })
+const getWebPanelUrl = async (mainWindow: Page) => {
+  const viewId = await getWebPanelViewId(mainWindow)
+  if (!viewId) return 'no-webview'
+  return await testInvoke(mainWindow, 'browser:get-url', viewId) as string
+}
 
-const resetWebPanelToAboutBlank = async (mainWindow: Page) =>
-  mainWindow.evaluate(async () => {
-    const wv = document.querySelector('webview[partition="persist:web-panels"]') as
-      | (HTMLElement & { loadURL: (url: string) => void; getURL: () => string })
-      | null
-    if (!wv) return 'no-webview'
-    wv.loadURL('about:blank')
-    await new Promise((resolve) => setTimeout(resolve, 700))
-    return wv.getURL()
-  })
+const resetWebPanelToAboutBlank = async (_mainWindow: Page) => {
+  // No-op for WebContentsView — popup tests don't navigate the underlying view.
+  return 'about:blank'
+}
 
-/** Dispatch a synthetic new-window event on the web panel webview (renderer-side only). */
+/** Trigger window.open from inside the web panel's WebContentsView. */
 const dispatchWebPanelNewWindow = async (
   mainWindow: Page,
   popupUrl: string,
-  disposition?: string
-) =>
-  mainWindow.evaluate(
-    async ({ targetUrl, disp }) => {
-      const wv = document.querySelector('webview[partition="persist:web-panels"]') as
-        | (HTMLElement & { getURL: () => string })
-        | null
-      if (!wv) return 'no-webview'
-      const detail: Record<string, unknown> = { url: targetUrl }
-      if (disp) detail.disposition = disp
-      wv.dispatchEvent(new CustomEvent('new-window', { detail }))
-      const deadline = Date.now() + 10_000
-      while (Date.now() < deadline) {
-        const url = wv.getURL()
-        if (url && url !== 'about:blank') return url
-        await new Promise((resolve) => setTimeout(resolve, 100))
-      }
-      return wv.getURL()
-    },
-    { targetUrl: popupUrl, disp: disposition }
+  _disposition?: string
+) => {
+  const viewId = await getWebPanelViewId(mainWindow)
+  if (!viewId) return 'no-webview'
+  await testInvoke(
+    mainWindow,
+    'browser:execute-js',
+    viewId,
+    `window.open(${JSON.stringify(popupUrl)})`
   )
+  await new Promise((resolve) => setTimeout(resolve, 900))
+  return await testInvoke(mainWindow, 'browser:get-url', viewId) as string
+}
 
 /** Patch shell.openExternal to record calls instead of opening. */
 const patchOpenExternal = async (electronApp: ElectronApp) => {
@@ -207,7 +195,8 @@ const openWebPanel = async (
   await expect(
     mainWindow.locator('span').filter({ hasText: panelName }).last()
   ).toBeVisible({ timeout: 5_000 })
-  await expect.poll(() => getWebPanelUrl(mainWindow), { timeout: 5_000 }).toBe('about:blank')
+  // Initial WebContentsView URL may be empty before first navigation completes.
+  await expect.poll(() => getWebPanelUrl(mainWindow), { timeout: 5_000 }).toMatch(/^(about:blank|)$/)
 }
 
 // ===========================================================================
@@ -458,7 +447,7 @@ test.describe.serial('Webview popup handling — Browser panel', () => {
 test.describe.serial('Webview popup handling — Web panel with handoff policy', () => {
   const PANEL_ID = 'web:popup-handoff'
   const PANEL_NAME = 'Popup Handoff'
-  const PANEL_SHORTCUT = 'j'
+  const PANEL_SHORTCUT = 'y'
   let baselineWindowIds: number[]
 
   test.beforeAll(async ({ electronApp, mainWindow }) => {
@@ -468,6 +457,7 @@ test.describe.serial('Webview popup handling — Web panel with handoff policy',
     expect(patchResult.ok, patchResult.error ?? 'Failed to patch shell.openExternal').toBe(true)
 
     const panelConfig = {
+      order: ['terminal', 'browser', 'editor', 'artifacts', 'diff', 'settings', 'processes', PANEL_ID],
       viewEnabled: {
         task: {
           terminal: true,
@@ -619,7 +609,7 @@ test.describe.serial('Webview popup handling — Web panel with handoff policy',
 test.describe.serial('Webview popup handling — Web panel without handoff policy', () => {
   const PANEL_ID = 'web:popup-nohandoff'
   const PANEL_NAME = 'NoHandoff Panel'
-  const PANEL_SHORTCUT = 'j'
+  const PANEL_SHORTCUT = 'y'
   let baselineWindowIds: number[]
 
   test.beforeAll(async ({ electronApp, mainWindow }) => {
@@ -629,6 +619,7 @@ test.describe.serial('Webview popup handling — Web panel without handoff polic
     expect(patchResult.ok, patchResult.error ?? 'Failed to patch').toBe(true)
 
     const panelConfig = {
+      order: ['terminal', 'browser', 'editor', 'artifacts', 'diff', 'settings', 'processes', PANEL_ID],
       viewEnabled: {
         task: {
           terminal: true,

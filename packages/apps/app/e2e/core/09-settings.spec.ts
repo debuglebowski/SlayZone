@@ -12,8 +12,8 @@ test.describe('Settings', () => {
       await clickSettings(mainWindow)
       await expect(dialog).toBeVisible({ timeout: 5_000 })
     }
-    await dialog.locator('aside button').filter({ hasText: 'General' }).first().click()
-    await expect(dialog.getByText('Preferred port')).toBeVisible({ timeout: 5_000 })
+    // Default tab is Appearance — wait for it to render rather than nav-switching.
+    await expect(dialog.getByText('Color theme')).toBeVisible({ timeout: 5_000 })
     return dialog
   }
 
@@ -27,11 +27,10 @@ test.describe('Settings', () => {
       await expect(dialog).not.toBeVisible({ timeout: 5_000 })
     }
     await openSettingsDialog(mainWindow)
-    // Terminal config is inside the Panels tab.
     await dialog.locator('aside button').filter({ hasText: 'Panels' }).first().click()
-    await expect(findCard(settingsDialog(mainWindow), 'Terminal')).toBeVisible({ timeout: 5_000 })
-    // Terminal row is clickable and opens the terminal detail settings.
-    const terminalCard = findCard(dialog, 'Terminal')
+    // Terminal panel was relabeled "Agent" in the panels list.
+    await expect(findCard(settingsDialog(mainWindow), 'Agent')).toBeVisible({ timeout: 5_000 })
+    const terminalCard = findCard(dialog, 'Agent')
     await terminalCard.click()
     await expect(dialog.getByText('Default mode')).toBeVisible({ timeout: 5_000 })
   }
@@ -43,7 +42,7 @@ test.describe('Settings', () => {
   test('Cmd+, opens settings dialog', async ({ mainWindow }) => {
     await mainWindow.keyboard.press('Meta+,')
     await expect(settingsDialog(mainWindow)).toBeVisible({ timeout: 5_000 })
-    await expect(settingsDialog(mainWindow).getByText('Preferred port')).toBeVisible({ timeout: 5_000 })
+    await expect(settingsDialog(mainWindow).getByText('Color theme')).toBeVisible({ timeout: 5_000 })
   })
 
   test('switch theme to dark', async ({ mainWindow }) => {

@@ -3,7 +3,7 @@ import { TEST_PROJECT_PATH } from '../fixtures/electron'
 
 /** Locate a home panel toggle button by label */
 const homePanelBtn = (page: import('@playwright/test').Page, label: string) =>
-  page.locator('.bg-surface-3.rounded-lg').filter({ has: page.locator(`button:has-text("Kanban")`) }).locator(`button:has-text("${label}")`)
+  page.locator('.bg-surface-2.rounded-lg').filter({ has: page.locator(`button:has-text("Kanban")`) }).locator(`button:has-text("${label}")`)
 
 test.describe('Home panel persistence', () => {
   let abbrevA: string
@@ -27,11 +27,11 @@ test.describe('Home panel persistence', () => {
 
   test('home panel visibility persists across reload', async ({ mainWindow }) => {
     // Git panel should be off by default
-    await expect(homePanelBtn(mainWindow, 'Git')).not.toHaveClass(/(?:^|\s)bg-muted(?:\s|$)/)
+    await expect(homePanelBtn(mainWindow, 'Git')).not.toHaveClass(/(?:^|\s)bg-surface-3(?:\s|$)/)
 
     // Toggle git on
     await homePanelBtn(mainWindow, 'Git').click()
-    await expect(homePanelBtn(mainWindow, 'Git')).toHaveClass(/bg-muted/)
+    await expect(homePanelBtn(mainWindow, 'Git')).toHaveClass(/bg-surface-3/)
 
     // Wait for debounce save + reload
     await mainWindow.waitForTimeout(800)
@@ -39,27 +39,27 @@ test.describe('Home panel persistence', () => {
     await mainWindow.waitForSelector('#root', { timeout: 10_000 })
 
     // Git panel should still be active after reload
-    await expect(homePanelBtn(mainWindow, 'Git')).toHaveClass(/bg-muted/, { timeout: 5_000 })
+    await expect(homePanelBtn(mainWindow, 'Git')).toHaveClass(/bg-surface-3/, { timeout: 5_000 })
   })
 
   test('home panel visibility is per-project', async ({ mainWindow }) => {
     // Project A has git on (from previous test)
-    await expect(homePanelBtn(mainWindow, 'Git')).toHaveClass(/bg-muted/)
+    await expect(homePanelBtn(mainWindow, 'Git')).toHaveClass(/bg-surface-3/)
 
     // Switch to project B — git should be off (default)
     await clickProject(mainWindow, abbrevB)
     await expect(mainWindow.getByText('HP task B').first()).toBeVisible({ timeout: 5_000 })
-    await expect(homePanelBtn(mainWindow, 'Git')).not.toHaveClass(/(?:^|\s)bg-muted(?:\s|$)/)
+    await expect(homePanelBtn(mainWindow, 'Git')).not.toHaveClass(/(?:^|\s)bg-surface-3(?:\s|$)/)
 
     // Switch back to project A — git should still be on
     await clickProject(mainWindow, abbrevA)
     await expect(mainWindow.getByText('HP task A').first()).toBeVisible({ timeout: 5_000 })
-    await expect(homePanelBtn(mainWindow, 'Git')).toHaveClass(/bg-muted/)
+    await expect(homePanelBtn(mainWindow, 'Git')).toHaveClass(/bg-surface-3/)
   })
 
   test('git sub-tab persists across reload', async ({ mainWindow }) => {
     // Git panel should be open (from earlier tests)
-    await expect(homePanelBtn(mainWindow, 'Git')).toHaveClass(/bg-muted/)
+    await expect(homePanelBtn(mainWindow, 'Git')).toHaveClass(/bg-surface-3/)
 
     // Click the "Diff" tab inside the git panel
     const diffTab = mainWindow.getByRole('button', { name: 'Diff' }).first()
@@ -72,7 +72,7 @@ test.describe('Home panel persistence', () => {
     await mainWindow.waitForSelector('#root', { timeout: 10_000 })
 
     // Git panel should be open and Diff tab should be active
-    await expect(homePanelBtn(mainWindow, 'Git')).toHaveClass(/bg-muted/, { timeout: 5_000 })
+    await expect(homePanelBtn(mainWindow, 'Git')).toHaveClass(/bg-surface-3/, { timeout: 5_000 })
     // Active tab has distinct styling — check it's not "General" that's active
     const diffTabAfter = mainWindow.getByRole('button', { name: 'Diff' }).first()
     await expect(diffTabAfter).toBeVisible({ timeout: 5_000 })
