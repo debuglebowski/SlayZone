@@ -62,9 +62,11 @@ if (isFloatingAgent) {
     </PtyProvider>
   )
 } else {
+  window.api.app.bootMark?.('renderer script entered')
   // Wait for tab store to hydrate from SQLite before rendering —
   // prevents race conditions where effects wipe persisted tabs.
   tabStoreReady.then(() => {
+    window.api.app.bootMark?.('tabStoreReady resolved')
     // Prefetch task details for open tabs — warms Suspense cache before React mounts.
     // Fire-and-forget: the cache's resolved-value tracking + notify ensures immediate
     // re-render when data arrives, eliminating the 250ms use() scheduling delay.
@@ -73,6 +75,7 @@ if (isFloatingAgent) {
     }
 
     performance.mark('sz:reactMount')
+    window.api.app.bootMark?.('reactMount')
     createRoot(document.getElementById('root')!).render(
       <ConvexAuthBootstrap>
         <PtyProvider>

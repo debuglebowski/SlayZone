@@ -462,6 +462,7 @@ export interface ElectronAPI {
     onZoomFactorChanged: (callback: (factor: number) => void) => () => void
     onCloseActiveTask: (callback: () => void) => () => void
     dataReady: () => void
+    bootMark: (label: string) => void
     restartForUpdate: () => Promise<void>
     checkForUpdates: () => Promise<void>
     cliStatus: () => Promise<{ installed: boolean; path?: string }>

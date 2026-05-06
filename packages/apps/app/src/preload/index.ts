@@ -306,6 +306,11 @@ const api: ElectronAPI = {
       return () => ipcRenderer.removeListener('app:update-status', handler)
     },
     dataReady: () => ipcRenderer.send('app:data-ready'),
+    // No-op in prod — only emits IPC when main is collecting boot timing.
+    // Avoids per-cold-start IPC waste for an instrumentation hook.
+    bootMark: process.env.SLAYZONE_DEBUG_BOOT === '1'
+      ? (label: string) => ipcRenderer.send('boot:mark', label)
+      : () => {},
     restartForUpdate: () => ipcRenderer.invoke('app:restart-for-update'),
     checkForUpdates: () => ipcRenderer.invoke('app:check-for-updates'),
     cliStatus: () => ipcRenderer.invoke('app:cli-status'),

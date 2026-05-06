@@ -38,6 +38,10 @@ export function createIsolatedGitRepo(name: string): string {
 let sharedApp: ElectronApplication | undefined
 let sharedPage: Page | undefined
 let sharedWorkerArtifactsDir: string | undefined
+
+export function getWorkerArtifactsDir(): string | undefined {
+  return sharedWorkerArtifactsDir
+}
 let sessionStdoutStream: fs.WriteStream | null = null
 let sessionStderrStream: fs.WriteStream | null = null
 
@@ -238,6 +242,9 @@ async function launchElectronWithRetry(args: {
       // Prevent host shell dev-server overrides from leaking into deterministic e2e launches.
       delete launchEnv.ELECTRON_RENDERER_URL
 
+      const bootLogPath = path.join(attemptArtifactsDir, 'boot.log')
+      ensureDir(attemptArtifactsDir)
+
       app = await electron.launch({
         args: [MAIN_JS],
         executablePath: args.executablePath,
@@ -246,6 +253,12 @@ async function launchElectronWithRetry(args: {
           PLAYWRIGHT: '1',
           SLAYZONE_DB_DIR: args.userDataDir,
           SLAYZONE_USER_DATA_DIR: args.userDataDir,
+          // Always-on boot tracing in e2e — cheap (~30 console.log per launch)
+          // and lets profiling specs read the timeline from boot.log. We use
+          // a file sink (not stdout) because Playwright's stdio capture races
+          // with main-process output emitted before its 'data' listener attaches.
+          SLAYZONE_DEBUG_BOOT: launchEnv.SLAYZONE_DEBUG_BOOT ?? '1',
+          SLAYZONE_BOOT_LOG_PATH: bootLogPath,
         },
       })
 

@@ -63,8 +63,13 @@ export function setProcessManagerWindow(window: BrowserWindow): void {
 
 export function initProcessManager(database: Database): void {
   db = database
-  // Warm the enriched-PATH cache early so first spawn doesn't pay the shell-init cost.
-  getEnrichedPath()
+  // Warm the enriched-PATH cache off the boot critical path. Spawning the
+  // user's shell to read $PATH is ~100ms (login shell + rc files); deferring
+  // saves it from blocking window creation. First spawn within the deferred
+  // window pays the cost lazily — same as before this warm-up existed.
+  setImmediate(() => {
+    try { getEnrichedPath() } catch { /* lazy fallback handles it */ }
+  })
   const rows = db.prepare('SELECT * FROM processes ORDER BY created_at').all() as Array<{
     id: string; task_id: string | null; project_id: string | null; label: string; command: string; cwd: string; auto_restart: number
   }>

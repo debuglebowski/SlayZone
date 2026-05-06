@@ -11,7 +11,7 @@ console.log('[fd-limit]', JSON.stringify(fdLimitResult))
 import { app, shell, BrowserWindow, ipcMain, nativeTheme, session, webContents, dialog, Menu, protocol, screen, powerMonitor, crashReporter } from 'electron'
 import { join, extname, normalize, sep, resolve } from 'path'
 import { homedir } from 'os'
-import { readFileSync, promises as fsp, mkdirSync } from 'fs'
+import { readFileSync, promises as fsp, mkdirSync, appendFileSync } from 'fs'
 import { electronApp, is } from '@electron-toolkit/utils'
 import { ElectronChromeExtensions } from 'electron-chrome-extensions'
 import { installChromeWebStore } from 'electron-chrome-web-store'
@@ -307,9 +307,47 @@ const SUPPORTED_PROTOCOL_SCHEMES = new Set([APP_PROTOCOL_SCHEME])
 const OAUTH_DEEP_LINK_REDIRECT_URI = `${APP_PROTOCOL_SCHEME}://auth/callback`
 const OAUTH_CALLBACK_TIMEOUT_MS = 120_000
 
+const BOOT_START_MS = performance.now()
+let bootLastStepMs = BOOT_START_MS
+const bootSteps: { step: string; t: number; delta: number }[] = []
+const isBootDebug = (): boolean => is.dev && process.env.SLAYZONE_DEBUG_BOOT === '1'
+
+// Optional sync file sink. stdout capture in Playwright drops data emitted
+// before its 'data' listener attaches, so writing direct to a known file
+// guarantees we keep the early-boot lines (db init, migrations, etc.).
+function bootLogFilePath(): string | null {
+  return process.env.SLAYZONE_BOOT_LOG_PATH ?? null
+}
+
 function logBoot(step: string): void {
-  if (is.dev && process.env.SLAYZONE_DEBUG_BOOT === '1') {
-    console.log(`[boot] ${step}`)
+  if (!isBootDebug()) return
+  const now = performance.now()
+  const t = Math.round(now - BOOT_START_MS)
+  const delta = Math.round(now - bootLastStepMs)
+  bootLastStepMs = now
+  bootSteps.push({ step, t, delta })
+  const line = `[boot] t=${String(t).padStart(5)}ms Δ=${String(delta).padStart(5)}ms ${step}`
+  console.log(line)
+  const file = bootLogFilePath()
+  if (file) {
+    try { appendFileSync(file, line + '\n') } catch { /* best effort */ }
+  }
+}
+
+function dumpBootSummary(label: string): void {
+  if (!isBootDebug() || bootSteps.length === 0) return
+  const sorted = [...bootSteps].sort((a, b) => b.delta - a.delta).slice(0, 12)
+  const last = bootSteps[bootSteps.length - 1]
+  const lines: string[] = []
+  lines.push(`[boot] ── summary @ ${label} ── total=${last.t}ms steps=${bootSteps.length}`)
+  lines.push(`[boot] top gaps:`)
+  for (const s of sorted) {
+    lines.push(`[boot]   Δ=${String(s.delta).padStart(5)}ms  t=${String(s.t).padStart(5)}ms  ${s.step}`)
+  }
+  for (const l of lines) console.log(l)
+  const file = bootLogFilePath()
+  if (file) {
+    try { appendFileSync(file, lines.join('\n') + '\n') } catch { /* best effort */ }
   }
 }
 
@@ -343,6 +381,8 @@ function tryShowMainWindow(): void {
   } else {
     if (!isPlaywright) mainWindow?.show()
   }
+  logBoot('main window shown')
+  dumpBootSummary('main window shown')
 }
 
 // InlineDevToolsBounds, normalizeInlineDevToolsBounds, ensureInlineDevToolsView, removeInlineDevToolsView removed
@@ -599,6 +639,7 @@ function createSplashWindow(): void {
 
   splashWindow.once('ready-to-show', () => {
     splashWindow?.show()
+    logBoot('splash window shown')
   })
 
   // Escape to dismiss splash early
@@ -618,6 +659,7 @@ function createMainWindow(): void {
   rendererDataReady = false
   setTimeout(() => {
     if (rendererDataReady) return
+    logBoot('renderer data-ready FALLBACK (5s timeout fired)')
     rendererDataReady = true
     tryShowMainWindow()
   }, 5000)
@@ -641,9 +683,14 @@ function createMainWindow(): void {
   })
 
   browserViewManager.setMainWindow(mainWindow)
-  mainWindow.on('ready-to-show', () => {
+  // .once: Chromium re-emits 'ready-to-show' a second time ~400ms after first
+  // paint (compositor surface re-allocates after React mount). The second fire
+  // is benign — handler is idempotent — but using .once keeps the boot
+  // timeline clean and avoids redundant idle-checker init.
+  mainWindow.once('ready-to-show', () => {
     if (mainWindow) startIdleChecker(mainWindow)
     mainWindowReady = true
+    logBoot('main window ready-to-show')
     tryShowMainWindow()
   })
 
@@ -822,8 +869,11 @@ app.whenReady().then(async () => {
   // Initialize databases
   logBoot('database init start')
   const db = getDatabase()
+  logBoot('db opened')
   await createPreMigrationBackup(db, LATEST_MIGRATION_VERSION)
+  logBoot('pre-migration backup done')
   runMigrations(db)
+  logBoot('migrations applied')
   normalizeProjectStatusData(db)
 
   // v127 disk-dir migration: assets/ → artifacts/. Idempotent.
@@ -841,6 +891,7 @@ app.whenReady().then(async () => {
       console.error('[migration v127] disk dir migration failed', e)
     }
   }
+  logBoot('v127 disk migration done')
 
   // Seed initial artifact versions (v1) for any artifacts without history. Idempotent.
   {
@@ -858,7 +909,9 @@ app.whenReady().then(async () => {
       console.log(`[artifact-versions] seeded=${seedReport.seeded} skippedMissing=${seedReport.skippedMissing}`)
     }
   }
+  logBoot('artifact versions seeded')
   const diagDb = getDiagnosticsDatabase()
+  logBoot('diagnostics db opened')
   const isLabEnabled = (key: string): boolean => {
     const row = db.prepare('SELECT value FROM settings WHERE key = ?').get(key) as { value: string } | undefined
     if (!row) return is.dev || isPlaywright
@@ -927,6 +980,7 @@ app.whenReady().then(async () => {
     | undefined
   const savedTheme = row?.value as 'light' | 'dark' | 'system' | undefined
   nativeTheme.themeSource = savedTheme ?? 'dark'
+  logBoot('theme loaded')
 
   function getMenuAccelerator(id: string, overrides: Record<string, string | null>): string | undefined {
     const keys = id in overrides ? overrides[id] : (MENU_SHORTCUT_DEFAULTS[id] ?? null)
@@ -1085,6 +1139,7 @@ app.whenReady().then(async () => {
 
   currentOverrides = loadShortcutOverrides()
   buildAppMenu(currentOverrides)
+  logBoot('app menu built')
 
   // Rebuild menu + update overrides cache whenever shortcuts change
   ipcMain.on('shortcuts:changed', () => {
@@ -1143,6 +1198,7 @@ app.whenReady().then(async () => {
   registerTagHandlers(ipcMain, db)
   registerHistoryHandlers(ipcMain, db)
   registerSettingsHandlers(ipcMain, db)
+  logBoot('core domain handlers registered')
 
   // Feedback handlers (lightweight, no domain package)
   ipcMain.handle('db:feedback:listThreads', () => {
@@ -1167,8 +1223,10 @@ app.whenReady().then(async () => {
   registerThemeHandlers(ipcMain, db)
   registerUsageHandlers(ipcMain, db)
   registerPtyHandlers(ipcMain, db)
+  logBoot('pty handlers registered')
   setupFloatingAgent(() => currentOverrides)
   setupTaskWindows()
+  logBoot('floating agent + task windows set up')
 
   // Task automation: auto-move tasks on terminal state change
   onGlobalStateChange((sessionId, newState, oldState) => {
@@ -1212,6 +1270,7 @@ app.whenReady().then(async () => {
   }
 
   registerTerminalTabsHandlers(ipcMain, db)
+  logBoot('terminal-tabs handlers registered')
   registerChatHandlers(ipcMain, db, { onChatEvent: initChatTurnSubscriber(db) })
   // One-shot: backfill `chatMode` for tasks that pre-date the chat-mode UI so
   // upgraded users keep their current `--allow-dangerously-skip-permissions`
@@ -1227,16 +1286,20 @@ app.whenReady().then(async () => {
   registerFilesHandlers(ipcMain)
   registerWorktreeHandlers(ipcMain, db)
   registerAgentTurnsHandlers(ipcMain, db)
+  logBoot('files+worktree+agent-turns registered')
   // xterm-mode turn detection: every Enter press in a PTY = turn boundary.
   onPtyInputSubmit(initPtyTurnSubscriber(db))
   registerAiConfigHandlers(ipcMain, db)
+  logBoot('ai-config handlers registered')
   const integrationHandles = registerIntegrationHandlers(ipcMain, db, { enableTestChannels: isPlaywright })
+  logBoot('integration handlers registered')
   registerFileEditorHandlers(ipcMain)
   registerClipboardHandlers(ipcMain)
   registerScreenshotHandlers(browserViewManager)
   registerExportImportHandlers(ipcMain, db, isPlaywright)
   registerLeaderboardHandlers(ipcMain, db)
   registerTestPanelHandlers(ipcMain, db)
+  logBoot('misc handlers registered (file-editor/clipboard/screenshot/export/leaderboard/tests)')
   const notifyAutomationsChanged = (): void => {
     mainWindow?.webContents.send('automations:changed')
     notifyTasksChanged()
@@ -1250,12 +1313,19 @@ app.whenReady().then(async () => {
   startAutoBackup(db)
   logBoot('domain IPC handlers registered')
 
-  // Start MCP server — preferred port from settings, falls back to dynamic port on conflict
-  import('./mcp-server').then((mod) => {
-    mod.startMcpServer(db, { automationEngine })
-    mcpCleanup = () => mod.stopMcpServer()
-  }).catch((err) => {
-    console.error('[MCP] Failed to start server:', err)
+  // Start MCP server off the boot critical path. The dynamic import resolves
+  // a heavy module graph (~70ms sync work even though it returns a Promise),
+  // and nothing on first paint depends on the server being listening — the
+  // CLI discovers the port via settings and the renderer doesn't talk to it.
+  setImmediate(() => {
+    logBoot('mcp server import dispatched')
+    import('./mcp-server').then((mod) => {
+      mod.startMcpServer(db, { automationEngine })
+      mcpCleanup = () => mod.stopMcpServer()
+      logBoot('mcp server started')
+    }).catch((err) => {
+      console.error('[MCP] Failed to start server:', err)
+    })
   })
 
   linearSyncPoller = startSyncPoller(db, notifyTasksChanged)
@@ -1450,12 +1520,14 @@ div{text-align:center}h1{font-size:14px;font-weight:500;color:#aaa}p{font-size:1
 
   // Initialize Chrome Web Store support for service worker lifecycle management.
   const extensionsPath = join(app.getPath('userData'), 'Extensions')
+  logBoot('chrome-web-store install start')
   await installChromeWebStore({
     session: browserSession,
     extensionsPath,
     loadExtensions: true,
     allowUnpackedExtensions: true,
   })
+  logBoot('chrome-web-store install done')
 
   // Initialize Chrome extension API support for the browser panel session.
   const chromeExtensions = new ElectronChromeExtensions({
@@ -1496,6 +1568,7 @@ div{text-align:center}h1{font-size:14px;font-weight:500;color:#aaa}p{font-size:1
     } catch { /* no saved extensions or file doesn't exist */ }
   }
   void loadSavedExtensions()
+  logBoot('extension+session config done')
 
   // Set app user model id for windows
   electronApp.setAppUserModelId('com.slayzone.app')
@@ -1591,8 +1664,16 @@ div{text-align:center}h1{font-size:14px;font-weight:500;color:#aaa}p{font-size:1
 
   ipcMain.on('app:data-ready', () => {
     if (rendererDataReady) return
+    logBoot('renderer data-ready (IPC from useTasksData)')
     rendererDataReady = true
     tryShowMainWindow()
+  })
+
+  // Renderer-emitted boot marks routed into main timeline. Renderer measures
+  // are page-relative; we record them with main's clock so the waterfall is
+  // unified. Gated behind SLAYZONE_DEBUG_BOOT.
+  ipcMain.on('boot:mark', (_event, label: string) => {
+    if (typeof label === 'string') logBoot(`renderer: ${label}`)
   })
 
   ipcMain.handle('app:getVersion', () => app.getVersion())
