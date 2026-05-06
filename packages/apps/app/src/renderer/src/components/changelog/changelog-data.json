@@ -1,5 +1,27 @@
 [
   {
+    "version": "0.27.1",
+    "date": "2026-05-06",
+    "tagline": "Update toast, tab menu",
+    "items": [
+      {
+        "category": "feature",
+        "title": "Right-click context menu on editor tabs",
+        "description": "Right-click any open file tab for close, close-others, and close-all actions."
+      },
+      {
+        "category": "feature",
+        "title": "Update-ready toast restored",
+        "description": "When an update finishes downloading, a toast surfaces alongside the restart button so the prompt is harder to miss."
+      },
+      {
+        "category": "fix",
+        "title": "Artifacts panel order survives rename",
+        "description": "Saved panel orders containing the legacy 'assets' id now migrate to 'artifacts' so the panel stays in its expected slot."
+      }
+    ]
+  },
+  {
     "version": "0.27.0",
     "date": "2026-05-06",
     "tagline": "Native chat, bulk kanban",

@@ -1,6 +1,27 @@
 # Changelog
 
 
+## v0.27.1
+
+[compare changes](https://github.com/debuglebowski/slayzone/compare/v0.27.0...v0.27.1)
+
+### 🚀 Enhancements
+
+- **editor:** Right-click tab context menu ([fcfd93b3](https://github.com/debuglebowski/slayzone/commit/fcfd93b3))
+- **updater:** Restore update-ready toast alongside restart button ([37ab41a4](https://github.com/debuglebowski/slayzone/commit/37ab41a4))
+
+### 🩹 Fixes
+
+- **panels:** Migrate legacy 'assets' id to 'artifacts' in saved order ([734da3fb](https://github.com/debuglebowski/slayzone/commit/734da3fb))
+
+### 🏡 Chore
+
+- **chat:** Log inFlight flips to diagnostics ([e951e1c6](https://github.com/debuglebowski/slayzone/commit/e951e1c6))
+
+### ❤️ Contributors
+
+- Debuglebowski
+
 ## v0.27.0
 
 [compare changes](https://github.com/debuglebowski/slayzone/compare/v0.26.2...v0.27.0)
