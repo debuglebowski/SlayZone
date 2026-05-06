@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef, useMemo, forwardRef, useImperativeHandle } from 'react'
 import { usePty } from '@slayzone/terminal'
-import { Terminal as TerminalView } from '@slayzone/terminal/client/Terminal'
+import { Terminal as TerminalView } from '@slayzone/terminal/client/LazyTerminal'
 import type { TerminalMode } from '@slayzone/terminal/shared'
 import { matchesShortcut, useShortcutStore, withModalGuard, getThemeChrome, getChromeStyleOverrides } from '@slayzone/ui'
 import { useTheme } from '@slayzone/settings/client'

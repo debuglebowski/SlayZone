@@ -1,3 +1,9 @@
+// IMPORTANT: Import via `./LazyTerminal` from consumer code, not this file
+// directly. This module pulls in xterm + addons + xterm.css (~440KB minified)
+// which the LazyTerminal wrapper splits into its own chunk via React.lazy.
+// Direct imports from `./Terminal` will land xterm back in the main renderer
+// bundle and undo the boot-time split. The package's "./client/Terminal"
+// export exists only for the lazy wrapper itself.
 import { useEffect, useRef, useCallback, useState, forwardRef, useImperativeHandle } from 'react'
 import { CheckCircle2, XCircle, Loader2 } from 'lucide-react'
 import { Terminal as XTerm } from '@xterm/xterm'
@@ -85,7 +91,7 @@ function waitForDimensions(
   })
 }
 
-interface TerminalProps {
+export interface TerminalProps {
   sessionId: string
   cwd: string
   mode?: TerminalMode

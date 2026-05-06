@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef, forwardRef, useImperativeHandle } from 'react'
-import { Terminal, type TerminalHandle } from '@slayzone/terminal/client/Terminal'
+import { Terminal, type TerminalHandle } from '@slayzone/terminal/client/LazyTerminal'
 import type { TabDisplayMode, TerminalTab } from '../shared/types'
 import { TerminalContextMenu } from './TerminalContextMenu'
 import { ChatPanel, type ChatPanelHandle } from './chat/ChatPanel'

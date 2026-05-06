@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { Terminal } from '@slayzone/terminal/client/Terminal'
+import { Terminal } from '@slayzone/terminal/client/LazyTerminal'
 import {
   useTerminalModes,
   getVisibleModes,

@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { Frame, X } from 'lucide-react'
-import { Terminal } from '@slayzone/terminal/client/Terminal'
+import { Terminal } from '@slayzone/terminal/client/LazyTerminal'
 import { usePty } from '@slayzone/terminal/client'
 import type { TerminalMode, TerminalState } from '@slayzone/terminal/shared'
 import { FloatingAgentCollapsed } from './FloatingAgentCollapsed'

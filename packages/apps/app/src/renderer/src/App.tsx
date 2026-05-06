@@ -284,6 +284,25 @@ function App(): React.JSX.Element {
   useEffect(() => { performance.mark('sz:app:mounted') }, [])
   useEffect(() => { return initShortcuts() }, [])
 
+  // Idle-prefetch heavy chunks user will likely hit soon. Runs after first
+  // paint settles. requestIdleCallback yields to main-thread work so this
+  // never blocks user input. import() is cached → real usage hits warm chunk.
+  useEffect(() => {
+    const idle = (cb: () => void): number => {
+      const ric = (window as unknown as { requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => number }).requestIdleCallback
+      return ric ? ric(cb, { timeout: 3000 }) : (setTimeout(cb, 1500) as unknown as number)
+    }
+    const handle = idle(() => {
+      // xterm chunk (~440KB) — first terminal panel mount lands warm.
+      void import('@slayzone/terminal/client/Terminal')
+    })
+    return () => {
+      const cic = (window as unknown as { cancelIdleCallback?: (h: number) => void }).cancelIdleCallback
+      if (cic) cic(handle)
+      else clearTimeout(handle)
+    }
+  }, [])
+
   useEffect(() => {
     Promise.all([
       window.api.settings.get('onboarding_completed'),
