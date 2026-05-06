@@ -12,7 +12,7 @@ const SLAY_JS = path.resolve(__dirname, '..', '..', '..', 'cli', 'dist', 'slay.j
 test.describe('Web panels', () => {
   let projectAbbrev: string
   let figmaPanelName = 'Figma'
-  let dbPath = ''
+  let dbDir = ''
   let mcpPort = 0
 
   const settingsDialog = (page: import('@playwright/test').Page) =>
@@ -49,7 +49,7 @@ test.describe('Web panels', () => {
       }
       await panelsTab.click()
     }
-    await expect(findCard(settingsDialog(page), 'Terminal')).toBeVisible({ timeout: 3_000 })
+    await expect(findCard(settingsDialog(page), 'Agent')).toBeVisible({ timeout: 3_000 })
   }
 
   const closePanelsTab = async (page: import('@playwright/test').Page) => {
@@ -68,7 +68,7 @@ test.describe('Web panels', () => {
 
   const runCli = (...args: string[]) =>
     spawnSync('node', [SLAY_JS, ...args], {
-      env: { ...process.env, SLAYZONE_DB_PATH: dbPath, SLAYZONE_MCP_PORT: String(mcpPort) },
+      env: { ...process.env, SLAYZONE_STORE_DIR: dbDir, SLAYZONE_DEV: '1', SLAYZONE_MCP_PORT: String(mcpPort) },
       encoding: 'utf8',
     })
 
@@ -77,8 +77,7 @@ test.describe('Web panels', () => {
 
     // CLI setup (same pattern as 60-cli.spec.ts)
     if (fs.existsSync(SLAY_JS)) {
-      const dbDir = await electronApp.evaluate(() => process.env.SLAYZONE_DB_DIR!)
-      dbPath = path.join(dbDir, 'slayzone.dev.sqlite')
+      dbDir = await electronApp.evaluate(() => process.env.SLAYZONE_STORE_DIR!)
       mcpPort = await electronApp.evaluate(async () => {
         for (let i = 0; i < 20; i++) {
           const p = (globalThis as Record<string, unknown>).__mcpPort
@@ -112,7 +111,7 @@ test.describe('Web panels', () => {
     await openPanelsTab(mainWindow)
     const dialog = settingsDialog(mainWindow)
 
-    for (const name of ['Terminal', 'Browser', 'Editor', 'Git']) {
+    for (const name of ['Agent', 'Browser', 'Editor', 'Git']) {
       await expect(findCard(dialog, name)).toBeVisible({ timeout: 3_000 })
     }
     for (const name of ['Figma', 'Notion', 'GitHub', 'Excalidraw']) {
@@ -124,7 +123,8 @@ test.describe('Web panels', () => {
     await openPanelsTab(mainWindow)
     const dialog = settingsDialog(mainWindow)
     for (const name of ['Figma', 'Notion', 'GitHub', 'Excalidraw']) {
-      await expect(findCard(dialog, name).getByRole('switch'))
+      // Each row has Home + Task toggles; web panels are task-only (Home is disabled placeholder).
+      await expect(findCard(dialog, name).getByRole('switch').last())
         .toHaveAttribute('data-state', 'unchecked')
     }
   })
@@ -145,13 +145,13 @@ test.describe('Web panels', () => {
 
     const card = findCard(dialog, 'TestPanel')
     await expect(card).toBeVisible({ timeout: 3_000 })
-    await expect(card.getByRole('switch')).toHaveAttribute('data-state', 'checked')
+    await expect(card.getByRole('switch').last()).toHaveAttribute('data-state', 'checked')
   })
 
   test('enable Figma panel', async ({ mainWindow }) => {
     await openPanelsTab(mainWindow)
     const dialog = settingsDialog(mainWindow)
-    const switchEl = findCard(dialog, 'Figma').getByRole('switch')
+    const switchEl = findCard(dialog, 'Figma').getByRole('switch').last()
     await expect(switchEl).toHaveAttribute('data-state', 'unchecked')
     await switchEl.click()
     await expect(switchEl).toHaveAttribute('data-state', 'checked')
@@ -277,13 +277,13 @@ test.describe('Web panels', () => {
     await closePanelsTab(mainWindow)
     await openPanelsTab(mainWindow)
     const dialog = settingsDialog(mainWindow)
-    const card = findCard(dialog, 'Terminal')
+    const card = findCard(dialog, 'Agent')
     await expect(card).toBeVisible({ timeout: 5_000 })
 
     await card.click()
     await expect(dialog.getByText('Default mode')).toBeVisible({ timeout: 5_000 })
     await dialog.getByTestId('settings-tab-panels').click()
-    await expect(findCard(dialog, 'Terminal')).toBeVisible({ timeout: 5_000 })
+    await expect(findCard(dialog, 'Agent')).toBeVisible({ timeout: 5_000 })
   })
 
   test('browser row opens config section', async ({ mainWindow }) => {
@@ -440,7 +440,8 @@ test.describe('Web panels', () => {
   })
 
   test('CLI create rejects reserved shortcut', async () => {
-    const r = runCli('--dev', 'panels', 'create', 'BadKey', 'https://badkey.example.com', '-s', 't')
+    // 'k' is reserved for the built-in terminal panel.
+    const r = runCli('--dev', 'panels', 'create', 'BadKey', 'https://badkey.example.com', '-s', 'k')
     expect(r.status).not.toBe(0)
     expect(r.stderr).toContain('reserved')
   })

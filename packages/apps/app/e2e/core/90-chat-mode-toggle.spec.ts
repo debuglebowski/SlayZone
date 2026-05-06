@@ -9,12 +9,18 @@ import { TEST_PROJECT_PATH } from '../fixtures/electron'
  *   packages/domains/terminal/src/main/chat-transport-manager.test.ts
  *   packages/domains/terminal/src/client/chat-timeline.test.ts
  *
- * This spec covers the UI wiring: toggle button visibility, confirm dialog,
- * DB persistence of display_mode, panel swap on toggle.
+ * This spec covers the UI wiring: terminal context menu surfaces an "Enable
+ * chat (beta)" item, the confirm dialog gates display-mode changes, and DB
+ * persistence flips display_mode on confirm.
  */
 test.describe('Chat-mode toggle', () => {
   let projectAbbrev: string
   let taskId: string
+
+  const openTerminalMenu = async (mainWindow: import('@playwright/test').Page) => {
+    const terminal = mainWindow.locator('.xterm-screen').first()
+    await terminal.click({ button: 'right' })
+  }
 
   test.beforeAll(async ({ mainWindow }) => {
     await resetApp(mainWindow)
@@ -24,7 +30,7 @@ test.describe('Chat-mode toggle', () => {
 
     const task = await s.createTask({ projectId: p.id, title: 'Chat toggle task', status: 'in_progress' })
     taskId = task.id
-    // Force terminal_mode = claude-code so the chat toggle is visible
+    // Force terminal_mode = claude-code so the chat toggle is offered.
     await mainWindow.evaluate(
       async (id) => window.api.db.updateTask({ id, terminalMode: 'claude-code' } as never),
       taskId
@@ -39,35 +45,37 @@ test.describe('Chat-mode toggle', () => {
     ).toBeVisible({ timeout: 10_000 })
   })
 
-  test('toggle icon appears on claude-code main tab', async ({ mainWindow }) => {
-    const toggle = mainWindow.locator(`[data-testid="terminal-display-mode-toggle-${taskId}"]`)
-    await expect(toggle).toBeVisible({ timeout: 5_000 })
+  test('terminal context menu offers Enable chat (beta) for claude-code', async ({ mainWindow }) => {
+    await openTerminalMenu(mainWindow)
+    await expect(mainWindow.getByRole('menuitem', { name: /Enable chat \(beta\)/ })).toBeVisible({ timeout: 5_000 })
+    // Close menu — Escape closes Radix context menus.
+    await mainWindow.keyboard.press('Escape')
   })
 
-  test('clicking toggle shows confirm dialog; cancel preserves xterm', async ({ mainWindow }) => {
-    const toggle = mainWindow.locator(`[data-testid="terminal-display-mode-toggle-${taskId}"]`)
-    await toggle.click()
+  test('clicking Enable chat shows confirm dialog; cancel preserves xterm', async ({ mainWindow }) => {
+    await openTerminalMenu(mainWindow)
+    await mainWindow.getByRole('menuitem', { name: /Enable chat \(beta\)/ }).click()
 
-    await expect(mainWindow.getByText('Switch to chat view?')).toBeVisible({ timeout: 5_000 })
+    await expect(mainWindow.getByText('Enable chat view?')).toBeVisible({ timeout: 5_000 })
     await mainWindow.getByRole('button', { name: 'Cancel' }).click()
-    await expect(mainWindow.getByText('Switch to chat view?')).toBeHidden({ timeout: 2_000 })
+    await expect(mainWindow.getByText('Enable chat view?')).toBeHidden({ timeout: 2_000 })
 
     // DB still xterm
-    const row = await mainWindow.evaluate(
+    const tabs = await mainWindow.evaluate(
       async (tid) => window.api.tabs.list(tid),
       taskId
     )
-    const mainTab = row.find((t) => t.isMain)!
+    const mainTab = tabs.find((t) => t.isMain)!
     expect(mainTab.displayMode).toBe('xterm')
   })
 
-  test('confirming toggle flips displayMode to chat in DB', async ({ mainWindow }) => {
-    const toggle = mainWindow.locator(`[data-testid="terminal-display-mode-toggle-${taskId}"]`)
-    await toggle.click()
+  test('confirming Enable chat flips displayMode to chat in DB', async ({ mainWindow }) => {
+    await openTerminalMenu(mainWindow)
+    await mainWindow.getByRole('menuitem', { name: /Enable chat \(beta\)/ }).click()
 
-    await expect(mainWindow.getByText('Switch to chat view?')).toBeVisible({ timeout: 5_000 })
-    await mainWindow.getByRole('button', { name: 'Switch' }).click()
-    await expect(mainWindow.getByText('Switch to chat view?')).toBeHidden({ timeout: 2_000 })
+    await expect(mainWindow.getByText('Enable chat view?')).toBeVisible({ timeout: 5_000 })
+    await mainWindow.getByRole('button', { name: 'Enable' }).click()
+    await expect(mainWindow.getByText('Enable chat view?')).toBeHidden({ timeout: 2_000 })
 
     // DB updated
     await expect
@@ -85,10 +93,11 @@ test.describe('Chat-mode toggle', () => {
       .toBe('chat')
   })
 
-  test('toggle icon flips to terminal icon after switching to chat', async ({ mainWindow }) => {
-    const toggle = mainWindow.locator(`[data-testid="terminal-display-mode-toggle-${taskId}"]`)
-    await expect(toggle).toBeVisible({ timeout: 5_000 })
-    // Icon swap: in chat mode we render lucide terminal icon (class .lucide-terminal)
-    await expect(toggle.locator('.lucide-terminal')).toBeVisible({ timeout: 5_000 })
+  test('after switching, context menu offers Disable chat', async ({ mainWindow }) => {
+    // In chat mode the pane renders ChatPanel — right-click on the chat
+    // timeline scroll surface (where its ContextMenuTrigger is mounted).
+    await mainWindow.locator('[data-panel-id="terminal"] .overflow-y-auto').first().click({ button: 'right', position: { x: 100, y: 100 } })
+    await expect(mainWindow.getByRole('menuitem', { name: 'Disable chat', exact: true })).toBeVisible({ timeout: 5_000 })
+    await mainWindow.keyboard.press('Escape')
   })
 })

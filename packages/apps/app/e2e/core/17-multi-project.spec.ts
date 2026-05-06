@@ -48,8 +48,8 @@ test.describe('Multi-project & persistence', () => {
     await expect(searchInput).toBeVisible({ timeout: 5_000 })
     await searchInput.fill('Beta task')
 
-    // Should find Beta task even if currently viewing Alpha
-    await expect(mainWindow.getByLabel('Tasks').getByText('Beta task one')).toBeVisible({ timeout: 3_000 })
+    // Unified palette returns mixed results — match the cmdk item.
+    await expect(mainWindow.locator('[cmdk-item]').filter({ hasText: 'Beta task one' })).toBeVisible({ timeout: 3_000 })
 
     await mainWindow.keyboard.press('Escape')
   })

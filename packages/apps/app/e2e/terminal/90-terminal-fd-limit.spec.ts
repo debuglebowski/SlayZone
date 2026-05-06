@@ -42,11 +42,11 @@ test.describe('PTY fd limit — RLIMIT_NOFILE soft', () => {
     await expect.poll(async () => {
       const buf = await readFullBuffer(mainWindow, sessionId)
       const match = buf.match(/NOFILE:(\d+|unlimited)\b/)
-      if (!match) return null
+      if (!match) return 'pending'
       const raw = match[1]
-      if (raw === 'unlimited') return 'unlimited'
+      if (raw === 'unlimited') return 'ok'
       const n = parseInt(raw, 10)
-      return n >= TARGET_SOFT ? n : `too-low:${raw}`
-    }, { timeout: 10_000, message: `expected PTY soft limit >= ${TARGET_SOFT}` }).not.toMatch(/^too-low:|^null$/)
+      return n >= TARGET_SOFT ? 'ok' : `too-low:${raw}`
+    }, { timeout: 10_000, message: `expected PTY soft limit >= ${TARGET_SOFT}` }).toBe('ok')
   })
 })

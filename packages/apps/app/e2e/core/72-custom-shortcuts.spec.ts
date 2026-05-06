@@ -17,16 +17,21 @@ test.describe.serial('Custom keyboard shortcuts', () => {
 
   const rebindShortcut = async (mainWindow: import('@playwright/test').Page, label: string, newKeys: string) => {
     await openShortcutsDialog(mainWindow)
-    // Expand all collapsible groups so the label is visible
-    const groups = mainWindow.getByRole('dialog').locator('button[data-state]')
-    for (let i = 0; i < await groups.count(); i++) {
-      const group = groups.nth(i)
-      if (await group.getAttribute('data-state') === 'closed') {
-        await group.click()
+    // Only one Collapsible group is open at a time — find the group containing
+    // the target label and ensure it's open. Walk groups, opening each in turn,
+    // until the label becomes visible.
+    const dialog = mainWindow.getByRole('dialog')
+    const labelSpan = dialog.locator(`span.text-sm:text-is("${label}")`).first()
+    if (!(await labelSpan.isVisible({ timeout: 300 }).catch(() => false))) {
+      const groups = dialog.locator('button[data-state]')
+      const count = await groups.count()
+      for (let i = 0; i < count; i++) {
+        await groups.nth(i).click()
+        if (await labelSpan.isVisible({ timeout: 300 }).catch(() => false)) break
       }
     }
-    const labelSpan = mainWindow.getByRole('dialog').locator(`span.text-sm:text-is("${label}")`).first()
-    const keyBadge = labelSpan.locator('..').locator('span.cursor-pointer')
+    await expect(labelSpan).toBeVisible({ timeout: 3_000 })
+    const keyBadge = labelSpan.locator('..').locator('span.cursor-pointer').first()
     await keyBadge.click()
     await expect(mainWindow.getByText('Press keys...')).toBeVisible({ timeout: 2_000 })
     await mainWindow.keyboard.press(newKeys)
@@ -149,16 +154,18 @@ test.describe.serial('Custom keyboard shortcuts', () => {
 
   test('rebinding to conflicting key swaps both shortcuts', async ({ mainWindow }) => {
     await openShortcutsDialog(mainWindow)
-    const groups = mainWindow.getByRole('dialog').locator('button[data-state]')
-    for (let i = 0; i < await groups.count(); i++) {
-      const group = groups.nth(i)
-      if (await group.getAttribute('data-state') === 'closed') {
-        await group.click()
+    const dialog = mainWindow.getByRole('dialog')
+    const newTaskRow = dialog.locator(`span.text-sm:text-is("New Task")`).first()
+    if (!(await newTaskRow.isVisible({ timeout: 300 }).catch(() => false))) {
+      const groups = dialog.locator('button[data-state]')
+      const count = await groups.count()
+      for (let i = 0; i < count; i++) {
+        await groups.nth(i).click()
+        if (await newTaskRow.isVisible({ timeout: 300 }).catch(() => false)) break
       }
     }
-
-    const newTaskRow = mainWindow.getByRole('dialog').locator(`span.text-sm:text-is("New Task")`).first()
-    await newTaskRow.locator('..').locator('span.cursor-pointer').click()
+    await expect(newTaskRow).toBeVisible({ timeout: 3_000 })
+    await newTaskRow.locator('..').locator('span.cursor-pointer').first().click()
     await expect(mainWindow.getByText('Press keys...')).toBeVisible({ timeout: 2_000 })
     // Rebind New Task to Search's current default key to trigger the conflict-swap flow.
     const searchDefaultKey = shortcutKey('search')

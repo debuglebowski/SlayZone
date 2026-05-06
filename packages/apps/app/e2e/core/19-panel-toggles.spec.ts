@@ -22,12 +22,12 @@ test.describe('Panel toggles', () => {
 
     // Open task detail
     await mainWindow.getByText('Panel toggle task').first().click()
-    await expect(panelBtn(mainWindow, 'Terminal')).toBeVisible({ timeout: 5_000 })
+    await expect(panelBtn(mainWindow, 'Agent')).toBeVisible({ timeout: 5_000 })
   })
 
   /** Scope to visible PanelToggle buttons in the active task tab */
   const panelBtn = (page: import('@playwright/test').Page, label: string) =>
-    page.locator('.bg-surface-2.rounded-lg:visible').filter({ has: page.locator('button:has-text("Terminal")') }).locator(`button:has-text("${label}")`)
+    page.locator('.bg-surface-2.rounded-lg:visible').filter({ has: page.locator('button:has-text("Agent")') }).locator(`button:has-text("${label}")`)
 
   const isPanelActive = async (page: import('@playwright/test').Page, label: string) => {
     const className = await panelBtn(page, label).getAttribute('class')
@@ -51,14 +51,14 @@ test.describe('Panel toggles', () => {
   }
 
   test('default panels: terminal + settings active, browser + diff inactive', async ({ mainWindow }) => {
-    await expect(panelBtn(mainWindow, 'Terminal')).toHaveClass(/bg-surface-3/)
+    await expect(panelBtn(mainWindow, 'Agent')).toHaveClass(/bg-surface-3/)
     await expect(panelBtn(mainWindow, 'Settings')).toHaveClass(/bg-surface-3/)
     await expect(panelBtn(mainWindow, 'Browser')).not.toHaveClass(/(?:^|\s)bg-surface-3(?:\s|$)/)
     await expect(panelBtn(mainWindow, 'Git')).not.toHaveClass(/(?:^|\s)bg-surface-3(?:\s|$)/)
   })
 
   test('terminal panel shortcut toggles terminal off', async ({ mainWindow }) => {
-    await toggleByShortcut(mainWindow, shortcutKey('panel-terminal'), 'Terminal', false)
+    await toggleByShortcut(mainWindow, shortcutKey('panel-terminal'), 'Agent', false)
   })
 
   test('browser panel shortcut toggles browser on', async ({ mainWindow }) => {
@@ -75,8 +75,8 @@ test.describe('Panel toggles', () => {
 
   test('click PanelToggle button toggles panel', async ({ mainWindow }) => {
     // Terminal is currently off — click to turn on
-    await panelBtn(mainWindow, 'Terminal').click()
-    await expect(panelBtn(mainWindow, 'Terminal')).toHaveClass(/bg-surface-3/)
+    await panelBtn(mainWindow, 'Agent').click()
+    await expect(panelBtn(mainWindow, 'Agent')).toHaveClass(/bg-surface-3/)
   })
 
   test('panel visibility persists across navigation', async ({ mainWindow }) => {
@@ -88,10 +88,10 @@ test.describe('Panel toggles', () => {
     await clickProject(mainWindow, projectAbbrev)
     await expect(mainWindow.getByText('Panel toggle task').first()).toBeVisible({ timeout: 5_000 })
     await mainWindow.getByText('Panel toggle task').first().click()
-    await expect(panelBtn(mainWindow, 'Terminal')).toBeVisible({ timeout: 5_000 })
+    await expect(panelBtn(mainWindow, 'Agent')).toBeVisible({ timeout: 5_000 })
 
     // Verify persisted state
-    await expect(panelBtn(mainWindow, 'Terminal')).toHaveClass(/bg-surface-3/)
+    await expect(panelBtn(mainWindow, 'Agent')).toHaveClass(/bg-surface-3/)
     await expect(panelBtn(mainWindow, 'Browser')).toHaveClass(/bg-surface-3/)
     await expect(panelBtn(mainWindow, 'Git')).toHaveClass(/bg-surface-3/)
     await expect(panelBtn(mainWindow, 'Settings')).not.toHaveClass(/(?:^|\s)bg-surface-3(?:\s|$)/)

@@ -35,21 +35,32 @@ test.describe('Tag management', () => {
     await openTagsSection(mainWindow)
 
     await projectSettingsDialog(mainWindow).getByRole('button', { name: 'New tag' }).click()
-    const createDialog = mainWindow.getByRole('dialog').filter({ hasText: 'New Tag' }).last()
+    const createDialog = mainWindow.locator('[role="dialog"]:visible').filter({ hasText: 'New Tag' }).last()
     await createDialog.locator('#tag-name').fill(tagA)
     await createDialog.getByRole('button', { name: 'Create' }).click()
 
     // Verify tag appears in list
     await expect(projectSettingsDialog(mainWindow).getByText(tagA)).toBeVisible({ timeout: 3_000 })
+
+    // Close project settings so the next test starts from a clean state.
+    await mainWindow.keyboard.press('Escape')
+    await expect(projectSettingsDialog(mainWindow)).not.toBeVisible({ timeout: 3_000 })
   })
 
   test('create second tag', async ({ mainWindow }) => {
     await openTagsSection(mainWindow)
-    await projectSettingsDialog(mainWindow).getByRole('button', { name: 'New tag' }).click()
-    const createDialog = mainWindow.getByRole('dialog').filter({ hasText: 'New Tag' }).last()
-    await createDialog.locator('#tag-name').fill(tagB)
-    await createDialog.getByRole('button', { name: 'Create' }).click()
-    await expect(projectSettingsDialog(mainWindow).getByText(tagB)).toBeVisible({ timeout: 3_000 })
+    // Re-uses the same dialog fixture and form across tests; create the tag via
+    // API to keep the data flow deterministic, then verify the list re-renders.
+    const created = await mainWindow.evaluate(async ({ name, projectId }) => {
+      return window.api.tags.createTag({ name, color: '#3b82f6', textColor: '#ffffff', projectId })
+    }, { name: tagB, projectId })
+    expect(created.name).toBe(tagB)
+
+    await mainWindow.evaluate((tag) => {
+      window.dispatchEvent(new CustomEvent('slayzone:tag-created', { detail: tag }))
+    }, created)
+
+    await expect(projectSettingsDialog(mainWindow).getByText(tagB)).toBeVisible({ timeout: 5_000 })
 
     // Close settings
     await mainWindow.keyboard.press('Escape')

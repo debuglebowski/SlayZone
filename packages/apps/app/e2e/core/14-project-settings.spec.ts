@@ -1,4 +1,4 @@
-import { test, expect, seed, goHome, clickProject, projectBlob, resetApp} from '../fixtures/electron'
+import { test, expect, seed, goHome, clickProject, projectBlob, openProjectSettings, resetApp} from '../fixtures/electron'
 import { TEST_PROJECT_PATH } from '../fixtures/electron'
 import type { Page, Locator } from '@playwright/test'
 
@@ -457,27 +457,19 @@ test.describe('Project settings & context menu', () => {
     const project = projects.find((p: { id: string; name: string }) => p.name === 'Settings Test')
     if (!project) throw new Error('Settings Test project not found')
 
+    // Open settings BEFORE creating the task — refreshData with status='review'
+    // can re-render and dismiss the dialog mid-open.
+    await openProjectSettings(mainWindow, projectAbbrev)
+
     const remapTask = await s.createTask({
       projectId: project.id,
       title: 'Needs status remap',
       status: 'review'
     })
-    await s.refreshData()
 
-    const settingsHeading = mainWindow.getByRole('heading', { name: 'Project Settings' })
-    const isOpen = await settingsHeading.isVisible().catch(() => false)
-    if (!isOpen) {
-      const blob = projectBlob(mainWindow, projectAbbrev)
-      await blob.click({ button: 'right' })
-      await mainWindow.getByRole('menuitem', { name: 'Settings' }).click()
-      await expect(settingsHeading).toBeVisible({ timeout: 5_000 })
-    }
-
-    await clickSettingsTab(
-      mainWindow,
-      mainWindow.getByTestId('settings-tab-columns'),
-      mainWindow.getByTestId('project-column-review')
-    )
+    // Columns tab was renamed to "Statuses" under the Tasks group.
+    await mainWindow.getByTestId('settings-tab-tasks/statuses').click()
+    await expect(mainWindow.getByTestId('project-column-review')).toBeVisible({ timeout: 10_000 })
     await mainWindow.getByTestId('delete-project-column-review').click()
     await expect(mainWindow.getByTestId('project-column-review')).not.toBeVisible({ timeout: 3_000 })
     await mainWindow.getByTestId('save-project-columns').click()

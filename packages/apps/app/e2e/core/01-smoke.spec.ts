@@ -6,7 +6,8 @@ test.describe('App launch', () => {
   })
 
   test('shows main window with empty state', async ({ mainWindow }) => {
-    await expect(mainWindow.getByText(/create a project/i)).toBeVisible({ timeout: 10_000 })
+    // The exact empty-state copy in App.tsx — avoid matching tutorial scene text.
+    await expect(mainWindow.getByText('Click + in sidebar to create a project')).toBeVisible({ timeout: 10_000 })
   })
 
   test('main process has correct app name', async ({ electronApp }) => {

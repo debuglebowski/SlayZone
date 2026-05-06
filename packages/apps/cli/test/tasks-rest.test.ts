@@ -66,7 +66,7 @@ function runCli(args: string[], envOverrides: Record<string, string | undefined>
   return new Promise((resolve) => {
     const env: Record<string, string> = {
       ...process.env as Record<string, string>,
-      SLAYZONE_DB_PATH: dbPath,
+      SLAYZONE_STORE_DIR: tmpDir,
       SLAYZONE_DEV: '1',
       SLAYZONE_MCP_PORT: String(rest.port),
     }

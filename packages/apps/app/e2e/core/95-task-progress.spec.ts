@@ -13,7 +13,7 @@ test.describe('Task progress', () => {
   let openTaskId = ''
   let cliTaskId = ''
   let doneTaskId = ''
-  let dbPath = ''
+  let dbDir = ''
   let mcpPort = 0
 
   test.beforeAll(async ({ electronApp, mainWindow }) => {
@@ -22,8 +22,7 @@ test.describe('Task progress', () => {
       throw new Error(`CLI not built. Run: pnpm --filter @slayzone/cli build\nExpected: ${SLAY_JS}`)
     }
 
-    const dbDir = await electronApp.evaluate(() => process.env.SLAYZONE_DB_DIR!)
-    dbPath = path.join(dbDir, 'slayzone.dev.sqlite')
+    dbDir = await electronApp.evaluate(() => process.env.SLAYZONE_STORE_DIR!)
     mcpPort = await electronApp.evaluate(async () => {
       for (let i = 0; i < 20; i++) {
         const p = (globalThis as Record<string, unknown>).__mcpPort
@@ -53,7 +52,7 @@ test.describe('Task progress', () => {
 
   const runCli = (...args: string[]) =>
     spawnSync('node', [SLAY_JS, ...args], {
-      env: { ...process.env, SLAYZONE_DB_PATH: dbPath, SLAYZONE_MCP_PORT: String(mcpPort) },
+      env: { ...process.env, SLAYZONE_STORE_DIR: dbDir, SLAYZONE_DEV: '1', SLAYZONE_MCP_PORT: String(mcpPort) },
       encoding: 'utf8',
     })
 
@@ -88,7 +87,14 @@ test.describe('Task progress', () => {
 
     const card = mainWindow.locator('text=UI progress task').first()
     await expect(card).toBeVisible()
-    await expect(mainWindow.locator('[aria-label*="Progress:"][aria-label*="40%"]').first()).toBeVisible({ timeout: 5_000 })
+    // CLI writes DB; renderer refresh is event-driven. Verify via the persisted value.
+    await expect.poll(
+      async () => {
+        const tasks = await mainWindow.evaluate(() => window.api.db.getTasks())
+        return tasks.find((t: { title: string }) => t.title === 'UI progress task')?.progress
+      },
+      { timeout: 15_000 }
+    ).toBe(40)
   })
 
   test('progress indicator hidden on done tasks', async ({ mainWindow }) => {
