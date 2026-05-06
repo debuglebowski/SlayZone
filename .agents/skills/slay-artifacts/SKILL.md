@@ -17,6 +17,15 @@ The `--task` flag defaults to `$SLAYZONE_TASK_ID` for `create`, `upload`, and `m
   - Binary artifacts (images, etc.) are written as raw buffers
   - Text artifacts as UTF-8
 
+- `slay tasks artifacts search <query> [--task <id>] [--all-tasks] [--folder <id>] [--titles-only] [--content-only] [--regex] [--case-sensitive] [--limit <n>] [--max-matches <n>] [--json]` — search artifact titles and file contents.
+  - Default: substring match, case-insensitive, scans both titles and contents
+  - Requires `--task` (or `$SLAYZONE_TASK_ID`) unless `--all-tasks` is set
+  - `--regex` treats query as a JS RegExp; invalid regex exits 1
+  - Binary artifacts (images, PDFs, ZIPs) skip content scan automatically
+  - Files >5MB skip content scan with a stderr warning
+  - Default limit: 50 artifacts, 20 content matches per artifact
+  - Human output groups matches by artifact with one line of context above/below; JSON returns `[{ artifactId, taskId, title, matches: [{ type, line?, snippet, contextBefore?, contextAfter? }] }]`
+
 - `slay tasks artifacts create <title> [--task <id>] [--folder <id>] [--copy-from <path>] [--render-mode <mode>] [--json]` — create a new artifact.
   - Content is read from stdin (must be piped — errors on TTY), or from a file via `--copy-from`
   - Render mode is inferred from the title's file extension if not specified (defaults to plain text if no extension)
