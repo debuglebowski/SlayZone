@@ -557,6 +557,42 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
     return () => window.removeEventListener('keydown', handler)
   }, [scrollRef, search, inFlight, chatMode, handleModeChange, autoCapability.optedIn, autocomplete.show, handleStop])
 
+  // Diagnostic: log every inFlight transition (incl. baseline post-hydrate) with
+  // the counters that drive `isInFlight` plus the last 5 timeline kinds. Captures
+  // evidence next time the indicator gets stuck without forcing a repro.
+  const prevInFlightRef = useRef<boolean | null>(null)
+  useEffect(() => {
+    if (hydrating) return
+    const prev = prevInFlightRef.current
+    prevInFlightRef.current = inFlight
+    if (prev === inFlight) return
+    try {
+      const api = (window as unknown as {
+        api?: { diagnostics?: { recordClientEvent?: (e: {
+          event: string; level: 'info' | 'warn'; message: string; taskId?: string; sessionId?: string | null; payload: unknown
+        }) => void } }
+      }).api
+      api?.diagnostics?.recordClientEvent?.({
+        event: 'renderer.chat.inFlight.flip',
+        level: 'info',
+        message: `inFlight ${prev ?? 'init'}→${inFlight}`,
+        taskId,
+        sessionId: state.sessionId,
+        payload: {
+          tabId,
+          mode,
+          from: prev,
+          to: inFlight,
+          userMessagesSent: state.userMessagesSent,
+          resultCount: state.resultCount,
+          sessionEnded: state.sessionEnded,
+          timelineLen: state.timeline.length,
+          lastEventKinds: state.timeline.slice(-5).map((it) => it.kind),
+        },
+      })
+    } catch { /* diagnostics never escalate */ }
+  }, [inFlight, hydrating, tabId, taskId, mode, state.sessionId, state.userMessagesSent, state.resultCount, state.sessionEnded, state.timeline])
+
   // Scroll to the active match.
   useEffect(() => {
     if (search.activeItemIdx < 0) return
