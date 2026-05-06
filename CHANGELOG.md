@@ -1,6 +1,18 @@
 # Changelog
 
 
+## v0.27.2
+
+[compare changes](https://github.com/debuglebowski/slayzone/compare/v0.27.1...v0.27.2)
+
+### 🩹 Fixes
+
+- **artifacts:** Recover orphaned files from buggy v127 disk migration ([f3a8bac3](https://github.com/debuglebowski/slayzone/commit/f3a8bac3))
+
+### ❤️ Contributors
+
+- Debuglebowski
+
 ## v0.27.1
 
 [compare changes](https://github.com/debuglebowski/slayzone/compare/v0.27.0...v0.27.1)
