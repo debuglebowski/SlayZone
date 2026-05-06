@@ -1,2 +1,2 @@
 export { FileIcon } from './FileIcon'
-export { getFileIconSvg } from './file-icons'
+export { getFileIconSvg, getFileIconSvgAsync, loadFileIcons } from './file-icons'

@@ -296,6 +296,8 @@ function App(): React.JSX.Element {
     const handle = idle(() => {
       // xterm chunk (~440KB) — first terminal panel mount lands warm.
       void import('@slayzone/terminal/client/Terminal')
+      // material-file-icons (~500KB) — first FileIcon render lands warm.
+      void import('@slayzone/icons').then((m) => m.loadFileIcons())
     })
     return () => {
       const cic = (window as unknown as { cancelIdleCallback?: (h: number) => void }).cancelIdleCallback

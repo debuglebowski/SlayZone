@@ -12,11 +12,21 @@ const ENABLED = !!(POSTHOG_KEY && POSTHOG_HOST)
 const HEARTBEAT_INTERVAL = 10 * 60 * 1000 // 10 minutes
 const ACTIVITY_THROTTLE = 1000 // 1 second
 
-// Lazy-loaded posthog instance (deferred to avoid blocking first paint)
+// Lazy-loaded posthog instance. The import() trigger is deferred until the
+// first initTelemetry() call (which itself runs from a useEffect after first
+// paint). Triggering at module top would still kick off chunk fetch + parse
+// during boot — even though the Promise is fire-and-forget, the fetch
+// competes with main-bundle parse for CPU + I/O on cold start.
 let ph: typeof import('posthog-js').default | null = null
-const phReady: Promise<typeof import('posthog-js').default | null> | null = ENABLED
-  ? import('posthog-js').then(m => { ph = m.default; return m.default }).catch(() => null)
-  : null
+let phReady: Promise<typeof import('posthog-js').default | null> | null = null
+
+function ensurePosthogLoading(): Promise<typeof import('posthog-js').default | null> | null {
+  if (!ENABLED) return null
+  if (!phReady) {
+    phReady = import('posthog-js').then(m => { ph = m.default; return m.default }).catch(() => null)
+  }
+  return phReady
+}
 
 let currentTier: TelemetryTier = 'anonymous'
 let initialized = false
@@ -160,9 +170,12 @@ export function stopHeartbeat(): void {
 }
 
 export async function initTelemetry(tier: TelemetryTier): Promise<void> {
-  if (!ENABLED || !phReady) return
+  if (!ENABLED) return
 
-  const posthog = await phReady
+  const ready = ensurePosthogLoading()
+  if (!ready) return
+
+  const posthog = await ready
   if (!posthog) return
 
   if (initialized) {
@@ -253,6 +266,7 @@ export function shutdownTelemetry(): void {
 
 /** Returns the posthog instance once loaded, for PostHogProvider */
 export async function getPosthogInstance(): Promise<typeof import('posthog-js').default | null> {
-  if (!phReady) return null
-  return phReady
+  const ready = ensurePosthogLoading()
+  if (!ready) return null
+  return ready
 }
