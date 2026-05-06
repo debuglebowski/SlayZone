@@ -264,6 +264,8 @@ export function SidebarFooterIcons({
     setPendingConflict(null)
   }, [recordingId, pendingKeys, pendingConflict, getKeys, batchSetOverrides, setRecording])
 
+  const tooltipSide: 'top' | 'right' = layout === 'horizontal' ? 'top' : 'right'
+
   const containerClass = cn(
     'flex',
     layout === 'vertical'
@@ -273,7 +275,7 @@ export function SidebarFooterIcons({
 
   return (
     <div className={containerClass}>
-      <TerminalStatusPopover tasks={tasks} onTaskClick={onTaskClick} />
+      <TerminalStatusPopover tasks={tasks} onTaskClick={onTaskClick} side={tooltipSide} />
 
       {isConvexConfigured && (
         <Tooltip>
@@ -288,7 +290,7 @@ export function SidebarFooterIcons({
               <Trophy className="size-5" />
             </IconButton>
           </TooltipTrigger>
-          <TooltipContent side="right">Leaderboard</TooltipContent>
+          <TooltipContent side={tooltipSide}>Leaderboard</TooltipContent>
         </Tooltip>
       )}
       <Tooltip>
@@ -303,7 +305,7 @@ export function SidebarFooterIcons({
             <BarChart3 className="size-5" />
           </IconButton>
         </TooltipTrigger>
-        <TooltipContent side="right">Usage</TooltipContent>
+        <TooltipContent side={tooltipSide}>Usage</TooltipContent>
       </Tooltip>
       <Popover open={checklistOpen} onOpenChange={setChecklistOpen}>
         <Tooltip>
@@ -328,9 +330,9 @@ export function SidebarFooterIcons({
               </button>
             </PopoverTrigger>
           </TooltipTrigger>
-          <TooltipContent side="right">Getting Started</TooltipContent>
+          <TooltipContent side={tooltipSide}>Getting Started</TooltipContent>
         </Tooltip>
-        <PopoverContent side="right" align="end" sideOffset={12} className="w-[320px] p-3">
+        <PopoverContent side={tooltipSide} align="end" sideOffset={12} className="w-[320px] p-3">
           <div className="mb-5 flex items-center justify-between gap-2">
             <p className="pt-0.5 text-base font-semibold">Getting started</p>
             {onboardingChecklist.hasRemaining && !onboardingChecklist.dismissed && (
@@ -414,7 +416,7 @@ export function SidebarFooterIcons({
             <Megaphone className="size-5" />
           </IconButton>
         </TooltipTrigger>
-        <TooltipContent side="right">What's New</TooltipContent>
+        <TooltipContent side={tooltipSide}>What's New</TooltipContent>
       </Tooltip>
       <Tooltip>
         <TooltipTrigger asChild>
@@ -428,7 +430,7 @@ export function SidebarFooterIcons({
             <Keyboard className="size-5" />
           </IconButton>
         </TooltipTrigger>
-        <TooltipContent side="right">Keyboard Shortcuts</TooltipContent>
+        <TooltipContent side={tooltipSide}>Keyboard Shortcuts</TooltipContent>
       </Tooltip>
       {isConvexConfigured && <FeedbackDialog />}
       <Dialog open={shortcutsOpen} onOpenChange={(open) => {
@@ -506,7 +508,7 @@ export function SidebarFooterIcons({
             <Settings className="size-5" />
           </IconButton>
         </TooltipTrigger>
-        <TooltipContent side="right">Settings</TooltipContent>
+        <TooltipContent side={tooltipSide}>Settings</TooltipContent>
       </Tooltip>
     </div>
   )

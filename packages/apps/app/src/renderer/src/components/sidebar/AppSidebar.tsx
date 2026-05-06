@@ -68,10 +68,18 @@ export function AppSidebar({
 
   const scheduleClose = useCallback(() => {
     cancelClose()
-    closeTimerRef.current = setTimeout(() => {
+    const tick = () => {
+      // Keep card open as long as a dropdown / context menu / popover is open
+      // (Radix portals these to document.body so mouse leaves the card while
+      // interacting with them).
+      if (document.querySelector('[role="menu"], [role="dialog"]')) {
+        closeTimerRef.current = setTimeout(tick, 200)
+        return
+      }
       setHoverRevealed(false)
       closeTimerRef.current = null
-    }, 400)
+    }
+    closeTimerRef.current = setTimeout(tick, 400)
   }, [cancelClose])
 
   useEffect(() => () => cancelClose(), [cancelClose])
@@ -89,13 +97,15 @@ export function AppSidebar({
       collapsible="none"
       style={effectiveWidth != null ? { width: effectiveWidth } : undefined}
       className={cn(
-        'h-svh relative',
+        'relative',
         zenMode && '!w-0 overflow-hidden',
         !zenMode && effectiveWidth == null && view.width,
-        autoHideActive && 'shadow-2xl border-r border-border'
+        autoHideActive
+          ? 'h-full rounded-xl overflow-hidden shadow-2xl border border-border'
+          : 'h-svh'
       )}
     >
-      <SidebarContent className="pt-10 pb-4 scrollbar-hide">
+      <SidebarContent className={cn('pb-4 scrollbar-hide', autoHideActive ? 'pt-4' : 'pt-10')}>
         <SidebarGroup>
           <SidebarGroupContent>
             {view.render({
@@ -121,7 +131,7 @@ export function AppSidebar({
           onLeaderboard={onLeaderboard}
           onboardingChecklist={onboardingChecklist}
         />
-        <div className={cn('px-2', compactSwitcher && 'flex justify-center')}>
+        <div className={cn('px-2 flex', compactSwitcher ? 'justify-center' : 'w-full')}>
           <SidebarViewSwitcher
             current={sidebarView}
             onChange={setSidebarView}
@@ -159,11 +169,13 @@ export function AppSidebar({
             setHoverRevealed(true)
           }}
         />
-        {/* Floating sidebar overlay (with right-edge spatial grace buffer) */}
+        {/* Floating card overlay (with right-edge spatial grace buffer) */}
         <div
           className={cn(
-            'fixed inset-y-0 left-0 z-40 transition-transform duration-200 ease-out pr-10',
-            hoverRevealed ? 'translate-x-0' : '-translate-x-full pointer-events-none'
+            'fixed top-10 bottom-2 left-2 z-40 transition-transform duration-200 ease-out pr-10',
+            hoverRevealed
+              ? 'translate-x-0'
+              : '-translate-x-[calc(100%+0.5rem)] pointer-events-none'
           )}
           onMouseEnter={() => {
             cancelClose()

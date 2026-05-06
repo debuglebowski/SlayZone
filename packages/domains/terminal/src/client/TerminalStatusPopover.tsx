@@ -13,9 +13,10 @@ interface TaskRef {
 interface TerminalStatusPopoverProps {
   tasks: TaskRef[]
   onTaskClick?: (taskId: string) => void
+  side?: 'top' | 'right' | 'bottom' | 'left'
 }
 
-export function TerminalStatusPopover({ tasks, onTaskClick }: TerminalStatusPopoverProps) {
+export function TerminalStatusPopover({ tasks, onTaskClick, side = 'right' }: TerminalStatusPopoverProps) {
   const [ptys, setPtys] = useState<PtyInfo[]>([])
   const [stats, setStats] = useState<Record<string, { cpu: number; rss: number }>>({})
   const [open, setOpen] = useState(false)
@@ -108,9 +109,9 @@ export function TerminalStatusPopover({ tasks, onTaskClick }: TerminalStatusPopo
             </IconButton>
           </PopoverTrigger>
         </TooltipTrigger>
-        <TooltipContent side="right">Active Terminals</TooltipContent>
+        <TooltipContent side={side}>Active Terminals</TooltipContent>
       </Tooltip>
-      <PopoverContent side="right" align="end" className="w-fit max-w-[20vw] max-h-[80vh] flex flex-col">
+      <PopoverContent side={side} align="end" className="w-fit max-w-[20vw] max-h-[80vh] flex flex-col">
         <div className="space-y-3 min-h-0 flex flex-col">
           <div className="flex items-center justify-between shrink-0">
             <h4 className="font-medium text-sm">Active Terminals</h4>

@@ -7,6 +7,53 @@ import { useTabStore } from '@slayzone/settings'
 import { useIdleTasks, useActiveSessionTaskIds } from '@/components/agent-status/useIdleTasks'
 import type { SidebarViewContext } from './types'
 
+// Tree guide layout (mirrors EditorToc / ManagerSidebar).
+const TG_INDENT = 18
+const TG_ROW_HEIGHT = 28
+const TG_CURVE_R = 5
+const TG_ELBOW_END_OFFSET = 7
+const TG_ROOT_X = 15
+const TG_TEXT_GAP_AFTER_CURVE = 8
+const tgGuideX = (ancestorDepth: number) => TG_ROOT_X + TG_INDENT * ancestorDepth
+const tgPaddingLeft = (depth: number) =>
+  depth === 0 ? TG_ROOT_X : tgGuideX(depth - 1) + TG_ELBOW_END_OFFSET + TG_TEXT_GAP_AFTER_CURVE
+
+function TreeGuides({ depth, ancestorFlags }: { depth: number; ancestorFlags: boolean[] }): ReactNode {
+  if (depth <= 0) return null
+  const parentX = tgGuideX(depth - 1)
+  const mid = TG_ROW_HEIGHT / 2
+  const r = TG_CURVE_R
+  const endX = parentX + TG_ELBOW_END_OFFSET
+  const continueBelow = ancestorFlags[depth - 1] ?? false
+  const connector =
+    `M ${parentX} 0 V ${mid - r} Q ${parentX} ${mid} ${parentX + r} ${mid} H ${endX}` +
+    (continueBelow ? ` M ${parentX} ${mid - r} V ${TG_ROW_HEIGHT}` : '')
+  const svgWidth = endX + 2
+  return (
+    <svg
+      aria-hidden
+      className="pointer-events-none absolute top-0 left-0 text-border"
+      width={svgWidth}
+      height={TG_ROW_HEIGHT}
+    >
+      {ancestorFlags.slice(0, -1).map((flag, a) =>
+        flag ? (
+          <line
+            key={a}
+            x1={tgGuideX(a)}
+            x2={tgGuideX(a)}
+            y1={0}
+            y2={TG_ROW_HEIGHT}
+            stroke="currentColor"
+            strokeWidth={1}
+          />
+        ) : null
+      )}
+      <path d={connector} fill="none" stroke="currentColor" strokeWidth={1} />
+    </svg>
+  )
+}
+
 export function TreeView({
   projects,
   tasks,
@@ -119,7 +166,7 @@ export function TreeView({
   )
   const visibleProjects = showAll ? sortedProjects : activeProjects
 
-  const renderTask = (task: Task, depth: number): ReactNode => {
+  const renderTask = (task: Task, depth: number, ancestorFlags: boolean[]): ReactNode => {
     const isActive = activeTaskId === task.id
     const isIdle = idleByTask.has(task.id)
     const children = childrenByParent.get(task.id) ?? []
@@ -128,14 +175,15 @@ export function TreeView({
         <button
           type="button"
           onClick={() => onTaskClick?.(task.id)}
-          style={{ paddingLeft: 8 + depth * 14 }}
+          style={{ paddingLeft: tgPaddingLeft(depth), minHeight: TG_ROW_HEIGHT }}
           className={cn(
-            'flex w-full items-center gap-2 rounded-md pr-2 py-1 text-sm text-left transition-colors',
+            'relative flex w-full items-center gap-2 rounded-md pr-2 py-1 text-sm text-left transition-colors',
             isActive
               ? 'bg-white/10 text-foreground'
               : 'text-muted-foreground hover:bg-accent/40 hover:text-accent-foreground'
           )}
         >
+          <TreeGuides depth={depth} ancestorFlags={ancestorFlags} />
           {isIdle ? (
             <span
               aria-label="idle"
@@ -146,7 +194,7 @@ export function TreeView({
           )}
           <span className="truncate">{task.title || 'Untitled'}</span>
         </button>
-        {children.map((c) => renderTask(c, depth + 1))}
+        {children.map((c, i) => renderTask(c, depth + 1, [...ancestorFlags, i < children.length - 1]))}
       </div>
     )
   }
@@ -166,7 +214,7 @@ export function TreeView({
           style={{
             backgroundColor: `color-mix(in oklch, ${project.color} ${projectIsActive(project.id) ? 22 : 10}%, transparent)`
           }}
-          className="group/projectrow flex items-center gap-0.5 rounded-md transition-[filter] hover:brightness-125"
+          className="group/projectrow relative flex items-center gap-0.5 rounded-md transition-[filter] hover:brightness-125"
         >
           <Collapsible.Trigger
             aria-label={isOpen ? `Collapse ${project.name}` : `Expand ${project.name}`}
@@ -201,13 +249,13 @@ export function TreeView({
           </button>
         </div>
         <Collapsible.Content className="overflow-hidden data-[state=closed]:animate-collapsible-up data-[state=open]:animate-collapsible-down">
-          <div className="flex flex-col gap-0.5 pl-5 pr-1 pt-0.5 pb-1">
+          <div className="flex flex-col pr-1 pb-1">
             {projectTasks.length === 0 ? (
               <span className="text-xs italic text-muted-foreground/60 px-2 py-1">
                 No active tasks
               </span>
             ) : (
-              rootTasks.map((task) => renderTask(task, 0))
+              rootTasks.map((task, i) => renderTask(task, 1, [i < rootTasks.length - 1]))
             )}
           </div>
         </Collapsible.Content>
