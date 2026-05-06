@@ -1,11 +1,11 @@
 ---
 name: slay-orchestrate
 description: "Supervise a set of slay tasks through planning, execution, and verification"
-trigger: manual
 depends_on:
   - slay-tasks
   - slay-pty
   - slay-artifacts
+trigger: manual
 ---
 
 Orchestrate any set of slay tasks toward completion. The user tells you *which* tasks to supervise (free-form: ids, tags, a project, a filter, or a description like "all refactor tasks in backlog"); you dispatch each to its own PTY, review plans, keep agents unblocked, and drive them to done. Works equally well for top-level tasks and subtasks — the skill does not care.
