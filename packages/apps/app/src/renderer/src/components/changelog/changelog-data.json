@@ -1,5 +1,17 @@
 [
   {
+    "version": "0.27.2",
+    "date": "2026-05-06",
+    "tagline": "Artifact recovery",
+    "items": [
+      {
+        "category": "fix",
+        "title": "Recover orphaned artifact files",
+        "description": "Files left orphaned by the v127 assets→artifacts disk migration are now recovered automatically."
+      }
+    ]
+  },
+  {
     "version": "0.27.1",
     "date": "2026-05-06",
     "tagline": "Update toast, tab menu",
