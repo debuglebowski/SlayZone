@@ -4,7 +4,7 @@ import { initShortcuts } from './shortcut-init'
 import { AlertTriangle, FolderClosed, LayoutGrid, TerminalSquare, GitBranch, FileCode, Cpu, Kanban, FlaskConical, Zap, BookOpen, Lock, Focus } from 'lucide-react'
 import { buildCreateTaskDraftFromBrowserLink } from '@slayzone/task/shared'
 import type { Task } from '@slayzone/task/shared'
-import type { Project } from '@slayzone/projects/shared'
+import type { Project, ColumnConfig } from '@slayzone/projects/shared'
 import { getDefaultStatus, getDoneStatus, getStatusByCategory, isCompletedStatus, resolveRepoPath } from '@slayzone/projects/shared'
 import type { Tag } from '@slayzone/tags/shared'
 // Domains
@@ -329,7 +329,12 @@ function App(): React.JSX.Element {
       if (m) setAgentPanelState({ mode: m })
     })
   }, [agentPanelState.mode, setAgentPanelState])
-  const { idleTasks: rawIdleTasks } = useIdleTasks(tasks, null)
+  const columnsByProjectId = useMemo(() => {
+    const map = new Map<string, ColumnConfig[] | null>()
+    for (const p of projects) map.set(p.id, p.columns_config)
+    return map
+  }, [projects])
+  const { idleTasks: rawIdleTasks } = useIdleTasks(tasks, null, columnsByProjectId)
   const [dismissedIdle, setDismissedIdle] = useState<Map<string, number>>(new Map())
   const handleDismissIdle = useCallback((sessionId: string) => {
     setDismissedIdle((prev) => {
@@ -1412,6 +1417,7 @@ function App(): React.JSX.Element {
                 onFilterToggle={() => setAgentStatusState({ filterCurrentProject: !agentStatusState.filterCurrentProject })}
                 onNavigate={openTask}
                 onDismiss={handleDismissIdle}
+                columnsByProjectId={columnsByProjectId}
                 selectedProjectId={selectedProjectId} currentProjectName={projects.find((p) => p.id === selectedProjectId)?.name} />
             )}
             </div>

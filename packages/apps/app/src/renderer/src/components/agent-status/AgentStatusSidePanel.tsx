@@ -1,3 +1,4 @@
+import type { ColumnConfig } from '@slayzone/projects/shared'
 import { AgentStatusPanel } from './AgentStatusPanel'
 import type { IdleTask } from './useIdleTasks'
 
@@ -8,6 +9,7 @@ interface AgentStatusSidePanelProps {
   onFilterToggle: () => void
   onNavigate: (taskId: string) => void
   onDismiss: (sessionId: string) => void
+  columnsByProjectId: Map<string, ColumnConfig[] | null>
   selectedProjectId: string
   currentProjectName?: string
 }
@@ -22,6 +24,7 @@ export function AgentStatusSidePanel({
   onFilterToggle,
   onNavigate,
   onDismiss,
+  columnsByProjectId,
   selectedProjectId,
   currentProjectName
 }: AgentStatusSidePanelProps) {
@@ -37,6 +40,7 @@ export function AgentStatusSidePanel({
           onFilterToggle={onFilterToggle}
           onNavigate={onNavigate}
           onDismiss={onDismiss}
+          columnsByProjectId={columnsByProjectId}
           selectedProjectId={selectedProjectId}
           currentProjectName={currentProjectName}
         />

@@ -1,6 +1,7 @@
-import { X } from 'lucide-react'
-import { IconButton, cn, Tooltip, TooltipTrigger, TooltipContent, getTerminalStateStyle } from '@slayzone/ui'
+import { X, Circle } from 'lucide-react'
+import { IconButton, cn, Tooltip, TooltipTrigger, TooltipContent, getColumnStatusStyle } from '@slayzone/ui'
 import { track } from '@slayzone/telemetry/client'
+import type { ColumnConfig } from '@slayzone/projects/shared'
 import type { IdleTask } from './useIdleTasks'
 
 interface AgentStatusPanelProps {
@@ -9,13 +10,10 @@ interface AgentStatusPanelProps {
   onFilterToggle: () => void
   onNavigate: (taskId: string) => void
   onDismiss: (sessionId: string) => void
+  columnsByProjectId: Map<string, ColumnConfig[] | null>
   selectedProjectId: string
   currentProjectName?: string
 }
-
-// Panel only ever surfaces idle agents, so the dot is always the canonical
-// idle-state color. If state changes, useIdleTasks drops the row.
-const IDLE_DOT_COLOR = getTerminalStateStyle('idle')!.color
 
 function formatIdleTime(lastOutputTime: number): string {
   const seconds = Math.floor((Date.now() - lastOutputTime) / 1000)
@@ -32,6 +30,7 @@ export function AgentStatusPanel({
   onFilterToggle,
   onNavigate,
   onDismiss,
+  columnsByProjectId,
   selectedProjectId,
   currentProjectName
 }: AgentStatusPanelProps) {
@@ -71,7 +70,13 @@ export function AgentStatusPanel({
         {sortedTasks.length === 0 ? (
           <p className="text-sm text-muted-foreground text-center py-4">No agents idle</p>
         ) : (
-          sortedTasks.map(({ task, sessionId, lastOutputTime }) => (
+          sortedTasks.map(({ task, sessionId, lastOutputTime }) => {
+            const columns = columnsByProjectId.get(task.project_id) ?? null
+            const statusStyle = getColumnStatusStyle(task.status, columns)
+            const StatusIcon = statusStyle?.icon ?? Circle
+            const statusLabel = statusStyle?.label ?? task.status
+            const statusIconClass = statusStyle?.iconClass ?? 'text-muted-foreground'
+            return (
             <div
               key={task.id}
               className="rounded-lg border bg-surface-2 p-3 shadow-sm hover:bg-accent/50 transition-colors cursor-pointer"
@@ -81,9 +86,10 @@ export function AgentStatusPanel({
               }}
             >
               <div className="flex items-start gap-2">
-                <span
-                  aria-label="Idle"
-                  className={cn('w-2 h-2 rounded-full flex-shrink-0 mt-1.5', IDLE_DOT_COLOR)}
+                <StatusIcon
+                  aria-label={statusLabel}
+                  strokeWidth={2.5}
+                  className={cn('size-3.5 flex-shrink-0 mt-0.5', statusIconClass)}
                 />
                 <div className="flex-1 min-w-0">
                   <div className="text-sm font-medium">{task.title}</div>
@@ -91,7 +97,7 @@ export function AgentStatusPanel({
               </div>
               <div className="flex items-center justify-between mt-2 pt-2 border-t">
                 <span className="text-xs text-muted-foreground">
-                  Idle {formatIdleTime(lastOutputTime)}
+                  {statusLabel} · Idle {formatIdleTime(lastOutputTime)}
                 </span>
                 <Tooltip>
                   <TooltipTrigger asChild>
@@ -111,7 +117,8 @@ export function AgentStatusPanel({
                 </Tooltip>
               </div>
             </div>
-          ))
+            )
+          })
         )}
         </div>
       </div>
