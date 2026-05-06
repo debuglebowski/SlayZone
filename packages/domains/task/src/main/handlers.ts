@@ -177,6 +177,14 @@ export function registerTaskHandlers(ipcMain: IpcMain, db: Database, onMutation?
     return path.join(artifactsDir, taskId, `${artifactId}${ext}`)
   }
 
+  // Fallback to pre-v127 path for users where the boot-time disk migration
+  // silently failed (permission/FS errors). Belt-and-suspenders — read on
+  // every miss, don't mutate. Cost: one existsSync per missing-file path.
+  function getLegacyArtifactFilePath(taskId: string, artifactId: string, title: string): string {
+    const ext = getExtensionFromTitle(title) || '.txt'
+    return path.join(dataDir, 'assets', taskId, `${artifactId}${ext}`)
+  }
+
   function parseArtifact(row: Record<string, unknown> | undefined): TaskArtifact | null {
     if (!row) return null
     return {
@@ -331,8 +339,10 @@ export function registerTaskHandlers(ipcMain: IpcMain, db: Database, onMutation?
     const existing = db.prepare('SELECT * FROM task_artifacts WHERE id = ?').get(id) as Record<string, unknown> | undefined
     if (!existing) return null
     const filePath = getArtifactFilePath(existing.task_id as string, id, existing.title as string)
-    if (!existsSync(filePath)) return ''
-    return readFileSync(filePath, 'utf-8')
+    if (existsSync(filePath)) return readFileSync(filePath, 'utf-8')
+    const legacyPath = getLegacyArtifactFilePath(existing.task_id as string, id, existing.title as string)
+    if (existsSync(legacyPath)) return readFileSync(legacyPath, 'utf-8')
+    return ''
   })
 
   ipcMain.handle('db:artifacts:getFilePath', (_, id: string) => {

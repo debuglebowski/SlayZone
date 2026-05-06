@@ -11,7 +11,7 @@ console.log('[fd-limit]', JSON.stringify(fdLimitResult))
 import { app, shell, BrowserWindow, ipcMain, nativeTheme, session, webContents, dialog, Menu, protocol, screen, powerMonitor, crashReporter } from 'electron'
 import { join, extname, normalize, sep, resolve } from 'path'
 import { homedir } from 'os'
-import { readFileSync, promises as fsp, mkdirSync, existsSync, renameSync } from 'fs'
+import { readFileSync, promises as fsp, mkdirSync } from 'fs'
 import { electronApp, is } from '@electron-toolkit/utils'
 import { ElectronChromeExtensions } from 'electron-chrome-extensions'
 import { installChromeWebStore } from 'electron-chrome-web-store'
@@ -109,6 +109,7 @@ import logoSolid from '../../resources/logo-solid.svg?asset'
 import { getDatabase, closeDatabase, getDiagnosticsDatabase, closeDiagnosticsDatabase } from './db'
 import { runMigrations, LATEST_MIGRATION_VERSION } from './db/migrations'
 import { normalizeProjectStatusData } from './db/status-normalization'
+import { migrateV127DiskDir } from './db/v127-disk-migration'
 import { registerBackupHandlers, startAutoBackup, stopAutoBackup, createPreMigrationBackup } from './backup'
 // Domain handlers
 import { registerProjectHandlers, handleTerminalStateChange } from '@slayzone/projects/main'
@@ -825,18 +826,19 @@ app.whenReady().then(async () => {
   runMigrations(db)
   normalizeProjectStatusData(db)
 
-  // v127 disk-dir rename: artifacts/ → artifacts/. Idempotent. Runs after migrations.
+  // v127 disk-dir migration: assets/ → artifacts/. Idempotent.
+  // Earlier v127 builds shipped a no-op rename (both vars = 'artifacts') that
+  // left user content orphaned in assets/. This block recovers from that and
+  // also handles fresh upgrades. See db/v127-disk-migration.ts.
   {
     const dataDir = process.env.SLAYZONE_DB_DIR || app.getPath('userData')
-    const oldDir = join(dataDir, 'artifacts')
-    const newDir = join(dataDir, 'artifacts')
     try {
-      if (existsSync(oldDir) && !existsSync(newDir)) {
-        renameSync(oldDir, newDir)
-        console.log('[migration v127] renamed userData/artifacts/ → userData/artifacts/')
+      const report = migrateV127DiskDir(join(dataDir, 'assets'), join(dataDir, 'artifacts'))
+      if (report.mode !== 'noop') {
+        console.log(`[migration v127] disk: mode=${report.mode} taskDirsMoved=${report.taskDirsMoved} filesMoved=${report.filesMoved} conflicts=${report.conflicts} oldDirRemoved=${report.oldDirRemoved}`)
       }
     } catch (e) {
-      console.error('[migration v127] disk dir rename failed', e)
+      console.error('[migration v127] disk dir migration failed', e)
     }
   }
 
