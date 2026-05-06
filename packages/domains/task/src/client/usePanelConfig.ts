@@ -22,7 +22,7 @@ export function usePanelConfig(): {
   updateConfig: (next: PanelConfig) => Promise<void>
   enabledWebPanels: WebPanelDefinition[]
   isBuiltinEnabled: (id: string, view: PanelView) => boolean
-  /** Returns ordered task-view panel IDs (e.g. 'terminal','browser','editor','assets','web:*','diff','settings','processes'). */
+  /** Returns ordered task-view panel IDs (e.g. 'terminal','browser','editor','artifacts','web:*','diff','settings','processes'). */
   getOrderedTaskIds: () => string[]
   /** Returns ordered home-view panel IDs (e.g. 'git','editor','processes','web:*'). Omits task-only panels. */
   getOrderedHomeIds: () => string[]

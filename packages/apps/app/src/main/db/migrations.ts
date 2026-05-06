@@ -2391,6 +2391,76 @@ const migrations: Migration[] = [
         CREATE INDEX IF NOT EXISTS idx_chat_queue_tab ON chat_queue(tab_id, position);
       `)
     }
+  },
+  {
+    version: 129,
+    up: (db) => {
+      // v127 renamed assets → artifacts in tables/columns/setting keys, but missed
+      // JSON blobs: settings.panel_config (order[] + viewEnabled.*.assets) and
+      // tasks.panel_visibility ({assets: bool}). Without this, a saved order with
+      // 'assets' is filtered out as unknown and 'artifacts' appended at the end
+      // → Artifacts panel lands on the far right after upgrade.
+
+      // 1. settings.panel_config
+      const cfgRow = db.prepare(`SELECT value FROM settings WHERE key = 'panel_config'`).get() as
+        | { value: string }
+        | undefined
+      if (cfgRow) {
+        try {
+          const cfg = JSON.parse(cfgRow.value) as {
+            order?: string[]
+            viewEnabled?: Record<string, Record<string, boolean>>
+            [k: string]: unknown
+          }
+          let changed = false
+          if (Array.isArray(cfg.order)) {
+            const next = cfg.order.map((id) => (id === 'assets' ? 'artifacts' : id))
+            if (next.some((id, i) => id !== cfg.order![i])) {
+              cfg.order = next
+              changed = true
+            }
+          }
+          if (cfg.viewEnabled) {
+            for (const view of Object.keys(cfg.viewEnabled)) {
+              const v = cfg.viewEnabled[view]
+              if (v && Object.prototype.hasOwnProperty.call(v, 'assets')) {
+                if (!Object.prototype.hasOwnProperty.call(v, 'artifacts')) {
+                  v.artifacts = v.assets
+                }
+                delete v.assets
+                changed = true
+              }
+            }
+          }
+          if (changed) {
+            db.prepare(`UPDATE settings SET value = ? WHERE key = 'panel_config'`).run(JSON.stringify(cfg))
+          }
+        } catch {
+          /* malformed JSON, skip */
+        }
+      }
+
+      // 2. tasks.panel_visibility per-row
+      const rows = db
+        .prepare(`SELECT id, panel_visibility FROM tasks WHERE panel_visibility LIKE '%assets%'`)
+        .all() as { id: string; panel_visibility: string | null }[]
+      const upd = db.prepare(`UPDATE tasks SET panel_visibility = ? WHERE id = ?`)
+      for (const row of rows) {
+        if (!row.panel_visibility) continue
+        try {
+          const pv = JSON.parse(row.panel_visibility) as Record<string, boolean>
+          if (Object.prototype.hasOwnProperty.call(pv, 'assets')) {
+            if (!Object.prototype.hasOwnProperty.call(pv, 'artifacts')) {
+              pv.artifacts = pv.assets
+            }
+            delete pv.assets
+            upd.run(JSON.stringify(pv), row.id)
+          }
+        } catch {
+          /* skip malformed */
+        }
+      }
+    }
   }
 ]
 

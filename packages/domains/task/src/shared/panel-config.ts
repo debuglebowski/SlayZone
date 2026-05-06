@@ -2,19 +2,55 @@ import type { PanelConfig, WebPanelDefinition } from './types'
 import { PREDEFINED_WEB_PANELS, DEFAULT_PANEL_ORDER, PANEL_ORDER_IDS } from './types'
 import { inferHostScopeFromUrl, inferProtocolFromUrl } from './handoff'
 
+/** Migrate legacy IDs to current names (e.g. 'assets' → 'artifacts').
+ *  Applied before validation so renamed panels keep their saved position. */
+function migrateLegacyId(id: string): string {
+  if (id === 'assets') return 'artifacts'
+  return id
+}
+
 /** Ensure config.order exists and contains every current panel ID (natives + web).
  *  Missing IDs are appended in their default position; removed web panels are pruned. */
 export function mergePanelOrder(config: PanelConfig): PanelConfig {
   const validIds = new Set<string>([...PANEL_ORDER_IDS, ...config.webPanels.map(wp => wp.id)])
   const prev = config.order ?? []
-  const filtered = prev.filter(id => validIds.has(id))
+  const renamed = prev.map(migrateLegacyId)
+  // Drop dups created by rename (e.g. legacy 'assets' + current 'artifacts' both present).
+  const seen = new Set<string>()
+  const deduped: string[] = []
+  for (const id of renamed) {
+    if (seen.has(id)) continue
+    seen.add(id)
+    deduped.push(id)
+  }
+  const filtered = deduped.filter(id => validIds.has(id))
   const present = new Set(filtered)
   const missing: string[] = []
   for (const id of DEFAULT_PANEL_ORDER) if (validIds.has(id) && !present.has(id)) missing.push(id)
   for (const wp of config.webPanels) if (!present.has(wp.id) && !DEFAULT_PANEL_ORDER.includes(wp.id)) missing.push(wp.id)
   const next = [...filtered, ...missing]
   const changed = !config.order || next.length !== prev.length || next.some((id, i) => id !== prev[i])
-  return changed ? { ...config, order: next } : config
+
+  // Also migrate viewEnabled keys.
+  let viewEnabled = config.viewEnabled
+  let viewChanged = false
+  if (viewEnabled) {
+    const nextViewEnabled: typeof viewEnabled = { ...viewEnabled }
+    for (const view of Object.keys(viewEnabled) as (keyof typeof viewEnabled)[]) {
+      const v = viewEnabled[view]
+      if (v && Object.prototype.hasOwnProperty.call(v, 'assets')) {
+        const { assets, ...rest } = v
+        nextViewEnabled[view] = Object.prototype.hasOwnProperty.call(rest, 'artifacts')
+          ? rest
+          : { ...rest, artifacts: assets }
+        viewChanged = true
+      }
+    }
+    if (viewChanged) viewEnabled = nextViewEnabled
+  }
+
+  if (!changed && !viewChanged) return config
+  return { ...config, order: next, viewEnabled: viewEnabled ?? config.viewEnabled }
 }
 
 /** Merge predefined panels into stored config (adds missing, syncs defaults, skips user-deleted). */
