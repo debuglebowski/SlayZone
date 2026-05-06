@@ -3,14 +3,14 @@
   "tag": "v0.27.1",
   "x86_64-linux": {
     "url": "https://github.com/debuglebowski/slayzone/releases/download/v0.27.1/SlayZone-x86_64.AppImage",
-    "sha256": "da8f6cf6982a2a2ce627544f25290ee795d627b648bf2a6497bf416724ae2b16"
+    "sha256": "0f0241824105a92f6febbfa305a9e824be1cbf18de4dee471fcce0104d771c54"
   },
   "aarch64-darwin": {
     "url": "https://github.com/debuglebowski/slayzone/releases/download/v0.27.1/SlayZone-arm64.zip",
-    "sha256": "3e68e8dedd84f17bc0352069295de20ccb14f43a3cda846eb978e8b6fe79da3e"
+    "sha256": "71d70704fa068af0a9bd29470113bc58e3ffc0f782ec8edd9206c9c0eea86efc"
   },
   "x86_64-darwin": {
     "url": "https://github.com/debuglebowski/slayzone/releases/download/v0.27.1/SlayZone-x64.zip",
-    "sha256": "ec2a3850eb966c2f64df331ddcf2598b4d48c61d0f2cc98f706c82dbff27e5d7"
+    "sha256": "432bb6847957942bca4aeba883b246b52f9182ef013226b19cc936ee0e9af801"
   }
 }
