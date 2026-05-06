@@ -7,6 +7,7 @@
 
 ### 🚀 Enhancements
 
+- **agent-status:** Show column status icon instead of idle dot ([debc9cb6](https://github.com/debuglebowski/slayzone/commit/debc9cb6))
 - **editor:** Right-click tab context menu ([fcfd93b3](https://github.com/debuglebowski/slayzone/commit/fcfd93b3))
 - **updater:** Restore update-ready toast alongside restart button ([37ab41a4](https://github.com/debuglebowski/slayzone/commit/37ab41a4))
 
@@ -14,9 +15,14 @@
 
 - **panels:** Migrate legacy 'assets' id to 'artifacts' in saved order ([734da3fb](https://github.com/debuglebowski/slayzone/commit/734da3fb))
 
+### 📖 Documentation
+
+- **slay-artifacts:** Document artifacts search command ([d81469c9](https://github.com/debuglebowski/slayzone/commit/d81469c9))
+
 ### 🏡 Chore
 
 - **chat:** Log inFlight flips to diagnostics ([e951e1c6](https://github.com/debuglebowski/slayzone/commit/e951e1c6))
+- **slay-orchestrate:** Reorder frontmatter keys ([a8514b1e](https://github.com/debuglebowski/slayzone/commit/a8514b1e))
 
 ### ❤️ Contributors
 

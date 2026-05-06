@@ -5,6 +5,11 @@
     "tagline": "Update toast, tab menu",
     "items": [
       {
+        "category": "improvement",
+        "title": "Agent-status column icon",
+        "description": "Agent-status panel now shows the task's column status icon instead of a generic idle dot, making state easier to read at a glance."
+      },
+      {
         "category": "feature",
         "title": "Right-click context menu on editor tabs",
         "description": "Right-click any open file tab for close, close-others, and close-all actions."
