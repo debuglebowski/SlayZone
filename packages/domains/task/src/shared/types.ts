@@ -6,6 +6,13 @@ import type { EditorOpenFilesState } from '@slayzone/file-editor/shared'
 export const BUILTIN_STATUSES = ['inbox', 'backlog', 'todo', 'in_progress', 'review', 'done', 'canceled'] as const
 export const TASK_STATUSES = BUILTIN_STATUSES
 export type TaskStatus = string
+
+// Single-source identifier for the "actively being worked on" status.
+// Wrap consumers in `isInProgress(task)` so future per-project status mappings
+// only need to update this helper.
+export const IN_PROGRESS_STATUS = 'in_progress'
+export const isInProgress = (status: TaskStatus | undefined | null): boolean =>
+  status === IN_PROGRESS_STATUS
 export type MergeState = 'uncommitted' | 'conflicts' | 'rebase-conflicts'
 
 export interface MergeContext {

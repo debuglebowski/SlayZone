@@ -43,6 +43,12 @@ interface TabState {
   closedTabs: TaskTab[]
   projectScopedTabs: boolean
   isLoaded: boolean
+  // Registry id of the currently selected sidebar view (default 'projects').
+  sidebarView: string
+  // Custom pixel width override for the current resizable sidebar view. null = use view default.
+  sidebarWidth: number | null
+  // When true, the sidebar collapses to a hover-revealed floating panel.
+  sidebarAutoHide: boolean
   // projectId → taskId of last active task tab, or 'home' if home tab was last active
   projectLastActiveTab: Record<string, string>
 
@@ -56,6 +62,9 @@ interface TabState {
   selectProject: (projectId: string) => void
   setProjectScopedTabs: (enabled: boolean) => void
   toggleProjectScopedTabs: () => void
+  setSidebarView: (id: string) => void
+  setSidebarWidth: (width: number | null) => void
+  setSidebarAutoHide: (enabled: boolean) => void
   setTabs: (tabs: Tab[]) => void
   reorderTabs: (from: number, to: number) => void
   openTask: (taskId: string) => void
@@ -66,7 +75,7 @@ interface TabState {
   reopenClosedTab: () => void
 
   // Internal
-  _loadState: (state: { tabs: Tab[]; activeTabIndex: number; activeView?: ActiveView; selectedProjectId: string; projectScopedTabs?: boolean; projectLastActiveTab?: Record<string, string> }) => void
+  _loadState: (state: { tabs: Tab[]; activeTabIndex: number; activeView?: ActiveView; selectedProjectId: string; projectScopedTabs?: boolean; sidebarView?: string; sidebarWidth?: number | null; sidebarAutoHide?: boolean; projectLastActiveTab?: Record<string, string> }) => void
 }
 
 function findWorktreeInsertIndex(taskId: string, tabs: Tab[], lookup: TaskLookup): number {
@@ -100,6 +109,9 @@ export const useTabStore = create<TabState>()(
     closedTabs: [],
     projectScopedTabs: false,
     isLoaded: false,
+    sidebarView: 'projects',
+    sidebarWidth: null,
+    sidebarAutoHide: false,
     projectLastActiveTab: {},
     _taskLookup: { tasks: [], projects: [] },
 
@@ -129,6 +141,12 @@ export const useTabStore = create<TabState>()(
     setProjectScopedTabs: (enabled) => set({ projectScopedTabs: enabled }),
 
     toggleProjectScopedTabs: () => set((s) => ({ projectScopedTabs: !s.projectScopedTabs })),
+
+    setSidebarView: (id) => set({ sidebarView: id }),
+
+    setSidebarWidth: (width) => set({ sidebarWidth: width }),
+
+    setSidebarAutoHide: (enabled) => set({ sidebarAutoHide: enabled }),
 
     setTabs: (tabs) => set({ tabs }),
 
@@ -247,6 +265,9 @@ export const useTabStore = create<TabState>()(
         activeView,
         selectedProjectId: typeof state.selectedProjectId === 'string' ? state.selectedProjectId : '',
         projectScopedTabs: !!state.projectScopedTabs,
+        sidebarView: typeof state.sidebarView === 'string' ? state.sidebarView : 'projects',
+        sidebarWidth: typeof state.sidebarWidth === 'number' && state.sidebarWidth > 0 ? state.sidebarWidth : null,
+        sidebarAutoHide: !!state.sidebarAutoHide,
         projectLastActiveTab: state.projectLastActiveTab && typeof state.projectLastActiveTab === 'object' ? state.projectLastActiveTab : {},
         isLoaded: true
       })
@@ -284,7 +305,7 @@ export const tabStoreReady: Promise<void> = (typeof window !== 'undefined' && wi
 let _debounceTimer: ReturnType<typeof setTimeout> | null = null
 
 useTabStore.subscribe(
-  (state) => ({ tabs: state.tabs, activeTabIndex: state.activeTabIndex, activeView: state.activeView, selectedProjectId: state.selectedProjectId, projectScopedTabs: state.projectScopedTabs, projectLastActiveTab: state.projectLastActiveTab }),
+  (state) => ({ tabs: state.tabs, activeTabIndex: state.activeTabIndex, activeView: state.activeView, selectedProjectId: state.selectedProjectId, projectScopedTabs: state.projectScopedTabs, sidebarView: state.sidebarView, sidebarWidth: state.sidebarWidth, sidebarAutoHide: state.sidebarAutoHide, projectLastActiveTab: state.projectLastActiveTab }),
   (slice) => {
     if (!useTabStore.getState().isLoaded) return
     if (_debounceTimer) clearTimeout(_debounceTimer)

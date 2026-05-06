@@ -149,6 +149,7 @@ function App(): React.JSX.Element {
   const tabs = useTabStore((s) => s.tabs)
   const activeTabIndex = useTabStore((s) => s.activeTabIndex)
   const activeView = useTabStore((s) => s.activeView)
+  const sidebarAutoHide = useTabStore((s) => s.sidebarAutoHide)
   const selectedProjectId = useTabStore((s) => s.selectedProjectId)
   const { setActiveTabIndex, setSelectedProjectId, openTask: rawOpenTask, openTaskInBackground, reorderTabs, reopenClosedTab } = useTabStore.getState()
   const [, startTransition] = useTransition()
@@ -1138,9 +1139,9 @@ function App(): React.JSX.Element {
           onTaskClick={openTask} zenMode={zenMode} onboardingChecklist={onboardingChecklist} idleByProject={idleByProject} onReorderProjects={reorderProjects}
         />
 
-        <div id="right-column" className={`flex-1 flex min-w-0 bg-sidebar pb-2 pr-2 ${zenMode ? 'pl-2' : ''}`}>
+        <div id="right-column" className={`flex-1 flex min-w-0 bg-sidebar pb-2 pr-2 ${zenMode || sidebarAutoHide ? 'pl-2' : ''}`}>
           <div id="right-main" className="flex-1 flex flex-col min-w-0 min-h-0">
-          <div className={zenMode ? "pl-16" : ""}>
+          <div className={zenMode || sidebarAutoHide ? "pl-16" : ""}>
             <TabBar
               hideTabs={explodeMode}
               tabs={visibleTabs} activeIndex={visibleActiveIndex} activeView={activeView} terminalStates={terminalStates}

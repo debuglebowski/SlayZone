@@ -125,3 +125,33 @@ export function useIdleTasks(
     refresh
   }
 }
+
+/**
+ * Returns the set of task ids that currently have any agent session (PTY or chat),
+ * regardless of state. Useful for "is this task active" affordances.
+ */
+export function useActiveSessionTaskIds(): Set<string> {
+  const [taskIds, setTaskIds] = useState<Set<string>>(new Set())
+
+  const refresh = useCallback(async () => {
+    const [ptys, chats] = await Promise.all([
+      window.api.pty.list(),
+      window.api.chat.list()
+    ])
+    const set = new Set<string>()
+    for (const p of ptys) set.add(p.taskId)
+    for (const c of chats) set.add(c.taskId)
+    setTaskIds(set)
+  }, [])
+
+  useEffect(() => {
+    refresh()
+  }, [refresh])
+
+  useEffect(() => {
+    const unsub = window.api.pty.onStateChange(() => { refresh() })
+    return () => { unsub() }
+  }, [refresh])
+
+  return taskIds
+}
