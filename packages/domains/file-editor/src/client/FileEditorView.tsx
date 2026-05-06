@@ -171,6 +171,11 @@ export const FileEditorView = forwardRef<FileEditorViewHandle, FileEditorViewPro
     updateContent,
     saveFile,
     closeFile,
+    closeOtherFiles,
+    closeFilesToRight,
+    closeSavedFiles,
+    closeAllFiles,
+    hasDirtyFiles,
     isDirty,
     isFileDiskChanged,
     isFileDeleted,
@@ -201,6 +206,7 @@ export const FileEditorView = forwardRef<FileEditorViewHandle, FileEditorViewPro
   const isDragging = useRef(false)
   const treeRef = useRef<EditorFileTreeHandle>(null)
   const [confirmClose, setConfirmClose] = useState<string | null>(null)
+  const [confirmCloseAll, setConfirmCloseAll] = useState(false)
   const [fileViewModes, setFileViewModes] = useState<Record<string, MarkdownViewMode>>(
     initialEditorState?.fileViewModes ?? {}
   )
@@ -342,6 +348,31 @@ export const FileEditorView = forwardRef<FileEditorViewHandle, FileEditorViewPro
       setConfirmClose(null)
     }
   }, [confirmClose, closeFile])
+
+  const handleCloseAll = useCallback(() => {
+    if (hasDirtyFiles) {
+      setConfirmCloseAll(true)
+      return
+    }
+    closeAllFiles()
+  }, [hasDirtyFiles, closeAllFiles])
+
+  const handleConfirmCloseAll = useCallback(() => {
+    closeAllFiles()
+    setConfirmCloseAll(false)
+  }, [closeAllFiles])
+
+  const handleCopyPath = useCallback((filePath: string) => {
+    void navigator.clipboard.writeText(`${projectPath}/${filePath}`)
+  }, [projectPath])
+
+  const handleCopyRelativePath = useCallback((filePath: string) => {
+    void navigator.clipboard.writeText(filePath)
+  }, [])
+
+  const handleRevealInFinder = useCallback((filePath: string) => {
+    void window.api.fs.showInFinder(projectPath, filePath)
+  }, [projectPath])
 
   const handleFileDragOver = useCallback((e: React.DragEvent) => {
     // Skip internal tree drags — let the tree handle them
@@ -487,6 +518,13 @@ export const FileEditorView = forwardRef<FileEditorViewHandle, FileEditorViewPro
               activeFilePath={activeFilePath}
               onSelect={setActiveFilePath}
               onClose={handleCloseFile}
+              onCloseOthers={closeOtherFiles}
+              onCloseToRight={closeFilesToRight}
+              onCloseSaved={closeSavedFiles}
+              onCloseAll={handleCloseAll}
+              onCopyPath={handleCopyPath}
+              onCopyRelativePath={handleCopyRelativePath}
+              onRevealInFinder={handleRevealInFinder}
               isDirty={isDirty}
               diskChanged={isFileDiskChanged}
               deleted={isFileDeleted}
@@ -735,6 +773,21 @@ export const FileEditorView = forwardRef<FileEditorViewHandle, FileEditorViewPro
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={handleConfirmDiscard}>Discard</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={confirmCloseAll} onOpenChange={setConfirmCloseAll}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Unsaved changes</AlertDialogTitle>
+            <AlertDialogDescription>
+              Some open files have unsaved changes. Closing all will discard them.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleConfirmCloseAll}>Discard all</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

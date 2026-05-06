@@ -305,6 +305,65 @@ export function useFileEditor(
     })
   }, [openFiles])
 
+  // Bulk close. `keepDirty` preserves dirty files in place so user can't lose work.
+  const closeFilesByPredicate = useCallback(
+    (shouldClose: (file: OpenFile) => boolean, keepDirty: boolean) => {
+      const removed = new Set<string>()
+      setOpenFiles((prev) => {
+        const next: OpenFile[] = []
+        for (const f of prev) {
+          const dirty = f.content !== f.originalContent
+          const close = shouldClose(f) && (!keepDirty || !dirty)
+          if (close) {
+            removed.add(f.path)
+          } else {
+            next.push(f)
+          }
+        }
+        return next.length === prev.length ? prev : next
+      })
+      if (removed.size === 0) return
+      setActiveFilePath((current) => {
+        if (!current || !removed.has(current)) return current
+        const remaining = openFilesRef.current.filter((f) => !removed.has(f.path))
+        return remaining.length > 0 ? remaining[remaining.length - 1].path : null
+      })
+      setFileVersions((prev) => {
+        const next = new Map<string, number>()
+        for (const [k, v] of prev) {
+          if (!removed.has(k)) next.set(k, v)
+        }
+        return next
+      })
+    },
+    []
+  )
+
+  const closeOtherFiles = useCallback(
+    (filePath: string) => closeFilesByPredicate((f) => f.path !== filePath, true),
+    [closeFilesByPredicate]
+  )
+
+  const closeFilesToRight = useCallback(
+    (filePath: string) => {
+      const idx = openFilesRef.current.findIndex((f) => f.path === filePath)
+      if (idx === -1) return
+      const rightPaths = new Set(openFilesRef.current.slice(idx + 1).map((f) => f.path))
+      closeFilesByPredicate((f) => rightPaths.has(f.path), true)
+    },
+    [closeFilesByPredicate]
+  )
+
+  const closeSavedFiles = useCallback(
+    () => closeFilesByPredicate(() => true, true),
+    [closeFilesByPredicate]
+  )
+
+  const closeAllFiles = useCallback(
+    () => closeFilesByPredicate(() => true, false),
+    [closeFilesByPredicate]
+  )
+
   const isDirty = useCallback(
     (filePath: string) => {
       const file = openFiles.find((f) => f.path === filePath)
@@ -379,6 +438,10 @@ export function useFileEditor(
     updateContent,
     saveFile,
     closeFile,
+    closeOtherFiles,
+    closeFilesToRight,
+    closeSavedFiles,
+    closeAllFiles,
     isDirty,
     hasDirtyFiles,
     isFileDiskChanged,
