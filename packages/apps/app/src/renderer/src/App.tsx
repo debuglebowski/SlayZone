@@ -152,6 +152,7 @@ function App(): React.JSX.Element {
   const activeTabIndex = useTabStore((s) => s.activeTabIndex)
   const activeView = useTabStore((s) => s.activeView)
   const sidebarAutoHide = useTabStore((s) => s.sidebarAutoHide)
+  const treePinnedTaskIds = useTabStore((s) => s.treePinnedTaskIds)
   const selectedProjectId = useTabStore((s) => s.selectedProjectId)
   const { setActiveTabIndex, setSelectedProjectId, openTask: rawOpenTask, openTaskInBackground, reorderTabs, reopenClosedTab } = useTabStore.getState()
   const [, startTransition] = useTransition()
@@ -1171,6 +1172,8 @@ function App(): React.JSX.Element {
                   ? () => shutdownAgentForTask(task.id)
                   : undefined
               }
+              isPinned={treePinnedTaskIds.includes(task.id)}
+              onTogglePin={() => useTabStore.getState().toggleTreePinnedTask(task.id)}
             >
               {child}
             </TaskContextMenu>

@@ -37,7 +37,7 @@ import type { Project } from '@slayzone/projects/shared'
 import type { ColumnConfig } from '@slayzone/projects/shared'
 import type { Tag } from '@slayzone/tags/shared'
 import { CreateTagDialog } from '@slayzone/tags/client'
-import { Plus, AlarmClock, X, CircleDot, Signal, Tag as TagIcon, FolderInput, Copy, Archive, Trash2, ShieldAlert, ListChecks, MessageSquare, Check, Power } from 'lucide-react'
+import { Plus, AlarmClock, X, CircleDot, Signal, Tag as TagIcon, FolderInput, Copy, Archive, Trash2, ShieldAlert, ListChecks, MessageSquare, Check, Power, Pin, PinOff } from 'lucide-react'
 import { track } from '@slayzone/telemetry/client'
 import { format } from 'date-fns'
 import { getSnoozePresets, CustomSnoozeDialog } from '@slayzone/task/client'
@@ -57,6 +57,9 @@ interface TaskContextMenuProps {
   onTagCreated?: (tag: Tag) => void
   /** Provided when the task has an active agent session (PTY or chat). Renders a "Shut down agent" item. */
   onShutdownAgent?: () => void
+  /** When defined, renders a Pin/Unpin item. */
+  isPinned?: boolean
+  onTogglePin?: () => void
   children: React.ReactNode
 }
 
@@ -81,6 +84,8 @@ export function TaskContextMenu({
   onTaskTagsChange,
   onTagCreated,
   onShutdownAgent,
+  isPinned,
+  onTogglePin,
   children
 }: TaskContextMenuProps): React.JSX.Element {
   const [archiveDialogOpen, setArchiveDialogOpen] = useState(false)
@@ -300,6 +305,16 @@ export function TaskContextMenu({
               </ContextMenuItem>
             </ContextMenuSubContent>
           </ContextMenuSub>
+
+          {onTogglePin && (
+            <>
+              <ContextMenuSeparator />
+              <ContextMenuItem onSelect={onTogglePin}>
+                {isPinned ? <PinOff className="mr-2 size-3.5" /> : <Pin className="mr-2 size-3.5" />}
+                {isPinned ? 'Unpin' : 'Pin'}
+              </ContextMenuItem>
+            </>
+          )}
 
           {onShutdownAgent && (
             <>

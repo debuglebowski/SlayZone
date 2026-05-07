@@ -1,5 +1,5 @@
-import { useMemo, useState, type ReactNode } from 'react'
-import { ChevronDown, Home, Settings } from 'lucide-react'
+import { useCallback, useMemo, useState, type ReactNode } from 'react'
+import { ChevronDown, Home, Pin, Settings } from 'lucide-react'
 import * as Collapsible from '@radix-ui/react-collapsible'
 import { cn, TerminalProgressDot, PriorityIcon, getColumnStatusStyle } from '@slayzone/ui'
 import { type Task } from '@slayzone/task/shared'
@@ -76,26 +76,32 @@ export function TreeView({
   const statusFilter = useMemo(() => new Set(treeStatusFilter), [treeStatusFilter])
   const treeShowStatus = useTabStore((s) => s.treeShowStatus)
   const treeShowPriority = useTabStore((s) => s.treeShowPriority)
+  const treePinnedTaskIds = useTabStore((s) => s.treePinnedTaskIds)
+  const pinnedSet = useMemo(() => new Set(treePinnedTaskIds), [treePinnedTaskIds])
+  const passesFilter = useCallback(
+    (t: Task) => statusFilter.has(t.status) || pinnedSet.has(t.id),
+    [statusFilter, pinnedSet]
+  )
 
   const tasksByProject = useMemo(() => {
     const m = new Map<string, Task[]>()
     for (const t of tasks) {
-      if (!statusFilter.has(t.status)) continue
+      if (!passesFilter(t)) continue
       const arr = m.get(t.project_id) ?? []
       arr.push(t)
       m.set(t.project_id, arr)
     }
     return m
-  }, [tasks, statusFilter])
+  }, [tasks, passesFilter])
 
   // For each in-progress task id → its in-progress children. Subtasks whose parent
   // is not in-progress are promoted to the project root.
   const childrenByParent = useMemo(() => {
     const inProgressIds = new Set<string>()
-    for (const t of tasks) if (statusFilter.has(t.status)) inProgressIds.add(t.id)
+    for (const t of tasks) if (passesFilter(t)) inProgressIds.add(t.id)
     const m = new Map<string, Task[]>()
     for (const t of tasks) {
-      if (!statusFilter.has(t.status)) continue
+      if (!passesFilter(t)) continue
       const pid = t.parent_id
       if (pid && inProgressIds.has(pid)) {
         const arr = m.get(pid) ?? []
@@ -104,14 +110,14 @@ export function TreeView({
       }
     }
     return m
-  }, [tasks, statusFilter])
+  }, [tasks, passesFilter])
 
   const rootTasksByProject = useMemo(() => {
     const inProgressIds = new Set<string>()
-    for (const t of tasks) if (statusFilter.has(t.status)) inProgressIds.add(t.id)
+    for (const t of tasks) if (passesFilter(t)) inProgressIds.add(t.id)
     const m = new Map<string, Task[]>()
     for (const t of tasks) {
-      if (!statusFilter.has(t.status)) continue
+      if (!passesFilter(t)) continue
       const isOrphan = !t.parent_id || !inProgressIds.has(t.parent_id)
       if (!isOrphan) continue
       const arr = m.get(t.project_id) ?? []
@@ -119,7 +125,7 @@ export function TreeView({
       m.set(t.project_id, arr)
     }
     return m
-  }, [tasks, statusFilter])
+  }, [tasks, passesFilter])
 
   const activeTaskId = useTabStore((s) => {
     const tab = s.tabs[s.activeTabIndex]
@@ -202,6 +208,12 @@ export function TreeView({
             tooltipSide="right"
           />
           <span className="truncate flex-1">{task.title || 'Untitled'}</span>
+          {pinnedSet.has(task.id) && (
+            <Pin
+              aria-label="Pinned"
+              className="size-3 shrink-0 text-muted-foreground/60 -rotate-45 fill-current"
+            />
+          )}
           {treeShowPriority && task.priority != null && (
             <PriorityIcon priority={task.priority} className="size-3.5 shrink-0" />
           )}
