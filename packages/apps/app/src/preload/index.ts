@@ -628,55 +628,6 @@ const api: ElectronAPI = {
       return () => ipcRenderer.removeListener('processes:title', handler)
     }
   },
-  integrations: {
-    connectGithub: (input) => ipcRenderer.invoke('integrations:connect-github', input),
-    connectLinear: (input) => ipcRenderer.invoke('integrations:connect-linear', input),
-    connectJira: (input) => ipcRenderer.invoke('integrations:connect-jira', input),
-    getJiraTransitions: (taskId) => ipcRenderer.invoke('integrations:get-jira-transitions', taskId),
-    updateConnection: (input) => ipcRenderer.invoke('integrations:update-connection', input),
-    listConnections: (provider) => ipcRenderer.invoke('integrations:list-connections', provider),
-    getConnectionUsage: (connectionId) => ipcRenderer.invoke('integrations:get-connection-usage', connectionId),
-    disconnect: (connectionId) => ipcRenderer.invoke('integrations:disconnect', connectionId),
-    clearProjectProvider: (input) => ipcRenderer.invoke('integrations:clear-project-provider', input),
-    getProjectConnection: (projectId, provider) =>
-      ipcRenderer.invoke('integrations:get-project-connection', projectId, provider),
-    setProjectConnection: (input) => ipcRenderer.invoke('integrations:set-project-connection', input),
-    clearProjectConnection: (input) => ipcRenderer.invoke('integrations:clear-project-connection', input),
-    listGithubRepositories: (connectionId) =>
-      ipcRenderer.invoke('integrations:list-github-repositories', connectionId),
-    listGithubProjects: (connectionId) =>
-      ipcRenderer.invoke('integrations:list-github-projects', connectionId),
-    listGithubIssues: (input) => ipcRenderer.invoke('integrations:list-github-issues', input),
-    importGithubIssues: (input) => ipcRenderer.invoke('integrations:import-github-issues', input),
-    listGithubRepositoryIssues: (input) =>
-      ipcRenderer.invoke('integrations:list-github-repository-issues', input),
-    importGithubRepositoryIssues: (input) =>
-      ipcRenderer.invoke('integrations:import-github-repository-issues', input),
-    listLinearTeams: (connectionId) => ipcRenderer.invoke('integrations:list-linear-teams', connectionId),
-    listLinearProjects: (connectionId, teamId) =>
-      ipcRenderer.invoke('integrations:list-linear-projects', connectionId, teamId),
-    listLinearIssues: (input) => ipcRenderer.invoke('integrations:list-linear-issues', input),
-    setProjectMapping: (input) => ipcRenderer.invoke('integrations:set-project-mapping', input),
-    getProjectMapping: (projectId, provider) =>
-      ipcRenderer.invoke('integrations:get-project-mapping', projectId, provider),
-    importLinearIssues: (input) => ipcRenderer.invoke('integrations:import-linear-issues', input),
-    syncNow: (input) => ipcRenderer.invoke('integrations:sync-now', input),
-    getTaskSyncStatus: (taskId, provider) => ipcRenderer.invoke('integrations:get-task-sync-status', taskId, provider),
-    getBatchTaskSyncStatus: (taskIds, provider) => ipcRenderer.invoke('integrations:get-batch-task-sync-status', taskIds, provider),
-    pushTask: (input) => ipcRenderer.invoke('integrations:push-task', input),
-    pullTask: (input) => ipcRenderer.invoke('integrations:pull-task', input),
-    getLink: (taskId, provider) => ipcRenderer.invoke('integrations:get-link', taskId, provider),
-    unlinkTask: (taskId, provider) => ipcRenderer.invoke('integrations:unlink-task', taskId, provider),
-    pushUnlinkedTasks: (input) => ipcRenderer.invoke('integrations:push-unlinked-tasks', input),
-    fetchProviderStatuses: (input) => ipcRenderer.invoke('integrations:fetch-provider-statuses', input),
-    applyStatusSync: (input) => ipcRenderer.invoke('integrations:apply-status-sync', input),
-    resyncProviderStatuses: (input) => ipcRenderer.invoke('integrations:resync-provider-statuses', input),
-    // Generic provider-dispatched
-    listProviderGroups: (connectionId) => ipcRenderer.invoke('integrations:list-provider-groups', connectionId),
-    listProviderScopes: (connectionId, groupId) => ipcRenderer.invoke('integrations:list-provider-scopes', connectionId, groupId),
-    listProviderIssues: (input) => ipcRenderer.invoke('integrations:list-provider-issues', input),
-    importProviderIssues: (input) => ipcRenderer.invoke('integrations:import-provider-issues', input)
-  },
   backup: {
     list: () => ipcRenderer.invoke('backup:list'),
     create: (name?: string) => ipcRenderer.invoke('backup:create', name),

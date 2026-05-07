@@ -130,8 +130,8 @@ import { detectPreviousCrash, writeBootStub, writeCleanShutdownSentinel, scanCra
 import { acquireLockWithSelfHeal, lockOutcomeIsAcquired, type LockOutcome } from './lifecycle/single-instance'
 import { IPC_TELEMETRY_MAP } from '@slayzone/telemetry/shared'
 import { initAiConfigOps } from '@slayzone/ai-config/server'
-import { registerIntegrationHandlers, ensureIntegrationSchema, ElectronStorageAdapter } from '@slayzone/integrations/electron'
-import { startSyncPoller, pushTaskAfterEdit, pushNewTaskToProviders, pushArchiveToProviders, pushUnarchiveToProviders, startDiscoveryPoller, resetSyncFlags, setStorageAdapter } from '@slayzone/integrations/server'
+import { ElectronStorageAdapter } from '@slayzone/integrations/electron'
+import { initIntegrationOps, ensureIntegrationSchema, startSyncPoller, pushTaskAfterEdit, pushNewTaskToProviders, pushArchiveToProviders, pushUnarchiveToProviders, startDiscoveryPoller, resetSyncFlags, setStorageAdapter } from '@slayzone/integrations/server'
 import { closeAllFileWatchers } from '@slayzone/file-editor/server'
 import { AutomationEngine, automationsEvents } from '@slayzone/automations/server'
 import { registerScreenshotHandlers } from './screenshot'
@@ -1305,8 +1305,8 @@ app.whenReady().then(async () => {
   initAiConfigOps(db)
   logBoot('ai-config ops initialized')
   setStorageAdapter(new ElectronStorageAdapter())
-  const integrationHandles = registerIntegrationHandlers(ipcMain, db, { enableTestChannels: isPlaywright })
-  logBoot('integration handlers registered')
+  const integrationHandles = initIntegrationOps(db, { enableTestChannels: isPlaywright })
+  logBoot('integration ops initialized')
   registerClipboardHandlers(ipcMain)
   registerScreenshotHandlers(browserViewManager)
   registerExportImportHandlers(ipcMain, db, isPlaywright)

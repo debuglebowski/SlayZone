@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { getTrpcVanillaClient } from '@slayzone/transport/client'
 import { CheckCircle2, Circle, Info, Loader2 } from 'lucide-react'
 import { Button, Card, CardContent, CardHeader, CardTitle } from '@slayzone/ui'
 import { Checkbox } from '@slayzone/ui'
@@ -179,7 +180,7 @@ export function ProjectIntegrationSetupWizard({
       setMessage('')
     }
     try {
-      const loadedConnections = await window.api.integrations.listConnections(provider)
+      const loadedConnections = await getTrpcVanillaClient().integrations.listConnections.query(provider)
       setConnections(loadedConnections)
       setConnectionId((current) => {
         if (connectionLocked) {
@@ -240,7 +241,7 @@ export function ProjectIntegrationSetupWizard({
       return
     }
     setLoadingTeams(true)
-    void window.api.integrations.listLinearTeams(connectionId)
+    void getTrpcVanillaClient().integrations.listLinearTeams.query({ connectionId })
       .then((result) => {
         const loadedTeams = Array.isArray(result) ? result : result.teams
         setTeams(loadedTeams)
@@ -261,7 +262,7 @@ export function ProjectIntegrationSetupWizard({
       return
     }
     setLoadingProjects(true)
-    void window.api.integrations.listLinearProjects(connectionId, teamId)
+    void getTrpcVanillaClient().integrations.listLinearProjects.query({ connectionId, teamId })
       .then((loadedProjects) => {
         setLinearProjects(loadedProjects)
       })
@@ -281,7 +282,7 @@ export function ProjectIntegrationSetupWizard({
       return
     }
     setLoadingGithubProjects(true)
-    void window.api.integrations.listGithubProjects(connectionId)
+    void getTrpcVanillaClient().integrations.listGithubProjects.query({ connectionId })
       .then((loadedProjects) => {
         setGithubProjects(loadedProjects)
         setGithubProjectId((current) => current || loadedProjects[0]?.id || '')
@@ -315,7 +316,7 @@ export function ProjectIntegrationSetupWizard({
     if (!externalTeamId) return
 
     setLoadingStatuses(true)
-    void window.api.integrations.fetchProviderStatuses({
+    void getTrpcVanillaClient().integrations.fetchProviderStatuses.mutate({
       connectionId,
       provider,
       externalTeamId,
@@ -336,7 +337,7 @@ export function ProjectIntegrationSetupWizard({
     setApplyingStatuses(true)
     setMessage('')
     try {
-      await window.api.integrations.applyStatusSync({
+      await getTrpcVanillaClient().integrations.applyStatusSync.mutate({
         projectId: project.id,
         provider,
         statuses: providerStatuses,
@@ -361,7 +362,7 @@ export function ProjectIntegrationSetupWizard({
     setPreviewLoading(true)
     setPreviewLoaded(false)
 
-    const request = window.api.integrations.listProviderIssues({
+    const request = getTrpcVanillaClient().integrations.listProviderIssues.query({
       connectionId,
       projectId: project.id,
       groupId: provider === 'linear' ? teamId : undefined,
@@ -402,7 +403,7 @@ export function ProjectIntegrationSetupWizard({
     if (provider === 'linear') {
       const team = teams.find((item) => item.id === teamId)
       if (!teamId) throw new Error('Team is required')
-      return window.api.integrations.setProjectMapping({
+      return getTrpcVanillaClient().integrations.setProjectMapping.mutate({
         projectId: project.id,
         provider: 'linear',
         connectionId,
@@ -415,7 +416,7 @@ export function ProjectIntegrationSetupWizard({
     }
 
     if (!selectedGitHubProject) throw new Error('GitHub Project is required')
-    return window.api.integrations.setProjectMapping({
+    return getTrpcVanillaClient().integrations.setProjectMapping.mutate({
       projectId: project.id,
       provider: 'github',
       connectionId,
@@ -434,7 +435,7 @@ export function ProjectIntegrationSetupWizard({
       const mapping = await persistMapping()
       let imported = 0
       if (runImport) {
-        const result = await window.api.integrations.importProviderIssues({
+        const result = await getTrpcVanillaClient().integrations.importProviderIssues.mutate({
           projectId: project.id,
           connectionId,
           groupId: provider === 'linear' ? teamId : undefined,
@@ -459,11 +460,11 @@ export function ProjectIntegrationSetupWizard({
     setMessage('')
     try {
       const connection = provider === 'github'
-        ? await window.api.integrations.connectGithub({
+        ? await getTrpcVanillaClient().integrations.connectGithub.mutate({
             token: connectionCredential.trim(),
             projectId: project.id
           })
-        : await window.api.integrations.connectLinear({
+        : await getTrpcVanillaClient().integrations.connectLinear.mutate({
             apiKey: connectionCredential.trim(),
             projectId: project.id
           })

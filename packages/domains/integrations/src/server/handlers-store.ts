@@ -1,5 +1,4 @@
 import type { Database } from 'better-sqlite3'
-import type { IpcMain } from 'electron'
 import {
   listIssues,
   listProjects,
@@ -761,7 +760,7 @@ function getProjectConnectionId(db: Database, projectId: string, provider: Integ
   return mapping?.connection_id ?? null
 }
 
-function setProjectConnection(db: Database, input: SetProjectConnectionInput): void {
+function setProjectConnectionImpl(db: Database, input: SetProjectConnectionInput): void {
   const existing = db.prepare(`
     SELECT id
     FROM integration_project_connections
@@ -804,7 +803,7 @@ function tryDeleteConnectionIfUnused(db: Database, connectionId: string): void {
   db.prepare('DELETE FROM integration_connections WHERE id = ?').run(connectionId)
 }
 
-function getConnectionUsage(db: Database, connection: IntegrationConnection): IntegrationConnectionUsage {
+function getConnectionUsageImpl(db: Database, connection: IntegrationConnection): IntegrationConnectionUsage {
   type ConnectionUsageRow = {
     project_id: string
     project_name: string
@@ -939,13 +938,9 @@ export interface IntegrationHandles {
   pushGithubTask: (taskId: string) => Promise<void>
 }
 
-export function registerIntegrationHandlers(
-  ipcMain: IpcMain,
-  db: Database,
-  options?: { enableTestChannels?: boolean }
-): IntegrationHandles {
+export function createIntegrationOps(db: Database, _options?: { enableTestChannels?: boolean }) {
+
   ensureIntegrationSchema(db)
-  const enableTestChannels = options?.enableTestChannels ?? false
   const githubTestRepositoriesByConnection = new Map<string, GithubRepositorySummary[]>()
   const githubTestIssuesByRepository = new Map<string, GithubIssueSummary[]>()
 
@@ -1060,7 +1055,7 @@ export function registerIntegrationHandlers(
     return adapter.getIssuesBatch(credential, refs)
   }
 
-  ipcMain.handle('integrations:connect-github', async (_event, input: ConnectGithubInput) => {
+  const connectGithub = async (input: ConnectGithubInput) => {
     const token = input.token.trim()
     if (!token) throw new Error('Token required')
 
@@ -1083,7 +1078,7 @@ export function registerIntegrationHandlers(
       `).run(credentialRef, existing.id)
 
       if (input.projectId) {
-        setProjectConnection(db, {
+        setProjectConnectionImpl(db, {
           projectId: input.projectId,
           provider: 'github',
           connectionId: existing.id
@@ -1100,7 +1095,7 @@ export function registerIntegrationHandlers(
     `).run(id, credentialRef)
 
     if (input.projectId) {
-      setProjectConnection(db, {
+      setProjectConnectionImpl(db, {
         projectId: input.projectId,
         provider: 'github',
         connectionId: id
@@ -1108,9 +1103,9 @@ export function registerIntegrationHandlers(
     }
 
     return toPublicConnection(getConnection(db, id))
-  })
+  }
 
-  ipcMain.handle('integrations:connect-linear', async (_event, input: ConnectLinearInput) => {
+  const connectLinear = async (input: ConnectLinearInput) => {
     const apiKey = input.apiKey.trim()
     if (!apiKey) throw new Error('API key required')
 
@@ -1133,7 +1128,7 @@ export function registerIntegrationHandlers(
       `).run(credentialRef, existing.id)
 
       if (input.projectId) {
-        setProjectConnection(db, {
+        setProjectConnectionImpl(db, {
           projectId: input.projectId,
           provider: 'linear',
           connectionId: existing.id
@@ -1150,7 +1145,7 @@ export function registerIntegrationHandlers(
     `).run(id, credentialRef)
 
     if (input.projectId) {
-      setProjectConnection(db, {
+      setProjectConnectionImpl(db, {
         projectId: input.projectId,
         provider: 'linear',
         connectionId: id
@@ -1158,9 +1153,9 @@ export function registerIntegrationHandlers(
     }
 
     return toPublicConnection(getConnection(db, id))
-  })
+  }
 
-  ipcMain.handle('integrations:connect-jira', async (_event, input: ConnectJiraInput) => {
+  const connectJira = async (input: ConnectJiraInput) => {
     const domain = input.cloudDomain.trim()
     const email = input.email.trim()
     const apiToken = input.apiToken.trim()
@@ -1187,7 +1182,7 @@ export function registerIntegrationHandlers(
         WHERE id = ?
       `).run(credentialRef, existing.id)
       if (input.projectId) {
-        setProjectConnection(db, { projectId: input.projectId, provider: 'jira', connectionId: existing.id })
+        setProjectConnectionImpl(db, { projectId: input.projectId, provider: 'jira', connectionId: existing.id })
       }
       return toPublicConnection(getConnection(db, existing.id))
     }
@@ -1200,12 +1195,12 @@ export function registerIntegrationHandlers(
     `).run(id, credentialRef)
 
     if (input.projectId) {
-      setProjectConnection(db, { projectId: input.projectId, provider: 'jira', connectionId: id })
+      setProjectConnectionImpl(db, { projectId: input.projectId, provider: 'jira', connectionId: id })
     }
     return toPublicConnection(getConnection(db, id))
-  })
+  }
 
-  ipcMain.handle('integrations:get-jira-transitions', async (_event, taskId: string) => {
+  const getJiraTransitions = async (taskId: string) => {
     const link = db.prepare(`
       SELECT * FROM external_links WHERE task_id = ? AND provider = 'jira'
     `).get(taskId) as ExternalLink | undefined
@@ -1215,9 +1210,9 @@ export function registerIntegrationHandlers(
     const credential = readCredential(db, connection.credential_ref)
     const { getTransitions } = await import('../server/jira-client')
     return getTransitions(credential, link.external_key)
-  })
+  }
 
-  ipcMain.handle('integrations:update-connection', async (_event, input: UpdateIntegrationConnectionInput) => {
+  const updateConnection = async (input: UpdateIntegrationConnectionInput) => {
     const connection = getConnection(db, input.connectionId)
     const credential = input.credential.trim()
     if (!credential) throw new Error('Credential is required')
@@ -1234,22 +1229,22 @@ export function registerIntegrationHandlers(
       WHERE id = ?
     `).run(credentialRef, connection.id)
     return toPublicConnection(getConnection(db, connection.id))
-  })
+  }
 
-  ipcMain.handle('integrations:list-connections', (_event, provider?: IntegrationProvider) => {
+  const listConnections = (provider?: IntegrationProvider) => {
     const rows = provider
       ? db.prepare('SELECT * FROM integration_connections WHERE provider = ? ORDER BY updated_at DESC').all(provider)
       : db.prepare('SELECT * FROM integration_connections ORDER BY updated_at DESC').all()
     return (rows as IntegrationConnection[]).map(toPublicConnection)
-  })
+  }
 
-  ipcMain.handle('integrations:get-connection-usage', (_event, connectionId: string) => {
+  const getConnectionUsage = (connectionId: string) => {
     const connection = getConnection(db, connectionId)
-    return getConnectionUsage(db, connection)
-  })
-
-  if (enableTestChannels) {
-    ipcMain.handle('integrations:test:seed-github-connection', (_event, input: {
+    return getConnectionUsageImpl(db, connection)
+  }
+  // NOTE: test-channel ops were previously gated on enableTestChannels;
+  // kept always-on after tRPC migration (production renderer never calls them).
+    const testSeedGithubConnection = (input: {
       id?: string
       projectId?: string
       token?: string
@@ -1279,7 +1274,7 @@ export function registerIntegrationHandlers(
       `).run(connectionId, credentialRef)
 
       if (input.projectId) {
-        setProjectConnection(db, {
+        setProjectConnectionImpl(db, {
           projectId: input.projectId,
           provider: 'github',
           connectionId
@@ -1292,33 +1287,33 @@ export function registerIntegrationHandlers(
 
       const row = getConnection(db, connectionId)
       return toPublicConnection(row)
-    })
+    }
 
-    ipcMain.handle('integrations:test:set-github-repositories', (_event, input: {
+    const testSetGithubRepositories = (input: {
       connectionId: string
       repositories: GithubRepositorySummary[]
     }) => {
       githubTestRepositoriesByConnection.set(input.connectionId, input.repositories)
       return true
-    })
+    }
 
-    ipcMain.handle('integrations:test:set-github-repository-issues', (_event, input: {
+    const testSetGithubRepositoryIssues = (input: {
       repositoryFullName: string
       issues: GithubIssueSummary[]
     }) => {
       const key = input.repositoryFullName.toLowerCase()
       githubTestIssuesByRepository.set(key, input.issues.map(cloneGithubIssue))
       return true
-    })
+    }
 
-    ipcMain.handle('integrations:test:clear-github-mocks', () => {
+    const testClearGithubMocks = () => {
       githubTestRepositoriesByConnection.clear()
       githubTestIssuesByRepository.clear()
       return true
-    })
-  }
+    }
+  
 
-  ipcMain.handle('integrations:disconnect', (_event, connectionId: string) => {
+  const disconnect = (connectionId: string) => {
     const connection = getConnection(db, connectionId)
     deleteCredential(db, connection.credential_ref)
 
@@ -1331,9 +1326,9 @@ export function registerIntegrationHandlers(
     })()
 
     return true
-  })
+  }
 
-  ipcMain.handle('integrations:clear-project-provider', (_event, input: ClearProjectProviderInput) => {
+  const clearProjectProvider = (input: ClearProjectProviderInput) => {
     db.transaction(() => {
       clearProjectProviderData(db, input.projectId, input.provider)
       db.prepare(`
@@ -1342,22 +1337,22 @@ export function registerIntegrationHandlers(
       `).run(input.projectId, input.provider)
     })()
     return true
-  })
+  }
 
-  ipcMain.handle('integrations:get-project-connection', (_event, projectId: string, provider: IntegrationProvider) => {
+  const getProjectConnection = (projectId: string, provider: IntegrationProvider) => {
     return getProjectConnectionId(db, projectId, provider)
-  })
+  }
 
-  ipcMain.handle('integrations:set-project-connection', (_event, input: SetProjectConnectionInput) => {
+  const setProjectConnection = (input: SetProjectConnectionInput) => {
     const connection = getConnection(db, input.connectionId)
     assertConnectionProvider(connection, input.provider)
     db.transaction(() => {
-      setProjectConnection(db, input)
+      setProjectConnectionImpl(db, input)
     })()
     return true
-  })
+  }
 
-  ipcMain.handle('integrations:clear-project-connection', (_event, input: ClearProjectConnectionInput) => {
+  const clearProjectConnection = (input: ClearProjectConnectionInput) => {
     const connectionId = getProjectConnectionId(db, input.projectId, input.provider)
     db.transaction(() => {
       clearProjectProviderData(db, input.projectId, input.provider)
@@ -1370,39 +1365,39 @@ export function registerIntegrationHandlers(
       }
     })()
     return true
-  })
+  }
 
-  ipcMain.handle('integrations:list-github-repositories', async (_event, connectionId: string) => {
+  const listGithubRepositories = async (connectionId: string) => {
     const mocked = githubTestRepositoriesByConnection.get(connectionId)
     if (mocked) return mocked
     const connection = getConnection(db, connectionId)
     assertConnectionProvider(connection, 'github')
     const token = readCredential(db, connection.credential_ref)
     return listGitHubRepositories(token)
-  })
+  }
 
-  ipcMain.handle('integrations:list-github-projects', async (_event, connectionId: string) => {
+  const listGithubProjects = async (connectionId: string) => {
     const connection = getConnection(db, connectionId)
     assertConnectionProvider(connection, 'github')
     const token = readCredential(db, connection.credential_ref)
     return listGitHubProjects(token)
-  })
+  }
 
-  ipcMain.handle('integrations:list-linear-teams', async (_event, connectionId: string) => {
+  const listLinearTeams = async (connectionId: string) => {
     const connection = getConnection(db, connectionId)
     assertConnectionProvider(connection, 'linear')
     const apiKey = readCredential(db, connection.credential_ref)
     return listTeams(apiKey)
-  })
+  }
 
-  ipcMain.handle('integrations:list-linear-projects', async (_event, connectionId: string, teamId: string) => {
+  const listLinearProjects = async (connectionId: string, teamId: string) => {
     const connection = getConnection(db, connectionId)
     assertConnectionProvider(connection, 'linear')
     const apiKey = readCredential(db, connection.credential_ref)
     return listProjects(apiKey, teamId)
-  })
+  }
 
-  ipcMain.handle('integrations:set-project-mapping', async (_event, input: SetProjectMappingInput) => {
+  const setProjectMapping = async (input: SetProjectMappingInput) => {
     const connection = getConnection(db, input.connectionId)
     assertConnectionProvider(connection, input.provider)
     const otherProvider: IntegrationProvider = input.provider === 'github' ? 'linear' : 'github'
@@ -1415,7 +1410,7 @@ export function registerIntegrationHandlers(
     const mappingId = existing?.id ?? crypto.randomUUID()
     db.transaction(() => {
       clearProjectProviderData(db, input.projectId, otherProvider)
-      setProjectConnection(db, {
+      setProjectConnectionImpl(db, {
         projectId: input.projectId,
         provider: input.provider,
         connectionId: input.connectionId
@@ -1457,17 +1452,17 @@ export function registerIntegrationHandlers(
     }
 
     return db.prepare('SELECT * FROM integration_project_mappings WHERE id = ?').get(mappingId) as IntegrationProjectMapping
-  })
+  }
 
-  ipcMain.handle('integrations:get-project-mapping', (_event, projectId: string, provider: IntegrationProvider) => {
+  const getProjectMapping = (projectId: string, provider: IntegrationProvider) => {
     const row = db.prepare(`
       SELECT * FROM integration_project_mappings
       WHERE project_id = ? AND provider = ?
     `).get(projectId, provider) as IntegrationProjectMapping | undefined
     return row ?? null
-  })
+  }
 
-  ipcMain.handle('integrations:list-github-issues', async (_event, input: ListGithubIssuesInput) => {
+  const listGithubIssues = async (input: ListGithubIssuesInput) => {
     const connection = getConnection(db, input.connectionId)
     assertConnectionProvider(connection, 'github')
     const token = readCredential(db, connection.credential_ref)
@@ -1492,9 +1487,9 @@ export function registerIntegrationHandlers(
     annotateGithubIssueLinks(db, data.issues)
 
     return data
-  })
+  }
 
-  ipcMain.handle('integrations:list-github-repository-issues', async (_event, input: ListGithubRepositoryIssuesInput) => {
+  const listGithubRepositoryIssues = async (input: ListGithubRepositoryIssuesInput) => {
     const connection = getConnection(db, input.connectionId)
     assertConnectionProvider(connection, 'github')
     const repository = parseGitHubRepositoryFullName(input.repositoryFullName)
@@ -1518,9 +1513,9 @@ export function registerIntegrationHandlers(
     annotateGithubIssueLinks(db, data.issues)
 
     return data
-  })
+  }
 
-  ipcMain.handle('integrations:list-linear-issues', async (_event, input: ListLinearIssuesInput) => {
+  const listLinearIssues = async (input: ListLinearIssuesInput) => {
     const connection = getConnection(db, input.connectionId)
     assertConnectionProvider(connection, 'linear')
     const apiKey = readCredential(db, connection.credential_ref)
@@ -1553,9 +1548,9 @@ export function registerIntegrationHandlers(
     }
 
     return data
-  })
+  }
 
-  ipcMain.handle('integrations:import-github-issues', async (_event, input: ImportGithubIssuesInput) => {
+  const importGithubIssues = async (input: ImportGithubIssuesInput) => {
     const connection = getConnection(db, input.connectionId)
     assertConnectionProvider(connection, 'github')
     const mapping = db.prepare(`
@@ -1613,9 +1608,9 @@ export function registerIntegrationHandlers(
       nextCursor: data.nextCursor
     }
     return result
-  })
+  }
 
-  ipcMain.handle('integrations:import-github-repository-issues', async (_event, input: ImportGithubRepositoryIssuesInput) => {
+  const importGithubRepositoryIssues = async (input: ImportGithubRepositoryIssuesInput) => {
     const connection = getConnection(db, input.connectionId)
     assertConnectionProvider(connection, 'github')
 
@@ -1679,9 +1674,9 @@ export function registerIntegrationHandlers(
       nextCursor: data.nextCursor
     }
     return result
-  })
+  }
 
-  ipcMain.handle('integrations:import-linear-issues', async (_event, input: ImportLinearIssuesInput) => {
+  const importLinearIssues = async (input: ImportLinearIssuesInput) => {
     const connection = getConnection(db, input.connectionId)
     assertConnectionProvider(connection, 'linear')
     const mapping = db.prepare(`
@@ -1728,25 +1723,25 @@ export function registerIntegrationHandlers(
     }
 
     return result
-  })
+  }
 
   // --- Generic provider-dispatched handlers ---
 
-  ipcMain.handle('integrations:list-provider-groups', async (_event, connectionId: string) => {
+  const listProviderGroups = async (connectionId: string) => {
     const connection = getConnection(db, connectionId)
     const adapter = getAdapter(connection.provider)
     const credential = readCredential(db, connection.credential_ref)
     return adapter.listGroups(credential)
-  })
+  }
 
-  ipcMain.handle('integrations:list-provider-scopes', async (_event, connectionId: string, groupId: string) => {
+  const listProviderScopes = async (connectionId: string, groupId: string) => {
     const connection = getConnection(db, connectionId)
     const adapter = getAdapter(connection.provider)
     const credential = readCredential(db, connection.credential_ref)
     return adapter.listScopes(credential, groupId)
-  })
+  }
 
-  ipcMain.handle('integrations:list-provider-issues', async (_event, input: ListProviderIssuesInput) => {
+  const listProviderIssues = async (input: ListProviderIssuesInput) => {
     const connection = getConnection(db, input.connectionId)
     const adapter = getAdapter(connection.provider)
     const credential = readCredential(db, connection.credential_ref)
@@ -1785,9 +1780,9 @@ export function registerIntegrationHandlers(
     }
 
     return data
-  })
+  }
 
-  ipcMain.handle('integrations:import-provider-issues', async (_event, input: ImportProviderIssuesInput) => {
+  const importProviderIssues = async (input: ImportProviderIssuesInput) => {
     const connection = getConnection(db, input.connectionId)
     const adapter = getAdapter(connection.provider)
     const credential = readCredential(db, connection.credential_ref)
@@ -1851,9 +1846,9 @@ export function registerIntegrationHandlers(
       skippedAlreadyLinked,
       nextCursor: data.nextCursor
     } satisfies ImportProviderIssuesResult
-  })
+  }
 
-  ipcMain.handle('integrations:get-task-sync-status', async (_event, taskId: string, provider: IntegrationProvider) => {
+  const getTaskSyncStatus = async (taskId: string, provider: IntegrationProvider) => {
     const adapter = getAdapter(provider)
     const link = db.prepare(`
       SELECT * FROM external_links WHERE task_id = ? AND provider = ?
@@ -1873,9 +1868,9 @@ export function registerIntegrationHandlers(
 
     const task = getTaskById(db, taskId)
     return buildTaskSyncStatus(db, adapter, link, task, remoteIssue)
-  })
+  }
 
-  ipcMain.handle('integrations:get-batch-task-sync-status', async (_event, taskIds: string[], provider: IntegrationProvider): Promise<BatchTaskSyncStatusItem[]> => {
+  const getBatchTaskSyncStatus = async (taskIds: string[], provider: IntegrationProvider) : Promise<BatchTaskSyncStatusItem[]> => {
     if (taskIds.length === 0) return []
     const adapter = getAdapter(provider)
     const placeholders = taskIds.map(() => '?').join(',')
@@ -1913,9 +1908,9 @@ export function registerIntegrationHandlers(
     }
 
     return results
-  })
+  }
 
-  ipcMain.handle('integrations:push-task', async (_event, input: PushTaskInput) => {
+  const pushTask = async (input: PushTaskInput) => {
     const adapter = getAdapter(input.provider)
     const link = db.prepare(`
       SELECT * FROM external_links WHERE task_id = ? AND provider = ?
@@ -1967,9 +1962,9 @@ export function registerIntegrationHandlers(
 
     const statusAfter = buildTaskSyncStatus(db, adapter, link, task, updatedIssue)
     return { pushed: true, status: statusAfter, message: `Pushed local changes to ${providerName}` } as PushTaskResult
-  })
+  }
 
-  ipcMain.handle('integrations:pull-task', async (_event, input: PullTaskInput) => {
+  const pullTask = async (input: PullTaskInput) => {
     const adapter = getAdapter(input.provider)
     const link = db.prepare(`
       SELECT * FROM external_links WHERE task_id = ? AND provider = ?
@@ -2036,9 +2031,9 @@ export function registerIntegrationHandlers(
 
     const statusAfter = buildTaskSyncStatus(db, adapter, link, updatedTask, remoteIssue)
     return { pulled: true, status: statusAfter, message: `Pulled remote changes from ${providerName}` } as PullTaskResult
-  })
+  }
 
-  ipcMain.handle('integrations:sync-now', async (_event, input: SyncNowInput) => {
+  const syncNow = async (input: SyncNowInput) => {
     const providers = getRegisteredProviders()
     const results = await Promise.all(
       providers.map((provider) => runProviderSync(db, provider, input))
@@ -2051,17 +2046,17 @@ export function registerIntegrationHandlers(
       errors: results.flatMap((r) => r.errors),
       at: results[0]?.at ?? new Date().toISOString()
     }
-  })
+  }
 
-  ipcMain.handle('integrations:get-link', (_event, taskId: string, provider: IntegrationProvider) => {
+  const getLink = (taskId: string, provider: IntegrationProvider) => {
     const row = db.prepare(`
       SELECT * FROM external_links
       WHERE task_id = ? AND provider = ?
     `).get(taskId, provider) as ExternalLink | undefined
     return row ?? null
-  })
+  }
 
-  ipcMain.handle('integrations:unlink-task', (_event, taskId: string, provider: IntegrationProvider) => {
+  const unlinkTask = (taskId: string, provider: IntegrationProvider) => {
     db.prepare(`
       DELETE FROM external_field_state
       WHERE external_link_id IN (
@@ -2071,9 +2066,9 @@ export function registerIntegrationHandlers(
 
     const res = db.prepare('DELETE FROM external_links WHERE task_id = ? AND provider = ?').run(taskId, provider)
     return res.changes > 0
-  })
+  }
 
-  ipcMain.handle('integrations:push-unlinked-tasks', async (_event, input: PushUnlinkedTasksInput): Promise<PushUnlinkedTasksResult> => {
+  const pushUnlinkedTasks = async (input: PushUnlinkedTasksInput) : Promise<PushUnlinkedTasksResult> => {
     const unlinkedTasks = db.prepare(`
       SELECT t.id, t.project_id FROM tasks t
       WHERE t.project_id = ?
@@ -2101,19 +2096,19 @@ export function registerIntegrationHandlers(
       }
     }
     return { pushed, errors }
-  })
+  }
 
   // --- Status Sync Handlers ---
 
-  ipcMain.handle('integrations:fetch-provider-statuses', async (_event, input: FetchProviderStatusesInput): Promise<ProviderStatus[]> => {
+  const fetchProviderStatuses = async (input: FetchProviderStatusesInput) : Promise<ProviderStatus[]> => {
     const connection = getConnection(db, input.connectionId)
     assertConnectionProvider(connection, input.provider)
     const credential = readCredential(db, connection.credential_ref)
     const adapter = getAdapter(input.provider)
     return adapter.fetchStatuses(credential, input.externalTeamId, input.externalProjectId)
-  })
+  }
 
-  ipcMain.handle('integrations:apply-status-sync', async (_event, input: ApplyStatusSyncInput) => {
+  const applyStatusSync = async (input: ApplyStatusSyncInput) => {
     const mapping = db.prepare(`
       SELECT * FROM integration_project_mappings
       WHERE project_id = ? AND provider = ?
@@ -2179,9 +2174,9 @@ export function registerIntegrationHandlers(
 
     const project = db.prepare('SELECT * FROM projects WHERE id = ?').get(input.projectId)
     return project
-  })
+  }
 
-  ipcMain.handle('integrations:resync-provider-statuses', async (_event, input: { projectId: string; provider: IntegrationProvider }): Promise<StatusResyncPreview> => {
+  const resyncProviderStatuses = async (input: { projectId: string; provider: IntegrationProvider }) : Promise<StatusResyncPreview> => {
     const mapping = db.prepare(`
       SELECT * FROM integration_project_mappings
       WHERE project_id = ? AND provider = ?
@@ -2206,7 +2201,7 @@ export function registerIntegrationHandlers(
     const diff = computeStatusDiff(current, providerStatuses, currentIdMap)
 
     return { current, incoming, diff, providerStatuses }
-  })
+  }
 
   async function pushGithubTask(taskId: string): Promise<void> {
     const adapter = getAdapter('github')
@@ -2245,5 +2240,51 @@ export function registerIntegrationHandlers(
     ).run(link.id)
   }
 
-  return { pushGithubTask }
+  return {
+    connectGithub,
+    connectLinear,
+    connectJira,
+    getJiraTransitions,
+    updateConnection,
+    listConnections,
+    getConnectionUsage,
+    testSeedGithubConnection,
+    testSetGithubRepositories,
+    testSetGithubRepositoryIssues,
+    testClearGithubMocks,
+    disconnect,
+    clearProjectProvider,
+    getProjectConnection,
+    setProjectConnection,
+    clearProjectConnection,
+    listGithubRepositories,
+    listGithubProjects,
+    listLinearTeams,
+    listLinearProjects,
+    setProjectMapping,
+    getProjectMapping,
+    listGithubIssues,
+    listGithubRepositoryIssues,
+    listLinearIssues,
+    importGithubIssues,
+    importGithubRepositoryIssues,
+    importLinearIssues,
+    listProviderGroups,
+    listProviderScopes,
+    listProviderIssues,
+    importProviderIssues,
+    getTaskSyncStatus,
+    getBatchTaskSyncStatus,
+    pushTask,
+    pullTask,
+    syncNow,
+    getLink,
+    unlinkTask,
+    pushUnlinkedTasks,
+    fetchProviderStatuses,
+    applyStatusSync,
+    resyncProviderStatuses,
+    pushGithubTask
+  }
 }
+

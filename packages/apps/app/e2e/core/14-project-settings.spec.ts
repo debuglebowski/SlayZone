@@ -1,4 +1,5 @@
 import { test, expect, seed, goHome, clickProject, projectBlob, openProjectSettings, resetApp} from '../fixtures/electron'
+import { getTrpcVanillaClient } from '@slayzone/transport/client'
 import { TEST_PROJECT_PATH } from '../fixtures/electron'
 import type { Page, Locator } from '@playwright/test'
 
@@ -116,8 +117,8 @@ test.describe('Project settings & context menu', () => {
     // (deleteTask blocks if external_links exist).
     await mainWindow.evaluate(
       async (pid) => {
-        await window.api.integrations.clearProjectProvider({ projectId: pid, provider: 'linear' }).catch(() => {})
-        await window.api.integrations.clearProjectProvider({ projectId: pid, provider: 'github' }).catch(() => {})
+        await getTrpcVanillaClient().integrations.clearProjectProvider.mutate({ projectId: pid, provider: 'linear' }).catch(() => {})
+        await getTrpcVanillaClient().integrations.clearProjectProvider.mutate({ projectId: pid, provider: 'github' }).catch(() => {})
         const tasks = await window.api.db.getTasksByProject(pid) as Array<{ id: string }>
         for (const task of tasks) await window.api.db.deleteTask(task.id)
       },
@@ -142,7 +143,7 @@ test.describe('Project settings & context menu', () => {
       issues: GITHUB_REPOSITORY_ISSUES
     })
     await mainWindow.evaluate(
-      ({ pid, cid }) => window.api.integrations.setProjectMapping({
+      ({ pid, cid }) => getTrpcVanillaClient().integrations.setProjectMapping.mutate({
         projectId: pid,
         provider: 'github',
         connectionId: cid,
@@ -154,7 +155,7 @@ test.describe('Project settings & context menu', () => {
       { pid: projectId, cid: GITHUB_REPO_CONNECTION_ID }
     )
     await mainWindow.evaluate(
-      ({ pid, statuses }) => window.api.integrations.applyStatusSync({
+      ({ pid, statuses }) => getTrpcVanillaClient().integrations.applyStatusSync.mutate({
         projectId: pid,
         provider: 'github',
         statuses
@@ -162,7 +163,7 @@ test.describe('Project settings & context menu', () => {
       { pid: projectId, statuses: GITHUB_STATUS_OPTIONS }
     )
     const githubConnections = await mainWindow.evaluate(
-      () => window.api.integrations.listConnections('github')
+      () => getTrpcVanillaClient().integrations.listConnections.query('github')
     ) as Array<{ id: string }>
     for (const connection of githubConnections) {
       await testInvoke(mainWindow, 'integrations:test:set-github-repositories', {
@@ -314,7 +315,7 @@ test.describe('Project settings & context menu', () => {
   test('linked GitHub repository issue row shows Linked and is not selectable', async ({ mainWindow }) => {
     await seedGithubRepoMocks(mainWindow)
     await mainWindow.evaluate(
-      ({ pid, cid, repo }) => window.api.integrations.importGithubRepositoryIssues({
+      ({ pid, cid, repo }) => getTrpcVanillaClient().integrations.importGithubRepositoryIssues.mutate({
         projectId: pid,
         connectionId: cid,
         repositoryFullName: repo,
@@ -352,7 +353,7 @@ test.describe('Project settings & context menu', () => {
   test('GitHub bulk sync controls check diffs and run push/pull', async ({ mainWindow }) => {
     await seedGithubRepoMocks(mainWindow)
     await mainWindow.evaluate(
-      ({ pid, cid, repo }) => window.api.integrations.importGithubRepositoryIssues({
+      ({ pid, cid, repo }) => getTrpcVanillaClient().integrations.importGithubRepositoryIssues.mutate({
         projectId: pid,
         connectionId: cid,
         repositoryFullName: repo,
@@ -418,7 +419,7 @@ test.describe('Project settings & context menu', () => {
   test('GitHub repo import skips issues linked to another project', async ({ mainWindow }) => {
     await seedGithubRepoMocks(mainWindow)
     await mainWindow.evaluate(
-      ({ pid, cid, repo }) => window.api.integrations.importGithubRepositoryIssues({
+      ({ pid, cid, repo }) => getTrpcVanillaClient().integrations.importGithubRepositoryIssues.mutate({
         projectId: pid,
         connectionId: cid,
         repositoryFullName: repo,
@@ -435,7 +436,7 @@ test.describe('Project settings & context menu', () => {
     }) as { id: string }
 
     const result = await mainWindow.evaluate(
-      ({ pid, cid, repo }) => window.api.integrations.importGithubRepositoryIssues({
+      ({ pid, cid, repo }) => getTrpcVanillaClient().integrations.importGithubRepositoryIssues.mutate({
         projectId: pid,
         connectionId: cid,
         repositoryFullName: repo,

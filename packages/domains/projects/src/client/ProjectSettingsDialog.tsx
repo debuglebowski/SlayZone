@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
+import { getTrpcVanillaClient } from '@slayzone/transport/client'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@slayzone/ui'
 import { SettingsLayout } from '@slayzone/ui'
 import type { Project } from '@slayzone/projects/shared'
@@ -54,8 +55,8 @@ export function ProjectSettingsDialog({
     }
     try {
       const [linear, github] = await Promise.all([
-        window.api.integrations.getProjectMapping(project.id, 'linear'),
-        window.api.integrations.getProjectMapping(project.id, 'github')
+        getTrpcVanillaClient().integrations.getProjectMapping.query({ projectId: project.id, provider: 'linear' }),
+        getTrpcVanillaClient().integrations.getProjectMapping.query({ projectId: project.id, provider: 'github' })
       ])
       if (linear?.status_setup_complete) setLockedByProvider('Linear')
       else if (github?.status_setup_complete) setLockedByProvider('GitHub')

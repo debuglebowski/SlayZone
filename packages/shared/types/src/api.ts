@@ -1,4 +1,4 @@
-import type { Project, ExecutionContext } from '@slayzone/projects/shared'
+import type { ExecutionContext } from '@slayzone/projects/shared'
 import type { DesktopHandoffPolicy } from '@slayzone/task/shared'
 import type {
   TerminalMode,
@@ -44,58 +44,6 @@ export interface ChatSessionInfo {
   /** Resolved reasoning effort this session was spawned with. `null` = inherit. */
   chatEffort?: 'low' | 'medium' | 'high' | 'xhigh' | 'max' | null
 }
-import type {
-  ConnectGithubInput,
-  ConnectLinearInput,
-  UpdateIntegrationConnectionInput,
-  ClearProjectProviderInput,
-  ClearProjectConnectionInput,
-  ExternalLink,
-  GithubIssueSummary,
-  GithubProjectSummary,
-  GithubRepositorySummary,
-  ImportGithubRepositoryIssuesInput,
-  ImportGithubRepositoryIssuesResult,
-  ImportGithubIssuesInput,
-  ImportGithubIssuesResult,
-  ImportLinearIssuesInput,
-  ImportLinearIssuesResult,
-  IntegrationConnectionPublic,
-  IntegrationConnectionUsage,
-  IntegrationProjectMapping,
-  IntegrationProvider,
-  ListGithubRepositoryIssuesInput,
-  ListGithubIssuesInput,
-  ListLinearIssuesInput,
-  LinearIssueSummary,
-  LinearProject,
-  LinearTeam,
-  PullTaskInput,
-  PullTaskResult,
-  PushTaskInput,
-  PushTaskResult,
-  SetProjectMappingInput,
-  SetProjectConnectionInput,
-  SyncNowInput,
-  SyncNowResult,
-  TaskSyncStatus,
-  FetchProviderStatusesInput,
-  ApplyStatusSyncInput,
-  ProviderStatus,
-  StatusResyncPreview,
-  PushUnlinkedTasksInput,
-  PushUnlinkedTasksResult,
-  BatchTaskSyncStatusItem,
-  ListProviderIssuesInput,
-  ImportProviderIssuesInput,
-  ImportProviderIssuesResult,
-  NormalizedIssue,
-  ExternalGroup,
-  ExternalScope,
-  ConnectJiraInput,
-  JiraTransition
-} from '@slayzone/integrations/shared'
-
 export type { ExecutionContext } from '@slayzone/projects/shared'
 
 export type BrowserCreateTaskFromLinkSource = 'modified-link-click' | 'link-context-menu'
@@ -659,58 +607,6 @@ export interface ElectronAPI {
       type: string
       [key: string]: unknown
     }) => void) => () => void
-  }
-  integrations: {
-    connectGithub: (input: ConnectGithubInput) => Promise<IntegrationConnectionPublic>
-    connectLinear: (input: ConnectLinearInput) => Promise<IntegrationConnectionPublic>
-    connectJira: (input: ConnectJiraInput) => Promise<IntegrationConnectionPublic>
-    getJiraTransitions: (taskId: string) => Promise<JiraTransition[]>
-    updateConnection: (input: UpdateIntegrationConnectionInput) => Promise<IntegrationConnectionPublic>
-    listConnections: (provider?: IntegrationProvider) => Promise<IntegrationConnectionPublic[]>
-    getConnectionUsage: (connectionId: string) => Promise<IntegrationConnectionUsage>
-    disconnect: (connectionId: string) => Promise<boolean>
-    clearProjectProvider: (input: ClearProjectProviderInput) => Promise<boolean>
-    getProjectConnection: (projectId: string, provider: IntegrationProvider) => Promise<string | null>
-    setProjectConnection: (input: SetProjectConnectionInput) => Promise<boolean>
-    clearProjectConnection: (input: ClearProjectConnectionInput) => Promise<boolean>
-    listGithubRepositories: (connectionId: string) => Promise<GithubRepositorySummary[]>
-    listGithubProjects: (connectionId: string) => Promise<GithubProjectSummary[]>
-    listGithubIssues: (
-      input: ListGithubIssuesInput
-    ) => Promise<{ issues: GithubIssueSummary[]; nextCursor: string | null }>
-    importGithubIssues: (input: ImportGithubIssuesInput) => Promise<ImportGithubIssuesResult>
-    listGithubRepositoryIssues: (
-      input: ListGithubRepositoryIssuesInput
-    ) => Promise<{ issues: GithubIssueSummary[]; nextCursor: string | null }>
-    importGithubRepositoryIssues: (
-      input: ImportGithubRepositoryIssuesInput
-    ) => Promise<ImportGithubRepositoryIssuesResult>
-    listLinearTeams: (connectionId: string) => Promise<{ teams: LinearTeam[]; orgUrlKey: string }>
-    listLinearProjects: (connectionId: string, teamId: string) => Promise<LinearProject[]>
-    listLinearIssues: (
-      input: ListLinearIssuesInput
-    ) => Promise<{ issues: LinearIssueSummary[]; nextCursor: string | null }>
-    setProjectMapping: (input: SetProjectMappingInput) => Promise<IntegrationProjectMapping>
-    getProjectMapping: (projectId: string, provider: IntegrationProvider) => Promise<IntegrationProjectMapping | null>
-    importLinearIssues: (input: ImportLinearIssuesInput) => Promise<ImportLinearIssuesResult>
-    syncNow: (input: SyncNowInput) => Promise<SyncNowResult>
-    getTaskSyncStatus: (taskId: string, provider: IntegrationProvider) => Promise<TaskSyncStatus>
-    getBatchTaskSyncStatus: (taskIds: string[], provider: IntegrationProvider) => Promise<BatchTaskSyncStatusItem[]>
-    pushTask: (input: PushTaskInput) => Promise<PushTaskResult>
-    pullTask: (input: PullTaskInput) => Promise<PullTaskResult>
-    getLink: (taskId: string, provider: IntegrationProvider) => Promise<ExternalLink | null>
-    unlinkTask: (taskId: string, provider: IntegrationProvider) => Promise<boolean>
-    pushUnlinkedTasks: (input: PushUnlinkedTasksInput) => Promise<PushUnlinkedTasksResult>
-    fetchProviderStatuses: (input: FetchProviderStatusesInput) => Promise<ProviderStatus[]>
-    applyStatusSync: (input: ApplyStatusSyncInput) => Promise<Project>
-    resyncProviderStatuses: (input: { projectId: string; provider: IntegrationProvider }) => Promise<StatusResyncPreview>
-    // Generic provider-dispatched methods
-    listProviderGroups: (connectionId: string) => Promise<ExternalGroup[]>
-    listProviderScopes: (connectionId: string, groupId: string) => Promise<ExternalScope[]>
-    listProviderIssues: (
-      input: ListProviderIssuesInput
-    ) => Promise<{ issues: NormalizedIssue[]; nextCursor: string | null }>
-    importProviderIssues: (input: ImportProviderIssuesInput) => Promise<ImportProviderIssuesResult>
   }
   exportImport: {
     exportAll: () => Promise<{ success: boolean; canceled?: boolean; path?: string; error?: string }>
