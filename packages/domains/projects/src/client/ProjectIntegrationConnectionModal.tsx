@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { getTrpcVanillaClient } from '@slayzone/transport/client'
 import type { IntegrationProvider } from '@slayzone/integrations/shared'
 import {
   Button,
@@ -113,19 +114,19 @@ export function ProjectIntegrationConnectionModal({
       if (mode === 'connect') {
         let nextConnection
         if (provider === 'github') {
-          nextConnection = await window.api.integrations.connectGithub({ token: credential.trim(), projectId })
+          nextConnection = await getTrpcVanillaClient().integrations.connectGithub.mutate({ token: credential.trim(), projectId })
         } else if (provider === 'jira') {
-          nextConnection = await window.api.integrations.connectJira({
+          nextConnection = await getTrpcVanillaClient().integrations.connectJira.mutate({
             cloudDomain: jiraDomain.trim(),
             email: jiraEmail.trim(),
             apiToken: credential.trim(),
             projectId
           })
         } else {
-          nextConnection = await window.api.integrations.connectLinear({ apiKey: credential.trim(), projectId })
+          nextConnection = await getTrpcVanillaClient().integrations.connectLinear.mutate({ apiKey: credential.trim(), projectId })
         }
 
-        await window.api.integrations.setProjectConnection({
+        await getTrpcVanillaClient().integrations.setProjectConnection.mutate({
           projectId,
           provider,
           connectionId: nextConnection.id
@@ -134,7 +135,7 @@ export function ProjectIntegrationConnectionModal({
         if (!connectionId) {
           throw new Error('No connection to edit')
         }
-        await window.api.integrations.updateConnection({
+        await getTrpcVanillaClient().integrations.updateConnection.mutate({
           connectionId,
           credential: credential.trim()
         })

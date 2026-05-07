@@ -610,8 +610,8 @@ export function ExternalSyncCard({ taskId, onUpdate }: ExternalSyncCardProps) {
     void (async () => {
       try {
         const [linearLink, githubLink] = await Promise.all([
-          window.api.integrations.getLink(taskId, 'linear'),
-          window.api.integrations.getLink(taskId, 'github')
+          getTrpcVanillaClient().integrations.getLink.query({ taskId, provider: 'linear' }),
+          getTrpcVanillaClient().integrations.getLink.query({ taskId, provider: 'github' })
         ])
 
         const loadedLinks = [linearLink, githubLink].filter((link): link is ExternalLink => Boolean(link))
@@ -625,7 +625,7 @@ export function ExternalSyncCard({ taskId, onUpdate }: ExternalSyncCardProps) {
 
         const statusEntries = await Promise.all(loadedLinks.map(async (link) => {
           try {
-            const status = await window.api.integrations.getTaskSyncStatus(taskId, link.provider)
+            const status = await getTrpcVanillaClient().integrations.getTaskSyncStatus.query({ taskId, provider: link.provider })
             return [link.id, status] as const
           } catch {
             return [link.id, toUnknownSyncStatus(link, taskId)] as const
@@ -647,7 +647,7 @@ export function ExternalSyncCard({ taskId, onUpdate }: ExternalSyncCardProps) {
 
   const refreshLinkSyncStatus = async (link: ExternalLink) => {
     try {
-      const status = await window.api.integrations.getTaskSyncStatus(taskId, link.provider)
+      const status = await getTrpcVanillaClient().integrations.getTaskSyncStatus.query({ taskId, provider: link.provider })
       setSyncStatusByLinkId((current) => ({ ...current, [link.id]: status }))
     } catch {
       setSyncStatusByLinkId((current) => ({ ...current, [link.id]: toUnknownSyncStatus(link, taskId) }))
@@ -683,7 +683,7 @@ export function ExternalSyncCard({ taskId, onUpdate }: ExternalSyncCardProps) {
     setLinkLoading(link.id, 'pull')
     try {
       if (link.provider === 'linear') {
-        const result = await window.api.integrations.syncNow({ taskId })
+        const result = await getTrpcVanillaClient().integrations.syncNow.mutate({ taskId })
         const errSuffix = result.errors.length > 0 ? ` (${result.errors.length} errors)` : ''
         const message = `${PROVIDER_LABELS[link.provider]} synced: ${result.pulled} pulled, ${result.pushed} pushed${errSuffix}`
         if (result.errors.length > 0) toast.error(message)
@@ -693,7 +693,7 @@ export function ExternalSyncCard({ taskId, onUpdate }: ExternalSyncCardProps) {
         return
       }
 
-      const result = await window.api.integrations.pullTask({
+      const result = await getTrpcVanillaClient().integrations.pullTask.mutate({
         taskId,
         provider: 'github'
       })
@@ -716,7 +716,7 @@ export function ExternalSyncCard({ taskId, onUpdate }: ExternalSyncCardProps) {
     setLinkLoading(link.id, 'push')
     try {
       if (link.provider === 'linear') {
-        const result = await window.api.integrations.syncNow({ taskId })
+        const result = await getTrpcVanillaClient().integrations.syncNow.mutate({ taskId })
         const errSuffix = result.errors.length > 0 ? ` (${result.errors.length} errors)` : ''
         const message = `${PROVIDER_LABELS[link.provider]} synced: ${result.pulled} pulled, ${result.pushed} pushed${errSuffix}`
         if (result.pushed > 0) toast.success(message)
@@ -729,7 +729,7 @@ export function ExternalSyncCard({ taskId, onUpdate }: ExternalSyncCardProps) {
         return
       }
 
-      const result = await window.api.integrations.pushTask({
+      const result = await getTrpcVanillaClient().integrations.pushTask.mutate({
         taskId,
         provider: 'github'
       })
