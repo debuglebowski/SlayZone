@@ -486,8 +486,7 @@ export function buildExportImportOps(db: Database, isTest = false) {
           return { success: false, error: `Unsupported export version: ${bundle.meta?.version}` }
         }
         const result = importBundle(db, bundle)
-        const mainWin = BrowserWindow.getAllWindows()[0]
-        if (mainWin) mainWin.webContents.send('tasks:changed')
+        notifyEvents.emit('tasks-changed')
         return result
       } catch (e) {
         return { success: false, error: String(e) }
