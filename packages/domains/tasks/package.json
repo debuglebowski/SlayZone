@@ -27,7 +27,8 @@
     "date-fns": "^4.1.0",
     "framer-motion": "^12.29.0",
     "lucide-react": "^0.562.0",
-    "react-hotkeys-hook": "^5.2.3"
+    "react-hotkeys-hook": "^5.2.3",
+    "zustand": "^5.0.0"
   },
   "peerDependencies": {
     "react": "^19.0.0"
