@@ -135,6 +135,7 @@ export interface ElectronAPI {
     isJiraIntegrationEnabledSync: boolean
     isLoopModeEnabledSync: boolean
     isPlaywright: boolean
+    windowId: number
     onGoHome: (callback: () => void) => () => void
     onToggleAgentPanel: (callback: () => void) => () => void
     onToggleAgentStatusPanel: (callback: () => void) => () => void
@@ -158,26 +159,6 @@ export interface ElectronAPI {
     onCloseActiveTask: (callback: () => void) => () => void
     dataReady: () => void
     bootMark: (label: string) => void
-  }
-  taskWindow: {
-    open: (taskId: string) => Promise<{ ok: boolean; focused?: boolean }>
-    close: (taskId: string) => Promise<{ ok: boolean; closed: number }>
-    list: () => Promise<string[]>
-    onListChanged: (callback: (taskIds: string[]) => void) => () => void
-    setPrimaryActive: (taskId: string | null) => Promise<{ ok: boolean }>
-    getPrimaryActive: () => Promise<string | null>
-    onPrimaryActiveChanged: (callback: (taskId: string | null) => void) => () => void
-  }
-  panels: {
-    claim: (taskId: string, panelId: string) => Promise<{ ok: boolean; unchanged?: boolean }>
-    claimAndCloseOther: (taskId: string, panelId: string) => Promise<{ ok: boolean }>
-    release: (taskId: string, panelId: string) => Promise<{ ok: boolean; unchanged?: boolean; reason?: string }>
-    releaseAllForTask: (taskId: string) => Promise<{ ok: boolean; released: number }>
-    getOwnership: (taskId: string) => Promise<Array<{ panelId: string; ownerWindowId: number }>>
-    getWindowId: () => Promise<number>
-    onOwnershipChanged: (callback: (payload: { taskId: string; ownership: Array<{ panelId: string; ownerWindowId: number }> }) => void) => () => void
-    onReleasedOnClose: (callback: (payload: { closedWindowId: number; released: Array<{ taskId: string; panelId: string }> }) => void) => () => void
-    onCloseRequest: (callback: (payload: { taskId: string; panelId: string }) => void) => () => void
   }
   window: {
     close: () => Promise<void>
@@ -220,7 +201,6 @@ export interface ElectronAPI {
     validate: (mode: TerminalMode) => Promise<ValidationResult[]>
     setTheme: (theme: { foreground: string; background: string; cursor: string; ansi?: readonly string[] }) => Promise<void>
     setShellOverride: (value: string | null) => Promise<void>
-    claimSession: (sessionId: string) => Promise<{ ok: boolean }>
   }
   session: {
     list: () => Promise<SessionInfo[]>

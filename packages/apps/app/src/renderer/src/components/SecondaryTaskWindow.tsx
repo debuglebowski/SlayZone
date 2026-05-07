@@ -29,13 +29,14 @@ export function SecondaryTaskWindow({ taskId: initialTaskId }: Props) {
   useEffect(() => {
     if (!followPrimary) return
     let alive = true
-    window.api.taskWindow.getPrimaryActive().then((id) => {
-      if (alive && id && id !== taskId) setTaskId(id)
+    getTrpcVanillaClient().app.taskWindows.getPrimaryActive.query().then((id) => {
+      const tid = id as string | null
+      if (alive && tid && tid !== taskId) setTaskId(tid)
     })
-    const unsub = window.api.taskWindow.onPrimaryActiveChanged((id) => {
-      if (id) setTaskId(id)
+    const sub = getTrpcVanillaClient().app.taskWindows.onPrimaryActiveChanged.subscribe(undefined, {
+      onData: (id) => { if (id) setTaskId(id as string) },
     })
-    return () => { alive = false; unsub() }
+    return () => { alive = false; sub.unsubscribe() }
   }, [followPrimary]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const loadTask = useCallback(async () => {
@@ -135,7 +136,7 @@ export function SecondaryTaskWindow({ taskId: initialTaskId }: Props) {
                   await getTrpcVanillaClient().task.delete.mutate({ id: id })
                   handleClose()
                 }}
-                onNavigateToTask={(id) => { window.api.taskWindow.open(id) }}
+                onNavigateToTask={(id) => { getTrpcVanillaClient().app.taskWindows.open.mutate({ taskId: id }) }}
                 onCloseTab={handleClose}
                 initialData={initialDataForPage}
                 isSidePanelResizing={false}

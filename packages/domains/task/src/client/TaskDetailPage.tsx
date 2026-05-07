@@ -443,7 +443,7 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
   useEffect(() => {
     if (!isSecondaryWindow || !task?.id) return
     const releasingTaskId = task.id
-    return () => { void window.api.panels.releaseAllForTask(releasingTaskId) }
+    return () => { void getTrpcVanillaClient().app.taskWindows.releaseAllForTask.mutate({ taskId: releasingTaskId }) }
   }, [isSecondaryWindow, task?.id])
 
   // Panel ownership across windows (multi-window support)
@@ -453,9 +453,11 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
   const [openTaskWindowIds, setOpenTaskWindowIds] = useState<string[]>([])
   useEffect(() => {
     let alive = true
-    window.api.taskWindow.list().then((ids) => { if (alive) setOpenTaskWindowIds(ids) })
-    const unsub = window.api.taskWindow.onListChanged((ids) => setOpenTaskWindowIds(ids))
-    return () => { alive = false; unsub() }
+    getTrpcVanillaClient().app.taskWindows.list.query().then((ids) => { if (alive) setOpenTaskWindowIds(ids as string[]) })
+    const sub = getTrpcVanillaClient().app.taskWindows.onListChanged.subscribe(undefined, {
+      onData: (ids) => setOpenTaskWindowIds(ids as string[]),
+    })
+    return () => { alive = false; sub.unsubscribe() }
   }, [])
   const hasOpenSecondary = !!task && openTaskWindowIds.includes(task.id)
 
@@ -521,10 +523,13 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
 
   // "Take over and close" from another window: flip local visibility false (no DB write)
   useEffect(() => {
-    return window.api.panels.onCloseRequest((payload) => {
-      if (!task || payload.taskId !== task.id) return
-      setPanelVisibility((prev) => prev[payload.panelId] ? { ...prev, [payload.panelId]: false } : prev)
+    const sub = getTrpcVanillaClient().app.taskWindows.onPanelCloseRequest.subscribe(undefined, {
+      onData: (payload) => {
+        if (!task || payload.taskId !== task.id) return
+        setPanelVisibility((prev) => prev[payload.panelId] ? { ...prev, [payload.panelId]: false } : prev)
+      },
     })
+    return () => sub.unsubscribe()
   }, [task?.id])
 
   // Panel sizes for resizable panels
@@ -1956,7 +1961,7 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
                   aria-label={isSecondaryWindow ? 'Reattach task' : 'Detach task to new window'}
                   onClick={() => {
                     if (isSecondaryWindow) window.api.window.close()
-                    else window.api.taskWindow.open(task.id)
+                    else getTrpcVanillaClient().app.taskWindows.open.mutate({ taskId: task.id })
                   }}
                   className="shrink-0 flex items-center gap-1.5 rounded-full bg-muted/50 hover:bg-muted px-2.5 py-1 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
                 >

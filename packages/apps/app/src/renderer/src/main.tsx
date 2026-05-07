@@ -78,7 +78,10 @@ if (isFloatingAgent) {
       if (tab.type === 'task') taskDetailCache.prefetch('taskDetail', tab.taskId)
     }
 
-    const trpcUrl = `ws://127.0.0.1:${trpcPort}/trpc`
+    // Pass per-window id so server can scope panel ownership + primary-active
+    // state. windowId is generated once per preload load (stable per window).
+    const wid = window.api.app.windowId ?? ''
+    const trpcUrl = `ws://127.0.0.1:${trpcPort}/trpc${wid ? `?windowId=${wid}` : ''}`
     performance.mark('sz:reactMount')
     window.api.app.bootMark?.('reactMount')
     createRoot(document.getElementById('root')!).render(

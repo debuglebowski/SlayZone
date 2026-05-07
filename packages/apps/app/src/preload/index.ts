@@ -38,6 +38,10 @@ const api: ElectronAPI = {
     isJiraIntegrationEnabledSync: ipcRenderer.sendSync('app:is-jira-integration-enabled-sync') as boolean,
     isLoopModeEnabledSync: ipcRenderer.sendSync('app:is-loop-mode-enabled-sync') as boolean,
     isPlaywright: process.env.PLAYWRIGHT === '1',
+    // Stable per-window id obtained via sync IPC at preload load. Each Electron
+    // BrowserWindow has its own preload context, so this id is unique to the
+    // window and survives page reloads (same webContents.id).
+    windowId: ipcRenderer.sendSync('preload:get-window-id') as number,
     onGoHome: (callback: () => void) => {
       const handler = () => callback()
       ipcRenderer.on('app:go-home', handler)
@@ -155,46 +159,6 @@ const api: ElectronAPI = {
       ? (label: string) => ipcRenderer.send('boot:mark', label)
       : () => {},
   },
-  taskWindow: {
-    open: (taskId: string) => ipcRenderer.invoke('task-window:open', taskId),
-    close: (taskId: string) => ipcRenderer.invoke('task-window:close', taskId),
-    list: () => ipcRenderer.invoke('task-window:list'),
-    onListChanged: (callback: (taskIds: string[]) => void) => {
-      const handler = (_: unknown, ids: string[]) => callback(ids)
-      ipcRenderer.on('task-window:list-changed', handler)
-      return () => ipcRenderer.removeListener('task-window:list-changed', handler)
-    },
-    setPrimaryActive: (taskId: string | null) => ipcRenderer.invoke('task-window:set-primary-active', taskId),
-    getPrimaryActive: () => ipcRenderer.invoke('task-window:get-primary-active'),
-    onPrimaryActiveChanged: (callback: (taskId: string | null) => void) => {
-      const handler = (_: unknown, id: string | null) => callback(id)
-      ipcRenderer.on('task-window:primary-active-changed', handler)
-      return () => ipcRenderer.removeListener('task-window:primary-active-changed', handler)
-    }
-  },
-  panels: {
-    claim: (taskId: string, panelId: string) => ipcRenderer.invoke('panels:claim', taskId, panelId),
-    claimAndCloseOther: (taskId: string, panelId: string) => ipcRenderer.invoke('panels:claim-and-close-other', taskId, panelId),
-    release: (taskId: string, panelId: string) => ipcRenderer.invoke('panels:release', taskId, panelId),
-    releaseAllForTask: (taskId: string) => ipcRenderer.invoke('panels:release-all-for-task', taskId),
-    getOwnership: (taskId: string) => ipcRenderer.invoke('panels:get-ownership', taskId),
-    getWindowId: () => ipcRenderer.invoke('panels:get-window-id'),
-    onOwnershipChanged: (callback: (payload: { taskId: string; ownership: Array<{ panelId: string; ownerWindowId: number }> }) => void) => {
-      const handler = (_: unknown, payload: { taskId: string; ownership: Array<{ panelId: string; ownerWindowId: number }> }) => callback(payload)
-      ipcRenderer.on('panels:ownership-changed', handler)
-      return () => ipcRenderer.removeListener('panels:ownership-changed', handler)
-    },
-    onReleasedOnClose: (callback: (payload: { closedWindowId: number; released: Array<{ taskId: string; panelId: string }> }) => void) => {
-      const handler = (_: unknown, payload: { closedWindowId: number; released: Array<{ taskId: string; panelId: string }> }) => callback(payload)
-      ipcRenderer.on('panels:released-on-close', handler)
-      return () => ipcRenderer.removeListener('panels:released-on-close', handler)
-    },
-    onCloseRequest: (callback: (payload: { taskId: string; panelId: string }) => void) => {
-      const handler = (_: unknown, payload: { taskId: string; panelId: string }) => callback(payload)
-      ipcRenderer.on('panels:close-request', handler)
-      return () => ipcRenderer.removeListener('panels:close-request', handler)
-    }
-  },
   window: {
     close: () => ipcRenderer.invoke('window:close')
   },
@@ -218,7 +182,6 @@ const api: ElectronAPI = {
     submit: (sessionId, text) => ipcRenderer.invoke('pty:submit', sessionId, text),
     setTheme: (theme) => ipcRenderer.invoke('pty:set-theme', theme),
     setShellOverride: (value) => ipcRenderer.invoke('pty:setShellOverride', value),
-    claimSession: (sessionId: string) => ipcRenderer.invoke('pty:claim-session', sessionId),
     resize: (sessionId, cols, rows) => ipcRenderer.invoke('pty:resize', sessionId, cols, rows),
     kill: (sessionId) => ipcRenderer.invoke('pty:kill', sessionId),
     exists: (sessionId) => ipcRenderer.invoke('pty:exists', sessionId),

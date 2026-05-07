@@ -123,7 +123,7 @@ import { setDatabase } from '@slayzone/terminal/electron'
 import { onTaskReachedTerminal, setOnTaskReachedTerminalHandler, syncTerminalModes } from '@slayzone/terminal/server'
 import { setProviderLastKilledAt, type ProviderConfig } from '@slayzone/task/shared'
 import { attachFloatingAgent, setupFloatingAgent, floatingAgentOps, floatingAgentEvents } from './floating-agent'
-import { attachTaskWindows, setupTaskWindows } from './task-windows'
+import { attachTaskWindows, setupTaskWindows, taskWindowsOps, taskWindowsEvents } from './task-windows'
 import { closeGitWatcher } from '@slayzone/worktrees/server'
 import { initChatTurnSubscriber, initPtyTurnSubscriber } from '@slayzone/agent-turns/server'
 import { registerDiagnosticsHandlers, registerProcessDiagnostics, recordDiagnosticEvent, stopDiagnostics, setIpcSuccessHook } from '@slayzone/diagnostics/electron'
@@ -1521,6 +1521,10 @@ app.whenReady().then(async () => {
       ...floatingAgentOps,
       events: floatingAgentEvents,
     },
+    taskWindows: {
+      ...taskWindowsOps,
+      events: taskWindowsEvents,
+    },
     webview: {
       registerBrowserTab,
       unregisterBrowserTab,
@@ -1881,6 +1885,7 @@ div{text-align:center}h1{font-size:14px;font-weight:500;color:#aaa}p{font-size:1
       check()
     })
   })
+  ipcMain.on('preload:get-window-id', (event) => { event.returnValue = event.sender.id })
   ipcMain.on('app:is-tests-panel-enabled-sync', (event) => { event.returnValue = isLabEnabled('labs_tests_panel') })
   ipcMain.on('app:is-jira-integration-enabled-sync', (event) => { event.returnValue = isLabEnabled('labs_jira_integration') })
   ipcMain.on('app:is-loop-mode-enabled-sync', (event) => { event.returnValue = isLabEnabled('labs_loop_mode') })

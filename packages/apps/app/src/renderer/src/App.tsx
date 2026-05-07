@@ -467,7 +467,7 @@ function App(): React.JSX.Element {
   // Broadcast primary's active task ID so secondary windows in "Follow current tab" mode swap
   useEffect(() => {
     const id = activeTab?.type === 'task' ? activeTab.taskId : null
-    void window.api.taskWindow.setPrimaryActive(id)
+    void getTrpcVanillaClient().app.taskWindows.setPrimaryActive.mutate({ taskId: id })
   }, [activeTab])
   useEffect(() => {
     if (activeTaskProjectId && activeTaskProjectId !== selectedProjectId) setSelectedProjectId(activeTaskProjectId)

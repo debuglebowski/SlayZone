@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import { Terminal } from '@slayzone/terminal/client/LazyTerminal'
+import { getTrpcVanillaClient } from '@slayzone/transport/client'
 import {
   useTerminalModes,
   getVisibleModes,
@@ -72,8 +73,8 @@ export function AgentSidePanel({
   // the previously-bound window. Claim redirects the session + replays buffer here.
   useEffect(() => {
     if (!isActive || !sessionId) return
-    window.api.pty.claimSession(sessionId)
-    const onFocus = () => { window.api.pty.claimSession(sessionId) }
+    getTrpcVanillaClient().app.taskWindows.claimSession.mutate({ sessionId })
+    const onFocus = () => { getTrpcVanillaClient().app.taskWindows.claimSession.mutate({ sessionId }) }
     window.addEventListener('focus', onFocus)
     return () => window.removeEventListener('focus', onFocus)
   }, [isActive, sessionId])

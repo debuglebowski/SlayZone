@@ -203,7 +203,7 @@ export const TerminalContainer = forwardRef<TerminalContainerHandle, TerminalCon
     const claimAll = () => {
       for (const tab of tabs) {
         const sid = getSessionId(tab.id)
-        if (sid) void window.api.pty.claimSession(sid)
+        if (sid) void getTrpcVanillaClient().app.taskWindows.claimSession.mutate({ sessionId: sid })
       }
     }
     claimAll()

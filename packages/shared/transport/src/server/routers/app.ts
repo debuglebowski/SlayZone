@@ -327,6 +327,93 @@ export const appLevelRouter = router({
     })),
   }),
 
+  // Task windows + panel ownership (uses ctx.windowId)
+  taskWindows: router({
+    open: publicProcedure.input(z.object({ taskId: z.string() })).mutation(({ input }) =>
+      getAppDeps().taskWindows.open(input.taskId),
+    ),
+    close: publicProcedure.input(z.object({ taskId: z.string() })).mutation(({ input }) =>
+      getAppDeps().taskWindows.close(input.taskId),
+    ),
+    list: publicProcedure.query(() => getAppDeps().taskWindows.list()),
+    setPrimaryActive: publicProcedure
+      .input(z.object({ taskId: z.string().nullable() }))
+      .mutation(({ ctx, input }) => getAppDeps().taskWindows.setPrimaryActive(input.taskId, ctx.windowId ?? null)),
+    getPrimaryActive: publicProcedure.query(() => getAppDeps().taskWindows.getPrimaryActive()),
+    claimPanel: publicProcedure
+      .input(z.object({ taskId: z.string(), panelId: z.string() }))
+      .mutation(({ ctx, input }) => {
+        if (ctx.windowId == null) throw new Error('windowId required')
+        return getAppDeps().taskWindows.claimPanel(input.taskId, input.panelId, ctx.windowId)
+      }),
+    releasePanel: publicProcedure
+      .input(z.object({ taskId: z.string(), panelId: z.string() }))
+      .mutation(({ ctx, input }) => {
+        if (ctx.windowId == null) throw new Error('windowId required')
+        return getAppDeps().taskWindows.releasePanel(input.taskId, input.panelId, ctx.windowId)
+      }),
+    releaseAllForTask: publicProcedure
+      .input(z.object({ taskId: z.string() }))
+      .mutation(({ ctx, input }) => {
+        if (ctx.windowId == null) throw new Error('windowId required')
+        return getAppDeps().taskWindows.releaseAllForTask(input.taskId, ctx.windowId)
+      }),
+    getOwnership: publicProcedure.input(z.object({ taskId: z.string() })).query(({ input }) =>
+      getAppDeps().taskWindows.getOwnership(input.taskId),
+    ),
+    getWindowId: publicProcedure.query(({ ctx }) =>
+      ctx.windowId == null ? null : getAppDeps().taskWindows.getWindowId(ctx.windowId),
+    ),
+    claimAndCloseOther: publicProcedure
+      .input(z.object({ taskId: z.string(), panelId: z.string() }))
+      .mutation(({ ctx, input }) => {
+        if (ctx.windowId == null) throw new Error('windowId required')
+        return getAppDeps().taskWindows.claimAndCloseOther(input.taskId, input.panelId, ctx.windowId)
+      }),
+    claimSession: publicProcedure
+      .input(z.object({ sessionId: z.string() }))
+      .mutation(({ ctx, input }) => {
+        if (ctx.windowId == null) throw new Error('windowId required')
+        return getAppDeps().taskWindows.claimSession(input.sessionId, ctx.windowId)
+      }),
+
+    // Streaming subscriptions
+    onListChanged: publicProcedure.subscription(() => observable<string[]>((emit) => {
+      const handler = (taskIds: string[]) => emit.next(taskIds)
+      const ev = getAppDeps().taskWindows.events
+      ev.on('list-changed', handler)
+      return () => ev.off('list-changed', handler)
+    })),
+    onPrimaryActiveChanged: publicProcedure.subscription(() => observable<string | null>((emit) => {
+      const handler = (taskId: string | null) => emit.next(taskId)
+      const ev = getAppDeps().taskWindows.events
+      ev.on('primary-active-changed', handler)
+      return () => ev.off('primary-active-changed', handler)
+    })),
+    onOwnershipChanged: publicProcedure.subscription(() => observable<{ taskId: string; ownership: Array<{ panelId: string; ownerWindowId: number }> }>((emit) => {
+      const handler = (payload: { taskId: string; ownership: Array<{ panelId: string; ownerWindowId: number }> }) => emit.next(payload)
+      const ev = getAppDeps().taskWindows.events
+      ev.on('ownership-changed', handler)
+      return () => ev.off('ownership-changed', handler)
+    })),
+    onPanelsReleasedOnClose: publicProcedure.subscription(() => observable<{ closedWindowId: number; released: Array<{ taskId: string; panelId: string }> }>((emit) => {
+      const handler = (payload: { closedWindowId: number; released: Array<{ taskId: string; panelId: string }> }) => emit.next(payload)
+      const ev = getAppDeps().taskWindows.events
+      ev.on('panels-released-on-close', handler)
+      return () => ev.off('panels-released-on-close', handler)
+    })),
+    // Targeted close-request: only fires for the connection whose windowId matches
+    onPanelCloseRequest: publicProcedure.subscription(({ ctx }) => observable<{ taskId: string; panelId: string }>((emit) => {
+      const handler = (targetWindowId: number, payload: { taskId: string; panelId: string }) => {
+        if (ctx.windowId !== targetWindowId) return // filter to this connection's window
+        emit.next(payload)
+      }
+      const ev = getAppDeps().taskWindows.events
+      ev.on('panels-close-request', handler)
+      return () => ev.off('panels-close-request', handler)
+    })),
+  }),
+
   // Webview ops
   webview: router({
     registerBrowserTab: publicProcedure
