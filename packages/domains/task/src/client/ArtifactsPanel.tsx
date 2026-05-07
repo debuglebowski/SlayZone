@@ -600,7 +600,7 @@ export const ArtifactsPanel = forwardRef<ArtifactsPanelHandle, ArtifactsPanelPro
   const [clipboard, setClipboard] = useState<{ ids: string[]; mode: 'copy' | 'cut' } | null>(null)
   const [osHasFiles, setOsHasFiles] = useState(false)
   const refreshOsClipboard = useCallback(() => {
-    window.api.clipboard.hasFiles().then(setOsHasFiles).catch(() => setOsHasFiles(false))
+    getTrpcVanillaClient().app.clipboard.hasFiles.query().then(setOsHasFiles).catch(() => setOsHasFiles(false))
   }, [])
   const willCreateRef = useRef(false)
   const createInputRef = useCallback((node: HTMLInputElement | null) => {
@@ -895,7 +895,7 @@ export const ArtifactsPanel = forwardRef<ArtifactsPanelHandle, ArtifactsPanelPro
 
   const writeArtifactsToOsClipboard = useCallback(async (ids: string[]) => {
     const paths = (await Promise.all(ids.map((id) => getFilePath(id)))).filter((p): p is string => !!p)
-    await window.api.clipboard.writeFilePaths(paths)
+    await getTrpcVanillaClient().app.clipboard.writeFilePaths.mutate({ paths })
   }, [getFilePath])
 
   const handleArtifactCopy = useCallback((ids: string[]) => {
@@ -911,7 +911,7 @@ export const ArtifactsPanel = forwardRef<ArtifactsPanelHandle, ArtifactsPanelPro
   }, [writeArtifactsToOsClipboard])
 
   const handleArtifactPaste = useCallback(async (destFolderId: string | null) => {
-    const osPaths = await window.api.clipboard.readFilePaths()
+    const osPaths = await getTrpcVanillaClient().app.clipboard.readFilePaths.query()
     if (!osPaths.length) return
     const created = await getTrpcVanillaClient().task.artifactsPasteFiles.mutate({ sourcePaths: osPaths, destTaskId: taskId, destFolderId })
     // Cut-mode source delete only if internal clipboard markers still match OS clipboard
