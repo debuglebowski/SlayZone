@@ -23,7 +23,7 @@ export async function updateTaskOp(db: Database, data: UpdateTaskInput, deps: Op
   })()
 
   if (result.nextTask) {
-    ipcMain.emit('db:tasks:update:done', null, data.id, { oldStatus: result.previousTask?.status })
+    ipcMain?.emit('db:tasks:update:done', null, data.id, { oldStatus: result.previousTask?.status })
     const projectId = result.nextTask.project_id ?? result.previousTask?.project_id ?? data.projectId
     if (projectId) {
       taskEvents.emit('task:updated', {
