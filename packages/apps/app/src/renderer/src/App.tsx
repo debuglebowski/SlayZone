@@ -362,8 +362,8 @@ function App(): React.JSX.Element {
   const { idleTasks: rawIdleTasks } = useIdleTasks(tasks, null, columnsByProjectId)
   const activeAgentTaskIds = useActiveSessionTaskIds()
   const shutdownAgentForTask = useCallback(async (taskId: string) => {
-    const [ptys, chats] = await Promise.all([window.api.pty.list(), window.api.chat.list()])
-    const ptyKills = ptys.filter((p) => p.taskId === taskId).map((p) => window.api.pty.kill(p.sessionId))
+    const [ptys, chats] = await Promise.all([getTrpcVanillaClient().pty.list.query(), window.api.chat.list()])
+    const ptyKills = ptys.filter((p) => p.taskId === taskId).map((p) => getTrpcVanillaClient().pty.kill.mutate({ sessionId: p.sessionId }))
     const chatKills = chats.filter((c) => c.taskId === taskId).map((c) => {
       const idx = c.sessionId.indexOf(':')
       const tabId = idx >= 0 ? c.sessionId.slice(idx + 1) : c.sessionId
@@ -593,13 +593,13 @@ function App(): React.JSX.Element {
   const agentSessionId = selectedProjectId ? `__agent-panel:${selectedProjectId}:${agentPanelState.sessionIndex}` : null
 
   const handleAgentNewSession = useCallback(async () => {
-    if (agentSessionId) await window.api.pty.kill(agentSessionId)
+    if (agentSessionId) await getTrpcVanillaClient().pty.kill.mutate({ sessionId: agentSessionId })
     setAgentPanelState({ sessionIndex: (agentPanelState.sessionIndex ?? 0) + 1 })
   }, [agentSessionId, agentPanelState.sessionIndex, setAgentPanelState])
 
   const handleAgentModeChange = useCallback(async (nextMode: string) => {
     if (nextMode === agentMode) return
-    if (agentSessionId) await window.api.pty.kill(agentSessionId)
+    if (agentSessionId) await getTrpcVanillaClient().pty.kill.mutate({ sessionId: agentSessionId })
     setAgentPanelState({ mode: nextMode, sessionIndex: (agentPanelState.sessionIndex ?? 0) + 1 })
   }, [agentMode, agentSessionId, agentPanelState.sessionIndex, setAgentPanelState])
 
@@ -970,7 +970,7 @@ function App(): React.JSX.Element {
     if (tab?.type === 'task') {
       const task = store._taskLookup.tasks.find((t) => t.id === tab.taskId)
       if (task?.is_temporary) {
-        window.api.pty.kill(`${tab.taskId}:${tab.taskId}`)
+        getTrpcVanillaClient().pty.kill.mutate({ sessionId: `${tab.taskId}:${tab.taskId}` })
         getTrpcVanillaClient().task.delete.mutate({ id: tab.taskId })
         setTasks((prev) => prev.filter((t) => t.id !== tab.taskId))
       }

@@ -1,4 +1,5 @@
 import { test, expect, seed, resetApp } from '../fixtures/electron'
+import { getTrpcVanillaClient } from '@slayzone/transport/client'
 import { TEST_PROJECT_PATH } from '../fixtures/electron'
 import {
   getMainSessionId,
@@ -47,7 +48,7 @@ test.describe('Issue #77: PTY revive on status transition', () => {
     // Subscribe to pty:exit on the renderer so we can assert the IPC actually fired.
     await mainWindow.evaluate((id) => {
       (window as unknown as { __ptyExits: string[] }).__ptyExits = [];
-      window.api.pty.onExit((s) => {
+      ((cb) => { const s = getTrpcVanillaClient().pty.onExit.subscribe(undefined, { onData: ({ sessionId, exitCode }) => cb(sessionId, exitCode) }); return () => s.unsubscribe() })((s) => {
         (window as unknown as { __ptyExits: string[] }).__ptyExits.push(s)
       })
       return id
@@ -75,7 +76,7 @@ test.describe('Issue #77: PTY revive on status transition', () => {
     // Subscribe before any status changes
     await mainWindow.evaluate((id) => {
       (window as unknown as { __respawnCalls: string[] }).__respawnCalls = [];
-      window.api.pty.onRespawnSuggested((t) => {
+      ((cb) => { const s = getTrpcVanillaClient().pty.onRespawnSuggested.subscribe(undefined, { onData: ({ taskId }) => cb(taskId) }); return () => s.unsubscribe() })((t) => {
         (window as unknown as { __respawnCalls: string[] }).__respawnCalls.push(t)
       })
       return id

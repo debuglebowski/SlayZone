@@ -79,7 +79,7 @@ export function TerminalContextMenu({
 
   const handlePaste = useCallback(() => {
     void navigator.clipboard.readText().then(text => {
-      if (text) window.api.pty.write(sessionId, text)
+      if (text) getTrpcVanillaClient().pty.write.mutate({ sessionId, data: text })
     })
   }, [sessionId])
 

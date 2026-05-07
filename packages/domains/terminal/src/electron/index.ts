@@ -1,4 +1,5 @@
-export { registerPtyHandlers } from './handlers'
+export { createPtyOps } from './pty-store'
+export { ptyEvents, setDatabase } from './pty-manager'
 export { buildUsageOps } from './usage'
 export { killAllPtys, killPty, killPtysByTaskId, electronOnTaskReachedTerminal, startIdleChecker, stopIdleChecker, getPtyPids, onSessionChange, onGlobalStateChange, listPtys, getBuffer, getBufferSince, writePty, submitPty, getState, hasPty, subscribeToPtyData, subscribeToStateChange, onPtyInputSubmit, redirectSessionWindow, setOnHostKillHandler, broadcastRespawnRequest, requestForceRespawn, PTY_EXIT_KILLED_BY_HOST } from './pty-manager'
 export { registerChatHandlers, shutdownChatTransports, inspectPermissionFlags, backfillChatModes, chatModeToFlags, type ChatMode } from './chat-handlers'

@@ -1,4 +1,5 @@
 import { test, expect, seed, clickProject, goHome, TEST_PROJECT_PATH, resetApp} from '../fixtures/electron'
+import { getTrpcVanillaClient } from '@slayzone/transport/client'
 import { spawnSync } from 'child_process'
 import path from 'path'
 import { fileURLToPath } from 'url'
@@ -495,7 +496,7 @@ test.describe('CLI: slay', () => {
         'if [ "$1" = "-c" ]; then shift; exec /bin/sh -c "$*"; fi',
       ].join('\n'), { mode: 0o755 })
 
-      await mainWindow.evaluate((shell: string) => window.api.pty.setShellOverride(shell), fakeShell)
+      await mainWindow.evaluate((shell: string) => getTrpcVanillaClient().pty.setShellOverride.mutate({ value: shell }), fakeShell)
       const originalPath = await electronApp.evaluate(() => {
         const orig = process.env.PATH
         process.env.PATH = '/usr/bin:/bin'
@@ -519,7 +520,7 @@ test.describe('CLI: slay', () => {
 
         runProcessesCli('processes', 'kill', id.slice(0, 8))
       } finally {
-        await mainWindow.evaluate(() => window.api.pty.setShellOverride(null))
+        await mainWindow.evaluate(() => getTrpcVanillaClient().pty.setShellOverride.mutate({ value: null }))
         await electronApp.evaluate((p: string) => { process.env.PATH = p }, originalPath)
         try { fs.unlinkSync(fakeShell) } catch {}
       }

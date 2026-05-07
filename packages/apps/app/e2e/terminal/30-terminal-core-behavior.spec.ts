@@ -4,6 +4,7 @@
  *              35-tab-rename-persistence, 37-clear-buffer, 55-trailing-output
  */
 import { test, expect, seed, clickProject, goHome, resetApp} from '../fixtures/electron'
+import { getTrpcVanillaClient } from '@slayzone/transport/client'
 import { TEST_PROJECT_PATH } from '../fixtures/electron'
 import {
   getMainSessionId,
@@ -83,7 +84,7 @@ test.describe('Terminal state transitions', () => {
     const sessionId = getMainSessionId(taskId)
     await waitForPtySession(mainWindow, sessionId)
 
-    const initialState = await mainWindow.evaluate((id) => window.api.pty.getState(id), sessionId)
+    const initialState = await mainWindow.evaluate((id) => getTrpcVanillaClient().pty.getState.query({ sessionId: id }), sessionId)
     expect(['starting', 'idle']).toContain(initialState)
 
     await waitForPtyState(mainWindow, sessionId, 'idle')
@@ -92,7 +93,7 @@ test.describe('Terminal state transitions', () => {
     await waitForBufferContains(mainWindow, sessionId, marker)
 
     await expect
-      .poll(async () => mainWindow.evaluate((id) => window.api.pty.getState(id), sessionId))
+      .poll(async () => mainWindow.evaluate((id) => getTrpcVanillaClient().pty.getState.query({ sessionId: id }), sessionId))
       .toBe('idle')
   })
 })
@@ -238,20 +239,20 @@ test.describe('Terminal clear buffer', () => {
     // late PTY redraw, eliminating the race the previous re-clear loop tried
     // to paper over.
     const cleared = await mainWindow.evaluate(
-      (id) => window.api.pty.clearBuffer(id),
+      (id) => getTrpcVanillaClient().pty.clearBuffer.mutate({ sessionId: id }),
       sessionId
     ) as { success: boolean; clearedSeq: number | null }
     expect(cleared.success).toBe(true)
     expect(cleared.clearedSeq).not.toBeNull()
     const clearedSeq = cleared.clearedSeq as number
 
-    await expect.poll(async () => mainWindow.evaluate((id) => window.api.pty.exists(id), sessionId)).toBe(true)
+    await expect.poll(async () => mainWindow.evaluate((id) => getTrpcVanillaClient().pty.exists.query({ sessionId: id }), sessionId)).toBe(true)
 
     await runCommand(mainWindow, sessionId, `echo ${markerB}`)
 
     const sinceClear = async () => {
       const result = await mainWindow.evaluate(
-        ([id, seq]: [string, number]) => window.api.pty.getBufferSince(id, seq),
+        ([id, seq]: [string, number]) => getTrpcVanillaClient().pty.getBufferSince.query({ sessionId: id, afterSeq: seq }),
         [sessionId, clearedSeq] as [string, number]
       ) as { chunks: { data: string }[] } | null
       return result?.chunks.map((c) => c.data).join('') ?? ''

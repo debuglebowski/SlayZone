@@ -1,4 +1,5 @@
 import { test, expect, seed, resetApp} from '../fixtures/electron'
+import { getTrpcVanillaClient } from '@slayzone/transport/client'
 import { TEST_PROJECT_PATH } from '../fixtures/electron'
 import {
   openTaskTerminal,
@@ -47,7 +48,7 @@ test.describe.skip('Cursor Agent CLI integration', () => {
 
     // Send a simple prompt
     await mainWindow.evaluate(
-      ({ id }) => window.api.pty.write(id, 'say the word hello\r'),
+      ({ id }) => getTrpcVanillaClient().pty.write.mutate({ sessionId: id, data: 'say the word hello\r' }),
       { id: sessionId }
     )
 
@@ -59,7 +60,7 @@ test.describe.skip('Cursor Agent CLI integration', () => {
 
     // Send a prompt to trigger work
     await mainWindow.evaluate(
-      ({ id }) => window.api.pty.write(id, 'say ok\r'),
+      ({ id }) => getTrpcVanillaClient().pty.write.mutate({ sessionId: id, data: 'say ok\r' }),
       { id: sessionId }
     )
 

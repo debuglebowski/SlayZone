@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
+import { getTrpcVanillaClient } from '@slayzone/transport/client'
 import type { PtyInfo, ChatSessionStateEntry, TerminalState } from '@slayzone/terminal/shared'
 import type { Task } from '@slayzone/task/shared'
 import { isTerminalStatus, type ColumnConfig } from '@slayzone/projects/shared'
@@ -87,7 +88,7 @@ export function useIdleTasks(
 
   const refresh = useCallback(async () => {
     const [ptys, chats] = await Promise.all([
-      window.api.pty.list(),
+      getTrpcVanillaClient().pty.list.query(),
       window.api.chat.list()
     ])
     setRows([...ptys.map(ptyToRow), ...chats.map(chatToRow)])
@@ -135,7 +136,7 @@ export function useActiveSessionTaskIds(): Set<string> {
 
   const refresh = useCallback(async () => {
     const [ptys, chats] = await Promise.all([
-      window.api.pty.list(),
+      getTrpcVanillaClient().pty.list.query(),
       window.api.chat.list()
     ])
     const set = new Set<string>()

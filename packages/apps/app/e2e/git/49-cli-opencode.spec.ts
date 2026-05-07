@@ -1,4 +1,5 @@
 import { test, expect, seed, resetApp} from '../fixtures/electron'
+import { getTrpcVanillaClient } from '@slayzone/transport/client'
 import { TEST_PROJECT_PATH, goHome, clickProject } from '../fixtures/electron'
 import {
   openTaskTerminal,
@@ -47,7 +48,7 @@ test.describe('OpenCode CLI integration', () => {
 
     // Send a minimal prompt
     await mainWindow.evaluate(
-      ({ id }) => window.api.pty.write(id, 'hi\r'),
+      ({ id }) => getTrpcVanillaClient().pty.write.mutate({ sessionId: id, data: 'hi\r' }),
       { id: sessionId }
     )
 
@@ -93,7 +94,7 @@ test.describe('OpenCode CLI integration', () => {
 
     // Send a prompt to trigger work
     await mainWindow.evaluate(
-      ({ id }) => window.api.pty.write(id, 'hi\r'),
+      ({ id }) => getTrpcVanillaClient().pty.write.mutate({ sessionId: id, data: 'hi\r' }),
       { id: sessionId }
     )
 
