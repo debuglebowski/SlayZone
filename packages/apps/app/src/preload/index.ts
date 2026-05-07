@@ -554,39 +554,6 @@ const api: ElectronAPI = {
       return () => ipcRenderer.removeListener('browser:event', handler)
     },
   },
-  processes: {
-    create: (projectId, taskId, label, command, cwd, autoRestart) =>
-      ipcRenderer.invoke('processes:create', projectId, taskId, label, command, cwd, autoRestart),
-    spawn: (projectId, taskId, label, command, cwd, autoRestart) =>
-      ipcRenderer.invoke('processes:spawn', projectId, taskId, label, command, cwd, autoRestart),
-    update: (processId, updates) => ipcRenderer.invoke('processes:update', processId, updates),
-    stop: (processId) => ipcRenderer.invoke('processes:stop', processId),
-    kill: (processId) => ipcRenderer.invoke('processes:kill', processId),
-    restart: (processId) => ipcRenderer.invoke('processes:restart', processId),
-    listForTask: (taskId, projectId) => ipcRenderer.invoke('processes:listForTask', taskId, projectId),
-    listAll: () => ipcRenderer.invoke('processes:listAll'),
-    killTask: (taskId) => ipcRenderer.invoke('processes:killTask', taskId),
-    onLog: (cb) => {
-      const handler = (_event: unknown, processId: string, line: string) => cb(processId, line)
-      ipcRenderer.on('processes:log', handler)
-      return () => ipcRenderer.removeListener('processes:log', handler)
-    },
-    onStatus: (cb) => {
-      const handler = (_event: unknown, processId: string, status: import('@slayzone/types').ProcessStatus) => cb(processId, status)
-      ipcRenderer.on('processes:status', handler)
-      return () => ipcRenderer.removeListener('processes:status', handler)
-    },
-    onStats: (cb) => {
-      const handler = (_event: unknown, stats: Record<string, import('@slayzone/types').ProcessStats>) => cb(stats)
-      ipcRenderer.on('processes:stats', handler)
-      return () => ipcRenderer.removeListener('processes:stats', handler)
-    },
-    onTitle: (cb) => {
-      const handler = (_event: unknown, processId: string, title: string | null) => cb(processId, title)
-      ipcRenderer.on('processes:title', handler)
-      return () => ipcRenderer.removeListener('processes:title', handler)
-    }
-  },
 }
 
 // Use `contextBridge` APIs to expose Electron APIs to

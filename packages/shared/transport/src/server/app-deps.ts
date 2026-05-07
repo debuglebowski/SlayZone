@@ -2,8 +2,9 @@
 // setAppDeps() at startup with concrete implementations; standalone server
 // runs without these and procedures throw NOT_FOUND.
 
-import type { BackupInfo, BackupSettings, LocalLeaderboardStats } from '@slayzone/types'
+import type { BackupInfo, BackupSettings, LocalLeaderboardStats, ProcessInfo, ProcessStatus, ProcessStats } from '@slayzone/types'
 import type { ProviderUsage, UsageProviderConfig, UsageWindow } from '@slayzone/terminal/shared'
+import type { EventEmitter } from 'node:events'
 
 export type AppDeps = {
   // backup
@@ -76,4 +77,35 @@ export function setAppDeps(deps: AppDeps): void {
 export function getAppDeps(): AppDeps {
   if (!appDeps) throw new Error('appDeps not initialized — call setAppDeps() in main host first')
   return appDeps
+}
+
+// Processes deps — lifecycle managed separately because EventEmitter must be live
+export type ProcessesDeps = {
+  create: (projectId: string | null, taskId: string | null, label: string, command: string, cwd: string, autoRestart: boolean) => string | Promise<string>
+  spawn: (projectId: string | null, taskId: string | null, label: string, command: string, cwd: string, autoRestart: boolean) => string | Promise<string>
+  update: (processId: string, updates: Partial<Pick<ProcessInfo, 'label' | 'command' | 'cwd' | 'autoRestart' | 'taskId' | 'projectId'>>) => boolean
+  stop: (processId: string) => boolean | Promise<boolean>
+  kill: (processId: string) => boolean | Promise<boolean>
+  restart: (processId: string) => boolean | Promise<boolean>
+  listForTask: (taskId: string | null, projectId: string | null) => ProcessInfo[]
+  listAll: () => ProcessInfo[]
+  killTask: (taskId: string) => void
+  events: EventEmitter & {
+    on(event: 'log', listener: (id: string, line: string) => void): EventEmitter
+    on(event: 'status', listener: (id: string, status: ProcessStatus) => void): EventEmitter
+    on(event: 'title', listener: (id: string, title: string | null) => void): EventEmitter
+    on(event: 'stats', listener: (stats: Record<string, ProcessStats>) => void): EventEmitter
+    off(event: string, listener: (...args: unknown[]) => void): EventEmitter
+  }
+}
+
+let processesDeps: ProcessesDeps | null = null
+
+export function setProcessesDeps(deps: ProcessesDeps): void {
+  processesDeps = deps
+}
+
+export function getProcessesDeps(): ProcessesDeps {
+  if (!processesDeps) throw new Error('processesDeps not initialized — call setProcessesDeps() in main host first')
+  return processesDeps
 }
