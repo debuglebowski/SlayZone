@@ -11,8 +11,10 @@ import { useTabStore } from '@slayzone/settings'
 export function TreeDisplaySettings() {
   const treeShowStatus = useTabStore((s) => s.treeShowStatus)
   const treeShowPriority = useTabStore((s) => s.treeShowPriority)
+  const treeShowSubtasks = useTabStore((s) => s.treeShowSubtasks)
   const setTreeShowStatus = useTabStore((s) => s.setTreeShowStatus)
   const setTreeShowPriority = useTabStore((s) => s.setTreeShowPriority)
+  const setTreeShowSubtasks = useTabStore((s) => s.setTreeShowSubtasks)
 
   return (
     <DropdownMenu>
@@ -49,6 +51,16 @@ export function TreeDisplaySettings() {
         >
           <span className="col-start-2">Show priority</span>
           {treeShowPriority && <Check className="size-4 col-start-3" />}
+        </DropdownMenuItem>
+        <DropdownMenuItem
+          onSelect={(e) => {
+            e.preventDefault()
+            setTreeShowSubtasks(!treeShowSubtasks)
+          }}
+          className="cursor-pointer"
+        >
+          <span className="col-start-2">Show sub-tasks</span>
+          {treeShowSubtasks && <Check className="size-4 col-start-3" />}
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

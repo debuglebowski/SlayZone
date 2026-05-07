@@ -10,7 +10,7 @@ import {
   TooltipContent,
   cn,
 } from '@slayzone/ui'
-import { Check, ChevronDown, PanelLeftClose } from 'lucide-react'
+import { Check, PanelLeftClose } from 'lucide-react'
 import { viewRegistry, getView } from './views/registry'
 
 interface SidebarViewSwitcherProps {
@@ -35,19 +35,14 @@ export function SidebarViewSwitcher({
     <button
       type="button"
       aria-label={`Sidebar view: ${view.label}`}
+      title={view.label}
       className={cn(
-        'inline-flex items-center gap-2 rounded-md border border-border bg-muted text-muted-foreground transition-colors',
+        'inline-flex items-center justify-center rounded-lg text-muted-foreground transition-colors',
         'hover:bg-accent hover:text-accent-foreground',
-        compact ? 'h-9 w-9 justify-center' : 'h-9 flex-1 px-2.5 min-w-0'
+        compact ? 'h-10 w-10' : 'h-8 w-8'
       )}
     >
-      <Icon className="size-4 shrink-0" />
-      {!compact && (
-        <>
-          <span className="truncate flex-1 text-left text-sm">{view.label}</span>
-          <ChevronDown className="size-3.5 shrink-0" />
-        </>
-      )}
+      <Icon className={compact ? 'size-5' : 'size-4'} />
     </button>
   )
 

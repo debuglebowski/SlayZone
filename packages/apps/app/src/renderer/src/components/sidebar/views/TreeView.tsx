@@ -76,17 +76,38 @@ export function TreeView({
   const statusFilter = useMemo(() => new Set(treeStatusFilter), [treeStatusFilter])
   const treeShowStatus = useTabStore((s) => s.treeShowStatus)
   const treeShowPriority = useTabStore((s) => s.treeShowPriority)
+  const treeShowSubtasks = useTabStore((s) => s.treeShowSubtasks)
   const treePinnedTaskIds = useTabStore((s) => s.treePinnedTaskIds)
   const pinnedSet = useMemo(() => new Set(treePinnedTaskIds), [treePinnedTaskIds])
   const passesFilter = useCallback(
-    (t: Task) => statusFilter.has(t.status) || pinnedSet.has(t.id),
+    (t: Task) => !t.archived_at && (statusFilter.has(t.status) || pinnedSet.has(t.id)),
     [statusFilter, pinnedSet]
   )
+
+  // A task is "visible" if it passes the filter OR if any descendant in the same
+  // project does (so the hierarchy stays connected when only sub-tasks match).
+  // Walk parents from each matching task up to the project root.
+  const visibleTaskIds = useMemo(() => {
+    const taskById = new Map(tasks.map((t) => [t.id, t]))
+    const set = new Set<string>()
+    for (const t of tasks) {
+      if (!passesFilter(t)) continue
+      // When sub-tasks hidden, only top-level tasks are eligible.
+      if (!treeShowSubtasks && t.parent_id) continue
+      let cur: Task | undefined = t
+      while (cur && !set.has(cur.id)) {
+        set.add(cur.id)
+        if (!treeShowSubtasks) break
+        cur = cur.parent_id ? taskById.get(cur.parent_id) : undefined
+      }
+    }
+    return set
+  }, [tasks, passesFilter, treeShowSubtasks])
 
   const tasksByProject = useMemo(() => {
     const m = new Map<string, Task[]>()
     for (const t of tasks) {
-      if (!passesFilter(t)) continue
+      if (!visibleTaskIds.has(t.id)) continue
       const arr = m.get(t.project_id) ?? []
       arr.push(t)
       m.set(t.project_id, arr)
@@ -97,11 +118,12 @@ export function TreeView({
   // For each in-progress task id → its in-progress children. Subtasks whose parent
   // is not in-progress are promoted to the project root.
   const childrenByParent = useMemo(() => {
+    if (!treeShowSubtasks) return new Map<string, Task[]>()
     const inProgressIds = new Set<string>()
-    for (const t of tasks) if (passesFilter(t)) inProgressIds.add(t.id)
+    for (const t of tasks) if (visibleTaskIds.has(t.id)) inProgressIds.add(t.id)
     const m = new Map<string, Task[]>()
     for (const t of tasks) {
-      if (!passesFilter(t)) continue
+      if (!visibleTaskIds.has(t.id)) continue
       const pid = t.parent_id
       if (pid && inProgressIds.has(pid)) {
         const arr = m.get(pid) ?? []
@@ -110,22 +132,23 @@ export function TreeView({
       }
     }
     return m
-  }, [tasks, passesFilter])
+  }, [tasks, visibleTaskIds, treeShowSubtasks])
 
   const rootTasksByProject = useMemo(() => {
     const inProgressIds = new Set<string>()
-    for (const t of tasks) if (passesFilter(t)) inProgressIds.add(t.id)
+    for (const t of tasks) if (visibleTaskIds.has(t.id)) inProgressIds.add(t.id)
     const m = new Map<string, Task[]>()
     for (const t of tasks) {
-      if (!passesFilter(t)) continue
-      const isOrphan = !t.parent_id || !inProgressIds.has(t.parent_id)
+      if (!visibleTaskIds.has(t.id)) continue
+      // When subtasks hidden, render every matched task at the root level.
+      const isOrphan = !treeShowSubtasks || !t.parent_id || !inProgressIds.has(t.parent_id)
       if (!isOrphan) continue
       const arr = m.get(t.project_id) ?? []
       arr.push(t)
       m.set(t.project_id, arr)
     }
     return m
-  }, [tasks, passesFilter])
+  }, [tasks, visibleTaskIds, treeShowSubtasks])
 
   const activeTaskId = useTabStore((s) => {
     const tab = s.tabs[s.activeTabIndex]
@@ -301,7 +324,7 @@ export function TreeView({
   }
 
   return (
-    <div className="flex flex-col gap-1 px-3">
+    <div className="flex flex-col gap-3 px-1">
       {visibleProjects.map(renderProject)}
       {hiddenProjects.length > 0 && (
         <button

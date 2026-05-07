@@ -98,7 +98,6 @@ export function AppSidebar({
 
   useEffect(() => () => cancelClose(), [cancelClose])
 
-  const compactSwitcher = view.footerLayout === 'vertical'
   const autoHideActive = sidebarAutoHide && !zenMode
   const isResizable = !zenMode && !!view.resizable
   const effectiveWidth =
@@ -120,7 +119,7 @@ export function AppSidebar({
       )}
     >
       {sidebarView === 'tree' && !autoHideActive && (
-        <div className="absolute top-0 left-0 right-0 h-11 flex items-center justify-end gap-1 pr-5 z-20">
+        <div className="absolute top-0 left-0 right-0 h-11 flex items-center justify-end gap-1 pr-3 z-20">
           <TreeStatusFilter />
           <TreeDisplaySettings />
         </div>
@@ -155,16 +154,29 @@ export function AppSidebar({
           onUsageAnalytics={onUsageAnalytics}
           onLeaderboard={onLeaderboard}
           onboardingChecklist={onboardingChecklist}
+          trailing={
+            view.footerLayout === 'horizontal' ? (
+              <SidebarViewSwitcher
+                current={sidebarView}
+                onChange={setSidebarView}
+                compact={false}
+                autoHide={sidebarAutoHide}
+                onToggleAutoHide={() => setSidebarAutoHide(!sidebarAutoHide)}
+              />
+            ) : null
+          }
         />
-        <div className={cn('px-2 flex', compactSwitcher ? 'justify-center' : 'w-full')}>
-          <SidebarViewSwitcher
-            current={sidebarView}
-            onChange={setSidebarView}
-            compact={compactSwitcher}
-            autoHide={sidebarAutoHide}
-            onToggleAutoHide={() => setSidebarAutoHide(!sidebarAutoHide)}
-          />
-        </div>
+        {view.footerLayout === 'vertical' && (
+          <div className="flex justify-center">
+            <SidebarViewSwitcher
+              current={sidebarView}
+              onChange={setSidebarView}
+              compact
+              autoHide={sidebarAutoHide}
+              onToggleAutoHide={() => setSidebarAutoHide(!sidebarAutoHide)}
+            />
+          </div>
+        )}
       </SidebarFooter>
       {isResizable && effectiveWidth != null && (
         <SidebarResizeHandle

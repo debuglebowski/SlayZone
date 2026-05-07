@@ -37,6 +37,7 @@ interface SidebarFooterIconsProps {
   onUsageAnalytics: () => void
   onLeaderboard: () => void
   onboardingChecklist: OnboardingChecklistState
+  trailing?: React.ReactNode
 }
 
 function ShortcutRow({
@@ -184,6 +185,7 @@ export function SidebarFooterIcons({
   onUsageAnalytics,
   onLeaderboard,
   onboardingChecklist,
+  trailing,
 }: SidebarFooterIconsProps) {
   const [shortcutsOpen, setShortcutsOpen] = useState(false)
   const [openShortcutGroup, setOpenShortcutGroup] = useState<string | null>(() => shortcutDefinitions[0]?.group ?? null)
@@ -267,10 +269,9 @@ export function SidebarFooterIcons({
   const tooltipSide: 'top' | 'right' = layout === 'horizontal' ? 'top' : 'right'
 
   const containerClass = cn(
-    'flex',
     layout === 'vertical'
-      ? 'flex-col items-center gap-2'
-      : 'flex-row flex-nowrap items-center gap-1 py-1 overflow-x-auto scrollbar-hide [&>*]:shrink-0'
+      ? 'flex flex-col items-center gap-2'
+      : 'grid [grid-template-columns:repeat(auto-fit,minmax(36px,1fr))] gap-1 py-1 px-1 place-items-center'
   )
 
   return (
@@ -510,6 +511,7 @@ export function SidebarFooterIcons({
         </TooltipTrigger>
         <TooltipContent side={tooltipSide}>Settings</TooltipContent>
       </Tooltip>
+      {trailing}
     </div>
   )
 }
