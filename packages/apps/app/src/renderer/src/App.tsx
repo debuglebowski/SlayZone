@@ -934,7 +934,8 @@ function App(): React.JSX.Element {
 
   // Forward keyboard shortcuts from WebContentsView back into the DOM
   useEffect(() => {
-    return window.api.browser.onBrowserViewShortcut((payload) => {
+    const sub = getTrpcVanillaClient().app.browser.onShortcut.subscribe(undefined, { onData: (raw) => {
+      const payload = raw as { viewId: string; key: string; shift: boolean; alt: boolean; meta: boolean; control: boolean; kind?: string }
       // WebContentsView is a separate web contents — focusin never fires in
       // renderer when it has focus. Set browser scope before dispatching so
       // the shortcut registry sees the correct active scopes.
@@ -957,7 +958,8 @@ function App(): React.JSX.Element {
       if (payload.shift) document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Shift', code: 'ShiftLeft', ...mods, bubbles: true }))
       if (payload.alt) document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Alt', code: 'AltLeft', ...mods, bubbles: true }))
       document.dispatchEvent(new KeyboardEvent('keydown', { key, code, ...mods, bubbles: true }))
-    })
+    } })
+    return () => sub.unsubscribe()
   }, [])
 
   // When a WebContentsView gains focus, dispatch a synthetic focusin on the
@@ -965,24 +967,29 @@ function App(): React.JSX.Element {
   // Uses DOM lookup via data-view-id → closest data-panel-id to work for
   // both browser tabs and web panels.
   useEffect(() => {
-    return window.api.browser.onBrowserViewFocused(({ viewId }) => {
-      const el = document.querySelector(`[data-view-id="${viewId}"]`)
-      const panel = el?.closest('[data-panel-id]')
-      if (panel) {
-        panel.dispatchEvent(new FocusEvent('focusin', { bubbles: true }))
-      }
+    const sub = getTrpcVanillaClient().app.browser.onFocused.subscribe(undefined, {
+      onData: ({ viewId }) => {
+        const el = document.querySelector(`[data-view-id="${viewId}"]`)
+        const panel = el?.closest('[data-panel-id]')
+        if (panel) panel.dispatchEvent(new FocusEvent('focusin', { bubbles: true }))
+      },
     })
+    return () => sub.unsubscribe()
   }, [])
 
   useEffect(() => {
-    return window.api.browser.onCreateTaskFromLink((intent) => {
-      const sourceTask = tasksMap.get(intent.taskId)
-      const fallbackProjectId = sourceTask?.project_id ?? selectedProjectId ?? projects[0]?.id
-      useDialogStore.getState().openCreateTask({
-        ...buildCreateTaskDraftFromBrowserLink(intent.url, intent.linkText),
-        projectId: fallbackProjectId,
-      })
+    const sub = getTrpcVanillaClient().app.browser.onCreateTaskFromLink.subscribe(undefined, {
+      onData: (raw) => {
+        const intent = raw as { taskId: string; url: string; linkText?: string }
+        const sourceTask = tasksMap.get(intent.taskId)
+        const fallbackProjectId = sourceTask?.project_id ?? selectedProjectId ?? projects[0]?.id
+        useDialogStore.getState().openCreateTask({
+          ...buildCreateTaskDraftFromBrowserLink(intent.url, intent.linkText),
+          projectId: fallbackProjectId,
+        })
+      },
     })
+    return () => sub.unsubscribe()
   }, [tasksMap, selectedProjectId, projects])
 
   // Tab management

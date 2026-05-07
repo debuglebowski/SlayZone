@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer, webUtils } from 'electron'
-import type { BrowserCreateTaskFromLinkIntent, ElectronAPI } from '@slayzone/types'
+import type { ElectronAPI } from '@slayzone/types'
 import type { TerminalState, PromptInfo } from '@slayzone/terminal/shared'
 
 // Prevent Electron's default file drop behavior (navigates to the file).
@@ -171,30 +171,6 @@ const api: ElectronAPI = {
       ipcRenderer.on('telemetry:ipc-event', handler)
       return () => ipcRenderer.removeListener('telemetry:ipc-event', handler)
     }
-  },
-  browser: {
-    // Subscription-style methods kept as IPC — backed by webContents.send from
-    // browser-view-manager. Migration would require routing events through tRPC subs.
-    onBrowserViewShortcut: (cb) => {
-      const handler = (_event: unknown, data: { viewId: string; key: string; shift: boolean; alt: boolean; meta: boolean; control: boolean; kind?: string }) => cb(data)
-      ipcRenderer.on('browser-view:shortcut', handler)
-      return () => ipcRenderer.removeListener('browser-view:shortcut', handler)
-    },
-    onBrowserViewFocused: (cb) => {
-      const handler = (_event: unknown, data: { viewId: string }) => cb(data)
-      ipcRenderer.on('browser-view:focused', handler)
-      return () => ipcRenderer.removeListener('browser-view:focused', handler)
-    },
-    onCreateTaskFromLink: (cb) => {
-      const handler = (_event: unknown, intent: BrowserCreateTaskFromLinkIntent) => cb(intent)
-      ipcRenderer.on('browser:create-task-from-link', handler)
-      return () => ipcRenderer.removeListener('browser:create-task-from-link', handler)
-    },
-    onEvent: (cb) => {
-      const handler = (_event: unknown, data: { viewId: string; type: string; [key: string]: unknown }) => cb(data)
-      ipcRenderer.on('browser:event', handler)
-      return () => ipcRenderer.removeListener('browser:event', handler)
-    },
   },
 }
 

@@ -1090,7 +1090,8 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
   // panel-glow state so a focused web panel renders the same focus shadow as
   // any other focused panel.
   useEffect(() => {
-    return window.api.browser.onBrowserViewFocused?.(() => setFocusedPanel('browser'))
+    const sub = getTrpcVanillaClient().app.browser.onFocused.subscribe(undefined, { onData: () => setFocusedPanel('browser') })
+    return () => sub.unsubscribe()
   }, [])
 
   // Cmd+W: close focused sub-item (terminal group, browser tab, editor file),

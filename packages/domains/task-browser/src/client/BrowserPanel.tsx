@@ -893,18 +893,21 @@ export const BrowserPanel = forwardRef<BrowserPanelHandle, BrowserPanelProps>(fu
   // Handle new-tab-request events from main process (Cmd+Click / middle-click on links)
   useEffect(() => {
     if (!taskId) return
-    const unsubscribe = window.api.browser.onEvent((event) => {
-      if (event.type !== 'new-tab-request' || event.taskId !== taskId) return
-      const tabUrl = event.url as string
-      if (event.background) {
-        const newTab: BrowserTab = { id: generateTabId(), url: tabUrl, title: tabUrl }
-        const t = tabsRef.current
-        commitTabsUpdate({ tabs: [...t.tabs, newTab], activeTabId: t.activeTabId })
-      } else {
-        createNewTabRef.current(tabUrl)
-      }
+    const sub = getTrpcVanillaClient().app.browser.onEvent.subscribe(undefined, {
+      onData: (raw) => {
+        const event = raw as { type: string; taskId?: string; url?: string; background?: boolean }
+        if (event.type !== 'new-tab-request' || event.taskId !== taskId) return
+        const tabUrl = event.url as string
+        if (event.background) {
+          const newTab: BrowserTab = { id: generateTabId(), url: tabUrl, title: tabUrl }
+          const t = tabsRef.current
+          commitTabsUpdate({ tabs: [...t.tabs, newTab], activeTabId: t.activeTabId })
+        } else {
+          createNewTabRef.current(tabUrl)
+        }
+      },
     })
-    return unsubscribe
+    return () => sub.unsubscribe()
   }, [taskId, commitTabsUpdate])
 
   // Apply the browser's own baseline zoom without tying it to app-level UI zoom.
@@ -1106,16 +1109,20 @@ export const BrowserPanel = forwardRef<BrowserPanelHandle, BrowserPanelProps>(fu
   // Subscribe to found-in-page results
   useEffect(() => {
     if (!findMode) return
-    return window.api.browser.onEvent((event) => {
-      if (event.type !== 'found-in-page') return
-      if (event.viewId !== activeViewId) return
-      if (event.finalUpdate) {
-        setFindResult({
-          active: event.activeMatchOrdinal as number,
-          total: event.matches as number,
-        })
-      }
+    const sub = getTrpcVanillaClient().app.browser.onEvent.subscribe(undefined, {
+      onData: (raw) => {
+        const event = raw as { type: string; viewId: string; finalUpdate?: boolean; activeMatchOrdinal?: number; matches?: number }
+        if (event.type !== 'found-in-page') return
+        if (event.viewId !== activeViewId) return
+        if (event.finalUpdate) {
+          setFindResult({
+            active: event.activeMatchOrdinal as number,
+            total: event.matches as number,
+          })
+        }
+      },
     })
+    return () => sub.unsubscribe()
   }, [findMode, activeViewId])
 
   // Close find when switching tabs

@@ -186,23 +186,4 @@ export interface ElectronAPI {
   telemetry: {
     onIpcEvent: (callback: (event: string, props: Record<string, unknown>) => void) => () => void
   }
-  browser: {
-    // Subscription-style methods kept as IPC (driven by webContents.send from manager).
-    onBrowserViewShortcut: (cb: (payload: {
-      viewId: string
-      key: string
-      shift: boolean
-      alt: boolean
-      meta: boolean
-      control: boolean
-      kind?: string
-    }) => void) => () => void
-    onBrowserViewFocused: (cb: (payload: { viewId: string }) => void) => () => void
-    onCreateTaskFromLink: (cb: (intent: BrowserCreateTaskFromLinkIntent) => void) => () => void
-    onEvent: (cb: (event: {
-      viewId: string
-      type: string
-      [key: string]: unknown
-    }) => void) => () => void
-  }
 }

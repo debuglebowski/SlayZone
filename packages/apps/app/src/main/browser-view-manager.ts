@@ -1,5 +1,15 @@
 import { clipboard, Menu, shell, WebContentsView, session, type BrowserWindow } from 'electron'
 import { join } from 'path'
+import { EventEmitter } from 'node:events'
+import { menuEvents } from './menu-events'
+
+export const browserViewEvents = new EventEmitter() as EventEmitter & {
+  on(event: 'event', listener: (e: unknown) => void): EventEmitter
+  on(event: 'shortcut', listener: (payload: unknown) => void): EventEmitter
+  on(event: 'focused', listener: (payload: { viewId: string }) => void): EventEmitter
+  on(event: 'create-task-from-link', listener: (intent: unknown) => void): EventEmitter
+  off(event: string, listener: (...args: unknown[]) => void): EventEmitter
+}
 import type { ElectronChromeExtensions } from 'electron-chrome-extensions'
 import type { BrowserCreateTaskFromLinkIntent } from '@slayzone/types'
 import type { DesktopHandoffPolicy } from '@slayzone/task/shared'
@@ -651,7 +661,7 @@ export class BrowserViewManager {
       source: payload.source,
     }
 
-    this.mainWindow.webContents.send('browser:create-task-from-link', intent)
+    browserViewEvents.emit('create-task-from-link', intent)
     return true
   }
 
@@ -676,7 +686,7 @@ export class BrowserViewManager {
         })
       case 'open-link-in-new-tab':
         if (!this.mainWindow || this.mainWindow.isDestroyed()) return false
-        this.mainWindow.webContents.send('browser:event', {
+        browserViewEvents.emit('event', {
           viewId,
           type: 'new-tab-request',
           url: normalizedInput.linkURL,
@@ -860,10 +870,7 @@ export class BrowserViewManager {
     const wc = view.webContents
     const entry = this.views.get(viewId)!
     const send = (event: BrowserViewEvent) => {
-      const win = this.windowFor(entry)
-      if (win && !win.isDestroyed()) {
-        win.webContents.send('browser:event', event)
-      }
+      browserViewEvents.emit('event', event)
     }
 
     if (entry.kind === 'web-panel') {
@@ -946,7 +953,7 @@ export class BrowserViewManager {
       if (input.key === 'Escape' && !input.control && !input.meta && !input.alt) {
         const win = this.mainWindow
         if (win && !win.isDestroyed()) {
-          win.webContents.send('browser-view:shortcut', {
+          browserViewEvents.emit('shortcut', {
             viewId,
             key: 'Escape',
             shift: Boolean(input.shift),
@@ -979,30 +986,30 @@ export class BrowserViewManager {
       }
       // Cmd+Shift+R: reload the app (renderer)
       if (key === 'r' && input.meta && input.shift && !input.alt) {
-        win.webContents.send('app:reload-app')
+        menuEvents.emit('reload-app')
         return
       }
       if (key === ',' && input.meta && input.shift) {
-        win.webContents.send('app:open-project-settings')
+        menuEvents.emit('open-project-settings')
         return
       }
       if (key === ',' && input.meta) {
-        win.webContents.send('app:open-settings')
+        menuEvents.emit('open-settings')
         return
       }
       if (key === 's' && input.meta && input.shift) {
-        win.webContents.send('app:screenshot-trigger')
+        menuEvents.emit('screenshot-trigger')
         return
       }
       if (input.key === '§' && input.meta) {
-        win.webContents.send('app:go-home')
+        menuEvents.emit('go-home')
         return
       }
 
       // All other Cmd/Ctrl shortcuts — forward to renderer as synthetic KeyboardEvent.
       // Web panels forward shortcuts too so app-level hotkeys (Cmd+B, etc.) still work,
       // but the renderer's shortcut handler must not create browser tabs from web-panel views.
-      win.webContents.send('browser-view:shortcut', {
+      browserViewEvents.emit('shortcut', {
         viewId,
         key: input.key,
         shift: Boolean(input.shift),
@@ -1019,7 +1026,7 @@ export class BrowserViewManager {
     wc.on('focus', () => {
       const win = this.mainWindow
       if (!win || win.isDestroyed()) return
-      win.webContents.send('browser-view:focused', { viewId })
+      browserViewEvents.emit('focused', { viewId })
     })
 
     wc.on('did-navigate', (_e, url) => {

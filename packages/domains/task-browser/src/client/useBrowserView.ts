@@ -67,11 +67,14 @@ export function useBrowserView(opts: UseBrowserViewOpts) {
   onPopupRouteRef.current = onPopupRoute
   useEffect(() => {
     if (!viewId || !onPopupRouteRef.current) return
-    const unsub = window.api.browser.onEvent((event) => {
-      if (event.viewId !== viewId || event.type !== 'web-panel:popup-request') return
-      onPopupRouteRef.current?.(event.url as string)
+    const sub = getTrpcVanillaClient().app.browser.onEvent.subscribe(undefined, {
+      onData: (raw) => {
+        const event = raw as { viewId: string; type: string; [k: string]: unknown }
+        if (event.viewId !== viewId || event.type !== 'web-panel:popup-request') return
+        onPopupRouteRef.current?.(event.url as string)
+      },
     })
-    return unsub
+    return () => sub.unsubscribe()
   }, [viewId])
 
   const actions: BrowserViewActions = useMemo(() => ({

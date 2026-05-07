@@ -413,6 +413,26 @@ export const appLevelRouter = router({
     reparentToCurrentWindow: publicProcedure.input(z.object({ viewId: z.string() })).mutation(({ input }) =>
       getAppDeps().browser.reparentToCurrentWindow(input.viewId),
     ),
+    onEvent: publicProcedure.subscription(() => observable<unknown>((emit) => {
+      const h = (e: unknown) => emit.next(e)
+      getAppDeps().browser.events.on('event', h)
+      return () => getAppDeps().browser.events.off('event', h)
+    })),
+    onShortcut: publicProcedure.subscription(() => observable<unknown>((emit) => {
+      const h = (p: unknown) => emit.next(p)
+      getAppDeps().browser.events.on('shortcut', h)
+      return () => getAppDeps().browser.events.off('shortcut', h)
+    })),
+    onFocused: publicProcedure.subscription(() => observable<{ viewId: string }>((emit) => {
+      const h = (p: { viewId: string }) => emit.next(p)
+      getAppDeps().browser.events.on('focused', h)
+      return () => getAppDeps().browser.events.off('focused', h)
+    })),
+    onCreateTaskFromLink: publicProcedure.subscription(() => observable<unknown>((emit) => {
+      const h = (i: unknown) => emit.next(i)
+      getAppDeps().browser.events.on('create-task-from-link', h)
+      return () => getAppDeps().browser.events.off('create-task-from-link', h)
+    })),
   }),
 
   // Floating agent

@@ -16,7 +16,7 @@ import { electronApp, is } from '@electron-toolkit/utils'
 import { ElectronChromeExtensions } from 'electron-chrome-extensions'
 import { installChromeWebStore } from 'electron-chrome-web-store'
 import { registerBrowserTab, unregisterBrowserTab, setActiveBrowserTab, clearBrowserRegistry } from './browser-registry'
-import { BrowserViewManager } from './browser-view-manager'
+import { BrowserViewManager, browserViewEvents } from './browser-view-manager'
 import {
   BLOCKED_EXTERNAL_PROTOCOLS,
   inferHostScopeFromUrl,
@@ -1518,6 +1518,7 @@ app.whenReady().then(async () => {
         const win = BrowserWindow.getFocusedWindow() ?? mainWindow
         if (win) browserViewManager.reparentView(viewId, win)
       },
+      events: browserViewEvents,
     },
     floatingAgent: {
       ...floatingAgentOps,

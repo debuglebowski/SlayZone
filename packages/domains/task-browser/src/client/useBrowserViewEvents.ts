@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import { getTrpcVanillaClient } from '@slayzone/transport/client'
 
 export interface LoadError {
   code: number
@@ -42,7 +43,8 @@ export function useBrowserViewEvents(viewId: string | null): BrowserViewState {
       return
     }
 
-    const unsubscribe = window.api.browser.onEvent((event) => {
+    const sub = getTrpcVanillaClient().app.browser.onEvent.subscribe(undefined, { onData: (raw) => {
+      const event = raw as { viewId: string; type: string; [k: string]: unknown }
       if (event.viewId !== viewIdRef.current) return
 
       switch (event.type) {
@@ -106,9 +108,9 @@ export function useBrowserViewEvents(viewId: string | null): BrowserViewState {
           }))
           break
       }
-    })
+    } })
 
-    return unsubscribe
+    return () => sub.unsubscribe()
   }, [viewId])
 
   return state

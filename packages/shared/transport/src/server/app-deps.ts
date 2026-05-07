@@ -150,6 +150,13 @@ export type AppDeps = {
     discoverBrowserExtensions: () => unknown
     importExtension: (extPath: string) => unknown
     reparentToCurrentWindow: (viewId: string) => unknown
+    events: EventEmitter & {
+      on(event: 'event', listener: (e: unknown) => void): EventEmitter
+      on(event: 'shortcut', listener: (payload: unknown) => void): EventEmitter
+      on(event: 'focused', listener: (payload: { viewId: string }) => void): EventEmitter
+      on(event: 'create-task-from-link', listener: (intent: unknown) => void): EventEmitter
+      off(event: string, listener: (...args: unknown[]) => void): EventEmitter
+    }
   }
   floatingAgent: {
     setEnabled: (enabled: boolean) => unknown
