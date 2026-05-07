@@ -1,5 +1,5 @@
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState, type Key } from 'react'
-import { useStickToBottom } from 'use-stick-to-bottom'
+import { useFollowBottom } from './useFollowBottom'
 import {
   ArrowUp,
   Square,
@@ -130,10 +130,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
     void bumpUsageRef.current(original)
   })
   const [attachments, setAttachments] = useState<ArtifactRef[]>([])
-  const { scrollRef, contentRef, isAtBottom, scrollToBottom } = useStickToBottom({
-    initial: 'instant',
-    resize: 'instant',
-  })
+  const { scrollRef, contentRef, isAtBottom, scrollToBottom } = useFollowBottom()
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const panelRef = useRef<HTMLDivElement>(null)
   // Snapshot of the in-flight turn's raw input + attachments. Used by Stop/Esc
@@ -786,18 +783,18 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
       <ContextMenu>
         <ContextMenuTrigger asChild>
       <div className="relative flex-1 min-h-0">
-        <div ref={scrollRef} className="h-full overflow-y-auto pt-4">
-          {hydrating ? (
-            <HydratingState />
-          ) : isEmpty && !inFlight ? (
-            <EmptyState
-              onPick={(text) => {
-                void sendMessage(text)
-              }}
-            />
-          ) : (
-            <div className={cn('mx-auto w-full', widthClass)}>
-              <div ref={contentRef}>
+        <div ref={scrollRef} className="h-full overflow-y-auto">
+          <div ref={contentRef} className="min-h-full">
+            {hydrating ? (
+              <HydratingState />
+            ) : isEmpty && !inFlight ? (
+              <EmptyState
+                onPick={(text) => {
+                  void sendMessage(text)
+                }}
+              />
+            ) : (
+              <div className={cn('mx-auto w-full pt-4', widthClass)}>
                 {hiddenCount > 0 && (
                   <div className="flex justify-center py-2">
                     <button
@@ -821,8 +818,8 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
                 })}
                 {inFlight && <TypingIndicator label={deriveLoadingLabel(state)} />}
               </div>
-            </div>
-          )}
+            )}
+          </div>
         </div>
 
         {/* Jump-to-latest button */}
