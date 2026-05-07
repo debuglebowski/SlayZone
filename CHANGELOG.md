@@ -1,6 +1,49 @@
 # Changelog
 
 
+## v0.28.1
+
+[compare changes](https://github.com/debuglebowski/slayzone/compare/v0.28.0...v0.28.1)
+
+### 🚀 Enhancements
+
+- **sidebar:** Pin tasks in tree view to keep them visible ([723cd523](https://github.com/debuglebowski/slayzone/commit/723cd523))
+- **sidebar:** Grid footer, sub-task toggle, ancestor inclusion, archive filter ([beabd168](https://github.com/debuglebowski/slayzone/commit/beabd168))
+- **sidebar:** Tree view honors per-project kanban sortBy ([fb45ec84](https://github.com/debuglebowski/slayzone/commit/fb45ec84))
+
+### 💅 Refactors
+
+- **sidebar:** Full-bleed auto-hide overlay matches inline content ([0e139cd7](https://github.com/debuglebowski/slayzone/commit/0e139cd7))
+
+### 🏡 Chore
+
+- **nix:** Update sources to 0.28.0 ([2d94ba61](https://github.com/debuglebowski/slayzone/commit/2d94ba61))
+
+### ❤️ Contributors
+
+- Debuglebowski
+
+## v0.28.1
+
+[compare changes](https://github.com/debuglebowski/slayzone/compare/v0.28.0...v0.28.1)
+
+### 🚀 Enhancements
+
+- **sidebar:** Pin tasks in tree view to keep them visible ([723cd523](https://github.com/debuglebowski/slayzone/commit/723cd523))
+- **sidebar:** Grid footer, sub-task toggle, ancestor inclusion, archive filter ([beabd168](https://github.com/debuglebowski/slayzone/commit/beabd168))
+
+### 💅 Refactors
+
+- **sidebar:** Full-bleed auto-hide overlay matches inline content ([0e139cd7](https://github.com/debuglebowski/slayzone/commit/0e139cd7))
+
+### 🏡 Chore
+
+- **nix:** Update sources to 0.28.0 ([2d94ba61](https://github.com/debuglebowski/slayzone/commit/2d94ba61))
+
+### ❤️ Contributors
+
+- Debuglebowski
+
 ## v0.28.0
 
 [compare changes](https://github.com/debuglebowski/slayzone/compare/v0.27.2...v0.28.0)

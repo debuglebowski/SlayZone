@@ -1,5 +1,32 @@
 [
   {
+    "version": "0.28.1",
+    "date": "2026-05-07",
+    "tagline": "Sidebar polish",
+    "items": [
+      {
+        "category": "feature",
+        "title": "Pin tasks in tree-view sidebar",
+        "description": "Pin tasks in the tree view to keep them visible regardless of filters or scroll position."
+      },
+      {
+        "category": "feature",
+        "title": "Tree-view filters: sub-tasks, ancestors, archive",
+        "description": "Added a grid footer, sub-task toggle, ancestor inclusion, and archive filter to the tree view for finer control over what's listed."
+      },
+      {
+        "category": "improvement",
+        "title": "Tree view honors per-project sort order",
+        "description": "Tree view now respects each project's kanban sortBy setting so task ordering matches what you see in the board."
+      },
+      {
+        "category": "improvement",
+        "title": "Auto-hide sidebar overlay matches inline content",
+        "description": "Auto-hide overlay is now full-bleed and visually matches the inline sidebar."
+      }
+    ]
+  },
+  {
     "version": "0.28.0",
     "date": "2026-05-07",
     "tagline": "Tree sidebar, faster boot",
