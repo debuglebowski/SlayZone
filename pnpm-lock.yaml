@@ -1508,6 +1508,9 @@ importers:
       '@slayzone/agent-turns':
         specifier: workspace:*
         version: link:../../domains/agent-turns
+      '@slayzone/automations':
+        specifier: workspace:*
+        version: link:../../domains/automations
       '@slayzone/diagnostics':
         specifier: workspace:*
         version: link:../../domains/diagnostics

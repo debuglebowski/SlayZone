@@ -137,8 +137,7 @@ import { registerIntegrationHandlers, ensureIntegrationSchema, ElectronStorageAd
 import { startSyncPoller, pushTaskAfterEdit, pushNewTaskToProviders, pushArchiveToProviders, pushUnarchiveToProviders, startDiscoveryPoller, resetSyncFlags, setStorageAdapter } from '@slayzone/integrations/server'
 import { registerFileEditorHandlers, closeAllWatchers } from '@slayzone/file-editor/electron'
 import { registerTestPanelHandlers } from '@slayzone/test-panel/electron'
-import { registerAutomationHandlers } from '@slayzone/automations/electron'
-import { AutomationEngine } from '@slayzone/automations/server'
+import { AutomationEngine, automationsEvents } from '@slayzone/automations/server'
 import { registerUsageAnalyticsHandlers } from '@slayzone/usage-analytics/electron'
 import { registerScreenshotHandlers } from './screenshot'
 import { registerClipboardHandlers } from './clipboard-handlers'
@@ -1324,12 +1323,11 @@ app.whenReady().then(async () => {
   registerLeaderboardHandlers(ipcMain, db)
   registerTestPanelHandlers(ipcMain, db)
   logBoot('misc handlers registered (file-editor/clipboard/screenshot/export/leaderboard/tests)')
-  const notifyAutomationsChanged = (): void => {
-    mainWindow?.webContents.send('automations:changed')
-    notifyTasksChanged()
-  }
-  const automationEngine = new AutomationEngine(db, notifyAutomationsChanged)
-  registerAutomationHandlers(ipcMain, db, automationEngine)
+  const automationEngine = new AutomationEngine(db)
+  // Each automation 'changed' emit also re-fetches tasks (engine mutations
+  // touch task rows). Renderer subscription `automations.onChanged` handles
+  // the UI side via tRPC.
+  automationsEvents.on('changed', () => notifyTasksChanged())
   automationEngine.start()
   powerMonitor.on('resume', () => automationEngine.runCatchup())
   registerUsageAnalyticsHandlers(ipcMain, db)
@@ -1355,7 +1353,7 @@ app.whenReady().then(async () => {
   setImmediate(() => {
     logBoot('trpc server import dispatched')
     import('@slayzone/transport/server').then((mod) => {
-      mod.startTrpcServer({ db, dataRoot: getDataRoot() })
+      mod.startTrpcServer({ db, dataRoot: getDataRoot(), automationEngine })
       trpcCleanup = () => mod.stopTrpcServer()
       logBoot('trpc server started')
     }).catch((err) => {
@@ -2345,7 +2343,7 @@ div{text-align:center}h1{font-size:14px;font-weight:500;color:#aaa}p{font-size:1
       mcpMod.startMcpServer(db, { automationEngine })
       mcpCleanup = () => mcpMod.stopMcpServer()
       const trpcMod = await import('@slayzone/transport/server')
-      trpcMod.startTrpcServer({ db, dataRoot: getDataRoot() })
+      trpcMod.startTrpcServer({ db, dataRoot: getDataRoot(), automationEngine })
       trpcCleanup = () => trpcMod.stopTrpcServer()
       // Wait for both servers to be listening
       await new Promise<void>((resolve) => {

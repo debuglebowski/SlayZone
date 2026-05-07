@@ -83,7 +83,6 @@ import type {
 } from '@slayzone/ai-config/shared'
 import type { DirEntry, ReadFileResult, FileSearchResult, SearchFilesOptions, GitStatusMap } from '@slayzone/file-editor/shared'
 import type { TestCategory, CreateTestCategoryInput, UpdateTestCategoryInput, TestProfile, ScanResult, TestLabel, CreateTestLabelInput, UpdateTestLabelInput, TestFileLabel, TestFileNote } from '@slayzone/test-panel/shared'
-import type { Automation, AutomationRun, CreateAutomationInput, UpdateAutomationInput } from '@slayzone/automations/shared'
 import type {
   ConnectGithubInput,
   ConnectLinearInput,
@@ -1089,20 +1088,6 @@ export interface ElectronAPI {
     toggleFileLabel: (projectId: string, filePath: string, labelId: string) => Promise<void>
     getFileNotes: (projectId: string) => Promise<TestFileNote[]>
     setFileNote: (projectId: string, filePath: string, note: string) => Promise<void>
-  }
-
-  automations: {
-    getByProject: (projectId: string) => Promise<Automation[]>
-    get: (id: string) => Promise<Automation | null>
-    create: (data: CreateAutomationInput) => Promise<Automation>
-    update: (data: UpdateAutomationInput) => Promise<Automation>
-    delete: (id: string) => Promise<boolean>
-    toggle: (id: string, enabled: boolean) => Promise<Automation>
-    reorder: (ids: string[]) => Promise<void>
-    getRuns: (automationId: string, limit?: number) => Promise<AutomationRun[]>
-    runManual: (id: string) => Promise<AutomationRun>
-    clearRuns: (automationId: string) => Promise<void>
-    onChanged: (callback: () => void) => () => void
   }
 
   usageAnalytics: {
