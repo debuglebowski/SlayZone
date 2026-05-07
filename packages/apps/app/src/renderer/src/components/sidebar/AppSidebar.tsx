@@ -110,21 +110,19 @@ export function AppSidebar({
       collapsible="none"
       style={effectiveWidth != null ? { width: effectiveWidth } : undefined}
       className={cn(
-        'relative',
+        'relative h-svh',
         zenMode && '!w-0 overflow-hidden',
         !zenMode && effectiveWidth == null && view.width,
-        autoHideActive
-          ? 'h-full rounded-xl overflow-hidden shadow-2xl border border-border'
-          : 'h-svh'
+        autoHideActive && 'shadow-[0_0_60px_-10px_rgba(0,0,0,0.6)]'
       )}
     >
-      {sidebarView === 'tree' && !autoHideActive && (
+      {sidebarView === 'tree' && (
         <div className="absolute top-0 left-0 right-0 h-11 flex items-center justify-end gap-1 pr-3 z-20">
           <TreeStatusFilter />
           <TreeDisplaySettings />
         </div>
       )}
-      <SidebarContent className={cn('pb-4 scrollbar-hide', autoHideActive ? 'pt-4' : 'pt-11')}>
+      <SidebarContent className="pb-4 pt-11 scrollbar-hide">
         <SidebarGroup>
           <SidebarGroupContent>
             {view.render({
@@ -209,10 +207,10 @@ export function AppSidebar({
         {/* Floating card overlay (with right-edge spatial grace buffer) */}
         <div
           className={cn(
-            'fixed top-10 bottom-2 left-2 z-40 transition-transform duration-200 ease-out pr-10',
+            'fixed inset-y-0 left-0 z-40 transition-transform duration-200 ease-out pr-10',
             hoverRevealed
               ? 'translate-x-0'
-              : '-translate-x-[calc(100%+0.5rem)] pointer-events-none'
+              : '-translate-x-full pointer-events-none'
           )}
           onMouseEnter={() => {
             cancelClose()
