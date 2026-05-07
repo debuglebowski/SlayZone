@@ -49,6 +49,8 @@ interface TabState {
   sidebarWidth: number | null
   // When true, the sidebar collapses to a hover-revealed floating panel.
   sidebarAutoHide: boolean
+  // Tree-view status filter — task statuses to include.
+  treeStatusFilter: string[]
   // projectId → taskId of last active task tab, or 'home' if home tab was last active
   projectLastActiveTab: Record<string, string>
 
@@ -65,6 +67,7 @@ interface TabState {
   setSidebarView: (id: string) => void
   setSidebarWidth: (width: number | null) => void
   setSidebarAutoHide: (enabled: boolean) => void
+  setTreeStatusFilter: (statuses: string[]) => void
   setTabs: (tabs: Tab[]) => void
   reorderTabs: (from: number, to: number) => void
   openTask: (taskId: string) => void
@@ -75,7 +78,7 @@ interface TabState {
   reopenClosedTab: () => void
 
   // Internal
-  _loadState: (state: { tabs: Tab[]; activeTabIndex: number; activeView?: ActiveView; selectedProjectId: string; projectScopedTabs?: boolean; sidebarView?: string; sidebarWidth?: number | null; sidebarAutoHide?: boolean; projectLastActiveTab?: Record<string, string> }) => void
+  _loadState: (state: { tabs: Tab[]; activeTabIndex: number; activeView?: ActiveView; selectedProjectId: string; projectScopedTabs?: boolean; sidebarView?: string; sidebarWidth?: number | null; sidebarAutoHide?: boolean; treeStatusFilter?: string[]; projectLastActiveTab?: Record<string, string> }) => void
 }
 
 function findWorktreeInsertIndex(taskId: string, tabs: Tab[], lookup: TaskLookup): number {
@@ -112,6 +115,7 @@ export const useTabStore = create<TabState>()(
     sidebarView: 'projects',
     sidebarWidth: null,
     sidebarAutoHide: false,
+    treeStatusFilter: ['in_progress'],
     projectLastActiveTab: {},
     _taskLookup: { tasks: [], projects: [] },
 
@@ -147,6 +151,8 @@ export const useTabStore = create<TabState>()(
     setSidebarWidth: (width) => set({ sidebarWidth: width }),
 
     setSidebarAutoHide: (enabled) => set({ sidebarAutoHide: enabled }),
+
+    setTreeStatusFilter: (statuses) => set({ treeStatusFilter: statuses }),
 
     setTabs: (tabs) => set({ tabs }),
 
@@ -268,6 +274,9 @@ export const useTabStore = create<TabState>()(
         sidebarView: typeof state.sidebarView === 'string' ? state.sidebarView : 'projects',
         sidebarWidth: typeof state.sidebarWidth === 'number' && state.sidebarWidth > 0 ? state.sidebarWidth : null,
         sidebarAutoHide: !!state.sidebarAutoHide,
+        treeStatusFilter: Array.isArray(state.treeStatusFilter) && state.treeStatusFilter.every((s) => typeof s === 'string')
+          ? state.treeStatusFilter
+          : ['in_progress'],
         projectLastActiveTab: state.projectLastActiveTab && typeof state.projectLastActiveTab === 'object' ? state.projectLastActiveTab : {},
         isLoaded: true
       })
@@ -305,7 +314,7 @@ export const tabStoreReady: Promise<void> = (typeof window !== 'undefined' && wi
 let _debounceTimer: ReturnType<typeof setTimeout> | null = null
 
 useTabStore.subscribe(
-  (state) => ({ tabs: state.tabs, activeTabIndex: state.activeTabIndex, activeView: state.activeView, selectedProjectId: state.selectedProjectId, projectScopedTabs: state.projectScopedTabs, sidebarView: state.sidebarView, sidebarWidth: state.sidebarWidth, sidebarAutoHide: state.sidebarAutoHide, projectLastActiveTab: state.projectLastActiveTab }),
+  (state) => ({ tabs: state.tabs, activeTabIndex: state.activeTabIndex, activeView: state.activeView, selectedProjectId: state.selectedProjectId, projectScopedTabs: state.projectScopedTabs, sidebarView: state.sidebarView, sidebarWidth: state.sidebarWidth, sidebarAutoHide: state.sidebarAutoHide, treeStatusFilter: state.treeStatusFilter, projectLastActiveTab: state.projectLastActiveTab }),
   (slice) => {
     if (!useTabStore.getState().isLoaded) return
     if (_debounceTimer) clearTimeout(_debounceTimer)

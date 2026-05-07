@@ -2,7 +2,7 @@ import { useMemo, useState, type ReactNode } from 'react'
 import { ChevronDown, Settings } from 'lucide-react'
 import * as Collapsible from '@radix-ui/react-collapsible'
 import { cn } from '@slayzone/ui'
-import { isInProgress, type Task } from '@slayzone/task/shared'
+import { type Task } from '@slayzone/task/shared'
 import { useTabStore } from '@slayzone/settings'
 import { useIdleTasks, useActiveSessionTaskIds } from '@/components/agent-status/useIdleTasks'
 import type { SidebarViewContext } from './types'
@@ -61,31 +61,35 @@ export function TreeView({
   onSelectProject,
   onProjectSettings,
   onTaskClick,
+  taskContextMenuRender,
 }: SidebarViewContext) {
   const sortedProjects = useMemo(
     () => [...projects].sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0)),
     [projects]
   )
 
+  const treeStatusFilter = useTabStore((s) => s.treeStatusFilter)
+  const statusFilter = useMemo(() => new Set(treeStatusFilter), [treeStatusFilter])
+
   const tasksByProject = useMemo(() => {
     const m = new Map<string, Task[]>()
     for (const t of tasks) {
-      if (!isInProgress(t.status)) continue
+      if (!statusFilter.has(t.status)) continue
       const arr = m.get(t.project_id) ?? []
       arr.push(t)
       m.set(t.project_id, arr)
     }
     return m
-  }, [tasks])
+  }, [tasks, statusFilter])
 
   // For each in-progress task id → its in-progress children. Subtasks whose parent
   // is not in-progress are promoted to the project root.
   const childrenByParent = useMemo(() => {
     const inProgressIds = new Set<string>()
-    for (const t of tasks) if (isInProgress(t.status)) inProgressIds.add(t.id)
+    for (const t of tasks) if (statusFilter.has(t.status)) inProgressIds.add(t.id)
     const m = new Map<string, Task[]>()
     for (const t of tasks) {
-      if (!isInProgress(t.status)) continue
+      if (!statusFilter.has(t.status)) continue
       const pid = t.parent_id
       if (pid && inProgressIds.has(pid)) {
         const arr = m.get(pid) ?? []
@@ -94,14 +98,14 @@ export function TreeView({
       }
     }
     return m
-  }, [tasks])
+  }, [tasks, statusFilter])
 
   const rootTasksByProject = useMemo(() => {
     const inProgressIds = new Set<string>()
-    for (const t of tasks) if (isInProgress(t.status)) inProgressIds.add(t.id)
+    for (const t of tasks) if (statusFilter.has(t.status)) inProgressIds.add(t.id)
     const m = new Map<string, Task[]>()
     for (const t of tasks) {
-      if (!isInProgress(t.status)) continue
+      if (!statusFilter.has(t.status)) continue
       const isOrphan = !t.parent_id || !inProgressIds.has(t.parent_id)
       if (!isOrphan) continue
       const arr = m.get(t.project_id) ?? []
@@ -109,7 +113,7 @@ export function TreeView({
       m.set(t.project_id, arr)
     }
     return m
-  }, [tasks])
+  }, [tasks, statusFilter])
 
   const { idleTasks } = useIdleTasks(tasks, null)
   const idleByTask = useMemo(() => {
@@ -170,30 +174,33 @@ export function TreeView({
     const isActive = activeTaskId === task.id
     const isIdle = idleByTask.has(task.id)
     const children = childrenByParent.get(task.id) ?? []
+    const button = (
+      <button
+        type="button"
+        onClick={() => onTaskClick?.(task.id)}
+        style={{ paddingLeft: tgPaddingLeft(depth), minHeight: TG_ROW_HEIGHT }}
+        className={cn(
+          'relative flex w-full items-center gap-2 rounded-md pr-2 py-1 text-sm text-left transition-colors',
+          isActive
+            ? 'bg-white/10 text-foreground'
+            : 'text-muted-foreground hover:bg-accent/40 hover:text-accent-foreground'
+        )}
+      >
+        <TreeGuides depth={depth} ancestorFlags={ancestorFlags} />
+        {isIdle ? (
+          <span
+            aria-label="idle"
+            className="size-1.5 rounded-full bg-primary shrink-0 animate-pulse"
+          />
+        ) : (
+          <span className="size-1.5 rounded-full bg-muted-foreground/30 shrink-0" />
+        )}
+        <span className="truncate">{task.title || 'Untitled'}</span>
+      </button>
+    )
     return (
       <div key={task.id}>
-        <button
-          type="button"
-          onClick={() => onTaskClick?.(task.id)}
-          style={{ paddingLeft: tgPaddingLeft(depth), minHeight: TG_ROW_HEIGHT }}
-          className={cn(
-            'relative flex w-full items-center gap-2 rounded-md pr-2 py-1 text-sm text-left transition-colors',
-            isActive
-              ? 'bg-white/10 text-foreground'
-              : 'text-muted-foreground hover:bg-accent/40 hover:text-accent-foreground'
-          )}
-        >
-          <TreeGuides depth={depth} ancestorFlags={ancestorFlags} />
-          {isIdle ? (
-            <span
-              aria-label="idle"
-              className="size-1.5 rounded-full bg-primary shrink-0 animate-pulse"
-            />
-          ) : (
-            <span className="size-1.5 rounded-full bg-muted-foreground/30 shrink-0" />
-          )}
-          <span className="truncate">{task.title || 'Untitled'}</span>
-        </button>
+        {taskContextMenuRender ? taskContextMenuRender(task, button) : button}
         {children.map((c, i) => renderTask(c, depth + 1, [...ancestorFlags, i < children.length - 1]))}
       </div>
     )

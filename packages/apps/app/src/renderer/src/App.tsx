@@ -17,7 +17,8 @@ import {
   useFilterState,
   applyFilters,
   getViewConfig,
-  useSnoozeWakeUp
+  useSnoozeWakeUp,
+  TaskContextMenu
 } from '@slayzone/tasks'
 import { ResizeHandle } from '@slayzone/task/client/ResizeHandle'
 import { usePanelSizes } from '@slayzone/task/client/usePanelSizes'
@@ -1139,6 +1140,23 @@ function App(): React.JSX.Element {
           onLeaderboard={() => { useTabStore.getState().setActiveView('leaderboard') }}
           onUsageAnalytics={() => { useTabStore.getState().setActiveView('usage-analytics') }}
           onTaskClick={openTask} zenMode={zenMode} onboardingChecklist={onboardingChecklist} idleByProject={idleByProject} onReorderProjects={reorderProjects}
+          taskContextMenuRender={(task, child) => (
+            <TaskContextMenu
+              task={task}
+              projects={projects}
+              columns={columnsByProjectId.get(task.project_id) ?? null}
+              tags={tags.filter((t) => t.project_id === task.project_id)}
+              taskTagIds={taskTags.get(task.id) ?? []}
+              isBlocked={blockedTaskIds.has(task.id)}
+              onUpdateTask={contextMenuUpdate}
+              onArchiveTask={archiveTask}
+              onDeleteTask={deleteTask}
+              onTaskTagsChange={handleTaskTagsChange}
+              onTagCreated={(tag) => setTags((prev) => [...prev, tag])}
+            >
+              {child}
+            </TaskContextMenu>
+          )}
         />
 
         <div id="right-column" className={`flex-1 flex min-w-0 bg-sidebar pb-2 pr-2 ${zenMode || sidebarAutoHide ? 'pl-2' : ''}`}>

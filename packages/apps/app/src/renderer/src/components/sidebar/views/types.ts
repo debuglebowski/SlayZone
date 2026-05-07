@@ -12,6 +12,8 @@ export interface SidebarViewContext {
   onTaskClick?: (taskId: string) => void
   onReorderProjects: (projectIds: string[]) => void
   idleByProject?: Map<string, number>
+  /** Render a task-row context-menu wrapper. Caller wires update/archive/delete + tag handlers. */
+  taskContextMenuRender?: (task: Task, child: ReactNode) => ReactNode
 }
 
 export interface SidebarView {

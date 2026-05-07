@@ -8,12 +8,14 @@ import {
   cn,
 } from '@slayzone/ui'
 import { useTabStore } from '@slayzone/settings'
+import type { ReactNode } from 'react'
 import type { Task } from '@slayzone/task/shared'
 import type { Project } from '@slayzone/projects/shared'
 import type { OnboardingChecklistState } from '@/hooks/useOnboardingChecklist'
 import { SidebarFooterIcons } from './SidebarFooterIcons'
 import { SidebarViewSwitcher } from './SidebarViewSwitcher'
 import { SidebarResizeHandle } from './SidebarResizeHandle'
+import { TreeStatusFilter } from './TreeStatusFilter'
 import { getView } from './views/registry'
 
 interface AppSidebarProps {
@@ -30,6 +32,7 @@ interface AppSidebarProps {
   onboardingChecklist: OnboardingChecklistState
   idleByProject?: Map<string, number>
   onReorderProjects: (projectIds: string[]) => void
+  taskContextMenuRender?: (task: Task, child: ReactNode) => ReactNode
 }
 
 export function AppSidebar({
@@ -46,6 +49,7 @@ export function AppSidebar({
   onboardingChecklist,
   idleByProject,
   onReorderProjects,
+  taskContextMenuRender,
 }: AppSidebarProps) {
   const sidebarView = useTabStore((s) => s.sidebarView)
   const setSidebarView = useTabStore((s) => s.setSidebarView)
@@ -105,7 +109,12 @@ export function AppSidebar({
           : 'h-svh'
       )}
     >
-      <SidebarContent className={cn('pb-4 scrollbar-hide', autoHideActive ? 'pt-4' : 'pt-10')}>
+      {sidebarView === 'tree' && !autoHideActive && (
+        <div className="absolute top-0 left-0 right-0 h-11 flex items-center justify-end pr-3 z-20">
+          <TreeStatusFilter />
+        </div>
+      )}
+      <SidebarContent className={cn('pb-4 scrollbar-hide', autoHideActive ? 'pt-4' : 'pt-11')}>
         <SidebarGroup>
           <SidebarGroupContent>
             {view.render({
@@ -117,6 +126,7 @@ export function AppSidebar({
               onTaskClick,
               onReorderProjects,
               idleByProject,
+              taskContextMenuRender,
             })}
           </SidebarGroupContent>
         </SidebarGroup>
