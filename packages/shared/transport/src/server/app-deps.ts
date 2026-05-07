@@ -67,6 +67,8 @@ export type AppDeps = {
   appWindowGetDisplayScaleFactor: () => number
   authGithubSystemSignIn: (input: { convexUrl: string; redirectTo: string }) => Promise<unknown>
 
+  dialogShowOpenDialog: (options: unknown) => Promise<{ canceled: boolean; filePaths: string[] }>
+
   // Browser view manager — heavy electron coupling, expose as opaque object
   // and call methods directly from procedures. All return types are unknown
   // since the manager's public surface evolves; callers cast on the renderer.

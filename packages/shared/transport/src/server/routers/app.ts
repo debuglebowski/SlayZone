@@ -158,6 +158,13 @@ export const appLevelRouter = router({
     getDisplayScaleFactor: publicProcedure.query(() => getAppDeps().appWindowGetDisplayScaleFactor()),
   }),
 
+  // Dialog
+  dialog: router({
+    showOpenDialog: publicProcedure.input(anyInput).mutation(({ input }) =>
+      getAppDeps().dialogShowOpenDialog(input),
+    ),
+  }),
+
   // Auth
   auth: router({
     githubSystemSignIn: publicProcedure.input(anyInput).mutation(({ input }) =>

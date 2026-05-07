@@ -2919,7 +2919,7 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
                 className="shrink-0 h-7 w-7 flex items-center justify-center rounded hover:bg-muted"
                 title="Change working directory"
                 onClick={async () => {
-                  const result = await window.api.dialog.showOpenDialog({
+                  const result = await getTrpcVanillaClient().app.dialog.showOpenDialog.mutate({
                     title: 'Select Working Directory',
                     defaultPath: task.base_dir ?? effectiveRepoPath ?? undefined,
                     properties: ['openDirectory']

@@ -29,9 +29,6 @@ const api: ElectronAPI = {
   shortcuts: {
     changed: () => ipcRenderer.send('shortcuts:changed'),
   },
-  dialog: {
-    showOpenDialog: (options) => ipcRenderer.invoke('dialog:showOpenDialog', options)
-  },
   app: {
     getTrpcPort: () => ipcRenderer.invoke('app:get-trpc-port') as Promise<number>,
     isTestsPanelEnabledSync: ipcRenderer.sendSync('app:is-tests-panel-enabled-sync') as boolean,

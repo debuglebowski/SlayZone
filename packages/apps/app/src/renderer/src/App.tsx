@@ -1126,7 +1126,7 @@ function App(): React.JSX.Element {
   const handleFixProjectPath = useCallback(async (): Promise<void> => {
     const project = projects.find((p) => p.id === selectedProjectId)
     if (!project) return
-    const result = await window.api.dialog.showOpenDialog({ title: 'Select Project Directory', defaultPath: project.path || undefined, properties: ['openDirectory'] })
+    const result = await getTrpcVanillaClient().app.dialog.showOpenDialog.mutate({ title: 'Select Project Directory', defaultPath: project.path || undefined, properties: ['openDirectory'] })
     if (result.canceled || !result.filePaths[0]) return
     const updated = await getTrpcVanillaClient().projects.update.mutate({ id: project.id, path: result.filePaths[0] })
     updateProject(updated); validateProjectPath(updated)

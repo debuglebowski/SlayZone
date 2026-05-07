@@ -39,7 +39,7 @@ export function GeneralTab({ project, onUpdated, onChanged, onClose }: GeneralTa
   const lettersPreview = iconLetters.trim().toUpperCase() || fallbackLetters
 
   const handleBrowse = async () => {
-    const result = await window.api.dialog.showOpenDialog({
+    const result = await getTrpcVanillaClient().app.dialog.showOpenDialog.mutate({
       title: 'Select Project Directory',
       defaultPath: path || undefined,
       properties: ['openDirectory', 'createDirectory', 'promptToCreate']
@@ -50,7 +50,7 @@ export function GeneralTab({ project, onUpdated, onChanged, onClose }: GeneralTa
   }
 
   const handleUploadIcon = async () => {
-    const result = await window.api.dialog.showOpenDialog({
+    const result = await getTrpcVanillaClient().app.dialog.showOpenDialog.mutate({
       title: 'Select Project Icon',
       properties: ['openFile'],
       filters: [{ name: 'Images', extensions: ['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg'] }]

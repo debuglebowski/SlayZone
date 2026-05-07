@@ -1553,6 +1553,7 @@ app.whenReady().then(async () => {
         return true
       },
     },
+    dialogShowOpenDialog: (options) => dialog.showOpenDialog(options as Electron.OpenDialogOptions),
     authGithubSystemSignIn: async (input) => {
       try {
         if (!input?.convexUrl) return { ok: false, error: 'Convex URL is required' }
@@ -1908,21 +1909,6 @@ div{text-align:center}h1{font-size:14px;font-weight:500;color:#aaa}p{font-size:1
     if (win) win.close()
   })
 
-  // Dialog
-  ipcMain.handle(
-    'dialog:showOpenDialog',
-    async (
-      _,
-      options: {
-        title?: string
-        defaultPath?: string
-        properties?: Array<'openFile' | 'openDirectory' | 'multiSelections' | 'showHiddenFiles' | 'createDirectory' | 'promptToCreate' | 'noResolveAliases' | 'treatPackageAsDirectory' | 'dontAddToRecent'>
-        filters?: Array<{ name: string; extensions: string[] }>
-      }
-    ) => {
-      return dialog.showOpenDialog(options)
-    }
-  )
 
 
   // Webview shortcut interception

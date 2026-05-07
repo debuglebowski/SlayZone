@@ -52,7 +52,7 @@ export function CreateProjectDialog({ open, onOpenChange, onCreated }: CreatePro
   const visibleStartOptions = START_OPTIONS
 
   const handleBrowse = async () => {
-    const result = await window.api.dialog.showOpenDialog({
+    const result = await getTrpcVanillaClient().app.dialog.showOpenDialog.mutate({
       title: 'Select Project Directory',
       properties: ['openDirectory', 'createDirectory', 'promptToCreate']
     })

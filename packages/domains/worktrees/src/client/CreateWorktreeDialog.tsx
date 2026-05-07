@@ -36,7 +36,7 @@ export function CreateWorktreeDialog({
   const [phase, setPhase] = useState<CreateWorktreePhase | null>(null)
 
   const handleBrowse = async () => {
-    const result = await window.api.dialog.showOpenDialog({
+    const result = await getTrpcVanillaClient().app.dialog.showOpenDialog.mutate({
       title: 'Select Worktree Directory',
       properties: ['openDirectory', 'createDirectory', 'promptToCreate']
     })

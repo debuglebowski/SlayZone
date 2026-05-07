@@ -91,7 +91,7 @@ export function DataSettingsTab() {
                   variant="outline"
                   aria-label="Browse folder"
                   onClick={async () => {
-                    const result = await window.api.dialog.showOpenDialog({
+                    const result = await getTrpcVanillaClient().app.dialog.showOpenDialog.mutate({
                       title: 'Select Project Directory',
                       defaultPath: p.path || undefined,
                       properties: ['openDirectory']

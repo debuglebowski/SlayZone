@@ -121,14 +121,6 @@ export interface ElectronAPI {
   shortcuts: {
     changed: () => void
   }
-  dialog: {
-    showOpenDialog: (options: {
-      title?: string
-      defaultPath?: string
-      properties?: Array<'openFile' | 'openDirectory' | 'multiSelections' | 'showHiddenFiles' | 'createDirectory' | 'promptToCreate' | 'noResolveAliases' | 'treatPackageAsDirectory' | 'dontAddToRecent'>
-      filters?: Array<{ name: string; extensions: string[] }>
-    }) => Promise<{ canceled: boolean; filePaths: string[] }>
-  }
   app: {
     getTrpcPort: () => Promise<number>
     isTestsPanelEnabledSync: boolean

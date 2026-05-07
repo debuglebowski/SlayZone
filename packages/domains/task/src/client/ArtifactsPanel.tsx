@@ -680,7 +680,7 @@ export const ArtifactsPanel = forwardRef<ArtifactsPanelHandle, ArtifactsPanelPro
   // --- Upload / drop ---
 
   const handleUpload = useCallback(async () => {
-    const result = await window.api.dialog.showOpenDialog({
+    const result = await getTrpcVanillaClient().app.dialog.showOpenDialog.mutate({
       title: 'Upload Artifact',
       properties: ['openFile', 'multiSelections']
     })
