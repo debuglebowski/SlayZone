@@ -37,7 +37,7 @@ import type { Project } from '@slayzone/projects/shared'
 import type { ColumnConfig } from '@slayzone/projects/shared'
 import type { Tag } from '@slayzone/tags/shared'
 import { CreateTagDialog } from '@slayzone/tags/client'
-import { Plus, AlarmClock, X, CircleDot, Signal, Tag as TagIcon, FolderInput, Copy, Archive, Trash2, ShieldAlert, ListChecks, MessageSquare, Check } from 'lucide-react'
+import { Plus, AlarmClock, X, CircleDot, Signal, Tag as TagIcon, FolderInput, Copy, Archive, Trash2, ShieldAlert, ListChecks, MessageSquare, Check, Power } from 'lucide-react'
 import { track } from '@slayzone/telemetry/client'
 import { format } from 'date-fns'
 import { getSnoozePresets, CustomSnoozeDialog } from '@slayzone/task/client'
@@ -55,6 +55,8 @@ interface TaskContextMenuProps {
   onDeleteTask: (taskId: string) => void
   onTaskTagsChange?: (taskId: string, tagIds: string[]) => void
   onTagCreated?: (tag: Tag) => void
+  /** Provided when the task has an active agent session (PTY or chat). Renders a "Shut down agent" item. */
+  onShutdownAgent?: () => void
   children: React.ReactNode
 }
 
@@ -78,6 +80,7 @@ export function TaskContextMenu({
   onDeleteTask,
   onTaskTagsChange,
   onTagCreated,
+  onShutdownAgent,
   children
 }: TaskContextMenuProps): React.JSX.Element {
   const [archiveDialogOpen, setArchiveDialogOpen] = useState(false)
@@ -297,6 +300,16 @@ export function TaskContextMenu({
               </ContextMenuItem>
             </ContextMenuSubContent>
           </ContextMenuSub>
+
+          {onShutdownAgent && (
+            <>
+              <ContextMenuSeparator />
+              <ContextMenuItem onSelect={onShutdownAgent}>
+                <Power className="mr-2 size-3.5" />
+                Shut down agent
+              </ContextMenuItem>
+            </>
+          )}
 
           <ContextMenuSeparator />
 

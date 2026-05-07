@@ -1,19 +1,19 @@
 import { useMemo, useState, type ReactNode } from 'react'
-import { ChevronDown, Settings } from 'lucide-react'
+import { ChevronDown, Home, Settings } from 'lucide-react'
 import * as Collapsible from '@radix-ui/react-collapsible'
-import { cn } from '@slayzone/ui'
+import { cn, TerminalProgressDot } from '@slayzone/ui'
 import { type Task } from '@slayzone/task/shared'
 import { useTabStore } from '@slayzone/settings'
-import { useIdleTasks, useActiveSessionTaskIds } from '@/components/agent-status/useIdleTasks'
+import { useActiveSessionTaskIds } from '@/components/agent-status/useIdleTasks'
 import type { SidebarViewContext } from './types'
 
 // Tree guide layout (mirrors EditorToc / ManagerSidebar).
-const TG_INDENT = 18
-const TG_ROW_HEIGHT = 28
+const TG_INDENT = 22
+const TG_ROW_HEIGHT = 32
 const TG_CURVE_R = 5
 const TG_ELBOW_END_OFFSET = 7
 const TG_ROOT_X = 15
-const TG_TEXT_GAP_AFTER_CURVE = 8
+const TG_TEXT_GAP_AFTER_CURVE = 2
 const tgGuideX = (ancestorDepth: number) => TG_ROOT_X + TG_INDENT * ancestorDepth
 const tgPaddingLeft = (depth: number) =>
   depth === 0 ? TG_ROOT_X : tgGuideX(depth - 1) + TG_ELBOW_END_OFFSET + TG_TEXT_GAP_AFTER_CURVE
@@ -62,6 +62,9 @@ export function TreeView({
   onProjectSettings,
   onTaskClick,
   taskContextMenuRender,
+  terminalStates,
+  taskProgress,
+  doneTaskIds,
 }: SidebarViewContext) {
   const sortedProjects = useMemo(
     () => [...projects].sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0)),
@@ -115,13 +118,6 @@ export function TreeView({
     return m
   }, [tasks, statusFilter])
 
-  const { idleTasks } = useIdleTasks(tasks, null)
-  const idleByTask = useMemo(() => {
-    const s = new Set<string>()
-    for (const it of idleTasks) s.add(it.task.id)
-    return s
-  }, [idleTasks])
-
   const activeTaskId = useTabStore((s) => {
     const tab = s.tabs[s.activeTabIndex]
     return tab?.type === 'task' ? tab.taskId : null
@@ -172,30 +168,35 @@ export function TreeView({
 
   const renderTask = (task: Task, depth: number, ancestorFlags: boolean[]): ReactNode => {
     const isActive = activeTaskId === task.id
-    const isIdle = idleByTask.has(task.id)
     const children = childrenByParent.get(task.id) ?? []
+    const termState = terminalStates?.get(task.id)
+    const progress = taskProgress?.get(task.id)
+    const isDone = doneTaskIds?.has(task.id) ?? false
     const button = (
       <button
         type="button"
         onClick={() => onTaskClick?.(task.id)}
         style={{ paddingLeft: tgPaddingLeft(depth), minHeight: TG_ROW_HEIGHT }}
-        className={cn(
-          'relative flex w-full items-center gap-2 rounded-md pr-2 py-1 text-sm text-left transition-colors',
-          isActive
-            ? 'bg-white/10 text-foreground'
-            : 'text-muted-foreground hover:bg-accent/40 hover:text-accent-foreground'
-        )}
+        className="relative flex w-full items-center pr-1 text-sm text-left"
       >
         <TreeGuides depth={depth} ancestorFlags={ancestorFlags} />
-        {isIdle ? (
-          <span
-            aria-label="idle"
-            className="size-1.5 rounded-full bg-primary shrink-0 animate-pulse"
+        <span
+          className={cn(
+            'flex flex-1 items-center gap-2 rounded-md px-1.5 py-1 min-w-0 transition-colors',
+            isActive
+              ? 'bg-white/10 text-foreground'
+              : 'text-muted-foreground hover:bg-accent/40 hover:text-accent-foreground'
+          )}
+        >
+          <TerminalProgressDot
+            state={termState}
+            progress={progress}
+            isDone={isDone}
+            alwaysShow
+            tooltipSide="right"
           />
-        ) : (
-          <span className="size-1.5 rounded-full bg-muted-foreground/30 shrink-0" />
-        )}
-        <span className="truncate">{task.title || 'Untitled'}</span>
+          <span className="truncate">{task.title || 'Untitled'}</span>
+        </span>
       </button>
     )
     return (
@@ -216,12 +217,13 @@ export function TreeView({
         key={project.id}
         open={isOpen}
         onOpenChange={(open) => setOpenProjects((s) => ({ ...s, [project.id]: open }))}
+        className="rounded-lg overflow-hidden bg-surface-1"
       >
         <div
           style={{
             backgroundColor: `color-mix(in oklch, ${project.color} ${projectIsActive(project.id) ? 22 : 10}%, transparent)`
           }}
-          className="group/projectrow relative flex items-center gap-0.5 rounded-md transition-[filter] hover:brightness-125"
+          className="group/projectrow relative flex items-center gap-0.5 transition-[filter] hover:brightness-125"
         >
           <Collapsible.Trigger
             aria-label={isOpen ? `Collapse ${project.name}` : `Expand ${project.name}`}
@@ -234,17 +236,21 @@ export function TreeView({
               )}
             />
           </Collapsible.Trigger>
+          <Collapsible.Trigger asChild>
+            <button
+              type="button"
+              className="flex flex-1 items-center gap-2 rounded-md px-2 py-1.5 text-sm min-w-0"
+            >
+              <span className="truncate flex-1 text-left">{project.name}</span>
+            </button>
+          </Collapsible.Trigger>
           <button
             type="button"
             onClick={() => onSelectProject(project.id)}
-            className="flex flex-1 items-center gap-2 rounded-md px-2 py-1.5 text-sm min-w-0"
+            aria-label={`Open ${project.name} home`}
+            className="inline-flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:text-foreground transition-colors"
           >
-            <span className="truncate flex-1 text-left">{project.name}</span>
-            {projectTasks.length > 0 && (
-              <span className="text-[10px] opacity-60 tabular-nums shrink-0">
-                {projectTasks.length}
-              </span>
-            )}
+            <Home className="size-3.5" />
           </button>
           <button
             type="button"
@@ -256,7 +262,7 @@ export function TreeView({
           </button>
         </div>
         <Collapsible.Content className="overflow-hidden data-[state=closed]:animate-collapsible-up data-[state=open]:animate-collapsible-down">
-          <div className="flex flex-col pr-1 pb-1">
+          <div className="flex flex-col pr-2 pt-2 pb-2">
             {projectTasks.length === 0 ? (
               <span className="text-xs italic text-muted-foreground/60 px-2 py-1">
                 No active tasks
@@ -271,7 +277,7 @@ export function TreeView({
   }
 
   return (
-    <div className="flex flex-col gap-1 px-2">
+    <div className="flex flex-col gap-1 px-3">
       {visibleProjects.map(renderProject)}
       {hiddenProjects.length > 0 && (
         <button

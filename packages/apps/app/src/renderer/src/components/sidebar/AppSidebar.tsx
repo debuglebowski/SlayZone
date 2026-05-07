@@ -11,6 +11,7 @@ import { useTabStore } from '@slayzone/settings'
 import type { ReactNode } from 'react'
 import type { Task } from '@slayzone/task/shared'
 import type { Project } from '@slayzone/projects/shared'
+import type { TerminalState } from '@slayzone/terminal/shared'
 import type { OnboardingChecklistState } from '@/hooks/useOnboardingChecklist'
 import { SidebarFooterIcons } from './SidebarFooterIcons'
 import { SidebarViewSwitcher } from './SidebarViewSwitcher'
@@ -33,6 +34,9 @@ interface AppSidebarProps {
   idleByProject?: Map<string, number>
   onReorderProjects: (projectIds: string[]) => void
   taskContextMenuRender?: (task: Task, child: ReactNode) => ReactNode
+  terminalStates?: Map<string, TerminalState>
+  taskProgress?: Map<string, number>
+  doneTaskIds?: Set<string>
 }
 
 export function AppSidebar({
@@ -50,6 +54,9 @@ export function AppSidebar({
   idleByProject,
   onReorderProjects,
   taskContextMenuRender,
+  terminalStates,
+  taskProgress,
+  doneTaskIds,
 }: AppSidebarProps) {
   const sidebarView = useTabStore((s) => s.sidebarView)
   const setSidebarView = useTabStore((s) => s.setSidebarView)
@@ -127,6 +134,9 @@ export function AppSidebar({
               onReorderProjects,
               idleByProject,
               taskContextMenuRender,
+              terminalStates,
+              taskProgress,
+              doneTaskIds,
             })}
           </SidebarGroupContent>
         </SidebarGroup>

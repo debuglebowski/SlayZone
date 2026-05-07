@@ -52,6 +52,8 @@ interface KanbanBoardProps {
   onDeleteTask?: (taskId: string) => void
   onBulkDeleteTasks?: (taskIds: string[]) => void
   onArchiveAllTasks?: (taskIds: string[]) => void
+  activeAgentTaskIds?: Set<string>
+  onShutdownAgent?: (taskId: string) => void
   // Reset selection when this key changes (e.g. project id)
   selectionResetKey?: string | null
 }
@@ -78,6 +80,8 @@ export function KanbanBoard({
   onDeleteTask,
   onBulkDeleteTasks,
   onArchiveAllTasks,
+  activeAgentTaskIds,
+  onShutdownAgent,
   selectionResetKey
 }: KanbanBoardProps): React.JSX.Element {
   const { groupBy, sortBy, showEmptyColumns } = viewConfig
@@ -331,6 +335,8 @@ export function KanbanBoard({
             onDeleteTask={onDeleteTask}
             onBulkDeleteTasks={onBulkDeleteTasks}
             onArchiveAllTasks={onArchiveAllTasks}
+            activeAgentTaskIds={activeAgentTaskIds}
+            onShutdownAgent={onShutdownAgent}
             allTasks={tasks}
           />
         ))}

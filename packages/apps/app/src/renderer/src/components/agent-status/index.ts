@@ -1,5 +1,5 @@
 export { AgentStatusButton } from './AgentStatusButton'
 export { AgentStatusPanel } from './AgentStatusPanel'
 export { AgentStatusSidePanel, AGENT_STATUS_PANEL_MIN_WIDTH, AGENT_STATUS_PANEL_MAX_WIDTH } from './AgentStatusSidePanel'
-export { useIdleTasks, buildIdleTasks, type IdleTask } from './useIdleTasks'
+export { useIdleTasks, useActiveSessionTaskIds, buildIdleTasks, type IdleTask } from './useIdleTasks'
 export { useAgentStatusState, DEFAULT_AGENT_STATUS_PANEL_WIDTH, type AgentStatusState } from './useAgentStatusState'

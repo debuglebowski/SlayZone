@@ -60,6 +60,7 @@ import {
   AGENT_STATUS_PANEL_MIN_WIDTH,
   AGENT_STATUS_PANEL_MAX_WIDTH,
   useIdleTasks,
+  useActiveSessionTaskIds,
   useAgentStatusState,
   DEFAULT_AGENT_STATUS_PANEL_WIDTH
 } from '@/components/agent-status'
@@ -358,6 +359,17 @@ function App(): React.JSX.Element {
     return map
   }, [projects])
   const { idleTasks: rawIdleTasks } = useIdleTasks(tasks, null, columnsByProjectId)
+  const activeAgentTaskIds = useActiveSessionTaskIds()
+  const shutdownAgentForTask = useCallback(async (taskId: string) => {
+    const [ptys, chats] = await Promise.all([window.api.pty.list(), window.api.chat.list()])
+    const ptyKills = ptys.filter((p) => p.taskId === taskId).map((p) => window.api.pty.kill(p.sessionId))
+    const chatKills = chats.filter((c) => c.taskId === taskId).map((c) => {
+      const idx = c.sessionId.indexOf(':')
+      const tabId = idx >= 0 ? c.sessionId.slice(idx + 1) : c.sessionId
+      return window.api.chat.kill(tabId)
+    })
+    await Promise.all([...ptyKills, ...chatKills])
+  }, [])
   const [dismissedIdle, setDismissedIdle] = useState<Map<string, number>>(new Map())
   const handleDismissIdle = useCallback((sessionId: string) => {
     setDismissedIdle((prev) => {
@@ -1140,6 +1152,7 @@ function App(): React.JSX.Element {
           onLeaderboard={() => { useTabStore.getState().setActiveView('leaderboard') }}
           onUsageAnalytics={() => { useTabStore.getState().setActiveView('usage-analytics') }}
           onTaskClick={openTask} zenMode={zenMode} onboardingChecklist={onboardingChecklist} idleByProject={idleByProject} onReorderProjects={reorderProjects}
+          terminalStates={terminalStates} taskProgress={taskProgress} doneTaskIds={doneTaskIds}
           taskContextMenuRender={(task, child) => (
             <TaskContextMenu
               task={task}
@@ -1153,6 +1166,11 @@ function App(): React.JSX.Element {
               onDeleteTask={deleteTask}
               onTaskTagsChange={handleTaskTagsChange}
               onTagCreated={(tag) => setTags((prev) => [...prev, tag])}
+              onShutdownAgent={
+                activeAgentTaskIds.has(task.id)
+                  ? () => shutdownAgentForTask(task.id)
+                  : undefined
+              }
             >
               {child}
             </TaskContextMenu>
@@ -1352,6 +1370,7 @@ function App(): React.JSX.Element {
                                       onTaskMove={handleTaskMove} onTaskBulkMove={handleTaskBulkMove} onTaskReorder={reorderTasks} onTaskClick={handleTaskClick}
                                       cardProperties={filter.cardProperties} taskTags={taskTags} tags={projectTags} onTaskTagsChange={handleTaskTagsChange} blockedTaskIds={blockedTaskIds}
                                       allProjects={projects} onUpdateTask={contextMenuUpdate} onBulkUpdateTasks={bulkContextMenuUpdate} onClearBlockers={clearBlockers} onArchiveTask={archiveTask} onDeleteTask={deleteTask} onBulkDeleteTasks={bulkDelete} onArchiveAllTasks={archiveTasks}
+                                      activeAgentTaskIds={activeAgentTaskIds} onShutdownAgent={shutdownAgentForTask}
                                       selectionResetKey={selectedProjectId} />
                                   )}
                                   {id === 'kanban' && filter.viewMode === 'list' && (
@@ -1359,7 +1378,8 @@ function App(): React.JSX.Element {
                                       onTaskMove={handleTaskMove} onTaskReorder={reorderTasks} onTaskClick={handleTaskClick}
                                       cardProperties={filter.cardProperties} blockedTaskIds={blockedTaskIds}
                                       allProjects={projects} onUpdateTask={contextMenuUpdate} onArchiveTask={archiveTask} onDeleteTask={deleteTask}
-                                      tags={projectTags} taskTags={taskTags} onTaskTagsChange={handleTaskTagsChange} />
+                                      tags={projectTags} taskTags={taskTags} onTaskTagsChange={handleTaskTagsChange}
+                                      activeAgentTaskIds={activeAgentTaskIds} onShutdownAgent={shutdownAgentForTask} />
                                   )}
                                   {id === 'git' && (
                                     <Suspense fallback={<div className="h-full animate-pulse bg-muted/30 rounded" />}>

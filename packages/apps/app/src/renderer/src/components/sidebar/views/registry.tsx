@@ -21,7 +21,7 @@ export const viewRegistry: SidebarView[] = [
     resizable: true,
     defaultWidth: 320,
     minWidth: 220,
-    maxWidth: 480,
+    maxWidth: 720,
     render: (ctx) => <TreeView {...ctx} />,
   },
 ]

@@ -50,6 +50,8 @@ interface SortableKanbanCardProps {
   onArchiveAllTasks?: (taskIds: string[]) => void
   onDeleteTask?: (taskId: string) => void
   onBulkDeleteTasks?: (taskIds: string[]) => void
+  activeAgentTaskIds?: Set<string>
+  onShutdownAgent?: (taskId: string) => void
 }
 
 function SortableKanbanCard({
@@ -78,7 +80,9 @@ function SortableKanbanCard({
   onArchiveTask,
   onArchiveAllTasks,
   onDeleteTask,
-  onBulkDeleteTasks
+  onBulkDeleteTasks,
+  activeAgentTaskIds,
+  onShutdownAgent
 }: SortableKanbanCardProps): React.JSX.Element {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: task.id,
@@ -168,6 +172,11 @@ function SortableKanbanCard({
         onArchiveTask={onArchiveTask}
         onDeleteTask={onDeleteTask}
         onTaskTagsChange={onTaskTagsChange}
+        onShutdownAgent={
+          activeAgentTaskIds?.has(task.id) && onShutdownAgent
+            ? () => onShutdownAgent(task.id)
+            : undefined
+        }
       >
         {card}
       </TaskContextMenu>
@@ -205,6 +214,8 @@ interface KanbanColumnProps {
   onDeleteTask?: (taskId: string) => void
   onBulkDeleteTasks?: (taskIds: string[]) => void
   onArchiveAllTasks?: (taskIds: string[]) => void
+  activeAgentTaskIds?: Set<string>
+  onShutdownAgent?: (taskId: string) => void
 }
 
 export function KanbanColumn({
@@ -233,7 +244,9 @@ export function KanbanColumn({
   onArchiveTask,
   onDeleteTask,
   onBulkDeleteTasks,
-  onArchiveAllTasks
+  onArchiveAllTasks,
+  activeAgentTaskIds,
+  onShutdownAgent
 }: KanbanColumnProps): React.JSX.Element {
   const columnConfig = getColumnById(column.id, columns)
   const isCompletedColumn = columnConfig ? isCompletedCategory(columnConfig.category) : false
@@ -333,6 +346,8 @@ export function KanbanColumn({
                 onArchiveAllTasks={onArchiveAllTasks}
                 onDeleteTask={onDeleteTask}
                 onBulkDeleteTasks={onBulkDeleteTasks}
+                activeAgentTaskIds={activeAgentTaskIds}
+                onShutdownAgent={onShutdownAgent}
               />
             ))}
           </div>

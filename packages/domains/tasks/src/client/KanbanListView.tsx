@@ -58,6 +58,8 @@ interface KanbanListViewProps {
   tags?: Tag[]
   taskTags?: Map<string, string[]>
   onTaskTagsChange?: (taskId: string, tagIds: string[]) => void
+  activeAgentTaskIds?: Set<string>
+  onShutdownAgent?: (taskId: string) => void
 }
 
 function PriorityBar({ priority }: { priority: number }): React.JSX.Element {
@@ -114,6 +116,8 @@ interface ListRowProps {
   tags?: Tag[]
   taskTagIds?: string[]
   onTaskTagsChange?: (taskId: string, tagIds: string[]) => void
+  activeAgentTaskIds?: Set<string>
+  onShutdownAgent?: (taskId: string) => void
 }
 
 function SortableListRow(props: ListRowProps): React.JSX.Element {
@@ -144,6 +148,11 @@ function SortableListRow(props: ListRowProps): React.JSX.Element {
       onArchiveTask={props.onArchiveTask}
       onDeleteTask={props.onDeleteTask}
       onTaskTagsChange={props.onTaskTagsChange}
+      onShutdownAgent={
+        props.activeAgentTaskIds?.has(task.id) && props.onShutdownAgent
+          ? () => props.onShutdownAgent!(task.id)
+          : undefined
+      }
     >
       <div ref={setNodeRef} style={style} {...dragProps}>
         {row}
@@ -281,6 +290,8 @@ interface GroupSectionProps {
   tags?: Tag[]
   taskTags?: Map<string, string[]>
   onTaskTagsChange?: (taskId: string, tagIds: string[]) => void
+  activeAgentTaskIds?: Set<string>
+  onShutdownAgent?: (taskId: string) => void
 }
 
 function GroupSection({
@@ -302,7 +313,9 @@ function GroupSection({
   onDeleteTask,
   tags,
   taskTags,
-  onTaskTagsChange
+  onTaskTagsChange,
+  activeAgentTaskIds,
+  onShutdownAgent
 }: GroupSectionProps): React.JSX.Element {
   return (
     <div>
@@ -357,6 +370,8 @@ function GroupSection({
                   tags={tags}
                   taskTagIds={taskTags?.get(task.id)}
                   onTaskTagsChange={onTaskTagsChange}
+                  activeAgentTaskIds={activeAgentTaskIds}
+                  onShutdownAgent={onShutdownAgent}
                 />
               ))}
             </div>
@@ -384,7 +399,9 @@ export function KanbanListView({
   onDeleteTask,
   tags,
   taskTags,
-  onTaskTagsChange
+  onTaskTagsChange,
+  activeAgentTaskIds,
+  onShutdownAgent
 }: KanbanListViewProps): React.JSX.Element {
   const { groupBy, sortBy, showEmptyColumns } = viewConfig
 
@@ -530,6 +547,8 @@ export function KanbanListView({
             tags={tags}
             taskTags={taskTags}
             onTaskTagsChange={onTaskTagsChange}
+            activeAgentTaskIds={activeAgentTaskIds}
+            onShutdownAgent={onShutdownAgent}
           />
         ))}
       </div>
