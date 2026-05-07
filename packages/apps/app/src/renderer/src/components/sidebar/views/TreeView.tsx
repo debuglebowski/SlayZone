@@ -4,6 +4,7 @@ import * as Collapsible from '@radix-ui/react-collapsible'
 import { cn, TerminalProgressDot, PriorityIcon, getColumnStatusStyle } from '@slayzone/ui'
 import { type Task } from '@slayzone/task/shared'
 import { useTabStore } from '@slayzone/settings'
+import { useFilterStateMap, sortTasks, getViewConfig } from '@slayzone/tasks'
 import { useActiveSessionTaskIds } from '@/components/agent-status/useIdleTasks'
 import type { SidebarViewContext } from './types'
 
@@ -104,51 +105,62 @@ export function TreeView({
     return set
   }, [tasks, passesFilter, treeShowSubtasks])
 
+  // Per-project filters (mirrors kanban). Live-updates when user changes
+  // sortBy / groupBy in the kanban filter bar.
+  const projectIds = useMemo(() => projects.map((p) => p.id), [projects])
+  const filtersByProject = useFilterStateMap(projectIds)
+
+  // Visible tasks bucketed and sorted per project using each project's
+  // own kanban sort preference.
   const tasksByProject = useMemo(() => {
-    const m = new Map<string, Task[]>()
+    const grouped = new Map<string, Task[]>()
     for (const t of tasks) {
       if (!visibleTaskIds.has(t.id)) continue
-      const arr = m.get(t.project_id) ?? []
+      const arr = grouped.get(t.project_id) ?? []
       arr.push(t)
-      m.set(t.project_id, arr)
+      grouped.set(t.project_id, arr)
     }
-    return m
-  }, [tasks, passesFilter])
+    const sorted = new Map<string, Task[]>()
+    for (const [pid, arr] of grouped) {
+      const f = filtersByProject[pid]
+      const sortBy = f ? getViewConfig(f).sortBy : 'manual'
+      sorted.set(pid, sortTasks(arr, sortBy))
+    }
+    return sorted
+  }, [tasks, visibleTaskIds, filtersByProject])
 
-  // For each in-progress task id → its in-progress children. Subtasks whose parent
-  // is not in-progress are promoted to the project root.
+  // For each in-progress task id → its in-progress children, in the
+  // per-project sort order. Subtasks whose parent is not in-progress are
+  // promoted to the project root.
   const childrenByParent = useMemo(() => {
     if (!treeShowSubtasks) return new Map<string, Task[]>()
-    const inProgressIds = new Set<string>()
-    for (const t of tasks) if (visibleTaskIds.has(t.id)) inProgressIds.add(t.id)
     const m = new Map<string, Task[]>()
-    for (const t of tasks) {
-      if (!visibleTaskIds.has(t.id)) continue
-      const pid = t.parent_id
-      if (pid && inProgressIds.has(pid)) {
-        const arr = m.get(pid) ?? []
-        arr.push(t)
-        m.set(pid, arr)
+    for (const arr of tasksByProject.values()) {
+      for (const t of arr) {
+        const pid = t.parent_id
+        if (pid && visibleTaskIds.has(pid)) {
+          const list = m.get(pid) ?? []
+          list.push(t)
+          m.set(pid, list)
+        }
       }
     }
     return m
-  }, [tasks, visibleTaskIds, treeShowSubtasks])
+  }, [tasksByProject, visibleTaskIds, treeShowSubtasks])
 
   const rootTasksByProject = useMemo(() => {
-    const inProgressIds = new Set<string>()
-    for (const t of tasks) if (visibleTaskIds.has(t.id)) inProgressIds.add(t.id)
     const m = new Map<string, Task[]>()
-    for (const t of tasks) {
-      if (!visibleTaskIds.has(t.id)) continue
-      // When subtasks hidden, render every matched task at the root level.
-      const isOrphan = !treeShowSubtasks || !t.parent_id || !inProgressIds.has(t.parent_id)
-      if (!isOrphan) continue
-      const arr = m.get(t.project_id) ?? []
-      arr.push(t)
-      m.set(t.project_id, arr)
+    for (const [pid, arr] of tasksByProject) {
+      const roots: Task[] = []
+      for (const t of arr) {
+        // When subtasks hidden, render every matched task at the root level.
+        const isOrphan = !treeShowSubtasks || !t.parent_id || !visibleTaskIds.has(t.parent_id)
+        if (isOrphan) roots.push(t)
+      }
+      m.set(pid, roots)
     }
     return m
-  }, [tasks, visibleTaskIds, treeShowSubtasks])
+  }, [tasksByProject, visibleTaskIds, treeShowSubtasks])
 
   const activeTaskId = useTabStore((s) => {
     const tab = s.tabs[s.activeTabIndex]

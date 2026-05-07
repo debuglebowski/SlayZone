@@ -43,7 +43,7 @@ export function addDaysISO(date: string, days: number): string {
   return d.toISOString().split('T')[0]
 }
 
-function sortTasks(tasks: Task[], sortBy: SortKey): Task[] {
+export function sortTasks(tasks: Task[], sortBy: SortKey): Task[] {
   return [...tasks].sort((a, b) => {
     switch (sortBy) {
       case 'priority':

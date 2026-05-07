@@ -1,4 +1,5 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useEffect, useCallback, useMemo } from 'react'
+import { create } from 'zustand'
 import { type FilterState, type ViewConfig, defaultFilterState, defaultCardProperties, defaultBoardConfig, defaultListConfig } from './FilterState'
 
 function getFilterKey(projectId: string): string {
@@ -31,15 +32,11 @@ function migrateViewConfig(raw: Record<string, unknown>, defaults: ViewConfig, a
 function migrateFilterState(raw: Record<string, unknown>): FilterState {
   const state = { ...defaultFilterState }
 
-  // View mode
   if (raw.viewMode === 'board' || raw.viewMode === 'list') state.viewMode = raw.viewMode
 
-  // Per-view configs
   if (raw.board && typeof raw.board === 'object') {
-    // New shape — already has nested configs
     state.board = migrateViewConfig(raw.board as Record<string, unknown>, defaultBoardConfig, false)
   } else if ('groupBy' in raw) {
-    // Old flat shape — copy into both views
     const flat = raw as Record<string, unknown>
     state.board = migrateViewConfig(flat, defaultBoardConfig, false)
   }
@@ -51,15 +48,12 @@ function migrateFilterState(raw: Record<string, unknown>): FilterState {
     state.list = migrateViewConfig(flat, defaultListConfig, true)
   }
 
-  // Migrate old groupActiveTasks toggle → 'active' grouping (list only)
   if (raw.groupActiveTasks === true && state.list.groupBy === 'none') state.list.groupBy = 'active'
 
-  // Shared fields
   if (raw.priority === null || (typeof raw.priority === 'number' && raw.priority >= 1 && raw.priority <= 5)) state.priority = raw.priority as number | null
   if (['all', 'overdue', 'today', 'week', 'later'].includes(raw.dueDateRange as string)) state.dueDateRange = raw.dueDateRange as FilterState['dueDateRange']
   if (Array.isArray(raw.tagIds)) state.tagIds = raw.tagIds.filter((id): id is string => typeof id === 'string')
 
-  // Card properties — merge with defaults so new properties get default value
   if (raw.cardProperties && typeof raw.cardProperties === 'object') {
     const cp = raw.cardProperties as Record<string, unknown>
     state.cardProperties = { ...defaultCardProperties }
@@ -71,69 +65,100 @@ function migrateFilterState(raw: Record<string, unknown>): FilterState {
   return state
 }
 
+interface FilterStore {
+  filters: Record<string, FilterState>
+  loaded: Record<string, true>
+  loading: Record<string, true>
+  ensureLoaded: (projectId: string) => void
+  setFilter: (projectId: string, filter: FilterState) => void
+  flushPending: () => void
+}
+
+const saveTimers = new Map<string, ReturnType<typeof setTimeout>>()
+const pendingSaves = new Map<string, FilterState>()
+
+function flushOne(projectId: string): void {
+  const t = saveTimers.get(projectId)
+  if (t) clearTimeout(t)
+  saveTimers.delete(projectId)
+  const pending = pendingSaves.get(projectId)
+  if (pending) {
+    pendingSaves.delete(projectId)
+    window.api.settings.set(getFilterKey(projectId), JSON.stringify(pending))
+  }
+}
+
+export const useFilterStore = create<FilterStore>((set, get) => ({
+  filters: {},
+  loaded: {},
+  loading: {},
+  ensureLoaded: (projectId) => {
+    const s = get()
+    if (s.loaded[projectId] || s.loading[projectId]) return
+    set({ loading: { ...s.loading, [projectId]: true } })
+    window.api.settings.get(getFilterKey(projectId)).then((value) => {
+      let next: FilterState = defaultFilterState
+      if (value) {
+        try { next = migrateFilterState(JSON.parse(value)) } catch { /* keep default */ }
+      }
+      set((s2) => {
+        const { [projectId]: _omit, ...restLoading } = s2.loading
+        return {
+          filters: { ...s2.filters, [projectId]: next },
+          loaded: { ...s2.loaded, [projectId]: true },
+          loading: restLoading,
+        }
+      })
+    })
+  },
+  setFilter: (projectId, filter) => {
+    set((s) => ({
+      filters: { ...s.filters, [projectId]: filter },
+      loaded: { ...s.loaded, [projectId]: true },
+    }))
+    pendingSaves.set(projectId, filter)
+    const existing = saveTimers.get(projectId)
+    if (existing) clearTimeout(existing)
+    saveTimers.set(projectId, setTimeout(() => flushOne(projectId), 500))
+  },
+  flushPending: () => {
+    for (const id of Array.from(saveTimers.keys())) flushOne(id)
+  },
+}))
+
+if (typeof window !== 'undefined') {
+  window.addEventListener('beforeunload', () => useFilterStore.getState().flushPending())
+}
+
 export function useFilterState(
   projectId: string
 ): [FilterState, (filter: FilterState) => void] {
-  const [filterState, setFilterState] = useState<FilterState>(defaultFilterState)
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const prevProjectIdRef = useRef<string>(projectId)
+  const ensureLoaded = useFilterStore((s) => s.ensureLoaded)
+  const setStoreFilter = useFilterStore((s) => s.setFilter)
+  const filter = useFilterStore((s) => s.filters[projectId] ?? defaultFilterState)
 
-  // Load filter from settings on mount and when projectId changes
-  useEffect(() => {
-    const key = getFilterKey(projectId)
-
-    // Only reset loaded state if projectId actually changed
-    if (prevProjectIdRef.current !== projectId) {
-      // Set default filter immediately to prevent flicker
-      setFilterState(defaultFilterState)
-      prevProjectIdRef.current = projectId
-    }
-
-    window.api.settings.get(key).then((value) => {
-      if (value) {
-        try {
-          const parsed = JSON.parse(value)
-          setFilterState(migrateFilterState(parsed))
-        } catch {
-          setFilterState(defaultFilterState)
-        }
-      } else {
-        setFilterState(defaultFilterState)
-      }
-    })
-  }, [projectId])
-
-  // Debounced save
-  const pendingRef = useRef<FilterState | null>(null)
-
-  const flushSave = useCallback(() => {
-    if (debounceRef.current) clearTimeout(debounceRef.current)
-    if (pendingRef.current) {
-      const key = getFilterKey(projectId)
-      window.api.settings.set(key, JSON.stringify(pendingRef.current))
-      pendingRef.current = null
-    }
-  }, [projectId])
+  useEffect(() => { ensureLoaded(projectId) }, [projectId, ensureLoaded])
 
   const setFilter = useCallback(
-    (newFilter: FilterState) => {
-      setFilterState(newFilter)
-      pendingRef.current = newFilter
-
-      if (debounceRef.current) clearTimeout(debounceRef.current)
-      debounceRef.current = setTimeout(() => {
-        pendingRef.current = null
-        const key = getFilterKey(projectId)
-        window.api.settings.set(key, JSON.stringify(newFilter))
-      }, 500)
-    },
-    [projectId]
+    (next: FilterState) => setStoreFilter(projectId, next),
+    [projectId, setStoreFilter]
   )
 
-  // Flush pending save on unmount
-  useEffect(() => {
-    return () => flushSave()
-  }, [flushSave])
+  return [filter, setFilter]
+}
 
-  return [filterState, setFilter]
+/**
+ * Read-only filter state for a set of projects. Triggers loads for any
+ * not-yet-loaded ids and re-renders when any tracked project's filter changes.
+ */
+export function useFilterStateMap(projectIds: string[]): Record<string, FilterState> {
+  const ensureLoaded = useFilterStore((s) => s.ensureLoaded)
+  const filters = useFilterStore((s) => s.filters)
+
+  const key = useMemo(() => projectIds.slice().sort().join('|'), [projectIds])
+  useEffect(() => {
+    for (const id of projectIds) ensureLoaded(id)
+  }, [key, ensureLoaded]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  return filters
 }
