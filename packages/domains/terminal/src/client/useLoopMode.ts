@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { getTrpcVanillaClient } from '@slayzone/transport/client'
 import type { LoopConfig, CriteriaType, LoopStatus } from '@slayzone/terminal/shared'
 import { makeLoopController, stripAnsi, checkCriteria, isLoopActive } from '@slayzone/terminal/shared'
 import { usePty } from './PtyContext'
@@ -28,9 +29,9 @@ export function useLoopMode({ sessionId, onConfigChange }: UseLoopModeOptions) {
     const controller = makeLoopController<number>(
       {
         markBoundary: () => getLastSeq(sessionId),
-        send: (prompt) => { window.api.pty.submit(sessionId, prompt) },
+        send: (prompt) => { getTrpcVanillaClient().pty.submit.mutate({ sessionId, text: prompt }) },
         readOutputSince: async (seq) => {
-          const result = await window.api.pty.getBufferSince(sessionId, seq)
+          const result = await getTrpcVanillaClient().pty.getBufferSince.query({ sessionId, afterSeq: seq })
           if (!result) return null
           return result.chunks.map(c => c.data).join('')
         },

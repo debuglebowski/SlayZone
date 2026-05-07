@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
+import { getTrpcVanillaClient } from '@slayzone/transport/client'
 import { Frame, X } from 'lucide-react'
 import { Terminal } from '@slayzone/terminal/client/LazyTerminal'
 import { usePty } from '@slayzone/terminal/client'
@@ -68,7 +69,7 @@ export function FloatingAgentPanel() {
     if (contextState !== 'starting') {
       setTerminalState(contextState)
     } else {
-      window.api.pty.getState(session.sessionId).then((backendState) => {
+      getTrpcVanillaClient().pty.getState.query({ sessionId: session.sessionId }).then((backendState) => {
         if (backendState) setTerminalState(backendState)
       })
     }

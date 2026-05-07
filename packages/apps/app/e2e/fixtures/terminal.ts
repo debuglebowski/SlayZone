@@ -1,4 +1,5 @@
 import type { Page } from '@playwright/test'
+import { getTrpcVanillaClient } from '@slayzone/transport/client'
 import { expect } from './electron'
 import { clickProject, goHome } from './electron'
 import { pressShortcut } from './shortcuts'
@@ -120,7 +121,7 @@ export async function waitForPtySession(
 ): Promise<void> {
   await expect
     .poll(
-      async () => page.evaluate((id) => window.api.pty.exists(id), sessionId),
+      async () => page.evaluate((id) => getTrpcVanillaClient().pty.exists.query({ sessionId: id }), sessionId),
       { timeout: timeoutMs }
     )
     .toBe(true)
@@ -133,7 +134,7 @@ export async function waitForNoPtySession(
 ): Promise<void> {
   await expect
     .poll(
-      async () => page.evaluate((id) => window.api.pty.exists(id), sessionId),
+      async () => page.evaluate((id) => getTrpcVanillaClient().pty.exists.query({ sessionId: id }), sessionId),
       { timeout: timeoutMs }
     )
     .toBe(false)
@@ -147,7 +148,7 @@ export async function waitForPtyState(
 ): Promise<void> {
   await expect
     .poll(
-      async () => page.evaluate((id) => window.api.pty.getState(id), sessionId),
+      async () => page.evaluate((id) => getTrpcVanillaClient().pty.getState.query({ sessionId: id }), sessionId),
       { timeout: timeoutMs }
     )
     .toBe(state)
@@ -155,7 +156,7 @@ export async function waitForPtyState(
 
 export async function readFullBuffer(page: Page, sessionId: string): Promise<string> {
   return page.evaluate(async (id) => {
-    const buffer = await window.api.pty.getBuffer(id)
+    const buffer = await getTrpcVanillaClient().pty.getBuffer.query({ sessionId: id })
     return buffer ?? ''
   }, sessionId)
 }
@@ -166,7 +167,7 @@ export async function readBufferSince(
   afterSeq: number
 ): Promise<{ currentSeq: number; chunks: Array<{ seq: number; data: string }> } | null> {
   return page.evaluate(
-    ({ id, after }) => window.api.pty.getBufferSince(id, after),
+    ({ id, after }) => getTrpcVanillaClient().pty.getBufferSince.query({ sessionId: id, afterSeq: after }),
     { id: sessionId, after: afterSeq }
   )
 }
@@ -174,7 +175,7 @@ export async function readBufferSince(
 export async function runCommand(page: Page, sessionId: string, command: string): Promise<void> {
   await page.evaluate(
     ({ id, cmd }) => {
-      window.api.pty.write(id, `${cmd}\r`)
+      getTrpcVanillaClient().pty.write.mutate({ sessionId: id, data: `${cmd}\r` })
     },
     { id: sessionId, cmd: command }
   )

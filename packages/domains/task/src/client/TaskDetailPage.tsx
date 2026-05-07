@@ -648,7 +648,7 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
   // Load CCS profiles when mode is 'ccs'
   useEffect(() => {
     if (task?.terminal_mode === 'ccs') {
-      window.api.pty.ccsListProfiles().then(({ profiles }) => setCcsProfiles(profiles)).catch(() => {})
+      getTrpcVanillaClient().pty.ccsListProfiles.query().then(({ profiles }) => setCcsProfiles(profiles)).catch(() => {})
     }
   }, [task?.terminal_mode])
 
@@ -669,7 +669,7 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
     // Subscribe first, then check buffer (avoids race where URL emits between read and subscribe)
     const unsub = subscribeDevServer(sid, handleUrl)
 
-    window.api.pty.getBuffer(sid).then((buf) => {
+    getTrpcVanillaClient().pty.getBuffer.query({ sessionId: sid }).then((buf) => {
       if (!buf || browserOpenRef.current) return
       DEV_SERVER_URL_PATTERN.lastIndex = 0
       const match = buf.match(DEV_SERVER_URL_PATTERN)
@@ -753,9 +753,9 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
   const handleDetectSessionId = useCallback(async () => {
     if (!task || !sessionIdCommand) return
     const sid = getMainSessionId(task.id)
-    const exists = await window.api.pty.exists(sid)
+    const exists = await getTrpcVanillaClient().pty.exists.query({ sessionId: sid })
     if (!exists) return
-    await window.api.pty.write(sid, sessionIdCommand + '\r')
+    await getTrpcVanillaClient().pty.write.mutate({ sessionId: sid, data: sessionIdCommand + '\r' })
   }, [task, sessionIdCommand, getMainSessionId])
 
   const getConversationIdForMode = useCallback((t: Task): string | null => {
@@ -830,7 +830,7 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
     onTaskUpdated(updated)
 
     // Kill the current PTY so we can restart fresh
-    await window.api.pty.kill(mainSessionId)
+    await getTrpcVanillaClient().pty.kill.mutate({ sessionId: mainSessionId })
   }, [task, onTaskUpdated, getMainSessionId])
 
   // Restart terminal (kill PTY, remount, keep session for --resume)
@@ -838,7 +838,7 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
     if (!task) return
     const mainSessionId = getMainSessionId(task.id)
     resetTaskState(mainSessionId)
-    await window.api.pty.kill(mainSessionId)
+    await getTrpcVanillaClient().pty.kill.mutate({ sessionId: mainSessionId })
     await new Promise((r) => setTimeout(r, 100))
     markSkipCache(mainSessionId)
     setTerminalKey((k) => k + 1)
@@ -849,7 +849,7 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
     if (!task) return
     const mainSessionId = getMainSessionId(task.id)
     resetTaskState(mainSessionId)
-    await window.api.pty.kill(mainSessionId)
+    await getTrpcVanillaClient().pty.kill.mutate({ sessionId: mainSessionId })
     // Clear session ID so new session starts fresh
     const updated = await getTrpcVanillaClient().task.update.mutate({
       id: task.id,
@@ -869,14 +869,14 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
   // bounces start a fresh one.
   useEffect(() => {
     if (!task) return
-    const unsubscribe = window.api.pty.onRespawnSuggested(async (taskId) => {
+    const unsubscribe = ((cb) => { const s = getTrpcVanillaClient().pty.onRespawnSuggested.subscribe(undefined, { onData: ({ taskId }) => cb(taskId) }); return () => s.unsubscribe() })(async (taskId) => {
       if (taskId !== task.id) return
       if (task.terminal_mode === 'terminal') return
       const sid = getMainSessionId(task.id)
       // Idempotent: if a PTY is already alive, another listener (or the user) beat
       // us to it — skip to avoid a double-spawn.
       try {
-        if (await window.api.pty.exists(sid)) return
+        if (await getTrpcVanillaClient().pty.exists.query({ sessionId: sid })) return
       } catch {
         return
       }
@@ -901,7 +901,9 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
   const forceRespawnHandledReqsRef = useRef<number[]>([])
   useEffect(() => {
     if (!task) return
-    return window.api.pty.onForceRespawn(async (taskId, reqId) => {
+    const sub = getTrpcVanillaClient().pty.onRespawnForced.subscribe(undefined, {
+      onData: async ({ taskId, reqId: rid }) => {
+        const reqId = Number(rid)
       if (taskId !== task.id) return
       // Stale retry for an already-completed reqId — re-ack idempotently.
       if (forceRespawnHandledReqsRef.current.includes(reqId)) {
@@ -933,7 +935,9 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
         }
         forceRespawnInFlightRef.current = false
       }
+      },
     })
+    return () => sub.unsubscribe()
   }, [task, handleRestartTerminal])
 
   // Doctor: validate CLI binary and dependencies
@@ -943,7 +947,7 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
     setDoctorResults(null)
     setDoctorDialogOpen(true)
     try {
-      const results = await window.api.pty.validate(task.terminal_mode)
+      const results = await getTrpcVanillaClient().pty.validate.query({ mode: task.terminal_mode })
       setDoctorResults(results)
     } catch {
       setDoctorResults([{ check: 'Validation', ok: false, detail: 'Failed to run checks' }])
@@ -984,7 +988,7 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
     const text = snippet.trim()
     if (!text) return
     const mainSessionId = `${task.id}:${task.id}`
-    await window.api.pty.write(mainSessionId, text)
+    await getTrpcVanillaClient().pty.write.mutate({ sessionId: mainSessionId, data: text })
   }, [task])
 
   // Inject task description into terminal (no execute)
@@ -1133,7 +1137,7 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
       // Reset state FIRST to ignore any in-flight data
       resetTaskState(mainSessionId)
       // Now kill the PTY (any data it sends will be ignored)
-      await window.api.pty.kill(mainSessionId)
+      await getTrpcVanillaClient().pty.kill.mutate({ sessionId: mainSessionId })
       // Small delay to let any remaining PTY data be processed and ignored
       await new Promise((r) => setTimeout(r, 100))
       // Update mode and clear all conversation IDs (fresh start)
@@ -1189,7 +1193,7 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
 
       const mainSessionId = `${task.id}:${task.id}`
       resetTaskState(mainSessionId)
-      await window.api.pty.kill(mainSessionId)
+      await getTrpcVanillaClient().pty.kill.mutate({ sessionId: mainSessionId })
       await new Promise((r) => setTimeout(r, 100))
       markSkipCache(mainSessionId)
       setTerminalKey((k) => k + 1)
@@ -1485,7 +1489,7 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
     if (modeChanged) {
       const mainSessionId = getMainSessionId(task.id)
       resetTaskState(mainSessionId)
-      await window.api.pty.kill(mainSessionId)
+      await getTrpcVanillaClient().pty.kill.mutate({ sessionId: mainSessionId })
       markSkipCache(mainSessionId)
     }
 
@@ -1513,7 +1517,7 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
     if (cwdChanged) {
       const mainSessionId = `${data.id}:${data.id}`
       resetTaskState(mainSessionId)
-      await window.api.pty.kill(mainSessionId)
+      await getTrpcVanillaClient().pty.kill.mutate({ sessionId: mainSessionId })
       markSkipCache(mainSessionId)
     }
 

@@ -71,6 +71,23 @@ const sessionChangeListeners = new Set<() => void>()
 const dataListeners = new Map<string, Set<(data: string) => void>>()
 const stateChangeListeners = new Map<string, Set<(newState: TerminalState, oldState: TerminalState) => void>>()
 
+import { EventEmitter } from 'node:events'
+
+/** Unified pty event stream — replaces per-window webContents.send broadcasts. */
+export const ptyEvents = new EventEmitter() as EventEmitter & {
+  on(event: 'data', listener: (sessionId: string, data: string, seq: number) => void): EventEmitter
+  on(event: 'state-change', listener: (sessionId: string, newState: TerminalState, oldState: TerminalState) => void): EventEmitter
+  on(event: 'title-change', listener: (sessionId: string, title: string) => void): EventEmitter
+  on(event: 'exit', listener: (sessionId: string, exitCode: number | null) => void): EventEmitter
+  on(event: 'prompt', listener: (sessionId: string, prompt: unknown) => void): EventEmitter
+  on(event: 'session-detected', listener: (sessionId: string, conversationId: string) => void): EventEmitter
+  on(event: 'session-not-found', listener: (sessionId: string) => void): EventEmitter
+  on(event: 'dev-server-detected', listener: (sessionId: string, info: unknown) => void): EventEmitter
+  on(event: 'respawn-suggested', listener: (taskId: string) => void): EventEmitter
+  on(event: 'respawn-forced', listener: (taskId: string, reqId: string) => void): EventEmitter
+  off(event: string, listener: (...args: unknown[]) => void): EventEmitter
+}
+
 /** Subscribe to live PTY output. Returns unsubscribe function. */
 export function subscribeToPtyData(sessionId: string, cb: (data: string) => void): () => void {
   if (!dataListeners.has(sessionId)) dataListeners.set(sessionId, new Set())
@@ -239,7 +256,7 @@ function emitStateChange(session: PtySession, sessionId: string, newState: Termi
 
   if (session.win && !session.win.isDestroyed()) {
     try {
-      session.win.webContents.send('pty:state-change', sessionId, newState, oldState)
+      ptyEvents.emit('state-change', sessionId, newState, oldState)
     } catch { /* Window destroyed */ }
   }
 
@@ -395,7 +412,7 @@ function emitTitle(session: PtySession, title: string): void {
   session.lastEmittedTitle = title
   if (!session.win.isDestroyed()) {
     try {
-      session.win.webContents.send('pty:title-change', session.sessionId, title)
+      ptyEvents.emit('title-change', session.sessionId, title)
     } catch { /* Window destroyed */ }
   }
 }
@@ -752,10 +769,10 @@ export async function createPty(opts: CreatePtyOptions): Promise<{ success: bool
       const exitWin = getWin()
       if (!exitWin.isDestroyed()) {
         try {
-          exitWin.webContents.send('pty:title-change', sessionId, '')
+          ptyEvents.emit('title-change', sessionId, '')
         } catch { /* Window destroyed */ }
         try {
-          exitWin.webContents.send('pty:exit', sessionId, exitCode)
+          ptyEvents.emit('exit', sessionId, exitCode)
         } catch {
           // Window destroyed, ignore
         }
@@ -881,7 +898,7 @@ export async function createPty(opts: CreatePtyOptions): Promise<{ success: bool
                 const detectedWin = getWin()
                 if (!detectedWin.isDestroyed()) {
                   try {
-                    detectedWin.webContents.send('pty:session-detected', sessionId, detected)
+                    ptyEvents.emit('session-detected', sessionId, detected)
                   } catch {
                     // Window destroyed, ignore
                   }
@@ -966,7 +983,7 @@ export async function createPty(opts: CreatePtyOptions): Promise<{ success: bool
         })
         if (!win.isDestroyed() && detectedError.code === 'SESSION_NOT_FOUND') {
           try {
-            win.webContents.send('pty:session-not-found', sessionId)
+            ptyEvents.emit('session-not-found', sessionId)
           } catch {
             // Window destroyed, ignore
           }
@@ -977,7 +994,7 @@ export async function createPty(opts: CreatePtyOptions): Promise<{ success: bool
       const prompt = session.adapter.detectPrompt(data)
       if (prompt && !win.isDestroyed()) {
         try {
-          win.webContents.send('pty:prompt', sessionId, prompt)
+          ptyEvents.emit('prompt', sessionId, prompt)
         } catch {
           // Window destroyed, ignore
         }
@@ -994,7 +1011,7 @@ export async function createPty(opts: CreatePtyOptions): Promise<{ success: bool
       if (!win.isDestroyed()) {
         try {
           // cleanData already filtered above (buffer append)
-          win.webContents.send('pty:data', sessionId, cleanData, currentSeq)
+          ptyEvents.emit('data', sessionId, cleanData, currentSeq)
         } catch {
           // Window destroyed between check and send, ignore
         }
@@ -1009,7 +1026,7 @@ export async function createPty(opts: CreatePtyOptions): Promise<{ success: bool
           if (!session.detectedDevUrls.has(normalized)) {
             session.detectedDevUrls.add(normalized)
             try {
-              win.webContents.send('pty:dev-server-detected', sessionId, normalized)
+              ptyEvents.emit('dev-server-detected', sessionId, normalized)
             } catch {
               // Window destroyed, ignore
             }
@@ -1050,7 +1067,7 @@ export async function createPty(opts: CreatePtyOptions): Promise<{ success: bool
           })
           if (!win.isDestroyed()) {
             try {
-              win.webContents.send('pty:session-detected', sessionId, detectedConversationId)
+              ptyEvents.emit('session-detected', sessionId, detectedConversationId)
             } catch {
               // Window destroyed, ignore
             }
@@ -1145,7 +1162,7 @@ export async function createPty(opts: CreatePtyOptions): Promise<{ success: bool
             }
           })
           try {
-            win.webContents.send('pty:session-not-found', sessionId)
+            ptyEvents.emit('session-not-found', sessionId)
           } catch {
             // Window destroyed, ignore
           }
@@ -1167,7 +1184,7 @@ export async function createPty(opts: CreatePtyOptions): Promise<{ success: bool
             session.buffer.append(infoLine)
             if (!win.isDestroyed()) {
               try {
-                win.webContents.send('pty:data', sessionId, infoLine, session.buffer.getCurrentSeq())
+                ptyEvents.emit('data', sessionId, infoLine, session.buffer.getCurrentSeq())
               } catch {
                 // Window destroyed, ignore
               }
@@ -1492,12 +1509,7 @@ export function killAllPtys(): void {
  *  whether any mounted TaskDetailPage should act (e.g. main tab PTY no longer
  *  exists and AI mode is configured). Matches the pty:exit IPC dispatch pattern. */
 export function broadcastRespawnRequest(taskId: string): void {
-  if (!mainWindow || mainWindow.isDestroyed()) return
-  try {
-    mainWindow.webContents.send('pty:respawn-suggested', taskId)
-  } catch {
-    // window destroyed — ignore
-  }
+  ptyEvents.emit('respawn-suggested', taskId)
   recordDiagnosticEvent({
     level: 'info',
     source: 'pty',
@@ -1556,11 +1568,7 @@ export function requestForceRespawn(
         finish('timeout')
         return
       }
-      try {
-        mainWindow.webContents.send('pty:respawn-forced', taskId, reqId)
-      } catch {
-        // window destroyed mid-send — let timeout catch it
-      }
+      ptyEvents.emit('respawn-forced', taskId, reqId)
     }
     send()
     const retry = setInterval(send, FORCE_RESPAWN_RETRY_MS)

@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
+import { getTrpcVanillaClient } from '@slayzone/transport/client'
 import { Monitor, X } from 'lucide-react'
 import { IconButton, getTerminalStateStyle } from '@slayzone/ui'
 import { Popover, PopoverContent, PopoverTrigger } from '@slayzone/ui'
@@ -23,7 +24,7 @@ export function TerminalStatusPopover({ tasks, onTaskClick, side = 'right' }: Te
   const [, tick] = useState(0)
 
   const refreshPtys = useCallback(async () => {
-    const list = await window.api.pty.list()
+    const list = await getTrpcVanillaClient().pty.list.query()
     setPtys(list)
   }, [])
 
@@ -41,10 +42,8 @@ export function TerminalStatusPopover({ tasks, onTaskClick, side = 'right' }: Te
 
   // Refresh on state-change events
   useEffect(() => {
-    const unsub = window.api.pty.onStateChange(() => {
-      refreshPtys()
-    })
-    return unsub
+    const s = getTrpcVanillaClient().pty.onStateChange.subscribe(undefined, { onData: () => refreshPtys() })
+    return () => s.unsubscribe()
   }, [refreshPtys])
 
   // Subscribe to stats
@@ -59,7 +58,7 @@ export function TerminalStatusPopover({ tasks, onTaskClick, side = 'right' }: Te
   }, [refreshPtys])
 
   const handleTerminate = async (sessionId: string) => {
-    await window.api.pty.kill(sessionId)
+    await getTrpcVanillaClient().pty.kill.mutate({ sessionId })
     refreshPtys()
   }
 

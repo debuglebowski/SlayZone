@@ -361,7 +361,7 @@ export function ProcessesPanel({ taskId, projectId, cwd, terminalSessionId, onOp
   const handleInject = useCallback((proc: ProcessEntry) => {
     if (proc.logBuffer.length === 0) return
     const output = `\r\n--- ${proc.label} output ---\r\n${proc.logBuffer.join('\r\n')}\r\n---\r\n`
-    void window.api.pty.write(terminalSessionId ?? `${taskId}:${taskId}`, output)
+    void getTrpcVanillaClient().pty.write.mutate({ sessionId: terminalSessionId ?? `${taskId}:${taskId}`, data: output })
   }, [taskId, terminalSessionId])
 
   const openNewDialog = useCallback(() => {

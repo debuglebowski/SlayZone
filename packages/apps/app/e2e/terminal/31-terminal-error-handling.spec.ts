@@ -1,4 +1,5 @@
 import { test, expect, seed, resetApp} from '../fixtures/electron'
+import { getTrpcVanillaClient } from '@slayzone/transport/client'
 import { TEST_PROJECT_PATH } from '../fixtures/electron'
 import {
   getMainSessionId,
@@ -23,29 +24,29 @@ test.describe('Terminal error handling', () => {
   })
 
   test.afterAll(async ({ mainWindow }) => {
-    await mainWindow.evaluate(() => window.api.pty.setShellOverride(null))
+    await mainWindow.evaluate(() => getTrpcVanillaClient().pty.setShellOverride.mutate({ value: null }))
   })
 
   test('invalid shell override falls back to the user shell and still allows recreation after reset', async ({ mainWindow }) => {
     const sessionId = getMainSessionId(taskId)
 
-    await mainWindow.evaluate(() => window.api.pty.setShellOverride('/definitely/not/a/real/shell'))
+    await mainWindow.evaluate(() => getTrpcVanillaClient().pty.setShellOverride.mutate({ value: '/definitely/not/a/real/shell' }))
 
     await openTaskTerminal(mainWindow, { projectAbbrev, taskTitle: 'Terminal error task' })
 
     await expect
-      .poll(async () => mainWindow.evaluate((id) => window.api.pty.exists(id), sessionId))
+      .poll(async () => mainWindow.evaluate((id) => getTrpcVanillaClient().pty.exists.query({ sessionId: id }), sessionId))
       .toBe(true)
     await expect(mainWindow.getByText(/Failed to start terminal:/)).toHaveCount(0)
 
-    await mainWindow.evaluate(() => window.api.pty.setShellOverride(null))
+    await mainWindow.evaluate(() => getTrpcVanillaClient().pty.setShellOverride.mutate({ value: null }))
     const createResult = await mainWindow.evaluate(
-      ({ id, cwd }) => window.api.pty.create({ sessionId: id, cwd, mode: 'terminal' }),
+      ({ id, cwd }) => getTrpcVanillaClient().pty.create.mutate({ sessionId: id, cwd, mode: 'terminal' }),
       { id: sessionId, cwd: TEST_PROJECT_PATH }
     )
     expect(createResult.success).toBe(true)
     await expect
-      .poll(async () => mainWindow.evaluate((id) => window.api.pty.exists(id), sessionId))
+      .poll(async () => mainWindow.evaluate((id) => getTrpcVanillaClient().pty.exists.query({ sessionId: id }), sessionId))
       .toBe(true)
   })
 })

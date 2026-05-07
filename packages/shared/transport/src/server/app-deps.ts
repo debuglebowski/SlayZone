@@ -79,6 +79,34 @@ export function getAppDeps(): AppDeps {
   return appDeps
 }
 
+// Pty deps
+import type { TerminalState } from '@slayzone/terminal/shared'
+import type { createPtyOps } from '@slayzone/terminal/electron'
+
+export type PtyDeps = {
+  ops: ReturnType<typeof createPtyOps>
+  events: EventEmitter & {
+    on(event: 'data', listener: (sessionId: string, data: string, seq: number) => void): EventEmitter
+    on(event: 'state-change', listener: (sessionId: string, newState: TerminalState, oldState: TerminalState) => void): EventEmitter
+    on(event: 'title-change', listener: (sessionId: string, title: string) => void): EventEmitter
+    on(event: 'exit', listener: (sessionId: string, exitCode: number | null) => void): EventEmitter
+    on(event: 'prompt', listener: (sessionId: string, prompt: unknown) => void): EventEmitter
+    on(event: 'session-detected', listener: (sessionId: string, conversationId: string) => void): EventEmitter
+    on(event: 'session-not-found', listener: (sessionId: string) => void): EventEmitter
+    on(event: 'dev-server-detected', listener: (sessionId: string, info: unknown) => void): EventEmitter
+    on(event: 'respawn-suggested', listener: (taskId: string) => void): EventEmitter
+    on(event: 'respawn-forced', listener: (taskId: string, reqId: string) => void): EventEmitter
+    off(event: string, listener: (...args: unknown[]) => void): EventEmitter
+  }
+}
+
+let ptyDeps: PtyDeps | null = null
+export function setPtyDeps(deps: PtyDeps): void { ptyDeps = deps }
+export function getPtyDeps(): PtyDeps {
+  if (!ptyDeps) throw new Error('ptyDeps not initialized')
+  return ptyDeps
+}
+
 // Processes deps — lifecycle managed separately because EventEmitter must be live
 export type ProcessesDeps = {
   create: (projectId: string | null, taskId: string | null, label: string, command: string, cwd: string, autoRestart: boolean) => string | Promise<string>

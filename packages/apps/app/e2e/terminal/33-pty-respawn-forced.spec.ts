@@ -1,4 +1,5 @@
 import { test, expect, seed, resetApp, TEST_PROJECT_PATH } from '../fixtures/electron'
+import { getTrpcVanillaClient } from '@slayzone/transport/client'
 import {
   getMainSessionId,
   openTaskTerminal,
@@ -101,7 +102,7 @@ test.describe('Forced PTY respawn via REST', () => {
 
     // Capture original createdAt; after force respawn it must change (new session).
     const originalCreatedAt = await mainWindow.evaluate(async (id) => {
-      const list = await window.api.pty.list()
+      const list = await getTrpcVanillaClient().pty.list.query()
       return list.find((s) => s.sessionId === id)?.createdAt ?? null
     }, sessionId)
 
@@ -113,7 +114,7 @@ test.describe('Forced PTY respawn via REST', () => {
 
     await expect.poll(async () =>
       mainWindow.evaluate(async (id) => {
-        const list = await window.api.pty.list()
+        const list = await getTrpcVanillaClient().pty.list.query()
         return list.find((s) => s.sessionId === id)?.createdAt ?? null
       }, sessionId)
     , { timeout: 10_000 }).not.toBe(originalCreatedAt)

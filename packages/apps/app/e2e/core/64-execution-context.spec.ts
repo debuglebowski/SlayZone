@@ -1,4 +1,5 @@
 import { test, expect, seed, goHome, projectBlob, openProjectSettings, resetApp} from '../fixtures/electron'
+import { getTrpcVanillaClient } from '@slayzone/transport/client'
 import { TEST_PROJECT_PATH } from '../fixtures/electron'
 
 test.describe('Project execution context settings', () => {
@@ -188,7 +189,7 @@ test.describe('Project execution context settings', () => {
   // ---------------------------------------------------------------------------
   test('test connection shows failure for nonexistent ssh target', async ({ mainWindow }) => {
     const result = await mainWindow.evaluate(() =>
-      window.api.pty.testExecutionContext({
+      getTrpcVanillaClient().pty.testExecutionContext.query({
         type: 'ssh',
         target: 'user@invalid.invalid',
         workdir: '/tmp'

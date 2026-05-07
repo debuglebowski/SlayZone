@@ -1,4 +1,5 @@
 import { test, expect, seed, resetApp } from '../fixtures/electron'
+import { getTrpcVanillaClient } from '@slayzone/transport/client'
 import { TEST_PROJECT_PATH } from '../fixtures/electron'
 import {
   openTaskTerminal,
@@ -104,9 +105,9 @@ test.describe.skip('Session ID consistency (real CLIs)', () => {
     await mainWindow.waitForTimeout(2000)
 
     // Text and \r must be separate writes (Ink TUI drops \r when concatenated with text)
-    await mainWindow.evaluate(({ id }) => window.api.pty.write(id, '/stats'), { id: sessionId })
+    await mainWindow.evaluate(({ id }) => getTrpcVanillaClient().pty.write.mutate({ sessionId: id, data: '/stats' }), { id: sessionId })
     await mainWindow.waitForTimeout(200)
-    await mainWindow.evaluate(({ id }) => window.api.pty.write(id, '\r'), { id: sessionId })
+    await mainWindow.evaluate(({ id }) => getTrpcVanillaClient().pty.write.mutate({ sessionId: id, data: '\r' }), { id: sessionId })
 
     await expect.poll(async () => {
       const task = await mainWindow.evaluate((id) => window.api.db.getTask(id), t.id)

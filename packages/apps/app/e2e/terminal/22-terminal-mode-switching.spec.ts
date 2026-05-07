@@ -1,4 +1,5 @@
 import { test, expect, seed, goHome, clickProject, resetApp} from '../fixtures/electron'
+import { getTrpcVanillaClient } from '@slayzone/transport/client'
 import { TEST_PROJECT_PATH } from '../fixtures/electron'
 import { openTaskTerminal, switchTerminalMode } from '../fixtures/terminal'
 
@@ -156,7 +157,7 @@ test.describe('Terminal mode switching', () => {
     // immediately. Bypass the UI: call handleModeChange directly via DB update.
     await mainWindow.evaluate(
       async (id) => {
-        await window.api.pty.kill(`${id}:${id}`)
+        await getTrpcVanillaClient().pty.kill.mutate({ sessionId: `${id}:${id}` })
         await new Promise((r) => setTimeout(r, 100))
         await window.api.db.updateTask({ id, terminalMode: 'codex' } as never)
       },

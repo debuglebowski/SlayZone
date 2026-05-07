@@ -11,6 +11,7 @@
  * affect the resize behavior being tested — only the visual styling.
  */
 import { test, expect, seed, resetApp, clickProject } from '../fixtures/electron'
+import { getTrpcVanillaClient } from '@slayzone/transport/client'
 import { TEST_PROJECT_PATH } from '../fixtures/electron'
 import {
   getMainSessionId,
@@ -47,7 +48,7 @@ test.describe.skip('Codex resize — no duplicate prompt', () => {
 
     // Pre-seed terminal theme so OSC 11 responses are correct from the start
     await mainWindow.evaluate(() =>
-      window.api.pty.setTheme({
+      getTrpcVanillaClient().pty.setTheme.mutate({
         foreground: '#d4d4d8',
         background: '#141418',
         cursor: '#a1a1aa',
@@ -79,7 +80,7 @@ test.describe.skip('Codex resize — no duplicate prompt', () => {
       const buf = await readFullBuffer(mainWindow, sessionId)
       if (buf.includes('trust') || buf.includes('Press enter') || buf.includes('model') && (buf.includes('keep') || buf.includes('change'))) {
         await mainWindow.evaluate(
-          ({ id }) => window.api.pty.write(id, '\r'),
+          ({ id }) => getTrpcVanillaClient().pty.write.mutate({ sessionId: id, data: '\r' }),
           { id: sessionId }
         )
         return 'accepted'
@@ -102,12 +103,12 @@ test.describe.skip('Codex resize — no duplicate prompt', () => {
 
     // Send a prompt that generates lots of output
     await mainWindow.evaluate(
-      ({ id }) => window.api.pty.write(id, 'Write a python fizzbuzz script with detailed comments on every line'),
+      ({ id }) => getTrpcVanillaClient().pty.write.mutate({ sessionId: id, data: 'Write a python fizzbuzz script with detailed comments on every line' }),
       { id: sessionId }
     )
     await mainWindow.waitForTimeout(200)
     await mainWindow.evaluate(
-      ({ id }) => window.api.pty.write(id, '\r'),
+      ({ id }) => getTrpcVanillaClient().pty.write.mutate({ sessionId: id, data: '\r' }),
       { id: sessionId }
     )
 

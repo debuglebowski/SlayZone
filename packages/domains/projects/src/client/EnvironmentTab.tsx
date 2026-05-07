@@ -129,7 +129,7 @@ export function EnvironmentTab({ project, onUpdated, onClose }: EnvironmentTabPr
                 onClick={async () => {
                   setTestingConnection(true)
                   setTestResult(null)
-                  const result = await window.api.pty.testExecutionContext({ type: 'docker', container: execContainer.trim() }).catch((e: unknown) => ({ success: false as const, error: e instanceof Error ? e.message : String(e) }))
+                  const result = await getTrpcVanillaClient().pty.testExecutionContext.query({ type: 'docker', container: execContainer.trim() }).catch((e: unknown) => ({ success: false as const, error: e instanceof Error ? e.message : String(e) }))
                   setTestResult(result)
                   setTestingConnection(false)
                 }}
@@ -169,7 +169,7 @@ export function EnvironmentTab({ project, onUpdated, onClose }: EnvironmentTabPr
                 onClick={async () => {
                   setTestingConnection(true)
                   setTestResult(null)
-                  const result = await window.api.pty.testExecutionContext({ type: 'ssh', target: execSshTarget.trim() }).catch((e: unknown) => ({ success: false as const, error: e instanceof Error ? e.message : String(e) }))
+                  const result = await getTrpcVanillaClient().pty.testExecutionContext.query({ type: 'ssh', target: execSshTarget.trim() }).catch((e: unknown) => ({ success: false as const, error: e instanceof Error ? e.message : String(e) }))
                   setTestResult(result)
                   setTestingConnection(false)
                 }}

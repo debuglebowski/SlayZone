@@ -125,7 +125,7 @@ export function useTaskTerminals(taskId: string, defaultMode: TerminalMode): Use
       if (success) {
         const sessionId = `${taskId}:${tabId}`
         if (!skipKill) {
-          await window.api.pty.kill(sessionId)
+          await getTrpcVanillaClient().pty.kill.mutate({ sessionId })
         }
         // Reap chat session for this tab regardless of displayMode — chat:remove is
         // a no-op when no session exists. Without this, a chat-mode tab's claude
@@ -219,7 +219,7 @@ export function useTaskTerminals(taskId: string, defaultMode: TerminalMode): Use
       const sessionId = `${taskId}:${tabId}`
       try {
         if (tab.displayMode === 'xterm') {
-          await window.api.pty.kill(sessionId)
+          await getTrpcVanillaClient().pty.kill.mutate({ sessionId })
         } else {
           await window.api.chat.remove(tabId)
         }

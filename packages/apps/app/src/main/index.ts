@@ -118,7 +118,8 @@ import { configureTaskRuntimeAdapters, pathExists, saveTempImage, closeArtifactW
 import { BlobStore, betterSqliteTxn, seedInitialVersions } from '@slayzone/task-artifacts/server'
 import { getExtensionFromTitle } from '@slayzone/task/shared'
 import { wireNativeThemeBridge } from '@slayzone/settings/electron'
-import { registerPtyHandlers, buildUsageOps, killAllPtys, killPtysByTaskId, electronOnTaskReachedTerminal, startIdleChecker, stopIdleChecker, getPtyPids, onSessionChange, onGlobalStateChange, onPtyInputSubmit, registerChatHandlers, shutdownChatTransports, setOnHostKillHandler, broadcastRespawnRequest, backfillChatModes } from '@slayzone/terminal/electron'
+import { createPtyOps, ptyEvents, buildUsageOps, killAllPtys, killPtysByTaskId, electronOnTaskReachedTerminal, startIdleChecker, stopIdleChecker, getPtyPids, onSessionChange, onGlobalStateChange, onPtyInputSubmit, registerChatHandlers, shutdownChatTransports, setOnHostKillHandler, broadcastRespawnRequest, backfillChatModes } from '@slayzone/terminal/electron'
+import { setDatabase } from '@slayzone/terminal/electron'
 import { onTaskReachedTerminal, setOnTaskReachedTerminalHandler, syncTerminalModes } from '@slayzone/terminal/server'
 import { setProviderLastKilledAt, type ProviderConfig } from '@slayzone/task/shared'
 import { attachFloatingAgent, setupFloatingAgent } from './floating-agent'
@@ -130,7 +131,7 @@ import { detectPreviousCrash, writeBootStub, writeCleanShutdownSentinel, scanCra
 import { acquireLockWithSelfHeal, lockOutcomeIsAcquired, type LockOutcome } from './lifecycle/single-instance'
 import { IPC_TELEMETRY_MAP } from '@slayzone/telemetry/shared'
 import { initAiConfigOps } from '@slayzone/ai-config/server'
-import { setAppDeps, setProcessesDeps } from '@slayzone/transport/server'
+import { setAppDeps, setProcessesDeps, setPtyDeps } from '@slayzone/transport/server'
 import { ElectronStorageAdapter } from '@slayzone/integrations/electron'
 import { initIntegrationOps, ensureIntegrationSchema, startSyncPoller, pushTaskAfterEdit, pushNewTaskToProviders, pushArchiveToProviders, pushUnarchiveToProviders, startDiscoveryPoller, resetSyncFlags, setStorageAdapter } from '@slayzone/integrations/server'
 import { closeAllFileWatchers } from '@slayzone/file-editor/server'
@@ -1198,8 +1199,13 @@ app.whenReady().then(async () => {
 
 
   wireNativeThemeBridge()
-  registerPtyHandlers(ipcMain, db)
-  logBoot('pty handlers registered')
+  setDatabase(db)
+  syncTerminalModes(db)
+  setPtyDeps({
+    ops: createPtyOps(db),
+    events: ptyEvents,
+  })
+  logBoot('pty ops wired into tRPC')
   setupFloatingAgent(() => currentOverrides)
   setupTaskWindows()
   logBoot('floating agent + task windows set up')
@@ -1213,56 +1219,7 @@ app.whenReady().then(async () => {
   if (isPlaywright) {
     ;(globalThis as Record<string, unknown>).__db = db
     ;(globalThis as Record<string, unknown>).__spawnProcess = spawnProcess
-    ;(globalThis as Record<string, unknown>).__restorePtyHandlers = () => {
-      // Keep this list in sync with all handlers in @slayzone/terminal/electron
-      // (handlers.ts + chat-handlers.ts). Adding a handler there without adding
-      // it here breaks tests that re-register via __restorePtyHandlers.
-      for (const ch of [
-        'terminalModes:list',
-        'terminalModes:test',
-        'terminalModes:get',
-        'terminalModes:create',
-        'terminalModes:update',
-        'terminalModes:delete',
-        'terminalModes:restoreDefaults',
-        'terminalModes:resetToDefaultState',
-        'pty:create',
-        'pty:testExecutionContext',
-        'pty:ccsListProfiles',
-        'pty:write',
-        'pty:submit',
-        'pty:resize',
-        'pty:kill',
-        'pty:exists',
-        'pty:getBuffer',
-        'pty:clearBuffer',
-        'pty:getBufferSince',
-        'pty:list',
-        'pty:getState',
-        'pty:set-theme',
-        'pty:validate',
-        'pty:setShellOverride',
-        'session:list',
-        'session:getState',
-        'chat:list',
-        'chat:create',
-        'chat:send',
-        'chat:supports',
-        'chat:interrupt',
-        'chat:abortAndPop',
-        'chat:reset',
-        'chat:remove',
-        'chat:kill',
-        'chat:getBufferSince',
-        'chat:getInfo',
-        'chat:listAgents',
-        'chat:listCommands',
-        'chat:listSkills',
-      ]) {
-        ipcMain.removeHandler(ch)
-      }
-      registerPtyHandlers(ipcMain, db)
-    }
+    // __restorePtyHandlers removed — tRPC procedures don't need re-registration.
   }
 
   setOnTaskReachedTerminalHandler(electronOnTaskReachedTerminal)
