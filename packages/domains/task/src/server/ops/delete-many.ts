@@ -46,7 +46,7 @@ export function deleteManyTasksOp(db: Database, ids: string[], deps: OpDeps): De
 
   for (const { id, previous } of deletable) {
     if (!deletedIds.includes(id)) continue
-    ipcMain.emit('db:tasks:delete:done', null, id)
+    ipcMain?.emit('db:tasks:delete:done', null, id)
     if (previous) {
       taskEvents.emit('task:deleted', { taskId: id, projectId: previous.project_id })
     }

@@ -22,7 +22,7 @@ export async function restoreTaskOp(db: Database, id: string, deps: OpDeps): Pro
   if (task) {
     const projectId = task.project_id
     taskEvents.emit('task:restored', { taskId: id, projectId })
-    ipcMain.emit('db:tasks:restore:done', null, id, projectId)
+    ipcMain?.emit('db:tasks:restore:done', null, id, projectId)
   }
   return colorOne(db, task)
 }

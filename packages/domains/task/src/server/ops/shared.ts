@@ -582,6 +582,6 @@ export function updateTask(db: Database, data: UpdateTaskInput): Task | null {
 }
 
 export interface OpDeps {
-  ipcMain: import('electron').IpcMain
+  ipcMain?: import('electron').IpcMain
   onMutation?: () => void
 }
