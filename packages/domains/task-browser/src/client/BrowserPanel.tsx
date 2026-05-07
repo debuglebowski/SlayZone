@@ -560,7 +560,7 @@ export const BrowserPanel = forwardRef<BrowserPanelHandle, BrowserPanelProps>(fu
   // Per-tab webContents registration is owned by BrowserTabPlaceholder.
   useEffect(() => {
     if (!taskId) return
-    void window.api.webview.setActiveBrowserTab(taskId, tabs.activeTabId)
+    void getTrpcVanillaClient().app.webview.setActiveBrowserTab.mutate({ taskId, tabId: tabs.activeTabId })
   }, [taskId, tabs.activeTabId])
 
   // Sync keyboard passthrough to main process

@@ -1907,16 +1907,6 @@ div{text-align:center}h1{font-size:14px;font-weight:500;color:#aaa}p{font-size:1
     }
   )
 
-  // Browser panel registry (CLI browser control — per-tab)
-  ipcMain.handle('webview:register-browser-tab', (_, taskId: string, tabId: string, webContentsId: number) => {
-    registerBrowserTab(taskId, tabId, webContentsId)
-  })
-  ipcMain.handle('webview:unregister-browser-tab', (_, taskId: string, tabId: string) => {
-    unregisterBrowserTab(taskId, tabId)
-  })
-  ipcMain.handle('webview:set-active-browser-tab', (_, taskId: string, tabId: string | null) => {
-    setActiveBrowserTab(taskId, tabId)
-  })
 
   // Webview shortcut interception
   const registeredWebviews = new Set<number>()

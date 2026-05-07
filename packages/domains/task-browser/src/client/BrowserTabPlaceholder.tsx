@@ -64,11 +64,11 @@ export const BrowserTabPlaceholder = forwardRef<BrowserTabPlaceholderHandle, Bro
       void (async () => {
         const wcId = await getTrpcVanillaClient().app.browser.getWebContentsId.query({ viewId }) as number | null
         if (cancelled || wcId == null) return
-        await window.api.webview.registerBrowserTab(taskId, tabId, wcId)
+        await getTrpcVanillaClient().app.webview.registerBrowserTab.mutate({ taskId, tabId, webContentsId: wcId })
       })()
       return () => {
         cancelled = true
-        void window.api.webview.unregisterBrowserTab(taskId, tabId)
+        void getTrpcVanillaClient().app.webview.unregisterBrowserTab.mutate({ taskId, tabId })
       }
     }, [taskId, tabId, viewId])
 

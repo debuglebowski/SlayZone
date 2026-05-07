@@ -259,9 +259,6 @@ export interface ElectronAPI {
       }
     ) => Promise<boolean>
     disableDeviceEmulation: (webviewId: number) => Promise<boolean>
-    registerBrowserTab: (taskId: string, tabId: string, webContentsId: number) => Promise<void>
-    unregisterBrowserTab: (taskId: string, tabId: string) => Promise<void>
-    setActiveBrowserTab: (taskId: string, tabId: string | null) => Promise<void>
   }
   browser: {
     // Subscription-style methods kept as IPC (driven by webContents.send from manager).

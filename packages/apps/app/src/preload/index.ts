@@ -350,12 +350,6 @@ const api: ElectronAPI = {
       ipcRenderer.invoke('webview:enable-device-emulation', webviewId, params),
     disableDeviceEmulation: (webviewId) =>
       ipcRenderer.invoke('webview:disable-device-emulation', webviewId),
-    registerBrowserTab: (taskId, tabId, webContentsId) =>
-      ipcRenderer.invoke('webview:register-browser-tab', taskId, tabId, webContentsId),
-    unregisterBrowserTab: (taskId, tabId) =>
-      ipcRenderer.invoke('webview:unregister-browser-tab', taskId, tabId),
-    setActiveBrowserTab: (taskId, tabId) =>
-      ipcRenderer.invoke('webview:set-active-browser-tab', taskId, tabId),
   },
   browser: {
     // Subscription-style methods kept as IPC — backed by webContents.send from
