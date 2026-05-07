@@ -46,7 +46,6 @@ function killProcessTree(child: ChildProcess, signal: NodeJS.Signals = 'SIGTERM'
   }
 }
 
-let win: BrowserWindow | null = null
 let db: Database | null = null
 const processes = new Map<string, ManagedProcess>()
 const logSubscribers = new Map<string, Set<(line: string) => void>>()
@@ -57,8 +56,25 @@ export function subscribeToProcessLogs(id: string, cb: (line: string) => void): 
   return () => logSubscribers.get(id)?.delete(cb)
 }
 
-export function setProcessManagerWindow(window: BrowserWindow): void {
-  win = window
+import { EventEmitter } from 'node:events'
+import type { ProcessStats } from '@slayzone/types'
+
+export interface ProcessEvents {
+  log: (id: string, line: string) => void
+  status: (id: string, status: ProcessStatus) => void
+  title: (id: string, title: string | null) => void
+  stats: (stats: Record<string, ProcessStats>) => void
+}
+
+export const processEvents = new EventEmitter() as EventEmitter & {
+  on<K extends keyof ProcessEvents>(event: K, listener: ProcessEvents[K]): EventEmitter
+  emit<K extends keyof ProcessEvents>(event: K, ...args: Parameters<ProcessEvents[K]>): boolean
+  off<K extends keyof ProcessEvents>(event: K, listener: ProcessEvents[K]): EventEmitter
+}
+
+export function setProcessManagerWindow(_window: BrowserWindow): void {
+  // No longer needed — events flow via processEvents EventEmitter to tRPC.
+  // Kept as no-op for backward compat (called from main/index.ts).
 }
 
 export function initProcessManager(database: Database): void {
@@ -100,19 +116,19 @@ export function initProcessManager(database: Database): void {
 function pushLog(proc: ManagedProcess, line: string): void {
   proc.logBuffer.push(line)
   if (proc.logBuffer.length > LOG_BUFFER_MAX) proc.logBuffer.shift()
-  win?.webContents.send('processes:log', proc.id, line)
+  processEvents.emit('log', proc.id, line)
   logSubscribers.get(proc.id)?.forEach((cb) => cb(line))
 }
 
 function setStatus(proc: ManagedProcess, status: ProcessStatus): void {
   proc.status = status
-  win?.webContents.send('processes:status', proc.id, status)
+  processEvents.emit('status', proc.id, status)
 }
 
 function emitTitle(proc: ManagedProcess, title: string): void {
   if (title === proc.processTitle) return
   proc.processTitle = title
-  win?.webContents.send('processes:title', proc.id, title)
+  processEvents.emit('title', proc.id, title)
 }
 
 function pollProcessTitle(proc: ManagedProcess): void {
@@ -185,7 +201,7 @@ function doSpawn(proc: ManagedProcess): void {
     proc.exitCode = code
     proc.processTitle = null
     proc.oscTitleSet = false
-    win?.webContents.send('processes:title', proc.id, null)
+    processEvents.emit('title', proc.id, null)
     if (proc.autoRestart && processes.has(proc.id)) {
       proc.restartCount++
       pushLog(proc, `[exited with code ${code ?? '?'}, restarting in 1s...]`)
@@ -326,7 +342,7 @@ const statsPoller = createStatsPoller(
     }
     return pidMap
   },
-  (stats) => { win?.webContents.send('processes:stats', stats) }
+  (stats) => { processEvents.emit('stats', stats) }
 )
 
 function startStatsPolling(): void { statsPoller.ensureStarted() }

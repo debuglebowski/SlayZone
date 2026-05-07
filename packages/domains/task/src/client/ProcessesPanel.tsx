@@ -262,7 +262,7 @@ export function ProcessesPanel({ taskId, projectId, cwd, terminalSessionId, onOp
 
   useEffect(() => {
     setLoading(true)
-    window.api.processes.listForTask(taskId, projectId).then((list) => {
+    getTrpcVanillaClient().processes.listForTask.query({ taskId, projectId }).then((list) => {
       const entries = (list as ProcessEntry[]).map(p => {
         if (p.serverUrl || p.status !== 'running') return p
         for (let i = p.logBuffer.length - 1; i >= 0; i--) {
@@ -277,41 +277,49 @@ export function ProcessesPanel({ taskId, projectId, cwd, terminalSessionId, onOp
   }, [taskId, projectId])
 
   useEffect(() => {
-    const unsub = window.api.processes.onLog((processId, line) => {
-      const url = extractUrlFromLine(line)
-      setProcesses(prev =>
-        prev.map(p => p.id === processId
-          ? { ...p, logBuffer: [...p.logBuffer.slice(-499), line], serverUrl: url ?? p.serverUrl }
-          : p)
-      )
+    const sub = getTrpcVanillaClient().processes.onLog.subscribe(undefined, {
+      onData: ({ id: processId, line }) => {
+        const url = extractUrlFromLine(line)
+        setProcesses(prev =>
+          prev.map(p => p.id === processId
+            ? { ...p, logBuffer: [...p.logBuffer.slice(-499), line], serverUrl: url ?? p.serverUrl }
+            : p)
+        )
+      },
     })
-    return unsub
+    return () => sub.unsubscribe()
   }, [])
 
   useEffect(() => {
-    const unsub = window.api.processes.onStatus((processId, status) => {
-      setProcesses(prev => prev.map(p => p.id === processId
-        ? { ...p, status, serverUrl: status === 'running' ? p.serverUrl : null }
-        : p))
+    const sub = getTrpcVanillaClient().processes.onStatus.subscribe(undefined, {
+      onData: ({ id: processId, status }) => {
+        setProcesses(prev => prev.map(p => p.id === processId
+          ? { ...p, status: status as ProcessEntry['status'], serverUrl: status === 'running' ? p.serverUrl : null }
+          : p))
+      },
     })
-    return unsub
+    return () => sub.unsubscribe()
   }, [])
 
   useEffect(() => {
-    const unsub = window.api.processes.onStats((s) => setStats(s))
-    return unsub
+    const sub = getTrpcVanillaClient().processes.onStats.subscribe(undefined, {
+      onData: (s) => setStats(s as Record<string, { cpu: number; rss: number }>),
+    })
+    return () => sub.unsubscribe()
   }, [])
 
   useEffect(() => {
-    const unsub = window.api.processes.onTitle((processId, title) => {
-      setProcesses(prev => prev.map(p => p.id === processId ? { ...p, processTitle: title } : p))
+    const sub = getTrpcVanillaClient().processes.onTitle.subscribe(undefined, {
+      onData: ({ id: processId, title }) => {
+        setProcesses(prev => prev.map(p => p.id === processId ? { ...p, processTitle: title } : p))
+      },
     })
-    return unsub
+    return () => sub.unsubscribe()
   }, [])
 
   useEffect(() => {
     const unsub = window.api.app.onCloseTask((closedTaskId) => {
-      if (taskId && closedTaskId === taskId) window.api.processes.killTask(taskId)
+      if (taskId && closedTaskId === taskId) getTrpcVanillaClient().processes.killTask.mutate({ taskId })
     })
     return unsub
   }, [taskId])
@@ -323,7 +331,7 @@ export function ProcessesPanel({ taskId, projectId, cwd, terminalSessionId, onOp
   }, [processes, expandedLogs])
 
   const refreshList = useCallback(async () => {
-    const list = await window.api.processes.listForTask(taskId, projectId)
+    const list = await getTrpcVanillaClient().processes.listForTask.query({ taskId, projectId })
     setProcesses(list as ProcessEntry[])
   }, [taskId, projectId])
 
@@ -337,17 +345,17 @@ export function ProcessesPanel({ taskId, projectId, cwd, terminalSessionId, onOp
   }, [])
 
   const handleKill = useCallback(async (id: string) => {
-    await window.api.processes.kill(id)
+    await getTrpcVanillaClient().processes.kill.mutate({ processId: id })
     setProcesses(prev => prev.filter(p => p.id !== id))
     setExpandedLogs(prev => { const next = new Set(prev); next.delete(id); return next })
   }, [])
 
   const handleStop = useCallback(async (id: string) => {
-    await window.api.processes.stop(id)
+    await getTrpcVanillaClient().processes.stop.mutate({ processId: id })
   }, [])
 
   const handleRestart = useCallback(async (id: string) => {
-    await window.api.processes.restart(id)
+    await getTrpcVanillaClient().processes.restart.mutate({ processId: id })
   }, [])
 
   const handleInject = useCallback((proc: ProcessEntry) => {

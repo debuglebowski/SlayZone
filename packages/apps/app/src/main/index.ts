@@ -130,14 +130,14 @@ import { detectPreviousCrash, writeBootStub, writeCleanShutdownSentinel, scanCra
 import { acquireLockWithSelfHeal, lockOutcomeIsAcquired, type LockOutcome } from './lifecycle/single-instance'
 import { IPC_TELEMETRY_MAP } from '@slayzone/telemetry/shared'
 import { initAiConfigOps } from '@slayzone/ai-config/server'
-import { setAppDeps } from '@slayzone/transport/server'
+import { setAppDeps, setProcessesDeps } from '@slayzone/transport/server'
 import { ElectronStorageAdapter } from '@slayzone/integrations/electron'
 import { initIntegrationOps, ensureIntegrationSchema, startSyncPoller, pushTaskAfterEdit, pushNewTaskToProviders, pushArchiveToProviders, pushUnarchiveToProviders, startDiscoveryPoller, resetSyncFlags, setStorageAdapter } from '@slayzone/integrations/server'
 import { closeAllFileWatchers } from '@slayzone/file-editor/server'
 import { AutomationEngine, automationsEvents } from '@slayzone/automations/server'
 import { captureBrowserViewScreenshot } from './screenshot'
 import { writeFilePaths, readFilePaths, hasFilePaths } from './clipboard-handlers'
-import { setProcessManagerWindow, initProcessManager, createProcess, spawnProcess, updateProcess, stopProcess, killProcess, restartProcess, listForTask, listAllProcesses, killTaskProcesses, killAllProcesses } from './process-manager'
+import { setProcessManagerWindow, initProcessManager, createProcess, spawnProcess, updateProcess, stopProcess, killProcess, restartProcess, listForTask, listAllProcesses, killTaskProcesses, killAllProcesses, processEvents } from './process-manager'
 import { createStatsPoller } from './pid-stats'
 import { buildExportImportOps } from './export-import'
 import { getLocalLeaderboardStats } from './leaderboard'
@@ -2405,33 +2405,18 @@ div{text-align:center}h1{font-size:14px;font-weight:500;color:#aaa}p{font-size:1
   )
   onSessionChange(() => ptyStatsPoller.ensureStarted())
 
-  // Register process IPC handlers
-  ipcMain.handle('processes:create', (_event, projectId: string | null, taskId: string | null, label: string, command: string, cwd: string, autoRestart: boolean) => {
-    return createProcess(projectId, taskId, label, command, cwd, autoRestart)
-  })
-  ipcMain.handle('processes:spawn', (_event, projectId: string | null, taskId: string | null, label: string, command: string, cwd: string, autoRestart: boolean) => {
-    return spawnProcess(projectId, taskId, label, command, cwd, autoRestart)
-  })
-  ipcMain.handle('processes:update', (_event, processId: string, updates: Parameters<typeof updateProcess>[1]) => {
-    return updateProcess(processId, updates)
-  })
-  ipcMain.handle('processes:stop', (_event, processId: string) => {
-    return stopProcess(processId)
-  })
-  ipcMain.handle('processes:kill', (_event, processId: string) => {
-    return killProcess(processId)
-  })
-  ipcMain.handle('processes:restart', (_event, processId: string) => {
-    return restartProcess(processId)
-  })
-  ipcMain.handle('processes:listForTask', (_event, taskId: string | null, projectId: string | null) => {
-    return listForTask(taskId, projectId)
-  })
-  ipcMain.handle('processes:listAll', () => {
-    return listAllProcesses()
-  })
-  ipcMain.handle('processes:killTask', (_event, taskId: string) => {
-    killTaskProcesses(taskId)
+  // Wire processes ops + events into tRPC router
+  setProcessesDeps({
+    create: createProcess,
+    spawn: spawnProcess,
+    update: updateProcess,
+    stop: stopProcess,
+    kill: killProcess,
+    restart: restartProcess,
+    listForTask,
+    listAll: listAllProcesses,
+    killTask: killTaskProcesses,
+    events: processEvents,
   })
 
   app.on('activate', function () {
