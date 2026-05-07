@@ -44,8 +44,6 @@ export interface ChatSessionInfo {
   /** Resolved reasoning effort this session was spawned with. `null` = inherit. */
   chatEffort?: 'low' | 'medium' | 'high' | 'xhigh' | 'max' | null
 }
-import type { CreateWorktreeOpts, CreateWorktreeResult, CreateWorktreePhase, IgnoredFileNode, DetectedWorktree, MergeResult, MergeWithAIResult, GitDiffSnapshot, GitSyncResult, ConflictFileContent, ConflictAnalysis, RebaseProgress, CommitInfo, AheadBehind, StatusSummary, BranchListResult, DeleteBranchResult, PruneResult, DiffStatsSummary, WorktreeMetadata, RebaseOntoResult, DagCommit, ResolvedGraph, ForkGraphResult, GhPullRequest, GhPrTimelineEvent, CreatePrInput, CreatePrResult, MergePrInput, EditPrCommentInput, StashEntry, StashApplyResult, RepoEntry, ListProjectReposOpts } from '@slayzone/worktrees/shared'
-import type { MergeContext } from '@slayzone/task/shared'
 import type {
   AiConfigItem,
   AiConfigProjectSelection,
@@ -566,103 +564,6 @@ export interface ElectronAPI {
     test: (command: string) => Promise<{ ok: boolean; error?: string; detail?: string }>
     restoreDefaults: () => Promise<void>
     resetToDefaultState: () => Promise<void>
-  }
-  git: {
-    isGitRepo: (path: string) => Promise<boolean>
-    detectChildRepos: (projectPath: string) => Promise<{ name: string; path: string }[]>
-    listProjectRepos: (projectPath: string, opts?: ListProjectReposOpts) => Promise<RepoEntry[]>
-    detectWorktrees: (repoPath: string) => Promise<DetectedWorktree[]>
-    createWorktree: (opts: CreateWorktreeOpts) => Promise<CreateWorktreeResult>
-    onCreateWorktreePhase: (requestId: string, cb: (phase: CreateWorktreePhase) => void) => () => void
-    removeWorktree: (repoPath: string, worktreePath: string, branchToDelete?: string) => Promise<{ branchDeleted?: boolean; branchError?: string }>
-    init: (path: string) => Promise<void>
-    getCurrentBranch: (path: string) => Promise<string | null>
-    listBranches: (path: string) => Promise<string[]>
-    checkoutBranch: (path: string, branch: string) => Promise<void>
-    createBranch: (path: string, branch: string) => Promise<void>
-    hasUncommittedChanges: (path: string) => Promise<boolean>
-    mergeIntoParent: (projectPath: string, parentBranch: string, sourceBranch: string) => Promise<MergeResult>
-    abortMerge: (path: string) => Promise<void>
-    mergeWithAI: (projectPath: string, worktreePath: string, parentBranch: string, sourceBranch: string) => Promise<MergeWithAIResult>
-    isMergeInProgress: (path: string) => Promise<boolean>
-    getConflictedFiles: (path: string) => Promise<string[]>
-    getWorkingDiff: (path: string, opts?: { contextLines?: string; ignoreWhitespace?: boolean; fromSha?: string; toSha?: string }) => Promise<GitDiffSnapshot>
-    stageFile: (path: string, filePath: string) => Promise<void>
-    unstageFile: (path: string, filePath: string) => Promise<void>
-    discardFile: (path: string, filePath: string, untracked?: boolean) => Promise<void>
-    stageAll: (path: string) => Promise<void>
-    unstageAll: (path: string) => Promise<void>
-    getFileDiff: (repoPath: string, filePath: string, staged: boolean, opts?: { contextLines?: string; ignoreWhitespace?: boolean }) => Promise<string>
-    getUntrackedFileDiff: (repoPath: string, filePath: string) => Promise<string>
-    getConflictContent: (repoPath: string, filePath: string) => Promise<ConflictFileContent>
-    writeResolvedFile: (repoPath: string, filePath: string, content: string) => Promise<void>
-    commitFiles: (repoPath: string, message: string) => Promise<void>
-    analyzeConflict: (mode: string, filePath: string, base: string | null, ours: string | null, theirs: string | null) => Promise<ConflictAnalysis>
-    isRebaseInProgress: (path: string) => Promise<boolean>
-    getRebaseProgress: (repoPath: string) => Promise<RebaseProgress | null>
-    abortRebase: (path: string) => Promise<void>
-    continueRebase: (path: string) => Promise<{ done: boolean; conflictedFiles: string[] }>
-    skipRebaseCommit: (path: string) => Promise<{ done: boolean; conflictedFiles: string[] }>
-    getMergeContext: (repoPath: string) => Promise<MergeContext | null>
-    getRecentCommits: (repoPath: string, count?: number) => Promise<CommitInfo[]>
-    getAheadBehind: (repoPath: string, branch: string, upstream: string) => Promise<AheadBehind>
-    getStatusSummary: (repoPath: string) => Promise<StatusSummary>
-    revealInFinder: (path: string) => Promise<void>
-    isDirty: (path: string) => Promise<boolean>
-    getRemoteUrl: (path: string) => Promise<string | null>
-    getAheadBehindUpstream: (path: string, branch: string) => Promise<AheadBehind | null>
-    fetch: (path: string) => Promise<void>
-    push: (path: string, branch?: string, force?: boolean) => Promise<GitSyncResult>
-    pull: (path: string) => Promise<GitSyncResult>
-    // Branch tab
-    getDefaultBranch: (path: string) => Promise<string>
-    listBranchesDetailed: (path: string) => Promise<BranchListResult>
-    listRemoteBranches: (path: string) => Promise<string[]>
-    getMergeBase: (path: string, branch1: string, branch2: string) => Promise<string | null>
-    getCommitsSince: (path: string, sinceRef: string, branch: string) => Promise<CommitInfo[]>
-    getCommitsBeforeRef: (path: string, ref: string, count?: number) => Promise<CommitInfo[]>
-    deleteBranch: (path: string, branch: string, force?: boolean) => Promise<DeleteBranchResult>
-    pruneRemote: (path: string) => Promise<PruneResult>
-    // Worktree tab
-    rebaseOnto: (path: string, ontoBranch: string) => Promise<RebaseOntoResult>
-    mergeFrom: (path: string, branch: string) => Promise<MergeResult>
-    getDiffStats: (path: string, ref: string) => Promise<DiffStatsSummary>
-    getWorktreeMetadata: (path: string) => Promise<WorktreeMetadata>
-    // DAG graph
-    getCommitDag: (path: string, limit: number, branches?: string[]) => Promise<DagCommit[]>
-    getResolvedCommitDag: (path: string, limit: number, branches: string[] | undefined, baseBranch: string) => Promise<ResolvedGraph>
-    getResolvedForkGraph: (targetPath: string, repoPath: string, activeBranch: string, compareBranch: string, activeBranchLabel: string, compareBranchLabel: string) => Promise<ForkGraphResult | null>
-    getResolvedUpstreamGraph: (repoPath: string, branch: string) => Promise<ForkGraphResult | null>
-    getResolvedRecentCommits: (path: string, count: number, branchName: string) => Promise<ResolvedGraph>
-    resolveChildBranches: (path: string, baseBranch: string) => Promise<{ children: string[]; merged: string[] }>
-    resolveCopyBehavior: (projectId?: string) => Promise<{ behavior: string; customPaths: string[] }>
-    getIgnoredFileTree: (repoPath: string) => Promise<IgnoredFileNode[]>
-    copyIgnoredFiles: (repoPath: string, worktreePath: string, paths: string[], mode?: 'all' | 'custom') => Promise<void>
-    // GitHub CLI (gh)
-    checkGhInstalled: () => Promise<boolean>
-    hasGithubRemote: (repoPath: string) => Promise<boolean>
-    listOpenPrs: (repoPath: string) => Promise<GhPullRequest[]>
-    getPrByUrl: (repoPath: string, url: string) => Promise<GhPullRequest | null>
-    createPr: (input: CreatePrInput) => Promise<CreatePrResult>
-    getPrComments: (repoPath: string, prNumber: number) => Promise<GhPrTimelineEvent[]>
-    addPrComment: (repoPath: string, prNumber: number, body: string) => Promise<void>
-    mergePr: (input: MergePrInput) => Promise<void>
-    getPrDiff: (repoPath: string, prNumber: number) => Promise<string>
-    getGhUser: (repoPath: string) => Promise<string>
-    editPrComment: (input: EditPrCommentInput) => Promise<void>
-    // Stash
-    listStashes: (repoPath: string) => Promise<StashEntry[]>
-    createStash: (repoPath: string, message: string, includeUntracked: boolean, keepIndex: boolean) => Promise<GitSyncResult>
-    applyStash: (repoPath: string, index: number) => Promise<StashApplyResult>
-    popStash: (repoPath: string, index: number) => Promise<StashApplyResult>
-    dropStash: (repoPath: string, index: number) => Promise<GitSyncResult>
-    branchFromStash: (repoPath: string, index: number, branchName: string) => Promise<GitSyncResult>
-    getStashDiff: (repoPath: string, index: number) => Promise<string>
-    // fs watcher for push-based diff invalidation (replaces renderer polling)
-    watchStart: (worktreePath: string) => Promise<void>
-    watchStop: (worktreePath: string) => Promise<void>
-    onDiffChanged: (cb: (worktreePath: string) => void) => () => void
-    onDiffWatchFailed: (cb: (worktreePath: string) => void) => () => void
   }
   telemetry: {
     onIpcEvent: (callback: (event: string, props: Record<string, unknown>) => void) => () => void

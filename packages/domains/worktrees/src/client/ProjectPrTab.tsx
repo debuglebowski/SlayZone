@@ -77,7 +77,7 @@ export function ProjectPrTab({ projectPath, visible, tasks, onTaskClick }: Proje
       setLoading(true)
       setError(null)
       try {
-        const list = await window.api.git.listOpenPrs(projectPath)
+        const list = await getTrpcVanillaClient().worktrees.listOpenPrs.query({ repoPath: projectPath })
         if (!cancelled) setPrs(list)
       } catch (err) {
         if (!cancelled) setError(err instanceof Error ? err.message : String(err))

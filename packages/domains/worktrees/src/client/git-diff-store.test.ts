@@ -10,6 +10,7 @@
  * Run: pnpm --filter @slayzone/worktrees exec vitest run src/client/git-diff-store.test.ts
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
+import { getTrpcVanillaClient } from '@slayzone/transport/client'
 import { renderHook, act } from '@testing-library/react'
 
 import {

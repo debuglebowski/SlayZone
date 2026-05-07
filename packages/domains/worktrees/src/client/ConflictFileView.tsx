@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { getTrpcVanillaClient } from '@slayzone/transport/client'
 import { Sparkles, Check, ArrowLeft, ArrowRight, Info, Layers } from 'lucide-react'
 import { Button, Tooltip, TooltipContent, TooltipTrigger, cn } from '@slayzone/ui'
 import { useAppearance } from '@slayzone/settings/client'
@@ -73,7 +74,7 @@ export function ConflictFileView({ repoPath, filePath, terminalMode, onResolved,
 
   // Load conflict content
   useEffect(() => {
-    window.api.git.getConflictContent(repoPath, filePath).then(setContent)
+    getTrpcVanillaClient().worktrees.getConflictContent.query({ repoPath: repoPath, filePath: filePath }).then(setContent)
   }, [repoPath, filePath])
 
   // Init CodeMirror editor
@@ -132,8 +133,8 @@ export function ConflictFileView({ repoPath, filePath, terminalMode, onResolved,
   const resolveWithContent = useCallback(async (text: string) => {
     setError(null)
     try {
-      await window.api.git.writeResolvedFile(repoPath, filePath, text)
-      await window.api.git.stageFile(repoPath, filePath)
+      await getTrpcVanillaClient().worktrees.writeResolvedFile.mutate({ repoPath: repoPath, filePath: filePath, content: text })
+      await getTrpcVanillaClient().worktrees.stageFile.mutate({ path: repoPath, filePath: filePath })
       setResolved(true)
       onResolved()
     } catch (err) {
@@ -146,13 +147,13 @@ export function ConflictFileView({ repoPath, filePath, terminalMode, onResolved,
     setAnalyzing(true)
     setError(null)
     try {
-      const result = await window.api.git.analyzeConflict(
-        terminalMode,
+      const result = await getTrpcVanillaClient().worktrees.analyzeConflict.mutate({
+        mode: terminalMode,
         filePath,
-        content.base,
-        content.ours,
-        content.theirs
-      )
+        base: content.base,
+        ours: content.ours,
+        theirs: content.theirs,
+      })
       setAnalysis(result)
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))

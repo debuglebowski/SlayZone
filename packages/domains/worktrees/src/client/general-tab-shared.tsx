@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { getTrpcVanillaClient } from '@slayzone/transport/client'
 import { GitBranch, GitMerge, GitPullRequest, FolderTree, FolderGit2, Link2, Loader2, AlertTriangle, ChevronDown, Trash2 } from 'lucide-react'
 import {
   Button, Tooltip, TooltipContent, TooltipTrigger,
@@ -204,7 +205,7 @@ function BranchPickerDialog({ open, onOpenChange, projectPath, onSelect }: {
   useEffect(() => {
     if (!open || !projectPath) return
     setLoading(true)
-    window.api.git.listBranches(projectPath)
+    getTrpcVanillaClient().worktrees.listBranches.query({ path: projectPath })
       .then(setBranches)
       .catch(() => setBranches([]))
       .finally(() => setLoading(false))

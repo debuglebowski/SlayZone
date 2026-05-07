@@ -103,7 +103,7 @@ export function useBranchGraph(
   const fetchData = useCallback(async () => {
     if (!projectPath) return
     try {
-      const branch = await window.api.git.getCurrentBranch(projectPath)
+      const branch = await getTrpcVanillaClient().worktrees.getCurrentBranch.query({ path: projectPath })
       if (branch) setCurrentBranch(branch)
 
       const baseBranch = config.baseBranch || defaultBaseBranch || branch || 'main'
@@ -111,14 +111,14 @@ export function useBranchGraph(
       const branchSet = new Set<string>([baseBranch])
 
       if (config.showBranches) {
-        const result = await window.api.git.resolveChildBranches(projectPath, baseBranch)
+        const result = await getTrpcVanillaClient().worktrees.resolveChildBranches.query({ path: projectPath, baseBranch: baseBranch })
         for (const child of result.children) branchSet.add(child)
         for (const merged of result.merged) branchSet.add(merged)
       }
 
-      const graph = await window.api.git.getResolvedCommitDag(
-        projectPath, FETCH_LIMIT, [...branchSet], baseBranch
-      )
+      const graph = await getTrpcVanillaClient().worktrees.getResolvedCommitDag.query({
+        path: projectPath, limit: FETCH_LIMIT, branches: [...branchSet], baseBranch,
+      })
       setDagGraph(graph)
     } catch { /* polling error */ }
   }, [projectPath, config, defaultBaseBranch])
@@ -143,7 +143,7 @@ export function useBranchGraph(
     if (!projectPath) return
     setFetching(true)
     try {
-      await window.api.git.fetch(projectPath)
+      await getTrpcVanillaClient().worktrees.fetch.mutate({ path: projectPath })
       await fetchData()
       toast('Fetched from remote')
     } catch {

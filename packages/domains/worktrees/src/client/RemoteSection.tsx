@@ -1,4 +1,5 @@
 import { useState, useCallback } from 'react'
+import { getTrpcVanillaClient } from '@slayzone/transport/client'
 import { ChevronDown, Loader2, Download, Upload } from 'lucide-react'
 import {
   Button,
@@ -39,7 +40,7 @@ export function RemoteSection({ upstreamAB, targetPath, branch, onSyncDone }: Re
     setPushMenuOpen(false)
     setForcePushConfirmOpen(false)
     try {
-      const result = await window.api.git.push(targetPath, branch ?? undefined, force)
+      const result = await getTrpcVanillaClient().worktrees.push.mutate({ path: targetPath, branch: branch ?? undefined, force: force })
       if (!result.success) {
         toast(result.error ?? 'Push failed')
       } else {
@@ -56,7 +57,7 @@ export function RemoteSection({ upstreamAB, targetPath, branch, onSyncDone }: Re
   const handlePull = useCallback(async () => {
     setPulling(true)
     try {
-      const result = await window.api.git.pull(targetPath)
+      const result = await getTrpcVanillaClient().worktrees.pull.mutate({ path: targetPath })
       if (!result.success) {
         toast(result.error ?? 'Pull failed')
       } else {

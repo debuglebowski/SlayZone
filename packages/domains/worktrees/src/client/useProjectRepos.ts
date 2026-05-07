@@ -10,6 +10,7 @@
  * `gitViewRepoPath`). This hook is purely a data source.
  */
 import { useEffect, useState, useCallback } from 'react'
+import { getTrpcVanillaClient } from '@slayzone/transport/client'
 import type { RepoEntry } from '@slayzone/worktrees/shared'
 
 export interface UseProjectReposResult {
@@ -32,7 +33,7 @@ export function useProjectRepos(
     if (!projectPath) { setRepos([]); return }
     let cancelled = false
     setLoading(true)
-    window.api.git.listProjectRepos(projectPath, { taskBoundPath })
+    getTrpcVanillaClient().worktrees.listProjectRepos.query({ projectPath: projectPath, opts: {  taskBoundPath  } })
       .then(list => { if (!cancelled) setRepos(list) })
       .catch(() => { if (!cancelled) setRepos([]) })
       .finally(() => { if (!cancelled) setLoading(false) })
