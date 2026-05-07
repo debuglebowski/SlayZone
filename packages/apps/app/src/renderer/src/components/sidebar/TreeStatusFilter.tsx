@@ -40,9 +40,9 @@ export function TreeStatusFilter() {
           type="button"
           aria-label={`Filter statuses (${summary})`}
           title={summary}
-          className="inline-flex h-6 w-6 items-center justify-center rounded-md text-muted-foreground hover:bg-accent/50 hover:text-foreground transition-colors"
+          className="inline-flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground hover:bg-accent/50 hover:text-foreground transition-colors"
         >
-          <Filter className="size-3.5" />
+          <Filter className="size-4" />
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent side="bottom" align="start" className="min-w-[200px]">

@@ -1152,7 +1152,7 @@ function App(): React.JSX.Element {
           onLeaderboard={() => { useTabStore.getState().setActiveView('leaderboard') }}
           onUsageAnalytics={() => { useTabStore.getState().setActiveView('usage-analytics') }}
           onTaskClick={openTask} zenMode={zenMode} onboardingChecklist={onboardingChecklist} idleByProject={idleByProject} onReorderProjects={reorderProjects}
-          terminalStates={terminalStates} taskProgress={taskProgress} doneTaskIds={doneTaskIds}
+          terminalStates={terminalStates} taskProgress={taskProgress} doneTaskIds={doneTaskIds} columnsByProjectId={columnsByProjectId}
           taskContextMenuRender={(task, child) => (
             <TaskContextMenu
               task={task}

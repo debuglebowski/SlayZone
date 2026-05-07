@@ -51,6 +51,9 @@ interface TabState {
   sidebarAutoHide: boolean
   // Tree-view status filter — task statuses to include.
   treeStatusFilter: string[]
+  // Tree-view display options — show indicators on each task row.
+  treeShowStatus: boolean
+  treeShowPriority: boolean
   // projectId → taskId of last active task tab, or 'home' if home tab was last active
   projectLastActiveTab: Record<string, string>
 
@@ -68,6 +71,8 @@ interface TabState {
   setSidebarWidth: (width: number | null) => void
   setSidebarAutoHide: (enabled: boolean) => void
   setTreeStatusFilter: (statuses: string[]) => void
+  setTreeShowStatus: (show: boolean) => void
+  setTreeShowPriority: (show: boolean) => void
   setTabs: (tabs: Tab[]) => void
   reorderTabs: (from: number, to: number) => void
   openTask: (taskId: string) => void
@@ -78,7 +83,7 @@ interface TabState {
   reopenClosedTab: () => void
 
   // Internal
-  _loadState: (state: { tabs: Tab[]; activeTabIndex: number; activeView?: ActiveView; selectedProjectId: string; projectScopedTabs?: boolean; sidebarView?: string; sidebarWidth?: number | null; sidebarAutoHide?: boolean; treeStatusFilter?: string[]; projectLastActiveTab?: Record<string, string> }) => void
+  _loadState: (state: { tabs: Tab[]; activeTabIndex: number; activeView?: ActiveView; selectedProjectId: string; projectScopedTabs?: boolean; sidebarView?: string; sidebarWidth?: number | null; sidebarAutoHide?: boolean; treeStatusFilter?: string[]; treeShowStatus?: boolean; treeShowPriority?: boolean; projectLastActiveTab?: Record<string, string> }) => void
 }
 
 function findWorktreeInsertIndex(taskId: string, tabs: Tab[], lookup: TaskLookup): number {
@@ -116,6 +121,8 @@ export const useTabStore = create<TabState>()(
     sidebarWidth: null,
     sidebarAutoHide: false,
     treeStatusFilter: ['in_progress'],
+    treeShowStatus: false,
+    treeShowPriority: true,
     projectLastActiveTab: {},
     _taskLookup: { tasks: [], projects: [] },
 
@@ -153,6 +160,10 @@ export const useTabStore = create<TabState>()(
     setSidebarAutoHide: (enabled) => set({ sidebarAutoHide: enabled }),
 
     setTreeStatusFilter: (statuses) => set({ treeStatusFilter: statuses }),
+
+    setTreeShowStatus: (show) => set({ treeShowStatus: show }),
+
+    setTreeShowPriority: (show) => set({ treeShowPriority: show }),
 
     setTabs: (tabs) => set({ tabs }),
 
@@ -277,6 +288,8 @@ export const useTabStore = create<TabState>()(
         treeStatusFilter: Array.isArray(state.treeStatusFilter) && state.treeStatusFilter.every((s) => typeof s === 'string')
           ? state.treeStatusFilter
           : ['in_progress'],
+        treeShowStatus: typeof state.treeShowStatus === 'boolean' ? state.treeShowStatus : false,
+        treeShowPriority: typeof state.treeShowPriority === 'boolean' ? state.treeShowPriority : true,
         projectLastActiveTab: state.projectLastActiveTab && typeof state.projectLastActiveTab === 'object' ? state.projectLastActiveTab : {},
         isLoaded: true
       })
@@ -314,7 +327,7 @@ export const tabStoreReady: Promise<void> = (typeof window !== 'undefined' && wi
 let _debounceTimer: ReturnType<typeof setTimeout> | null = null
 
 useTabStore.subscribe(
-  (state) => ({ tabs: state.tabs, activeTabIndex: state.activeTabIndex, activeView: state.activeView, selectedProjectId: state.selectedProjectId, projectScopedTabs: state.projectScopedTabs, sidebarView: state.sidebarView, sidebarWidth: state.sidebarWidth, sidebarAutoHide: state.sidebarAutoHide, treeStatusFilter: state.treeStatusFilter, projectLastActiveTab: state.projectLastActiveTab }),
+  (state) => ({ tabs: state.tabs, activeTabIndex: state.activeTabIndex, activeView: state.activeView, selectedProjectId: state.selectedProjectId, projectScopedTabs: state.projectScopedTabs, sidebarView: state.sidebarView, sidebarWidth: state.sidebarWidth, sidebarAutoHide: state.sidebarAutoHide, treeStatusFilter: state.treeStatusFilter, treeShowStatus: state.treeShowStatus, treeShowPriority: state.treeShowPriority, projectLastActiveTab: state.projectLastActiveTab }),
   (slice) => {
     if (!useTabStore.getState().isLoaded) return
     if (_debounceTimer) clearTimeout(_debounceTimer)

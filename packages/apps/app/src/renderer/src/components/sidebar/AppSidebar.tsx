@@ -10,13 +10,14 @@ import {
 import { useTabStore } from '@slayzone/settings'
 import type { ReactNode } from 'react'
 import type { Task } from '@slayzone/task/shared'
-import type { Project } from '@slayzone/projects/shared'
+import type { Project, ColumnConfig } from '@slayzone/projects/shared'
 import type { TerminalState } from '@slayzone/terminal/shared'
 import type { OnboardingChecklistState } from '@/hooks/useOnboardingChecklist'
 import { SidebarFooterIcons } from './SidebarFooterIcons'
 import { SidebarViewSwitcher } from './SidebarViewSwitcher'
 import { SidebarResizeHandle } from './SidebarResizeHandle'
 import { TreeStatusFilter } from './TreeStatusFilter'
+import { TreeDisplaySettings } from './TreeDisplaySettings'
 import { getView } from './views/registry'
 
 interface AppSidebarProps {
@@ -37,6 +38,7 @@ interface AppSidebarProps {
   terminalStates?: Map<string, TerminalState>
   taskProgress?: Map<string, number>
   doneTaskIds?: Set<string>
+  columnsByProjectId?: Map<string, ColumnConfig[] | null>
 }
 
 export function AppSidebar({
@@ -57,6 +59,7 @@ export function AppSidebar({
   terminalStates,
   taskProgress,
   doneTaskIds,
+  columnsByProjectId,
 }: AppSidebarProps) {
   const sidebarView = useTabStore((s) => s.sidebarView)
   const setSidebarView = useTabStore((s) => s.setSidebarView)
@@ -117,8 +120,9 @@ export function AppSidebar({
       )}
     >
       {sidebarView === 'tree' && !autoHideActive && (
-        <div className="absolute top-0 left-0 right-0 h-11 flex items-center justify-end pr-3 z-20">
+        <div className="absolute top-0 left-0 right-0 h-11 flex items-center justify-end gap-1 pr-5 z-20">
           <TreeStatusFilter />
+          <TreeDisplaySettings />
         </div>
       )}
       <SidebarContent className={cn('pb-4 scrollbar-hide', autoHideActive ? 'pt-4' : 'pt-11')}>
@@ -137,6 +141,7 @@ export function AppSidebar({
               terminalStates,
               taskProgress,
               doneTaskIds,
+              columnsByProjectId,
             })}
           </SidebarGroupContent>
         </SidebarGroup>

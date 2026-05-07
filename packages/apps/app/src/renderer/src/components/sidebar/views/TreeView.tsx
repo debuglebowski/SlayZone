@@ -1,7 +1,7 @@
 import { useMemo, useState, type ReactNode } from 'react'
 import { ChevronDown, Home, Settings } from 'lucide-react'
 import * as Collapsible from '@radix-ui/react-collapsible'
-import { cn, TerminalProgressDot } from '@slayzone/ui'
+import { cn, TerminalProgressDot, PriorityIcon, getColumnStatusStyle } from '@slayzone/ui'
 import { type Task } from '@slayzone/task/shared'
 import { useTabStore } from '@slayzone/settings'
 import { useActiveSessionTaskIds } from '@/components/agent-status/useIdleTasks'
@@ -65,6 +65,7 @@ export function TreeView({
   terminalStates,
   taskProgress,
   doneTaskIds,
+  columnsByProjectId,
 }: SidebarViewContext) {
   const sortedProjects = useMemo(
     () => [...projects].sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0)),
@@ -73,6 +74,8 @@ export function TreeView({
 
   const treeStatusFilter = useTabStore((s) => s.treeStatusFilter)
   const statusFilter = useMemo(() => new Set(treeStatusFilter), [treeStatusFilter])
+  const treeShowStatus = useTabStore((s) => s.treeShowStatus)
+  const treeShowPriority = useTabStore((s) => s.treeShowPriority)
 
   const tasksByProject = useMemo(() => {
     const m = new Map<string, Task[]>()
@@ -172,6 +175,9 @@ export function TreeView({
     const termState = terminalStates?.get(task.id)
     const progress = taskProgress?.get(task.id)
     const isDone = doneTaskIds?.has(task.id) ?? false
+    const cols = columnsByProjectId?.get(task.project_id) ?? null
+    const statusStyle = getColumnStatusStyle(task.status, cols)
+    const StatusIcon = statusStyle?.icon
     const button = (
       <button
         type="button"
@@ -195,7 +201,13 @@ export function TreeView({
             alwaysShow
             tooltipSide="right"
           />
-          <span className="truncate">{task.title || 'Untitled'}</span>
+          <span className="truncate flex-1">{task.title || 'Untitled'}</span>
+          {treeShowPriority && task.priority != null && (
+            <PriorityIcon priority={task.priority} className="size-3.5 shrink-0" />
+          )}
+          {treeShowStatus && StatusIcon && (
+            <StatusIcon className={cn('size-3.5 shrink-0', statusStyle?.iconClass)} />
+          )}
         </span>
       </button>
     )
@@ -248,7 +260,7 @@ export function TreeView({
             type="button"
             onClick={() => onSelectProject(project.id)}
             aria-label={`Open ${project.name} home`}
-            className="inline-flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:text-foreground transition-colors"
+            className="inline-flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground/50 hover:text-foreground opacity-0 group-hover/projectrow:opacity-100 focus-visible:opacity-100 transition-[color,opacity]"
           >
             <Home className="size-3.5" />
           </button>
@@ -256,7 +268,7 @@ export function TreeView({
             type="button"
             onClick={() => onProjectSettings(project)}
             aria-label={`Settings for ${project.name}`}
-            className="inline-flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:text-foreground transition-colors mr-0.5"
+            className="inline-flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground/50 hover:text-foreground opacity-0 group-hover/projectrow:opacity-100 focus-visible:opacity-100 transition-[color,opacity] mr-0.5"
           >
             <Settings className="size-3.5" />
           </button>
@@ -283,13 +295,10 @@ export function TreeView({
         <button
           type="button"
           onClick={() => setShowAll((v) => !v)}
-          className="group flex items-center gap-2 px-2 py-2 text-[11px] text-muted-foreground/50 hover:text-muted-foreground transition-colors"
+          className="flex items-center justify-center gap-1 px-2 py-2 text-[11px] text-muted-foreground/60 hover:text-muted-foreground transition-colors"
         >
-          <span className="flex-1 h-px bg-border/60 group-hover:bg-border transition-colors" />
-          <span className="shrink-0">
-            {showAll ? 'Hide inactive' : 'Show all projects'}
-          </span>
-          <span className="flex-1 h-px bg-border/60 group-hover:bg-border transition-colors" />
+          <span>{showAll ? 'Hide inactive' : 'Show all'}</span>
+          <ChevronDown className={cn('size-3 transition-transform', showAll && 'rotate-180')} />
         </button>
       )}
     </div>

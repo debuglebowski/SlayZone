@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
 import type { LucideIcon } from 'lucide-react'
 import type { Task } from '@slayzone/task/shared'
-import type { Project } from '@slayzone/projects/shared'
+import type { Project, ColumnConfig } from '@slayzone/projects/shared'
 import type { TerminalState } from '@slayzone/terminal/shared'
 
 export interface SidebarViewContext {
@@ -21,6 +21,8 @@ export interface SidebarViewContext {
   taskProgress?: Map<string, number>
   /** Task ids in a "done" status. */
   doneTaskIds?: Set<string>
+  /** Per-project kanban column config (used for task-status icon lookup). */
+  columnsByProjectId?: Map<string, ColumnConfig[] | null>
 }
 
 export interface SidebarView {
