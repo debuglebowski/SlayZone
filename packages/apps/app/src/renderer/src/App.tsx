@@ -890,19 +890,19 @@ function App(): React.JSX.Element {
 
       if (e.key === '=' || e.key === '+') {
         e.preventDefault()
-        void window.api.app.adjustZoom('in')
+        void getTrpcVanillaClient().app.meta.adjustZoom.mutate({ command: 'in' })
         return
       }
 
       if (e.key === '-') {
         e.preventDefault()
-        void window.api.app.adjustZoom('out')
+        void getTrpcVanillaClient().app.meta.adjustZoom.mutate({ command: 'out' })
         return
       }
 
       if (e.key === '0') {
         e.preventDefault()
-        void window.api.app.adjustZoom('reset')
+        void getTrpcVanillaClient().app.meta.adjustZoom.mutate({ command: 'reset' })
       }
     }
 
@@ -1256,7 +1256,7 @@ function App(): React.JSX.Element {
                   </TooltipContent></Tooltip>
                   <AgentStatusButton active={agentStatusState.isLocked} count={idleTasks.length} onClick={() => setAgentStatusState({ isLocked: !agentStatusState.isLocked })} shortcutHint={agentStatusPanelShortcut} />
                   <AgentPanelButton active={agentPanelState.isOpen} disabled={!selectedProjectId} onClick={() => setAgentPanelState({ isOpen: !agentPanelState.isOpen })} shortcutHint={agentPanelShortcut} />
-                  <UpdateButton version={updateVersion} onRestart={() => window.api.app.restartForUpdate()} />
+                  <UpdateButton version={updateVersion} onRestart={() => getTrpcVanillaClient().app.meta.restartForUpdate.mutate()} />
                 </div>
               }
             />
@@ -1518,7 +1518,7 @@ function App(): React.JSX.Element {
           <AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Complete Task</AlertDialogTitle><AlertDialogDescription>Mark as complete and close tab?</AlertDialogDescription></AlertDialogHeader>
           <AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction autoFocus onClick={handleCompleteTaskConfirm}>Complete</AlertDialogAction></AlertDialogFooter></AlertDialogContent>
         </AlertDialog>
-        <UpdateToast version={updateToastDismissed ? null : updateVersion} onRestart={() => window.api.app.restartForUpdate()} onDismiss={() => setUpdateToastDismissed(true)} />
+        <UpdateToast version={updateToastDismissed ? null : updateVersion} onRestart={() => getTrpcVanillaClient().app.meta.restartForUpdate.mutate()} onDismiss={() => setUpdateToastDismissed(true)} />
         <Toaster position="bottom-right" theme="dark" closeButton />
       </div>
     </SidebarProvider>

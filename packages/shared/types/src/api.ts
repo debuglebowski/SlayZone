@@ -121,15 +121,6 @@ export interface ElectronAPI {
   shortcuts: {
     changed: () => void
   }
-  auth: {
-    githubSystemSignIn: (input: { convexUrl: string; redirectTo: string }) => Promise<{
-      ok: boolean
-      code?: string
-      verifier?: string
-      error?: string
-      cancelled?: boolean
-    }>
-  }
   dialog: {
     showOpenDialog: (options: {
       title?: string
@@ -139,17 +130,10 @@ export interface ElectronAPI {
     }) => Promise<{ canceled: boolean; filePaths: string[] }>
   }
   app: {
-    getProtocolClientStatus: () => Promise<{
-      scheme: string
-      attempted: boolean
-      registered: boolean
-      reason: 'registered' | 'dev-skipped' | 'registration-failed'
-    }>
     getTrpcPort: () => Promise<number>
     isTestsPanelEnabledSync: boolean
     isJiraIntegrationEnabledSync: boolean
     isLoopModeEnabledSync: boolean
-    adjustZoom: (command: 'in' | 'out' | 'reset') => Promise<number>
     isPlaywright: boolean
     onGoHome: (callback: () => void) => () => void
     onToggleAgentPanel: (callback: () => void) => () => void
@@ -174,8 +158,6 @@ export interface ElectronAPI {
     onCloseActiveTask: (callback: () => void) => () => void
     dataReady: () => void
     bootMark: (label: string) => void
-    restartForUpdate: () => Promise<void>
-    checkForUpdates: () => Promise<void>
   }
   floatingAgent: {
     setEnabled: (enabled: boolean) => Promise<{ kind: string }>
