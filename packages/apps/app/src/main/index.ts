@@ -8,7 +8,7 @@ import { raiseFdLimit } from './raise-fd-limit'
 const fdLimitResult = raiseFdLimit()
 console.log('[fd-limit]', JSON.stringify(fdLimitResult))
 
-import { app, shell, BrowserWindow, ipcMain, nativeTheme, session, webContents, dialog, Menu, protocol, screen, powerMonitor, crashReporter } from 'electron'
+import { app, shell, BrowserWindow, ipcMain, nativeTheme, session, webContents, dialog, Menu, protocol, powerMonitor, crashReporter } from 'electron'
 import { join, extname, normalize, sep, resolve } from 'path'
 import { homedir } from 'os'
 import { readFileSync, promises as fsp, mkdirSync, appendFileSync } from 'fs'
@@ -1357,6 +1357,44 @@ app.whenReady().then(async () => {
     appGetZoomFactor: () => mainWindow?.webContents.zoomFactor ?? 1,
     appCheckCliInstalled: () => checkCliInstalled(),
     appInstallCli: () => installCli(getCliSrc()),
+    appAdjustZoom: (command) => applyAppZoom(command),
+    appRestartForUpdate: () => restartForUpdate(),
+    appCheckForUpdates: () => checkForUpdates(),
+    appGetProtocolClientStatus: () => protocolClientStatus,
+    appGetRendererZoomFactor: () => mainWindow?.webContents.zoomFactor ?? null,
+    appWindowGetContentBounds: () => mainWindow?.getContentBounds() ?? null,
+    appWindowGetDisplayScaleFactor: () => {
+      const cb = mainWindow?.getContentBounds()
+      if (!cb) return 1
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const { screen } = require('electron') as typeof import('electron')
+      const display = screen.getDisplayMatching(cb)
+      return display.scaleFactor
+    },
+    authGithubSystemSignIn: async (input) => {
+      try {
+        if (!input?.convexUrl) return { ok: false, error: 'Convex URL is required' }
+        if (input.redirectTo !== OAUTH_DEEP_LINK_REDIRECT_URI) {
+          return { ok: false, error: `Unsupported redirect URI: ${input.redirectTo}` }
+        }
+        if (oauthCallbackWaiters.size > 0) {
+          return { ok: false, error: 'An OAuth sign-in flow is already in progress' }
+        }
+        oauthCallbackQueue.length = 0
+        const start = await requestGithubSignInStart(input.convexUrl, input.redirectTo)
+        await shell.openExternal(start.redirect)
+        const callback = await waitForOAuthCallback(OAUTH_CALLBACK_TIMEOUT_MS)
+        if (callback.error) {
+          return { ok: false, verifier: start.verifier, error: callback.error }
+        }
+        if (!callback.code) {
+          return { ok: false, verifier: start.verifier, error: 'GitHub sign-in failed — no authorization code returned. Try again or use a different browser.' }
+        }
+        return { ok: true, verifier: start.verifier, code: callback.code }
+      } catch (error) {
+        return { ok: false, error: error instanceof Error ? error.message : 'GitHub sign-in failed' }
+      }
+    },
   })
   logBoot('app-level deps wired into tRPC')
 
@@ -1648,42 +1686,6 @@ div{text-align:center}h1{font-size:14px;font-weight:500;color:#aaa}p{font-size:1
   // IPC test
   ipcMain.on('ping', () => console.log('pong'))
 
-  ipcMain.handle('auth:github-system-sign-in', async (_event, input: {
-    convexUrl: string
-    redirectTo: string
-  }) => {
-    try {
-      if (!input?.convexUrl) {
-        return { ok: false, error: 'Convex URL is required' }
-      }
-      if (input.redirectTo !== OAUTH_DEEP_LINK_REDIRECT_URI) {
-        return { ok: false, error: `Unsupported redirect URI: ${input.redirectTo}` }
-      }
-      if (oauthCallbackWaiters.size > 0) {
-        return { ok: false, error: 'An OAuth sign-in flow is already in progress' }
-      }
-
-      // Ignore stale callbacks from prior sign-in attempts.
-      oauthCallbackQueue.length = 0
-
-      const start = await requestGithubSignInStart(input.convexUrl, input.redirectTo)
-      await shell.openExternal(start.redirect)
-
-      const callback = await waitForOAuthCallback(OAUTH_CALLBACK_TIMEOUT_MS)
-      if (callback.error) {
-        return { ok: false, verifier: start.verifier, error: callback.error }
-      }
-      if (!callback.code) {
-        return { ok: false, verifier: start.verifier, error: 'GitHub sign-in failed — no authorization code returned. Try again or use a different browser.' }
-      }
-      return { ok: true, verifier: start.verifier, code: callback.code }
-    } catch (error) {
-      return {
-        ok: false,
-        error: error instanceof Error ? error.message : 'GitHub sign-in failed'
-      }
-    }
-  })
 
   ipcMain.on('app:data-ready', () => {
     if (rendererDataReady) return
@@ -1716,10 +1718,6 @@ div{text-align:center}h1{font-size:14px;font-weight:500;color:#aaa}p{font-size:1
   ipcMain.on('app:is-tests-panel-enabled-sync', (event) => { event.returnValue = isLabEnabled('labs_tests_panel') })
   ipcMain.on('app:is-jira-integration-enabled-sync', (event) => { event.returnValue = isLabEnabled('labs_jira_integration') })
   ipcMain.on('app:is-loop-mode-enabled-sync', (event) => { event.returnValue = isLabEnabled('labs_loop_mode') })
-  ipcMain.handle('app:get-protocol-client-status', () => protocolClientStatus)
-  ipcMain.handle('app:adjust-zoom', (_event, command: AppZoomCommand) => applyAppZoom(command))
-  ipcMain.handle('app:restart-for-update', () => restartForUpdate())
-  ipcMain.handle('app:check-for-updates', () => checkForUpdates())
 
   // Window close
   ipcMain.handle('window:close', (event) => {
@@ -2204,12 +2202,6 @@ div{text-align:center}h1{font-size:14px;font-weight:500;color:#aaa}p{font-size:1
 
   // Test-only handles
   if (isPlaywright) {
-    ipcMain.handle('app:get-renderer-zoom-factor', () => mainWindow?.webContents.zoomFactor ?? null)
-    ipcMain.handle('window:get-content-bounds', () => mainWindow?.getContentBounds() ?? null)
-    ipcMain.handle('window:get-display-scale-factor', () => {
-      if (!mainWindow || mainWindow.isDestroyed()) return null
-      return screen.getDisplayMatching(mainWindow.getBounds()).scaleFactor
-    })
     ipcMain.handle('browser:get-url', (_, viewId: string) => browserViewManager.getUrl(viewId))
     ipcMain.handle('browser:get-bounds', (_, viewId: string) => browserViewManager.getBounds(viewId))
     ipcMain.handle('browser:get-zoom-factor', (_, viewId: string) => browserViewManager.getZoomFactor(viewId))

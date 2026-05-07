@@ -29,20 +29,14 @@ const api: ElectronAPI = {
   shortcuts: {
     changed: () => ipcRenderer.send('shortcuts:changed'),
   },
-  auth: {
-    githubSystemSignIn: (input: { convexUrl: string; redirectTo: string }) =>
-      ipcRenderer.invoke('auth:github-system-sign-in', input)
-  },
   dialog: {
     showOpenDialog: (options) => ipcRenderer.invoke('dialog:showOpenDialog', options)
   },
   app: {
-    getProtocolClientStatus: () => ipcRenderer.invoke('app:get-protocol-client-status'),
     getTrpcPort: () => ipcRenderer.invoke('app:get-trpc-port') as Promise<number>,
     isTestsPanelEnabledSync: ipcRenderer.sendSync('app:is-tests-panel-enabled-sync') as boolean,
     isJiraIntegrationEnabledSync: ipcRenderer.sendSync('app:is-jira-integration-enabled-sync') as boolean,
     isLoopModeEnabledSync: ipcRenderer.sendSync('app:is-loop-mode-enabled-sync') as boolean,
-    adjustZoom: (command: 'in' | 'out' | 'reset') => ipcRenderer.invoke('app:adjust-zoom', command) as Promise<number>,
     isPlaywright: process.env.PLAYWRIGHT === '1',
     onGoHome: (callback: () => void) => {
       const handler = () => callback()
@@ -160,8 +154,6 @@ const api: ElectronAPI = {
     bootMark: process.env.SLAYZONE_DEBUG_BOOT === '1'
       ? (label: string) => ipcRenderer.send('boot:mark', label)
       : () => {},
-    restartForUpdate: () => ipcRenderer.invoke('app:restart-for-update'),
-    checkForUpdates: () => ipcRenderer.invoke('app:check-for-updates'),
   },
   floatingAgent: {
     setEnabled: (enabled: boolean) => ipcRenderer.invoke('floating-agent:set-enabled', enabled),

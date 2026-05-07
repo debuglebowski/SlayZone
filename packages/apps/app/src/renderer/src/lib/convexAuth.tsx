@@ -84,17 +84,11 @@ function ConvexAuthBridge({ children }: { children: React.ReactNode }): React.JS
       signInWithGitHub: async () => {
         try {
           setLastError(null)
-          const authApi = window.api?.auth
           if (convexUrl) {
-            if (!authApi?.githubSystemSignIn) {
-              setLastError('GitHub sign-in unavailable: system auth transport is not exposed.')
-              return
-            }
-
-            const signInResult = await authApi.githubSystemSignIn({
+            const signInResult = await getTrpcVanillaClient().app.auth.githubSystemSignIn.mutate({
               convexUrl,
               redirectTo: OAUTH_REDIRECT_URI
-            })
+            }) as { ok: boolean; code?: string; verifier?: string; error?: string; cancelled?: boolean }
 
             if (signInResult.ok && signInResult.code && signInResult.verifier) {
               window.localStorage.setItem(namespacedVerifierKey(AUTH_STORAGE_NAMESPACE), signInResult.verifier)

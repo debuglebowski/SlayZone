@@ -58,6 +58,14 @@ export type AppDeps = {
   appGetZoomFactor: () => number
   appCheckCliInstalled: () => { installed: boolean; path?: string; mode?: string; error?: string } | Promise<{ installed: boolean; path?: string; mode?: string; error?: string }>
   appInstallCli: () => Promise<{ ok: boolean; path?: string; error?: string; pathNotInPATH?: boolean; elevationCancelled?: boolean; permissionDenied?: boolean }>
+  appAdjustZoom: (command: 'in' | 'out' | 'reset') => number
+  appRestartForUpdate: () => void
+  appCheckForUpdates: () => Promise<void>
+  appGetProtocolClientStatus: () => { scheme: string; attempted: boolean; registered: boolean; reason: 'registered' | 'dev-skipped' | 'registration-failed' }
+  appGetRendererZoomFactor: () => number | null
+  appWindowGetContentBounds: () => { x: number; y: number; width: number; height: number } | null
+  appWindowGetDisplayScaleFactor: () => number
+  authGithubSystemSignIn: (input: { convexUrl: string; redirectTo: string }) => Promise<unknown>
 
   // db:feedback (6 ops — pure DB)
   feedbackListThreads: () => unknown

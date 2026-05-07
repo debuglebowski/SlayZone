@@ -155,8 +155,7 @@ function LeaderboardPageInner({ auth }: { auth: ReturnType<typeof useLeaderboard
   useEffect(() => {
     if (!import.meta.env.DEV) return
     let cancelled = false
-    void window.api.app
-      .getProtocolClientStatus()
+    void getTrpcVanillaClient().app.meta.getProtocolClientStatus.query()
       .then((status) => {
         if (cancelled) return
         if (status.reason === 'dev-skipped') {
