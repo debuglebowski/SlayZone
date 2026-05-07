@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef, useImperativeHandle, forwardRef, useMemo, type CSSProperties, type DragEvent } from 'react'
+import { getTrpcVanillaClient } from '@slayzone/transport/client'
 import { Upload, Download, Trash2, FileText, Code, Globe, Image, GitBranch, Eye, Code2, Columns2, ZoomIn, ZoomOut, FolderPlus, Pencil, FilePlus, FolderOpen, Folder, ArrowRight, Copy, Search, Files, PanelLeftClose, PanelLeft, ImageDown, FileCode, Archive, Rows2, Rows3, Maximize2, AlignCenter, History, Scissors, ClipboardPaste, CopyPlus, Settings2, Type } from 'lucide-react'
 import {
   cn, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Button, Input,
@@ -508,7 +509,7 @@ export const ArtifactsPanel = forwardRef<ArtifactsPanelHandle, ArtifactsPanelPro
 
   const { editorMarkdownViewMode, notesReadability, notesWidth, notesFontFamily, artifactsSettingsBannerOpen, editorMinimapEnabled, editorTocEnabled } = useAppearance()
   const setBannerOpen = useCallback((open: boolean) => {
-    void window.api.settings.set('assets_settings_banner_open', open ? '1' : '0')
+    void getTrpcVanillaClient().settings.set.mutate({ key: 'assets_settings_banner_open', value: open ? '1' : '0' })
     window.dispatchEvent(new Event('sz:settings-changed'))
   }, [])
   const artifactDefaultViewMode = editorMarkdownViewMode === 'code' ? 'raw' : editorMarkdownViewMode === 'split' ? 'split' : 'preview'
@@ -1584,11 +1585,11 @@ export const ArtifactsPanel = forwardRef<ArtifactsPanelHandle, ArtifactsPanelPro
                 minimapDisabled={viewMode === 'preview'}
                 minimapDisabledLabel="Minimap (not in preview)"
                 onToggleToc={() => {
-                  void window.api.settings.set('editor_toc_enabled', editorTocEnabled ? '0' : '1')
+                  void getTrpcVanillaClient().settings.set.mutate({ key: 'editor_toc_enabled', value: editorTocEnabled ? '0' : '1' })
                   window.dispatchEvent(new Event('sz:settings-changed'))
                 }}
                 onToggleMinimap={() => {
-                  void window.api.settings.set('editor_minimap_enabled', editorMinimapEnabled ? '0' : '1')
+                  void getTrpcVanillaClient().settings.set.mutate({ key: 'editor_minimap_enabled', value: editorMinimapEnabled ? '0' : '1' })
                   window.dispatchEvent(new Event('sz:settings-changed'))
                 }}
               />
@@ -1685,7 +1686,7 @@ export const ArtifactsPanel = forwardRef<ArtifactsPanelHandle, ArtifactsPanelPro
                           notesFontFamily === value ? 'bg-muted text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
                         )}
                         onClick={() => {
-                          void window.api.settings.set('notes_font_family', value)
+                          void getTrpcVanillaClient().settings.set.mutate({ key: 'notes_font_family', value: value })
                           window.dispatchEvent(new Event('sz:settings-changed'))
                         }}
                       >
