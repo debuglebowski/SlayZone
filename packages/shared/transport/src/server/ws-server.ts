@@ -4,7 +4,7 @@ import { applyWSSHandler } from '@trpc/server/adapters/ws'
 import type { Database } from 'better-sqlite3'
 import { getServerHost, getTrpcPort } from '@slayzone/platform'
 import { appRouter } from './router'
-import type { TrpcContext } from './context'
+import type { AutomationEngineLike, TrpcContext } from './context'
 
 let httpServer: HttpServer | null = null
 let wss: WebSocketServer | null = null
@@ -27,16 +27,17 @@ function getPreferredPort(db: Database): number {
 export type StartTrpcServerOpts = {
   db: Database
   dataRoot: string
+  automationEngine?: AutomationEngineLike
 }
 
 export function startTrpcServer(opts: StartTrpcServerOpts): void {
   stopTrpcServer()
 
-  const { db, dataRoot } = opts
+  const { db, dataRoot, automationEngine } = opts
   const host = getServerHost()
   const preferred = getPreferredPort(db)
 
-  const baseContext: TrpcContext = { db, dataRoot }
+  const baseContext: TrpcContext = { db, dataRoot, automationEngine }
 
   function tryListen(port: number): void {
     httpServer = createServer((_req, res) => {

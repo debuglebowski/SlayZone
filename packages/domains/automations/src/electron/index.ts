@@ -1,1 +1,0 @@
-export { registerAutomationHandlers } from './handlers'

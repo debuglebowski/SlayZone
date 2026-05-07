@@ -6,6 +6,7 @@ import { parseAutomationRow } from '@slayzone/automations/shared'
 import { buildAiHeadlessCommand, resolveTemplate, type TemplateContext } from '@slayzone/automations/shared'
 import { taskEvents } from '@slayzone/task/server'
 import { exec } from 'child_process'
+import { automationsEvents } from './events'
 
 const MAX_DEPTH = 5
 const ACTION_TIMEOUT_MS = 30_000
@@ -47,10 +48,7 @@ export class AutomationEngine {
   private currentDepth = 0
   private cronInterval: ReturnType<typeof setInterval> | null = null
 
-  constructor(
-    private db: Database,
-    private notifyRenderer: () => void
-  ) {}
+  constructor(private db: Database) {}
 
   start(): void {
 
@@ -324,7 +322,7 @@ export class AutomationEngine {
     })()
 
     this.pruneOldRuns(automation.id)
-    this.notifyRenderer()
+    automationsEvents.emit('changed')
   }
 
   private resolveAction(action: ActionConfig, ctx: TemplateContext): { command: string; cwd?: string; timeoutMs: number } {

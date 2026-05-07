@@ -1064,24 +1064,6 @@ const api: ElectronAPI = {
     setFileNote: (projectId, filePath, note) => ipcRenderer.invoke('db:testPanel:setFileNote', projectId, filePath, note)
   },
 
-  automations: {
-    getByProject: (projectId) => ipcRenderer.invoke('db:automations:getByProject', projectId),
-    get: (id) => ipcRenderer.invoke('db:automations:get', id),
-    create: (data) => ipcRenderer.invoke('db:automations:create', data),
-    update: (data) => ipcRenderer.invoke('db:automations:update', data),
-    delete: (id) => ipcRenderer.invoke('db:automations:delete', id),
-    toggle: (id, enabled) => ipcRenderer.invoke('db:automations:toggle', id, enabled),
-    reorder: (ids) => ipcRenderer.invoke('db:automations:reorder', ids),
-    getRuns: (automationId, limit) => ipcRenderer.invoke('db:automations:getRuns', automationId, limit),
-    runManual: (id) => ipcRenderer.invoke('db:automations:runManual', id),
-    clearRuns: (automationId) => ipcRenderer.invoke('db:automations:clearRuns', automationId),
-    onChanged: (callback) => {
-      const handler = () => callback()
-      ipcRenderer.on('automations:changed', handler)
-      return () => ipcRenderer.removeListener('automations:changed', handler)
-    }
-  },
-
   usageAnalytics: {
     query: (range) => ipcRenderer.invoke('usage-analytics:query', range),
     refresh: (range) => ipcRenderer.invoke('usage-analytics:refresh', range),

@@ -19,8 +19,9 @@ export function AutomationsPanel({ projectId }: AutomationsPanelProps) {
 
   const loadData = useCallback(() => {
     if (!projectId) return
-    window.api.automations.getByProject(projectId).then(setAutomations)
-    getTrpcVanillaClient().tags.list.query().then((all) => setTags(all.filter((t: Tag) => t.project_id === projectId)))
+    const trpc = getTrpcVanillaClient()
+    trpc.automations.getByProject.query({ projectId }).then(setAutomations)
+    trpc.tags.list.query().then((all) => setTags(all.filter((t: Tag) => t.project_id === projectId)))
   }, [projectId])
 
   useEffect(() => {
@@ -28,30 +29,34 @@ export function AutomationsPanel({ projectId }: AutomationsPanelProps) {
   }, [loadData])
 
   useEffect(() => {
-    return window.api.automations.onChanged(loadData)
+    const sub = getTrpcVanillaClient().automations.onChanged.subscribe(undefined, {
+      onData: () => loadData(),
+    })
+    return () => sub.unsubscribe()
   }, [loadData])
 
   const handleSave = async (data: CreateAutomationInput | UpdateAutomationInput) => {
+    const trpc = getTrpcVanillaClient()
     if ('id' in data) {
-      await window.api.automations.update(data)
+      await trpc.automations.update.mutate(data)
     } else {
-      await window.api.automations.create(data)
+      await trpc.automations.create.mutate(data)
     }
     loadData()
   }
 
   const handleToggle = async (id: string, enabled: boolean) => {
-    await window.api.automations.toggle(id, enabled)
+    await getTrpcVanillaClient().automations.toggle.mutate({ id, enabled })
     loadData()
   }
 
   const handleDelete = async (id: string) => {
-    await window.api.automations.delete(id)
+    await getTrpcVanillaClient().automations.delete.mutate({ id })
     loadData()
   }
 
   const handleDuplicate = async (automation: Automation) => {
-    await window.api.automations.create({
+    await getTrpcVanillaClient().automations.create.mutate({
       project_id: automation.project_id,
       name: `${automation.name} (copy)`,
       description: automation.description ?? undefined,
@@ -63,12 +68,12 @@ export function AutomationsPanel({ projectId }: AutomationsPanelProps) {
   }
 
   const handleRunManual = async (id: string) => {
-    await window.api.automations.runManual(id)
+    await getTrpcVanillaClient().automations.runManual.mutate({ id })
     loadData()
   }
 
   const handleLoadRuns = (automationId: string) => {
-    return window.api.automations.getRuns(automationId, 10)
+    return getTrpcVanillaClient().automations.getRuns.query({ automationId, limit: 10 })
   }
 
   const handleEdit = (automation: Automation) => {
