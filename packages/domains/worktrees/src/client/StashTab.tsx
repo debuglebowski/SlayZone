@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, forwardRef, useImperativeHandle } from 'react'
+import { getTrpcVanillaClient } from '@slayzone/transport/client'
 import { Archive, FileText } from 'lucide-react'
 import { cn, PulseGrid } from '@slayzone/ui'
 import type { StashEntry } from '../shared/types'
@@ -43,8 +44,8 @@ export const StashTab = forwardRef<StashTabHandle, StashTabProps>(function Stash
     setLoading(true)
     try {
       const [list, branch] = await Promise.all([
-        window.api.git.listStashes(repoPath),
-        window.api.git.getCurrentBranch(repoPath).catch(() => null)
+        getTrpcVanillaClient().worktrees.listStashes.query({ repoPath: repoPath }),
+        getTrpcVanillaClient().worktrees.getCurrentBranch.query({ path: repoPath }).catch(() => null)
       ])
       setStashes(list)
       setCurrentBranch(branch)
@@ -81,7 +82,7 @@ export const StashTab = forwardRef<StashTabHandle, StashTabProps>(function Stash
     if (!repoPath || selected === null) { setDiff([]); return }
     let cancelled = false
     setDiffLoading(true)
-    window.api.git.getStashDiff(repoPath, selected.index).then((patch) => {
+    getTrpcVanillaClient().worktrees.getStashDiff.query({ repoPath: repoPath, index: selected.index }).then((patch) => {
       if (cancelled) return
       setDiff(parseUnifiedDiff(patch))
     }).finally(() => {

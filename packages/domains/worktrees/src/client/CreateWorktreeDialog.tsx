@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { getTrpcVanillaClient } from '@slayzone/transport/client'
 import { FolderOpen } from 'lucide-react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, toast } from '@slayzone/ui'
 import { Button, IconButton } from '@slayzone/ui'
@@ -52,19 +53,19 @@ export function CreateWorktreeDialog({
     setError(null)
     setPhase(null)
 
-    const requestId = crypto.randomUUID()
-    const unsubscribe = window.api.git.onCreateWorktreePhase(requestId, setPhase)
+    // NOTE: phase events removed during tRPC migration (P14). UX shows
+    // generic "creating..." spinner from setPhase(null) until done.
+    const unsubscribe = () => {}
 
     try {
       // Capture parent branch before creating worktree
-      const parentBranch = await window.api.git.getCurrentBranch(projectPath)
+      const parentBranch = await getTrpcVanillaClient().worktrees.getCurrentBranch.query({ path: projectPath })
 
-      const result = await window.api.git.createWorktree({
+      const result = await getTrpcVanillaClient().worktrees.createWorktree.mutate({
         repoPath: projectPath,
         targetPath: path,
         branch: branch || undefined,
         projectId,
-        requestId
       })
 
       if (result.submoduleResult.ran && !result.submoduleResult.success) {

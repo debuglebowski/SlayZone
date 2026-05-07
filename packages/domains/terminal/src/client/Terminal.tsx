@@ -5,6 +5,7 @@
 // bundle and undo the boot-time split. The package's "./client/Terminal"
 // export exists only for the lazy wrapper itself.
 import { useEffect, useRef, useCallback, useState, forwardRef, useImperativeHandle } from 'react'
+import { getTrpcVanillaClient } from '@slayzone/transport/client'
 import { CheckCircle2, XCircle, Loader2 } from 'lucide-react'
 import { Terminal as XTerm } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
@@ -486,14 +487,14 @@ export const Terminal = forwardRef<TerminalHandle, TerminalProps>(function Termi
         const resolved = filePath.startsWith('/') ? filePath : `${cwd}/${filePath}`
         const isInProject = resolved.startsWith(cwd + '/') || resolved === cwd
         if (!isInProject) {
-          void window.api.git.revealInFinder(resolved)
+          void getTrpcVanillaClient().worktrees.revealInFinder.mutate({ path: resolved })
         } else if (onOpenFileRef.current) {
           // Pass relative path to editor panel
           const relative = resolved.startsWith(cwd + '/') ? resolved.slice(cwd.length + 1) : filePath
           // Terminal file links use 1-based col; normalize to 0-based
           onOpenFileRef.current(relative, line != null ? { position: { line, col: col != null ? col - 1 : undefined } } : undefined)
         } else {
-          void window.api.git.revealInFinder(resolved)
+          void getTrpcVanillaClient().worktrees.revealInFinder.mutate({ path: resolved })
         }
       }, (e, text) => showTooltip(e, text, fileHint), hideTooltip))
 

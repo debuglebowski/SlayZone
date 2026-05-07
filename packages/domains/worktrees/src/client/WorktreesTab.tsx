@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, useImperativeHandle, forwardRef } from 'react'
+import { getTrpcVanillaClient } from '@slayzone/transport/client'
 import { useDialogStore } from '@slayzone/settings/client'
 import {
   FolderGit2,
@@ -94,7 +95,7 @@ export const WorktreesTab = forwardRef<WorktreesTabHandle, WorktreesTabProps>(fu
   const fetchWorktrees = useCallback(async () => {
     if (!projectPath) return
     try {
-      const detected = await window.api.git.detectWorktrees(projectPath)
+      const detected = await getTrpcVanillaClient().worktrees.detectWorktrees.query({ repoPath: projectPath })
       setWorktrees(detected)
     } catch { /* polling error */ }
   }, [projectPath])
@@ -116,7 +117,7 @@ export const WorktreesTab = forwardRef<WorktreesTabHandle, WorktreesTabProps>(fu
       
       // 1. Always prioritize active worktree
       if (activePath) {
-        const isDirty = await window.api.git.isDirty(activePath)
+        const isDirty = await getTrpcVanillaClient().worktrees.isDirty.query({ path: activePath })
         setDirtyStatuses(prev => {
           if (prev[activePath] === isDirty) return prev
           return { ...prev, [activePath]: isDirty }
@@ -127,7 +128,7 @@ export const WorktreesTab = forwardRef<WorktreesTabHandle, WorktreesTabProps>(fu
       const backgroundWts = worktrees.filter(wt => wt.path !== activePath)
       if (backgroundWts.length > 0) {
         const randomWt = backgroundWts[Math.floor(Math.random() * backgroundWts.length)]
-        const isDirty = await window.api.git.isDirty(randomWt.path)
+        const isDirty = await getTrpcVanillaClient().worktrees.isDirty.query({ path: randomWt.path })
         setDirtyStatuses(prev => {
           if (prev[randomWt.path] === isDirty) return prev
           return { ...prev, [randomWt.path]: isDirty }
@@ -196,7 +197,7 @@ export const WorktreesTab = forwardRef<WorktreesTabHandle, WorktreesTabProps>(fu
   const handleRemoveWorktree = async (path: string) => {
     if (!projectPath) return
     try {
-      await window.api.git.removeWorktree(projectPath, path)
+      await getTrpcVanillaClient().worktrees.removeWorktree.mutate({ repoPath: projectPath, worktreePath: path })
       const task = tasks.find(t => t.worktree_path === path)
       if (task && onUpdateTask) {
         await onUpdateTask({ id: task.id, worktreePath: null })
@@ -598,7 +599,7 @@ function WorktreeCard({
                   </IconButton>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-56">
-                  <DropdownMenuItem onClick={() => window.api.git.revealInFinder(node.path)}>
+                  <DropdownMenuItem onClick={() => getTrpcVanillaClient().worktrees.revealInFinder.mutate({ path: node.path })}>
                     <FolderSearch className="h-3.5 w-3.5 mr-2" /> Reveal in Finder
                   </DropdownMenuItem>
                   {!node.task && (

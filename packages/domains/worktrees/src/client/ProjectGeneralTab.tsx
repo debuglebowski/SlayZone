@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
+import { getTrpcVanillaClient } from '@slayzone/transport/client'
 import { GitBranch, ChevronDown, Check, Loader2, Plus, Copy, FolderGit2 } from 'lucide-react'
 import { Button, IconButton, Input, Popover, PopoverContent, PopoverTrigger, cn, toast } from '@slayzone/ui'
 import type { StatusSummary, AheadBehind } from '../shared/types'
@@ -34,19 +35,19 @@ export function ProjectGeneralTab({ projectId, projectPath, visible, onSwitchToD
   const fetchGitData = useCallback(async () => {
     if (!projectPath) return
     try {
-      const isRepo = await window.api.git.isGitRepo(projectPath)
+      const isRepo = await getTrpcVanillaClient().worktrees.isGitRepo.query({ path: projectPath })
       setIsGitRepo(isRepo)
       if (!isRepo) return
       const [branch, status, remote] = await Promise.all([
-        window.api.git.getCurrentBranch(projectPath),
-        window.api.git.getStatusSummary(projectPath),
-        window.api.git.getRemoteUrl(projectPath)
+        getTrpcVanillaClient().worktrees.getCurrentBranch.query({ path: projectPath }),
+        getTrpcVanillaClient().worktrees.getStatusSummary.query({ repoPath: projectPath }),
+        getTrpcVanillaClient().worktrees.getRemoteUrl.query({ path: projectPath })
       ])
       setCurrentBranch(branch)
       setStatusSummary(status)
       setRemoteUrl(remote)
       if (branch) {
-        const uab = await window.api.git.getAheadBehindUpstream(projectPath, branch)
+        const uab = await getTrpcVanillaClient().worktrees.getAheadBehindUpstream.query({ path: projectPath, branch: branch })
         setUpstreamAB(uab)
       } else {
         setUpstreamAB(null)
@@ -66,7 +67,7 @@ export function ProjectGeneralTab({ projectId, projectPath, visible, onSwitchToD
     if (open && projectPath) {
       setLoadingBranches(true)
       setBranchError(null)
-      window.api.git.listBranches(projectPath).then(setBranches).catch(() => setBranches([])).finally(() => setLoadingBranches(false))
+      getTrpcVanillaClient().worktrees.listBranches.query({ path: projectPath }).then(setBranches).catch(() => setBranches([])).finally(() => setLoadingBranches(false))
     }
     if (!open) { setNewBranchName(''); setBranchError(null) }
   }
@@ -76,9 +77,9 @@ export function ProjectGeneralTab({ projectId, projectPath, visible, onSwitchToD
     setSwitching(true)
     setBranchError(null)
     try {
-      const hasChanges = await window.api.git.hasUncommittedChanges(projectPath)
+      const hasChanges = await getTrpcVanillaClient().worktrees.hasUncommittedChanges.query({ path: projectPath })
       if (hasChanges) { setBranchError('Uncommitted changes — commit or stash first'); return }
-      await window.api.git.checkoutBranch(projectPath, branch)
+      await getTrpcVanillaClient().worktrees.checkoutBranch.mutate({ path: projectPath, branch: branch })
       setCurrentBranch(branch)
       setBranchPopoverOpen(false)
     } catch (err) {
@@ -93,7 +94,7 @@ export function ProjectGeneralTab({ projectId, projectPath, visible, onSwitchToD
     setSwitching(true)
     setBranchError(null)
     try {
-      await window.api.git.createBranch(projectPath, newBranchName.trim())
+      await getTrpcVanillaClient().worktrees.createBranch.mutate({ path: projectPath, branch: newBranchName.trim() })
       setCurrentBranch(newBranchName.trim())
       setNewBranchName('')
       setBranchPopoverOpen(false)
@@ -108,9 +109,9 @@ export function ProjectGeneralTab({ projectId, projectPath, visible, onSwitchToD
     if (!projectPath) return
     setInitializing(true)
     try {
-      await window.api.git.init(projectPath)
+      await getTrpcVanillaClient().worktrees.init.mutate({ path: projectPath })
       setIsGitRepo(true)
-      const branch = await window.api.git.getCurrentBranch(projectPath)
+      const branch = await getTrpcVanillaClient().worktrees.getCurrentBranch.query({ path: projectPath })
       setCurrentBranch(branch)
     } catch { /* ignore */ }
     finally { setInitializing(false) }

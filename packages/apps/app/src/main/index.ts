@@ -123,10 +123,8 @@ import { onTaskReachedTerminal, setOnTaskReachedTerminalHandler, syncTerminalMod
 import { setProviderLastKilledAt, type ProviderConfig } from '@slayzone/task/shared'
 import { attachFloatingAgent, setupFloatingAgent } from './floating-agent'
 import { attachTaskWindows, setupTaskWindows } from './task-windows'
-import { registerWorktreeHandlers } from '@slayzone/worktrees/electron'
 import { closeGitWatcher } from '@slayzone/worktrees/server'
 import { initChatTurnSubscriber, initPtyTurnSubscriber } from '@slayzone/agent-turns/server'
-import { wireDomainEvents } from './glue'
 import { registerDiagnosticsHandlers, registerProcessDiagnostics, recordDiagnosticEvent, stopDiagnostics, setIpcSuccessHook } from '@slayzone/diagnostics/electron'
 import { detectPreviousCrash, writeBootStub, writeCleanShutdownSentinel, scanCrashDumps } from './lifecycle/sentinel'
 import { acquireLockWithSelfHeal, lockOutcomeIsAcquired, type LockOutcome } from './lifecycle/single-instance'
@@ -1301,9 +1299,7 @@ app.whenReady().then(async () => {
     console.error('[chat-handlers] backfillChatModes failed:', err)
   }
   registerFilesHandlers(ipcMain)
-  registerWorktreeHandlers(ipcMain, db)
-  logBoot('files+worktree registered')
-  wireDomainEvents()
+  logBoot('files registered')
   // xterm-mode turn detection: every Enter press in a PTY = turn boundary.
   onPtyInputSubmit(initPtyTurnSubscriber(db))
   registerAiConfigHandlers(ipcMain, db)

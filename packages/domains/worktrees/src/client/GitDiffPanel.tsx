@@ -428,7 +428,7 @@ export const GitDiffPanel = forwardRef<GitDiffPanelHandle, GitDiffPanelProps>(fu
 
     const added = curr.filter((f) => !prevSet.has(f))
     for (const filePath of added) {
-      window.api.git.getUntrackedFileDiff(targetPath, filePath).then((patch) => {
+      getTrpcVanillaClient().worktrees.getUntrackedFileDiff.query({ repoPath: targetPath, filePath: filePath }).then((patch) => {
         const parsed = parseUnifiedDiff(patch)
         if (parsed.length > 0) {
           setUntrackedDiffs((old) => new Map(old).set(filePath, parsed[0]))
@@ -581,9 +581,9 @@ export const GitDiffPanel = forwardRef<GitDiffPanelHandle, GitDiffPanelProps>(fu
     if (!targetPath) return
     try {
       if (action === 'stageAll') {
-        await window.api.git.stageAll(targetPath)
+        await getTrpcVanillaClient().worktrees.stageAll.mutate({ path: targetPath })
       } else {
-        await window.api.git.unstageAll(targetPath)
+        await getTrpcVanillaClient().worktrees.unstageAll.mutate({ path: targetPath })
       }
       await refreshRef.current()
     } catch {
@@ -595,9 +595,9 @@ export const GitDiffPanel = forwardRef<GitDiffPanelHandle, GitDiffPanelProps>(fu
     if (!targetPath) return
     try {
       if (source === 'unstaged') {
-        await window.api.git.stageFile(targetPath, filePath)
+        await getTrpcVanillaClient().worktrees.stageFile.mutate({ path: targetPath, filePath: filePath })
       } else {
-        await window.api.git.unstageFile(targetPath, filePath)
+        await getTrpcVanillaClient().worktrees.unstageFile.mutate({ path: targetPath, filePath: filePath })
       }
       await refreshRef.current()
     } catch {
@@ -608,7 +608,7 @@ export const GitDiffPanel = forwardRef<GitDiffPanelHandle, GitDiffPanelProps>(fu
   const handleDiscardFile = useCallback(async (filePath: string, untracked?: boolean) => {
     if (!targetPath) return
     try {
-      await window.api.git.discardFile(targetPath, filePath, untracked)
+      await getTrpcVanillaClient().worktrees.discardFile.mutate({ path: targetPath, filePath, untracked })
       await refreshRef.current()
     } catch {
       // silently fail — next poll will correct state
@@ -619,9 +619,9 @@ export const GitDiffPanel = forwardRef<GitDiffPanelHandle, GitDiffPanelProps>(fu
     if (!targetPath) return
     try {
       if (source === 'unstaged') {
-        await window.api.git.stageFile(targetPath, folderPath)
+        await getTrpcVanillaClient().worktrees.stageFile.mutate({ path: targetPath, filePath: folderPath })
       } else {
-        await window.api.git.unstageFile(targetPath, folderPath)
+        await getTrpcVanillaClient().worktrees.unstageFile.mutate({ path: targetPath, filePath: folderPath })
       }
       await refreshRef.current()
     } catch {
@@ -633,7 +633,7 @@ export const GitDiffPanel = forwardRef<GitDiffPanelHandle, GitDiffPanelProps>(fu
     if (!targetPath || !commitMessage.trim() || stagedEntries.length === 0) return
     setCommitting(true)
     try {
-      await window.api.git.commitFiles(targetPath, commitMessage.trim())
+      await getTrpcVanillaClient().worktrees.commitFiles.mutate({ repoPath: targetPath, message: commitMessage.trim() })
       setCommitMessage('')
       await refreshRef.current()
     } catch (err) {

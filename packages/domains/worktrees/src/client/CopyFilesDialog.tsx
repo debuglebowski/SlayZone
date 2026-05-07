@@ -129,7 +129,7 @@ export function CopyFilesDialog({ open, onOpenChange, repoPath, onConfirm }: Cop
     })
 
     setLoading(true)
-    window.api.git.getIgnoredFileTree(repoPath).then(nodes => {
+    getTrpcVanillaClient().worktrees.getIgnoredFileTree.query({ repoPath: repoPath }).then(nodes => {
       setTree(nodes)
       setTreeLoaded(true)
       setLoading(false)

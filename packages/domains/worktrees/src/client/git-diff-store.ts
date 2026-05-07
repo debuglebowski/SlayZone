@@ -26,6 +26,7 @@
  *   races with getSnapshot returning stale EMPTY_STATE.
  */
 import { useMemo, useRef, useSyncExternalStore } from 'react'
+import { getTrpcVanillaClient } from '@slayzone/transport/client'
 import type { GitDiffSnapshot } from '../shared/types'
 
 export type GitDiffContextLines = '0' | '3' | '5' | 'all'
@@ -193,10 +194,13 @@ async function runFetch(entry: StoreEntry): Promise<void> {
     const range: { fromSha?: string; toSha?: string } = {}
     if (entry.fromSha !== undefined) range.fromSha = entry.fromSha
     if (entry.toSha !== undefined) range.toSha = entry.toSha
-    const next = await window.api.git.getWorkingDiff(entry.targetPath, {
-      contextLines: entry.contextLines,
-      ignoreWhitespace: entry.ignoreWhitespace,
-      ...range,
+    const next = await getTrpcVanillaClient().worktrees.getWorkingDiff.query({
+      path: entry.targetPath,
+      opts: {
+        contextLines: entry.contextLines,
+        ignoreWhitespace: entry.ignoreWhitespace,
+        ...range,
+      },
     })
     // If this entry was torn down or a newer fetch superseded us, drop result.
     if (entries.get(entry.key) !== entry || entry.fetchSeq !== seq) return
@@ -293,41 +297,35 @@ function acquirePathWatcher(targetPath: string, entry: StoreEntry): void {
   state.entries.add(entry)
   if (state.entries.size > 1) return // already kicked off
 
-  // Register IPC listener before watchStart so we don't miss the first event.
-  const api = typeof window !== 'undefined' ? window.api : undefined
-  if (!api?.git?.onDiffChanged || !api.git.watchStart) {
-    // Preload surface unavailable (SSR / tests) → poll-only.
-    return
-  }
+  // Register tRPC subscription before watchStart so we don't miss the first event.
+  let trpc: ReturnType<typeof getTrpcVanillaClient> | null = null
+  try { trpc = getTrpcVanillaClient() } catch { /* not initialized — SSR / tests */ }
+  if (!trpc) return
 
-  state.listenerDispose = api.git.onDiffChanged((changedPath) => {
-    if (changedPath === targetPath) handleDiffChanged(targetPath)
+  const diffChangedSub = trpc.worktrees.onDiffChanged.subscribe(undefined, {
+    onData: (payload) => {
+      const changedPath = payload.worktreePath
+      if (changedPath === targetPath) handleDiffChanged(targetPath)
+    },
   })
+  state.listenerDispose = () => diffChangedSub.unsubscribe()
 
-  // Listen for main-process watcher death (ENOSPC, worktree removed, etc.).
-  // Without this, watcherActive stays true forever and the poll timer is
-  // stuck at WATCHER_FALLBACK_POLL_MS (30s) even though no fs events will
-  // arrive. Flip watcherActive off + re-arm timers so poll tightens back
-  // to the subscriber-requested cadence (typically 5s).
-  if (api.git.onDiffWatchFailed) {
-    const capturedStateForFailure = state
-    capturedStateForFailure.failureListenerDispose = api.git.onDiffWatchFailed((failedPath) => {
+  const capturedStateForFailure = state
+  const failedSub = trpc.worktrees.onDiffWatchFailed.subscribe(undefined, {
+    onData: (payload) => {
+      const failedPath = payload.worktreePath
       if (failedPath !== targetPath) return
-      // Ensure this state is still the canonical one for the path — a
-      // release/re-acquire race could have replaced it.
       if (pathWatchers.get(targetPath) !== capturedStateForFailure) return
       if (!capturedStateForFailure.watcherActive) return
       capturedStateForFailure.watcherActive = false
       retimeAllForPath(targetPath)
-      // Trigger an immediate catch-up fetch — something just changed on disk
-      // that caused the watcher to die, and we don't want to wait for the
-      // next poll tick to surface it.
       for (const e of capturedStateForFailure.entries) void runFetch(e)
-    })
-  }
+    },
+  })
+  capturedStateForFailure.failureListenerDispose = () => failedSub.unsubscribe()
 
   const capturedState = state
-  capturedState.startPromise = api.git.watchStart(targetPath).then(
+  capturedState.startPromise = trpc.worktrees.watchStart.mutate({ worktreePath: targetPath }).then(
     () => {
       // Subscribe may have been torn down while start was in flight.
       if (pathWatchers.get(targetPath) !== capturedState) return
@@ -358,14 +356,13 @@ function releasePathWatcher(targetPath: string, entry: StoreEntry): void {
     try { state.failureListenerDispose() } catch { /* ignore */ }
     state.failureListenerDispose = null
   }
-  const api = typeof window !== 'undefined' ? window.api : undefined
-  if (state.watcherActive && api?.git?.watchStop) {
-    // Best-effort — we don't await.
-    void api.git.watchStop(targetPath).catch(() => { /* ignore */ })
-  } else if (state.startPromise && api?.git?.watchStop) {
-    // Started while we were in flight — stop after start resolves, to keep
-    // main-process refcount balanced.
-    void state.startPromise.then(() => api.git.watchStop(targetPath).catch(() => { /* ignore */ }))
+  let trpc2: ReturnType<typeof getTrpcVanillaClient> | null = null
+  try { trpc2 = getTrpcVanillaClient() } catch { /* not initialized */ }
+  if (state.watcherActive && trpc2) {
+    void trpc2.worktrees.watchStop.mutate({ worktreePath: targetPath }).catch(() => { /* ignore */ })
+  } else if (state.startPromise && trpc2) {
+    const t = trpc2
+    void state.startPromise.then(() => t.worktrees.watchStop.mutate({ worktreePath: targetPath }).catch(() => { /* ignore */ }))
   }
   state.watcherActive = false
   pathWatchers.delete(targetPath)
@@ -537,8 +534,9 @@ export function _resetStore(): void {
       try { state.failureListenerDispose() } catch { /* ignore */ }
     }
     if (state.watcherActive) {
-      const api = typeof window !== 'undefined' ? window.api : undefined
-      if (api?.git?.watchStop) void api.git.watchStop(p).catch(() => { /* ignore */ })
+      try {
+        void getTrpcVanillaClient().worktrees.watchStop.mutate({ worktreePath: p }).catch(() => { /* ignore */ })
+      } catch { /* trpc not init */ }
     }
   }
   pathWatchers.clear()
