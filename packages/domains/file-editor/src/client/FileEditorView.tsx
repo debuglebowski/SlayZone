@@ -1,4 +1,5 @@
 import { useState, useCallback, useRef, useEffect, useMemo, useImperativeHandle, forwardRef } from 'react'
+import { getTrpcVanillaClient } from '@slayzone/transport/client'
 import { AlignCenter, Code, Columns2, Eye, FileCode, Files, Maximize2, RefreshCw, Rows2, Rows3, Search, Settings2, Type } from 'lucide-react'
 import type { EditorView as CMEditorView } from '@codemirror/view'
 import {
@@ -371,7 +372,7 @@ export const FileEditorView = forwardRef<FileEditorViewHandle, FileEditorViewPro
   }, [])
 
   const handleRevealInFinder = useCallback((filePath: string) => {
-    void window.api.fs.showInFinder(projectPath, filePath)
+    void getTrpcVanillaClient().fileEditor.showInFinder.mutate({ rootPath: projectPath, targetPath: filePath })
   }, [projectPath])
 
   const handleFileDragOver = useCallback((e: React.DragEvent) => {
@@ -420,7 +421,7 @@ export const FileEditorView = forwardRef<FileEditorViewHandle, FileEditorViewPro
       } else {
         // External file — copy into project root
         try {
-          const relPath = await window.api.fs.copyIn(projectPath, absPath)
+          const relPath = await getTrpcVanillaClient().fileEditor.copyIn.mutate({ rootPath: projectPath, absoluteSrc: absPath })
           openFile(relPath)
         } catch {
           // Copy failed (e.g. directory, permission error)
