@@ -1,6 +1,39 @@
 # Changelog
 
 
+## v0.28.0
+
+[compare changes](https://github.com/debuglebowski/slayzone/compare/v0.27.2...v0.28.0)
+
+### 🚀 Enhancements
+
+- **ui:** Show loading state on update download button ([0cd43843](https://github.com/debuglebowski/slayzone/commit/0cd43843))
+- **sidebar:** Pluggable view system with tree view + auto-hide ([d2bf2387](https://github.com/debuglebowski/slayzone/commit/d2bf2387))
+- **sidebar:** Floating auto-hide card, tree guides, polish ([75802404](https://github.com/debuglebowski/slayzone/commit/75802404))
+- **sidebar:** Tree-view task context menu + status filter header ([957446da](https://github.com/debuglebowski/slayzone/commit/957446da))
+- **sidebar:** Shut-down-agent menu, terminal-progress dot, project-card polish ([7f258656](https://github.com/debuglebowski/slayzone/commit/7f258656))
+- **sidebar:** Tree-view display settings (status, priority) + header polish ([886b21bb](https://github.com/debuglebowski/slayzone/commit/886b21bb))
+
+### 🔥 Performance
+
+- **boot:** Defer mcp + shell-PATH warmup, fix double ready-to-show ([4e848913](https://github.com/debuglebowski/slayzone/commit/4e848913))
+- **boot:** Split xterm into lazy chunk, idle-prefetch on App mount ([7cee6f7f](https://github.com/debuglebowski/slayzone/commit/7cee6f7f))
+- **boot:** Split material-file-icons + defer posthog chunk fetch ([8229d282](https://github.com/debuglebowski/slayzone/commit/8229d282))
+
+### 🩹 Fixes
+
+- **artifacts:** Recover orphaned files from buggy v127 disk migration ([f3a8bac3](https://github.com/debuglebowski/slayzone/commit/f3a8bac3))
+- **artifacts:** Recover orphaned files from buggy v127 disk migration ([4fc6160e](https://github.com/debuglebowski/slayzone/commit/4fc6160e))
+
+### 🏡 Chore
+
+- **nix:** Update sources to 0.27.1 ([ce4e7ee1](https://github.com/debuglebowski/slayzone/commit/ce4e7ee1))
+- **nix:** Update sources to 0.27.1 ([55721ac2](https://github.com/debuglebowski/slayzone/commit/55721ac2))
+
+### ❤️ Contributors
+
+- Debuglebowski
+
 ## v0.27.2
 
 [compare changes](https://github.com/debuglebowski/slayzone/compare/v0.27.1...v0.27.2)

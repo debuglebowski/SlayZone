@@ -1,5 +1,27 @@
 [
   {
+    "version": "0.28.0",
+    "date": "2026-05-07",
+    "tagline": "Tree sidebar, faster boot",
+    "items": [
+      {
+        "category": "feature",
+        "title": "Tree-view sidebar with auto-hide",
+        "description": "New pluggable sidebar view system with a tree view: auto-hide floating card, tree guides, status filter header, right-click context menu, display settings (status/priority), and a shut-down-agent menu."
+      },
+      {
+        "category": "improvement",
+        "title": "Faster cold boot",
+        "description": "Deferred MCP and shell-PATH warmup, split xterm/material-file-icons into lazy chunks, and deferred PostHog fetch — app shows up sooner."
+      },
+      {
+        "category": "improvement",
+        "title": "Update download button shows loading state",
+        "description": "The update download button now reflects in-flight state so the click feels responsive."
+      }
+    ]
+  },
+  {
     "version": "0.27.2",
     "date": "2026-05-06",
     "tagline": "Artifact recovery",
