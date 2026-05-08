@@ -651,10 +651,28 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
   }, [state.sessionId])
 
   const [resetting, setResetting] = useState(false)
+  const [restarting, setRestarting] = useState(false)
   const [pendingChatDisable, setPendingChatDisable] = useState(false)
-  // Suppress "Session ended" UI during a reset — process-exit fires between kill and
+  // Suppress "Session ended" UI during a reset/restart — process-exit fires between kill and
   // the new session's turn-init, creating a brief flash of the ended state.
-  const displaySessionEnded = state.sessionEnded && !resetting
+  const displaySessionEnded = state.sessionEnded && !resetting && !restarting
+  const handleRestart = useCallback(async () => {
+    if (restarting) return
+    setRestarting(true)
+    try {
+      await chatApi.create({
+        tabId,
+        taskId,
+        mode,
+        cwd,
+        providerFlagsOverride: providerFlagsOverride ?? null,
+      })
+    } catch (err) {
+      toast(`Restart failed: ${err instanceof Error ? err.message : String(err)}`)
+    } finally {
+      setRestarting(false)
+    }
+  }, [restarting, chatApi, tabId, taskId, mode, cwd, providerFlagsOverride])
   const handleReset = useCallback(async () => {
     if (resetting) return
     setResetting(true)
@@ -1009,41 +1027,54 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
           )}
         </div>
         <div className="flex items-center gap-3 mt-1.5 px-1 text-[10px] text-muted-foreground/60">
-          <AgentModePill
-            mode={chatMode}
-            onChange={(next) => { handleModeChange(next).catch(() => { /* toast already shown by hook */ }) }}
-            disabled={inFlight}
-            compact
-            variant="text"
-            autoCapability={autoCapability}
-          />
-          {chatModel && (
-            <AgentModelPill
-              model={chatModel}
-              onChange={(next) => { void handleModelChange(next) }}
-              disabled={modelChanging || inFlight}
-              compact
-              variant="text"
-            />
-          )}
-          {chatModel && modelSupportsEffort(chatModel) && (
-            <AgentEffortPill
-              effort={chatEffort}
-              onChange={(next) => { void handleEffortChange(next) }}
-              disabled={effortChanging || inFlight}
-              compact
-              variant="text"
-            />
-          )}
-          {appearance.chatWidth === 'wide' && (
-            <span>
-              {inFlight
-                ? 'Enter to queue · Shift+Enter for newline'
-                : 'Enter to send · Shift+Enter for newline'}
-            </span>
+          {displaySessionEnded ? (
+            <button
+              type="button"
+              onClick={() => { void handleRestart() }}
+              disabled={restarting}
+              className="text-destructive hover:underline disabled:opacity-50"
+              title="Restart the chat session (preserves history)"
+            >
+              {restarting ? 'Restarting…' : 'Session ended, click to restart'}
+            </button>
+          ) : (
+            <>
+              <AgentModePill
+                mode={chatMode}
+                onChange={(next) => { handleModeChange(next).catch(() => { /* toast already shown by hook */ }) }}
+                disabled={inFlight}
+                compact
+                variant="text"
+                autoCapability={autoCapability}
+              />
+              {chatModel && (
+                <AgentModelPill
+                  model={chatModel}
+                  onChange={(next) => { void handleModelChange(next) }}
+                  disabled={modelChanging || inFlight}
+                  compact
+                  variant="text"
+                />
+              )}
+              {chatModel && modelSupportsEffort(chatModel) && (
+                <AgentEffortPill
+                  effort={chatEffort}
+                  onChange={(next) => { void handleEffortChange(next) }}
+                  disabled={effortChanging || inFlight}
+                  compact
+                  variant="text"
+                />
+              )}
+              {appearance.chatWidth === 'wide' && (
+                <span>
+                  {inFlight
+                    ? 'Enter to queue · Shift+Enter for newline'
+                    : 'Enter to send · Shift+Enter for newline'}
+                </span>
+              )}
+            </>
           )}
           <div className="flex-1" />
-          {displaySessionEnded && <span className="text-destructive">Session ended</span>}
           <Popover>
             <PopoverTrigger asChild>
               <button

@@ -889,7 +889,17 @@ function applyEvent(state: ChatTimelineState, event: AgentEvent): ChatTimelineSt
     case 'session-spawn':
       // Bg-shell scoping bookkeeping (handled by applyBgShellEvent post-pass).
       // No timeline item — this is process-lifecycle metadata, not chat content.
-      return { ...state, currentSpawnId: event.spawnId }
+      // Also clears any prior end-state: a fresh spawn means a live process,
+      // even if no turn-init has fired yet (idle agent waiting for user msg).
+      // Without this, "Session ended" sticks in the UI after restart until
+      // the first user message triggers turn-init.
+      return {
+        ...state,
+        currentSpawnId: event.spawnId,
+        sessionEnded: false,
+        exitCode: null,
+        exitSignal: null,
+      }
   }
 }
 
