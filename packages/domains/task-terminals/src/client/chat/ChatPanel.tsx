@@ -1001,7 +1001,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
                 void handleStop()
               }}
               disabled={displaySessionEnded}
-              className="shrink-0 size-8 rounded-full flex items-center justify-center bg-destructive text-destructive-foreground hover:bg-destructive/90 transition-colors disabled:opacity-50"
+              className="shrink-0 size-8 rounded-full flex items-center justify-center bg-destructive text-white hover:bg-destructive/90 transition-colors disabled:opacity-50"
               title="Stop generation (Esc)"
               aria-label="Stop generation"
             >
