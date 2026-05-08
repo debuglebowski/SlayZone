@@ -472,6 +472,133 @@ await test('invalid --resume: onInvalidResume fires + auto-retry with fresh sess
   expect(lastArgs[1].includes('--session-id')).toBe(true)
 })
 
+await test('invalid --resume: failed spawn events never broadcast or persist', async () => {
+  await setup()
+  const broadcastEvents: Array<{ tabId: string; kind: string }> = []
+  const persistedEvents: Array<{ tabId: string; kind: string }> = []
+  const fakes: Array<ReturnType<typeof makeFakeChild>> = []
+  let spawnCount = 0
+  mgr.setTransportDepsForTests({
+    whichBinary: async () => '/fake/claude',
+    spawn: () => {
+      spawnCount++
+      const f = makeFakeChild()
+      fakes.push(f)
+      return f as unknown as ChildProcess
+    },
+    broadcastEvent: (tabId, event) => broadcastEvents.push({ tabId, kind: event.kind }),
+    broadcastExit: () => {},
+    broadcastStateChange: () => {},
+    persistEvent: (tabId, _seq, event) => persistedEvents.push({ tabId, kind: event.kind }),
+  })
+  await mgr.createChat({
+    tabId: 'tab-stage',
+    taskId: 'task-stage',
+    mode: 'claude-code',
+    cwd: '/tmp',
+    conversationId: 'stale-uuid',
+    providerFlags: [],
+  })
+
+  const first = fakes[0]
+  // Synthetic spawn event so session-spawn enters tentative window first.
+  ;(first as unknown as EventEmitter).emit('spawn')
+  first._stderr.write('No conversation found with session ID: stale-uuid\n')
+  first._stdout.write(
+    JSON.stringify({
+      type: 'result',
+      subtype: 'error_during_execution',
+      is_error: true,
+      duration_ms: 0,
+      duration_api_ms: 0,
+      num_turns: 0,
+      total_cost_usd: 0,
+      result: 'No conversation found with session ID: stale-uuid',
+    }) + '\n'
+  )
+  await new Promise((r) => setTimeout(r, 150))
+  ;(first as unknown as EventEmitter).emit('exit', 1, null)
+  await new Promise((r) => setTimeout(r, 150))
+
+  // Failed spawn's noise events MUST NOT have reached renderer or chat_events.
+  expect(broadcastEvents.some((e) => e.kind === 'stderr')).toBe(false)
+  expect(broadcastEvents.some((e) => e.kind === 'process-exit')).toBe(false)
+  expect(broadcastEvents.some((e) => e.kind === 'result')).toBe(false)
+  expect(broadcastEvents.some((e) => e.kind === 'session-spawn')).toBe(false)
+  expect(persistedEvents.some((e) => e.kind === 'stderr')).toBe(false)
+  expect(persistedEvents.some((e) => e.kind === 'process-exit')).toBe(false)
+  expect(persistedEvents.some((e) => e.kind === 'result')).toBe(false)
+  expect(persistedEvents.some((e) => e.kind === 'session-spawn')).toBe(false)
+  // Auto-retry must have run.
+  expect(spawnCount).toBe(2)
+})
+
+await test('valid --resume: first healthy event flushes staged events in order', async () => {
+  await setup()
+  const broadcastEvents: Array<{ kind: string; seq: number }> = []
+  const fake = makeFakeChild()
+  mgr.setTransportDepsForTests({
+    whichBinary: async () => '/fake/claude',
+    spawn: () => fake as unknown as ChildProcess,
+    broadcastEvent: (_tab, event, seq) => broadcastEvents.push({ kind: event.kind, seq }),
+    broadcastExit: () => {},
+    broadcastStateChange: () => {},
+  })
+  await mgr.createChat({
+    tabId: 'tab-resume-ok',
+    taskId: 'task-resume-ok',
+    mode: 'claude-code',
+    cwd: '/tmp',
+    conversationId: 'good-uuid',
+    providerFlags: [],
+  })
+
+  // Synthetic spawn event → would normally broadcast immediately, but we're in
+  // the tentative window so it stages.
+  ;(fake as unknown as EventEmitter).emit('spawn')
+  // No broadcasts yet — staged.
+  expect(broadcastEvents.some((e) => e.kind === 'session-spawn')).toBe(false)
+
+  // Healthy turn-init … wait, turn-init alone isn't healthy in commitEvent
+  // semantics (only assistant-text / tool-call / non-error result count).
+  // Send turn-init (stages) then assistant-text (flushes).
+  fake._stdout.write(
+    JSON.stringify({
+      type: 'system',
+      subtype: 'init',
+      session_id: 'good-uuid',
+      model: 'sonnet',
+      cwd: '/tmp',
+      tools: [],
+    }) + '\n'
+  )
+  await new Promise((r) => setTimeout(r, 30))
+  // Still staged — turn-init isn't healthy.
+  expect(broadcastEvents.some((e) => e.kind === 'turn-init')).toBe(false)
+
+  fake._stdout.write(
+    JSON.stringify({
+      type: 'assistant',
+      message: { content: [{ type: 'text', text: 'hello back' }] },
+    }) + '\n'
+  )
+  await new Promise((r) => setTimeout(r, 30))
+
+  // Flush order: session-spawn → turn-init → assistant-text. Seqs monotonic from 0.
+  const kinds = broadcastEvents.map((e) => e.kind)
+  const ssIdx = kinds.indexOf('session-spawn')
+  const tiIdx = kinds.indexOf('turn-init')
+  const atIdx = kinds.indexOf('assistant-text')
+  expect(ssIdx >= 0).toBeTruthy()
+  expect(tiIdx >= 0).toBeTruthy()
+  expect(atIdx >= 0).toBeTruthy()
+  expect(ssIdx < tiIdx).toBeTruthy()
+  expect(tiIdx < atIdx).toBeTruthy()
+  expect(broadcastEvents[ssIdx].seq).toBe(0)
+  expect(broadcastEvents[tiIdx].seq).toBe(1)
+  expect(broadcastEvents[atIdx].seq).toBe(2)
+})
+
 await test('exit event: fires process-exit + chat:exit broadcast', async () => {
   await setup()
   const fake = makeFakeChild()

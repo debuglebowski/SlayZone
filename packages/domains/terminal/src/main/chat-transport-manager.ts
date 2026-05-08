@@ -174,6 +174,16 @@ interface Session {
   controlReqCounter: number
   onPersistSessionId?: (id: string) => void
   onInvalidResume?: () => void
+  /**
+   * Tentative-resume staging buffer. While `usedResume && !sawHealthyTurn`,
+   * events are held here instead of being persisted/broadcast/state-transitioned.
+   * On the first healthy event we flush in order; on detected resume-failure
+   * we drop them. Keeps the failed-spawn's stderr/process-exit/error-result
+   * out of `chat_events` and the renderer.
+   */
+  staged: AgentEvent[]
+  /** Re-entry guard: true while flushing `staged` through `commitEvent`. */
+  flushingStaged: boolean
 }
 
 const MAX_BUFFER_EVENTS = 2000
@@ -238,7 +248,7 @@ export function getSessionTerminalState(tabId: string): ChatTerminalState | null
   return s ? s.terminalState : null
 }
 
-function handleEvent(session: Session, event: AgentEvent): void {
+function commitEvent(session: Session, event: AgentEvent): void {
   const seq = appendToBuffer(session, event)
   deps.broadcastEvent(session.tabId, event, seq)
 
@@ -266,16 +276,29 @@ function handleEvent(session: Session, event: AgentEvent): void {
     session.sawHealthyTurn = true
   }
 
-  // Detect invalid --resume: Claude prints 'No conversation found with session ID' before exit.
-  // Clear the stored id so next spawn starts fresh.
-  if (session.usedResume && !session.sawHealthyTurn) {
-    const text = detectResumeFailure(event)
-    if (text) {
+  // Surface discovered session id for persistence (resume-on-reopen).
+  const extracted = session.adapter.extractSessionId(event)
+  if (extracted && session.onPersistSessionId) {
+    session.onPersistSessionId(extracted)
+  }
+}
+
+function handleEvent(session: Session, event: AgentEvent): void {
+  // Tentative-resume window: spawn was started with --resume <id> but we
+  // haven't yet seen any signal the conversation actually loaded. Stage
+  // events instead of persisting/broadcasting them. On the first healthy
+  // event we flush staged in order; on a detected resume-failure we drop
+  // them entirely and trigger a fresh respawn. This keeps the failed
+  // spawn's stderr ("No conversation found with session ID: …"),
+  // process-exit, and error-result events out of `chat_events` and away
+  // from the renderer — the user sees a brief reconnect, not a red error.
+  if (session.usedResume && !session.sawHealthyTurn && !session.flushingStaged) {
+    if (detectResumeFailure(event)) {
+      session.staged = []
       if (session.onInvalidResume) {
         session.onInvalidResume()
         session.onInvalidResume = undefined
       }
-      // Auto-retry fresh once. Schedule after current event tick so parse flush completes.
       const autoRetry = session.respawnOpts.autoRetryOnInvalidResume !== false
       if (autoRetry && !session.retryScheduled) {
         session.retryScheduled = true
@@ -283,14 +306,31 @@ function handleEvent(session: Session, event: AgentEvent): void {
           void respawnFresh(session)
         })
       }
+      return
     }
+    const isHealthy =
+      event.kind === 'assistant-text' ||
+      event.kind === 'tool-call' ||
+      (event.kind === 'result' && !event.isError)
+    if (!isHealthy) {
+      session.staged.push(event)
+      return
+    }
+    // Healthy event proves the resume worked. Flush staged through the normal
+    // commit path, then commit this event. `flushingStaged` blocks re-entry
+    // so commitEvent setting `sawHealthyTurn` mid-flush doesn't recurse.
+    session.flushingStaged = true
+    try {
+      for (const staged of session.staged) commitEvent(session, staged)
+      session.staged = []
+    } finally {
+      session.flushingStaged = false
+    }
+    commitEvent(session, event)
+    return
   }
 
-  // Surface discovered session id for persistence (resume-on-reopen).
-  const extracted = session.adapter.extractSessionId(event)
-  if (extracted && session.onPersistSessionId) {
-    session.onPersistSessionId(extracted)
-  }
+  commitEvent(session, event)
 }
 
 async function respawnFresh(session: Session): Promise<void> {
@@ -482,6 +522,8 @@ export async function createChat(opts: CreateChatOpts): Promise<ChatSessionInfo>
     controlReqCounter: 0,
     onPersistSessionId: opts.onPersistSessionId,
     onInvalidResume: opts.onInvalidResume,
+    staged: [],
+    flushingStaged: false,
   }
   sessions.set(opts.tabId, session)
 
@@ -493,7 +535,11 @@ export async function createChat(opts: CreateChatOpts): Promise<ChatSessionInfo>
   // emitting it here keeps `terminalState='starting'` until the spawn handler
   // moves it to idle.
   if (tailIsUnfinishedTurn(seededBuffer)) {
-    handleEvent(session, { kind: 'interrupted' })
+    // Synthetic restore-time signal — describes the SEEDED buffer, not the
+    // current spawn. Commit directly so it's broadcast immediately even when
+    // the spawn used --resume (and would otherwise stage in the tentative
+    // window). Renderer reducer relies on this to balance counters.
+    commitEvent(session, { kind: 'interrupted' })
   }
 
   // --- spawn: subprocess confirmed alive ---
