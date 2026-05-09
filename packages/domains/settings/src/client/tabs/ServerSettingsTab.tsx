@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Button, Input, Label, toast } from '@slayzone/ui'
-import { getTrpcVanillaClient } from '@slayzone/transport/client'
+import { useSetting, useSetSettingMutation } from '../queries'
 import { SettingsTabIntro } from './SettingsTabIntro'
 import { MigrateToRemoteWizard } from '../MigrateToRemoteWizard'
 
@@ -19,25 +19,27 @@ function toHealthUrl(wsUrl: string): string | null {
 }
 
 export function ServerSettingsTab() {
+  const setSetting = useSetSettingMutation()
+  const savedModeRaw = useSetting('server_mode')
+  const savedUrlRaw = useSetting('remote_server_url')
+  const savedMode: Mode = savedModeRaw === 'remote' ? 'remote' : 'local'
+  const savedUrl = savedUrlRaw ?? ''
+
   const [mode, setMode] = useState<Mode>('local')
   const [url, setUrl] = useState('')
-  const [savedMode, setSavedMode] = useState<Mode>('local')
-  const [savedUrl, setSavedUrl] = useState('')
   const [probe, setProbe] = useState<ProbeState>({ kind: 'idle' })
   const [saving, setSaving] = useState(false)
   const [wizardOpen, setWizardOpen] = useState(false)
+  const [hydrated, setHydrated] = useState(false)
 
+  // Sync the editable draft once after the saved values arrive.
   useEffect(() => {
-    void Promise.all([
-      getTrpcVanillaClient().settings.get.query({ key: 'server_mode' }),
-      getTrpcVanillaClient().settings.get.query({ key: 'remote_server_url' }),
-    ]).then(([m, u]) => {
-      const initialMode: Mode = m === 'remote' ? 'remote' : 'local'
-      const initialUrl = u ?? ''
-      setMode(initialMode); setSavedMode(initialMode)
-      setUrl(initialUrl); setSavedUrl(initialUrl)
-    })
-  }, [])
+    if (hydrated) return
+    if (savedModeRaw === undefined || savedUrlRaw === undefined) return
+    setMode(savedMode)
+    setUrl(savedUrl)
+    setHydrated(true)
+  }, [hydrated, savedMode, savedUrl, savedModeRaw, savedUrlRaw])
 
   const dirty = mode !== savedMode || (mode === 'remote' && url.trim() !== savedUrl.trim())
 
@@ -69,9 +71,9 @@ export function ServerSettingsTab() {
     }
     setSaving(true)
     try {
-      await getTrpcVanillaClient().settings.set.mutate({ key: 'server_mode', value: mode })
+      await setSetting.mutateAsync({ key: 'server_mode', value: mode })
       if (mode === 'remote') {
-        await getTrpcVanillaClient().settings.set.mutate({ key: 'remote_server_url', value: url.trim() })
+        await setSetting.mutateAsync({ key: 'remote_server_url', value: url.trim() })
       }
       // Mode change always requires a relaunch — embedded-server start/skip
       // is decided at boot time in main.
@@ -80,7 +82,6 @@ export function ServerSettingsTab() {
         await window.api.app.relaunch()
       } else {
         toast.success('Saved. Relaunch later to apply.')
-        setSavedMode(mode); setSavedUrl(url.trim())
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err)

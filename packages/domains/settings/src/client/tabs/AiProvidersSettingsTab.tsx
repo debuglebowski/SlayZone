@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, type ComponentProps } from 'react'
-import { getTrpcVanillaClient } from '@slayzone/transport/client'
+import { useMutation } from '@tanstack/react-query'
+import { useTRPC } from '@slayzone/transport/client'
 import { ChevronRight, Copy, HelpCircle, Plus, RefreshCw, Trash2, CheckCircle2, AlertCircle } from 'lucide-react'
 import { Button, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger, IconButton, Input, Label, Select, SelectContent, SelectItem, SelectSeparator, SelectTrigger, SelectValue, Switch, Tooltip, TooltipTrigger, TooltipContent, toast } from '@slayzone/ui'
 import { getVisibleModes, getModeLabel, groupTerminalModes } from '@slayzone/terminal'
@@ -45,9 +46,10 @@ function UsageConfigSection({
   mode: TerminalModeInfo
   onUpdate: (id: string, updates: UpdateTerminalModeInput) => Promise<TerminalModeInfo | null>
 }) {
+  const trpc = useTRPC()
   const config: UsageProviderConfig = mode.usageConfig ?? EMPTY_USAGE_CONFIG
-  const [testing, setTesting] = useState(false)
   const [testResult, setTestResult] = useState<{ ok: boolean; windows?: UsageWindow[]; error?: string } | null>(null)
+  const usageTest = useMutation(trpc.app.usage.test.mutationOptions())
 
   const update = (patch: Partial<Omit<UsageProviderConfig, 'windowMapping'>> & { windowMapping?: Partial<UsageProviderConfig['windowMapping']> }) => {
     onUpdate(mode.id, {
@@ -59,18 +61,17 @@ function UsageConfigSection({
     })
   }
 
+  const testing = usageTest.isPending
+
   const handleTest = async () => {
-    setTesting(true)
     setTestResult(null)
     try {
-      const res = await getTrpcVanillaClient().app.usage.test.mutate(config)
+      const res = await usageTest.mutateAsync(config)
       setTestResult(res)
       if (res.ok) toast.success(`Found ${res.windows?.length ?? 0} usage window(s)`)
       else toast.error(res.error ?? 'Test failed')
     } catch (e) {
       setTestResult({ ok: false, error: (e as Error).message })
-    } finally {
-      setTesting(false)
     }
   }
 

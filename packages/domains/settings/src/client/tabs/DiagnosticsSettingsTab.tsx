@@ -1,35 +1,39 @@
-import { useState, useEffect, useRef } from 'react'
+import { useEffect, useState } from 'react'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Button, Input, Label, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@slayzone/ui'
 import type { DiagnosticsConfig } from '@slayzone/diagnostics/shared'
-import { getTrpcVanillaClient } from '@slayzone/transport/client'
+import { useTRPC, useTRPCClient } from '@slayzone/transport/client'
 import { SettingsTabIntro } from './SettingsTabIntro'
 
 export function DiagnosticsSettingsTab() {
-  const [diagnosticsConfig, setDiagnosticsConfig] = useState<DiagnosticsConfig | null>(null)
+  const trpc = useTRPC()
+  const trpcClient = useTRPCClient()
+  const queryClient = useQueryClient()
+
+  const { data: diagnosticsConfig } = useQuery(trpc.diagnostics.getConfig.queryOptions())
   const [retentionDaysInput, setRetentionDaysInput] = useState('14')
   const [exportRange, setExportRange] = useState<'15m' | '1h' | '24h' | '7d'>('1h')
-  const [exportingDiagnostics, setExportingDiagnostics] = useState(false)
   const [diagnosticsMessage, setDiagnosticsMessage] = useState('')
-  const mountedRef = useRef(true)
 
+  // Sync editable retention input with the loaded config (one-way).
   useEffect(() => {
-    getTrpcVanillaClient().diagnostics.getConfig.query().then(config => {
-      if (!mountedRef.current) return
-      setDiagnosticsConfig(config)
-      setRetentionDaysInput(String(config.retentionDays))
-    })
-    return () => { mountedRef.current = false }
-  }, [])
+    if (diagnosticsConfig) setRetentionDaysInput(String(diagnosticsConfig.retentionDays))
+  }, [diagnosticsConfig?.retentionDays])
 
-  const updateDiagnosticsConfig = async (partial: Partial<DiagnosticsConfig>) => {
-    const next = await getTrpcVanillaClient().diagnostics.setConfig.mutate(partial)
-    setDiagnosticsConfig(next)
-    setRetentionDaysInput(String(next.retentionDays))
-    return next
-  }
+  const updateConfig = useMutation(
+    trpc.diagnostics.setConfig.mutationOptions({
+      onSuccess: (next) => {
+        queryClient.setQueryData(trpc.diagnostics.getConfig.queryKey(), next)
+      },
+    }),
+  )
+
+  const exportBundle = useMutation({
+    mutationFn: async (input: Parameters<typeof trpcClient.diagnostics.exportBundle.query>[0]) =>
+      trpcClient.diagnostics.exportBundle.query(input),
+  })
 
   const handleExportDiagnostics = async () => {
-    setExportingDiagnostics(true)
     setDiagnosticsMessage('')
     try {
       const now = Date.now()
@@ -37,10 +41,10 @@ export function DiagnosticsSettingsTab() {
         '15m': now - 15 * 60 * 1000,
         '1h': now - 60 * 60 * 1000,
         '24h': now - 24 * 60 * 60 * 1000,
-        '7d': now - 7 * 24 * 60 * 60 * 1000
+        '7d': now - 7 * 24 * 60 * 60 * 1000,
       }
-      const appVersion = await getTrpcVanillaClient().app.meta.getVersion.query()
-      const bundle = await getTrpcVanillaClient().diagnostics.exportBundle.query({
+      const appVersion = await trpcClient.app.meta.getVersion.query()
+      const bundle = await exportBundle.mutateAsync({
         fromTsMs: fromByRange[exportRange],
         toTsMs: now,
         appVersion,
@@ -50,7 +54,6 @@ export function DiagnosticsSettingsTab() {
         setDiagnosticsMessage('Export failed: diagnostics DB not available')
         return
       }
-      // Browser-native download — replaces the Electron save-file dialog.
       const blob = new Blob([JSON.stringify(bundle, null, 2)], { type: 'application/json' })
       const url = URL.createObjectURL(blob)
       const fileName = `slayzone-diagnostics-${new Date().toISOString().replace(/[:.]/g, '-')}.json`
@@ -62,9 +65,13 @@ export function DiagnosticsSettingsTab() {
       document.body.removeChild(a)
       URL.revokeObjectURL(url)
       setDiagnosticsMessage(`Exported ${bundle.events.length} events to ${fileName}`)
-    } finally {
-      setExportingDiagnostics(false)
+    } catch (err) {
+      setDiagnosticsMessage(err instanceof Error ? err.message : 'Export failed')
     }
+  }
+
+  const updateDiagnosticsConfig = (partial: Partial<DiagnosticsConfig>) => {
+    updateConfig.mutate(partial)
   }
 
   return (
@@ -80,9 +87,7 @@ export function DiagnosticsSettingsTab() {
           <input
             type="checkbox"
             checked={diagnosticsConfig?.enabled ?? true}
-            onChange={(e) => {
-              updateDiagnosticsConfig({ enabled: e.target.checked })
-            }}
+            onChange={(e) => updateDiagnosticsConfig({ enabled: e.target.checked })}
           />
         </div>
         <div className="grid grid-cols-[220px_minmax(0,1fr)] items-center gap-4">
@@ -90,9 +95,7 @@ export function DiagnosticsSettingsTab() {
           <input
             type="checkbox"
             checked={diagnosticsConfig?.verbose ?? false}
-            onChange={(e) => {
-              updateDiagnosticsConfig({ verbose: e.target.checked })
-            }}
+            onChange={(e) => updateDiagnosticsConfig({ verbose: e.target.checked })}
           />
         </div>
         <div className="grid grid-cols-[220px_minmax(0,1fr)] items-center gap-4">
@@ -100,9 +103,7 @@ export function DiagnosticsSettingsTab() {
           <input
             type="checkbox"
             checked={diagnosticsConfig?.includePtyOutput ?? false}
-            onChange={(e) => {
-              updateDiagnosticsConfig({ includePtyOutput: e.target.checked })
-            }}
+            onChange={(e) => updateDiagnosticsConfig({ includePtyOutput: e.target.checked })}
           />
         </div>
         <div className="grid grid-cols-[220px_minmax(0,1fr)] items-center gap-4">
@@ -140,8 +141,8 @@ export function DiagnosticsSettingsTab() {
             </SelectContent>
           </Select>
         </div>
-        <Button onClick={handleExportDiagnostics} disabled={exportingDiagnostics}>
-          {exportingDiagnostics ? 'Exporting…' : 'Export Diagnostics'}
+        <Button onClick={handleExportDiagnostics} disabled={exportBundle.isPending}>
+          {exportBundle.isPending ? 'Exporting…' : 'Export Diagnostics'}
         </Button>
         {diagnosticsMessage ? (
           <p className="text-xs text-muted-foreground">{diagnosticsMessage}</p>

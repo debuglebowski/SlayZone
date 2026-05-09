@@ -1,8 +1,9 @@
-import { useState, useEffect } from 'react'
+import { useEffect, useState } from 'react'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Button, Label } from '@slayzone/ui'
 import type { Tag } from '@slayzone/tags/shared'
 import { CreateTagDialog } from '@slayzone/tags/client'
-import { getTrpcVanillaClient } from '@slayzone/transport/client'
+import { useTRPC } from '@slayzone/transport/client'
 import { SettingsTabIntro } from './SettingsTabIntro'
 import { ChevronUp, ChevronDown, Pencil, Plus, Trash2 } from 'lucide-react'
 
@@ -11,38 +12,43 @@ interface TagsSettingsTabProps {
 }
 
 export function TagsSettingsTab({ projectId }: TagsSettingsTabProps) {
-  const [allTags, setAllTags] = useState<Tag[]>([])
+  const trpc = useTRPC()
+  const queryClient = useQueryClient()
+  const { data: allTags = [] } = useQuery(trpc.tags.list.queryOptions())
+
   const [dialogState, setDialogState] = useState<{ mode: 'create' } | { mode: 'edit'; tag: Tag } | null>(null)
 
+  // Cross-component custom events still drive refresh — invalidate the cache when fired.
   useEffect(() => {
-    let cancelled = false
-    const refresh = () => {
-      getTrpcVanillaClient().tags.list.query().then((next) => { if (!cancelled) setAllTags(next) })
-    }
-    refresh()
-    const onCreated = () => refresh()
-    const onUpdated = () => refresh()
-    const onDeleted = () => refresh()
-    window.addEventListener('slayzone:tag-created', onCreated as EventListener)
-    window.addEventListener('slayzone:tag-updated', onUpdated as EventListener)
-    window.addEventListener('slayzone:tag-deleted', onDeleted as EventListener)
+    const refresh = () => queryClient.invalidateQueries({ queryKey: trpc.tags.list.queryKey() })
+    window.addEventListener('slayzone:tag-created', refresh as EventListener)
+    window.addEventListener('slayzone:tag-updated', refresh as EventListener)
+    window.addEventListener('slayzone:tag-deleted', refresh as EventListener)
     return () => {
-      cancelled = true
-      window.removeEventListener('slayzone:tag-created', onCreated as EventListener)
-      window.removeEventListener('slayzone:tag-updated', onUpdated as EventListener)
-      window.removeEventListener('slayzone:tag-deleted', onDeleted as EventListener)
+      window.removeEventListener('slayzone:tag-created', refresh as EventListener)
+      window.removeEventListener('slayzone:tag-updated', refresh as EventListener)
+      window.removeEventListener('slayzone:tag-deleted', refresh as EventListener)
     }
-  }, [])
+  }, [queryClient, trpc])
 
   const tags = allTags.filter((t) => t.project_id === projectId)
 
+  const deleteTag = useMutation(
+    trpc.tags.delete.mutationOptions({
+      onSuccess: () => queryClient.invalidateQueries({ queryKey: trpc.tags.list.queryKey() }),
+    }),
+  )
+  const reorderTags = useMutation(
+    trpc.tags.reorder.mutationOptions({
+      onSuccess: () => queryClient.invalidateQueries({ queryKey: trpc.tags.list.queryKey() }),
+    }),
+  )
 
-  const handleDeleteTag = async (id: string) => {
-    await getTrpcVanillaClient().tags.delete.mutate({ id })
-    setAllTags(allTags.filter((t) => t.id !== id))
+  const handleDeleteTag = (id: string) => {
+    deleteTag.mutate({ id })
   }
 
-  const handleMoveTag = async (index: number, direction: -1 | 1) => {
+  const handleMoveTag = (index: number, direction: -1 | 1) => {
     const swapIndex = index + direction
     if (swapIndex < 0 || swapIndex >= tags.length) return
     const reordered = [...tags]
@@ -50,12 +56,7 @@ export function TagsSettingsTab({ projectId }: TagsSettingsTabProps) {
     reordered[index] = reordered[swapIndex]
     reordered[swapIndex] = tmp
     const reorderedIds = reordered.map((t) => t.id)
-    await getTrpcVanillaClient().tags.reorder.mutate({ tagIds: reorderedIds })
-    const updatedAll = allTags.map((t) => {
-      const idx = reorderedIds.indexOf(t.id)
-      return idx >= 0 ? { ...t, sort_order: idx } : t
-    })
-    setAllTags(updatedAll)
+    reorderTags.mutate({ tagIds: reorderedIds })
   }
 
   return (
@@ -112,11 +113,11 @@ export function TagsSettingsTab({ projectId }: TagsSettingsTabProps) {
             tag={dialogState?.mode === 'edit' ? dialogState.tag : null}
             existingTags={tags}
             onCreated={(tag) => {
-              setAllTags((prev) => [...prev, tag])
+              queryClient.invalidateQueries({ queryKey: trpc.tags.list.queryKey() })
               window.dispatchEvent(new CustomEvent('slayzone:tag-created', { detail: tag }))
             }}
             onUpdated={(updated) => {
-              setAllTags((prev) => prev.map((t) => t.id === updated.id ? updated : t))
+              queryClient.invalidateQueries({ queryKey: trpc.tags.list.queryKey() })
               window.dispatchEvent(new CustomEvent('slayzone:tag-updated', { detail: updated }))
             }}
           />

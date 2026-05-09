@@ -1,5 +1,6 @@
-import { useState, useEffect, useCallback } from 'react'
-import { getTrpcVanillaClient } from '@slayzone/transport/client'
+import { useState } from 'react'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useTRPC } from '@slayzone/transport/client'
 import { FolderOpen, Trash2, RotateCcw, Download, Loader2, Pencil, Check, X } from 'lucide-react'
 import {
   Button,
@@ -58,52 +59,64 @@ function formatTimestamp(iso: string): string {
 }
 
 export function BackupSettingsTab() {
-  const [backups, setBackups] = useState<BackupInfo[]>([])
-  const [settings, setSettings] = useState<BackupSettings>({
-    autoEnabled: false,
-    intervalMinutes: 60,
-    maxAutoBackups: 10,
-    nextBackupNumber: 1
-  })
-  const [creating, setCreating] = useState(false)
+  const trpc = useTRPC()
+  const queryClient = useQueryClient()
+
+  const { data: backups = [] } = useQuery(trpc.app.backup.list.queryOptions())
+  const { data: settings = { autoEnabled: false, intervalMinutes: 60, maxAutoBackups: 10, nextBackupNumber: 1 } } =
+    useQuery(trpc.app.backup.getSettings.queryOptions())
+
   const [restoreTarget, setRestoreTarget] = useState<BackupInfo | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<BackupInfo | null>(null)
   const [createSafetyBackup, setCreateSafetyBackup] = useState(true)
   const [editingFilename, setEditingFilename] = useState<string | null>(null)
   const [editingName, setEditingName] = useState('')
 
-  const loadData = useCallback(async () => {
-    const [b, s] = await Promise.all([
-      getTrpcVanillaClient().app.backup.list.query(),
-      getTrpcVanillaClient().app.backup.getSettings.query()
-    ])
-    setBackups(b)
-    setSettings(s)
-  }, [])
+  const invalidateBackups = () => {
+    queryClient.invalidateQueries({ queryKey: trpc.app.backup.list.queryKey() })
+  }
 
-  useEffect(() => { loadData() }, [loadData])
+  const createBackup = useMutation(
+    trpc.app.backup.create.mutationOptions({
+      onSuccess: invalidateBackups,
+    }),
+  )
+  const deleteBackup = useMutation(
+    trpc.app.backup.delete.mutationOptions({
+      onSuccess: invalidateBackups,
+    }),
+  )
+  const restoreBackup = useMutation(trpc.app.backup.restore.mutationOptions())
+  const renameBackup = useMutation(
+    trpc.app.backup.rename.mutationOptions({
+      onSuccess: invalidateBackups,
+    }),
+  )
+  const setBackupSettings = useMutation(
+    trpc.app.backup.setSettings.mutationOptions({
+      onSuccess: (next) => {
+        queryClient.setQueryData(trpc.app.backup.getSettings.queryKey(), next)
+      },
+    }),
+  )
+  const revealInFinder = useMutation(trpc.app.backup.revealInFinder.mutationOptions())
 
   const handleCreate = async () => {
-    setCreating(true)
     try {
-      const backup = await getTrpcVanillaClient().app.backup.create.mutate()
+      const backup = await createBackup.mutateAsync()
       toast.success(`Backup created (${formatBytes(backup.sizeBytes)})`)
-      loadData()
-    } catch (err: any) {
-      toast.error(`Backup failed: ${err.message}`)
-    } finally {
-      setCreating(false)
+    } catch (err) {
+      toast.error(`Backup failed: ${err instanceof Error ? err.message : String(err)}`)
     }
   }
 
   const handleDelete = async () => {
     if (!deleteTarget) return
     try {
-      await getTrpcVanillaClient().app.backup.delete.mutate({ filename: deleteTarget.filename })
+      await deleteBackup.mutateAsync({ filename: deleteTarget.filename })
       toast.success('Backup deleted')
-      loadData()
-    } catch (err: any) {
-      toast.error(`Delete failed: ${err.message}`)
+    } catch (err) {
+      toast.error(`Delete failed: ${err instanceof Error ? err.message : String(err)}`)
     }
     setDeleteTarget(null)
   }
@@ -112,21 +125,20 @@ export function BackupSettingsTab() {
     if (!restoreTarget) return
     try {
       if (createSafetyBackup) {
-        await getTrpcVanillaClient().app.backup.create.mutate()
+        await createBackup.mutateAsync()
       }
-      await getTrpcVanillaClient().app.backup.restore.mutate({ filename: restoreTarget.filename })
-    } catch (err: any) {
-      toast.error(`Restore failed: ${err.message}`)
+      await restoreBackup.mutateAsync({ filename: restoreTarget.filename })
+    } catch (err) {
+      toast.error(`Restore failed: ${err instanceof Error ? err.message : String(err)}`)
     }
     setRestoreTarget(null)
   }
 
   const updateSettings = async (partial: Partial<BackupSettings>) => {
     try {
-      const updated = await getTrpcVanillaClient().app.backup.setSettings.mutate(partial)
-      setSettings(updated)
-    } catch (err: any) {
-      toast.error(`Failed to save settings: ${err.message}`)
+      await setBackupSettings.mutateAsync(partial)
+    } catch (err) {
+      toast.error(`Failed to save settings: ${err instanceof Error ? err.message : String(err)}`)
     }
   }
 
@@ -138,11 +150,11 @@ export function BackupSettingsTab() {
       />
 
       <div className="flex items-center gap-2">
-        <Button variant="outline" onClick={handleCreate} disabled={creating}>
-          {creating ? <Loader2 className="mr-2 size-4 animate-spin" /> : <Download className="mr-2 size-4" />}
+        <Button variant="outline" onClick={handleCreate} disabled={createBackup.isPending}>
+          {createBackup.isPending ? <Loader2 className="mr-2 size-4 animate-spin" /> : <Download className="mr-2 size-4" />}
           Create Backup
         </Button>
-        <Button variant="ghost" onClick={() => getTrpcVanillaClient().app.backup.revealInFinder.mutate()}>
+        <Button variant="ghost" onClick={() => revealInFinder.mutate()}>
           <FolderOpen className="mr-2 size-4" />
           Open Folder
         </Button>
@@ -225,8 +237,7 @@ export function BackupSettingsTab() {
                       onSubmit={async (e) => {
                         e.preventDefault()
                         if (editingName.trim()) {
-                          await getTrpcVanillaClient().app.backup.rename.mutate({ filename: backup.filename, name: editingName.trim() })
-                          loadData()
+                          await renameBackup.mutateAsync({ filename: backup.filename, name: editingName.trim() })
                         }
                         setEditingFilename(null)
                       }}

@@ -1,8 +1,8 @@
-import { useState, useEffect, useCallback } from 'react'
-import { getTrpcVanillaClient } from '@slayzone/transport/client'
+import { useEffect, useState } from 'react'
 import { Plus, Trash2 } from 'lucide-react'
 import { Input, Label, Tooltip, TooltipTrigger, TooltipContent, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Button } from '@slayzone/ui'
 import type { WorktreeCopyBehavior, WorktreeSubmoduleInit } from '@slayzone/projects/shared'
+import { useSetting, useSetSettingMutation } from '../queries'
 import { SettingsTabIntro } from './SettingsTabIntro'
 
 interface CopyPreset {
@@ -17,35 +17,40 @@ const FALLBACK_PRESETS: CopyPreset[] = [
   { id: 'docs-and-env', name: 'Docs + env', pathGlobs: ['docs/**', '*.md', '.env*', '*.local'] },
 ]
 
+function parsePresets(raw: string | null | undefined): CopyPreset[] {
+  if (!raw) return FALLBACK_PRESETS
+  try {
+    const parsed = JSON.parse(raw) as CopyPreset[]
+    return Array.isArray(parsed) && parsed.length > 0 ? parsed : FALLBACK_PRESETS
+  } catch {
+    return FALLBACK_PRESETS
+  }
+}
+
 export function WorktreesSettingsTab() {
-  const [worktreeBasePath, setWorktreeBasePath] = useState('')
-  const [autoCreateWorktreeOnTaskCreate, setAutoCreateWorktreeOnTaskCreate] = useState(false)
-  const [copyBehavior, setCopyBehavior] = useState<WorktreeCopyBehavior>('ask')
-  const [submoduleInit, setSubmoduleInit] = useState<WorktreeSubmoduleInit>('auto')
-  const [presets, setPresets] = useState<CopyPreset[]>([])
+  const setSetting = useSetSettingMutation()
+  const savedBasePath = useSetting('worktree_base_path') ?? ''
+  const autoCreateWorktreeOnTaskCreate = useSetting('auto_create_worktree_on_task_create') === '1'
+  const copyBehavior: WorktreeCopyBehavior = (useSetting('worktree_copy_behavior') as WorktreeCopyBehavior) ?? 'ask'
+  const submoduleInit: WorktreeSubmoduleInit = (useSetting('worktree_submodule_init') as WorktreeSubmoduleInit) ?? 'auto'
+  const presetsRaw = useSetting('worktree_copy_presets')
+  const presets = parsePresets(presetsRaw)
 
+  // Editable draft for base path — only resyncs from server when not actively editing.
+  const [worktreeBasePathDraft, setWorktreeBasePathDraft] = useState<string | null>(null)
+  const worktreeBasePath = worktreeBasePathDraft ?? savedBasePath
   useEffect(() => {
-    getTrpcVanillaClient().settings.get.query({ key: 'worktree_base_path' }).then(val => setWorktreeBasePath(val ?? ''))
-    getTrpcVanillaClient().settings.get.query({ key: 'auto_create_worktree_on_task_create' }).then(val => setAutoCreateWorktreeOnTaskCreate(val === '1'))
-    getTrpcVanillaClient().settings.get.query({ key: 'worktree_copy_behavior' }).then(val => setCopyBehavior((val as WorktreeCopyBehavior) ?? 'ask'))
-    getTrpcVanillaClient().settings.get.query({ key: 'worktree_submodule_init' }).then(val => setSubmoduleInit((val as WorktreeSubmoduleInit) ?? 'auto'))
-    getTrpcVanillaClient().settings.get.query({ key: 'worktree_copy_presets' }).then(val => {
-      const parsed = val ? JSON.parse(val) as CopyPreset[] : null
-      setPresets(parsed && parsed.length > 0 ? parsed : FALLBACK_PRESETS)
-    }).catch(() => setPresets(FALLBACK_PRESETS))
-  }, [])
+    if (worktreeBasePathDraft === null) return
+    if (worktreeBasePathDraft === savedBasePath) setWorktreeBasePathDraft(null)
+  }, [worktreeBasePathDraft, savedBasePath])
 
-  const savePresets = useCallback((updated: CopyPreset[]) => {
-    setPresets(updated)
-    getTrpcVanillaClient().settings.set.mutate({ key: 'worktree_copy_presets', value: JSON.stringify(updated) })
-  }, [])
+  const savePresets = (updated: CopyPreset[]) => {
+    setSetting.mutate({ key: 'worktree_copy_presets', value: JSON.stringify(updated) })
+  }
 
   const addPreset = () => {
     const id = `preset-${Date.now()}`
-    savePresets([...presets, {
-      id, name: 'New preset',
-      pathGlobs: []
-    }])
+    savePresets([...presets, { id, name: 'New preset', pathGlobs: [] }])
   }
 
   const removePreset = (id: string) => {
@@ -78,9 +83,9 @@ export function WorktreesSettingsTab() {
             className="w-full max-w-lg"
             placeholder="{project}/.."
             value={worktreeBasePath}
-            onChange={(e) => setWorktreeBasePath(e.target.value)}
+            onChange={(e) => setWorktreeBasePathDraft(e.target.value)}
             onBlur={() => {
-              getTrpcVanillaClient().settings.set.mutate({ key: 'worktree_base_path', value: worktreeBasePath.trim() })
+              setSetting.mutate({ key: 'worktree_base_path', value: worktreeBasePath.trim() })
             }}
           />
         </div>
@@ -91,11 +96,9 @@ export function WorktreesSettingsTab() {
               type="checkbox"
               checked={autoCreateWorktreeOnTaskCreate}
               onChange={(e) => {
-                const enabled = e.target.checked
-                setAutoCreateWorktreeOnTaskCreate(enabled)
-                getTrpcVanillaClient().settings.set.mutate({
+                setSetting.mutate({
                   key: 'auto_create_worktree_on_task_create',
-                  value: enabled ? '1' : '0',
+                  value: e.target.checked ? '1' : '0',
                 })
               }}
             />
@@ -118,9 +121,7 @@ export function WorktreesSettingsTab() {
           <Select
             value={copyBehavior}
             onValueChange={(value) => {
-              const v = value as WorktreeCopyBehavior
-              setCopyBehavior(v)
-              getTrpcVanillaClient().settings.set.mutate({ key: 'worktree_copy_behavior', value: v })
+              setSetting.mutate({ key: 'worktree_copy_behavior', value: value as WorktreeCopyBehavior })
             }}
           >
             <SelectTrigger className="max-w-sm">
@@ -144,9 +145,7 @@ export function WorktreesSettingsTab() {
           <Select
             value={submoduleInit}
             onValueChange={(value) => {
-              const v = value as WorktreeSubmoduleInit
-              setSubmoduleInit(v)
-              getTrpcVanillaClient().settings.set.mutate({ key: 'worktree_submodule_init', value: v })
+              setSetting.mutate({ key: 'worktree_submodule_init', value: value as WorktreeSubmoduleInit })
             }}
           >
             <SelectTrigger className="max-w-sm">

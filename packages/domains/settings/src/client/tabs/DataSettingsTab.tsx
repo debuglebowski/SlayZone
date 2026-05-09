@@ -1,17 +1,21 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
+import { useMutation, useQuery } from '@tanstack/react-query'
 import { FolderOpen } from 'lucide-react'
 import { Button, IconButton, Input, Label, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, toast } from '@slayzone/ui'
-import { getTrpcVanillaClient } from '@slayzone/transport/client'
+import { useTRPC } from '@slayzone/transport/client'
 import { SettingsTabIntro } from './SettingsTabIntro'
 
 export function DataSettingsTab() {
-  const [projects, setProjects] = useState<Array<{ id: string; name: string }>>([])
+  const trpc = useTRPC()
+  const { data: projects = [] } = useQuery(trpc.projects.list.queryOptions())
+
   const [exportProjectId, setExportProjectId] = useState('')
   const [importedProjects, setImportedProjects] = useState<Array<{ id: string; name: string; path: string }>>([])
 
-  useEffect(() => {
-    getTrpcVanillaClient().projects.list.query().then(setProjects)
-  }, [])
+  const exportProject = useMutation(trpc.app.exportImport.exportProject.mutationOptions())
+  const importBundle = useMutation(trpc.app.exportImport.import.mutationOptions())
+  const showOpenDialog = useMutation(trpc.app.dialog.showOpenDialog.mutationOptions())
+  const updateProject = useMutation(trpc.projects.update.mutationOptions())
 
   return (
     <div className="space-y-6">
@@ -36,7 +40,7 @@ export function DataSettingsTab() {
             variant="outline"
             disabled={!exportProjectId}
             onClick={async () => {
-              const result = await getTrpcVanillaClient().app.exportImport.exportProject.mutate({ projectId: exportProjectId })
+              const result = await exportProject.mutateAsync({ projectId: exportProjectId })
               if (result.canceled) return
               if (result.success) {
                 toast.success(`Exported to ${result.path}`)
@@ -53,12 +57,12 @@ export function DataSettingsTab() {
         <Button
           variant="outline"
           onClick={async () => {
-            const result = await getTrpcVanillaClient().app.exportImport.import.mutate()
+            const result = await importBundle.mutateAsync()
             if (result.canceled) return
             if (result.success) {
               toast.success(`Imported ${result.projectCount} project(s), ${result.taskCount} task(s)`)
               if (result.importedProjects?.length) {
-                setImportedProjects(result.importedProjects.map((p: any) => ({ ...p, path: '' })))
+                setImportedProjects(result.importedProjects.map((p) => ({ ...p, path: '' })))
               }
             } else {
               toast.error(`Import failed: ${result.error}`)
@@ -81,7 +85,7 @@ export function DataSettingsTab() {
                   placeholder="/path/to/repo"
                   value={p.path}
                   onChange={(e) => {
-                    setImportedProjects((prev: any[]) =>
+                    setImportedProjects((prev) =>
                       prev.map((proj, j) => (j === i ? { ...proj, path: e.target.value } : proj))
                     )
                   }}
@@ -91,13 +95,13 @@ export function DataSettingsTab() {
                   variant="outline"
                   aria-label="Browse folder"
                   onClick={async () => {
-                    const result = await getTrpcVanillaClient().app.dialog.showOpenDialog.mutate({
+                    const result = await showOpenDialog.mutateAsync({
                       title: 'Select Project Directory',
                       defaultPath: p.path || undefined,
-                      properties: ['openDirectory']
+                      properties: ['openDirectory'],
                     })
                     if (!result.canceled && result.filePaths[0]) {
-                      setImportedProjects((prev: any[]) =>
+                      setImportedProjects((prev) =>
                         prev.map((proj, j) => (j === i ? { ...proj, path: result.filePaths[0] } : proj))
                       )
                     }
@@ -113,7 +117,7 @@ export function DataSettingsTab() {
               onClick={async () => {
                 for (const p of importedProjects) {
                   if (p.path.trim()) {
-                    await getTrpcVanillaClient().projects.update.mutate({ id: p.id, path: p.path.trim() })
+                    await updateProject.mutateAsync({ id: p.id, path: p.path.trim() })
                   }
                 }
                 const saved = importedProjects.filter((p) => p.path.trim()).length

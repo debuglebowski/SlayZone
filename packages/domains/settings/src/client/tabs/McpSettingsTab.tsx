@@ -1,16 +1,20 @@
-import { useState, useEffect } from 'react'
-import { getTrpcVanillaClient } from '@slayzone/transport/client'
+import { useEffect, useState } from 'react'
 import { Input, Label } from '@slayzone/ui'
+import { useSetting, useSetSettingMutation } from '../queries'
 import { SettingsTabIntro } from './SettingsTabIntro'
 
 export function McpSettingsTab() {
-  const [preferredPort, setPreferredPort] = useState('')
-  const [actualPort, setActualPort] = useState('')
+  const setSetting = useSetSettingMutation()
+  const savedPreferredPort = useSetting('mcp_preferred_port') ?? ''
+  const actualPort = useSetting('mcp_server_port') ?? ''
+
+  const [preferredPortDraft, setPreferredPortDraft] = useState<string | null>(null)
+  const preferredPort = preferredPortDraft ?? savedPreferredPort
 
   useEffect(() => {
-    getTrpcVanillaClient().settings.get.query({ key: 'mcp_preferred_port' }).then(val => setPreferredPort(val ?? ''))
-    getTrpcVanillaClient().settings.get.query({ key: 'mcp_server_port' }).then(val => setActualPort(val ?? ''))
-  }, [])
+    if (preferredPortDraft === null) return
+    if (preferredPortDraft === savedPreferredPort) setPreferredPortDraft(null)
+  }, [preferredPortDraft, savedPreferredPort])
 
   return (
     <>
@@ -28,11 +32,12 @@ export function McpSettingsTab() {
             type="number"
             placeholder="auto"
             value={preferredPort}
-            onChange={(e) => setPreferredPort(e.target.value)}
+            onChange={(e) => setPreferredPortDraft(e.target.value)}
             onBlur={() => {
-              const port = parseInt(preferredPort, 10)
-              if (preferredPort === '' || (port >= 1024 && port <= 65535)) {
-                getTrpcVanillaClient().settings.set.mutate({ key: 'mcp_preferred_port', value: preferredPort === '' ? '' : String(port) })
+              const raw = preferredPort
+              const port = parseInt(raw, 10)
+              if (raw === '' || (port >= 1024 && port <= 65535)) {
+                setSetting.mutate({ key: 'mcp_preferred_port', value: raw === '' ? '' : String(port) })
               }
             }}
           />

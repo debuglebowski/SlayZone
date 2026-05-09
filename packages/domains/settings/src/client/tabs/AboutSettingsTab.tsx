@@ -1,31 +1,32 @@
-import { useState, useEffect } from 'react'
-import { getTrpcVanillaClient } from '@slayzone/transport/client'
+import { useState } from 'react'
+import { useMutation, useQuery } from '@tanstack/react-query'
+import { useTRPC } from '@slayzone/transport/client'
 import { Button, Label } from '@slayzone/ui'
+import { useSetting } from '../queries'
 import { SettingsTabIntro } from './SettingsTabIntro'
 
 export function AboutSettingsTab() {
-  const [dbPath, setDbPath] = useState<string>('')
-  const [cliInstalled, setCliInstalled] = useState(false)
-  const [cliPath, setCliPath] = useState<string>('')
-  const [cliInstalling, setCliInstalling] = useState(false)
+  const trpc = useTRPC()
+  const dbPathRaw = useSetting('database_path')
+  const dbPath = dbPathRaw ?? 'Default location (userData)'
+
+  const { data: cliStatus } = useQuery(trpc.app.meta.checkCliInstalled.queryOptions())
+  const [cliInstalledOverride, setCliInstalledOverride] = useState<boolean | null>(null)
+  const [cliPathOverride, setCliPathOverride] = useState<string | null>(null)
   const [cliMessage, setCliMessage] = useState('')
 
-  useEffect(() => {
-    getTrpcVanillaClient().settings.get.query({ key: 'database_path' }).then(path => setDbPath(path ?? 'Default location (userData)'))
-    getTrpcVanillaClient().app.meta.checkCliInstalled.query().then(status => {
-      setCliInstalled(status.installed)
-      if (status.path) setCliPath(status.path)
-    })
-  }, [])
+  const cliInstalled = cliInstalledOverride ?? cliStatus?.installed ?? false
+  const cliPath = cliPathOverride ?? cliStatus?.path ?? ''
+
+  const installCli = useMutation(trpc.app.meta.installCli.mutationOptions())
 
   const handleInstallCli = async () => {
-    setCliInstalling(true)
     setCliMessage('')
     try {
-      const result = await getTrpcVanillaClient().app.meta.installCli.mutate()
+      const result = await installCli.mutateAsync()
       if (result.ok) {
-        setCliInstalled(true)
-        if (result.path) setCliPath(result.path)
+        setCliInstalledOverride(true)
+        if (result.path) setCliPathOverride(result.path)
         let msg = 'Installed successfully.'
         if (result.pathNotInPATH) msg += ' Note: the install directory is not in your PATH. Add it to use \'slay\' from any terminal.'
         setCliMessage(msg)
@@ -38,8 +39,6 @@ export function AboutSettingsTab() {
       }
     } catch (err) {
       setCliMessage(err instanceof Error ? err.message : 'Install failed.')
-    } finally {
-      setCliInstalling(false)
     }
   }
 
@@ -67,10 +66,10 @@ export function AboutSettingsTab() {
           <Button
             size="sm"
             variant="outline"
-            disabled={cliInstalling}
+            disabled={installCli.isPending}
             onClick={handleInstallCli}
           >
-            {cliInstalling ? 'Installing…' : cliInstalled ? 'Reinstall' : 'Install'}
+            {installCli.isPending ? 'Installing…' : cliInstalled ? 'Reinstall' : 'Install'}
           </Button>
         </div>
         {cliMessage && (
