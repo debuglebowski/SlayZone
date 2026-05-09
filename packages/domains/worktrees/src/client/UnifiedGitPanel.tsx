@@ -1,5 +1,7 @@
 import { createContext, forwardRef, useCallback, useContext, useEffect, useImperativeHandle, useRef, useState } from 'react'
-import { useTRPCClient } from '@slayzone/transport/client'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useTRPC, useTRPCClient } from '@slayzone/transport/client'
+import { useSetSettingMutation } from '@slayzone/settings/client'
 import { Check, X, SkipForward, AlertTriangle, RefreshCw, Plus, PanelLeftClose, PanelLeftOpen, AlignJustify, Columns2, WrapText } from 'lucide-react'
 import { Button, Checkbox, IconButton, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Switch, Tooltip, TooltipContent, TooltipTrigger, cn, useShortcutDisplay } from '@slayzone/ui'
 import { useAppearance } from '@slayzone/settings/client'
@@ -99,7 +101,16 @@ export const UnifiedGitPanel = forwardRef<UnifiedGitPanelHandle, UnifiedGitPanel
   isRepoStale,
   onRepoChange
 }, ref) {
+  const trpc = useTRPC()
   const trpcClient = useTRPCClient()
+  const queryClient = useQueryClient()
+  const setSetting = useSetSettingMutation()
+  const tabOrderQuery = useQuery(trpc.settings.get.queryOptions({ key: 'git_tab_order' }))
+  const tabVisibilityQuery = useQuery(trpc.settings.get.queryOptions({ key: 'git_tab_visibility' }))
+  const githubRemoteQuery = useQuery({
+    ...trpc.worktrees.hasGithubRemote.queryOptions({ repoPath: projectPath ?? '' }),
+    enabled: !!projectPath,
+  })
   const gitGeneralShortcut = useShortcutDisplay('panel-git')
   const gitDiffShortcut = useShortcutDisplay('panel-git-diff')
 
@@ -137,35 +148,34 @@ export const UnifiedGitPanel = forwardRef<UnifiedGitPanelHandle, UnifiedGitPanel
     return true
   }, [hasConflicts, tabVisibility, showWorktrees, hasGithubRemote, task])
 
+  // Hydrate tab order/visibility from query data
   useEffect(() => {
-    let cancelled = false
-    const load = () => {
-      Promise.all([
-        trpcClient.settings.get.query({ key: 'git_tab_order' }),
-        trpcClient.settings.get.query({ key: 'git_tab_visibility' }),
-      ]).then(([order, vis]) => {
-        if (cancelled) return
-        setTabOrder(normalizeGitTabOrder(order))
-        setTabVisibility(normalizeGitTabVisibility(vis))
-      })
+    setTabOrder(normalizeGitTabOrder(tabOrderQuery.data ?? null))
+  }, [tabOrderQuery.data])
+  useEffect(() => {
+    setTabVisibility(normalizeGitTabVisibility(tabVisibilityQuery.data ?? null))
+  }, [tabVisibilityQuery.data])
+  // Cross-component sz:settings-changed → invalidate
+  useEffect(() => {
+    const handler = () => {
+      queryClient.invalidateQueries({ queryKey: trpc.settings.get.queryKey({ key: 'git_tab_order' }) })
+      queryClient.invalidateQueries({ queryKey: trpc.settings.get.queryKey({ key: 'git_tab_visibility' }) })
     }
-    load()
-    const handler = () => load()
     window.addEventListener('sz:settings-changed', handler)
-    return () => { cancelled = true; window.removeEventListener('sz:settings-changed', handler) }
-  }, [])
+    return () => window.removeEventListener('sz:settings-changed', handler)
+  }, [queryClient, trpc])
 
   const { diffContinuousFlow, diffTreeCollapsed, diffSideBySide, diffWrap } = useAppearance()
   const setBoolSetting = useCallback((key: string, value: boolean) => {
-    trpcClient.settings.set.mutate({ key: key, value: value ? '1' : '0' })
+    setSetting.mutate({ key, value: value ? '1' : '0' })
     window.dispatchEvent(new CustomEvent('sz:settings-changed'))
-  }, [])
+  }, [setSetting])
 
-  // Check if repo has a GitHub remote
+  // GitHub remote — derived from query
   useEffect(() => {
     if (!projectPath) { setHasGithubRemote(false); return }
-    trpcClient.worktrees.hasGithubRemote.query({ repoPath: projectPath }).then(setHasGithubRemote).catch(() => setHasGithubRemote(false))
-  }, [projectPath])
+    setHasGithubRemote(githubRemoteQuery.data ?? false)
+  }, [projectPath, githubRemoteQuery.data])
 
   // Auto-switch to conflicts tab when conflicts detected
   useEffect(() => {
@@ -591,8 +601,16 @@ function ConflictPhaseContent({ task, projectPath, completedStatus, isRebase, on
   onTaskUpdated: (task: Task) => void
   onToolbarChange: (data: ConflictToolbarData) => void
 }) {
+  const trpc = useTRPC()
   const trpcClient = useTRPCClient()
-  const [conflictedFiles, setConflictedFiles] = useState<string[]>([])
+  const queryClient = useQueryClient()
+  const mergeContextQuery = useQuery({
+    ...trpc.worktrees.getMergeContext.queryOptions({ repoPath: projectPath }),
+    enabled: !task.merge_context,
+  })
+  const conflictedFilesQuery = useQuery(trpc.worktrees.getConflictedFiles.queryOptions({ path: projectPath }))
+  const [conflictedFilesOverride, setConflictedFilesOverride] = useState<string[] | null>(null)
+  const conflictedFiles = conflictedFilesOverride ?? conflictedFilesQuery.data ?? []
   const [resolvedFiles, setResolvedFiles] = useState<Set<string>>(new Set())
   const [selectedFile, setSelectedFile] = useState<string | null>(null)
   const [completing, setCompleting] = useState(false)
@@ -600,25 +618,19 @@ function ConflictPhaseContent({ task, projectPath, completedStatus, isRebase, on
   const [error, setError] = useState<string | null>(null)
   const [mergeContext, setMergeContext] = useState<MergeContext | null>(task.merge_context)
 
-  // Load merge context if not on task
+  // Hydrate mergeContext from query
   useEffect(() => {
-    if (!mergeContext) {
-      trpcClient.worktrees.getMergeContext.query({ repoPath: projectPath }).then(ctx => {
-        if (ctx) {
-          setMergeContext(ctx)
-          onUpdateTask({ id: task.id, mergeContext: ctx })
-        }
-      })
+    if (!mergeContext && mergeContextQuery.data) {
+      setMergeContext(mergeContextQuery.data)
+      onUpdateTask({ id: task.id, mergeContext: mergeContextQuery.data })
     }
-  }, [projectPath, mergeContext])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mergeContextQuery.data])
 
-  // Load conflicted files
+  // Auto-select first conflicted file when list arrives
   useEffect(() => {
-    trpcClient.worktrees.getConflictedFiles.query({ path: projectPath }).then((files: string[]) => {
-      setConflictedFiles(files)
-      if (files.length > 0 && !selectedFile) setSelectedFile(files[0])
-    })
-  }, [projectPath])
+    if (conflictedFiles.length > 0 && !selectedFile) setSelectedFile(conflictedFiles[0])
+  }, [conflictedFiles, selectedFile])
 
   const handleFileResolved = useCallback((filePath: string) => {
     setResolvedFiles(prev => new Set(prev).add(filePath))
@@ -657,7 +669,7 @@ function ConflictPhaseContent({ task, projectPath, completedStatus, isRebase, on
         const updated = await onUpdateTask(updates)
         onTaskUpdated(updated)
       } else {
-        setConflictedFiles(result.conflictedFiles)
+        setConflictedFilesOverride(result.conflictedFiles)
         setResolvedFiles(new Set())
         setSelectedFile(result.conflictedFiles[0] ?? null)
       }
@@ -677,7 +689,7 @@ function ConflictPhaseContent({ task, projectPath, completedStatus, isRebase, on
         const updated = await onUpdateTask(updates)
         onTaskUpdated(updated)
       } else {
-        setConflictedFiles(result.conflictedFiles)
+        setConflictedFilesOverride(result.conflictedFiles)
         setResolvedFiles(new Set())
         setSelectedFile(result.conflictedFiles[0] ?? null)
       }
