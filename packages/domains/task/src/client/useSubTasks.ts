@@ -1,6 +1,7 @@
-import { useState, useCallback } from 'react'
+import { useCallback } from 'react'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useSubscription } from '@trpc/tanstack-react-query'
-import { useTRPC, useTRPCClient } from '@slayzone/transport/client'
+import { useTRPC } from '@slayzone/transport/client'
 import type { DragEndEvent } from '@dnd-kit/core'
 import { arrayMove } from '@dnd-kit/sortable'
 import type { Task } from '@slayzone/task/shared'
@@ -19,58 +20,75 @@ export function useSubTasks(
   initialSubTasks?: Task[]
 ): UseSubTasksReturn {
   const trpc = useTRPC()
-  const trpcClient = useTRPCClient()
-  const [subTasks, setSubTasks] = useState<Task[]>(initialSubTasks ?? [])
+  const queryClient = useQueryClient()
+
+  const subTasksQuery = useQuery({
+    ...trpc.task.getSubTasks.queryOptions({ parentId: parentId ?? '' }),
+    enabled: !!parentId,
+    initialData: initialSubTasks,
+  })
+  const subTasks = subTasksQuery.data ?? []
+
+  const invalidate = useCallback(() => {
+    if (parentId) {
+      queryClient.invalidateQueries({ queryKey: trpc.task.getSubTasks.queryKey({ parentId }) })
+    }
+  }, [parentId, queryClient, trpc])
 
   // Re-fetch subtasks on external changes (CLI, MCP)
   useSubscription(
     trpc.task.onChanged.subscriptionOptions(undefined, {
       enabled: !!parentId,
-      onData: () => {
-        if (!parentId) return
-        trpcClient.task.getSubTasks.query({ parentId }).then(setSubTasks).catch(() => {})
-      },
+      onData: () => invalidate(),
     }),
   )
 
+  const createMutation = useMutation(trpc.task.create.mutationOptions({
+    onSuccess: () => invalidate(),
+  }))
+  const updateMutation = useMutation(trpc.task.update.mutationOptions({
+    onSuccess: () => invalidate(),
+  }))
+  const deleteMutation = useMutation(trpc.task.delete.mutationOptions({
+    onSuccess: () => invalidate(),
+  }))
+  const reorderMutation = useMutation(trpc.task.reorder.mutationOptions({
+    onSuccess: () => invalidate(),
+  }))
+
   const createSubTask = useCallback(async (params: { projectId: string; title: string; status: string }): Promise<Task | null> => {
     if (!parentId) return null
-    const sub = await trpcClient.task.create.mutate({
+    const sub = await createMutation.mutateAsync({
       projectId: params.projectId,
       title: params.title,
       parentId,
       status: params.status,
     })
-    if (sub) {
-      setSubTasks(prev => [...prev, sub])
-      track('subtask_created')
-    }
+    if (sub) track('subtask_created')
     return sub
-  }, [parentId, trpcClient])
+  }, [parentId, createMutation])
 
   const updateSubTask = useCallback(async (subId: string, updates: Record<string, unknown>): Promise<void> => {
-    const updated = await trpcClient.task.update.mutate({ id: subId, ...updates })
-    if (updated) {
-      setSubTasks(prev => prev.map(s => s.id === subId ? updated : s))
-    }
-  }, [trpcClient])
+    await updateMutation.mutateAsync({ id: subId, ...updates })
+  }, [updateMutation])
 
   const deleteSubTask = useCallback(async (subId: string): Promise<void> => {
-    await trpcClient.task.delete.mutate({ id: subId })
-    setSubTasks(prev => prev.filter(s => s.id !== subId))
-  }, [trpcClient])
+    await deleteMutation.mutateAsync({ id: subId })
+  }, [deleteMutation])
 
   const handleDragEnd = useCallback((event: DragEndEvent): void => {
     const { active, over } = event
     if (!over || active.id === over.id) return
-    setSubTasks(prev => {
-      const oldIndex = prev.findIndex(s => s.id === active.id)
-      const newIndex = prev.findIndex(s => s.id === over.id)
-      const reordered = arrayMove(prev, oldIndex, newIndex)
-      trpcClient.task.reorder.mutate({ taskIds: reordered.map(t => t.id) })
-      return reordered
-    })
-  }, [trpcClient])
+    const oldIndex = subTasks.findIndex(s => s.id === active.id)
+    const newIndex = subTasks.findIndex(s => s.id === over.id)
+    if (oldIndex < 0 || newIndex < 0) return
+    const reordered = arrayMove(subTasks, oldIndex, newIndex)
+    // Optimistic cache update
+    if (parentId) {
+      queryClient.setQueryData(trpc.task.getSubTasks.queryKey({ parentId }), reordered)
+    }
+    reorderMutation.mutate({ taskIds: reordered.map(t => t.id) })
+  }, [subTasks, parentId, queryClient, trpc, reorderMutation])
 
   return { subTasks, createSubTask, updateSubTask, deleteSubTask, handleDragEnd }
 }

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState, useMemo } from 'react'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useSubscription } from '@trpc/tanstack-react-query'
-import { useTRPC, useTRPCClient } from '@slayzone/transport/client'
+import { useTRPC } from '@slayzone/transport/client'
 
 interface OwnershipEntry {
   panelId: string
@@ -14,38 +15,27 @@ interface OwnershipEntry {
  */
 export function usePanelOwnership(taskId: string | undefined) {
   const trpc = useTRPC()
-  const trpcClient = useTRPCClient()
-  const [windowId, setWindowId] = useState<number | null>(null)
-  const [entries, setEntries] = useState<OwnershipEntry[]>([])
+  const queryClient = useQueryClient()
   const [releasedOnClose, setReleasedOnClose] = useState<Array<{ taskId: string; panelId: string }> | null>(null)
 
-  // Resolve this window's id once via tRPC (server reads ?windowId from WS query)
-  useEffect(() => {
-    let alive = true
-    trpcClient.app.taskWindows.getWindowId.query().then((id) => {
-      if (alive) setWindowId(id as number | null)
-    })
-    return () => { alive = false }
-  }, [trpcClient])
+  const windowIdQuery = useQuery(trpc.app.taskWindows.getWindowId.queryOptions())
+  const windowId = (windowIdQuery.data ?? null) as number | null
 
-  // Initial ownership snapshot for this task. Resets when taskId changes.
-  useEffect(() => {
-    if (!taskId) {
-      setEntries([])
-      return
-    }
-    let alive = true
-    trpcClient.app.taskWindows.getOwnership.query({ taskId }).then((list) => {
-      if (alive) setEntries(list as OwnershipEntry[])
-    })
-    return () => { alive = false }
-  }, [taskId, trpcClient])
+  const ownershipQuery = useQuery({
+    ...trpc.app.taskWindows.getOwnership.queryOptions({ taskId: taskId ?? '' }),
+    enabled: !!taskId,
+  })
+  const entries = (ownershipQuery.data ?? []) as OwnershipEntry[]
 
   useSubscription(
     trpc.app.taskWindows.onOwnershipChanged.subscriptionOptions(undefined, {
       enabled: !!taskId,
       onData: (payload) => {
-        if (payload.taskId === taskId) setEntries(payload.ownership)
+        if (payload.taskId !== taskId || !taskId) return
+        queryClient.setQueryData(
+          trpc.app.taskWindows.getOwnership.queryKey({ taskId }),
+          payload.ownership,
+        )
       },
     }),
   )
@@ -60,6 +50,15 @@ export function usePanelOwnership(taskId: string | undefined) {
       },
     }),
   )
+
+  const claimMutation = useMutation(trpc.app.taskWindows.claimPanel.mutationOptions())
+  const claimAndCloseMutation = useMutation(trpc.app.taskWindows.claimAndCloseOther.mutationOptions())
+  const releaseMutation = useMutation(trpc.app.taskWindows.releasePanel.mutationOptions())
+
+  // Reset releasedOnClose when task changes
+  useEffect(() => {
+    setReleasedOnClose(null)
+  }, [taskId])
 
   const ownerOf = useCallback(
     (panelId: string): number | null => entries.find((e) => e.panelId === panelId)?.ownerWindowId ?? null,
@@ -85,25 +84,25 @@ export function usePanelOwnership(taskId: string | undefined) {
   const claim = useCallback(
     async (panelId: string) => {
       if (!taskId) return { ok: false }
-      return trpcClient.app.taskWindows.claimPanel.mutate({ taskId, panelId })
+      return claimMutation.mutateAsync({ taskId, panelId })
     },
-    [taskId, trpcClient]
+    [taskId, claimMutation]
   )
 
   const claimAndCloseOther = useCallback(
     async (panelId: string) => {
       if (!taskId) return { ok: false }
-      return trpcClient.app.taskWindows.claimAndCloseOther.mutate({ taskId, panelId })
+      return claimAndCloseMutation.mutateAsync({ taskId, panelId })
     },
-    [taskId, trpcClient]
+    [taskId, claimAndCloseMutation]
   )
 
   const release = useCallback(
     async (panelId: string) => {
       if (!taskId) return { ok: false }
-      return trpcClient.app.taskWindows.releasePanel.mutate({ taskId, panelId })
+      return releaseMutation.mutateAsync({ taskId, panelId })
     },
-    [taskId, trpcClient]
+    [taskId, releaseMutation]
   )
 
   const consumeReleasedOnClose = useCallback(() => {
