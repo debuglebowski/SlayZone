@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useCallback, forwardRef, useImperativeHandle, createRef } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useSubscription } from '@trpc/tanstack-react-query'
 import { useTRPC, useTRPCClient } from '@slayzone/transport/client'
 import { track } from '@slayzone/telemetry/client'
 import { ArrowLeft, ArrowRight, RotateCw, X, Plus, Import, Smartphone, Monitor, Tablet, LayoutGrid, ChevronDown, ChevronUp, Crosshair, Camera, Bug, Sun, Moon, PaintbrushVertical, Keyboard, Puzzle, Trash2, Download, TriangleAlert } from 'lucide-react'
@@ -907,9 +908,9 @@ export const BrowserPanel = forwardRef<BrowserPanelHandle, BrowserPanelProps>(fu
   }, [activeViewState.favicon])
 
   // Handle new-tab-request events from main process (Cmd+Click / middle-click on links)
-  useEffect(() => {
-    if (!taskId) return
-    const sub = trpcClient.app.browser.onEvent.subscribe(undefined, {
+  useSubscription(
+    trpc.app.browser.onEvent.subscriptionOptions(undefined, {
+      enabled: !!taskId,
       onData: (raw) => {
         const event = raw as { type: string; taskId?: string; url?: string; background?: boolean }
         if (event.type !== 'new-tab-request' || event.taskId !== taskId) return
@@ -922,9 +923,8 @@ export const BrowserPanel = forwardRef<BrowserPanelHandle, BrowserPanelProps>(fu
           createNewTabRef.current(tabUrl)
         }
       },
-    })
-    return () => sub.unsubscribe()
-  }, [taskId, commitTabsUpdate])
+    }),
+  )
 
   // Apply the browser's own baseline zoom without tying it to app-level UI zoom.
   useEffect(() => {
@@ -1123,9 +1123,9 @@ export const BrowserPanel = forwardRef<BrowserPanelHandle, BrowserPanelProps>(fu
   }, [activeViewId])
 
   // Subscribe to found-in-page results
-  useEffect(() => {
-    if (!findMode) return
-    const sub = trpcClient.app.browser.onEvent.subscribe(undefined, {
+  useSubscription(
+    trpc.app.browser.onEvent.subscriptionOptions(undefined, {
+      enabled: findMode,
       onData: (raw) => {
         const event = raw as { type: string; viewId: string; finalUpdate?: boolean; activeMatchOrdinal?: number; matches?: number }
         if (event.type !== 'found-in-page') return
@@ -1137,9 +1137,8 @@ export const BrowserPanel = forwardRef<BrowserPanelHandle, BrowserPanelProps>(fu
           })
         }
       },
-    })
-    return () => sub.unsubscribe()
-  }, [findMode, activeViewId])
+    }),
+  )
 
   // Close find when switching tabs
   useEffect(() => {
