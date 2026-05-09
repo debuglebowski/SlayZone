@@ -1,6 +1,6 @@
 import React, { Suspense, lazy, useState, useEffect, useRef, useMemo, useCallback, useTransition } from 'react'
 import { useGuardedHotkeys } from '@slayzone/ui'
-import { getTrpcVanillaClient } from '@slayzone/transport/client'
+import { useTRPCClient } from '@slayzone/transport/client'
 import { initShortcuts } from './shortcut-init'
 import { AlertTriangle, FolderClosed, LayoutGrid, TerminalSquare, GitBranch, FileCode, Cpu, Kanban, FlaskConical, Zap, BookOpen, Lock, Focus } from 'lucide-react'
 import { buildCreateTaskDraftFromBrowserLink } from '@slayzone/task/shared'
@@ -118,6 +118,7 @@ function useLazyMounted() {
 
 function App(): React.JSX.Element {
   performance.mark('sz:app:render')
+  const trpcClient = useTRPCClient()
   const shouldMount = useLazyMounted()
   // Core data from domain hook
   const {
@@ -221,7 +222,7 @@ function App(): React.JSX.Element {
   )
   const handleHomeRepoChange = useCallback((repoName: string) => {
     if (!homeSelectedProject) return
-    getTrpcVanillaClient().projects.update.mutate({ id: homeSelectedProject.id, selectedRepo: repoName }).then((updated) => {
+    trpcClient.projects.update.mutate({ id: homeSelectedProject.id, selectedRepo: repoName }).then((updated) => {
       updateProject(updated)
     })
   }, [homeSelectedProject?.id, updateProject])
@@ -230,7 +231,7 @@ function App(): React.JSX.Element {
   const [projectPathMissing, setProjectPathMissing] = useState(false)
   const validateProjectPath = useCallback(async (project: Project | undefined) => {
     if (!project?.path) { setProjectPathMissing(false); return }
-    const exists = await getTrpcVanillaClient().app.files.pathExists.query({ filePath: project.path })
+    const exists = await trpcClient.app.files.pathExists.query({ filePath: project.path })
     setProjectPathMissing(!exists)
   }, [])
 
@@ -269,8 +270,8 @@ function App(): React.JSX.Element {
   const handleChecklistCheckLeaderboard = useCallback((): void => {
     useTabStore.getState().setActiveView('leaderboard')
   }, [])
-  const handleChecklistJoinCommunity = useCallback((): void => { void getTrpcVanillaClient().app.shell.openExternal.mutate({ url: COMMUNITY_DISCORD_URL }) }, [])
-  const handleChecklistFollowOnX = useCallback((): void => { void getTrpcVanillaClient().app.shell.openExternal.mutate({ url: COMMUNITY_X_URL }) }, [])
+  const handleChecklistJoinCommunity = useCallback((): void => { void trpcClient.app.shell.openExternal.mutate({ url: COMMUNITY_DISCORD_URL }) }, [])
+  const handleChecklistFollowOnX = useCallback((): void => { void trpcClient.app.shell.openExternal.mutate({ url: COMMUNITY_X_URL }) }, [])
 
   const hasCreatedTask = useMemo(() => tasks.some((task) => !task.is_temporary), [tasks])
   const {
@@ -292,7 +293,7 @@ function App(): React.JSX.Element {
   // Toast persists since the app is non-functional in local mode without the server —
   // user needs to act (check port conflict, restart, or switch to remote mode).
   useEffect(() => {
-    const sub = getTrpcVanillaClient().app.notify.onEmbeddedServerFailed.subscribe(undefined, {
+    const sub = trpcClient.app.notify.onEmbeddedServerFailed.subscribe(undefined, {
       onData: ({ attempts, message }) => {
         toast.error(`Embedded server failed to start after ${attempts} attempts: ${message}. Try relaunching the app.`, { duration: Infinity })
       },
@@ -323,11 +324,11 @@ function App(): React.JSX.Element {
 
   useEffect(() => {
     Promise.all([
-      getTrpcVanillaClient().settings.get.query({ key: 'onboarding_completed' }),
-      getTrpcVanillaClient().settings.get.query({ key: 'tutorial_prompted' })
+      trpcClient.settings.get.query({ key: 'onboarding_completed' }),
+      trpcClient.settings.get.query({ key: 'tutorial_prompted' })
     ]).then(([onboarded, prompted]) => {
       if (onboarded === 'true' && !prompted) {
-        void getTrpcVanillaClient().settings.set.mutate({ key: 'tutorial_prompted', value: 'true' })
+        void trpcClient.settings.set.mutate({ key: 'tutorial_prompted', value: 'true' })
         toast('Want a quick tour?', { duration: 8000, action: { label: 'Take the tour', onClick: startTour } })
       }
     })
@@ -341,7 +342,7 @@ function App(): React.JSX.Element {
 
     let cancelled = false
 
-    getTrpcVanillaClient().settings.get.query({ key: 'onboarding_completed' }).then((value) => {
+    trpcClient.settings.get.query({ key: 'onboarding_completed' }).then((value) => {
       if (!cancelled && value !== 'true') {
         setShouldMountOnboarding(true)
       }
@@ -362,7 +363,7 @@ function App(): React.JSX.Element {
   const agentMode = agentPanelState.mode ?? 'claude-code'
   useEffect(() => {
     if (agentPanelState.mode) return
-    getTrpcVanillaClient().settings.get.query({ key: 'default_terminal_mode' }).then(m => {
+    trpcClient.settings.get.query({ key: 'default_terminal_mode' }).then(m => {
       if (m) setAgentPanelState({ mode: m })
     })
   }, [agentPanelState.mode, setAgentPanelState])
@@ -374,12 +375,12 @@ function App(): React.JSX.Element {
   const { idleTasks: rawIdleTasks } = useIdleTasks(tasks, null, columnsByProjectId)
   const activeAgentTaskIds = useActiveSessionTaskIds()
   const shutdownAgentForTask = useCallback(async (taskId: string) => {
-    const [ptys, chats] = await Promise.all([getTrpcVanillaClient().pty.list.query(), getTrpcVanillaClient().pty.chatList.query()])
-    const ptyKills = ptys.filter((p) => p.taskId === taskId).map((p) => getTrpcVanillaClient().pty.kill.mutate({ sessionId: p.sessionId }))
+    const [ptys, chats] = await Promise.all([trpcClient.pty.list.query(), trpcClient.pty.chatList.query()])
+    const ptyKills = ptys.filter((p) => p.taskId === taskId).map((p) => trpcClient.pty.kill.mutate({ sessionId: p.sessionId }))
     const chatKills = chats.filter((c) => c.taskId === taskId).map((c) => {
       const idx = c.sessionId.indexOf(':')
       const tabId = idx >= 0 ? c.sessionId.slice(idx + 1) : c.sessionId
-      return getTrpcVanillaClient().chat.kill.mutate({ tabId })
+      return trpcClient.chat.kill.mutate({ tabId })
     })
     await Promise.all([...ptyKills, ...chatKills])
   }, [])
@@ -479,7 +480,7 @@ function App(): React.JSX.Element {
   // Broadcast primary's active task ID so secondary windows in "Follow current tab" mode swap
   useEffect(() => {
     const id = activeTab?.type === 'task' ? activeTab.taskId : null
-    void getTrpcVanillaClient().app.taskWindows.setPrimaryActive.mutate({ taskId: id })
+    void trpcClient.app.taskWindows.setPrimaryActive.mutate({ taskId: id })
   }, [activeTab])
   useEffect(() => {
     if (activeTaskProjectId && activeTaskProjectId !== selectedProjectId) setSelectedProjectId(activeTaskProjectId)
@@ -530,9 +531,9 @@ function App(): React.JSX.Element {
 
   // Read settings on mount and whenever settings change
   useEffect(() => {
-    getTrpcVanillaClient().settings.get.query({ key: 'project_color_tints_enabled' }).then((v) => setColorTintsEnabled(v !== '0'))
-    getTrpcVanillaClient().settings.get.query({ key: 'show_context_manager' }).then((v) => setShowContextManager(v !== '0'))
-    getTrpcVanillaClient().app.meta.isTestsPanelEnabled.query().then(setTestsPanelEnabled)
+    trpcClient.settings.get.query({ key: 'project_color_tints_enabled' }).then((v) => setColorTintsEnabled(v !== '0'))
+    trpcClient.settings.get.query({ key: 'show_context_manager' }).then((v) => setShowContextManager(v !== '0'))
+    trpcClient.app.meta.isTestsPanelEnabled.query().then(setTestsPanelEnabled)
   }, [settingsRevision])
 
   // Close context manager when hidden
@@ -568,7 +569,7 @@ function App(): React.JSX.Element {
   )
 
   const handleTaskTagsChange = async (taskId: string, tagIds: string[]) => {
-    await getTrpcVanillaClient().tags.setForTask.mutate({ taskId, tagIds })
+    await trpcClient.tags.setForTask.mutate({ taskId, tagIds })
     setTaskTags((prev) => { const next = new Map(prev); next.set(taskId, tagIds); return next })
   }
 
@@ -605,36 +606,36 @@ function App(): React.JSX.Element {
   const agentSessionId = selectedProjectId ? `__agent-panel:${selectedProjectId}:${agentPanelState.sessionIndex}` : null
 
   const handleAgentNewSession = useCallback(async () => {
-    if (agentSessionId) await getTrpcVanillaClient().pty.kill.mutate({ sessionId: agentSessionId })
+    if (agentSessionId) await trpcClient.pty.kill.mutate({ sessionId: agentSessionId })
     setAgentPanelState({ sessionIndex: (agentPanelState.sessionIndex ?? 0) + 1 })
   }, [agentSessionId, agentPanelState.sessionIndex, setAgentPanelState])
 
   const handleAgentModeChange = useCallback(async (nextMode: string) => {
     if (nextMode === agentMode) return
-    if (agentSessionId) await getTrpcVanillaClient().pty.kill.mutate({ sessionId: agentSessionId })
+    if (agentSessionId) await trpcClient.pty.kill.mutate({ sessionId: agentSessionId })
     setAgentPanelState({ mode: nextMode, sessionIndex: (agentPanelState.sessionIndex ?? 0) + 1 })
   }, [agentMode, agentSessionId, agentPanelState.sessionIndex, setAgentPanelState])
 
   // Floating agent panel: push context to main-process state machine.
   // All detach/reattach decisions happen in main; renderer just keeps ctx in sync.
   useEffect(() => {
-    getTrpcVanillaClient().app.floatingAgent.setSessionId.mutate({ sessionId: agentSessionId })
+    trpcClient.app.floatingAgent.setSessionId.mutate({ sessionId: agentSessionId })
   }, [agentSessionId])
   useEffect(() => {
-    getTrpcVanillaClient().app.floatingAgent.setPanelOpen.mutate({ isOpen: agentPanelState.isOpen })
+    trpcClient.app.floatingAgent.setPanelOpen.mutate({ isOpen: agentPanelState.isOpen })
   }, [agentPanelState.isOpen])
   useEffect(() => {
-    getTrpcVanillaClient().app.floatingAgent.setEnabled.mutate({ enabled: agentPanelState.floatingEnabled })
+    trpcClient.app.floatingAgent.setEnabled.mutate({ enabled: agentPanelState.floatingEnabled })
   }, [agentPanelState.floatingEnabled])
 
   // Subscribe to floating-agent state for menu label + sidebar visibility.
   const [floatingAgentState, setFloatingAgentState] = useState<{ kind: 'attached' | 'detached' | 'disabled'; mode: 'auto' | 'manual' | null }>({ kind: 'attached', mode: null })
   useEffect(() => {
-    getTrpcVanillaClient().app.floatingAgent.getState.query().then((s) => {
+    trpcClient.app.floatingAgent.getState.query().then((s) => {
       const st = s as { kind: string; mode: 'auto' | 'manual' | null }
       setFloatingAgentState({ kind: st.kind as 'attached' | 'detached' | 'disabled', mode: st.mode })
     })
-    const sub = getTrpcVanillaClient().app.floatingAgent.onState.subscribe(undefined, {
+    const sub = trpcClient.app.floatingAgent.onState.subscribe(undefined, {
       onData: (s) => {
         const st = s as { kind: string; mode: 'auto' | 'manual' | null }
         setFloatingAgentState({ kind: st.kind as 'attached' | 'detached' | 'disabled', mode: st.mode })
@@ -705,20 +706,20 @@ function App(): React.JSX.Element {
   closeActiveTaskRef.current = () => {
     const activeTab = tabs[activeTabIndex]
     if (activeTab?.type === 'task') closeTab(activeTabIndex)
-    else void getTrpcVanillaClient().app.window.close.mutate()
+    else void trpcClient.app.window.close.mutate()
   }
   const closeCurrentHomeRef = useRef<() => void>(() => {})
   closeCurrentHomeRef.current = () => {
     const activeTab = tabs[activeTabIndex]
-    if (activeTab?.type === 'home') void getTrpcVanillaClient().app.window.close.mutate()
+    if (activeTab?.type === 'home') void trpcClient.app.window.close.mutate()
   }
 
-  useEffect(() => { const s = getTrpcVanillaClient().app.menu.onCloseActiveTask.subscribe(undefined, { onData: () => closeActiveTaskRef.current() }); return () => s.unsubscribe() }, [])
-  useEffect(() => { const s = getTrpcVanillaClient().app.menu.onCloseCurrent.subscribe(undefined, { onData: () => closeCurrentHomeRef.current() }); return () => s.unsubscribe() }, [])
-  useEffect(() => { const s = getTrpcVanillaClient().app.menu.onCloseTask.subscribe(undefined, { onData: (taskId) => { useTabStore.getState().closeTabByTaskId(taskId as string) } }); return () => s.unsubscribe() }, [])
-  useEffect(() => { const s = getTrpcVanillaClient().app.menu.onOpenTask.subscribe(undefined, { onData: (taskId) => { openTaskRef.current(taskId as string) } }); return () => s.unsubscribe() }, [])
+  useEffect(() => { const s = trpcClient.app.menu.onCloseActiveTask.subscribe(undefined, { onData: () => closeActiveTaskRef.current() }); return () => s.unsubscribe() }, [])
+  useEffect(() => { const s = trpcClient.app.menu.onCloseCurrent.subscribe(undefined, { onData: () => closeCurrentHomeRef.current() }); return () => s.unsubscribe() }, [])
+  useEffect(() => { const s = trpcClient.app.menu.onCloseTask.subscribe(undefined, { onData: (taskId) => { useTabStore.getState().closeTabByTaskId(taskId as string) } }); return () => s.unsubscribe() }, [])
+  useEffect(() => { const s = trpcClient.app.menu.onOpenTask.subscribe(undefined, { onData: (taskId) => { openTaskRef.current(taskId as string) } }); return () => s.unsubscribe() }, [])
   useEffect(() => {
-    const s = getTrpcVanillaClient().app.menu.onGoHome.subscribe(undefined, {
+    const s = trpcClient.app.menu.onGoHome.subscribe(undefined, {
       onData: () => {
         const homeIndex = useTabStore.getState().tabs.findIndex((tab) => tab.type === 'home')
         if (homeIndex >= 0) setActiveTabIndex(homeIndex)
@@ -727,25 +728,25 @@ function App(): React.JSX.Element {
     return () => s.unsubscribe()
   }, [])
   useEffect(() => {
-    const s = getTrpcVanillaClient().app.menu.onToggleAgentPanel.subscribe(undefined, {
+    const s = trpcClient.app.menu.onToggleAgentPanel.subscribe(undefined, {
       onData: () => { if (selectedProjectId) setAgentPanelState({ isOpen: !agentPanelState.isOpen }) },
     })
     return () => s.unsubscribe()
   }, [selectedProjectId, agentPanelState.isOpen])
   useEffect(() => {
-    const s = getTrpcVanillaClient().app.menu.onToggleAgentStatusPanel.subscribe(undefined, {
+    const s = trpcClient.app.menu.onToggleAgentStatusPanel.subscribe(undefined, {
       onData: () => setAgentStatusState({ isLocked: !agentStatusState.isLocked }),
     })
     return () => s.unsubscribe()
   }, [agentStatusState.isLocked])
   useEffect(() => {
-    const s = getTrpcVanillaClient().app.menu.onOpenSettings.subscribe(undefined, {
+    const s = trpcClient.app.menu.onOpenSettings.subscribe(undefined, {
       onData: () => { setSettingsInitialTab('appearance'); setSettingsInitialAiConfigSection(null); setSettingsOpen(true) },
     })
     return () => s.unsubscribe()
   }, [])
   useEffect(() => {
-    const s = getTrpcVanillaClient().app.menu.onOpenProjectSettings.subscribe(undefined, {
+    const s = trpcClient.app.menu.onOpenProjectSettings.subscribe(undefined, {
       onData: () => {
         if (!selectedProjectId) return
         const project = projects.find((p) => p.id === selectedProjectId)
@@ -757,7 +758,7 @@ function App(): React.JSX.Element {
   }, [selectedProjectId, projects])
 
   useEffect(() => {
-    const s = getTrpcVanillaClient().app.menu.onUpdateStatus.subscribe(undefined, {
+    const s = trpcClient.app.menu.onUpdateStatus.subscribe(undefined, {
       onData: (raw) => {
         const status = raw as { type: string; percent?: number; version?: string; message?: string }
         switch (status.type) {
@@ -894,12 +895,12 @@ function App(): React.JSX.Element {
 
   // Cmd+R: reload the active browser view (WebContentsView or webview fallback)
   useEffect(() => {
-    const sub = getTrpcVanillaClient().app.menu.onReloadBrowser.subscribe(undefined, {
+    const sub = trpcClient.app.menu.onReloadBrowser.subscribe(undefined, {
       onData: () => {
         const placeholder = document.querySelector('[data-browser-panel][data-view-id]') as HTMLElement | null
         const viewId = placeholder?.dataset.viewId
         if (viewId) {
-          void getTrpcVanillaClient().app.browser.reload.mutate({ viewId })
+          void trpcClient.app.browser.reload.mutate({ viewId })
           return
         }
         const webview = document.querySelector('[data-browser-panel] webview') as any
@@ -911,7 +912,7 @@ function App(): React.JSX.Element {
 
   // Cmd+Shift+R: reload the app
   useEffect(() => {
-    const sub = getTrpcVanillaClient().app.menu.onReloadApp.subscribe(undefined, {
+    const sub = trpcClient.app.menu.onReloadApp.subscribe(undefined, {
       onData: () => window.location.reload(),
     })
     return () => sub.unsubscribe()
@@ -924,19 +925,19 @@ function App(): React.JSX.Element {
 
       if (e.key === '=' || e.key === '+') {
         e.preventDefault()
-        void getTrpcVanillaClient().app.meta.adjustZoom.mutate({ command: 'in' })
+        void trpcClient.app.meta.adjustZoom.mutate({ command: 'in' })
         return
       }
 
       if (e.key === '-') {
         e.preventDefault()
-        void getTrpcVanillaClient().app.meta.adjustZoom.mutate({ command: 'out' })
+        void trpcClient.app.meta.adjustZoom.mutate({ command: 'out' })
         return
       }
 
       if (e.key === '0') {
         e.preventDefault()
-        void getTrpcVanillaClient().app.meta.adjustZoom.mutate({ command: 'reset' })
+        void trpcClient.app.meta.adjustZoom.mutate({ command: 'reset' })
       }
     }
 
@@ -946,7 +947,7 @@ function App(): React.JSX.Element {
 
   // Forward keyboard shortcuts from WebContentsView back into the DOM
   useEffect(() => {
-    const sub = getTrpcVanillaClient().app.browser.onShortcut.subscribe(undefined, { onData: (raw) => {
+    const sub = trpcClient.app.browser.onShortcut.subscribe(undefined, { onData: (raw) => {
       const payload = raw as { viewId: string; key: string; shift: boolean; alt: boolean; meta: boolean; control: boolean; kind?: string }
       // WebContentsView is a separate web contents — focusin never fires in
       // renderer when it has focus. Set browser scope before dispatching so
@@ -979,7 +980,7 @@ function App(): React.JSX.Element {
   // Uses DOM lookup via data-view-id → closest data-panel-id to work for
   // both browser tabs and web panels.
   useEffect(() => {
-    const sub = getTrpcVanillaClient().app.browser.onFocused.subscribe(undefined, {
+    const sub = trpcClient.app.browser.onFocused.subscribe(undefined, {
       onData: ({ viewId }) => {
         const el = document.querySelector(`[data-view-id="${viewId}"]`)
         const panel = el?.closest('[data-panel-id]')
@@ -990,7 +991,7 @@ function App(): React.JSX.Element {
   }, [])
 
   useEffect(() => {
-    const sub = getTrpcVanillaClient().app.browser.onCreateTaskFromLink.subscribe(undefined, {
+    const sub = trpcClient.app.browser.onCreateTaskFromLink.subscribe(undefined, {
       onData: (raw) => {
         const intent = raw as { taskId: string; url: string; linkText?: string }
         const sourceTask = tasksMap.get(intent.taskId)
@@ -1011,8 +1012,8 @@ function App(): React.JSX.Element {
     if (tab?.type === 'task') {
       const task = store._taskLookup.tasks.find((t) => t.id === tab.taskId)
       if (task?.is_temporary) {
-        getTrpcVanillaClient().pty.kill.mutate({ sessionId: `${tab.taskId}:${tab.taskId}` })
-        getTrpcVanillaClient().task.delete.mutate({ id: tab.taskId })
+        trpcClient.pty.kill.mutate({ sessionId: `${tab.taskId}:${tab.taskId}` })
+        trpcClient.task.delete.mutate({ id: tab.taskId })
         setTasks((prev) => prev.filter((t) => t.id !== tab.taskId))
       }
     }
@@ -1037,15 +1038,15 @@ function App(): React.JSX.Element {
     const project = projectsMap.get(task.project_id)
     const doneStatus = getDoneStatus(project?.columns_config)
     const prevStatus = task.status
-    await getTrpcVanillaClient().task.update.mutate({ id: activeTab.taskId, status: doneStatus })
+    await trpcClient.task.update.mutate({ id: activeTab.taskId, status: doneStatus })
     updateTask({ ...task, status: doneStatus })
     closeTab(activeTabIndex)
     useDialogStore.getState().closeCompleteTaskDialog()
     if (prevStatus !== doneStatus) {
       pushUndo({
         label: `Completed "${task.title}"`,
-        undo: async () => { await getTrpcVanillaClient().task.update.mutate({ id: task.id, status: prevStatus }); setTasks((prev) => prev.map((t) => (t.id === task.id ? { ...t, status: prevStatus } : t))) },
-        redo: async () => { await getTrpcVanillaClient().task.update.mutate({ id: task.id, status: doneStatus }); setTasks((prev) => prev.map((t) => (t.id === task.id ? { ...t, status: doneStatus } : t))) }
+        undo: async () => { await trpcClient.task.update.mutate({ id: task.id, status: prevStatus }); setTasks((prev) => prev.map((t) => (t.id === task.id ? { ...t, status: prevStatus } : t))) },
+        redo: async () => { await trpcClient.task.update.mutate({ id: task.id, status: doneStatus }); setTasks((prev) => prev.map((t) => (t.id === task.id ? { ...t, status: doneStatus } : t))) }
       })
       toast(`Completed "${task.title}"`, { action: { label: 'Undo', onClick: () => void undo() } })
     }
@@ -1058,7 +1059,7 @@ function App(): React.JSX.Element {
     const existing = tasks.filter((t) => t.project_id === selectedProjectId).map((t) => t.title.match(/^Terminal (\d+)$/)).filter(Boolean).map((m) => parseInt(m![1], 10))
     const next = existing.length > 0 ? Math.max(...existing) + 1 : 1
     const status = getDefaultStatus(selectedProject?.columns_config)
-    const task = await getTrpcVanillaClient().task.create.mutate({ projectId: selectedProjectId, title: `Terminal ${next}`, status, isTemporary: true })
+    const task = await trpcClient.task.create.mutate({ projectId: selectedProjectId, title: `Terminal ${next}`, status, isTemporary: true })
     track('temporary_task_created')
     setTasks((prev) => [task, ...prev])
     setTerminalFocusRequests((prev) => ({ ...prev, [task.id]: (prev[task.id] ?? 0) + 1 }))
@@ -1083,7 +1084,7 @@ function App(): React.JSX.Element {
   }, [openTask])
 
   useEffect(() => {
-    const sub = getTrpcVanillaClient().app.menu.onNewTemporaryTask.subscribe(undefined, { onData: () => handleCreateScratchTerminal() })
+    const sub = trpcClient.app.menu.onNewTemporaryTask.subscribe(undefined, { onData: () => handleCreateScratchTerminal() })
     return () => sub.unsubscribe()
   }, [handleCreateScratchTerminal])
 
@@ -1110,7 +1111,7 @@ function App(): React.JSX.Element {
 
   const handleConvertTask = useCallback(async (task: Task): Promise<Task> => {
     const project = useTabStore.getState()._taskLookup.projects.find((item) => item.id === task.project_id)
-    const converted = await getTrpcVanillaClient().task.update.mutate({ id: task.id, title: 'Untitled task', status: getStatusByCategory('started', project?.columns_config) ?? getDefaultStatus(project?.columns_config), isTemporary: false })
+    const converted = await trpcClient.task.update.mutate({ id: task.id, title: 'Untitled task', status: getStatusByCategory('started', project?.columns_config) ?? getDefaultStatus(project?.columns_config), isTemporary: false })
     updateTask(converted); return converted
   }, [updateTask])
 
@@ -1150,7 +1151,7 @@ function App(): React.JSX.Element {
     if (!trimmed) { const p = projects.find((p) => p.id === selectedProjectId); if (p) setProjectNameValue(p.name); return }
     const project = projects.find((p) => p.id === selectedProjectId)
     if (project && trimmed !== project.name) {
-      try { const updated = await getTrpcVanillaClient().projects.update.mutate({ id: selectedProjectId, name: trimmed, color: project.color }); updateProject(updated) }
+      try { const updated = await trpcClient.projects.update.mutate({ id: selectedProjectId, name: trimmed, color: project.color }); updateProject(updated) }
       catch { if (project) setProjectNameValue(project.name) }
     }
   }
@@ -1163,9 +1164,9 @@ function App(): React.JSX.Element {
   const handleFixProjectPath = useCallback(async (): Promise<void> => {
     const project = projects.find((p) => p.id === selectedProjectId)
     if (!project) return
-    const result = await getTrpcVanillaClient().app.dialog.showOpenDialog.mutate({ title: 'Select Project Directory', defaultPath: project.path || undefined, properties: ['openDirectory'] })
+    const result = await trpcClient.app.dialog.showOpenDialog.mutate({ title: 'Select Project Directory', defaultPath: project.path || undefined, properties: ['openDirectory'] })
     if (result.canceled || !result.filePaths[0]) return
-    const updated = await getTrpcVanillaClient().projects.update.mutate({ id: project.id, path: result.filePaths[0] })
+    const updated = await trpcClient.projects.update.mutate({ id: project.id, path: result.filePaths[0] })
     updateProject(updated); validateProjectPath(updated)
   }, [selectedProjectId, projects, updateProject, validateProjectPath])
 
@@ -1233,7 +1234,7 @@ function App(): React.JSX.Element {
               projectColors={taskProjectColors} worktreeColors={taskWorktreeColors}
               taskProgress={taskProgress} doneTaskIds={doneTaskIds}
               onTabClick={(i) => setActiveTabIndex(toFullIndex(i))} onTabClose={(i) => closeTab(toFullIndex(i))} onTabReorder={(from, to) => reorderTabs(toFullIndex(from), toFullIndex(to))}
-              onTabRename={async (taskId, title) => { const t = await getTrpcVanillaClient().task.update.mutate({ id: taskId, title }); updateTask(t) }}
+              onTabRename={async (taskId, title) => { const t = await trpcClient.task.update.mutate({ id: taskId, title }); updateTask(t) }}
               leftContent={(showContextManager || explodeMode) ? (
                 <>
                   {showContextManager && (
@@ -1300,7 +1301,7 @@ function App(): React.JSX.Element {
                   </TooltipContent></Tooltip>
                   <AgentStatusButton active={agentStatusState.isLocked} count={idleTasks.length} onClick={() => setAgentStatusState({ isLocked: !agentStatusState.isLocked })} shortcutHint={agentStatusPanelShortcut} />
                   <AgentPanelButton active={agentPanelState.isOpen} disabled={!selectedProjectId} onClick={() => setAgentPanelState({ isOpen: !agentPanelState.isOpen })} shortcutHint={agentPanelShortcut} />
-                  <UpdateButton version={updateVersion} onRestart={() => getTrpcVanillaClient().app.meta.restartForUpdate.mutate()} />
+                  <UpdateButton version={updateVersion} onRestart={() => trpcClient.app.meta.restartForUpdate.mutate()} />
                 </div>
               }
             />
@@ -1433,7 +1434,7 @@ function App(): React.JSX.Element {
                                     <UnifiedGitPanel ref={homePanel.homeGitPanelRef} projectId={selectedProjectId} projectPath={projectPath} visible={isViewActive}
                                       defaultTab={homePanel.homeGitDefaultTab} onTabChange={homePanel.setHomeGitDefaultTab} tasks={tasks} filter={filter} projects={projects}
                                       onTaskClick={(t) => handleTaskClick(t, { metaKey: false })}
-                                      onUpdateTask={(data) => getTrpcVanillaClient().task.update.mutate(data).then(t => { updateTask(t); return t })}
+                                      onUpdateTask={(data) => trpcClient.task.update.mutate(data).then(t => { updateTask(t); return t })}
                                       detectedRepos={homeDetectedRepos}
                                       selectedRepoName={homeSelectedProject?.selected_repo}
                                       isRepoStale={homeResolvedRepo.stale}
@@ -1508,8 +1509,8 @@ function App(): React.JSX.Element {
                   floatingEnabled={agentPanelState.floatingEnabled}
                   onToggleFloating={() => setAgentPanelState({ floatingEnabled: !agentPanelState.floatingEnabled })}
                   floatingState={floatingAgentState.kind}
-                  onDetach={() => getTrpcVanillaClient().app.floatingAgent.detach.mutate()}
-                  onReattach={() => getTrpcVanillaClient().app.floatingAgent.reattach.mutate()} />
+                  onDetach={() => trpcClient.app.floatingAgent.detach.mutate()}
+                  onReattach={() => trpcClient.app.floatingAgent.reattach.mutate()} />
               </div>
             )}
             {agentStatusState.isLocked && (
@@ -1551,9 +1552,9 @@ function App(): React.JSX.Element {
         {shouldMount('search', searchOpen) && <Suspense fallback={null}><SearchDialog open={searchOpen} onOpenChange={(open) => { if (!open) useDialogStore.getState().closeSearch() }} tasks={tasks} projects={projects} onSelectTask={openTask} onSelectProject={setSelectedProjectId} /></Suspense>}
         {shouldMount('onboarding', shouldMountOnboarding) && <Suspense fallback={null}><OnboardingDialog externalOpen={onboardingOpen} onExternalClose={async () => {
           useDialogStore.getState().closeOnboarding()
-          const [onboardingCompleted, prompted] = await Promise.all([getTrpcVanillaClient().settings.get.query({ key: 'onboarding_completed' }), getTrpcVanillaClient().settings.get.query({ key: 'tutorial_prompted' })])
+          const [onboardingCompleted, prompted] = await Promise.all([trpcClient.settings.get.query({ key: 'onboarding_completed' }), trpcClient.settings.get.query({ key: 'tutorial_prompted' })])
           if (onboardingCompleted === 'true') markSetupGuideCompleted()
-          if (!prompted) { void getTrpcVanillaClient().settings.set.mutate({ key: 'tutorial_prompted', value: 'true' }); toast('Want a quick tour?', { duration: 8000, action: { label: 'Take the tour', onClick: startTour } }) }
+          if (!prompted) { void trpcClient.settings.set.mutate({ key: 'tutorial_prompted', value: 'true' }); toast('Want a quick tour?', { duration: 8000, action: { label: 'Take the tour', onClick: startTour } }) }
         }} /></Suspense>}
         <Suspense fallback={null}><CliInstallDialog /></Suspense>
         {shouldMount('tutorial', showAnimatedTour) && <Suspense fallback={null}><TutorialAnimationModal open={showAnimatedTour} onClose={() => useDialogStore.getState().closeAnimatedTour()} /></Suspense>}
@@ -1562,7 +1563,7 @@ function App(): React.JSX.Element {
           <AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Complete Task</AlertDialogTitle><AlertDialogDescription>Mark as complete and close tab?</AlertDialogDescription></AlertDialogHeader>
           <AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction autoFocus onClick={handleCompleteTaskConfirm}>Complete</AlertDialogAction></AlertDialogFooter></AlertDialogContent>
         </AlertDialog>
-        <UpdateToast version={updateToastDismissed ? null : updateVersion} onRestart={() => getTrpcVanillaClient().app.meta.restartForUpdate.mutate()} onDismiss={() => setUpdateToastDismissed(true)} />
+        <UpdateToast version={updateToastDismissed ? null : updateVersion} onRestart={() => trpcClient.app.meta.restartForUpdate.mutate()} onDismiss={() => setUpdateToastDismissed(true)} />
         <Toaster position="bottom-right" theme="dark" closeButton />
       </div>
     </SidebarProvider>

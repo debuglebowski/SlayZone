@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { getTrpcVanillaClient } from '@slayzone/transport/client'
+import { useSetting, useSetSettingMutation } from '@slayzone/settings/client'
 import { AlertTriangle, Circle, RefreshCw } from 'lucide-react'
 import {
   cn,
@@ -169,19 +169,23 @@ function totalPinCount(pins: PinnedBars): number {
 export function UsagePopover({ data, onRefresh }: UsagePopoverProps) {
   const [open, setOpen] = useState(false)
   const closeTimer = useRef<ReturnType<typeof setTimeout>>(null)
+  const setSetting = useSetSettingMutation()
+  const pinnedRaw = useSetting('usage_pinned_bars')
   const [pinned, setPinned] = useState<PinnedBars | null>(null)
+  const hydrated = useRef(false)
 
   useEffect(() => {
-    getTrpcVanillaClient().settings.get.query({ key: 'usage_pinned_bars' }).then((raw) => {
-      if (raw) {
-        try {
-          setPinned(JSON.parse(raw))
-        } catch {
-          /* ignore corrupt */
-        }
+    if (hydrated.current) return
+    if (pinnedRaw === undefined) return
+    hydrated.current = true
+    if (pinnedRaw) {
+      try {
+        setPinned(JSON.parse(pinnedRaw))
+      } catch {
+        /* ignore corrupt */
       }
-    })
-  }, [])
+    }
+  }, [pinnedRaw])
 
   // Resolve effective pins: saved or default (first window per provider)
   const effectivePinned = pinned ?? defaultPins(data)
@@ -202,11 +206,11 @@ export function UsagePopover({ data, onRefresh }: UsagePopoverProps) {
         } else {
           next[provider] = [...arr, windowKey]
         }
-        getTrpcVanillaClient().settings.set.mutate({ key: 'usage_pinned_bars', value: JSON.stringify(next) })
+        setSetting.mutate({ key: 'usage_pinned_bars', value: JSON.stringify(next) })
         return next
       })
     },
-    [data],
+    [data, setSetting],
   )
 
   const handleEnter = () => {

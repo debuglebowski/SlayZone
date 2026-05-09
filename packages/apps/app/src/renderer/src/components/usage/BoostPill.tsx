@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { getTrpcVanillaClient } from '@slayzone/transport/client'
+import { useTRPCClient } from '@slayzone/transport/client'
 import {
   cn,
   Popover,
@@ -89,6 +89,7 @@ function formatCountdown(ms: number): string {
 }
 
 function useBoostStatus() {
+  const trpcClient = useTRPCClient()
   const [visible, setVisible] = useState(false)
   const [status, setStatus] = useState<BoostStatus>({ isBoosted: false, msUntilChange: 0, ptHour: 0, isWeekend: false })
   const timerRef = useRef<ReturnType<typeof setTimeout>>(null)
@@ -96,7 +97,7 @@ function useBoostStatus() {
   useEffect(() => {
     if (Date.now() >= PROMO_END.getTime()) return
 
-    getTrpcVanillaClient().settings.get.query({ key: 'default_terminal_mode' }).then((mode) => {
+    trpcClient.settings.get.query({ key: 'default_terminal_mode' }).then((mode) => {
       if (!mode || !mode.toLowerCase().includes('claude')) return
       setVisible(true)
 
@@ -116,7 +117,7 @@ function useBoostStatus() {
     return () => {
       if (timerRef.current) clearTimeout(timerRef.current)
     }
-  }, [])
+  }, [trpcClient])
 
   return { visible, ...status }
 }
