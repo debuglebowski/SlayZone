@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { useSubscription } from '@trpc/tanstack-react-query'
 import type { Task, TaskStatus } from '@slayzone/task/shared'
 import type { Project } from '@slayzone/projects/shared'
@@ -46,6 +47,7 @@ interface UseTasksDataReturn {
 export function useTasksData(): UseTasksDataReturn {
   const trpc = useTRPC()
   const trpcClient = useTRPCClient()
+  const queryClient = useQueryClient()
   const [tasks, setTasks] = useState<Task[]>([])
   const [projects, setProjects] = useState<Project[]>([])
   const [tags, setTags] = useState<Tag[]>([])
@@ -77,7 +79,7 @@ export function useTasksData(): UseTasksDataReturn {
         performance.mark('sz:loadBoardData:start')
         window.api.app.bootMark?.('loadBoardData start')
       }
-      trpcClient.task.loadBoardData.query().then((data) => {
+      queryClient.fetchQuery(trpc.task.loadBoardData.queryOptions()).then((data) => {
         setTasks(data.tasks as Task[])
         setProjects(data.projects as Project[])
         setTags(data.tags as Tag[])
@@ -106,7 +108,7 @@ export function useTasksData(): UseTasksDataReturn {
       setTags((prev) => prev.map((t) => t.id === tag.id ? tag : t))
     }
     const handleBlockedChanged = () => {
-      trpcClient.task.getAllBlockedTaskIds.query().then(ids => setBlockedTaskIds(new Set(ids)))
+      queryClient.fetchQuery(trpc.task.getAllBlockedTaskIds.queryOptions()).then(ids => setBlockedTaskIds(new Set(ids)))
     }
     window.addEventListener('slayzone:tag-created', handleTagCreated)
     window.addEventListener('slayzone:tag-updated', handleTagUpdated)
