@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useSubscription } from '@trpc/tanstack-react-query'
 import { useTRPC, useTRPCClient } from '@slayzone/transport/client'
 import type { TaskArtifact, RenderMode, CreateArtifactInput, UpdateArtifactInput, ArtifactFolder, UpdateArtifactFolderInput } from '@slayzone/task/shared'
@@ -50,34 +51,43 @@ export interface UseArtifactsReturn {
 export function useArtifacts(taskId: string | null | undefined, initialSelectedId?: string | null): UseArtifactsReturn {
   const trpc = useTRPC()
   const trpcClient = useTRPCClient()
-  const [artifacts, setArtifacts] = useState<TaskArtifact[]>([])
-  const [folders, setFolders] = useState<ArtifactFolder[]>([])
-  const [isLoading, setIsLoading] = useState<boolean>(!!taskId)
+  const queryClient = useQueryClient()
   const [selectedId, setSelectedId] = useState<string | null>(initialSelectedId ?? null)
 
   // Re-sync selection when switching tasks
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { setSelectedId(initialSelectedId ?? null) }, [taskId])
 
-  // Fetch artifacts + folders on mount + on `task.onChanged` subscription emits.
-  useEffect(() => {
-    if (!taskId) { setIsLoading(false); return }
-    setIsLoading(true)
-    let cancelled = false
-    Promise.all([
-      trpcClient.task.artifactsGetByTask.query({ taskId }).then(r => { if (!cancelled) setArtifacts(r) }).catch(() => {}),
-      trpcClient.task.foldersGetByTask.query({ taskId }).then(r => { if (!cancelled) setFolders(r) }).catch(() => {}),
-    ]).finally(() => { if (!cancelled) setIsLoading(false) })
-    return () => { cancelled = true }
-  }, [taskId, trpcClient])
+  const artifactsQuery = useQuery({
+    ...trpc.task.artifactsGetByTask.queryOptions({ taskId: taskId ?? '' }),
+    enabled: !!taskId,
+  })
+  const foldersQuery = useQuery({
+    ...trpc.task.foldersGetByTask.queryOptions({ taskId: taskId ?? '' }),
+    enabled: !!taskId,
+  })
+
+  const artifacts = artifactsQuery.data ?? []
+  const folders = foldersQuery.data ?? []
+  const isLoading = !!taskId && (artifactsQuery.isLoading || foldersQuery.isLoading)
+
+  const invalidateArtifacts = useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: trpc.task.artifactsGetByTask.queryKey() })
+  }, [queryClient, trpc])
+  const invalidateFolders = useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: trpc.task.foldersGetByTask.queryKey() })
+  }, [queryClient, trpc])
+  const invalidateAll = useCallback(() => {
+    invalidateArtifacts()
+    invalidateFolders()
+  }, [invalidateArtifacts, invalidateFolders])
 
   useSubscription(
     trpc.task.onChanged.subscriptionOptions(undefined, {
       enabled: !!taskId,
       onData: () => {
         if (!taskId) return
-        trpcClient.task.artifactsGetByTask.query({ taskId }).then(setArtifacts).catch(() => {})
-        trpcClient.task.foldersGetByTask.query({ taskId }).then(setFolders).catch(() => {})
+        invalidateAll()
       },
     }),
   )
@@ -98,7 +108,6 @@ export function useArtifacts(taskId: string | null | undefined, initialSelectedI
     return map
   }, [folders])
 
-  // Reverse lookup: path string -> folderId
   const pathToFolderId = useMemo(() => {
     const map = new Map<string, string>()
     for (const [id, path] of folderPathMap) map.set(path, id)
@@ -113,175 +122,169 @@ export function useArtifacts(taskId: string | null | undefined, initialSelectedI
 
   // --- Artifact CRUD ---
 
+  const createMutation = useMutation(trpc.task.artifactsCreate.mutationOptions({
+    onSuccess: (artifact) => {
+      invalidateArtifacts()
+      if (artifact) {
+        setSelectedId(artifact.id)
+        track('asset_created')
+      }
+    },
+  }))
+  const updateMutation = useMutation(trpc.task.artifactsUpdate.mutationOptions({
+    onSuccess: () => invalidateArtifacts(),
+  }))
+  const deleteMutation = useMutation(trpc.task.artifactsDelete.mutationOptions({
+    onSuccess: (_data, vars) => {
+      invalidateArtifacts()
+      setSelectedId(prev => prev === vars.id ? null : prev)
+      track('asset_deleted')
+    },
+  }))
+  const uploadMutation = useMutation(trpc.task.artifactsUpload.mutationOptions({
+    onSuccess: (artifact) => {
+      invalidateArtifacts()
+      if (artifact) {
+        setSelectedId(artifact.id)
+        track('asset_created')
+      }
+    },
+  }))
+  const uploadDirMutation = useMutation(trpc.task.artifactsUploadDir.mutationOptions({
+    onSuccess: invalidateAll,
+  }))
+  const versionsSetCurrentMutation = useMutation(trpc.task.versionsSetCurrent.mutationOptions({
+    onSuccess: invalidateArtifacts,
+  }))
+  const createFolderMutation = useMutation(trpc.task.foldersCreate.mutationOptions({
+    onSuccess: invalidateFolders,
+  }))
+  const updateFolderMutation = useMutation(trpc.task.foldersUpdate.mutationOptions({
+    onSuccess: invalidateFolders,
+  }))
+  const deleteFolderMutation = useMutation(trpc.task.foldersDelete.mutationOptions({
+    onSuccess: invalidateAll,
+  }))
+
   const createArtifact = useCallback(async (params: { title: string; folderId?: string | null; renderMode?: RenderMode; content?: string; language?: string | null }): Promise<TaskArtifact | null> => {
     if (!taskId) return null
     const data: CreateArtifactInput = { taskId, ...params }
-    const artifact = await trpcClient.task.artifactsCreate.mutate(data)
-    if (artifact) {
-      setArtifacts(prev => [...prev, artifact])
-      setSelectedId(artifact.id)
-      track('asset_created')
-    }
-    return artifact
-  }, [taskId])
+    return await createMutation.mutateAsync(data)
+  }, [taskId, createMutation])
 
   const updateArtifact = useCallback(async (data: UpdateArtifactInput): Promise<void> => {
-    const updated = await trpcClient.task.artifactsUpdate.mutate(data)
-    if (updated) {
-      setArtifacts(prev => prev.map(a => a.id === data.id ? updated : a))
-    }
-  }, [])
+    await updateMutation.mutateAsync(data)
+  }, [updateMutation])
 
   const deleteArtifact = useCallback(async (id: string): Promise<void> => {
-    await trpcClient.task.artifactsDelete.mutate({ id: id })
-    setArtifacts(prev => prev.filter(a => a.id !== id))
-    setSelectedId(prev => prev === id ? null : prev)
-    track('asset_deleted')
-  }, [])
+    await deleteMutation.mutateAsync({ id })
+  }, [deleteMutation])
 
   const renameArtifact = useCallback(async (id: string, newTitle: string): Promise<void> => {
-    const updated = await trpcClient.task.artifactsUpdate.mutate({ id, title: newTitle })
-    if (updated) {
-      setArtifacts(prev => prev.map(a => a.id === id ? updated : a))
-    }
-  }, [])
+    await updateMutation.mutateAsync({ id, title: newTitle })
+  }, [updateMutation])
 
   const moveArtifactToFolder = useCallback(async (artifactId: string, folderId: string | null): Promise<void> => {
-    const updated = await trpcClient.task.artifactsUpdate.mutate({ id: artifactId, folderId })
-    if (updated) {
-      setArtifacts(prev => prev.map(a => a.id === artifactId ? updated : a))
-    }
-  }, [])
+    await updateMutation.mutateAsync({ id: artifactId, folderId })
+  }, [updateMutation])
 
   const readContent = useCallback(async (id: string): Promise<string | null> => {
-    return trpcClient.task.artifactsReadContent.query({ id: id })
-  }, [])
+    return trpcClient.task.artifactsReadContent.query({ id })
+  }, [trpcClient])
 
   const saveContent = useCallback(async (id: string, content: string): Promise<void> => {
     // UI saves always mutate the latest version in place. The explicit
     // "Create version" action is the only UI path that creates new versions.
-    await trpcClient.task.artifactsUpdate.mutate({ id, content, mutateVersion: true })
-  }, [])
+    await updateMutation.mutateAsync({ id, content, mutateVersion: true })
+  }, [updateMutation])
 
   const uploadArtifact = useCallback(async (sourcePath: string, title?: string): Promise<TaskArtifact | null> => {
     if (!taskId) return null
-    const artifact = await trpcClient.task.artifactsUpload.mutate({ taskId, sourcePath, title })
-    if (artifact) {
-      setArtifacts(prev => [...prev, artifact])
-      setSelectedId(artifact.id)
-      track('asset_created')
-    }
-    return artifact
-  }, [taskId])
+    return await uploadMutation.mutateAsync({ taskId, sourcePath, title })
+  }, [taskId, uploadMutation])
 
   const getFilePath = useCallback(async (id: string): Promise<string | null> => {
-    return trpcClient.task.artifactsGetFilePath.query({ id: id })
-  }, [])
+    return trpcClient.task.artifactsGetFilePath.query({ id })
+  }, [trpcClient])
 
   const downloadFile = useCallback(async (id: string): Promise<boolean> => {
-    return trpcClient.task.artifactsDownloadFile.mutate({ id: id })
-  }, [])
+    return trpcClient.task.artifactsDownloadFile.mutate({ id })
+  }, [trpcClient])
 
   const downloadFolder = useCallback(async (id: string): Promise<boolean> => {
     return trpcClient.task.artifactsDownloadFolder.mutate({ folderId: id })
-  }, [])
+  }, [trpcClient])
 
   const downloadAsPdf = useCallback(async (id: string): Promise<boolean> => {
-    return trpcClient.task.artifactsDownloadAsPdf.mutate({ id: id })
-  }, [])
+    return trpcClient.task.artifactsDownloadAsPdf.mutate({ id })
+  }, [trpcClient])
 
   const downloadAsPng = useCallback(async (id: string): Promise<boolean> => {
-    return trpcClient.task.artifactsDownloadAsPng.mutate({ id: id })
-  }, [])
+    return trpcClient.task.artifactsDownloadAsPng.mutate({ id })
+  }, [trpcClient])
 
   const downloadAsHtml = useCallback(async (id: string): Promise<boolean> => {
-    return trpcClient.task.artifactsDownloadAsHtml.mutate({ id: id })
-  }, [])
+    return trpcClient.task.artifactsDownloadAsHtml.mutate({ id })
+  }, [trpcClient])
 
   const downloadAllAsZip = useCallback(async (): Promise<boolean> => {
     if (!taskId) return false
-    return trpcClient.task.artifactsDownloadAllAsZip.mutate({ taskId: taskId })
-  }, [taskId])
+    return trpcClient.task.artifactsDownloadAllAsZip.mutate({ taskId })
+  }, [taskId, trpcClient])
 
   const uploadDir = useCallback(async (dirPath: string, parentFolderId?: string | null): Promise<void> => {
     if (!taskId) return
-    await trpcClient.task.artifactsUploadDir.mutate({ taskId, dirPath, parentFolderId: parentFolderId ?? null })
-    // Reload everything after bulk operation
-    const [newArtifacts, newFolders] = await Promise.all([
-      trpcClient.task.artifactsGetByTask.query({ taskId: taskId }),
-      trpcClient.task.foldersGetByTask.query({ taskId: taskId }),
-    ])
-    setArtifacts(newArtifacts)
-    setFolders(newFolders)
-  }, [taskId])
+    await uploadDirMutation.mutateAsync({ taskId, dirPath, parentFolderId: parentFolderId ?? null })
+  }, [taskId, uploadDirMutation])
 
   // --- Versions ---
 
   const listVersions = useCallback(async (artifactId: string, opts?: { limit?: number; offset?: number }): Promise<ArtifactVersion[]> => {
     return trpcClient.task.versionsList.query({ artifactId, ...opts })
-  }, [])
+  }, [trpcClient])
 
   const readVersion = useCallback(async (artifactId: string, versionRef: VersionRef): Promise<string> => {
     return trpcClient.task.versionsRead.query({ artifactId, versionRef })
-  }, [])
+  }, [trpcClient])
 
   const createVersion = useCallback(async (artifactId: string, name?: string | null): Promise<ArtifactVersion> => {
     return trpcClient.task.versionsCreate.mutate({ artifactId, name })
-  }, [])
+  }, [trpcClient])
 
   const renameVersion = useCallback(async (artifactId: string, versionRef: VersionRef, newName: string | null): Promise<ArtifactVersion> => {
     return trpcClient.task.versionsRename.mutate({ artifactId, versionRef, newName })
-  }, [])
+  }, [trpcClient])
 
   const diffVersions = useCallback(async (artifactId: string, a: VersionRef, b?: VersionRef): Promise<DiffResult> => {
     return trpcClient.task.versionsDiff.query({ artifactId, a, b })
-  }, [])
+  }, [trpcClient])
 
   const pruneVersions = useCallback(async (artifactId: string, opts: { keepLast?: number; keepNamed?: boolean; keepCurrent?: boolean; dryRun?: boolean }): Promise<PruneReport> => {
     return trpcClient.task.versionsPrune.mutate({ artifactId, ...opts })
-  }, [])
+  }, [trpcClient])
 
   const setCurrentVersion = useCallback(async (artifactId: string, versionRef: VersionRef): Promise<ArtifactVersion> => {
-    const v = await trpcClient.task.versionsSetCurrent.mutate({ artifactId, versionRef })
-    // Refresh artifact rows so current_version_id in local state matches DB.
-    if (taskId) {
-      const refreshed = await trpcClient.task.artifactsGetByTask.query({ taskId: taskId })
-      setArtifacts(refreshed)
-    }
-    return v
-  }, [taskId])
+    return await versionsSetCurrentMutation.mutateAsync({ artifactId, versionRef })
+  }, [versionsSetCurrentMutation])
 
   // --- Folder CRUD ---
 
   const createFolder = useCallback(async (params: { name: string; parentId?: string | null }): Promise<ArtifactFolder | null> => {
     if (!taskId) return null
-    const folder = await trpcClient.task.foldersCreate.mutate({ taskId, ...params })
-    if (folder) {
-      setFolders(prev => [...prev, folder])
-    }
-    return folder
-  }, [taskId])
+    return await createFolderMutation.mutateAsync({ taskId, ...params })
+  }, [taskId, createFolderMutation])
 
   const updateFolder = useCallback(async (data: UpdateArtifactFolderInput): Promise<void> => {
-    const updated = await trpcClient.task.foldersUpdate.mutate(data)
-    if (updated) {
-      setFolders(prev => prev.map(f => f.id === data.id ? updated : f))
-    }
-  }, [])
+    await updateFolderMutation.mutateAsync(data)
+  }, [updateFolderMutation])
 
   const deleteFolder = useCallback(async (id: string): Promise<void> => {
-    await trpcClient.task.foldersDelete.mutate({ id: id })
-    setFolders(prev => prev.filter(f => f.id !== id))
-    // Artifacts in deleted folder get folder_id = NULL (DB handles it), refresh local state
-    setArtifacts(prev => prev.map(a => a.folder_id === id ? { ...a, folder_id: null } : a))
-  }, [])
+    await deleteFolderMutation.mutateAsync({ id })
+  }, [deleteFolderMutation])
 
   const renameFolder = useCallback(async (id: string, newName: string): Promise<void> => {
-    const updated = await trpcClient.task.foldersUpdate.mutate({ id, name: newName })
-    if (updated) {
-      setFolders(prev => prev.map(f => f.id === id ? updated : f))
-    }
-  }, [])
+    await updateFolderMutation.mutateAsync({ id, name: newName })
+  }, [updateFolderMutation])
 
   return {
     artifacts, folders, isLoading, selectedId, setSelectedId,
