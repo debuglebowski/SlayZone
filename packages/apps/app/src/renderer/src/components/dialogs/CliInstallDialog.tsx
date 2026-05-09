@@ -1,36 +1,38 @@
 import { useState, useEffect, useRef } from 'react'
-import { getTrpcVanillaClient } from '@slayzone/transport/client'
+import { useMutation, useQuery } from '@tanstack/react-query'
+import { useTRPC } from '@slayzone/transport/client'
+import { useSetting, useSetSettingMutation } from '@slayzone/settings/client'
 import { motion } from 'framer-motion'
 import { Terminal } from 'lucide-react'
 import { Button, Checkbox, Dialog, DialogContent } from '@slayzone/ui'
 
 export function CliInstallDialog() {
+  const trpc = useTRPC()
+  const onboarded = useSetting('onboarding_completed')
+  const dismissed = useSetting('cli_install_dismissed')
+  const { data: cliStatus } = useQuery(trpc.app.meta.checkCliInstalled.queryOptions())
+  const setSetting = useSetSettingMutation()
+  const installCli = useMutation(trpc.app.meta.installCli.mutationOptions())
+
   const [open, setOpen] = useState(false)
   const [dontAsk, setDontAsk] = useState(false)
-  const [installing, setInstalling] = useState(false)
   const [message, setMessage] = useState('')
   const [installed, setInstalled] = useState(false)
   const checked = useRef(false)
 
   useEffect(() => {
     if (checked.current) return
+    if (onboarded === undefined || dismissed === undefined || !cliStatus) return
     checked.current = true
-    Promise.all([
-      getTrpcVanillaClient().settings.get.query({ key: 'onboarding_completed' }),
-      getTrpcVanillaClient().settings.get.query({ key: 'cli_install_dismissed' }),
-      getTrpcVanillaClient().app.meta.checkCliInstalled.query()
-    ]).then(([onboarded, dismissed, status]) => {
-      if (onboarded === 'true' && dismissed !== 'true' && !status.installed) {
-        setOpen(true)
-      }
-    })
-  }, [])
+    if (onboarded === 'true' && dismissed !== 'true' && !cliStatus.installed) {
+      setOpen(true)
+    }
+  }, [onboarded, dismissed, cliStatus])
 
   const handleInstall = async () => {
-    setInstalling(true)
     setMessage('')
     try {
-      const result = await getTrpcVanillaClient().app.meta.installCli.mutate()
+      const result = await installCli.mutateAsync()
       if (result.ok) {
         setInstalled(true)
         let msg = 'Installed successfully.'
@@ -45,13 +47,13 @@ export function CliInstallDialog() {
       }
     } catch (err) {
       setMessage(err instanceof Error ? err.message : 'Install failed.')
-    } finally {
-      setInstalling(false)
     }
   }
 
+  const installing = installCli.isPending
+
   const handleClose = () => {
-    if (dontAsk) getTrpcVanillaClient().settings.set.mutate({ key: 'cli_install_dismissed', value: 'true' })
+    if (dontAsk) setSetting.mutate({ key: 'cli_install_dismissed', value: 'true' })
     setOpen(false)
   }
 

@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { getTrpcVanillaClient } from '@slayzone/transport/client'
-import { useDialogStore } from '@slayzone/settings'
+import { useDialogStore, useSetting, useSetSettingMutation } from '@slayzone/settings'
 
 const CHECKLIST_SETTINGS_KEY = 'onboarding_checklist_state'
 const CHECKLIST_STATE_VERSION = 1 as const
@@ -60,7 +59,7 @@ interface UseOnboardingChecklistResult {
   markSetupGuideCompleted: () => void
 }
 
-function isTruthy(value: string | null): boolean {
+function isTruthy(value: string | null | undefined): boolean {
   return value === '1' || value === 'true'
 }
 
@@ -80,7 +79,7 @@ function isPersistedChecklistStateV1(value: unknown): value is PersistedChecklis
   )
 }
 
-function parsePersistedChecklistState(raw: string | null): PersistedChecklistStateV1 | null {
+function parsePersistedChecklistState(raw: string | null | undefined): PersistedChecklistStateV1 | null {
   if (!raw) return null
   try {
     const parsed: unknown = JSON.parse(raw)
@@ -113,80 +112,76 @@ export function useOnboardingChecklist({
   onJoinCommunity,
   onFollowOnX
 }: UseOnboardingChecklistOptions): UseOnboardingChecklistResult {
+  const setSetting = useSetSettingMutation()
+  const storedRaw = useSetting(CHECKLIST_SETTINGS_KEY)
+
+  // Legacy keys — only consulted when the consolidated key has no value yet.
+  const legacySetupGuide = useSetting('onboarding_completed')
+  const legacyTour = useSetting('onboarding_tour_completed')
+  const legacyJoinDiscord = useSetting('onboarding_joined_discord')
+  const legacyFollowedX = useSetting('onboarding_followed_x')
+  const legacyDismissed = useSetting('onboarding_checklist_dismissed')
+
   const [persistedState, setPersistedState] = useState<PersistedChecklistStateV1>(DEFAULT_PERSISTED_STATE)
+  const [hydrated, setHydrated] = useState(false)
 
-  const persistState = useCallback(async (state: PersistedChecklistStateV1): Promise<void> => {
-    await getTrpcVanillaClient().settings.set.mutate({ key: CHECKLIST_SETTINGS_KEY, value: JSON.stringify(state) })
-  }, [])
-
-  const loadLegacyState = useCallback(async (): Promise<PersistedChecklistStateV1> => {
-    const [setupGuideRaw, takeTourRaw, joinCommunityRaw, followOnXRaw, dismissedRaw] = await Promise.all([
-      getTrpcVanillaClient().settings.get.query({ key: 'onboarding_completed' }),
-      getTrpcVanillaClient().settings.get.query({ key: 'onboarding_tour_completed' }),
-      getTrpcVanillaClient().settings.get.query({ key: 'onboarding_joined_discord' }),
-      getTrpcVanillaClient().settings.get.query({ key: 'onboarding_followed_x' }),
-      getTrpcVanillaClient().settings.get.query({ key: 'onboarding_checklist_dismissed' })
-    ])
-
-    const dismissed = isTruthy(dismissedRaw)
-    if (dismissed) {
-      return {
-        version: CHECKLIST_STATE_VERSION,
-        dismissed: true,
-        completed: {
-          setupGuide: true,
-          takeTour: true,
-          checkLeaderboard: true,
-          joinCommunity: true,
-          followOnX: true
-        }
-      }
-    }
-
-    return {
-      version: CHECKLIST_STATE_VERSION,
-      dismissed: false,
-      completed: {
-        setupGuide: isTruthy(setupGuideRaw),
-        takeTour: isTruthy(takeTourRaw),
-        checkLeaderboard: false,
-        joinCommunity: isTruthy(joinCommunityRaw),
-        followOnX: isTruthy(followOnXRaw)
-      }
-    }
-  }, [])
-
+  // Hydrate from the consolidated key if present; otherwise migrate from legacy keys
+  // and write the consolidated key once. Runs once after queries resolve.
   useEffect(() => {
-    let isCancelled = false
-
-    const loadState = async (): Promise<void> => {
-      const storedRaw = await getTrpcVanillaClient().settings.get.query({ key: CHECKLIST_SETTINGS_KEY })
-      const stored = parsePersistedChecklistState(storedRaw)
-      if (stored) {
-        if (!isCancelled) setPersistedState(stored)
-        return
-      }
-
-      const migrated = await loadLegacyState()
-      if (isCancelled) return
-      setPersistedState(migrated)
-      void persistState(migrated)
+    if (hydrated) return
+    if (storedRaw === undefined) return
+    const stored = parsePersistedChecklistState(storedRaw)
+    if (stored) {
+      setPersistedState(stored)
+      setHydrated(true)
+      return
     }
-
-    void loadState()
-    return () => {
-      isCancelled = true
+    if (
+      legacySetupGuide === undefined ||
+      legacyTour === undefined ||
+      legacyJoinDiscord === undefined ||
+      legacyFollowedX === undefined ||
+      legacyDismissed === undefined
+    ) {
+      return
     }
-  }, [loadLegacyState, persistState])
+    const dismissed = isTruthy(legacyDismissed)
+    const migrated: PersistedChecklistStateV1 = dismissed
+      ? {
+          version: CHECKLIST_STATE_VERSION,
+          dismissed: true,
+          completed: {
+            setupGuide: true,
+            takeTour: true,
+            checkLeaderboard: true,
+            joinCommunity: true,
+            followOnX: true,
+          },
+        }
+      : {
+          version: CHECKLIST_STATE_VERSION,
+          dismissed: false,
+          completed: {
+            setupGuide: isTruthy(legacySetupGuide),
+            takeTour: isTruthy(legacyTour),
+            checkLeaderboard: false,
+            joinCommunity: isTruthy(legacyJoinDiscord),
+            followOnX: isTruthy(legacyFollowedX),
+          },
+        }
+    setPersistedState(migrated)
+    setHydrated(true)
+    setSetting.mutate({ key: CHECKLIST_SETTINGS_KEY, value: JSON.stringify(migrated) })
+  }, [hydrated, storedRaw, legacySetupGuide, legacyTour, legacyJoinDiscord, legacyFollowedX, legacyDismissed, setSetting])
 
   const updatePersistedState = useCallback((updater: (previous: PersistedChecklistStateV1) => PersistedChecklistStateV1): void => {
     setPersistedState((previous) => {
       const next = updater(previous)
       if (areStatesEqual(previous, next)) return previous
-      void persistState(next)
+      setSetting.mutate({ key: CHECKLIST_SETTINGS_KEY, value: JSON.stringify(next) })
       return next
     })
-  }, [persistState])
+  }, [setSetting])
 
   const markSetupGuideCompleted = useCallback((): void => {
     updatePersistedState((previous) => ({
