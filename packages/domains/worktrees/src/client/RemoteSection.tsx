@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react'
-import { useTRPCClient } from '@slayzone/transport/client'
+import { useMutation } from '@tanstack/react-query'
+import { useTRPC } from '@slayzone/transport/client'
 import { ChevronDown, Loader2, Download, Upload } from 'lucide-react'
 import {
   Button,
@@ -30,18 +31,19 @@ interface RemoteSectionProps {
 }
 
 export function RemoteSection({ upstreamAB, targetPath, branch, onSyncDone }: RemoteSectionProps) {
-  const trpcClient = useTRPCClient()
-  const [pushing, setPushing] = useState(false)
-  const [pulling, setPulling] = useState(false)
+  const trpc = useTRPC()
+  const pushMutation = useMutation(trpc.worktrees.push.mutationOptions())
+  const pullMutation = useMutation(trpc.worktrees.pull.mutationOptions())
   const [pushMenuOpen, setPushMenuOpen] = useState(false)
   const [forcePushConfirmOpen, setForcePushConfirmOpen] = useState(false)
+  const pushing = pushMutation.isPending
+  const pulling = pullMutation.isPending
 
   const handlePush = useCallback(async (force?: boolean) => {
-    setPushing(true)
     setPushMenuOpen(false)
     setForcePushConfirmOpen(false)
     try {
-      const result = await trpcClient.worktrees.push.mutate({ path: targetPath, branch: branch ?? undefined, force: force })
+      const result = await pushMutation.mutateAsync({ path: targetPath, branch: branch ?? undefined, force })
       if (!result.success) {
         toast(result.error ?? 'Push failed')
       } else {
@@ -50,15 +52,12 @@ export function RemoteSection({ upstreamAB, targetPath, branch, onSyncDone }: Re
       }
     } catch (err) {
       toast(err instanceof Error ? err.message : 'Push failed')
-    } finally {
-      setPushing(false)
     }
-  }, [targetPath, branch, onSyncDone, trpcClient])
+  }, [targetPath, branch, onSyncDone, pushMutation])
 
   const handlePull = useCallback(async () => {
-    setPulling(true)
     try {
-      const result = await trpcClient.worktrees.pull.mutate({ path: targetPath })
+      const result = await pullMutation.mutateAsync({ path: targetPath })
       if (!result.success) {
         toast(result.error ?? 'Pull failed')
       } else {
@@ -67,10 +66,8 @@ export function RemoteSection({ upstreamAB, targetPath, branch, onSyncDone }: Re
       }
     } catch (err) {
       toast(err instanceof Error ? err.message : 'Pull failed')
-    } finally {
-      setPulling(false)
     }
-  }, [targetPath, onSyncDone, trpcClient])
+  }, [targetPath, onSyncDone, pullMutation])
 
   const behind = upstreamAB?.behind ?? 0
   const ahead = upstreamAB?.ahead ?? 0

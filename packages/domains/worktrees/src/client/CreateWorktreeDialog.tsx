@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { useTRPCClient } from '@slayzone/transport/client'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useTRPC } from '@slayzone/transport/client'
 import { FolderOpen } from 'lucide-react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, toast } from '@slayzone/ui'
 import { Button, IconButton } from '@slayzone/ui'
@@ -29,7 +30,10 @@ export function CreateWorktreeDialog({
   projectId,
   onCreated
 }: CreateWorktreeDialogProps) {
-  const trpcClient = useTRPCClient()
+  const trpc = useTRPC()
+  const queryClient = useQueryClient()
+  const showOpenDialogMutation = useMutation(trpc.app.dialog.showOpenDialog.mutationOptions())
+  const createWorktreeMutation = useMutation(trpc.worktrees.createWorktree.mutationOptions())
   const [path, setPath] = useState('')
   const [branch, setBranch] = useState('')
   const [loading, setLoading] = useState(false)
@@ -37,7 +41,7 @@ export function CreateWorktreeDialog({
   const [phase, setPhase] = useState<CreateWorktreePhase | null>(null)
 
   const handleBrowse = async () => {
-    const result = await trpcClient.app.dialog.showOpenDialog.mutate({
+    const result = await showOpenDialogMutation.mutateAsync({
       title: 'Select Worktree Directory',
       properties: ['openDirectory', 'createDirectory', 'promptToCreate']
     })
@@ -60,9 +64,9 @@ export function CreateWorktreeDialog({
 
     try {
       // Capture parent branch before creating worktree
-      const parentBranch = await trpcClient.worktrees.getCurrentBranch.query({ path: projectPath })
+      const parentBranch = await queryClient.fetchQuery(trpc.worktrees.getCurrentBranch.queryOptions({ path: projectPath }))
 
-      const result = await trpcClient.worktrees.createWorktree.mutate({
+      const result = await createWorktreeMutation.mutateAsync({
         repoPath: projectPath,
         targetPath: path,
         branch: branch || undefined,
