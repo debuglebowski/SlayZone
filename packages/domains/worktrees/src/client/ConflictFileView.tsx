@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useTRPCClient } from '@slayzone/transport/client'
+import { useMutation, useQuery } from '@tanstack/react-query'
+import { useTRPC } from '@slayzone/transport/client'
 import { Sparkles, Check, ArrowLeft, ArrowRight, Info, Layers } from 'lucide-react'
 import { Button, Tooltip, TooltipContent, TooltipTrigger, cn } from '@slayzone/ui'
 import { useAppearance } from '@slayzone/settings/client'
@@ -41,7 +42,7 @@ function resolveLabels(ctx: MergeContext): { oursLabel: string; oursDesc: string
 }
 
 export function ConflictFileView({ repoPath, filePath, terminalMode, onResolved, branchContext }: ConflictFileViewProps) {
-  const trpcClient = useTRPCClient()
+  const trpc = useTRPC()
   const { editorThemeId, contentVariant } = useTheme()
   const { editorFontSize } = useAppearance()
   const resolvedEditorColors = getThemeEditorColors(editorThemeId, contentVariant)
@@ -54,11 +55,15 @@ export function ConflictFileView({ repoPath, filePath, terminalMode, onResolved,
     '.cm-scroller': { overflow: 'auto' },
     '.cm-content': { fontFamily: 'ui-monospace, monospace' }
   }), [editorFontSize])
-  const [content, setContent] = useState<ConflictFileContent | null>(null)
+  const contentQuery = useQuery(trpc.worktrees.getConflictContent.queryOptions({ repoPath, filePath }))
+  const content = contentQuery.data ?? null
   const [analysis, setAnalysis] = useState<ConflictAnalysis | null>(null)
-  const [analyzing, setAnalyzing] = useState(false)
   const [resolved, setResolved] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const writeResolvedMutation = useMutation(trpc.worktrees.writeResolvedFile.mutationOptions())
+  const stageFileMutation = useMutation(trpc.worktrees.stageFile.mutationOptions())
+  const analyzeConflictMutation = useMutation(trpc.worktrees.analyzeConflict.mutationOptions())
+  const analyzing = analyzeConflictMutation.isPending
   const [visiblePanels, setVisiblePanels] = useState<Record<PanelId, boolean>>({
     base: false,
     ours: true,
@@ -72,11 +77,6 @@ export function ConflictFileView({ repoPath, filePath, terminalMode, onResolved,
   const togglePanel = useCallback((id: PanelId) => {
     setVisiblePanels(prev => ({ ...prev, [id]: !prev[id] }))
   }, [])
-
-  // Load conflict content
-  useEffect(() => {
-    trpcClient.worktrees.getConflictContent.query({ repoPath: repoPath, filePath: filePath }).then(setContent)
-  }, [repoPath, filePath])
 
   // Init CodeMirror editor
   useEffect(() => {
@@ -134,21 +134,20 @@ export function ConflictFileView({ repoPath, filePath, terminalMode, onResolved,
   const resolveWithContent = useCallback(async (text: string) => {
     setError(null)
     try {
-      await trpcClient.worktrees.writeResolvedFile.mutate({ repoPath: repoPath, filePath: filePath, content: text })
-      await trpcClient.worktrees.stageFile.mutate({ path: repoPath, filePath: filePath })
+      await writeResolvedMutation.mutateAsync({ repoPath, filePath, content: text })
+      await stageFileMutation.mutateAsync({ path: repoPath, filePath })
       setResolved(true)
       onResolved()
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
     }
-  }, [repoPath, filePath, onResolved])
+  }, [repoPath, filePath, onResolved, writeResolvedMutation, stageFileMutation])
 
   const handleAnalyze = useCallback(async () => {
     if (!content) return
-    setAnalyzing(true)
     setError(null)
     try {
-      const result = await trpcClient.worktrees.analyzeConflict.mutate({
+      const result = await analyzeConflictMutation.mutateAsync({
         mode: terminalMode,
         filePath,
         base: content.base,
@@ -158,10 +157,8 @@ export function ConflictFileView({ repoPath, filePath, terminalMode, onResolved,
       setAnalysis(result)
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
-    } finally {
-      setAnalyzing(false)
     }
-  }, [content, terminalMode, filePath])
+  }, [content, terminalMode, filePath, analyzeConflictMutation])
 
   if (!content) {
     return (
