@@ -1,5 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
-import { useTRPCClient } from '@slayzone/transport/client'
+import { useQuery } from '@tanstack/react-query'
+import { useTRPC } from '@slayzone/transport/client'
+import { useSetting } from '@slayzone/settings/client'
 import { Loader2, Folder, File, ChevronRight } from 'lucide-react'
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
@@ -104,42 +106,33 @@ function NodeRow({
 }
 
 export function CopyFilesDialog({ open, onOpenChange, repoPath, onConfirm }: CopyFilesDialogProps) {
-  const trpcClient = useTRPCClient()
-  const [presets, setPresets] = useState<WorktreeCopyPreset[]>([])
+  const trpc = useTRPC()
+  const presetsRaw = useSetting('worktree_copy_presets')
+  const presets = useMemo<WorktreeCopyPreset[]>(() => {
+    if (!presetsRaw) return DEFAULT_COPY_PRESETS
+    try {
+      const parsed = JSON.parse(presetsRaw) as WorktreeCopyPreset[]
+      return parsed && parsed.length > 0 ? parsed : DEFAULT_COPY_PRESETS
+    } catch {
+      return DEFAULT_COPY_PRESETS
+    }
+  }, [presetsRaw])
   const [selectedPresetId, setSelectedPresetId] = useState<string>('')
-  const [tree, setTree] = useState<IgnoredFileNode[]>([])
+  const treeQuery = useQuery({
+    ...trpc.worktrees.getIgnoredFileTree.queryOptions({ repoPath }),
+    enabled: open,
+  })
+  const tree: IgnoredFileNode[] = treeQuery.data ?? []
+  const treeLoaded = !treeQuery.isLoading && open
+  const loading = treeQuery.isLoading
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
-  const [loading, setLoading] = useState(false)
-  const [treeLoaded, setTreeLoaded] = useState(false)
 
   useEffect(() => {
     if (!open) return
     setExpanded(new Set())
-    setTree([])
-    setTreeLoaded(false)
-
-    trpcClient.settings.get.query({ key: 'worktree_copy_presets' }).then((raw) => {
-      const parsed = raw ? JSON.parse(raw) as WorktreeCopyPreset[] : null
-      const list = parsed && parsed.length > 0 ? parsed : DEFAULT_COPY_PRESETS
-      setPresets(list)
-      setSelectedPresetId(list[0].id)
-    }).catch(() => {
-      setPresets(DEFAULT_COPY_PRESETS)
-      setSelectedPresetId(DEFAULT_COPY_PRESETS[0].id)
-    })
-
-    setLoading(true)
-    trpcClient.worktrees.getIgnoredFileTree.query({ repoPath: repoPath }).then(nodes => {
-      setTree(nodes)
-      setTreeLoaded(true)
-      setLoading(false)
-    }).catch(() => {
-      setTree([])
-      setTreeLoaded(true)
-      setLoading(false)
-    })
-  }, [open, repoPath])
+    setSelectedPresetId(presets[0]?.id ?? '')
+  }, [open, presets])
 
   useEffect(() => {
     if (!treeLoaded || presets.length === 0) return
