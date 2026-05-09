@@ -5,7 +5,7 @@ import { Button } from '@slayzone/ui'
 import { Plus, Zap } from 'lucide-react'
 import type { Automation, CreateAutomationInput, UpdateAutomationInput } from '@slayzone/automations/shared'
 import type { Tag } from '@slayzone/tags/shared'
-import { useTRPC, useTRPCClient } from '@slayzone/transport/client'
+import { useTRPC } from '@slayzone/transport/client'
 import { AutomationCard } from './AutomationCard'
 import { AutomationDialog } from './AutomationDialog'
 
@@ -15,7 +15,6 @@ interface AutomationsPanelProps {
 
 export function AutomationsPanel({ projectId }: AutomationsPanelProps) {
   const trpc = useTRPC()
-  const trpcClient = useTRPCClient()
   const queryClient = useQueryClient()
   const enabled = !!projectId
 
@@ -77,7 +76,7 @@ export function AutomationsPanel({ projectId }: AutomationsPanelProps) {
   }
 
   const handleLoadRuns = (automationId: string) => {
-    return trpcClient.automations.getRuns.query({ automationId, limit: 10 })
+    return queryClient.fetchQuery(trpc.automations.getRuns.queryOptions({ automationId, limit: 10 }))
   }
 
   const handleEdit = (automation: Automation) => {

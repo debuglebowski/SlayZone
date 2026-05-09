@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useMutation } from '@tanstack/react-query'
 import type { Tag } from '@slayzone/tags/shared'
 import { TAG_PRESETS } from '@slayzone/tags/shared'
 import {
@@ -6,7 +7,7 @@ import {
   Button, Input, Label
 } from '@slayzone/ui'
 import { track } from '@slayzone/telemetry/client'
-import { useTRPCClient } from '@slayzone/transport/client'
+import { useTRPC } from '@slayzone/transport/client'
 
 interface CreateTagDialogProps {
   open: boolean
@@ -23,7 +24,9 @@ interface CreateTagDialogProps {
 const DEFAULT_PRESET = TAG_PRESETS[17] // indigo
 
 export function CreateTagDialog({ open, onOpenChange, projectId, tag, existingTags, onCreated, onUpdated }: CreateTagDialogProps) {
-  const trpcClient = useTRPCClient()
+  const trpc = useTRPC()
+  const updateMutation = useMutation(trpc.tags.update.mutationOptions())
+  const createMutation = useMutation(trpc.tags.create.mutationOptions())
   const usedColors = new Set(
     (existingTags ?? [])
       .filter((t) => !tag || t.id !== tag.id) // don't exclude the tag being edited
@@ -47,9 +50,8 @@ export function CreateTagDialog({ open, onOpenChange, projectId, tag, existingTa
 
   const handleSubmit = async () => {
     if (!name.trim()) return
-    const trpc = trpcClient
     if (isEditing) {
-      const updated = await trpc.tags.update.mutate({
+      const updated = await updateMutation.mutateAsync({
         id: tag.id,
         name: name.trim(),
         color: selected.bg,
@@ -59,7 +61,7 @@ export function CreateTagDialog({ open, onOpenChange, projectId, tag, existingTa
       window.dispatchEvent(new CustomEvent('slayzone:tag-updated', { detail: updated }))
     } else {
       if (!projectId) return
-      const created = await trpc.tags.create.mutate({
+      const created = await createMutation.mutateAsync({
         name: name.trim(),
         color: selected.bg,
         textColor: selected.text,
