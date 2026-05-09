@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
-import { useTRPCClient } from "@slayzone/transport/client"
+import { useMutation } from '@tanstack/react-query'
+import { useTRPC } from '@slayzone/transport/client'
 import { Button, Label, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@slayzone/ui'
 import type { Project, TaskAutomationConfig } from '@slayzone/projects/shared'
 import { resolveColumns } from '@slayzone/workflow'
@@ -11,7 +12,8 @@ interface TasksGeneralTabProps {
 }
 
 export function TasksGeneralTab({ project, onUpdated }: TasksGeneralTabProps) {
-  const trpcClient = useTRPCClient()
+  const trpc = useTRPC()
+  const updateMutation = useMutation(trpc.projects.update.mutationOptions())
   const columns = resolveColumns(project.columns_config)
   const [onActive, setOnActive] = useState<string>(
     () => project.task_automation_config?.on_terminal_active ?? 'none'
@@ -36,7 +38,7 @@ export function TasksGeneralTab({ project, onUpdated }: TasksGeneralTabProps) {
         on_terminal_idle: onIdle === 'none' ? null : onIdle
       }
       const hasValue = config.on_terminal_active || config.on_terminal_idle
-      const updated = await trpcClient.projects.update.mutate({
+      const updated = await updateMutation.mutateAsync({
         id: project.id,
         taskAutomationConfig: hasValue ? config : null
       })
