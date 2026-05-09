@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo, forwardRef, useImperativeHandle } from 'react'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useSubscription } from '@trpc/tanstack-react-query'
-import { useTRPC, useTRPCClient } from '@slayzone/transport/client'
+import { useTRPC } from '@slayzone/transport/client'
 import { usePty } from '@slayzone/terminal'
 import { Terminal as TerminalView } from '@slayzone/terminal/client/LazyTerminal'
 import type { TerminalMode } from '@slayzone/terminal/shared'
@@ -91,7 +92,9 @@ export const TerminalContainer = forwardRef<TerminalContainerHandle, TerminalCon
   initialManagerMode,
 }: TerminalContainerProps, ref) {
   const trpc = useTRPC()
-  const trpcClient = useTRPCClient()
+  const queryClient = useQueryClient()
+  const updateTaskMutation = useMutation(trpc.task.update.mutationOptions())
+  const claimSessionMutation = useMutation(trpc.app.taskWindows.claimSession.mutationOptions())
   const {
     tabs,
     groups,
@@ -118,7 +121,7 @@ export const TerminalContainer = forwardRef<TerminalContainerHandle, TerminalCon
     setManagerMode((v) => {
       const next = !v
       if (v) setManagerSelectedTask(null)
-      trpcClient.task.update.mutate({ id: taskId, managerMode: next }).catch(() => {})
+      updateTaskMutation.mutateAsync({ id: taskId, managerMode: next }).catch(() => {})
       return next
     })
   }, [taskId])
@@ -136,10 +139,10 @@ export const TerminalContainer = forwardRef<TerminalContainerHandle, TerminalCon
   // (which would incorrectly clear a persisted managerMode on mount).
   const [subtaskInfo, setSubtaskInfo] = useState<{ loaded: boolean; has: boolean }>({ loaded: false, has: false })
   const refreshSubtaskInfo = useCallback((): void => {
-    trpcClient.task.getSubTasks.query({ parentId: taskId })
+    queryClient.fetchQuery(trpc.task.getSubTasks.queryOptions({ parentId: taskId }))
       .then((rows) => setSubtaskInfo({ loaded: true, has: rows.length > 0 }))
       .catch(() => {})
-  }, [taskId, trpcClient])
+  }, [taskId, queryClient, trpc])
   useEffect(() => {
     setSubtaskInfo({ loaded: false, has: false })
     refreshSubtaskInfo()
@@ -156,7 +159,7 @@ export const TerminalContainer = forwardRef<TerminalContainerHandle, TerminalCon
     if (subtaskInfo.loaded && !subtaskInfo.has && managerMode) {
       setManagerMode(false)
       setManagerSelectedTask(null)
-      trpcClient.task.update.mutate({ id: taskId, managerMode: false }).catch(() => {})
+      updateTaskMutation.mutateAsync({ id: taskId, managerMode: false }).catch(() => {})
     }
   }, [subtaskInfo, managerMode, taskId])
 
@@ -208,7 +211,7 @@ export const TerminalContainer = forwardRef<TerminalContainerHandle, TerminalCon
     const claimAll = () => {
       for (const tab of tabs) {
         const sid = getSessionId(tab.id)
-        if (sid) void trpcClient.app.taskWindows.claimSession.mutate({ sessionId: sid })
+        if (sid) claimSessionMutation.mutate({ sessionId: sid })
       }
     }
     claimAll()
