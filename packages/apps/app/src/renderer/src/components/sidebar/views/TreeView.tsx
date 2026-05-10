@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState, type ReactNode } from 'react'
-import { ChevronDown, Clock, GitBranch, Home, Pin, Plus, Power, Search, Settings, X } from 'lucide-react'
+import { BookOpen, ChevronDown, Clock, GitBranch, Home, Pin, Plus, Power, Search, Settings, X } from 'lucide-react'
 import * as Collapsible from '@radix-ui/react-collapsible'
 import { cn, TerminalProgressDot, PriorityIcon, getColumnStatusStyle, TASK_STATUS_ORDER, Tooltip, TooltipContent, TooltipTrigger, useShortcutDisplay } from '@slayzone/ui'
 import { type Task } from '@slayzone/task/shared'
@@ -452,6 +452,13 @@ export function TreeView({
     const projectTasks = tasksByProject.get(project.id) ?? []
     const rootTasks = rootTasksByProject.get(project.id) ?? []
     const isOpen = openProjects[project.id] ?? false
+    const isContextActive = selectedProjectId === project.id && activeView === 'context'
+    const isHomeActive =
+      selectedProjectId === project.id && activeTabType === 'home' && !isContextActive
+    const anyActive = isHomeActive || isContextActive
+    const visClasses = anyActive
+      ? 'opacity-100'
+      : 'opacity-0 group-hover/projectrow:opacity-100 focus-visible:opacity-100'
 
     return (
       <Collapsible.Root
@@ -489,15 +496,41 @@ export function TreeView({
             type="button"
             onClick={() => onSelectProject(project.id)}
             aria-label={`Open ${project.name} home`}
-            className="inline-flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground/50 hover:text-foreground opacity-0 group-hover/projectrow:opacity-100 focus-visible:opacity-100 transition-[color,opacity]"
+            className={cn(
+              'inline-flex size-7 shrink-0 items-center justify-center rounded-md transition-[color,opacity,background-color]',
+              visClasses,
+              isHomeActive
+                ? 'bg-foreground text-background shadow-sm hover:bg-foreground/90'
+                : 'text-muted-foreground/70 hover:text-foreground'
+            )}
           >
             <Home className="size-3.5" />
           </button>
           <button
             type="button"
+            onClick={() => {
+              useTabStore.getState().setSelectedProjectId(project.id)
+              useTabStore.getState().setActiveView('context')
+            }}
+            aria-label={`Context Manager for ${project.name}`}
+            className={cn(
+              'inline-flex size-7 shrink-0 items-center justify-center rounded-md transition-[color,opacity,background-color]',
+              visClasses,
+              isContextActive
+                ? 'bg-foreground text-background shadow-sm hover:bg-foreground/90'
+                : 'text-muted-foreground/70 hover:text-foreground'
+            )}
+          >
+            <BookOpen className="size-3.5" />
+          </button>
+          <button
+            type="button"
             onClick={() => onProjectSettings(project)}
             aria-label={`Settings for ${project.name}`}
-            className="inline-flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground/50 hover:text-foreground opacity-0 group-hover/projectrow:opacity-100 focus-visible:opacity-100 transition-[color,opacity] mr-0.5"
+            className={cn(
+              'inline-flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground/70 hover:text-foreground transition-[color,opacity] mr-0.5',
+              visClasses
+            )}
           >
             <Settings className="size-3.5" />
           </button>
