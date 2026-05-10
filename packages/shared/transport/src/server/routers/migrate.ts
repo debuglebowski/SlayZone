@@ -115,7 +115,7 @@ export const migrateRouter = router({
           throw new Error(`Archive integrity failure: ${detail}`)
         }
 
-        emit(uploadId, 'committing', 0, dryRun ? 'dry-run import' : 'committing')
+        emit(uploadId, 'committing', 0, dryRun ? 'dry-run-import' : 'committing')
         const result = commitMigration({
           db: ctx.db,
           dataRoot: ctx.dataRoot,
