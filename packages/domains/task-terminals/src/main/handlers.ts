@@ -1,6 +1,6 @@
 import type { IpcMain } from 'electron'
 import type { Database } from 'better-sqlite3'
-import { supportsChatMode } from '@slayzone/terminal/main'
+import { supportsChatMode, deleteScrollbackArchive } from '@slayzone/terminal/main'
 import type { TabDisplayMode, TerminalTab, CreateTerminalTabInput, UpdateTerminalTabInput } from '../shared/types'
 
 function resolveDisplayMode(db: Database, mode: string): TabDisplayMode {
@@ -165,11 +165,12 @@ export function registerTerminalTabsHandlers(ipcMain: IpcMain, db: Database): vo
 
   // Delete a tab (reject if main)
   ipcMain.handle('tabs:delete', (_, tabId: string): boolean => {
-    const tab = db.prepare('SELECT is_main FROM terminal_tabs WHERE id = ?').get(tabId) as { is_main: number } | undefined
+    const tab = db.prepare('SELECT is_main, task_id FROM terminal_tabs WHERE id = ?').get(tabId) as { is_main: number; task_id: string } | undefined
     if (!tab) return false
     if (tab.is_main === 1) return false // Can't delete main tab
 
     db.prepare('DELETE FROM terminal_tabs WHERE id = ?').run(tabId)
+    void deleteScrollbackArchive(`${tab.task_id}:${tabId}`)
     return true
   })
 

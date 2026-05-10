@@ -10,6 +10,8 @@ import type {
   SessionInfo,
   PromptInfo,
   BufferSinceResult,
+  HistorySnapshotResult,
+  HistoryRangeResult,
   ProviderUsage,
   UsageWindow,
   UsageProviderConfig,
@@ -441,7 +443,7 @@ export interface ElectronAPI {
     adjustZoom: (command: 'in' | 'out' | 'reset') => Promise<number>
     isPlaywright: boolean
     onGoHome: (callback: () => void) => () => void
-    onToggleAgentPanel: (callback: () => void) => () => void
+    onToggleGlobalAgentPanel: (callback: () => void) => () => void
     onToggleAgentStatusPanel: (callback: () => void) => () => void
     onOpenSettings: (callback: () => void) => () => void
     onOpenProjectSettings: (callback: () => void) => () => void
@@ -534,6 +536,9 @@ export interface ElectronAPI {
       sessionId: string
     ) => Promise<{ success: boolean; clearedSeq: number | null }>
     getBufferSince: (sessionId: string, afterSeq: number) => Promise<BufferSinceResult | null>
+    getHistorySnapshot: (sessionId: string, lineCount: number) => Promise<HistorySnapshotResult>
+    getHistoryBefore: (sessionId: string, currentEarliestOffset: number, lineCount: number) => Promise<HistoryRangeResult>
+    setArchiveCapMb: (mb: number) => Promise<void>
     list: () => Promise<PtyInfo[]>
     onData: (callback: (sessionId: string, data: string, seq: number) => void) => () => void
     onExit: (callback: (sessionId: string, exitCode: number) => void) => () => void

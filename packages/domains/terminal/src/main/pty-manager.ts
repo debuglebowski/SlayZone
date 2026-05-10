@@ -16,6 +16,7 @@ import { quoteForShell, buildExecCommand, resolveUserShell, getShellStartupArgs,
 import { shouldShellFallback, shouldNotifySessionNotFound, buildRecoveryMessage } from './pty-exit-strategy'
 import { computeSyncQueryResponse, type TerminalTheme } from './sync-query-response'
 import { filterBufferData } from './filter-buffer-data'
+import { scrollbackArchive } from './scrollback-archive'
 import { buildMcpEnv } from './mcp-env'
 import { killByTaskId as killChatsByTaskId } from './chat-transport-manager'
 import { markSessionUserInput, clearSessionUserInputMark } from './user-input-tracker'
@@ -748,6 +749,7 @@ export async function createPty(opts: CreatePtyOptions): Promise<{ success: bool
         sessions.delete(sessionId)
         stateMachine.unregister(sessionId)
         clearSessionUserInputMark(sessionId)
+        void scrollbackArchive.closeStream(sessionId)
         notifySessionChange()
       }, 100)
       const exitWin = getWin()
@@ -920,6 +922,7 @@ export async function createPty(opts: CreatePtyOptions): Promise<{ success: bool
         // Append to buffer for history restoration (filter problematic sequences)
         const cleanData = filterBufferData(data)
         const seq = session.buffer.append(cleanData)
+        scrollbackArchive.append(sessionId, cleanData)
         // Notify external data subscribers (REST API follow endpoints)
         const listeners = dataListeners.get(sessionId)
         if (listeners) for (const cb of listeners) cb(cleanData)
@@ -1167,6 +1170,7 @@ export async function createPty(opts: CreatePtyOptions): Promise<{ success: bool
 
             const infoLine = buildRecoveryMessage(terminalMode, exitCode)
             session.buffer.append(infoLine)
+            scrollbackArchive.append(sessionId, infoLine)
             if (!win.isDestroyed()) {
               try {
                 win.webContents.send('pty:data', sessionId, infoLine, session.buffer.getCurrentSeq())
@@ -1444,6 +1448,52 @@ export function getBufferSince(sessionId: string, afterSeq: number): BufferSince
     chunks: session.buffer.getChunksSince(afterSeq),
     currentSeq: session.buffer.getCurrentSeq()
   }
+}
+
+export interface HistorySnapshotResult {
+  data: string
+  earliestOffset: number
+  totalSize: number
+  currentSeq: number
+}
+
+export interface HistoryRangeResult {
+  data: string
+  earliestOffset: number
+}
+
+export async function getHistorySnapshot(sessionId: string, lineCount: number): Promise<HistorySnapshotResult> {
+  // Snapshot the live ring seq BEFORE awaiting the disk read so we never
+  // skip live chunks that arrive after the read but during the await.
+  // Archive writes are sync inside the data callback, so any chunk with
+  // seq <= currentSeq at this moment is already on disk.
+  const session = sessions.get(sessionId)
+  const currentSeq = session?.buffer.getCurrentSeq() ?? -1
+  const tail = await scrollbackArchive.getTailLines(sessionId, lineCount)
+  return { ...tail, currentSeq }
+}
+
+export function getHistoryBefore(sessionId: string, currentEarliestOffset: number, lineCount: number): Promise<HistoryRangeResult> {
+  return scrollbackArchive.getRangeLinesBefore(sessionId, currentEarliestOffset, lineCount)
+}
+
+export function setArchiveCapBytes(bytes: number): void {
+  scrollbackArchive.setCapBytes(bytes)
+}
+
+export function deleteScrollbackArchive(stableId: string): Promise<void> {
+  return scrollbackArchive.delete(stableId)
+}
+
+export function deleteScrollbackArchiveTask(taskId: string): Promise<void> {
+  return scrollbackArchive.deleteTask(taskId)
+}
+
+export function sweepScrollbackOrphans(
+  isLiveTask: (taskId: string) => boolean,
+  isLiveTab: (taskId: string, tabId: string) => boolean,
+): Promise<void> {
+  return scrollbackArchive.sweepOrphans(isLiveTask, isLiveTab)
 }
 
 export function listPtys(): PtyInfo[] {

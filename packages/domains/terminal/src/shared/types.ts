@@ -167,6 +167,25 @@ export interface BufferSinceResult {
   currentSeq: number
 }
 
+// Snapshot of disk-archived scrollback for lazy initial render.
+// `data` is the last `lineCount` lines from the archive file.
+// `earliestOffset` is the byte offset where `data` starts in the archive (0 = file fully fits).
+// `totalSize` is the archive file's current byte size.
+// `currentSeq` is the live ring's current seq at snapshot time — chunks with seq > currentSeq are new.
+export interface HistorySnapshotResult {
+  data: string
+  earliestOffset: number
+  totalSize: number
+  currentSeq: number
+}
+
+// Result of fetching older lines via "Load more".
+// `data` is the bytes between [earliestOffset, currentEarliestOffset) (exclusive end).
+export interface HistoryRangeResult {
+  data: string
+  earliestOffset: number
+}
+
 export interface PromptInfo {
   type: 'permission' | 'question' | 'input'
   text: string

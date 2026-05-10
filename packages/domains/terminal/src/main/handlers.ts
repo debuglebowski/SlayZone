@@ -3,7 +3,7 @@ import type { IpcMain } from 'electron'
 import type { Database } from 'better-sqlite3'
 import { execFile } from 'child_process'
 import { promisify } from 'util'
-import { createPty, writePty, submitPty, resizePty, killPty, hasPty, getBuffer, clearBuffer, getBufferSince, listPtys, getState, setDatabase, setTerminalTheme, testExecutionContext } from './pty-manager'
+import { createPty, writePty, submitPty, resizePty, killPty, hasPty, getBuffer, clearBuffer, getBufferSince, getHistorySnapshot, getHistoryBefore, setArchiveCapBytes, listPtys, getState, setDatabase, setTerminalTheme, testExecutionContext } from './pty-manager'
 import { listSessions, getSessionState } from './session-registry'
 import { listChatSessions } from './chat-transport-manager'
 
@@ -56,6 +56,17 @@ export function registerPtyHandlers(ipcMain: IpcMain, db: Database): void {
 
   // Synchronize built-in modes from code to database
   syncTerminalModes(db)
+
+  // Apply scrollback archive cap from setting (default 10MB if unset)
+  try {
+    const row = db.prepare('SELECT value FROM settings WHERE key = ?').get('terminal_archive_cap_mb') as { value: string } | undefined
+    const mb = row?.value ? parseInt(row.value, 10) : NaN
+    if (Number.isFinite(mb) && mb >= 1) setArchiveCapBytes(mb * 1024 * 1024)
+  } catch { /* ignore */ }
+
+  ipcMain.handle('pty:setArchiveCapMb', (_, mb: number) => {
+    if (Number.isFinite(mb) && mb >= 1) setArchiveCapBytes(Math.floor(mb) * 1024 * 1024)
+  })
 
   // Terminal Modes CRUD
   ipcMain.handle('terminalModes:list', async () => {
@@ -306,6 +317,14 @@ ipcMain.handle('pty:resize', (_, sessionId: string, cols: number, rows: number) 
 
   ipcMain.handle('pty:getBufferSince', (_, sessionId: string, afterSeq: number) => {
     return getBufferSince(sessionId, afterSeq)
+  })
+
+  ipcMain.handle('pty:getHistorySnapshot', (_, sessionId: string, lineCount: number) => {
+    return getHistorySnapshot(sessionId, lineCount)
+  })
+
+  ipcMain.handle('pty:getHistoryBefore', (_, sessionId: string, currentEarliestOffset: number, lineCount: number) => {
+    return getHistoryBefore(sessionId, currentEarliestOffset, lineCount)
   })
 
   ipcMain.handle('pty:list', () => {

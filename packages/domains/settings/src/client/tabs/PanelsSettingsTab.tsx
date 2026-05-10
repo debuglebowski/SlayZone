@@ -205,6 +205,9 @@ export function PanelsSettingsTab({ activeTab, navigateTo, modes, defaultTermina
   )
   const [terminalFontFamily, setTerminalFontFamily] = useState('Menlo, Monaco, "Courier New", monospace')
   const [terminalScrollback, setTerminalScrollback] = useState('5000')
+  const [terminalArchiveCapMb, setTerminalArchiveCapMb] = useState('10')
+  const [terminalArchiveInitialLines, setTerminalArchiveInitialLines] = useState('1000')
+  const [terminalArchiveStepLines, setTerminalArchiveStepLines] = useState('1000')
   
   // Editor
   const [editorWordWrap, setEditorWordWrap] = useState<'on' | 'off'>('off')
@@ -265,6 +268,9 @@ export function PanelsSettingsTab({ activeTab, navigateTo, modes, defaultTermina
       window.api.settings.get('panel_config'),
       window.api.settings.get('terminal_font_family'),
       window.api.settings.get('terminal_scrollback'),
+      window.api.settings.get('terminal_archive_cap_mb'),
+      window.api.settings.get('terminal_archive_initial_lines'),
+      window.api.settings.get('terminal_archive_step_lines'),
       window.api.settings.get('editor_word_wrap'),
       window.api.settings.get('editor_render_whitespace'),
       window.api.settings.get('editor_tab_size'),
@@ -284,10 +290,13 @@ export function PanelsSettingsTab({ activeTab, navigateTo, modes, defaultTermina
       window.api.settings.get('editor_markdown_view_mode'),
       window.api.settings.get('git_tab_order'),
       window.api.settings.get('git_tab_visibility'),
-    ]).then(([pc, tff, ts, eww, erw, ets, eit, dcl, diw, dcf, dtc, dsbs, dwr, dste, dsaob, bdu, bdz, bdd, cgc, emvm, gto, gtv]) => {
+    ]).then(([pc, tff, ts, tacm, tail, tasl, eww, erw, ets, eit, dcl, diw, dcf, dtc, dsbs, dwr, dste, dsaob, bdu, bdz, bdd, cgc, emvm, gto, gtv]) => {
       if (pc) setPanelConfig(mergePanelOrder(mergePredefinedWebPanels(JSON.parse(pc) as PanelConfig)))
       if (tff) setTerminalFontFamily(tff)
       if (ts) setTerminalScrollback(ts)
+      if (tacm) setTerminalArchiveCapMb(tacm)
+      if (tail) setTerminalArchiveInitialLines(tail)
+      if (tasl) setTerminalArchiveStepLines(tasl)
       if (eww === 'on') setEditorWordWrap('on')
       if (erw === 'all') setEditorRenderWhitespace('all')
       if (ets === '4') setEditorTabSize('4')
@@ -574,6 +583,45 @@ export function PanelsSettingsTab({ activeTab, navigateTo, modes, defaultTermina
           <div className="grid grid-cols-[180px_minmax(0,1fr)] items-center gap-3">
             <span className="text-sm text-muted-foreground">Scrollback</span>
             <Input className="max-w-32" type="number" value={terminalScrollback} onChange={(e) => setTerminalScrollback(e.target.value)} onBlur={() => { const n = parseInt(terminalScrollback, 10); if (n >= 0) window.api.settings.set('terminal_scrollback', String(n)) }} />
+          </div>
+          <div className="grid grid-cols-[180px_minmax(0,1fr)] items-center gap-3">
+            <span className="text-sm text-muted-foreground">Max scrollback file (MB)</span>
+            <Input
+              className="max-w-32"
+              type="number"
+              min={1}
+              value={terminalArchiveCapMb}
+              onChange={(e) => setTerminalArchiveCapMb(e.target.value)}
+              onBlur={() => {
+                const n = parseInt(terminalArchiveCapMb, 10)
+                if (n >= 1) {
+                  window.api.settings.set('terminal_archive_cap_mb', String(n))
+                  window.api.pty.setArchiveCapMb?.(n)
+                }
+              }}
+            />
+          </div>
+          <div className="grid grid-cols-[180px_minmax(0,1fr)] items-center gap-3">
+            <span className="text-sm text-muted-foreground">Lines on tab open</span>
+            <Input
+              className="max-w-32"
+              type="number"
+              min={50}
+              value={terminalArchiveInitialLines}
+              onChange={(e) => setTerminalArchiveInitialLines(e.target.value)}
+              onBlur={() => { const n = parseInt(terminalArchiveInitialLines, 10); if (n >= 50) window.api.settings.set('terminal_archive_initial_lines', String(n)) }}
+            />
+          </div>
+          <div className="grid grid-cols-[180px_minmax(0,1fr)] items-center gap-3">
+            <span className="text-sm text-muted-foreground">Lines per Load more</span>
+            <Input
+              className="max-w-32"
+              type="number"
+              min={50}
+              value={terminalArchiveStepLines}
+              onChange={(e) => setTerminalArchiveStepLines(e.target.value)}
+              onBlur={() => { const n = parseInt(terminalArchiveStepLines, 10); if (n >= 50) window.api.settings.set('terminal_archive_step_lines', String(n)) }}
+            />
           </div>
         </div>
       )}
