@@ -758,7 +758,7 @@ function App(): React.JSX.Element {
     return window.api.app.onUpdateStatus((status) => {
       switch (status.type) {
         case 'checking': toast.loading('Checking for updates...', { id: 'update-check' }); break
-        case 'downloading': setUpdateDownloadPercent(status.percent); toast.dismiss('update-check'); break
+        case 'downloading': setUpdateDownloadPercent(status.percent); setUpdateVersion(null); toast.dismiss('update-check'); break
         case 'downloaded': toast.dismiss('update-check'); setUpdateDownloadPercent(null); setUpdateVersion(status.version); setUpdateToastDismissed(false); break
         case 'not-available': setUpdateDownloadPercent(null); toast.success('You\'re on the latest version', { id: 'update-check' }); break
         case 'error': setUpdateDownloadPercent(null); toast.dismiss('update-check'); toast.error(`Update failed: ${status.message}`, { duration: 8000 }); break
