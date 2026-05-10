@@ -1,0 +1,13 @@
+diff --git a/dist/chunks/lib-q6ns0vZr.js b/dist/chunks/lib-q6ns0vZr.js
+index fe0d0c62c9a4159f17437d44e8d128db4bea2ae4..1e5e7452404b534aee27f36ed4415ba0e6c40731 100644
+--- a/dist/chunks/lib-q6ns0vZr.js
++++ b/dist/chunks/lib-q6ns0vZr.js
+@@ -800,7 +800,7 @@ const __filename = import.meta.filename;
+ const __dirname = import.meta.dirname;
+ const require = __cjs_mod__.createRequire(import.meta.url);
+ `;
+-const ESMStaticImportRe = /(?<=\s|^|;)import\s*([\s"']*(?<imports>[\p{L}\p{M}\w\t\n\r $*,/{}@.]+)from\s*)?["']\s*(?<specifier>(?<="\s*)[^"]*[^\s"](?=\s*")|(?<='\s*)[^']*[^\s'](?=\s*'))\s*["'][\s;]*/gmu;
++const ESMStaticImportRe = /(?<=\n|^|;)import\s*([\s"']*(?<imports>[\p{L}\p{M}\w\t\n\r $*,/{}@.]+)from\s*)?["']\s*(?<specifier>(?<="\s*)[^"]*[^\s"](?=\s*")|(?<='\s*)[^']*[^\s'](?=\s*'))\s*["'][\s;]*/gmu;
+ function findStaticImports(code) {
+     const matches = [];
+     for (const match of code.matchAll(ESMStaticImportRe)) {

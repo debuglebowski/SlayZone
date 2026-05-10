@@ -1703,7 +1703,7 @@ app.whenReady().then(async () => {
   const serverMode = (getSetting(db, 'server_mode') ?? 'local') as 'local' | 'remote'
   if (serverMode === 'local') {
     setImmediate(() => {
-      logBoot('embedded server import dispatched')
+      logBoot('embedded-server-import dispatched')
       Promise.all([
         import('@slayzone/server'),
         import('./rest-api/extra'),
@@ -1747,7 +1747,7 @@ app.whenReady().then(async () => {
           },
         })
       }).catch((err) => {
-        console.error('[server] Failed to import embedded server module:', err)
+        console.error('[server] Failed to import-embedded-server-module:', err)
       })
     })
   } else {
