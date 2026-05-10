@@ -1,6 +1,7 @@
 import { test, expect, seed, goHome, clickProject, resetApp } from '../fixtures/electron'
 import { TEST_PROJECT_PATH } from '../fixtures/electron'
 import { pressShortcut } from '../fixtures/shortcuts'
+import { getTrpcVanillaClient } from '@slayzone/transport/client'
 import type { Page } from '@playwright/test'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -127,7 +128,7 @@ test.describe('Tab store — persistence, sync, and side effects', () => {
   test('closing temp task tab deletes it from DB', async ({ mainWindow, electronApp }) => {
     const s = seed(mainWindow)
     const temp = await mainWindow.evaluate(
-      (d: any) => window.api.db.createTask(d),
+      (d: any) => getTrpcVanillaClient().task.create.mutate(d),
       { projectId, title: 'TS temp task', status: 'in_progress', isTemporary: true }
     )
     await s.refreshData()
@@ -142,7 +143,7 @@ test.describe('Tab store — persistence, sync, and side effects', () => {
     await sendIPC(electronApp, 'app:close-active-task')
 
     await expect.poll(async () => {
-      const tasks = await mainWindow.evaluate(() => window.api.db.getTasks())
+      const tasks = await mainWindow.evaluate(() => getTrpcVanillaClient().task.getAll.query())
       return tasks.some((t: any) => t.id === temp.id)
     }, { timeout: 10_000 }).toBe(false)
   })

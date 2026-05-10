@@ -142,7 +142,7 @@ test.describe.serial('Web panel handoff routing', () => {
 
     await mainWindow.evaluate(
       ({ taskId, panelId }) =>
-        window.api.db.updateTask({
+        getTrpcVanillaClient().task.update.mutate({
           id: taskId,
           webPanelUrls: { [panelId]: 'about:blank' },
         }),

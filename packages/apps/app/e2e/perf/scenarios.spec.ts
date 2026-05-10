@@ -1,4 +1,5 @@
 import { test, expect, seed, resetApp, goHome, clickProject, TEST_PROJECT_PATH } from '../fixtures/electron'
+import { getTrpcVanillaClient } from '@slayzone/transport/client'
 import path from 'path'
 import { fileURLToPath } from 'url'
 import { profileScenario, defaultResultsDir, type ScenarioDefinition } from './harness'
@@ -162,7 +163,7 @@ test.describe.serial('Perf scenarios', () => {
 
         // Wait for the new task to land in DB
         await page.waitForFunction((t) => {
-          return window.api.db.getTasks().then((tasks: any[]) => tasks.some((task) => task.title === t))
+          return getTrpcVanillaClient().task.getAll.query().then((tasks: any[]) => tasks.some((task) => task.title === t))
         }, title, { timeout: 5000 }).catch(() => {})
       },
       afterEach: async (page) => {

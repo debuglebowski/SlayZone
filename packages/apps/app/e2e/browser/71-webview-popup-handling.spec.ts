@@ -9,6 +9,7 @@
  */
 import { test, expect, seed, resetApp } from '../fixtures/electron'
 import { TEST_PROJECT_PATH } from '../fixtures/electron'
+import { getTrpcVanillaClient } from '@slayzone/transport/client'
 import {
   ensureBrowserPanelVisible,
   focusForAppShortcut,
@@ -498,7 +499,7 @@ test.describe.serial('Webview popup handling — Web panel with handoff policy',
 
     await mainWindow.evaluate(
       ({ taskId, panelId }) =>
-        window.api.db.updateTask({
+        getTrpcVanillaClient().task.update.mutate({
           id: taskId,
           webPanelUrls: { [panelId]: 'about:blank' },
         }),
@@ -658,7 +659,7 @@ test.describe.serial('Webview popup handling — Web panel without handoff polic
 
     await mainWindow.evaluate(
       ({ taskId, panelId }) =>
-        window.api.db.updateTask({
+        getTrpcVanillaClient().task.update.mutate({
           id: taskId,
           webPanelUrls: { [panelId]: 'about:blank' },
         }),

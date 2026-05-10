@@ -1,5 +1,6 @@
 import { test, expect, seed, resetApp } from '../fixtures/electron'
 import { TEST_PROJECT_PATH } from '../fixtures/electron'
+import { getTrpcVanillaClient } from '@slayzone/transport/client'
 
 /**
  * Backend-persisted chat queue (table `chat_queue`). Validates the IPC layer
@@ -20,7 +21,7 @@ test.describe('Chat queue persistence', () => {
     taskId = task.id
 
     await mainWindow.evaluate(
-      async (id) => window.api.db.updateTask({ id, terminalMode: 'claude-code' } as never),
+      async (id) => getTrpcVanillaClient().task.update.mutate({ id, terminalMode: 'claude-code' } as never),
       taskId
     )
     await s.refreshData()
@@ -28,7 +29,7 @@ test.describe('Chat queue persistence', () => {
     // Materialize a main tab so chat_queue rows have a valid FK target.
     mainTabId = await mainWindow.evaluate(
       async (id) => {
-        const tab = await window.api.tabs.ensureMain(id, 'claude-code')
+        const tab = await getTrpcVanillaClient().taskTerminals.ensureMain.mutate({ taskId: id, mode: 'claude-code' })
         return tab.id
       },
       taskId
@@ -140,7 +141,7 @@ test.describe('Chat queue persistence', () => {
     // Make a fresh tab so we can delete it without affecting other tests.
     const ephemeralTabId = await mainWindow.evaluate(
       async (id) => {
-        const tab = await window.api.tabs.create({ taskId: id, mode: 'claude-code' })
+        const tab = await getTrpcVanillaClient().taskTerminals.create.mutate({ taskId: id, mode: 'claude-code' })
         return tab.id
       },
       taskId
@@ -157,7 +158,7 @@ test.describe('Chat queue persistence', () => {
     expect(before).toHaveLength(1)
 
     await mainWindow.evaluate(
-      async (id) => window.api.tabs.delete(id),
+      async (id) => getTrpcVanillaClient().taskTerminals.delete.mutate({ tabId: id }),
       ephemeralTabId
     )
 

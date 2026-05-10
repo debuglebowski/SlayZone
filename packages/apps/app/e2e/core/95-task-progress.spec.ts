@@ -1,4 +1,5 @@
 import { test, expect, seed, goHome, clickProject, resetApp, TEST_PROJECT_PATH } from '../fixtures/electron'
+import { getTrpcVanillaClient } from '@slayzone/transport/client'
 import { spawnSync } from 'child_process'
 import path from 'path'
 import fs from 'fs'
@@ -90,7 +91,7 @@ test.describe('Task progress', () => {
     // CLI writes DB; renderer refresh is event-driven. Verify via the persisted value.
     await expect.poll(
       async () => {
-        const tasks = await mainWindow.evaluate(() => window.api.db.getTasks())
+        const tasks = await mainWindow.evaluate(() => getTrpcVanillaClient().task.getAll.query())
         return tasks.find((t: { title: string }) => t.title === 'UI progress task')?.progress
       },
       { timeout: 15_000 }

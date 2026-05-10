@@ -1,5 +1,6 @@
 import { test, expect, seed, resetApp} from '../fixtures/electron'
 import { TEST_PROJECT_PATH } from '../fixtures/electron'
+import { getTrpcVanillaClient } from '@slayzone/transport/client'
 import {
   getMainSessionId,
   openTaskTerminal,
@@ -47,7 +48,7 @@ test.describe('Dev server URL detection', () => {
     taskId = t.id
     sessionId = getMainSessionId(taskId)
 
-    await mainWindow.evaluate((id) => window.api.db.updateTask({ id, terminalMode: 'terminal' }), taskId)
+    await mainWindow.evaluate((id) => getTrpcVanillaClient().task.update.mutate({ id, terminalMode: 'terminal' }), taskId)
     await s.refreshData()
 
     await openTaskTerminal(mainWindow, { projectAbbrev, taskTitle: 'Dev server task' })
@@ -75,7 +76,7 @@ test.describe('Dev server URL detection', () => {
     await expect(toast(mainWindow)).not.toBeVisible({ timeout: 3_000 })
 
     // Verify browser tab has the URL
-    const task = await mainWindow.evaluate((id) => window.api.db.getTask(id), taskId)
+    const task = await mainWindow.evaluate((id) => getTrpcVanillaClient().task.get.query({ id }), taskId)
     const tabs = task?.browser_tabs?.tabs ?? []
     expect(tabs.some((t: { url: string }) => t.url === 'http://localhost:3456')).toBe(true)
   })
@@ -123,7 +124,7 @@ test.describe('Dev server detection — toast disabled', () => {
     const t = await s.createTask({ projectId: p.id, title: 'No toast task', status: 'in_progress' })
     sessionId = getMainSessionId(t.id)
 
-    await mainWindow.evaluate((id) => window.api.db.updateTask({ id, terminalMode: 'terminal' }), t.id)
+    await mainWindow.evaluate((id) => getTrpcVanillaClient().task.update.mutate({ id, terminalMode: 'terminal' }), t.id)
     await s.refreshData()
 
     await openTaskTerminal(mainWindow, { projectAbbrev: 'NO', taskTitle: 'No toast task' })
@@ -159,7 +160,7 @@ test.describe('Dev server detection — auto-open browser', () => {
     const t = await s.createTask({ projectId: p.id, title: 'Auto open task', status: 'in_progress' })
     sessionId = getMainSessionId(t.id)
 
-    await mainWindow.evaluate((id) => window.api.db.updateTask({ id, terminalMode: 'terminal' }), t.id)
+    await mainWindow.evaluate((id) => getTrpcVanillaClient().task.update.mutate({ id, terminalMode: 'terminal' }), t.id)
     await s.refreshData()
 
     await openTaskTerminal(mainWindow, { projectAbbrev: 'AU', taskTitle: 'Auto open task' })

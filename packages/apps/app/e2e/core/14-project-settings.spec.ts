@@ -119,8 +119,8 @@ test.describe('Project settings & context menu', () => {
       async (pid) => {
         await getTrpcVanillaClient().integrations.clearProjectProvider.mutate({ projectId: pid, provider: 'linear' }).catch(() => {})
         await getTrpcVanillaClient().integrations.clearProjectProvider.mutate({ projectId: pid, provider: 'github' }).catch(() => {})
-        const tasks = await window.api.db.getTasksByProject(pid) as Array<{ id: string }>
-        for (const task of tasks) await window.api.db.deleteTask(task.id)
+        const tasks = await getTrpcVanillaClient().task.getByProject.query({ projectId: pid }) as Array<{ id: string }>
+        for (const task of tasks) await getTrpcVanillaClient().task.delete.mutate({ id: task.id })
       },
       projectId
     )
@@ -373,7 +373,7 @@ test.describe('Project settings & context menu', () => {
     if (!alphaTask) throw new Error('Expected imported alpha task')
 
     await mainWindow.evaluate(
-      ({ id, title }) => window.api.db.updateTask({ id, title }),
+      ({ id, title }) => getTrpcVanillaClient().task.update.mutate({ id, title }),
       { id: alphaTask.id, title: 'Repository issue alpha local changed' }
     )
     await setGithubRepoIssues(mainWindow, GITHUB_REPOSITORY_ISSUES_REMOTE_AHEAD)

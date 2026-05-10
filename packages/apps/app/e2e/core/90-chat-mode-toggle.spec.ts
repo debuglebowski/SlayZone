@@ -1,5 +1,6 @@
 import { test, expect, seed, goHome, clickProject, resetApp } from '../fixtures/electron'
 import { TEST_PROJECT_PATH } from '../fixtures/electron'
+import { getTrpcVanillaClient } from '@slayzone/transport/client'
 
 /**
  * Chat-mode toggle UI test (no live claude spawn).
@@ -32,7 +33,7 @@ test.describe('Chat-mode toggle', () => {
     taskId = task.id
     // Force terminal_mode = claude-code so the chat toggle is offered.
     await mainWindow.evaluate(
-      async (id) => window.api.db.updateTask({ id, terminalMode: 'claude-code' } as never),
+      async (id) => getTrpcVanillaClient().task.update.mutate({ id, terminalMode: 'claude-code' } as never),
       taskId
     )
     await s.refreshData()
@@ -62,7 +63,7 @@ test.describe('Chat-mode toggle', () => {
 
     // DB still xterm
     const tabs = await mainWindow.evaluate(
-      async (tid) => window.api.tabs.list(tid),
+      async (tid) => getTrpcVanillaClient().taskTerminals.list.query({ taskId: tid }),
       taskId
     )
     const mainTab = tabs.find((t) => t.isMain)!
@@ -82,7 +83,7 @@ test.describe('Chat-mode toggle', () => {
       .poll(
         async () => {
           const tabs = await mainWindow.evaluate(
-            async (tid) => window.api.tabs.list(tid),
+            async (tid) => getTrpcVanillaClient().taskTerminals.list.query({ taskId: tid }),
             taskId
           )
           const mainTab = tabs.find((t) => t.isMain)

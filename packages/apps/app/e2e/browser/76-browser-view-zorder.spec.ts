@@ -1,4 +1,5 @@
 import { test, expect, seed, resetApp, TEST_PROJECT_PATH } from '../fixtures/electron'
+import { getTrpcVanillaClient } from '@slayzone/transport/client'
 import {
   testInvoke,
   ensureBrowserPanelVisible,
@@ -163,7 +164,7 @@ test.describe('Browser view z-ordering (NativeViewLayer)', () => {
 
     // Create a second task
     const s = (await import('./fixtures/electron')).seed(mainWindow)
-    const t2 = await s.createTask({ projectId: (await mainWindow.evaluate(() => window.api.db.getProjects())).find((p: any) => p.name === 'ZOrder T')!.id, title: 'ZOrder task B', status: 'todo' })
+    const t2 = await s.createTask({ projectId: (await mainWindow.evaluate(() => getTrpcVanillaClient().projects.list.query())).find((p: any) => p.name === 'ZOrder T')!.id, title: 'ZOrder task B', status: 'todo' })
     await s.refreshData()
 
     // Open second task

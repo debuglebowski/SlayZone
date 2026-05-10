@@ -1,4 +1,5 @@
 import { test, expect, seed, goHome, clickProject, resetApp, TEST_PROJECT_PATH } from '../fixtures/electron'
+import { getTrpcVanillaClient } from '@slayzone/transport/client'
 import {
   testInvoke, urlInput, tabEntries, newTabBtn,
   focusForAppShortcut, ensureBrowserPanelVisible, ensureBrowserPanelHidden,
@@ -229,7 +230,7 @@ test.describe('Browser panel', () => {
     await newTabBtn(mainWindow).click()
     await expect(tabEntries(mainWindow)).toHaveCount(countBefore + 1)
 
-    const task = await mainWindow.evaluate((id) => window.api.db.getTask(id), taskId)
+    const task = await mainWindow.evaluate((id) => getTrpcVanillaClient().task.get.query({ id }), taskId)
     expect(task?.browser_tabs).toBeTruthy()
     expect(task?.browser_tabs?.tabs.length ?? 0).toBeGreaterThanOrEqual(2)
 
