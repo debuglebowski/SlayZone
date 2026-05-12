@@ -76,6 +76,7 @@ export function tasksCommand(): Command {
     .option('--parent <id>', 'Reparent task under <id> (prefix supported, must be in same project)')
     .option('--no-parent', 'Detach task (make top-level)')
     .option('--permanent', 'Convert temporary task to a real task')
+    .option('--worktree-path <path>', 'Link a git worktree to this task (auto-derives parent branch + repo from project layout)')
     .action(updateAction)
 
   // slay tasks progress

@@ -17,7 +17,7 @@
 import * as fs from 'node:fs'
 import * as path from 'node:path'
 import * as os from 'node:os'
-import { spawn } from 'node:child_process'
+import { spawn, execSync } from 'node:child_process'
 import express from 'express'
 import Database from 'better-sqlite3'
 import { test, expect, describe } from '../../../shared/test-utils/ipc-harness.js'
@@ -132,6 +132,128 @@ await describe('CLI tasks update → REST', () => {
     expect(spy.calls.length).toBe(1)
     const emits = __ipcEmitCalls.filter((c) => c[0] === 'db:tasks:update:done')
     expect(emits.length).toBeGreaterThanOrEqual(1)
+  })
+})
+
+await describe('CLI tasks update --worktree-path', () => {
+  function git(cmd: string, cwd: string): string {
+    return execSync(cmd, {
+      cwd,
+      encoding: 'utf-8',
+      env: {
+        ...process.env,
+        GIT_AUTHOR_NAME: 'Test', GIT_AUTHOR_EMAIL: 't@t.com',
+        GIT_COMMITTER_NAME: 'Test', GIT_COMMITTER_EMAIL: 't@t.com',
+      },
+    }).trim()
+  }
+
+  test('happy: single-repo project — derives parent_branch, repo_name=null', async () => {
+    const wtProjectDir = fs.mkdtempSync(path.join(os.tmpdir(), 'slay-wt-proj-'))
+    git('git init -q -b main', wtProjectDir)
+    fs.writeFileSync(path.join(wtProjectDir, 'README.md'), '#')
+    git('git add -A', wtProjectDir)
+    git('git -c commit.gpgsign=false commit -qm init', wtProjectDir)
+
+    const wtProjectId = crypto.randomUUID()
+    db.prepare('INSERT INTO projects (id, name, color, path) VALUES (?, ?, ?, ?)')
+      .run(wtProjectId, 'WTPROJ', '#000', wtProjectDir)
+
+    const wtPath = path.join(os.tmpdir(), `slay-wt-${crypto.randomUUID().slice(0, 8)}`)
+    git(`git worktree add -b feature-x ${wtPath}`, wtProjectDir)
+
+    const taskId = crypto.randomUUID()
+    db.prepare('INSERT INTO tasks (id, project_id, title, status, priority, "order") VALUES (?, ?, ?, ?, ?, ?)')
+      .run(taskId, wtProjectId, 'Link me', 'todo', 3, 0)
+
+    const r = await runCli(['tasks', 'update', taskId, '--worktree-path', wtPath])
+    expect(r.exitCode).toBe(0)
+
+    const row = db.prepare('SELECT worktree_path, worktree_parent_branch, repo_name FROM tasks WHERE id = ?')
+      .get(taskId) as { worktree_path: string; worktree_parent_branch: string; repo_name: string | null }
+    expect(row.worktree_path).toBe(path.resolve(wtPath))
+    expect(row.worktree_parent_branch).toBe('main')
+    expect(row.repo_name).toBeNull()
+
+    git(`git worktree remove --force ${wtPath}`, wtProjectDir)
+    fs.rmSync(wtProjectDir, { recursive: true, force: true })
+  })
+
+  test('happy: multi-repo project — repo_name set to child repo dir', async () => {
+    const wtProjectDir = fs.mkdtempSync(path.join(os.tmpdir(), 'slay-wt-multi-'))
+    const childRepo = path.join(wtProjectDir, 'svc-a')
+    fs.mkdirSync(childRepo, { recursive: true })
+    git('git init -q -b main', childRepo)
+    fs.writeFileSync(path.join(childRepo, 'README.md'), '#')
+    git('git add -A', childRepo)
+    git('git -c commit.gpgsign=false commit -qm init', childRepo)
+
+    const wtProjectId = crypto.randomUUID()
+    db.prepare('INSERT INTO projects (id, name, color, path) VALUES (?, ?, ?, ?)')
+      .run(wtProjectId, 'WTMULTI', '#000', wtProjectDir)
+
+    const wtPath = path.join(os.tmpdir(), `slay-wt-${crypto.randomUUID().slice(0, 8)}`)
+    git(`git worktree add -b feature-y ${wtPath}`, childRepo)
+
+    const taskId = crypto.randomUUID()
+    db.prepare('INSERT INTO tasks (id, project_id, title, status, priority, "order") VALUES (?, ?, ?, ?, ?, ?)')
+      .run(taskId, wtProjectId, 'Multi link', 'todo', 3, 0)
+
+    const r = await runCli(['tasks', 'update', taskId, '--worktree-path', wtPath])
+    expect(r.exitCode).toBe(0)
+
+    const row = db.prepare('SELECT worktree_path, worktree_parent_branch, repo_name FROM tasks WHERE id = ?')
+      .get(taskId) as { worktree_path: string; worktree_parent_branch: string; repo_name: string | null }
+    expect(row.worktree_path).toBe(path.resolve(wtPath))
+    expect(row.worktree_parent_branch).toBe('main')
+    expect(row.repo_name).toBe('svc-a')
+
+    git(`git worktree remove --force ${wtPath}`, childRepo)
+    fs.rmSync(wtProjectDir, { recursive: true, force: true })
+  })
+
+  test('error: path not a git worktree', async () => {
+    const bogus = fs.mkdtempSync(path.join(os.tmpdir(), 'slay-wt-bogus-'))
+    const taskId = crypto.randomUUID()
+    db.prepare('INSERT INTO tasks (id, project_id, title, status, priority, "order") VALUES (?, ?, ?, ?, ?, ?)')
+      .run(taskId, projectId, 'Bogus link', 'todo', 3, 0)
+    const r = await runCli(['tasks', 'update', taskId, '--worktree-path', bogus])
+    expect(r.exitCode).toBe(1)
+    expect(r.stderr.includes('Not a git worktree')).toBe(true)
+    fs.rmSync(bogus, { recursive: true, force: true })
+  })
+
+  test('error: worktree not owned by any project repo', async () => {
+    const wtProjectDir = fs.mkdtempSync(path.join(os.tmpdir(), 'slay-wt-orphan-'))
+    git('git init -q -b main', wtProjectDir)
+    fs.writeFileSync(path.join(wtProjectDir, 'README.md'), '#')
+    git('git add -A', wtProjectDir)
+    git('git -c commit.gpgsign=false commit -qm init', wtProjectDir)
+
+    const wtProjectId = crypto.randomUUID()
+    db.prepare('INSERT INTO projects (id, name, color, path) VALUES (?, ?, ?, ?)')
+      .run(wtProjectId, 'WTORPH', '#000', wtProjectDir)
+
+    // Worktree under a foreign repo
+    const foreignRepo = fs.mkdtempSync(path.join(os.tmpdir(), 'slay-wt-foreign-'))
+    git('git init -q -b main', foreignRepo)
+    fs.writeFileSync(path.join(foreignRepo, 'README.md'), '#')
+    git('git add -A', foreignRepo)
+    git('git -c commit.gpgsign=false commit -qm init', foreignRepo)
+    const wtPath = path.join(os.tmpdir(), `slay-wt-${crypto.randomUUID().slice(0, 8)}`)
+    git(`git worktree add -b feature-z ${wtPath}`, foreignRepo)
+
+    const taskId = crypto.randomUUID()
+    db.prepare('INSERT INTO tasks (id, project_id, title, status, priority, "order") VALUES (?, ?, ?, ?, ?, ?)')
+      .run(taskId, wtProjectId, 'Orphan link', 'todo', 3, 0)
+
+    const r = await runCli(['tasks', 'update', taskId, '--worktree-path', wtPath])
+    expect(r.exitCode).toBe(1)
+    expect(r.stderr.includes('does not belong to any repo')).toBe(true)
+
+    git(`git worktree remove --force ${wtPath}`, foreignRepo)
+    fs.rmSync(wtProjectDir, { recursive: true, force: true })
+    fs.rmSync(foreignRepo, { recursive: true, force: true })
   })
 })
 

@@ -1,5 +1,8 @@
+import path from 'path'
+import { existsSync } from 'fs'
 import { openDb } from '../../db'
 import { apiPatch } from '../../api'
+import { findSourceRepo, getCurrentBranch, isGitRepo } from '../../git'
 import { resolveStatusId } from '@slayzone/projects/shared'
 import { validateReparent, reparentErrorMessage, type ReparentTaskRow } from '@slayzone/task/shared/reparent-validation'
 import { getProjectColumnsConfig, resolveId } from './_shared'
@@ -13,6 +16,7 @@ export interface UpdateOpts {
   due?: string | false
   parent?: string | false
   permanent?: boolean
+  worktreePath?: string
 }
 
 export async function updateAction(idPrefix: string | undefined, opts: UpdateOpts): Promise<void> {
@@ -22,8 +26,9 @@ export async function updateAction(idPrefix: string | undefined, opts: UpdateOpt
     process.exit(1)
   }
   if (opts.title === undefined && opts.description === undefined && opts.appendDescription === undefined && opts.status === undefined
-    && opts.priority === undefined && opts.due === undefined && opts.parent === undefined && !opts.permanent) {
-    console.error('Provide at least one of --title, --description, --append-description, --status, --priority, --due, --no-due, --parent, --no-parent, --permanent')
+    && opts.priority === undefined && opts.due === undefined && opts.parent === undefined && !opts.permanent
+    && opts.worktreePath === undefined) {
+    console.error('Provide at least one of --title, --description, --append-description, --status, --priority, --due, --no-due, --parent, --no-parent, --permanent, --worktree-path')
     process.exit(1)
   }
 
@@ -99,6 +104,40 @@ export async function updateAction(idPrefix: string | undefined, opts: UpdateOpt
   else if (opts.due === false) body.dueDate = null
   if (resolvedParentId !== undefined) body.parentId = resolvedParentId
   if (opts.permanent) body.isTemporary = false
+
+  if (opts.worktreePath !== undefined) {
+    const abs = path.resolve(opts.worktreePath)
+    if (!existsSync(abs)) {
+      console.error(`Worktree path does not exist: ${abs}`)
+      process.exit(1)
+    }
+    if (!isGitRepo(abs)) {
+      console.error(`Not a git worktree: ${abs}`)
+      process.exit(1)
+    }
+    const projRows = db.query<{ path: string | null }>(
+      `SELECT path FROM projects WHERE id = :id LIMIT 1`,
+      { ':id': task.project_id }
+    )
+    const projectPath = projRows[0]?.path
+    if (!projectPath) {
+      console.error(`Project path is not set; cannot resolve worktree owner.`)
+      process.exit(1)
+    }
+    const sourceRepo = findSourceRepo(projectPath, abs)
+    if (!sourceRepo) {
+      console.error(`Worktree ${abs} does not belong to any repo under project ${projectPath}.`)
+      process.exit(1)
+    }
+    const parentBranch = getCurrentBranch(sourceRepo)
+    if (!parentBranch) {
+      console.error(`Could not determine current branch of source repo: ${sourceRepo}`)
+      process.exit(1)
+    }
+    body.worktreePath = abs
+    body.worktreeParentBranch = parentBranch
+    body.repoName = sourceRepo === projectPath ? null : path.relative(projectPath, sourceRepo)
+  }
 
   db.close()
   await apiPatch<{ ok: boolean; data: { id: string; title: string } }>(`/api/tasks/${task.id}`, body)
