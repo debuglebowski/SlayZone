@@ -12,11 +12,26 @@ export interface AutocompleteMenuProps {
 export function AutocompleteMenu(props: AutocompleteMenuProps) {
   const { active, selectedIndex, onSelect, onHover } = props
   const listRef = useRef<HTMLDivElement>(null)
+  // Gate hover-driven selection until the mouse actually moves. The menu can
+  // materialize under a stationary pointer, which fires synthetic mouseenter
+  // without real motion — that should not override the default index.
+  const armedRef = useRef(false)
 
   useEffect(() => {
     const el = listRef.current?.querySelector<HTMLElement>(`[data-idx="${selectedIndex}"]`)
     el?.scrollIntoView({ block: 'nearest' })
   }, [selectedIndex])
+
+  useEffect(() => {
+    armedRef.current = false
+    const el = listRef.current
+    if (!el) return
+    const handler = () => {
+      armedRef.current = true
+    }
+    el.addEventListener('mousemove', handler, { once: true })
+    return () => el.removeEventListener('mousemove', handler)
+  }, [active.leadSourceId, active.match.tokenStart, active.match.query])
 
   return (
     <div
@@ -39,7 +54,9 @@ export function AutocompleteMenu(props: AutocompleteMenuProps) {
               e.preventDefault()
               onSelect(i)
             }}
-            onMouseEnter={() => onHover(i)}
+            onMouseEnter={() => {
+              if (armedRef.current) onHover(i)
+            }}
             className={cn(
               'px-3 py-2 cursor-pointer text-sm',
               selected && 'bg-accent text-accent-foreground'
