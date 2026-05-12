@@ -4,6 +4,8 @@ import { apiGet, apiPost, apiDelete, apiFetch } from '../api'
 interface PtyInfo {
   sessionId: string
   taskId: string
+  tabId: string
+  label: string | null
   mode: string
   state: string
   createdAt: number
@@ -78,18 +80,20 @@ export function ptyCommand(): Command {
 
       const idW = 24
       const taskW = 12
+      const titleW = 20
       const modeW = 14
       const stateW = 10
-      console.log(`${'SESSION'.padEnd(idW)}  ${'TASK'.padEnd(taskW)}  ${'MODE'.padEnd(modeW)}  ${'STATE'.padEnd(stateW)}  AGE`)
-      console.log(`${'-'.repeat(idW)}  ${'-'.repeat(taskW)}  ${'-'.repeat(modeW)}  ${'-'.repeat(stateW)}  ${'-'.repeat(6)}`)
+      console.log(`${'SESSION'.padEnd(idW)}  ${'TASK'.padEnd(taskW)}  ${'TITLE'.padEnd(titleW)}  ${'MODE'.padEnd(modeW)}  ${'STATE'.padEnd(stateW)}  AGE`)
+      console.log(`${'-'.repeat(idW)}  ${'-'.repeat(taskW)}  ${'-'.repeat(titleW)}  ${'-'.repeat(modeW)}  ${'-'.repeat(stateW)}  ${'-'.repeat(6)}`)
       const now = Date.now()
       for (const s of sessions) {
         const id = s.sessionId.padEnd(idW)
         const task = s.taskId.slice(0, taskW).padEnd(taskW)
+        const title = (s.label ?? '').slice(0, titleW).padEnd(titleW)
         const mode = s.mode.slice(0, modeW).padEnd(modeW)
         const state = s.state.padEnd(stateW)
         const age = formatAge(now - s.createdAt)
-        console.log(`${id}  ${task}  ${mode}  ${state}  ${age}`)
+        console.log(`${id}  ${task}  ${title}  ${mode}  ${state}  ${age}`)
       }
     })
 
@@ -268,6 +272,24 @@ export function ptyCommand(): Command {
       const session = resolveSession(sessions, idPrefix)
       await apiDelete<{ ok: boolean }>(`/api/pty/${encodedId(session.sessionId)}`)
       console.log(`Killed: ${session.sessionId}`)
+    })
+
+  // slay pty rename <id> <label>
+  cmd
+    .command('rename <id> <label>')
+    .description('Rename a terminal tab. Empty string clears the title.')
+    .action(async (idPrefix: string, label: string) => {
+      const sessions = await apiGet<PtyInfo[]>('/api/pty')
+      const session = resolveSession(sessions, idPrefix)
+      if (!session.tabId) {
+        console.error(`Session has no associated tab: ${session.sessionId}`)
+        process.exit(1)
+      }
+      const { tab } = await apiPost<{ tab: { id: string; label: string | null } }>(
+        '/api/tabs/rename',
+        { id: session.tabId, label }
+      )
+      console.log(`Renamed ${session.sessionId} → ${tab.label === null ? '(cleared)' : tab.label}`)
     })
 
   // slay pty create <task-id>

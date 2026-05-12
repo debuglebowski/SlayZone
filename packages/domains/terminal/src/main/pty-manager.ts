@@ -11,7 +11,7 @@ import { RingBuffer, type BufferChunk } from './ring-buffer'
 import { getAdapter, type TerminalMode, type TerminalAdapter, type SpawnConfig, type ActivityState, type ErrorInfo, type ExecutionContext } from './adapters'
 import { interpolateTemplate } from './adapters/template-interpolation'
 import { parseShellArgs } from './adapters/flag-parser'
-import { StateMachine, activityToTerminalState, shouldRefreshIdleClock, shouldFlipToIdle, shouldFlipToRunningOnInput } from './state-machine'
+import { StateMachine, activityToTerminalState, shouldRefreshIdleClock, shouldFlipToIdle, shouldFlipToRunningOnInput, recordWorkingDetection } from './state-machine'
 import { quoteForShell, buildExecCommand, resolveUserShell, getShellStartupArgs, wrapShellWithUlimit } from './shell-env'
 import { shouldShellFallback, shouldNotifySessionNotFound, buildRecoveryMessage } from './pty-exit-strategy'
 import { computeSyncQueryResponse, type TerminalTheme } from './sync-query-response'
@@ -63,6 +63,14 @@ interface PtySession {
   // (e.g. killPty) to route through the same exit path as natural exits so the
   // renderer reliably receives pty:exit + pty:state-change → 'dead'.
   finalizer?: (exitCode: number) => void
+  // One-shot trigger label + sample for the next emitted state change.
+  // Consumed by emitStateChange so pty.state_change diagnostics include
+  // *why* a transition fired (e.g. "detect:✻ Cogitating..." vs "silence-timer").
+  pendingTransitionTrigger?: { source: string; preview?: string }
+  // Sliding window of recent 'working' detection timestamps. Multi-chunk
+  // gate: idle→running on detection path requires ≥2 hits within window
+  // to defeat single chrome-redraw bullets.
+  workingDetections?: number[]
 }
 
 export type { PtyInfo }
@@ -225,6 +233,8 @@ function stripAnsiForSessionParse(data: string): string {
 
 // Emit state change via IPC
 function emitStateChange(session: PtySession, sessionId: string, newState: TerminalState, oldState: TerminalState): void {
+  const trigger = session.pendingTransitionTrigger
+  session.pendingTransitionTrigger = undefined
   recordDiagnosticEvent({
     level: 'info',
     source: 'pty',
@@ -234,7 +244,9 @@ function emitStateChange(session: PtySession, sessionId: string, newState: Termi
     message: `${oldState} -> ${newState}`,
     payload: {
       oldState,
-      newState
+      newState,
+      triggerSource: trigger?.source,
+      triggerPreview: trigger?.preview
     }
   })
 
@@ -275,6 +287,10 @@ function checkInactiveSessions(): void {
     const timeout = session.adapter.idleTimeoutMs ?? IDLE_TIMEOUT_MS
     if (shouldFlipToIdle(session.state, session.lastOutputTime, now, timeout)) {
       session.activity = 'unknown'
+      session.pendingTransitionTrigger = {
+        source: 'silence-timer',
+        preview: `${Math.round((now - session.lastOutputTime) / 1000)}s since last activity-refresh (timeout ${timeout}ms)`
+      }
       transitionState(sessionId, 'idle')
     }
   }
@@ -681,6 +697,7 @@ export async function createPty(opts: CreatePtyOptions): Promise<{ success: bool
     queueMicrotask(() => {
       const live = sessions.get(sessionId)
       if (live && live.state === 'starting') {
+        live.pendingTransitionTrigger = { source: 'startup-settle' }
         transitionState(sessionId, 'idle')
       }
     })
@@ -713,6 +730,7 @@ export async function createPty(opts: CreatePtyOptions): Promise<{ success: bool
         clearTimeout(exitSession.sessionIdAutoDetectTimer)
       }
       if (exitSession) stopTitlePolling(exitSession)
+      if (exitSession) exitSession.pendingTransitionTrigger = { source: 'pty-exit', preview: `exitCode=${exitCode}` }
       transitionState(sessionId, 'dead')
       recordDiagnosticEvent({
         level: 'info',
@@ -945,7 +963,22 @@ export async function createPty(opts: CreatePtyOptions): Promise<{ success: bool
         }
         // Map activity to TerminalState for backward compatibility
         const newState = activityToTerminalState(detectedActivity)
-        if (newState) transitionState(sessionId, newState)
+        if (newState) {
+          const preview = stripAnsiForSessionParse(data).slice(0, 200).replace(/\s+/g, ' ').trim()
+          if (newState === 'running' && session.state !== 'running') {
+            // See `recordWorkingDetection` in state-machine.ts for the why.
+            const gate = recordWorkingDetection(session.workingDetections, Date.now())
+            session.workingDetections = gate.history
+            if (gate.shouldPromote) {
+              session.workingDetections = []
+              session.pendingTransitionTrigger = { source: 'detect-activity:working', preview }
+              transitionState(sessionId, newState)
+            }
+          } else {
+            session.pendingTransitionTrigger = { source: `detect-activity:${detectedActivity}`, preview }
+            transitionState(sessionId, newState)
+          }
+        }
       }
 
       // Use adapter for error detection
@@ -953,6 +986,10 @@ export async function createPty(opts: CreatePtyOptions): Promise<{ success: bool
       if (detectedError) {
         session.error = detectedError
         session.checkingForSessionError = false
+        session.pendingTransitionTrigger = {
+          source: `detect-error:${detectedError.code}`,
+          preview: detectedError.message?.slice(0, 200)
+        }
         transitionState(sessionId, 'error')
         recordDiagnosticEvent({
           level: 'error',
@@ -1317,6 +1354,10 @@ export function writePty(sessionId: string, data: string): boolean {
     if (shouldFlipToRunningOnInput(session.adapter, session.state, session.inputBuffer.trim().length)) {
       session.activity = 'working'
       session.lastOutputTime = Date.now() // reset idle timer from input submission
+      session.pendingTransitionTrigger = {
+        source: 'user-input',
+        preview: submittedLine.slice(0, 200).replace(/\s+/g, ' ').trim()
+      }
       transitionState(sessionId, 'running')
     }
     const cmd = session.adapter.sessionIdCommand ?? '/status'
@@ -1446,19 +1487,31 @@ export function getBufferSince(sessionId: string, afterSeq: number): BufferSince
   }
 }
 
+/** Injected by composition root (apps/app) to surface tab id + label per
+ *  session without pty-manager touching the `terminal_tabs` table (owned by
+ *  the task-terminals package). */
+type PtyEnricher = (raw: PtyInfo[]) => PtyInfo[]
+let ptyEnricher: PtyEnricher | null = null
+
+export function setPtyEnricher(fn: PtyEnricher | null): void {
+  ptyEnricher = fn
+}
+
 export function listPtys(): PtyInfo[] {
-  const result: PtyInfo[] = []
+  const raw: PtyInfo[] = []
   for (const [sessionId, session] of sessions) {
-    result.push({
+    raw.push({
       sessionId,
       taskId: session.taskId,
+      tabId: '',
+      label: null,
       lastOutputTime: session.lastOutputTime,
       createdAt: session.createdAt,
       mode: session.mode,
       state: session.state
     })
   }
-  return result
+  return ptyEnricher ? ptyEnricher(raw) : raw
 }
 
 /** Returns a map of sessionId → PID for all alive sessions. Used for stats polling. */

@@ -129,6 +129,8 @@ export interface CLIState {
 export interface PtyInfo {
   sessionId: string
   taskId: string
+  tabId: string
+  label: string | null
   lastOutputTime: number
   createdAt: number
   mode: TerminalMode

@@ -37,6 +37,7 @@ import { registerBrowserTabsRoute } from './browser/tabs'
 import { registerBrowserNewTabRoute } from './browser/new-tab'
 import { registerTabsCreateRoute } from './tabs/create'
 import { registerTabsSplitRoute } from './tabs/split'
+import { registerTabsRenameRoute } from './tabs/rename'
 
 export type { RestApiDeps } from './types'
 
@@ -82,6 +83,7 @@ export function registerRestApi(app: Express, deps: RestApiDeps): void {
   // Terminal tabs
   registerTabsCreateRoute(app, deps)
   registerTabsSplitRoute(app, deps)
+  registerTabsRenameRoute(app, deps)
 
   // Browser
   registerBrowserUrlRoute(app, deps)

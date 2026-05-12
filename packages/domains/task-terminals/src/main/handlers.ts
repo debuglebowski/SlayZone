@@ -1,6 +1,7 @@
 import type { IpcMain } from 'electron'
 import type { Database } from 'better-sqlite3'
 import { supportsChatMode } from '@slayzone/terminal/main'
+import type { PtyInfo } from '@slayzone/terminal/shared'
 import type { TabDisplayMode, TerminalTab, CreateTerminalTabInput, UpdateTerminalTabInput } from '../shared/types'
 
 function resolveDisplayMode(db: Database, mode: string): TabDisplayMode {
@@ -67,6 +68,57 @@ export function createTabRow(db: Database, input: CreateTerminalTabInput): Termi
     position,
     createdAt: now
   }
+}
+
+/** Returns an enricher for pty-manager's `listPtys()` that attaches `tabId` +
+ *  `label` from `terminal_tabs`. Wire via `setPtyEnricher` at app boot — keeps
+ *  pty-manager from touching the task-terminals schema directly. sessionId
+ *  format: `${taskId}` for main pty, `${taskId}:${tabId}` for panes. */
+export function createPtyEnricher(db: Database): (raw: PtyInfo[]) => PtyInfo[] {
+  return (raw) => {
+    if (raw.length === 0) return raw
+    const taskIds = [...new Set(raw.map(r => r.taskId))]
+    const placeholders = taskIds.map(() => '?').join(',')
+    const tabs = db.prepare(
+      `SELECT id, task_id, label, is_main FROM terminal_tabs WHERE task_id IN (${placeholders})`
+    ).all(...taskIds) as Array<{ id: string; task_id: string; label: string | null; is_main: number }>
+    const byPaneId = new Map<string, { id: string; label: string | null }>()
+    const mainByTaskId = new Map<string, { id: string; label: string | null }>()
+    for (const t of tabs) {
+      byPaneId.set(t.id, { id: t.id, label: t.label })
+      if (t.is_main) mainByTaskId.set(t.task_id, { id: t.id, label: t.label })
+    }
+    return raw.map(r => {
+      const colon = r.sessionId.indexOf(':')
+      const tab = colon >= 0
+        ? byPaneId.get(r.sessionId.slice(colon + 1))
+        : mainByTaskId.get(r.taskId)
+      return { ...r, tabId: tab?.id ?? '', label: tab?.label ?? null }
+    })
+  }
+}
+
+/** Pure DB write — update a tab. Returns null if not found.
+ *  Used by both IPC handler (`tabs:update`) and REST route. */
+export function updateTabRow(db: Database, input: UpdateTerminalTabInput): TerminalTab | null {
+  const existing = db.prepare('SELECT * FROM terminal_tabs WHERE id = ?').get(input.id) as TabRow | undefined
+  if (!existing) return null
+
+  const mode = input.mode ?? existing.mode
+  const displayMode = input.displayMode ?? (existing.display_mode === 'chat' ? 'chat' : 'xterm')
+  const label = input.label !== undefined ? input.label : existing.label
+
+  db.prepare(`
+    UPDATE terminal_tabs
+    SET label = ?,
+        mode = ?,
+        display_mode = ?,
+        position = COALESCE(?, position)
+    WHERE id = ?
+  `).run(label, mode, displayMode, input.position, input.id)
+
+  const updated = db.prepare('SELECT * FROM terminal_tabs WHERE id = ?').get(input.id) as TabRow
+  return rowToTab(updated)
 }
 
 /** Pure DB write — insert a new pane in the same group as the target tab.
@@ -137,30 +189,7 @@ export function registerTerminalTabsHandlers(ipcMain: IpcMain, db: Database): vo
 
   // Update a tab
   ipcMain.handle('tabs:update', (_, input: UpdateTerminalTabInput): TerminalTab | null => {
-    const existing = db.prepare('SELECT * FROM terminal_tabs WHERE id = ?').get(input.id) as TabRow | undefined
-    if (!existing) return null
-
-    const mode = input.mode ?? existing.mode
-    const displayMode = input.displayMode ?? (existing.display_mode === 'chat' ? 'chat' : 'xterm')
-
-    const label = input.label !== undefined ? input.label : existing.label
-    db.prepare(`
-      UPDATE terminal_tabs
-      SET label = ?,
-          mode = ?,
-          display_mode = ?,
-          position = COALESCE(?, position)
-      WHERE id = ?
-    `).run(
-      label,
-      mode,
-      displayMode,
-      input.position,
-      input.id
-    )
-
-    const updated = db.prepare('SELECT * FROM terminal_tabs WHERE id = ?').get(input.id) as TabRow
-    return rowToTab(updated)
+    return updateTabRow(db, input)
   })
 
   // Delete a tab (reject if main)

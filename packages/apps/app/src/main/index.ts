@@ -118,11 +118,11 @@ import { BlobStore, betterSqliteTxn, seedInitialVersions } from '@slayzone/task-
 import { getExtensionFromTitle } from '@slayzone/task/shared'
 import { registerTagHandlers } from '@slayzone/tags/main'
 import { registerSettingsHandlers, registerThemeHandlers } from '@slayzone/settings/main'
-import { registerPtyHandlers, registerUsageHandlers, killAllPtys, killPtysByTaskId, onTaskReachedTerminal, startIdleChecker, stopIdleChecker, syncTerminalModes, getPtyPids, onSessionChange, onGlobalStateChange, onPtyInputSubmit, registerChatHandlers, shutdownChatTransports, setOnHostKillHandler, broadcastRespawnRequest, backfillChatModes, hasSessionUserInput, markSessionUserInput, clearSessionUserInputMark, notifyGlobalStateListeners } from '@slayzone/terminal/main'
+import { registerPtyHandlers, registerUsageHandlers, killAllPtys, killPtysByTaskId, onTaskReachedTerminal, startIdleChecker, stopIdleChecker, syncTerminalModes, getPtyPids, onSessionChange, onGlobalStateChange, onPtyInputSubmit, registerChatHandlers, shutdownChatTransports, setOnHostKillHandler, broadcastRespawnRequest, backfillChatModes, hasSessionUserInput, markSessionUserInput, clearSessionUserInputMark, notifyGlobalStateListeners, setPtyEnricher } from '@slayzone/terminal/main'
 import { setProviderLastKilledAt, type ProviderConfig } from '@slayzone/task/shared'
 import { attachFloatingGlobalAgentPanel, setupFloatingGlobalAgentPanel } from './floating-global-agent-panel'
 import { attachTaskWindows, setupTaskWindows } from './task-windows'
-import { registerTerminalTabsHandlers } from '@slayzone/task-terminals/main'
+import { registerTerminalTabsHandlers, createPtyEnricher } from '@slayzone/task-terminals/main'
 import { registerWorktreeHandlers, closeGitWatcher } from '@slayzone/worktrees/main'
 import { registerAgentTurnsHandlers, initChatTurnSubscriber, initPtyTurnSubscriber } from '@slayzone/agent-turns/main'
 import { registerDiagnosticsHandlers, registerProcessDiagnostics, recordDiagnosticEvent, stopDiagnostics, setIpcSuccessHook } from '@slayzone/diagnostics/main'
@@ -1286,6 +1286,7 @@ app.whenReady().then(async () => {
   }
 
   registerTerminalTabsHandlers(ipcMain, db)
+  setPtyEnricher(createPtyEnricher(db))
   logBoot('terminal-tabs handlers registered')
   registerChatHandlers(ipcMain, db, { onChatEvent: initChatTurnSubscriber(db) })
   // One-shot: backfill `chatMode` for tasks that pre-date the chat-mode UI so
