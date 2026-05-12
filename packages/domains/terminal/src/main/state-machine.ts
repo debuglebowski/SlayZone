@@ -144,3 +144,38 @@ export function shouldFlipToRunningOnInput(
     state !== 'running'
   )
 }
+
+/**
+ * Multi-chunk gate for adapter-driven `idle → running` promotion.
+ *
+ * A single output chunk can falsely match an adapter's `'working'` heuristic
+ * — e.g. a TUI chrome redraw line that happens to start with a Claude bullet
+ * glyph but is not actually a live spinner. Promoting on that single chunk +
+ * the silence timer then producing a `running → idle` flip a few seconds
+ * later is the mechanism behind spurious `needs_attention` notifications.
+ *
+ * Require `≥ threshold` `'working'` detections inside `windowMs`: real
+ * spinners emit many chunks per second; one-off chrome redraws do not. The
+ * `'idle'` completion-stamp signal bypasses this gate (strong active done-
+ * signal), as does the user-input flip path.
+ *
+ * Pure: returns the trimmed history (with `now` appended) and whether the
+ * caller should fire the transition. Caller is responsible for resetting the
+ * history on promote.
+ */
+export const WORKING_DETECTION_WINDOW_MS = 1500
+export const WORKING_DETECTION_THRESHOLD = 2
+
+export function recordWorkingDetection(
+  prev: number[] | undefined,
+  now: number,
+  windowMs: number = WORKING_DETECTION_WINDOW_MS,
+  threshold: number = WORKING_DETECTION_THRESHOLD,
+): { history: number[]; shouldPromote: boolean } {
+  const recent = (prev ?? []).filter((t) => now - t < windowMs)
+  recent.push(now)
+  return {
+    history: recent,
+    shouldPromote: recent.length >= threshold,
+  }
+}

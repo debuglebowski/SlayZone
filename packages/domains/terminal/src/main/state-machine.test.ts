@@ -8,6 +8,9 @@ import {
   shouldRefreshIdleClock,
   shouldFlipToIdle,
   shouldFlipToRunningOnInput,
+  recordWorkingDetection,
+  WORKING_DETECTION_WINDOW_MS,
+  WORKING_DETECTION_THRESHOLD,
 } from './state-machine'
 import type { TerminalState } from '@slayzone/terminal/shared'
 import type { ActivityState } from './adapters/types'
@@ -367,6 +370,69 @@ test('output-driven (false): redraw stream KEEPS idle clock fresh (legacy plain-
   // we kept refreshing.
   now = t0 + idleTimeoutMs
   expect(shouldFlipToIdle('running', lastOutputTime, now, idleTimeoutMs)).toBe(false)
+})
+
+console.log('\nrecordWorkingDetection (multi-chunk gate)\n')
+
+test('single detection does NOT promote (defeats one-shot chrome glyph)', () => {
+  const r = recordWorkingDetection(undefined, 1000)
+  expect(r.shouldPromote).toBe(false)
+  expect(r.history.length).toBe(1)
+})
+
+test('second detection inside window → promote', () => {
+  const r1 = recordWorkingDetection(undefined, 1000)
+  const r2 = recordWorkingDetection(r1.history, 1100)
+  expect(r2.shouldPromote).toBe(true)
+  expect(r2.history.length).toBe(2)
+})
+
+test('second detection past window → still does NOT promote (old hit drops)', () => {
+  const r1 = recordWorkingDetection(undefined, 1000)
+  const r2 = recordWorkingDetection(r1.history, 1000 + WORKING_DETECTION_WINDOW_MS + 1)
+  expect(r2.shouldPromote).toBe(false)
+  expect(r2.history.length).toBe(1)
+})
+
+test('promote at exact threshold boundary', () => {
+  // Configurable threshold; default is 2.
+  let hist: number[] | undefined
+  for (let i = 0; i < WORKING_DETECTION_THRESHOLD - 1; i++) {
+    const r = recordWorkingDetection(hist, 1000 + i * 10)
+    expect(r.shouldPromote).toBe(false)
+    hist = r.history
+  }
+  const final = recordWorkingDetection(hist, 1000 + WORKING_DETECTION_THRESHOLD * 10)
+  expect(final.shouldPromote).toBe(true)
+})
+
+test('history is bounded by window — stale entries pruned', () => {
+  // Burst at t=0, then a lonely entry at t=10s. Burst entries should drop.
+  let hist: number[] | undefined
+  for (let i = 0; i < 5; i++) {
+    const r = recordWorkingDetection(hist, 1000 + i * 50)
+    hist = r.history
+  }
+  const lonely = recordWorkingDetection(hist, 1000 + 10_000)
+  expect(lonely.history.length).toBe(1)
+  expect(lonely.shouldPromote).toBe(false)
+})
+
+test('custom threshold + window honored', () => {
+  // threshold=3, window=500ms
+  const a = recordWorkingDetection(undefined, 0, 500, 3)
+  const b = recordWorkingDetection(a.history, 100, 500, 3)
+  const c = recordWorkingDetection(b.history, 200, 500, 3)
+  expect(a.shouldPromote).toBe(false)
+  expect(b.shouldPromote).toBe(false)
+  expect(c.shouldPromote).toBe(true)
+})
+
+test('does not mutate input history array', () => {
+  const original: number[] = [1000]
+  const snapshot = [...original]
+  recordWorkingDetection(original, 1100)
+  expect(JSON.stringify(original)).toBe(JSON.stringify(snapshot))
 })
 
 // Quiet unused-var warnings on imports referenced only via type-narrowing in tests.
