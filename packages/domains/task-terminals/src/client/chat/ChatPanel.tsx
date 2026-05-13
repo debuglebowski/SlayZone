@@ -807,15 +807,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
       <div className="relative flex-1 min-h-0">
         <div ref={scrollRef} className="h-full overflow-y-auto">
           <div ref={contentRef} className="min-h-full">
-            {hydrating ? (
-              <HydratingState />
-            ) : isEmpty && !inFlight ? (
-              <EmptyState
-                onPick={(text) => {
-                  void sendMessage(text)
-                }}
-              />
-            ) : (
+            {!hydrating && !(isEmpty && !inFlight) && (
               <div className={cn('mx-auto w-full pt-4', widthClass)}>
                 {hiddenCount > 0 && (
                   <div className="flex justify-center py-2">
@@ -843,6 +835,16 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
             )}
           </div>
         </div>
+
+        {/* Overlays — sibling of the scroll viewport so they own their own layout */}
+        {hydrating && <HydratingState />}
+        {!hydrating && isEmpty && !inFlight && (
+          <EmptyState
+            onPick={(text) => {
+              void sendMessage(text)
+            }}
+          />
+        )}
 
         {/* Jump-to-latest button */}
         {!isAtBottom && (
@@ -1189,7 +1191,7 @@ function DisplayOptionRow({
 
 function HydratingState() {
   return (
-    <div className="h-full relative">
+    <div className="absolute inset-0">
       <PulseGrid />
     </div>
   )
@@ -1197,7 +1199,8 @@ function HydratingState() {
 
 function EmptyState({ onPick }: { onPick: (text: string) => void }) {
   return (
-    <div className="h-full flex flex-col items-center justify-center px-6 py-12 text-center">
+    <div className="absolute inset-0 flex flex-col items-center px-6 text-center">
+      <div className="h-[30%] shrink-0" />
       <div className="size-12 rounded-full bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center text-white shadow-lg mb-4">
         <Sparkles className="size-5" />
       </div>
