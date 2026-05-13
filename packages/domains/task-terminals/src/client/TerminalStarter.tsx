@@ -81,7 +81,7 @@ export const TerminalStarter = forwardRef<TerminalHandle, TerminalStarterProps>(
 
   return (
     <div
-      className="h-full w-full flex items-center justify-center"
+      className="h-full w-full flex flex-col items-center justify-center gap-3 px-6"
       style={{ backgroundColor: themeColors.background ?? '#0a0a0a' }}
     >
       <button
@@ -93,6 +93,9 @@ export const TerminalStarter = forwardRef<TerminalHandle, TerminalStarterProps>(
         {Icon ? <Icon className="size-4" /> : <Play className="size-4" />}
         Start {label}
       </button>
+      <p className="max-w-sm text-center text-xs text-muted-foreground">
+        Manual start keeps idle tabs from burning resources or API credits.
+      </p>
     </div>
   )
 })
