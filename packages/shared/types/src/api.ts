@@ -348,6 +348,7 @@ export interface ElectronAPI {
   }
   artifactFolders: {
     getByTask: (taskId: string) => Promise<ArtifactFolder[]>
+    getOrCreateByName: (data: { taskId: string; name: string }) => Promise<ArtifactFolder | null>
     create: (data: CreateArtifactFolderInput) => Promise<ArtifactFolder>
     update: (data: UpdateArtifactFolderInput) => Promise<ArtifactFolder | null>
     delete: (id: string) => Promise<boolean>

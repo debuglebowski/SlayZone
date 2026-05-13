@@ -159,7 +159,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
     if (isActive) textareaRef.current?.focus()
   }, [isActive])
 
-  const { uploadFiles: uploadImageFiles, getFilePath: getArtifactFilePath } = useArtifactUpload(taskId)
+  const { uploadFiles: uploadImageFiles, getFilePath: getArtifactFilePath } = useArtifactUpload(taskId, { folderName: 'Uploads' })
 
   const imagePasteDrop = useImagePasteDrop<ArtifactRef>({
     onUpload: uploadImageFiles,

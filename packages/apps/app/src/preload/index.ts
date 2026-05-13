@@ -126,6 +126,7 @@ const api: ElectronAPI = {
   },
   artifactFolders: {
     getByTask: (taskId) => ipcRenderer.invoke('db:artifactFolders:getByTask', taskId),
+    getOrCreateByName: (data) => ipcRenderer.invoke('db:artifactFolders:getOrCreateByName', data),
     create: (data) => ipcRenderer.invoke('db:artifactFolders:create', data),
     update: (data) => ipcRenderer.invoke('db:artifactFolders:update', data),
     delete: (id) => ipcRenderer.invoke('db:artifactFolders:delete', id),

@@ -862,6 +862,27 @@ export function registerTaskHandlers(ipcMain: IpcMain, db: Database, onMutation?
     return rows.map(parseFolder).filter(Boolean)
   })
 
+  ipcMain.handle('db:artifactFolders:getOrCreateByName', (_, data: { taskId: string; name: string }) => {
+    const existing = db
+      .prepare('SELECT * FROM artifact_folders WHERE task_id = ? AND parent_id IS NULL AND name = ?')
+      .get(data.taskId, data.name) as Record<string, unknown> | undefined
+    if (existing) return parseFolder(existing)
+
+    const id = randomUUID()
+    const maxOrder = (db
+      .prepare('SELECT MAX("order") as m FROM artifact_folders WHERE task_id = ? AND parent_id IS NULL')
+      .get(data.taskId) as { m: number | null }).m ?? -1
+
+    db.prepare(`
+      INSERT INTO artifact_folders (id, task_id, parent_id, name, "order")
+      VALUES (?, ?, NULL, ?, ?)
+    `).run(id, data.taskId, data.name, maxOrder + 1)
+
+    onMutation?.()
+    const row = db.prepare('SELECT * FROM artifact_folders WHERE id = ?').get(id) as Record<string, unknown> | undefined
+    return parseFolder(row)
+  })
+
   ipcMain.handle('db:artifactFolders:create', (_, data: CreateArtifactFolderInput) => {
     const id = randomUUID()
     const parentId = data.parentId ?? null

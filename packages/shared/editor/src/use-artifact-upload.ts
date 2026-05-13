@@ -23,22 +23,45 @@ function extFromMime(mime: string): string {
 }
 
 interface ArtifactsApiNarrow {
-  uploadBlob: (data: { taskId: string; title: string; bytes: Uint8Array }) => Promise<ArtifactRef | null>
+  uploadBlob: (data: { taskId: string; title: string; bytes: Uint8Array; folderId?: string | null }) => Promise<ArtifactRef | null>
   getFilePath: (id: string) => Promise<string | null>
+}
+
+interface ArtifactFoldersApiNarrow {
+  getOrCreateByName: (data: { taskId: string; name: string }) => Promise<{ id: string } | null>
 }
 
 function getArtifactsApi(): ArtifactsApiNarrow {
   return (window as unknown as { api: { artifacts: ArtifactsApiNarrow } }).api.artifacts
 }
 
-export function useArtifactUpload(taskId: string | null | undefined): UseArtifactUploadReturn {
+function getArtifactFoldersApi(): ArtifactFoldersApiNarrow {
+  return (window as unknown as { api: { artifactFolders: ArtifactFoldersApiNarrow } }).api.artifactFolders
+}
+
+export interface UseArtifactUploadOptions {
+  folderName?: string
+}
+
+export function useArtifactUpload(
+  taskId: string | null | undefined,
+  options?: UseArtifactUploadOptions
+): UseArtifactUploadReturn {
   const taskIdRef = useRef(taskId)
   taskIdRef.current = taskId
+  const folderNameRef = useRef(options?.folderName)
+  folderNameRef.current = options?.folderName
 
   const uploadFiles = useCallback(async (files: File[]): Promise<ArtifactRef[]> => {
     const tid = taskIdRef.current
     if (!tid) return []
     const artifacts = getArtifactsApi()
+    let folderId: string | null = null
+    const folderName = folderNameRef.current
+    if (folderName) {
+      const folder = await getArtifactFoldersApi().getOrCreateByName({ taskId: tid, name: folderName })
+      folderId = folder?.id ?? null
+    }
     const results = await Promise.all(
       files.map(async (file) => {
         const buf = await file.arrayBuffer()
@@ -46,7 +69,7 @@ export function useArtifactUpload(taskId: string | null | undefined): UseArtifac
         const baseTitle = file.name && file.name.length > 0
           ? file.name
           : `pasted-${tsSlug()}${extFromMime(file.type)}`
-        return artifacts.uploadBlob({ taskId: tid, title: baseTitle, bytes })
+        return artifacts.uploadBlob({ taskId: tid, title: baseTitle, bytes, folderId })
       })
     )
     return results.filter((a): a is ArtifactRef => a !== null)
