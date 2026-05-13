@@ -16,6 +16,7 @@ export function TreeDisplaySettings() {
   const treeShowPriority = useTabStore((s) => s.treeShowPriority)
   const treeShowSubtasks = useTabStore((s) => s.treeShowSubtasks)
   const treeShowAllSubtasks = useTabStore((s) => s.treeShowAllSubtasks)
+  const treeShowAllUndoneSubtasks = useTabStore((s) => s.treeShowAllUndoneSubtasks)
   const treeCrossOutDone = useTabStore((s) => s.treeCrossOutDone)
   const treeShowOnlyActive = useTabStore((s) => s.treeShowOnlyActive)
   const treeShowTemporary = useTabStore((s) => s.treeShowTemporary)
@@ -25,6 +26,7 @@ export function TreeDisplaySettings() {
   const setTreeShowPriority = useTabStore((s) => s.setTreeShowPriority)
   const setTreeShowSubtasks = useTabStore((s) => s.setTreeShowSubtasks)
   const setTreeShowAllSubtasks = useTabStore((s) => s.setTreeShowAllSubtasks)
+  const setTreeShowAllUndoneSubtasks = useTabStore((s) => s.setTreeShowAllUndoneSubtasks)
   const setTreeCrossOutDone = useTabStore((s) => s.setTreeCrossOutDone)
   const setTreeShowOnlyActive = useTabStore((s) => s.setTreeShowOnlyActive)
   const setTreeShowTemporary = useTabStore((s) => s.setTreeShowTemporary)
@@ -81,13 +83,21 @@ export function TreeDisplaySettings() {
               onChange={setTreeShowSubtasks}
             />
             {treeShowSubtasks && (
-              <div className="pl-4 border-l border-border/40">
+              <div className="pl-4 border-l border-border/40 space-y-3">
                 <Row
                   id="tree-show-all-subtasks"
                   label="Show all sub-tasks"
                   hint="Include every descendant of a matching parent, even non-matches"
                   checked={treeShowAllSubtasks}
                   onChange={setTreeShowAllSubtasks}
+                />
+                <Row
+                  id="tree-show-all-undone-subtasks"
+                  label="Show all undone sub-tasks"
+                  hint="Include every non-completed descendant of a matching parent"
+                  checked={treeShowAllUndoneSubtasks}
+                  onChange={setTreeShowAllUndoneSubtasks}
+                  disabled={treeShowAllSubtasks}
                 />
               </div>
             )}

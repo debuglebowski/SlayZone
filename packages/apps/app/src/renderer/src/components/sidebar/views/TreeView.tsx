@@ -96,6 +96,7 @@ export function TreeView({
   const treeShowPriority = useTabStore((s) => s.treeShowPriority)
   const treeShowSubtasks = useTabStore((s) => s.treeShowSubtasks)
   const treeIncludeAllSubtasks = useTabStore((s) => s.treeShowAllSubtasks)
+  const treeIncludeAllUndoneSubtasks = useTabStore((s) => s.treeShowAllUndoneSubtasks)
   const treeCrossOutDone = useTabStore((s) => s.treeCrossOutDone)
   const treeShowOnlyActive = useTabStore((s) => s.treeShowOnlyActive)
   const treeShowTemporary = useTabStore((s) => s.treeShowTemporary)
@@ -141,7 +142,8 @@ export function TreeView({
     const taskById = new Map(tasks.map((t) => [t.id, t]))
     const set = new Set<string>()
 
-    if (treeShowSubtasks && treeIncludeAllSubtasks) {
+    if (treeShowSubtasks && (treeIncludeAllSubtasks || treeIncludeAllUndoneSubtasks)) {
+      const excludeDone = !treeIncludeAllSubtasks && treeIncludeAllUndoneSubtasks
       const childrenOf = new Map<string, Task[]>()
       for (const t of tasks) {
         if (!t.parent_id) continue
@@ -156,6 +158,9 @@ export function TreeView({
         while (stack.length > 0) {
           const cur = stack.pop()!
           if (set.has(cur.id) || cur.archived_at) continue
+          // Root passes filter, so include regardless of done. Descendants only
+          // gated by excludeDone — keeps a matching root visible even if done.
+          if (excludeDone && cur.id !== t.id && doneTaskIds?.has(cur.id)) continue
           set.add(cur.id)
           const kids = childrenOf.get(cur.id)
           if (kids) for (const k of kids) stack.push(k)
@@ -176,7 +181,7 @@ export function TreeView({
       }
     }
     return set
-  }, [tasks, passesFilter, treeShowSubtasks, treeIncludeAllSubtasks])
+  }, [tasks, passesFilter, treeShowSubtasks, treeIncludeAllSubtasks, treeIncludeAllUndoneSubtasks, doneTaskIds])
 
   // Per-project filters (mirrors kanban). Live-updates when user changes
   // sortBy / groupBy in the kanban filter bar.
