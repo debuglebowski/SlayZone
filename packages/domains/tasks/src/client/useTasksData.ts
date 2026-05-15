@@ -27,6 +27,7 @@ interface UseTasksDataReturn {
   moveTask: (taskId: string, newColumnId: string, targetIndex: number, groupBy: GroupKey) => void
   bulkMove: (taskIds: string[], newColumnId: string, targetIndex: number, groupBy: GroupKey) => void
   reorderTasks: (taskIds: string[]) => void
+  reparentTask: (taskId: string, newParentId: string | null, newSiblingTaskIds: string[]) => void
   archiveTask: (taskId: string) => Promise<void>
   archiveTasks: (taskIds: string[]) => Promise<void>
   deleteTask: (taskId: string) => Promise<void>
@@ -246,6 +247,31 @@ export function useTasksData(): UseTasksDataReturn {
     })
   }, [])
 
+  // Reparent task + reorder its new sibling list. Used by tree drag-into-task.
+  const reparentTask = useCallback((
+    taskId: string,
+    newParentId: string | null,
+    newSiblingTaskIds: string[]
+  ) => {
+    let snapshot: Task[] = []
+    setTasks((prevTasks) => {
+      snapshot = prevTasks
+      return prevTasks.map((t) => {
+        if (t.id === taskId) {
+          const newOrder = newSiblingTaskIds.indexOf(taskId)
+          return { ...t, parent_id: newParentId, order: newOrder >= 0 ? newOrder : t.order }
+        }
+        const idx = newSiblingTaskIds.indexOf(t.id)
+        if (idx >= 0) return { ...t, order: idx }
+        return t
+      })
+    })
+    Promise.all([
+      window.api.db.updateTask({ id: taskId, parentId: newParentId }),
+      window.api.db.reorderTasks(newSiblingTaskIds),
+    ]).catch(() => setTasks(snapshot))
+  }, [])
+
   // Archive single task
   const archiveTask = useCallback(async (taskId: string) => {
     const now = new Date().toISOString()
@@ -439,6 +465,7 @@ export function useTasksData(): UseTasksDataReturn {
     moveTask,
     bulkMove,
     reorderTasks,
+    reparentTask,
     archiveTask,
     archiveTasks,
     deleteTask,

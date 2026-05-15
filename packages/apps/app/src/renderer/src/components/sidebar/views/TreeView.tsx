@@ -3,16 +3,17 @@ import { BookOpen, ChevronDown, Clock, GitBranch, Home, Pin, Plus, Power, Search
 import * as Collapsible from '@radix-ui/react-collapsible'
 import {
   DndContext,
+  DragOverlay,
   PointerSensor,
   pointerWithin,
   useDroppable,
   useSensor,
   useSensors,
   type DragEndEvent,
+  type DragStartEvent,
 } from '@dnd-kit/core'
 import {
   SortableContext,
-  arrayMove,
   useSortable,
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable'
@@ -156,10 +157,16 @@ function TaskRow({
     data: dragData,
     disabled: !draggable,
   })
+  // While dragging, the floating preview renders via DragOverlay (portal,
+  // escapes the project's overflow-hidden clip). Hide source row but keep
+  // its layout reserved — verticalListSortingStrategy measures each row's
+  // bounding rect to compute sibling slide transforms, so collapsing the
+  // source's height (display:none) breaks the animation math.
   const style: CSSProperties = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-    opacity: isDragging ? 0.4 : 1,
+    transform: isDragging ? undefined : CSS.Transform.toString(transform),
+    transition: isDragging ? undefined : transition,
+    opacity: isDragging ? 0 : 1,
+    pointerEvents: isDragging ? 'none' : undefined,
   }
 
   const isActive = ctx.activeTaskId === task.id
@@ -322,19 +329,34 @@ function TaskBranch({
   return (
     <div>
       <TaskRow task={task} depth={depth} ancestorFlags={ancestorFlags} ctx={ctx} />
-      {children.length > 0 && (
-        <SortableContext items={children.map((c) => c.id)} strategy={verticalListSortingStrategy}>
-          {children.map((c, i) => (
-            <TaskBranch
-              key={c.id}
-              task={c}
-              depth={depth + 1}
-              ancestorFlags={[...ancestorFlags, i < children.length - 1]}
-              ctx={ctx}
-            />
-          ))}
-        </SortableContext>
-      )}
+      {children.map((c, i) => (
+        <TaskBranch
+          key={c.id}
+          task={c}
+          depth={depth + 1}
+          ancestorFlags={[...ancestorFlags, i < children.length - 1]}
+          ctx={ctx}
+        />
+      ))}
+    </div>
+  )
+}
+
+// Floating drag preview — renders portal'd to document.body via DragOverlay,
+// so it escapes the project's `overflow-hidden` collapsible wrapper. Without
+// this, the dragged row's transform is clipped at the project boundary and
+// vanishes after a few pixels of motion.
+function TaskDragPreview({ task }: { task: Task }): ReactNode {
+  return (
+    <div className="flex items-center gap-2 rounded-md bg-surface-2/95 px-2 py-1 text-sm text-foreground shadow-lg ring-1 ring-border min-h-[28px]">
+      <TerminalProgressDot
+        state={undefined}
+        progress={undefined}
+        isDone={false}
+        needsAttention={Boolean(task.needs_attention)}
+        alwaysShow
+      />
+      <span className="truncate max-w-[260px]">{task.title || 'Untitled'}</span>
     </div>
   )
 }
@@ -385,6 +407,8 @@ export function TreeView({
   columnsByProjectId,
   onTaskReorder,
   onTaskMove,
+  onTaskReparent,
+  onTaskFieldUpdate,
 }: SidebarViewContext) {
   const sortedProjects = useMemo(
     () => [...projects].sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0)),
@@ -602,74 +626,179 @@ export function TreeView({
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }))
 
+  // Track active drag for DragOverlay rendering. Storing just the id keeps
+  // state small; the task is looked up at render time.
+  const [activeDragTaskId, setActiveDragTaskId] = useState<string | null>(null)
+
+  const handleDragStart = useCallback((event: DragStartEvent) => {
+    setActiveDragTaskId(event.active.id as string)
+  }, [])
+
+  const handleDragCancel = useCallback(() => {
+    setActiveDragTaskId(null)
+  }, [])
+
+  // Full task lookup (all tasks, not just visible) for cycle detection +
+  // orderBy field comparison. Visible-only maps would miss collapsed parents
+  // and yield false negatives on cycle check.
+  const tasksById = useMemo(() => {
+    const m = new Map<string, Task>()
+    for (const t of tasks) m.set(t.id, t)
+    return m
+  }, [tasks])
+
+  // Drop into descendant of source = cycle. Walk parent chain from target
+  // upward; if it hits source, abort the reparent.
+  const wouldCycle = useCallback((sourceId: string, targetId: string): boolean => {
+    if (sourceId === targetId) return true
+    let cur: string | null | undefined = targetId
+    const seen = new Set<string>()
+    while (cur && !seen.has(cur)) {
+      if (cur === sourceId) return true
+      seen.add(cur)
+      cur = tasksById.get(cur)?.parent_id ?? null
+    }
+    return false
+  }, [tasksById])
+
+  // When sorting by a meaningful field (priority/due_date), dropping above or
+  // below a sibling with a different value implies the user wants the dragged
+  // task to inherit that value — otherwise sort would snap it back to its old
+  // position and the drop would feel ignored.
+  const inheritOrderByField = useCallback((sourceId: string, targetId: string): void => {
+    if (sourceId === targetId) return
+    const source = tasksById.get(sourceId)
+    const target = tasksById.get(targetId)
+    if (!source || !target) return
+    if (treeOrderBy === 'priority') {
+      if (source.priority !== target.priority) {
+        onTaskFieldUpdate?.(sourceId, { priority: target.priority })
+      }
+    } else if (treeOrderBy === 'due_date') {
+      const a = source.due_date ?? null
+      const b = target.due_date ?? null
+      if (a !== b) onTaskFieldUpdate?.(sourceId, { due_date: b })
+    }
+    // 'manual' / 'created' / 'title' — no inheritance.
+  }, [treeOrderBy, tasksById, onTaskFieldUpdate])
+
+  // Drop semantics: source always becomes a SIBLING of the target row. Never
+  // a child. Target's parent → source's new parent. Target root → source root
+  // (with target's group field). Target subtask → source subtask under same
+  // parent. Group-header drop = root in that group.
   const handleDragEnd = useCallback((event: DragEndEvent) => {
+    setActiveDragTaskId(null)
     const { active, over } = event
     if (!over) return
     const activeData = active.data.current as TaskRowDragData | undefined
     if (!activeData || activeData.kind !== 'task') return
+    const sourceId = active.id as string
+
     const overData = over.data.current as TaskRowDragData | GroupDropData | undefined
     if (!overData) return
 
-    // Cross-project blocked.
     if (overData.projectId !== activeData.projectId) return
 
-    // Subtask: only sibling reorder, no reparent. Subtasks stay nested under
-    // parent regardless of treeGroupBy, so cross-group check doesn't apply.
-    if (activeData.parentId) {
-      if (overData.kind !== 'task') return
-      if (overData.parentId !== activeData.parentId) return
-      if (active.id === over.id) return
-      const siblings = childrenByParent.get(activeData.parentId) ?? []
-      const oldIdx = siblings.findIndex((s) => s.id === active.id)
-      const newIdx = siblings.findIndex((s) => s.id === over.id)
-      if (oldIdx === -1 || newIdx === -1 || oldIdx === newIdx) return
-      const reordered = arrayMove(siblings, oldIdx, newIdx)
-      onTaskReorder?.(reordered.map((t) => t.id))
-      return
-    }
-
-    // Root task drag.
     const groups = rootGroupsByProject.get(activeData.projectId)
     if (!groups) return
     const groupByKey = new Map(groups.map((g) => [g.key, g]))
 
-    // Block drops into the temp/pinned groups — they have no valid
-    // status/priority semantic.
+    // === Drop on a group header — make source a root in that group. ===
     if (overData.kind === 'group') {
       const g = groupByKey.get(overData.groupValue)
-      if (g?.isTemp || g?.isPinned) return
-    }
-
-    if (overData.kind === 'group') {
-      const destValue = overData.groupValue
-      if (destValue === activeData.groupValue) return
-      const destGroup = groupByKey.get(destValue)
-      const destLen = destGroup?.tasks.length ?? 0
-      onTaskMove?.(active.id as string, destValue, destLen, treeGroupBy)
+      if (!g || g.isTemp || g.isPinned) return
+      const sameGroup = activeData.parentId === null && overData.groupValue === activeData.groupValue
+      if (sameGroup) return
+      if (activeData.parentId !== null) {
+        // Subtask → root: reparent + set group field.
+        const newSiblings = [...g.tasks.map((t) => t.id).filter((id) => id !== sourceId), sourceId]
+        onTaskReparent?.(sourceId, null, newSiblings)
+        const fieldUpdate: Partial<Task> = treeGroupBy === 'status'
+          ? { status: overData.groupValue as Task['status'] }
+          : { priority: parseInt(overData.groupValue.slice(1), 10) }
+        onTaskFieldUpdate?.(sourceId, fieldUpdate)
+        return
+      }
+      // Root → cross-group move.
+      onTaskMove?.(sourceId, overData.groupValue, g.tasks.length, treeGroupBy)
       return
     }
 
-    // overData is a task. Block dropping a root onto a subtask (would reparent).
-    if (overData.parentId) return
+    // === Drop on a task row — make source a sibling of target. ===
+    const targetId = over.id as string
+    if (sourceId === targetId) return
+    const target = tasksById.get(targetId)
+    if (!target) return
+    const targetParent = target.parent_id ?? null
 
-    if (overData.groupValue === activeData.groupValue) {
-      // Same-group reorder.
-      const group = groupByKey.get(activeData.groupValue)
-      if (!group) return
-      const oldIdx = group.tasks.findIndex((t) => t.id === active.id)
-      const newIdx = group.tasks.findIndex((t) => t.id === over.id)
-      if (oldIdx === -1 || newIdx === -1 || oldIdx === newIdx) return
-      const reordered = arrayMove(group.tasks, oldIdx, newIdx)
-      onTaskReorder?.(reordered.map((t) => t.id))
+    // Cycle check — source becoming child of own descendant.
+    if (targetParent !== null && wouldCycle(sourceId, targetParent)) return
+
+    // Determine "above or below target" by comparing pointer Y to target's
+    // mid-Y. dnd-kit doesn't pass pointer position directly to onDragEnd; we
+    // reconstruct it from activator pointer + drag delta.
+    const startY =
+      event.activatorEvent && 'clientY' in event.activatorEvent
+        ? (event.activatorEvent as { clientY: number }).clientY
+        : 0
+    const pointerY = startY + event.delta.y
+    const overRect = over.rect
+    const insertBelow = pointerY > overRect.top + overRect.height / 2
+
+    // Build sibling list with source inserted above or below target accordingly.
+    let siblings: Task[]
+    let targetGroupKey: string | null = null
+    if (targetParent === null) {
+      targetGroupKey = rowGroupValue(target, treeGroupBy, treeGroupPinned, pinnedSet)
+      const g = groupByKey.get(targetGroupKey)
+      if (!g || g.isTemp || g.isPinned) return
+      siblings = g.tasks
     } else {
-      // Cross-group drag onto a task — move source into target's group at target's index.
-      const destGroup = groupByKey.get(overData.groupValue)
-      if (!destGroup || destGroup.isTemp || destGroup.isPinned) return
-      const newIdx = destGroup.tasks.findIndex((t) => t.id === over.id)
-      if (newIdx === -1) return
-      onTaskMove?.(active.id as string, overData.groupValue, newIdx, treeGroupBy)
+      siblings = childrenByParent.get(targetParent) ?? []
     }
-  }, [childrenByParent, rootGroupsByProject, onTaskReorder, onTaskMove, treeGroupBy])
+    const filtered = siblings.filter((s) => s.id !== sourceId)
+    const targetIdx = filtered.findIndex((s) => s.id === targetId)
+    if (targetIdx === -1) return
+    const insertIdx = insertBelow ? targetIdx + 1 : targetIdx
+    const newSiblingIds = [
+      ...filtered.slice(0, insertIdx).map((s) => s.id),
+      sourceId,
+      ...filtered.slice(insertIdx).map((s) => s.id),
+    ]
+
+    const sameParent = activeData.parentId === targetParent
+
+    if (sameParent) {
+      if (targetParent === null && targetGroupKey !== null && activeData.groupValue !== targetGroupKey) {
+        // Cross-group root reorder → moveTask handles status/priority + position.
+        onTaskMove?.(sourceId, targetGroupKey, insertIdx, treeGroupBy)
+        // Skip orderBy inherit when moveTask already wrote that same field.
+        if (!(treeOrderBy === 'priority' && treeGroupBy === 'priority')) {
+          inheritOrderByField(sourceId, targetId)
+        }
+        return
+      }
+      // Same group: no-op if dragged to its own slot.
+      const oldIdx = siblings.findIndex((s) => s.id === sourceId)
+      if (oldIdx !== -1) {
+        const adjustedInsertIdx = oldIdx < insertIdx ? insertIdx - 1 : insertIdx
+        if (adjustedInsertIdx === oldIdx) return
+      }
+      onTaskReorder?.(newSiblingIds)
+      inheritOrderByField(sourceId, targetId)
+      return
+    }
+
+    // Different parent → reparent.
+    onTaskReparent?.(sourceId, targetParent, newSiblingIds)
+    if (targetParent === null && targetGroupKey !== null) {
+      const fieldUpdate: Partial<Task> = treeGroupBy === 'status'
+        ? { status: targetGroupKey as Task['status'] }
+        : { priority: parseInt(targetGroupKey.slice(1), 10) }
+      onTaskFieldUpdate?.(sourceId, fieldUpdate)
+    }
+    inheritOrderByField(sourceId, targetId)
+  }, [childrenByParent, rootGroupsByProject, onTaskReorder, onTaskMove, onTaskReparent, onTaskFieldUpdate, treeGroupBy, treeGroupPinned, treeOrderBy, pinnedSet, tasksById, wouldCycle, inheritOrderByField])
 
   const renderGroupAddButton = (
     group: TreeGroup,
@@ -736,17 +865,15 @@ export function TreeView({
             <span>{label}</span>
             {renderGroupAddButton(g, projectId, label)}
           </div>
-          <SortableContext items={g.tasks.map((t) => t.id)} strategy={verticalListSortingStrategy}>
-            {g.tasks.map((task, i) => (
-              <TaskBranch
-                key={task.id}
-                task={task}
-                depth={1}
-                ancestorFlags={[i < g.tasks.length - 1]}
-                ctx={branchCtx}
-              />
-            ))}
-          </SortableContext>
+          {g.tasks.map((task, i) => (
+            <TaskBranch
+              key={task.id}
+              task={task}
+              depth={1}
+              ancestorFlags={[i < g.tasks.length - 1]}
+              ctx={branchCtx}
+            />
+          ))}
         </>
       )
       // Temp/pinned groups have no valid drop semantic, so skip droppable wrapper.
@@ -767,6 +894,22 @@ export function TreeView({
     const isHomeActive =
       selectedProjectId === project.id && activeTabType === 'home' && !isContextActive
     const dragEnabled = Boolean(onTaskReorder) && Boolean(onTaskMove)
+    // Flat list of all visible task IDs in render order (group → root →
+    // descendants pre-order). Single SortableContext over the whole tree so
+    // verticalListSortingStrategy animates siblings AND descendants when
+    // dragging across the hierarchy. handleDragEnd still enforces drop semantics.
+    const flatTaskIds: string[] = (() => {
+      const ids: string[] = []
+      const walk = (t: Task) => {
+        ids.push(t.id)
+        const kids = childrenByParent.get(t.id) ?? []
+        for (const k of kids) walk(k)
+      }
+      for (const g of groups) {
+        for (const root of g.tasks) walk(root)
+      }
+      return ids
+    })()
     const branchCtx: TaskBranchCtx = {
       childrenByParent,
       activeTaskId,
@@ -866,7 +1009,9 @@ export function TreeView({
                 No active tasks
               </span>
             ) : (
-              renderTreeGroups(groups, project.id, branchCtx)
+              <SortableContext items={flatTaskIds} strategy={verticalListSortingStrategy}>
+                {renderTreeGroups(groups, project.id, branchCtx)}
+              </SortableContext>
             )}
           </div>
         </Collapsible.Content>
@@ -924,8 +1069,22 @@ export function TreeView({
           </Tooltip>
         </div>
       </div>
-      <DndContext sensors={sensors} collisionDetection={pointerWithin} onDragEnd={handleDragEnd}>
+      <DndContext
+        sensors={sensors}
+        collisionDetection={pointerWithin}
+        onDragStart={handleDragStart}
+        onDragEnd={handleDragEnd}
+        onDragCancel={handleDragCancel}
+      >
         {visibleProjects.map(renderProject)}
+        <DragOverlay dropAnimation={null}>
+          {activeDragTaskId
+            ? (() => {
+                const t = tasks.find((x) => x.id === activeDragTaskId)
+                return t ? <TaskDragPreview task={t} /> : null
+              })()
+            : null}
+        </DragOverlay>
       </DndContext>
       {hiddenProjects.length > 0 && (
         <button

@@ -37,6 +37,10 @@ export interface SidebarViewContext {
    * - 'priority': 'p1'..'p5'
    */
   onTaskMove?: (taskId: string, newColumnId: string, targetIndex: number, groupBy: 'status' | 'priority') => void
+  /** Reparent a task — sets new parent_id (or null) and rewrites sibling order. */
+  onTaskReparent?: (taskId: string, newParentId: string | null, newSiblingTaskIds: string[]) => void
+  /** Patch a task with a partial update (used for orderBy field inheritance on drop). */
+  onTaskFieldUpdate?: (taskId: string, updates: Partial<Task>) => void
 }
 
 export interface SidebarView {

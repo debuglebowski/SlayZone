@@ -124,7 +124,7 @@ function App(): React.JSX.Element {
   const {
     tasks, projects, tags, taskTags, blockedTaskIds,
     setTasks, setProjects, setTags, setTaskTags,
-    updateTask, moveTask, bulkMove, reorderTasks,
+    updateTask, moveTask, bulkMove, reorderTasks, reparentTask,
     archiveTask: rawArchiveTask, archiveTasks: rawArchiveTasks,
     deleteTask: rawDeleteTask, bulkDelete: rawBulkDelete,
     contextMenuUpdate: rawContextMenuUpdate,
@@ -1406,7 +1406,7 @@ function App(): React.JSX.Element {
           onSettings={handleOpenSettings}
           onLeaderboard={() => { useTabStore.getState().setActiveView('leaderboard') }}
           onUsageAnalytics={() => { useTabStore.getState().setActiveView('usage-analytics') }}
-          onTaskClick={openTask} onCloseTab={closeTabByTaskId} onOpenTaskInBackground={(id) => useTabStore.getState().openTaskInBackground(id)} onCreateTemporaryTask={(projectId) => { void handleCreateScratchTerminal(projectId) }} zenMode={zenMode} onboardingChecklist={onboardingChecklist} idleByProject={idleByProject} onReorderProjects={reorderProjects} onTaskReorder={reorderTasks} onTaskMove={handleSidebarTaskMove}
+          onTaskClick={openTask} onCloseTab={closeTabByTaskId} onOpenTaskInBackground={(id) => useTabStore.getState().openTaskInBackground(id)} onCreateTemporaryTask={(projectId) => { void handleCreateScratchTerminal(projectId) }} zenMode={zenMode} onboardingChecklist={onboardingChecklist} idleByProject={idleByProject} onReorderProjects={reorderProjects} onTaskReorder={reorderTasks} onTaskMove={handleSidebarTaskMove} onTaskReparent={reparentTask} onTaskFieldUpdate={(taskId, updates) => { void rawContextMenuUpdate(taskId, updates) }}
           terminalStates={terminalStates} taskProgress={taskProgress} doneTaskIds={doneTaskIds} columnsByProjectId={columnsByProjectId}
           compactFooter={headerHidden ? compactFooterContent : undefined}
           updateState={
