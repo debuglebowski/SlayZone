@@ -1,40 +1,40 @@
 {
-  "timestamp": "2026-05-16T10:53:10.762Z",
+  "timestamp": "2026-05-16T17:35:45.860Z",
   "memory": {
-    "usedMB": 61,
-    "totalMB": 133,
+    "usedMB": 87,
+    "totalMB": 150,
     "limitMB": 3586
   },
   "dom": {
     "totalNodes": 519,
-    "divs": 187,
-    "svgs": 53,
-    "svgChildren": 173,
+    "divs": 190,
+    "svgs": 52,
+    "svgChildren": 170,
     "svgPctOfDOM": 33,
     "canvases": 0,
     "styleElements": 3
   },
   "paint": {
-    "firstPaint": 44,
-    "firstContentfulPaint": 168
+    "firstPaint": 76,
+    "firstContentfulPaint": 200
   },
   "resources": {
     "count": 4,
     "slowest": [
       {
-        "name": "config?ip=0&_=1778928791004&ver=1.347.2",
-        "durationMs": 144
+        "name": "?ip=0&_=1778952949160&ver=1.347.2&compression=gzip-js",
+        "durationMs": 482
       },
       {
-        "name": "?ip=0&_=1778928794006&ver=1.347.2&compression=gzip-js",
-        "durationMs": 127
+        "name": "?ip=0&_=1778952949158&ver=1.347.2&compression=gzip-js",
+        "durationMs": 461
       },
       {
-        "name": "?ip=0&_=1778928794008&ver=1.347.2&compression=gzip-js",
-        "durationMs": 126
+        "name": "config?ip=0&_=1778952946153&ver=1.347.2",
+        "durationMs": 114
       },
       {
-        "name": "?v=2&config=true&ip=0&_=1778928791005&ver=1.347.2&compressio",
+        "name": "?v=2&config=true&ip=0&_=1778952946154&ver=1.347.2&compressio",
         "durationMs": 56
       }
     ]
@@ -42,7 +42,7 @@
   "ipc": {
     "loadBoardDataMs": 1,
     "createTaskMs": 1,
-    "getProjectsMs": 26
+    "getProjectsMs": 21
   },
   "interaction": {
     "tabSwitchMs": 67,
@@ -52,7 +52,7 @@
   "scaling": {
     "taskCount": 100,
     "domNodesAtScale": 2070,
-    "memoryAtScaleMB": 61,
+    "memoryAtScaleMB": 87,
     "loadBoardDataAtScaleMs": 5
   }
 }

@@ -1,12 +1,10 @@
 import { test, expect, seed, goHome, clickProject, resetApp} from '../fixtures/electron'
 import { TEST_PROJECT_PATH } from '../fixtures/electron'
 
-// QUARANTINED 2026-05-16: web panels migrated from <webview> to WebContentsView
-// (useBrowserView w/ kind:'web-panel'). beforeAll setup no longer activates the
-// panel content reliably — listViews returns no entry post-toggle. Helpers
-// already migrated to use window.api.browser.listViews, but the panel toggle
-// pipeline needs deeper investigation. Feature (handoff routing) still works
-// in app; only the e2e shim is broken.
+// QUARANTINED 2026-05-16: WebPanelView post-Meta+o doesn't register a view
+// (listViews empty). Helpers migrated to window.api.browser.listViews; the
+// panel-toggle → useBrowserView createView path likely blocked by ownership
+// claim or another render guard. Needs source-side trace.
 test.describe.skip('Web panel handoff routing', () => {
   const PANEL_ID = 'web:handoff-e2e'
   const PANEL_NAME = 'Handoff Panel'
