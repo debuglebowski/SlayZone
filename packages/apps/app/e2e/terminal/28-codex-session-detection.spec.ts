@@ -90,9 +90,14 @@ test.describe('Session ID banners', () => {
   })
 
   test.afterAll(async ({ electronApp }) => {
+    // restorePtyHandlers re-registers the original handlers, which throws if
+    // another describe has already restored them. Swallow the duplicate-
+    // handler error so afterAll doesn't fail the suite.
     await electronApp.evaluate(() => {
-      const restore = (globalThis as unknown as { __restorePtyHandlers?: () => void }).__restorePtyHandlers
-      restore?.()
+      try {
+        const restore = (globalThis as unknown as { __restorePtyHandlers?: () => void }).__restorePtyHandlers
+        restore?.()
+      } catch { /* already restored */ }
     })
   })
 
