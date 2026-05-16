@@ -50,12 +50,7 @@ test.describe('Terminal mode switching', () => {
   // Note: 'Sync name' menu item was removed from the terminal header dropdown.
   // Tests that asserted its presence/absence have been dropped.
 
-  // QUARANTINED 2026-05-16 (revisit): ContextMenu chevron/right-click dispatch
-  // doesn't surface menuitemradio items in the Playwright env even with three
-  // strategies (chevron click, native right-click, JS contextmenu dispatch).
-  // Test 1 passes (trigger label) so the trigger renders — only menu opening
-  // is broken. May need Radix-specific test instrumentation.
-  test.skip('switch to Codex mode', async ({ mainWindow }) => {
+  test('switch to Codex mode', async ({ mainWindow }) => {
     await switchTerminalMode(mainWindow, 'codex')
 
     await expect(modeTrigger(mainWindow)).toHaveText(/Codex/)
@@ -83,20 +78,22 @@ test.describe('Terminal mode switching', () => {
     expect(task?.terminal_mode).toBe('codex')
   })
 
+  // QUARANTINED 2026-05-16 (revisit): the switch itself works via fallback,
+  // but openTerminalMenu's lucide-ellipsis click is intercepted by <html>
+  // (pointer-events leak from a prior Radix overlay). Skip until the
+  // overlay cleanup is more reliable.
   test.skip('switch back to Claude Code', async ({ mainWindow }) => {
     await switchTerminalMode(mainWindow, 'claude-code')
 
     await expect(modeTrigger(mainWindow)).toHaveText(/Claude( Code)?/)
+    // "Sync name" menu item was removed (commit 5d0ba505); just verify the
+    // terminal menu still opens for the active mode.
     await openTerminalMenu(mainWindow)
-    await expect(mainWindow.getByRole('menuitem', { name: 'Sync name' })).toBeVisible()
+    await expect(mainWindow.locator('[role="menu"]:visible').first()).toBeVisible()
     await mainWindow.keyboard.press('Escape')
   })
 
-  // QUARANTINED 2026-05-16 (revisit): the clear-on-switch behavior lives
-  // inside handleModeChange (renderer). Without a working ContextMenu fixture
-  // for non-'terminal' modes there's no way to exercise that callback in e2e
-  // — calling updateTask directly bypasses the very logic this test asserts.
-  test.skip('conversation IDs cleared on mode switch', async ({ mainWindow }) => {
+  test('conversation IDs cleared on mode switch', async ({ mainWindow }) => {
     await mainWindow.evaluate((id) =>
       window.api.db.updateTask({
         id,
@@ -109,7 +106,7 @@ test.describe('Terminal mode switching', () => {
     expect(task?.codex_conversation_id).toBeNull()
   })
 
-  test.skip('switching back to a mode restores that mode default flags', async ({ mainWindow }) => {
+  test('switching back to a mode restores that mode default flags', async ({ mainWindow }) => {
     // Set custom flags for claude-code
     await mainWindow.evaluate((id) =>
       window.api.db.updateTask({ id, claudeFlags: '--custom-flag-test' }), taskId)
