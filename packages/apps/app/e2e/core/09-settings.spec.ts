@@ -32,7 +32,7 @@ test.describe('Settings', () => {
     await expect(findCard(settingsDialog(mainWindow), 'Agent')).toBeVisible({ timeout: 5_000 })
     const terminalCard = findCard(dialog, 'Agent')
     await terminalCard.click()
-    await expect(dialog.getByText('Default mode')).toBeVisible({ timeout: 5_000 })
+    await expect(dialog.getByText('Default agent provider')).toBeVisible({ timeout: 5_000 })
   }
 
   test('open settings dialog', async ({ mainWindow }) => {
