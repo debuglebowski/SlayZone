@@ -94,32 +94,18 @@ export async function switchTerminalMode(page: Page, mode: TerminalMode): Promis
   const dropdownBtn = trigger.locator('[data-testid="terminal-mode-dropdown"], button').first()
   await dropdownBtn.click()
 
-  // Provider switcher uses DropdownMenu (role=menuitem). Older Select-based
-  // markup is still tolerated for backwards-compat with stale snapshots.
-  const itemByValue = page.locator(
-    `[role="menuitem"][data-value="${mode}"], [role="option"][data-value="${mode}"]`
-  ).first()
-  if (await itemByValue.isVisible({ timeout: 2_000 }).catch(() => false)) {
-    const selectedLabel = (await itemByValue.textContent())?.trim().replace(/\s*✓\s*$/, '')
-    await itemByValue.click()
-    if (selectedLabel) {
-      await expect(trigger).toContainText(selectedLabel)
-      return
-    }
-  }
-
+  // Provider switcher uses Radix ContextMenuRadioItem (role=menuitemradio).
+  // Older DropdownMenu (role=menuitem) and Select (role=option) markups are
+  // tolerated for backwards-compat with stale snapshots.
   for (const label of labels[mode] ?? [mode]) {
-    const itemByRole = page.getByRole('menuitem', { name: new RegExp(`^${label}(\\s*✓)?$`) }).first()
-    if (await itemByRole.isVisible({ timeout: 800 }).catch(() => false)) {
-      await itemByRole.click()
-      await expect(trigger).toContainText(label)
-      return
-    }
-    const option = page.getByRole('option', { name: label, exact: true })
-    if (await option.isVisible({ timeout: 400 }).catch(() => false)) {
-      await option.click()
-      await expect(trigger).toContainText(label)
-      return
+    const re = new RegExp(`^${label}(\\s*✓)?$`)
+    for (const role of ['menuitemradio', 'menuitem', 'option'] as const) {
+      const item = page.getByRole(role, { name: re }).first()
+      if (await item.isVisible({ timeout: 800 }).catch(() => false)) {
+        await item.click()
+        await expect(trigger).toContainText(label)
+        return
+      }
     }
   }
 
