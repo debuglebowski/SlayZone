@@ -66,9 +66,10 @@ test.describe('Issue #77: PTY revive on status transition', () => {
     await waitForNoPtySession(mainWindow, sessionId)
   })
 
-  // QUARANTINED 2026-05-16: subscriber installed but pty:respawn-suggested
-  // never fires. Either runtime adapter not configured in test env or
-  // updateTask path bypasses the revived branch. Needs main-process trace.
+  // QUARANTINED 2026-05-16: status flips correctly at DB level (sanity asserted
+  // above), but pty:respawn-suggested IPC never reaches the renderer
+  // subscriber. Either runtime adapter not actually wired in PLAYWRIGHT boot
+  // path, or webContents.send drops without erroring. Needs main-process trace.
   test.skip('status → in_progress broadcasts pty:respawn-suggested (Part B)', async ({ mainWindow }) => {
     const s = seed(mainWindow)
     const task = await s.createTask({ projectId, title: 'Revive-signal test', status: 'in_progress' })
@@ -92,9 +93,14 @@ test.describe('Issue #77: PTY revive on status transition', () => {
     )
     expect(noopCalls).toBe(0)
 
-    // Now do the full cycle: in_progress → done → in_progress
+    // Now do the full cycle: in_progress → done → in_progress.
+    // Wait between writes so the renderer observes 'done' as the "previous"
+    // status when the in_progress write computes the `revived` flag.
     await mainWindow.evaluate((id) => window.api.db.updateTask({ id, status: 'done' }), task.id)
-    await mainWindow.evaluate((id) => window.api.db.updateTask({ id, status: 'in_progress' }), task.id)
+    await mainWindow.waitForTimeout(200)
+    const result = await mainWindow.evaluate((id) => window.api.db.updateTask({ id, status: 'in_progress' }), task.id)
+    // sanity: status actually flipped at DB level
+    expect(result?.status).toBe('in_progress')
 
     await expect.poll(async () =>
       mainWindow.evaluate(
