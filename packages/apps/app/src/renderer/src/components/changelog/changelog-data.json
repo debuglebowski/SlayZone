@@ -1,5 +1,82 @@
 [
   {
+    "version": "0.31.0",
+    "date": "2026-05-20",
+    "tagline": "Sub-tasks, hook-driven agents",
+    "items": [
+      {
+        "category": "feature",
+        "title": "Tree drag-and-drop: pin, unpin, reorder",
+        "description": "Drag tasks into, out of, or within the pinned bucket; cross-group sibling reordering now lands where the preview shows, with group headers as valid drop targets."
+      },
+      {
+        "category": "feature",
+        "title": "Sub-tasks in tree view",
+        "description": "Sub-tasks are now collapsible under their parent in the tree, with blocked/snoozed visibility toggles and an auto-collapse when dragging a parent."
+      },
+      {
+        "category": "feature",
+        "title": "Bulk actions on multi-selected tree rows",
+        "description": "Multi-select rows in the sidebar tree and run actions (status, priority, delete, etc.) on all of them from one context menu."
+      },
+      {
+        "category": "feature",
+        "title": "Hook-driven agent lifecycle for Claude Code, Codex, Gemini",
+        "description": "Terminal now tracks agent start/stop via hook events instead of regex-matching output, eliminating false idle states and missed turns."
+      },
+      {
+        "category": "feature",
+        "title": "Tree filters: priority + show-all-open",
+        "description": "Filter the tree by priority and toggle show-all-open with a keyboard shortcut."
+      },
+      {
+        "category": "feature",
+        "title": "Start the main PTY from the slay CLI",
+        "description": "New verb + flag let you spawn or auto-spawn a task's main agent terminal directly from the command line."
+      },
+      {
+        "category": "improvement",
+        "title": "Sidebar polish",
+        "description": "Sidebar gains a pill-shaped resize handle and auto-hides the window buttons when collapsed."
+      },
+      {
+        "category": "improvement",
+        "title": "Markdown tables support inline line breaks",
+        "description": "Editor now renders inline `<br>` inside markdown table cells, so multi-line content displays correctly."
+      },
+      {
+        "category": "improvement",
+        "title": "Task description cap raised to 10,000 characters",
+        "description": "Long-form task descriptions no longer truncate at the old 5,000-char limit."
+      },
+      {
+        "category": "fix",
+        "title": "Claude ESC interrupt detected reliably",
+        "description": "Pressing ESC to cancel a Claude turn is now picked up via an output marker, so the UI flips state immediately."
+      },
+      {
+        "category": "fix",
+        "title": "Claude state flips to idle on blocking PreToolUse hook",
+        "description": "When a PreToolUse hook blocks the turn, Claude's state correctly resets to idle instead of staying stuck working."
+      },
+      {
+        "category": "fix",
+        "title": "Temp tasks no longer auto-deleted when their PTY exits",
+        "description": "Closing a temporary task's terminal no longer wipes the task — close it explicitly to remove it."
+      },
+      {
+        "category": "fix",
+        "title": "Browser tab lock state updates instantly",
+        "description": "Toggling or auto-locking a browser tab now stamps the lock state locally for immediate UI feedback."
+      },
+      {
+        "category": "fix",
+        "title": "Diff chip row stays mounted on clean state",
+        "description": "The continuous-flow chip row no longer disappears the moment the working tree goes clean."
+      }
+    ]
+  },
+  {
     "version": "0.30.0",
     "date": "2026-05-15",
     "tagline": "Tree overhaul, lazy agents",

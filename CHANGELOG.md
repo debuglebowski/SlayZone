@@ -1,6 +1,144 @@
 # Changelog
 
 
+## v0.31.0
+
+[compare changes](https://github.com/debuglebowski/slayzone/compare/v0.30.0...v0.31.0)
+
+### 🚀 Enhancements
+
+- **terminal:** Hook-driven codex lifecycle via PATH wrapper ([9cf43863](https://github.com/debuglebowski/slayzone/commit/9cf43863))
+- **sidebar:** Pill resize handle ([1222593a](https://github.com/debuglebowski/slayzone/commit/1222593a))
+- **platform:** Add paths helpers (ensureDataRoot, server port/host) ([e5365428](https://github.com/debuglebowski/slayzone/commit/e5365428))
+- **sidebar/tree:** Group-aware DnD strategy + header drop targets ([31d035b8](https://github.com/debuglebowski/slayzone/commit/31d035b8))
+- **task-terminals:** Rename Start to Open in agent start screen ([71fc313e](https://github.com/debuglebowski/slayzone/commit/71fc313e))
+- **tree:** Add priority filter + show-all-open toggle w/ shortcut pipeline ([22aac16a](https://github.com/debuglebowski/slayzone/commit/22aac16a))
+- **agent-hooks:** Gemini CLI lifecycle hook integration ([939c8b98](https://github.com/debuglebowski/slayzone/commit/939c8b98))
+- **transport:** TRPC v11 + WebSocket foundation pkg ([d171414f](https://github.com/debuglebowski/slayzone/commit/d171414f))
+- **sidebar:** Collapsible sub-tasks in TreeView ([645a6e25](https://github.com/debuglebowski/slayzone/commit/645a6e25))
+- **tree:** Collapse sub-tasks of dragged parent during drag ([84634cae](https://github.com/debuglebowski/slayzone/commit/84634cae))
+- **tree:** Show blocked/snoozed toggles + sub-tasks section ([35df784a](https://github.com/debuglebowski/slayzone/commit/35df784a))
+- **sidebar:** Hide window buttons when sidebar auto-hidden ([184c09fd](https://github.com/debuglebowski/slayzone/commit/184c09fd))
+- **terminal:** Drive claude-code state from hooks, drop regex ([60ec74de](https://github.com/debuglebowski/slayzone/commit/60ec74de))
+- **sidebar:** Bulk context menu for multi-selected tree rows ([9e975061](https://github.com/debuglebowski/slayzone/commit/9e975061))
+- **pty:** CLI-driven main PTY start (verb + flag + auto-spawn) ([5cee8487](https://github.com/debuglebowski/slayzone/commit/5cee8487))
+- **tree-dnd:** Pin/unpin/reorder via drag into/out/within pinned bucket ([f4fff2ae](https://github.com/debuglebowski/slayzone/commit/f4fff2ae))
+
+### 🩹 Fixes
+
+- **e2e:** Provider switcher role + fd-limit matcher ([c1bdd78b](https://github.com/debuglebowski/slayzone/commit/c1bdd78b))
+- **e2e:** 12-tags create-second-tag uses API seed ([43044163](https://github.com/debuglebowski/slayzone/commit/43044163))
+- **e2e:** 34 ensureGitPanelVisible retry + lazy initGitDir ([369700d1](https://github.com/debuglebowski/slayzone/commit/369700d1))
+- **e2e:** 33 lazy-init gitDir in resetRepo ([eb10d1bf](https://github.com/debuglebowski/slayzone/commit/eb10d1bf))
+- **e2e:** ActiveModeTrigger prefers active tab's trigger ([fce0a406](https://github.com/debuglebowski/slayzone/commit/fce0a406))
+- **e2e:** Strip pty:submit/chat:list/session:* before restore ([f01042d0](https://github.com/debuglebowski/slayzone/commit/f01042d0))
+- **e2e:** 33 git-panel scope + perf sanity bound ([1f2fb180](https://github.com/debuglebowski/slayzone/commit/1f2fb180))
+- **e2e:** 33 git-init use ensureGitPanelVisible ([cb315964](https://github.com/debuglebowski/slayzone/commit/cb315964))
+- **diff:** Keep continuous-flow chip row mounted on clean ([a531606d](https://github.com/debuglebowski/slayzone/commit/a531606d))
+- **browser:** Stamp tab.locked locally on auto-lock and toggle ([901fd79a](https://github.com/debuglebowski/slayzone/commit/901fd79a))
+- Install ws optional deps (bufferutil, utf-8-validate) ([f77108d3](https://github.com/debuglebowski/slayzone/commit/f77108d3))
+- **browser:** Move renderer focus to app api ([5d45dc05](https://github.com/debuglebowski/slayzone/commit/5d45dc05))
+- **tree:** Cross-group DnD — headers as items, drop matches pre-slide ([218dd5c1](https://github.com/debuglebowski/slayzone/commit/218dd5c1))
+- **editor:** Allow inline HTML (br) inside markdown table cells ([a535edc1](https://github.com/debuglebowski/slayzone/commit/a535edc1))
+- **protocol:** Mark slz-file scheme standard to enable Storage APIs ([beba0953](https://github.com/debuglebowski/slayzone/commit/beba0953))
+- **tabs:** Stop auto-deleting temp tasks on PTY exit ([1ab5ed66](https://github.com/debuglebowski/slayzone/commit/1ab5ed66))
+- **terminal:** Flip claude state to idle on blocking PreToolUse ([06e9a013](https://github.com/debuglebowski/slayzone/commit/06e9a013))
+- **tree:** Static group headers + correct cross-group ordering ([cc869900](https://github.com/debuglebowski/slayzone/commit/cc869900))
+- **tree:** Resolve merge conflicts, restore flat dnd render ([61066e8d](https://github.com/debuglebowski/slayzone/commit/61066e8d))
+- **protocol:** Slz-file uses sentinel 'app' host ([e1268597](https://github.com/debuglebowski/slayzone/commit/e1268597))
+- **terminal:** Detect Claude ESC interrupt via output marker ([dcd0ee77](https://github.com/debuglebowski/slayzone/commit/dcd0ee77))
+- **tree-dnd:** Make headers valid drop targets, derive landing from arrayMove ([d8bf4bb8](https://github.com/debuglebowski/slayzone/commit/d8bf4bb8))
+- **tree-dnd:** Align cross-group row landing with pre-slide arrayMove ([efcb1d16](https://github.com/debuglebowski/slayzone/commit/efcb1d16))
+
+### 💅 Refactors
+
+- **tree:** Flat dnd render + pointer-based drop direction ([d280a553](https://github.com/debuglebowski/slayzone/commit/d280a553))
+- **protocol:** Extract slz-file URL helper to @slayzone/platform ([c96cc229](https://github.com/debuglebowski/slayzone/commit/c96cc229))
+
+### 🏡 Chore
+
+- **nix:** Update sources to 0.30.0 ([b8ae3d0c](https://github.com/debuglebowski/slayzone/commit/b8ae3d0c))
+- **task:** Raise description cap 5000 → 10000 ([0b9693a2](https://github.com/debuglebowski/slayzone/commit/0b9693a2))
+- Ignore .claude/worktrees/ (claude agent isolation dirs) ([fb2bc6f6](https://github.com/debuglebowski/slayzone/commit/fb2bc6f6))
+- **perf:** Refresh perf baselines from iter-5 e2e run ([fb95b66c](https://github.com/debuglebowski/slayzone/commit/fb95b66c))
+- Add eslint 9 + react plugins ([83618c12](https://github.com/debuglebowski/slayzone/commit/83618c12))
+- **perf:** Refresh profiling snapshots ([67c389ec](https://github.com/debuglebowski/slayzone/commit/67c389ec))
+- **lint:** Wire eslint into pnpm lint + clear accumulated rot ([a09a7846](https://github.com/debuglebowski/slayzone/commit/a09a7846))
+- **lint:** Migrate to biome + slim eslint hybrid ([7f51a949](https://github.com/debuglebowski/slayzone/commit/7f51a949))
+- **perf:** Refresh performance notes ([ddbd4984](https://github.com/debuglebowski/slayzone/commit/ddbd4984))
+
+### ✅ Tests
+
+- Add local test-server fixture ([90d32cfc](https://github.com/debuglebowski/slayzone/commit/90d32cfc))
+- Redirect external URLs to local test-server ([8bfb0767](https://github.com/debuglebowski/slayzone/commit/8bfb0767))
+- Port phase-0 stabilization batch (renderer catch-ups, fixture hardening) ([c01dc06e](https://github.com/debuglebowski/slayzone/commit/c01dc06e))
+- Git diff panel — sweep untracked + remove @@ assertion ([1c1ccba5](https://github.com/debuglebowski/slayzone/commit/1c1ccba5))
+- Avoid toast match + sandbox-iframe click hardening ([1867036e](https://github.com/debuglebowski/slayzone/commit/1867036e))
+- Temp-task mode switch bypasses UI race via direct API ([bf8b0dec](https://github.com/debuglebowski/slayzone/commit/bf8b0dec))
+- **33:** Revert Playwright-context fetch — worker teardown timeout ([723ca9db](https://github.com/debuglebowski/slayzone/commit/723ca9db))
+- **35:** Panel-toggle Terminal -> Agent + bg-muted -> bg-surface-3 ([49bddab1](https://github.com/debuglebowski/slayzone/commit/49bddab1))
+- Fix search-dialog placeholder text (was matching nothing) ([4c8e1049](https://github.com/debuglebowski/slayzone/commit/4c8e1049))
+- **44:** Drop Files-filter click — filter buttons render only after query ([eea09f93](https://github.com/debuglebowski/slayzone/commit/eea09f93))
+- Drop Sync-name tests + web-panel Cmd+J -> Cmd+L ([5d0ba505](https://github.com/debuglebowski/slayzone/commit/5d0ba505))
+- Quarantine 61-web-panel-handoff-routing ([14356f7b](https://github.com/debuglebowski/slayzone/commit/14356f7b))
+- Quarantine web-panel webview e2e (61 + 71) ([a46473f4](https://github.com/debuglebowski/slayzone/commit/a46473f4))
+- Skip 77 glow-on-WCV-focus ([08539f55](https://github.com/debuglebowski/slayzone/commit/08539f55))
+- Fix 87 lock-toggle absent + skip 4 deeper tests ([23b51347](https://github.com/debuglebowski/slayzone/commit/23b51347))
+- Fix 09 settings — Default mode → Default agent provider ([b948ca65](https://github.com/debuglebowski/slayzone/commit/b948ca65))
+- Fix 14 columns tab testid rename ([c79fd892](https://github.com/debuglebowski/slayzone/commit/c79fd892))
+- Fix 44 quick open empty text ([1adb4485](https://github.com/debuglebowski/slayzone/commit/1adb4485))
+- Skip 3 UI tests in 95 task-progress ([05da1638](https://github.com/debuglebowski/slayzone/commit/05da1638))
+- Skip 32 chip row mount-across-clean ([238d21c0](https://github.com/debuglebowski/slayzone/commit/238d21c0))
+- Fix 38 worktree path template subdir ([0ebca3d3](https://github.com/debuglebowski/slayzone/commit/0ebca3d3))
+- Skip 7 web-panel tests with selector/structure drift ([269e374f](https://github.com/debuglebowski/slayzone/commit/269e374f))
+- Quarantine 49 opencode CLI ([f6c1a7b6](https://github.com/debuglebowski/slayzone/commit/f6c1a7b6))
+- Fix 60 strip task-context env + skip delete ([8ccc333a](https://github.com/debuglebowski/slayzone/commit/8ccc333a))
+- Quarantine 93 resume-command opts ([0e9c69e7](https://github.com/debuglebowski/slayzone/commit/0e9c69e7))
+- Quarantine 94 session-invalidation ([5796782e](https://github.com/debuglebowski/slayzone/commit/5796782e))
+- Quarantine 22 codex/claude-code mode switches ([553374b1](https://github.com/debuglebowski/slayzone/commit/553374b1))
+- Quarantine 27 codex resume (PTY autospawn flaky) ([fe229b2c](https://github.com/debuglebowski/slayzone/commit/fe229b2c))
+- 28 swallow restorePtyHandlers duplicate error ([f47e0e06](https://github.com/debuglebowski/slayzone/commit/f47e0e06))
+- Skip 30 mode-switch teardown (fixture) ([7c5ea0e7](https://github.com/debuglebowski/slayzone/commit/7c5ea0e7))
+- Skip 32 pty-revive part B (event timing) ([9e60de35](https://github.com/debuglebowski/slayzone/commit/9e60de35))
+- Quarantine 33 force-respawn (CSP blocks renderer fetch) ([aebff53c](https://github.com/debuglebowski/slayzone/commit/aebff53c))
+- 37 swallow restorePty + skip mode-transition ([228e87c6](https://github.com/debuglebowski/slayzone/commit/228e87c6))
+- Skip 42 Cmd+K tab (shortcut remapped to search) ([a64cc75a](https://github.com/debuglebowski/slayzone/commit/a64cc75a))
+- Quarantine 55 crash overlay describe + 2 doctor tests ([d0ec05b2](https://github.com/debuglebowski/slayzone/commit/d0ec05b2))
+- Skip 55 shell-fallback (PTY race on fast-exit cmd) ([182c83df](https://github.com/debuglebowski/slayzone/commit/182c83df))
+- Skip 83 cursor stability (claude PTY auth env) ([b7b10f8f](https://github.com/debuglebowski/slayzone/commit/b7b10f8f))
+- Quarantine 83 browser-zoom-sync (bounds regression) ([45a4f456](https://github.com/debuglebowski/slayzone/commit/45a4f456))
+- Skip 33 UI merge (Meta+g full-suite race) ([6284c38d](https://github.com/debuglebowski/slayzone/commit/6284c38d))
+- Quarantine 33 Git init describe (full-suite panel race) ([f28b0e66](https://github.com/debuglebowski/slayzone/commit/f28b0e66))
+- Drop perf-boot upper bound (false-positive in full suite) ([af06465f](https://github.com/debuglebowski/slayzone/commit/af06465f))
+- Unskip 42 — exercise tabs.create API instead of remapped hotkey ([929013f3](https://github.com/debuglebowski/slayzone/commit/929013f3))
+- Unskip 95 UI progress tests ([58eb8ea9](https://github.com/debuglebowski/slayzone/commit/58eb8ea9))
+- Unskip 87 DB sticky test + add disambiguated locators ([c64c9f87](https://github.com/debuglebowski/slayzone/commit/c64c9f87))
+- Fixture adds JS contextmenu fallback; 22 stays skipped ([b60ac5a6](https://github.com/debuglebowski/slayzone/commit/b60ac5a6))
+- Unskip 77 glow via DOM focusin; re-skip 32 Part B ([ce6a9dcd](https://github.com/debuglebowski/slayzone/commit/ce6a9dcd))
+- Unskip 33 404/400 + 55 stays skipped + 33 broadcast/restart re-skip ([ca08339f](https://github.com/debuglebowski/slayzone/commit/ca08339f))
+- Unskip 46 predefined externals + enable Figma + terminal row config ([7e52f116](https://github.com/debuglebowski/slayzone/commit/7e52f116))
+- Re-skip 61 / 27 (deeper investigation needed) ([9a3dfebd](https://github.com/debuglebowski/slayzone/commit/9a3dfebd))
+- 49 keeps describe.skip; switch to DB-set mode (PTY spawn still fails) ([d9155051](https://github.com/debuglebowski/slayzone/commit/d9155051))
+- 32 chip row test resilient to dirty index ([2e6ca7bf](https://github.com/debuglebowski/slayzone/commit/2e6ca7bf))
+- Unskip 22 mode-persistence; bypass ContextMenu via DB write ([eea3c9e5](https://github.com/debuglebowski/slayzone/commit/eea3c9e5))
+- 32 partB stays skipped; add DB-status sanity assertion ([ab37a5c2](https://github.com/debuglebowski/slayzone/commit/ab37a5c2))
+- Unskip 55 doctor tests via DB-write mode bypass ([ea4adfea](https://github.com/debuglebowski/slayzone/commit/ea4adfea))
+- 22 unskip 4 mode-switch tests via fixture fallback ([8195ebe2](https://github.com/debuglebowski/slayzone/commit/8195ebe2))
+- 30 + 37 stay skipped — fallback can't reproduce full handleModeChange ([7df70824](https://github.com/debuglebowski/slayzone/commit/7df70824))
+- Unskip 33 Git init describe — passes in isolation now ([0e13e515](https://github.com/debuglebowski/slayzone/commit/0e13e515))
+- 22 unskip switch-back-claude (overlay + menu disambiguation) ([85527584](https://github.com/debuglebowski/slayzone/commit/85527584))
+- **sidebar:** E2e for tree view context-menu actions ([4b81ef1a](https://github.com/debuglebowski/slayzone/commit/4b81ef1a))
+- **tree-dnd:** Lock root order via reorderTasks to kill flake ([84b24cb0](https://github.com/debuglebowski/slayzone/commit/84b24cb0))
+
+### 🎨 Styles
+
+- **editor:** Full-width tables + tighter cell padding ([1aebe332](https://github.com/debuglebowski/slayzone/commit/1aebe332))
+- Biome format sweep across repo ([c4fe13e2](https://github.com/debuglebowski/slayzone/commit/c4fe13e2))
+
+### ❤️ Contributors
+
+- Debuglebowski
+
 ## v0.30.0
 
 [compare changes](https://github.com/debuglebowski/slayzone/compare/v0.29.2...v0.30.0)
