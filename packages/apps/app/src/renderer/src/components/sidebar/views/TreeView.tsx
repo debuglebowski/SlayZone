@@ -1403,9 +1403,14 @@ export function TreeView({
         const origTargetIdx = siblings.findIndex((s) => s.id === targetId)
         insertIdx = sourceOrigIdx < origTargetIdx ? filteredTargetIdx + 1 : filteredTargetIdx
       } else {
-        // Cross-group: branch by source's visual position relative to target
-        // in the flat render order. Flat-idx is scroll/transform invariant
-        // (rect-top comparison flips sign under auto-scroll + strategy shift).
+        // Cross-group: pure arrayMove convention so landing matches the
+        // pre-slide visual (verticalListSortingStrategy uses arrayMove).
+        //   Drag DOWN (source above target in flat): source AFTER target.
+        //   Drag UP (source below target in flat): source AT target's slot
+        //     (= BEFORE target in flat).
+        // "Insert at top of group" semantics route through a header drop
+        // (`kind: 'group'` branch) — collision detection picks the header
+        // when pointer is in the inter-group gap.
         const flat: string[] = []
         {
           const projectGroups = rootGroupsByProject.get(activeData.projectId) ?? []
@@ -1420,26 +1425,7 @@ export function TreeView({
         const tgtFlatIdx = flat.indexOf(targetId)
         const sourceAboveOver =
           srcFlatIdx !== -1 && tgtFlatIdx !== -1 ? srcFlatIdx < tgtFlatIdx : true
-        if (sourceAboveOver) {
-          // Source above target: source takes target's slot (target shifts
-          // down). Drop intent uniform across pointer-positions on the
-          // target row — always BEFORE. This matches dnd-kit's `arrayMove`
-          // convention applied across groups.
-          insertIdx = filteredTargetIdx
-        } else {
-          // Source below target: pointer fraction within target decides.
-          //   Top half → BEFORE target (drop at top of target's group).
-          //   Bottom half → AFTER target (drop at end of target's group,
-          //   e.g. last spot of an upper group reached via the inter-group
-          //   gap below the target row).
-          const translated = active.rect.current.translated
-          const sourceCenterY = translated
-            ? translated.top + translated.height / 2
-            : (active.rect.current.initial?.top ?? 0) +
-              (active.rect.current.initial?.height ?? 0) / 2
-          const overCenterY = over.rect.top + over.rect.height / 2
-          insertIdx = sourceCenterY < overCenterY ? filteredTargetIdx : filteredTargetIdx + 1
-        }
+        insertIdx = sourceAboveOver ? filteredTargetIdx + 1 : filteredTargetIdx
       }
       const newSiblingIds = [
         ...filtered.slice(0, insertIdx).map((s) => s.id),

@@ -657,20 +657,21 @@ test.describe('TreeView drag and drop', () => {
   test('drop on group header: source becomes idx 0 of that group', async ({ mainWindow }) => {
     // Drag rootA (in_progress, idx 0) onto the 'todo' group header.
     // After: rootA.status='todo', rootA.order=0, rootTodo.order=1.
+    // Header box must be resolved AFTER drag activation — subs collapse
+    // shifts the layout, so the pre-drag header position is stale.
     const srcBox = await taskRow(mainWindow, rootA).boundingBox()
     if (!srcBox) throw new Error('source row missing')
-    // Header lives inside the 'todo' StatusGroupDroppable. Locate the header
-    // text and drop on it.
-    const todoHeader = mainWindow
-      .locator(`[data-testid="tree-status-group"][data-status="todo"]`)
-      .locator('text=Todo')
-      .first()
-    const headerBox = await todoHeader.boundingBox()
-    if (!headerBox) throw new Error('todo header box missing')
     await dragFromTo(
       mainWindow,
       { x: srcBox.x + srcBox.width / 2, y: srcBox.y + srcBox.height / 2 },
-      { x: headerBox.x + headerBox.width / 2, y: headerBox.y + headerBox.height / 2 }
+      async () => {
+        const todoHeader = mainWindow
+          .locator(`[data-testid="tree-status-group"][data-status="todo"]`)
+          .first()
+        const headerBox = await todoHeader.boundingBox()
+        if (!headerBox) throw new Error('todo header box missing')
+        return { x: headerBox.x + headerBox.width / 2, y: headerBox.y + headerBox.height / 2 }
+      }
     )
     await expect
       .poll(
@@ -698,8 +699,17 @@ test.describe('TreeView drag and drop', () => {
     await dragFromTo(
       mainWindow,
       { x: srcBox.x + srcBox.width / 2, y: srcBox.y + srcBox.height / 2 },
-      // 2px below rootC's bottom edge — inside the inter-group gap.
-      rowDropPoint(mainWindow, rootC, { yFrac: 1, yOffset: 2 })
+      // Drop on the todo header itself — header sits in the inter-group gap.
+      // arrayMove(source, headerIdx) for drag UP lands source AT headerIdx
+      // in flat = above the header = end of previous group (in_progress).
+      async () => {
+        const todoHeader = mainWindow
+          .locator(`[data-testid="tree-status-group"][data-status="todo"]`)
+          .first()
+        const box = await todoHeader.boundingBox()
+        if (!box) throw new Error('todo header box missing')
+        return { x: box.x + box.width / 2, y: box.y + box.height / 2 }
+      }
     )
 
     await expect
@@ -708,11 +718,6 @@ test.describe('TreeView drag and drop', () => {
           const t = await getTaskById(mainWindow, rootTodo)
           const c = await getTaskById(mainWindow, rootC)
           if (!t || !c) return null
-          // Key invariants: rootTodo is now an in_progress task, placed AFTER
-          // rootC (= visually at end of the upper group). The exact order
-          // integer for rootC depends on the status-filtered list order
-          // moveTask sees (subtasks counted), but rootC must stay before
-          // rootTodo.
           return {
             tStatus: t.status,
             afterRootC: t.order > c.order
@@ -723,11 +728,12 @@ test.describe('TreeView drag and drop', () => {
       .toEqual({ tStatus: 'in_progress', afterRootC: true })
   })
 
-  test("drop on row in different group: source lands at that row's slot in target group", async ({
+  test('drop on row in different group: drag DOWN cross-group lands source AFTER target', async ({
     mainWindow
   }) => {
-    // Drag rootA (in_progress) onto rootTodo (only row in 'todo') —
-    // expect rootA at order=0 of todo, rootTodo at order=1.
+    // Drag rootA (in_progress) onto rootTodo (only row in 'todo'). Pure
+    // arrayMove convention: drag DOWN onto X lands source AFTER X →
+    // rootTodo stays at order 0, rootA at order 1.
     const srcBox = await taskRow(mainWindow, rootA).boundingBox()
     const dstBox = await taskRow(mainWindow, rootTodo).boundingBox()
     if (!srcBox || !dstBox) throw new Error('row bounding boxes unavailable')
@@ -745,7 +751,7 @@ test.describe('TreeView drag and drop', () => {
         },
         { timeout: 5_000 }
       )
-      .toEqual({ aStatus: 'todo', aOrder: 0, todoOrder: 1 })
+      .toEqual({ aStatus: 'todo', aOrder: 1, todoOrder: 0 })
   })
 
   // ====== Pre-slide visual tests ======
@@ -1020,7 +1026,7 @@ test.describe('TreeView drag and drop', () => {
   //   (d) inside the visual gap (= target's ORIGINAL slot)
   // All four must produce the same drop: source at idx 0 of target group.
 
-  test('3-group B→C variations: drop at target current TOP lands at idx 0 of C', async ({
+  test('3-group B→C variations: drop on row at TOP lands AFTER target (arrayMove)', async ({
     mainWindow
   }) => {
     const rootDone = await mainWindow.evaluate(
@@ -1060,13 +1066,13 @@ test.describe('TreeView drag and drop', () => {
           },
           { timeout: 5_000 }
         )
-        .toEqual({ dStatus: 'todo', beforeRootTodo: true })
+        .toEqual({ dStatus: 'todo', beforeRootTodo: false })
     } finally {
       await mainWindow.evaluate((id) => window.api.db.deleteTask(id), rootDone.id)
     }
   })
 
-  test('3-group B→C variations: drop at target current CENTER lands at idx 0 of C', async ({
+  test('3-group B→C variations: drop on row at CENTER lands AFTER target (arrayMove)', async ({
     mainWindow
   }) => {
     const rootDone = await mainWindow.evaluate(
@@ -1106,13 +1112,13 @@ test.describe('TreeView drag and drop', () => {
           },
           { timeout: 5_000 }
         )
-        .toEqual({ dStatus: 'todo', beforeRootTodo: true })
+        .toEqual({ dStatus: 'todo', beforeRootTodo: false })
     } finally {
       await mainWindow.evaluate((id) => window.api.db.deleteTask(id), rootDone.id)
     }
   })
 
-  test('3-group B→C variations: drop at target current BOTTOM lands at idx 0 of C', async ({
+  test('3-group B→C variations: drop on row at BOTTOM lands AFTER target (arrayMove)', async ({
     mainWindow
   }) => {
     const rootDone = await mainWindow.evaluate(
@@ -1152,13 +1158,13 @@ test.describe('TreeView drag and drop', () => {
           },
           { timeout: 5_000 }
         )
-        .toEqual({ dStatus: 'todo', beforeRootTodo: true })
+        .toEqual({ dStatus: 'todo', beforeRootTodo: false })
     } finally {
       await mainWindow.evaluate((id) => window.api.db.deleteTask(id), rootDone.id)
     }
   })
 
-  test('3-group B→C variations: drop in PRE-SLIDE GAP (target original slot) lands at idx 0 of C', async ({
+  test('3-group B→C variations: drop in pre-slide gap lands AFTER target (arrayMove)', async ({
     mainWindow
   }) => {
     const rootDone = await mainWindow.evaluate(
@@ -1204,7 +1210,7 @@ test.describe('TreeView drag and drop', () => {
           },
           { timeout: 5_000 }
         )
-        .toEqual({ dStatus: 'todo', beforeRootTodo: true })
+        .toEqual({ dStatus: 'todo', beforeRootTodo: false })
     } finally {
       await mainWindow.evaluate((id) => window.api.db.deleteTask(id), rootDone.id)
     }
