@@ -719,6 +719,7 @@ export function TreeView({
   const treeCollapsedTaskIds = useTabStore((s) => s.treeCollapsedTaskIds)
   const collapsedSet = useMemo(() => new Set(treeCollapsedTaskIds), [treeCollapsedTaskIds])
   const toggleTreeCollapsedTask = useTabStore((s) => s.toggleTreeCollapsedTask)
+  const toggleTreePinnedTask = useTabStore((s) => s.toggleTreePinnedTask)
   // Hoisted above `childrenByParent` memo so it can react to drag start —
   // dragging a parent transiently collapses its sub-tasks.
   const [activeDragTaskId, setActiveDragTaskId] = useState<string | null>(null)
@@ -1286,7 +1287,24 @@ export function TreeView({
         if (!newGroupKey) newGroupKey = activeData.groupValue
 
         const newGroup = groupByKey.get(newGroupKey)
-        if (!newGroup || newGroup.isTemp || newGroup.isPinned) return
+        if (!newGroup || newGroup.isTemp) return
+
+        // Drop into the pinned bucket → pin the moved task(s). Status /
+        // priority unchanged (pinning is independent). For sources already
+        // pinned, toggle would unpin — guard with pinnedSet check.
+        if (newGroup.isPinned) {
+          for (const id of movedIds) {
+            if (!pinnedSet.has(id)) toggleTreePinnedTask(id)
+          }
+          return
+        }
+        // Source leaving the pinned bucket → unpin (status/priority change
+        // applied by the dispatch below).
+        if (activeData.groupValue === PINNED_GROUP_KEY) {
+          for (const id of movedIds) {
+            if (pinnedSet.has(id)) toggleTreePinnedTask(id)
+          }
+        }
 
         // No-op: same group AND insertion at source's original position.
         if (newGroupKey === activeData.groupValue && newSourceIdx === activeIdx) {
@@ -1367,7 +1385,31 @@ export function TreeView({
       if (targetParent === null) {
         targetGroupKey = rowGroupValue(target, treeGroupBy, treeGroupPinned, pinnedSet)
         const g = groupByKey.get(targetGroupKey)
-        if (!g || g.isTemp || g.isPinned) return
+        if (!g || g.isTemp) return
+        // Drop on a row in the pinned bucket:
+        //   - If any moved task isn't pinned yet → pin them (no reorder).
+        //     Status/priority preserved (pinning is independent).
+        //   - If all moved are already pinned → fall through to standard
+        //     same-group reorder (arrayMove on pinned siblings).
+        if (g.isPinned) {
+          const allPinned = movedIds.every((id) => pinnedSet.has(id))
+          if (!allPinned) {
+            for (const id of movedIds) {
+              if (!pinnedSet.has(id)) toggleTreePinnedTask(id)
+            }
+            return
+          }
+        }
+        // Source leaving the pinned bucket → unpin (status change still
+        // applied by the cross-group dispatch below).
+        if (
+          activeData.groupValue === PINNED_GROUP_KEY &&
+          targetGroupKey !== PINNED_GROUP_KEY
+        ) {
+          for (const id of movedIds) {
+            if (pinnedSet.has(id)) toggleTreePinnedTask(id)
+          }
+        }
         siblings = g.tasks
       } else {
         siblings = childrenByParent.get(targetParent) ?? []
