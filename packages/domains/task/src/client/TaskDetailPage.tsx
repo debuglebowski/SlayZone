@@ -3584,35 +3584,53 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
                   <TaskSettingsPanel
                     taskId={task.id}
                     renderDefaultContent={() => {
-                      // Open cards: content-sized up to fair share of available space.
-                      // Closed cards: header only (auto).
-                      // Units in rem so values track Tailwind scale directly:
-                      //   gap-4 = 1rem, min-h-8 (card header) = 2rem.
-                      // Share = (container − closed×header − total-gap) / openCount
+                      // Two layouts, picked by the Description "Full height" (↕) toggle:
+                      //
+                      // Full height (descriptionExpanded): Description fills all spare
+                      //   space (minmax(9rem,1fr)); Sub-tasks/Artifacts are auxiliary —
+                      //   header-only when closed, capped at 18rem (internal scroll)
+                      //   when open.
+                      //
+                      // Default height: open cards share remaining space evenly.
+                      //   Share = (container − closed×header − total-gap) / openCount,
+                      //   floored at 9rem so a short panel can't starve the grid down
+                      //   to header-only — it scrolls instead. Units in rem to track
+                      //   Tailwind scale: gap-4 = 1rem, min-h-8 (card header) = 2rem.
                       const openCount = [descriptionOpen, subTasksOpen, artifactsOpen].filter(
                         Boolean
                       ).length
                       const closedCount = 3 - openCount
                       const share =
                         openCount > 0
-                          ? `calc((100% - ${closedCount * 2}rem - 2rem) / ${openCount})`
+                          ? `max(9rem, calc((100% - ${closedCount * 2}rem - 2rem) / ${openCount}))`
                           : '100%'
                       const rowFor = (open: boolean): string =>
                         open ? `fit-content(${share})` : 'auto'
-                      const cardRows = [
-                        rowFor(descriptionOpen),
-                        rowFor(subTasksOpen),
-                        rowFor(artifactsOpen)
-                      ].join(' ')
+                      const cappedRowFor = (open: boolean): string =>
+                        open ? 'fit-content(18rem)' : 'auto'
+                      const cardRows = descriptionExpanded
+                        ? [
+                            descriptionOpen ? 'minmax(9rem, 1fr)' : 'auto',
+                            cappedRowFor(subTasksOpen),
+                            cappedRowFor(artifactsOpen)
+                          ].join(' ')
+                        : [
+                            rowFor(descriptionOpen),
+                            rowFor(subTasksOpen),
+                            rowFor(artifactsOpen)
+                          ].join(' ')
                       return (
                         <>
                           {/* External sync links */}
                           <ExternalSyncCard taskId={task.id} onUpdate={handleTaskUpdate} />
 
-                          {/* Cards grid: open cards share remaining space (1fr), closed cards collapse to header (auto) */}
+                          {/* Cards grid: open cards share remaining space, closed cards
+                              collapse to header. flex-[1_0_auto] = grow into spare space
+                              but never shrink below content, so floored rows push the
+                              panel into its overflow-y-auto scroll instead of clipping. */}
                           <div
                             data-testid="settings-cards-grid"
-                            className="flex-1 min-h-0 grid gap-4 content-start"
+                            className="flex-[1_0_auto] grid gap-4 content-start"
                             style={{ gridTemplateRows: cardRows }}
                           >
                             {/* Description */}
@@ -3628,7 +3646,7 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
                                   descriptionOpen && 'border-b border-border'
                                 )}
                               >
-                                <CollapsibleTrigger className="flex items-center gap-1.5 hover:text-foreground transition-colors [&[data-state=open]>svg:first-child]:rotate-90">
+                                <CollapsibleTrigger className="flex flex-1 items-center gap-1.5 hover:text-foreground transition-colors [&[data-state=open]>svg:first-child]:rotate-90">
                                   <ChevronRight className="size-3 transition-transform" />
                                   Description
                                 </CollapsibleTrigger>
@@ -3727,11 +3745,9 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
                               onOpenChange={setSubTasksOpen}
                               className="group/sub rounded-md border border-border overflow-hidden flex flex-col min-h-0"
                             >
-                              <div className="shrink-0 flex w-full items-center gap-1.5 bg-muted/50 px-2.5 py-1.5 min-h-8 text-xs font-medium text-muted-foreground group-data-[state=open]/sub:border-b border-border">
-                                <CollapsibleTrigger className="flex items-center gap-1.5 hover:text-foreground transition-colors [&[data-state=open]>svg:first-child]:rotate-90">
-                                  <ChevronRight className="size-3 transition-transform" />
-                                  Sub-tasks
-                                </CollapsibleTrigger>
+                              <CollapsibleTrigger className="shrink-0 flex w-full items-center gap-1.5 bg-muted/50 px-2.5 py-1.5 min-h-8 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors group-data-[state=open]/sub:border-b border-border [&[data-state=open]>svg:first-child]:rotate-90">
+                                <ChevronRight className="size-3 transition-transform" />
+                                Sub-tasks
                                 {subTasks.length > 0 && (
                                   <span className="ml-auto text-muted-foreground/60 text-[10px]">
                                     {
@@ -3742,7 +3758,7 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
                                     /{subTasks.length}
                                   </span>
                                 )}
-                              </div>
+                              </CollapsibleTrigger>
                               <CollapsibleContent className="p-2 flex flex-col flex-1 min-h-0">
                                 <DndContext
                                   sensors={subTaskSensors}
@@ -3809,17 +3825,15 @@ export const TaskDetailPage = React.memo(function TaskDetailPage({
                               onOpenChange={setArtifactsOpen}
                               className="group/artifacts rounded-md border border-border overflow-hidden flex flex-col min-h-0"
                             >
-                              <div className="flex w-full items-center gap-1.5 bg-muted/50 px-2.5 py-1.5 min-h-8 text-xs font-medium text-muted-foreground group-data-[state=open]/artifacts:border-b border-border">
-                                <CollapsibleTrigger className="flex items-center gap-1.5 hover:text-foreground transition-colors [&[data-state=open]>svg:first-child]:rotate-90">
-                                  <ChevronRight className="size-3 transition-transform" />
-                                  Artifacts
-                                </CollapsibleTrigger>
+                              <CollapsibleTrigger className="flex w-full items-center gap-1.5 bg-muted/50 px-2.5 py-1.5 min-h-8 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors group-data-[state=open]/artifacts:border-b border-border [&[data-state=open]>svg:first-child]:rotate-90">
+                                <ChevronRight className="size-3 transition-transform" />
+                                Artifacts
                                 {artifacts.length > 0 && (
                                   <span className="ml-auto text-muted-foreground/60 text-[10px]">
                                     {artifacts.length}
                                   </span>
                                 )}
-                              </div>
+                              </CollapsibleTrigger>
                               <CollapsibleContent className="p-2 flex flex-col flex-1 min-h-0">
                                 <div className="flex flex-col gap-0.5 flex-1 min-h-0 overflow-y-auto overscroll-contain">
                                   {artifacts.map((artifact) => (

@@ -7,7 +7,7 @@ import {
   resetApp,
   TEST_PROJECT_PATH
 } from '../fixtures/electron'
-import type { Page, Locator } from '@playwright/test'
+import type { Page, Locator, ElectronApplication } from '@playwright/test'
 
 // --- Helpers ---
 
@@ -75,6 +75,24 @@ async function clearSubtasks(page: Page, parentId: string) {
     ).__slayzone_refreshData?.()
     await new Promise((r) => setTimeout(r, 100))
   })
+}
+
+async function resizeWindow(electronApp: ElectronApplication, width: number, height: number) {
+  await electronApp.evaluate(
+    ({ BrowserWindow }, size) => {
+      const win = BrowserWindow.getAllWindows().find(
+        (w) =>
+          !w.isDestroyed() &&
+          w.webContents.getURL() !== 'about:blank' &&
+          !w.webContents.getURL().startsWith('data:')
+      )
+      if (win) {
+        win.setSize(size.width, size.height)
+        win.center()
+      }
+    },
+    { width, height }
+  )
 }
 
 // --- Tests ---
@@ -223,6 +241,107 @@ test.describe('Settings panel card sizing', () => {
 
     await setCardOpen(subtasksCard(mainWindow), false)
     expect(await cardHeight(subtasksCard(mainWindow))).toBeLessThan(60)
+  })
+
+  test('short window: open card with content stays visible, panel scrolls (regression)', async ({
+    mainWindow,
+    electronApp
+  }) => {
+    // Regression: a short panel used to starve the cards grid (flex-1) — the
+    // fit-content `share` calc went ~0/negative and open cards clipped to
+    // header-only. Open cards holding content must stay visible; the panel
+    // degrades by scrolling instead.
+    await createSubtasks(mainWindow, taskId, projectId, 6)
+    await setCardOpen(descriptionCard(mainWindow), true)
+    await setCardOpen(subtasksCard(mainWindow), true)
+    await setCardOpen(artifactsCard(mainWindow), true)
+
+    await resizeWindow(electronApp, 1100, 500)
+    await mainWindow.waitForTimeout(300)
+
+    // Sub-tasks card has 6 items — must not clip to header-only
+    expect(await cardHeight(subtasksCard(mainWindow))).toBeGreaterThan(60)
+
+    // Panel degrades by scrolling, not clipping
+    const scrollable = await settingsPanel(mainWindow).evaluate(
+      (el) => el.scrollHeight > el.clientHeight
+    )
+    expect(scrollable).toBe(true)
+
+    await resizeWindow(electronApp, 1920, 1200)
+  })
+
+  test.afterAll(async ({ electronApp }) => {
+    await resizeWindow(electronApp, 1920, 1200)
+  })
+
+  test('description full-height mode: sub-tasks + artifacts still expandable', async ({
+    mainWindow
+  }) => {
+    // Repro: after toggling Description "Full height", the handler force-closes
+    // sub-tasks/artifacts. Clicking their headers must still re-open them.
+    await setCardOpen(descriptionCard(mainWindow), true)
+    await setCardOpen(subtasksCard(mainWindow), true)
+    await setCardOpen(artifactsCard(mainWindow), true)
+
+    // Enter full-height mode (force-closes sub-tasks + artifacts)
+    await settingsPanel(mainWindow).getByRole('button', { name: 'Full height' }).click()
+    await expect(subtasksCard(mainWindow)).toHaveAttribute('data-state', 'closed')
+    await expect(artifactsCard(mainWindow)).toHaveAttribute('data-state', 'closed')
+
+    // User clicks the headers — they must expand
+    await setCardOpen(subtasksCard(mainWindow), true)
+    await setCardOpen(artifactsCard(mainWindow), true)
+    expect(await cardHeight(subtasksCard(mainWindow))).toBeGreaterThan(60)
+    expect(await cardHeight(artifactsCard(mainWindow))).toBeGreaterThan(60)
+
+    // Restore default height for later tests
+    await settingsPanel(mainWindow).getByRole('button', { name: 'Default height' }).click()
+  })
+
+  test('full-height mode: Description fills space, opened peers stay capped', async ({
+    mainWindow
+  }) => {
+    await createSubtasks(mainWindow, taskId, projectId, 25)
+    await setCardOpen(descriptionCard(mainWindow), true)
+    await setCardOpen(subtasksCard(mainWindow), false)
+    await setCardOpen(artifactsCard(mainWindow), false)
+
+    await settingsPanel(mainWindow).getByRole('button', { name: 'Full height' }).click()
+
+    // Description fills available space — far taller than the collapsed peers
+    expect(await cardHeight(descriptionCard(mainWindow))).toBeGreaterThan(300)
+
+    // Open sub-tasks (25 items): must cap (fit-content(18rem)), not run away
+    await setCardOpen(subtasksCard(mainWindow), true)
+    const subH = await cardHeight(subtasksCard(mainWindow))
+    expect(subH).toBeGreaterThan(60)
+    expect(subH).toBeLessThanOrEqual(18 * 16 + 2)
+
+    // Description still dominates
+    expect(await cardHeight(descriptionCard(mainWindow))).toBeGreaterThan(subH)
+
+    await settingsPanel(mainWindow).getByRole('button', { name: 'Default height' }).click()
+  })
+
+  test('clicking anywhere on a card header toggles it (not just the chevron)', async ({
+    mainWindow
+  }) => {
+    // Repro: the CollapsibleTrigger only covered the chevron + label, leaving
+    // the rest of the header row as dead space — clicking there did nothing.
+    await setCardOpen(subtasksCard(mainWindow), false)
+    await setCardOpen(artifactsCard(mainWindow), false)
+
+    for (const card of [subtasksCard(mainWindow), artifactsCard(mainWindow)]) {
+      const header = card.locator('[data-slot="collapsible-trigger"]').first()
+      const box = await header.boundingBox()
+      if (!box) throw new Error('no header box')
+      // The header trigger must span the full row width — clicking its
+      // far-right edge (dead space in the old layout) must toggle the card.
+      expect(box.width).toBeGreaterThan(200)
+      await mainWindow.mouse.click(box.x + box.width - 16, box.y + box.height / 2)
+      await expect(card).toHaveAttribute('data-state', 'open', { timeout: 2_000 })
+    }
   })
 
   test('cards grid total does not exceed panel height', async ({ mainWindow }) => {
