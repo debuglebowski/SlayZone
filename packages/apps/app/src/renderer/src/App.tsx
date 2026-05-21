@@ -1828,6 +1828,7 @@ function App(): React.JSX.Element {
 
   const handleProjectDeleted = (): void => {
     if (deletingProject) {
+      if (editingProject?.id === deletingProject.id) closeProjectSettings()
       deleteProject(deletingProject.id, selectedProjectId, setSelectedProjectId)
       useDialogStore.getState().closeDeleteProject()
     }

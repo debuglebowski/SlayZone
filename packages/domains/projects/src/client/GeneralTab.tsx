@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react'
-import { FolderOpen, Upload } from 'lucide-react'
+import { FolderOpen, Upload, Trash2 } from 'lucide-react'
 import { Button, IconButton } from '@slayzone/ui'
 import { Input } from '@slayzone/ui'
 import { Label } from '@slayzone/ui'
 import { ColorPicker } from '@slayzone/ui'
 import type { Project } from '@slayzone/projects/shared'
 import { toSlzFileUrl } from '@slayzone/platform/slz-file-url'
+import { useDialogStore } from '@slayzone/settings/client'
 import { SettingsTabIntro } from './project-settings-shared'
 
 interface GeneralTabProps {
@@ -101,121 +102,142 @@ export function GeneralTab({ project, onUpdated, onChanged, onClose }: GeneralTa
   }
 
   return (
-    <div className="w-full space-y-6">
-      <SettingsTabIntro
-        title="General"
-        description="Configure the project identity and repository defaults."
-      />
-      <form onSubmit={handleSubmit} className="space-y-6">
-        <div className="space-y-1">
-          <Label htmlFor="edit-name">Name</Label>
-          <Input id="edit-name" value={name} onChange={(e) => setName(e.target.value)} />
-        </div>
-        <div className="space-y-1">
-          <Label htmlFor="edit-path">Repository Path</Label>
-          <div className="flex gap-2">
-            <Input
-              id="edit-path"
-              value={path}
-              onChange={(e) => setPath(e.target.value)}
-              placeholder="/path/to/repo"
-              className="flex-1"
-            />
-            <IconButton
-              type="button"
-              variant="outline"
-              aria-label="Browse folder"
-              onClick={handleBrowse}
-            >
-              <FolderOpen className="h-4 w-4" />
-            </IconButton>
+    <div className="flex h-full w-full flex-col">
+      <div className="mb-6 space-y-6">
+        <SettingsTabIntro
+          title="General"
+          description="Configure the project identity and repository defaults."
+        />
+        <form onSubmit={handleSubmit} className="space-y-6">
+          <div className="space-y-1">
+            <Label htmlFor="edit-name">Name</Label>
+            <Input id="edit-name" value={name} onChange={(e) => setName(e.target.value)} />
           </div>
-          <p className="text-xs text-muted-foreground">
-            Claude Code terminal will open in this directory
-          </p>
-        </div>
-        <div className="space-y-1">
-          <Label>Color</Label>
-          <ColorPicker value={color} onChange={setColor} />
-        </div>
-        <div className="space-y-2">
-          <Label>Icon</Label>
-          <div className="flex items-center gap-3">
-            <div
-              className="h-14 w-14 rounded-md flex items-center justify-center overflow-hidden font-semibold text-white shrink-0"
-              style={{ backgroundColor: color }}
-            >
-              {iconImagePath ? (
-                <img
-                  src={toSlzFileUrl(iconImagePath, iconCacheKey)}
-                  alt=""
-                  className="w-full h-full object-cover"
-                  draggable={false}
-                />
-              ) : (
-                <span
-                  className={
-                    lettersPreview.length >= 5
-                      ? 'text-xs'
-                      : lettersPreview.length > 2
-                        ? 'text-sm'
-                        : 'text-base'
-                  }
-                >
-                  {lettersPreview}
-                </span>
-              )}
+          <div className="space-y-1">
+            <Label htmlFor="edit-path">Repository Path</Label>
+            <div className="flex gap-2">
+              <Input
+                id="edit-path"
+                value={path}
+                onChange={(e) => setPath(e.target.value)}
+                placeholder="/path/to/repo"
+                className="flex-1"
+              />
+              <IconButton
+                type="button"
+                variant="outline"
+                aria-label="Browse folder"
+                onClick={handleBrowse}
+              >
+                <FolderOpen className="h-4 w-4" />
+              </IconButton>
             </div>
-            <div className="flex-1 space-y-1">
-              <div className="flex items-center gap-2">
-                {!iconImagePath && (
-                  <Input
-                    id="edit-icon-letters"
-                    value={iconLetters}
-                    maxLength={5}
-                    placeholder={fallbackLetters}
-                    onChange={(e) => setIconLetters(e.target.value)}
-                    className="w-28"
+            <p className="text-xs text-muted-foreground">
+              Claude Code terminal will open in this directory
+            </p>
+          </div>
+          <div className="space-y-1">
+            <Label>Color</Label>
+            <ColorPicker value={color} onChange={setColor} />
+          </div>
+          <div className="space-y-2">
+            <Label>Icon</Label>
+            <div className="flex items-center gap-3">
+              <div
+                className="h-14 w-14 rounded-md flex items-center justify-center overflow-hidden font-semibold text-white shrink-0"
+                style={{ backgroundColor: color }}
+              >
+                {iconImagePath ? (
+                  <img
+                    src={toSlzFileUrl(iconImagePath, iconCacheKey)}
+                    alt=""
+                    className="w-full h-full object-cover"
+                    draggable={false}
                   />
-                )}
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={handleUploadIcon}
-                  disabled={iconBusy}
-                >
-                  <Upload className="h-3.5 w-3.5 mr-1.5" />
-                  {iconImagePath ? 'Upload new image' : 'Upload image'}
-                </Button>
-                {iconImagePath && (
-                  <button
-                    type="button"
-                    onClick={handleRemoveIcon}
-                    disabled={iconBusy}
-                    className="text-xs text-destructive hover:underline disabled:opacity-50"
+                ) : (
+                  <span
+                    className={
+                      lettersPreview.length >= 5
+                        ? 'text-xs'
+                        : lettersPreview.length > 2
+                          ? 'text-sm'
+                          : 'text-base'
+                    }
                   >
-                    Remove
-                  </button>
+                    {lettersPreview}
+                  </span>
                 )}
               </div>
-              <p className="text-xs text-muted-foreground">
-                {iconImagePath
-                  ? 'Remove the image to use initials instead.'
-                  : 'Initials 1–5 chars (empty = derive from name). Upload an image to override.'}
-              </p>
+              <div className="flex-1 space-y-1">
+                <div className="flex items-center gap-2">
+                  {!iconImagePath && (
+                    <Input
+                      id="edit-icon-letters"
+                      value={iconLetters}
+                      maxLength={5}
+                      placeholder={fallbackLetters}
+                      onChange={(e) => setIconLetters(e.target.value)}
+                      className="w-28"
+                    />
+                  )}
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={handleUploadIcon}
+                    disabled={iconBusy}
+                  >
+                    <Upload className="h-3.5 w-3.5 mr-1.5" />
+                    {iconImagePath ? 'Upload new image' : 'Upload image'}
+                  </Button>
+                  {iconImagePath && (
+                    <button
+                      type="button"
+                      onClick={handleRemoveIcon}
+                      disabled={iconBusy}
+                      className="text-xs text-destructive hover:underline disabled:opacity-50"
+                    >
+                      Remove
+                    </button>
+                  )}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  {iconImagePath
+                    ? 'Remove the image to use initials instead.'
+                    : 'Initials 1–5 chars (empty = derive from name). Upload an image to override.'}
+                </p>
+              </div>
             </div>
           </div>
+          <div className="flex justify-end gap-2">
+            <Button type="button" variant="outline" onClick={onClose}>
+              Cancel
+            </Button>
+            <Button type="submit" disabled={!name.trim() || loading}>
+              Save
+            </Button>
+          </div>
+        </form>
+      </div>
+
+      <div className="mt-auto space-y-3 rounded-md border border-destructive/40 p-4">
+        <div className="space-y-1">
+          <h3 className="text-sm font-medium text-destructive">Danger Zone</h3>
+          <p className="text-xs text-muted-foreground">
+            Permanently delete this project and all of its tasks. This action cannot be undone.
+          </p>
         </div>
-        <div className="flex justify-end gap-2">
-          <Button type="button" variant="outline" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button type="submit" disabled={!name.trim() || loading}>
-            Save
-          </Button>
-        </div>
-      </form>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="border-destructive/40 text-destructive hover:text-destructive"
+          onClick={() => useDialogStore.getState().openDeleteProject(project)}
+        >
+          <Trash2 className="h-3.5 w-3.5 mr-1.5" />
+          Delete Project
+        </Button>
+      </div>
     </div>
   )
 }
