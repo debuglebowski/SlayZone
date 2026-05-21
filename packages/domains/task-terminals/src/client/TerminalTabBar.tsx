@@ -52,6 +52,7 @@ export const MODE_ICONS: Partial<Record<TerminalMode, IconComponent>> = {
   'claude-code': ClaudeColor as IconComponent,
   'claude-chat': ClaudeColor as IconComponent,
   codex: CodexColor as IconComponent,
+  'codex-chat': CodexColor as IconComponent,
   'cursor-agent': CursorMono as IconComponent,
   gemini: GeminiColor as IconComponent,
   opencode: OpenCodeMono as IconComponent,

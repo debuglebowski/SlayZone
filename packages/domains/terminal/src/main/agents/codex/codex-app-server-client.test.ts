@@ -170,6 +170,22 @@ async function run(): Promise<void> {
     assert(caught instanceof Error, 'expected rejection')
   })
 
+  await test('a throwing write (dead subprocess stdin) rejects the request', async () => {
+    const client = new CodexAppServerClient({
+      write: () => {
+        throw new Error('EPIPE: write to a closed stream')
+      }
+    })
+    let caught: unknown
+    try {
+      await client.request('initialize')
+    } catch (e) {
+      caught = e
+    }
+    assert(caught instanceof Error, 'a write failure must reject the request promise')
+    assert(String(caught).includes('EPIPE'), 'the underlying write error should propagate')
+  })
+
   console.log(`\n${passed} passed, ${failed} failed`)
   process.exit(failed > 0 ? 1 : 0)
 }
