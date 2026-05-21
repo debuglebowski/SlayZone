@@ -158,6 +158,35 @@ test('split sequence: client-side join + filter catches it', () => {
   assert(joined, 'helloworld', 'joined + filtered strips underline')
 })
 
+// SGR sub-parameter safety — `4` as a color sub-parameter must NOT be stripped.
+// `38`/`48`/`58` followed by `5;<idx>` or `2;<r>;<g>;<b>` consume those tokens as a
+// color spec; a `4` appearing as the index or an RGB component is not SGR underline.
+test('preserves 256-color fg index 4', () => {
+  assert(filterBufferData('\x1b[38;5;4m'), '\x1b[38;5;4m')
+})
+
+test('preserves 256-color bg index 4', () => {
+  assert(filterBufferData('\x1b[48;5;4m'), '\x1b[48;5;4m')
+})
+
+test('preserves underline-color (SGR 58) index 4', () => {
+  assert(filterBufferData('\x1b[58;5;4m'), '\x1b[58;5;4m')
+})
+
+test('preserves RGB fg with component 4', () => {
+  assert(filterBufferData('\x1b[38;2;4;120;200m'), '\x1b[38;2;4;120;200m')
+  assert(filterBufferData('\x1b[38;2;120;4;200m'), '\x1b[38;2;120;4;200m')
+  assert(filterBufferData('\x1b[38;2;4;4;4m'), '\x1b[38;2;4;4;4m')
+})
+
+test('strips standalone underline but keeps color index 4 in same sequence', () => {
+  assert(filterBufferData('\x1b[1;4;38;5;4m'), '\x1b[1;38;5;4m')
+})
+
+test('preserves colon-form extended color with index 4', () => {
+  assert(filterBufferData('\x1b[38:5:4m'), '\x1b[38:5:4m')
+})
+
 console.log('─'.repeat(40))
 console.log(`\n${passed} passed, ${failed} failed\n`)
 process.exit(failed > 0 ? 1 : 0)
