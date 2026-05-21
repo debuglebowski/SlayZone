@@ -39,9 +39,9 @@ playwright-report/
 
 # Performance profiling artifacts
 *.cpuprofile
-working-notes/performance/**/*.json
 
-working-notes/performance/*.json
+# Working notes (scratch)
+working-notes/
 
 # Antigravity CLI local runtime symlinks
 .antigravitycli/
