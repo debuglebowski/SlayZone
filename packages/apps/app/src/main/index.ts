@@ -436,6 +436,7 @@ let discoveryPoller: NodeJS.Timeout | null = null
 let mcpCleanup: (() => void) | null = null
 let trpcCleanup: (() => void) | null = null
 let sidecarCleanup: (() => void) | null = null
+let sidecarServerHandle: import('./sidecar-server-supervisor').SidecarServerHandle | null = null
 let quitDrainComplete = false
 let quitSubprocessCleanupPromise: Promise<void> | null = null
 const QUIT_SUBPROCESS_TERM_GRACE_MS = 1500
@@ -1640,6 +1641,7 @@ app
               )
             }
           })
+          sidecarServerHandle = supervisor
           sidecarCleanup = () => void supervisor.stop()
           logBoot('sidecar server supervisor started')
         })
@@ -2134,6 +2136,22 @@ div{text-align:center}h1{font-size:14px;font-weight:500;color:#aaa}p{font-size:1
         }
         check()
       })
+    })
+    // Read-only side-car (dark-launch) status for the Diagnostics settings tab.
+    ipcMain.handle('app:get-sidecar-status', () => {
+      return (
+        sidecarServerHandle?.getStatus() ?? {
+          health: 'starting' as const,
+          port: null,
+          pid: null,
+          restarts: 0,
+          dbPath: null,
+          uptimeMs: null
+        }
+      )
+    })
+    ipcMain.handle('app:reveal-sidecar-log', () => {
+      shell.showItemInFolder(join(ensureDataRoot(), 'logs', 'sidecar.log'))
     })
     ipcMain.handle('app:is-tests-panel-enabled', () => isLabEnabled('labs_tests_panel'))
     ipcMain.on('app:is-tests-panel-enabled-sync', (event) => {

@@ -36,9 +36,27 @@ export type SidecarServerOpts = {
   onPermanentFailure: (info: { attempts: number; lastError: unknown }) => void
 }
 
+export type SidecarHealth = 'starting' | 'ready' | 'restarting' | 'failed'
+
+export type SidecarStatus = {
+  health: SidecarHealth
+  /** Last known port. Null before the first spawn. */
+  port: number | null
+  /** Current child PID, or null when no child is running. */
+  pid: number | null
+  /** Restart attempts since the last 60s healthy streak. */
+  restarts: number
+  /** Absolute DB path the side-car was told to open. */
+  dbPath: string | null
+  /** Milliseconds the side-car has been continuously healthy, or null. */
+  uptimeMs: number | null
+}
+
 export type SidecarServerHandle = {
   getPort: () => number | null
-  getHealth: () => 'starting' | 'ready' | 'restarting' | 'failed'
+  getHealth: () => SidecarHealth
+  /** Read-only status snapshot for diagnostics UI. */
+  getStatus: () => SidecarStatus
   /** Resolves on first ready; rejects on permanent failure. */
   waitForReady: () => Promise<void>
   stop: () => Promise<void>
@@ -75,7 +93,8 @@ function probeHealth(host: string, port: number): Promise<boolean> {
 export function startSidecarServer(opts: SidecarServerOpts): SidecarServerHandle {
   let child: ChildProcess | null = null
   let port: number | null = null
-  let health: 'starting' | 'ready' | 'restarting' | 'failed' = 'starting'
+  let health: SidecarHealth = 'starting'
+  let readySince: number | null = null
   let attempt = 0
   let stopped = false
   let backoffTimer: NodeJS.Timeout | null = null
@@ -121,6 +140,7 @@ export function startSidecarServer(opts: SidecarServerOpts): SidecarServerHandle
       if (stopped) return
       if (ok) {
         health = 'ready'
+        readySince = Date.now()
         opts.logger(`[supervisor] sidecar ready pid=${child?.pid} port=${port}`)
         opts.onReady({ pid: child?.pid ?? -1, port: port! })
         resolveWaiters()
@@ -185,6 +205,7 @@ export function startSidecarServer(opts: SidecarServerOpts): SidecarServerHandle
         proc.on('exit', (code, signal) => {
           if (child !== proc) return
           child = null
+          readySince = null
           if (stopped) return
           const wasReady = health === 'ready'
           opts.logger(`[supervisor] sidecar exited code=${code} signal=${signal}`)
@@ -210,6 +231,14 @@ export function startSidecarServer(opts: SidecarServerOpts): SidecarServerHandle
   return {
     getPort: () => (health === 'ready' ? port : null),
     getHealth: () => health,
+    getStatus: () => ({
+      health,
+      port,
+      pid: child?.pid ?? null,
+      restarts: attempt,
+      dbPath: opts.env.SLAYZONE_DB_PATH ?? null,
+      uptimeMs: readySince === null ? null : Date.now() - readySince
+    }),
     waitForReady: () =>
       new Promise<void>((resolve, reject) => {
         if (health === 'ready') return resolve()
