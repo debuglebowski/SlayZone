@@ -182,14 +182,19 @@ class CodexChatSession implements ChatSessionDriver {
   private async handshake(ctx: ChatDriverContext): Promise<void> {
     const client = this.client
     if (!client) return
-    await client.request(
-      'initialize',
-      {
-        clientInfo: CLIENT_INFO,
-        capabilities: { experimentalApi: true, requestAttestation: false }
-      },
-      HANDSHAKE_TIMEOUT_MS
-    )
+    try {
+      await client.request(
+        'initialize',
+        {
+          clientInfo: CLIENT_INFO,
+          capabilities: { experimentalApi: true, requestAttestation: false }
+        },
+        HANDSHAKE_TIMEOUT_MS
+      )
+    } catch (err) {
+      this.emitFatalStartError(ctx, err)
+      return
+    }
     client.notify('initialized')
 
     const policy = mapRuntimePolicy(this.mode, ctx.cwd)
@@ -220,16 +225,21 @@ class CodexChatSession implements ChatSessionDriver {
       }
     } else {
       const startModel = codexModelOrUndefined(this.model)
-      resp = await client.request<CodexThreadStartResponse>(
-        'thread/start',
-        {
-          cwd: ctx.cwd,
-          approvalPolicy: policy.approvalPolicy,
-          sandbox: policy.sandboxMode,
-          ...(startModel ? { model: startModel } : {})
-        },
-        HANDSHAKE_TIMEOUT_MS
-      )
+      try {
+        resp = await client.request<CodexThreadStartResponse>(
+          'thread/start',
+          {
+            cwd: ctx.cwd,
+            approvalPolicy: policy.approvalPolicy,
+            sandbox: policy.sandboxMode,
+            ...(startModel ? { model: startModel } : {})
+          },
+          HANDSHAKE_TIMEOUT_MS
+        )
+      } catch (err) {
+        this.emitFatalStartError(ctx, err)
+        return
+      }
     }
 
     this.threadId = resp.thread.id
@@ -247,6 +257,23 @@ class CodexChatSession implements ChatSessionDriver {
     // Flush any messages the user sent before the handshake completed.
     const pending = this.queued.splice(0)
     for (const text of pending) this.startTurn(text)
+  }
+
+  /**
+   * Emit a fatal driver-start error. Unlike a resume failure (recoverable —
+   * the transport respawns fresh), an `initialize` or `thread/start` failure
+   * leaves the session with nowhere to go. `detail.fatal` tells the transport
+   * to tear the session down to its terminal dead state (Retry overlay)
+   * rather than leave it half-alive, silently queueing input that never sends.
+   */
+  private emitFatalStartError(ctx: ChatDriverContext, err: unknown): void {
+    this.emit(ctx, {
+      kind: 'error',
+      message: `Codex failed to start a session: ${
+        err instanceof Error ? err.message : String(err)
+      }`,
+      detail: { phase: 'driver-start', fatal: true }
+    })
   }
 
   handleLine(line: string): void {

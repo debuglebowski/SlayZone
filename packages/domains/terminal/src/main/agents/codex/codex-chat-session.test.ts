@@ -134,6 +134,57 @@ async function run(): Promise<void> {
     )
   })
 
+  await test('a failed fresh thread/start surfaces a fatal error event', async () => {
+    const h = makeHarness()
+    await flush()
+    // initialize succeeds...
+    h.driver.handleLine(JSON.stringify({ id: 1, result: { userAgent: 'x', codexHome: '/h' } }))
+    await flush()
+    // ...but thread/start (id 2) fails.
+    h.driver.handleLine(
+      JSON.stringify({ id: 2, error: { code: -32000, message: 'server overloaded' } })
+    )
+    await flush()
+    const err = h.emitted.find((e) => e.kind === 'error')
+    assert(
+      err !== undefined && err.kind === 'error' && /server overloaded/.test(err.message),
+      'a fresh thread/start failure must surface as an error event, not throw away'
+    )
+    // The fatal marker tells the transport to tear the session down.
+    assert(
+      err!.kind === 'error' && (err!.detail as { fatal?: unknown }).fatal === true,
+      'a handshake failure must be marked detail.fatal'
+    )
+    // It must NOT look like a resume failure — that would trigger a pointless respawn.
+    assert(
+      !h.emitted.some((e) => e.kind === 'stderr'),
+      'a fresh-start failure is not a resume failure'
+    )
+  })
+
+  await test('a failed initialize surfaces a fatal error and sends no thread request', async () => {
+    const h = makeHarness()
+    await flush()
+    // initialize (id 1) fails outright — the handshake cannot even begin.
+    h.driver.handleLine(
+      JSON.stringify({ id: 1, error: { code: -32000, message: 'app-server unavailable' } })
+    )
+    await flush()
+    const err = h.emitted.find((e) => e.kind === 'error')
+    assert(
+      err !== undefined && err.kind === 'error' && /app-server unavailable/.test(err.message),
+      'an initialize failure must surface as an error event'
+    )
+    assert(
+      err!.kind === 'error' && (err!.detail as { fatal?: unknown }).fatal === true,
+      'an initialize failure must be marked detail.fatal'
+    )
+    assert(
+      !h.sent.some((m) => m.method === 'thread/start' || m.method === 'thread/resume'),
+      'no thread request should follow a failed initialize'
+    )
+  })
+
   await test('sendUserMessage issues turn/start with the prompt', async () => {
     const h = makeHarness()
     await handshake(h)
